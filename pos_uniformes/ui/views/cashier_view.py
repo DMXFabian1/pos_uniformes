@@ -1,0 +1,148 @@
+"""Vista principal de la pestaña Caja."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import (
+    QFrame,
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QLabel,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
+)
+
+if TYPE_CHECKING:
+    from pos_uniformes.ui.main_window import MainWindow
+
+
+def build_cashier_tab(window: "MainWindow") -> QWidget:
+    widget = QWidget()
+    layout = QVBoxLayout()
+    layout.setSpacing(8)
+
+    sale_box = QGroupBox("Venta rapida")
+    sale_box.setObjectName("infoCard")
+    sale_layout = QVBoxLayout()
+    sale_layout.setSpacing(5)
+    window.sale_qty_spin.setRange(1, 100)
+    window.sale_sku_input.setPlaceholderText("Escanea o captura el SKU")
+    window.sale_folio_input.setObjectName("readOnlyField")
+    window.sale_client_combo.setObjectName("toolbarSelect")
+    window.sale_payment_combo.clear()
+    window.sale_payment_combo.addItems(["Efectivo", "Tarjeta", "Transferencia", "Mixto"])
+    window.sale_discount_combo.clear()
+    window.sale_discount_combo.addItem("Sin descuento", 0)
+    window.sale_discount_combo.addItem("5%", 5)
+    window.sale_discount_combo.addItem("10%", 10)
+    window.sale_discount_combo.addItem("15%", 15)
+    window.sale_received_spin.setRange(0.0, 999999.99)
+    window.sale_received_spin.setDecimals(2)
+    window.sale_received_spin.setPrefix("$")
+    window.sale_received_spin.setSingleStep(50.0)
+    window.sale_qty_spin.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
+    window.sale_add_button.setText("Agregar")
+    window.sale_add_button.setObjectName("toolbarSecondaryButton")
+    window.sale_add_button.setVisible(False)
+    window.sale_button.setText("Cobrar")
+    window.sale_button.setObjectName("toolbarPrimaryButton")
+    window.sale_layaway_button.setObjectName("toolbarSecondaryButton")
+    window.sale_recent_button.setObjectName("toolbarGhostButton")
+    window.sale_remove_button.setObjectName("toolbarSecondaryButton")
+    window.sale_clear_button.setObjectName("toolbarGhostButton")
+    window.cancel_button.setText("Cancelar venta")
+    window.cancel_button.setObjectName("cashierDangerButton")
+    window.sale_total_label.setObjectName("cashierTotalValue")
+    window.sale_total_meta_label.setObjectName("cashierMetaLabel")
+    window.sale_change_label.setObjectName("cashierChangeValue")
+    window.sale_feedback_label.setObjectName("cashierFeedbackLabel")
+    window._set_sale_feedback("Listo para escanear.", "neutral")
+
+    sale_form = QGridLayout()
+    sale_form.setHorizontalSpacing(6)
+    sale_form.setVerticalSpacing(5)
+    sale_form.addWidget(QLabel("SKU"), 0, 0)
+    sale_form.addWidget(window.sale_sku_input, 0, 1)
+    sale_form.addWidget(QLabel("Cantidad"), 0, 2)
+    sale_form.addWidget(window.sale_qty_spin, 0, 3)
+    sale_form.addWidget(QLabel("Pago"), 0, 4)
+    sale_form.addWidget(window.sale_payment_combo, 0, 5)
+    sale_form.addWidget(QLabel("Desc."), 0, 6)
+    sale_form.addWidget(window.sale_discount_combo, 0, 7)
+    sale_form.addWidget(QLabel("Folio"), 1, 0)
+    sale_form.addWidget(window.sale_folio_input, 1, 1, 1, 2)
+    sale_form.addWidget(QLabel("Cliente"), 1, 3)
+    sale_form.addWidget(window.sale_client_combo, 1, 4, 1, 4)
+    sale_form.setColumnStretch(1, 3)
+    sale_form.setColumnStretch(7, 2)
+    window.sale_received_spin.setVisible(False)
+    window.sale_change_label.setVisible(False)
+    window.sale_add_button.clicked.connect(window._handle_add_sale_item)
+    window.sale_sku_input.returnPressed.connect(window._handle_add_sale_item)
+    window.sale_button.clicked.connect(window._handle_sale)
+    window.sale_discount_combo.currentIndexChanged.connect(window._refresh_sale_cart_table)
+    window.sale_payment_combo.currentTextChanged.connect(window._refresh_payment_fields)
+    window.sale_received_spin.valueChanged.connect(window._refresh_payment_fields)
+    sale_layout.addLayout(sale_form)
+    sale_footer = QHBoxLayout()
+    sale_footer.setSpacing(6)
+    sale_footer.addWidget(window.sale_feedback_label, 1)
+    sale_footer.addStretch()
+    sale_footer.addWidget(window.sale_layaway_button)
+    sale_footer.addWidget(window.sale_button)
+    sale_layout.addLayout(sale_footer)
+    sale_box.setLayout(sale_layout)
+
+    window.recent_sales_table.setColumnCount(7)
+    window.recent_sales_table.setHorizontalHeaderLabels(
+        ["Id", "Folio", "Cliente", "Usuario", "Estado", "Total", "Fecha"]
+    )
+    window.recent_sales_table.setObjectName("dataTable")
+    window.recent_sales_table.verticalHeader().setVisible(False)
+    window.recent_sales_table.setSelectionBehavior(window.recent_sales_table.SelectionBehavior.SelectRows)
+    window.recent_sales_table.setAlternatingRowColors(True)
+
+    cart_box = QGroupBox("Detalle del carrito")
+    cart_box.setObjectName("infoCard")
+    cart_layout = QVBoxLayout()
+    cart_layout.setSpacing(8)
+    window.sale_cart_table.setColumnCount(5)
+    window.sale_cart_table.setHorizontalHeaderLabels(["SKU", "Producto", "Cantidad", "Precio", "Subtotal"])
+    window.sale_cart_table.setObjectName("dataTable")
+    window.sale_cart_table.verticalHeader().setVisible(False)
+    window.sale_cart_table.setSelectionBehavior(window.sale_cart_table.SelectionBehavior.SelectRows)
+    window.sale_cart_table.setAlternatingRowColors(True)
+    window.sale_cart_table.setMinimumHeight(180)
+    window.sale_summary_label.setObjectName("cashierSummaryCard")
+    cart_actions = QHBoxLayout()
+    cart_actions.addWidget(window.sale_remove_button)
+    cart_actions.addWidget(window.sale_clear_button)
+    cart_actions.addStretch()
+    cart_actions.addWidget(window.sale_recent_button)
+    totals_box = QFrame()
+    totals_box.setObjectName("cashierTotalsCard")
+    totals_layout = QVBoxLayout()
+    totals_layout.setContentsMargins(12, 10, 12, 10)
+    totals_layout.setSpacing(2)
+    totals_layout.addWidget(window.sale_total_meta_label)
+    totals_layout.addWidget(window.sale_total_label)
+    totals_box.setLayout(totals_layout)
+    window.sale_remove_button.clicked.connect(window._handle_remove_sale_item)
+    window.sale_clear_button.clicked.connect(window._handle_clear_sale_cart)
+    window.sale_layaway_button.clicked.connect(window._handle_convert_sale_cart_to_layaway)
+    window.sale_recent_button.clicked.connect(window._open_recent_sales_dialog)
+    cart_layout.addWidget(window.sale_cart_table)
+    cart_layout.addLayout(cart_actions)
+    cart_layout.addWidget(totals_box, 0, Qt.AlignmentFlag.AlignRight)
+    cart_layout.addWidget(window.sale_summary_label)
+    cart_box.setLayout(cart_layout)
+
+    layout.addWidget(sale_box)
+    layout.addWidget(cart_box, 1)
+    window._reset_sale_form()
+    widget.setLayout(layout)
+    return widget

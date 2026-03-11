@@ -1,0 +1,17 @@
+{
+  "source": "/Users/danielfabian/Downloads/productos.db",
+  "rows_read": 3468,
+  "max_legacy_sku": 3933,
+  "categories_created": 5,
+  "brands_created": 3,
+  "schools_created": 37,
+  "garment_types_created": 5,
+  "piece_types_created": 20,
+  "education_levels_created": 4,
+  "attributes_created": 23,
+  "product_families_created": 417,
+  "variants_created": 3468,
+  "assets_created": 4495,
+  "stock_movements_created": 827,
+  "duplicated_variant_fallbacks": 10
+}

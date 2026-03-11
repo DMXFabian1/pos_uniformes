@@ -1,0 +1,5 @@
+Alembic esta preparado para futuras migraciones.
+
+Ejemplos:
+- alembic revision --autogenerate -m "crear tablas iniciales"
+- alembic upgrade head
