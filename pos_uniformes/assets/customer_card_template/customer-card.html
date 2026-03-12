@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, initial-scale=1.0" />
+    <title>Credencial de Cliente</title>
+    <link rel="stylesheet" href="./customer-card.css" />
+  </head>
+  <body>
+    <main class="card-shell">
+      <article
+        class="customer-card"
+        data-name-size="{{ name_size }}"
+        style="
+          --primary-color: {{ primary_color }};
+          --secondary-color: {{ secondary_color }};
+        "
+      >
+        <div class="pattern-layer" aria-hidden="true">
+          <span class="pattern-mark pattern-mark-one"></span>
+          <span class="pattern-mark pattern-mark-two"></span>
+          <span class="pattern-mark pattern-mark-three"></span>
+        </div>
+
+        <header class="card-header">
+          <figure class="brand-mark">
+            <img src="{{ logo_path }}" alt="Logo de la tienda" class="brand-logo" />
+          </figure>
+          <p class="brand-caption">Credencial de cliente</p>
+        </header>
+
+        <section class="identity-block" aria-labelledby="customer-name">
+          <p class="section-kicker">Cliente desde</p>
+          <p class="customer-since">{{ customer_since }}</p>
+          <h1 id="customer-name" class="customer-name">{{ full_name }}</h1>
+        </section>
+
+        <aside class="level-seal" aria-label="Nivel de lealtad" data-level="{{ loyalty_level }}">
+          <p class="level-meta">Nivel</p>
+          <strong class="level-label">{{ level_label }}</strong>
+        </aside>
+
+        <section class="qr-section" aria-label="Codigo QR del cliente">
+          <div class="qr-frame">
+            <img src="{{ qr_path }}" alt="QR del cliente" class="qr-image" />
+          </div>
+          <p class="qr-caption">Presenta este codigo al visitarnos</p>
+        </section>
+
+        <footer class="card-footer">
+          <span class="footer-line"></span>
+          <p class="footer-copy">Cliente registrado para beneficios y seguimiento preferente</p>
+        </footer>
+      </article>
+    </main>
+  </body>
+</html>

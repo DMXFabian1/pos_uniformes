@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -13,6 +14,15 @@ from pos_uniformes.database.models import ConfiguracionNegocio, RolUsuario, Usua
 @dataclass(frozen=True)
 class BusinessSettingsInput:
     nombre_negocio: str
+    logo_path: str | None
+    loyalty_review_window_days: int
+    leal_spend_threshold: Decimal
+    leal_purchase_count_threshold: int
+    leal_purchase_sum_threshold: Decimal
+    discount_basico: Decimal
+    discount_leal: Decimal
+    discount_profesor: Decimal
+    discount_mayorista: Decimal
     telefono: str | None
     direccion: str | None
     pie_ticket: str | None
@@ -45,6 +55,14 @@ class BusinessSettingsService:
         if config is None:
             config = ConfiguracionNegocio(
                 nombre_negocio="POS Uniformes",
+                loyalty_review_window_days=365,
+                leal_spend_threshold=Decimal("3000.00"),
+                leal_purchase_count_threshold=3,
+                leal_purchase_sum_threshold=Decimal("2000.00"),
+                discount_basico=Decimal("5.00"),
+                discount_leal=Decimal("10.00"),
+                discount_profesor=Decimal("15.00"),
+                discount_mayorista=Decimal("20.00"),
                 pie_ticket="Gracias por tu compra.",
                 whatsapp_apartado_recordatorio=(
                     "Hola {cliente}, te recordamos tu apartado {folio}. "
@@ -82,9 +100,38 @@ class BusinessSettingsService:
             raise ValueError("El nombre del negocio no puede estar vacio.")
         if payload.copias_ticket < 1 or payload.copias_ticket > 5:
             raise ValueError("Las copias de ticket deben estar entre 1 y 5.")
+        if payload.loyalty_review_window_days < 30 or payload.loyalty_review_window_days > 1095:
+            raise ValueError("La ventana de evaluacion debe estar entre 30 y 1095 dias.")
+        if payload.leal_purchase_count_threshold < 1:
+            raise ValueError("La cantidad minima de compras para LEAL debe ser al menos 1.")
+        for field_name, field_value in {
+            "Monto LEAL": payload.leal_spend_threshold,
+            "Monto acumulado por frecuencia": payload.leal_purchase_sum_threshold,
+        }.items():
+            normalized = Decimal(str(field_value)).quantize(Decimal("0.01"))
+            if normalized < Decimal("0.00") or normalized > Decimal("999999.99"):
+                raise ValueError(f"{field_name} fuera de rango.")
+        for field_name, field_value in {
+            "Descuento BASICO": payload.discount_basico,
+            "Descuento LEAL": payload.discount_leal,
+            "Descuento PROFESOR": payload.discount_profesor,
+            "Descuento MAYORISTA": payload.discount_mayorista,
+        }.items():
+            normalized = Decimal(str(field_value)).quantize(Decimal("0.01"))
+            if normalized < Decimal("0.00") or normalized > Decimal("100.00"):
+                raise ValueError(f"{field_name} debe estar entre 0 y 100.")
 
         config = cls.get_or_create(session)
         config.nombre_negocio = payload.nombre_negocio.strip()
+        config.logo_path = payload.logo_path.strip() if payload.logo_path else None
+        config.loyalty_review_window_days = int(payload.loyalty_review_window_days)
+        config.leal_spend_threshold = Decimal(str(payload.leal_spend_threshold)).quantize(Decimal("0.01"))
+        config.leal_purchase_count_threshold = int(payload.leal_purchase_count_threshold)
+        config.leal_purchase_sum_threshold = Decimal(str(payload.leal_purchase_sum_threshold)).quantize(Decimal("0.01"))
+        config.discount_basico = Decimal(str(payload.discount_basico)).quantize(Decimal("0.01"))
+        config.discount_leal = Decimal(str(payload.discount_leal)).quantize(Decimal("0.01"))
+        config.discount_profesor = Decimal(str(payload.discount_profesor)).quantize(Decimal("0.01"))
+        config.discount_mayorista = Decimal(str(payload.discount_mayorista)).quantize(Decimal("0.01"))
         config.telefono = payload.telefono.strip() if payload.telefono else None
         config.direccion = payload.direccion.strip() if payload.direccion else None
         config.pie_ticket = payload.pie_ticket.strip() if payload.pie_ticket else None

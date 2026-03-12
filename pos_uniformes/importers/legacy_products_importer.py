@@ -19,6 +19,9 @@ from pos_uniformes.database.models import (
     AtributoProducto,
     Categoria,
     Escuela,
+    ImportacionCatalogo,
+    ImportacionCatalogoFila,
+    ImportacionCatalogoIncidencia,
     Marca,
     MovimientoInventario,
     NivelEducativo,
@@ -108,6 +111,14 @@ class LegacyProductsImporter:
         self._assert_safe_destination(session)
         rows = self._read_legacy_rows()
         self._load_legacy_schools()
+        import_batch = ImportacionCatalogo(
+            fuente_nombre=LEGACY_SOURCE,
+            fuente_ruta=str(self.sqlite_path),
+            observaciones="Importacion inicial desde SQLite legacy hacia POS Uniformes.",
+            filas_leidas=len(rows),
+        )
+        session.add(import_batch)
+        session.flush()
 
         categories: dict[str, Categoria] = {}
         brands: dict[str, Marca] = {}
@@ -177,6 +188,7 @@ class LegacyProductsImporter:
                 attribute.nombre if attribute else None,
                 row.genero or None,
             )
+            family_key_serialized = self._serialize_family_key(family_key)
             product = products.get(family_key)
             if product is None:
                 display_name = self._build_product_display_name(
@@ -207,6 +219,8 @@ class LegacyProductsImporter:
                 self._stats["product_families_created"] += 1
 
             variant_key = (int(product.id), size_value, color_value)
+            fallback_product = False
+            duplicate_issue_payload: dict[str, object] | None = None
             if variant_key in variant_keys:
                 product = self._create_duplicate_product_fallback(
                     session=session,
@@ -224,6 +238,16 @@ class LegacyProductsImporter:
                     ubicacion=row.ubicacion or None,
                 )
                 variant_key = (int(product.id), size_value, color_value)
+                fallback_product = True
+                duplicate_issue_payload = {
+                    "sku": row.sku,
+                    "nombre_legacy": row.nombre,
+                    "nombre_base": base_name,
+                    "talla": size_value,
+                    "color": color_value,
+                    "clave_familia": family_key_serialized,
+                    "producto_generado": product.nombre,
+                }
                 self._stats["duplicated_variant_fallbacks"] += 1
 
             variant = Variante(
@@ -246,6 +270,39 @@ class LegacyProductsImporter:
 
             assets_created = self._create_variant_assets(session, variant, row)
             self._stats["assets_created"] += assets_created
+            import_row = ImportacionCatalogoFila(
+                importacion=import_batch,
+                legacy_sku=row.sku,
+                legacy_nombre=row.nombre,
+                legacy_nombre_base=base_name,
+                legacy_talla=size_value,
+                legacy_color=color_value,
+                legacy_precio=row.precio,
+                legacy_inventario=row.inventario,
+                legacy_last_modified=row.last_modified,
+                producto_id=product.id,
+                variante_id=variant.id,
+                producto_fallback=fallback_product,
+                clave_familia=family_key_serialized,
+            )
+            session.add(import_row)
+            session.flush()
+            if duplicate_issue_payload is not None:
+                issue = ImportacionCatalogoIncidencia(
+                    importacion=import_batch,
+                    fila_id=import_row.id,
+                    producto_id=product.id,
+                    variante_id=variant.id,
+                    severidad="WARNING",
+                    tipo="DUPLICATE_VARIANT_FALLBACK",
+                    legacy_sku=row.sku,
+                    descripcion=(
+                        "Se detecto una colision de talla/color dentro de la misma familia y se genero "
+                        "un producto fallback para conservar el SKU legacy."
+                    ),
+                    detalle_json=json.dumps(duplicate_issue_payload, ensure_ascii=True, sort_keys=True),
+                )
+                session.add(issue)
 
             if row.inventario > 0:
                 movement = MovimientoInventario(
@@ -268,8 +325,17 @@ class LegacyProductsImporter:
                 max_legacy_sku = parsed_sku
 
         self._sync_sku_sequence(session, max_legacy_sku)
-        session.commit()
         report_path = self._write_report(rows_count=len(rows), max_legacy_sku=max_legacy_sku)
+        import_batch.familias_creadas = self._stats["product_families_created"]
+        import_batch.variantes_creadas = self._stats["variants_created"]
+        import_batch.assets_creados = self._stats["assets_created"]
+        import_batch.movimientos_stock_creados = self._stats["stock_movements_created"]
+        import_batch.duplicados_fallback = self._stats["duplicated_variant_fallbacks"]
+        import_batch.max_sku_legacy = max_legacy_sku
+        import_batch.reporte_ruta = str(report_path)
+        import_batch.finished_at = datetime.now(tz=LOCAL_TIMEZONE)
+        session.add(import_batch)
+        session.commit()
         return ImportSummary(
             products_read=len(rows),
             categories_created=self._stats["categories_created"],
@@ -391,6 +457,10 @@ class LegacyProductsImporter:
         if sku.startswith("SKU") and sku[3:].isdigit():
             return int(sku[3:])
         return 0
+
+    @staticmethod
+    def _serialize_family_key(family_key: tuple[str, str, str | None, str | None, str | None, str | None, str | None, str | None]) -> str:
+        return " | ".join(part or "-" for part in family_key)
 
     def _build_product_display_name(
         self,

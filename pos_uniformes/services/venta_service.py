@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 
 from pos_uniformes.database.models import Apartado, Cliente, EstadoVenta, RolUsuario, Usuario, Variante, Venta, VentaDetalle
 from pos_uniformes.services.inventario_service import InventarioService
+from pos_uniformes.services.loyalty_service import LoyaltyService
 
 
 @dataclass(frozen=True)
@@ -112,6 +113,14 @@ class VentaService:
         venta.estado = EstadoVenta.CONFIRMADA
         venta.confirmada_at = datetime.now()
         session.add(venta)
+        session.flush()
+        LoyaltyService.refresh_client_level_from_sales(
+            session,
+            venta.cliente,
+            actor_user=venta.usuario,
+            reason="venta_confirmada",
+            reference_time=venta.confirmada_at,
+        )
         return venta
 
     @staticmethod
@@ -149,6 +158,14 @@ class VentaService:
         venta.subtotal = total
         venta.total = total
         session.add(venta)
+        session.flush()
+        LoyaltyService.refresh_client_level_from_sales(
+            session,
+            venta.cliente,
+            actor_user=usuario,
+            reason="venta_confirmada_apartado",
+            reference_time=venta.confirmada_at,
+        )
         return venta
 
     @staticmethod
@@ -183,4 +200,12 @@ class VentaService:
             venta.observacion = observacion
 
         session.add(venta)
+        session.flush()
+        LoyaltyService.refresh_client_level_from_sales(
+            session,
+            venta.cliente,
+            actor_user=admin_usuario,
+            reason="venta_cancelada",
+            reference_time=datetime.now(),
+        )
         return venta

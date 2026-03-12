@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QVBoxLayout,
+    QWidget,
 )
 
 if TYPE_CHECKING:
@@ -145,12 +146,13 @@ def build_clients_settings_dialog(window: "MainWindow") -> QDialog:
     )
     window.settings_clients_status_label.setObjectName("analyticsLine")
     actions = QHBoxLayout()
-    window.settings_clients_search_input.setPlaceholderText("Buscar por codigo, nombre, telefono, correo, direccion o notas")
+    window.settings_clients_search_input.setPlaceholderText("Buscar por codigo, nombre, telefono, tipo, nivel o notas")
     window.settings_create_client_button.setObjectName("toolbarPrimaryButton")
     window.settings_update_client_button.setObjectName("toolbarSecondaryButton")
     window.settings_toggle_client_button.setObjectName("toolbarGhostButton")
     window.settings_generate_client_qr_button.setObjectName("toolbarSecondaryButton")
     window.settings_client_whatsapp_button.setObjectName("toolbarGhostButton")
+    window.settings_client_whatsapp_button.setText("WhatsApp + credencial")
     window.settings_clients_search_input.textChanged.connect(window._refresh_settings_clients)
     window.settings_create_client_button.clicked.connect(window._handle_create_client)
     window.settings_update_client_button.clicked.connect(window._handle_update_client)
@@ -165,9 +167,9 @@ def build_clients_settings_dialog(window: "MainWindow") -> QDialog:
     actions.addWidget(window.settings_generate_client_qr_button)
     actions.addWidget(window.settings_client_whatsapp_button)
 
-    window.settings_clients_table.setColumnCount(9)
+    window.settings_clients_table.setColumnCount(11)
     window.settings_clients_table.setHorizontalHeaderLabels(
-        ["Codigo", "Cliente", "Telefono", "Correo", "Direccion", "Notas", "QR", "Estado", "Actualizado"]
+        ["Codigo", "Cliente", "Tipo", "Nivel", "Desc.", "Telefono", "Notas", "QR", "Credencial", "Estado", "Actualizado"]
     )
     window.settings_clients_table.setObjectName("dataTable")
     window.settings_clients_table.verticalHeader().setVisible(False)
@@ -266,6 +268,11 @@ def build_business_settings_dialog(window: "MainWindow") -> QDialog:
     form_box.setObjectName("infoCard")
     form = QFormLayout()
     window.settings_business_name_input.setPlaceholderText("Nombre comercial")
+    window.settings_business_logo_input.setPlaceholderText("Ruta del logo para credenciales")
+    window.settings_business_logo_input.setReadOnly(True)
+    window.settings_business_logo_preview_label.setFixedSize(220, 120)
+    window.settings_business_logo_preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    window.settings_business_logo_preview_label.setObjectName("infoCard")
     window.settings_business_phone_input.setPlaceholderText("Telefono")
     window.settings_business_address_input.setPlaceholderText("Direccion visible en ticket")
     window.settings_business_address_input.setMinimumHeight(80)
@@ -281,7 +288,22 @@ def build_business_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_business_printer_combo.addItem("Preguntar siempre", "")
     for printer in QPrinterInfo.availablePrinters():
         window.settings_business_printer_combo.addItem(printer.printerName(), printer.printerName())
+    logo_row = QHBoxLayout()
+    logo_row.addWidget(window.settings_business_logo_input)
+    logo_row.addWidget(window.settings_business_logo_pick_button)
+    logo_row.addWidget(window.settings_business_logo_clear_button)
+    logo_widget = QWidget()
+    logo_widget.setLayout(logo_row)
+    logo_preview_box = QVBoxLayout()
+    logo_preview_box.setSpacing(8)
+    logo_preview_box.addWidget(logo_widget)
+    logo_preview_box.addWidget(window.settings_business_logo_preview_label, 0, Qt.AlignmentFlag.AlignLeft)
+    logo_preview_widget = QWidget()
+    logo_preview_widget.setLayout(logo_preview_box)
+    window.settings_business_logo_pick_button.clicked.connect(window._handle_select_business_logo)
+    window.settings_business_logo_clear_button.clicked.connect(window._handle_clear_business_logo)
     form.addRow("Negocio", window.settings_business_name_input)
+    form.addRow("Logo credencial", logo_preview_widget)
     form.addRow("Telefono", window.settings_business_phone_input)
     form.addRow("Direccion", window.settings_business_address_input)
     form.addRow("Pie ticket", window.settings_business_footer_input)
@@ -293,13 +315,106 @@ def build_business_settings_dialog(window: "MainWindow") -> QDialog:
     form.addRow("Copias", window.settings_business_copies_spin)
     form_box.setLayout(form)
     window.settings_business_save_button.setObjectName("toolbarPrimaryButton")
+    window.settings_business_demo_button.setObjectName("toolbarSecondaryButton")
     window.settings_business_save_button.clicked.connect(window._handle_save_business_settings)
+    window.settings_business_demo_button.clicked.connect(window._handle_preview_business_card)
     close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
     close_buttons.rejected.connect(dialog.reject)
     close_buttons.accepted.connect(dialog.accept)
     layout.addWidget(window.settings_business_status_label)
     layout.addWidget(form_box)
-    layout.addWidget(window.settings_business_save_button, 0, Qt.AlignmentFlag.AlignRight)
+    actions = QHBoxLayout()
+    actions.addWidget(window.settings_business_demo_button)
+    actions.addWidget(window.settings_business_save_button)
+    actions.addStretch()
+    layout.addLayout(actions)
+    layout.addWidget(close_buttons)
+    return dialog
+
+
+def build_marketing_settings_dialog(window: "MainWindow") -> QDialog:
+    dialog, layout = _create_settings_dialog(
+        window,
+        "Marketing y promociones",
+        "Configura reglas automaticas de lealtad, descuentos por nivel y recalculo masivo de clientes.",
+        width=720,
+    )
+    window.settings_marketing_status_label.setObjectName("analyticsLine")
+    rules_box = QGroupBox("Reglas de lealtad")
+    rules_box.setObjectName("infoCard")
+    rules_form = QFormLayout()
+    for money_spin in (
+        window.settings_marketing_leal_spend_spin,
+        window.settings_marketing_leal_purchase_sum_spin,
+        window.settings_marketing_discount_basico_spin,
+        window.settings_marketing_discount_leal_spin,
+        window.settings_marketing_discount_profesor_spin,
+        window.settings_marketing_discount_mayorista_spin,
+    ):
+        money_spin.setRange(0.0, 999999.99)
+        money_spin.setDecimals(2)
+        money_spin.setSingleStep(5.0)
+    for percent_spin in (
+        window.settings_marketing_discount_basico_spin,
+        window.settings_marketing_discount_leal_spin,
+        window.settings_marketing_discount_profesor_spin,
+        window.settings_marketing_discount_mayorista_spin,
+    ):
+        percent_spin.setSuffix("%")
+        percent_spin.setRange(0.0, 100.0)
+    window.settings_marketing_leal_spend_spin.setPrefix("$")
+    window.settings_marketing_leal_purchase_sum_spin.setPrefix("$")
+    window.settings_marketing_review_days_spin.setRange(30, 1095)
+    window.settings_marketing_review_days_spin.setSingleStep(30)
+    window.settings_marketing_leal_purchase_count_spin.setRange(1, 50)
+    rules_form.addRow("Ventana evaluacion (dias)", window.settings_marketing_review_days_spin)
+    rules_form.addRow("Monto para subir a LEAL", window.settings_marketing_leal_spend_spin)
+    rules_form.addRow("Compras minimas para LEAL", window.settings_marketing_leal_purchase_count_spin)
+    rules_form.addRow("Monto acumulado por frecuencia", window.settings_marketing_leal_purchase_sum_spin)
+    rules_box.setLayout(rules_form)
+
+    discounts_box = QGroupBox("Descuentos por nivel")
+    discounts_box.setObjectName("infoCard")
+    discounts_form = QFormLayout()
+    discounts_form.addRow("BASICO", window.settings_marketing_discount_basico_spin)
+    discounts_form.addRow("LEAL", window.settings_marketing_discount_leal_spin)
+    discounts_form.addRow("PROFESOR", window.settings_marketing_discount_profesor_spin)
+    discounts_form.addRow("MAYORISTA", window.settings_marketing_discount_mayorista_spin)
+    discounts_box.setLayout(discounts_form)
+
+    note = QLabel(
+        "PROFESOR y MAYORISTA siguen siendo niveles asignados manualmente. "
+        "Las reglas automaticas solo aplican a la transicion BASICO <-> LEAL."
+    )
+    note.setWordWrap(True)
+    note.setObjectName("subtleLine")
+    summary_box = QGroupBox("Resumen actual")
+    summary_box.setObjectName("infoCard")
+    summary_layout = QVBoxLayout()
+    window.settings_marketing_summary_label.setWordWrap(True)
+    window.settings_marketing_summary_label.setObjectName("subtleLine")
+    summary_layout.addWidget(window.settings_marketing_summary_label)
+    summary_box.setLayout(summary_layout)
+
+    window.settings_marketing_save_button.setObjectName("toolbarPrimaryButton")
+    window.settings_marketing_recalculate_button.setObjectName("toolbarSecondaryButton")
+    window.settings_marketing_save_button.clicked.connect(window._handle_save_marketing_settings)
+    window.settings_marketing_recalculate_button.clicked.connect(window._handle_recalculate_loyalty_levels)
+
+    actions = QHBoxLayout()
+    actions.addWidget(window.settings_marketing_recalculate_button)
+    actions.addWidget(window.settings_marketing_save_button)
+    actions.addStretch()
+
+    close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+    close_buttons.rejected.connect(dialog.reject)
+    close_buttons.accepted.connect(dialog.accept)
+    layout.addWidget(window.settings_marketing_status_label)
+    layout.addWidget(rules_box)
+    layout.addWidget(discounts_box)
+    layout.addWidget(summary_box)
+    layout.addWidget(note)
+    layout.addLayout(actions)
     layout.addWidget(close_buttons)
     return dialog
 

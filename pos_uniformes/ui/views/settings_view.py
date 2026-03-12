@@ -43,6 +43,12 @@ def build_settings_tab(window: "MainWindow") -> QWidget:
             window._open_clients_settings_dialog,
         ),
         (
+            window.settings_marketing_button,
+            "Define reglas de lealtad, descuentos por nivel y promociones configurables.",
+            QStyle.StandardPixmap.SP_DialogApplyButton,
+            window._open_marketing_settings_dialog,
+        ),
+        (
             window.settings_whatsapp_button,
             "Configura plantillas de mensajes para clientes y apartados.",
             QStyle.StandardPixmap.SP_MessageBoxInformation,

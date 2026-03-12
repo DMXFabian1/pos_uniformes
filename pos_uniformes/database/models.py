@@ -28,6 +28,19 @@ class RolUsuario(str, Enum):
     CAJERO = "CAJERO"
 
 
+class TipoCliente(str, Enum):
+    GENERAL = "GENERAL"
+    PROFESOR = "PROFESOR"
+    MAYORISTA = "MAYORISTA"
+
+
+class NivelLealtad(str, Enum):
+    BASICO = "BASICO"
+    LEAL = "LEAL"
+    PROFESOR = "PROFESOR"
+    MAYORISTA = "MAYORISTA"
+
+
 class EstadoCompra(str, Enum):
     BORRADOR = "BORRADOR"
     CONFIRMADA = "CONFIRMADA"
@@ -45,6 +58,13 @@ class EstadoApartado(str, Enum):
     LIQUIDADO = "LIQUIDADO"
     ENTREGADO = "ENTREGADO"
     CANCELADO = "CANCELADO"
+
+
+class EstadoPresupuesto(str, Enum):
+    BORRADOR = "BORRADOR"
+    EMITIDO = "EMITIDO"
+    CANCELADO = "CANCELADO"
+    CONVERTIDO = "CONVERTIDO"
 
 
 class TipoEntidadCatalogo(str, Enum):
@@ -124,6 +144,7 @@ class Usuario(Base):
     )
     movimientos_caja: Mapped[list["MovimientoCaja"]] = relationship(back_populates="usuario")
     cambios_catalogo: Mapped[list["CambioCatalogo"]] = relationship(back_populates="usuario")
+    presupuestos: Mapped[list["Presupuesto"]] = relationship(back_populates="usuario")
 
 
 class ConfiguracionNegocio(Base):
@@ -131,6 +152,19 @@ class ConfiguracionNegocio(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     nombre_negocio: Mapped[str] = mapped_column(String(160), nullable=False, default="POS Uniformes")
+    logo_path: Mapped[str | None] = mapped_column(Text())
+    loyalty_review_window_days: Mapped[int] = mapped_column(Integer, nullable=False, default=365)
+    leal_spend_threshold: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("3000.00"))
+    leal_purchase_count_threshold: Mapped[int] = mapped_column(Integer, nullable=False, default=3)
+    leal_purchase_sum_threshold: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2),
+        nullable=False,
+        default=Decimal("2000.00"),
+    )
+    discount_basico: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("5.00"))
+    discount_leal: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("10.00"))
+    discount_profesor: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("15.00"))
+    discount_mayorista: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("20.00"))
     telefono: Mapped[str | None] = mapped_column(String(40))
     direccion: Mapped[str | None] = mapped_column(Text())
     pie_ticket: Mapped[str | None] = mapped_column(Text())
@@ -247,9 +281,29 @@ class Cliente(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     codigo_cliente: Mapped[str] = mapped_column(String(30), nullable=False, unique=True, index=True)
     nombre: Mapped[str] = mapped_column(String(150), nullable=False, index=True)
+    tipo_cliente: Mapped[TipoCliente] = mapped_column(
+        SqlEnum(TipoCliente, name="tipo_cliente"),
+        default=TipoCliente.GENERAL,
+        nullable=False,
+        index=True,
+    )
+    descuento_preferente: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("0.00"), nullable=False)
+    nivel_lealtad: Mapped[NivelLealtad] = mapped_column(
+        SqlEnum(NivelLealtad, name="nivel_lealtad"),
+        default=NivelLealtad.BASICO,
+        nullable=False,
+        index=True,
+    )
     telefono: Mapped[str | None] = mapped_column(String(40), index=True)
-    email: Mapped[str | None] = mapped_column(String(120))
-    direccion: Mapped[str | None] = mapped_column(Text())
+    cliente_desde: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    nivel_asignado_por_user_id: Mapped[int | None] = mapped_column(ForeignKey("usuario.id"), index=True)
+    nivel_asignado_por_rol: Mapped[str | None] = mapped_column(String(20))
+    nivel_asignacion_motivo: Mapped[str | None] = mapped_column(String(255))
+    card_image_path: Mapped[str | None] = mapped_column(Text())
     notas: Mapped[str | None] = mapped_column(Text())
     activo: Mapped[bool] = mapped_column(default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
@@ -266,6 +320,7 @@ class Cliente(Base):
 
     apartados: Mapped[list["Apartado"]] = relationship(back_populates="cliente")
     ventas: Mapped[list["Venta"]] = relationship(back_populates="cliente")
+    presupuestos: Mapped[list["Presupuesto"]] = relationship(back_populates="cliente")
 
 
 class Categoria(Base):
@@ -583,6 +638,7 @@ class Variante(Base):
     compras_detalle: Mapped[list["CompraDetalle"]] = relationship(back_populates="variante")
     ventas_detalle: Mapped[list["VentaDetalle"]] = relationship(back_populates="variante")
     apartados_detalle: Mapped[list["ApartadoDetalle"]] = relationship(back_populates="variante")
+    presupuestos_detalle: Mapped[list["PresupuestoDetalle"]] = relationship(back_populates="variante")
     assets: Mapped[list["ProductoAsset"]] = relationship(
         back_populates="variante",
         cascade="all, delete-orphan",
@@ -622,6 +678,181 @@ class ProductoAsset(Base):
     )
 
     variante: Mapped["Variante"] = relationship(back_populates="assets")
+
+
+class ImportacionCatalogo(Base):
+    __tablename__ = "importacion_catalogo"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    fuente_nombre: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    fuente_ruta: Mapped[str] = mapped_column(Text(), nullable=False)
+    reporte_ruta: Mapped[str | None] = mapped_column(Text())
+    filas_leidas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    familias_creadas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    variantes_creadas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    assets_creados: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    movimientos_stock_creados: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    duplicados_fallback: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    max_sku_legacy: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    observaciones: Mapped[str | None] = mapped_column(Text())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True,
+    )
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+
+    filas: Mapped[list["ImportacionCatalogoFila"]] = relationship(
+        back_populates="importacion",
+        cascade="all, delete-orphan",
+    )
+    incidencias: Mapped[list["ImportacionCatalogoIncidencia"]] = relationship(
+        back_populates="importacion",
+        cascade="all, delete-orphan",
+    )
+
+
+class ImportacionCatalogoFila(Base):
+    __tablename__ = "importacion_catalogo_fila"
+    __table_args__ = (
+        UniqueConstraint("importacion_id", "legacy_sku", name="importacion_catalogo_fila_sku_unico"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    importacion_id: Mapped[int] = mapped_column(
+        ForeignKey("importacion_catalogo.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    legacy_sku: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    legacy_nombre: Mapped[str] = mapped_column(String(220), nullable=False)
+    legacy_nombre_base: Mapped[str] = mapped_column(String(150), nullable=False, index=True)
+    legacy_talla: Mapped[str] = mapped_column(String(30), nullable=False)
+    legacy_color: Mapped[str] = mapped_column(String(50), nullable=False)
+    legacy_precio: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    legacy_inventario: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    legacy_last_modified: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    producto_id: Mapped[int | None] = mapped_column(ForeignKey("producto.id", ondelete="SET NULL"), index=True)
+    variante_id: Mapped[int | None] = mapped_column(ForeignKey("variante.id", ondelete="SET NULL"), index=True)
+    producto_fallback: Mapped[bool] = mapped_column(default=False, nullable=False, index=True)
+    clave_familia: Mapped[str | None] = mapped_column(Text())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    importacion: Mapped["ImportacionCatalogo"] = relationship(back_populates="filas")
+
+
+class ImportacionCatalogoIncidencia(Base):
+    __tablename__ = "importacion_catalogo_incidencia"
+    __table_args__ = (
+        CheckConstraint(
+            "severidad IN ('INFO', 'WARNING', 'ERROR')",
+            name="importacion_catalogo_incidencia_severidad_valida",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    importacion_id: Mapped[int] = mapped_column(
+        ForeignKey("importacion_catalogo.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    fila_id: Mapped[int | None] = mapped_column(
+        ForeignKey("importacion_catalogo_fila.id", ondelete="SET NULL"),
+        index=True,
+    )
+    producto_id: Mapped[int | None] = mapped_column(ForeignKey("producto.id", ondelete="SET NULL"), index=True)
+    variante_id: Mapped[int | None] = mapped_column(ForeignKey("variante.id", ondelete="SET NULL"), index=True)
+    severidad: Mapped[str] = mapped_column(String(20), nullable=False, default="WARNING", index=True)
+    tipo: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    legacy_sku: Mapped[str | None] = mapped_column(String(64), index=True)
+    descripcion: Mapped[str] = mapped_column(Text(), nullable=False)
+    detalle_json: Mapped[str | None] = mapped_column(Text())
+    resuelta: Mapped[bool] = mapped_column(default=False, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True,
+    )
+
+    importacion: Mapped["ImportacionCatalogo"] = relationship(back_populates="incidencias")
+
+
+class AjusteInventarioLote(Base):
+    __tablename__ = "ajuste_inventario_lote"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(
+        ForeignKey("usuario.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    tipo_fuente: Mapped[str] = mapped_column(String(30), nullable=False, default="SELECCION")
+    tipo_ajuste: Mapped[str] = mapped_column(String(30), nullable=False, default="STOCK_FINAL")
+    referencia: Mapped[str] = mapped_column(String(120), nullable=False, index=True)
+    motivo: Mapped[str] = mapped_column(String(160), nullable=False)
+    observacion: Mapped[str | None] = mapped_column(Text())
+    total_filas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    filas_validas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    filas_error: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    unidades_positivas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    unidades_negativas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True,
+    )
+
+    usuario: Mapped["Usuario"] = relationship()
+    detalles: Mapped[list["AjusteInventarioLoteDetalle"]] = relationship(
+        back_populates="lote",
+        cascade="all, delete-orphan",
+    )
+
+
+class AjusteInventarioLoteDetalle(Base):
+    __tablename__ = "ajuste_inventario_lote_detalle"
+    __table_args__ = (
+        CheckConstraint(
+            "estado IN ('VALIDO', 'ERROR', 'SIN_CAMBIOS')",
+            name="ajuste_inventario_lote_detalle_estado_valido",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    lote_id: Mapped[int] = mapped_column(
+        ForeignKey("ajuste_inventario_lote.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    variante_id: Mapped[int] = mapped_column(
+        ForeignKey("variante.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    sku_snapshot: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    stock_anterior: Mapped[int] = mapped_column(Integer, nullable=False)
+    apartado_comprometido: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    valor_capturado: Mapped[int] = mapped_column(Integer, nullable=False)
+    delta_aplicado: Mapped[int] = mapped_column(Integer, nullable=False)
+    stock_final: Mapped[int] = mapped_column(Integer, nullable=False)
+    estado: Mapped[str] = mapped_column(String(20), nullable=False, default="VALIDO", index=True)
+    mensaje: Mapped[str | None] = mapped_column(Text())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True,
+    )
+
+    lote: Mapped["AjusteInventarioLote"] = relationship(back_populates="detalles")
+    variante: Mapped["Variante"] = relationship()
 
 
 class MovimientoInventario(Base):
@@ -784,6 +1015,86 @@ class Venta(Base):
         back_populates="venta",
         cascade="all, delete-orphan",
     )
+
+
+class Presupuesto(Base):
+    __tablename__ = "presupuesto"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(
+        ForeignKey("usuario.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    cliente_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cliente.id", ondelete="SET NULL"),
+        index=True,
+    )
+    folio: Mapped[str] = mapped_column(String(40), unique=True, nullable=False, index=True)
+    cliente_nombre: Mapped[str | None] = mapped_column(String(150), index=True)
+    cliente_telefono: Mapped[str | None] = mapped_column(String(40))
+    estado: Mapped[EstadoPresupuesto] = mapped_column(
+        SqlEnum(EstadoPresupuesto, name="estado_presupuesto"),
+        default=EstadoPresupuesto.BORRADOR,
+        nullable=False,
+        index=True,
+    )
+    subtotal: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
+    total: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
+    vigencia_hasta: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    observacion: Mapped[str | None] = mapped_column(Text())
+    emitido_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cancelado_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    convertido_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    usuario: Mapped["Usuario"] = relationship(back_populates="presupuestos")
+    cliente: Mapped["Cliente | None"] = relationship(back_populates="presupuestos")
+    detalles: Mapped[list["PresupuestoDetalle"]] = relationship(
+        back_populates="presupuesto",
+        cascade="all, delete-orphan",
+    )
+
+
+class PresupuestoDetalle(Base):
+    __tablename__ = "presupuesto_detalle"
+    __table_args__ = (
+        CheckConstraint("cantidad > 0", name="presupuesto_detalle_cantidad_positiva"),
+        CheckConstraint("precio_unitario >= 0", name="presupuesto_detalle_precio_unitario_no_negativo"),
+        UniqueConstraint("presupuesto_id", "sku_snapshot", name="presupuesto_detalle_sku_unico"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    presupuesto_id: Mapped[int] = mapped_column(
+        ForeignKey("presupuesto.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    variante_id: Mapped[int | None] = mapped_column(
+        ForeignKey("variante.id", ondelete="SET NULL"),
+        index=True,
+    )
+    sku_snapshot: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    descripcion_snapshot: Mapped[str] = mapped_column(String(220), nullable=False)
+    talla_snapshot: Mapped[str | None] = mapped_column(String(30))
+    color_snapshot: Mapped[str | None] = mapped_column(String(50))
+    precio_unitario: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
+    cantidad: Mapped[int] = mapped_column(Integer, nullable=False)
+    subtotal_linea: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+
+    presupuesto: Mapped["Presupuesto"] = relationship(back_populates="detalles")
+    variante: Mapped["Variante | None"] = relationship(back_populates="presupuestos_detalle")
 
 
 class VentaDetalle(Base):

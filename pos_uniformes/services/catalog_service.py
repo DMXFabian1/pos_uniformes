@@ -8,15 +8,20 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from pos_uniformes.database.models import (
+    AtributoProducto,
     Categoria,
     CompraDetalle,
+    Escuela,
     Marca,
     MovimientoInventario,
+    NivelEducativo,
     Producto,
     RolUsuario,
     SkuSequence,
+    TipoPieza,
     TipoCambioCatalogo,
     TipoEntidadCatalogo,
+    TipoPrenda,
     Usuario,
     Variante,
     VentaDetalle,
@@ -31,6 +36,32 @@ class CatalogService:
     SKU_SEQUENCE_CODE = "VARIANTE"
     SKU_PREFIX = "SKU"
     SKU_PADDING = 6
+
+    @staticmethod
+    def _optional_name(value: object | None) -> str | None:
+        return getattr(value, "nombre", None) if value is not None else None
+
+    @classmethod
+    def _build_product_display_name(
+        cls,
+        *,
+        base_name: str,
+        school: Escuela | None = None,
+        garment_type: TipoPrenda | None = None,
+        piece_type: TipoPieza | None = None,
+    ) -> str:
+        suffix_parts = [
+            part
+            for part in (
+                cls._optional_name(school),
+                cls._optional_name(garment_type),
+                cls._optional_name(piece_type),
+            )
+            if part
+        ]
+        if not suffix_parts:
+            return base_name
+        return f"{base_name} | {' | '.join(suffix_parts)}"
 
     @staticmethod
     def _descripcion_categoria(categoria: Categoria) -> str:
@@ -105,6 +136,7 @@ class CatalogService:
         valores_anteriores: dict[str, object | None],
         valores_nuevos: dict[str, object | None],
         accion_por_campo: dict[str, TipoCambioCatalogo] | None = None,
+        observacion: str | None = None,
     ) -> None:
         for campo, valor_anterior in valores_anteriores.items():
             valor_nuevo = valores_nuevos.get(campo)
@@ -121,7 +153,13 @@ class CatalogService:
                 valor_anterior=valor_anterior,
                 valor_nuevo=valor_nuevo,
                 descripcion_entidad=descripcion_entidad,
+                observacion=observacion,
             )
+
+    @staticmethod
+    def _money(value: Decimal | int | float | str | None) -> Decimal:
+        normalized = Decimal("0.00") if value is None else Decimal(str(value))
+        return normalized.quantize(Decimal("0.01"))
 
     @staticmethod
     def _parse_legacy_sku_number(sku: str) -> int | None:
@@ -161,6 +199,16 @@ class CatalogService:
         return sequence
 
     @classmethod
+    def _sync_sequence_with_manual_sku(cls, session: Session, sku: str) -> None:
+        parsed = cls._parse_legacy_sku_number(sku)
+        if parsed is None:
+            return
+        sequence = cls._get_or_create_sku_sequence(session)
+        if parsed > int(sequence.ultimo_numero):
+            sequence.ultimo_numero = parsed
+            session.add(sequence)
+
+    @classmethod
     def generar_sku_sugerido(
         cls,
         session: Session,
@@ -180,8 +228,6 @@ class CatalogService:
                 statement = statement.where(Variante.id != excluding_variant_id)
             existing = session.scalar(statement)
             if existing is None:
-                sequence.ultimo_numero = next_number
-                session.add(sequence)
                 return candidate
             next_number += 1
 
@@ -197,14 +243,17 @@ class CatalogService:
     ) -> str:
         normalized = (sku or "").strip().upper()
         if normalized:
+            cls._sync_sequence_with_manual_sku(session, normalized)
             return normalized
-        return cls.generar_sku_sugerido(
+        generated = cls.generar_sku_sugerido(
             session=session,
             producto=producto,
             talla=talla,
             color=color,
             excluding_variant_id=excluding_variant_id,
         )
+        cls._sync_sequence_with_manual_sku(session, generated)
+        return generated
 
     @staticmethod
     def _validar_admin(usuario: Usuario) -> None:
@@ -282,15 +331,29 @@ class CatalogService:
         marca: Marca,
         nombre: str,
         descripcion: str | None = None,
+        escuela: Escuela | None = None,
+        tipo_prenda: TipoPrenda | None = None,
+        tipo_pieza: TipoPieza | None = None,
+        nivel_educativo: NivelEducativo | None = None,
+        atributo: AtributoProducto | None = None,
+        genero: str | None = None,
+        escudo: str | None = None,
+        ubicacion: str | None = None,
     ) -> Producto:
         cls._validar_admin(usuario)
-        nombre = nombre.strip()
-        if not nombre:
+        nombre_base = nombre.strip()
+        if not nombre_base:
             raise ValueError("El nombre del producto es obligatorio.")
+        display_name = cls._build_product_display_name(
+            base_name=nombre_base,
+            school=escuela,
+            garment_type=tipo_prenda,
+            piece_type=tipo_pieza,
+        )
 
         existente = session.scalar(
             select(Producto).where(
-                Producto.nombre == nombre,
+                Producto.nombre == display_name,
                 Producto.marca_id == marca.id,
             )
         )
@@ -300,8 +363,16 @@ class CatalogService:
         producto = Producto(
             categoria=categoria,
             marca=marca,
-            nombre=nombre,
-            nombre_base=nombre,
+            nombre=display_name,
+            nombre_base=nombre_base,
+            escuela=escuela,
+            tipo_prenda=tipo_prenda,
+            tipo_pieza=tipo_pieza,
+            nivel_educativo=nivel_educativo,
+            atributo=atributo,
+            genero=(genero or "").strip() or None,
+            escudo=(escudo or "").strip() or None,
+            ubicacion=(ubicacion or "").strip() or None,
             descripcion=descripcion or None,
         )
         session.add(producto)
@@ -326,16 +397,30 @@ class CatalogService:
         marca: Marca,
         nombre: str,
         descripcion: str | None = None,
+        escuela: Escuela | None = None,
+        tipo_prenda: TipoPrenda | None = None,
+        tipo_pieza: TipoPieza | None = None,
+        nivel_educativo: NivelEducativo | None = None,
+        atributo: AtributoProducto | None = None,
+        genero: str | None = None,
+        escudo: str | None = None,
+        ubicacion: str | None = None,
     ) -> Producto:
         cls._validar_admin(usuario)
-        nombre = nombre.strip()
-        if not nombre:
+        nombre_base = nombre.strip()
+        if not nombre_base:
             raise ValueError("El nombre del producto es obligatorio.")
+        display_name = cls._build_product_display_name(
+            base_name=nombre_base,
+            school=escuela,
+            garment_type=tipo_prenda,
+            piece_type=tipo_pieza,
+        )
 
         existente = session.scalar(
             select(Producto).where(
                 Producto.id != producto.id,
-                Producto.nombre == nombre,
+                Producto.nombre == display_name,
                 Producto.marca_id == marca.id,
             )
         )
@@ -345,13 +430,30 @@ class CatalogService:
         valores_anteriores = {
             "categoria": producto.categoria.nombre,
             "marca": producto.marca.nombre,
+            "nombre_base": producto.nombre_base,
             "nombre": producto.nombre,
             "descripcion": producto.descripcion,
+            "escuela": cls._optional_name(producto.escuela),
+            "tipo_prenda": cls._optional_name(producto.tipo_prenda),
+            "tipo_pieza": cls._optional_name(producto.tipo_pieza),
+            "nivel_educativo": cls._optional_name(producto.nivel_educativo),
+            "atributo": cls._optional_name(producto.atributo),
+            "genero": producto.genero,
+            "escudo": producto.escudo,
+            "ubicacion": producto.ubicacion,
         }
         producto.categoria = categoria
         producto.marca = marca
-        producto.nombre = nombre
-        producto.nombre_base = nombre
+        producto.nombre = display_name
+        producto.nombre_base = nombre_base
+        producto.escuela = escuela
+        producto.tipo_prenda = tipo_prenda
+        producto.tipo_pieza = tipo_pieza
+        producto.nivel_educativo = nivel_educativo
+        producto.atributo = atributo
+        producto.genero = (genero or "").strip() or None
+        producto.escudo = (escudo or "").strip() or None
+        producto.ubicacion = (ubicacion or "").strip() or None
         producto.descripcion = descripcion or None
         session.add(producto)
         cls._registrar_cambios(
@@ -364,8 +466,17 @@ class CatalogService:
             valores_nuevos={
                 "categoria": producto.categoria.nombre,
                 "marca": producto.marca.nombre,
+                "nombre_base": producto.nombre_base,
                 "nombre": producto.nombre,
                 "descripcion": producto.descripcion,
+                "escuela": cls._optional_name(producto.escuela),
+                "tipo_prenda": cls._optional_name(producto.tipo_prenda),
+                "tipo_pieza": cls._optional_name(producto.tipo_pieza),
+                "nivel_educativo": cls._optional_name(producto.nivel_educativo),
+                "atributo": cls._optional_name(producto.atributo),
+                "genero": producto.genero,
+                "escudo": producto.escudo,
+                "ubicacion": producto.ubicacion,
             },
         )
         return producto
@@ -385,7 +496,7 @@ class CatalogService:
     ) -> Variante:
         cls._validar_admin(usuario)
         talla = talla.strip()
-        color = color.strip()
+        color = color.strip() or "Sin color"
         sku = cls.normalizar_o_generar_sku(session, producto, sku, talla, color)
 
         if not sku or not talla or not color:
@@ -460,7 +571,7 @@ class CatalogService:
     ) -> Variante:
         cls._validar_admin(usuario)
         talla = talla.strip()
-        color = color.strip()
+        color = color.strip() or "Sin color"
         sku = cls.normalizar_o_generar_sku(
             session=session,
             producto=producto,
@@ -476,6 +587,8 @@ class CatalogService:
             raise ValueError("El precio de venta no puede ser negativo.")
         if costo_referencia is not None and costo_referencia < 0:
             raise ValueError("El costo de referencia no puede ser negativo.")
+        if variante.origen_legacy and sku != variante.sku:
+            raise ValueError("No se puede cambiar el SKU de una presentacion importada del legacy.")
 
         existente_sku = session.scalar(select(Variante).where(Variante.id != variante.id, Variante.sku == sku))
         if existente_sku is not None:
@@ -586,6 +699,71 @@ class CatalogService:
             accion_por_campo={"activo": TipoCambioCatalogo.ESTADO},
         )
         return variante
+
+    @classmethod
+    def aplicar_cambio_masivo_precio(
+        cls,
+        session: Session,
+        usuario: Usuario,
+        *,
+        referencia: str,
+        motivo: str,
+        observacion: str | None,
+        precios_por_variante: list[tuple[int, Decimal]],
+    ) -> dict[str, int]:
+        cls._validar_admin(usuario)
+        if not precios_por_variante:
+            raise ValueError("No hay presentaciones para actualizar precio.")
+
+        resumen = {
+            "total_filas": len(precios_por_variante),
+            "aplicadas": 0,
+            "sin_cambios": 0,
+            "suben": 0,
+            "bajan": 0,
+        }
+        audit_note_parts = [f"Lote {referencia}"]
+        motive_text = motivo.strip()
+        if motive_text:
+            audit_note_parts.append(motive_text)
+        note_text = (observacion or "").strip()
+        if note_text:
+            audit_note_parts.append(note_text)
+        audit_note = " | ".join(audit_note_parts)
+
+        for variante_id, nuevo_precio in precios_por_variante:
+            variante = session.get(Variante, int(variante_id))
+            if variante is None:
+                raise ValueError(f"La presentacion {variante_id} ya no existe.")
+            precio_anterior = cls._money(variante.precio_venta)
+            precio_nuevo = cls._money(nuevo_precio)
+            if precio_nuevo < Decimal("0.00"):
+                raise ValueError(f"El precio de {variante.sku} no puede ser negativo.")
+            if precio_nuevo == precio_anterior:
+                resumen["sin_cambios"] += 1
+                continue
+
+            variante.precio_venta = precio_nuevo
+            session.add(variante)
+            cls._registrar_cambios(
+                session=session,
+                usuario=usuario,
+                entidad_tipo=TipoEntidadCatalogo.PRESENTACION,
+                entidad_id=variante.id,
+                descripcion_entidad=cls._descripcion_presentacion(variante),
+                valores_anteriores={"precio_venta": precio_anterior},
+                valores_nuevos={"precio_venta": precio_nuevo},
+                observacion=audit_note,
+            )
+            resumen["aplicadas"] += 1
+            if precio_nuevo > precio_anterior:
+                resumen["suben"] += 1
+            else:
+                resumen["bajan"] += 1
+
+        if resumen["aplicadas"] == 0:
+            raise ValueError("El lote no genera cambios efectivos de precio.")
+        return resumen
 
     @staticmethod
     def _validar_variante_eliminable(session: Session, variante: Variante) -> None:
