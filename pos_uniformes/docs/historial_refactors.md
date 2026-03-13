@@ -23,6 +23,8 @@
 
 - `services/sale_discount_service.py`
   - Descuentos, desglose y totales.
+- `services/sale_cart_table_service.py`
+  - Filas visibles del carrito y conteo total de piezas para Caja.
 - `services/sale_cashier_summary_service.py`
   - Resumen visible del bloque total en Caja sin referencia del cliente.
 - `services/manual_promo_flow_service.py`

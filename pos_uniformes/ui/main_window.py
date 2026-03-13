@@ -136,6 +136,7 @@ from pos_uniformes.services.sale_discount_option_service import (
 )
 from pos_uniformes.services.sale_ticket_text_service import build_sale_ticket_text
 from pos_uniformes.services.sale_client_discount_service import resolve_sale_client_discount
+from pos_uniformes.services.sale_cart_table_service import build_sale_cart_table_view
 from pos_uniformes.services.sale_cashier_summary_service import build_sale_cashier_summary
 from pos_uniformes.services.sale_client_sync_service import resolve_sale_client_sync_state
 from pos_uniformes.services.sale_discount_lock_service import (
@@ -11800,18 +11801,9 @@ class MainWindow(QMainWindow):
 
     def _refresh_sale_cart_table(self) -> None:
         self.sale_cart_table.setRowCount(len(self.sale_cart))
-        total_items = 0
-        for row_index, item in enumerate(self.sale_cart):
-            line_subtotal = Decimal(item["precio_unitario"]) * int(item["cantidad"])
-            total_items += int(item["cantidad"])
-            values = [
-                item["sku"],
-                item["producto_nombre"],
-                item["cantidad"],
-                item["precio_unitario"],
-                line_subtotal,
-            ]
-            for column_index, value in enumerate(values):
+        table_view = build_sale_cart_table_view(self.sale_cart)
+        for row_index, row in enumerate(table_view.rows):
+            for column_index, value in enumerate(row.values):
                 self.sale_cart_table.setItem(row_index, column_index, _table_item(value))
         self.sale_cart_table.resizeColumnsToContents()
         pricing = self._calculate_sale_pricing()
@@ -11825,7 +11817,7 @@ class MainWindow(QMainWindow):
         summary = build_sale_cashier_summary(
             has_items=bool(self.sale_cart),
             lines_count=len(self.sale_cart),
-            total_items=total_items,
+            total_items=table_view.total_items,
             subtotal=subtotal,
             applied_discount=applied_discount,
             rounding_adjustment=rounding_adjustment,
