@@ -133,6 +133,10 @@ from pos_uniformes.services.business_print_settings_service import load_business
 from pos_uniformes.services.layaway_receipt_text_service import build_layaway_receipt_text
 from pos_uniformes.services.sale_note_service import build_sale_note_parts
 from pos_uniformes.services.sale_loyalty_notice_service import build_sale_loyalty_transition_notice
+from pos_uniformes.services.sale_checkout_service import (
+    load_sale_client_checkout_snapshot,
+    resolve_sale_loyalty_transition_notice,
+)
 from pos_uniformes.services.sale_discount_option_service import (
     build_sale_discount_options,
     expected_discount_option_label,
@@ -183,6 +187,7 @@ from pos_uniformes.ui.dialogs.settings_dialogs import (
     build_whatsapp_settings_dialog,
     build_users_settings_dialog,
 )
+from pos_uniformes.ui.dialogs.layaway_payment_dialog import build_layaway_payment_dialog
 from pos_uniformes.ui.dialogs.printable_text_dialog import open_printable_text_dialog
 from pos_uniformes.ui.helpers.sale_cart_table_helper import build_sale_cart_table_view
 from pos_uniformes.ui.helpers.sale_cashier_summary_helper import build_sale_cashier_summary
@@ -8196,21 +8201,11 @@ class MainWindow(QMainWindow):
                 usuario = session.get(Usuario, self.user_id)
                 if usuario is None:
                     raise ValueError("Usuario no encontrado.")
-                cliente = None
-                previous_level = None
-                previous_discount = None
-                previous_level_label = ""
-                client_name_for_notice = ""
-                if selected_client_id not in {None, ""}:
-                    cliente = session.get(Cliente, int(selected_client_id))
-                    if cliente is None:
-                        raise ValueError("No se pudo cargar el cliente seleccionado.")
-                    previous_level = LoyaltyService.coerce_level(cliente.nivel_lealtad)
-                    previous_discount = Decimal(str(cliente.descuento_preferente or Decimal("0.00"))).quantize(
-                        Decimal("0.01")
-                    )
-                    previous_level_label = LoyaltyService.visual_spec(previous_level).label
-                    client_name_for_notice = str(cliente.nombre)
+                client_snapshot = load_sale_client_checkout_snapshot(
+                    session,
+                    selected_client_id=selected_client_id,
+                )
+                cliente = client_snapshot.client
                 venta = VentaService.crear_borrador(
                     session=session,
                     usuario=usuario,
@@ -8239,19 +8234,10 @@ class MainWindow(QMainWindow):
                         applied_source=str(breakdown["winner_source"]),
                         note="Promocion manual autorizada con codigo en caja.",
                     )
-                if cliente is not None and previous_level is not None and previous_discount is not None:
-                    updated_level = LoyaltyService.coerce_level(cliente.nivel_lealtad)
-                    updated_discount = Decimal(str(cliente.descuento_preferente or Decimal("0.00"))).quantize(
-                        Decimal("0.01")
-                    )
-                    if updated_level != previous_level or updated_discount != previous_discount:
-                        updated_label = LoyaltyService.visual_spec(updated_level).label
-                        loyalty_transition_notice = self._build_sale_loyalty_transition_notice(
-                            client_name_for_notice,
-                            previous_level_label,
-                            updated_label,
-                            updated_discount,
-                        )
+                loyalty_transition_notice = resolve_sale_loyalty_transition_notice(
+                    client_snapshot,
+                    build_notice=self._build_sale_loyalty_transition_notice,
+                )
                 session.commit()
         except Exception as exc:  # noqa: BLE001
             self._set_sale_processing(False)
@@ -11194,65 +11180,6 @@ class MainWindow(QMainWindow):
             f"El carrito actual se convirtio en el apartado {apartado_folio}.",
         )
 
-    def _prompt_layaway_payment_data(self) -> tuple[Decimal, str, Decimal, str, str] | None:
-        dialog, layout = self._create_modal_dialog("Registrar abono", width=420)
-        form = QFormLayout()
-        amount_spin = QDoubleSpinBox()
-        amount_spin.setRange(0.01, 999999.99)
-        amount_spin.setDecimals(2)
-        amount_spin.setPrefix("$")
-        payment_combo = QComboBox()
-        payment_combo.addItems(["Efectivo", "Transferencia", "Mixto"])
-        cash_spin = QDoubleSpinBox()
-        cash_spin.setRange(0.00, 999999.99)
-        cash_spin.setDecimals(2)
-        cash_spin.setPrefix("$")
-        reference_input = QLineEdit()
-        reference_input.setPlaceholderText("Referencia opcional")
-        notes_input = QTextEdit()
-        notes_input.setMaximumHeight(90)
-        form.addRow("Monto", amount_spin)
-        form.addRow("Metodo", payment_combo)
-        form.addRow("Efectivo en caja", cash_spin)
-        form.addRow("Referencia", reference_input)
-        form.addRow("Observacion", notes_input)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addLayout(form)
-        layout.addWidget(buttons)
-
-        def sync_cash_spin() -> None:
-            method = payment_combo.currentText()
-            amount_spin_value = amount_spin.value()
-            if method == "Efectivo":
-                cash_spin.blockSignals(True)
-                cash_spin.setValue(amount_spin_value)
-                cash_spin.blockSignals(False)
-                cash_spin.setEnabled(False)
-            elif method == "Transferencia":
-                cash_spin.blockSignals(True)
-                cash_spin.setValue(0.0)
-                cash_spin.blockSignals(False)
-                cash_spin.setEnabled(False)
-            else:
-                cash_spin.setEnabled(True)
-                cash_spin.setMaximum(amount_spin_value)
-
-        payment_combo.currentTextChanged.connect(sync_cash_spin)
-        amount_spin.valueChanged.connect(sync_cash_spin)
-        sync_cash_spin()
-
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return None
-        return (
-            Decimal(str(amount_spin.value())),
-            payment_combo.currentText().strip() or "Efectivo",
-            Decimal(str(cash_spin.value())),
-            reference_input.text().strip(),
-            notes_input.toPlainText().strip(),
-        )
-
     def _handle_register_layaway_payment(self) -> None:
         apartado_id = self._selected_layaway_id()
         if apartado_id is None:
@@ -11260,10 +11187,9 @@ class MainWindow(QMainWindow):
             return
         if not self._ensure_cash_session_current_day_for_operation("registrar abonos"):
             return
-        payload = self._prompt_layaway_payment_data()
+        payload = build_layaway_payment_dialog(self)
         if payload is None:
             return
-        amount, payment_method, cash_amount, reference, notes = payload
         try:
             with get_session() as session:
                 usuario = session.get(Usuario, self.user_id)
@@ -11274,11 +11200,11 @@ class MainWindow(QMainWindow):
                     session=session,
                     apartado=apartado,
                     usuario=usuario,
-                    monto=amount,
-                    metodo_pago=payment_method,
-                    monto_efectivo=cash_amount,
-                    referencia=reference or None,
-                    observacion=notes or None,
+                    monto=payload.amount,
+                    metodo_pago=payload.payment_method,
+                    monto_efectivo=payload.cash_amount,
+                    referencia=payload.reference or None,
+                    observacion=payload.notes or None,
                 )
                 session.commit()
         except Exception as exc:  # noqa: BLE001
@@ -11290,7 +11216,7 @@ class MainWindow(QMainWindow):
         QMessageBox.information(
             self,
             "Abono registrado",
-            f"Se registro un abono por ${amount}. Efectivo en caja: ${cash_amount}.",
+            f"Se registro un abono por ${payload.amount}. Efectivo en caja: ${payload.cash_amount}.",
         )
 
     def _handle_deliver_layaway(self) -> None:

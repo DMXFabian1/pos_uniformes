@@ -36,6 +36,8 @@
   - Estado, decision y transicion de promo manual fuera de `MainWindow`.
 - `services/sale_note_service.py`
   - Notas operativas de la venta.
+- `services/sale_checkout_service.py`
+  - Snapshot del cliente en checkout y resolucion del aviso de lealtad post-venta.
 - `services/sale_loyalty_notice_service.py`
   - Mensajes de transicion de lealtad.
 - `services/scanned_client_flow_service.py`
@@ -68,10 +70,14 @@
   - Snapshot reutilizable de datos de transferencia para dialogs de cobro.
 - `services/sale_payment_note_service.py`
   - Detalles puros de cobro y notas operativas por metodo de pago.
+- `services/layaway_payment_service.py`
+  - Estado y normalizacion del abono segun metodo de pago para apartados.
 - `services/sale_rounding_service.py`
   - Regla pura de redondeo posterior al descuento.
 - `ui/dialogs/payment_dialogs.py`
   - Dialogos de efectivo, transferencia y mixto fuera de `MainWindow`.
+- `ui/dialogs/layaway_payment_dialog.py`
+  - Dialogo reutilizable para registrar abonos fuera de `MainWindow`.
 - `ui/helpers/sale_payment_helper.py`
   - Enrutamiento UI del cobro por metodo sin dejar prompts ni snapshot en `MainWindow`.
 
