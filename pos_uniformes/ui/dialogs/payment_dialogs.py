@@ -173,9 +173,9 @@ def build_cash_payment_dialog(window: "MainWindow", total: Decimal) -> dict[str,
 def build_transfer_payment_dialog(
     window: "MainWindow",
     total: Decimal,
-    business: dict[str, object],
+    business,
 ) -> dict[str, object] | None:
-    if not business["transferencia_clabe"] and not business["transferencia_instrucciones"]:
+    if not business.transfer_clabe and not business.transfer_instructions:
         QMessageBox.warning(
             window,
             "Transferencia no configurada",
@@ -189,16 +189,16 @@ def build_transfer_payment_dialog(
         width=520,
     )
     info_lines = [
-        f"Negocio: {business['nombre_negocio']}",
-        f"Banco: {business['transferencia_banco'] or 'No configurado'}",
-        f"Beneficiario: {business['transferencia_beneficiario'] or 'No configurado'}",
-        f"CLABE: {business['transferencia_clabe'] or 'No configurada'}",
+        f"Negocio: {business.business_name}",
+        f"Banco: {business.transfer_bank or 'No configurado'}",
+        f"Beneficiario: {business.transfer_beneficiary or 'No configurado'}",
+        f"CLABE: {business.transfer_clabe or 'No configurada'}",
         f"Total a transferir: ${total}",
     ]
     info_label = QLabel("\n".join(info_lines))
     info_label.setWordWrap(True)
     info_label.setObjectName("inventoryMetaCard")
-    instructions_label = QLabel(str(business["transferencia_instrucciones"] or "Sin instrucciones adicionales."))
+    instructions_label = QLabel(str(business.transfer_instructions or "Sin instrucciones adicionales."))
     instructions_label.setWordWrap(True)
     instructions_label.setObjectName("inventoryMetaCardAlt")
     reference_input = QLineEdit()
@@ -228,7 +228,7 @@ def build_transfer_payment_dialog(
 def build_mixed_payment_dialog(
     window: "MainWindow",
     total: Decimal,
-    business: dict[str, object],
+    business,
 ) -> dict[str, object] | None:
     dialog, layout = window._create_modal_dialog(
         "Cobro mixto",
@@ -240,9 +240,9 @@ def build_mixed_payment_dialog(
     transfer_info = QLabel(
         "\n".join(
             [
-                f"Banco: {business['transferencia_banco'] or 'No configurado'}",
-                f"Beneficiario: {business['transferencia_beneficiario'] or 'No configurado'}",
-                f"CLABE: {business['transferencia_clabe'] or 'No configurada'}",
+                f"Banco: {business.transfer_bank or 'No configurado'}",
+                f"Beneficiario: {business.transfer_beneficiary or 'No configurado'}",
+                f"CLABE: {business.transfer_clabe or 'No configurada'}",
             ]
         )
     )

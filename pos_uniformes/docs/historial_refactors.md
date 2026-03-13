@@ -62,6 +62,8 @@
 
 ### Cobro
 
+- `services/business_payment_settings_service.py`
+  - Snapshot reutilizable de datos de transferencia para dialogs de cobro.
 - `services/sale_rounding_service.py`
   - Regla pura de redondeo posterior al descuento.
 - `ui/dialogs/payment_dialogs.py`

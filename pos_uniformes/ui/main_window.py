@@ -129,6 +129,7 @@ from pos_uniformes.services.manual_promo_flow_service import (
 from pos_uniformes.services.manual_promo_service import ManualPromoService
 from pos_uniformes.services.marketing_audit_service import MarketingAuditService
 from pos_uniformes.services.presupuesto_service import PresupuestoItemInput, PresupuestoService
+from pos_uniformes.services.business_payment_settings_service import load_business_payment_settings_snapshot
 from pos_uniformes.services.business_print_settings_service import load_business_print_settings_snapshot
 from pos_uniformes.services.layaway_receipt_text_service import build_layaway_receipt_text
 from pos_uniformes.services.sale_note_service import build_sale_note_parts
@@ -7864,35 +7865,28 @@ class MainWindow(QMainWindow):
             promo_discount=promo_discount,
         )
 
-    def _load_business_settings_snapshot(self) -> dict[str, object]:
+    def _load_business_payment_settings_snapshot(self):
         try:
             with get_session() as session:
-                config = BusinessSettingsService.get_or_create(session)
-                return {
-                    "nombre_negocio": config.nombre_negocio,
-                    "transferencia_banco": config.transferencia_banco or "",
-                    "transferencia_beneficiario": config.transferencia_beneficiario or "",
-                    "transferencia_clabe": config.transferencia_clabe or "",
-                    "transferencia_instrucciones": config.transferencia_instrucciones or "",
-                }
+                return load_business_payment_settings_snapshot(session)
         except Exception:
-            return {
-                "nombre_negocio": "POS Uniformes",
-                "transferencia_banco": "",
-                "transferencia_beneficiario": "",
-                "transferencia_clabe": "",
-                "transferencia_instrucciones": "",
-            }
+            return SimpleNamespace(
+                business_name="POS Uniformes",
+                transfer_bank="",
+                transfer_beneficiary="",
+                transfer_clabe="",
+                transfer_instructions="",
+            )
 
     def _prompt_cash_payment(self, total: Decimal) -> dict[str, object] | None:
         return build_cash_payment_dialog(self, total)
 
     def _prompt_transfer_payment(self, total: Decimal) -> dict[str, object] | None:
-        business = self._load_business_settings_snapshot()
+        business = self._load_business_payment_settings_snapshot()
         return build_transfer_payment_dialog(self, total, business)
 
     def _prompt_mixed_payment(self, total: Decimal) -> dict[str, object] | None:
-        business = self._load_business_settings_snapshot()
+        business = self._load_business_payment_settings_snapshot()
         return build_mixed_payment_dialog(self, total, business)
 
     def _collect_sale_payment_details(self, payment_method: str, total: Decimal) -> dict[str, object] | None:
