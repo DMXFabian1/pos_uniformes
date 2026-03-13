@@ -10,6 +10,7 @@ from pathlib import Path
 import subprocess
 import sys
 from time import monotonic
+from types import SimpleNamespace
 import unicodedata
 from urllib.parse import quote
 from uuid import uuid4
@@ -128,6 +129,8 @@ from pos_uniformes.services.manual_promo_flow_service import (
 from pos_uniformes.services.manual_promo_service import ManualPromoService
 from pos_uniformes.services.marketing_audit_service import MarketingAuditService
 from pos_uniformes.services.presupuesto_service import PresupuestoItemInput, PresupuestoService
+from pos_uniformes.services.business_print_settings_service import load_business_print_settings_snapshot
+from pos_uniformes.services.layaway_receipt_text_service import build_layaway_receipt_text
 from pos_uniformes.services.sale_note_service import build_sale_note_parts
 from pos_uniformes.services.sale_loyalty_notice_service import build_sale_loyalty_transition_notice
 from pos_uniformes.services.sale_discount_option_service import (
@@ -7324,32 +7327,26 @@ class MainWindow(QMainWindow):
             return None
 
     def _build_sale_ticket_text(self, sale: Venta) -> str:
-        business_name = "POS Uniformes"
-        business_phone = ""
-        business_address = ""
-        ticket_footer = "Gracias por tu compra."
-        preferred_printer = ""
-        ticket_copies = 1
         try:
             with get_session() as session:
-                config = BusinessSettingsService.get_or_create(session)
-                business_name = config.nombre_negocio
-                business_phone = config.telefono or ""
-                business_address = config.direccion or ""
-                ticket_footer = config.pie_ticket or ticket_footer
-                preferred_printer = config.impresora_preferida or ""
-                ticket_copies = config.copias_ticket or 1
+                settings = load_business_print_settings_snapshot(session)
         except Exception:
-            preferred_printer = ""
-            ticket_copies = 1
+            settings = SimpleNamespace(
+                business_name="POS Uniformes",
+                business_phone="",
+                business_address="",
+                ticket_footer="Gracias por tu compra.",
+                preferred_printer="",
+                ticket_copies=1,
+            )
         return build_sale_ticket_text(
             sale=sale,
-            business_name=business_name,
-            business_phone=business_phone,
-            business_address=business_address,
-            ticket_footer=ticket_footer,
-            preferred_printer=preferred_printer,
-            ticket_copies=ticket_copies,
+            business_name=settings.business_name,
+            business_phone=settings.business_phone,
+            business_address=settings.business_address,
+            ticket_footer=settings.ticket_footer,
+            preferred_printer=settings.preferred_printer,
+            ticket_copies=settings.ticket_copies,
         )
 
     def _handle_view_sale_ticket(self) -> None:
@@ -7376,69 +7373,28 @@ class MainWindow(QMainWindow):
     def _build_layaway_receipt_text(self, layaway: Apartado) -> str:
         try:
             with get_session() as session:
-                config = BusinessSettingsService.get_or_create(session)
-                business_name = config.nombre_negocio
-                business_phone = config.telefono or ""
-                business_address = config.direccion or ""
-                ticket_footer = config.pie_ticket or "Gracias por tu preferencia."
-                preferred_printer = config.impresora_preferida or ""
-                ticket_copies = config.copias_ticket or 1
-        except Exception:
-            business_name = "POS Uniformes"
-            business_phone = ""
-            business_address = ""
-            ticket_footer = "Gracias por tu preferencia."
-            preferred_printer = ""
-            ticket_copies = 1
-
-        lines = [
-            business_name,
-            business_phone,
-            business_address,
-            "",
-            f"Comprobante de apartado: {layaway.folio}",
-            f"Estado: {layaway.estado.value}",
-            f"Cliente: {layaway.cliente_nombre}",
-            (
-                f"Codigo cliente: {layaway.cliente.codigo_cliente}"
-                if layaway.cliente is not None
-                else "Codigo cliente: Manual / sin cliente"
-            ),
-            f"Telefono: {layaway.cliente_telefono or 'Sin telefono'}",
-            f"Fecha: {layaway.created_at.strftime('%Y-%m-%d %H:%M') if layaway.created_at else ''}",
-            (
-                "Compromiso: "
-                + (layaway.fecha_compromiso.strftime("%Y-%m-%d") if layaway.fecha_compromiso else "Sin fecha")
-            ),
-            "",
-            "Presentaciones:",
-        ]
-        for detalle in layaway.detalles:
-            producto = detalle.variante.producto.nombre if detalle.variante and detalle.variante.producto else ""
-            sku = detalle.variante.sku if detalle.variante else ""
-            lines.append(
-                f"- {producto} | {sku} | {detalle.cantidad} x {detalle.precio_unitario} = {detalle.subtotal_linea}"
-            )
-        lines.extend(
-            [
-                "",
-                f"Total: {layaway.total}",
-                f"Abonado: {layaway.total_abonado}",
-                f"Saldo pendiente: {layaway.saldo_pendiente}",
-            ]
-        )
-        if layaway.abonos:
-            lines.extend(["", "Abonos:"])
-            for abono in layaway.abonos:
-                lines.append(
-                    f"- {abono.created_at.strftime('%Y-%m-%d %H:%M') if abono.created_at else ''} | "
-                    f"{abono.monto} | {abono.referencia or 'Sin referencia'} | {abono.usuario.username}"
+                settings = load_business_print_settings_snapshot(
+                    session,
+                    default_ticket_footer="Gracias por tu preferencia.",
                 )
-        if layaway.observacion:
-            lines.extend(["", f"Notas: {layaway.observacion}"])
-        lines.extend(["", ticket_footer, f"Copias configuradas: {ticket_copies}"])
-        lines.append(f"Impresora preferida: {preferred_printer or 'Preguntar siempre'}")
-        return "\n".join(lines)
+        except Exception:
+            settings = SimpleNamespace(
+                business_name="POS Uniformes",
+                business_phone="",
+                business_address="",
+                ticket_footer="Gracias por tu preferencia.",
+                preferred_printer="",
+                ticket_copies=1,
+            )
+        return build_layaway_receipt_text(
+            layaway=layaway,
+            business_name=settings.business_name,
+            business_phone=settings.business_phone,
+            business_address=settings.business_address,
+            ticket_footer=settings.ticket_footer,
+            preferred_printer=settings.preferred_printer,
+            ticket_copies=settings.ticket_copies,
+        )
 
     def _handle_view_layaway_receipt(self) -> None:
         apartado_id = self._selected_layaway_id()

@@ -47,10 +47,14 @@
 
 ### Ticket
 
+- `services/business_print_settings_service.py`
+  - Snapshot reutilizable de negocio, impresion y pie de ticket para textos operativos.
 - `services/sale_ticket_totals_service.py`
   - Normalizacion y reconstruccion de descuento para render de ticket.
 - `services/sale_ticket_text_service.py`
   - Render textual del ticket, forma de pago y ajuste de cobro visible.
+- `services/layaway_receipt_text_service.py`
+  - Render textual del comprobante de apartado fuera de `MainWindow`.
 - `ui/dialogs/printable_text_dialog.py`
   - Modal reutilizable para mostrar e imprimir ticket o comprobante en texto plano.
 
