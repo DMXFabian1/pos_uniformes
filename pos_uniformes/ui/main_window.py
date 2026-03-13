@@ -146,6 +146,7 @@ from pos_uniformes.services.sale_document_service import (
 )
 from pos_uniformes.services.sale_client_benefit_service import resolve_sale_client_benefit
 from pos_uniformes.services.sale_client_discount_service import resolve_sale_client_discount
+from pos_uniformes.services.sale_selected_client_service import load_sale_selected_client_benefit
 from pos_uniformes.services.sale_client_sync_service import resolve_sale_client_sync_state
 from pos_uniformes.services.sale_discount_lock_service import (
     build_sale_discount_lock_state,
@@ -7629,16 +7630,12 @@ class MainWindow(QMainWindow):
             return Decimal("0.00")
         try:
             with get_session() as session:
-                client = session.get(Cliente, int(selected_client_id))
-                if client is None:
-                    return Decimal("0.00")
-                benefit = resolve_sale_client_benefit(
-                    preferred_discount=client.descuento_preferente,
-                    loyalty_level=client.nivel_lealtad,
-                    loyalty_discount_resolver=lambda level: LoyaltyService.discount_for_level(level, session=session),
+                benefit = load_sale_selected_client_benefit(
+                    session,
+                    selected_client_id=selected_client_id,
                     normalize_discount_value=self._normalize_discount_value,
                 )
-                return benefit.discount_percent
+                return benefit.discount_percent if benefit is not None else Decimal("0.00")
         except Exception:
             return Decimal("0.00")
 
@@ -7801,15 +7798,13 @@ class MainWindow(QMainWindow):
 
         try:
             with get_session() as session:
-                client = session.get(Cliente, int(selected_client_id))
-                if client is None:
-                    raise ValueError("No se pudo cargar el cliente seleccionado.")
-                benefit = resolve_sale_client_benefit(
-                    preferred_discount=client.descuento_preferente,
-                    loyalty_level=client.nivel_lealtad,
-                    loyalty_discount_resolver=lambda level: LoyaltyService.discount_for_level(level, session=session),
+                benefit = load_sale_selected_client_benefit(
+                    session,
+                    selected_client_id=selected_client_id,
                     normalize_discount_value=self._normalize_discount_value,
                 )
+                if benefit is None:
+                    raise ValueError("No se pudo cargar el cliente seleccionado.")
         except Exception:
             self._reset_sale_client_discount_sync()
             return
