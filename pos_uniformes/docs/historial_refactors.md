@@ -7,6 +7,8 @@
 - Base actual validada con `check_startup_health.py`.
 - Ticket de venta documentado y con correccion tolerante para descuentos faltantes en ventas antiguas.
 - Validacion manual confirmada para `Ventas recientes -> Ver ticket`.
+- Dialogos de cobro extraidos a `ui/dialogs/payment_dialogs.py`.
+- Modal imprimible de ticket y comprobante extraido a `ui/dialogs/printable_text_dialog.py`.
 
 ## Extracciones ya realizadas
 
@@ -42,11 +44,15 @@
   - Normalizacion y reconstruccion de descuento para render de ticket.
 - `services/sale_ticket_text_service.py`
   - Render textual del ticket, forma de pago y ajuste de cobro visible.
+- `ui/dialogs/printable_text_dialog.py`
+  - Modal reutilizable para mostrar e imprimir ticket o comprobante en texto plano.
 
 ### Cobro
 
 - `services/sale_rounding_service.py`
   - Regla pura de redondeo posterior al descuento.
+- `ui/dialogs/payment_dialogs.py`
+  - Dialogos de efectivo, transferencia y mixto fuera de `MainWindow`.
 
 ### Catalogo e inventario
 
@@ -60,11 +66,9 @@
 - `ui/main_window.py` sigue siendo el coordinador mas grande y sensible.
 - Configuracion y algunas acciones de inventario aun dependen mucho de handlers largos.
 - Falta documentar por dominio con mas detalle.
-- El render completo del ticket sigue en `ui/main_window.py` y aun no tiene prueba integrada de texto final.
 - Falta validacion manual visual de caja con redondeo ya conectado al total de cobro.
 
 ## Proximo paso recomendado
 
-- Blindar el render del ticket con pruebas de texto final.
-- Seguir con extracciones pequenas desde caja o catalogo.
+- Seguir con extracciones pequenas desde ticket, resumen visual de caja o catalogo.
 - Registrar aqui cada nuevo checkpoint antes de pasar a otro dominio.

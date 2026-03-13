@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
+    QDoubleSpinBox,
+    QFormLayout,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -166,4 +168,155 @@ def build_cash_payment_dialog(window: "MainWindow", total: Decimal) -> dict[str,
             f"Cambio: {change}",
             f"Referencia: {reference_input.text().strip() or 'Sin referencia'}",
         ],
+    }
+
+
+def build_transfer_payment_dialog(
+    window: "MainWindow",
+    total: Decimal,
+    business: dict[str, object],
+) -> dict[str, object] | None:
+    if not business["transferencia_clabe"] and not business["transferencia_instrucciones"]:
+        QMessageBox.warning(
+            window,
+            "Transferencia no configurada",
+            "Configura CLABE o instrucciones de transferencia en Configuracion > Negocio e impresion.",
+        )
+        return None
+
+    dialog, layout = window._create_modal_dialog(
+        "Cobro por transferencia",
+        "Muestra los datos de pago al cliente y confirma cuando la transferencia este registrada.",
+        width=520,
+    )
+    info_lines = [
+        f"Negocio: {business['nombre_negocio']}",
+        f"Banco: {business['transferencia_banco'] or 'No configurado'}",
+        f"Beneficiario: {business['transferencia_beneficiario'] or 'No configurado'}",
+        f"CLABE: {business['transferencia_clabe'] or 'No configurada'}",
+        f"Total a transferir: ${total}",
+    ]
+    info_label = QLabel("\n".join(info_lines))
+    info_label.setWordWrap(True)
+    info_label.setObjectName("inventoryMetaCard")
+    instructions_label = QLabel(str(business["transferencia_instrucciones"] or "Sin instrucciones adicionales."))
+    instructions_label.setWordWrap(True)
+    instructions_label.setObjectName("inventoryMetaCardAlt")
+    reference_input = QLineEdit()
+    reference_input.setPlaceholderText("Folio o referencia de transferencia")
+    buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+    buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Confirmar pago")
+    buttons.accepted.connect(dialog.accept)
+    buttons.rejected.connect(dialog.reject)
+
+    layout.addWidget(info_label)
+    layout.addWidget(QLabel("Indicaciones"))
+    layout.addWidget(instructions_label)
+    layout.addWidget(QLabel("Referencia"))
+    layout.addWidget(reference_input)
+    layout.addWidget(buttons)
+
+    if dialog.exec() != int(QDialog.DialogCode.Accepted):
+        return None
+
+    return {
+        "nota": [
+            f"Referencia transferencia: {reference_input.text().strip() or 'Sin referencia'}",
+        ]
+    }
+
+
+def build_mixed_payment_dialog(
+    window: "MainWindow",
+    total: Decimal,
+    business: dict[str, object],
+) -> dict[str, object] | None:
+    dialog, layout = window._create_modal_dialog(
+        "Cobro mixto",
+        "Registra cuanto entra por transferencia y cuanto efectivo recibes. El sistema calcula el cambio.",
+        width=520,
+    )
+    total_label = QLabel(f"Total a cobrar: ${total}")
+    total_label.setObjectName("inventoryTitle")
+    transfer_info = QLabel(
+        "\n".join(
+            [
+                f"Banco: {business['transferencia_banco'] or 'No configurado'}",
+                f"Beneficiario: {business['transferencia_beneficiario'] or 'No configurado'}",
+                f"CLABE: {business['transferencia_clabe'] or 'No configurada'}",
+            ]
+        )
+    )
+    transfer_info.setWordWrap(True)
+    transfer_info.setObjectName("inventoryMetaCard")
+    transfer_spin = QDoubleSpinBox()
+    transfer_spin.setRange(0.0, 999999.99)
+    transfer_spin.setDecimals(2)
+    transfer_spin.setPrefix("$")
+    transfer_spin.setSingleStep(50.0)
+    cash_received_spin = QDoubleSpinBox()
+    cash_received_spin.setRange(0.0, 999999.99)
+    cash_received_spin.setDecimals(2)
+    cash_received_spin.setPrefix("$")
+    cash_received_spin.setSingleStep(50.0)
+    remaining_label = QLabel("$0.00")
+    remaining_label.setObjectName("cashierMetaLabel")
+    change_label = QLabel("$0.00")
+    change_label.setObjectName("cashierChangeValue")
+    reference_input = QLineEdit()
+    reference_input.setPlaceholderText("Referencia transferencia opcional")
+
+    def update_mixed_labels() -> None:
+        transfer_amount = Decimal(str(transfer_spin.value())).quantize(Decimal("0.01"))
+        cash_received = Decimal(str(cash_received_spin.value())).quantize(Decimal("0.01"))
+        remaining_cash = total - transfer_amount
+        if remaining_cash < Decimal("0.00"):
+            remaining_cash = Decimal("0.00")
+        change = cash_received - remaining_cash
+        if change < Decimal("0.00"):
+            change = Decimal("0.00")
+        remaining_label.setText(f"${remaining_cash}")
+        change_label.setText(f"${change}")
+
+    transfer_spin.valueChanged.connect(update_mixed_labels)
+    cash_received_spin.valueChanged.connect(update_mixed_labels)
+
+    form = QFormLayout()
+    form.addRow("Transferencia", transfer_spin)
+    form.addRow("Efectivo recibido", cash_received_spin)
+    form.addRow("Efectivo a cubrir", remaining_label)
+    form.addRow("Cambio", change_label)
+    form.addRow("Referencia", reference_input)
+    buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+    buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Confirmar pago")
+    buttons.accepted.connect(dialog.accept)
+    buttons.rejected.connect(dialog.reject)
+
+    layout.addWidget(total_label)
+    layout.addWidget(transfer_info)
+    layout.addLayout(form)
+    layout.addWidget(buttons)
+    update_mixed_labels()
+
+    if dialog.exec() != int(QDialog.DialogCode.Accepted):
+        return None
+
+    transfer_amount = Decimal(str(transfer_spin.value())).quantize(Decimal("0.01"))
+    cash_received = Decimal(str(cash_received_spin.value())).quantize(Decimal("0.01"))
+    cash_due = total - transfer_amount
+    if cash_due < Decimal("0.00"):
+        cash_due = Decimal("0.00")
+    if transfer_amount + cash_received < total:
+        QMessageBox.warning(window, "Pago insuficiente", "La suma de transferencia y efectivo debe cubrir el total.")
+        return None
+    change = (cash_received - cash_due).quantize(Decimal("0.01"))
+    if change < Decimal("0.00"):
+        change = Decimal("0.00")
+    return {
+        "nota": [
+            f"Transferencia: {transfer_amount}",
+            f"Efectivo recibido: {cash_received}",
+            f"Cambio: {change}",
+            f"Referencia transferencia: {reference_input.text().strip() or 'Sin referencia'}",
+        ]
     }

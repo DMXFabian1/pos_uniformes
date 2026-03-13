@@ -171,7 +171,12 @@ from pos_uniformes.ui.dialogs.settings_dialogs import (
     build_whatsapp_settings_dialog,
     build_users_settings_dialog,
 )
-from pos_uniformes.ui.dialogs.payment_dialogs import build_cash_payment_dialog
+from pos_uniformes.ui.dialogs.payment_dialogs import (
+    build_cash_payment_dialog,
+    build_mixed_payment_dialog,
+    build_transfer_payment_dialog,
+)
+from pos_uniformes.ui.dialogs.printable_text_dialog import open_printable_text_dialog
 from pos_uniformes.ui.views.analytics_view import build_analytics_tab
 from pos_uniformes.ui.views.cashier_view import build_cashier_tab
 from pos_uniformes.ui.views.dashboard_view import build_dashboard_tab
@@ -7344,42 +7349,6 @@ class MainWindow(QMainWindow):
             ticket_copies=ticket_copies,
         )
 
-    def _open_text_ticket_dialog(self, title: str, ticket_text: str) -> None:
-        dialog = QDialog(self)
-        dialog.setWindowTitle(title)
-        dialog.resize(620, 520)
-        layout = QVBoxLayout()
-        editor = QTextEdit()
-        editor.setReadOnly(True)
-        editor.setPlainText(ticket_text)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        print_button = buttons.addButton("Imprimir", QDialogButtonBox.ButtonRole.ActionRole)
-
-        def handle_print() -> None:
-            printer = QPrinter()
-            try:
-                with get_session() as session:
-                    config = BusinessSettingsService.get_or_create(session)
-                    preferred_printer = config.impresora_preferida or ""
-                    copies = config.copias_ticket or 1
-            except Exception:
-                preferred_printer = ""
-                copies = 1
-            if preferred_printer:
-                printer.setPrinterName(preferred_printer)
-            printer.setCopyCount(copies)
-            print_dialog = QPrintDialog(printer, dialog)
-            if print_dialog.exec() == QDialog.DialogCode.Accepted:
-                editor.print(printer)
-
-        print_button.clicked.connect(handle_print)
-        buttons.rejected.connect(dialog.reject)
-        buttons.accepted.connect(dialog.accept)
-        layout.addWidget(editor)
-        layout.addWidget(buttons)
-        dialog.setLayout(layout)
-        dialog.exec()
-
     def _handle_view_sale_ticket(self) -> None:
         sale_id = self._selected_recent_sale_id()
         if sale_id is None:
@@ -7399,7 +7368,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Ticket no disponible", str(exc))
             return
 
-        self._open_text_ticket_dialog(f"Ticket {sale_id}", ticket_text)
+        open_printable_text_dialog(self, f"Ticket {sale_id}", ticket_text)
 
     def _build_layaway_receipt_text(self, layaway: Apartado) -> str:
         try:
@@ -7486,40 +7455,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Comprobante no disponible", str(exc))
             return
 
-        dialog = QDialog(self)
-        dialog.setWindowTitle(f"Apartado {apartado_id}")
-        dialog.resize(620, 520)
-        layout = QVBoxLayout()
-        editor = QTextEdit()
-        editor.setReadOnly(True)
-        editor.setPlainText(receipt_text)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        print_button = buttons.addButton("Imprimir", QDialogButtonBox.ButtonRole.ActionRole)
-
-        def handle_print() -> None:
-            printer = QPrinter()
-            try:
-                with get_session() as session:
-                    config = BusinessSettingsService.get_or_create(session)
-                    preferred_printer = config.impresora_preferida or ""
-                    copies = config.copias_ticket or 1
-            except Exception:
-                preferred_printer = ""
-                copies = 1
-            if preferred_printer:
-                printer.setPrinterName(preferred_printer)
-            printer.setCopyCount(copies)
-            print_dialog = QPrintDialog(printer, dialog)
-            if print_dialog.exec() == QDialog.DialogCode.Accepted:
-                editor.print(printer)
-
-        print_button.clicked.connect(handle_print)
-        buttons.rejected.connect(dialog.reject)
-        buttons.accepted.connect(dialog.accept)
-        layout.addWidget(editor)
-        layout.addWidget(buttons)
-        dialog.setLayout(layout)
-        dialog.exec()
+        open_printable_text_dialog(self, f"Apartado {apartado_id}", receipt_text)
 
     def _handle_view_layaway_sale_ticket(self) -> None:
         apartado_id = self._selected_layaway_id()
@@ -7544,7 +7480,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Ticket no disponible", str(exc))
             return
 
-        self._open_text_ticket_dialog(f"Ticket de entrega {apartado_id}", ticket_text)
+        open_printable_text_dialog(self, f"Ticket de entrega {apartado_id}", ticket_text)
 
     @staticmethod
     def _generate_sale_folio() -> str:
@@ -8009,146 +7945,11 @@ class MainWindow(QMainWindow):
 
     def _prompt_transfer_payment(self, total: Decimal) -> dict[str, object] | None:
         business = self._load_business_settings_snapshot()
-        if not business["transferencia_clabe"] and not business["transferencia_instrucciones"]:
-            QMessageBox.warning(
-                self,
-                "Transferencia no configurada",
-                "Configura CLABE o instrucciones de transferencia en Configuracion > Negocio e impresion.",
-            )
-            return None
-
-        dialog, layout = self._create_modal_dialog(
-            "Cobro por transferencia",
-            "Muestra los datos de pago al cliente y confirma cuando la transferencia este registrada.",
-            width=520,
-        )
-        info_lines = [
-            f"Negocio: {business['nombre_negocio']}",
-            f"Banco: {business['transferencia_banco'] or 'No configurado'}",
-            f"Beneficiario: {business['transferencia_beneficiario'] or 'No configurado'}",
-            f"CLABE: {business['transferencia_clabe'] or 'No configurada'}",
-            f"Total a transferir: ${total}",
-        ]
-        info_label = QLabel("\n".join(info_lines))
-        info_label.setWordWrap(True)
-        info_label.setObjectName("inventoryMetaCard")
-        instructions_label = QLabel(str(business["transferencia_instrucciones"] or "Sin instrucciones adicionales."))
-        instructions_label.setWordWrap(True)
-        instructions_label.setObjectName("inventoryMetaCardAlt")
-        reference_input = QLineEdit()
-        reference_input.setPlaceholderText("Folio o referencia de transferencia")
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Confirmar pago")
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-
-        layout.addWidget(info_label)
-        layout.addWidget(QLabel("Indicaciones"))
-        layout.addWidget(instructions_label)
-        layout.addWidget(QLabel("Referencia"))
-        layout.addWidget(reference_input)
-        layout.addWidget(buttons)
-
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return None
-
-        return {
-            "nota": [
-                f"Referencia transferencia: {reference_input.text().strip() or 'Sin referencia'}",
-            ]
-        }
+        return build_transfer_payment_dialog(self, total, business)
 
     def _prompt_mixed_payment(self, total: Decimal) -> dict[str, object] | None:
         business = self._load_business_settings_snapshot()
-        dialog, layout = self._create_modal_dialog(
-            "Cobro mixto",
-            "Registra cuanto entra por transferencia y cuanto efectivo recibes. El sistema calcula el cambio.",
-            width=520,
-        )
-        total_label = QLabel(f"Total a cobrar: ${total}")
-        total_label.setObjectName("inventoryTitle")
-        transfer_info = QLabel(
-            "\n".join(
-                [
-                    f"Banco: {business['transferencia_banco'] or 'No configurado'}",
-                    f"Beneficiario: {business['transferencia_beneficiario'] or 'No configurado'}",
-                    f"CLABE: {business['transferencia_clabe'] or 'No configurada'}",
-                ]
-            )
-        )
-        transfer_info.setWordWrap(True)
-        transfer_info.setObjectName("inventoryMetaCard")
-        transfer_spin = QDoubleSpinBox()
-        transfer_spin.setRange(0.0, 999999.99)
-        transfer_spin.setDecimals(2)
-        transfer_spin.setPrefix("$")
-        transfer_spin.setSingleStep(50.0)
-        cash_received_spin = QDoubleSpinBox()
-        cash_received_spin.setRange(0.0, 999999.99)
-        cash_received_spin.setDecimals(2)
-        cash_received_spin.setPrefix("$")
-        cash_received_spin.setSingleStep(50.0)
-        remaining_label = QLabel("$0.00")
-        remaining_label.setObjectName("cashierMetaLabel")
-        change_label = QLabel("$0.00")
-        change_label.setObjectName("cashierChangeValue")
-        reference_input = QLineEdit()
-        reference_input.setPlaceholderText("Referencia transferencia opcional")
-
-        def update_mixed_labels() -> None:
-            transfer_amount = Decimal(str(transfer_spin.value())).quantize(Decimal("0.01"))
-            cash_received = Decimal(str(cash_received_spin.value())).quantize(Decimal("0.01"))
-            remaining_cash = total - transfer_amount
-            if remaining_cash < Decimal("0.00"):
-                remaining_cash = Decimal("0.00")
-            change = cash_received - remaining_cash
-            if change < Decimal("0.00"):
-                change = Decimal("0.00")
-            remaining_label.setText(f"${remaining_cash}")
-            change_label.setText(f"${change}")
-
-        transfer_spin.valueChanged.connect(update_mixed_labels)
-        cash_received_spin.valueChanged.connect(update_mixed_labels)
-
-        form = QFormLayout()
-        form.addRow("Transferencia", transfer_spin)
-        form.addRow("Efectivo recibido", cash_received_spin)
-        form.addRow("Efectivo a cubrir", remaining_label)
-        form.addRow("Cambio", change_label)
-        form.addRow("Referencia", reference_input)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Confirmar pago")
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-
-        layout.addWidget(total_label)
-        layout.addWidget(transfer_info)
-        layout.addLayout(form)
-        layout.addWidget(buttons)
-        update_mixed_labels()
-
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return None
-
-        transfer_amount = Decimal(str(transfer_spin.value())).quantize(Decimal("0.01"))
-        cash_received = Decimal(str(cash_received_spin.value())).quantize(Decimal("0.01"))
-        cash_due = total - transfer_amount
-        if cash_due < Decimal("0.00"):
-            cash_due = Decimal("0.00")
-        if transfer_amount + cash_received < total:
-            QMessageBox.warning(self, "Pago insuficiente", "La suma de transferencia y efectivo debe cubrir el total.")
-            return None
-        change = (cash_received - cash_due).quantize(Decimal("0.01"))
-        if change < Decimal("0.00"):
-            change = Decimal("0.00")
-        return {
-            "nota": [
-                f"Transferencia: {transfer_amount}",
-                f"Efectivo recibido: {cash_received}",
-                f"Cambio: {change}",
-                f"Referencia transferencia: {reference_input.text().strip() or 'Sin referencia'}",
-            ]
-        }
+        return build_mixed_payment_dialog(self, total, business)
 
     def _collect_sale_payment_details(self, payment_method: str, total: Decimal) -> dict[str, object] | None:
         if payment_method == "Efectivo":
