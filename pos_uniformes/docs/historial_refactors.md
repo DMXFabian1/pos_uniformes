@@ -22,6 +22,8 @@
 
 ### Caja
 
+- `services/sale_client_benefit_service.py`
+  - Beneficio visible del cliente en Caja a partir de descuento preferente y nivel de lealtad.
 - `services/sale_discount_service.py`
   - Descuentos, desglose y totales.
 - `ui/helpers/sale_cart_table_helper.py`

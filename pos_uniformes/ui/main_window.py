@@ -135,6 +135,7 @@ from pos_uniformes.services.sale_discount_option_service import (
     expected_discount_option_label,
 )
 from pos_uniformes.services.sale_ticket_text_service import build_sale_ticket_text
+from pos_uniformes.services.sale_client_benefit_service import resolve_sale_client_benefit
 from pos_uniformes.services.sale_client_discount_service import resolve_sale_client_discount
 from pos_uniformes.services.sale_client_sync_service import resolve_sale_client_sync_state
 from pos_uniformes.services.sale_discount_lock_service import (
@@ -7687,13 +7688,29 @@ class MainWindow(QMainWindow):
                 client = session.get(Cliente, int(selected_client_id))
                 if client is None:
                     return Decimal("0.00")
-                return resolve_sale_client_discount(
+                benefit = resolve_sale_client_benefit(
                     preferred_discount=client.descuento_preferente,
-                    loyalty_discount=LoyaltyService.discount_for_level(client.nivel_lealtad, session=session),
+                    loyalty_level=client.nivel_lealtad,
+                    loyalty_discount_resolver=lambda level: LoyaltyService.discount_for_level(level, session=session),
                     normalize_discount_value=self._normalize_discount_value,
                 )
+                return benefit.discount_percent
         except Exception:
             return Decimal("0.00")
+
+    def _reset_sale_client_discount_sync(self) -> None:
+        state = resolve_sale_client_sync_state(
+            has_selected_client=False,
+            discount_percent=Decimal("0.00"),
+            source_label="",
+            normalize_discount_value=self._normalize_discount_value,
+        )
+        self._set_sale_discount_lock_state(
+            locked=state.locked,
+            discount_percent=state.discount_percent,
+            source_label=state.source_label,
+        )
+        self._refresh_sale_cart_table()
 
     def _refresh_sale_discount_options(self, *, selected_discount: Decimal | int | float | str | None = None) -> None:
         current_discount = (
@@ -7835,18 +7852,7 @@ class MainWindow(QMainWindow):
 
         selected_client_id = self.sale_client_combo.currentData()
         if selected_client_id in {None, ""}:
-            state = resolve_sale_client_sync_state(
-                has_selected_client=False,
-                discount_percent=Decimal("0.00"),
-                source_label="",
-                normalize_discount_value=self._normalize_discount_value,
-            )
-            self._set_sale_discount_lock_state(
-                locked=state.locked,
-                discount_percent=state.discount_percent,
-                source_label=state.source_label,
-            )
-            self._refresh_sale_cart_table()
+            self._reset_sale_client_discount_sync()
             return
 
         try:
@@ -7854,27 +7860,20 @@ class MainWindow(QMainWindow):
                 client = session.get(Cliente, int(selected_client_id))
                 if client is None:
                     raise ValueError("No se pudo cargar el cliente seleccionado.")
-                visual = LoyaltyService.visual_spec(client.nivel_lealtad)
-                discount_percent = self._selected_sale_client_discount()
+                benefit = resolve_sale_client_benefit(
+                    preferred_discount=client.descuento_preferente,
+                    loyalty_level=client.nivel_lealtad,
+                    loyalty_discount_resolver=lambda level: LoyaltyService.discount_for_level(level, session=session),
+                    normalize_discount_value=self._normalize_discount_value,
+                )
         except Exception:
-            state = resolve_sale_client_sync_state(
-                has_selected_client=False,
-                discount_percent=Decimal("0.00"),
-                source_label="",
-                normalize_discount_value=self._normalize_discount_value,
-            )
-            self._set_sale_discount_lock_state(
-                locked=state.locked,
-                discount_percent=state.discount_percent,
-                source_label=state.source_label,
-            )
-            self._refresh_sale_cart_table()
+            self._reset_sale_client_discount_sync()
             return
 
         state = resolve_sale_client_sync_state(
             has_selected_client=True,
-            discount_percent=discount_percent,
-            source_label=visual.label,
+            discount_percent=benefit.discount_percent,
+            source_label=benefit.source_label,
             normalize_discount_value=self._normalize_discount_value,
         )
         self._set_sale_discount_lock_state(
