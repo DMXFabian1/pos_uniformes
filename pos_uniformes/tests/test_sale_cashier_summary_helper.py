@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 import unittest
 
-from pos_uniformes.services.sale_cashier_summary_service import build_sale_cashier_summary
+from pos_uniformes.ui.helpers.sale_cashier_summary_helper import build_sale_cashier_summary
 
 
 class SaleCashierSummaryServiceTests(unittest.TestCase):

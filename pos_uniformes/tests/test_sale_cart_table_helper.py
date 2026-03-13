@@ -3,7 +3,7 @@ from __future__ import annotations
 from decimal import Decimal
 import unittest
 
-from pos_uniformes.services.sale_cart_table_service import build_sale_cart_table_view
+from pos_uniformes.ui.helpers.sale_cart_table_helper import build_sale_cart_table_view
 
 
 class SaleCartTableServiceTests(unittest.TestCase):

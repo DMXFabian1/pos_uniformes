@@ -136,8 +136,6 @@ from pos_uniformes.services.sale_discount_option_service import (
 )
 from pos_uniformes.services.sale_ticket_text_service import build_sale_ticket_text
 from pos_uniformes.services.sale_client_discount_service import resolve_sale_client_discount
-from pos_uniformes.services.sale_cart_table_service import build_sale_cart_table_view
-from pos_uniformes.services.sale_cashier_summary_service import build_sale_cashier_summary
 from pos_uniformes.services.sale_client_sync_service import resolve_sale_client_sync_state
 from pos_uniformes.services.sale_discount_lock_service import (
     build_sale_discount_lock_state,
@@ -179,6 +177,8 @@ from pos_uniformes.ui.dialogs.payment_dialogs import (
     build_transfer_payment_dialog,
 )
 from pos_uniformes.ui.dialogs.printable_text_dialog import open_printable_text_dialog
+from pos_uniformes.ui.helpers.sale_cart_table_helper import build_sale_cart_table_view
+from pos_uniformes.ui.helpers.sale_cashier_summary_helper import build_sale_cashier_summary
 from pos_uniformes.ui.views.analytics_view import build_analytics_tab
 from pos_uniformes.ui.views.cashier_view import build_cashier_tab
 from pos_uniformes.ui.views.dashboard_view import build_dashboard_tab
