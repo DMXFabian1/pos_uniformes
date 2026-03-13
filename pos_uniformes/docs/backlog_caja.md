@@ -46,3 +46,16 @@
   - consistente entre total, cambio y ticket
 - Documento base:
   `docs/politica_redondeo_efectivo.md`
+
+#### 4. Cliente en caja solo por escaneo de QR
+
+- Contexto:
+  En Caja no se quiere seleccion manual del cliente. La venta debe quedarse como mostrador salvo que el cliente se agregue escaneando su QR o codigo de cliente.
+- Objetivo:
+  Reducir errores operativos y forzar un flujo de identificacion mas consistente para beneficios de cliente.
+- Criterio esperado:
+  - el selector manual de cliente deja de ser editable o desaparece de Caja
+  - el cliente solo se enlaza cuando se escanea su QR o codigo
+  - si no se escanea cliente, la venta permanece como mostrador
+  - el flujo de reemplazo de cliente escaneado con carrito sigue pidiendo confirmacion cuando corresponda
+  - descuento, lealtad y resumen visual siguen sincronizados con el cliente escaneado
