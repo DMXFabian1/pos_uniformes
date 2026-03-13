@@ -136,6 +136,7 @@ from pos_uniformes.services.sale_discount_option_service import (
 )
 from pos_uniformes.services.sale_ticket_text_service import build_sale_ticket_text
 from pos_uniformes.services.sale_client_discount_service import resolve_sale_client_discount
+from pos_uniformes.services.sale_cashier_summary_service import build_sale_cashier_summary
 from pos_uniformes.services.sale_client_sync_service import resolve_sale_client_sync_state
 from pos_uniformes.services.sale_discount_lock_service import (
     build_sale_discount_lock_state,
@@ -11819,25 +11820,22 @@ class MainWindow(QMainWindow):
         rounding_adjustment = pricing.rounding_adjustment
         total = pricing.collected_total
         breakdown = self._sale_discount_breakdown()
-        loyalty_discount = self._normalize_discount_value(breakdown["loyalty_discount"])
-        promo_discount = self._normalize_discount_value(breakdown["promo_discount"])
         winner_label = str(breakdown["winner_label"])
         payment_method = self.sale_payment_combo.currentText().strip() or "Efectivo"
-        self.sale_total_label.setText(f"${total}")
-        self.sale_total_meta_label.setText(
-            f"{payment_method} | {winner_label}"
-            if self.sale_cart
-            else "Total a cobrar"
+        summary = build_sale_cashier_summary(
+            has_items=bool(self.sale_cart),
+            lines_count=len(self.sale_cart),
+            total_items=total_items,
+            subtotal=subtotal,
+            applied_discount=applied_discount,
+            rounding_adjustment=rounding_adjustment,
+            collected_total=total,
+            payment_method=payment_method,
+            winner_label=winner_label,
         )
-        self.sale_summary_label.setText(
-            (
-                f"Lineas: {len(self.sale_cart)} | Piezas: {total_items} | "
-                f"Subtotal: ${subtotal} | Descuento: ${applied_discount}"
-                + (f" | Ajuste: ${rounding_adjustment}" if rounding_adjustment != Decimal("0.00") else "")
-            )
-            if self.sale_cart
-            else "Carrito vacio."
-        )
+        self.sale_total_label.setText(summary.total_label)
+        self.sale_total_meta_label.setText(summary.meta_label)
+        self.sale_summary_label.setText(summary.summary_label)
         self._refresh_payment_fields()
         can_sell = self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
         self.sale_remove_button.setEnabled(can_sell and bool(self.sale_cart))

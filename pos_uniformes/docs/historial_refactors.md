@@ -23,6 +23,8 @@
 
 - `services/sale_discount_service.py`
   - Descuentos, desglose y totales.
+- `services/sale_cashier_summary_service.py`
+  - Resumen visible del bloque total en Caja sin referencia del cliente.
 - `services/manual_promo_flow_service.py`
   - Estado y decision de promo manual.
 - `services/sale_note_service.py`
