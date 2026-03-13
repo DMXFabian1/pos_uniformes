@@ -11,6 +11,7 @@ def build_sale_note_parts(
     payment_method: str,
     discount_percent: Decimal | str | int | float,
     applied_discount: Decimal | str | int | float,
+    rounding_adjustment: Decimal | str | int | float = Decimal("0.00"),
     breakdown: dict[str, object],
     format_discount_label: Callable[[Decimal | str | int | float], str],
     extra_notes: list[object] | None = None,
@@ -22,6 +23,7 @@ def build_sale_note_parts(
     loyalty_source = str(breakdown.get("loyalty_source") or "")
     winner_label = str(breakdown.get("winner_label") or "")
     normalized_applied_discount = Decimal(str(applied_discount or 0)).quantize(Decimal("0.01"))
+    normalized_rounding_adjustment = Decimal(str(rounding_adjustment or 0)).quantize(Decimal("0.01"))
 
     note_parts.append(f"Descuento: {discount_percent}%")
     if loyalty_discount > Decimal("0.00"):
@@ -36,6 +38,8 @@ def build_sale_note_parts(
     note_parts.append(f"Beneficio aplicado: {winner_label}")
     if normalized_applied_discount > Decimal("0.00"):
         note_parts.append(f"Descuento aplicado: {normalized_applied_discount}")
+    if normalized_rounding_adjustment != Decimal("0.00"):
+        note_parts.append(f"Ajuste redondeo: {normalized_rounding_adjustment}")
 
     for note in extra_notes or []:
         note_parts.append(str(note))

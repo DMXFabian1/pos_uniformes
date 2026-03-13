@@ -15,6 +15,16 @@ def _extract_payment_method(observacion: str) -> str:
     return match.group(1).strip()
 
 
+def _extract_rounding_adjustment(observacion: str) -> Decimal:
+    match = re.search(r"Ajuste redondeo:\s*([^|]+)", observacion)
+    if not match:
+        return Decimal("0.00")
+    try:
+        return Decimal(match.group(1).strip()).quantize(Decimal("0.01"))
+    except Exception:
+        return Decimal("0.00")
+
+
 def _extract_ticket_notes(observacion: str) -> list[str]:
     cleaned_parts: list[str] = []
     for raw_part in observacion.split("|"):
@@ -32,6 +42,8 @@ def _extract_ticket_notes(observacion: str) -> list[str]:
         if part == "Promocion manual autorizada con codigo":
             continue
         if part.startswith("Descuento aplicado:"):
+            continue
+        if part.startswith("Ajuste redondeo:"):
             continue
         if part.startswith("Beneficio aplicado:"):
             cleaned_parts.append(part.replace("Beneficio aplicado:", "Beneficio:", 1).strip())
@@ -56,6 +68,7 @@ def build_sale_ticket_text(
     created_at = getattr(sale, "created_at", None)
     observacion = getattr(sale, "observacion", "")
     payment_method = _extract_payment_method(observacion)
+    rounding_adjustment = _extract_rounding_adjustment(observacion)
     ticket_notes = _extract_ticket_notes(observacion)
     detalles = getattr(sale, "detalles", []) or []
 
@@ -101,15 +114,18 @@ def build_sale_ticket_text(
         stored_discount_percent=getattr(sale, "descuento_porcentaje", Decimal("0.00")),
         stored_discount_amount=getattr(sale, "descuento_monto", Decimal("0.00")),
         total=getattr(sale, "total", Decimal("0.00")),
+        rounding_adjustment=rounding_adjustment,
     )
     lines.extend(
         [
             "",
             f"Subtotal: {ticket_totals.subtotal}",
             f"Descuento aplicado: {ticket_totals.discount_percent}% (-{ticket_totals.discount_amount})",
-            f"Total a pagar: {ticket_totals.total}",
         ]
     )
+    if rounding_adjustment != Decimal("0.00"):
+        lines.append(f"Ajuste: {rounding_adjustment}")
+    lines.append(f"Total a pagar: {ticket_totals.total}")
 
     if ticket_notes:
         lines.extend(["", "Notas:"])

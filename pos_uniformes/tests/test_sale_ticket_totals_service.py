@@ -54,3 +54,15 @@ class SaleTicketTotalsServiceTests(unittest.TestCase):
 
         self.assertEqual(totals.discount_amount, Decimal("0.00"))
         self.assertEqual(totals.discount_percent, Decimal("0.00"))
+
+    def test_infers_discount_without_counting_rounding_adjustment_as_discount(self) -> None:
+        totals = resolve_sale_ticket_totals(
+            subtotal=Decimal("199.00"),
+            stored_discount_percent=Decimal("0.00"),
+            stored_discount_amount=Decimal("0.00"),
+            total=Decimal("169.00"),
+            rounding_adjustment=Decimal("-0.15"),
+        )
+
+        self.assertEqual(totals.discount_amount, Decimal("29.85"))
+        self.assertEqual(totals.discount_percent, Decimal("15.00"))

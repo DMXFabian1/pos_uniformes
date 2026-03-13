@@ -149,6 +149,44 @@ class SaleTicketTextServiceTests(unittest.TestCase):
         self.assertNotIn("Descuento aplicado: 29.85", ticket)
         self.assertNotIn("Referencia: Sin referencia", ticket)
 
+    def test_shows_rounding_adjustment_as_separate_line_when_present(self) -> None:
+        sale = _build_sale(
+            with_client=False,
+            stored_discount_percent="15.00",
+            stored_discount_amount="29.85",
+            total="169.00",
+            observacion="Metodo de pago: Efectivo | Ajuste redondeo: -0.15 | Cambio: 31.00",
+        )
+
+        ticket = build_sale_ticket_text(
+            sale=sale,
+            business_name="POS Uniformes",
+        )
+
+        self.assertIn("Descuento aplicado: 15.00% (-29.85)", ticket)
+        self.assertIn("Ajuste: -0.15", ticket)
+        self.assertIn("Total a pagar: 169.00", ticket)
+        self.assertIn("Notas:\n- Cambio: 31.00", ticket)
+        self.assertNotIn("Ajuste redondeo:", ticket)
+
+    def test_reconstructs_discount_correctly_when_rounding_adjustment_is_present(self) -> None:
+        sale = _build_sale(
+            with_client=False,
+            stored_discount_percent="0.00",
+            stored_discount_amount="0.00",
+            total="169.00",
+            observacion="Metodo de pago: Efectivo | Ajuste redondeo: -0.15",
+        )
+
+        ticket = build_sale_ticket_text(
+            sale=sale,
+            business_name="POS Uniformes",
+        )
+
+        self.assertIn("Descuento aplicado: 15.00% (-29.85)", ticket)
+        self.assertIn("Ajuste: -0.15", ticket)
+        self.assertIn("Total a pagar: 169.00", ticket)
+
 
 if __name__ == "__main__":
     unittest.main()

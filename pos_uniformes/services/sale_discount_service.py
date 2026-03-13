@@ -2,7 +2,20 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from decimal import Decimal, InvalidOperation
+
+from pos_uniformes.services.sale_rounding_service import resolve_sale_rounding
+
+
+@dataclass(frozen=True)
+class SalePricing:
+    subtotal: Decimal
+    discount_percent: Decimal
+    applied_discount: Decimal
+    total_after_discount: Decimal
+    rounding_adjustment: Decimal
+    collected_total: Decimal
 
 
 def normalize_discount_value(value: object | None) -> Decimal:
@@ -89,3 +102,25 @@ def calculate_sale_totals(
         applied_discount = subtotal
     total = subtotal - applied_discount
     return subtotal, discount_percent, applied_discount, total
+
+
+def calculate_sale_pricing(
+    sale_cart: list[dict[str, object]],
+    *,
+    loyalty_discount: Decimal | str | int | float,
+    promo_discount: Decimal | str | int | float,
+) -> SalePricing:
+    subtotal, discount_percent, applied_discount, total_after_discount = calculate_sale_totals(
+        sale_cart,
+        loyalty_discount=loyalty_discount,
+        promo_discount=promo_discount,
+    )
+    rounding = resolve_sale_rounding(total_after_discount)
+    return SalePricing(
+        subtotal=subtotal,
+        discount_percent=discount_percent,
+        applied_discount=applied_discount,
+        total_after_discount=rounding.total_after_discount,
+        rounding_adjustment=rounding.rounding_adjustment,
+        collected_total=rounding.collected_total,
+    )

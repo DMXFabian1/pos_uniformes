@@ -20,6 +20,7 @@ class SaleNoteServiceTests(unittest.TestCase):
             payment_method="Tarjeta",
             discount_percent=Decimal("15.00"),
             applied_discount=Decimal("75.00"),
+            rounding_adjustment=Decimal("0.00"),
             breakdown=breakdown,
             format_discount_label=format_discount_label,
             extra_notes=["Autorizacion bancaria OK", "Referencia 123"],
@@ -52,6 +53,7 @@ class SaleNoteServiceTests(unittest.TestCase):
             payment_method="Efectivo",
             discount_percent=Decimal("0.00"),
             applied_discount=Decimal("0.00"),
+            rounding_adjustment=Decimal("0.00"),
             breakdown=breakdown,
             format_discount_label=format_discount_label,
             extra_notes=[],
@@ -78,6 +80,7 @@ class SaleNoteServiceTests(unittest.TestCase):
             payment_method="Transferencia",
             discount_percent=Decimal("10.00"),
             applied_discount=Decimal("50.00"),
+            rounding_adjustment=Decimal("0.00"),
             breakdown=breakdown,
             format_discount_label=format_discount_label,
             extra_notes=["Pago conciliado"],
@@ -94,3 +97,23 @@ class SaleNoteServiceTests(unittest.TestCase):
                 "Pago conciliado",
             ],
         )
+
+    def test_build_sale_note_parts_includes_rounding_adjustment_when_present(self) -> None:
+        breakdown = {
+            "loyalty_discount": Decimal("15.00"),
+            "promo_discount": Decimal("0.00"),
+            "loyalty_source": "Profesor",
+            "winner_label": "Lealtad Profesor 15%",
+        }
+
+        notes = build_sale_note_parts(
+            payment_method="Efectivo",
+            discount_percent=Decimal("15.00"),
+            applied_discount=Decimal("29.85"),
+            rounding_adjustment=Decimal("-0.15"),
+            breakdown=breakdown,
+            format_discount_label=format_discount_label,
+            extra_notes=["Recibido: 200.00"],
+        )
+
+        self.assertIn("Ajuste redondeo: -0.15", notes)

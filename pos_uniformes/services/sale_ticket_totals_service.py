@@ -20,13 +20,17 @@ def resolve_sale_ticket_totals(
     stored_discount_percent: Decimal | str | int | float | None,
     stored_discount_amount: Decimal | str | int | float | None,
     total: Decimal | str | int | float,
+    rounding_adjustment: Decimal | str | int | float | None = None,
 ) -> SaleTicketTotals:
     normalized_subtotal = Decimal(str(subtotal or 0)).quantize(Decimal("0.01"))
     normalized_total = Decimal(str(total or 0)).quantize(Decimal("0.01"))
     normalized_discount_percent = Decimal(str(stored_discount_percent or 0)).quantize(Decimal("0.01"))
     normalized_discount_amount = Decimal(str(stored_discount_amount or 0)).quantize(Decimal("0.01"))
+    normalized_rounding_adjustment = Decimal(str(rounding_adjustment or 0)).quantize(Decimal("0.01"))
 
-    inferred_discount_amount = (normalized_subtotal - normalized_total).quantize(Decimal("0.01"))
+    inferred_discount_amount = (
+        normalized_subtotal - normalized_total + normalized_rounding_adjustment
+    ).quantize(Decimal("0.01"))
     if inferred_discount_amount < Decimal("0.00"):
         inferred_discount_amount = Decimal("0.00")
 

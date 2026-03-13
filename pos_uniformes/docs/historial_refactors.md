@@ -40,6 +40,13 @@
 
 - `services/sale_ticket_totals_service.py`
   - Normalizacion y reconstruccion de descuento para render de ticket.
+- `services/sale_ticket_text_service.py`
+  - Render textual del ticket, forma de pago y ajuste de cobro visible.
+
+### Cobro
+
+- `services/sale_rounding_service.py`
+  - Regla pura de redondeo posterior al descuento.
 
 ### Catalogo e inventario
 
@@ -54,6 +61,7 @@
 - Configuracion y algunas acciones de inventario aun dependen mucho de handlers largos.
 - Falta documentar por dominio con mas detalle.
 - El render completo del ticket sigue en `ui/main_window.py` y aun no tiene prueba integrada de texto final.
+- Falta validacion manual visual de caja con redondeo ya conectado al total de cobro.
 
 ## Proximo paso recomendado
 

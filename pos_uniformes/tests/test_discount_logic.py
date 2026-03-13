@@ -5,6 +5,7 @@ import unittest
 
 from pos_uniformes.services.sale_discount_service import (
     build_sale_discount_breakdown,
+    calculate_sale_pricing,
     calculate_sale_totals,
     effective_sale_discount_percent,
     format_discount_label,
@@ -65,3 +66,18 @@ class DiscountLogicTests(unittest.TestCase):
         self.assertEqual(discount_percent, Decimal("110.00"))
         self.assertEqual(applied_discount, Decimal("100.00"))
         self.assertEqual(total, Decimal("0.00"))
+
+    def test_calculate_sale_pricing_keeps_discount_and_rounding_separate(self) -> None:
+        pricing = calculate_sale_pricing(
+            [
+                {"precio_unitario": "199.00", "cantidad": 1},
+            ],
+            loyalty_discount=Decimal("15.00"),
+            promo_discount=Decimal("0.00"),
+        )
+
+        self.assertEqual(pricing.subtotal, Decimal("199.00"))
+        self.assertEqual(pricing.applied_discount, Decimal("29.85"))
+        self.assertEqual(pricing.total_after_discount, Decimal("169.15"))
+        self.assertEqual(pricing.rounding_adjustment, Decimal("-0.15"))
+        self.assertEqual(pricing.collected_total, Decimal("169.00"))

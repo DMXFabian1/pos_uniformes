@@ -226,3 +226,4 @@ Antes de refactorizar esta zona:
 - mantener fuera del ticket el `usuario` tecnico del sistema
 - evaluar mas adelante un campo mas claro para operacion, por ejemplo `Atendido por` o `Empleado`
 - no implementar ese dato hasta definir bien su fuente y su diferencia contra el usuario interno
+- tomar como referencia visual futura los tickets de retiro de dinero de `7-Eleven` en Japon: composicion limpia, jerarquia fuerte y lectura muy rapida
