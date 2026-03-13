@@ -91,6 +91,34 @@ class SearchFilterServiceTests(unittest.TestCase):
             )
         )
 
+    def test_row_matches_general_text_without_accent(self) -> None:
+        accented_row = dict(
+            self.row,
+            producto_nombre="Corbatín Rojo",
+            producto_nombre_base="Corbatín",
+            producto_descripcion="Corbatín escolar",
+            nombre_legacy="Corbatín rojo",
+        )
+        self.assertTrue(
+            row_matches_search(
+                accented_row,
+                search_text="corbatin",
+                alias_map=self.alias_map,
+                general_fields=self.general_fields,
+            )
+        )
+
+    def test_row_matches_alias_text_without_accent(self) -> None:
+        accented_row = dict(self.row, producto_nombre="Corbatín Rojo", producto_nombre_base="Corbatín")
+        self.assertTrue(
+            row_matches_search(
+                accented_row,
+                search_text="producto:corbatin",
+                alias_map=self.alias_map,
+                general_fields=self.general_fields,
+            )
+        )
+
     def test_row_rejects_non_matching_alias(self) -> None:
         self.assertFalse(
             row_matches_search(

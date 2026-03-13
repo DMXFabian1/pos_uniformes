@@ -3,6 +3,13 @@
 from __future__ import annotations
 
 import shlex
+import unicodedata
+
+
+def _normalize_search_fragment(value: object) -> str:
+    text = str(value or "").strip().casefold()
+    decomposed = unicodedata.normalize("NFKD", text)
+    return "".join(char for char in decomposed if not unicodedata.combining(char))
 
 
 def tokenize_search_text(search_text: str) -> list[str]:
@@ -10,9 +17,9 @@ def tokenize_search_text(search_text: str) -> list[str]:
     if not normalized:
         return []
     try:
-        return [term.strip().lower() for term in shlex.split(normalized) if term.strip()]
+        return [_normalize_search_fragment(term) for term in shlex.split(normalized) if term.strip()]
     except ValueError:
-        return [term.strip().lower() for term in normalized.split() if term.strip()]
+        return [_normalize_search_fragment(term) for term in normalized.split() if term.strip()]
 
 
 def row_matches_search(
@@ -26,10 +33,7 @@ def row_matches_search(
     if not terms:
         return True
 
-    general_haystack = " ".join(
-        str(row.get(field, "") or "").lower()
-        for field in general_fields
-    )
+    general_haystack = " ".join(_normalize_search_fragment(row.get(field, "")) for field in general_fields)
 
     for term in terms:
         if ":" not in term:
@@ -44,6 +48,6 @@ def row_matches_search(
             if term not in general_haystack:
                 return False
             continue
-        if not any(value in str(row.get(field, "") or "").lower() for field in fields):
+        if not any(value in _normalize_search_fragment(row.get(field, "")) for field in fields):
             return False
     return True

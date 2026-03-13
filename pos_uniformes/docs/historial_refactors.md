@@ -6,6 +6,7 @@
 - Suite de pruebas activa.
 - Base actual validada con `check_startup_health.py`.
 - Busqueda textual endurecida para tolerar alias con comillas mal cerradas sin dejar al operador con resultados vacios silenciosos.
+- Busqueda textual endurecida para tolerar comparaciones sin acento contra catalogo real con nombres y variantes acentuadas.
 - Ticket de venta documentado y con correccion tolerante para descuentos faltantes en ventas antiguas.
 - Validacion manual confirmada para `Ventas recientes -> Ver ticket`.
 - Dialogos de cobro extraidos a `ui/dialogs/payment_dialogs.py`.
@@ -87,6 +88,7 @@
 - `services/search_filter_service.py`
   - Busqueda textual compartida.
   - Degrada con gracia cuando el operador deja una comilla sin cerrar en un prefijo como `producto:"...`.
+  - Normaliza acentos para que `corbatin` siga encontrando `Corbatín` en texto general y por alias.
 - `services/active_filter_service.py`
   - Etiquetas y resumenes de filtros activos.
 
