@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+from decimal import Decimal
 import unittest
 
 from pos_uniformes.ui.keypad_input_helper import (
     append_keypad_text,
     backspace_keypad_text,
     clear_keypad_text,
+    parse_keypad_amount_text,
 )
 
 
@@ -26,6 +28,12 @@ class KeypadInputHelperTests(unittest.TestCase):
         self.assertEqual(backspace_keypad_text("150"), "15")
         self.assertEqual(backspace_keypad_text("12.30"), "12.3")
         self.assertEqual(backspace_keypad_text("12."), "12")
+
+    def test_parse_keypad_amount_supports_comma_separator(self) -> None:
+        self.assertEqual(parse_keypad_amount_text("12,5"), Decimal("12.50"))
+
+    def test_parse_keypad_amount_returns_zero_for_invalid_value(self) -> None:
+        self.assertEqual(parse_keypad_amount_text("abc"), Decimal("0.00"))
 
 
 if __name__ == "__main__":

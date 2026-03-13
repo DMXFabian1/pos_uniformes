@@ -2,13 +2,14 @@
 
 from __future__ import annotations
 
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
+from PyQt6.QtCore import QRegularExpression, Qt
+from PyQt6.QtGui import QKeySequence, QRegularExpressionValidator, QShortcut
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
-    QDoubleSpinBox,
     QFormLayout,
     QGridLayout,
     QHBoxLayout,
@@ -24,6 +25,7 @@ from pos_uniformes.ui.keypad_input_helper import (
     backspace_keypad_text,
     clear_keypad_text,
     install_keypad_shortcuts,
+    parse_keypad_amount_text,
 )
 
 if TYPE_CHECKING:
@@ -51,10 +53,7 @@ def build_cash_payment_dialog(window: "MainWindow", total: Decimal) -> dict[str,
     reference_input.setPlaceholderText("Referencia opcional")
 
     def parse_received() -> Decimal:
-        try:
-            return Decimal(keypad_display.text()).quantize(Decimal("0.01"))
-        except (InvalidOperation, ValueError):
-            return Decimal("0.00")
+        return parse_keypad_amount_text(keypad_display.text())
 
     def update_cash_labels() -> None:
         received = parse_received()
@@ -249,26 +248,38 @@ def build_mixed_payment_dialog(
     )
     transfer_info.setWordWrap(True)
     transfer_info.setObjectName("inventoryMetaCard")
-    transfer_spin = QDoubleSpinBox()
-    transfer_spin.setRange(0.0, 999999.99)
-    transfer_spin.setDecimals(2)
-    transfer_spin.setPrefix("$")
-    transfer_spin.setSingleStep(50.0)
-    cash_received_spin = QDoubleSpinBox()
-    cash_received_spin.setRange(0.0, 999999.99)
-    cash_received_spin.setDecimals(2)
-    cash_received_spin.setPrefix("$")
-    cash_received_spin.setSingleStep(50.0)
+    amount_validator = QRegularExpressionValidator(QRegularExpression(r"^\d{0,6}([.,]\d{0,2})?$"))
+    transfer_input = QLineEdit("0.00")
+    transfer_input.setValidator(amount_validator)
+    transfer_input.setPlaceholderText("0.00")
+    transfer_input.setAlignment(Qt.AlignmentFlag.AlignRight)
+    transfer_input.setClearButtonEnabled(True)
+    cash_received_input = QLineEdit("0.00")
+    cash_received_input.setValidator(amount_validator)
+    cash_received_input.setPlaceholderText("0.00")
+    cash_received_input.setAlignment(Qt.AlignmentFlag.AlignRight)
+    cash_received_input.setClearButtonEnabled(True)
     remaining_label = QLabel("$0.00")
     remaining_label.setObjectName("cashierMetaLabel")
     change_label = QLabel("$0.00")
     change_label.setObjectName("cashierChangeValue")
+    keyboard_hint = QLabel("Usa Tab para cambiar de campo. Enter confirma y Esc cancela.")
+    keyboard_hint.setObjectName("analyticsLine")
     reference_input = QLineEdit()
     reference_input.setPlaceholderText("Referencia transferencia opcional")
 
+    def parse_transfer_amount() -> Decimal:
+        return parse_keypad_amount_text(transfer_input.text())
+
+    def parse_cash_received() -> Decimal:
+        return parse_keypad_amount_text(cash_received_input.text())
+
+    def normalize_amount_input(input_field: QLineEdit) -> None:
+        input_field.setText(f"{parse_keypad_amount_text(input_field.text()):.2f}")
+
     def update_mixed_labels() -> None:
-        transfer_amount = Decimal(str(transfer_spin.value())).quantize(Decimal("0.01"))
-        cash_received = Decimal(str(cash_received_spin.value())).quantize(Decimal("0.01"))
+        transfer_amount = parse_transfer_amount()
+        cash_received = parse_cash_received()
         remaining_cash = total - transfer_amount
         if remaining_cash < Decimal("0.00"):
             remaining_cash = Decimal("0.00")
@@ -278,12 +289,14 @@ def build_mixed_payment_dialog(
         remaining_label.setText(f"${remaining_cash}")
         change_label.setText(f"${change}")
 
-    transfer_spin.valueChanged.connect(update_mixed_labels)
-    cash_received_spin.valueChanged.connect(update_mixed_labels)
+    transfer_input.textChanged.connect(update_mixed_labels)
+    transfer_input.editingFinished.connect(lambda: normalize_amount_input(transfer_input))
+    cash_received_input.textChanged.connect(update_mixed_labels)
+    cash_received_input.editingFinished.connect(lambda: normalize_amount_input(cash_received_input))
 
     form = QFormLayout()
-    form.addRow("Transferencia", transfer_spin)
-    form.addRow("Efectivo recibido", cash_received_spin)
+    form.addRow("Transferencia", transfer_input)
+    form.addRow("Efectivo recibido", cash_received_input)
     form.addRow("Efectivo a cubrir", remaining_label)
     form.addRow("Cambio", change_label)
     form.addRow("Referencia", reference_input)
@@ -291,18 +304,33 @@ def build_mixed_payment_dialog(
     buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Confirmar pago")
     buttons.accepted.connect(dialog.accept)
     buttons.rejected.connect(dialog.reject)
+    submit_shortcuts: list[QShortcut] = []
+
+    def register_submit_shortcut(sequence: QKeySequence | str, callback) -> None:
+        shortcut = QShortcut(QKeySequence(sequence), dialog)
+        shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        shortcut.activated.connect(callback)
+        submit_shortcuts.append(shortcut)
+
+    register_submit_shortcut(QKeySequence(Qt.Key.Key_Return), buttons.button(QDialogButtonBox.StandardButton.Ok).click)
+    register_submit_shortcut(QKeySequence(Qt.Key.Key_Enter), buttons.button(QDialogButtonBox.StandardButton.Ok).click)
+    register_submit_shortcut("Escape", buttons.button(QDialogButtonBox.StandardButton.Cancel).click)
+    dialog._mixed_payment_shortcuts = submit_shortcuts  # type: ignore[attr-defined]
 
     layout.addWidget(total_label)
     layout.addWidget(transfer_info)
+    layout.addWidget(keyboard_hint)
     layout.addLayout(form)
     layout.addWidget(buttons)
     update_mixed_labels()
+    cash_received_input.setFocus()
+    cash_received_input.selectAll()
 
     if dialog.exec() != int(QDialog.DialogCode.Accepted):
         return None
 
-    transfer_amount = Decimal(str(transfer_spin.value())).quantize(Decimal("0.01"))
-    cash_received = Decimal(str(cash_received_spin.value())).quantize(Decimal("0.01"))
+    transfer_amount = parse_transfer_amount()
+    cash_received = parse_cash_received()
     cash_due = total - transfer_amount
     if cash_due < Decimal("0.00"):
         cash_due = Decimal("0.00")

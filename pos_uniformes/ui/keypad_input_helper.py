@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from decimal import Decimal, InvalidOperation
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QKeySequence, QShortcut
@@ -27,6 +28,16 @@ def backspace_keypad_text(current: str) -> str:
     if not normalized_current or normalized_current == "-":
         return "0.00"
     return normalized_current
+
+
+def parse_keypad_amount_text(current: str) -> Decimal:
+    normalized_current = (current or "0.00").strip().replace(",", ".")
+    if normalized_current in {"", ".", "-"}:
+        return Decimal("0.00")
+    try:
+        return Decimal(normalized_current).quantize(Decimal("0.01"))
+    except (InvalidOperation, ValueError):
+        return Decimal("0.00")
 
 
 def install_keypad_shortcuts(

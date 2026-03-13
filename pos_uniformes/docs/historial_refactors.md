@@ -9,6 +9,7 @@
 - Validacion manual confirmada para `Ventas recientes -> Ver ticket`.
 - Dialogos de cobro extraidos a `ui/dialogs/payment_dialogs.py`.
 - Modal imprimible de ticket y comprobante extraido a `ui/dialogs/printable_text_dialog.py`.
+- Cobro mixto ajustado para captura por teclado fisico con confirmacion por `Enter` y cancelacion por `Esc`.
 
 ## Extracciones ya realizadas
 
