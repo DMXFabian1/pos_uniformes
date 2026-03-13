@@ -3,11 +3,20 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
+from typing import Callable
 
 
 @dataclass(frozen=True)
 class ScannedClientDecision:
     action: str
+
+
+@dataclass(frozen=True)
+class ScannedClientFeedback:
+    message: str
+    tone: str
+    auto_clear_ms: int
 
 
 def decide_scanned_client_action(
@@ -58,4 +67,24 @@ def build_client_linked_feedback(
     return (
         f"Cliente enlazado: {client_code} · {client_name}. "
         f"Descuento vigente: {discount_label}."
+    )
+
+
+def build_scanned_client_applied_feedback(
+    *,
+    client_code: str,
+    client_name: str,
+    discount_percent: Decimal | str | int | float,
+    format_discount_label: Callable[[Decimal | str | int | float], str],
+) -> ScannedClientFeedback:
+    normalized_discount = Decimal(str(discount_percent or 0)).quantize(Decimal("0.01"))
+    discount_label = format_discount_label(normalized_discount) if normalized_discount > Decimal("0.00") else "0%"
+    return ScannedClientFeedback(
+        message=build_client_linked_feedback(
+            client_code=client_code,
+            client_name=client_name,
+            discount_label=discount_label,
+        ),
+        tone="positive",
+        auto_clear_ms=2200,
     )

@@ -9,6 +9,7 @@ from pos_uniformes.services.manual_promo_flow_service import (
     clear_manual_promo_state,
     current_manual_promo_percent,
     decide_manual_promo_change,
+    resolve_manual_promo_transition,
 )
 
 
@@ -85,3 +86,58 @@ class ManualPromoFlowServiceTests(unittest.TestCase):
             current_manual_promo_percent(selected_percent=Decimal("15.00"), state=state),
             Decimal("0.00"),
         )
+
+    def test_transition_clears_manual_promo_state(self) -> None:
+        decision = decide_manual_promo_change(
+            selected_percent=Decimal("0.00"),
+            state=build_manual_promo_state(authorized=True, authorized_percent=Decimal("15.00")),
+        )
+
+        transition = resolve_manual_promo_transition(
+            decision=decision,
+            authorization_granted=False,
+            format_discount_label=lambda value: f"{value}%",
+        )
+
+        self.assertFalse(transition.next_state.authorized)
+        self.assertEqual(transition.combo_percent, Decimal("0.00"))
+        self.assertEqual(transition.feedback_message, "")
+
+    def test_transition_reverts_when_authorization_is_rejected(self) -> None:
+        decision = decide_manual_promo_change(
+            selected_percent=Decimal("20.00"),
+            state=build_manual_promo_state(authorized=True, authorized_percent=Decimal("15.00")),
+        )
+
+        transition = resolve_manual_promo_transition(
+            decision=decision,
+            authorization_granted=False,
+            format_discount_label=lambda value: f"{value}%",
+        )
+
+        self.assertTrue(transition.next_state.authorized)
+        self.assertEqual(transition.next_state.authorized_percent, Decimal("15.00"))
+        self.assertEqual(transition.combo_percent, Decimal("15.00"))
+        self.assertEqual(transition.feedback_message, "")
+
+    def test_transition_applies_feedback_when_authorization_is_granted(self) -> None:
+        decision = decide_manual_promo_change(
+            selected_percent=Decimal("20.00"),
+            state=build_manual_promo_state(authorized=False, authorized_percent=Decimal("0.00")),
+        )
+
+        transition = resolve_manual_promo_transition(
+            decision=decision,
+            authorization_granted=True,
+            format_discount_label=lambda value: f"{int(value)}%",
+        )
+
+        self.assertTrue(transition.next_state.authorized)
+        self.assertEqual(transition.next_state.authorized_percent, Decimal("20.00"))
+        self.assertEqual(transition.combo_percent, Decimal("20.00"))
+        self.assertEqual(
+            transition.feedback_message,
+            "Promocion manual 20% autorizada con codigo.",
+        )
+        self.assertEqual(transition.feedback_tone, "warning")
+        self.assertEqual(transition.feedback_auto_clear_ms, 1800)

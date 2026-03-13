@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+from decimal import Decimal
 import unittest
 
 from pos_uniformes.services.scanned_client_flow_service import (
     build_client_already_linked_feedback,
+    build_scanned_client_applied_feedback,
     build_client_linked_feedback,
     build_replace_client_confirmation,
     build_scanned_client_kept_feedback,
@@ -69,4 +71,19 @@ class ScannedClientFlowServiceTests(unittest.TestCase):
                 discount_label="10%",
             ),
             "Cliente enlazado: CLI001 · Maria. Descuento vigente: 10%.",
+        )
+
+    def test_build_scanned_client_applied_feedback_uses_zero_label_when_discount_is_empty(self) -> None:
+        feedback = build_scanned_client_applied_feedback(
+            client_code="CLI001",
+            client_name="Maria",
+            discount_percent=Decimal("0.00"),
+            format_discount_label=lambda value: f"{value}%",
+        )
+
+        self.assertEqual(feedback.tone, "positive")
+        self.assertEqual(feedback.auto_clear_ms, 2200)
+        self.assertEqual(
+            feedback.message,
+            "Cliente enlazado: CLI001 · Maria. Descuento vigente: 0%.",
         )

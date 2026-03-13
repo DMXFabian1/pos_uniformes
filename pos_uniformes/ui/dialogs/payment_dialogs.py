@@ -27,12 +27,17 @@ from pos_uniformes.ui.keypad_input_helper import (
     install_keypad_shortcuts,
     parse_keypad_amount_text,
 )
+from pos_uniformes.services.sale_payment_note_service import (
+    build_cash_payment_details,
+    build_mixed_payment_details,
+    build_transfer_payment_details,
+)
 
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
 
 
-def build_cash_payment_dialog(window: "MainWindow", total: Decimal) -> dict[str, object] | None:
+def build_cash_payment_dialog(window: "MainWindow", total: Decimal):
     dialog, layout = window._create_modal_dialog(
         "Cobro en efectivo",
         "Captura el efectivo recibido. Puedes usar el teclado numerico o los montos rapidos.",
@@ -159,22 +164,14 @@ def build_cash_payment_dialog(window: "MainWindow", total: Decimal) -> dict[str,
         QMessageBox.warning(window, "Pago insuficiente", "El monto recibido debe cubrir el total de la venta.")
         return None
     change = (received - total).quantize(Decimal("0.01"))
-    return {
-        "recibido": received,
-        "cambio": change,
-        "nota": [
-            f"Recibido: {received}",
-            f"Cambio: {change}",
-            f"Referencia: {reference_input.text().strip() or 'Sin referencia'}",
-        ],
-    }
+    return build_cash_payment_details(
+        received=received,
+        change=change,
+        reference=reference_input.text(),
+    )
 
 
-def build_transfer_payment_dialog(
-    window: "MainWindow",
-    total: Decimal,
-    business,
-) -> dict[str, object] | None:
+def build_transfer_payment_dialog(window: "MainWindow", total: Decimal, business):
     if not business.transfer_clabe and not business.transfer_instructions:
         QMessageBox.warning(
             window,
@@ -218,18 +215,10 @@ def build_transfer_payment_dialog(
     if dialog.exec() != int(QDialog.DialogCode.Accepted):
         return None
 
-    return {
-        "nota": [
-            f"Referencia transferencia: {reference_input.text().strip() or 'Sin referencia'}",
-        ]
-    }
+    return build_transfer_payment_details(reference_input.text())
 
 
-def build_mixed_payment_dialog(
-    window: "MainWindow",
-    total: Decimal,
-    business,
-) -> dict[str, object] | None:
+def build_mixed_payment_dialog(window: "MainWindow", total: Decimal, business):
     dialog, layout = window._create_modal_dialog(
         "Cobro mixto",
         "Registra cuanto entra por transferencia y cuanto efectivo recibes. El sistema calcula el cambio.",
@@ -340,11 +329,9 @@ def build_mixed_payment_dialog(
     change = (cash_received - cash_due).quantize(Decimal("0.01"))
     if change < Decimal("0.00"):
         change = Decimal("0.00")
-    return {
-        "nota": [
-            f"Transferencia: {transfer_amount}",
-            f"Efectivo recibido: {cash_received}",
-            f"Cambio: {change}",
-            f"Referencia transferencia: {reference_input.text().strip() or 'Sin referencia'}",
-        ]
-    }
+    return build_mixed_payment_details(
+        transfer_amount=transfer_amount,
+        cash_received=cash_received,
+        change=change,
+        reference=reference_input.text(),
+    )

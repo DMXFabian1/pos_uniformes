@@ -33,7 +33,7 @@
 - `ui/helpers/sale_cashier_summary_helper.py`
   - Resumen visible del bloque total en Caja sin referencia del cliente.
 - `services/manual_promo_flow_service.py`
-  - Estado y decision de promo manual.
+  - Estado, decision y transicion de promo manual fuera de `MainWindow`.
 - `services/sale_note_service.py`
   - Notas operativas de la venta.
 - `services/sale_loyalty_notice_service.py`
@@ -66,10 +66,14 @@
 
 - `services/business_payment_settings_service.py`
   - Snapshot reutilizable de datos de transferencia para dialogs de cobro.
+- `services/sale_payment_note_service.py`
+  - Detalles puros de cobro y notas operativas por metodo de pago.
 - `services/sale_rounding_service.py`
   - Regla pura de redondeo posterior al descuento.
 - `ui/dialogs/payment_dialogs.py`
   - Dialogos de efectivo, transferencia y mixto fuera de `MainWindow`.
+- `ui/helpers/sale_payment_helper.py`
+  - Enrutamiento UI del cobro por metodo sin dejar prompts ni snapshot en `MainWindow`.
 
 ### Catalogo e inventario
 

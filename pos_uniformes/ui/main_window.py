@@ -120,16 +120,15 @@ from pos_uniformes.services.inventario_service import (
 )
 from pos_uniformes.services.loyalty_service import LoyaltyService
 from pos_uniformes.services.manual_promo_flow_service import (
-    apply_manual_promo_authorization,
     build_manual_promo_state,
     clear_manual_promo_state,
     current_manual_promo_percent,
     decide_manual_promo_change,
+    resolve_manual_promo_transition,
 )
 from pos_uniformes.services.manual_promo_service import ManualPromoService
 from pos_uniformes.services.marketing_audit_service import MarketingAuditService
 from pos_uniformes.services.presupuesto_service import PresupuestoItemInput, PresupuestoService
-from pos_uniformes.services.business_payment_settings_service import load_business_payment_settings_snapshot
 from pos_uniformes.services.business_print_settings_service import load_business_print_settings_snapshot
 from pos_uniformes.services.layaway_receipt_text_service import build_layaway_receipt_text
 from pos_uniformes.services.sale_note_service import build_sale_note_parts
@@ -144,10 +143,11 @@ from pos_uniformes.services.sale_document_service import (
     load_sale_for_layaway_ticket,
     load_sale_for_ticket,
 )
-from pos_uniformes.services.sale_client_benefit_service import resolve_sale_client_benefit
-from pos_uniformes.services.sale_client_discount_service import resolve_sale_client_discount
-from pos_uniformes.services.sale_selected_client_service import load_sale_selected_client_benefit
-from pos_uniformes.services.sale_client_sync_service import resolve_sale_client_sync_state
+from pos_uniformes.services.sale_selected_client_service import (
+    find_active_sale_client_by_code,
+    load_sale_selected_client_benefit,
+    resolve_sale_selected_client_sync_state,
+)
 from pos_uniformes.services.sale_discount_lock_service import (
     build_sale_discount_lock_state,
     build_sale_discount_lock_tooltip,
@@ -163,6 +163,7 @@ from pos_uniformes.services.sale_discount_service import (
 from pos_uniformes.services.search_filter_service import row_matches_search
 from pos_uniformes.services.scanned_client_flow_service import (
     build_client_already_linked_feedback,
+    build_scanned_client_applied_feedback,
     build_client_linked_feedback,
     build_replace_client_confirmation,
     build_scanned_client_kept_feedback,
@@ -182,14 +183,10 @@ from pos_uniformes.ui.dialogs.settings_dialogs import (
     build_whatsapp_settings_dialog,
     build_users_settings_dialog,
 )
-from pos_uniformes.ui.dialogs.payment_dialogs import (
-    build_cash_payment_dialog,
-    build_mixed_payment_dialog,
-    build_transfer_payment_dialog,
-)
 from pos_uniformes.ui.dialogs.printable_text_dialog import open_printable_text_dialog
 from pos_uniformes.ui.helpers.sale_cart_table_helper import build_sale_cart_table_view
 from pos_uniformes.ui.helpers.sale_cashier_summary_helper import build_sale_cashier_summary
+from pos_uniformes.ui.helpers.sale_payment_helper import collect_sale_payment_details
 from pos_uniformes.ui.views.analytics_view import build_analytics_tab
 from pos_uniformes.ui.views.cashier_view import build_cashier_tab
 from pos_uniformes.ui.views.dashboard_view import build_dashboard_tab
@@ -746,7 +743,6 @@ class MainWindow(QMainWindow):
         self.sale_client_combo = QComboBox()
         self.sale_payment_combo = QComboBox()
         self.sale_discount_combo = QComboBox()
-        self.sale_received_spin = QDoubleSpinBox()
         self.sale_add_button = QPushButton("Agregar al carrito")
         self.sale_button = QPushButton("Confirmar venta")
         self.sale_layaway_button = QPushButton("Convertir a apartado")
@@ -760,7 +756,6 @@ class MainWindow(QMainWindow):
         self.sale_summary_label = QLabel("Carrito vacio.")
         self.sale_total_label = QLabel("$0.00")
         self.sale_total_meta_label = QLabel("Total a cobrar")
-        self.sale_change_label = QLabel("$0.00")
         self.sale_feedback_label = QLabel("Listo para escanear.")
         self.sales_dialog: QDialog | None = None
         self.sale_processing = False
@@ -7446,7 +7441,6 @@ class MainWindow(QMainWindow):
         self._set_sale_discount_lock_state(locked=False, discount_percent=Decimal("0.00"))
         self._clear_sale_manual_promo_authorization()
         self._refresh_sale_discount_options(selected_discount=Decimal("0.00"))
-        self.sale_received_spin.setValue(0.0)
         self.sale_folio_input.setText(self._generate_sale_folio())
         self.sale_last_scanned_sku = ""
         self.sale_last_scanned_at = 0.0
@@ -7511,18 +7505,6 @@ class MainWindow(QMainWindow):
             return f"{preview_head} | rango {preview_list[0]} -> {preview_list[-1]}"
         return f"{preview_head} ... (+{len(preview_list) - 4}) | rango {preview_list[0]} -> {preview_list[-1]}"
 
-    @staticmethod
-    def _find_active_client_by_code(session, client_code: str) -> Cliente | None:
-        normalized_code = client_code.strip().upper()
-        if not normalized_code:
-            return None
-        return session.scalar(
-            select(Cliente).where(
-                func.upper(Cliente.codigo_cliente) == normalized_code,
-                Cliente.activo.is_(True),
-            )
-        )
-
     def _apply_scanned_client_to_sale(self, client: Cliente, scanned_code: str) -> bool:
         current_client_id = self.sale_client_combo.currentData()
         decision = decide_scanned_client_action(
@@ -7576,15 +7558,16 @@ class MainWindow(QMainWindow):
         self.sale_qty_spin.setValue(1)
         self._play_sale_feedback_sound()
         discount = self._selected_sale_client_discount()
-        discount_label = self._format_discount_label(discount) if discount > Decimal("0.00") else "0%"
+        feedback = build_scanned_client_applied_feedback(
+            client_code=client.codigo_cliente,
+            client_name=client.nombre,
+            discount_percent=discount,
+            format_discount_label=self._format_discount_label,
+        )
         self._set_sale_feedback(
-            build_client_linked_feedback(
-                client_code=client.codigo_cliente,
-                client_name=client.nombre,
-                discount_label=discount_label,
-            ),
-            "positive",
-            auto_clear_ms=2200,
+            feedback.message,
+            feedback.tone,
+            auto_clear_ms=feedback.auto_clear_ms,
         )
         self.sale_sku_input.setFocus()
         return True
@@ -7638,20 +7621,6 @@ class MainWindow(QMainWindow):
                 return benefit.discount_percent if benefit is not None else Decimal("0.00")
         except Exception:
             return Decimal("0.00")
-
-    def _reset_sale_client_discount_sync(self) -> None:
-        state = resolve_sale_client_sync_state(
-            has_selected_client=False,
-            discount_percent=Decimal("0.00"),
-            source_label="",
-            normalize_discount_value=self._normalize_discount_value,
-        )
-        self._set_sale_discount_lock_state(
-            locked=state.locked,
-            discount_percent=state.discount_percent,
-            source_label=state.source_label,
-        )
-        self._refresh_sale_cart_table()
 
     def _refresh_sale_discount_options(self, *, selected_discount: Decimal | int | float | str | None = None) -> None:
         current_discount = (
@@ -7724,13 +7693,20 @@ class MainWindow(QMainWindow):
         self.sale_manual_promo_authorized = state.authorized
         self.sale_manual_promo_authorized_percent = state.authorized_percent
 
+    def _sale_manual_promo_state(self):
+        return build_manual_promo_state(
+            authorized=self.sale_manual_promo_authorized,
+            authorized_percent=self.sale_manual_promo_authorized_percent,
+        )
+
+    def _apply_sale_manual_promo_state(self, state) -> None:
+        self.sale_manual_promo_authorized = state.authorized
+        self.sale_manual_promo_authorized_percent = state.authorized_percent
+
     def _current_manual_promo_percent(self) -> Decimal:
         return current_manual_promo_percent(
             selected_percent=self.sale_discount_combo.currentData(),
-            state=build_manual_promo_state(
-                authorized=self.sale_manual_promo_authorized,
-                authorized_percent=self.sale_manual_promo_authorized_percent,
-            ),
+            state=self._sale_manual_promo_state(),
         )
 
     def _prompt_manual_promo_authorization(self, promo_percent: Decimal) -> bool:
@@ -7758,32 +7734,26 @@ class MainWindow(QMainWindow):
     def _handle_sale_discount_changed(self) -> None:
         decision = decide_manual_promo_change(
             selected_percent=self.sale_discount_combo.currentData(),
-            state=build_manual_promo_state(
-                authorized=self.sale_manual_promo_authorized,
-                authorized_percent=self.sale_manual_promo_authorized_percent,
-            ),
+            state=self._sale_manual_promo_state(),
         )
-        if decision.action == "clear":
-            self._clear_sale_manual_promo_authorization()
-            self._refresh_sale_cart_table()
-            return
-        if decision.action == "keep":
-            self._refresh_sale_cart_table()
-            return
-        if not self._prompt_manual_promo_authorization(decision.selected_percent):
-            self._set_sale_discount_combo_percent(decision.revert_percent)
-            if not decision.previous_state.authorized:
-                self._clear_sale_manual_promo_authorization()
-            self._refresh_sale_cart_table()
-            return
-        new_state = apply_manual_promo_authorization(decision.selected_percent)
-        self.sale_manual_promo_authorized = new_state.authorized
-        self.sale_manual_promo_authorized_percent = new_state.authorized_percent
-        self._set_sale_feedback(
-            f"Promocion manual {self._format_discount_label(decision.selected_percent)} autorizada con codigo.",
-            "warning",
-            auto_clear_ms=1800,
+        authorization_granted = (
+            self._prompt_manual_promo_authorization(decision.selected_percent)
+            if decision.action == "authorize"
+            else False
         )
+        transition = resolve_manual_promo_transition(
+            decision=decision,
+            authorization_granted=authorization_granted,
+            format_discount_label=self._format_discount_label,
+        )
+        self._apply_sale_manual_promo_state(transition.next_state)
+        self._set_sale_discount_combo_percent(transition.combo_percent)
+        if transition.feedback_message:
+            self._set_sale_feedback(
+                transition.feedback_message,
+                transition.feedback_tone,
+                auto_clear_ms=transition.feedback_auto_clear_ms,
+            )
         self._refresh_sale_cart_table()
 
     def _sync_sale_discount_with_selected_client(self, *, reset_manual: bool = False) -> None:
@@ -7791,30 +7761,19 @@ class MainWindow(QMainWindow):
             self._set_sale_discount_combo_percent(Decimal("0.00"))
             self._clear_sale_manual_promo_authorization()
 
-        selected_client_id = self.sale_client_combo.currentData()
-        if selected_client_id in {None, ""}:
-            self._reset_sale_client_discount_sync()
-            return
-
         try:
             with get_session() as session:
-                benefit = load_sale_selected_client_benefit(
+                state = resolve_sale_selected_client_sync_state(
                     session,
-                    selected_client_id=selected_client_id,
+                    selected_client_id=self.sale_client_combo.currentData(),
                     normalize_discount_value=self._normalize_discount_value,
                 )
-                if benefit is None:
-                    raise ValueError("No se pudo cargar el cliente seleccionado.")
         except Exception:
-            self._reset_sale_client_discount_sync()
-            return
-
-        state = resolve_sale_client_sync_state(
-            has_selected_client=True,
-            discount_percent=benefit.discount_percent,
-            source_label=benefit.source_label,
-            normalize_discount_value=self._normalize_discount_value,
-        )
+            state = resolve_sale_selected_client_sync_state(
+                None,
+                selected_client_id=None,
+                normalize_discount_value=self._normalize_discount_value,
+            )
         self._set_sale_discount_lock_state(
             locked=state.locked,
             discount_percent=state.discount_percent,
@@ -7860,45 +7819,8 @@ class MainWindow(QMainWindow):
             promo_discount=promo_discount,
         )
 
-    def _load_business_payment_settings_snapshot(self):
-        try:
-            with get_session() as session:
-                return load_business_payment_settings_snapshot(session)
-        except Exception:
-            return SimpleNamespace(
-                business_name="POS Uniformes",
-                transfer_bank="",
-                transfer_beneficiary="",
-                transfer_clabe="",
-                transfer_instructions="",
-            )
-
-    def _prompt_cash_payment(self, total: Decimal) -> dict[str, object] | None:
-        return build_cash_payment_dialog(self, total)
-
-    def _prompt_transfer_payment(self, total: Decimal) -> dict[str, object] | None:
-        business = self._load_business_payment_settings_snapshot()
-        return build_transfer_payment_dialog(self, total, business)
-
-    def _prompt_mixed_payment(self, total: Decimal) -> dict[str, object] | None:
-        business = self._load_business_payment_settings_snapshot()
-        return build_mixed_payment_dialog(self, total, business)
-
-    def _collect_sale_payment_details(self, payment_method: str, total: Decimal) -> dict[str, object] | None:
-        if payment_method == "Efectivo":
-            return self._prompt_cash_payment(total)
-        if payment_method == "Transferencia":
-            return self._prompt_transfer_payment(total)
-        if payment_method == "Mixto":
-            return self._prompt_mixed_payment(total)
-        return {"nota": []}
-
     def _refresh_payment_fields(self) -> None:
-        pricing = self._calculate_sale_pricing()
-        total = pricing.collected_total
         payment_method = self.sale_payment_combo.currentText() or "Efectivo"
-        self.sale_received_spin.setValue(float(total))
-        self.sale_change_label.setText("$0.00")
         self.sale_feedback_label.setToolTip(
             f"El cobro se completara en una ventana aparte para {payment_method.lower()}."
         )
@@ -7938,7 +7860,7 @@ class MainWindow(QMainWindow):
 
         try:
             with get_session() as session:
-                client = self._find_active_client_by_code(session, sku)
+                client = find_active_sale_client_by_code(session, sku)
                 if client is not None:
                     if self._apply_scanned_client_to_sale(client, sku):
                         return
@@ -8250,7 +8172,11 @@ class MainWindow(QMainWindow):
         breakdown = self._sale_discount_breakdown()
         loyalty_discount = self._normalize_discount_value(breakdown["loyalty_discount"])
         promo_discount = self._normalize_discount_value(breakdown["promo_discount"])
-        payment_details = self._collect_sale_payment_details(payment_method, total)
+        payment_details = collect_sale_payment_details(
+            self,
+            payment_method=payment_method,
+            total=total,
+        )
         if payment_details is None:
             return
         sale_note_parts = build_sale_note_parts(
@@ -8260,7 +8186,7 @@ class MainWindow(QMainWindow):
             rounding_adjustment=rounding_adjustment,
             breakdown=breakdown,
             format_discount_label=self._format_discount_label,
-            extra_notes=list(payment_details.get("nota", [])),
+            extra_notes=list(payment_details.note_lines),
         )
         loyalty_transition_notice = ""
 

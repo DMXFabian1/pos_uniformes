@@ -22,6 +22,15 @@ class ManualPromoDecision:
     revert_percent: Decimal
 
 
+@dataclass(frozen=True)
+class ManualPromoTransition:
+    next_state: ManualPromoState
+    combo_percent: Decimal
+    feedback_message: str
+    feedback_tone: str
+    feedback_auto_clear_ms: int | None
+
+
 def build_manual_promo_state(
     *,
     authorized: bool,
@@ -97,4 +106,50 @@ def apply_manual_promo_authorization(
     return ManualPromoState(
         authorized=True,
         authorized_percent=normalized_selected,
+    )
+
+
+def resolve_manual_promo_transition(
+    *,
+    decision: ManualPromoDecision,
+    authorization_granted: bool,
+    format_discount_label,
+) -> ManualPromoTransition:
+    if decision.action == "clear":
+        return ManualPromoTransition(
+            next_state=clear_manual_promo_state(),
+            combo_percent=Decimal("0.00"),
+            feedback_message="",
+            feedback_tone="neutral",
+            feedback_auto_clear_ms=None,
+        )
+
+    if decision.action == "keep":
+        return ManualPromoTransition(
+            next_state=decision.previous_state,
+            combo_percent=decision.selected_percent,
+            feedback_message="",
+            feedback_tone="neutral",
+            feedback_auto_clear_ms=None,
+        )
+
+    if not authorization_granted:
+        fallback_state = decision.previous_state if decision.previous_state.authorized else clear_manual_promo_state()
+        return ManualPromoTransition(
+            next_state=fallback_state,
+            combo_percent=decision.revert_percent,
+            feedback_message="",
+            feedback_tone="neutral",
+            feedback_auto_clear_ms=None,
+        )
+
+    new_state = apply_manual_promo_authorization(decision.selected_percent)
+    return ManualPromoTransition(
+        next_state=new_state,
+        combo_percent=decision.selected_percent,
+        feedback_message=(
+            f"Promocion manual {format_discount_label(decision.selected_percent)} autorizada con codigo."
+        ),
+        feedback_tone="warning",
+        feedback_auto_clear_ms=1800,
     )
