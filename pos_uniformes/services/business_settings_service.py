@@ -9,6 +9,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from pos_uniformes.database.models import ConfiguracionNegocio, RolUsuario, Usuario
+from pos_uniformes.services.manual_promo_service import DEFAULT_PROMO_AUTHORIZATION_CODE, ManualPromoService
+from pos_uniformes.services.marketing_audit_service import MarketingAuditField, MarketingAuditService
 
 
 @dataclass(frozen=True)
@@ -37,10 +39,22 @@ class BusinessSettingsInput:
     whatsapp_cliente_saludo: str | None
     impresora_preferida: str | None
     copias_ticket: int
+    promo_authorization_code: str | None = None
 
 
 class BusinessSettingsService:
     """Administra la configuracion general del negocio."""
+
+    MARKETING_AUDIT_FIELDS = (
+        ("REGLAS", "loyalty_review_window_days", "Ventana evaluacion (dias)"),
+        ("REGLAS", "leal_spend_threshold", "Monto para subir a LEAL"),
+        ("REGLAS", "leal_purchase_count_threshold", "Compras minimas para LEAL"),
+        ("REGLAS", "leal_purchase_sum_threshold", "Monto acumulado por frecuencia"),
+        ("DESCUENTOS", "discount_basico", "Descuento BASICO"),
+        ("DESCUENTOS", "discount_leal", "Descuento LEAL"),
+        ("DESCUENTOS", "discount_profesor", "Descuento PROFESOR"),
+        ("DESCUENTOS", "discount_mayorista", "Descuento MAYORISTA"),
+    )
 
     @staticmethod
     def _validate_admin(admin_user: Usuario) -> None:
@@ -84,6 +98,7 @@ class BusinessSettingsService:
                 ),
                 copias_ticket=1,
             )
+            ManualPromoService.update_authorization_code(session, config, DEFAULT_PROMO_AUTHORIZATION_CODE)
             session.add(config)
             session.flush()
         return config
@@ -122,6 +137,16 @@ class BusinessSettingsService:
                 raise ValueError(f"{field_name} debe estar entre 0 y 100.")
 
         config = cls.get_or_create(session)
+        audit_fields = [
+            MarketingAuditField(
+                field_key=field_key,
+                section=section,
+                label=label,
+                previous_value=getattr(config, field_key),
+                new_value=getattr(payload, field_key),
+            )
+            for section, field_key, label in cls.MARKETING_AUDIT_FIELDS
+        ]
         config.nombre_negocio = payload.nombre_negocio.strip()
         config.logo_path = payload.logo_path.strip() if payload.logo_path else None
         config.loyalty_review_window_days = int(payload.loyalty_review_window_days)
@@ -160,5 +185,7 @@ class BusinessSettingsService:
         )
         config.impresora_preferida = payload.impresora_preferida.strip() if payload.impresora_preferida else None
         config.copias_ticket = payload.copias_ticket
+        ManualPromoService.update_authorization_code(session, config, payload.promo_authorization_code)
+        MarketingAuditService.log_field_changes(session, actor_user=admin_user, fields=audit_fields)
         session.add(config)
         return config

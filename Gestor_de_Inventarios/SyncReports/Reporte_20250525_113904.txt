@@ -1,0 +1,30 @@
+Reporte de Cambios - 20250525_113904
+--------------------------------------------------
+Productos Nuevos:
+SKU: SKU002764, Nombre: Playera Deportiva Ad hoc Talla 16, Inventario: 4, Precio: 219.0, Escuela: Conalep, Última Modificación: 2025-05-22 12:50:39
+SKU: SKU002765, Nombre: Playera Deportiva Ad hoc Talla CH, Inventario: 6, Precio: 219.0, Escuela: Conalep, Última Modificación: 2025-05-22 12:50:39
+SKU: SKU002766, Nombre: Playera Deportiva Ad hoc Talla MD, Inventario: 4, Precio: 219.0, Escuela: Conalep, Última Modificación: 2025-05-22 12:50:39
+SKU: SKU002767, Nombre: Playera Deportiva Ad hoc Talla GD, Inventario: 4, Precio: 219.0, Escuela: Conalep, Última Modificación: 2025-05-22 12:50:40
+SKU: SKU002768, Nombre: Playera Deportiva Ad hoc Talla EXG, Inventario: 6, Precio: 219.0, Escuela: Conalep, Última Modificación: 2025-05-22 12:50:40
+SKU: SKU002769, Nombre: Boina Escolta Verde limon Talla Uni, Inventario: 0, Precio: 80.0, Escuela: Sin Escuela, Última Modificación: 2025-05-24 16:26:54
+--------------------------------------------------
+Productos Modificados:
+SKU: SKU000003, Nombre: Bata Manga Larga Blanca Talla 16, Cambios: Inventario: 0 → 1, Última Modificación: 2025-05-21 19:31:51
+SKU: SKU000004, Nombre: Bata Manga Larga Blanca Talla 18, Cambios: Inventario: 0 → 1, Última Modificación: 2025-05-21 19:31:51
+SKU: SKU000013, Nombre: Bata Manga Larga Blanca Talla 44, Cambios: Inventario: 0 → 6, Última Modificación: 2025-05-21 19:31:51
+SKU: SKU000192, Nombre: Boina Escolta Azul Marino Talla Uni, Cambios: Inventario: 2 → 0, Última Modificación: 2025-05-21 19:31:51
+SKU: SKU000194, Nombre: Boina Escolta Verde Talla Uni, Cambios: Inventario: 0 → 18, Última Modificación: 2025-05-21 19:31:51
+SKU: SKU000507, Nombre: Pants 2pz Punto Rojo Talla 8, Cambios: Inventario: 0 → 6, Última Modificación: 2025-05-21 19:31:51
+SKU: SKU000516, Nombre: Pants 2pz Punto Rojo Talla 10, Cambios: Inventario: 0 → 15, Última Modificación: 2025-05-21 19:31:51
+SKU: SKU000534, Nombre: Pants 2pz Punto Rojo Talla 14, Cambios: Inventario: 0 → 12, Última Modificación: 2025-05-21 19:31:51
+SKU: SKU000543, Nombre: Pants 2pz Punto Rojo Talla 16, Cambios: Inventario: 0 → 13, Última Modificación: 2025-05-21 19:31:51
+SKU: SKU000561, Nombre: Pants 2pz Punto Rojo Talla CH, Cambios: Inventario: 0 → 4, Última Modificación: 2025-05-21 19:31:51
+SKU: SKU000579, Nombre: Pants 2pz Punto Rojo Talla GD, Cambios: Inventario: 0 → 1, Última Modificación: 2025-05-21 19:31:51
+SKU: SKU000616, Nombre: Pants 2pz Liso Doble raya Talla 4, Cambios: Inventario: 0 → 15, Última Modificación: 2025-05-21 19:31:51
+SKU: SKU000626, Nombre: Pants 2pz Liso Doble raya Talla 6, Cambios: Inventario: 0 → 14, Última Modificación: 2025-05-21 19:31:51
+SKU: SKU000636, Nombre: Pants 2pz Liso Doble raya Talla 8, Cambios: Inventario: 0 → 22, Última Modificación: 2025-05-21 19:31:51
+SKU: SKU000646, Nombre: Pants 2pz Liso Doble raya Talla 10, Cambios: Inventario: 0 → 12, Última Modificación: 2025-05-21 19:31:51
+SKU: SKU000656, Nombre: Pants 2pz Liso Doble raya Talla 12, Cambios: Inventario: 0 → 7, Última Modificación: 2025-05-21 19:31:51
+SKU: SKU000666, Nombre: Pants 2pz Liso Doble raya Talla 14, Cambios: Inventario: 0 → 23, Última Modificación: 2025-05-21 19:31:51
+SKU: SKU000676, Nombre: Pants 2pz Liso Doble raya Talla 16, Cambios: Inventario: 0 → 6, Última Modificación: 2025-05-21 19:31:51
+SKU: SKU000686, Nombre: Pants 2pz Liso Doble raya Talla 28, Cambios: Inventario: 0 → 2, Última Modificación: 2025-05-21 19:31:51

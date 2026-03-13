@@ -1,0 +1,424 @@
+2025-06-30 09:55:27,755 - src.core.config.db_manager - INFO - Conexión a c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\data/productos.db establecida.
+2025-06-30 09:55:27,777 - src.core.config.db_manager - INFO - Migración de fechas completada.
+2025-06-30 09:55:29,180 - __main__ - INFO - Iniciando precarga de formularios
+2025-06-30 09:55:29,253 - src.modules.products.product_manager - INFO - ProductManager inicializado para usuario admin con rol admin en tienda 1
+2025-06-30 09:55:29,254 - src.modules.products.product_manager_window - INFO - Inicializando ProductManagerWindow para usuario admin con rol admin en tienda 1
+2025-06-30 09:55:29,259 - src.modules.products.inventory_manager - INFO - InventoryManager inicializado para tienda 1
+2025-06-30 09:55:29,260 - src.modules.products.qr_generator - INFO - QRGenerator inicializado para tienda 1
+2025-06-30 09:55:29,260 - src.core.utils.logging_config - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-06-30 09:55:29,261 - src.core.utils.logging_config - DEBUG - ProductEditForm inicializado para tienda 1
+2025-06-30 09:55:29,262 - src.core.utils.logging_config - INFO - Inicializando ProductManagerUI para tienda 1
+2025-06-30 09:55:29,264 - src.core.utils.logging_config - DEBUG - Ícono cargado: edit
+2025-06-30 09:55:29,266 - src.core.utils.logging_config - DEBUG - Ícono cargado: copy
+2025-06-30 09:55:29,270 - src.core.utils.logging_config - DEBUG - Ícono cargado: delete
+2025-06-30 09:55:29,271 - src.core.utils.logging_config - DEBUG - Ícono cargado: duplicate
+2025-06-30 09:55:29,273 - src.core.utils.logging_config - DEBUG - Ícono cargado: price
+2025-06-30 09:55:29,275 - src.core.utils.logging_config - DEBUG - Ícono cargado: print
+2025-06-30 09:55:29,276 - src.core.utils.logging_config - DEBUG - Ícono cargado: inventory
+2025-06-30 09:55:29,921 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=color
+2025-06-30 09:55:29,966 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-06-30 09:55:29,977 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-06-30 09:55:30,004 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-06-30 09:55:30,014 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-06-30 09:55:30,042 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-06-30 09:55:30,052 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-06-30 09:55:30,079 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-06-30 09:55:30,089 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-06-30 09:55:30,116 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-06-30 09:55:30,127 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-06-30 09:55:30,154 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-06-30 09:55:30,165 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=genero
+2025-06-30 09:55:30,192 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-06-30 09:55:30,202 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=marca
+2025-06-30 09:55:30,229 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-06-30 09:55:30,239 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=talla
+2025-06-30 09:55:30,266 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-06-30 09:55:30,533 - src.core.utils.logging_config - DEBUG - Inicializando comboboxes para filtros
+2025-06-30 09:55:30,574 - src.core.utils.logging_config - DEBUG - Obtenidos 31 valores únicos para color en 0.041s
+2025-06-30 09:55:30,575 - src.core.utils.logging_config - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-30 09:55:30,583 - src.core.utils.logging_config - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.002s
+2025-06-30 09:55:30,584 - src.core.utils.logging_config - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-06-30 09:55:30,591 - src.core.utils.logging_config - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.003s
+2025-06-30 09:55:30,592 - src.core.utils.logging_config - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-06-30 09:55:30,601 - src.core.utils.logging_config - DEBUG - Obtenidos 20 valores únicos para atributo en 0.003s
+2025-06-30 09:55:30,601 - src.core.utils.logging_config - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Conalep', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Punto', 'Tableada', 'Tortuga', 'Vestir']
+2025-06-30 09:55:30,607 - src.core.utils.logging_config - DEBUG - Obtenidos 47 valores únicos para escuela en 0.001s
+2025-06-30 09:55:30,609 - src.core.utils.logging_config - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-06-30 09:55:30,618 - src.core.utils.logging_config - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.002s
+2025-06-30 09:55:30,619 - src.core.utils.logging_config - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-06-30 09:55:30,626 - src.core.utils.logging_config - DEBUG - Obtenidos 3 valores únicos para genero en 0.002s
+2025-06-30 09:55:30,627 - src.core.utils.logging_config - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-06-30 09:55:30,634 - src.core.utils.logging_config - DEBUG - Obtenidos 2 valores únicos para marca en 0.002s
+2025-06-30 09:55:30,635 - src.core.utils.logging_config - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-06-30 09:55:30,645 - src.core.utils.logging_config - DEBUG - Obtenidos 40 valores únicos para talla en 0.004s
+2025-06-30 09:55:30,646 - src.core.utils.logging_config - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-06-30 09:55:30,651 - src.core.utils.logging_config - INFO - Comboboxes inicializados correctamente
+2025-06-30 09:55:30,653 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-06-30 09:55:30,671 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-30 09:55:30,772 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-30 09:55:30,776 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=3334, current_page=0, total_pages=112
+2025-06-30 09:55:30,787 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 112
+2025-06-30 09:55:30,790 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-30 09:55:30,791 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 112, tiempo: 0.120s
+2025-06-30 09:55:30,792 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-30 09:55:30,893 - src.core.utils.logging_config - DEBUG - Inicializando comboboxes para filtros
+2025-06-30 09:55:30,894 - src.core.utils.logging_config - DEBUG - Obtenidos 31 valores únicos para color en 0.000s
+2025-06-30 09:55:30,894 - src.core.utils.logging_config - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-30 09:55:30,900 - src.core.utils.logging_config - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.000s
+2025-06-30 09:55:30,900 - src.core.utils.logging_config - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-06-30 09:55:30,906 - src.core.utils.logging_config - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.000s
+2025-06-30 09:55:30,906 - src.core.utils.logging_config - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-06-30 09:55:30,913 - src.core.utils.logging_config - DEBUG - Obtenidos 20 valores únicos para atributo en 0.000s
+2025-06-30 09:55:30,913 - src.core.utils.logging_config - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Conalep', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Punto', 'Tableada', 'Tortuga', 'Vestir']
+2025-06-30 09:55:30,919 - src.core.utils.logging_config - DEBUG - Obtenidos 47 valores únicos para escuela en 0.000s
+2025-06-30 09:55:30,920 - src.core.utils.logging_config - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-06-30 09:55:30,926 - src.core.utils.logging_config - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-06-30 09:55:30,927 - src.core.utils.logging_config - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-06-30 09:55:30,933 - src.core.utils.logging_config - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-06-30 09:55:30,933 - src.core.utils.logging_config - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-06-30 09:55:30,939 - src.core.utils.logging_config - DEBUG - Obtenidos 2 valores únicos para marca en 0.000s
+2025-06-30 09:55:30,939 - src.core.utils.logging_config - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-06-30 09:55:30,945 - src.core.utils.logging_config - DEBUG - Obtenidos 40 valores únicos para talla en 0.000s
+2025-06-30 09:55:30,945 - src.core.utils.logging_config - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-06-30 09:55:30,952 - src.core.utils.logging_config - INFO - Comboboxes inicializados correctamente
+2025-06-30 09:55:30,953 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-06-30 09:55:30,954 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-30 09:55:31,054 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-30 09:55:31,058 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=3334, current_page=0, total_pages=112
+2025-06-30 09:55:31,069 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 112
+2025-06-30 09:55:31,073 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-30 09:55:31,073 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 112, tiempo: 0.120s
+2025-06-30 09:55:31,074 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-30 09:55:31,324 - root - INFO - Iniciando GeneradorCodigos para tienda 1
+2025-06-30 09:55:31,337 - root - INFO - Colores cargados desde config.json: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Oficial', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-30 09:55:31,338 - root - INFO - Controlador inicializado para tienda 1
+2025-06-30 09:55:31,364 - root - INFO - Antes de setup_ui
+2025-06-30 09:55:31,365 - root - INFO - Iniciando setup_ui
+2025-06-30 09:55:31,970 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=None
+2025-06-30 09:55:32,004 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Escuelas, column=None
+2025-06-30 09:55:33,874 - root - INFO - setup_ui completado
+2025-06-30 09:55:33,875 - root - INFO - GeneradorCodigos inicializado para tienda 1
+2025-06-30 09:55:34,042 - src.modules.sales.apartados.apartados_logic - INFO - Tabla 'modificaciones_apartados' verificada/creada con store_id para tienda 1.
+2025-06-30 09:55:34,043 - src.modules.sales.apartados.apartados_logic - INFO - ApartadosLogic inicializado para tienda 1
+2025-06-30 09:55:34,048 - src.modules.sales.apartados.apartados_manager - INFO - Interfaz de gestión de apartados inicializada para usuario con ID 'admin' en tienda 1.
+2025-06-30 09:55:34,153 - __main__ - INFO - Base de datos verificada correctamente
+2025-06-30 09:55:34,212 - __main__ - INFO - Iniciando cambio a Product Manager
+2025-06-30 09:55:34,232 - __main__ - INFO - Precarga de formularios completada
+2025-06-30 09:55:34,345 - src.modules.products.product_manager - INFO - ProductManager inicializado para usuario admin con rol admin en tienda 1
+2025-06-30 09:55:34,346 - src.modules.products.product_manager_window - INFO - Inicializando ProductManagerWindow para usuario admin con rol admin en tienda 1
+2025-06-30 09:55:34,351 - src.modules.products.inventory_manager - INFO - InventoryManager inicializado para tienda 1
+2025-06-30 09:55:34,352 - src.modules.products.qr_generator - INFO - QRGenerator inicializado para tienda 1
+2025-06-30 09:55:34,352 - src.core.utils.logging_config - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-06-30 09:55:34,354 - src.core.utils.logging_config - DEBUG - ProductEditForm inicializado para tienda 1
+2025-06-30 09:55:34,355 - src.core.utils.logging_config - INFO - Inicializando ProductManagerUI para tienda 1
+2025-06-30 09:55:34,356 - src.core.utils.logging_config - DEBUG - Ícono cargado: edit
+2025-06-30 09:55:34,358 - src.core.utils.logging_config - DEBUG - Ícono cargado: copy
+2025-06-30 09:55:34,360 - src.core.utils.logging_config - DEBUG - Ícono cargado: delete
+2025-06-30 09:55:34,362 - src.core.utils.logging_config - DEBUG - Ícono cargado: duplicate
+2025-06-30 09:55:34,364 - src.core.utils.logging_config - DEBUG - Ícono cargado: price
+2025-06-30 09:55:34,365 - src.core.utils.logging_config - DEBUG - Ícono cargado: print
+2025-06-30 09:55:34,367 - src.core.utils.logging_config - DEBUG - Ícono cargado: inventory
+2025-06-30 09:55:34,451 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=color
+2025-06-30 09:55:34,478 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-06-30 09:55:34,521 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-06-30 09:55:34,564 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-06-30 09:55:34,573 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-06-30 09:55:34,600 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-06-30 09:55:34,610 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-06-30 09:55:34,636 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-06-30 09:55:34,646 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-06-30 09:55:34,673 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-06-30 09:55:34,683 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-06-30 09:55:34,711 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-06-30 09:55:34,722 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=genero
+2025-06-30 09:55:34,749 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-06-30 09:55:34,759 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=marca
+2025-06-30 09:55:34,787 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-06-30 09:55:34,798 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=talla
+2025-06-30 09:55:34,824 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-06-30 09:55:35,919 - src.core.utils.logging_config - DEBUG - Inicializando comboboxes para filtros
+2025-06-30 09:55:35,924 - src.core.utils.logging_config - DEBUG - Obtenidos 31 valores únicos para color en 0.005s
+2025-06-30 09:55:35,929 - src.core.utils.logging_config - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-30 09:55:35,939 - src.core.utils.logging_config - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.004s
+2025-06-30 09:55:35,940 - src.core.utils.logging_config - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-06-30 09:55:35,950 - src.core.utils.logging_config - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.004s
+2025-06-30 09:55:35,951 - src.core.utils.logging_config - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-06-30 09:55:35,962 - src.core.utils.logging_config - DEBUG - Obtenidos 20 valores únicos para atributo en 0.005s
+2025-06-30 09:55:35,966 - src.core.utils.logging_config - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Conalep', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Punto', 'Tableada', 'Tortuga', 'Vestir']
+2025-06-30 09:55:35,972 - src.core.utils.logging_config - DEBUG - Obtenidos 47 valores únicos para escuela en 0.000s
+2025-06-30 09:55:35,972 - src.core.utils.logging_config - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-06-30 09:55:35,981 - src.core.utils.logging_config - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.002s
+2025-06-30 09:55:35,982 - src.core.utils.logging_config - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-06-30 09:55:35,990 - src.core.utils.logging_config - DEBUG - Obtenidos 3 valores únicos para genero en 0.002s
+2025-06-30 09:55:35,990 - src.core.utils.logging_config - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-06-30 09:55:35,998 - src.core.utils.logging_config - DEBUG - Obtenidos 2 valores únicos para marca en 0.002s
+2025-06-30 09:55:35,999 - src.core.utils.logging_config - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-06-30 09:55:36,008 - src.core.utils.logging_config - DEBUG - Obtenidos 40 valores únicos para talla en 0.004s
+2025-06-30 09:55:36,008 - src.core.utils.logging_config - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-06-30 09:55:36,015 - src.core.utils.logging_config - INFO - Comboboxes inicializados correctamente
+2025-06-30 09:55:36,016 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-06-30 09:55:36,031 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-30 09:55:36,133 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-30 09:55:36,136 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=3334, current_page=0, total_pages=112
+2025-06-30 09:55:36,148 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 112
+2025-06-30 09:55:36,151 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-30 09:55:36,152 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 112, tiempo: 0.121s
+2025-06-30 09:55:36,152 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-30 09:55:36,253 - src.core.utils.logging_config - DEBUG - Inicializando comboboxes para filtros
+2025-06-30 09:55:36,254 - src.core.utils.logging_config - DEBUG - Obtenidos 31 valores únicos para color en 0.000s
+2025-06-30 09:55:36,255 - src.core.utils.logging_config - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-30 09:55:36,260 - src.core.utils.logging_config - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.000s
+2025-06-30 09:55:36,261 - src.core.utils.logging_config - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-06-30 09:55:36,267 - src.core.utils.logging_config - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.000s
+2025-06-30 09:55:36,270 - src.core.utils.logging_config - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-06-30 09:55:36,277 - src.core.utils.logging_config - DEBUG - Obtenidos 20 valores únicos para atributo en 0.000s
+2025-06-30 09:55:36,278 - src.core.utils.logging_config - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Conalep', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Punto', 'Tableada', 'Tortuga', 'Vestir']
+2025-06-30 09:55:36,285 - src.core.utils.logging_config - DEBUG - Obtenidos 47 valores únicos para escuela en 0.000s
+2025-06-30 09:55:36,286 - src.core.utils.logging_config - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-06-30 09:55:36,292 - src.core.utils.logging_config - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-06-30 09:55:36,293 - src.core.utils.logging_config - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-06-30 09:55:36,299 - src.core.utils.logging_config - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-06-30 09:55:36,301 - src.core.utils.logging_config - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-06-30 09:55:36,306 - src.core.utils.logging_config - DEBUG - Obtenidos 2 valores únicos para marca en 0.000s
+2025-06-30 09:55:36,307 - src.core.utils.logging_config - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-06-30 09:55:36,312 - src.core.utils.logging_config - DEBUG - Obtenidos 40 valores únicos para talla en 0.000s
+2025-06-30 09:55:36,313 - src.core.utils.logging_config - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-06-30 09:55:36,320 - src.core.utils.logging_config - INFO - Comboboxes inicializados correctamente
+2025-06-30 09:55:36,321 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-06-30 09:55:36,321 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-30 09:55:36,422 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-30 09:55:36,426 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=3334, current_page=0, total_pages=112
+2025-06-30 09:55:36,437 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 112
+2025-06-30 09:55:36,441 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-30 09:55:36,441 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 112, tiempo: 0.120s
+2025-06-30 09:55:36,442 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-30 09:55:36,556 - __main__ - INFO - Interfaz de Product Manager cargada exitosamente
+2025-06-30 09:55:42,868 - src.core.utils.logging_config - DEBUG - Menú desplegable creado y mostrado
+2025-06-30 09:56:54,895 - src.core.utils.logging_config - DEBUG - Ejecutando comando con selecciones: ['Gales verde'], column=color
+2025-06-30 09:56:54,897 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-30 09:56:55,009 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-30 09:56:55,012 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=37, current_page=0, total_pages=2
+2025-06-30 09:56:55,022 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 2
+2025-06-30 09:56:55,026 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-30 09:56:55,027 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 2, tiempo: 0.130s
+2025-06-30 09:56:55,028 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-30 09:56:55,130 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Filtros: Color: Gales verde
+2025-06-30 09:57:01,840 - src.core.utils.logging_config - DEBUG - Menú desplegable cerrado
+2025-06-30 09:57:05,867 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 09:57:05,868 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001243
+2025-06-30 09:57:05,881 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 09:57:05,883 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\16
+2025-06-30 09:57:05,906 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\16\label_SKU001243.png
+2025-06-30 09:57:11,186 - src.core.utils.logging_config - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\16\label_SKU001243.png
+2025-06-30 09:57:11,198 - src.core.utils.logging_config - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU001243
+2025-06-30 09:57:11,283 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU001243: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\16\label_SKU001243.png
+2025-06-30 09:57:36,128 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU001243: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\16\label_split_SKU001243.png
+2025-06-30 09:59:11,494 - src.modules.products.product_manager_window - INFO - Impresas 5 etiquetas para SKU SKU001243 (tipo: split, copias solicitadas: 18)
+2025-06-30 09:59:11,501 - src.modules.products.product_manager_window - INFO - Inventario actualizado para SKU SKU001243: 15 -> 33
+2025-06-30 09:59:11,505 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 09:59:11,506 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001243
+2025-06-30 09:59:11,516 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 09:59:11,518 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\16
+2025-06-30 09:59:11,521 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\16\label_split_SKU001243.png
+2025-06-30 09:59:11,523 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I044 (SKU: SKU001243, índice: 7)
+2025-06-30 09:59:11,544 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 09:59:11,551 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001243
+2025-06-30 09:59:11,560 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 09:59:11,568 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\16
+2025-06-30 09:59:11,574 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\16\label_split_SKU001243.png
+2025-06-30 09:59:11,577 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 09:59:11,581 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001243
+2025-06-30 09:59:11,589 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 09:59:11,591 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\16
+2025-06-30 09:59:11,595 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\16\label_split_SKU001243.png
+2025-06-30 09:59:11,608 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 09:59:11,615 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001243
+2025-06-30 09:59:11,625 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 09:59:11,627 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\16
+2025-06-30 09:59:11,635 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\16\label_split_SKU001243.png
+2025-06-30 09:59:11,638 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 09:59:11,639 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001243
+2025-06-30 09:59:11,647 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 09:59:11,651 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\16
+2025-06-30 09:59:11,655 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\16\label_split_SKU001243.png
+2025-06-30 09:59:30,261 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU001246: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\28\label_split_SKU001246.png
+2025-06-30 09:59:30,269 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 09:59:30,270 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001246
+2025-06-30 09:59:30,279 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 09:59:30,280 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\28
+2025-06-30 09:59:30,283 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\28\label_split_SKU001246.png
+2025-06-30 09:59:30,283 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I045 (SKU: SKU001246, índice: 8)
+2025-06-30 09:59:30,285 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 09:59:30,286 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001246
+2025-06-30 09:59:30,294 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 09:59:30,295 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\28
+2025-06-30 09:59:30,297 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\28\label_split_SKU001246.png
+2025-06-30 09:59:30,299 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 09:59:30,299 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001246
+2025-06-30 09:59:30,307 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 09:59:30,308 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\28
+2025-06-30 09:59:30,311 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\28\label_split_SKU001246.png
+2025-06-30 09:59:31,526 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU001249: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\32\label_split_SKU001249.png
+2025-06-30 09:59:31,535 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 09:59:31,535 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001249
+2025-06-30 09:59:31,544 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 09:59:31,545 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\32
+2025-06-30 09:59:31,548 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\32\label_split_SKU001249.png
+2025-06-30 09:59:31,549 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I046 (SKU: SKU001249, índice: 9)
+2025-06-30 09:59:31,550 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 09:59:31,550 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001249
+2025-06-30 09:59:31,559 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 09:59:31,561 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\32
+2025-06-30 09:59:31,564 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\32\label_split_SKU001249.png
+2025-06-30 09:59:31,566 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 09:59:31,566 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001249
+2025-06-30 09:59:31,575 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 09:59:31,576 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\32
+2025-06-30 09:59:31,580 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\32\label_split_SKU001249.png
+2025-06-30 10:00:08,551 - src.modules.products.product_manager_window - INFO - Impresas 5 etiquetas para SKU SKU001249 (tipo: split, copias solicitadas: 18)
+2025-06-30 10:00:08,557 - src.modules.products.product_manager_window - INFO - Inventario actualizado para SKU SKU001249: 14 -> 32
+2025-06-30 10:00:08,561 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 10:00:08,561 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001249
+2025-06-30 10:00:08,570 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 10:00:08,571 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\32
+2025-06-30 10:00:08,574 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\32\label_split_SKU001249.png
+2025-06-30 10:00:08,575 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I046 (SKU: SKU001249, índice: 9)
+2025-06-30 10:00:08,580 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 10:00:08,580 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001249
+2025-06-30 10:00:08,589 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 10:00:08,592 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\32
+2025-06-30 10:00:08,595 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\32\label_split_SKU001249.png
+2025-06-30 10:00:08,597 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 10:00:08,598 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001249
+2025-06-30 10:00:08,606 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 10:00:08,652 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\32
+2025-06-30 10:00:08,659 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\32\label_split_SKU001249.png
+2025-06-30 10:00:08,667 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 10:00:08,669 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001249
+2025-06-30 10:00:08,679 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 10:00:08,691 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\32
+2025-06-30 10:00:08,694 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\32\label_split_SKU001249.png
+2025-06-30 10:00:08,696 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 10:00:08,696 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001249
+2025-06-30 10:00:08,705 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 10:00:08,706 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\32
+2025-06-30 10:00:08,709 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\32\label_split_SKU001249.png
+2025-06-30 10:00:31,482 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU001252: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34\label_split_SKU001252.png
+2025-06-30 10:00:31,490 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 10:00:31,491 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001252
+2025-06-30 10:00:31,500 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 10:00:31,501 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34
+2025-06-30 10:00:31,504 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34\label_split_SKU001252.png
+2025-06-30 10:00:31,504 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I047 (SKU: SKU001252, índice: 10)
+2025-06-30 10:00:31,506 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 10:00:31,506 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001252
+2025-06-30 10:00:31,515 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 10:00:31,516 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34
+2025-06-30 10:00:31,518 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34\label_split_SKU001252.png
+2025-06-30 10:00:31,520 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 10:00:31,520 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001252
+2025-06-30 10:00:31,528 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 10:00:31,529 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34
+2025-06-30 10:00:31,532 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34\label_split_SKU001252.png
+2025-06-30 10:00:32,504 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU001255: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\36\label_split_SKU001255.png
+2025-06-30 10:00:32,514 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 10:00:32,525 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001255
+2025-06-30 10:00:32,533 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 10:00:32,535 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\36
+2025-06-30 10:00:32,538 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\36\label_split_SKU001255.png
+2025-06-30 10:00:32,539 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I048 (SKU: SKU001255, índice: 11)
+2025-06-30 10:00:32,541 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 10:00:32,542 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001255
+2025-06-30 10:00:32,550 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 10:00:32,551 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\36
+2025-06-30 10:00:32,554 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\36\label_split_SKU001255.png
+2025-06-30 10:00:32,556 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 10:00:32,556 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001255
+2025-06-30 10:00:32,564 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 10:00:32,567 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\36
+2025-06-30 10:00:32,570 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\36\label_split_SKU001255.png
+2025-06-30 10:01:38,945 - src.core.utils.logging_config - DEBUG - Manteniendo selección para SKU: SKU001255 al cerrar PrintPreviewWindow
+2025-06-30 10:01:38,987 - src.core.utils.logging_config - DEBUG - Selección restaurada para SKU: SKU001255 después de cerrar PrintPreviewWindow
+2025-06-30 10:01:38,989 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 10:01:38,990 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001255
+2025-06-30 10:01:38,998 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 10:01:38,999 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\36
+2025-06-30 10:01:39,002 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\36\label_split_SKU001255.png
+2025-06-30 10:01:39,003 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 10:01:39,004 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001255
+2025-06-30 10:01:39,014 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 10:01:39,015 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\36
+2025-06-30 10:01:39,018 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\36\label_split_SKU001255.png
+2025-06-30 10:01:39,021 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 10:01:39,024 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001255
+2025-06-30 10:01:39,035 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 10:01:39,036 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\36
+2025-06-30 10:01:39,041 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\36\label_split_SKU001255.png
+2025-06-30 10:01:39,043 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-30 10:01:39,043 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU001255
+2025-06-30 10:01:39,051 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-30 10:01:39,057 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\36
+2025-06-30 10:01:39,061 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\36\label_split_SKU001255.png
+2025-06-30 10:01:48,094 - src.core.utils.logging_config - DEBUG - Botón 'Avanza 10 páginas' presionado, página actual: 0, total páginas: 0
+2025-06-30 10:01:48,095 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-30 10:01:48,220 - src.core.utils.logging_config - DEBUG - Cargando productos para página 2, batch_size=30
+2025-06-30 10:01:48,224 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=37, current_page=1, total_pages=2
+2025-06-30 10:01:48,237 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 2 de 2
+2025-06-30 10:01:48,239 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/7
+2025-06-30 10:01:48,239 - src.core.utils.logging_config - INFO - Cargados 7 productos, página 2, total páginas: 2, tiempo: 0.144s
+2025-06-30 10:01:48,240 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-30 10:01:48,354 - src.modules.products.product_manager_window - INFO - Navegación a la última página (página 2)
+2025-06-30 10:01:48,356 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/7
+2025-06-30 10:01:55,045 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-30 10:01:55,165 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-30 10:01:55,168 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=37, current_page=0, total_pages=2
+2025-06-30 10:01:55,181 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 2
+2025-06-30 10:01:55,184 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-30 10:01:55,185 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 2, tiempo: 0.140s
+2025-06-30 10:01:55,185 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-30 10:02:23,829 - src.core.utils.logging_config - INFO - Filtros limpiados para columnas: color, tipo_prenda, tipo_pieza, atributo, escuela, nivel_educativo, genero, marca, talla
+2025-06-30 10:02:23,830 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-30 10:02:23,949 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-30 10:02:23,953 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=3334, current_page=0, total_pages=112
+2025-06-30 10:02:23,966 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 112
+2025-06-30 10:02:23,970 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-30 10:02:23,970 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 112, tiempo: 0.140s
+2025-06-30 10:02:23,971 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-30 10:02:24,087 - src.core.utils.logging_config - INFO - Filtros limpiados y productos recargados
+2025-06-30 10:02:24,088 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-06-30 10:02:24,089 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-30 10:02:24,205 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-30 10:02:24,208 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=3334, current_page=0, total_pages=112
+2025-06-30 10:02:24,220 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 112
+2025-06-30 10:02:24,224 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-30 10:02:24,225 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 112, tiempo: 0.136s
+2025-06-30 10:02:24,225 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-30 10:02:29,991 - src.core.utils.logging_config - DEBUG - Menú desplegable creado y mostrado
+2025-06-30 10:02:35,965 - src.core.utils.logging_config - DEBUG - Menú desplegable cerrado
+2025-06-30 10:02:36,353 - src.core.utils.logging_config - DEBUG - Menú desplegable creado y mostrado
+2025-06-30 10:03:04,099 - src.core.utils.logging_config - DEBUG - Menú desplegable cerrado
+2025-06-30 10:03:04,493 - src.core.utils.logging_config - DEBUG - Menú desplegable creado y mostrado
+2025-06-30 10:03:21,166 - src.core.utils.logging_config - DEBUG - Ejecutando comando con selecciones: ['Chazarilla'], column=atributo
+2025-06-30 10:03:21,168 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-30 10:03:21,291 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-30 10:03:21,295 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=39, current_page=0, total_pages=2
+2025-06-30 10:03:21,307 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 2
+2025-06-30 10:03:21,311 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-30 10:03:21,311 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 2, tiempo: 0.144s
+2025-06-30 10:03:21,312 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-30 10:03:21,428 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Filtros: Atributo: Chazarilla
+2025-06-30 10:03:24,441 - src.core.utils.logging_config - DEBUG - Menú desplegable cerrado
+2025-06-30 10:03:34,366 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-30 10:03:34,486 - src.core.utils.logging_config - DEBUG - Cargando productos para página 2, batch_size=30
+2025-06-30 10:03:34,489 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=39, current_page=1, total_pages=2
+2025-06-30 10:03:34,502 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 2 de 2
+2025-06-30 10:03:34,503 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/9
+2025-06-30 10:03:34,504 - src.core.utils.logging_config - INFO - Cargados 9 productos, página 2, total páginas: 2, tiempo: 0.138s
+2025-06-30 10:03:34,504 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-30 10:03:43,826 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-30 10:03:43,954 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-30 10:03:43,957 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=39, current_page=0, total_pages=2
+2025-06-30 10:03:43,970 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 2
+2025-06-30 10:03:43,974 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-30 10:03:43,975 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 2, tiempo: 0.149s
+2025-06-30 10:03:43,975 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1

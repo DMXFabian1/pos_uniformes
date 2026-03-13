@@ -144,6 +144,16 @@ class Usuario(Base):
     )
     movimientos_caja: Mapped[list["MovimientoCaja"]] = relationship(back_populates="usuario")
     cambios_catalogo: Mapped[list["CambioCatalogo"]] = relationship(back_populates="usuario")
+    cambios_marketing: Mapped[list["CambioMarketingConfiguracion"]] = relationship(
+        back_populates="usuario",
+        foreign_keys="CambioMarketingConfiguracion.usuario_id",
+        order_by="desc(CambioMarketingConfiguracion.created_at)",
+    )
+    promociones_manual_autorizadas: Mapped[list["AutorizacionPromocionManual"]] = relationship(
+        back_populates="usuario",
+        foreign_keys="AutorizacionPromocionManual.usuario_id",
+        order_by="desc(AutorizacionPromocionManual.created_at)",
+    )
     presupuestos: Mapped[list["Presupuesto"]] = relationship(back_populates="usuario")
 
 
@@ -179,6 +189,7 @@ class ConfiguracionNegocio(Base):
     whatsapp_cliente_saludo: Mapped[str | None] = mapped_column(Text())
     impresora_preferida: Mapped[str | None] = mapped_column(String(200))
     copias_ticket: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    promo_authorization_code_hash: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -320,6 +331,10 @@ class Cliente(Base):
 
     apartados: Mapped[list["Apartado"]] = relationship(back_populates="cliente")
     ventas: Mapped[list["Venta"]] = relationship(back_populates="cliente")
+    promociones_manual_autorizadas: Mapped[list["AutorizacionPromocionManual"]] = relationship(
+        back_populates="cliente",
+        order_by="desc(AutorizacionPromocionManual.created_at)",
+    )
     presupuestos: Mapped[list["Presupuesto"]] = relationship(back_populates="cliente")
 
 
@@ -526,6 +541,71 @@ class CambioCatalogo(Base):
     )
 
     usuario: Mapped["Usuario"] = relationship(back_populates="cambios_catalogo")
+
+
+class AutorizacionPromocionManual(Base):
+    __tablename__ = "autorizacion_promocion_manual"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    venta_id: Mapped[int | None] = mapped_column(
+        ForeignKey("venta.id", ondelete="SET NULL"),
+        index=True,
+    )
+    usuario_id: Mapped[int] = mapped_column(
+        ForeignKey("usuario.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    cliente_id: Mapped[int | None] = mapped_column(
+        ForeignKey("cliente.id", ondelete="SET NULL"),
+        index=True,
+    )
+    rol_usuario: Mapped[str | None] = mapped_column(String(20))
+    folio_venta: Mapped[str | None] = mapped_column(String(40), index=True)
+    porcentaje_lealtad: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("0.00"))
+    porcentaje_promocion: Mapped[Decimal] = mapped_column(
+        Numeric(5, 2),
+        nullable=False,
+        default=Decimal("0.00"),
+    )
+    porcentaje_aplicado: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=Decimal("0.00"))
+    origen_aplicado: Mapped[str] = mapped_column(String(40), nullable=False, default="SIN_DESCUENTO")
+    observacion: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True,
+    )
+
+    venta: Mapped["Venta | None"] = relationship(back_populates="promociones_manual_autorizadas")
+    usuario: Mapped["Usuario"] = relationship(back_populates="promociones_manual_autorizadas")
+    cliente: Mapped["Cliente | None"] = relationship(back_populates="promociones_manual_autorizadas")
+
+
+class CambioMarketingConfiguracion(Base):
+    __tablename__ = "cambio_marketing_configuracion"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    usuario_id: Mapped[int] = mapped_column(
+        ForeignKey("usuario.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    rol_usuario: Mapped[str | None] = mapped_column(String(20))
+    seccion: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    campo: Mapped[str] = mapped_column(String(80), nullable=False, index=True)
+    etiqueta_campo: Mapped[str] = mapped_column(String(120), nullable=False)
+    valor_anterior: Mapped[str | None] = mapped_column(Text())
+    valor_nuevo: Mapped[str | None] = mapped_column(Text())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True,
+    )
+
+    usuario: Mapped["Usuario"] = relationship(back_populates="cambios_marketing")
 
 
 class Producto(Base):
@@ -912,6 +992,8 @@ class Compra(Base):
     )
     subtotal: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
+    descuento_porcentaje: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("0.00"), nullable=False)
+    descuento_monto: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
     observacion: Mapped[str | None] = mapped_column(Text())
     confirmada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_at: Mapped[datetime] = mapped_column(
@@ -987,6 +1069,8 @@ class Venta(Base):
     )
     subtotal: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
+    descuento_porcentaje: Mapped[Decimal] = mapped_column(Numeric(5, 2), default=Decimal("0.00"), nullable=False)
+    descuento_monto: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
     observacion: Mapped[str | None] = mapped_column(Text())
     confirmada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancelada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -1014,6 +1098,10 @@ class Venta(Base):
     detalles: Mapped[list["VentaDetalle"]] = relationship(
         back_populates="venta",
         cascade="all, delete-orphan",
+    )
+    promociones_manual_autorizadas: Mapped[list["AutorizacionPromocionManual"]] = relationship(
+        back_populates="venta",
+        order_by="desc(AutorizacionPromocionManual.created_at)",
     )
 
 

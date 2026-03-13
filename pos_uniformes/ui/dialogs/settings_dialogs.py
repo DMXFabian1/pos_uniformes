@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -283,6 +284,8 @@ def build_business_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_business_transfer_clabe_input.setPlaceholderText("CLABE o numero de cuenta")
     window.settings_business_transfer_instructions_input.setPlaceholderText("Indicaciones de pago por transferencia")
     window.settings_business_transfer_instructions_input.setMinimumHeight(80)
+    window.settings_business_promo_code_input.setPlaceholderText("Deja vacio para conservar el codigo actual")
+    window.settings_business_promo_code_input.setEchoMode(QLineEdit.EchoMode.Password)
     window.settings_business_copies_spin.setRange(1, 5)
     window.settings_business_printer_combo.clear()
     window.settings_business_printer_combo.addItem("Preguntar siempre", "")
@@ -311,6 +314,7 @@ def build_business_settings_dialog(window: "MainWindow") -> QDialog:
     form.addRow("Beneficiario", window.settings_business_transfer_beneficiary_input)
     form.addRow("CLABE", window.settings_business_transfer_clabe_input)
     form.addRow("Instrucciones pago", window.settings_business_transfer_instructions_input)
+    form.addRow("Codigo promo manual", window.settings_business_promo_code_input)
     form.addRow("Impresora", window.settings_business_printer_combo)
     form.addRow("Copias", window.settings_business_copies_spin)
     form_box.setLayout(form)
@@ -398,10 +402,13 @@ def build_marketing_settings_dialog(window: "MainWindow") -> QDialog:
 
     window.settings_marketing_save_button.setObjectName("toolbarPrimaryButton")
     window.settings_marketing_recalculate_button.setObjectName("toolbarSecondaryButton")
+    window.settings_marketing_history_button.setObjectName("toolbarGhostButton")
     window.settings_marketing_save_button.clicked.connect(window._handle_save_marketing_settings)
     window.settings_marketing_recalculate_button.clicked.connect(window._handle_recalculate_loyalty_levels)
+    window.settings_marketing_history_button.clicked.connect(window._handle_open_marketing_history)
 
     actions = QHBoxLayout()
+    actions.addWidget(window.settings_marketing_history_button)
     actions.addWidget(window.settings_marketing_recalculate_button)
     actions.addWidget(window.settings_marketing_save_button)
     actions.addStretch()

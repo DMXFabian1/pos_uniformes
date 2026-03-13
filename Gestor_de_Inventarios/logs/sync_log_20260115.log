@@ -1,0 +1,356 @@
+2026-01-15 15:59:02,005 - src.core.config.db_manager - INFO - Conexión a c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\data/productos.db establecida.
+2026-01-15 15:59:02,062 - src.core.config.db_manager - INFO - Migración de fechas completada.
+2026-01-15 15:59:03,746 - __main__ - INFO - Iniciando precarga de formularios
+2026-01-15 15:59:03,815 - src.modules.products.product_manager - INFO - ProductManager inicializado para usuario admin con rol admin en tienda 1
+2026-01-15 15:59:03,816 - src.modules.products.product_manager_window - INFO - Inicializando ProductManagerWindow para usuario admin con rol admin en tienda 1
+2026-01-15 15:59:03,821 - src.modules.products.inventory_manager - INFO - InventoryManager inicializado para tienda 1
+2026-01-15 15:59:03,821 - src.modules.products.qr_generator - INFO - QRGenerator inicializado para tienda 1
+2026-01-15 15:59:03,821 - src.core.utils.logging_config - INFO - Inicializando ProductManagerLogic para tienda 1
+2026-01-15 15:59:03,823 - src.core.utils.logging_config - DEBUG - ProductEditForm inicializado para tienda 1
+2026-01-15 15:59:03,823 - src.core.utils.logging_config - INFO - Inicializando ProductManagerUI para tienda 1
+2026-01-15 15:59:03,827 - src.core.utils.logging_config - DEBUG - Ícono cargado: edit
+2026-01-15 15:59:03,829 - src.core.utils.logging_config - DEBUG - Ícono cargado: copy
+2026-01-15 15:59:03,830 - src.core.utils.logging_config - DEBUG - Ícono cargado: delete
+2026-01-15 15:59:03,832 - src.core.utils.logging_config - DEBUG - Ícono cargado: duplicate
+2026-01-15 15:59:03,836 - src.core.utils.logging_config - DEBUG - Ícono cargado: price
+2026-01-15 15:59:03,846 - src.core.utils.logging_config - DEBUG - Ícono cargado: print
+2026-01-15 15:59:03,848 - src.core.utils.logging_config - DEBUG - Ícono cargado: inventory
+2026-01-15 15:59:04,782 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=color
+2026-01-15 15:59:04,839 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Color, column=color
+2026-01-15 15:59:04,853 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2026-01-15 15:59:04,885 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2026-01-15 15:59:04,900 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2026-01-15 15:59:04,937 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2026-01-15 15:59:04,963 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=atributo
+2026-01-15 15:59:04,989 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2026-01-15 15:59:05,002 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=escuela
+2026-01-15 15:59:05,119 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2026-01-15 15:59:05,144 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2026-01-15 15:59:05,169 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2026-01-15 15:59:05,184 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=genero
+2026-01-15 15:59:05,217 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Género, column=genero
+2026-01-15 15:59:05,229 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=marca
+2026-01-15 15:59:05,255 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2026-01-15 15:59:05,269 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=talla
+2026-01-15 15:59:05,300 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2026-01-15 15:59:05,593 - src.core.utils.logging_config - DEBUG - Inicializando comboboxes para filtros
+2026-01-15 15:59:05,664 - src.core.utils.logging_config - DEBUG - Obtenidos 32 valores únicos para color en 0.071s
+2026-01-15 15:59:05,665 - src.core.utils.logging_config - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2026-01-15 15:59:05,674 - src.core.utils.logging_config - DEBUG - Obtenidos 6 valores únicos para tipo_prenda en 0.003s
+2026-01-15 15:59:05,679 - src.core.utils.logging_config - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial', 'Uniforme']
+2026-01-15 15:59:05,689 - src.core.utils.logging_config - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.003s
+2026-01-15 15:59:05,693 - src.core.utils.logging_config - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2026-01-15 15:59:05,704 - src.core.utils.logging_config - DEBUG - Obtenidos 23 valores únicos para atributo en 0.003s
+2026-01-15 15:59:05,707 - src.core.utils.logging_config - DEBUG - Valores para atributo: ['Algodón', 'Botones', 'Chazarilla', 'Conalep', 'Conjunto', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Cuello olan', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Oferta', 'Polo', 'Punto', 'Tortuga', 'Vestir']
+2026-01-15 15:59:05,713 - src.core.utils.logging_config - DEBUG - Obtenidos 56 valores únicos para escuela en 0.001s
+2026-01-15 15:59:05,714 - src.core.utils.logging_config - DEBUG - Valores para escuela: ['16 de Septiembre', 'Adolfo Lopez Mareo', 'Adolfo Lopez Mateo', 'Albino García Ramos', 'Alvaro Obregon', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'ESTV 663', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Huizache', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Palacio', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Santa Rosa 238', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Telesecundaria 600', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Vidal Acolcer', 'Álvaro Obregón']
+2026-01-15 15:59:05,725 - src.core.utils.logging_config - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.003s
+2026-01-15 15:59:05,731 - src.core.utils.logging_config - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2026-01-15 15:59:05,738 - src.core.utils.logging_config - DEBUG - Obtenidos 3 valores únicos para genero en 0.002s
+2026-01-15 15:59:05,740 - src.core.utils.logging_config - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2026-01-15 15:59:05,748 - src.core.utils.logging_config - DEBUG - Obtenidos 5 valores únicos para marca en 0.002s
+2026-01-15 15:59:05,749 - src.core.utils.logging_config - DEBUG - Valores para marca: ['Claudia', 'Lobito', 'MarcaX', 'MarcaY', 'Prowear']
+2026-01-15 15:59:05,760 - src.core.utils.logging_config - DEBUG - Obtenidos 43 valores únicos para talla en 0.005s
+2026-01-15 15:59:05,762 - src.core.utils.logging_config - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'M', 'L', 'CH', 'MD', 'GD', 'EXG', 'Uni', 'ESP', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2026-01-15 15:59:05,771 - src.core.utils.logging_config - INFO - Comboboxes inicializados correctamente
+2026-01-15 15:59:05,772 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2026-01-15 15:59:05,795 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2026-01-15 15:59:05,900 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2026-01-15 15:59:05,906 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=4034, current_page=0, total_pages=135
+2026-01-15 15:59:05,917 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 135
+2026-01-15 15:59:05,932 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2026-01-15 15:59:05,933 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 135, tiempo: 0.138s
+2026-01-15 15:59:05,934 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2026-01-15 15:59:06,045 - src.core.utils.logging_config - DEBUG - Inicializando comboboxes para filtros
+2026-01-15 15:59:06,046 - src.core.utils.logging_config - DEBUG - Obtenidos 32 valores únicos para color en 0.000s
+2026-01-15 15:59:06,047 - src.core.utils.logging_config - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2026-01-15 15:59:06,053 - src.core.utils.logging_config - DEBUG - Obtenidos 6 valores únicos para tipo_prenda en 0.000s
+2026-01-15 15:59:06,056 - src.core.utils.logging_config - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial', 'Uniforme']
+2026-01-15 15:59:06,065 - src.core.utils.logging_config - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.000s
+2026-01-15 15:59:06,066 - src.core.utils.logging_config - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2026-01-15 15:59:06,073 - src.core.utils.logging_config - DEBUG - Obtenidos 23 valores únicos para atributo en 0.000s
+2026-01-15 15:59:06,076 - src.core.utils.logging_config - DEBUG - Valores para atributo: ['Algodón', 'Botones', 'Chazarilla', 'Conalep', 'Conjunto', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Cuello olan', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Oferta', 'Polo', 'Punto', 'Tortuga', 'Vestir']
+2026-01-15 15:59:06,082 - src.core.utils.logging_config - DEBUG - Obtenidos 56 valores únicos para escuela en 0.000s
+2026-01-15 15:59:06,085 - src.core.utils.logging_config - DEBUG - Valores para escuela: ['16 de Septiembre', 'Adolfo Lopez Mareo', 'Adolfo Lopez Mateo', 'Albino García Ramos', 'Alvaro Obregon', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'ESTV 663', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Huizache', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Palacio', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Santa Rosa 238', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Telesecundaria 600', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Vidal Acolcer', 'Álvaro Obregón']
+2026-01-15 15:59:06,094 - src.core.utils.logging_config - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2026-01-15 15:59:06,095 - src.core.utils.logging_config - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2026-01-15 15:59:06,100 - src.core.utils.logging_config - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2026-01-15 15:59:06,100 - src.core.utils.logging_config - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2026-01-15 15:59:06,106 - src.core.utils.logging_config - DEBUG - Obtenidos 5 valores únicos para marca en 0.000s
+2026-01-15 15:59:06,107 - src.core.utils.logging_config - DEBUG - Valores para marca: ['Claudia', 'Lobito', 'MarcaX', 'MarcaY', 'Prowear']
+2026-01-15 15:59:06,113 - src.core.utils.logging_config - DEBUG - Obtenidos 43 valores únicos para talla en 0.000s
+2026-01-15 15:59:06,113 - src.core.utils.logging_config - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'M', 'L', 'CH', 'MD', 'GD', 'EXG', 'Uni', 'ESP', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2026-01-15 15:59:06,125 - src.core.utils.logging_config - INFO - Comboboxes inicializados correctamente
+2026-01-15 15:59:06,127 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2026-01-15 15:59:06,128 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2026-01-15 15:59:06,235 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2026-01-15 15:59:06,243 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=4034, current_page=0, total_pages=135
+2026-01-15 15:59:06,255 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 135
+2026-01-15 15:59:06,259 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2026-01-15 15:59:06,259 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 135, tiempo: 0.131s
+2026-01-15 15:59:06,260 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2026-01-15 15:59:06,532 - root - INFO - Iniciando GeneradorCodigos para tienda 1
+2026-01-15 15:59:06,534 - root - INFO - Colores cargados desde config.json: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Oficial', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2026-01-15 15:59:06,535 - root - INFO - Controlador inicializado para tienda 1
+2026-01-15 15:59:06,563 - root - INFO - Antes de setup_ui
+2026-01-15 15:59:06,563 - root - INFO - Iniciando setup_ui
+2026-01-15 15:59:07,249 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=None
+2026-01-15 15:59:07,310 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Escuelas, column=None
+2026-01-15 15:59:09,564 - root - INFO - setup_ui completado
+2026-01-15 15:59:09,565 - root - INFO - GeneradorCodigos inicializado para tienda 1
+2026-01-15 15:59:09,749 - src.modules.sales.apartados.apartados_logic - INFO - Tabla 'modificaciones_apartados' verificada/creada con store_id para tienda 1.
+2026-01-15 15:59:09,782 - src.modules.sales.apartados.apartados_logic - INFO - ApartadosLogic inicializado para tienda 1
+2026-01-15 15:59:09,795 - src.modules.sales.apartados.apartados_manager - INFO - Interfaz de gestión de apartados inicializada para usuario con ID 'admin' en tienda 1.
+2026-01-15 15:59:10,111 - __main__ - INFO - Base de datos verificada correctamente
+2026-01-15 15:59:10,230 - __main__ - INFO - Iniciando cambio a Product Manager
+2026-01-15 15:59:10,250 - __main__ - INFO - Precarga de formularios completada
+2026-01-15 15:59:10,365 - src.modules.products.product_manager - INFO - ProductManager inicializado para usuario admin con rol admin en tienda 1
+2026-01-15 15:59:10,367 - src.modules.products.product_manager_window - INFO - Inicializando ProductManagerWindow para usuario admin con rol admin en tienda 1
+2026-01-15 15:59:10,371 - src.modules.products.inventory_manager - INFO - InventoryManager inicializado para tienda 1
+2026-01-15 15:59:10,376 - src.modules.products.qr_generator - INFO - QRGenerator inicializado para tienda 1
+2026-01-15 15:59:10,378 - src.core.utils.logging_config - INFO - Inicializando ProductManagerLogic para tienda 1
+2026-01-15 15:59:10,382 - src.core.utils.logging_config - DEBUG - ProductEditForm inicializado para tienda 1
+2026-01-15 15:59:10,383 - src.core.utils.logging_config - INFO - Inicializando ProductManagerUI para tienda 1
+2026-01-15 15:59:10,386 - src.core.utils.logging_config - DEBUG - Ícono cargado: edit
+2026-01-15 15:59:10,394 - src.core.utils.logging_config - DEBUG - Ícono cargado: copy
+2026-01-15 15:59:10,399 - src.core.utils.logging_config - DEBUG - Ícono cargado: delete
+2026-01-15 15:59:10,401 - src.core.utils.logging_config - DEBUG - Ícono cargado: duplicate
+2026-01-15 15:59:10,403 - src.core.utils.logging_config - DEBUG - Ícono cargado: price
+2026-01-15 15:59:10,411 - src.core.utils.logging_config - DEBUG - Ícono cargado: print
+2026-01-15 15:59:10,413 - src.core.utils.logging_config - DEBUG - Ícono cargado: inventory
+2026-01-15 15:59:10,531 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=color
+2026-01-15 15:59:10,576 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Color, column=color
+2026-01-15 15:59:10,589 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2026-01-15 15:59:10,644 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2026-01-15 15:59:10,736 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2026-01-15 15:59:10,803 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2026-01-15 15:59:10,901 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=atributo
+2026-01-15 15:59:10,975 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2026-01-15 15:59:10,991 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=escuela
+2026-01-15 15:59:11,026 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2026-01-15 15:59:11,086 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2026-01-15 15:59:11,153 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2026-01-15 15:59:11,188 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=genero
+2026-01-15 15:59:11,228 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Género, column=genero
+2026-01-15 15:59:11,247 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=marca
+2026-01-15 15:59:11,289 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2026-01-15 15:59:11,302 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=talla
+2026-01-15 15:59:11,357 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2026-01-15 15:59:12,725 - src.core.utils.logging_config - DEBUG - Inicializando comboboxes para filtros
+2026-01-15 15:59:12,731 - src.core.utils.logging_config - DEBUG - Obtenidos 32 valores únicos para color en 0.005s
+2026-01-15 15:59:12,732 - src.core.utils.logging_config - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2026-01-15 15:59:12,743 - src.core.utils.logging_config - DEBUG - Obtenidos 6 valores únicos para tipo_prenda en 0.004s
+2026-01-15 15:59:12,746 - src.core.utils.logging_config - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial', 'Uniforme']
+2026-01-15 15:59:12,759 - src.core.utils.logging_config - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.005s
+2026-01-15 15:59:12,767 - src.core.utils.logging_config - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2026-01-15 15:59:12,778 - src.core.utils.logging_config - DEBUG - Obtenidos 23 valores únicos para atributo en 0.005s
+2026-01-15 15:59:12,783 - src.core.utils.logging_config - DEBUG - Valores para atributo: ['Algodón', 'Botones', 'Chazarilla', 'Conalep', 'Conjunto', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Cuello olan', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Oferta', 'Polo', 'Punto', 'Tortuga', 'Vestir']
+2026-01-15 15:59:12,792 - src.core.utils.logging_config - DEBUG - Obtenidos 56 valores únicos para escuela en 0.001s
+2026-01-15 15:59:12,803 - src.core.utils.logging_config - DEBUG - Valores para escuela: ['16 de Septiembre', 'Adolfo Lopez Mareo', 'Adolfo Lopez Mateo', 'Albino García Ramos', 'Alvaro Obregon', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'ESTV 663', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Huizache', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Palacio', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Santa Rosa 238', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Telesecundaria 600', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Vidal Acolcer', 'Álvaro Obregón']
+2026-01-15 15:59:12,820 - src.core.utils.logging_config - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.003s
+2026-01-15 15:59:12,832 - src.core.utils.logging_config - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2026-01-15 15:59:12,840 - src.core.utils.logging_config - DEBUG - Obtenidos 3 valores únicos para genero en 0.002s
+2026-01-15 15:59:12,849 - src.core.utils.logging_config - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2026-01-15 15:59:12,865 - src.core.utils.logging_config - DEBUG - Obtenidos 5 valores únicos para marca en 0.003s
+2026-01-15 15:59:12,867 - src.core.utils.logging_config - DEBUG - Valores para marca: ['Claudia', 'Lobito', 'MarcaX', 'MarcaY', 'Prowear']
+2026-01-15 15:59:12,878 - src.core.utils.logging_config - DEBUG - Obtenidos 43 valores únicos para talla en 0.005s
+2026-01-15 15:59:12,883 - src.core.utils.logging_config - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'M', 'L', 'CH', 'MD', 'GD', 'EXG', 'Uni', 'ESP', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2026-01-15 15:59:12,894 - src.core.utils.logging_config - INFO - Comboboxes inicializados correctamente
+2026-01-15 15:59:12,899 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2026-01-15 15:59:12,921 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2026-01-15 15:59:13,043 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2026-01-15 15:59:13,068 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=4034, current_page=0, total_pages=135
+2026-01-15 15:59:13,084 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 135
+2026-01-15 15:59:13,088 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2026-01-15 15:59:13,093 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 135, tiempo: 0.172s
+2026-01-15 15:59:13,095 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2026-01-15 15:59:13,210 - src.core.utils.logging_config - DEBUG - Inicializando comboboxes para filtros
+2026-01-15 15:59:13,210 - src.core.utils.logging_config - DEBUG - Obtenidos 32 valores únicos para color en 0.000s
+2026-01-15 15:59:13,211 - src.core.utils.logging_config - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2026-01-15 15:59:13,217 - src.core.utils.logging_config - DEBUG - Obtenidos 6 valores únicos para tipo_prenda en 0.000s
+2026-01-15 15:59:13,218 - src.core.utils.logging_config - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial', 'Uniforme']
+2026-01-15 15:59:13,224 - src.core.utils.logging_config - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.000s
+2026-01-15 15:59:13,229 - src.core.utils.logging_config - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2026-01-15 15:59:13,235 - src.core.utils.logging_config - DEBUG - Obtenidos 23 valores únicos para atributo en 0.000s
+2026-01-15 15:59:13,270 - src.core.utils.logging_config - DEBUG - Valores para atributo: ['Algodón', 'Botones', 'Chazarilla', 'Conalep', 'Conjunto', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Cuello olan', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Oferta', 'Polo', 'Punto', 'Tortuga', 'Vestir']
+2026-01-15 15:59:13,280 - src.core.utils.logging_config - DEBUG - Obtenidos 56 valores únicos para escuela en 0.000s
+2026-01-15 15:59:13,283 - src.core.utils.logging_config - DEBUG - Valores para escuela: ['16 de Septiembre', 'Adolfo Lopez Mareo', 'Adolfo Lopez Mateo', 'Albino García Ramos', 'Alvaro Obregon', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'ESTV 663', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Huizache', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Palacio', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Santa Rosa 238', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Telesecundaria 600', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Vidal Acolcer', 'Álvaro Obregón']
+2026-01-15 15:59:13,312 - src.core.utils.logging_config - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2026-01-15 15:59:13,316 - src.core.utils.logging_config - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2026-01-15 15:59:13,333 - src.core.utils.logging_config - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2026-01-15 15:59:13,335 - src.core.utils.logging_config - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2026-01-15 15:59:13,341 - src.core.utils.logging_config - DEBUG - Obtenidos 5 valores únicos para marca en 0.000s
+2026-01-15 15:59:13,354 - src.core.utils.logging_config - DEBUG - Valores para marca: ['Claudia', 'Lobito', 'MarcaX', 'MarcaY', 'Prowear']
+2026-01-15 15:59:13,370 - src.core.utils.logging_config - DEBUG - Obtenidos 43 valores únicos para talla en 0.000s
+2026-01-15 15:59:13,370 - src.core.utils.logging_config - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'M', 'L', 'CH', 'MD', 'GD', 'EXG', 'Uni', 'ESP', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2026-01-15 15:59:13,382 - src.core.utils.logging_config - INFO - Comboboxes inicializados correctamente
+2026-01-15 15:59:13,383 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2026-01-15 15:59:13,385 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2026-01-15 15:59:13,492 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2026-01-15 15:59:13,498 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=4034, current_page=0, total_pages=135
+2026-01-15 15:59:13,512 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 135
+2026-01-15 15:59:13,516 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2026-01-15 15:59:13,517 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 135, tiempo: 0.132s
+2026-01-15 15:59:13,517 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2026-01-15 15:59:13,638 - __main__ - INFO - Interfaz de Product Manager cargada exitosamente
+2026-01-15 15:59:24,234 - src.core.utils.logging_config - DEBUG - Menú desplegable creado y mostrado
+2026-01-15 15:59:25,501 - src.core.utils.logging_config - DEBUG - Menú desplegable cerrado
+2026-01-15 15:59:26,710 - src.core.utils.logging_config - DEBUG - Menú desplegable creado y mostrado
+2026-01-15 15:59:34,329 - src.core.utils.logging_config - DEBUG - Ejecutando comando con selecciones: ['José María Morelos y Pavón'], column=escuela
+2026-01-15 15:59:34,330 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2026-01-15 15:59:34,442 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2026-01-15 15:59:34,444 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=66, current_page=0, total_pages=3
+2026-01-15 15:59:34,456 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 3
+2026-01-15 15:59:34,461 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2026-01-15 15:59:34,462 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 3, tiempo: 0.132s
+2026-01-15 15:59:34,471 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2026-01-15 15:59:34,586 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Filtros: Escuela: José María Morelos y Pavón
+2026-01-15 15:59:37,417 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 15:59:37,417 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002382
+2026-01-15 15:59:37,898 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 15:59:37,899 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\6
+2026-01-15 15:59:38,798 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\6\label_SKU002382.png
+2026-01-15 15:59:38,884 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 15:59:38,884 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002382
+2026-01-15 15:59:38,891 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 15:59:39,050 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\6
+2026-01-15 15:59:39,053 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\6\label_SKU002382.png
+2026-01-15 15:59:40,336 - src.core.utils.logging_config - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\6\label_SKU002382.png
+2026-01-15 15:59:40,344 - src.core.utils.logging_config - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU002382
+2026-01-15 15:59:40,620 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU002382: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\6\label_SKU002382.png
+2026-01-15 15:59:50,647 - src.modules.products.product_manager_window - INFO - Impresas 4 etiquetas para SKU SKU002382 (tipo: standard, copias solicitadas: 4)
+2026-01-15 15:59:50,649 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 15:59:50,650 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002382
+2026-01-15 15:59:50,661 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 15:59:50,667 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\6
+2026-01-15 15:59:50,677 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\6\label_SKU002382.png
+2026-01-15 15:59:50,682 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I052 (SKU: SKU002382, índice: 21)
+2026-01-15 15:59:50,712 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 15:59:50,713 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002382
+2026-01-15 15:59:50,722 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 15:59:50,727 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\6
+2026-01-15 15:59:50,731 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\6\label_SKU002382.png
+2026-01-15 15:59:50,742 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 15:59:50,750 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002382
+2026-01-15 15:59:50,759 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 15:59:50,762 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\6
+2026-01-15 15:59:50,765 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\6\label_SKU002382.png
+2026-01-15 15:59:50,904 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU002397: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\8\label_SKU002397.png
+2026-01-15 15:59:50,912 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 15:59:50,913 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002397
+2026-01-15 15:59:50,922 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 15:59:50,924 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\8
+2026-01-15 15:59:50,927 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\8\label_SKU002397.png
+2026-01-15 15:59:50,928 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I053 (SKU: SKU002397, índice: 22)
+2026-01-15 15:59:50,929 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 15:59:50,929 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002397
+2026-01-15 15:59:50,939 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 15:59:50,942 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\8
+2026-01-15 15:59:50,945 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\8\label_SKU002397.png
+2026-01-15 15:59:50,946 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 15:59:50,947 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002397
+2026-01-15 15:59:50,958 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 15:59:50,960 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\8
+2026-01-15 15:59:50,964 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\8\label_SKU002397.png
+2026-01-15 15:59:51,474 - src.modules.products.product_manager_window - INFO - Impresas 4 etiquetas para SKU SKU002397 (tipo: standard, copias solicitadas: 4)
+2026-01-15 15:59:51,479 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 15:59:51,481 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002397
+2026-01-15 15:59:51,490 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 15:59:51,491 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\8
+2026-01-15 15:59:51,497 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\8\label_SKU002397.png
+2026-01-15 15:59:51,498 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I053 (SKU: SKU002397, índice: 22)
+2026-01-15 15:59:51,501 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 15:59:51,501 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002397
+2026-01-15 15:59:51,516 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 15:59:51,517 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\8
+2026-01-15 15:59:51,520 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\8\label_SKU002397.png
+2026-01-15 15:59:51,526 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 15:59:51,527 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002397
+2026-01-15 15:59:51,535 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 15:59:51,537 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\8
+2026-01-15 15:59:51,542 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\8\label_SKU002397.png
+2026-01-15 15:59:52,363 - src.modules.products.product_manager_window - INFO - Impresas 4 etiquetas para SKU SKU002397 (tipo: standard, copias solicitadas: 4)
+2026-01-15 15:59:52,365 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 15:59:52,366 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002397
+2026-01-15 15:59:52,374 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 15:59:52,375 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\8
+2026-01-15 15:59:52,378 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\8\label_SKU002397.png
+2026-01-15 15:59:52,379 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I053 (SKU: SKU002397, índice: 22)
+2026-01-15 15:59:52,381 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 15:59:52,382 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002397
+2026-01-15 15:59:52,392 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 15:59:52,393 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\8
+2026-01-15 15:59:52,397 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\8\label_SKU002397.png
+2026-01-15 15:59:52,399 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 15:59:52,399 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002397
+2026-01-15 15:59:52,409 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 15:59:52,410 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\8
+2026-01-15 15:59:52,413 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\8\label_SKU002397.png
+2026-01-15 15:59:52,587 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU002412: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\10\label_SKU002412.png
+2026-01-15 15:59:52,595 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 15:59:52,596 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002412
+2026-01-15 15:59:52,604 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 15:59:52,608 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\10
+2026-01-15 15:59:52,611 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\10\label_SKU002412.png
+2026-01-15 15:59:52,612 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I054 (SKU: SKU002412, índice: 23)
+2026-01-15 15:59:52,613 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 15:59:52,613 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002412
+2026-01-15 15:59:52,622 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 15:59:52,625 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\10
+2026-01-15 15:59:52,628 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\10\label_SKU002412.png
+2026-01-15 15:59:52,629 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 15:59:52,630 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002412
+2026-01-15 15:59:52,638 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 15:59:52,639 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\10
+2026-01-15 15:59:52,642 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\10\label_SKU002412.png
+2026-01-15 15:59:53,444 - src.modules.products.product_manager_window - INFO - Impresas 4 etiquetas para SKU SKU002412 (tipo: standard, copias solicitadas: 4)
+2026-01-15 15:59:53,447 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 15:59:53,449 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002412
+2026-01-15 15:59:53,461 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 15:59:53,467 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\10
+2026-01-15 15:59:53,477 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\10\label_SKU002412.png
+2026-01-15 15:59:53,479 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I054 (SKU: SKU002412, índice: 23)
+2026-01-15 15:59:53,481 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 15:59:53,482 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002412
+2026-01-15 15:59:53,490 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 15:59:53,492 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\10
+2026-01-15 15:59:53,496 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\10\label_SKU002412.png
+2026-01-15 15:59:53,500 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 15:59:53,502 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002412
+2026-01-15 15:59:53,511 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 15:59:53,514 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\10
+2026-01-15 15:59:53,518 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\10\label_SKU002412.png
+2026-01-15 16:00:54,297 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU002427: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\12\label_SKU002427.png
+2026-01-15 16:00:54,306 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 16:00:54,308 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002427
+2026-01-15 16:00:54,323 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 16:00:54,324 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\12
+2026-01-15 16:00:54,329 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\12\label_SKU002427.png
+2026-01-15 16:00:54,339 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I055 (SKU: SKU002427, índice: 24)
+2026-01-15 16:00:54,342 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 16:00:54,350 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002427
+2026-01-15 16:00:54,360 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 16:00:54,367 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\12
+2026-01-15 16:00:54,371 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\12\label_SKU002427.png
+2026-01-15 16:00:54,374 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 16:00:54,383 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002427
+2026-01-15 16:00:54,392 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 16:00:54,403 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\12
+2026-01-15 16:00:54,408 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\12\label_SKU002427.png
+2026-01-15 16:00:55,669 - src.modules.products.product_manager_window - INFO - Impresas 4 etiquetas para SKU SKU002427 (tipo: standard, copias solicitadas: 4)
+2026-01-15 16:00:55,672 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 16:00:55,673 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002427
+2026-01-15 16:00:55,681 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 16:00:55,682 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\12
+2026-01-15 16:00:55,685 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\12\label_SKU002427.png
+2026-01-15 16:00:55,686 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I055 (SKU: SKU002427, índice: 24)
+2026-01-15 16:00:55,688 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 16:00:55,689 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002427
+2026-01-15 16:00:55,697 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 16:00:55,701 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\12
+2026-01-15 16:00:55,706 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\12\label_SKU002427.png
+2026-01-15 16:00:55,709 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/30
+2026-01-15 16:00:55,713 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002427
+2026-01-15 16:00:55,722 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-15 16:00:55,724 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\12
+2026-01-15 16:00:55,728 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Deportiva Ad hoc Talla_Deportivo_Playera\12\label_SKU002427.png

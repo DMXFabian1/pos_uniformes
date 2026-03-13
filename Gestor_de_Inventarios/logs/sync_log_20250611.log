@@ -1,0 +1,962 @@
+2025-06-11 16:33:46,706 - src.core.config.db_manager - INFO - Conexión a c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\data/productos.db establecida.
+2025-06-11 16:33:46,734 - src.core.config.db_manager - INFO - Migración de fechas completada.
+2025-06-11 16:33:48,055 - __main__ - INFO - Iniciando precarga de formularios
+2025-06-11 16:33:48,116 - src.modules.products.product_manager - INFO - ProductManager inicializado para usuario admin con rol admin en tienda 1
+2025-06-11 16:33:48,117 - src.modules.products.product_manager_window - INFO - Inicializando ProductManagerWindow para usuario admin con rol admin en tienda 1
+2025-06-11 16:33:48,123 - src.modules.products.inventory_manager - INFO - InventoryManager inicializado para tienda 1
+2025-06-11 16:33:48,123 - src.modules.products.qr_generator - INFO - QRGenerator inicializado para tienda 1
+2025-06-11 16:33:48,124 - src.core.utils.logging_config - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-06-11 16:33:48,126 - src.core.utils.logging_config - DEBUG - ProductEditForm inicializado para tienda 1
+2025-06-11 16:33:48,127 - src.core.utils.logging_config - INFO - Inicializando ProductManagerUI para tienda 1
+2025-06-11 16:33:48,128 - src.core.utils.logging_config - DEBUG - Ícono cargado: edit
+2025-06-11 16:33:48,130 - src.core.utils.logging_config - DEBUG - Ícono cargado: copy
+2025-06-11 16:33:48,131 - src.core.utils.logging_config - DEBUG - Ícono cargado: delete
+2025-06-11 16:33:48,132 - src.core.utils.logging_config - DEBUG - Ícono cargado: duplicate
+2025-06-11 16:33:48,134 - src.core.utils.logging_config - DEBUG - Ícono cargado: price
+2025-06-11 16:33:48,137 - src.core.utils.logging_config - DEBUG - Ícono cargado: print
+2025-06-11 16:33:48,142 - src.core.utils.logging_config - DEBUG - Ícono cargado: inventory
+2025-06-11 16:33:48,777 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=color
+2025-06-11 16:33:48,819 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-06-11 16:33:48,829 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-06-11 16:33:48,856 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-06-11 16:33:48,865 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-06-11 16:33:48,894 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-06-11 16:33:48,904 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-06-11 16:33:48,931 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-06-11 16:33:48,942 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-06-11 16:33:48,969 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-06-11 16:33:48,979 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-06-11 16:33:49,008 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-06-11 16:33:49,019 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=genero
+2025-06-11 16:33:49,046 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-06-11 16:33:49,057 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=marca
+2025-06-11 16:33:49,083 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-06-11 16:33:49,093 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=talla
+2025-06-11 16:33:49,120 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-06-11 16:33:49,374 - src.core.utils.logging_config - DEBUG - Inicializando comboboxes para filtros
+2025-06-11 16:33:49,420 - src.core.utils.logging_config - DEBUG - Obtenidos 30 valores únicos para color en 0.045s
+2025-06-11 16:33:49,420 - src.core.utils.logging_config - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-11 16:33:49,428 - src.core.utils.logging_config - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.002s
+2025-06-11 16:33:49,429 - src.core.utils.logging_config - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-06-11 16:33:49,436 - src.core.utils.logging_config - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.002s
+2025-06-11 16:33:49,437 - src.core.utils.logging_config - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-06-11 16:33:49,445 - src.core.utils.logging_config - DEBUG - Obtenidos 18 valores únicos para atributo en 0.002s
+2025-06-11 16:33:49,445 - src.core.utils.logging_config - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Punto', 'Tableada', 'Tortuga', 'Vestir']
+2025-06-11 16:33:49,452 - src.core.utils.logging_config - DEBUG - Obtenidos 47 valores únicos para escuela en 0.001s
+2025-06-11 16:33:49,453 - src.core.utils.logging_config - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-06-11 16:33:49,464 - src.core.utils.logging_config - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.002s
+2025-06-11 16:33:49,465 - src.core.utils.logging_config - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-06-11 16:33:49,472 - src.core.utils.logging_config - DEBUG - Obtenidos 3 valores únicos para genero en 0.002s
+2025-06-11 16:33:49,473 - src.core.utils.logging_config - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-06-11 16:33:49,482 - src.core.utils.logging_config - DEBUG - Obtenidos 2 valores únicos para marca en 0.002s
+2025-06-11 16:33:49,483 - src.core.utils.logging_config - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-06-11 16:33:49,493 - src.core.utils.logging_config - DEBUG - Obtenidos 40 valores únicos para talla en 0.004s
+2025-06-11 16:33:49,493 - src.core.utils.logging_config - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-06-11 16:33:49,499 - src.core.utils.logging_config - INFO - Comboboxes inicializados correctamente
+2025-06-11 16:33:49,501 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-06-11 16:33:49,519 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-11 16:33:49,619 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-11 16:33:49,622 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=3077, current_page=0, total_pages=103
+2025-06-11 16:33:49,633 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 103
+2025-06-11 16:33:49,637 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-11 16:33:49,637 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 103, tiempo: 0.118s
+2025-06-11 16:33:49,638 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-11 16:33:49,740 - src.core.utils.logging_config - DEBUG - Inicializando comboboxes para filtros
+2025-06-11 16:33:49,741 - src.core.utils.logging_config - DEBUG - Obtenidos 30 valores únicos para color en 0.000s
+2025-06-11 16:33:49,741 - src.core.utils.logging_config - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-11 16:33:49,747 - src.core.utils.logging_config - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.000s
+2025-06-11 16:33:49,747 - src.core.utils.logging_config - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-06-11 16:33:49,753 - src.core.utils.logging_config - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.000s
+2025-06-11 16:33:49,753 - src.core.utils.logging_config - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-06-11 16:33:49,759 - src.core.utils.logging_config - DEBUG - Obtenidos 18 valores únicos para atributo en 0.000s
+2025-06-11 16:33:49,760 - src.core.utils.logging_config - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Punto', 'Tableada', 'Tortuga', 'Vestir']
+2025-06-11 16:33:49,766 - src.core.utils.logging_config - DEBUG - Obtenidos 47 valores únicos para escuela en 0.000s
+2025-06-11 16:33:49,767 - src.core.utils.logging_config - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-06-11 16:33:49,775 - src.core.utils.logging_config - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-06-11 16:33:49,776 - src.core.utils.logging_config - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-06-11 16:33:49,781 - src.core.utils.logging_config - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-06-11 16:33:49,782 - src.core.utils.logging_config - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-06-11 16:33:49,787 - src.core.utils.logging_config - DEBUG - Obtenidos 2 valores únicos para marca en 0.000s
+2025-06-11 16:33:49,788 - src.core.utils.logging_config - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-06-11 16:33:49,793 - src.core.utils.logging_config - DEBUG - Obtenidos 40 valores únicos para talla en 0.000s
+2025-06-11 16:33:49,793 - src.core.utils.logging_config - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-06-11 16:33:49,800 - src.core.utils.logging_config - INFO - Comboboxes inicializados correctamente
+2025-06-11 16:33:49,801 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-06-11 16:33:49,802 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-11 16:33:49,904 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-11 16:33:49,907 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=3077, current_page=0, total_pages=103
+2025-06-11 16:33:49,917 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 103
+2025-06-11 16:33:49,921 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-11 16:33:49,921 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 103, tiempo: 0.119s
+2025-06-11 16:33:49,922 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-11 16:33:50,181 - root - INFO - Iniciando GeneradorCodigos para tienda 1
+2025-06-11 16:33:50,183 - root - INFO - Colores cargados desde config.json: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-11 16:33:50,183 - root - INFO - Controlador inicializado para tienda 1
+2025-06-11 16:33:50,208 - root - INFO - Antes de setup_ui
+2025-06-11 16:33:50,209 - root - INFO - Iniciando setup_ui
+2025-06-11 16:33:50,780 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=None
+2025-06-11 16:33:50,807 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Escuelas, column=None
+2025-06-11 16:33:52,719 - root - INFO - setup_ui completado
+2025-06-11 16:33:52,720 - root - INFO - GeneradorCodigos inicializado para tienda 1
+2025-06-11 16:33:52,896 - src.modules.sales.apartados.apartados_logic - INFO - Tabla 'modificaciones_apartados' verificada/creada con store_id para tienda 1.
+2025-06-11 16:33:52,897 - src.modules.sales.apartados.apartados_logic - INFO - ApartadosLogic inicializado para tienda 1
+2025-06-11 16:33:52,901 - src.modules.sales.apartados.apartados_manager - INFO - Interfaz de gestión de apartados inicializada para usuario con ID 'admin' en tienda 1.
+2025-06-11 16:33:53,012 - __main__ - INFO - Base de datos verificada correctamente
+2025-06-11 16:33:53,072 - __main__ - INFO - Iniciando cambio a Product Manager
+2025-06-11 16:33:53,092 - __main__ - INFO - Precarga de formularios completada
+2025-06-11 16:33:53,214 - src.modules.products.product_manager - INFO - ProductManager inicializado para usuario admin con rol admin en tienda 1
+2025-06-11 16:33:53,215 - src.modules.products.product_manager_window - INFO - Inicializando ProductManagerWindow para usuario admin con rol admin en tienda 1
+2025-06-11 16:33:53,220 - src.modules.products.inventory_manager - INFO - InventoryManager inicializado para tienda 1
+2025-06-11 16:33:53,220 - src.modules.products.qr_generator - INFO - QRGenerator inicializado para tienda 1
+2025-06-11 16:33:53,221 - src.core.utils.logging_config - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-06-11 16:33:53,223 - src.core.utils.logging_config - DEBUG - ProductEditForm inicializado para tienda 1
+2025-06-11 16:33:53,223 - src.core.utils.logging_config - INFO - Inicializando ProductManagerUI para tienda 1
+2025-06-11 16:33:53,225 - src.core.utils.logging_config - DEBUG - Ícono cargado: edit
+2025-06-11 16:33:53,226 - src.core.utils.logging_config - DEBUG - Ícono cargado: copy
+2025-06-11 16:33:53,228 - src.core.utils.logging_config - DEBUG - Ícono cargado: delete
+2025-06-11 16:33:53,232 - src.core.utils.logging_config - DEBUG - Ícono cargado: duplicate
+2025-06-11 16:33:53,234 - src.core.utils.logging_config - DEBUG - Ícono cargado: price
+2025-06-11 16:33:53,236 - src.core.utils.logging_config - DEBUG - Ícono cargado: print
+2025-06-11 16:33:53,238 - src.core.utils.logging_config - DEBUG - Ícono cargado: inventory
+2025-06-11 16:33:53,334 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=color
+2025-06-11 16:33:53,363 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-06-11 16:33:53,373 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-06-11 16:33:53,401 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-06-11 16:33:53,411 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-06-11 16:33:53,439 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-06-11 16:33:53,449 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-06-11 16:33:53,476 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-06-11 16:33:53,487 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-06-11 16:33:53,513 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-06-11 16:33:53,524 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-06-11 16:33:53,550 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-06-11 16:33:53,560 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=genero
+2025-06-11 16:33:53,587 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-06-11 16:33:53,598 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=marca
+2025-06-11 16:33:53,625 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-06-11 16:33:53,635 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=talla
+2025-06-11 16:33:53,704 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-06-11 16:33:54,836 - src.core.utils.logging_config - DEBUG - Inicializando comboboxes para filtros
+2025-06-11 16:33:54,840 - src.core.utils.logging_config - DEBUG - Obtenidos 30 valores únicos para color en 0.004s
+2025-06-11 16:33:54,841 - src.core.utils.logging_config - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-11 16:33:54,851 - src.core.utils.logging_config - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.003s
+2025-06-11 16:33:54,853 - src.core.utils.logging_config - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-06-11 16:33:54,863 - src.core.utils.logging_config - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.004s
+2025-06-11 16:33:54,863 - src.core.utils.logging_config - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-06-11 16:33:54,873 - src.core.utils.logging_config - DEBUG - Obtenidos 18 valores únicos para atributo en 0.004s
+2025-06-11 16:33:54,876 - src.core.utils.logging_config - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Punto', 'Tableada', 'Tortuga', 'Vestir']
+2025-06-11 16:33:54,883 - src.core.utils.logging_config - DEBUG - Obtenidos 47 valores únicos para escuela en 0.000s
+2025-06-11 16:33:54,884 - src.core.utils.logging_config - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-06-11 16:33:54,892 - src.core.utils.logging_config - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.002s
+2025-06-11 16:33:54,893 - src.core.utils.logging_config - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-06-11 16:33:54,900 - src.core.utils.logging_config - DEBUG - Obtenidos 3 valores únicos para genero en 0.002s
+2025-06-11 16:33:54,900 - src.core.utils.logging_config - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-06-11 16:33:54,908 - src.core.utils.logging_config - DEBUG - Obtenidos 2 valores únicos para marca en 0.002s
+2025-06-11 16:33:54,908 - src.core.utils.logging_config - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-06-11 16:33:54,917 - src.core.utils.logging_config - DEBUG - Obtenidos 40 valores únicos para talla en 0.004s
+2025-06-11 16:33:54,918 - src.core.utils.logging_config - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-06-11 16:33:54,925 - src.core.utils.logging_config - INFO - Comboboxes inicializados correctamente
+2025-06-11 16:33:54,927 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-06-11 16:33:54,941 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-11 16:33:55,045 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-11 16:33:55,048 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=3077, current_page=0, total_pages=103
+2025-06-11 16:33:55,059 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 103
+2025-06-11 16:33:55,063 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-11 16:33:55,064 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 103, tiempo: 0.122s
+2025-06-11 16:33:55,064 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-11 16:33:55,169 - src.core.utils.logging_config - DEBUG - Inicializando comboboxes para filtros
+2025-06-11 16:33:55,170 - src.core.utils.logging_config - DEBUG - Obtenidos 30 valores únicos para color en 0.000s
+2025-06-11 16:33:55,170 - src.core.utils.logging_config - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-11 16:33:55,176 - src.core.utils.logging_config - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.000s
+2025-06-11 16:33:55,176 - src.core.utils.logging_config - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-06-11 16:33:55,184 - src.core.utils.logging_config - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.000s
+2025-06-11 16:33:55,187 - src.core.utils.logging_config - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-06-11 16:33:55,193 - src.core.utils.logging_config - DEBUG - Obtenidos 18 valores únicos para atributo en 0.000s
+2025-06-11 16:33:55,193 - src.core.utils.logging_config - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Punto', 'Tableada', 'Tortuga', 'Vestir']
+2025-06-11 16:33:55,199 - src.core.utils.logging_config - DEBUG - Obtenidos 47 valores únicos para escuela en 0.000s
+2025-06-11 16:33:55,200 - src.core.utils.logging_config - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-06-11 16:33:55,208 - src.core.utils.logging_config - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-06-11 16:33:55,209 - src.core.utils.logging_config - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-06-11 16:33:55,214 - src.core.utils.logging_config - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-06-11 16:33:55,214 - src.core.utils.logging_config - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-06-11 16:33:55,221 - src.core.utils.logging_config - DEBUG - Obtenidos 2 valores únicos para marca en 0.000s
+2025-06-11 16:33:55,221 - src.core.utils.logging_config - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-06-11 16:33:55,227 - src.core.utils.logging_config - DEBUG - Obtenidos 40 valores únicos para talla en 0.000s
+2025-06-11 16:33:55,227 - src.core.utils.logging_config - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-06-11 16:33:55,233 - src.core.utils.logging_config - INFO - Comboboxes inicializados correctamente
+2025-06-11 16:33:55,235 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-06-11 16:33:55,236 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-11 16:33:55,337 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-11 16:33:55,341 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=3077, current_page=0, total_pages=103
+2025-06-11 16:33:55,351 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 103
+2025-06-11 16:33:55,355 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-11 16:33:55,355 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 103, tiempo: 0.120s
+2025-06-11 16:33:55,356 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-11 16:33:55,472 - __main__ - INFO - Interfaz de Product Manager cargada exitosamente
+2025-06-11 16:33:55,474 - __main__ - INFO - Iniciando cambio a Escanear e Imprimir
+2025-06-11 16:33:56,241 - src.modules.scanner.scan_and_print - INFO - ScanAndPrintApp inicializada
+2025-06-11 16:33:56,257 - __main__ - INFO - Ventana de Escanear e Imprimir cargada exitosamente
+2025-06-11 16:34:05,503 - src.modules.scanner.scan_and_print - INFO - Etiqueta impresa para SKU SKU003438
+2025-06-11 17:33:13,376 - src.core.config.db_manager - INFO - Conexión a c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\data/productos.db establecida.
+2025-06-11 17:33:13,417 - src.core.config.db_manager - INFO - Migración de fechas completada.
+2025-06-11 17:33:14,758 - __main__ - INFO - Iniciando precarga de formularios
+2025-06-11 17:33:14,826 - src.modules.products.product_manager - INFO - ProductManager inicializado para usuario admin con rol admin en tienda 1
+2025-06-11 17:33:14,827 - src.modules.products.product_manager_window - INFO - Inicializando ProductManagerWindow para usuario admin con rol admin en tienda 1
+2025-06-11 17:33:14,832 - src.modules.products.inventory_manager - INFO - InventoryManager inicializado para tienda 1
+2025-06-11 17:33:14,832 - src.modules.products.qr_generator - INFO - QRGenerator inicializado para tienda 1
+2025-06-11 17:33:14,833 - src.core.utils.logging_config - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-06-11 17:33:14,833 - src.core.utils.logging_config - DEBUG - ProductEditForm inicializado para tienda 1
+2025-06-11 17:33:14,834 - src.core.utils.logging_config - INFO - Inicializando ProductManagerUI para tienda 1
+2025-06-11 17:33:14,836 - src.core.utils.logging_config - DEBUG - Ícono cargado: edit
+2025-06-11 17:33:14,837 - src.core.utils.logging_config - DEBUG - Ícono cargado: copy
+2025-06-11 17:33:14,838 - src.core.utils.logging_config - DEBUG - Ícono cargado: delete
+2025-06-11 17:33:14,839 - src.core.utils.logging_config - DEBUG - Ícono cargado: duplicate
+2025-06-11 17:33:14,841 - src.core.utils.logging_config - DEBUG - Ícono cargado: price
+2025-06-11 17:33:14,842 - src.core.utils.logging_config - DEBUG - Ícono cargado: print
+2025-06-11 17:33:14,843 - src.core.utils.logging_config - DEBUG - Ícono cargado: inventory
+2025-06-11 17:33:15,487 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=color
+2025-06-11 17:33:15,528 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-06-11 17:33:15,537 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-06-11 17:33:15,564 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-06-11 17:33:15,575 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-06-11 17:33:15,601 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-06-11 17:33:15,612 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-06-11 17:33:15,639 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-06-11 17:33:15,649 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-06-11 17:33:15,677 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-06-11 17:33:15,688 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-06-11 17:33:15,715 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-06-11 17:33:15,726 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=genero
+2025-06-11 17:33:15,752 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-06-11 17:33:15,762 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=marca
+2025-06-11 17:33:15,789 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-06-11 17:33:15,799 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=talla
+2025-06-11 17:33:15,826 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-06-11 17:33:16,082 - src.core.utils.logging_config - DEBUG - Inicializando comboboxes para filtros
+2025-06-11 17:33:16,086 - src.core.utils.logging_config - DEBUG - Obtenidos 30 valores únicos para color en 0.004s
+2025-06-11 17:33:16,087 - src.core.utils.logging_config - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-11 17:33:16,095 - src.core.utils.logging_config - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.002s
+2025-06-11 17:33:16,096 - src.core.utils.logging_config - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-06-11 17:33:16,105 - src.core.utils.logging_config - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.002s
+2025-06-11 17:33:16,106 - src.core.utils.logging_config - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-06-11 17:33:16,133 - src.core.utils.logging_config - DEBUG - Obtenidos 18 valores únicos para atributo en 0.021s
+2025-06-11 17:33:16,147 - src.core.utils.logging_config - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Punto', 'Tableada', 'Tortuga', 'Vestir']
+2025-06-11 17:33:16,175 - src.core.utils.logging_config - DEBUG - Obtenidos 47 valores únicos para escuela en 0.000s
+2025-06-11 17:33:16,176 - src.core.utils.logging_config - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-06-11 17:33:16,199 - src.core.utils.logging_config - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.002s
+2025-06-11 17:33:16,199 - src.core.utils.logging_config - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-06-11 17:33:16,207 - src.core.utils.logging_config - DEBUG - Obtenidos 3 valores únicos para genero en 0.002s
+2025-06-11 17:33:16,207 - src.core.utils.logging_config - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-06-11 17:33:16,214 - src.core.utils.logging_config - DEBUG - Obtenidos 2 valores únicos para marca en 0.002s
+2025-06-11 17:33:16,214 - src.core.utils.logging_config - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-06-11 17:33:16,224 - src.core.utils.logging_config - DEBUG - Obtenidos 40 valores únicos para talla en 0.004s
+2025-06-11 17:33:16,225 - src.core.utils.logging_config - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-06-11 17:33:16,231 - src.core.utils.logging_config - INFO - Comboboxes inicializados correctamente
+2025-06-11 17:33:16,232 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-06-11 17:33:16,251 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-11 17:33:16,356 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-11 17:33:16,359 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=3077, current_page=0, total_pages=103
+2025-06-11 17:33:16,371 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 103
+2025-06-11 17:33:16,375 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-11 17:33:16,375 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 103, tiempo: 0.124s
+2025-06-11 17:33:16,375 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-11 17:33:16,478 - src.core.utils.logging_config - DEBUG - Inicializando comboboxes para filtros
+2025-06-11 17:33:16,479 - src.core.utils.logging_config - DEBUG - Obtenidos 30 valores únicos para color en 0.000s
+2025-06-11 17:33:16,479 - src.core.utils.logging_config - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-11 17:33:16,485 - src.core.utils.logging_config - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.000s
+2025-06-11 17:33:16,485 - src.core.utils.logging_config - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-06-11 17:33:16,491 - src.core.utils.logging_config - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.000s
+2025-06-11 17:33:16,491 - src.core.utils.logging_config - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-06-11 17:33:16,498 - src.core.utils.logging_config - DEBUG - Obtenidos 18 valores únicos para atributo en 0.000s
+2025-06-11 17:33:16,499 - src.core.utils.logging_config - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Punto', 'Tableada', 'Tortuga', 'Vestir']
+2025-06-11 17:33:16,505 - src.core.utils.logging_config - DEBUG - Obtenidos 47 valores únicos para escuela en 0.000s
+2025-06-11 17:33:16,506 - src.core.utils.logging_config - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-06-11 17:33:16,513 - src.core.utils.logging_config - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-06-11 17:33:16,514 - src.core.utils.logging_config - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-06-11 17:33:16,520 - src.core.utils.logging_config - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-06-11 17:33:16,521 - src.core.utils.logging_config - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-06-11 17:33:16,526 - src.core.utils.logging_config - DEBUG - Obtenidos 2 valores únicos para marca en 0.000s
+2025-06-11 17:33:16,527 - src.core.utils.logging_config - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-06-11 17:33:16,532 - src.core.utils.logging_config - DEBUG - Obtenidos 40 valores únicos para talla en 0.000s
+2025-06-11 17:33:16,532 - src.core.utils.logging_config - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-06-11 17:33:16,539 - src.core.utils.logging_config - INFO - Comboboxes inicializados correctamente
+2025-06-11 17:33:16,540 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-06-11 17:33:16,541 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-11 17:33:16,644 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-11 17:33:16,648 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=3077, current_page=0, total_pages=103
+2025-06-11 17:33:16,659 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 103
+2025-06-11 17:33:16,663 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-11 17:33:16,664 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 103, tiempo: 0.123s
+2025-06-11 17:33:16,667 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-11 17:33:16,931 - root - INFO - Iniciando GeneradorCodigos para tienda 1
+2025-06-11 17:33:16,932 - root - INFO - Colores cargados desde config.json: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-11 17:33:16,933 - root - INFO - Controlador inicializado para tienda 1
+2025-06-11 17:33:16,957 - root - INFO - Antes de setup_ui
+2025-06-11 17:33:16,958 - root - INFO - Iniciando setup_ui
+2025-06-11 17:33:17,547 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=None
+2025-06-11 17:33:17,578 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Escuelas, column=None
+2025-06-11 17:33:19,490 - root - INFO - setup_ui completado
+2025-06-11 17:33:19,491 - root - INFO - GeneradorCodigos inicializado para tienda 1
+2025-06-11 17:33:19,669 - src.modules.sales.apartados.apartados_logic - INFO - Tabla 'modificaciones_apartados' verificada/creada con store_id para tienda 1.
+2025-06-11 17:33:19,670 - src.modules.sales.apartados.apartados_logic - INFO - ApartadosLogic inicializado para tienda 1
+2025-06-11 17:33:19,674 - src.modules.sales.apartados.apartados_manager - INFO - Interfaz de gestión de apartados inicializada para usuario con ID 'admin' en tienda 1.
+2025-06-11 17:33:19,786 - __main__ - INFO - Base de datos verificada correctamente
+2025-06-11 17:33:19,844 - __main__ - INFO - Iniciando cambio a Product Manager
+2025-06-11 17:33:19,862 - __main__ - INFO - Precarga de formularios completada
+2025-06-11 17:33:19,972 - src.modules.products.product_manager - INFO - ProductManager inicializado para usuario admin con rol admin en tienda 1
+2025-06-11 17:33:19,973 - src.modules.products.product_manager_window - INFO - Inicializando ProductManagerWindow para usuario admin con rol admin en tienda 1
+2025-06-11 17:33:19,977 - src.modules.products.inventory_manager - INFO - InventoryManager inicializado para tienda 1
+2025-06-11 17:33:19,978 - src.modules.products.qr_generator - INFO - QRGenerator inicializado para tienda 1
+2025-06-11 17:33:19,978 - src.core.utils.logging_config - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-06-11 17:33:19,979 - src.core.utils.logging_config - DEBUG - ProductEditForm inicializado para tienda 1
+2025-06-11 17:33:19,980 - src.core.utils.logging_config - INFO - Inicializando ProductManagerUI para tienda 1
+2025-06-11 17:33:19,981 - src.core.utils.logging_config - DEBUG - Ícono cargado: edit
+2025-06-11 17:33:19,983 - src.core.utils.logging_config - DEBUG - Ícono cargado: copy
+2025-06-11 17:33:19,984 - src.core.utils.logging_config - DEBUG - Ícono cargado: delete
+2025-06-11 17:33:19,986 - src.core.utils.logging_config - DEBUG - Ícono cargado: duplicate
+2025-06-11 17:33:19,988 - src.core.utils.logging_config - DEBUG - Ícono cargado: price
+2025-06-11 17:33:19,990 - src.core.utils.logging_config - DEBUG - Ícono cargado: print
+2025-06-11 17:33:19,991 - src.core.utils.logging_config - DEBUG - Ícono cargado: inventory
+2025-06-11 17:33:20,071 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=color
+2025-06-11 17:33:20,097 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-06-11 17:33:20,108 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-06-11 17:33:20,135 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-06-11 17:33:20,145 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-06-11 17:33:20,173 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-06-11 17:33:20,182 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-06-11 17:33:20,209 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-06-11 17:33:20,219 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-06-11 17:33:20,246 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-06-11 17:33:20,257 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-06-11 17:33:20,283 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-06-11 17:33:20,295 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=genero
+2025-06-11 17:33:20,322 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-06-11 17:33:20,332 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=marca
+2025-06-11 17:33:20,359 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-06-11 17:33:20,369 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=talla
+2025-06-11 17:33:20,396 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-06-11 17:33:21,463 - src.core.utils.logging_config - DEBUG - Inicializando comboboxes para filtros
+2025-06-11 17:33:21,468 - src.core.utils.logging_config - DEBUG - Obtenidos 30 valores únicos para color en 0.004s
+2025-06-11 17:33:21,469 - src.core.utils.logging_config - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-11 17:33:21,480 - src.core.utils.logging_config - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.003s
+2025-06-11 17:33:21,481 - src.core.utils.logging_config - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-06-11 17:33:21,490 - src.core.utils.logging_config - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.004s
+2025-06-11 17:33:21,491 - src.core.utils.logging_config - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-06-11 17:33:21,501 - src.core.utils.logging_config - DEBUG - Obtenidos 18 valores únicos para atributo en 0.004s
+2025-06-11 17:33:21,501 - src.core.utils.logging_config - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Punto', 'Tableada', 'Tortuga', 'Vestir']
+2025-06-11 17:33:21,509 - src.core.utils.logging_config - DEBUG - Obtenidos 47 valores únicos para escuela en 0.000s
+2025-06-11 17:33:21,510 - src.core.utils.logging_config - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-06-11 17:33:21,519 - src.core.utils.logging_config - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.002s
+2025-06-11 17:33:21,520 - src.core.utils.logging_config - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-06-11 17:33:21,527 - src.core.utils.logging_config - DEBUG - Obtenidos 3 valores únicos para genero en 0.001s
+2025-06-11 17:33:21,527 - src.core.utils.logging_config - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-06-11 17:33:21,534 - src.core.utils.logging_config - DEBUG - Obtenidos 2 valores únicos para marca en 0.001s
+2025-06-11 17:33:21,535 - src.core.utils.logging_config - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-06-11 17:33:21,544 - src.core.utils.logging_config - DEBUG - Obtenidos 40 valores únicos para talla en 0.003s
+2025-06-11 17:33:21,544 - src.core.utils.logging_config - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-06-11 17:33:21,550 - src.core.utils.logging_config - INFO - Comboboxes inicializados correctamente
+2025-06-11 17:33:21,552 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-06-11 17:33:21,566 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-11 17:33:21,666 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-11 17:33:21,669 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=3077, current_page=0, total_pages=103
+2025-06-11 17:33:21,679 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 103
+2025-06-11 17:33:21,683 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-11 17:33:21,684 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 103, tiempo: 0.118s
+2025-06-11 17:33:21,684 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-11 17:33:21,788 - src.core.utils.logging_config - DEBUG - Inicializando comboboxes para filtros
+2025-06-11 17:33:21,788 - src.core.utils.logging_config - DEBUG - Obtenidos 30 valores únicos para color en 0.000s
+2025-06-11 17:33:21,789 - src.core.utils.logging_config - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-11 17:33:21,794 - src.core.utils.logging_config - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.000s
+2025-06-11 17:33:21,795 - src.core.utils.logging_config - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-06-11 17:33:21,800 - src.core.utils.logging_config - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.000s
+2025-06-11 17:33:21,801 - src.core.utils.logging_config - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-06-11 17:33:21,809 - src.core.utils.logging_config - DEBUG - Obtenidos 18 valores únicos para atributo en 0.000s
+2025-06-11 17:33:21,809 - src.core.utils.logging_config - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Punto', 'Tableada', 'Tortuga', 'Vestir']
+2025-06-11 17:33:21,815 - src.core.utils.logging_config - DEBUG - Obtenidos 47 valores únicos para escuela en 0.000s
+2025-06-11 17:33:21,817 - src.core.utils.logging_config - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-06-11 17:33:21,824 - src.core.utils.logging_config - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-06-11 17:33:21,824 - src.core.utils.logging_config - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-06-11 17:33:21,830 - src.core.utils.logging_config - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-06-11 17:33:21,830 - src.core.utils.logging_config - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-06-11 17:33:21,836 - src.core.utils.logging_config - DEBUG - Obtenidos 2 valores únicos para marca en 0.000s
+2025-06-11 17:33:21,837 - src.core.utils.logging_config - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-06-11 17:33:21,842 - src.core.utils.logging_config - DEBUG - Obtenidos 40 valores únicos para talla en 0.000s
+2025-06-11 17:33:21,843 - src.core.utils.logging_config - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-06-11 17:33:21,849 - src.core.utils.logging_config - INFO - Comboboxes inicializados correctamente
+2025-06-11 17:33:21,850 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-06-11 17:33:21,851 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-11 17:33:21,955 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-11 17:33:21,958 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=3077, current_page=0, total_pages=103
+2025-06-11 17:33:21,970 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 103
+2025-06-11 17:33:21,974 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-11 17:33:21,975 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 103, tiempo: 0.123s
+2025-06-11 17:33:21,975 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-11 17:33:22,093 - __main__ - INFO - Interfaz de Product Manager cargada exitosamente
+2025-06-11 17:33:27,642 - src.core.utils.logging_config - DEBUG - Menú desplegable creado y mostrado
+2025-06-11 17:33:36,716 - src.core.utils.logging_config - DEBUG - Ejecutando comando con selecciones: ['Escoces'], column=color
+2025-06-11 17:33:36,717 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-11 17:33:36,818 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-11 17:33:36,822 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=35, current_page=0, total_pages=2
+2025-06-11 17:33:36,833 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 2
+2025-06-11 17:33:36,837 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-11 17:33:36,838 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 2, tiempo: 0.121s
+2025-06-11 17:33:36,838 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-11 17:33:36,939 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Filtros: Color: Escoces
+2025-06-11 17:33:37,890 - src.core.utils.logging_config - DEBUG - Menú desplegable cerrado
+2025-06-11 17:33:41,693 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-11 17:33:41,797 - src.core.utils.logging_config - DEBUG - Cargando productos para página 2, batch_size=30
+2025-06-11 17:33:41,800 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=35, current_page=1, total_pages=2
+2025-06-11 17:33:41,811 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 2 de 2
+2025-06-11 17:33:41,813 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/5
+2025-06-11 17:33:41,813 - src.core.utils.logging_config - INFO - Cargados 5 productos, página 2, total páginas: 2, tiempo: 0.120s
+2025-06-11 17:33:41,814 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-11 17:33:43,453 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/5
+2025-06-11 17:33:43,453 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003141
+2025-06-11 17:33:43,467 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:33:43,468 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escolar Escoces Talla_Oficial_Pantalón\4
+2025-06-11 17:33:43,473 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escolar Escoces Talla_Oficial_Pantalón\4\label_SKU003141.png
+2025-06-11 17:33:45,836 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 3/5
+2025-06-11 17:33:45,837 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003141
+2025-06-11 17:33:45,850 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:33:45,851 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escolar Escoces Talla_Oficial_Pantalón\4
+2025-06-11 17:33:45,856 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escolar Escoces Talla_Oficial_Pantalón\4\label_SKU003141.png
+2025-06-11 17:33:48,772 - src.modules.products.product_service - INFO - Producto eliminado: SKU SKU003141 en tienda 1
+2025-06-11 17:33:48,773 - src.modules.products.product_service - INFO - Producto eliminado: SKU SKU003142 en tienda 1
+2025-06-11 17:33:48,774 - src.modules.products.product_service - INFO - Producto eliminado: SKU SKU003143 en tienda 1
+2025-06-11 17:33:48,775 - src.modules.products.product_service - INFO - Subcarpeta de talla eliminada: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escolar Escoces Talla_Oficial_Pantalón\6
+2025-06-11 17:33:48,778 - src.modules.products.product_service - INFO - Subcarpeta de talla eliminada: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escolar Escoces Talla_Oficial_Pantalón\8
+2025-06-11 17:33:48,779 - src.modules.products.product_service - INFO - Subcarpeta de talla eliminada: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escolar Escoces Talla_Oficial_Pantalón\4
+2025-06-11 17:33:48,781 - src.modules.products.product_service - INFO - Carpeta base vacía eliminada: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escolar Escoces Talla_Oficial_Pantalón
+2025-06-11 17:33:48,789 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-11 17:33:48,893 - src.core.utils.logging_config - DEBUG - Cargando productos para página 2, batch_size=30
+2025-06-11 17:33:48,895 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=32, current_page=1, total_pages=2
+2025-06-11 17:33:48,906 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 2 de 2
+2025-06-11 17:33:48,907 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/2
+2025-06-11 17:33:48,908 - src.core.utils.logging_config - INFO - Cargados 2 productos, página 2, total páginas: 2, tiempo: 0.119s
+2025-06-11 17:33:48,908 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-11 17:33:49,012 - src.core.utils.logging_config - INFO - Eliminados 3 producto(s)
+2025-06-11 17:33:49,015 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/2
+2025-06-11 17:33:51,125 - __main__ - INFO - Iniciando cambio a Generador de Códigos
+2025-06-11 17:33:51,441 - root - INFO - Iniciando GeneradorCodigos para tienda 1
+2025-06-11 17:33:51,443 - root - INFO - Colores cargados desde config.json: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-11 17:33:51,444 - root - INFO - Controlador inicializado para tienda 1
+2025-06-11 17:33:51,462 - root - INFO - Antes de setup_ui
+2025-06-11 17:33:51,464 - root - INFO - Iniciando setup_ui
+2025-06-11 17:33:52,025 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=None
+2025-06-11 17:33:52,051 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Escuelas, column=None
+2025-06-11 17:33:53,855 - root - INFO - setup_ui completado
+2025-06-11 17:33:53,856 - root - INFO - GeneradorCodigos inicializado para tienda 1
+2025-06-11 17:33:53,872 - __main__ - INFO - Interfaz de Generador de Códigos cargada exitosamente
+2025-06-11 17:34:21,156 - root - INFO - Actualizando nombre del producto
+2025-06-11 17:34:21,160 - root - INFO - Nombre generado: Pantalón para tienda 1
+2025-06-11 17:34:24,252 - root - INFO - Cambiando estado del campo para tienda 1, omitir: True
+2025-06-11 17:34:24,828 - root - INFO - Cambiando estado del campo para tienda 1, omitir: True
+2025-06-11 17:34:26,590 - root - INFO - Cambiando estado del campo para tienda 1, omitir: True
+2025-06-11 17:34:27,628 - root - INFO - Cambiando estado del campo para tienda 1, omitir: True
+2025-06-11 17:34:29,080 - root - INFO - Cambiando estado del campo para tienda 1, omitir: True
+2025-06-11 17:34:30,051 - root - INFO - Cambiando estado del campo para tienda 1, omitir: True
+2025-06-11 17:34:31,804 - root - INFO - Validando precio
+2025-06-11 17:34:33,700 - root - INFO - Validando precio
+2025-06-11 17:34:33,901 - root - INFO - Validando precio
+2025-06-11 17:34:34,063 - root - INFO - Validando precio
+2025-06-11 17:35:03,085 - root - INFO - Actualizando nombre del producto
+2025-06-11 17:35:03,092 - root - INFO - Nombre generado: Pantalón para tienda 1
+2025-06-11 17:35:03,501 - root - INFO - Botón Revisar clicado para tienda 1
+2025-06-11 17:35:03,501 - root - INFO - Obteniendo escuelas seleccionadas
+2025-06-11 17:35:03,502 - root - INFO - Escuelas seleccionadas: [] para tienda 1
+2025-06-11 17:35:03,502 - root - INFO - Obteniendo colores seleccionados
+2025-06-11 17:35:03,503 - root - INFO - Colores seleccionados: ['Escoces'] para tienda 1
+2025-06-11 17:35:03,504 - root - INFO - Obteniendo colores seleccionados
+2025-06-11 17:35:03,504 - root - INFO - Colores seleccionados: ['Escoces'] para tienda 1
+2025-06-11 17:35:03,554 - root - INFO - Campos faltantes detectados para tienda 1: ['Marca']
+2025-06-11 17:35:03,569 - root - INFO - Validando precio final
+2025-06-11 17:35:03,583 - root - INFO - Validando precio final
+2025-06-11 17:35:04,787 - root - INFO - Botón Revisar clicado para tienda 1
+2025-06-11 17:35:04,788 - root - INFO - Obteniendo escuelas seleccionadas
+2025-06-11 17:35:04,789 - root - INFO - Escuelas seleccionadas: [] para tienda 1
+2025-06-11 17:35:04,790 - root - INFO - Obteniendo colores seleccionados
+2025-06-11 17:35:04,791 - root - INFO - Colores seleccionados: ['Escoces'] para tienda 1
+2025-06-11 17:35:04,792 - root - INFO - Obteniendo colores seleccionados
+2025-06-11 17:35:04,792 - root - INFO - Colores seleccionados: ['Escoces'] para tienda 1
+2025-06-11 17:35:04,793 - root - INFO - Validando campos del formulario para tienda 1
+2025-06-11 17:35:04,794 - root - INFO - Campos validados exitosamente para tienda 1
+2025-06-11 17:35:04,794 - root - INFO - Total productos a previsualizar para tienda 1: 12
+2025-06-11 17:35:04,795 - root - INFO - Gestionando SKU para tienda 1, incrementar: False
+2025-06-11 17:35:04,796 - root - INFO - Último SKU antes de previsualización para tienda 1: SKU003479
+2025-06-11 17:35:04,798 - root - INFO - Previsualización mostrada para tienda 1: SKU003480 - SKU003491
+2025-06-11 17:35:04,801 - root - INFO - Mensaje mostrado para tienda 1: Revisa los datos antes de generar. (color: green)
+2025-06-11 17:35:04,807 - root - INFO - Gestionando SKU para tienda 1, incrementar: False
+2025-06-11 17:35:04,808 - root - INFO - Último SKU después de previsualización para tienda 1: SKU003479
+2025-06-11 17:35:04,809 - root - INFO - Campos faltantes omitidos exitosamente para tienda 1
+2025-06-11 17:35:07,820 - root - INFO - Actualizando nombre del producto
+2025-06-11 17:35:07,827 - root - INFO - Nombre generado: Pantalón para tienda 1
+2025-06-11 17:35:08,382 - root - INFO - Botón Revisar clicado para tienda 1
+2025-06-11 17:35:08,382 - root - INFO - Obteniendo escuelas seleccionadas
+2025-06-11 17:35:08,383 - root - INFO - Escuelas seleccionadas: [] para tienda 1
+2025-06-11 17:35:08,383 - root - INFO - Obteniendo colores seleccionados
+2025-06-11 17:35:08,384 - root - INFO - Colores seleccionados: ['Escoces'] para tienda 1
+2025-06-11 17:35:08,385 - root - INFO - Obteniendo colores seleccionados
+2025-06-11 17:35:08,385 - root - INFO - Colores seleccionados: ['Escoces'] para tienda 1
+2025-06-11 17:35:08,386 - root - INFO - Validando campos del formulario para tienda 1
+2025-06-11 17:35:08,386 - root - INFO - Campos validados exitosamente para tienda 1
+2025-06-11 17:35:08,386 - root - INFO - Total productos a previsualizar para tienda 1: 12
+2025-06-11 17:35:08,387 - root - INFO - Gestionando SKU para tienda 1, incrementar: False
+2025-06-11 17:35:08,388 - root - INFO - Último SKU antes de previsualización para tienda 1: SKU003479
+2025-06-11 17:35:08,389 - root - INFO - Previsualización mostrada para tienda 1: SKU003480 - SKU003491
+2025-06-11 17:35:08,391 - root - INFO - Mensaje mostrado para tienda 1: Revisa los datos antes de generar. (color: green)
+2025-06-11 17:35:08,397 - root - INFO - Gestionando SKU para tienda 1, incrementar: False
+2025-06-11 17:35:08,398 - root - INFO - Último SKU después de previsualización para tienda 1: SKU003479
+2025-06-11 17:35:08,845 - root - INFO - Botón Generar clicado para tienda 1
+2025-06-11 17:35:08,846 - root - INFO - Obteniendo colores seleccionados
+2025-06-11 17:35:08,847 - root - INFO - Colores seleccionados: ['Escoces'] para tienda 1
+2025-06-11 17:35:08,847 - root - INFO - Validando campos del formulario para tienda 1
+2025-06-11 17:35:08,848 - root - INFO - Campos validados exitosamente para tienda 1
+2025-06-11 17:35:08,849 - root - INFO - Eliminando directorio existente para tienda 1: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón
+2025-06-11 17:35:08,900 - root - INFO - Creando directorio para tienda 1: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón
+2025-06-11 17:35:08,901 - root - INFO - Gestionando SKU para tienda 1, incrementar: True
+2025-06-11 17:35:08,908 - root - INFO - Nuevo SKU generado para tienda 1: SKU003480
+2025-06-11 17:35:08,919 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\2\SKU003480_Pantalón_2_Escoces_qr.png
+2025-06-11 17:35:08,949 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\2\SKU003480_Pantalón_2_Escoces_label.png
+2025-06-11 17:35:08,953 - root - INFO - Gestionando SKU para tienda 1, incrementar: True
+2025-06-11 17:35:08,961 - root - INFO - Nuevo SKU generado para tienda 1: SKU003481
+2025-06-11 17:35:08,969 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\3\SKU003481_Pantalón_3_Escoces_qr.png
+2025-06-11 17:35:08,995 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\3\SKU003481_Pantalón_3_Escoces_label.png
+2025-06-11 17:35:08,999 - root - INFO - Gestionando SKU para tienda 1, incrementar: True
+2025-06-11 17:35:09,007 - root - INFO - Nuevo SKU generado para tienda 1: SKU003482
+2025-06-11 17:35:09,015 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\4\SKU003482_Pantalón_4_Escoces_qr.png
+2025-06-11 17:35:09,042 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\4\SKU003482_Pantalón_4_Escoces_label.png
+2025-06-11 17:35:09,044 - root - INFO - Gestionando SKU para tienda 1, incrementar: True
+2025-06-11 17:35:09,052 - root - INFO - Nuevo SKU generado para tienda 1: SKU003483
+2025-06-11 17:35:09,061 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\6\SKU003483_Pantalón_6_Escoces_qr.png
+2025-06-11 17:35:09,086 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\6\SKU003483_Pantalón_6_Escoces_label.png
+2025-06-11 17:35:09,088 - root - INFO - Gestionando SKU para tienda 1, incrementar: True
+2025-06-11 17:35:09,095 - root - INFO - Nuevo SKU generado para tienda 1: SKU003484
+2025-06-11 17:35:09,105 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\8\SKU003484_Pantalón_8_Escoces_qr.png
+2025-06-11 17:35:09,133 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\8\SKU003484_Pantalón_8_Escoces_label.png
+2025-06-11 17:35:09,135 - root - INFO - Gestionando SKU para tienda 1, incrementar: True
+2025-06-11 17:35:09,143 - root - INFO - Nuevo SKU generado para tienda 1: SKU003485
+2025-06-11 17:35:09,151 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\10\SKU003485_Pantalón_10_Escoces_qr.png
+2025-06-11 17:35:09,177 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\10\SKU003485_Pantalón_10_Escoces_label.png
+2025-06-11 17:35:09,181 - root - INFO - Gestionando SKU para tienda 1, incrementar: True
+2025-06-11 17:35:09,189 - root - INFO - Nuevo SKU generado para tienda 1: SKU003486
+2025-06-11 17:35:09,198 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\12\SKU003486_Pantalón_12_Escoces_qr.png
+2025-06-11 17:35:09,225 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\12\SKU003486_Pantalón_12_Escoces_label.png
+2025-06-11 17:35:09,227 - root - INFO - Gestionando SKU para tienda 1, incrementar: True
+2025-06-11 17:35:09,235 - root - INFO - Nuevo SKU generado para tienda 1: SKU003487
+2025-06-11 17:35:09,244 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\14\SKU003487_Pantalón_14_Escoces_qr.png
+2025-06-11 17:35:09,269 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\14\SKU003487_Pantalón_14_Escoces_label.png
+2025-06-11 17:35:09,271 - root - INFO - Gestionando SKU para tienda 1, incrementar: True
+2025-06-11 17:35:09,280 - root - INFO - Nuevo SKU generado para tienda 1: SKU003488
+2025-06-11 17:35:09,289 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\16\SKU003488_Pantalón_16_Escoces_qr.png
+2025-06-11 17:35:09,316 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\16\SKU003488_Pantalón_16_Escoces_label.png
+2025-06-11 17:35:09,318 - root - INFO - Gestionando SKU para tienda 1, incrementar: True
+2025-06-11 17:35:09,327 - root - INFO - Nuevo SKU generado para tienda 1: SKU003489
+2025-06-11 17:35:09,335 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\28\SKU003489_Pantalón_28_Escoces_qr.png
+2025-06-11 17:35:09,361 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\28\SKU003489_Pantalón_28_Escoces_label.png
+2025-06-11 17:35:09,365 - root - INFO - Gestionando SKU para tienda 1, incrementar: True
+2025-06-11 17:35:09,373 - root - INFO - Nuevo SKU generado para tienda 1: SKU003490
+2025-06-11 17:35:09,382 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\30\SKU003490_Pantalón_30_Escoces_qr.png
+2025-06-11 17:35:09,409 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\30\SKU003490_Pantalón_30_Escoces_label.png
+2025-06-11 17:35:09,412 - root - INFO - Gestionando SKU para tienda 1, incrementar: True
+2025-06-11 17:35:09,421 - root - INFO - Nuevo SKU generado para tienda 1: SKU003491
+2025-06-11 17:35:09,430 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\32\SKU003491_Pantalón_32_Escoces_qr.png
+2025-06-11 17:35:09,456 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón_Básico_Pantalón\32\SKU003491_Pantalón_32_Escoces_label.png
+2025-06-11 17:35:09,469 - root - INFO - Mostrando ventana de éxito para generación de códigos en tienda 1
+2025-06-11 17:35:09,469 - root - INFO - Mostrando diálogo de éxito para tienda 1: Éxito - ¡Códigos generados con éxito en Mis códigos!
+2025-06-11 17:35:09,518 - root - INFO - Códigos generados exitosamente para 12 productos en tienda 1
+2025-06-11 17:35:09,531 - root - INFO - Validando precio final
+2025-06-11 17:35:09,543 - root - INFO - Validando precio final
+2025-06-11 17:35:11,348 - __main__ - INFO - Iniciando cambio a Product Manager
+2025-06-11 17:35:11,863 - src.modules.products.product_manager - INFO - ProductManager inicializado para usuario admin con rol admin en tienda 1
+2025-06-11 17:35:11,864 - src.modules.products.product_manager_window - INFO - Inicializando ProductManagerWindow para usuario admin con rol admin en tienda 1
+2025-06-11 17:35:11,869 - src.modules.products.inventory_manager - INFO - InventoryManager inicializado para tienda 1
+2025-06-11 17:35:11,869 - src.modules.products.qr_generator - INFO - QRGenerator inicializado para tienda 1
+2025-06-11 17:35:11,870 - src.core.utils.logging_config - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-06-11 17:35:11,870 - src.core.utils.logging_config - DEBUG - ProductEditForm inicializado para tienda 1
+2025-06-11 17:35:11,871 - src.core.utils.logging_config - INFO - Inicializando ProductManagerUI para tienda 1
+2025-06-11 17:35:11,872 - src.core.utils.logging_config - DEBUG - Ícono cargado: edit
+2025-06-11 17:35:11,874 - src.core.utils.logging_config - DEBUG - Ícono cargado: copy
+2025-06-11 17:35:11,875 - src.core.utils.logging_config - DEBUG - Ícono cargado: delete
+2025-06-11 17:35:11,876 - src.core.utils.logging_config - DEBUG - Ícono cargado: duplicate
+2025-06-11 17:35:11,878 - src.core.utils.logging_config - DEBUG - Ícono cargado: price
+2025-06-11 17:35:11,880 - src.core.utils.logging_config - DEBUG - Ícono cargado: print
+2025-06-11 17:35:11,882 - src.core.utils.logging_config - DEBUG - Ícono cargado: inventory
+2025-06-11 17:35:11,961 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=color
+2025-06-11 17:35:11,987 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-06-11 17:35:11,998 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-06-11 17:35:12,023 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-06-11 17:35:12,034 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-06-11 17:35:12,061 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-06-11 17:35:12,070 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-06-11 17:35:12,096 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-06-11 17:35:12,106 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-06-11 17:35:12,131 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-06-11 17:35:12,141 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-06-11 17:35:12,170 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-06-11 17:35:12,185 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=genero
+2025-06-11 17:35:12,211 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-06-11 17:35:12,220 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=marca
+2025-06-11 17:35:12,247 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-06-11 17:35:12,256 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=talla
+2025-06-11 17:35:12,284 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-06-11 17:35:13,358 - src.core.utils.logging_config - DEBUG - Inicializando comboboxes para filtros
+2025-06-11 17:35:13,362 - src.core.utils.logging_config - DEBUG - Obtenidos 30 valores únicos para color en 0.003s
+2025-06-11 17:35:13,362 - src.core.utils.logging_config - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-11 17:35:13,372 - src.core.utils.logging_config - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.003s
+2025-06-11 17:35:13,372 - src.core.utils.logging_config - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-06-11 17:35:13,381 - src.core.utils.logging_config - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.004s
+2025-06-11 17:35:13,383 - src.core.utils.logging_config - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-06-11 17:35:13,392 - src.core.utils.logging_config - DEBUG - Obtenidos 18 valores únicos para atributo en 0.003s
+2025-06-11 17:35:13,393 - src.core.utils.logging_config - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Punto', 'Tableada', 'Tortuga', 'Vestir']
+2025-06-11 17:35:13,400 - src.core.utils.logging_config - DEBUG - Obtenidos 47 valores únicos para escuela en 0.000s
+2025-06-11 17:35:13,401 - src.core.utils.logging_config - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-06-11 17:35:13,409 - src.core.utils.logging_config - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.002s
+2025-06-11 17:35:13,410 - src.core.utils.logging_config - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-06-11 17:35:13,419 - src.core.utils.logging_config - DEBUG - Obtenidos 3 valores únicos para genero en 0.001s
+2025-06-11 17:35:13,419 - src.core.utils.logging_config - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-06-11 17:35:13,426 - src.core.utils.logging_config - DEBUG - Obtenidos 2 valores únicos para marca en 0.002s
+2025-06-11 17:35:13,427 - src.core.utils.logging_config - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-06-11 17:35:13,436 - src.core.utils.logging_config - DEBUG - Obtenidos 40 valores únicos para talla en 0.004s
+2025-06-11 17:35:13,437 - src.core.utils.logging_config - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-06-11 17:35:13,443 - src.core.utils.logging_config - INFO - Comboboxes inicializados correctamente
+2025-06-11 17:35:13,444 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-06-11 17:35:13,459 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-11 17:35:13,566 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-11 17:35:13,569 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=3086, current_page=0, total_pages=103
+2025-06-11 17:35:13,580 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 103
+2025-06-11 17:35:13,584 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-11 17:35:13,584 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 103, tiempo: 0.125s
+2025-06-11 17:35:13,585 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-11 17:35:13,688 - src.core.utils.logging_config - DEBUG - Inicializando comboboxes para filtros
+2025-06-11 17:35:13,689 - src.core.utils.logging_config - DEBUG - Obtenidos 30 valores únicos para color en 0.000s
+2025-06-11 17:35:13,689 - src.core.utils.logging_config - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-11 17:35:13,695 - src.core.utils.logging_config - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.000s
+2025-06-11 17:35:13,695 - src.core.utils.logging_config - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-06-11 17:35:13,701 - src.core.utils.logging_config - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.000s
+2025-06-11 17:35:13,701 - src.core.utils.logging_config - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-06-11 17:35:13,709 - src.core.utils.logging_config - DEBUG - Obtenidos 18 valores únicos para atributo en 0.000s
+2025-06-11 17:35:13,709 - src.core.utils.logging_config - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Punto', 'Tableada', 'Tortuga', 'Vestir']
+2025-06-11 17:35:13,715 - src.core.utils.logging_config - DEBUG - Obtenidos 47 valores únicos para escuela en 0.000s
+2025-06-11 17:35:13,716 - src.core.utils.logging_config - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-06-11 17:35:13,722 - src.core.utils.logging_config - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-06-11 17:35:13,723 - src.core.utils.logging_config - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-06-11 17:35:13,728 - src.core.utils.logging_config - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-06-11 17:35:13,730 - src.core.utils.logging_config - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-06-11 17:35:13,735 - src.core.utils.logging_config - DEBUG - Obtenidos 2 valores únicos para marca en 0.000s
+2025-06-11 17:35:13,736 - src.core.utils.logging_config - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-06-11 17:35:13,741 - src.core.utils.logging_config - DEBUG - Obtenidos 40 valores únicos para talla en 0.000s
+2025-06-11 17:35:13,741 - src.core.utils.logging_config - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-06-11 17:35:13,749 - src.core.utils.logging_config - INFO - Comboboxes inicializados correctamente
+2025-06-11 17:35:13,750 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-06-11 17:35:13,751 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-11 17:35:13,853 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-11 17:35:13,856 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=3086, current_page=0, total_pages=103
+2025-06-11 17:35:13,867 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 103
+2025-06-11 17:35:13,870 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-11 17:35:13,871 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 103, tiempo: 0.120s
+2025-06-11 17:35:13,871 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-11 17:35:13,988 - __main__ - INFO - Interfaz de Product Manager cargada exitosamente
+2025-06-11 17:35:17,648 - src.core.utils.logging_config - DEBUG - Menú desplegable creado y mostrado
+2025-06-11 17:35:21,147 - src.core.utils.logging_config - DEBUG - Ejecutando comando con selecciones: ['Pantalón'], column=tipo_pieza
+2025-06-11 17:35:21,148 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-11 17:35:21,259 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-11 17:35:21,262 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=303, current_page=0, total_pages=11
+2025-06-11 17:35:21,273 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 11
+2025-06-11 17:35:21,277 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-11 17:35:21,278 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 11, tiempo: 0.130s
+2025-06-11 17:35:21,278 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-11 17:35:21,386 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Filtros: Tipo Pieza: Pantalón
+2025-06-11 17:35:22,117 - src.core.utils.logging_config - DEBUG - Menú desplegable cerrado
+2025-06-11 17:35:22,631 - src.core.utils.logging_config - DEBUG - Menú desplegable creado y mostrado
+2025-06-11 17:35:29,627 - src.core.utils.logging_config - DEBUG - Ejecutando comando con selecciones: ['Escoces'], column=color
+2025-06-11 17:35:29,628 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-11 17:35:29,738 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-11 17:35:29,741 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=12, current_page=0, total_pages=1
+2025-06-11 17:35:29,752 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 1
+2025-06-11 17:35:29,754 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/12
+2025-06-11 17:35:29,755 - src.core.utils.logging_config - INFO - Cargados 12 productos, página 1, total páginas: 1, tiempo: 0.126s
+2025-06-11 17:35:29,755 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-11 17:35:29,856 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Filtros: Color: Escoces; Tipo Pieza: Pantalón
+2025-06-11 17:35:31,111 - src.core.utils.logging_config - DEBUG - Menú desplegable cerrado
+2025-06-11 17:35:31,740 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:35:31,741 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003480
+2025-06-11 17:35:31,754 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:35:31,757 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\2
+2025-06-11 17:35:31,772 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\2\SKU003480.png
+2025-06-11 17:35:31,773 - src.core.utils.logging_config - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\2\SKU003480.png
+2025-06-11 17:35:31,792 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\2\label_SKU003480.png
+2025-06-11 17:35:31,800 - src.core.utils.logging_config - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\2\label_SKU003480.png, qr_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\2\label_SKU003480.png
+2025-06-11 17:35:31,886 - src.core.utils.logging_config - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\2\label_split_SKU003480.png, label_split_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\2\label_split_SKU003480.png
+2025-06-11 17:35:31,897 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\2\label_SKU003480.png
+2025-06-11 17:35:33,739 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:35:33,740 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003481
+2025-06-11 17:35:33,752 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:35:33,753 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3
+2025-06-11 17:35:33,762 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\SKU003481.png
+2025-06-11 17:35:33,763 - src.core.utils.logging_config - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\SKU003481.png
+2025-06-11 17:35:33,781 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_SKU003481.png
+2025-06-11 17:35:33,788 - src.core.utils.logging_config - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_SKU003481.png, qr_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_SKU003481.png
+2025-06-11 17:35:33,879 - src.core.utils.logging_config - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_split_SKU003481.png, label_split_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_split_SKU003481.png
+2025-06-11 17:35:33,893 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_SKU003481.png
+2025-06-11 17:35:36,004 - src.core.utils.logging_config - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_SKU003481.png
+2025-06-11 17:35:36,018 - src.core.utils.logging_config - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU003481
+2025-06-11 17:35:36,106 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU003481: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_SKU003481.png
+2025-06-11 17:35:42,106 - src.modules.products.product_manager_window - INFO - Impresas 27 etiquetas para SKU SKU003481 (tipo: standard, copias solicitadas: 27)
+2025-06-11 17:35:42,112 - src.modules.products.product_manager_window - INFO - Inventario actualizado para SKU SKU003481: 0 -> 27
+2025-06-11 17:35:42,115 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:35:42,116 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003481
+2025-06-11 17:35:42,125 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:35:42,126 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3
+2025-06-11 17:35:42,128 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_SKU003481.png
+2025-06-11 17:35:42,129 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I05C (SKU: SKU003481, índice: 1)
+2025-06-11 17:35:42,131 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:35:42,132 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003481
+2025-06-11 17:35:42,140 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:35:42,141 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3
+2025-06-11 17:35:42,144 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_SKU003481.png
+2025-06-11 17:35:42,145 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:35:42,145 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003481
+2025-06-11 17:35:42,153 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:35:42,154 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3
+2025-06-11 17:35:42,158 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_SKU003481.png
+2025-06-11 17:35:42,160 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:35:42,160 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003481
+2025-06-11 17:35:42,168 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:35:42,169 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3
+2025-06-11 17:35:42,172 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_SKU003481.png
+2025-06-11 17:35:42,174 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:35:42,175 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003481
+2025-06-11 17:35:42,183 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:35:42,184 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3
+2025-06-11 17:35:42,186 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_SKU003481.png
+2025-06-11 17:36:19,929 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU003481: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_split_SKU003481.png
+2025-06-11 17:36:21,496 - src.core.utils.logging_config - DEBUG - Manteniendo selección para SKU: SKU003481 al cerrar PrintPreviewWindow
+2025-06-11 17:36:21,528 - src.core.utils.logging_config - DEBUG - Selección restaurada para SKU: SKU003481 después de cerrar PrintPreviewWindow
+2025-06-11 17:36:21,530 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:36:21,530 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003481
+2025-06-11 17:36:21,539 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:36:21,540 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3
+2025-06-11 17:36:21,543 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_split_SKU003481.png
+2025-06-11 17:36:21,544 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:36:21,545 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003481
+2025-06-11 17:36:21,554 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:36:21,555 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3
+2025-06-11 17:36:21,557 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_split_SKU003481.png
+2025-06-11 17:36:21,560 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:36:21,560 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003481
+2025-06-11 17:36:21,568 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:36:21,569 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3
+2025-06-11 17:36:21,607 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_split_SKU003481.png
+2025-06-11 17:36:21,639 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:36:21,640 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003481
+2025-06-11 17:36:21,649 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:36:21,657 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3
+2025-06-11 17:36:21,660 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_split_SKU003481.png
+2025-06-11 17:36:22,600 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:36:22,601 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003480
+2025-06-11 17:36:22,615 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:36:22,617 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\2
+2025-06-11 17:36:22,632 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\2\label_split_SKU003480.png
+2025-06-11 17:36:23,013 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:36:23,014 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003481
+2025-06-11 17:36:23,022 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:36:23,023 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3
+2025-06-11 17:36:23,026 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_split_SKU003481.png
+2025-06-11 17:36:23,198 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:36:23,199 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003482
+2025-06-11 17:36:23,213 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:36:23,215 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4
+2025-06-11 17:36:23,227 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4\SKU003482.png
+2025-06-11 17:36:23,228 - src.core.utils.logging_config - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4\SKU003482.png
+2025-06-11 17:36:23,246 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4\label_SKU003482.png
+2025-06-11 17:36:23,254 - src.core.utils.logging_config - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4\label_SKU003482.png, qr_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4\label_SKU003482.png
+2025-06-11 17:36:23,342 - src.core.utils.logging_config - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4\label_split_SKU003482.png, label_split_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4\label_split_SKU003482.png
+2025-06-11 17:36:23,354 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4\label_split_SKU003482.png
+2025-06-11 17:36:23,419 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:36:23,419 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003483
+2025-06-11 17:36:23,427 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:36:23,429 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\6
+2025-06-11 17:36:23,437 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\6\SKU003483.png
+2025-06-11 17:36:23,438 - src.core.utils.logging_config - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\6\SKU003483.png
+2025-06-11 17:36:23,455 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\6\label_SKU003483.png
+2025-06-11 17:36:23,463 - src.core.utils.logging_config - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\6\label_SKU003483.png, qr_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\6\label_SKU003483.png
+2025-06-11 17:36:23,550 - src.core.utils.logging_config - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\6\label_split_SKU003483.png, label_split_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\6\label_split_SKU003483.png
+2025-06-11 17:36:23,561 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\6\label_split_SKU003483.png
+2025-06-11 17:36:23,564 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:36:23,564 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003484
+2025-06-11 17:36:23,572 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:36:23,573 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\8
+2025-06-11 17:36:23,582 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\8\SKU003484.png
+2025-06-11 17:36:23,583 - src.core.utils.logging_config - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\8\SKU003484.png
+2025-06-11 17:36:23,601 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\8\label_SKU003484.png
+2025-06-11 17:36:23,608 - src.core.utils.logging_config - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\8\label_SKU003484.png, qr_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\8\label_SKU003484.png
+2025-06-11 17:36:23,696 - src.core.utils.logging_config - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\8\label_split_SKU003484.png, label_split_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\8\label_split_SKU003484.png
+2025-06-11 17:36:23,708 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\8\label_split_SKU003484.png
+2025-06-11 17:36:23,781 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:36:23,781 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003485
+2025-06-11 17:36:23,790 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:36:23,791 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\10
+2025-06-11 17:36:23,800 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\10\SKU003485.png
+2025-06-11 17:36:23,801 - src.core.utils.logging_config - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\10\SKU003485.png
+2025-06-11 17:36:23,819 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\10\label_SKU003485.png
+2025-06-11 17:36:23,826 - src.core.utils.logging_config - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\10\label_SKU003485.png, qr_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\10\label_SKU003485.png
+2025-06-11 17:36:23,913 - src.core.utils.logging_config - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\10\label_split_SKU003485.png, label_split_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\10\label_split_SKU003485.png
+2025-06-11 17:36:23,925 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\10\label_split_SKU003485.png
+2025-06-11 17:36:23,927 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:36:23,927 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003486
+2025-06-11 17:36:23,935 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:36:23,936 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\12
+2025-06-11 17:36:23,945 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\12\SKU003486.png
+2025-06-11 17:36:23,946 - src.core.utils.logging_config - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\12\SKU003486.png
+2025-06-11 17:36:23,965 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\12\label_SKU003486.png
+2025-06-11 17:36:23,971 - src.core.utils.logging_config - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\12\label_SKU003486.png, qr_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\12\label_SKU003486.png
+2025-06-11 17:36:24,062 - src.core.utils.logging_config - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\12\label_split_SKU003486.png, label_split_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\12\label_split_SKU003486.png
+2025-06-11 17:36:24,074 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\12\label_split_SKU003486.png
+2025-06-11 17:36:24,076 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:36:24,076 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003487
+2025-06-11 17:36:24,084 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:36:24,085 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\14
+2025-06-11 17:36:24,094 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\14\SKU003487.png
+2025-06-11 17:36:24,095 - src.core.utils.logging_config - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\14\SKU003487.png
+2025-06-11 17:36:24,113 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\14\label_SKU003487.png
+2025-06-11 17:36:24,120 - src.core.utils.logging_config - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\14\label_SKU003487.png, qr_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\14\label_SKU003487.png
+2025-06-11 17:36:24,213 - src.core.utils.logging_config - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\14\label_split_SKU003487.png, label_split_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\14\label_split_SKU003487.png
+2025-06-11 17:36:24,225 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\14\label_split_SKU003487.png
+2025-06-11 17:36:24,292 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:36:24,292 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003488
+2025-06-11 17:36:24,300 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:36:24,301 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\16
+2025-06-11 17:36:24,309 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\16\SKU003488.png
+2025-06-11 17:36:24,310 - src.core.utils.logging_config - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\16\SKU003488.png
+2025-06-11 17:36:24,328 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\16\label_SKU003488.png
+2025-06-11 17:36:24,335 - src.core.utils.logging_config - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\16\label_SKU003488.png, qr_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\16\label_SKU003488.png
+2025-06-11 17:36:24,424 - src.core.utils.logging_config - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\16\label_split_SKU003488.png, label_split_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\16\label_split_SKU003488.png
+2025-06-11 17:36:24,436 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\16\label_split_SKU003488.png
+2025-06-11 17:36:24,509 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:36:24,510 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003489
+2025-06-11 17:36:24,517 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:36:24,518 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\28
+2025-06-11 17:36:24,527 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\28\SKU003489.png
+2025-06-11 17:36:24,528 - src.core.utils.logging_config - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\28\SKU003489.png
+2025-06-11 17:36:24,547 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\28\label_SKU003489.png
+2025-06-11 17:36:24,553 - src.core.utils.logging_config - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\28\label_SKU003489.png, qr_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\28\label_SKU003489.png
+2025-06-11 17:36:24,644 - src.core.utils.logging_config - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\28\label_split_SKU003489.png, label_split_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\28\label_split_SKU003489.png
+2025-06-11 17:36:24,656 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\28\label_split_SKU003489.png
+2025-06-11 17:36:24,727 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:36:24,728 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003490
+2025-06-11 17:36:24,735 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:36:24,736 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\30
+2025-06-11 17:36:24,745 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\30\SKU003490.png
+2025-06-11 17:36:24,746 - src.core.utils.logging_config - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\30\SKU003490.png
+2025-06-11 17:36:24,764 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\30\label_SKU003490.png
+2025-06-11 17:36:24,771 - src.core.utils.logging_config - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\30\label_SKU003490.png, qr_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\30\label_SKU003490.png
+2025-06-11 17:36:24,863 - src.core.utils.logging_config - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\30\label_split_SKU003490.png, label_split_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\30\label_split_SKU003490.png
+2025-06-11 17:36:24,875 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\30\label_split_SKU003490.png
+2025-06-11 17:36:24,945 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:36:24,946 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003491
+2025-06-11 17:36:24,954 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:36:24,955 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\32
+2025-06-11 17:36:24,964 - src.modules.products.qr_code_generator - INFO - QR generado y guardado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\32\SKU003491.png
+2025-06-11 17:36:24,965 - src.core.utils.logging_config - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\32\SKU003491.png
+2025-06-11 17:36:24,983 - src.modules.products.standard_label_generator - INFO - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\32\label_SKU003491.png
+2025-06-11 17:36:24,990 - src.core.utils.logging_config - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\32\label_SKU003491.png, qr_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\32\label_SKU003491.png
+2025-06-11 17:36:25,081 - src.core.utils.logging_config - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\32\label_split_SKU003491.png, label_split_path actualizado: Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\32\label_split_SKU003491.png
+2025-06-11 17:36:25,092 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\32\label_split_SKU003491.png
+2025-06-11 17:36:26,131 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:36:26,132 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003480
+2025-06-11 17:36:26,146 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:36:26,148 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\2
+2025-06-11 17:36:26,152 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\2\label_split_SKU003480.png
+2025-06-11 17:36:26,619 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:36:26,620 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003481
+2025-06-11 17:36:26,634 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:36:26,635 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3
+2025-06-11 17:36:26,640 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_split_SKU003481.png
+2025-06-11 17:36:30,396 - src.core.utils.logging_config - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_split_SKU003481.png
+2025-06-11 17:36:30,412 - src.core.utils.logging_config - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU003481
+2025-06-11 17:36:30,499 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU003481: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_split_SKU003481.png
+2025-06-11 17:36:36,963 - src.modules.products.product_manager_window - INFO - Impresas 7 etiquetas para SKU SKU003481 (tipo: split, copias solicitadas: 27)
+2025-06-11 17:36:36,966 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:36:36,966 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003481
+2025-06-11 17:36:36,974 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:36:36,975 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3
+2025-06-11 17:36:36,978 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_split_SKU003481.png
+2025-06-11 17:36:36,979 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I05C (SKU: SKU003481, índice: 1)
+2025-06-11 17:36:36,983 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:36:36,984 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003481
+2025-06-11 17:36:36,996 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:36:36,997 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3
+2025-06-11 17:36:36,999 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_split_SKU003481.png
+2025-06-11 17:36:37,001 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:36:37,002 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003481
+2025-06-11 17:36:37,011 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:36:37,012 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3
+2025-06-11 17:36:37,014 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\3\label_split_SKU003481.png
+2025-06-11 17:37:48,923 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU003482: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4\label_split_SKU003482.png
+2025-06-11 17:37:48,935 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:37:48,936 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003482
+2025-06-11 17:37:48,946 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:37:48,947 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4
+2025-06-11 17:37:48,950 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4\label_split_SKU003482.png
+2025-06-11 17:37:48,950 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I05D (SKU: SKU003482, índice: 2)
+2025-06-11 17:37:48,951 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:37:48,952 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003482
+2025-06-11 17:37:48,961 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:37:48,992 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4
+2025-06-11 17:37:48,998 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4\label_split_SKU003482.png
+2025-06-11 17:37:49,005 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:37:49,018 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003482
+2025-06-11 17:37:49,027 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:37:49,033 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4
+2025-06-11 17:37:49,036 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4\label_split_SKU003482.png
+2025-06-11 17:37:56,893 - src.modules.products.product_manager_window - INFO - Impresas 38 etiquetas para SKU SKU003482 (tipo: split, copias solicitadas: 151)
+2025-06-11 17:37:56,900 - src.modules.products.product_manager_window - INFO - Inventario actualizado para SKU SKU003482: 0 -> 151
+2025-06-11 17:37:56,903 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:37:56,904 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003482
+2025-06-11 17:37:56,912 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:37:56,914 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4
+2025-06-11 17:37:56,917 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4\label_split_SKU003482.png
+2025-06-11 17:37:56,917 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I05D (SKU: SKU003482, índice: 2)
+2025-06-11 17:37:56,921 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:37:56,924 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003482
+2025-06-11 17:37:56,932 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:37:56,933 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4
+2025-06-11 17:37:56,936 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4\label_split_SKU003482.png
+2025-06-11 17:37:56,938 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:37:56,938 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003482
+2025-06-11 17:37:56,949 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:37:56,950 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4
+2025-06-11 17:37:56,952 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4\label_split_SKU003482.png
+2025-06-11 17:37:56,953 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:37:56,954 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003482
+2025-06-11 17:37:56,962 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:37:56,963 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4
+2025-06-11 17:37:56,966 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4\label_split_SKU003482.png
+2025-06-11 17:37:56,967 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 17:37:56,967 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003482
+2025-06-11 17:37:56,976 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 17:37:56,977 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4
+2025-06-11 17:37:56,979 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4\label_split_SKU003482.png
+2025-06-11 18:11:04,178 - src.core.utils.logging_config - DEBUG - Manteniendo selección para SKU: SKU003482 al cerrar PrintPreviewWindow
+2025-06-11 18:11:04,224 - src.core.utils.logging_config - DEBUG - Selección restaurada para SKU: SKU003482 después de cerrar PrintPreviewWindow
+2025-06-11 18:11:04,229 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 18:11:04,229 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003482
+2025-06-11 18:11:04,237 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 18:11:04,238 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4
+2025-06-11 18:11:04,241 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4\label_split_SKU003482.png
+2025-06-11 18:11:04,243 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 18:11:04,243 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003482
+2025-06-11 18:11:04,251 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 18:11:04,252 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4
+2025-06-11 18:11:04,254 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4\label_split_SKU003482.png
+2025-06-11 18:11:04,257 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 18:11:04,258 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003482
+2025-06-11 18:11:04,267 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 18:11:04,268 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4
+2025-06-11 18:11:04,270 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4\label_split_SKU003482.png
+2025-06-11 18:11:04,271 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/12
+2025-06-11 18:11:04,272 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU003482
+2025-06-11 18:11:04,280 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2025-06-11 18:11:04,281 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4
+2025-06-11 18:11:04,284 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Escoces Talla_Básico_Pantalón\4\label_split_SKU003482.png
+2025-06-11 18:11:05,385 - src.core.config.db_manager - INFO - Conexión a c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\data/productos.db cerrada.

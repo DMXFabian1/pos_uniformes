@@ -255,6 +255,18 @@ class CatalogService:
         cls._sync_sequence_with_manual_sku(session, generated)
         return generated
 
+    @classmethod
+    def preview_next_skus(cls, session: Session, count: int) -> list[str]:
+        normalized_count = max(0, int(count))
+        if normalized_count == 0:
+            return []
+        sequence = cls._get_or_create_sku_sequence(session)
+        start_number = int(sequence.ultimo_numero) + 1
+        return [
+            f"{sequence.prefijo}{number:0{sequence.padding}d}"
+            for number in range(start_number, start_number + normalized_count)
+        ]
+
     @staticmethod
     def _validar_admin(usuario: Usuario) -> None:
         if not usuario.activo:

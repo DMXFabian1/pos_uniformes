@@ -1,0 +1,997 @@
+2025-05-25 11:19:02 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-05-25 11:19:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - ProductEditForm inicializado para tienda 1
+2025-05-25 11:19:02 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerUI para tienda 1
+2025-05-25 11:19:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: edit
+2025-05-25 11:19:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: copy
+2025-05-25 11:19:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: delete
+2025-05-25 11:19:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: duplicate
+2025-05-25 11:19:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: price
+2025-05-25 11:19:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: print
+2025-05-25 11:19:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: inventory
+2025-05-25 11:19:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=color
+2025-05-25 11:19:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-05-25 11:19:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=genero
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=marca
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=talla
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 27 valores únicos para color en 0.030s
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Vino']
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.002s
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.002s
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para atributo en 0.002s
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Pretina', 'Punto', 'Resorte', 'Tableada', 'Tortuga', 'Vestir']
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 46 valores únicos para escuela en 0.001s
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.002s
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.001s
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.001s
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.004s
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=2684, current_page=0, total_pages=90
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 90
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 90, tiempo: 0.138s
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 27 valores únicos para color en 0.000s
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Vino']
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.000s
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.000s
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para atributo en 0.000s
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Pretina', 'Punto', 'Resorte', 'Tableada', 'Tortuga', 'Vestir']
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 46 valores únicos para escuela en 0.000s
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.000s
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.000s
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-05-25 11:19:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-05-25 11:19:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-05-25 11:19:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=2684, current_page=0, total_pages=90
+2025-05-25 11:19:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 90
+2025-05-25 11:19:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-05-25 11:19:05 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 90, tiempo: 0.120s
+2025-05-25 11:19:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-05-25 11:19:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=None
+2025-05-25 11:19:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuelas, column=None
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - ProductEditForm inicializado para tienda 1
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerUI para tienda 1
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: edit
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: copy
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: delete
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: duplicate
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: price
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: print
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: inventory
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=color
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=genero
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=marca
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=talla
+2025-05-25 11:19:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-05-25 11:19:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-05-25 11:19:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 27 valores únicos para color en 0.003s
+2025-05-25 11:19:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Vino']
+2025-05-25 11:19:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.005s
+2025-05-25 11:19:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-05-25 11:19:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.004s
+2025-05-25 11:19:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-05-25 11:19:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para atributo en 0.004s
+2025-05-25 11:19:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Pretina', 'Punto', 'Resorte', 'Tableada', 'Tortuga', 'Vestir']
+2025-05-25 11:19:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 46 valores únicos para escuela en 0.000s
+2025-05-25 11:19:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-05-25 11:19:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.002s
+2025-05-25 11:19:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-05-25 11:19:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.002s
+2025-05-25 11:19:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-05-25 11:19:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.001s
+2025-05-25 11:19:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-05-25 11:19:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.004s
+2025-05-25 11:19:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-05-25 11:19:09 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-05-25 11:19:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-05-25 11:19:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=2684, current_page=0, total_pages=90
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 90
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 90, tiempo: 0.118s
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 27 valores únicos para color en 0.000s
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Vino']
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.000s
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.000s
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para atributo en 0.000s
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Pretina', 'Punto', 'Resorte', 'Tableada', 'Tortuga', 'Vestir']
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 46 valores únicos para escuela en 0.000s
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.000s
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.000s
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=2684, current_page=0, total_pages=90
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 90
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 90, tiempo: 0.118s
+2025-05-25 11:19:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-05-25 11:29:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-05-25 11:29:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Básico'], column=tipo_prenda
+2025-05-25 11:29:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-05-25 11:29:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-05-25 11:29:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=1698, current_page=0, total_pages=57
+2025-05-25 11:29:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 57
+2025-05-25 11:29:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-05-25 11:29:58 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 57, tiempo: 0.111s
+2025-05-25 11:29:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-05-25 11:29:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Tipo Prenda: Básico
+2025-05-25 11:30:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: [], column=tipo_prenda
+2025-05-25 11:30:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-05-25 11:30:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-05-25 11:30:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=2684, current_page=0, total_pages=90
+2025-05-25 11:30:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 90
+2025-05-25 11:30:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-05-25 11:30:00 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 90, tiempo: 0.122s
+2025-05-25 11:30:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-05-25 11:30:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-05-25 11:30:01 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-05-25 11:30:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-05-25 11:30:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Bata'], column=tipo_pieza
+2025-05-25 11:30:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-05-25 11:30:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-05-25 11:30:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=36, current_page=0, total_pages=2
+2025-05-25 11:30:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 2
+2025-05-25 11:30:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-05-25 11:30:03 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 2, tiempo: 0.135s
+2025-05-25 11:30:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-05-25 11:30:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Tipo Pieza: Bata
+2025-05-25 11:31:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 11:31:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000001
+2025-05-25 11:31:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 11:31:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\12
+2025-05-25 11:31:14 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\12\label_SKU000001.png. Generando nueva etiqueta.
+2025-05-25 11:31:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\12\SKU000001.png
+2025-05-25 11:31:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\12\label_SKU000001.png, qr_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\12\label_SKU000001.png
+2025-05-25 11:31:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\12\label_split_SKU000001.png, label_split_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\12\label_split_SKU000001.png
+2025-05-25 11:31:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\12\label_SKU000001.png
+2025-05-25 12:04:07 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-05-25 12:04:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - ProductEditForm inicializado para tienda 1
+2025-05-25 12:04:07 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerUI para tienda 1
+2025-05-25 12:04:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: edit
+2025-05-25 12:04:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: copy
+2025-05-25 12:04:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: delete
+2025-05-25 12:04:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: duplicate
+2025-05-25 12:04:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: price
+2025-05-25 12:04:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: print
+2025-05-25 12:04:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: inventory
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=color
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=genero
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=marca
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=talla
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 27 valores únicos para color en 0.005s
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Vino']
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.002s
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.002s
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para atributo en 0.002s
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Pretina', 'Punto', 'Resorte', 'Tableada', 'Tortuga', 'Vestir']
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 46 valores únicos para escuela en 0.000s
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.002s
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.002s
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.001s
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.004s
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-05-25 12:04:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=2684, current_page=0, total_pages=90
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 90
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 90, tiempo: 0.145s
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 27 valores únicos para color en 0.000s
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Vino']
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.000s
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.000s
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para atributo en 0.000s
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Pretina', 'Punto', 'Resorte', 'Tableada', 'Tortuga', 'Vestir']
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 46 valores únicos para escuela en 0.000s
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.000s
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.000s
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=2684, current_page=0, total_pages=90
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 90
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 90, tiempo: 0.111s
+2025-05-25 12:04:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-05-25 12:04:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=None
+2025-05-25 12:04:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuelas, column=None
+2025-05-25 12:04:12 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-05-25 12:04:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - ProductEditForm inicializado para tienda 1
+2025-05-25 12:04:12 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerUI para tienda 1
+2025-05-25 12:04:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: edit
+2025-05-25 12:04:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: copy
+2025-05-25 12:04:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: delete
+2025-05-25 12:04:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: duplicate
+2025-05-25 12:04:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: price
+2025-05-25 12:04:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: print
+2025-05-25 12:04:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: inventory
+2025-05-25 12:04:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=color
+2025-05-25 12:04:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-05-25 12:04:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-05-25 12:04:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-05-25 12:04:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-05-25 12:04:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-05-25 12:04:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-05-25 12:04:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-05-25 12:04:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-05-25 12:04:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-05-25 12:04:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-05-25 12:04:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-05-25 12:04:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=genero
+2025-05-25 12:04:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-05-25 12:04:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=marca
+2025-05-25 12:04:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-05-25 12:04:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=talla
+2025-05-25 12:04:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 27 valores únicos para color en 0.003s
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Vino']
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.003s
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.004s
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para atributo en 0.003s
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Pretina', 'Punto', 'Resorte', 'Tableada', 'Tortuga', 'Vestir']
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 46 valores únicos para escuela en 0.000s
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.002s
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.001s
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.001s
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.003s
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=2684, current_page=0, total_pages=90
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 90
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 90, tiempo: 0.112s
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 27 valores únicos para color en 0.000s
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Vino']
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.000s
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.000s
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para atributo en 0.000s
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Pretina', 'Punto', 'Resorte', 'Tableada', 'Tortuga', 'Vestir']
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 46 valores únicos para escuela en 0.000s
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.000s
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.000s
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=2684, current_page=0, total_pages=90
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 90
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 90, tiempo: 0.125s
+2025-05-25 12:04:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-05-25 12:04:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000001
+2025-05-25 12:04:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\12
+2025-05-25 12:04:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\12\label_SKU000001.png
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000002
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\14
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\14\label_SKU000002.png. Generando nueva etiqueta.
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\14\SKU000002.png
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\14\label_SKU000002.png, qr_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\14\label_SKU000002.png
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\14\label_split_SKU000002.png, label_split_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\14\label_split_SKU000002.png
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\14\label_SKU000002.png
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000003
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\16
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\16\label_SKU000003.png. Generando nueva etiqueta.
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\16\SKU000003.png
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\16\label_SKU000003.png, qr_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\16\label_SKU000003.png
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\16\label_split_SKU000003.png, label_split_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\16\label_split_SKU000003.png
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\16\label_SKU000003.png
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000004
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\18
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\18\label_SKU000004.png. Generando nueva etiqueta.
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\18\SKU000004.png
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\18\label_SKU000004.png, qr_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\18\label_SKU000004.png
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\18\label_split_SKU000004.png, label_split_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\18\label_split_SKU000004.png
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\18\label_SKU000004.png
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000005
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\20
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\20\label_SKU000005.png. Generando nueva etiqueta.
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\20\SKU000005.png
+2025-05-25 12:04:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\20\label_SKU000005.png, qr_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\20\label_SKU000005.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\20\label_split_SKU000005.png, label_split_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\20\label_split_SKU000005.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\20\label_SKU000005.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000006
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\28
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\28\label_SKU000006.png. Generando nueva etiqueta.
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\28\SKU000006.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\28\label_SKU000006.png, qr_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\28\label_SKU000006.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\28\label_split_SKU000006.png, label_split_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\28\label_split_SKU000006.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\28\label_SKU000006.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000007
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\32
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\32\label_SKU000007.png. Generando nueva etiqueta.
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\32\SKU000007.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\32\label_SKU000007.png, qr_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\32\label_SKU000007.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\32\label_split_SKU000007.png, label_split_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\32\label_split_SKU000007.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\32\label_SKU000007.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000008
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\34
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\34\label_SKU000008.png. Generando nueva etiqueta.
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\34\SKU000008.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\34\label_SKU000008.png, qr_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\34\label_SKU000008.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\34\label_split_SKU000008.png, label_split_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\34\label_split_SKU000008.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\34\label_SKU000008.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000009
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\36
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\36\label_SKU000009.png. Generando nueva etiqueta.
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\36\SKU000009.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\36\label_SKU000009.png, qr_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\36\label_SKU000009.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\36\label_split_SKU000009.png, label_split_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\36\label_split_SKU000009.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\36\label_SKU000009.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000010
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\38
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\38\label_SKU000010.png. Generando nueva etiqueta.
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\38\SKU000010.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\38\label_SKU000010.png, qr_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\38\label_SKU000010.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\38\label_split_SKU000010.png, label_split_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\38\label_split_SKU000010.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\38\label_SKU000010.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000011
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\40
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\40\label_SKU000011.png. Generando nueva etiqueta.
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\40\SKU000011.png
+2025-05-25 12:04:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\40\label_SKU000011.png, qr_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\40\label_SKU000011.png
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\40\label_split_SKU000011.png, label_split_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\40\label_split_SKU000011.png
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\40\label_SKU000011.png
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000012
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\42
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\42\label_SKU000012.png. Generando nueva etiqueta.
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\42\SKU000012.png
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\42\label_SKU000012.png, qr_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\42\label_SKU000012.png
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\42\label_split_SKU000012.png, label_split_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\42\label_split_SKU000012.png
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\42\label_SKU000012.png
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000013
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\44
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\44\label_SKU000013.png. Generando nueva etiqueta.
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\44\SKU000013.png
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\44\label_SKU000013.png, qr_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\44\label_SKU000013.png
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\44\label_split_SKU000013.png, label_split_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\44\label_split_SKU000013.png
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\44\label_SKU000013.png
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000014
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\46
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\46\label_SKU000014.png. Generando nueva etiqueta.
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\46\SKU000014.png
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\46\label_SKU000014.png, qr_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\46\label_SKU000014.png
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\46\label_split_SKU000014.png, label_split_path actualizado: Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\46\label_split_SKU000014.png
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Larga Blanca Talla_Accesorio_Bata\46\label_SKU000014.png
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000015
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\12
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\12\label_SKU000015.png. Generando nueva etiqueta.
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\12\SKU000015.png
+2025-05-25 12:04:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\12\label_SKU000015.png, qr_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\12\label_SKU000015.png
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\12\label_split_SKU000015.png, label_split_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\12\label_split_SKU000015.png
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\12\label_SKU000015.png
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000016
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\14
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\14\label_SKU000016.png. Generando nueva etiqueta.
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\14\SKU000016.png
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\14\label_SKU000016.png, qr_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\14\label_SKU000016.png
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\14\label_split_SKU000016.png, label_split_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\14\label_split_SKU000016.png
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\14\label_SKU000016.png
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000017
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\16
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\16\label_SKU000017.png. Generando nueva etiqueta.
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\16\SKU000017.png
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\16\label_SKU000017.png, qr_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\16\label_SKU000017.png
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\16\label_split_SKU000017.png, label_split_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\16\label_split_SKU000017.png
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\16\label_SKU000017.png
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000018
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\18
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\18\label_SKU000018.png. Generando nueva etiqueta.
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\18\SKU000018.png
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\18\label_SKU000018.png, qr_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\18\label_SKU000018.png
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\18\label_split_SKU000018.png, label_split_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\18\label_split_SKU000018.png
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\18\label_SKU000018.png
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000019
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\20
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\20\label_SKU000019.png. Generando nueva etiqueta.
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\20\SKU000019.png
+2025-05-25 12:04:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\20\label_SKU000019.png, qr_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\20\label_SKU000019.png
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\20\label_split_SKU000019.png, label_split_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\20\label_split_SKU000019.png
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\20\label_SKU000019.png
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000020
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\28
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\28\label_SKU000020.png. Generando nueva etiqueta.
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\28\SKU000020.png
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\28\label_SKU000020.png, qr_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\28\label_SKU000020.png
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\28\label_split_SKU000020.png, label_split_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\28\label_split_SKU000020.png
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\28\label_SKU000020.png
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000021
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\32
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\32\label_SKU000021.png. Generando nueva etiqueta.
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\32\SKU000021.png
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\32\label_SKU000021.png, qr_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\32\label_SKU000021.png
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\32\label_split_SKU000021.png, label_split_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\32\label_split_SKU000021.png
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\32\label_SKU000021.png
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000022
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\34
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\34\label_SKU000022.png. Generando nueva etiqueta.
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\34\SKU000022.png
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\34\label_SKU000022.png, qr_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\34\label_SKU000022.png
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\34\label_split_SKU000022.png, label_split_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\34\label_split_SKU000022.png
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\34\label_SKU000022.png
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000023
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\36
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta_Accesorio_Bata\36\SKU000023_Bata Manga Corta_36_Blanca_label.png. Generando nueva etiqueta.
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\36\SKU000023.png
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\36\label_SKU000023.png, qr_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\36\label_SKU000023.png
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\36\label_split_SKU000023.png, label_split_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\36\label_split_SKU000023.png
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\36\label_SKU000023.png
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000024
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\38
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\38\label_SKU000024.png. Generando nueva etiqueta.
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\38\SKU000024.png
+2025-05-25 12:04:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\38\label_SKU000024.png, qr_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\38\label_SKU000024.png
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\38\label_split_SKU000024.png, label_split_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\38\label_split_SKU000024.png
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\38\label_SKU000024.png
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000025
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\40
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta_Accesorio_Bata\40\SKU000025_Bata Manga Corta_40_Blanca_label.png. Generando nueva etiqueta.
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\40\SKU000025.png
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\40\label_SKU000025.png, qr_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\40\label_SKU000025.png
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\40\label_split_SKU000025.png, label_split_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\40\label_split_SKU000025.png
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\40\label_SKU000025.png
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000026
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\42
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\42\label_SKU000026.png. Generando nueva etiqueta.
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\42\SKU000026.png
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\42\label_SKU000026.png, qr_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\42\label_SKU000026.png
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\42\label_split_SKU000026.png, label_split_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\42\label_split_SKU000026.png
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\42\label_SKU000026.png
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000027
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\44
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\44\label_SKU000027.png. Generando nueva etiqueta.
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\44\SKU000027.png
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\44\label_SKU000027.png, qr_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\44\label_SKU000027.png
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\44\label_split_SKU000027.png, label_split_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\44\label_split_SKU000027.png
+2025-05-25 12:04:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\44\label_SKU000027.png
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000028
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\46
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta_Accesorio_Bata\46\SKU000028_Bata Manga Corta_46_Blanca_label.png. Generando nueva etiqueta.
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\46\SKU000028.png
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\46\label_SKU000028.png, qr_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\46\label_SKU000028.png
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\46\label_split_SKU000028.png, label_split_path actualizado: Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\46\label_split_SKU000028.png
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Bata Manga Corta Blanca Talla_Accesorio_Bata\46\label_SKU000028.png
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000029
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Tortuga Blanca Talla_Accesorio_Playera\2
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Tortuga Blanca Talla_Accesorio_Playera\2\label_SKU000029.png. Generando nueva etiqueta.
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Tortuga Blanca Talla_Accesorio_Playera\2\SKU000029.png
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Tortuga Blanca Talla_Accesorio_Playera\2\label_SKU000029.png, qr_path actualizado: Mis codigos\Playera Tortuga Blanca Talla_Accesorio_Playera\2\label_SKU000029.png
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Tortuga Blanca Talla_Accesorio_Playera\2\label_split_SKU000029.png, label_split_path actualizado: Mis codigos\Playera Tortuga Blanca Talla_Accesorio_Playera\2\label_split_SKU000029.png
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Tortuga Blanca Talla_Accesorio_Playera\2\label_SKU000029.png
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000030
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Tortuga Blanca Talla_Accesorio_Playera\3
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Tortuga Blanca Talla_Accesorio_Playera\3\label_SKU000030.png. Generando nueva etiqueta.
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Tortuga Blanca Talla_Accesorio_Playera\3\SKU000030.png
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Tortuga Blanca Talla_Accesorio_Playera\3\label_SKU000030.png, qr_path actualizado: Mis codigos\Playera Tortuga Blanca Talla_Accesorio_Playera\3\label_SKU000030.png
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Tortuga Blanca Talla_Accesorio_Playera\3\label_split_SKU000030.png, label_split_path actualizado: Mis codigos\Playera Tortuga Blanca Talla_Accesorio_Playera\3\label_split_SKU000030.png
+2025-05-25 12:04:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Tortuga Blanca Talla_Accesorio_Playera\3\label_SKU000030.png
+2025-05-25 14:56:13 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-05-25 14:56:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - ProductEditForm inicializado para tienda 1
+2025-05-25 14:56:13 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerUI para tienda 1
+2025-05-25 14:56:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: edit
+2025-05-25 14:56:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: copy
+2025-05-25 14:56:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: delete
+2025-05-25 14:56:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: duplicate
+2025-05-25 14:56:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: price
+2025-05-25 14:56:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: print
+2025-05-25 14:56:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: inventory
+2025-05-25 14:56:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=color
+2025-05-25 14:56:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-05-25 14:56:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-05-25 14:56:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-05-25 14:56:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-05-25 14:56:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-05-25 14:56:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-05-25 14:56:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-05-25 14:56:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-05-25 14:56:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-05-25 14:56:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-05-25 14:56:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-05-25 14:56:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=genero
+2025-05-25 14:56:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-05-25 14:56:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=marca
+2025-05-25 14:56:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-05-25 14:56:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=talla
+2025-05-25 14:56:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 27 valores únicos para color en 0.037s
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Vino']
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.003s
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.002s
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para atributo en 0.002s
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Pretina', 'Punto', 'Resorte', 'Tableada', 'Tortuga', 'Vestir']
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 46 valores únicos para escuela en 0.001s
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.003s
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.002s
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.002s
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.004s
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=2684, current_page=0, total_pages=90
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 90
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 90, tiempo: 0.155s
+2025-05-25 14:56:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 27 valores únicos para color en 0.000s
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Vino']
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.000s
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.000s
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para atributo en 0.000s
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Pretina', 'Punto', 'Resorte', 'Tableada', 'Tortuga', 'Vestir']
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 46 valores únicos para escuela en 0.000s
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.000s
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.000s
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=2684, current_page=0, total_pages=90
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 90
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 90, tiempo: 0.183s
+2025-05-25 14:56:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-05-25 14:56:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=None
+2025-05-25 14:56:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuelas, column=None
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - ProductEditForm inicializado para tienda 1
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerUI para tienda 1
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: edit
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: copy
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: delete
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: duplicate
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: price
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: print
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: inventory
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=color
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=genero
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-05-25 14:56:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=marca
+2025-05-25 14:56:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-05-25 14:56:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=talla
+2025-05-25 14:56:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 27 valores únicos para color en 0.003s
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Vino']
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.003s
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.003s
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para atributo en 0.003s
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Pretina', 'Punto', 'Resorte', 'Tableada', 'Tortuga', 'Vestir']
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 46 valores únicos para escuela en 0.001s
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.003s
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.001s
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.001s
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.003s
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=2684, current_page=0, total_pages=90
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 90
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 90, tiempo: 0.138s
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 27 valores únicos para color en 0.000s
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Vino']
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.000s
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.000s
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para atributo en 0.000s
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Pretina', 'Punto', 'Resorte', 'Tableada', 'Tortuga', 'Vestir']
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 46 valores únicos para escuela en 0.000s
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.000s
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.000s
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=2684, current_page=0, total_pages=90
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 90
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 90, tiempo: 0.136s
+2025-05-25 14:56:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-05-25 14:56:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-05-25 14:56:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Azul Marino'], column=color
+2025-05-25 14:56:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-05-25 14:56:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-05-25 14:56:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=240, current_page=0, total_pages=8
+2025-05-25 14:56:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 8
+2025-05-25 14:56:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-05-25 14:56:28 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 8, tiempo: 0.123s
+2025-05-25 14:56:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-05-25 14:56:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Color: Azul Marino
+2025-05-25 14:56:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-05-25 14:56:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-05-25 14:56:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Pants 2pz'], column=tipo_pieza
+2025-05-25 14:56:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-05-25 14:56:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-05-25 14:56:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=26, current_page=0, total_pages=1
+2025-05-25 14:56:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 1
+2025-05-25 14:56:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/26
+2025-05-25 14:56:33 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 26 productos, página 1, total páginas: 1, tiempo: 0.120s
+2025-05-25 14:56:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-05-25 14:56:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Color: Azul Marino; Tipo Pieza: Pants 2pz
+2025-05-25 14:56:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-05-25 14:56:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-05-25 14:56:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Liso'], column=atributo
+2025-05-25 14:56:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-05-25 14:56:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-05-25 14:56:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=13, current_page=0, total_pages=1
+2025-05-25 14:56:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 1
+2025-05-25 14:56:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/13
+2025-05-25 14:56:36 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 13 productos, página 1, total páginas: 1, tiempo: 0.122s
+2025-05-25 14:56:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-05-25 14:56:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Color: Azul Marino; Tipo Pieza: Pants 2pz; Atributo: Liso
+2025-05-25 14:56:38 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-05-25 14:56:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:56:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000631
+2025-05-25 14:56:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:56:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8
+2025-05-25 14:56:40 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8\SKU000631_Pants 2pz Liso Azul Marino Talla_8_label.png. Generando nueva etiqueta.
+2025-05-25 14:56:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8\SKU000631.png
+2025-05-25 14:56:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8\label_SKU000631.png, qr_path actualizado: Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8\label_SKU000631.png
+2025-05-25 14:56:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8\label_split_SKU000631.png, label_split_path actualizado: Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8\label_split_SKU000631.png
+2025-05-25 14:56:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8\label_SKU000631.png
+2025-05-25 14:56:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8\label_SKU000631.png
+2025-05-25 14:56:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU000631
+2025-05-25 14:56:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU000631: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8\label_SKU000631.png
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000631
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8\label_SKU000631.png
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I078 (SKU: SKU000631, índice: 3)
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000631
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8\label_SKU000631.png
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000631
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8\label_SKU000631.png
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000631
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8\label_SKU000631.png
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000631
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8
+2025-05-25 14:57:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8\label_SKU000631.png
+2025-05-25 14:59:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Manteniendo selección para SKU: SKU000631 al cerrar PrintPreviewWindow
+2025-05-25 14:59:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección restaurada para SKU: SKU000631 después de cerrar PrintPreviewWindow
+2025-05-25 14:59:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:59:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000631
+2025-05-25 14:59:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:59:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8
+2025-05-25 14:59:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8\label_SKU000631.png
+2025-05-25 14:59:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:59:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000631
+2025-05-25 14:59:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:59:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8
+2025-05-25 14:59:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8\label_SKU000631.png
+2025-05-25 14:59:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:59:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000631
+2025-05-25 14:59:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:59:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8
+2025-05-25 14:59:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8\label_SKU000631.png
+2025-05-25 14:59:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:59:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000631
+2025-05-25 14:59:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:59:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8
+2025-05-25 14:59:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8\label_SKU000631.png
+2025-05-25 14:59:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000631
+2025-05-25 14:59:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:59:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000631
+2025-05-25 14:59:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:59:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8
+2025-05-25 14:59:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8\label_SKU000631.png
+2025-05-25 14:59:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-05-25 14:59:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-05-25 14:59:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=13, current_page=0, total_pages=1
+2025-05-25 14:59:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 1
+2025-05-25 14:59:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:59:17 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 13 productos, página 1, total páginas: 1, tiempo: 0.138s
+2025-05-25 14:59:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-05-25 14:59:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000631
+2025-05-25 14:59:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:59:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000631
+2025-05-25 14:59:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:59:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8
+2025-05-25 14:59:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8\label_SKU000631.png
+2025-05-25 14:59:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:59:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000631
+2025-05-25 14:59:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:59:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8
+2025-05-25 14:59:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8\label_SKU000631.png
+2025-05-25 14:59:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:59:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000631
+2025-05-25 14:59:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:59:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8
+2025-05-25 14:59:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\8\label_SKU000631.png
+2025-05-25 14:59:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:59:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000621
+2025-05-25 14:59:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:59:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6
+2025-05-25 14:59:21 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6\SKU000621_Pants 2pz Liso Azul Marino Talla_6_label.png. Generando nueva etiqueta.
+2025-05-25 14:59:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6\SKU000621.png
+2025-05-25 14:59:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6\label_SKU000621.png, qr_path actualizado: Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6\label_SKU000621.png
+2025-05-25 14:59:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6\label_split_SKU000621.png, label_split_path actualizado: Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6\label_split_SKU000621.png
+2025-05-25 14:59:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6\label_SKU000621.png
+2025-05-25 14:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6\label_SKU000621.png
+2025-05-25 14:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU000621
+2025-05-25 14:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU000621: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6\label_SKU000621.png
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000621
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6\label_SKU000621.png
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I084 (SKU: SKU000621, índice: 2)
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000621
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6\label_SKU000621.png
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000621
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6\label_SKU000621.png
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000621
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6\label_SKU000621.png
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000621
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6
+2025-05-25 14:59:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6\label_SKU000621.png
+2025-05-25 14:59:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Manteniendo selección para SKU: SKU000621 al cerrar PrintPreviewWindow
+2025-05-25 14:59:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección restaurada para SKU: SKU000621 después de cerrar PrintPreviewWindow
+2025-05-25 14:59:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:59:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000621
+2025-05-25 14:59:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:59:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6
+2025-05-25 14:59:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6\label_SKU000621.png
+2025-05-25 14:59:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:59:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000621
+2025-05-25 14:59:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:59:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6
+2025-05-25 14:59:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6\label_SKU000621.png
+2025-05-25 14:59:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:59:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000621
+2025-05-25 14:59:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:59:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6
+2025-05-25 14:59:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6\label_SKU000621.png
+2025-05-25 14:59:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-05-25 14:59:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000621
+2025-05-25 14:59:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-05-25 14:59:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6
+2025-05-25 14:59:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Liso Azul Marino Talla_Básico_Pants 2pz\6\label_SKU000621.png

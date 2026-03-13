@@ -1,0 +1,265 @@
+2025-08-13 17:48:20 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-08-13 17:48:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - ProductEditForm inicializado para tienda 1
+2025-08-13 17:48:20 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerUI para tienda 1
+2025-08-13 17:48:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: edit
+2025-08-13 17:48:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: copy
+2025-08-13 17:48:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: delete
+2025-08-13 17:48:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: duplicate
+2025-08-13 17:48:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: price
+2025-08-13 17:48:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: print
+2025-08-13 17:48:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: inventory
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=color
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=genero
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=marca
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=talla
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 32 valores únicos para color en 0.066s
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 6 valores únicos para tipo_prenda en 0.002s
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial', 'Uniforme']
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.004s
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 23 valores únicos para atributo en 0.003s
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Algodón', 'Botones', 'Chazarilla', 'Conalep', 'Conjunto', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Cuello olan', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Oferta', 'Polo', 'Punto', 'Tortuga', 'Vestir']
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 55 valores únicos para escuela en 0.001s
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Adolfo Lopez Mareo', 'Adolfo Lopez Mateo', 'Albino García Ramos', 'Alvaro Obregon', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Huizache', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Palacio', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Santa Rosa 238', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Telesecundaria 600', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Vidal Acolcer', 'Álvaro Obregón']
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.003s
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.002s
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para marca en 0.002s
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'MarcaX', 'MarcaY', 'Prowear']
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 43 valores únicos para talla en 0.005s
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'M', 'L', 'CH', 'MD', 'GD', 'EXG', 'Uni', 'ESP', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-08-13 17:48:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3990, current_page=0, total_pages=133
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 133
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 133, tiempo: 0.118s
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 32 valores únicos para color en 0.000s
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 6 valores únicos para tipo_prenda en 0.000s
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial', 'Uniforme']
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.000s
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 23 valores únicos para atributo en 0.000s
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Algodón', 'Botones', 'Chazarilla', 'Conalep', 'Conjunto', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Cuello olan', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Oferta', 'Polo', 'Punto', 'Tortuga', 'Vestir']
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 55 valores únicos para escuela en 0.000s
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Adolfo Lopez Mareo', 'Adolfo Lopez Mateo', 'Albino García Ramos', 'Alvaro Obregon', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Huizache', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Palacio', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Santa Rosa 238', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Telesecundaria 600', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Vidal Acolcer', 'Álvaro Obregón']
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para marca en 0.000s
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'MarcaX', 'MarcaY', 'Prowear']
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 43 valores únicos para talla en 0.000s
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'M', 'L', 'CH', 'MD', 'GD', 'EXG', 'Uni', 'ESP', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3990, current_page=0, total_pages=133
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 133
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 133, tiempo: 0.114s
+2025-08-13 17:48:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-08-13 17:48:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=None
+2025-08-13 17:48:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuelas, column=None
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - ProductEditForm inicializado para tienda 1
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerUI para tienda 1
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: edit
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: copy
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: delete
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: duplicate
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: price
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: print
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: inventory
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=color
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=genero
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=marca
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=talla
+2025-08-13 17:48:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 32 valores únicos para color en 0.005s
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 6 valores únicos para tipo_prenda en 0.004s
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial', 'Uniforme']
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.005s
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 23 valores únicos para atributo en 0.005s
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Algodón', 'Botones', 'Chazarilla', 'Conalep', 'Conjunto', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Cuello olan', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Oferta', 'Polo', 'Punto', 'Tortuga', 'Vestir']
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 55 valores únicos para escuela en 0.000s
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Adolfo Lopez Mareo', 'Adolfo Lopez Mateo', 'Albino García Ramos', 'Alvaro Obregon', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Huizache', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Palacio', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Santa Rosa 238', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Telesecundaria 600', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Vidal Acolcer', 'Álvaro Obregón']
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.003s
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.002s
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para marca en 0.002s
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'MarcaX', 'MarcaY', 'Prowear']
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 43 valores únicos para talla en 0.005s
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'M', 'L', 'CH', 'MD', 'GD', 'EXG', 'Uni', 'ESP', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3990, current_page=0, total_pages=133
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 133
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 133, tiempo: 0.119s
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 32 valores únicos para color en 0.000s
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 6 valores únicos para tipo_prenda en 0.000s
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial', 'Uniforme']
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.000s
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 23 valores únicos para atributo en 0.000s
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Algodón', 'Botones', 'Chazarilla', 'Conalep', 'Conjunto', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Cuello olan', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Oferta', 'Polo', 'Punto', 'Tortuga', 'Vestir']
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 55 valores únicos para escuela en 0.000s
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Adolfo Lopez Mareo', 'Adolfo Lopez Mateo', 'Albino García Ramos', 'Alvaro Obregon', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Huizache', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Palacio', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Santa Rosa 238', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Telesecundaria 600', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Vidal Acolcer', 'Álvaro Obregón']
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para marca en 0.000s
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'MarcaX', 'MarcaY', 'Prowear']
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 43 valores únicos para talla en 0.000s
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'M', 'L', 'CH', 'MD', 'GD', 'EXG', 'Uni', 'ESP', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3990, current_page=0, total_pages=133
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 133
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 133, tiempo: 0.118s
+2025-08-13 17:48:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-08-13 17:48:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-08-13 17:48:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-08-13 17:48:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-08-13 17:48:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Camisa'], column=tipo_pieza
+2025-08-13 17:48:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-08-13 17:48:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-08-13 17:48:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=122, current_page=0, total_pages=5
+2025-08-13 17:48:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 5
+2025-08-13 17:48:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-08-13 17:48:53 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 5, tiempo: 0.124s
+2025-08-13 17:48:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-08-13 17:48:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Tipo Pieza: Camisa
+2025-08-13 17:48:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-08-13 17:48:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-13 17:48:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000228
+2025-08-13 17:48:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-13 17:48:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\8
+2025-08-13 17:48:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\8\label_SKU000228.png
+2025-08-13 17:49:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-13 17:49:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000226
+2025-08-13 17:49:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-13 17:49:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\4
+2025-08-13 17:49:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\4\label_SKU000226.png
+2025-08-13 17:49:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\4\label_SKU000226.png
+2025-08-13 17:49:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU000226
+2025-08-13 17:49:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\4\label_SKU000226.png
+2025-08-13 17:49:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU000226
+2025-08-13 17:49:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-13 17:49:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000234
+2025-08-13 17:49:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-13 17:49:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\32
+2025-08-13 17:49:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\32\label_SKU000234.png
+2025-08-13 17:49:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\32\label_SKU000234.png
+2025-08-13 17:49:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU000234
+2025-08-13 17:49:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-13 17:49:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000226
+2025-08-13 17:49:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-13 17:49:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\4
+2025-08-13 17:49:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\4\label_SKU000226.png
+2025-08-13 17:49:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\4\label_SKU000226.png
+2025-08-13 17:49:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU000226
+2025-08-13 17:49:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU 12345: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa_Uniforme_Camisa\M\label_split_12345.png
+2025-08-13 17:50:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-13 17:50:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000231
+2025-08-13 17:50:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-13 17:50:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\14
+2025-08-13 17:50:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\14\label_split_SKU000231.png
+2025-08-13 17:50:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\14\label_split_SKU000231.png
+2025-08-13 17:50:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU000231
+2025-08-13 17:50:42 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-13 17:50:42 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000226
+2025-08-13 17:50:42 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-13 17:50:42 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\4
+2025-08-13 17:50:42 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\4\label_split_SKU000226.png
+2025-08-13 17:50:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-13 17:50:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000232
+2025-08-13 17:50:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-13 17:50:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\16
+2025-08-13 17:50:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\16\label_split_SKU000232.png
+2025-08-13 17:50:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-13 17:50:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000231
+2025-08-13 17:50:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-13 17:50:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\14
+2025-08-13 17:50:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\14\label_split_SKU000231.png
+2025-08-13 17:50:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-13 17:50:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000230
+2025-08-13 17:50:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-13 17:50:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\12
+2025-08-13 17:50:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\12\label_split_SKU000230.png
+2025-08-13 17:50:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\12\label_split_SKU000230.png
+2025-08-13 17:50:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU000230
+2025-08-13 17:53:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-13 17:53:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000228
+2025-08-13 17:53:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-13 17:53:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\8
+2025-08-13 17:53:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\8\label_split_SKU000228.png
+2025-08-13 17:54:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-13 17:54:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000229
+2025-08-13 17:54:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-13 17:54:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\10
+2025-08-13 17:54:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\10\label_split_SKU000229.png
+2025-08-13 17:54:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\10\label_split_SKU000229.png
+2025-08-13 17:54:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU000229
+2025-08-13 17:54:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-13 17:54:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000236
+2025-08-13 17:54:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-13 17:54:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\36
+2025-08-13 17:54:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\36\label_split_SKU000236.png
+2025-08-13 17:54:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-13 17:54:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU000235
+2025-08-13 17:54:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-13 17:54:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\34
+2025-08-13 17:54:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\34\label_split_SKU000235.png
+2025-08-13 17:54:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Corta Blanca Talla_Básico_Camisa\34\label_split_SKU000235.png
+2025-08-13 17:54:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU000235

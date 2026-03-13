@@ -1,0 +1,480 @@
+2025-06-15 11:38:43 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-06-15 11:38:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - ProductEditForm inicializado para tienda 1
+2025-06-15 11:38:43 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerUI para tienda 1
+2025-06-15 11:38:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: edit
+2025-06-15 11:38:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: copy
+2025-06-15 11:38:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: delete
+2025-06-15 11:38:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: duplicate
+2025-06-15 11:38:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: price
+2025-06-15 11:38:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: print
+2025-06-15 11:38:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: inventory
+2025-06-15 11:38:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=color
+2025-06-15 11:38:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-06-15 11:38:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-06-15 11:38:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-06-15 11:38:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-06-15 11:38:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-06-15 11:38:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-06-15 11:38:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-06-15 11:38:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-06-15 11:38:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-06-15 11:38:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-06-15 11:38:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-06-15 11:38:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=genero
+2025-06-15 11:38:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-06-15 11:38:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=marca
+2025-06-15 11:38:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-06-15 11:38:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=talla
+2025-06-15 11:38:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 30 valores únicos para color en 0.043s
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.002s
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.002s
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 18 valores únicos para atributo en 0.002s
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Punto', 'Tableada', 'Tortuga', 'Vestir']
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 47 valores únicos para escuela en 0.001s
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.002s
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.002s
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.002s
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.004s
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3076, current_page=0, total_pages=103
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 103
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 103, tiempo: 0.126s
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 30 valores únicos para color en 0.000s
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.000s
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.000s
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 18 valores únicos para atributo en 0.000s
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Punto', 'Tableada', 'Tortuga', 'Vestir']
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 47 valores únicos para escuela en 0.000s
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.000s
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.000s
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3076, current_page=0, total_pages=103
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 103
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 103, tiempo: 0.124s
+2025-06-15 11:38:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-15 11:38:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=None
+2025-06-15 11:38:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuelas, column=None
+2025-06-15 11:38:49 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-06-15 11:38:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - ProductEditForm inicializado para tienda 1
+2025-06-15 11:38:49 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerUI para tienda 1
+2025-06-15 11:38:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: edit
+2025-06-15 11:38:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: copy
+2025-06-15 11:38:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: delete
+2025-06-15 11:38:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: duplicate
+2025-06-15 11:38:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: price
+2025-06-15 11:38:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: print
+2025-06-15 11:38:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: inventory
+2025-06-15 11:38:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=color
+2025-06-15 11:38:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-06-15 11:38:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-06-15 11:38:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-06-15 11:38:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-06-15 11:38:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-06-15 11:38:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-06-15 11:38:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-06-15 11:38:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-06-15 11:38:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-06-15 11:38:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-06-15 11:38:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-06-15 11:38:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=genero
+2025-06-15 11:38:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-06-15 11:38:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=marca
+2025-06-15 11:38:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-06-15 11:38:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=talla
+2025-06-15 11:38:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 30 valores únicos para color en 0.004s
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.004s
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.005s
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 18 valores únicos para atributo en 0.004s
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Punto', 'Tableada', 'Tortuga', 'Vestir']
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 47 valores únicos para escuela en 0.001s
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.002s
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.002s
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.002s
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.004s
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3076, current_page=0, total_pages=103
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 103
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 103, tiempo: 0.122s
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 30 valores únicos para color en 0.000s
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.000s
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.000s
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 18 valores únicos para atributo en 0.000s
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Punto', 'Tableada', 'Tortuga', 'Vestir']
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 47 valores únicos para escuela en 0.000s
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.000s
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.000s
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-06-15 11:38:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-15 11:38:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-15 11:38:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3076, current_page=0, total_pages=103
+2025-06-15 11:38:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 103
+2025-06-15 11:38:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-15 11:38:52 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 103, tiempo: 0.123s
+2025-06-15 11:38:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-15 11:39:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-06-15 11:39:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Azul Marino'], column=color
+2025-06-15 11:39:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-15 11:39:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-15 11:39:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=213, current_page=0, total_pages=8
+2025-06-15 11:39:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 8
+2025-06-15 11:39:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-15 11:39:10 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 8, tiempo: 0.125s
+2025-06-15 11:39:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-15 11:39:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Color: Azul Marino
+2025-06-15 11:39:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-06-15 11:39:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-06-15 11:39:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Falda'], column=tipo_pieza
+2025-06-15 11:39:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-15 11:39:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-15 11:39:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=18, current_page=0, total_pages=1
+2025-06-15 11:39:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 1
+2025-06-15 11:39:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/18
+2025-06-15 11:39:13 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 18 productos, página 1, total páginas: 1, tiempo: 0.121s
+2025-06-15 11:39:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-15 11:39:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Color: Azul Marino; Tipo Pieza: Falda
+2025-06-15 11:39:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-06-15 11:39:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:39:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003501
+2025-06-15 11:39:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:39:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12
+2025-06-15 11:39:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12\label_SKU003501.png
+2025-06-15 11:39:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12\label_SKU003501.png
+2025-06-15 11:39:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU003501
+2025-06-15 11:39:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU003501: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12\label_SKU003501.png
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003501
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12\label_SKU003501.png
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I060 (SKU: SKU003501, índice: 5)
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003501
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12\label_SKU003501.png
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003501
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12\label_SKU003501.png
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003501
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12\label_SKU003501.png
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003501
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12
+2025-06-15 11:39:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12\label_SKU003501.png
+2025-06-15 11:39:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Manteniendo selección para SKU: SKU003501 al cerrar PrintPreviewWindow
+2025-06-15 11:39:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección restaurada para SKU: SKU003501 después de cerrar PrintPreviewWindow
+2025-06-15 11:39:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:39:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003501
+2025-06-15 11:39:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:39:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12
+2025-06-15 11:39:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12\label_SKU003501.png
+2025-06-15 11:39:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:39:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003501
+2025-06-15 11:39:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:39:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12
+2025-06-15 11:39:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12\label_SKU003501.png
+2025-06-15 11:39:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:39:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003501
+2025-06-15 11:39:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:39:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12
+2025-06-15 11:39:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12\label_SKU003501.png
+2025-06-15 11:39:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:39:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003501
+2025-06-15 11:39:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:39:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12
+2025-06-15 11:39:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12\label_SKU003501.png
+2025-06-15 11:39:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12\label_SKU003501.png
+2025-06-15 11:39:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU003501
+2025-06-15 11:39:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU003501: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12\label_SKU003501.png
+2025-06-15 11:39:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU003501: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12\label_split_SKU003501.png
+2025-06-15 11:40:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:40:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003501
+2025-06-15 11:40:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:40:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12
+2025-06-15 11:40:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12\label_split_SKU003501.png
+2025-06-15 11:40:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I060 (SKU: SKU003501, índice: 5)
+2025-06-15 11:40:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:40:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003501
+2025-06-15 11:40:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:40:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12
+2025-06-15 11:40:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12\label_split_SKU003501.png
+2025-06-15 11:40:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:40:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003501
+2025-06-15 11:40:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:40:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12
+2025-06-15 11:40:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12\label_split_SKU003501.png
+2025-06-15 11:40:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Manteniendo selección para SKU: SKU003501 al cerrar PrintPreviewWindow
+2025-06-15 11:40:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección restaurada para SKU: SKU003501 después de cerrar PrintPreviewWindow
+2025-06-15 11:40:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:40:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003501
+2025-06-15 11:40:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:40:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12
+2025-06-15 11:40:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12\label_split_SKU003501.png
+2025-06-15 11:40:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:40:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003501
+2025-06-15 11:40:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:40:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12
+2025-06-15 11:40:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12\label_split_SKU003501.png
+2025-06-15 11:40:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:40:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003501
+2025-06-15 11:40:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:40:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12
+2025-06-15 11:40:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12\label_split_SKU003501.png
+2025-06-15 11:40:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:40:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003501
+2025-06-15 11:40:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:40:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12
+2025-06-15 11:40:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\12\label_split_SKU003501.png
+2025-06-15 11:40:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:40:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003496
+2025-06-15 11:40:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:40:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\2
+2025-06-15 11:40:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\2\label_split_SKU003496.png
+2025-06-15 11:40:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\2\label_split_SKU003496.png
+2025-06-15 11:40:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU003496
+2025-06-15 11:40:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU003496: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\2\label_split_SKU003496.png
+2025-06-15 11:40:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:40:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003496
+2025-06-15 11:40:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:40:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\2
+2025-06-15 11:40:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\2\label_split_SKU003496.png
+2025-06-15 11:40:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I05B (SKU: SKU003496, índice: 0)
+2025-06-15 11:40:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:40:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003496
+2025-06-15 11:40:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:40:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\2
+2025-06-15 11:40:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\2\label_split_SKU003496.png
+2025-06-15 11:40:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:40:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003496
+2025-06-15 11:40:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:40:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\2
+2025-06-15 11:40:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\2\label_split_SKU003496.png
+2025-06-15 11:40:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Manteniendo selección para SKU: SKU003496 al cerrar PrintPreviewWindow
+2025-06-15 11:40:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección restaurada para SKU: SKU003496 después de cerrar PrintPreviewWindow
+2025-06-15 11:40:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:40:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003496
+2025-06-15 11:40:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:40:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\2
+2025-06-15 11:40:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\2\label_split_SKU003496.png
+2025-06-15 11:40:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:40:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003496
+2025-06-15 11:40:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:40:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\2
+2025-06-15 11:40:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\2\label_split_SKU003496.png
+2025-06-15 11:40:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:40:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003496
+2025-06-15 11:40:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:40:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\2
+2025-06-15 11:40:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\2\label_split_SKU003496.png
+2025-06-15 11:40:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/18
+2025-06-15 11:40:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003496
+2025-06-15 11:40:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 11:40:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\2
+2025-06-15 11:40:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Escolar Azul Marino Talla_Básico_Falda\2\label_split_SKU003496.png
+2025-06-15 13:09:42 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-06-15 13:09:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: [], column=color
+2025-06-15 13:09:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-15 13:09:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-15 13:09:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=233, current_page=0, total_pages=8
+2025-06-15 13:09:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 8
+2025-06-15 13:09:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-15 13:09:43 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 8, tiempo: 0.137s
+2025-06-15 13:09:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-15 13:09:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Tipo Pieza: Falda
+2025-06-15 13:09:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-15 13:09:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Gales azul'], column=color
+2025-06-15 13:09:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-15 13:09:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-15 13:09:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=17, current_page=0, total_pages=1
+2025-06-15 13:09:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 1
+2025-06-15 13:09:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/17
+2025-06-15 13:09:46 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 17 productos, página 1, total páginas: 1, tiempo: 0.123s
+2025-06-15 13:09:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-15 13:09:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Color: Gales azul; Tipo Pieza: Falda
+2025-06-15 13:09:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-06-15 13:09:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/17
+2025-06-15 13:09:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001244
+2025-06-15 13:09:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 13:09:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales azul Talla_Básico_Falda\16
+2025-06-15 13:09:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales azul Talla_Básico_Falda\16\label_split_SKU001244.png
+2025-06-15 13:09:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales azul Talla_Básico_Falda\16\label_split_SKU001244.png
+2025-06-15 13:09:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU001244
+2025-06-15 13:09:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU001244: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales azul Talla_Básico_Falda\16\label_split_SKU001244.png
+2025-06-15 13:10:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/17
+2025-06-15 13:10:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001244
+2025-06-15 13:10:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 13:10:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales azul Talla_Básico_Falda\16
+2025-06-15 13:10:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales azul Talla_Básico_Falda\16\label_split_SKU001244.png
+2025-06-15 13:10:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I092 (SKU: SKU001244, índice: 7)
+2025-06-15 13:10:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/17
+2025-06-15 13:10:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001244
+2025-06-15 13:10:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 13:10:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales azul Talla_Básico_Falda\16
+2025-06-15 13:10:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales azul Talla_Básico_Falda\16\label_split_SKU001244.png
+2025-06-15 13:10:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/17
+2025-06-15 13:10:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001244
+2025-06-15 13:10:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 13:10:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales azul Talla_Básico_Falda\16
+2025-06-15 13:10:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales azul Talla_Básico_Falda\16\label_split_SKU001244.png
+2025-06-15 13:50:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Manteniendo selección para SKU: SKU001244 al cerrar PrintPreviewWindow
+2025-06-15 13:50:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección restaurada para SKU: SKU001244 después de cerrar PrintPreviewWindow
+2025-06-15 13:50:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/17
+2025-06-15 13:50:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001244
+2025-06-15 13:50:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 13:50:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales azul Talla_Básico_Falda\16
+2025-06-15 13:50:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales azul Talla_Básico_Falda\16\label_split_SKU001244.png
+2025-06-15 13:50:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/17
+2025-06-15 13:50:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001244
+2025-06-15 13:50:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 13:50:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales azul Talla_Básico_Falda\16
+2025-06-15 13:50:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales azul Talla_Básico_Falda\16\label_split_SKU001244.png
+2025-06-15 13:50:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/17
+2025-06-15 13:50:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001244
+2025-06-15 13:50:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 13:50:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales azul Talla_Básico_Falda\16
+2025-06-15 13:50:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales azul Talla_Básico_Falda\16\label_split_SKU001244.png
+2025-06-15 13:50:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/17
+2025-06-15 13:50:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001244
+2025-06-15 13:50:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 13:50:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales azul Talla_Básico_Falda\16
+2025-06-15 13:50:15 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales azul Talla_Básico_Falda\16\label_split_SKU001244.png
+2025-06-15 13:50:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-06-15 13:50:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Gales azul', 'Gales verde'], column=color
+2025-06-15 13:50:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-15 13:50:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-15 13:50:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=34, current_page=0, total_pages=2
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 2
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 2, tiempo: 0.128s
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Color: Gales azul, Gales verde; Tipo Pieza: Falda
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001244
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales azul Talla_Básico_Falda\16
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales azul Talla_Básico_Falda\16\label_split_SKU001244.png
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001244
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales azul Talla_Básico_Falda\16
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales azul Talla_Básico_Falda\16\label_split_SKU001244.png
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Gales verde'], column=color
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=17, current_page=0, total_pages=1
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 1
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/17
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 17 productos, página 1, total páginas: 1, tiempo: 0.121s
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Color: Gales verde; Tipo Pieza: Falda
+2025-06-15 13:50:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/17
+2025-06-15 13:50:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/17
+2025-06-15 13:50:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001252
+2025-06-15 13:50:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 13:50:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34
+2025-06-15 13:50:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34\label_split_SKU001252.png
+2025-06-15 13:50:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34\label_split_SKU001252.png
+2025-06-15 13:50:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU001252
+2025-06-15 13:50:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU001252: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34\label_split_SKU001252.png
+2025-06-15 13:50:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/17
+2025-06-15 13:50:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001252
+2025-06-15 13:50:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 13:50:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34
+2025-06-15 13:50:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34\label_split_SKU001252.png
+2025-06-15 13:50:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I0C4 (SKU: SKU001252, índice: 10)
+2025-06-15 13:50:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/17
+2025-06-15 13:50:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001252
+2025-06-15 13:50:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 13:50:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34
+2025-06-15 13:50:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34\label_split_SKU001252.png
+2025-06-15 13:50:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/17
+2025-06-15 13:50:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001252
+2025-06-15 13:50:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 13:50:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34
+2025-06-15 13:50:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34\label_split_SKU001252.png
+2025-06-15 15:10:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Manteniendo selección para SKU: SKU001252 al cerrar PrintPreviewWindow
+2025-06-15 15:10:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección restaurada para SKU: SKU001252 después de cerrar PrintPreviewWindow
+2025-06-15 15:10:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/17
+2025-06-15 15:10:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001252
+2025-06-15 15:10:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 15:10:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34
+2025-06-15 15:10:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34\label_split_SKU001252.png
+2025-06-15 15:10:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/17
+2025-06-15 15:10:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001252
+2025-06-15 15:10:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 15:10:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34
+2025-06-15 15:10:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34\label_split_SKU001252.png
+2025-06-15 15:10:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/17
+2025-06-15 15:10:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001252
+2025-06-15 15:10:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 15:10:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34
+2025-06-15 15:10:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34\label_split_SKU001252.png
+2025-06-15 15:10:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/17
+2025-06-15 15:10:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001252
+2025-06-15 15:10:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-15 15:10:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34
+2025-06-15 15:10:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Falda Gales verde Talla_Básico_Falda\34\label_split_SKU001252.png
+2025-06-15 15:10:38 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado

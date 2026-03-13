@@ -1,0 +1,758 @@
+2026-01-14 15:20:20,186 - src.core.config.db_manager - INFO - Conexión a c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\data/productos.db establecida.
+2026-01-14 15:20:20,252 - src.core.config.db_manager - INFO - Migración de fechas completada.
+2026-01-14 15:20:21,981 - __main__ - INFO - Iniciando precarga de formularios
+2026-01-14 15:20:22,050 - src.modules.products.product_manager - INFO - ProductManager inicializado para usuario admin con rol admin en tienda 1
+2026-01-14 15:20:22,050 - src.modules.products.product_manager_window - INFO - Inicializando ProductManagerWindow para usuario admin con rol admin en tienda 1
+2026-01-14 15:20:22,055 - src.modules.products.inventory_manager - INFO - InventoryManager inicializado para tienda 1
+2026-01-14 15:20:22,055 - src.modules.products.qr_generator - INFO - QRGenerator inicializado para tienda 1
+2026-01-14 15:20:22,055 - src.core.utils.logging_config - INFO - Inicializando ProductManagerLogic para tienda 1
+2026-01-14 15:20:22,057 - src.core.utils.logging_config - DEBUG - ProductEditForm inicializado para tienda 1
+2026-01-14 15:20:22,057 - src.core.utils.logging_config - INFO - Inicializando ProductManagerUI para tienda 1
+2026-01-14 15:20:22,059 - src.core.utils.logging_config - DEBUG - Ícono cargado: edit
+2026-01-14 15:20:22,061 - src.core.utils.logging_config - DEBUG - Ícono cargado: copy
+2026-01-14 15:20:22,063 - src.core.utils.logging_config - DEBUG - Ícono cargado: delete
+2026-01-14 15:20:22,065 - src.core.utils.logging_config - DEBUG - Ícono cargado: duplicate
+2026-01-14 15:20:22,069 - src.core.utils.logging_config - DEBUG - Ícono cargado: price
+2026-01-14 15:20:22,070 - src.core.utils.logging_config - DEBUG - Ícono cargado: print
+2026-01-14 15:20:22,072 - src.core.utils.logging_config - DEBUG - Ícono cargado: inventory
+2026-01-14 15:20:22,801 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=color
+2026-01-14 15:20:22,878 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Color, column=color
+2026-01-14 15:20:22,894 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2026-01-14 15:20:22,932 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2026-01-14 15:20:22,942 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2026-01-14 15:20:22,970 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2026-01-14 15:20:22,980 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=atributo
+2026-01-14 15:20:23,010 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2026-01-14 15:20:23,021 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=escuela
+2026-01-14 15:20:23,048 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2026-01-14 15:20:23,059 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2026-01-14 15:20:23,088 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2026-01-14 15:20:23,108 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=genero
+2026-01-14 15:20:23,144 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Género, column=genero
+2026-01-14 15:20:23,154 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=marca
+2026-01-14 15:20:23,181 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2026-01-14 15:20:23,191 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=talla
+2026-01-14 15:20:23,227 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2026-01-14 15:20:23,501 - src.core.utils.logging_config - DEBUG - Inicializando comboboxes para filtros
+2026-01-14 15:20:23,648 - src.core.utils.logging_config - DEBUG - Obtenidos 32 valores únicos para color en 0.146s
+2026-01-14 15:20:23,648 - src.core.utils.logging_config - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2026-01-14 15:20:23,657 - src.core.utils.logging_config - DEBUG - Obtenidos 6 valores únicos para tipo_prenda en 0.003s
+2026-01-14 15:20:23,658 - src.core.utils.logging_config - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial', 'Uniforme']
+2026-01-14 15:20:23,667 - src.core.utils.logging_config - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.003s
+2026-01-14 15:20:23,668 - src.core.utils.logging_config - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2026-01-14 15:20:23,678 - src.core.utils.logging_config - DEBUG - Obtenidos 23 valores únicos para atributo en 0.003s
+2026-01-14 15:20:23,683 - src.core.utils.logging_config - DEBUG - Valores para atributo: ['Algodón', 'Botones', 'Chazarilla', 'Conalep', 'Conjunto', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Cuello olan', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Oferta', 'Polo', 'Punto', 'Tortuga', 'Vestir']
+2026-01-14 15:20:23,689 - src.core.utils.logging_config - DEBUG - Obtenidos 56 valores únicos para escuela en 0.001s
+2026-01-14 15:20:23,696 - src.core.utils.logging_config - DEBUG - Valores para escuela: ['16 de Septiembre', 'Adolfo Lopez Mareo', 'Adolfo Lopez Mateo', 'Albino García Ramos', 'Alvaro Obregon', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'ESTV 663', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Huizache', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Palacio', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Santa Rosa 238', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Telesecundaria 600', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Vidal Acolcer', 'Álvaro Obregón']
+2026-01-14 15:20:23,708 - src.core.utils.logging_config - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.003s
+2026-01-14 15:20:23,710 - src.core.utils.logging_config - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2026-01-14 15:20:23,720 - src.core.utils.logging_config - DEBUG - Obtenidos 3 valores únicos para genero en 0.002s
+2026-01-14 15:20:23,720 - src.core.utils.logging_config - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2026-01-14 15:20:23,728 - src.core.utils.logging_config - DEBUG - Obtenidos 5 valores únicos para marca en 0.002s
+2026-01-14 15:20:23,731 - src.core.utils.logging_config - DEBUG - Valores para marca: ['Claudia', 'Lobito', 'MarcaX', 'MarcaY', 'Prowear']
+2026-01-14 15:20:23,742 - src.core.utils.logging_config - DEBUG - Obtenidos 43 valores únicos para talla en 0.005s
+2026-01-14 15:20:23,744 - src.core.utils.logging_config - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'M', 'L', 'CH', 'MD', 'GD', 'EXG', 'Uni', 'ESP', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2026-01-14 15:20:23,750 - src.core.utils.logging_config - INFO - Comboboxes inicializados correctamente
+2026-01-14 15:20:23,751 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2026-01-14 15:20:23,776 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2026-01-14 15:20:23,882 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2026-01-14 15:20:23,886 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=4034, current_page=0, total_pages=135
+2026-01-14 15:20:23,898 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 135
+2026-01-14 15:20:23,902 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2026-01-14 15:20:23,902 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 135, tiempo: 0.127s
+2026-01-14 15:20:23,903 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2026-01-14 15:20:24,007 - src.core.utils.logging_config - DEBUG - Inicializando comboboxes para filtros
+2026-01-14 15:20:24,008 - src.core.utils.logging_config - DEBUG - Obtenidos 32 valores únicos para color en 0.000s
+2026-01-14 15:20:24,008 - src.core.utils.logging_config - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2026-01-14 15:20:24,014 - src.core.utils.logging_config - DEBUG - Obtenidos 6 valores únicos para tipo_prenda en 0.000s
+2026-01-14 15:20:24,015 - src.core.utils.logging_config - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial', 'Uniforme']
+2026-01-14 15:20:24,020 - src.core.utils.logging_config - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.000s
+2026-01-14 15:20:24,021 - src.core.utils.logging_config - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2026-01-14 15:20:24,028 - src.core.utils.logging_config - DEBUG - Obtenidos 23 valores únicos para atributo en 0.000s
+2026-01-14 15:20:24,029 - src.core.utils.logging_config - DEBUG - Valores para atributo: ['Algodón', 'Botones', 'Chazarilla', 'Conalep', 'Conjunto', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Cuello olan', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Oferta', 'Polo', 'Punto', 'Tortuga', 'Vestir']
+2026-01-14 15:20:24,035 - src.core.utils.logging_config - DEBUG - Obtenidos 56 valores únicos para escuela en 0.000s
+2026-01-14 15:20:24,036 - src.core.utils.logging_config - DEBUG - Valores para escuela: ['16 de Septiembre', 'Adolfo Lopez Mareo', 'Adolfo Lopez Mateo', 'Albino García Ramos', 'Alvaro Obregon', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'ESTV 663', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Huizache', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Palacio', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Santa Rosa 238', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Telesecundaria 600', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Vidal Acolcer', 'Álvaro Obregón']
+2026-01-14 15:20:24,044 - src.core.utils.logging_config - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2026-01-14 15:20:24,048 - src.core.utils.logging_config - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2026-01-14 15:20:24,054 - src.core.utils.logging_config - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2026-01-14 15:20:24,055 - src.core.utils.logging_config - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2026-01-14 15:20:24,060 - src.core.utils.logging_config - DEBUG - Obtenidos 5 valores únicos para marca en 0.000s
+2026-01-14 15:20:24,061 - src.core.utils.logging_config - DEBUG - Valores para marca: ['Claudia', 'Lobito', 'MarcaX', 'MarcaY', 'Prowear']
+2026-01-14 15:20:24,067 - src.core.utils.logging_config - DEBUG - Obtenidos 43 valores únicos para talla en 0.000s
+2026-01-14 15:20:24,067 - src.core.utils.logging_config - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'M', 'L', 'CH', 'MD', 'GD', 'EXG', 'Uni', 'ESP', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2026-01-14 15:20:24,075 - src.core.utils.logging_config - INFO - Comboboxes inicializados correctamente
+2026-01-14 15:20:24,077 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2026-01-14 15:20:24,078 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2026-01-14 15:20:24,186 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2026-01-14 15:20:24,190 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=4034, current_page=0, total_pages=135
+2026-01-14 15:20:24,201 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 135
+2026-01-14 15:20:24,205 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2026-01-14 15:20:24,206 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 135, tiempo: 0.127s
+2026-01-14 15:20:24,209 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2026-01-14 15:20:24,483 - root - INFO - Iniciando GeneradorCodigos para tienda 1
+2026-01-14 15:20:24,498 - root - INFO - Colores cargados desde config.json: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Oficial', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2026-01-14 15:20:24,499 - root - INFO - Controlador inicializado para tienda 1
+2026-01-14 15:20:24,523 - root - INFO - Antes de setup_ui
+2026-01-14 15:20:24,523 - root - INFO - Iniciando setup_ui
+2026-01-14 15:20:25,147 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=None
+2026-01-14 15:20:25,175 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Escuelas, column=None
+2026-01-14 15:20:27,142 - root - INFO - setup_ui completado
+2026-01-14 15:20:27,142 - root - INFO - GeneradorCodigos inicializado para tienda 1
+2026-01-14 15:20:27,331 - src.modules.sales.apartados.apartados_logic - INFO - Tabla 'modificaciones_apartados' verificada/creada con store_id para tienda 1.
+2026-01-14 15:20:27,331 - src.modules.sales.apartados.apartados_logic - INFO - ApartadosLogic inicializado para tienda 1
+2026-01-14 15:20:27,336 - src.modules.sales.apartados.apartados_manager - INFO - Interfaz de gestión de apartados inicializada para usuario con ID 'admin' en tienda 1.
+2026-01-14 15:20:27,451 - __main__ - INFO - Base de datos verificada correctamente
+2026-01-14 15:20:27,508 - __main__ - INFO - Iniciando cambio a Product Manager
+2026-01-14 15:20:27,527 - __main__ - INFO - Precarga de formularios completada
+2026-01-14 15:20:27,640 - src.modules.products.product_manager - INFO - ProductManager inicializado para usuario admin con rol admin en tienda 1
+2026-01-14 15:20:27,640 - src.modules.products.product_manager_window - INFO - Inicializando ProductManagerWindow para usuario admin con rol admin en tienda 1
+2026-01-14 15:20:27,646 - src.modules.products.inventory_manager - INFO - InventoryManager inicializado para tienda 1
+2026-01-14 15:20:27,646 - src.modules.products.qr_generator - INFO - QRGenerator inicializado para tienda 1
+2026-01-14 15:20:27,646 - src.core.utils.logging_config - INFO - Inicializando ProductManagerLogic para tienda 1
+2026-01-14 15:20:27,647 - src.core.utils.logging_config - DEBUG - ProductEditForm inicializado para tienda 1
+2026-01-14 15:20:27,648 - src.core.utils.logging_config - INFO - Inicializando ProductManagerUI para tienda 1
+2026-01-14 15:20:27,650 - src.core.utils.logging_config - DEBUG - Ícono cargado: edit
+2026-01-14 15:20:27,652 - src.core.utils.logging_config - DEBUG - Ícono cargado: copy
+2026-01-14 15:20:27,653 - src.core.utils.logging_config - DEBUG - Ícono cargado: delete
+2026-01-14 15:20:27,655 - src.core.utils.logging_config - DEBUG - Ícono cargado: duplicate
+2026-01-14 15:20:27,657 - src.core.utils.logging_config - DEBUG - Ícono cargado: price
+2026-01-14 15:20:27,669 - src.core.utils.logging_config - DEBUG - Ícono cargado: print
+2026-01-14 15:20:27,671 - src.core.utils.logging_config - DEBUG - Ícono cargado: inventory
+2026-01-14 15:20:27,750 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=color
+2026-01-14 15:20:27,778 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Color, column=color
+2026-01-14 15:20:27,789 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2026-01-14 15:20:27,817 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2026-01-14 15:20:27,827 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2026-01-14 15:20:27,856 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2026-01-14 15:20:27,867 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=atributo
+2026-01-14 15:20:27,893 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2026-01-14 15:20:27,904 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=escuela
+2026-01-14 15:20:27,931 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2026-01-14 15:20:27,940 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2026-01-14 15:20:27,969 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2026-01-14 15:20:27,979 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=genero
+2026-01-14 15:20:28,007 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Género, column=genero
+2026-01-14 15:20:28,017 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=marca
+2026-01-14 15:20:28,042 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2026-01-14 15:20:28,054 - src.core.utils.logging_config - DEBUG - Inicializando CheckComboBox con column=talla
+2026-01-14 15:20:28,081 - src.core.utils.logging_config - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2026-01-14 15:20:29,158 - src.core.utils.logging_config - DEBUG - Inicializando comboboxes para filtros
+2026-01-14 15:20:29,164 - src.core.utils.logging_config - DEBUG - Obtenidos 32 valores únicos para color en 0.006s
+2026-01-14 15:20:29,165 - src.core.utils.logging_config - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2026-01-14 15:20:29,175 - src.core.utils.logging_config - DEBUG - Obtenidos 6 valores únicos para tipo_prenda en 0.004s
+2026-01-14 15:20:29,177 - src.core.utils.logging_config - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial', 'Uniforme']
+2026-01-14 15:20:29,188 - src.core.utils.logging_config - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.005s
+2026-01-14 15:20:29,188 - src.core.utils.logging_config - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2026-01-14 15:20:29,199 - src.core.utils.logging_config - DEBUG - Obtenidos 23 valores únicos para atributo en 0.005s
+2026-01-14 15:20:29,199 - src.core.utils.logging_config - DEBUG - Valores para atributo: ['Algodón', 'Botones', 'Chazarilla', 'Conalep', 'Conjunto', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Cuello olan', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Oferta', 'Polo', 'Punto', 'Tortuga', 'Vestir']
+2026-01-14 15:20:29,205 - src.core.utils.logging_config - DEBUG - Obtenidos 56 valores únicos para escuela en 0.000s
+2026-01-14 15:20:29,206 - src.core.utils.logging_config - DEBUG - Valores para escuela: ['16 de Septiembre', 'Adolfo Lopez Mareo', 'Adolfo Lopez Mateo', 'Albino García Ramos', 'Alvaro Obregon', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'ESTV 663', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Huizache', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Palacio', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Santa Rosa 238', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Telesecundaria 600', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Vidal Acolcer', 'Álvaro Obregón']
+2026-01-14 15:20:29,216 - src.core.utils.logging_config - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.003s
+2026-01-14 15:20:29,216 - src.core.utils.logging_config - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2026-01-14 15:20:29,224 - src.core.utils.logging_config - DEBUG - Obtenidos 3 valores únicos para genero en 0.002s
+2026-01-14 15:20:29,224 - src.core.utils.logging_config - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2026-01-14 15:20:29,232 - src.core.utils.logging_config - DEBUG - Obtenidos 5 valores únicos para marca en 0.002s
+2026-01-14 15:20:29,232 - src.core.utils.logging_config - DEBUG - Valores para marca: ['Claudia', 'Lobito', 'MarcaX', 'MarcaY', 'Prowear']
+2026-01-14 15:20:29,243 - src.core.utils.logging_config - DEBUG - Obtenidos 43 valores únicos para talla en 0.005s
+2026-01-14 15:20:29,244 - src.core.utils.logging_config - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'M', 'L', 'CH', 'MD', 'GD', 'EXG', 'Uni', 'ESP', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2026-01-14 15:20:29,252 - src.core.utils.logging_config - INFO - Comboboxes inicializados correctamente
+2026-01-14 15:20:29,253 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2026-01-14 15:20:29,268 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2026-01-14 15:20:29,370 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2026-01-14 15:20:29,373 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=4034, current_page=0, total_pages=135
+2026-01-14 15:20:29,384 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 135
+2026-01-14 15:20:29,387 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2026-01-14 15:20:29,388 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 135, tiempo: 0.120s
+2026-01-14 15:20:29,388 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2026-01-14 15:20:29,490 - src.core.utils.logging_config - DEBUG - Inicializando comboboxes para filtros
+2026-01-14 15:20:29,491 - src.core.utils.logging_config - DEBUG - Obtenidos 32 valores únicos para color en 0.000s
+2026-01-14 15:20:29,491 - src.core.utils.logging_config - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2026-01-14 15:20:29,497 - src.core.utils.logging_config - DEBUG - Obtenidos 6 valores únicos para tipo_prenda en 0.000s
+2026-01-14 15:20:29,497 - src.core.utils.logging_config - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial', 'Uniforme']
+2026-01-14 15:20:29,503 - src.core.utils.logging_config - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.000s
+2026-01-14 15:20:29,503 - src.core.utils.logging_config - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2026-01-14 15:20:29,508 - src.core.utils.logging_config - DEBUG - Obtenidos 23 valores únicos para atributo en 0.000s
+2026-01-14 15:20:29,509 - src.core.utils.logging_config - DEBUG - Valores para atributo: ['Algodón', 'Botones', 'Chazarilla', 'Conalep', 'Conjunto', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Cuello olan', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Oferta', 'Polo', 'Punto', 'Tortuga', 'Vestir']
+2026-01-14 15:20:29,515 - src.core.utils.logging_config - DEBUG - Obtenidos 56 valores únicos para escuela en 0.000s
+2026-01-14 15:20:29,516 - src.core.utils.logging_config - DEBUG - Valores para escuela: ['16 de Septiembre', 'Adolfo Lopez Mareo', 'Adolfo Lopez Mateo', 'Albino García Ramos', 'Alvaro Obregon', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'ESTV 663', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Huizache', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Palacio', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Santa Rosa 238', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Telesecundaria 600', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Vidal Acolcer', 'Álvaro Obregón']
+2026-01-14 15:20:29,523 - src.core.utils.logging_config - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2026-01-14 15:20:29,523 - src.core.utils.logging_config - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2026-01-14 15:20:29,529 - src.core.utils.logging_config - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2026-01-14 15:20:29,533 - src.core.utils.logging_config - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2026-01-14 15:20:29,538 - src.core.utils.logging_config - DEBUG - Obtenidos 5 valores únicos para marca en 0.000s
+2026-01-14 15:20:29,538 - src.core.utils.logging_config - DEBUG - Valores para marca: ['Claudia', 'Lobito', 'MarcaX', 'MarcaY', 'Prowear']
+2026-01-14 15:20:29,544 - src.core.utils.logging_config - DEBUG - Obtenidos 43 valores únicos para talla en 0.000s
+2026-01-14 15:20:29,548 - src.core.utils.logging_config - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'M', 'L', 'CH', 'MD', 'GD', 'EXG', 'Uni', 'ESP', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2026-01-14 15:20:29,554 - src.core.utils.logging_config - INFO - Comboboxes inicializados correctamente
+2026-01-14 15:20:29,557 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2026-01-14 15:20:29,557 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2026-01-14 15:20:29,659 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2026-01-14 15:20:29,663 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=4034, current_page=0, total_pages=135
+2026-01-14 15:20:29,673 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 135
+2026-01-14 15:20:29,677 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2026-01-14 15:20:29,678 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 135, tiempo: 0.120s
+2026-01-14 15:20:29,678 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2026-01-14 15:20:29,795 - __main__ - INFO - Interfaz de Product Manager cargada exitosamente
+2026-01-14 15:31:16,896 - src.core.utils.logging_config - DEBUG - Menú desplegable creado y mostrado
+2026-01-14 15:31:26,439 - src.core.utils.logging_config - DEBUG - Ejecutando comando con selecciones: ['Justo Sierra'], column=escuela
+2026-01-14 15:31:26,440 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2026-01-14 15:31:26,540 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2026-01-14 15:31:26,542 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=71, current_page=0, total_pages=3
+2026-01-14 15:31:26,553 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 3
+2026-01-14 15:31:26,556 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2026-01-14 15:31:26,557 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 3, tiempo: 0.117s
+2026-01-14 15:31:26,557 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2026-01-14 15:31:26,654 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Filtros: Escuela: Justo Sierra
+2026-01-14 15:31:27,693 - src.core.utils.logging_config - DEBUG - Menú desplegable cerrado
+2026-01-14 15:31:28,030 - src.core.utils.logging_config - DEBUG - Menú desplegable creado y mostrado
+2026-01-14 15:31:30,465 - src.core.utils.logging_config - DEBUG - Ejecutando comando con selecciones: ['Pants 2pz'], column=tipo_pieza
+2026-01-14 15:31:30,466 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2026-01-14 15:31:30,571 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2026-01-14 15:31:30,572 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=10, current_page=0, total_pages=1
+2026-01-14 15:31:30,583 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 1
+2026-01-14 15:31:30,585 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/10
+2026-01-14 15:31:30,586 - src.core.utils.logging_config - INFO - Cargados 10 productos, página 1, total páginas: 1, tiempo: 0.120s
+2026-01-14 15:31:30,586 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2026-01-14 15:31:30,684 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Filtros: Tipo Pieza: Pants 2pz; Escuela: Justo Sierra
+2026-01-14 15:31:31,666 - src.core.utils.logging_config - DEBUG - Menú desplegable cerrado
+2026-01-14 15:31:34,435 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:31:34,435 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002268
+2026-01-14 15:31:34,448 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:31:34,451 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\12
+2026-01-14 15:31:34,456 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\12\label_SKU002268.png
+2026-01-14 15:31:35,476 - src.core.utils.logging_config - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\12\label_SKU002268.png
+2026-01-14 15:31:35,491 - src.core.utils.logging_config - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU002268
+2026-01-14 15:31:35,575 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU002268: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\12\label_SKU002268.png
+2026-01-14 15:31:40,853 - src.modules.products.product_manager_window - INFO - Impresas 5 etiquetas para SKU SKU002268 (tipo: standard, copias solicitadas: 5)
+2026-01-14 15:31:40,856 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:31:40,857 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002268
+2026-01-14 15:31:40,865 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:31:40,866 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\12
+2026-01-14 15:31:40,871 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\12\label_SKU002268.png
+2026-01-14 15:31:40,872 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I05F (SKU: SKU002268, índice: 4)
+2026-01-14 15:31:40,892 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:31:40,895 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002268
+2026-01-14 15:31:40,904 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:31:40,909 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\12
+2026-01-14 15:31:40,912 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\12\label_SKU002268.png
+2026-01-14 15:31:40,915 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:31:40,916 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002268
+2026-01-14 15:31:40,928 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:31:40,929 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\12
+2026-01-14 15:31:40,933 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\12\label_SKU002268.png
+2026-01-14 15:31:42,040 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU002283: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\14\label_SKU002283.png
+2026-01-14 15:31:42,048 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:31:42,048 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002283
+2026-01-14 15:31:42,056 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:31:42,058 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:31:42,063 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\14\label_SKU002283.png
+2026-01-14 15:31:42,064 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I060 (SKU: SKU002283, índice: 5)
+2026-01-14 15:31:42,065 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:31:42,066 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002283
+2026-01-14 15:31:42,074 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:31:42,076 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:31:42,079 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\14\label_SKU002283.png
+2026-01-14 15:31:42,080 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:31:42,080 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002283
+2026-01-14 15:31:42,088 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:31:42,089 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:31:42,092 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\14\label_SKU002283.png
+2026-01-14 15:31:42,586 - src.modules.products.product_manager_window - INFO - Impresas 5 etiquetas para SKU SKU002283 (tipo: standard, copias solicitadas: 5)
+2026-01-14 15:31:42,589 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:31:42,589 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002283
+2026-01-14 15:31:42,597 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:31:42,599 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:31:42,602 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\14\label_SKU002283.png
+2026-01-14 15:31:42,603 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I060 (SKU: SKU002283, índice: 5)
+2026-01-14 15:31:42,606 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:31:42,607 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002283
+2026-01-14 15:31:42,615 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:31:42,616 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:31:42,619 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\14\label_SKU002283.png
+2026-01-14 15:31:42,620 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:31:42,621 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002283
+2026-01-14 15:31:42,630 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:31:42,631 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:31:42,635 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\14\label_SKU002283.png
+2026-01-14 15:32:22,479 - src.core.utils.logging_config - DEBUG - Manteniendo selección para SKU: SKU002283 al cerrar PrintPreviewWindow
+2026-01-14 15:32:22,515 - src.core.utils.logging_config - DEBUG - Selección restaurada para SKU: SKU002283 después de cerrar PrintPreviewWindow
+2026-01-14 15:32:22,517 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:32:22,518 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002283
+2026-01-14 15:32:22,526 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:32:22,527 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:32:22,530 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\14\label_SKU002283.png
+2026-01-14 15:32:22,531 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:32:22,532 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002283
+2026-01-14 15:32:22,541 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:32:22,542 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:32:22,545 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\14\label_SKU002283.png
+2026-01-14 15:32:22,547 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:32:22,547 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002283
+2026-01-14 15:32:22,556 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:32:22,557 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:32:22,560 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\14\label_SKU002283.png
+2026-01-14 15:32:22,561 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:32:22,562 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002283
+2026-01-14 15:32:22,571 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:32:22,572 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:32:22,574 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Justo Sierra Talla_Deportivo_Pants 2pz\14\label_SKU002283.png
+2026-01-14 15:32:24,744 - src.core.utils.logging_config - DEBUG - Menú desplegable creado y mostrado
+2026-01-14 15:32:28,098 - src.core.utils.logging_config - DEBUG - Ejecutando comando con selecciones: [], column=escuela
+2026-01-14 15:32:28,099 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2026-01-14 15:32:28,212 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2026-01-14 15:32:28,215 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=578, current_page=0, total_pages=20
+2026-01-14 15:32:28,228 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 20
+2026-01-14 15:32:28,232 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2026-01-14 15:32:28,233 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 20, tiempo: 0.133s
+2026-01-14 15:32:28,233 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2026-01-14 15:32:28,348 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Filtros: Tipo Pieza: Pants 2pz
+2026-01-14 15:32:28,350 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2026-01-14 15:32:32,107 - src.core.utils.logging_config - DEBUG - Ejecutando comando con selecciones: ['Albino García Ramos'], column=escuela
+2026-01-14 15:32:32,108 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2026-01-14 15:32:32,228 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2026-01-14 15:32:32,229 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=10, current_page=0, total_pages=1
+2026-01-14 15:32:32,242 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 1
+2026-01-14 15:32:32,244 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/10
+2026-01-14 15:32:32,244 - src.core.utils.logging_config - INFO - Cargados 10 productos, página 1, total páginas: 1, tiempo: 0.136s
+2026-01-14 15:32:32,245 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2026-01-14 15:32:32,358 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Filtros: Tipo Pieza: Pants 2pz; Escuela: Albino García Ramos
+2026-01-14 15:32:33,150 - src.core.utils.logging_config - DEBUG - Menú desplegable cerrado
+2026-01-14 15:32:36,355 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:32:36,356 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002213
+2026-01-14 15:32:36,371 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:32:36,373 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\6
+2026-01-14 15:32:36,380 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\6\label_SKU002213.png
+2026-01-14 15:32:37,538 - src.core.utils.logging_config - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\6\label_SKU002213.png
+2026-01-14 15:32:37,553 - src.core.utils.logging_config - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU002213
+2026-01-14 15:32:37,642 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU002213: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\6\label_SKU002213.png
+2026-01-14 15:33:23,301 - src.modules.products.product_manager_window - INFO - Impresas 5 etiquetas para SKU SKU002213 (tipo: standard, copias solicitadas: 5)
+2026-01-14 15:33:23,303 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:23,304 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002213
+2026-01-14 15:33:23,314 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:23,322 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\6
+2026-01-14 15:33:23,325 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\6\label_SKU002213.png
+2026-01-14 15:33:23,333 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I084 (SKU: SKU002213, índice: 1)
+2026-01-14 15:33:23,338 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:23,347 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002213
+2026-01-14 15:33:23,358 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:23,366 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\6
+2026-01-14 15:33:23,381 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\6\label_SKU002213.png
+2026-01-14 15:33:23,385 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:23,387 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002213
+2026-01-14 15:33:23,401 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:23,407 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\6
+2026-01-14 15:33:23,421 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\6\label_SKU002213.png
+2026-01-14 15:33:25,459 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU002228: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\8\label_SKU002228.png
+2026-01-14 15:33:25,475 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:25,479 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002228
+2026-01-14 15:33:25,490 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:25,495 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\8
+2026-01-14 15:33:25,500 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\8\label_SKU002228.png
+2026-01-14 15:33:25,501 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I085 (SKU: SKU002228, índice: 2)
+2026-01-14 15:33:25,502 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:25,502 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002228
+2026-01-14 15:33:25,511 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:25,512 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\8
+2026-01-14 15:33:25,515 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\8\label_SKU002228.png
+2026-01-14 15:33:25,516 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:25,517 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002228
+2026-01-14 15:33:25,526 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:25,528 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\8
+2026-01-14 15:33:25,531 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\8\label_SKU002228.png
+2026-01-14 15:33:26,069 - src.modules.products.product_manager_window - INFO - Impresas 5 etiquetas para SKU SKU002228 (tipo: standard, copias solicitadas: 5)
+2026-01-14 15:33:26,072 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:26,072 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002228
+2026-01-14 15:33:26,079 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:26,080 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\8
+2026-01-14 15:33:26,083 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\8\label_SKU002228.png
+2026-01-14 15:33:26,084 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I085 (SKU: SKU002228, índice: 2)
+2026-01-14 15:33:26,088 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:26,088 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002228
+2026-01-14 15:33:26,100 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:26,102 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\8
+2026-01-14 15:33:26,105 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\8\label_SKU002228.png
+2026-01-14 15:33:26,106 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:26,107 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002228
+2026-01-14 15:33:26,117 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:26,118 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\8
+2026-01-14 15:33:26,121 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\8\label_SKU002228.png
+2026-01-14 15:33:26,427 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU002243: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\10\label_SKU002243.png
+2026-01-14 15:33:26,440 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:26,440 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002243
+2026-01-14 15:33:26,451 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:26,452 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\10
+2026-01-14 15:33:26,455 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\10\label_SKU002243.png
+2026-01-14 15:33:26,456 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I086 (SKU: SKU002243, índice: 3)
+2026-01-14 15:33:26,457 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:26,457 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002243
+2026-01-14 15:33:26,466 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:26,467 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\10
+2026-01-14 15:33:26,470 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\10\label_SKU002243.png
+2026-01-14 15:33:26,471 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:26,471 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002243
+2026-01-14 15:33:26,480 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:26,481 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\10
+2026-01-14 15:33:26,484 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\10\label_SKU002243.png
+2026-01-14 15:33:27,020 - src.modules.products.product_manager_window - INFO - Impresas 5 etiquetas para SKU SKU002243 (tipo: standard, copias solicitadas: 5)
+2026-01-14 15:33:27,023 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:27,023 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002243
+2026-01-14 15:33:27,032 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:27,033 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\10
+2026-01-14 15:33:27,035 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\10\label_SKU002243.png
+2026-01-14 15:33:27,036 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I086 (SKU: SKU002243, índice: 3)
+2026-01-14 15:33:27,040 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:27,040 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002243
+2026-01-14 15:33:27,049 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:27,050 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\10
+2026-01-14 15:33:27,053 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\10\label_SKU002243.png
+2026-01-14 15:33:27,054 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:27,055 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002243
+2026-01-14 15:33:27,064 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:27,065 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\10
+2026-01-14 15:33:27,068 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\10\label_SKU002243.png
+2026-01-14 15:33:27,295 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU002258: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\12\label_SKU002258.png
+2026-01-14 15:33:27,308 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:27,309 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002258
+2026-01-14 15:33:27,320 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:27,321 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\12
+2026-01-14 15:33:27,324 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\12\label_SKU002258.png
+2026-01-14 15:33:27,325 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I087 (SKU: SKU002258, índice: 4)
+2026-01-14 15:33:27,326 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:27,327 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002258
+2026-01-14 15:33:27,336 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:27,337 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\12
+2026-01-14 15:33:27,339 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\12\label_SKU002258.png
+2026-01-14 15:33:27,341 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:27,341 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002258
+2026-01-14 15:33:27,350 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:27,351 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\12
+2026-01-14 15:33:27,354 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\12\label_SKU002258.png
+2026-01-14 15:33:27,791 - src.modules.products.product_manager_window - INFO - Impresas 5 etiquetas para SKU SKU002258 (tipo: standard, copias solicitadas: 5)
+2026-01-14 15:33:27,793 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:27,794 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002258
+2026-01-14 15:33:27,802 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:27,803 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\12
+2026-01-14 15:33:27,806 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\12\label_SKU002258.png
+2026-01-14 15:33:27,806 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I087 (SKU: SKU002258, índice: 4)
+2026-01-14 15:33:27,809 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:27,809 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002258
+2026-01-14 15:33:27,818 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:27,819 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\12
+2026-01-14 15:33:27,822 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\12\label_SKU002258.png
+2026-01-14 15:33:27,823 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:27,824 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002258
+2026-01-14 15:33:27,833 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:27,834 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\12
+2026-01-14 15:33:27,837 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\12\label_SKU002258.png
+2026-01-14 15:33:28,398 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU002273: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\14\label_SKU002273.png
+2026-01-14 15:33:28,407 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:28,407 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002273
+2026-01-14 15:33:28,417 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:28,418 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:33:28,422 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\14\label_SKU002273.png
+2026-01-14 15:33:28,422 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I088 (SKU: SKU002273, índice: 5)
+2026-01-14 15:33:28,423 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:28,424 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002273
+2026-01-14 15:33:28,435 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:28,436 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:33:28,439 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\14\label_SKU002273.png
+2026-01-14 15:33:28,440 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:28,441 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002273
+2026-01-14 15:33:28,450 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:28,451 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:33:28,454 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\14\label_SKU002273.png
+2026-01-14 15:33:29,195 - src.modules.products.product_manager_window - INFO - Impresas 5 etiquetas para SKU SKU002273 (tipo: standard, copias solicitadas: 5)
+2026-01-14 15:33:29,198 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:29,198 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002273
+2026-01-14 15:33:29,206 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:29,207 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:33:29,210 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\14\label_SKU002273.png
+2026-01-14 15:33:29,211 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I088 (SKU: SKU002273, índice: 5)
+2026-01-14 15:33:29,214 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:29,215 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002273
+2026-01-14 15:33:29,224 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:29,226 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:33:29,229 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\14\label_SKU002273.png
+2026-01-14 15:33:29,231 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:33:29,232 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002273
+2026-01-14 15:33:29,240 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:33:29,241 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:33:29,247 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\14\label_SKU002273.png
+2026-01-14 15:40:49,649 - src.core.utils.logging_config - DEBUG - Manteniendo selección para SKU: SKU002273 al cerrar PrintPreviewWindow
+2026-01-14 15:40:49,685 - src.core.utils.logging_config - DEBUG - Selección restaurada para SKU: SKU002273 después de cerrar PrintPreviewWindow
+2026-01-14 15:40:49,687 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:40:49,687 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002273
+2026-01-14 15:40:49,697 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:40:49,700 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:40:49,703 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\14\label_SKU002273.png
+2026-01-14 15:40:49,705 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:40:49,705 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002273
+2026-01-14 15:40:49,714 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:40:49,716 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:40:49,719 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\14\label_SKU002273.png
+2026-01-14 15:40:49,721 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:40:49,722 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002273
+2026-01-14 15:40:49,731 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:40:49,732 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:40:49,735 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\14\label_SKU002273.png
+2026-01-14 15:40:49,738 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:40:49,738 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002273
+2026-01-14 15:40:49,747 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:40:49,748 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:40:49,751 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Albino García Ramos Talla_Deportivo_Pants 2pz\14\label_SKU002273.png
+2026-01-14 15:40:54,058 - src.core.utils.logging_config - DEBUG - Menú desplegable creado y mostrado
+2026-01-14 15:40:55,061 - src.core.utils.logging_config - DEBUG - Ejecutando comando con selecciones: [], column=escuela
+2026-01-14 15:40:55,062 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2026-01-14 15:40:55,176 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2026-01-14 15:40:55,179 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=578, current_page=0, total_pages=20
+2026-01-14 15:40:55,191 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 20
+2026-01-14 15:40:55,195 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2026-01-14 15:40:55,195 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 20, tiempo: 0.133s
+2026-01-14 15:40:55,196 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2026-01-14 15:40:55,308 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Filtros: Tipo Pieza: Pants 2pz
+2026-01-14 15:40:55,309 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2026-01-14 15:40:58,741 - src.core.utils.logging_config - DEBUG - Ejecutando comando con selecciones: ['Miguel Campuzano'], column=escuela
+2026-01-14 15:40:58,742 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2026-01-14 15:40:58,862 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2026-01-14 15:40:58,863 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=10, current_page=0, total_pages=1
+2026-01-14 15:40:58,876 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 1
+2026-01-14 15:40:58,878 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/10
+2026-01-14 15:40:58,878 - src.core.utils.logging_config - INFO - Cargados 10 productos, página 1, total páginas: 1, tiempo: 0.136s
+2026-01-14 15:40:58,879 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2026-01-14 15:40:58,989 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Filtros: Tipo Pieza: Pants 2pz; Escuela: Miguel Campuzano
+2026-01-14 15:40:59,880 - src.core.utils.logging_config - DEBUG - Menú desplegable cerrado
+2026-01-14 15:41:01,724 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:41:01,725 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002269
+2026-01-14 15:41:01,739 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:41:01,741 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\12
+2026-01-14 15:41:01,747 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\12\label_SKU002269.png
+2026-01-14 15:41:02,941 - src.core.utils.logging_config - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\12\label_SKU002269.png
+2026-01-14 15:41:02,956 - src.core.utils.logging_config - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU002269
+2026-01-14 15:41:03,037 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU002269: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\12\label_SKU002269.png
+2026-01-14 15:41:06,123 - src.modules.products.product_manager_window - INFO - Impresas 5 etiquetas para SKU SKU002269 (tipo: standard, copias solicitadas: 5)
+2026-01-14 15:41:06,125 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:41:06,126 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002269
+2026-01-14 15:41:06,134 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:41:06,135 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\12
+2026-01-14 15:41:06,139 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\12\label_SKU002269.png
+2026-01-14 15:41:06,140 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I0AF (SKU: SKU002269, índice: 4)
+2026-01-14 15:41:06,142 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:41:06,143 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002269
+2026-01-14 15:41:06,151 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:41:06,153 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\12
+2026-01-14 15:41:06,156 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\12\label_SKU002269.png
+2026-01-14 15:41:06,160 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:41:06,161 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002269
+2026-01-14 15:41:06,170 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:41:06,172 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\12
+2026-01-14 15:41:06,175 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\12\label_SKU002269.png
+2026-01-14 15:41:06,559 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU002284: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\14\label_SKU002284.png
+2026-01-14 15:41:06,566 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:41:06,566 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002284
+2026-01-14 15:41:06,575 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:41:06,576 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:41:06,579 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\14\label_SKU002284.png
+2026-01-14 15:41:06,580 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I0B0 (SKU: SKU002284, índice: 5)
+2026-01-14 15:41:06,581 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:41:06,581 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002284
+2026-01-14 15:41:06,590 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:41:06,591 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:41:06,594 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\14\label_SKU002284.png
+2026-01-14 15:41:06,595 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:41:06,595 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002284
+2026-01-14 15:41:06,603 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:41:06,604 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:41:06,608 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\14\label_SKU002284.png
+2026-01-14 15:41:08,082 - src.modules.products.product_manager_window - INFO - Impresas 5 etiquetas para SKU SKU002284 (tipo: standard, copias solicitadas: 5)
+2026-01-14 15:41:08,084 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:41:08,084 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002284
+2026-01-14 15:41:08,092 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:41:08,093 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:41:08,097 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\14\label_SKU002284.png
+2026-01-14 15:41:08,098 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I0B0 (SKU: SKU002284, índice: 5)
+2026-01-14 15:41:08,101 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:41:08,103 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002284
+2026-01-14 15:41:08,112 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:41:08,114 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:41:08,116 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\14\label_SKU002284.png
+2026-01-14 15:41:08,118 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 15:41:08,121 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002284
+2026-01-14 15:41:08,131 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 15:41:08,133 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\14
+2026-01-14 15:41:08,136 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\14\label_SKU002284.png
+2026-01-14 16:18:40,550 - src.core.utils.logging_config - DEBUG - Manteniendo selección para SKU: SKU002284 al cerrar PrintPreviewWindow
+2026-01-14 16:18:40,587 - src.core.utils.logging_config - DEBUG - Selección restaurada para SKU: SKU002284 después de cerrar PrintPreviewWindow
+2026-01-14 16:18:40,603 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 16:18:40,604 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002284
+2026-01-14 16:18:40,614 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 16:18:40,616 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\14
+2026-01-14 16:18:40,622 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\14\label_SKU002284.png
+2026-01-14 16:18:40,626 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 16:18:40,626 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002284
+2026-01-14 16:18:40,635 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 16:18:40,657 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\14
+2026-01-14 16:18:40,663 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\14\label_SKU002284.png
+2026-01-14 16:18:40,666 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 16:18:40,667 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002284
+2026-01-14 16:18:40,677 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 16:18:40,679 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\14
+2026-01-14 16:18:40,683 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\14\label_SKU002284.png
+2026-01-14 16:18:40,685 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/10
+2026-01-14 16:18:40,686 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU002284
+2026-01-14 16:18:40,696 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 16:18:40,698 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\14
+2026-01-14 16:18:40,701 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pants 2pz Deportivo Miguel Campuzano Talla_Deportivo_Pants 2pz\14\label_SKU002284.png
+2026-01-14 16:18:41,285 - src.core.utils.logging_config - INFO - Filtros limpiados para columnas: color, tipo_prenda, tipo_pieza, atributo, escuela, nivel_educativo, genero, marca, talla
+2026-01-14 16:18:41,286 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2026-01-14 16:18:41,400 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2026-01-14 16:18:41,404 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=4034, current_page=0, total_pages=135
+2026-01-14 16:18:41,416 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 135
+2026-01-14 16:18:41,420 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2026-01-14 16:18:41,421 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 135, tiempo: 0.135s
+2026-01-14 16:18:41,422 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2026-01-14 16:18:41,534 - src.core.utils.logging_config - INFO - Filtros limpiados y productos recargados
+2026-01-14 16:18:41,535 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Sin filtros activos
+2026-01-14 16:18:41,536 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2026-01-14 16:18:41,652 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2026-01-14 16:18:41,656 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=4034, current_page=0, total_pages=135
+2026-01-14 16:18:41,667 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 135
+2026-01-14 16:18:41,671 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2026-01-14 16:18:41,673 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 135, tiempo: 0.137s
+2026-01-14 16:18:41,673 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2026-01-14 16:18:41,786 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2026-01-14 16:18:42,894 - src.core.utils.logging_config - DEBUG - Menú desplegable creado y mostrado
+2026-01-14 16:18:46,306 - src.core.utils.logging_config - DEBUG - Ejecutando comando con selecciones: ['Escoces'], column=color
+2026-01-14 16:18:46,307 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2026-01-14 16:18:46,427 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2026-01-14 16:18:46,431 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=58, current_page=0, total_pages=2
+2026-01-14 16:18:46,443 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 2
+2026-01-14 16:18:46,447 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/30
+2026-01-14 16:18:46,447 - src.core.utils.logging_config - INFO - Cargados 30 productos, página 1, total páginas: 2, tiempo: 0.140s
+2026-01-14 16:18:46,448 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2026-01-14 16:18:46,559 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Filtros: Color: Escoces
+2026-01-14 16:18:47,337 - src.core.utils.logging_config - DEBUG - Menú desplegable cerrado
+2026-01-14 16:18:49,120 - src.core.utils.logging_config - DEBUG - Menú desplegable creado y mostrado
+2026-01-14 16:18:50,351 - src.core.utils.logging_config - DEBUG - Menú desplegable cerrado
+2026-01-14 16:18:50,731 - src.core.utils.logging_config - DEBUG - Menú desplegable creado y mostrado
+2026-01-14 16:18:55,104 - src.core.utils.logging_config - DEBUG - Ejecutando comando con selecciones: ['Jumper'], column=tipo_pieza
+2026-01-14 16:18:55,105 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=True, tree exists=1
+2026-01-14 16:18:55,219 - src.core.utils.logging_config - DEBUG - Cargando productos para página 1, batch_size=30
+2026-01-14 16:18:55,222 - src.core.utils.logging_config - DEBUG - Actualizando paginación: total_items=16, current_page=0, total_pages=1
+2026-01-14 16:18:55,236 - src.core.utils.logging_config - DEBUG - Texto de paginación actualizado: Página 1 de 1
+2026-01-14 16:18:55,238 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 0/16
+2026-01-14 16:18:55,238 - src.core.utils.logging_config - INFO - Cargados 16 productos, página 1, total páginas: 1, tiempo: 0.134s
+2026-01-14 16:18:55,239 - src.core.utils.logging_config - DEBUG - Lock interface called with lock=False, tree exists=1
+2026-01-14 16:18:55,351 - src.core.utils.logging_config - DEBUG - Label de filtros actualizado: Filtros: Color: Escoces; Tipo Pieza: Jumper
+2026-01-14 16:18:55,853 - src.core.utils.logging_config - DEBUG - Menú desplegable cerrado
+2026-01-14 16:18:56,712 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/16
+2026-01-14 16:18:56,713 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU000437
+2026-01-14 16:18:56,720 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 16:18:56,721 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\4
+2026-01-14 16:18:56,725 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\4\label_SKU000437.png
+2026-01-14 16:18:58,162 - src.core.utils.logging_config - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\4\label_SKU000437.png
+2026-01-14 16:18:58,176 - src.core.utils.logging_config - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU000437
+2026-01-14 16:18:58,265 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU000437: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\4\label_SKU000437.png
+2026-01-14 16:19:00,487 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU000437: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\4\label_split_SKU000437.png
+2026-01-14 16:19:38,014 - src.modules.products.product_manager_window - INFO - Impresas 4 etiquetas para SKU SKU000437 (tipo: split, copias solicitadas: 16)
+2026-01-14 16:19:38,017 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/16
+2026-01-14 16:19:38,017 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU000437
+2026-01-14 16:19:38,029 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 16:19:38,031 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\4
+2026-01-14 16:19:38,035 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\4\label_split_SKU000437.png
+2026-01-14 16:19:38,038 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I110 (SKU: SKU000437, índice: 1)
+2026-01-14 16:19:38,040 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/16
+2026-01-14 16:19:38,041 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU000437
+2026-01-14 16:19:38,049 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 16:19:38,052 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\4
+2026-01-14 16:19:38,057 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\4\label_split_SKU000437.png
+2026-01-14 16:19:38,058 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/16
+2026-01-14 16:19:38,058 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU000437
+2026-01-14 16:19:38,067 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 16:19:38,069 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\4
+2026-01-14 16:19:38,074 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\4\label_split_SKU000437.png
+2026-01-14 16:19:38,399 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU000440: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\6\label_split_SKU000440.png
+2026-01-14 16:19:38,410 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/16
+2026-01-14 16:19:38,413 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU000440
+2026-01-14 16:19:38,422 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 16:19:38,423 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\6
+2026-01-14 16:19:38,426 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\6\label_split_SKU000440.png
+2026-01-14 16:19:38,427 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I111 (SKU: SKU000440, índice: 2)
+2026-01-14 16:19:38,429 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/16
+2026-01-14 16:19:38,430 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU000440
+2026-01-14 16:19:38,438 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 16:19:38,439 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\6
+2026-01-14 16:19:38,442 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\6\label_split_SKU000440.png
+2026-01-14 16:19:38,443 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/16
+2026-01-14 16:19:38,443 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU000440
+2026-01-14 16:19:38,451 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 16:19:38,452 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\6
+2026-01-14 16:19:38,455 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\6\label_split_SKU000440.png
+2026-01-14 16:19:39,739 - src.modules.products.product_manager_window - INFO - Impresas 4 etiquetas para SKU SKU000440 (tipo: split, copias solicitadas: 16)
+2026-01-14 16:19:39,742 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/16
+2026-01-14 16:19:39,742 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU000440
+2026-01-14 16:19:39,750 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 16:19:39,751 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\6
+2026-01-14 16:19:39,754 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\6\label_split_SKU000440.png
+2026-01-14 16:19:39,755 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I111 (SKU: SKU000440, índice: 2)
+2026-01-14 16:19:39,757 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/16
+2026-01-14 16:19:39,758 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU000440
+2026-01-14 16:19:39,765 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 16:19:39,767 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\6
+2026-01-14 16:19:39,772 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\6\label_split_SKU000440.png
+2026-01-14 16:19:39,773 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/16
+2026-01-14 16:19:39,773 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU000440
+2026-01-14 16:19:39,782 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 16:19:39,783 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\6
+2026-01-14 16:19:39,788 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\6\label_split_SKU000440.png
+2026-01-14 16:19:39,981 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU000443: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\8\label_split_SKU000443.png
+2026-01-14 16:19:39,991 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/16
+2026-01-14 16:19:39,992 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU000443
+2026-01-14 16:19:40,000 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 16:19:40,001 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\8
+2026-01-14 16:19:40,004 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\8\label_split_SKU000443.png
+2026-01-14 16:19:40,005 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I112 (SKU: SKU000443, índice: 3)
+2026-01-14 16:19:40,006 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/16
+2026-01-14 16:19:40,006 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU000443
+2026-01-14 16:19:40,015 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 16:19:40,016 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\8
+2026-01-14 16:19:40,019 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\8\label_split_SKU000443.png
+2026-01-14 16:19:40,020 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/16
+2026-01-14 16:19:40,021 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU000443
+2026-01-14 16:19:40,029 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 16:19:40,030 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\8
+2026-01-14 16:19:40,033 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\8\label_split_SKU000443.png
+2026-01-14 16:19:40,644 - src.modules.products.product_manager_window - INFO - Impresas 4 etiquetas para SKU SKU000443 (tipo: split, copias solicitadas: 16)
+2026-01-14 16:19:40,647 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/16
+2026-01-14 16:19:40,647 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU000443
+2026-01-14 16:19:40,655 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 16:19:40,656 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\8
+2026-01-14 16:19:40,658 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\8\label_split_SKU000443.png
+2026-01-14 16:19:40,659 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I112 (SKU: SKU000443, índice: 3)
+2026-01-14 16:19:40,662 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/16
+2026-01-14 16:19:40,662 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU000443
+2026-01-14 16:19:40,670 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 16:19:40,671 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\8
+2026-01-14 16:19:40,675 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\8\label_split_SKU000443.png
+2026-01-14 16:19:40,676 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/16
+2026-01-14 16:19:40,676 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU000443
+2026-01-14 16:19:40,686 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 16:19:40,688 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\8
+2026-01-14 16:19:40,691 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\8\label_split_SKU000443.png
+2026-01-14 16:33:31,726 - src.core.utils.logging_config - DEBUG - Etiqueta cargada para SKU SKU000443: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\8\label_SKU000443.png
+2026-01-14 16:33:34,083 - src.modules.products.product_manager_window - INFO - Impresas 1 etiquetas para SKU SKU000443 (tipo: standard, copias solicitadas: 1)
+2026-01-14 16:33:34,086 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/16
+2026-01-14 16:33:34,086 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU000443
+2026-01-14 16:33:34,096 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 16:33:34,102 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\8
+2026-01-14 16:33:34,106 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\8\label_SKU000443.png
+2026-01-14 16:33:34,108 - src.core.utils.logging_config - DEBUG - Selección del Treeview actualizada al item I112 (SKU: SKU000443, índice: 3)
+2026-01-14 16:33:34,114 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/16
+2026-01-14 16:33:34,114 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU000443
+2026-01-14 16:33:34,128 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 16:33:34,131 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\8
+2026-01-14 16:33:34,134 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\8\label_SKU000443.png
+2026-01-14 16:33:34,137 - src.core.utils.logging_config - DEBUG - Conteo de selección actualizado: 1/16
+2026-01-14 16:33:34,139 - src.core.utils.logging_config - DEBUG - Mostrando detalles para SKU: SKU000443
+2026-01-14 16:33:34,149 - src.core.utils.logging_config - DEBUG - Intentando cargar imagen desde: None
+2026-01-14 16:33:34,153 - src.core.utils.logging_config - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\8
+2026-01-14 16:33:34,158 - src.core.utils.logging_config - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Jumper Escoces Talla_Básico_Jumper\8\label_SKU000443.png

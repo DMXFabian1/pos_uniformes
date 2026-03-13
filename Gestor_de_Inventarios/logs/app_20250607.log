@@ -1,0 +1,618 @@
+2025-06-07 12:11:43 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-06-07 12:11:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - ProductEditForm inicializado para tienda 1
+2025-06-07 12:11:43 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerUI para tienda 1
+2025-06-07 12:11:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: edit
+2025-06-07 12:11:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: copy
+2025-06-07 12:11:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: delete
+2025-06-07 12:11:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: duplicate
+2025-06-07 12:11:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: price
+2025-06-07 12:11:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: print
+2025-06-07 12:11:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: inventory
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=color
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=genero
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=marca
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=talla
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 30 valores únicos para color en 0.040s
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.002s
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.002s
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para atributo en 0.002s
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Pretina', 'Punto', 'Resorte', 'Tableada', 'Tortuga', 'Vestir']
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 47 valores únicos para escuela en 0.001s
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.002s
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.002s
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.002s
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.004s
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-06-07 12:11:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3181, current_page=0, total_pages=107
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 107
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 107, tiempo: 0.119s
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 30 valores únicos para color en 0.000s
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.000s
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.000s
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para atributo en 0.000s
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Pretina', 'Punto', 'Resorte', 'Tableada', 'Tortuga', 'Vestir']
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 47 valores únicos para escuela en 0.000s
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.000s
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.000s
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3181, current_page=0, total_pages=107
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 107
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 107, tiempo: 0.117s
+2025-06-07 12:11:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-07 12:11:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=None
+2025-06-07 12:11:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuelas, column=None
+2025-06-07 12:11:48 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-06-07 12:11:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - ProductEditForm inicializado para tienda 1
+2025-06-07 12:11:48 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerUI para tienda 1
+2025-06-07 12:11:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: edit
+2025-06-07 12:11:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: copy
+2025-06-07 12:11:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: delete
+2025-06-07 12:11:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: duplicate
+2025-06-07 12:11:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: price
+2025-06-07 12:11:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: print
+2025-06-07 12:11:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: inventory
+2025-06-07 12:11:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=color
+2025-06-07 12:11:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-06-07 12:11:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-06-07 12:11:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-06-07 12:11:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-06-07 12:11:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-06-07 12:11:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-06-07 12:11:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-06-07 12:11:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-06-07 12:11:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-06-07 12:11:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-06-07 12:11:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-06-07 12:11:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=genero
+2025-06-07 12:11:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-06-07 12:11:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=marca
+2025-06-07 12:11:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-06-07 12:11:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=talla
+2025-06-07 12:11:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 30 valores únicos para color en 0.005s
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.004s
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.004s
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para atributo en 0.005s
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Pretina', 'Punto', 'Resorte', 'Tableada', 'Tortuga', 'Vestir']
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 47 valores únicos para escuela en 0.000s
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.002s
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.002s
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.002s
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.004s
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3181, current_page=0, total_pages=107
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 107
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 107, tiempo: 0.122s
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 30 valores únicos para color en 0.000s
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.000s
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 19 valores únicos para tipo_pieza en 0.000s
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para atributo en 0.000s
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Cuatro tablas', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Pretina', 'Punto', 'Resorte', 'Tableada', 'Tortuga', 'Vestir']
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 47 valores únicos para escuela en 0.000s
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.000s
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.000s
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3181, current_page=0, total_pages=107
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 107
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 107, tiempo: 0.122s
+2025-06-07 12:11:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-07 12:34:37 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-06-07 12:34:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Negro'], column=color
+2025-06-07 12:34:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-07 12:34:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-07 12:34:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=127, current_page=0, total_pages=5
+2025-06-07 12:34:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 5
+2025-06-07 12:34:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-07 12:34:43 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 5, tiempo: 0.120s
+2025-06-07 12:34:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-07 12:34:43 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Color: Negro
+2025-06-07 12:34:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-06-07 12:34:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-06-07 12:34:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-06-07 12:34:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-06-07 12:34:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Pantalón'], column=tipo_pieza
+2025-06-07 12:34:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-07 12:34:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-07 12:34:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=57, current_page=0, total_pages=2
+2025-06-07 12:34:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 2
+2025-06-07 12:34:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-06-07 12:34:54 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 2, tiempo: 0.134s
+2025-06-07 12:34:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-07 12:34:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Color: Negro; Tipo Pieza: Pantalón
+2025-06-07 12:34:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-06-07 12:34:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-06-07 12:34:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-06-07 12:34:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-06-07 12:35:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Gabardina'], column=atributo
+2025-06-07 12:35:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-06-07 12:35:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-06-07 12:35:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=8, current_page=0, total_pages=1
+2025-06-07 12:35:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 1
+2025-06-07 12:35:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/8
+2025-06-07 12:35:04 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 8 productos, página 1, total páginas: 1, tiempo: 0.118s
+2025-06-07 12:35:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-06-07 12:35:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Color: Negro; Tipo Pieza: Pantalón; Atributo: Gabardina
+2025-06-07 12:35:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-06-07 12:35:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 12:35:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003315
+2025-06-07 12:35:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 12:35:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\2
+2025-06-07 12:35:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\2\label_SKU003315.png
+2025-06-07 12:35:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\2\label_SKU003315.png
+2025-06-07 12:35:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU003315
+2025-06-07 12:35:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU003315: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\2\label_SKU003315.png
+2025-06-07 12:35:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU003315: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\2\label_split_SKU003315.png
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003315
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\2
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\2\label_split_SKU003315.png
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I079 (SKU: SKU003315, índice: 0)
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003315
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\2
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\2\label_split_SKU003315.png
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003315
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\2
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\2\label_split_SKU003315.png
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003315
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\2
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\2\label_split_SKU003315.png
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003315
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\2
+2025-06-07 12:35:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\2\label_split_SKU003315.png
+2025-06-07 12:39:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU003316: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina_Básico_Pantalón\4\SKU003316_Pantalón Gabardina_4_Negro_label.png
+2025-06-07 12:39:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 12:39:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003316
+2025-06-07 12:39:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 12:39:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\4
+2025-06-07 12:39:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\4\SKU003316.png
+2025-06-07 12:39:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\4\label_SKU003316.png, qr_path actualizado: Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\4\label_SKU003316.png
+2025-06-07 12:39:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\4\label_split_SKU003316.png, label_split_path actualizado: Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\4\label_split_SKU003316.png
+2025-06-07 12:39:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\4\label_split_SKU003316.png
+2025-06-07 12:39:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I07A (SKU: SKU003316, índice: 1)
+2025-06-07 12:39:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 12:39:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003316
+2025-06-07 12:39:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 12:39:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\4
+2025-06-07 12:39:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\4\label_split_SKU003316.png
+2025-06-07 12:39:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 12:39:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003316
+2025-06-07 12:39:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 12:39:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\4
+2025-06-07 12:39:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\4\label_split_SKU003316.png
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003316
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\4
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\4\label_split_SKU003316.png
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I07A (SKU: SKU003316, índice: 1)
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003316
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\4
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\4\label_split_SKU003316.png
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003316
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\4
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\4\label_split_SKU003316.png
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003316
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\4
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\4\label_split_SKU003316.png
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003316
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\4
+2025-06-07 12:39:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\4\label_split_SKU003316.png
+2025-06-07 12:51:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU003317: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina_Básico_Pantalón\6\SKU003317_Pantalón Gabardina_6_Negro_label.png
+2025-06-07 12:51:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 12:51:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003317
+2025-06-07 12:51:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 12:51:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\6
+2025-06-07 12:51:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\6\SKU003317.png
+2025-06-07 12:51:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\6\label_SKU003317.png, qr_path actualizado: Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\6\label_SKU003317.png
+2025-06-07 12:51:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\6\label_split_SKU003317.png, label_split_path actualizado: Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\6\label_split_SKU003317.png
+2025-06-07 12:51:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\6\label_split_SKU003317.png
+2025-06-07 12:51:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I07B (SKU: SKU003317, índice: 2)
+2025-06-07 12:51:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 12:51:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003317
+2025-06-07 12:51:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 12:51:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\6
+2025-06-07 12:51:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\6\label_split_SKU003317.png
+2025-06-07 12:51:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 12:51:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003317
+2025-06-07 12:51:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 12:51:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\6
+2025-06-07 12:51:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\6\label_split_SKU003317.png
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003317
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\6
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\6\label_split_SKU003317.png
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I07B (SKU: SKU003317, índice: 2)
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003317
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\6
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\6\label_split_SKU003317.png
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003317
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\6
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\6\label_split_SKU003317.png
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003317
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\6
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\6\label_split_SKU003317.png
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003317
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\6
+2025-06-07 12:52:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\6\label_split_SKU003317.png
+2025-06-07 14:01:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU003318: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina_Básico_Pantalón\8\SKU003318_Pantalón Gabardina_8_Negro_label.png
+2025-06-07 14:01:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:01:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003318
+2025-06-07 14:01:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:01:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\8
+2025-06-07 14:01:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\8\SKU003318.png
+2025-06-07 14:01:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\8\label_SKU003318.png, qr_path actualizado: Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\8\label_SKU003318.png
+2025-06-07 14:01:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\8\label_split_SKU003318.png, label_split_path actualizado: Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\8\label_split_SKU003318.png
+2025-06-07 14:01:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\8\label_split_SKU003318.png
+2025-06-07 14:01:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I07C (SKU: SKU003318, índice: 3)
+2025-06-07 14:01:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:01:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003318
+2025-06-07 14:01:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:01:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\8
+2025-06-07 14:01:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\8\label_split_SKU003318.png
+2025-06-07 14:01:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:01:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003318
+2025-06-07 14:01:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:01:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\8
+2025-06-07 14:01:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\8\label_split_SKU003318.png
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003318
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\8
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\8\label_split_SKU003318.png
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I07C (SKU: SKU003318, índice: 3)
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003318
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\8
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\8\label_split_SKU003318.png
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003318
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\8
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\8\label_split_SKU003318.png
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003318
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\8
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\8\label_split_SKU003318.png
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003318
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\8
+2025-06-07 14:01:18 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\8\label_split_SKU003318.png
+2025-06-07 14:02:41 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU003319: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina_Básico_Pantalón\10\SKU003319_Pantalón Gabardina_10_Negro_label.png
+2025-06-07 14:02:41 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:02:41 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003319
+2025-06-07 14:02:41 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:02:41 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\10
+2025-06-07 14:02:41 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\10\SKU003319.png
+2025-06-07 14:02:41 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\10\label_SKU003319.png, qr_path actualizado: Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\10\label_SKU003319.png
+2025-06-07 14:02:41 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\10\label_split_SKU003319.png, label_split_path actualizado: Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\10\label_split_SKU003319.png
+2025-06-07 14:02:41 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\10\label_split_SKU003319.png
+2025-06-07 14:02:41 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I07D (SKU: SKU003319, índice: 4)
+2025-06-07 14:02:41 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:02:41 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003319
+2025-06-07 14:02:41 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:02:41 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\10
+2025-06-07 14:02:41 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\10\label_split_SKU003319.png
+2025-06-07 14:02:41 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:02:41 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003319
+2025-06-07 14:02:41 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:02:41 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\10
+2025-06-07 14:02:41 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\10\label_split_SKU003319.png
+2025-06-07 14:02:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU003319: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\10\label_split_SKU003319.png
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003319
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\10
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\10\label_split_SKU003319.png
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I07D (SKU: SKU003319, índice: 4)
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003319
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\10
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\10\label_split_SKU003319.png
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003319
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\10
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\10\label_split_SKU003319.png
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003319
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\10
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\10\label_split_SKU003319.png
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003319
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\10
+2025-06-07 14:02:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\10\label_split_SKU003319.png
+2025-06-07 14:03:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU003320: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina_Básico_Pantalón\12\SKU003320_Pantalón Gabardina_12_Negro_label.png
+2025-06-07 14:03:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:03:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003320
+2025-06-07 14:03:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:03:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\12
+2025-06-07 14:03:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\12\SKU003320.png
+2025-06-07 14:03:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\12\label_SKU003320.png, qr_path actualizado: Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\12\label_SKU003320.png
+2025-06-07 14:03:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\12\label_split_SKU003320.png, label_split_path actualizado: Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\12\label_split_SKU003320.png
+2025-06-07 14:03:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\12\label_split_SKU003320.png
+2025-06-07 14:03:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I07E (SKU: SKU003320, índice: 5)
+2025-06-07 14:03:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:03:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003320
+2025-06-07 14:03:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:03:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\12
+2025-06-07 14:03:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\12\label_split_SKU003320.png
+2025-06-07 14:03:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:03:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003320
+2025-06-07 14:03:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:03:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\12
+2025-06-07 14:03:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\12\label_split_SKU003320.png
+2025-06-07 14:03:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU003320: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\12\label_split_SKU003320.png
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003320
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\12
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\12\label_split_SKU003320.png
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I07E (SKU: SKU003320, índice: 5)
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003320
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\12
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\12\label_split_SKU003320.png
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003320
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\12
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\12\label_split_SKU003320.png
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003320
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\12
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\12\label_split_SKU003320.png
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003320
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\12
+2025-06-07 14:03:17 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\12\label_split_SKU003320.png
+2025-06-07 14:03:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU003321: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina_Básico_Pantalón\14\SKU003321_Pantalón Gabardina_14_Negro_label.png
+2025-06-07 14:03:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:03:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003321
+2025-06-07 14:03:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:03:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14
+2025-06-07 14:03:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14\SKU003321.png
+2025-06-07 14:03:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14\label_SKU003321.png, qr_path actualizado: Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14\label_SKU003321.png
+2025-06-07 14:03:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14\label_split_SKU003321.png, label_split_path actualizado: Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14\label_split_SKU003321.png
+2025-06-07 14:03:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14\label_split_SKU003321.png
+2025-06-07 14:03:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I07F (SKU: SKU003321, índice: 6)
+2025-06-07 14:03:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:03:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003321
+2025-06-07 14:03:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:03:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14
+2025-06-07 14:03:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14\label_split_SKU003321.png
+2025-06-07 14:03:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:03:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003321
+2025-06-07 14:03:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:03:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14
+2025-06-07 14:03:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14\label_split_SKU003321.png
+2025-06-07 14:03:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU003321: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14\label_split_SKU003321.png
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003321
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14\label_split_SKU003321.png
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I07F (SKU: SKU003321, índice: 6)
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003321
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14\label_split_SKU003321.png
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003321
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14\label_split_SKU003321.png
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003321
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14\label_split_SKU003321.png
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003321
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14
+2025-06-07 14:03:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14\label_split_SKU003321.png
+2025-06-07 14:03:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Manteniendo selección para SKU: SKU003321 al cerrar PrintPreviewWindow
+2025-06-07 14:03:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección restaurada para SKU: SKU003321 después de cerrar PrintPreviewWindow
+2025-06-07 14:03:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:03:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003321
+2025-06-07 14:03:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:03:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14
+2025-06-07 14:03:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14\label_split_SKU003321.png
+2025-06-07 14:03:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:03:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003321
+2025-06-07 14:03:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:03:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14
+2025-06-07 14:03:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14\label_split_SKU003321.png
+2025-06-07 14:03:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:03:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003321
+2025-06-07 14:03:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:03:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14
+2025-06-07 14:03:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14\label_split_SKU003321.png
+2025-06-07 14:03:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:03:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003321
+2025-06-07 14:03:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:03:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14
+2025-06-07 14:03:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\14\label_split_SKU003321.png
+2025-06-07 14:03:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:03:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003322
+2025-06-07 14:03:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:03:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16
+2025-06-07 14:03:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16\SKU003322.png
+2025-06-07 14:03:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16\label_SKU003322.png, qr_path actualizado: Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16\label_SKU003322.png
+2025-06-07 14:03:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16\label_split_SKU003322.png, label_split_path actualizado: Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16\label_split_SKU003322.png
+2025-06-07 14:03:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16\label_split_SKU003322.png
+2025-06-07 14:03:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16\label_split_SKU003322.png
+2025-06-07 14:03:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU003322
+2025-06-07 14:03:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU003322: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16\label_split_SKU003322.png
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003322
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16\label_split_SKU003322.png
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I080 (SKU: SKU003322, índice: 7)
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003322
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16\label_split_SKU003322.png
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003322
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16\label_split_SKU003322.png
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003322
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16\label_split_SKU003322.png
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003322
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16
+2025-06-07 14:04:06 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16\label_split_SKU003322.png
+2025-06-07 14:21:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:21:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003322
+2025-06-07 14:21:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:21:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16
+2025-06-07 14:21:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16\label_split_SKU003322.png
+2025-06-07 14:21:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I080 (SKU: SKU003322, índice: 7)
+2025-06-07 14:21:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:21:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003322
+2025-06-07 14:21:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:21:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16
+2025-06-07 14:21:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16\label_split_SKU003322.png
+2025-06-07 14:21:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 14:21:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003322
+2025-06-07 14:21:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 14:21:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16
+2025-06-07 14:21:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16\label_split_SKU003322.png
+2025-06-07 17:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Manteniendo selección para SKU: SKU003322 al cerrar PrintPreviewWindow
+2025-06-07 17:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección restaurada para SKU: SKU003322 después de cerrar PrintPreviewWindow
+2025-06-07 17:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 17:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003322
+2025-06-07 17:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 17:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16
+2025-06-07 17:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16\label_split_SKU003322.png
+2025-06-07 17:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 17:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003322
+2025-06-07 17:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 17:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16
+2025-06-07 17:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16\label_split_SKU003322.png
+2025-06-07 17:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 17:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003322
+2025-06-07 17:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 17:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16
+2025-06-07 17:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16\label_split_SKU003322.png
+2025-06-07 17:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/8
+2025-06-07 17:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003322
+2025-06-07 17:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-06-07 17:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16
+2025-06-07 17:59:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gabardina Negro Talla_Básico_Pantalón\16\label_split_SKU003322.png

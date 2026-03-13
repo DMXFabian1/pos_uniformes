@@ -80,11 +80,25 @@ def build_dashboard_tab(window: "MainWindow") -> QWidget:
     alerts_layout.addWidget(window.layaway_alerts_label)
     alerts_box.setLayout(alerts_layout)
 
+    manual_promo_box = QGroupBox("Promos manuales")
+    manual_promo_box.setObjectName("infoCard")
+    manual_promo_layout = QVBoxLayout()
+    manual_promo_layout.setSpacing(6)
+    manual_promo_intro = QLabel("Vigila autorizaciones manuales del dia.")
+    manual_promo_intro.setObjectName("inventorySubtitle")
+    window.dashboard_manual_promo_label.setWordWrap(True)
+    window.dashboard_manual_promo_label.setObjectName("analyticsFlagCard")
+    manual_promo_layout.addWidget(manual_promo_intro)
+    manual_promo_layout.addWidget(window.dashboard_manual_promo_label)
+    manual_promo_box.setLayout(manual_promo_layout)
+    window.dashboard_manual_promo_box = manual_promo_box
+
     info_grid = QGridLayout()
     info_grid.setHorizontalSpacing(10)
     info_grid.setVerticalSpacing(10)
     info_grid.addWidget(business_box, 0, 0)
     info_grid.addWidget(alerts_box, 0, 1)
+    info_grid.addWidget(manual_promo_box, 1, 0, 1, 2)
     info_grid.setColumnStretch(0, 1)
     info_grid.setColumnStretch(1, 1)
 

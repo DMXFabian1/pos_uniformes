@@ -1,0 +1,879 @@
+2025-08-21 12:13:23 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-08-21 12:13:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - ProductEditForm inicializado para tienda 1
+2025-08-21 12:13:23 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerUI para tienda 1
+2025-08-21 12:13:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: edit
+2025-08-21 12:13:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: copy
+2025-08-21 12:13:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: delete
+2025-08-21 12:13:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: duplicate
+2025-08-21 12:13:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: price
+2025-08-21 12:13:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: print
+2025-08-21 12:13:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: inventory
+2025-08-21 12:13:24 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-08-21 12:13:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - ProductEditForm inicializado para tienda 1
+2025-08-21 12:13:24 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerUI para tienda 1
+2025-08-21 12:13:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: edit
+2025-08-21 12:13:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: copy
+2025-08-21 12:13:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: delete
+2025-08-21 12:13:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: duplicate
+2025-08-21 12:13:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: price
+2025-08-21 12:13:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: print
+2025-08-21 12:13:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: inventory
+2025-08-21 12:13:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=color
+2025-08-21 12:13:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=color
+2025-08-21 12:13:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-08-21 12:13:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-08-21 12:13:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-08-21 12:13:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-08-21 12:13:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-08-21 12:13:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-08-21 12:13:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-08-21 12:13:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-08-21 12:13:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-08-21 12:13:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-08-21 12:13:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-08-21 12:13:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-08-21 12:13:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-08-21 12:13:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-08-21 12:13:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-08-21 12:13:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-08-21 12:13:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-08-21 12:13:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-08-21 12:13:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-08-21 12:13:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-08-21 12:13:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-08-21 12:13:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=genero
+2025-08-21 12:13:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=genero
+2025-08-21 12:13:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-08-21 12:13:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=marca
+2025-08-21 12:13:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-08-21 12:13:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=marca
+2025-08-21 12:13:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-08-21 12:13:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-08-21 12:13:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=talla
+2025-08-21 12:13:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=talla
+2025-08-21 12:13:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-08-21 12:13:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-08-21 12:13:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-08-21 12:13:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-08-21 12:13:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 32 valores únicos para color en 0.096s
+2025-08-21 12:13:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-08-21 12:13:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-08-21 12:13:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 6 valores únicos para tipo_prenda en 0.003s
+2025-08-21 12:13:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 6 valores únicos para tipo_prenda en 0.003s
+2025-08-21 12:13:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial', 'Uniforme']
+2025-08-21 12:13:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial', 'Uniforme']
+2025-08-21 12:13:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.007s
+2025-08-21 12:13:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.005s
+2025-08-21 12:13:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-08-21 12:13:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-08-21 12:13:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 23 valores únicos para atributo en 0.003s
+2025-08-21 12:13:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 23 valores únicos para atributo en 0.003s
+2025-08-21 12:13:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Algodón', 'Botones', 'Chazarilla', 'Conalep', 'Conjunto', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Cuello olan', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Oferta', 'Polo', 'Punto', 'Tortuga', 'Vestir']
+2025-08-21 12:13:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Algodón', 'Botones', 'Chazarilla', 'Conalep', 'Conjunto', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Cuello olan', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Oferta', 'Polo', 'Punto', 'Tortuga', 'Vestir']
+2025-08-21 12:13:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 55 valores únicos para escuela en 0.001s
+2025-08-21 12:13:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 55 valores únicos para escuela en 0.001s
+2025-08-21 12:13:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Adolfo Lopez Mareo', 'Adolfo Lopez Mateo', 'Albino García Ramos', 'Alvaro Obregon', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Huizache', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Palacio', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Santa Rosa 238', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Telesecundaria 600', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Vidal Acolcer', 'Álvaro Obregón']
+2025-08-21 12:13:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Adolfo Lopez Mareo', 'Adolfo Lopez Mateo', 'Albino García Ramos', 'Alvaro Obregon', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Huizache', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Palacio', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Santa Rosa 238', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Telesecundaria 600', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Vidal Acolcer', 'Álvaro Obregón']
+2025-08-21 12:13:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.006s
+2025-08-21 12:13:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.004s
+2025-08-21 12:13:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-08-21 12:13:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-08-21 12:13:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.010s
+2025-08-21 12:13:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.003s
+2025-08-21 12:13:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-08-21 12:13:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-08-21 12:13:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para marca en 0.003s
+2025-08-21 12:13:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para marca en 0.002s
+2025-08-21 12:13:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'MarcaX', 'MarcaY', 'Prowear']
+2025-08-21 12:13:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'MarcaX', 'MarcaY', 'Prowear']
+2025-08-21 12:13:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 43 valores únicos para talla en 0.005s
+2025-08-21 12:13:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 43 valores únicos para talla en 0.005s
+2025-08-21 12:13:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'M', 'L', 'CH', 'MD', 'GD', 'EXG', 'Uni', 'ESP', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-08-21 12:13:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'M', 'L', 'CH', 'MD', 'GD', 'EXG', 'Uni', 'ESP', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-08-21 12:13:33 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-08-21 12:13:33 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-08-21 12:13:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-08-21 12:13:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3990, current_page=0, total_pages=133
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3990, current_page=0, total_pages=133
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 133
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 133
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 133, tiempo: 0.423s
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 133, tiempo: 0.449s
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 32 valores únicos para color en 0.000s
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 32 valores únicos para color en 0.000s
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 6 valores únicos para tipo_prenda en 0.000s
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial', 'Uniforme']
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.000s
+2025-08-21 12:13:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 6 valores únicos para tipo_prenda en 0.000s
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial', 'Uniforme']
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.000s
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 23 valores únicos para atributo en 0.000s
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 23 valores únicos para atributo en 0.000s
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Algodón', 'Botones', 'Chazarilla', 'Conalep', 'Conjunto', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Cuello olan', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Oferta', 'Polo', 'Punto', 'Tortuga', 'Vestir']
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Algodón', 'Botones', 'Chazarilla', 'Conalep', 'Conjunto', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Cuello olan', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Oferta', 'Polo', 'Punto', 'Tortuga', 'Vestir']
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 55 valores únicos para escuela en 0.000s
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 55 valores únicos para escuela en 0.000s
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Adolfo Lopez Mareo', 'Adolfo Lopez Mateo', 'Albino García Ramos', 'Alvaro Obregon', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Huizache', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Palacio', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Santa Rosa 238', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Telesecundaria 600', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Vidal Acolcer', 'Álvaro Obregón']
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Adolfo Lopez Mareo', 'Adolfo Lopez Mateo', 'Albino García Ramos', 'Alvaro Obregon', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Huizache', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Palacio', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Santa Rosa 238', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Telesecundaria 600', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Vidal Acolcer', 'Álvaro Obregón']
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para marca en 0.000s
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para marca en 0.000s
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'MarcaX', 'MarcaY', 'Prowear']
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'MarcaX', 'MarcaY', 'Prowear']
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 43 valores únicos para talla en 0.000s
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 43 valores únicos para talla en 0.000s
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'M', 'L', 'CH', 'MD', 'GD', 'EXG', 'Uni', 'ESP', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'M', 'L', 'CH', 'MD', 'GD', 'EXG', 'Uni', 'ESP', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3990, current_page=0, total_pages=133
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 133
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3990, current_page=0, total_pages=133
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 133
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 133, tiempo: 0.428s
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 133, tiempo: 0.342s
+2025-08-21 12:13:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-08-21 12:13:38 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=None
+2025-08-21 12:13:38 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=None
+2025-08-21 12:13:38 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuelas, column=None
+2025-08-21 12:13:38 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuelas, column=None
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - ProductEditForm inicializado para tienda 1
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - ProductEditForm inicializado para tienda 1
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerUI para tienda 1
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerUI para tienda 1
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: edit
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: copy
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: delete
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: edit
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: duplicate
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: copy
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: price
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: delete
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: print
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: duplicate
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: inventory
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: price
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: print
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: inventory
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=color
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=color
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=genero
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=genero
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=marca
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=marca
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-08-21 12:13:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=talla
+2025-08-21 12:13:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 32 valores únicos para color en 0.004s
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 6 valores únicos para tipo_prenda en 0.005s
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial', 'Uniforme']
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.005s
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 23 valores únicos para atributo en 0.006s
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Algodón', 'Botones', 'Chazarilla', 'Conalep', 'Conjunto', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Cuello olan', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Oferta', 'Polo', 'Punto', 'Tortuga', 'Vestir']
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 55 valores únicos para escuela en 0.000s
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Adolfo Lopez Mareo', 'Adolfo Lopez Mateo', 'Albino García Ramos', 'Alvaro Obregon', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Huizache', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Palacio', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Santa Rosa 238', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Telesecundaria 600', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Vidal Acolcer', 'Álvaro Obregón']
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.003s
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.002s
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 32 valores únicos para color en 0.005s
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para marca en 0.002s
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'MarcaX', 'MarcaY', 'Prowear']
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 6 valores únicos para tipo_prenda en 0.005s
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 43 valores únicos para talla en 0.008s
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial', 'Uniforme']
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'M', 'L', 'CH', 'MD', 'GD', 'EXG', 'Uni', 'ESP', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.005s
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 23 valores únicos para atributo en 0.004s
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Algodón', 'Botones', 'Chazarilla', 'Conalep', 'Conjunto', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Cuello olan', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Oferta', 'Polo', 'Punto', 'Tortuga', 'Vestir']
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 55 valores únicos para escuela en 0.000s
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Adolfo Lopez Mareo', 'Adolfo Lopez Mateo', 'Albino García Ramos', 'Alvaro Obregon', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Huizache', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Palacio', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Santa Rosa 238', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Telesecundaria 600', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Vidal Acolcer', 'Álvaro Obregón']
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.004s
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.002s
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para marca en 0.002s
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'MarcaX', 'MarcaY', 'Prowear']
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 43 valores únicos para talla en 0.005s
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'M', 'L', 'CH', 'MD', 'GD', 'EXG', 'Uni', 'ESP', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-08-21 12:13:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3990, current_page=0, total_pages=133
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 133
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 133, tiempo: 0.221s
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3990, current_page=0, total_pages=133
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 133
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 133, tiempo: 0.204s
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 32 valores únicos para color en 0.000s
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 6 valores únicos para tipo_prenda en 0.000s
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial', 'Uniforme']
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.000s
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 23 valores únicos para atributo en 0.000s
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Algodón', 'Botones', 'Chazarilla', 'Conalep', 'Conjunto', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Cuello olan', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Oferta', 'Polo', 'Punto', 'Tortuga', 'Vestir']
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 55 valores únicos para escuela en 0.000s
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Adolfo Lopez Mareo', 'Adolfo Lopez Mateo', 'Albino García Ramos', 'Alvaro Obregon', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Huizache', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Palacio', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Santa Rosa 238', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Telesecundaria 600', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Vidal Acolcer', 'Álvaro Obregón']
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para marca en 0.000s
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'MarcaX', 'MarcaY', 'Prowear']
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 43 valores únicos para talla en 0.000s
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'M', 'L', 'CH', 'MD', 'GD', 'EXG', 'Uni', 'ESP', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 32 valores únicos para color en 0.000s
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 6 valores únicos para tipo_prenda en 0.000s
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial', 'Uniforme']
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.000s
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 23 valores únicos para atributo en 0.000s
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Algodón', 'Botones', 'Chazarilla', 'Conalep', 'Conjunto', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Cuello olan', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Oferta', 'Polo', 'Punto', 'Tortuga', 'Vestir']
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 55 valores únicos para escuela en 0.000s
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Adolfo Lopez Mareo', 'Adolfo Lopez Mateo', 'Albino García Ramos', 'Alvaro Obregon', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Huizache', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Palacio', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Santa Rosa 238', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Telesecundaria 600', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Vidal Acolcer', 'Álvaro Obregón']
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para marca en 0.000s
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'MarcaX', 'MarcaY', 'Prowear']
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 43 valores únicos para talla en 0.000s
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'M', 'L', 'CH', 'MD', 'GD', 'EXG', 'Uni', 'ESP', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3990, current_page=0, total_pages=133
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 133
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 133, tiempo: 0.185s
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3990, current_page=0, total_pages=133
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 133
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 133, tiempo: 0.183s
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - INFO - Filtros limpiados para columnas: color, tipo_prenda, tipo_pieza, atributo, escuela, nivel_educativo, genero, marca, talla
+2025-08-21 12:13:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-08-21 12:13:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-08-21 12:13:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3990, current_page=0, total_pages=133
+2025-08-21 12:13:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 133
+2025-08-21 12:13:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-08-21 12:13:49 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 133, tiempo: 0.226s
+2025-08-21 12:13:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-08-21 12:13:49 - src.core.utils.logging_config - StoreID:N/A - INFO - Filtros limpiados y productos recargados
+2025-08-21 12:13:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-08-21 12:13:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-08-21 12:13:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-08-21 12:13:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3990, current_page=0, total_pages=133
+2025-08-21 12:13:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 133
+2025-08-21 12:13:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-08-21 12:13:49 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 133, tiempo: 0.224s
+2025-08-21 12:13:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-08-21 12:13:50 - src.core.utils.logging_config - StoreID:N/A - INFO - Filtros limpiados para columnas: color, tipo_prenda, tipo_pieza, atributo, escuela, nivel_educativo, genero, marca, talla
+2025-08-21 12:13:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-08-21 12:13:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-08-21 12:13:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3990, current_page=0, total_pages=133
+2025-08-21 12:13:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 133
+2025-08-21 12:13:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-08-21 12:13:50 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 133, tiempo: 0.134s
+2025-08-21 12:13:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-08-21 12:13:50 - src.core.utils.logging_config - StoreID:N/A - INFO - Filtros limpiados y productos recargados
+2025-08-21 12:13:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-08-21 12:13:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-08-21 12:13:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-08-21 12:13:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3990, current_page=0, total_pages=133
+2025-08-21 12:13:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 133
+2025-08-21 12:13:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-08-21 12:13:50 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 133, tiempo: 0.136s
+2025-08-21 12:13:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-08-21 12:13:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-08-21 12:13:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Suéter'], column=tipo_pieza
+2025-08-21 12:13:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-08-21 12:13:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-08-21 12:13:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=707, current_page=0, total_pages=24
+2025-08-21 12:13:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 24
+2025-08-21 12:13:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-08-21 12:13:54 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 24, tiempo: 0.140s
+2025-08-21 12:13:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-08-21 12:13:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Tipo Pieza: Suéter
+2025-08-21 12:13:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-08-21 12:13:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-08-21 12:13:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-08-21 12:13:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-08-21 12:14:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Azul Marino'], column=color
+2025-08-21 12:14:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-08-21 12:14:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-08-21 12:14:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=196, current_page=0, total_pages=7
+2025-08-21 12:14:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 7
+2025-08-21 12:14:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-08-21 12:14:03 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 7, tiempo: 0.255s
+2025-08-21 12:14:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-08-21 12:14:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Color: Azul Marino; Tipo Pieza: Suéter
+2025-08-21 12:14:04 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-08-21 12:14:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:14:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001714
+2025-08-21 12:14:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:14:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10
+2025-08-21 12:14:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10\label_SKU001714.png
+2025-08-21 12:14:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:14:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001707
+2025-08-21 12:14:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:14:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8
+2025-08-21 12:14:45 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8\SKU001707_Suéter Claudia Botones M Azul Marino Talla_8_label.png. Generando nueva etiqueta.
+2025-08-21 12:14:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8\SKU001707.png
+2025-08-21 12:14:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8\label_SKU001707.png, qr_path actualizado: Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8\label_SKU001707.png
+2025-08-21 12:14:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8\label_split_SKU001707.png, label_split_path actualizado: Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8\label_split_SKU001707.png
+2025-08-21 12:14:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8\label_SKU001707.png
+2025-08-21 12:14:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:14:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001812
+2025-08-21 12:14:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:14:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\4
+2025-08-21 12:14:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\4\label_SKU001812.png
+2025-08-21 12:14:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\4\label_SKU001812.png
+2025-08-21 12:14:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU001812
+2025-08-21 12:14:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU001812: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\4\label_SKU001812.png
+2025-08-21 12:14:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:14:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001812
+2025-08-21 12:14:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:14:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\4
+2025-08-21 12:14:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\4\label_SKU001812.png
+2025-08-21 12:14:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I0E2 (SKU: SKU001812, índice: 15)
+2025-08-21 12:14:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:14:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001812
+2025-08-21 12:14:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:14:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\4
+2025-08-21 12:14:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\4\label_SKU001812.png
+2025-08-21 12:14:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:14:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001812
+2025-08-21 12:14:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:14:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\4
+2025-08-21 12:14:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\4\label_SKU001812.png
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Manteniendo selección para SKU: SKU001812 al cerrar PrintPreviewWindow
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección restaurada para SKU: SKU001812 después de cerrar PrintPreviewWindow
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001812
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\4
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\4\label_SKU001812.png
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001812
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\4
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\4\label_SKU001812.png
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001812
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\4
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\4\label_SKU001812.png
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001812
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\4
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\4\label_SKU001812.png
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001714
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10
+2025-08-21 12:16:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10\label_SKU001714.png
+2025-08-21 12:16:42 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10\label_SKU001714.png
+2025-08-21 12:16:42 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU001714
+2025-08-21 12:16:42 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU001714: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10\label_SKU001714.png
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001714
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10\label_SKU001714.png
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I0D6 (SKU: SKU001714, índice: 3)
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001714
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10\label_SKU001714.png
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001714
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10\label_SKU001714.png
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001714
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10\label_SKU001714.png
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I0D6 (SKU: SKU001714, índice: 3)
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001714
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10\label_SKU001714.png
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001714
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10
+2025-08-21 12:16:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10\label_SKU001714.png
+2025-08-21 12:17:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Manteniendo selección para SKU: SKU001714 al cerrar PrintPreviewWindow
+2025-08-21 12:17:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección restaurada para SKU: SKU001714 después de cerrar PrintPreviewWindow
+2025-08-21 12:17:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:17:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001714
+2025-08-21 12:17:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:17:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10
+2025-08-21 12:17:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10\label_SKU001714.png
+2025-08-21 12:17:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:17:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001714
+2025-08-21 12:17:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:17:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10
+2025-08-21 12:17:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10\label_SKU001714.png
+2025-08-21 12:17:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:17:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001714
+2025-08-21 12:17:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:17:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10
+2025-08-21 12:17:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10\label_SKU001714.png
+2025-08-21 12:17:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:17:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001714
+2025-08-21 12:17:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:17:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10
+2025-08-21 12:17:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10\label_SKU001714.png
+2025-08-21 12:18:01 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:18:01 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001833
+2025-08-21 12:18:01 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:18:01 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10
+2025-08-21 12:18:01 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10\SKU001833_Suéter Claudia Cuello V H Azul Marino Talla_10_label.png. Generando nueva etiqueta.
+2025-08-21 12:18:01 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10\SKU001833.png
+2025-08-21 12:18:01 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10\label_SKU001833.png, qr_path actualizado: Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10\label_SKU001833.png
+2025-08-21 12:18:01 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10\label_split_SKU001833.png, label_split_path actualizado: Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10\label_split_SKU001833.png
+2025-08-21 12:18:01 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10\label_SKU001833.png
+2025-08-21 12:18:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10\label_SKU001833.png
+2025-08-21 12:18:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU001833
+2025-08-21 12:18:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU001833: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10\label_SKU001833.png
+2025-08-21 12:18:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:18:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001833
+2025-08-21 12:18:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:18:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10
+2025-08-21 12:18:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10\label_SKU001833.png
+2025-08-21 12:18:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I0E5 (SKU: SKU001833, índice: 18)
+2025-08-21 12:18:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:18:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001833
+2025-08-21 12:18:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:18:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10
+2025-08-21 12:18:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10\label_SKU001833.png
+2025-08-21 12:18:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:18:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001833
+2025-08-21 12:18:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:18:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10
+2025-08-21 12:18:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10\label_SKU001833.png
+2025-08-21 12:20:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Manteniendo selección para SKU: SKU001833 al cerrar PrintPreviewWindow
+2025-08-21 12:20:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección restaurada para SKU: SKU001833 después de cerrar PrintPreviewWindow
+2025-08-21 12:20:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:20:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001833
+2025-08-21 12:20:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:20:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10
+2025-08-21 12:20:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10\label_SKU001833.png
+2025-08-21 12:20:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:20:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001833
+2025-08-21 12:20:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:20:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10
+2025-08-21 12:20:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10\label_SKU001833.png
+2025-08-21 12:20:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:20:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001833
+2025-08-21 12:20:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:20:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10
+2025-08-21 12:20:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10\label_SKU001833.png
+2025-08-21 12:20:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:20:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001833
+2025-08-21 12:20:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:20:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10
+2025-08-21 12:20:31 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\10\label_SKU001833.png
+2025-08-21 12:20:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:20:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001707
+2025-08-21 12:20:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:20:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8
+2025-08-21 12:20:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8\label_SKU001707.png
+2025-08-21 12:20:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8\label_SKU001707.png
+2025-08-21 12:20:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU001707
+2025-08-21 12:20:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU001707: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8\label_SKU001707.png
+2025-08-21 12:20:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:20:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001707
+2025-08-21 12:20:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:20:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8
+2025-08-21 12:20:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8\label_SKU001707.png
+2025-08-21 12:20:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I0D5 (SKU: SKU001707, índice: 2)
+2025-08-21 12:20:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:20:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001707
+2025-08-21 12:20:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:20:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8
+2025-08-21 12:20:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8\label_SKU001707.png
+2025-08-21 12:20:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:20:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001707
+2025-08-21 12:20:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:20:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8
+2025-08-21 12:20:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8\label_SKU001707.png
+2025-08-21 12:22:45 - src.core.utils.logging_config - StoreID:N/A - WARNING - Etiqueta no encontrada para SKU SKU001700: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6\SKU001700_Suéter Claudia Botones M Azul Marino Talla_6_label.png
+2025-08-21 12:22:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:22:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001700
+2025-08-21 12:22:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:22:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6
+2025-08-21 12:22:45 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6\SKU001700_Suéter Claudia Botones M Azul Marino Talla_6_label.png. Generando nueva etiqueta.
+2025-08-21 12:22:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6\SKU001700.png
+2025-08-21 12:22:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6\label_SKU001700.png, qr_path actualizado: Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6\label_SKU001700.png
+2025-08-21 12:22:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6\label_split_SKU001700.png, label_split_path actualizado: Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6\label_split_SKU001700.png
+2025-08-21 12:22:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6\label_SKU001700.png
+2025-08-21 12:22:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I0D4 (SKU: SKU001700, índice: 1)
+2025-08-21 12:22:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:22:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001700
+2025-08-21 12:22:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:22:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6
+2025-08-21 12:22:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6\label_SKU001700.png
+2025-08-21 12:22:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:22:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001700
+2025-08-21 12:22:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:22:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6
+2025-08-21 12:22:46 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6\label_SKU001700.png
+2025-08-21 12:22:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Manteniendo selección para SKU: SKU001700 al cerrar PrintPreviewWindow
+2025-08-21 12:22:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:22:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001700
+2025-08-21 12:22:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:22:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6
+2025-08-21 12:22:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6\label_SKU001700.png
+2025-08-21 12:22:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:22:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001700
+2025-08-21 12:22:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:22:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6
+2025-08-21 12:22:49 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6\label_SKU001700.png
+2025-08-21 12:22:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección restaurada para SKU: SKU001700 después de cerrar PrintPreviewWindow
+2025-08-21 12:22:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:22:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001700
+2025-08-21 12:22:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:22:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6
+2025-08-21 12:22:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6\label_SKU001700.png
+2025-08-21 12:22:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:22:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001700
+2025-08-21 12:22:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:22:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6
+2025-08-21 12:22:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6\label_SKU001700.png
+2025-08-21 12:22:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6\label_SKU001700.png
+2025-08-21 12:22:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU001700
+2025-08-21 12:22:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU001700: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6\label_SKU001700.png
+2025-08-21 12:22:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:22:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001700
+2025-08-21 12:22:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:22:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6
+2025-08-21 12:22:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6\label_SKU001700.png
+2025-08-21 12:22:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I0D4 (SKU: SKU001700, índice: 1)
+2025-08-21 12:22:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:22:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001700
+2025-08-21 12:22:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:22:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6
+2025-08-21 12:22:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6\label_SKU001700.png
+2025-08-21 12:22:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:22:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001700
+2025-08-21 12:22:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:22:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6
+2025-08-21 12:22:55 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\6\label_SKU001700.png
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU001707: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8\label_SKU001707.png
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001707
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8\label_SKU001707.png
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I0D5 (SKU: SKU001707, índice: 2)
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001707
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8\label_SKU001707.png
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001707
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\8\label_SKU001707.png
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU001714: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10\label_SKU001714.png
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001714
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10\label_SKU001714.png
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I0D6 (SKU: SKU001714, índice: 3)
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001714
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10\label_SKU001714.png
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001714
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10
+2025-08-21 12:24:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\10\label_SKU001714.png
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - WARNING - Etiqueta no encontrada para SKU SKU001721: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\12\SKU001721_Suéter Claudia Botones M Azul Marino Talla_12_label.png
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001721
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\12
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\12\SKU001721_Suéter Claudia Botones M Azul Marino Talla_12_label.png. Generando nueva etiqueta.
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\12\SKU001721.png
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\12\label_SKU001721.png, qr_path actualizado: Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\12\label_SKU001721.png
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\12\label_split_SKU001721.png, label_split_path actualizado: Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\12\label_split_SKU001721.png
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\12\label_SKU001721.png
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I0D7 (SKU: SKU001721, índice: 4)
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001721
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\12
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\12\label_SKU001721.png
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001721
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\12
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\12\label_SKU001721.png
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - WARNING - Etiqueta no encontrada para SKU SKU001728: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\14\SKU001728_Suéter Claudia Botones M Azul Marino Talla_14_label.png
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001728
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\14
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\14\SKU001728_Suéter Claudia Botones M Azul Marino Talla_14_label.png. Generando nueva etiqueta.
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\14\SKU001728.png
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\14\label_SKU001728.png, qr_path actualizado: Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\14\label_SKU001728.png
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\14\label_split_SKU001728.png, label_split_path actualizado: Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\14\label_split_SKU001728.png
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\14\label_SKU001728.png
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I0D8 (SKU: SKU001728, índice: 5)
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001728
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\14
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\14\label_SKU001728.png
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001728
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\14
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\14\label_SKU001728.png
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - WARNING - Etiqueta no encontrada para SKU SKU001735: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\16\SKU001735_Suéter Claudia Botones M Azul Marino Talla_16_label.png
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001735
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\16
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\16\SKU001735_Suéter Claudia Botones M Azul Marino Talla_16_label.png. Generando nueva etiqueta.
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\16\SKU001735.png
+2025-08-21 12:24:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\16\label_SKU001735.png, qr_path actualizado: Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\16\label_SKU001735.png
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\16\label_split_SKU001735.png, label_split_path actualizado: Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\16\label_split_SKU001735.png
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\16\label_SKU001735.png
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I0D9 (SKU: SKU001735, índice: 6)
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001735
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\16
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\16\label_SKU001735.png
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001735
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\16
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\16\label_SKU001735.png
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - WARNING - Etiqueta no encontrada para SKU SKU001749: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\32\SKU001749_Suéter Claudia Botones M Azul Marino Talla_32_label.png
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001749
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\32
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\32\SKU001749_Suéter Claudia Botones M Azul Marino Talla_32_label.png. Generando nueva etiqueta.
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\32\SKU001749.png
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\32\label_SKU001749.png, qr_path actualizado: Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\32\label_SKU001749.png
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\32\label_split_SKU001749.png, label_split_path actualizado: Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\32\label_split_SKU001749.png
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\32\label_SKU001749.png
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I0DA (SKU: SKU001749, índice: 7)
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001749
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\32
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\32\label_SKU001749.png
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001749
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\32
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\32\label_SKU001749.png
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU001756: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\34\label_SKU001756.png
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001756
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\34
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\34\label_SKU001756.png
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I0DB (SKU: SKU001756, índice: 8)
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001756
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\34
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\34\label_SKU001756.png
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001756
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\34
+2025-08-21 12:24:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\34\label_SKU001756.png
+2025-08-21 12:24:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Manteniendo selección para SKU: SKU001756 al cerrar PrintPreviewWindow
+2025-08-21 12:24:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001756
+2025-08-21 12:24:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\34
+2025-08-21 12:24:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\34\label_SKU001756.png
+2025-08-21 12:24:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001756
+2025-08-21 12:24:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\34
+2025-08-21 12:24:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\34\label_SKU001756.png
+2025-08-21 12:24:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección restaurada para SKU: SKU001756 después de cerrar PrintPreviewWindow
+2025-08-21 12:24:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001756
+2025-08-21 12:24:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\34
+2025-08-21 12:24:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\34\label_SKU001756.png
+2025-08-21 12:24:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001756
+2025-08-21 12:24:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\34
+2025-08-21 12:24:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\34\label_SKU001756.png
+2025-08-21 12:24:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001819
+2025-08-21 12:24:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\6
+2025-08-21 12:24:14 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\6\label_SKU001819.png
+2025-08-21 12:24:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\6\label_SKU001819.png
+2025-08-21 12:24:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU001819
+2025-08-21 12:24:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU001819: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\6\label_SKU001819.png
+2025-08-21 12:24:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001819
+2025-08-21 12:24:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\6
+2025-08-21 12:24:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\6\label_SKU001819.png
+2025-08-21 12:24:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I0E3 (SKU: SKU001819, índice: 16)
+2025-08-21 12:24:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001819
+2025-08-21 12:24:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\6
+2025-08-21 12:24:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\6\label_SKU001819.png
+2025-08-21 12:24:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 12:24:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001819
+2025-08-21 12:24:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 12:24:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\6
+2025-08-21 12:24:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\6\label_SKU001819.png
+2025-08-21 13:26:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Manteniendo selección para SKU: SKU001819 al cerrar PrintPreviewWindow
+2025-08-21 13:26:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección restaurada para SKU: SKU001819 después de cerrar PrintPreviewWindow
+2025-08-21 13:26:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 13:26:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001819
+2025-08-21 13:26:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 13:26:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\6
+2025-08-21 13:26:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\6\label_SKU001819.png
+2025-08-21 13:26:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 13:26:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001819
+2025-08-21 13:26:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 13:26:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\6
+2025-08-21 13:26:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\6\label_SKU001819.png
+2025-08-21 13:26:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 13:26:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001819
+2025-08-21 13:26:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 13:26:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\6
+2025-08-21 13:26:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\6\label_SKU001819.png
+2025-08-21 13:26:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 13:26:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001819
+2025-08-21 13:26:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 13:26:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\6
+2025-08-21 13:26:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Cuello V H Azul Marino Talla_Básico_Suéter\6\label_SKU001819.png
+2025-08-21 13:26:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 13:26:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001721
+2025-08-21 13:26:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 13:26:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\12
+2025-08-21 13:26:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\12\label_SKU001721.png
+2025-08-21 13:26:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\12\label_SKU001721.png
+2025-08-21 13:26:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU001721
+2025-08-21 13:26:36 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU001721: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\12\label_SKU001721.png
+2025-08-21 13:26:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 13:26:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001721
+2025-08-21 13:26:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 13:26:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\12
+2025-08-21 13:26:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\12\label_SKU001721.png
+2025-08-21 13:26:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I0D7 (SKU: SKU001721, índice: 4)
+2025-08-21 13:26:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 13:26:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001721
+2025-08-21 13:26:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 13:26:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\12
+2025-08-21 13:26:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\12\label_SKU001721.png
+2025-08-21 13:26:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-08-21 13:26:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001721
+2025-08-21 13:26:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-08-21 13:26:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\12
+2025-08-21 13:26:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Suéter Claudia Botones M Azul Marino Talla_Básico_Suéter\12\label_SKU001721.png

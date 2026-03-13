@@ -70,7 +70,12 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
         button.setMinimumWidth(108 if button is not window.inventory_more_button else 92)
         button.setPopupMode(button.ToolButtonPopupMode.InstantPopup)
 
-    for button in (window.toggle_product_button, window.toggle_variant_button, window.inventory_generate_qr_button):
+    for button in (
+        window.toggle_product_button,
+        window.toggle_variant_button,
+        window.inventory_generate_qr_button,
+        window.inventory_print_label_button,
+    ):
         button.setObjectName("inventorySecondaryButton")
     window.inventory_bulk_adjust_button.setObjectName("inventorySecondaryButton")
     window.inventory_bulk_price_button.setObjectName("inventorySecondaryButton")
@@ -166,6 +171,7 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.qr_preview_info_label.setObjectName("inventoryQrCaption")
     window.qr_status_label.setObjectName("inventoryQrStatus")
     window.inventory_generate_qr_button.setText("Generar QR")
+    window.inventory_print_label_button.setText("Imprimir etiqueta")
     header_row = QHBoxLayout()
     header_row.setSpacing(8)
     header_text = QVBoxLayout()
@@ -186,9 +192,11 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     side_layout.addLayout(state_row)
     side_layout.addWidget(window.qr_preview_label, 0, Qt.AlignmentFlag.AlignHCenter)
     side_layout.addWidget(window.inventory_generate_qr_button)
+    side_layout.addWidget(window.inventory_print_label_button)
     side_layout.addWidget(window.qr_preview_info_label)
     side_layout.addWidget(window.qr_status_label)
     window.inventory_generate_qr_button.clicked.connect(window._handle_generate_selected_qr)
+    window.inventory_print_label_button.clicked.connect(window._handle_inventory_print_label)
     window.inventory_generate_all_qr_button.clicked.connect(window._handle_generate_all_qr)
     window.inventory_variant_combo.currentIndexChanged.connect(window._refresh_selected_qr_preview)
     side_box.setLayout(side_layout)

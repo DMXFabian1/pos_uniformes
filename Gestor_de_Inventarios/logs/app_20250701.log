@@ -1,0 +1,1055 @@
+2025-07-01 11:28:16 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-07-01 11:28:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - ProductEditForm inicializado para tienda 1
+2025-07-01 11:28:16 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerUI para tienda 1
+2025-07-01 11:28:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: edit
+2025-07-01 11:28:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: copy
+2025-07-01 11:28:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: delete
+2025-07-01 11:28:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: duplicate
+2025-07-01 11:28:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: price
+2025-07-01 11:28:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: print
+2025-07-01 11:28:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: inventory
+2025-07-01 11:28:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=color
+2025-07-01 11:28:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-07-01 11:28:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-07-01 11:28:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-07-01 11:28:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-07-01 11:28:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-07-01 11:28:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-07-01 11:28:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-07-01 11:28:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-07-01 11:28:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-07-01 11:28:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-07-01 11:28:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-07-01 11:28:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=genero
+2025-07-01 11:28:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-07-01 11:28:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=marca
+2025-07-01 11:28:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-07-01 11:28:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=talla
+2025-07-01 11:28:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 31 valores únicos para color en 0.038s
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.002s
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.003s
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para atributo en 0.002s
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Conalep', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Punto', 'Tableada', 'Tortuga', 'Vestir']
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 47 valores únicos para escuela en 0.001s
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.002s
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.002s
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.002s
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.004s
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3334, current_page=0, total_pages=112
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 112
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 112, tiempo: 0.120s
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 31 valores únicos para color en 0.000s
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.000s
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.000s
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para atributo en 0.000s
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Conalep', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Punto', 'Tableada', 'Tortuga', 'Vestir']
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 47 valores únicos para escuela en 0.000s
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.000s
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.000s
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3334, current_page=0, total_pages=112
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 112
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 112, tiempo: 0.121s
+2025-07-01 11:28:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-07-01 11:28:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=None
+2025-07-01 11:28:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuelas, column=None
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerLogic para tienda 1
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - ProductEditForm inicializado para tienda 1
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - INFO - Inicializando ProductManagerUI para tienda 1
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: edit
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: copy
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: delete
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: duplicate
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: price
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: print
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ícono cargado: inventory
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=color
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Color, column=color
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_prenda
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Prenda, column=tipo_prenda
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=tipo_pieza
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Tipo Pieza, column=tipo_pieza
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=atributo
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Atributo, column=atributo
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=escuela
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Escuela, column=escuela
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=nivel_educativo
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Nivel Educativo, column=nivel_educativo
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=genero
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Género, column=genero
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=marca
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Marca, column=marca
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando CheckComboBox con column=talla
+2025-07-01 11:28:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - CheckComboBox creado con label=Talla, column=talla
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 31 valores únicos para color en 0.004s
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.003s
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.004s
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para atributo en 0.004s
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Conalep', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Punto', 'Tableada', 'Tortuga', 'Vestir']
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 47 valores únicos para escuela en 0.000s
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.002s
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.002s
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.002s
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.004s
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3334, current_page=0, total_pages=112
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 112
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 112, tiempo: 0.115s
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Inicializando comboboxes para filtros
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 31 valores únicos para color en 0.000s
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para color: ['Ad hoc', 'Amarillo', 'Azul Marino', 'Azul Rey', 'Azul cielo', 'Beige', 'Bicolor', 'Blanca', 'Blanco', 'Café', 'Camuflaje', 'Caqui', 'Doble raya', 'Escoces', 'Gales azul', 'Gales rojo', 'Gales verde', 'Gris', 'Gris claro', 'Gris obscuro', 'Negro', 'Pata de gallo', 'Pgallo cafe', 'Raya roja', 'Rojo', 'Rosa', 'SABES', 'Verde', 'Verde limon', 'Verde olivo', 'Vino']
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 5 valores únicos para tipo_prenda en 0.000s
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_prenda: ['Accesorio', 'Básico', 'Deportivo', 'Escolta', 'Oficial']
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para tipo_pieza en 0.000s
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para tipo_pieza: ['Bata', 'Boina', 'Calceta', 'Camisa', 'Chaleco', 'Chamarra', 'Corbata', 'Corbatín', 'Falda', 'Guante', 'Jumper', 'Malla', 'Mascada', 'Moño', 'Pantalón', 'Pants 2pz', 'Pants 3pz', 'Pants Suelto', 'Playera', 'Suéter']
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 20 valores únicos para atributo en 0.000s
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para atributo: ['Botones', 'Chazarilla', 'Conalep', 'Cuatro tablas', 'Cuello Olan', 'Cuello V', 'Deportiva', 'Deportivo', 'Escolar', 'Escolta', 'Gabardina', 'Infantil', 'Liso', 'Manga Corta', 'Manga Larga', 'Polo', 'Punto', 'Tableada', 'Tortuga', 'Vestir']
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 47 valores únicos para escuela en 0.000s
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para escuela: ['16 de Septiembre', 'Albino García Ramos', 'Benito Juárez', 'Bicentenario', 'Blanca Verónica Soto Martínez Príncipes', 'CBTIS 148', 'CECYTE', 'Club Rotario', 'Colegio Motolinea', 'Conalep', 'Emiliano Zapata', 'Erasmo Castellano', 'EsTv 154', 'Francisco González Bocanegra', 'Francisco Villa', 'Frida Kahlo', 'Guillermo Prieto', 'Himno Nacional', 'Ignacio Allende', 'Ignacio Ramirez Lopez', 'Ignacio Zaragoza', 'J. Guadalupe Victoria', 'Jean Piaget', 'Jorge Cantor', 'Josefa Ortiz de Domínguez', 'José María Morelos', 'José María Morelos y Pavón', 'Justo Sierra', 'Manuel Gutiérrez Nájera', 'Margarita Paz Paredes', 'Miguel Campuzano', 'Miguel Hidalgo', 'Narciso Mendoza', 'Niños Héroes', 'Omecalli', 'Paolo Fraire', 'Patria', 'Práxedis Guerrero', 'Rafael Ramírez', 'SABES', 'Sor Juana Inés de la Cruz', 'Telesecundaria 454', 'Telesecundaria 512', 'Técnica de San Bartolo', 'UVEG', 'Vicente Guerrero', 'Álvaro Obregón']
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 4 valores únicos para nivel_educativo en 0.000s
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para nivel_educativo: ['Bachillerato', 'Preescolar', 'Primaria', 'Secundaria']
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 3 valores únicos para genero en 0.000s
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para genero: ['Hombre', 'Mujer', 'Unisex']
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 2 valores únicos para marca en 0.000s
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para marca: ['Claudia', 'Prowear']
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Obtenidos 40 valores únicos para talla en 0.000s
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Valores para talla: ['2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '16', '18', '20', '28', '30', '32', '34', '36', '38', '40', '42', '44', '46', 'CH', 'MD', 'GD', 'EXG', 'Uni', '0-0', '0-2', '3-5', '6-8', '9-12', '13-18', 'CH-MD', 'GD-EXG', 'Dama']
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - INFO - Comboboxes inicializados correctamente
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-07-01 11:28:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-07-01 11:28:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-07-01 11:28:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3334, current_page=0, total_pages=112
+2025-07-01 11:28:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 112
+2025-07-01 11:28:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-07-01 11:28:26 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 112, tiempo: 0.119s
+2025-07-01 11:28:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-07-01 11:29:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-07-01 11:29:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-07-01 11:29:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-07-01 11:29:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-07-01 11:29:11 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-07-01 11:29:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-07-01 11:29:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-07-01 11:29:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Gales verde'], column=color
+2025-07-01 11:29:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-07-01 11:29:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-07-01 11:29:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=37, current_page=0, total_pages=2
+2025-07-01 11:29:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 2
+2025-07-01 11:29:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-07-01 11:29:19 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 2, tiempo: 0.117s
+2025-07-01 11:29:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-07-01 11:29:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Color: Gales verde
+2025-07-01 11:29:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-07-01 11:29:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-07-01 11:29:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Pantalón'], column=tipo_pieza
+2025-07-01 11:29:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-07-01 11:29:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-07-01 11:29:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=20, current_page=0, total_pages=1
+2025-07-01 11:29:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 1
+2025-07-01 11:29:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/20
+2025-07-01 11:29:25 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 20 productos, página 1, total páginas: 1, tiempo: 0.125s
+2025-07-01 11:29:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-07-01 11:29:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Color: Gales verde; Tipo Pieza: Pantalón
+2025-07-01 11:29:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-07-01 11:29:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:29:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003467
+2025-07-01 11:29:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:29:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36
+2025-07-01 11:29:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36\label_SKU003467.png
+2025-07-01 11:29:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36\label_SKU003467.png
+2025-07-01 11:29:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU003467
+2025-07-01 11:29:32 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU003467: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36\label_SKU003467.png
+2025-07-01 11:29:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU003467: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36\label_split_SKU003467.png
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003467
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36\label_split_SKU003467.png
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I06A (SKU: SKU003467, índice: 15)
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003467
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36\label_split_SKU003467.png
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003467
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36\label_split_SKU003467.png
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003467
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36\label_split_SKU003467.png
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003467
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36
+2025-07-01 11:34:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36\label_split_SKU003467.png
+2025-07-01 11:34:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU003470: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38\label_split_SKU003470.png
+2025-07-01 11:34:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:34:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003470
+2025-07-01 11:34:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:34:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38
+2025-07-01 11:34:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38\label_split_SKU003470.png
+2025-07-01 11:34:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I06B (SKU: SKU003470, índice: 16)
+2025-07-01 11:34:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:34:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003470
+2025-07-01 11:34:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:34:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38
+2025-07-01 11:34:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38\label_split_SKU003470.png
+2025-07-01 11:34:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:34:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003470
+2025-07-01 11:34:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:34:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38
+2025-07-01 11:34:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38\label_split_SKU003470.png
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003470
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38\label_split_SKU003470.png
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I06B (SKU: SKU003470, índice: 16)
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003470
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38\label_split_SKU003470.png
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003470
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38\label_split_SKU003470.png
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003470
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38\label_split_SKU003470.png
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003470
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38
+2025-07-01 11:34:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38\label_split_SKU003470.png
+2025-07-01 11:35:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU003473: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\40\label_split_SKU003473.png
+2025-07-01 11:35:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:35:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003473
+2025-07-01 11:35:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:35:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\40
+2025-07-01 11:35:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\40\label_split_SKU003473.png
+2025-07-01 11:35:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I06C (SKU: SKU003473, índice: 17)
+2025-07-01 11:35:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:35:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003473
+2025-07-01 11:35:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:35:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\40
+2025-07-01 11:35:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\40\label_split_SKU003473.png
+2025-07-01 11:35:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:35:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003473
+2025-07-01 11:35:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:35:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\40
+2025-07-01 11:35:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\40\label_split_SKU003473.png
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003473
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\40
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\40\label_split_SKU003473.png
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I06C (SKU: SKU003473, índice: 17)
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003473
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\40
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\40\label_split_SKU003473.png
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003473
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\40
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\40\label_split_SKU003473.png
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003473
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\40
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\40\label_split_SKU003473.png
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003473
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\40
+2025-07-01 11:35:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\40\label_split_SKU003473.png
+2025-07-01 11:50:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU003470: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38\label_split_SKU003470.png
+2025-07-01 11:50:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:50:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003470
+2025-07-01 11:50:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:50:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38
+2025-07-01 11:50:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38\label_split_SKU003470.png
+2025-07-01 11:50:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I06B (SKU: SKU003470, índice: 16)
+2025-07-01 11:50:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:50:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003470
+2025-07-01 11:50:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:50:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38
+2025-07-01 11:50:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38\label_split_SKU003470.png
+2025-07-01 11:50:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:50:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003470
+2025-07-01 11:50:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:50:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38
+2025-07-01 11:50:44 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\38\label_split_SKU003470.png
+2025-07-01 11:50:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU003467: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36\label_split_SKU003467.png
+2025-07-01 11:50:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:50:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003467
+2025-07-01 11:50:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:50:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36
+2025-07-01 11:50:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36\label_split_SKU003467.png
+2025-07-01 11:50:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I06A (SKU: SKU003467, índice: 15)
+2025-07-01 11:50:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:50:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003467
+2025-07-01 11:50:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:50:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36
+2025-07-01 11:50:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36\label_split_SKU003467.png
+2025-07-01 11:50:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:50:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003467
+2025-07-01 11:50:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:50:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36
+2025-07-01 11:50:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36\label_split_SKU003467.png
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003467
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36\label_split_SKU003467.png
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I06A (SKU: SKU003467, índice: 15)
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003467
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36\label_split_SKU003467.png
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003467
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36\label_split_SKU003467.png
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003467
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36\label_split_SKU003467.png
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003467
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36
+2025-07-01 11:50:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36\label_split_SKU003467.png
+2025-07-01 11:50:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Manteniendo selección para SKU: SKU003467 al cerrar PrintPreviewWindow
+2025-07-01 11:50:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección restaurada para SKU: SKU003467 después de cerrar PrintPreviewWindow
+2025-07-01 11:50:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:50:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003467
+2025-07-01 11:50:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:50:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36
+2025-07-01 11:50:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36\label_split_SKU003467.png
+2025-07-01 11:50:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:50:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003467
+2025-07-01 11:50:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:50:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36
+2025-07-01 11:50:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36\label_split_SKU003467.png
+2025-07-01 11:50:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:50:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003467
+2025-07-01 11:50:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:50:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36
+2025-07-01 11:50:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36\label_split_SKU003467.png
+2025-07-01 11:50:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/20
+2025-07-01 11:50:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU003467
+2025-07-01 11:50:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 11:50:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36
+2025-07-01 11:50:59 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Pantalón Gales verde Talla_Básico_Pantalón\36\label_split_SKU003467.png
+2025-07-01 12:05:12 - src.core.utils.logging_config - StoreID:N/A - INFO - Filtros limpiados para columnas: color, tipo_prenda, tipo_pieza, atributo, escuela, nivel_educativo, genero, marca, talla
+2025-07-01 12:05:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-07-01 12:05:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-07-01 12:05:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3334, current_page=0, total_pages=112
+2025-07-01 12:05:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 112
+2025-07-01 12:05:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-07-01 12:05:12 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 112, tiempo: 0.142s
+2025-07-01 12:05:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-07-01 12:05:12 - src.core.utils.logging_config - StoreID:N/A - INFO - Filtros limpiados y productos recargados
+2025-07-01 12:05:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-07-01 12:05:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-07-01 12:05:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-07-01 12:05:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3334, current_page=0, total_pages=112
+2025-07-01 12:05:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 112
+2025-07-01 12:05:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-07-01 12:05:12 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 112, tiempo: 0.133s
+2025-07-01 12:05:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-07-01 12:05:12 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-07-01 12:05:13 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-07-01 12:05:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Camisa'], column=tipo_pieza
+2025-07-01 12:05:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-07-01 12:05:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-07-01 12:05:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=78, current_page=0, total_pages=3
+2025-07-01 12:05:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 3
+2025-07-01 12:05:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-07-01 12:05:16 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 3, tiempo: 0.154s
+2025-07-01 12:05:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-07-01 12:05:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Tipo Pieza: Camisa
+2025-07-01 12:05:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-07-01 12:05:20 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-07-01 12:05:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Blanca'], column=color
+2025-07-01 12:05:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-07-01 12:05:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-07-01 12:05:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=78, current_page=0, total_pages=3
+2025-07-01 12:05:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 3
+2025-07-01 12:05:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-07-01 12:05:21 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 3, tiempo: 0.149s
+2025-07-01 12:05:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-07-01 12:05:21 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Color: Blanca; Tipo Pieza: Camisa
+2025-07-01 12:05:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-07-01 12:05:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-07-01 12:05:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 2, batch_size=30
+2025-07-01 12:05:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=78, current_page=1, total_pages=3
+2025-07-01 12:05:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 2 de 3
+2025-07-01 12:05:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-07-01 12:05:28 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 2, total páginas: 3, tiempo: 0.166s
+2025-07-01 12:05:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-07-01 12:05:33 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-07-01 12:05:38 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Manga Larga'], column=atributo
+2025-07-01 12:05:38 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-07-01 12:05:38 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-07-01 12:05:38 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=35, current_page=0, total_pages=2
+2025-07-01 12:05:38 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 2
+2025-07-01 12:05:38 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-07-01 12:05:38 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 2, tiempo: 0.136s
+2025-07-01 12:05:38 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-07-01 12:05:38 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Color: Blanca; Tipo Pieza: Camisa; Atributo: Manga Larga
+2025-07-01 12:05:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-07-01 12:05:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:05:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002830
+2025-07-01 12:05:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:05:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6
+2025-07-01 12:05:52 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6\label_split_SKU002830.png
+2025-07-01 12:05:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6\label_split_SKU002830.png
+2025-07-01 12:05:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU002830
+2025-07-01 12:05:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU002830: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6\label_split_SKU002830.png
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002830
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6\label_split_SKU002830.png
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I108 (SKU: SKU002830, índice: 3)
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002830
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6\label_split_SKU002830.png
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002830
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6\label_split_SKU002830.png
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002830
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6\label_split_SKU002830.png
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002830
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6
+2025-07-01 12:06:00 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6\label_split_SKU002830.png
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU002829: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8\label_split_SKU002829.png
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002829
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8\label_split_SKU002829.png
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I107 (SKU: SKU002829, índice: 2)
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002829
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8\label_split_SKU002829.png
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002829
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8\label_split_SKU002829.png
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU002828: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\4\label_split_SKU002828.png
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002828
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\4
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\4\label_split_SKU002828.png
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I106 (SKU: SKU002828, índice: 1)
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002828
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\4
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\4\label_split_SKU002828.png
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002828
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\4
+2025-07-01 12:07:16 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\4\label_split_SKU002828.png
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002828
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\4
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\4\label_split_SKU002828.png
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I106 (SKU: SKU002828, índice: 1)
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002828
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\4
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\4\label_split_SKU002828.png
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002828
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\4
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\4\label_split_SKU002828.png
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002828
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\4
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\4\label_split_SKU002828.png
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002828
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\4
+2025-07-01 12:07:19 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\4\label_split_SKU002828.png
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU002829: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8\label_split_SKU002829.png
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002829
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8\label_split_SKU002829.png
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I107 (SKU: SKU002829, índice: 2)
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002829
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8\label_split_SKU002829.png
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002829
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8\label_split_SKU002829.png
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU002830: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6\label_split_SKU002830.png
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002830
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6\label_split_SKU002830.png
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I108 (SKU: SKU002830, índice: 3)
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:39 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002830
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6\label_split_SKU002830.png
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002830
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6\label_split_SKU002830.png
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU002831: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10\label_split_SKU002831.png
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002831
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10\label_split_SKU002831.png
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I109 (SKU: SKU002831, índice: 4)
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002831
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10\label_split_SKU002831.png
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002831
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10\label_split_SKU002831.png
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU002832: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\12\label_split_SKU002832.png
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002832
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\12
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\12\label_split_SKU002832.png
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I10A (SKU: SKU002832, índice: 5)
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002832
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\12
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\12\label_split_SKU002832.png
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002832
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\12
+2025-07-01 12:07:40 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\12\label_split_SKU002832.png
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002832
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\12
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\12\label_split_SKU002832.png
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I10A (SKU: SKU002832, índice: 5)
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002832
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\12
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\12\label_split_SKU002832.png
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002832
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\12
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\12\label_split_SKU002832.png
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002832
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\12
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\12\label_split_SKU002832.png
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002832
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\12
+2025-07-01 12:07:45 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\12\label_split_SKU002832.png
+2025-07-01 12:07:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU002833: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\14\label_split_SKU002833.png
+2025-07-01 12:07:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002833
+2025-07-01 12:07:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\14
+2025-07-01 12:07:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\14\label_split_SKU002833.png
+2025-07-01 12:07:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I10B (SKU: SKU002833, índice: 6)
+2025-07-01 12:07:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002833
+2025-07-01 12:07:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\14
+2025-07-01 12:07:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\14\label_split_SKU002833.png
+2025-07-01 12:07:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:07:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002833
+2025-07-01 12:07:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:07:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\14
+2025-07-01 12:07:48 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\14\label_split_SKU002833.png
+2025-07-01 12:08:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Manteniendo selección para SKU: SKU002833 al cerrar PrintPreviewWindow
+2025-07-01 12:08:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección restaurada para SKU: SKU002833 después de cerrar PrintPreviewWindow
+2025-07-01 12:08:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:08:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002833
+2025-07-01 12:08:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:08:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\14
+2025-07-01 12:08:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\14\label_split_SKU002833.png
+2025-07-01 12:08:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:08:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002833
+2025-07-01 12:08:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:08:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\14
+2025-07-01 12:08:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\14\label_split_SKU002833.png
+2025-07-01 12:08:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:08:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002833
+2025-07-01 12:08:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:08:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\14
+2025-07-01 12:08:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\14\label_split_SKU002833.png
+2025-07-01 12:08:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:08:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002833
+2025-07-01 12:08:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:08:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\14
+2025-07-01 12:08:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\14\label_split_SKU002833.png
+2025-07-01 12:08:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:08:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002829
+2025-07-01 12:08:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:08:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8
+2025-07-01 12:08:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8\label_split_SKU002829.png
+2025-07-01 12:08:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8\label_split_SKU002829.png
+2025-07-01 12:08:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU002829
+2025-07-01 12:08:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU002829: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8\label_split_SKU002829.png
+2025-07-01 12:08:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:08:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002829
+2025-07-01 12:08:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:08:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8
+2025-07-01 12:08:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8\label_split_SKU002829.png
+2025-07-01 12:08:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I107 (SKU: SKU002829, índice: 2)
+2025-07-01 12:08:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:08:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002829
+2025-07-01 12:08:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:08:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8
+2025-07-01 12:08:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8\label_split_SKU002829.png
+2025-07-01 12:08:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:08:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002829
+2025-07-01 12:08:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:08:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8
+2025-07-01 12:08:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\8\label_split_SKU002829.png
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU002830: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6\label_split_SKU002830.png
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002830
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6\label_split_SKU002830.png
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I108 (SKU: SKU002830, índice: 3)
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002830
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6\label_split_SKU002830.png
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002830
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\6\label_split_SKU002830.png
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU002831: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10\label_split_SKU002831.png
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002831
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10\label_split_SKU002831.png
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I109 (SKU: SKU002831, índice: 4)
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002831
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10\label_split_SKU002831.png
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002831
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10
+2025-07-01 12:08:27 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10\label_split_SKU002831.png
+2025-07-01 12:08:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:08:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002831
+2025-07-01 12:08:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:08:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10
+2025-07-01 12:08:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10\label_split_SKU002831.png
+2025-07-01 12:08:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I109 (SKU: SKU002831, índice: 4)
+2025-07-01 12:08:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:08:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002831
+2025-07-01 12:08:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:08:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10
+2025-07-01 12:08:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10\label_split_SKU002831.png
+2025-07-01 12:08:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 12:08:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002831
+2025-07-01 12:08:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 12:08:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10
+2025-07-01 12:08:30 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10\label_split_SKU002831.png
+2025-07-01 17:57:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Manteniendo selección para SKU: SKU002831 al cerrar PrintPreviewWindow
+2025-07-01 17:57:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 17:57:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002831
+2025-07-01 17:57:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:57:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10
+2025-07-01 17:57:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10\label_split_SKU002831.png
+2025-07-01 17:57:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 17:57:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002831
+2025-07-01 17:57:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:57:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10
+2025-07-01 17:57:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10\label_split_SKU002831.png
+2025-07-01 17:57:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección restaurada para SKU: SKU002831 después de cerrar PrintPreviewWindow
+2025-07-01 17:57:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 17:57:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002831
+2025-07-01 17:57:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:57:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10
+2025-07-01 17:57:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10\label_split_SKU002831.png
+2025-07-01 17:57:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/30
+2025-07-01 17:57:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU002831
+2025-07-01 17:57:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:57:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10
+2025-07-01 17:57:23 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Camisa Manga Larga H Blanca Talla_Básico_Camisa\10\label_split_SKU002831.png
+2025-07-01 17:57:25 - src.core.utils.logging_config - StoreID:N/A - INFO - Filtros limpiados para columnas: color, tipo_prenda, tipo_pieza, atributo, escuela, nivel_educativo, genero, marca, talla
+2025-07-01 17:57:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-07-01 17:57:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-07-01 17:57:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3334, current_page=0, total_pages=112
+2025-07-01 17:57:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 112
+2025-07-01 17:57:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-07-01 17:57:25 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 112, tiempo: 0.134s
+2025-07-01 17:57:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-07-01 17:57:25 - src.core.utils.logging_config - StoreID:N/A - INFO - Filtros limpiados y productos recargados
+2025-07-01 17:57:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Sin filtros activos
+2025-07-01 17:57:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-07-01 17:57:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-07-01 17:57:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=3334, current_page=0, total_pages=112
+2025-07-01 17:57:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 112
+2025-07-01 17:57:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-07-01 17:57:25 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 112, tiempo: 0.133s
+2025-07-01 17:57:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-07-01 17:57:25 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-07-01 17:57:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-07-01 17:57:28 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-07-01 17:57:29 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-07-01 17:57:34 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-07-01 17:57:35 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-07-01 17:57:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Chazarilla'], column=atributo
+2025-07-01 17:57:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-07-01 17:57:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-07-01 17:57:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=39, current_page=0, total_pages=2
+2025-07-01 17:57:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 2
+2025-07-01 17:57:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-07-01 17:57:53 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 2, tiempo: 0.132s
+2025-07-01 17:57:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-07-01 17:57:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Atributo: Chazarilla
+2025-07-01 17:57:54 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-07-01 17:57:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable creado y mostrado
+2025-07-01 17:58:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Gales azul'], column=color
+2025-07-01 17:58:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-07-01 17:58:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-07-01 17:58:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=0, current_page=0, total_pages=0
+2025-07-01 17:58:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: No hay productos
+2025-07-01 17:58:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/1
+2025-07-01 17:58:02 - src.core.utils.logging_config - StoreID:N/A - INFO - No se encontraron productos, tiempo: 0.142s
+2025-07-01 17:58:02 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-07-01 17:58:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Color: Gales azul; Atributo: Chazarilla
+2025-07-01 17:58:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: [], column=color
+2025-07-01 17:58:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-07-01 17:58:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-07-01 17:58:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=39, current_page=0, total_pages=2
+2025-07-01 17:58:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 2
+2025-07-01 17:58:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/30
+2025-07-01 17:58:03 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 30 productos, página 1, total páginas: 2, tiempo: 0.136s
+2025-07-01 17:58:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-07-01 17:58:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Atributo: Chazarilla
+2025-07-01 17:58:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Ejecutando comando con selecciones: ['Azul Marino'], column=color
+2025-07-01 17:58:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-07-01 17:58:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-07-01 17:58:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=13, current_page=0, total_pages=1
+2025-07-01 17:58:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 1
+2025-07-01 17:58:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 0/13
+2025-07-01 17:58:08 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 13 productos, página 1, total páginas: 1, tiempo: 0.135s
+2025-07-01 17:58:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-07-01 17:58:08 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Label de filtros actualizado: Filtros: Color: Azul Marino; Atributo: Chazarilla
+2025-07-01 17:58:10 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Menú desplegable cerrado
+2025-07-01 17:58:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:58:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001950
+2025-07-01 17:58:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:58:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32
+2025-07-01 17:58:22 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla_Básico_Playera\32\SKU001950_Playera Chazarilla_32_Azul Marino_label.png. Generando nueva etiqueta.
+2025-07-01 17:58:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32\SKU001950.png
+2025-07-01 17:58:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32\label_SKU001950.png, qr_path actualizado: Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32\label_SKU001950.png
+2025-07-01 17:58:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32\label_split_SKU001950.png, label_split_path actualizado: Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32\label_split_SKU001950.png
+2025-07-01 17:58:22 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32\label_split_SKU001950.png
+2025-07-01 17:58:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32\label_split_SKU001950.png
+2025-07-01 17:58:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU001950
+2025-07-01 17:58:24 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU001950: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32\label_split_SKU001950.png
+2025-07-01 17:58:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:58:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001950
+2025-07-01 17:58:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:58:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32
+2025-07-01 17:58:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32\label_split_SKU001950.png
+2025-07-01 17:58:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I1A4 (SKU: SKU001950, índice: 7)
+2025-07-01 17:58:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:58:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001950
+2025-07-01 17:58:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:58:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32
+2025-07-01 17:58:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32\label_split_SKU001950.png
+2025-07-01 17:58:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:58:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001950
+2025-07-01 17:58:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:58:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32
+2025-07-01 17:58:26 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32\label_split_SKU001950.png
+2025-07-01 17:58:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Manteniendo selección para SKU: SKU001950 al cerrar PrintPreviewWindow
+2025-07-01 17:58:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección restaurada para SKU: SKU001950 después de cerrar PrintPreviewWindow
+2025-07-01 17:58:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:58:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001950
+2025-07-01 17:58:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:58:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32
+2025-07-01 17:58:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32\label_split_SKU001950.png
+2025-07-01 17:58:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:58:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001950
+2025-07-01 17:58:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:58:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32
+2025-07-01 17:58:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32\label_split_SKU001950.png
+2025-07-01 17:58:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:58:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001950
+2025-07-01 17:58:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:58:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32
+2025-07-01 17:58:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32\label_split_SKU001950.png
+2025-07-01 17:58:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:58:50 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001950
+2025-07-01 17:58:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:58:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32
+2025-07-01 17:58:51 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32\label_split_SKU001950.png
+2025-07-01 17:58:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=True, tree exists=1
+2025-07-01 17:58:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Cargando productos para página 1, batch_size=30
+2025-07-01 17:58:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Actualizando paginación: total_items=13, current_page=0, total_pages=1
+2025-07-01 17:58:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Texto de paginación actualizado: Página 1 de 1
+2025-07-01 17:58:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:58:53 - src.core.utils.logging_config - StoreID:N/A - INFO - Cargados 13 productos, página 1, total páginas: 1, tiempo: 0.136s
+2025-07-01 17:58:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Lock interface called with lock=False, tree exists=1
+2025-07-01 17:58:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001950
+2025-07-01 17:58:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:58:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001950
+2025-07-01 17:58:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:58:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32
+2025-07-01 17:58:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32\label_split_SKU001950.png
+2025-07-01 17:58:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:58:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001950
+2025-07-01 17:58:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:58:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32
+2025-07-01 17:58:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32\label_split_SKU001950.png
+2025-07-01 17:58:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:58:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001950
+2025-07-01 17:58:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:58:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32
+2025-07-01 17:58:53 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\32\label_split_SKU001950.png
+2025-07-01 17:58:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:58:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001956
+2025-07-01 17:58:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:58:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36
+2025-07-01 17:58:56 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36\SKU001956_Playera Chazarilla Azul Marino Talla_36_label.png. Generando nueva etiqueta.
+2025-07-01 17:58:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36\SKU001956.png
+2025-07-01 17:58:56 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36\label_SKU001956.png, qr_path actualizado: Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36\label_SKU001956.png
+2025-07-01 17:58:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36\label_split_SKU001956.png, label_split_path actualizado: Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36\label_split_SKU001956.png
+2025-07-01 17:58:57 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36\label_split_SKU001956.png
+2025-07-01 17:58:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:58:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001959
+2025-07-01 17:58:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:58:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38
+2025-07-01 17:58:58 - src.core.utils.logging_config - StoreID:N/A - WARNING - qr_path existente no encontrado: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38\SKU001959_Playera Chazarilla Azul Marino Talla_38_label.png. Generando nueva etiqueta.
+2025-07-01 17:58:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - QR generado en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38\SKU001959.png
+2025-07-01 17:58:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta estándar generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38\label_SKU001959.png, qr_path actualizado: Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38\label_SKU001959.png
+2025-07-01 17:58:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta dividida generada y guardada en: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38\label_split_SKU001959.png, label_split_path actualizado: Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38\label_split_SKU001959.png
+2025-07-01 17:58:58 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38\label_split_SKU001959.png
+2025-07-01 17:59:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Abriendo vista previa de impresión con label_path: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38\label_split_SKU001959.png
+2025-07-01 17:59:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - SKU seleccionado al abrir PrintPreviewWindow: SKU001959
+2025-07-01 17:59:03 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU001959: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38\label_split_SKU001959.png
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001959
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38\label_split_SKU001959.png
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I1B4 (SKU: SKU001959, índice: 10)
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001959
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38\label_split_SKU001959.png
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001959
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38\label_split_SKU001959.png
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001959
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38\label_split_SKU001959.png
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001959
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38\label_split_SKU001959.png
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001959
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38\label_split_SKU001959.png
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I1B4 (SKU: SKU001959, índice: 10)
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001959
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38\label_split_SKU001959.png
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001959
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38\label_split_SKU001959.png
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001959
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38\label_split_SKU001959.png
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001959
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38
+2025-07-01 17:59:07 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\38\label_split_SKU001959.png
+2025-07-01 18:00:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada para SKU SKU001956: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36\label_split_SKU001956.png
+2025-07-01 18:00:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 18:00:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001956
+2025-07-01 18:00:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 18:00:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36
+2025-07-01 18:00:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36\label_split_SKU001956.png
+2025-07-01 18:00:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I1B3 (SKU: SKU001956, índice: 9)
+2025-07-01 18:00:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 18:00:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001956
+2025-07-01 18:00:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 18:00:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36
+2025-07-01 18:00:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36\label_split_SKU001956.png
+2025-07-01 18:00:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 18:00:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001956
+2025-07-01 18:00:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 18:00:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36
+2025-07-01 18:00:05 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36\label_split_SKU001956.png
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001956
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36\label_split_SKU001956.png
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección del Treeview actualizada al item I1B3 (SKU: SKU001956, índice: 9)
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001956
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36\label_split_SKU001956.png
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001956
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36\label_split_SKU001956.png
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001956
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36\label_split_SKU001956.png
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001956
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36
+2025-07-01 18:00:09 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36\label_split_SKU001956.png
+2025-07-01 18:20:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Manteniendo selección para SKU: SKU001956 al cerrar PrintPreviewWindow
+2025-07-01 18:20:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Selección restaurada para SKU: SKU001956 después de cerrar PrintPreviewWindow
+2025-07-01 18:20:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 18:20:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001956
+2025-07-01 18:20:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 18:20:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36
+2025-07-01 18:20:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36\label_split_SKU001956.png
+2025-07-01 18:20:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 18:20:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001956
+2025-07-01 18:20:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 18:20:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36
+2025-07-01 18:20:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36\label_split_SKU001956.png
+2025-07-01 18:20:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 18:20:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001956
+2025-07-01 18:20:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 18:20:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36
+2025-07-01 18:20:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36\label_split_SKU001956.png
+2025-07-01 18:20:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Conteo de selección actualizado: 1/13
+2025-07-01 18:20:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Mostrando detalles para SKU: SKU001956
+2025-07-01 18:20:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Intentando cargar imagen desde: None
+2025-07-01 18:20:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Carpeta creada o existente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36
+2025-07-01 18:20:47 - src.core.utils.logging_config - StoreID:N/A - DEBUG - Etiqueta cargada exitosamente: c:\Users\dafab\OneDrive\Documentos\Gestor\Gestor_de_Inventarios\Mis codigos\Playera Chazarilla Azul Marino Talla_Básico_Playera\36\label_split_SKU001956.png
