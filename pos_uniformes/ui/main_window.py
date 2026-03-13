@@ -138,6 +138,11 @@ from pos_uniformes.services.sale_discount_option_service import (
     expected_discount_option_label,
 )
 from pos_uniformes.services.sale_ticket_text_service import build_sale_ticket_text
+from pos_uniformes.services.sale_document_service import (
+    load_layaway_for_receipt,
+    load_sale_for_layaway_ticket,
+    load_sale_for_ticket,
+)
 from pos_uniformes.services.sale_client_benefit_service import resolve_sale_client_benefit
 from pos_uniformes.services.sale_client_discount_service import resolve_sale_client_discount
 from pos_uniformes.services.sale_client_sync_service import resolve_sale_client_sync_state
@@ -7357,12 +7362,7 @@ class MainWindow(QMainWindow):
 
         try:
             with get_session() as session:
-                sale = session.get(Venta, sale_id)
-                if sale is None:
-                    raise ValueError("Venta no encontrada.")
-                # Force-load details while the session is active.
-                _ = [(detalle.variante.sku if detalle.variante else "") for detalle in sale.detalles]
-                _ = sale.cliente.codigo_cliente if sale.cliente is not None else ""
+                sale = load_sale_for_ticket(session, sale_id)
                 ticket_text = self._build_sale_ticket_text(sale)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Ticket no disponible", str(exc))
@@ -7404,11 +7404,7 @@ class MainWindow(QMainWindow):
 
         try:
             with get_session() as session:
-                layaway = ApartadoService.obtener_apartado(session, apartado_id)
-                if layaway is None:
-                    raise ValueError("Apartado no encontrado.")
-                _ = [detalle.variante.sku if detalle.variante else "" for detalle in layaway.detalles]
-                _ = [abono.usuario.username if abono.usuario else "" for abono in layaway.abonos]
+                layaway = load_layaway_for_receipt(session, apartado_id)
                 receipt_text = self._build_layaway_receipt_text(layaway)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Comprobante no disponible", str(exc))
@@ -7424,16 +7420,7 @@ class MainWindow(QMainWindow):
 
         try:
             with get_session() as session:
-                layaway = ApartadoService.obtener_apartado(session, apartado_id)
-                if layaway is None:
-                    raise ValueError("Apartado no encontrado.")
-                if layaway.estado != EstadoApartado.ENTREGADO:
-                    raise ValueError("El ticket de venta solo esta disponible para apartados entregados.")
-                sale = session.scalar(select(Venta).where(Venta.folio == f"ENT-{layaway.folio}"))
-                if sale is None:
-                    raise ValueError("No se encontro la venta generada para este apartado.")
-                _ = [detalle.variante.sku if detalle.variante else "" for detalle in sale.detalles]
-                _ = sale.cliente.codigo_cliente if sale.cliente is not None else ""
+                sale = load_sale_for_layaway_ticket(session, apartado_id)
                 ticket_text = self._build_sale_ticket_text(sale)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Ticket no disponible", str(exc))

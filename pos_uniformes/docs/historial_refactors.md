@@ -49,6 +49,8 @@
 
 - `services/business_print_settings_service.py`
   - Snapshot reutilizable de negocio, impresion y pie de ticket para textos operativos.
+- `services/sale_document_service.py`
+  - Carga y validaciones de venta/apartado para abrir ticket o comprobante.
 - `services/sale_ticket_totals_service.py`
   - Normalizacion y reconstruccion de descuento para render de ticket.
 - `services/sale_ticket_text_service.py`
