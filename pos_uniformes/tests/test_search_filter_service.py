@@ -110,3 +110,13 @@ class SearchFilterServiceTests(unittest.TestCase):
                 general_fields=self.general_fields,
             )
         )
+
+    def test_invalid_quote_in_alias_value_degrades_gracefully(self) -> None:
+        self.assertTrue(
+            row_matches_search(
+                self.row,
+                search_text='producto:"pants azul',
+                alias_map=self.alias_map,
+                general_fields=self.general_fields,
+            )
+        )

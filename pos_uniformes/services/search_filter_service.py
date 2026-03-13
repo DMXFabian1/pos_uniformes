@@ -39,7 +39,7 @@ def row_matches_search(
 
         alias, raw_value = term.split(":", 1)
         fields = alias_map.get(alias.strip())
-        value = raw_value.strip()
+        value = raw_value.strip().strip("\"'")
         if not fields or not value:
             if term not in general_haystack:
                 return False
