@@ -43,6 +43,22 @@ def load_sale_selected_client_benefit(
     )
 
 
+def load_sale_selected_client_discount_percent(
+    session,
+    *,
+    selected_client_id: int | str | None,
+    normalize_discount_value,
+):
+    benefit = load_sale_selected_client_benefit(
+        session,
+        selected_client_id=selected_client_id,
+        normalize_discount_value=normalize_discount_value,
+    )
+    if benefit is None:
+        return normalize_discount_value(0)
+    return benefit.discount_percent
+
+
 def resolve_sale_selected_client_sync_state(
     session,
     *,

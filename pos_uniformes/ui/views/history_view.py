@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 from PyQt6.QtCore import QDate
 from PyQt6.QtWidgets import QGridLayout, QGroupBox, QLabel, QTableWidget, QVBoxLayout, QWidget
 
-from pos_uniformes.database.models import TipoCambioCatalogo, TipoMovimientoInventario
+from pos_uniformes.ui.helpers.history_filter_helper import build_history_type_options
 
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
@@ -35,11 +35,8 @@ def build_history_tab(window: "MainWindow") -> QWidget:
     window.history_entity_combo.addItem("Marca", "MARCA")
     window.history_entity_combo.addItem("Categoria", "CATEGORIA")
     window.history_type_combo.clear()
-    window.history_type_combo.addItem("Todos", "")
-    for tipo in TipoMovimientoInventario:
-        window.history_type_combo.addItem(f"Inv. {tipo.value}", f"inventory:{tipo.value}")
-    for tipo in TipoCambioCatalogo:
-        window.history_type_combo.addItem(f"Cat. {tipo.value}", f"catalog:{tipo.value}")
+    for label, value in build_history_type_options(""):
+        window.history_type_combo.addItem(label, value)
     empty_date = QDate(2000, 1, 1)
     for field, text in (
         (window.history_from_input, "Desde"),
@@ -78,6 +75,9 @@ def build_history_tab(window: "MainWindow") -> QWidget:
     filters.setColumnStretch(5, 1)
     filters_box.setLayout(filters)
 
+    window.history_status_label.setObjectName("statusLine")
+    window.history_status_label.setWordWrap(True)
+
     window.movements_table.setColumnCount(8)
     window.movements_table.setHorizontalHeaderLabels(
         ["Fecha", "Origen", "Registro", "Tipo", "Cambio", "Resultado", "Usuario", "Detalle"]
@@ -89,6 +89,7 @@ def build_history_tab(window: "MainWindow") -> QWidget:
     window.movements_table.setMinimumHeight(460)
 
     layout.addWidget(filters_box)
+    layout.addWidget(window.history_status_label)
     layout.addWidget(window.movements_table, 1)
     widget.setLayout(layout)
     return widget

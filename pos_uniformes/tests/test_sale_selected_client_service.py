@@ -10,6 +10,7 @@ from pos_uniformes.services.sale_discount_service import normalize_discount_valu
 from pos_uniformes.services.sale_selected_client_service import (
     find_active_sale_client_by_code,
     load_sale_selected_client_benefit,
+    load_sale_selected_client_discount_percent,
     resolve_sale_selected_client_sync_state,
 )
 
@@ -65,6 +66,36 @@ class SaleSelectedClientServiceTests(unittest.TestCase):
         assert result is not None
         self.assertEqual(result.discount_percent, Decimal("15.00"))
         self.assertEqual(result.source_label, "Profesor")
+
+    def test_load_sale_selected_client_discount_percent_returns_zero_when_missing(self) -> None:
+        session = SimpleNamespace(get=lambda _model, _id: None)
+
+        result = load_sale_selected_client_discount_percent(
+            session,
+            selected_client_id=10,
+            normalize_discount_value=normalize_discount_value,
+        )
+
+        self.assertEqual(result, Decimal("0.00"))
+
+    def test_load_sale_selected_client_discount_percent_returns_benefit_discount_when_client_exists(self) -> None:
+        client = SimpleNamespace(
+            descuento_preferente=Decimal("0.00"),
+            nivel_lealtad=NivelLealtad.PROFESOR,
+        )
+        session = SimpleNamespace(get=lambda _model, _id: client)
+
+        with patch(
+            "pos_uniformes.services.sale_selected_client_service.LoyaltyService.discount_for_level",
+            return_value=Decimal("15.00"),
+        ):
+            result = load_sale_selected_client_discount_percent(
+                session,
+                selected_client_id=10,
+                normalize_discount_value=normalize_discount_value,
+            )
+
+        self.assertEqual(result, Decimal("15.00"))
 
     def test_resolve_sale_selected_client_sync_state_returns_unlocked_state_when_missing(self) -> None:
         session = SimpleNamespace(get=lambda _model, _id: None)

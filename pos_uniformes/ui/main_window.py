@@ -98,7 +98,6 @@ from pos_uniformes.services.apartado_service import ApartadoItemInput, ApartadoS
 from pos_uniformes.services.active_filter_service import (
     build_active_filter_labels,
     build_active_filters_summary,
-    build_filters_label,
 )
 from pos_uniformes.services.bootstrap_service import BootstrapService
 from pos_uniformes.services.backup_service import (
@@ -149,12 +148,8 @@ from pos_uniformes.services.sale_document_service import (
 )
 from pos_uniformes.services.sale_selected_client_service import (
     find_active_sale_client_by_code,
-    load_sale_selected_client_benefit,
+    load_sale_selected_client_discount_percent,
     resolve_sale_selected_client_sync_state,
-)
-from pos_uniformes.services.sale_discount_lock_service import (
-    build_sale_discount_lock_state,
-    build_sale_discount_lock_tooltip,
 )
 from pos_uniformes.services.sale_discount_service import (
     build_sale_discount_breakdown,
@@ -164,15 +159,8 @@ from pos_uniformes.services.sale_discount_service import (
     format_discount_label,
     normalize_discount_value,
 )
+from pos_uniformes.services.recent_sale_service import list_recent_sale_rows
 from pos_uniformes.services.search_filter_service import row_matches_search
-from pos_uniformes.services.scanned_client_flow_service import (
-    build_client_already_linked_feedback,
-    build_scanned_client_applied_feedback,
-    build_client_linked_feedback,
-    build_replace_client_confirmation,
-    build_scanned_client_kept_feedback,
-    decide_scanned_client_action,
-)
 from pos_uniformes.services.supplier_service import SupplierService
 from pos_uniformes.services.user_service import UserService
 from pos_uniformes.services.venta_service import VentaItemInput, VentaService
@@ -187,11 +175,103 @@ from pos_uniformes.ui.dialogs.settings_dialogs import (
     build_whatsapp_settings_dialog,
     build_users_settings_dialog,
 )
+from pos_uniformes.ui.dialogs.settings_prompt_dialogs import (
+    prompt_client_data,
+    prompt_client_whatsapp_data,
+    prompt_create_user_data,
+    prompt_edit_user_data,
+    prompt_password_change,
+    prompt_role_change,
+    prompt_supplier_data,
+)
 from pos_uniformes.ui.dialogs.layaway_payment_dialog import build_layaway_payment_dialog
+from pos_uniformes.ui.dialogs.create_layaway_dialog import build_create_layaway_dialog
+from pos_uniformes.ui.dialogs.marketing_history_dialog import build_marketing_history_dialog
 from pos_uniformes.ui.dialogs.printable_text_dialog import open_printable_text_dialog
-from pos_uniformes.ui.helpers.sale_cart_table_helper import build_sale_cart_table_view
-from pos_uniformes.ui.helpers.sale_cashier_summary_helper import build_sale_cashier_summary
+from pos_uniformes.ui.dialogs.cash_session_prompt_dialogs import (
+    CashCutSummaryView,
+    prompt_cash_cut_data,
+    prompt_cash_movement_data,
+    prompt_cash_opening_correction,
+    prompt_open_cash_session,
+)
+from pos_uniformes.ui.helpers.catalog_access_helper import build_catalog_access_view
+from pos_uniformes.ui.helpers.catalog_macro_filter_helper import (
+    build_catalog_uniform_macro_button_states,
+    resolve_catalog_uniform_macro_selection,
+)
+from pos_uniformes.ui.helpers.history_filter_helper import build_history_type_options
+from pos_uniformes.ui.helpers.history_summary_helper import build_history_summary_view
+from pos_uniformes.ui.helpers.history_table_helper import build_history_table_rows
+from pos_uniformes.ui.helpers.catalog_selection_helper import (
+    build_catalog_selection_view,
+    build_empty_catalog_selection_view,
+)
+from pos_uniformes.ui.helpers.catalog_summary_helper import build_catalog_summary_view
+from pos_uniformes.ui.helpers.inventory_context_menu_helper import build_inventory_context_menu_actions
+from pos_uniformes.ui.helpers.inventory_overview_helper import (
+    build_empty_inventory_overview_view,
+    build_error_inventory_overview_view,
+    build_inventory_overview_view,
+)
+from pos_uniformes.ui.helpers.inventory_summary_helper import build_inventory_summary_view
+from pos_uniformes.ui.helpers.layaway_alerts_helper import build_layaway_alerts_view
+from pos_uniformes.ui.helpers.layaway_detail_helper import (
+    build_empty_layaway_detail_view,
+    build_error_layaway_detail_view,
+    build_layaway_detail_view,
+)
+from pos_uniformes.ui.helpers.layaway_history_helper import build_layaway_history_rows
+from pos_uniformes.ui.helpers.layaway_summary_helper import build_layaway_summary_view
+from pos_uniformes.ui.helpers.quote_cart_view_helper import build_quote_cart_view
+from pos_uniformes.ui.helpers.quote_history_helper import build_quote_history_rows
+from pos_uniformes.ui.helpers.quote_detail_helper import (
+    build_empty_quote_detail_view,
+    build_error_quote_detail_view,
+    build_quote_detail_view,
+)
+from pos_uniformes.ui.helpers.quote_summary_helper import build_quote_summary_view
+from pos_uniformes.ui.helpers.sale_client_selection_helper import (
+    build_empty_sale_client_selection_ui_state,
+    build_sale_client_selection_ui_state,
+)
+from pos_uniformes.ui.helpers.sale_cashier_view_helper import build_sale_cashier_view
 from pos_uniformes.ui.helpers.sale_payment_helper import collect_sale_payment_details
+from pos_uniformes.ui.helpers.sale_scanned_client_helper import build_sale_scanned_client_ui_state
+from pos_uniformes.ui.helpers.settings_backup_helper import (
+    build_settings_backup_error_view,
+    build_settings_backup_view,
+)
+from pos_uniformes.ui.helpers.settings_cash_history_helper import (
+    build_settings_cash_history_rows,
+)
+from pos_uniformes.ui.helpers.settings_cash_history_detail_helper import (
+    build_settings_cash_history_detail_view,
+)
+from pos_uniformes.ui.helpers.settings_cash_history_movements_helper import (
+    build_settings_cash_history_movements_view,
+)
+from pos_uniformes.ui.helpers.settings_cash_history_summary_helper import (
+    build_settings_cash_history_status_label,
+)
+from pos_uniformes.ui.helpers.settings_clients_helper import (
+    build_settings_clients_error_view,
+    build_settings_clients_view,
+)
+from pos_uniformes.ui.helpers.settings_marketing_helper import (
+    build_settings_marketing_summary_label,
+)
+from pos_uniformes.ui.helpers.settings_suppliers_helper import (
+    build_settings_suppliers_error_view,
+    build_settings_suppliers_view,
+)
+from pos_uniformes.ui.helpers.settings_users_helper import (
+    build_settings_users_error_view,
+    build_settings_users_view,
+)
+from pos_uniformes.ui.helpers.settings_whatsapp_preview_helper import (
+    build_settings_whatsapp_preview_text,
+)
 from pos_uniformes.ui.views.analytics_view import build_analytics_tab
 from pos_uniformes.ui.views.cashier_view import build_cashier_tab
 from pos_uniformes.ui.views.dashboard_view import build_dashboard_tab
@@ -201,6 +281,7 @@ from pos_uniformes.ui.views.layaway_view import build_layaway_tab
 from pos_uniformes.ui.views.products_view import build_products_tab
 from pos_uniformes.ui.views.quotes_view import build_quotes_tab
 from pos_uniformes.ui.views.settings_view import build_settings_tab
+from pos_uniformes.ui.styles.main_window_styles import build_main_window_stylesheet
 from pos_uniformes.utils.product_templates import (
     build_price_blocks,
     build_product_template_preview,
@@ -508,22 +589,6 @@ def _set_table_badge_style(item: QTableWidgetItem, tone: str) -> None:
     item.setTextAlignment(int(Qt.AlignmentFlag.AlignCenter))
 
 
-def _inline_metric_badge(label: str, value: object, tone: str) -> str:
-    palette = {
-        "positive": ("#f8dfcf", "#8f4527", "#dfb496"),
-        "warning": ("#fbf0cf", "#8a5a00", "#e7d49b"),
-        "danger": ("#f8dfd9", "#9a2f22", "#dfb3aa"),
-        "neutral": ("#fbf3ec", "#8c6656", "#ecd5c5"),
-    }
-    background, foreground, border = palette.get(tone, palette["neutral"])
-    return (
-        f"<span style=\"display:inline-block; margin-right:8px; margin-bottom:4px; "
-        f"padding:5px 9px; border-radius:999px; background:{background}; color:{foreground}; "
-        f"border:1px solid {border}; font-weight:700;\">"
-        f"{label}: {value}</span>"
-    )
-
-
 def _stock_table_text(stock_value: int) -> str:
     if stock_value == 0:
         return "0 Agotado"
@@ -701,7 +766,7 @@ class MainWindow(QMainWindow):
         self.catalog_results_label = QLabel()
         self.catalog_active_filters_label = QLabel()
         self.catalog_selection_label = QLabel("Selecciona una presentacion en inventario para gestionar cambios.")
-        self.products_selection_label = QLabel("Consulta uniformes y usa filtros macro como Deportivo, Oficial, Basico, Escolta o Accesorio.")
+        self.products_selection_label = QLabel(build_empty_catalog_selection_view().selection_label)
         self.catalog_search_input = QLineEdit()
         self.catalog_category_filter_combo = MultiSelectFilterButton("Categoria: todas")
         self.catalog_brand_filter_combo = MultiSelectFilterButton("Marca: todas")
@@ -886,6 +951,7 @@ class MainWindow(QMainWindow):
         self.history_today_button = QPushButton("Hoy")
         self.history_clear_button = QPushButton("Limpiar")
         self.history_filter_button = QPushButton("Aplicar filtros")
+        self.history_status_label = QLabel("Sin movimientos cargados.")
 
         self.settings_backup_format_combo = QComboBox()
         self.settings_backup_table = QTableWidget()
@@ -1453,35 +1519,42 @@ class MainWindow(QMainWindow):
 
     def _refresh_settings_backups(self) -> None:
         backup_dir = backup_output_dir()
-        self.settings_backup_location_label.setText(f"Carpeta de respaldos: {backup_dir}")
         try:
             backups = list_backups(backup_dir)
         except Exception as exc:  # noqa: BLE001
-            self.settings_backup_status_label.setText(f"No se pudo leer la carpeta de respaldos: {exc}")
-            self.settings_backup_table.setRowCount(0)
+            backup_view = build_settings_backup_error_view(
+                backup_dir=str(backup_dir),
+                error_message=str(exc),
+            )
+            self.settings_backup_location_label.setText(backup_view.location_label)
+            self.settings_backup_status_label.setText(backup_view.status_label)
+            self.settings_backup_table.setRowCount(len(backup_view.rows))
             return
 
-        self.settings_backup_table.setRowCount(len(backups))
-        for row_index, backup in enumerate(backups):
-            values = [
-                backup.path.name,
-                "Dump" if backup.dump_format == "custom" else "SQL",
-                backup.modified_at.strftime("%Y-%m-%d %H:%M"),
-                format_size(backup.size_bytes),
-                "Si" if backup.dump_format == "custom" else "No",
-            ]
-            for column_index, value in enumerate(values):
+        backup_view = build_settings_backup_view(
+            backup_dir=str(backup_dir),
+            backups=[
+                {
+                    "path_value": str(backup.path),
+                    "name": backup.path.name,
+                    "format_label": "Dump" if backup.dump_format == "custom" else "SQL",
+                    "modified_label": backup.modified_at.strftime("%Y-%m-%d %H:%M"),
+                    "size_label": format_size(backup.size_bytes),
+                    "restorable_label": "Si" if backup.dump_format == "custom" else "No",
+                }
+                for backup in backups
+            ],
+        )
+        self.settings_backup_location_label.setText(backup_view.location_label)
+        self.settings_backup_table.setRowCount(len(backup_view.rows))
+        for row_index, backup_row in enumerate(backup_view.rows):
+            for column_index, value in enumerate(backup_row.values):
                 item = _table_item(value)
                 if column_index == 0:
-                    item.setData(Qt.ItemDataRole.UserRole, str(backup.path))
+                    item.setData(Qt.ItemDataRole.UserRole, backup_row.path_value)
                 self.settings_backup_table.setItem(row_index, column_index, item)
         self.settings_backup_table.resizeColumnsToContents()
-        if backups:
-            self.settings_backup_status_label.setText(
-                f"Respaldos disponibles: {len(backups)} | Ultimo: {backups[0].path.name}"
-            )
-        else:
-            self.settings_backup_status_label.setText("No hay respaldos todavia en la carpeta configurada.")
+        self.settings_backup_status_label.setText(backup_view.status_label)
 
     def _open_users_settings_dialog(self) -> None:
         if self.settings_users_dialog is None:
@@ -1575,9 +1648,9 @@ class MainWindow(QMainWindow):
             return
 
         self.settings_cash_history_rows = {}
-        self.settings_cash_history_table.setRowCount(len(cash_sessions))
         abiertas = 0
         cerradas = 0
+        cash_session_snapshots: list[dict[str, object]] = []
         for row_index, cash_session in enumerate(cash_sessions):
             is_closed = cash_session.cerrada_at is not None
             if is_closed:
@@ -1596,36 +1669,43 @@ class MainWindow(QMainWindow):
                 }
                 for movement in cash_session.movimientos
             ]
-            values = [
-                cash_session.id,
-                "Cerrada" if is_closed else "Abierta",
-                cash_session.abierta_at.strftime("%Y-%m-%d %H:%M") if cash_session.abierta_at else "",
-                opened_by,
-                f"${Decimal(cash_session.monto_apertura or 0).quantize(Decimal('0.01'))}",
-                cash_session.cerrada_at.strftime("%Y-%m-%d %H:%M") if cash_session.cerrada_at else "-",
-                closed_by,
-                f"${Decimal(cash_session.monto_esperado_cierre or 0).quantize(Decimal('0.01'))}" if is_closed else "-",
-                f"${Decimal(cash_session.monto_cierre_declarado or 0).quantize(Decimal('0.01'))}" if is_closed else "-",
-                f"${Decimal(cash_session.diferencia_cierre or 0).quantize(Decimal('0.01'))}" if is_closed else "-",
-            ]
-            for column_index, value in enumerate(values):
+            cash_session_snapshots.append(
+                {
+                    "session_id": cash_session.id,
+                    "is_closed": is_closed,
+                    "status_label": "Cerrada" if is_closed else "Abierta",
+                    "opened_at": cash_session.abierta_at.strftime("%Y-%m-%d %H:%M") if cash_session.abierta_at else "",
+                    "opened_by": opened_by,
+                    "opening_amount": f"${Decimal(cash_session.monto_apertura or 0).quantize(Decimal('0.01'))}",
+                    "closed_at": cash_session.cerrada_at.strftime("%Y-%m-%d %H:%M") if cash_session.cerrada_at else "-",
+                    "closed_by": closed_by,
+                    "expected_amount": f"${Decimal(cash_session.monto_esperado_cierre or 0).quantize(Decimal('0.01'))}" if is_closed else "-",
+                    "declared_amount": f"${Decimal(cash_session.monto_cierre_declarado or 0).quantize(Decimal('0.01'))}" if is_closed else "-",
+                    "difference_amount": f"${Decimal(cash_session.diferencia_cierre or 0).quantize(Decimal('0.01'))}" if is_closed else "-",
+                    "difference": str(Decimal(cash_session.diferencia_cierre or 0).quantize(Decimal("0.01"))),
+                }
+            )
+        cash_history_rows = build_settings_cash_history_rows(cash_session_snapshots)
+        self.settings_cash_history_table.setRowCount(len(cash_history_rows))
+        for row_index, cash_history_row in enumerate(cash_history_rows):
+            for column_index, value in enumerate(cash_history_row.values):
                 item = _table_item(value)
                 if column_index == 0:
-                    item.setData(Qt.ItemDataRole.UserRole, cash_session.id)
+                    item.setData(Qt.ItemDataRole.UserRole, cash_history_row.session_id)
                 if column_index == 1:
-                    _set_table_badge_style(item, "muted" if is_closed else "positive")
-                elif column_index == 9 and is_closed:
-                    difference = Decimal(cash_session.diferencia_cierre or 0).quantize(Decimal("0.01"))
-                    if difference == Decimal("0.00"):
-                        _set_table_badge_style(item, "positive")
-                    elif difference > Decimal("0.00"):
-                        _set_table_badge_style(item, "warning")
-                    else:
-                        _set_table_badge_style(item, "danger")
+                    _set_table_badge_style(item, cash_history_row.status_tone)
+                elif column_index == 9 and cash_history_row.difference_tone is not None:
+                    _set_table_badge_style(item, cash_history_row.difference_tone)
                 self.settings_cash_history_table.setItem(row_index, column_index, item)
         self.settings_cash_history_table.resizeColumnsToContents()
         self.settings_cash_history_status_label.setText(
-            f"Cortes registrados: {len(cash_sessions)} | Abiertas: {abiertas} | Cerradas: {cerradas} | Rango: {fecha_desde.isoformat()} a {fecha_hasta.isoformat()}"
+            build_settings_cash_history_status_label(
+                total_sessions=len(cash_sessions),
+                open_sessions=abiertas,
+                closed_sessions=cerradas,
+                date_from_iso=fecha_desde.isoformat(),
+                date_to_iso=fecha_hasta.isoformat(),
+            )
         )
         if cash_sessions:
             self.settings_cash_history_table.setCurrentCell(0, 0)
@@ -1636,36 +1716,19 @@ class MainWindow(QMainWindow):
     def _refresh_selected_cash_history_movements(self) -> None:
         cash_session_id = self._selected_cash_history_id()
         movements = self.settings_cash_history_rows.get(cash_session_id or -1, [])
-        self.settings_cash_history_movements_table.setRowCount(len(movements))
-        for row_index, movement in enumerate(movements):
-            values = [
-                movement["fecha"],
-                movement["tipo"],
-                f"${movement['monto']}",
-                movement["usuario"],
-                movement["concepto"] or "-",
-            ]
-            for column_index, value in enumerate(values):
+        movements_view = build_settings_cash_history_movements_view(
+            cash_session_id=cash_session_id,
+            movements=movements,
+        )
+        self.settings_cash_history_movements_table.setRowCount(len(movements_view.rows))
+        for row_index, movement_row in enumerate(movements_view.rows):
+            for column_index, value in enumerate(movement_row.values):
                 item = _table_item(value)
                 if column_index == 1:
-                    tone = {
-                        "REACTIVO": "positive",
-                        "INGRESO": "warning",
-                        "RETIRO": "danger",
-                    }.get(str(movement["tipo"]), "muted")
-                    _set_table_badge_style(item, tone)
+                    _set_table_badge_style(item, movement_row.type_tone)
                 self.settings_cash_history_movements_table.setItem(row_index, column_index, item)
         self.settings_cash_history_movements_table.resizeColumnsToContents()
-        if cash_session_id is None:
-            self.settings_cash_history_movements_label.setText("Selecciona un corte para ver sus movimientos.")
-        elif movements:
-            self.settings_cash_history_movements_label.setText(
-                f"Movimientos registrados en la sesion #{cash_session_id}: {len(movements)}"
-            )
-        else:
-            self.settings_cash_history_movements_label.setText(
-                f"La sesion #{cash_session_id} no tiene movimientos manuales registrados."
-            )
+        self.settings_cash_history_movements_label.setText(movements_view.status_label)
 
     def _selected_cash_history_id(self) -> int | None:
         row = self.settings_cash_history_table.currentRow()
@@ -1743,7 +1806,33 @@ class MainWindow(QMainWindow):
             return
 
         dialog = QDialog(self)
-        dialog.setWindowTitle(f"Detalle del corte #{detail['id']}")
+        detail_view = build_settings_cash_history_detail_view(
+            session_id=int(detail["id"]),
+            is_closed=bool(detail["is_closed"]),
+            opened_at=str(detail["opened_at"]),
+            opened_by=str(detail["opened_by"]),
+            opening_amount=detail["opening_amount"],
+            opening_note=str(detail["opening_note"]),
+            opening_corrections=list(detail["opening_corrections"]),
+            reactivo_count=int(detail["reactivo_count"]),
+            reactivo_total=detail["reactivo_total"],
+            ingresos_count=int(detail["ingresos_count"]),
+            ingresos_total=detail["ingresos_total"],
+            retiros_count=int(detail["retiros_count"]),
+            retiros_total=detail["retiros_total"],
+            cash_sales_count=int(detail["cash_sales_count"]),
+            cash_sales_total=detail["cash_sales_total"],
+            cash_payments_count=int(detail["cash_payments_count"]),
+            cash_payments_total=detail["cash_payments_total"],
+            movement_rows=list(detail["movements"]),
+            closed_at=str(detail["closed_at"]),
+            closed_by=str(detail["closed_by"]),
+            expected_amount=detail["expected_amount"],
+            declared_amount=detail["declared_amount"],
+            difference=detail["difference"],
+            closing_note=str(detail["closing_note"]),
+        )
+        dialog.setWindowTitle(detail_view.dialog_title)
         dialog.setModal(True)
         dialog.setMinimumWidth(560)
 
@@ -1751,11 +1840,11 @@ class MainWindow(QMainWindow):
         layout.setSpacing(12)
 
         status_row = QHBoxLayout()
-        title = QLabel(f"Corte #{detail['id']}")
+        title = QLabel(detail_view.title_label)
         title.setObjectName("inventoryTitle")
-        status_badge = QLabel(str(detail["status"]))
+        status_badge = QLabel(detail_view.status_badge.text)
         status_badge.setObjectName("inventoryStatusBadge")
-        self._set_badge_state(status_badge, str(detail["status"]), "muted" if detail["is_closed"] else "positive")
+        self._set_badge_state(status_badge, detail_view.status_badge.text, detail_view.status_badge.tone)
         status_row.addWidget(title)
         status_row.addStretch()
         status_row.addWidget(status_badge)
@@ -1763,10 +1852,9 @@ class MainWindow(QMainWindow):
         open_box = QGroupBox("Apertura")
         open_box.setObjectName("infoCard")
         open_form = QFormLayout()
-        open_form.addRow("Fecha", QLabel(str(detail["opened_at"])))
-        open_form.addRow("Usuario", QLabel(str(detail["opened_by"])))
-        open_form.addRow("Reactivo inicial", QLabel(f"${detail['opening_amount']}"))
-        opening_note = QLabel(str(detail["opening_note"]))
+        for label, value in detail_view.opening_rows:
+            open_form.addRow(label, QLabel(value))
+        opening_note = QLabel(detail_view.opening_note)
         opening_note.setWordWrap(True)
         opening_note.setObjectName("subtleLine")
         open_form.addRow("Observacion", opening_note)
@@ -1775,12 +1863,12 @@ class MainWindow(QMainWindow):
         layout.addLayout(status_row)
         layout.addWidget(open_box)
 
-        if detail["opening_corrections"]:
+        if detail_view.opening_corrections:
             corrections_box = QGroupBox("Correcciones de apertura")
             corrections_box.setObjectName("infoCard")
             corrections_layout = QVBoxLayout()
             corrections_layout.setSpacing(8)
-            for correction in detail["opening_corrections"]:
+            for correction in detail_view.opening_corrections:
                 correction_row = QFrame()
                 correction_row.setObjectName("infoCard")
                 correction_row_layout = QHBoxLayout()
@@ -1802,13 +1890,8 @@ class MainWindow(QMainWindow):
         flow_box = QGroupBox("Movimiento de efectivo")
         flow_box.setObjectName("infoCard")
         flow_form = QFormLayout()
-        flow_form.addRow("Reactivos extra", QLabel(f"{detail['reactivo_count']} | ${detail['reactivo_total']}"))
-        flow_form.addRow("Ingresos manuales", QLabel(f"{detail['ingresos_count']} | ${detail['ingresos_total']}"))
-        flow_form.addRow("Retiros manuales", QLabel(f"{detail['retiros_count']} | ${detail['retiros_total']}"))
-        flow_form.addRow("Ventas con efectivo", QLabel(f"{detail['cash_sales_count']}"))
-        flow_form.addRow("Efectivo por ventas", QLabel(f"${detail['cash_sales_total']}"))
-        flow_form.addRow("Abonos con efectivo", QLabel(f"{detail['cash_payments_count']}"))
-        flow_form.addRow("Efectivo por abonos", QLabel(f"${detail['cash_payments_total']}"))
+        for label, value in detail_view.flow_rows:
+            flow_form.addRow(label, QLabel(value))
         flow_box.setLayout(flow_form)
         layout.addWidget(flow_box)
 
@@ -1822,25 +1905,12 @@ class MainWindow(QMainWindow):
         movements_table.verticalHeader().setVisible(False)
         movements_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         movements_table.setAlternatingRowColors(True)
-        movement_rows = detail["movements"]
-        movements_table.setRowCount(len(movement_rows))
-        for row_index, movement in enumerate(movement_rows):
-            values = [
-                movement["fecha"],
-                movement["tipo"],
-                f"${movement['monto']}",
-                movement["usuario"],
-                movement["concepto"] or "-",
-            ]
-            for column_index, value in enumerate(values):
+        movements_table.setRowCount(len(detail_view.movement_rows))
+        for row_index, movement_row in enumerate(detail_view.movement_rows):
+            for column_index, value in enumerate(movement_row.values):
                 item = _table_item(value)
                 if column_index == 1:
-                    tone = {
-                        "REACTIVO": "positive",
-                        "INGRESO": "warning",
-                        "RETIRO": "danger",
-                    }.get(str(movement["tipo"]), "muted")
-                    _set_table_badge_style(item, tone)
+                    _set_table_badge_style(item, movement_row.type_tone)
                 movements_table.setItem(row_index, column_index, item)
         movements_table.resizeColumnsToContents()
         movements_table.setMinimumHeight(160)
@@ -1848,20 +1918,22 @@ class MainWindow(QMainWindow):
         movements_box.setLayout(movements_layout)
         layout.addWidget(movements_box)
 
-        if detail["is_closed"]:
+        if detail_view.closing_visible:
             close_box = QGroupBox("Cierre")
             close_box.setObjectName("infoCard")
             close_form = QFormLayout()
-            close_form.addRow("Fecha", QLabel(str(detail["closed_at"])))
-            close_form.addRow("Usuario", QLabel(str(detail["closed_by"])))
-            close_form.addRow("Esperado", QLabel(f"${detail['expected_amount']}"))
-            close_form.addRow("Contado", QLabel(f"${detail['declared_amount']}"))
-            difference_label = QLabel(f"${detail['difference']}")
+            for label, value in detail_view.closing_rows:
+                close_form.addRow(label, QLabel(value))
+            difference_label = QLabel(detail_view.difference_badge.text if detail_view.difference_badge is not None else "")
             difference_label.setObjectName("inventoryStatusBadge")
-            difference_tone = "positive" if detail["difference"] == Decimal("0.00") else ("warning" if detail["difference"] > Decimal("0.00") else "danger")
-            self._set_badge_state(difference_label, f"${detail['difference']}", difference_tone)
+            if detail_view.difference_badge is not None:
+                self._set_badge_state(
+                    difference_label,
+                    detail_view.difference_badge.text,
+                    detail_view.difference_badge.tone,
+                )
             close_form.addRow("Diferencia", difference_label)
-            closing_note = QLabel(str(detail["closing_note"]))
+            closing_note = QLabel(detail_view.closing_note)
             closing_note.setWordWrap(True)
             closing_note.setObjectName("subtleLine")
             close_form.addRow("Observacion", closing_note)
@@ -1963,24 +2035,9 @@ class MainWindow(QMainWindow):
         )
 
     def _refresh_marketing_summary(self, session) -> None:
-        clients = session.scalars(select(Cliente)).all()
-        counts = {
-            NivelLealtad.BASICO: 0,
-            NivelLealtad.LEAL: 0,
-            NivelLealtad.PROFESOR: 0,
-            NivelLealtad.MAYORISTA: 0,
-        }
-        for client in clients:
-            counts[client.nivel_lealtad] = counts.get(client.nivel_lealtad, 0) + 1
-        total = len(clients)
+        loyalty_levels = session.scalars(select(Cliente.nivel_lealtad)).all()
         self.settings_marketing_summary_label.setText(
-            (
-                f"Clientes registrados: {total}\n"
-                f"BASICO: {counts[NivelLealtad.BASICO]} | "
-                f"LEAL: {counts[NivelLealtad.LEAL]} | "
-                f"PROFESOR: {counts[NivelLealtad.PROFESOR]} | "
-                f"MAYORISTA: {counts[NivelLealtad.MAYORISTA]}"
-            )
+            build_settings_marketing_summary_label(list(loyalty_levels))
         )
 
     def _save_business_settings(self, success_message: str) -> bool:
@@ -2143,76 +2200,54 @@ class MainWindow(QMainWindow):
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Historial no disponible", str(exc))
             return
-
-        dialog, layout = self._create_modal_dialog(
-            "Historial de Marketing y promociones",
-            "Consulta los ultimos cambios guardados en reglas de lealtad y descuentos por nivel.",
-            width=1080,
+        build_marketing_history_dialog(
+            self,
+            changes=[
+                {
+                    "created_at_label": change.created_at.strftime("%Y-%m-%d %H:%M") if change.created_at else "",
+                    "username": change.usuario.username if change.usuario is not None else "-",
+                    "role_label": change.rol_usuario or "-",
+                    "section_label": change.seccion.title(),
+                    "field_label": change.etiqueta_campo,
+                    "old_value": change.valor_anterior or "-",
+                    "new_value": change.valor_nuevo or "-",
+                }
+                for change in changes
+            ],
         )
-        status = QLabel(
-            f"Cambios registrados: {len(changes)}"
-            if changes
-            else "Aun no hay cambios auditados en Marketing y promociones."
-        )
-        status.setObjectName("analyticsLine")
-        table = QTableWidget()
-        table.setColumnCount(7)
-        table.setHorizontalHeaderLabels(
-            ["Fecha", "Usuario", "Rol", "Seccion", "Campo", "Valor anterior", "Valor nuevo"]
-        )
-        table.setObjectName("dataTable")
-        table.verticalHeader().setVisible(False)
-        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        table.setAlternatingRowColors(True)
-        table.setRowCount(len(changes))
-
-        for row_index, change in enumerate(changes):
-            values = [
-                change.created_at.strftime("%Y-%m-%d %H:%M") if change.created_at else "",
-                change.usuario.username if change.usuario is not None else "-",
-                change.rol_usuario or "-",
-                change.seccion.title(),
-                change.etiqueta_campo,
-                change.valor_anterior or "-",
-                change.valor_nuevo or "-",
-            ]
-            for column_index, value in enumerate(values):
-                table.setItem(row_index, column_index, _table_item(value))
-        table.resizeColumnsToContents()
-
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        buttons.rejected.connect(dialog.reject)
-        buttons.accepted.connect(dialog.accept)
-        layout.addWidget(status)
-        layout.addWidget(table)
-        layout.addWidget(buttons)
-        dialog.exec()
 
     def _refresh_settings_users(self) -> None:
         try:
             with get_session() as session:
                 users = UserService.list_users(session)
         except Exception as exc:  # noqa: BLE001
-            self.settings_users_status_label.setText(f"No se pudieron cargar usuarios: {exc}")
-            self.settings_users_table.setRowCount(0)
+            users_view = build_settings_users_error_view(str(exc))
+            self.settings_users_status_label.setText(users_view.status_label)
+            self.settings_users_table.setRowCount(len(users_view.rows))
             return
 
-        self.settings_users_table.setRowCount(len(users))
-        for row_index, user in enumerate(users):
-            values = [
-                user.username,
-                user.nombre_completo,
-                user.rol.value,
-                "ACTIVO" if user.activo else "INACTIVO",
-                user.updated_at.strftime("%Y-%m-%d %H:%M") if user.updated_at else "",
+        users_view = build_settings_users_view(
+            [
+                {
+                    "id": int(user.id),
+                    "username": user.username,
+                    "full_name": user.nombre_completo,
+                    "role": user.rol.value,
+                    "active_label": "ACTIVO" if user.activo else "INACTIVO",
+                    "updated_label": user.updated_at.strftime("%Y-%m-%d %H:%M") if user.updated_at else "",
+                }
+                for user in users
             ]
-            for column_index, value in enumerate(values):
+        )
+        self.settings_users_table.setRowCount(len(users_view.rows))
+        for row_index, user_row in enumerate(users_view.rows):
+            for column_index, value in enumerate(user_row.values):
                 item = _table_item(value)
                 if column_index == 0:
-                    item.setData(Qt.ItemDataRole.UserRole, int(user.id))
+                    item.setData(Qt.ItemDataRole.UserRole, user_row.user_id)
                 self.settings_users_table.setItem(row_index, column_index, item)
         self.settings_users_table.resizeColumnsToContents()
-        self.settings_users_status_label.setText(f"Usuarios registrados: {len(users)}")
+        self.settings_users_status_label.setText(users_view.status_label)
 
     def _refresh_settings_suppliers(self) -> None:
         search_text = self.settings_suppliers_search_input.text().strip()
@@ -2220,29 +2255,36 @@ class MainWindow(QMainWindow):
             with get_session() as session:
                 suppliers = SupplierService.list_suppliers(session, search_text)
         except Exception as exc:  # noqa: BLE001
-            self.settings_suppliers_status_label.setText(f"No se pudieron cargar proveedores: {exc}")
-            self.settings_suppliers_table.setRowCount(0)
+            suppliers_view = build_settings_suppliers_error_view(str(exc))
+            self.settings_suppliers_status_label.setText(suppliers_view.status_label)
+            self.settings_suppliers_table.setRowCount(len(suppliers_view.rows))
             return
-
-        self.settings_suppliers_table.setRowCount(len(suppliers))
-        for row_index, supplier in enumerate(suppliers):
-            values = [
-                supplier.nombre,
-                supplier.telefono or "",
-                supplier.email or "",
-                supplier.direccion or "",
-                "ACTIVO" if supplier.activo else "INACTIVO",
-                supplier.updated_at.strftime("%Y-%m-%d %H:%M") if supplier.updated_at else "",
+        suppliers_view = build_settings_suppliers_view(
+            [
+                {
+                    "id": int(supplier.id),
+                    "name": supplier.nombre,
+                    "phone": supplier.telefono or "",
+                    "email": supplier.email or "",
+                    "address": supplier.direccion or "",
+                    "active": bool(supplier.activo),
+                    "active_label": "ACTIVO" if supplier.activo else "INACTIVO",
+                    "updated_label": supplier.updated_at.strftime("%Y-%m-%d %H:%M") if supplier.updated_at else "",
+                }
+                for supplier in suppliers
             ]
-            for column_index, value in enumerate(values):
+        )
+        self.settings_suppliers_table.setRowCount(len(suppliers_view.rows))
+        for row_index, supplier_row in enumerate(suppliers_view.rows):
+            for column_index, value in enumerate(supplier_row.values):
                 item = _table_item(value)
                 if column_index == 0:
-                    item.setData(Qt.ItemDataRole.UserRole, int(supplier.id))
+                    item.setData(Qt.ItemDataRole.UserRole, supplier_row.supplier_id)
                 if column_index == 4:
-                    _set_table_badge_style(item, "positive" if supplier.activo else "muted")
+                    _set_table_badge_style(item, supplier_row.status_tone)
                 self.settings_suppliers_table.setItem(row_index, column_index, item)
         self.settings_suppliers_table.resizeColumnsToContents()
-        self.settings_suppliers_status_label.setText(f"Proveedores registrados: {len(suppliers)}")
+        self.settings_suppliers_status_label.setText(suppliers_view.status_label)
 
     def _refresh_settings_clients(self) -> None:
         search_text = self.settings_clients_search_input.text().strip()
@@ -2250,58 +2292,54 @@ class MainWindow(QMainWindow):
             with get_session() as session:
                 clients = ClientService.list_clients(session, search_text)
         except Exception as exc:  # noqa: BLE001
-            self.settings_clients_status_label.setText(f"No se pudieron cargar clientes: {exc}")
-            self.settings_clients_table.setRowCount(0)
+            clients_view = build_settings_clients_error_view(str(exc))
+            self.settings_clients_status_label.setText(clients_view.status_label)
+            self.settings_clients_table.setRowCount(len(clients_view.rows))
             return
-
-        self.settings_clients_table.setRowCount(len(clients))
-        for row_index, client in enumerate(clients):
-            card_ready = bool(client.card_image_path) and Path(str(client.card_image_path)).exists()
-            values = [
-                client.codigo_cliente,
-                client.nombre,
-                client.tipo_cliente.value,
-                client.nivel_lealtad.value,
-                f"{Decimal(client.descuento_preferente).quantize(Decimal('0.01'))}%",
-                client.telefono or "",
-                client.notas or "",
-                "Listo" if QrGenerator.exists_for_client(client) else "Pendiente",
-                "Lista" if card_ready else "Pendiente",
-                "ACTIVO" if client.activo else "INACTIVO",
-                client.updated_at.strftime("%Y-%m-%d %H:%M") if client.updated_at else "",
+        clients_view = build_settings_clients_view(
+            [
+                {
+                    "id": int(client.id),
+                    "code": client.codigo_cliente,
+                    "name": client.nombre,
+                    "client_type": client.tipo_cliente.value,
+                    "loyalty_level": client.nivel_lealtad.value,
+                    "discount_label": f"{Decimal(client.descuento_preferente).quantize(Decimal('0.01'))}%",
+                    "has_discount": Decimal(client.descuento_preferente) > Decimal("0.00"),
+                    "phone": client.telefono or "",
+                    "notes": client.notas or "",
+                    "qr_label": "Listo" if QrGenerator.exists_for_client(client) else "Pendiente",
+                    "card_label": "Lista" if bool(client.card_image_path) and Path(str(client.card_image_path)).exists() else "Pendiente",
+                    "active": bool(client.activo),
+                    "active_label": "ACTIVO" if client.activo else "INACTIVO",
+                    "updated_label": client.updated_at.strftime("%Y-%m-%d %H:%M") if client.updated_at else "",
+                }
+                for client in clients
             ]
-            for column_index, value in enumerate(values):
+        )
+        self.settings_clients_table.setRowCount(len(clients_view.rows))
+        for row_index, client_row in enumerate(clients_view.rows):
+            for column_index, value in enumerate(client_row.values):
                 item = _table_item(value)
                 if column_index == 0:
-                    item.setData(Qt.ItemDataRole.UserRole + 1, str(client.codigo_cliente))
+                    item.setData(Qt.ItemDataRole.UserRole + 1, client_row.client_code)
                 if column_index == 1:
-                    item.setData(Qt.ItemDataRole.UserRole, int(client.id))
+                    item.setData(Qt.ItemDataRole.UserRole, client_row.client_id)
                 if column_index == 2:
-                    tone = {
-                        TipoCliente.GENERAL.value: "muted",
-                        TipoCliente.PROFESOR.value: "positive",
-                        TipoCliente.MAYORISTA.value: "warning",
-                    }.get(str(value), "muted")
-                    _set_table_badge_style(item, tone)
+                    _set_table_badge_style(item, client_row.client_type_tone)
                 if column_index == 3:
-                    level_tone = {
-                        NivelLealtad.BASICO.value: "muted",
-                        NivelLealtad.LEAL.value: "warning",
-                        NivelLealtad.PROFESOR.value: "positive",
-                        NivelLealtad.MAYORISTA.value: "warning",
-                    }.get(str(value), "muted")
-                    _set_table_badge_style(item, level_tone)
-                if column_index == 4 and Decimal(client.descuento_preferente) > Decimal("0.00"):
-                    _set_table_badge_style(item, "positive")
+                    _set_table_badge_style(item, client_row.loyalty_level_tone)
+                if column_index == 4 and client_row.discount_tone is not None:
+                    _set_table_badge_style(item, client_row.discount_tone)
                 if column_index == 7:
-                    _set_table_badge_style(item, "positive" if value == "Listo" else "warning")
+                    _set_table_badge_style(item, client_row.qr_tone)
                 if column_index == 8:
-                    _set_table_badge_style(item, "positive" if value == "Lista" else "muted")
+                    _set_table_badge_style(item, client_row.card_tone)
                 if column_index == 9:
-                    _set_table_badge_style(item, "positive" if client.activo else "muted")
+                    _set_table_badge_style(item, client_row.status_tone)
                 self.settings_clients_table.setItem(row_index, column_index, item)
         self.settings_clients_table.resizeColumnsToContents()
-        self.settings_clients_status_label.setText(f"Clientes registrados: {len(clients)}")
+        self.settings_clients_status_label.setText(clients_view.status_label)
 
     def _selected_settings_user_id(self) -> int | None:
         selected_row = self.settings_users_table.currentRow()
@@ -2333,250 +2371,11 @@ class MainWindow(QMainWindow):
         client_id = item.data(Qt.ItemDataRole.UserRole)
         return int(client_id) if client_id is not None else None
 
-    def _prompt_create_user_data(self) -> dict[str, object] | None:
-        dialog, layout = self._create_modal_dialog(
-            "Crear usuario",
-            "Define username, nombre, rol y contrasena inicial.",
-            width=480,
-        )
-        form = QFormLayout()
-        username_input = QLineEdit()
-        username_input.setPlaceholderText("ejemplo: cajero2")
-        full_name_input = QLineEdit()
-        full_name_input.setPlaceholderText("Nombre completo")
-        role_combo = QComboBox()
-        role_combo.addItem("ADMIN", RolUsuario.ADMIN)
-        role_combo.addItem("CAJERO", RolUsuario.CAJERO)
-        password_input = QLineEdit()
-        password_input.setEchoMode(QLineEdit.EchoMode.Password)
-        password_input.setPlaceholderText("Contrasena inicial")
-        form.addRow("Username", username_input)
-        form.addRow("Nombre", full_name_input)
-        form.addRow("Rol", role_combo)
-        form.addRow("Contrasena", password_input)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addLayout(form)
-        layout.addWidget(buttons)
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return None
-        return {
-            "username": username_input.text().strip(),
-            "nombre_completo": full_name_input.text().strip(),
-            "rol": role_combo.currentData(),
-            "password": password_input.text(),
-        }
-
-    def _prompt_edit_user_data(
-        self,
-        username: str,
-        nombre_completo: str,
-        current_role: RolUsuario,
-    ) -> dict[str, object] | None:
-        dialog, layout = self._create_modal_dialog(
-            "Editar usuario",
-            "Actualiza username, nombre y rol del usuario seleccionado.",
-            width=480,
-        )
-        form = QFormLayout()
-        username_input = QLineEdit()
-        username_input.setText(username)
-        full_name_input = QLineEdit()
-        full_name_input.setText(nombre_completo)
-        role_combo = QComboBox()
-        role_combo.addItem("ADMIN", RolUsuario.ADMIN)
-        role_combo.addItem("CAJERO", RolUsuario.CAJERO)
-        role_combo.setCurrentIndex(0 if current_role == RolUsuario.ADMIN else 1)
-        form.addRow("Username", username_input)
-        form.addRow("Nombre", full_name_input)
-        form.addRow("Rol", role_combo)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addLayout(form)
-        layout.addWidget(buttons)
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return None
-        return {
-            "username": username_input.text().strip(),
-            "nombre_completo": full_name_input.text().strip(),
-            "rol": role_combo.currentData(),
-        }
-
-    def _prompt_role_change(self, current_role: RolUsuario) -> RolUsuario | None:
-        dialog, layout = self._create_modal_dialog("Cambiar rol", width=360)
-        form = QFormLayout()
-        role_combo = QComboBox()
-        role_combo.addItem("ADMIN", RolUsuario.ADMIN)
-        role_combo.addItem("CAJERO", RolUsuario.CAJERO)
-        role_combo.setCurrentIndex(0 if current_role == RolUsuario.ADMIN else 1)
-        form.addRow("Nuevo rol", role_combo)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addLayout(form)
-        layout.addWidget(buttons)
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return None
-        return role_combo.currentData()
-
-    def _prompt_password_change(self) -> str | None:
-        dialog, layout = self._create_modal_dialog("Cambiar contrasena", width=420)
-        form = QFormLayout()
-        password_input = QLineEdit()
-        password_input.setEchoMode(QLineEdit.EchoMode.Password)
-        password_input.setPlaceholderText("Nueva contrasena")
-        confirm_input = QLineEdit()
-        confirm_input.setEchoMode(QLineEdit.EchoMode.Password)
-        confirm_input.setPlaceholderText("Confirmar contrasena")
-        form.addRow("Nueva", password_input)
-        form.addRow("Confirmar", confirm_input)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addLayout(form)
-        layout.addWidget(buttons)
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return None
-        if password_input.text() != confirm_input.text():
-            raise ValueError("La confirmacion de contrasena no coincide.")
-        return password_input.text()
-
-    def _prompt_supplier_data(
-        self,
-        title: str,
-        helper_text: str,
-        current_values: dict[str, str] | None = None,
-    ) -> dict[str, str] | None:
-        dialog, layout = self._create_modal_dialog(title, helper_text, width=520)
-        form = QFormLayout()
-        name_input = QLineEdit()
-        phone_input = QLineEdit()
-        email_input = QLineEdit()
-        address_input = QTextEdit()
-        address_input.setMinimumHeight(90)
-        name_input.setPlaceholderText("Nombre comercial o razon social")
-        phone_input.setPlaceholderText("Telefono")
-        email_input.setPlaceholderText("correo@proveedor.com")
-        address_input.setPlaceholderText("Direccion o notas de ubicacion")
-        if current_values:
-            name_input.setText(current_values.get("nombre", ""))
-            phone_input.setText(current_values.get("telefono", ""))
-            email_input.setText(current_values.get("email", ""))
-            address_input.setPlainText(current_values.get("direccion", ""))
-        form.addRow("Nombre", name_input)
-        form.addRow("Telefono", phone_input)
-        form.addRow("Correo", email_input)
-        form.addRow("Direccion", address_input)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addLayout(form)
-        layout.addWidget(buttons)
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return None
-        return {
-            "nombre": name_input.text().strip(),
-            "telefono": phone_input.text().strip(),
-            "email": email_input.text().strip(),
-            "direccion": address_input.toPlainText().strip(),
-        }
-
-    def _prompt_client_data(
-        self,
-        title: str,
-        helper_text: str,
-        current_values: dict[str, str] | None = None,
-    ) -> dict[str, str] | None:
-        dialog, layout = self._create_modal_dialog(title, helper_text, width=560)
-        form = QFormLayout()
-        name_input = QLineEdit()
-        client_type_combo = QComboBox()
-        client_type_combo.addItem("GENERAL", TipoCliente.GENERAL)
-        client_type_combo.addItem("PROFESOR", TipoCliente.PROFESOR)
-        client_type_combo.addItem("MAYORISTA", TipoCliente.MAYORISTA)
-        discount_spin = QDoubleSpinBox()
-        discount_spin.setRange(0.0, 100.0)
-        discount_spin.setDecimals(2)
-        discount_spin.setSuffix("%")
-        discount_spin.setSingleStep(5.0)
-        phone_input = QLineEdit()
-        notes_input = QTextEdit()
-        notes_input.setMinimumHeight(90)
-        name_input.setPlaceholderText("Nombre completo o identificacion del cliente")
-        phone_input.setPlaceholderText("Telefono")
-        notes_input.setPlaceholderText("Notas internas o referencias")
-        if current_values:
-            name_input.setText(current_values.get("nombre", ""))
-            initial_type = current_values.get("tipo_cliente", TipoCliente.GENERAL.value)
-            type_index = client_type_combo.findData(TipoCliente(initial_type))
-            client_type_combo.setCurrentIndex(type_index if type_index >= 0 else 0)
-            discount_spin.setValue(float(current_values.get("descuento_preferente", "0") or 0))
-            phone_input.setText(current_values.get("telefono", ""))
-            notes_input.setPlainText(current_values.get("notas", ""))
-        else:
-            discount_spin.setValue(float(ClientService.default_discount_for_type(TipoCliente.GENERAL)))
-
-        def _sync_discount_with_type() -> None:
-            tipo = client_type_combo.currentData()
-            if not isinstance(tipo, TipoCliente):
-                return
-            suggested = ClientService.default_discount_for_type(tipo)
-            if tipo != TipoCliente.GENERAL:
-                discount_spin.setValue(float(suggested))
-
-        client_type_combo.currentIndexChanged.connect(_sync_discount_with_type)
-        form.addRow("Nombre", name_input)
-        form.addRow("Tipo cliente", client_type_combo)
-        form.addRow("Desc. preferente", discount_spin)
-        form.addRow("Telefono", phone_input)
-        form.addRow("Notas", notes_input)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addLayout(form)
-        layout.addWidget(buttons)
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return None
-        return {
-            "nombre": name_input.text().strip(),
-            "tipo_cliente": str((client_type_combo.currentData() or TipoCliente.GENERAL).value),
-            "descuento_preferente": str(Decimal(str(discount_spin.value())).quantize(Decimal("0.01"))),
-            "telefono": phone_input.text().strip(),
-            "notas": notes_input.toPlainText().strip(),
-        }
-
-    def _prompt_client_whatsapp_data(self, client_name: str) -> tuple[str, str] | None:
-        dialog, layout = self._create_modal_dialog(
-            "Mensaje de WhatsApp",
-            f"Prepara un mensaje para {client_name}. Se generara o reutilizara su credencial para que puedas adjuntarla por WhatsApp.",
-            width=520,
-        )
-        form = QFormLayout()
-        message_type_combo = QComboBox()
-        message_type_combo.addItem("Promocion / descuento", "promotion")
-        message_type_combo.addItem("Seguimiento general", "followup")
-        message_type_combo.addItem("Saludo", "greeting")
-        extra_message_input = QTextEdit()
-        extra_message_input.setMinimumHeight(110)
-        extra_message_input.setPlaceholderText("Texto extra opcional")
-        form.addRow("Tipo", message_type_combo)
-        form.addRow("Extra", extra_message_input)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addLayout(form)
-        layout.addWidget(buttons)
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return None
-        return str(message_type_combo.currentData() or "followup"), extra_message_input.toPlainText().strip()
-
     def _handle_create_user(self) -> None:
         if self.current_role != RolUsuario.ADMIN:
             QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede crear usuarios.")
             return
-        data = self._prompt_create_user_data()
+        data = prompt_create_user_data(self)
         if data is None:
             return
         try:
@@ -2632,7 +2431,7 @@ class MainWindow(QMainWindow):
                 target_user = session.get(Usuario, user_id)
                 if target_user is None:
                     raise ValueError("No se encontro el usuario seleccionado.")
-                new_role = self._prompt_role_change(target_user.rol)
+                new_role = prompt_role_change(self, target_user.rol)
                 if new_role is None:
                     return
         except Exception as exc:  # noqa: BLE001
@@ -2661,7 +2460,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Sin seleccion", "Selecciona un usuario en la tabla.")
             return
         try:
-            new_password = self._prompt_password_change()
+            new_password = prompt_password_change(self)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Contrasena invalida", str(exc))
             return
@@ -2693,7 +2492,8 @@ class MainWindow(QMainWindow):
                 target_user = session.get(Usuario, user_id)
                 if target_user is None:
                     raise ValueError("No se encontro el usuario seleccionado.")
-                data = self._prompt_edit_user_data(
+                data = prompt_edit_user_data(
+                    self,
                     username=target_user.username,
                     nombre_completo=target_user.nombre_completo,
                     current_role=target_user.rol,
@@ -2731,9 +2531,10 @@ class MainWindow(QMainWindow):
         if self.current_role != RolUsuario.ADMIN:
             QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede crear proveedores.")
             return
-        data = self._prompt_supplier_data(
-            "Crear proveedor",
-            "Captura los datos base del proveedor para usarlo despues en compras.",
+        data = prompt_supplier_data(
+            self,
+            title="Crear proveedor",
+            helper_text="Captura los datos base del proveedor para usarlo despues en compras.",
         )
         if data is None:
             return
@@ -2768,9 +2569,10 @@ class MainWindow(QMainWindow):
                 supplier = session.get(Proveedor, supplier_id)
                 if supplier is None:
                     raise ValueError("No se encontro el proveedor seleccionado.")
-                data = self._prompt_supplier_data(
-                    "Editar proveedor",
-                    "Actualiza contacto, correo o direccion del proveedor.",
+                data = prompt_supplier_data(
+                    self,
+                    title="Editar proveedor",
+                    helper_text="Actualiza contacto, correo o direccion del proveedor.",
                     current_values={
                         "nombre": supplier.nombre,
                         "telefono": supplier.telefono or "",
@@ -2837,9 +2639,10 @@ class MainWindow(QMainWindow):
         if self.current_role != RolUsuario.ADMIN:
             QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede crear clientes.")
             return
-        data = self._prompt_client_data(
-            "Crear cliente",
-            "Captura los datos base del cliente para futuras ventas, apartados o programas de fidelizacion.",
+        data = prompt_client_data(
+            self,
+            title="Crear cliente",
+            helper_text="Captura los datos base del cliente para futuras ventas, apartados o programas de fidelizacion.",
         )
         if data is None:
             return
@@ -2882,9 +2685,10 @@ class MainWindow(QMainWindow):
                 client = session.get(Cliente, client_id)
                 if client is None:
                     raise ValueError("No se encontro el cliente seleccionado.")
-                data = self._prompt_client_data(
-                    "Editar cliente",
-                    "Actualiza telefono, tipo comercial, descuento o notas del cliente.",
+                data = prompt_client_data(
+                    self,
+                    title="Editar cliente",
+                    helper_text="Actualiza telefono, tipo comercial, descuento o notas del cliente.",
                     current_values={
                         "nombre": client.nombre,
                         "tipo_cliente": client.tipo_cliente.value,
@@ -2989,7 +2793,7 @@ class MainWindow(QMainWindow):
                 if client is None:
                     raise ValueError("No se encontro el cliente seleccionado.")
                 normalized_phone, asset_path, delivery_note = self._prepare_client_card_delivery(client)
-                payload = self._prompt_client_whatsapp_data(client.nombre)
+                payload = prompt_client_whatsapp_data(self, client.nombre)
                 if payload is None:
                     return
                 message_type, extra_message = payload
@@ -3292,71 +3096,12 @@ class MainWindow(QMainWindow):
                 suggested_amount = CajaService.obtener_ultimo_reactivo_sugerido(session)
         except Exception:
             suggested_amount = None
-        dialog, layout = self._create_modal_dialog(
-            "Apertura de caja",
-            "Antes de operar, confirma cuanto reactivo inicial hay actualmente en caja.",
-            width=420,
+        return prompt_open_cash_session(
+            self,
+            suggested_amount=suggested_amount,
         )
-        amount_spin = QDoubleSpinBox()
-        amount_spin.setRange(0.0, 999999.99)
-        amount_spin.setDecimals(2)
-        amount_spin.setPrefix("$")
-        amount_spin.setSingleStep(50.0)
-        if suggested_amount is not None:
-            amount_spin.setValue(float(suggested_amount))
-        note_input = QTextEdit()
-        note_input.setPlaceholderText("Observacion opcional")
-        note_input.setMaximumHeight(90)
-        reuse_button = QPushButton("Usar ultimo reactivo")
-        reuse_button.setObjectName("toolbarSecondaryButton")
-        reuse_button.setEnabled(suggested_amount is not None)
-        reuse_hint = QLabel(
-            f"Ultimo reactivo sugerido: ${suggested_amount}" if suggested_amount is not None else "No hay un reactivo anterior registrado."
-        )
-        reuse_hint.setObjectName("subtleLine")
-        reuse_hint.setWordWrap(True)
-        if suggested_amount is not None:
-            reuse_button.clicked.connect(lambda: amount_spin.setValue(float(suggested_amount)))
-        form = QFormLayout()
-        form.addRow("Reactivo inicial", amount_spin)
-        form.addRow("", reuse_button)
-        form.addRow("Observacion", note_input)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Abrir caja")
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addWidget(reuse_hint)
-        layout.addLayout(form)
-        layout.addWidget(buttons)
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return None
-        return {
-            "monto_apertura": Decimal(str(amount_spin.value())).quantize(Decimal("0.01")),
-            "observacion": note_input.toPlainText().strip(),
-        }
 
     def _prompt_cash_movement_data(self, movement_type: TipoMovimientoCaja) -> dict[str, object] | None:
-        labels = {
-            TipoMovimientoCaja.REACTIVO: (
-                "Ajustar reactivo",
-                "Captura el total actual de reactivo en caja. El sistema calculara la diferencia automaticamente.",
-            ),
-            TipoMovimientoCaja.INGRESO: ("Ingreso", "Registra una entrada manual de efectivo a la caja actual."),
-            TipoMovimientoCaja.RETIRO: ("Retiro", "Registra una salida manual de efectivo de la caja actual."),
-        }
-        title, helper = labels[movement_type]
-        dialog, layout = self._create_modal_dialog(title, helper, width=420)
-        amount_spin = QDoubleSpinBox()
-        amount_spin.setRange(0.00, 999999.99)
-        amount_spin.setDecimals(2)
-        amount_spin.setPrefix("$")
-        amount_spin.setSingleStep(50.0)
-        concept_input = QTextEdit()
-        concept_input.setPlaceholderText("Concepto u observacion")
-        concept_input.setMaximumHeight(90)
-        form = QFormLayout()
-        delta_label = QLabel("")
-        delta_label.setObjectName("cashierChangeValue")
         target_total: Decimal | None = None
         if movement_type == TipoMovimientoCaja.REACTIVO:
             try:
@@ -3370,58 +3115,13 @@ class MainWindow(QMainWindow):
                         ).quantize(Decimal("0.01"))
             except Exception:
                 target_total = None
-            if target_total is not None:
-                amount_spin.setValue(float(target_total))
-
-            current_label = QLabel(
-                f"Reactivo actual registrado: ${target_total}" if target_total is not None else "No se pudo calcular el reactivo actual."
-            )
-            current_label.setObjectName("subtleLine")
-            current_label.setWordWrap(True)
-
-            def update_delta() -> None:
-                current_total = target_total or Decimal("0.00")
-                delta = (Decimal(str(amount_spin.value())).quantize(Decimal("0.01")) - current_total).quantize(Decimal("0.01"))
-                sign = "+" if delta >= Decimal("0.00") else ""
-                delta_label.setText(f"Diferencia a registrar: {sign}${delta}")
-
-            amount_spin.valueChanged.connect(update_delta)
-            form.addRow(current_label)
-            form.addRow("Total actual", amount_spin)
-            form.addRow("Diferencia", delta_label)
-            update_delta()
-        else:
-            form.addRow("Monto", amount_spin)
-        form.addRow("Concepto", concept_input)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.button(QDialogButtonBox.StandardButton.Ok).setText(f"Registrar {title.lower()}")
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addLayout(form)
-        layout.addWidget(buttons)
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return None
-        amount = Decimal(str(amount_spin.value())).quantize(Decimal("0.01"))
-        if movement_type == TipoMovimientoCaja.REACTIVO:
-            current_total = target_total or Decimal("0.00")
-            amount = (amount - current_total).quantize(Decimal("0.01"))
-            if amount == Decimal("0.00"):
-                QMessageBox.information(dialog, "Sin cambios", "El total actual coincide con el reactivo ya registrado.")
-                return None
-        return {
-            "monto": amount,
-            "total_objetivo": Decimal(str(amount_spin.value())).quantize(Decimal("0.01"))
-            if movement_type == TipoMovimientoCaja.REACTIVO
-            else None,
-            "concepto": concept_input.toPlainText().strip(),
-        }
+        return prompt_cash_movement_data(
+            self,
+            movement_type=movement_type,
+            target_total=target_total,
+        )
 
     def _prompt_cash_opening_correction(self) -> dict[str, object] | None:
-        dialog, layout = self._create_modal_dialog(
-            "Corregir apertura",
-            "Actualiza el reactivo inicial de la caja abierta. Usa esto solo si la apertura se registro con un monto incorrecto.",
-            width=430,
-        )
         current_amount = Decimal("0.00")
         try:
             with get_session() as session:
@@ -3430,56 +3130,10 @@ class MainWindow(QMainWindow):
                     current_amount = Decimal(cash_session.monto_apertura).quantize(Decimal("0.01"))
         except Exception:
             current_amount = Decimal("0.00")
-
-        amount_spin = QDoubleSpinBox()
-        amount_spin.setRange(0.00, 999999.99)
-        amount_spin.setDecimals(2)
-        amount_spin.setPrefix("$")
-        amount_spin.setSingleStep(50.0)
-        amount_spin.setValue(float(current_amount))
-
-        difference_label = QLabel("")
-        difference_label.setObjectName("cashierChangeValue")
-        current_label = QLabel(f"Reactivo inicial registrado: ${current_amount}")
-        current_label.setObjectName("subtleLine")
-        current_label.setWordWrap(True)
-
-        reason_input = QTextEdit()
-        reason_input.setPlaceholderText("Motivo o aclaracion de la correccion")
-        reason_input.setMaximumHeight(90)
-
-        def update_difference() -> None:
-            nuevo = Decimal(str(amount_spin.value())).quantize(Decimal("0.01"))
-            delta = (nuevo - current_amount).quantize(Decimal("0.01"))
-            sign = "+" if delta >= Decimal("0.00") else ""
-            difference_label.setText(f"Cambio sobre apertura: {sign}${delta}")
-
-        amount_spin.valueChanged.connect(update_difference)
-        update_difference()
-
-        form = QFormLayout()
-        form.addRow(current_label)
-        form.addRow("Nuevo reactivo inicial", amount_spin)
-        form.addRow("Diferencia", difference_label)
-        form.addRow("Motivo", reason_input)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Guardar correccion")
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addLayout(form)
-        layout.addWidget(buttons)
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return None
-
-        nuevo_monto = Decimal(str(amount_spin.value())).quantize(Decimal("0.01"))
-        if nuevo_monto == current_amount:
-            QMessageBox.information(dialog, "Sin cambios", "El reactivo inicial ya tiene ese valor.")
-            return None
-        return {
-            "monto_anterior": current_amount,
-            "nuevo_monto": nuevo_monto,
-            "motivo": reason_input.toPlainText().strip(),
-        }
+        return prompt_cash_opening_correction(
+            self,
+            current_amount=current_amount,
+        )
 
     def _handle_cash_movement(self, movement_type: TipoMovimientoCaja) -> None:
         if self.current_role not in {RolUsuario.ADMIN, RolUsuario.CAJERO}:
@@ -3583,60 +3237,25 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Corte no disponible", str(exc))
             return
 
-        dialog, layout = self._create_modal_dialog(
-            "Corte de caja",
-            "Revisa el efectivo esperado y captura el monto contado para cerrar la caja.",
-            width=520,
+        payload = prompt_cash_cut_data(
+            self,
+            summary_view=CashCutSummaryView(
+                opened_at_label=cash_session.abierta_at.strftime("%Y-%m-%d %H:%M") if cash_session.abierta_at else "",
+                opening_amount=Decimal(cash_session.monto_apertura),
+                reactivo_count=resumen.reactivo_count,
+                reactivo_total=resumen.reactivo_total,
+                ingresos_count=resumen.ingresos_count,
+                ingresos_total=resumen.ingresos_total,
+                retiros_count=resumen.retiros_count,
+                retiros_total=resumen.retiros_total,
+                cash_sales_count=resumen.ventas_efectivo_count,
+                cash_sales_total=resumen.efectivo_ventas,
+                cash_payments_count=resumen.abonos_efectivo_count,
+                cash_payments_total=resumen.efectivo_abonos,
+                expected_amount=resumen.esperado_en_caja,
+            ),
         )
-        info = QLabel(
-            "\n".join(
-                [
-                    f"Apertura: {cash_session.abierta_at.strftime('%Y-%m-%d %H:%M') if cash_session.abierta_at else ''}",
-                    f"Reactivo inicial: ${Decimal(cash_session.monto_apertura)}",
-                    f"Reactivos extra: {resumen.reactivo_count} | ${resumen.reactivo_total}",
-                    f"Ingresos manuales: {resumen.ingresos_count} | ${resumen.ingresos_total}",
-                    f"Retiros manuales: {resumen.retiros_count} | ${resumen.retiros_total}",
-                    f"Ventas con efectivo: {resumen.ventas_efectivo_count}",
-                    f"Efectivo por ventas: ${resumen.efectivo_ventas}",
-                    f"Abonos con efectivo: {resumen.abonos_efectivo_count}",
-                    f"Efectivo por abonos: ${resumen.efectivo_abonos}",
-                    f"Esperado en caja: ${resumen.esperado_en_caja}",
-                ]
-            )
-        )
-        info.setWordWrap(True)
-        info.setObjectName("inventoryMetaCard")
-        counted_spin = QDoubleSpinBox()
-        counted_spin.setRange(0.0, 999999.99)
-        counted_spin.setDecimals(2)
-        counted_spin.setPrefix("$")
-        counted_spin.setSingleStep(50.0)
-        counted_spin.setValue(float(resumen.esperado_en_caja))
-        difference_label = QLabel("$0.00")
-        difference_label.setObjectName("cashierChangeValue")
-        note_input = QTextEdit()
-        note_input.setPlaceholderText("Observaciones del corte")
-        note_input.setMaximumHeight(90)
-
-        def update_difference() -> None:
-            counted = Decimal(str(counted_spin.value())).quantize(Decimal("0.01"))
-            difference = (counted - resumen.esperado_en_caja).quantize(Decimal("0.01"))
-            difference_label.setText(f"${difference}")
-
-        counted_spin.valueChanged.connect(update_difference)
-        form = QFormLayout()
-        form.addRow("Monto contado", counted_spin)
-        form.addRow("Diferencia", difference_label)
-        form.addRow("Observacion", note_input)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Cerrar caja")
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addWidget(info)
-        layout.addLayout(form)
-        layout.addWidget(buttons)
-        update_difference()
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
+        if payload is None:
             return
 
         try:
@@ -3649,8 +3268,8 @@ class MainWindow(QMainWindow):
                     session=session,
                     cash_session=cash_session,
                     usuario=user,
-                    monto_contado=Decimal(str(counted_spin.value())).quantize(Decimal("0.01")),
-                    observacion=note_input.toPlainText().strip(),
+                    monto_contado=Decimal(payload["monto_contado"]),
+                    observacion=str(payload["observacion"]),
                 )
                 session.commit()
         except Exception as exc:  # noqa: BLE001
@@ -6976,34 +6595,27 @@ class MainWindow(QMainWindow):
     def _handle_catalog_selection(self) -> None:
         selected_row = self.catalog_table.currentRow()
         if selected_row < 0 or selected_row >= len(self.catalog_rows):
-            self.products_selection_label.setText(
-                "Consulta uniformes y usa filtros macro como Deportivo, Oficial, Basico, Escolta o Accesorio."
-            )
+            self.products_selection_label.setText(build_empty_catalog_selection_view().selection_label)
             return
 
         row = self.catalog_rows[selected_row]
-        context_parts = [
-            str(row["escuela_nombre"]),
-            str(row["tipo_prenda_nombre"]),
-            str(row["tipo_pieza_nombre"]),
-        ]
-        context_text = " | ".join(part for part in context_parts if part and part != "-")
-        legacy_note = (
-            f" | legacy: {row['nombre_legacy']}"
-            if row["origen_legacy"] and row["nombre_legacy"] and row["nombre_legacy"] != row["producto_nombre"]
-            else ""
+        selection_view = build_catalog_selection_view(
+            is_admin=self.current_role == RolUsuario.ADMIN,
+            sku=str(row["sku"]),
+            product_name=str(row["producto_nombre"]),
+            product_base_name=str(row["producto_nombre_base"]),
+            school_name=str(row["escuela_nombre"]),
+            uniform_type_name=str(row["tipo_prenda_nombre"]),
+            piece_type_name=str(row["tipo_pieza_nombre"]),
+            sale_price=row["precio_venta"],
+            stock_actual=int(row["stock_actual"]),
+            layaway_reserved=int(row["apartado_cantidad"]),
+            variant_status=str(row["variante_estado"]),
+            origin_label=str(row["origen_etiqueta"]),
+            origin_legacy=bool(row["origen_legacy"]),
+            legacy_name=str(row["nombre_legacy"] or ""),
         )
-        if self.current_role == RolUsuario.ADMIN:
-            self.products_selection_label.setText(
-                f"{row['sku']} | {row['producto_nombre_base']} | {context_text or 'General'} | "
-                f"precio {row['precio_venta']} | stock {row['stock_actual']} | apartado {row['apartado_cantidad']} | "
-                f"{row['variante_estado']} | {row['origen_etiqueta']}{legacy_note}"
-            )
-        else:
-            self.products_selection_label.setText(
-                f"{row['producto_nombre_base']} | {row['sku']} | {context_text or 'General'} | "
-                f"precio {row['precio_venta']} | stock {row['stock_actual']}"
-            )
+        self.products_selection_label.setText(selection_view.selection_label)
 
     def _handle_update_product(self) -> None:
         selected = self._selected_catalog_row()
@@ -7443,8 +7055,12 @@ class MainWindow(QMainWindow):
         self.sale_qty_spin.setValue(1)
         self.sale_payment_combo.setCurrentText("Efectivo")
         self.sale_client_combo.setCurrentIndex(0)
-        self._set_sale_discount_lock_state(locked=False, discount_percent=Decimal("0.00"))
-        self._clear_sale_manual_promo_authorization()
+        self._apply_sale_client_selection_ui_state(
+            build_empty_sale_client_selection_ui_state(
+                normalize_discount_value=self._normalize_discount_value,
+                format_discount_label=self._format_discount_label,
+            )
+        )
         self._refresh_sale_discount_options(selected_discount=Decimal("0.00"))
         self.sale_folio_input.setText(self._generate_sale_folio())
         self.sale_last_scanned_sku = ""
@@ -7510,44 +7126,49 @@ class MainWindow(QMainWindow):
             return f"{preview_head} | rango {preview_list[0]} -> {preview_list[-1]}"
         return f"{preview_head} ... (+{len(preview_list) - 4}) | rango {preview_list[0]} -> {preview_list[-1]}"
 
-    def _apply_scanned_client_to_sale(self, client: Cliente, scanned_code: str) -> bool:
-        current_client_id = self.sale_client_combo.currentData()
-        decision = decide_scanned_client_action(
-            current_client_id=current_client_id,
+    def _apply_scanned_client_to_sale(self, session, client: Cliente, scanned_code: str) -> bool:
+        ui_state = build_sale_scanned_client_ui_state(
+            current_client_id=self.sale_client_combo.currentData(),
+            current_client_label=self.sale_client_combo.currentText().strip() or "Cliente actual",
             scanned_client_id=client.id,
+            scanned_client_code=client.codigo_cliente,
+            scanned_client_name=client.nombre,
             has_sale_cart=bool(self.sale_cart),
+            discount_percent=load_sale_selected_client_discount_percent(
+                session,
+                selected_client_id=client.id,
+                normalize_discount_value=self._normalize_discount_value,
+            ),
+            format_discount_label=self._format_discount_label,
         )
-        if decision.action == "already_linked":
+        if ui_state.action == "already_linked":
             self.sale_sku_input.clear()
             self.sale_qty_spin.setValue(1)
+            assert ui_state.immediate_feedback is not None
             self._set_sale_feedback(
-                build_client_already_linked_feedback(client.codigo_cliente),
-                "neutral",
-                auto_clear_ms=1700,
+                ui_state.immediate_feedback.message,
+                ui_state.immediate_feedback.tone,
+                auto_clear_ms=ui_state.immediate_feedback.auto_clear_ms,
             )
             self.sale_sku_input.setFocus()
             return True
 
-        if decision.action == "confirm_replace":
-            current_label = self.sale_client_combo.currentText().strip() or "Cliente actual"
+        if ui_state.action == "confirm_replace":
             confirmation = QMessageBox.question(
                 self,
                 "Cambiar cliente de la venta",
-                build_replace_client_confirmation(
-                    current_label=current_label,
-                    scanned_client_code=client.codigo_cliente,
-                    scanned_client_name=client.nombre,
-                ),
+                ui_state.confirmation_message,
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
             if confirmation != QMessageBox.StandardButton.Yes:
                 self.sale_sku_input.clear()
                 self.sale_qty_spin.setValue(1)
+                assert ui_state.rejected_feedback is not None
                 self._set_sale_feedback(
-                    build_scanned_client_kept_feedback(),
-                    "warning",
-                    auto_clear_ms=2000,
+                    ui_state.rejected_feedback.message,
+                    ui_state.rejected_feedback.tone,
+                    auto_clear_ms=ui_state.rejected_feedback.auto_clear_ms,
                 )
                 self.sale_sku_input.setFocus()
                 return True
@@ -7562,17 +7183,11 @@ class MainWindow(QMainWindow):
         self.sale_sku_input.clear()
         self.sale_qty_spin.setValue(1)
         self._play_sale_feedback_sound()
-        discount = self._selected_sale_client_discount()
-        feedback = build_scanned_client_applied_feedback(
-            client_code=client.codigo_cliente,
-            client_name=client.nombre,
-            discount_percent=discount,
-            format_discount_label=self._format_discount_label,
-        )
+        assert ui_state.applied_feedback is not None
         self._set_sale_feedback(
-            feedback.message,
-            feedback.tone,
-            auto_clear_ms=feedback.auto_clear_ms,
+            ui_state.applied_feedback.message,
+            ui_state.applied_feedback.tone,
+            auto_clear_ms=ui_state.applied_feedback.auto_clear_ms,
         )
         self.sale_sku_input.setFocus()
         return True
@@ -7611,21 +7226,6 @@ class MainWindow(QMainWindow):
         except Exception:
             values = default_values
         return sorted({value for value in values if value > Decimal("0.00")})
-
-    def _selected_sale_client_discount(self) -> Decimal:
-        selected_client_id = self.sale_client_combo.currentData()
-        if selected_client_id in {None, ""}:
-            return Decimal("0.00")
-        try:
-            with get_session() as session:
-                benefit = load_sale_selected_client_benefit(
-                    session,
-                    selected_client_id=selected_client_id,
-                    normalize_discount_value=self._normalize_discount_value,
-                )
-                return benefit.discount_percent if benefit is not None else Decimal("0.00")
-        except Exception:
-            return Decimal("0.00")
 
     def _refresh_sale_discount_options(self, *, selected_discount: Decimal | int | float | str | None = None) -> None:
         current_discount = (
@@ -7670,23 +7270,6 @@ class MainWindow(QMainWindow):
         self.sale_discount_combo.addItem(label, float(normalized))
         return self.sale_discount_combo.count() - 1
 
-    def _set_sale_discount_lock_state(self, *, locked: bool, discount_percent: Decimal, source_label: str = "") -> None:
-        state = build_sale_discount_lock_state(
-            locked=locked,
-            discount_percent=discount_percent,
-            source_label=source_label,
-            normalize_discount_value=self._normalize_discount_value,
-        )
-        self.sale_discount_locked_to_client = state.locked
-        self.sale_locked_discount_percent = state.discount_percent
-        self.sale_locked_discount_source = state.source_label
-        self.sale_discount_combo.setToolTip(
-            build_sale_discount_lock_tooltip(
-                state=state,
-                format_discount_label=self._format_discount_label,
-            )
-        )
-
     def _set_sale_discount_combo_percent(self, discount_percent: Decimal | str | int | float) -> None:
         index = self._ensure_sale_discount_option(discount_percent)
         previous_state = self.sale_discount_combo.blockSignals(True)
@@ -7707,6 +7290,16 @@ class MainWindow(QMainWindow):
     def _apply_sale_manual_promo_state(self, state) -> None:
         self.sale_manual_promo_authorized = state.authorized
         self.sale_manual_promo_authorized_percent = state.authorized_percent
+
+    def _apply_sale_client_selection_ui_state(self, ui_state) -> None:
+        if ui_state.combo_discount_percent is not None:
+            self._set_sale_discount_combo_percent(ui_state.combo_discount_percent)
+        if ui_state.clear_manual_promo:
+            self._clear_sale_manual_promo_authorization()
+        self.sale_discount_locked_to_client = ui_state.lock_state.locked
+        self.sale_locked_discount_percent = ui_state.lock_state.discount_percent
+        self.sale_locked_discount_source = ui_state.lock_state.source_label
+        self.sale_discount_combo.setToolTip(ui_state.lock_tooltip)
 
     def _current_manual_promo_percent(self) -> Decimal:
         return current_manual_promo_percent(
@@ -7762,10 +7355,6 @@ class MainWindow(QMainWindow):
         self._refresh_sale_cart_table()
 
     def _sync_sale_discount_with_selected_client(self, *, reset_manual: bool = False) -> None:
-        if reset_manual:
-            self._set_sale_discount_combo_percent(Decimal("0.00"))
-            self._clear_sale_manual_promo_authorization()
-
         try:
             with get_session() as session:
                 state = resolve_sale_selected_client_sync_state(
@@ -7779,10 +7368,13 @@ class MainWindow(QMainWindow):
                 selected_client_id=None,
                 normalize_discount_value=self._normalize_discount_value,
             )
-        self._set_sale_discount_lock_state(
-            locked=state.locked,
-            discount_percent=state.discount_percent,
-            source_label=state.source_label,
+        self._apply_sale_client_selection_ui_state(
+            build_sale_client_selection_ui_state(
+                sync_state=state,
+                reset_manual=reset_manual,
+                normalize_discount_value=self._normalize_discount_value,
+                format_discount_label=self._format_discount_label,
+            )
         )
         self._refresh_sale_cart_table()
 
@@ -7867,7 +7459,7 @@ class MainWindow(QMainWindow):
             with get_session() as session:
                 client = find_active_sale_client_by_code(session, sku)
                 if client is not None:
-                    if self._apply_scanned_client_to_sale(client, sku):
+                    if self._apply_scanned_client_to_sale(session, client, sku):
                         return
                 variante = VentaService.obtener_variante_por_sku(session, sku)
                 if variante is None:
@@ -8268,22 +7860,17 @@ class MainWindow(QMainWindow):
             )
 
     def _handle_cancel_sale(self) -> None:
-        selected_row = self.recent_sales_table.currentRow()
-        if selected_row < 0:
+        sale_id = self._selected_recent_sale_id()
+        if sale_id is None:
             QMessageBox.warning(self, "Sin seleccion", "Selecciona una venta en la tabla.")
             return
         if self.current_role != RolUsuario.ADMIN:
             QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede cancelar ventas.")
             return
 
-        sale_id_item = self.recent_sales_table.item(selected_row, 0)
-        if sale_id_item is None:
-            QMessageBox.warning(self, "Sin seleccion", "No se pudo identificar la venta seleccionada.")
-            return
-
         try:
             with get_session() as session:
-                venta = session.get(Venta, int(sale_id_item.text()))
+                venta = session.get(Venta, sale_id)
                 admin = session.get(Usuario, self.user_id)
                 if venta is None or admin is None:
                     raise ValueError("Venta o usuario ADMIN no encontrado.")
@@ -8637,19 +8224,20 @@ class MainWindow(QMainWindow):
         can_manage_layaways = self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
         has_cash_session = self.active_cash_session_id is not None
         can_operate_open_cash = has_cash_session and not self.cash_session_requires_cut
+        catalog_access_view = build_catalog_access_view(is_admin=is_admin)
         self._apply_role_navigation()
         self.category_button.setEnabled(is_admin)
         self.brand_button.setEnabled(is_admin)
         self.inventory_category_button.setEnabled(is_admin)
         self.inventory_brand_button.setEnabled(is_admin)
-        self.product_button.setEnabled(is_admin)
-        self.variant_button.setEnabled(is_admin)
-        self.update_product_button.setEnabled(is_admin)
-        self.update_variant_button.setEnabled(is_admin)
-        self.toggle_product_button.setEnabled(is_admin)
-        self.toggle_variant_button.setEnabled(is_admin)
-        self.delete_product_button.setEnabled(is_admin)
-        self.delete_variant_button.setEnabled(is_admin)
+        self.product_button.setEnabled(catalog_access_view.create_product_enabled)
+        self.variant_button.setEnabled(catalog_access_view.create_variant_enabled)
+        self.update_product_button.setEnabled(catalog_access_view.update_product_enabled)
+        self.update_variant_button.setEnabled(catalog_access_view.update_variant_enabled)
+        self.toggle_product_button.setEnabled(catalog_access_view.toggle_product_enabled)
+        self.toggle_variant_button.setEnabled(catalog_access_view.toggle_variant_enabled)
+        self.delete_product_button.setEnabled(catalog_access_view.delete_product_enabled)
+        self.delete_variant_button.setEnabled(catalog_access_view.delete_variant_enabled)
         self.inventory_new_button.setEnabled(is_admin)
         self.inventory_edit_button.setEnabled(is_admin)
         self.inventory_stock_button.setEnabled(is_admin)
@@ -8751,13 +8339,9 @@ class MainWindow(QMainWindow):
         self.analytics_label.setVisible(is_admin)
         self.layaway_alerts_label.setVisible(is_admin)
         if self.products_quick_setup_box is not None:
-            self.products_quick_setup_box.setVisible(is_admin)
+            self.products_quick_setup_box.setVisible(catalog_access_view.quick_setup_visible)
 
-        self.catalog_permission_label.setText(
-            "Esta pestaña es de consulta. Las altas, cambios de precio y existencias se gestionan en Inventario."
-            if is_admin
-            else "Consulta precio, stock y estado de cada presentacion sin salir de caja."
-        )
+        self.catalog_permission_label.setText(catalog_access_view.permission_label)
         self.purchase_permission_label.setText(
             "" if is_admin else "Compras y carga de datos demo disponibles solo para ADMIN."
         )
@@ -8854,25 +8438,14 @@ class MainWindow(QMainWindow):
                 ]
             )
         )
+        layaway_alerts_view = build_layaway_alerts_view(
+            overdue_count=apartados_vencidos,
+            due_today_count=apartados_hoy,
+            due_week_count=apartados_semana,
+        )
         self.layaway_alerts_label.setTextFormat(Qt.TextFormat.RichText)
-        self.layaway_alerts_label.setText(
-            "".join(
-                [
-                    _inline_metric_badge("Vencidos", apartados_vencidos, "danger" if apartados_vencidos else "neutral"),
-                    _inline_metric_badge("Hoy", apartados_hoy, "warning" if apartados_hoy else "neutral"),
-                    _inline_metric_badge("7 dias", apartados_semana, "positive" if apartados_semana else "neutral"),
-                ]
-            )
-        )
-        self.layaway_quick_alerts_label.setText(
-            " | ".join(
-                [
-                    f"Apartados vencidos: {apartados_vencidos}",
-                    f"Vencen hoy: {apartados_hoy}",
-                    f"Proximos 7 dias: {apartados_semana}",
-                ]
-            )
-        )
+        self.layaway_alerts_label.setText(layaway_alerts_view.alerts_rich_text)
+        self.layaway_quick_alerts_label.setText(layaway_alerts_view.quick_alerts_text)
         if manual_promo_summary.total_hoy <= 0:
             self.dashboard_manual_promo_label.setText("Sin promociones manuales autorizadas hoy.")
             self.dashboard_manual_promo_label.setProperty("tone", "neutral")
@@ -9080,8 +8653,14 @@ class MainWindow(QMainWindow):
             for column_index, value in enumerate(values):
                 self.catalog_table.setItem(row_index, column_index, _table_item(value))
         self.catalog_table.resizeColumnsToContents()
-        self.catalog_results_label.setText(self._build_catalog_results_summary(rows_count=len(rows)))
-        self.catalog_active_filters_label.setText(self._build_catalog_active_filters_summary())
+        active_filter_labels = self._catalog_active_filter_labels()
+        catalog_summary_view = build_catalog_summary_view(
+            total_rows=len(rows),
+            visible_rows=self.catalog_rows,
+            active_filter_labels=active_filter_labels,
+        )
+        self.catalog_results_label.setText(catalog_summary_view.results_summary)
+        self.catalog_active_filters_label.setText(catalog_summary_view.active_filters_summary)
         if selected_variant_id is not None and not self._select_catalog_variant(selected_variant_id):
             self._clear_catalog_editor()
         elif selected_variant_id is None:
@@ -9131,18 +8710,6 @@ class MainWindow(QMainWindow):
             ),
         )
 
-    def _build_catalog_results_summary(self, *, rows_count: int) -> str:
-        filtered_count = len(self.catalog_rows)
-        total_stock = sum(int(row["stock_actual"]) for row in self.catalog_rows)
-        reserved_count = sum(1 for row in self.catalog_rows if int(row["apartado_cantidad"]) > 0)
-        fallback_count = sum(1 for row in self.catalog_rows if bool(row.get("fallback_importacion")))
-        active_filters = self._catalog_active_filter_labels()
-        filters_label = build_filters_label(active_filters)
-        return (
-            f"Resultados: {filtered_count} de {rows_count} | Stock visible: {total_stock} | "
-            f"Con apartados: {reserved_count} | Fallbacks: {fallback_count} | Filtros: {filters_label}"
-        )
-
     def _catalog_active_filter_labels(self) -> list[str]:
         return build_active_filter_labels(
             search_text=self.catalog_search_input.text(),
@@ -9163,9 +8730,6 @@ class MainWindow(QMainWindow):
                 ("incidencias", self.catalog_duplicate_filter_combo.currentData(), self.catalog_duplicate_filter_combo.currentText()),
             ),
         )
-
-    def _build_catalog_active_filters_summary(self) -> str:
-        return build_active_filters_summary(self._catalog_active_filter_labels())
 
     @staticmethod
     def _inventory_search_alias_map() -> dict[str, tuple[str, ...]]:
@@ -9232,16 +8796,6 @@ class MainWindow(QMainWindow):
 
     def _build_inventory_active_filters_summary(self) -> str:
         return build_active_filters_summary(self._inventory_active_filter_labels())
-
-    def _build_inventory_results_summary(self, *, total_rows: int, visible_rows: list[dict[str, object]]) -> str:
-        total_stock = sum(int(row["stock_actual"]) for row in visible_rows)
-        reserved_count = sum(1 for row in visible_rows if int(row["apartado_cantidad"]) > 0)
-        fallback_count = sum(1 for row in visible_rows if bool(row.get("fallback_importacion")))
-        filters_label = build_filters_label(self._inventory_active_filter_labels())
-        return (
-            f"Resultados: {len(visible_rows)} de {total_rows} | Stock visible: {total_stock} | "
-            f"Con apartados: {reserved_count} | Fallbacks: {fallback_count} | Filtros: {filters_label}"
-        )
 
     def _refresh_combos(self, session) -> None:
         categorias = session.scalars(select(Categoria).where(Categoria.activo.is_(True)).order_by(Categoria.nombre)).all()
@@ -9326,19 +8880,10 @@ class MainWindow(QMainWindow):
         self._refresh_selected_qr_preview()
 
     def _refresh_sales_table(self, session) -> None:
-        sales = session.scalars(select(Venta).order_by(desc(Venta.created_at)).limit(20)).all()
-        self.recent_sales_table.setRowCount(len(sales))
-        for row_index, sale in enumerate(sales):
-            values = [
-                sale.id,
-                sale.folio,
-                sale.cliente.nombre if sale.cliente is not None else "Mostrador",
-                sale.usuario.username if sale.usuario else "",
-                sale.estado.value,
-                sale.total,
-                sale.created_at.strftime("%Y-%m-%d %H:%M") if sale.created_at else "",
-            ]
-            for column_index, value in enumerate(values):
+        rows = list_recent_sale_rows(session, limit=20)
+        self.recent_sales_table.setRowCount(len(rows))
+        for row_index, row in enumerate(rows):
+            for column_index, value in enumerate(row.values):
                 self.recent_sales_table.setItem(row_index, column_index, _table_item(value))
         self.recent_sales_table.resizeColumnsToContents()
         self._refresh_sale_cart_table()
@@ -9348,33 +8893,39 @@ class MainWindow(QMainWindow):
         search_text = self.quote_search_input.text().strip().lower()
         state_filter = str(self.quote_state_combo.currentData() or "")
         presupuestos = PresupuestoService.listar_presupuestos(session, limit=200)
-
-        rows: list[dict[str, object]] = []
-        for presupuesto in presupuestos:
-            if state_filter and presupuesto.estado.value != state_filter:
-                continue
-            searchable = " ".join(
-                [
-                    presupuesto.folio,
-                    presupuesto.cliente_nombre or "",
-                    presupuesto.cliente_telefono or "",
-                    " ".join(detalle.sku_snapshot for detalle in presupuesto.detalles),
-                ]
-            ).lower()
-            if search_text and search_text not in searchable:
-                continue
-            rows.append(
-                {
-                    "id": int(presupuesto.id),
-                    "folio": presupuesto.folio,
-                    "cliente": presupuesto.cliente_nombre or (presupuesto.cliente.nombre if presupuesto.cliente else "Mostrador / sin cliente"),
-                    "estado": presupuesto.estado.value,
-                    "total": Decimal(presupuesto.total),
-                    "usuario": presupuesto.usuario.username if presupuesto.usuario else "",
-                    "vigencia": presupuesto.vigencia_hasta.strftime("%Y-%m-%d") if presupuesto.vigencia_hasta else "Sin vigencia",
-                    "fecha": presupuesto.created_at.strftime("%Y-%m-%d %H:%M") if presupuesto.created_at else "",
-                }
-            )
+        quote_snapshots = [
+            {
+                "id": int(presupuesto.id),
+                "folio": presupuesto.folio,
+                "cliente": presupuesto.cliente_nombre
+                or (presupuesto.cliente.nombre if presupuesto.cliente else "Mostrador / sin cliente"),
+                "estado": presupuesto.estado.value,
+                "total": Decimal(presupuesto.total),
+                "usuario": presupuesto.usuario.username if presupuesto.usuario else "",
+                "vigencia": presupuesto.vigencia_hasta.strftime("%Y-%m-%d") if presupuesto.vigencia_hasta else "Sin vigencia",
+                "fecha": presupuesto.created_at.strftime("%Y-%m-%d %H:%M") if presupuesto.created_at else "",
+                "searchable": " ".join(
+                    [
+                        presupuesto.folio,
+                        presupuesto.cliente_nombre or "",
+                        presupuesto.cliente_telefono or "",
+                        " ".join(detalle.sku_snapshot for detalle in presupuesto.detalles),
+                    ]
+                ),
+            }
+            for presupuesto in presupuestos
+        ]
+        rows = build_quote_history_rows(
+            quote_snapshots=quote_snapshots,
+            search_text=search_text,
+            state_filter=state_filter,
+        )
+        quote_summary_view = build_quote_summary_view(
+            visible_count=len(rows),
+            search_text=self.quote_search_input.text(),
+            state_filter_value=self.quote_state_combo.currentData(),
+            state_filter_text=self.quote_state_combo.currentText(),
+        )
 
         self.quote_rows = rows
         self.quote_table.setRowCount(len(rows))
@@ -9394,21 +8945,11 @@ class MainWindow(QMainWindow):
             status_item = self.quote_table.item(row_index, 2)
             total_item = self.quote_table.item(row_index, 3)
             if status_item is not None:
-                tone = {
-                    EstadoPresupuesto.EMITIDO.value: "positive",
-                    EstadoPresupuesto.BORRADOR.value: "warning",
-                    EstadoPresupuesto.CANCELADO.value: "danger",
-                    EstadoPresupuesto.CONVERTIDO.value: "muted",
-                }.get(str(row["estado"]), "muted")
-                _set_table_badge_style(status_item, tone)
+                _set_table_badge_style(status_item, str(row["status_tone"]))
             if total_item is not None:
                 _set_table_badge_style(total_item, "positive")
         self.quote_table.resizeColumnsToContents()
-        self.quote_status_label.setText(
-            f"Presupuestos visibles: {len(rows)} | Filtro: {self.quote_state_combo.currentText()}"
-            if rows
-            else "No hay presupuestos con esos filtros."
-        )
+        self.quote_status_label.setText(quote_summary_view.status_label)
 
         if selected_quote_id is not None:
             self.quote_table.blockSignals(True)
@@ -9425,10 +8966,11 @@ class MainWindow(QMainWindow):
 
     def _refresh_quote_detail(self, quote_id: int | None) -> None:
         if not quote_id:
-            self.quote_customer_label.setText("Sin detalle.")
-            self.quote_meta_label.setText("")
-            self.quote_notes_label.setText("")
-            self.quote_detail_table.setRowCount(0)
+            detail_view = build_empty_quote_detail_view()
+            self.quote_customer_label.setText(detail_view.customer_label)
+            self.quote_meta_label.setText(detail_view.meta_label)
+            self.quote_notes_label.setText(detail_view.notes_label)
+            self.quote_detail_table.setRowCount(len(detail_view.detail_rows))
             return
 
         try:
@@ -9438,36 +8980,47 @@ class MainWindow(QMainWindow):
                     raise ValueError("Presupuesto no encontrado.")
                 client_text = presupuesto.cliente_nombre or (presupuesto.cliente.nombre if presupuesto.cliente else "Mostrador / sin cliente")
                 phone_text = presupuesto.cliente_telefono or (presupuesto.cliente.telefono if presupuesto.cliente else "Sin telefono")
-                self.quote_customer_label.setText(f"{presupuesto.folio} | {client_text}")
-                self.quote_meta_label.setText(
-                    " | ".join(
-                        [
-                            f"Estado {presupuesto.estado.value}",
-                            f"Telefono {phone_text}",
-                            f"Total ${Decimal(presupuesto.total).quantize(Decimal('0.01'))}",
-                            f"Vigencia {presupuesto.vigencia_hasta.strftime('%Y-%m-%d') if presupuesto.vigencia_hasta else 'Sin vigencia'}",
-                            f"Usuario {presupuesto.usuario.username if presupuesto.usuario else '-'}",
-                        ]
-                    )
+                detail_view = build_quote_detail_view(
+                    folio=presupuesto.folio,
+                    client_name=client_text,
+                    status_label=presupuesto.estado.value,
+                    phone_text=phone_text,
+                    total=Decimal(presupuesto.total),
+                    validity_label=presupuesto.vigencia_hasta.strftime("%Y-%m-%d") if presupuesto.vigencia_hasta else "Sin vigencia",
+                    user_label=presupuesto.usuario.username if presupuesto.usuario else "-",
+                    notes_text=presupuesto.observacion or "Sin observaciones.",
+                    detail_rows=[
+                        {
+                            "sku": detalle.sku_snapshot,
+                            "description": detalle.descripcion_snapshot,
+                            "quantity": detalle.cantidad,
+                            "unit_price": detalle.precio_unitario,
+                            "subtotal": detalle.subtotal_linea,
+                        }
+                        for detalle in presupuesto.detalles
+                    ],
                 )
-                self.quote_notes_label.setText(presupuesto.observacion or "Sin observaciones.")
-                self.quote_detail_table.setRowCount(len(presupuesto.detalles))
-                for row_index, detalle in enumerate(presupuesto.detalles):
+                self.quote_customer_label.setText(detail_view.customer_label)
+                self.quote_meta_label.setText(detail_view.meta_label)
+                self.quote_notes_label.setText(detail_view.notes_label)
+                self.quote_detail_table.setRowCount(len(detail_view.detail_rows))
+                for row_index, detalle in enumerate(detail_view.detail_rows):
                     values = [
-                        detalle.sku_snapshot,
-                        detalle.descripcion_snapshot,
-                        detalle.cantidad,
-                        detalle.precio_unitario,
-                        detalle.subtotal_linea,
+                        detalle.sku,
+                        detalle.description,
+                        detalle.quantity,
+                        detalle.unit_price,
+                        detalle.subtotal,
                     ]
                     for column_index, value in enumerate(values):
                         self.quote_detail_table.setItem(row_index, column_index, _table_item(value))
                 self.quote_detail_table.resizeColumnsToContents()
         except Exception as exc:  # noqa: BLE001
-            self.quote_customer_label.setText("No se pudo cargar el presupuesto")
-            self.quote_meta_label.setText(str(exc))
-            self.quote_notes_label.setText("")
-            self.quote_detail_table.setRowCount(0)
+            detail_view = build_error_quote_detail_view(str(exc))
+            self.quote_customer_label.setText(detail_view.customer_label)
+            self.quote_meta_label.setText(detail_view.meta_label)
+            self.quote_notes_label.setText(detail_view.notes_label)
+            self.quote_detail_table.setRowCount(len(detail_view.detail_rows))
 
     def _refresh_inventory_table(self, session) -> None:
         current_variant_id = self.inventory_variant_combo.currentData()
@@ -9529,10 +9082,6 @@ class MainWindow(QMainWindow):
         duplicate_filter = str(self.inventory_duplicate_filter_combo.currentData() or "")
 
         visible_rows: list[dict[str, object]] = []
-        count_out = 0
-        count_low = 0
-        count_missing_qr = 0
-        count_inactive = 0
         for row in rows:
             qr_exists = (QrGenerator.output_dir() / f"{row[1]}.png").exists()
             row_data = {
@@ -9598,38 +9147,24 @@ class MainWindow(QMainWindow):
                 continue
             if duplicate_filter == "fallback_exclude" and bool(row_data["fallback_importacion"]):
                 continue
-
-            stock_value = int(row_data["stock_actual"])
-            committed_value = int(row_data["apartado_cantidad"])
-            if stock_value == 0:
-                count_out += 1
-            elif stock_value <= 3:
-                count_low += 1
-            if not qr_exists:
-                count_missing_qr += 1
-            if not bool(row_data["variante_activa"]):
-                count_inactive += 1
             visible_rows.append(row_data)
 
-        self._set_badge_state(
-            self.inventory_out_counter,
-            f"Agotados: {count_out}",
-            "danger" if count_out else "positive",
+        summary_view = build_inventory_summary_view(
+            total_rows=len(rows),
+            visible_rows=visible_rows,
+            active_filter_labels=self._inventory_active_filter_labels(),
         )
-        self._set_badge_state(
-            self.inventory_low_counter,
-            f"Bajo stock: {count_low}",
-            "warning" if count_low else "positive",
-        )
+        self._set_badge_state(self.inventory_out_counter, summary_view.out_counter.text, summary_view.out_counter.tone)
+        self._set_badge_state(self.inventory_low_counter, summary_view.low_counter.text, summary_view.low_counter.tone)
         self._set_badge_state(
             self.inventory_qr_pending_counter,
-            f"Sin QR: {count_missing_qr}",
-            "warning" if count_missing_qr else "positive",
+            summary_view.qr_pending_counter.text,
+            summary_view.qr_pending_counter.tone,
         )
         self._set_badge_state(
             self.inventory_inactive_counter,
-            f"Inactivas: {count_inactive}",
-            "muted" if count_inactive else "positive",
+            summary_view.inactive_counter.text,
+            summary_view.inactive_counter.tone,
         )
 
         self.inventory_table.setRowCount(len(visible_rows))
@@ -9668,7 +9203,7 @@ class MainWindow(QMainWindow):
             if qr_item is not None:
                 _set_table_badge_style(qr_item, qr_tone)
         self.inventory_table.resizeColumnsToContents()
-        self.inventory_results_label.setText(self._build_inventory_results_summary(total_rows=len(rows), visible_rows=visible_rows))
+        self.inventory_results_label.setText(summary_view.results_summary)
         self.inventory_active_filters_label.setText(self._build_inventory_active_filters_summary())
         self._sync_inventory_table_selection(current_variant_id)
         self._refresh_inventory_overview()
@@ -10228,16 +9763,20 @@ class MainWindow(QMainWindow):
         entity_filter = str(self.history_entity_combo.currentData() or "")
         sku_filter = self.history_sku_input.text().strip()
         type_filter = str(self.history_type_combo.currentData() or "")
+        start_date_label = ""
+        end_date_label = ""
 
         start_datetime = None
         if self.history_from_input.date() > self.history_from_input.minimumDate():
             start_date = self.history_from_input.date().toPyDate()
             start_datetime = datetime.combine(start_date, datetime.min.time())
+            start_date_label = start_date.isoformat()
 
         end_datetime = None
         if self.history_to_input.date() > self.history_to_input.minimumDate():
             end_date = self.history_to_input.date().toPyDate() + timedelta(days=1)
             end_datetime = datetime.combine(end_date, datetime.min.time())
+            end_date_label = (end_date - timedelta(days=1)).isoformat()
 
         rows: list[dict[str, object]] = []
 
@@ -10351,37 +9890,31 @@ class MainWindow(QMainWindow):
                     }
                 )
 
-        rows.sort(key=lambda item: item["fecha"] or datetime.min, reverse=True)
-        rows = rows[:200]
+        history_rows = build_history_table_rows(rows)
 
-        self.movements_table.setRowCount(len(rows))
-        for row_index, row in enumerate(rows):
-            values = [
-                row["fecha"].strftime("%Y-%m-%d %H:%M") if row["fecha"] else "",
-                row["origen"],
-                row["registro"],
-                row["tipo"],
-                row["cambio"],
-                row["resultado"],
-                row["usuario"],
-                row["detalle"],
-            ]
-            for column_index, value in enumerate(values):
+        self.movements_table.setRowCount(len(history_rows))
+        for row_index, row in enumerate(history_rows):
+            for column_index, value in enumerate(row.values):
                 item = _table_item(value)
                 if column_index == 1:
-                    _set_table_badge_style(item, "positive" if row["origen"] == "Inventario" else "warning")
+                    _set_table_badge_style(item, row.source_tone)
                 elif column_index == 3:
-                    tipo_text = str(row["tipo"])
-                    if "ELIMINACION" in tipo_text or "SALIDA" in tipo_text:
-                        _set_table_badge_style(item, "danger")
-                    elif "ESTADO" in tipo_text or "AJUSTE" in tipo_text:
-                        _set_table_badge_style(item, "warning")
-                    elif "CREACION" in tipo_text or "ENTRADA" in tipo_text or "RESERVA" in tipo_text:
-                        _set_table_badge_style(item, "positive")
-                    else:
-                        _set_table_badge_style(item, "muted")
+                    _set_table_badge_style(item, row.type_tone)
                 self.movements_table.setItem(row_index, column_index, item)
         self.movements_table.resizeColumnsToContents()
+        history_summary = build_history_summary_view(
+            visible_count=len(history_rows),
+            search_text=sku_filter,
+            source_filter_value=source_filter,
+            source_filter_text=self.history_source_combo.currentText(),
+            entity_filter_value=entity_filter,
+            entity_filter_text=self.history_entity_combo.currentText(),
+            type_filter_value=type_filter,
+            type_filter_text=self.history_type_combo.currentText(),
+            date_from_label=start_date_label,
+            date_to_label=end_date_label,
+        )
+        self.history_status_label.setText(history_summary.status_label)
 
     @staticmethod
     def _generate_layaway_folio() -> str:
@@ -10479,17 +10012,12 @@ class MainWindow(QMainWindow):
             "client_followup": self.settings_whatsapp_client_followup_input.toPlainText().strip(),
             "client_greeting": self.settings_whatsapp_client_greeting_input.toPlainText().strip(),
         }
-        sample_values = {
-            "cliente": "Ana Perez",
-            "folio": "APT-20260311-AB12",
-            "saldo": "350.00",
-            "vencimiento": "Vence hoy",
-            "fecha_compromiso": "2026-03-11",
-            "codigo_cliente": "CLI-000125",
-        }
-        template_text = template_map.get(template_key) or self._default_whatsapp_templates().get(template_key, "")
         self.settings_whatsapp_preview_output.setPlainText(
-            self._render_whatsapp_template(template_text, sample_values)
+            build_settings_whatsapp_preview_text(
+                template_key=template_key,
+                template_map=template_map,
+                default_templates=self._default_whatsapp_templates(),
+            )
         )
 
     def _handle_reset_whatsapp_templates(self) -> None:
@@ -10576,17 +10104,23 @@ class MainWindow(QMainWindow):
 
     def _set_catalog_uniform_macro_filter(self, macro_type: str) -> None:
         current_selection = self.catalog_type_filter_combo.selected_values()
-        if current_selection == {macro_type}:
+        next_selection = resolve_catalog_uniform_macro_selection(
+            current_selection=current_selection,
+            macro_type=macro_type,
+        )
+        if not next_selection:
             self.catalog_type_filter_combo.clear_selection()
         else:
-            self.catalog_type_filter_combo.set_selected_values([macro_type])
+            self.catalog_type_filter_combo.set_selected_values(next_selection)
         self._refresh_catalog_uniform_macro_buttons()
 
     def _refresh_catalog_uniform_macro_buttons(self) -> None:
-        selected_types = self.catalog_type_filter_combo.selected_values()
-        active_macro = next(iter(selected_types)) if len(selected_types) == 1 else ""
+        macro_states = build_catalog_uniform_macro_button_states(
+            available_macros=self.catalog_uniform_macro_buttons.keys(),
+            selected_types=self.catalog_type_filter_combo.selected_values(),
+        )
         for macro_type, button in self.catalog_uniform_macro_buttons.items():
-            is_active = macro_type == active_macro
+            is_active = macro_states.get(macro_type, False)
             button.setProperty("active", "true" if is_active else "false")
             button.style().unpolish(button)
             button.style().polish(button)
@@ -10596,13 +10130,8 @@ class MainWindow(QMainWindow):
         current_type = str(self.history_type_combo.currentData() or "")
         self.history_type_combo.blockSignals(True)
         self.history_type_combo.clear()
-        self.history_type_combo.addItem("Todos", "")
-        if current_source in {"", "inventory"}:
-            for tipo in TipoMovimientoInventario:
-                self.history_type_combo.addItem(f"Inv. {tipo.value}", f"inventory:{tipo.value}")
-        if current_source in {"", "catalog"}:
-            for tipo in TipoCambioCatalogo:
-                self.history_type_combo.addItem(f"Cat. {tipo.value}", f"catalog:{tipo.value}")
+        for label, value in build_history_type_options(current_source):
+            self.history_type_combo.addItem(label, value)
         if current_type:
             index = self.history_type_combo.findData(current_type)
             if index >= 0:
@@ -10635,10 +10164,8 @@ class MainWindow(QMainWindow):
         today = date.today()
         week_limit = today + timedelta(days=7)
 
-        rows: list[dict[str, object]] = []
+        layaway_snapshots: list[dict[str, object]] = []
         for apartado in apartados:
-            if state_filter and apartado.estado.value != state_filter:
-                continue
             searchable = " ".join(
                 [
                     apartado.folio,
@@ -10647,8 +10174,6 @@ class MainWindow(QMainWindow):
                     apartado.cliente_telefono or "",
                 ]
             ).lower()
-            if search_text and search_text not in searchable:
-                continue
             due_date = apartado.fecha_compromiso.date() if apartado.fecha_compromiso else None
             due_bucket = "none"
             if due_date is not None and apartado.estado not in {EstadoApartado.ENTREGADO, EstadoApartado.CANCELADO}:
@@ -10658,10 +10183,8 @@ class MainWindow(QMainWindow):
                     due_bucket = "today"
                 elif due_date <= week_limit:
                     due_bucket = "week"
-            if due_filter and due_bucket != due_filter:
-                continue
             due_text, due_tone = self._classify_layaway_due(apartado.fecha_compromiso, apartado.estado)
-            rows.append(
+            layaway_snapshots.append(
                 {
                     "id": apartado.id,
                     "folio": apartado.folio,
@@ -10674,11 +10197,26 @@ class MainWindow(QMainWindow):
                     "total": Decimal(apartado.total),
                     "abonado": Decimal(apartado.total_abonado),
                     "saldo": Decimal(apartado.saldo_pendiente),
-                    "fecha_compromiso": apartado.fecha_compromiso,
+                    "due_bucket": due_bucket,
                     "due_text": due_text,
                     "due_tone": due_tone,
+                    "searchable": searchable,
                 }
             )
+        rows = build_layaway_history_rows(
+            layaway_snapshots=layaway_snapshots,
+            search_text=search_text,
+            state_filter=state_filter,
+            due_filter=due_filter,
+        )
+        layaway_summary_view = build_layaway_summary_view(
+            visible_rows=rows,
+            search_text=self.layaway_search_input.text(),
+            state_filter_value=self.layaway_state_combo.currentData(),
+            state_filter_text=self.layaway_state_combo.currentText(),
+            due_filter_value=self.layaway_due_combo.currentData(),
+            due_filter_text=self.layaway_due_combo.currentText(),
+        )
 
         self.layaway_rows = rows
         self.layaway_table.setRowCount(len(rows))
@@ -10699,13 +10237,7 @@ class MainWindow(QMainWindow):
             balance_item = self.layaway_table.item(row_index, 5)
             due_item = self.layaway_table.item(row_index, 6)
             if status_item is not None:
-                tone = {
-                    EstadoApartado.ACTIVO.value: "warning",
-                    EstadoApartado.LIQUIDADO.value: "positive",
-                    EstadoApartado.ENTREGADO.value: "muted",
-                    EstadoApartado.CANCELADO.value: "danger",
-                }.get(str(row["estado"]), "muted")
-                _set_table_badge_style(status_item, tone)
+                _set_table_badge_style(status_item, str(row["status_tone"]))
             if balance_item is not None:
                 _set_table_badge_style(
                     balance_item,
@@ -10714,13 +10246,7 @@ class MainWindow(QMainWindow):
             if due_item is not None:
                 _set_table_badge_style(due_item, str(row["due_tone"]))
         self.layaway_table.resizeColumnsToContents()
-
-        if rows:
-            self.layaway_status_label.setText(
-                f"Apartados visibles: {len(rows)} | Pendiente total: ${sum(Decimal(r['saldo']) for r in rows)}"
-            )
-        else:
-            self.layaway_status_label.setText("No hay apartados con esos filtros.")
+        self.layaway_status_label.setText(layaway_summary_view.status_label)
 
         if selected_id is not None:
             self.layaway_table.blockSignals(True)
@@ -10736,16 +10262,21 @@ class MainWindow(QMainWindow):
 
     def _refresh_layaway_detail(self, apartado_id: int | None) -> None:
         if not apartado_id:
-            self.layaway_summary_label.setText("Selecciona un apartado")
-            self.layaway_customer_label.setText("Sin detalle.")
-            self.layaway_balance_label.setText("")
-            self.layaway_commitment_label.setText("")
-            self._set_badge_state(self.layaway_due_status_label, "Sin detalle", "neutral")
-            self.layaway_notes_label.setText("")
-            self.layaway_detail_table.setRowCount(0)
-            self.layaway_payments_table.setRowCount(0)
-            self.layaway_sale_ticket_button.setEnabled(False)
-            self.layaway_whatsapp_button.setEnabled(False)
+            detail_view = build_empty_layaway_detail_view()
+            self.layaway_summary_label.setText(detail_view.summary_label)
+            self.layaway_customer_label.setText(detail_view.customer_label)
+            self.layaway_balance_label.setText(detail_view.balance_label)
+            self.layaway_commitment_label.setText(detail_view.commitment_label)
+            self._set_badge_state(
+                self.layaway_due_status_label,
+                detail_view.due_badge.text,
+                detail_view.due_badge.tone,
+            )
+            self.layaway_notes_label.setText(detail_view.notes_label)
+            self.layaway_detail_table.setRowCount(len(detail_view.detail_rows))
+            self.layaway_payments_table.setRowCount(len(detail_view.payment_rows))
+            self.layaway_sale_ticket_button.setEnabled(detail_view.sale_ticket_enabled)
+            self.layaway_whatsapp_button.setEnabled(detail_view.whatsapp_enabled)
             return
 
         try:
@@ -10754,72 +10285,83 @@ class MainWindow(QMainWindow):
                 if apartado is None:
                     raise ValueError("Apartado no encontrado.")
 
-                self.layaway_summary_label.setText(f"{apartado.folio} | {apartado.estado.value}")
-                self.layaway_customer_label.setText(
-                    " | ".join(
-                        filter(
-                            None,
-                            [
-                                apartado.cliente.codigo_cliente if apartado.cliente is not None else "",
-                                apartado.cliente_nombre,
-                                apartado.cliente_telefono or "Sin telefono",
-                            ],
-                        )
-                    )
-                )
-                self.layaway_balance_label.setText(
-                    f"Total ${apartado.total} | Abonado ${apartado.total_abonado} | Saldo ${apartado.saldo_pendiente}"
-                )
-                self.layaway_commitment_label.setText(
-                    "Compromiso: "
-                    + (apartado.fecha_compromiso.strftime("%Y-%m-%d") if apartado.fecha_compromiso else "Sin fecha")
-                )
                 due_text, due_tone = self._classify_layaway_due(apartado.fecha_compromiso, apartado.estado)
-                self._set_badge_state(self.layaway_due_status_label, due_text, due_tone)
-                self.layaway_notes_label.setText(apartado.observacion or "Sin observaciones.")
                 can_manage_layaways = self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
-                self.layaway_sale_ticket_button.setEnabled(
-                    can_manage_layaways and apartado.estado == EstadoApartado.ENTREGADO
+                detail_view = build_layaway_detail_view(
+                    folio=apartado.folio,
+                    estado=apartado.estado.value,
+                    customer_code=apartado.cliente.codigo_cliente if apartado.cliente is not None else "Manual",
+                    customer_name=apartado.cliente_nombre,
+                    customer_phone=apartado.cliente_telefono or "",
+                    total=Decimal(apartado.total),
+                    total_paid=Decimal(apartado.total_abonado),
+                    balance_due=Decimal(apartado.saldo_pendiente),
+                    commitment_label=apartado.fecha_compromiso.strftime("%Y-%m-%d") if apartado.fecha_compromiso else "Sin fecha",
+                    due_text=due_text,
+                    due_tone=due_tone,
+                    notes_text=apartado.observacion or "Sin observaciones.",
+                    detail_rows=[
+                        {
+                            "sku": detalle.variante.sku,
+                            "product_name": detalle.variante.producto.nombre,
+                            "quantity": detalle.cantidad,
+                            "unit_price": detalle.precio_unitario,
+                            "subtotal": detalle.subtotal_linea,
+                        }
+                        for detalle in apartado.detalles
+                    ],
+                    payment_rows=[
+                        {
+                            "created_at": abono.created_at.strftime("%Y-%m-%d %H:%M") if abono.created_at else "",
+                            "amount": abono.monto,
+                            "reference": abono.referencia or "",
+                            "username": abono.usuario.username,
+                        }
+                        for abono in apartado.abonos
+                    ],
+                    sale_ticket_enabled=can_manage_layaways and apartado.estado == EstadoApartado.ENTREGADO,
+                    whatsapp_enabled=can_manage_layaways and bool((apartado.cliente_telefono or "").strip()),
                 )
-                self.layaway_whatsapp_button.setEnabled(
-                    can_manage_layaways and bool((apartado.cliente_telefono or "").strip())
+                self.layaway_summary_label.setText(detail_view.summary_label)
+                self.layaway_customer_label.setText(detail_view.customer_label)
+                self.layaway_balance_label.setText(detail_view.balance_label)
+                self.layaway_commitment_label.setText(detail_view.commitment_label)
+                self._set_badge_state(
+                    self.layaway_due_status_label,
+                    detail_view.due_badge.text,
+                    detail_view.due_badge.tone,
                 )
+                self.layaway_notes_label.setText(detail_view.notes_label)
+                self.layaway_sale_ticket_button.setEnabled(detail_view.sale_ticket_enabled)
+                self.layaway_whatsapp_button.setEnabled(detail_view.whatsapp_enabled)
 
-                self.layaway_detail_table.setRowCount(len(apartado.detalles))
-                for row_index, detalle in enumerate(apartado.detalles):
-                    values = [
-                        detalle.variante.sku,
-                        detalle.variante.producto.nombre,
-                        detalle.cantidad,
-                        detalle.precio_unitario,
-                        detalle.subtotal_linea,
-                    ]
-                    for column_index, value in enumerate(values):
+                self.layaway_detail_table.setRowCount(len(detail_view.detail_rows))
+                for row_index, detail_row in enumerate(detail_view.detail_rows):
+                    for column_index, value in enumerate(detail_row.values):
                         self.layaway_detail_table.setItem(row_index, column_index, _table_item(value))
                 self.layaway_detail_table.resizeColumnsToContents()
 
-                self.layaway_payments_table.setRowCount(len(apartado.abonos))
-                for row_index, abono in enumerate(apartado.abonos):
-                    values = [
-                        abono.created_at.strftime("%Y-%m-%d %H:%M") if abono.created_at else "",
-                        abono.monto,
-                        abono.referencia or "",
-                        abono.usuario.username,
-                    ]
-                    for column_index, value in enumerate(values):
+                self.layaway_payments_table.setRowCount(len(detail_view.payment_rows))
+                for row_index, payment_row in enumerate(detail_view.payment_rows):
+                    for column_index, value in enumerate(payment_row.values):
                         self.layaway_payments_table.setItem(row_index, column_index, _table_item(value))
                 self.layaway_payments_table.resizeColumnsToContents()
         except Exception as exc:  # noqa: BLE001
-            self.layaway_summary_label.setText("No se pudo cargar el apartado")
-            self.layaway_customer_label.setText(str(exc))
-            self.layaway_balance_label.setText("")
-            self.layaway_commitment_label.setText("")
-            self._set_badge_state(self.layaway_due_status_label, "Sin detalle", "neutral")
-            self.layaway_notes_label.setText("")
-            self.layaway_detail_table.setRowCount(0)
-            self.layaway_payments_table.setRowCount(0)
-            self.layaway_sale_ticket_button.setEnabled(False)
-            self.layaway_whatsapp_button.setEnabled(False)
+            detail_view = build_error_layaway_detail_view(str(exc))
+            self.layaway_summary_label.setText(detail_view.summary_label)
+            self.layaway_customer_label.setText(detail_view.customer_label)
+            self.layaway_balance_label.setText(detail_view.balance_label)
+            self.layaway_commitment_label.setText(detail_view.commitment_label)
+            self._set_badge_state(
+                self.layaway_due_status_label,
+                detail_view.due_badge.text,
+                detail_view.due_badge.tone,
+            )
+            self.layaway_notes_label.setText(detail_view.notes_label)
+            self.layaway_detail_table.setRowCount(len(detail_view.detail_rows))
+            self.layaway_payments_table.setRowCount(len(detail_view.payment_rows))
+            self.layaway_sale_ticket_button.setEnabled(detail_view.sale_ticket_enabled)
+            self.layaway_whatsapp_button.setEnabled(detail_view.whatsapp_enabled)
 
     def _handle_open_layaway_whatsapp(self) -> None:
         apartado_id = self._selected_layaway_id()
@@ -10850,224 +10392,17 @@ class MainWindow(QMainWindow):
                 "No se pudo abrir WhatsApp automaticamente. Verifica que tengas navegador disponible.",
             )
 
-    def _prompt_create_layaway_data(self, initial_items: list[dict[str, object]] | None = None) -> dict[str, object] | None:
-        dialog, layout = self._create_modal_dialog(
-            "Nuevo apartado",
-            "Agrega una o varias presentaciones y registra el anticipo inicial del apartado.",
-            width=760,
-        )
-        form = QFormLayout()
-        client_selector = QComboBox()
-        client_selector.addItem("Manual / sin cliente", None)
-        customer_input = QLineEdit()
-        customer_input.setPlaceholderText("Nombre del cliente")
-        phone_input = QLineEdit()
-        phone_input.setPlaceholderText("Telefono")
-        last_autofill = {"nombre": "", "telefono": ""}
-        try:
-            with get_session() as session:
-                for client in [item for item in ClientService.list_clients(session) if item.activo]:
-                    client_selector.addItem(
-                        f"{client.codigo_cliente} · {client.nombre}",
-                        {
-                            "id": int(client.id),
-                            "nombre": client.nombre,
-                            "telefono": client.telefono or "",
-                        },
-                    )
-        except Exception:
-            pass
-
-        def sync_selected_client() -> None:
-            nonlocal last_autofill
-            selected_client = client_selector.currentData()
-            if isinstance(selected_client, dict):
-                nombre = str(selected_client.get("nombre", "")).strip()
-                telefono = str(selected_client.get("telefono", "")).strip()
-                customer_input.setText(nombre)
-                phone_input.setText(telefono)
-                last_autofill = {"nombre": nombre, "telefono": telefono}
-                return
-            if customer_input.text().strip() == last_autofill["nombre"]:
-                customer_input.clear()
-            if phone_input.text().strip() == last_autofill["telefono"]:
-                phone_input.clear()
-            last_autofill = {"nombre": "", "telefono": ""}
-
-        client_selector.currentIndexChanged.connect(sync_selected_client)
-        form.addRow("Cliente guardado", client_selector)
-        form.addRow("Cliente", customer_input)
-        form.addRow("Telefono", phone_input)
-
-        items: list[dict[str, object]] = [
-            {
-                "sku": str(item["sku"]),
-                "producto_nombre": str(item["producto_nombre"]),
-                "cantidad": int(item["cantidad"]),
-                "precio_unitario": Decimal(item["precio_unitario"]),
-            }
-            for item in (initial_items or [])
-        ]
-        sku_input = QLineEdit()
-        sku_input.setPlaceholderText("SKU")
-        selected = self._selected_catalog_row()
-        if selected is not None:
-            sku_input.setText(str(selected["sku"]))
-        qty_spin = QSpinBox()
-        qty_spin.setRange(1, 100)
-        add_item_button = QPushButton("Agregar presentacion")
-        remove_item_button = QPushButton("Quitar seleccionada")
-        items_table = QTableWidget()
-        items_table.setColumnCount(5)
-        items_table.setHorizontalHeaderLabels(["SKU", "Producto", "Cantidad", "Precio", "Subtotal"])
-        items_table.setObjectName("dataTable")
-        items_table.verticalHeader().setVisible(False)
-        items_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
-        items_table.setAlternatingRowColors(True)
-        total_label = QLabel("Total estimado: $0.00")
-        total_label.setObjectName("analyticsLine")
-
-        def refresh_items_table() -> None:
-            total = Decimal("0.00")
-            items_table.setRowCount(len(items))
-            for row_index, item in enumerate(items):
-                subtotal = Decimal(item["precio_unitario"]) * int(item["cantidad"])
-                total += subtotal
-                values = [
-                    item["sku"],
-                    item["producto_nombre"],
-                    item["cantidad"],
-                    item["precio_unitario"],
-                    subtotal,
-                ]
-                for column_index, value in enumerate(values):
-                    items_table.setItem(row_index, column_index, _table_item(value))
-            items_table.resizeColumnsToContents()
-            total_label.setText(f"Total estimado: ${total}")
-
-        def handle_add_item() -> None:
-            sku = sku_input.text().strip().upper()
-            cantidad = qty_spin.value()
-            if not sku:
-                QMessageBox.warning(dialog, "SKU requerido", "Captura o escanea un SKU para agregarlo.")
-                return
-            try:
-                with get_session() as session:
-                    variante = ApartadoService.obtener_variante_por_sku(session, sku)
-                    if variante is None:
-                        raise ValueError(f"El SKU '{sku}' no existe o esta inactivo.")
-                    InventarioService.validar_stock_disponible(variante, cantidad)
-                    producto_nombre = variante.producto.nombre
-                    precio_unitario = Decimal(variante.precio_venta)
-            except Exception as exc:  # noqa: BLE001
-                message = str(exc)
-                if "Stock insuficiente" in message:
-                    message = f"No hay stock suficiente para reservar {cantidad} pieza(s) de '{sku}'."
-                QMessageBox.warning(dialog, "No se pudo agregar", message)
-                return
-
-            existing = next((item for item in items if str(item["sku"]) == sku), None)
-            if existing is not None:
-                nueva_cantidad = int(existing["cantidad"]) + cantidad
-                try:
-                    with get_session() as session:
-                        variante = ApartadoService.obtener_variante_por_sku(session, sku)
-                        if variante is None:
-                            raise ValueError(f"El SKU '{sku}' no existe o esta inactivo.")
-                        InventarioService.validar_stock_disponible(variante, nueva_cantidad)
-                except Exception as exc:  # noqa: BLE001
-                    message = str(exc)
-                    if "Stock insuficiente" in message:
-                        message = f"No hay stock suficiente para dejar {nueva_cantidad} pieza(s) de '{sku}' en el apartado."
-                    QMessageBox.warning(dialog, "Stock insuficiente", message)
-                    return
-                existing["cantidad"] = nueva_cantidad
-            else:
-                items.append(
-                    {
-                        "sku": sku,
-                        "producto_nombre": producto_nombre,
-                        "cantidad": cantidad,
-                        "precio_unitario": precio_unitario,
-                    }
-                )
-
-            sku_input.clear()
-            qty_spin.setValue(1)
-            refresh_items_table()
-
-        def handle_remove_item() -> None:
-            row_index = items_table.currentRow()
-            if row_index < 0 or row_index >= len(items):
-                return
-            items.pop(row_index)
-            refresh_items_table()
-
-        add_item_button.clicked.connect(handle_add_item)
-        remove_item_button.clicked.connect(handle_remove_item)
-
-        line_row = QHBoxLayout()
-        line_row.setSpacing(8)
-        line_row.addWidget(QLabel("SKU"))
-        line_row.addWidget(sku_input, 1)
-        line_row.addWidget(QLabel("Cantidad"))
-        line_row.addWidget(qty_spin)
-        line_row.addWidget(add_item_button)
-        line_row.addWidget(remove_item_button)
-
-        due_input = QLineEdit()
-        due_input.setPlaceholderText("YYYY-MM-DD")
-        due_input.setText((date.today() + timedelta(days=15)).isoformat())
-        deposit_spin = QDoubleSpinBox()
-        deposit_spin.setRange(0.0, 999999.99)
-        deposit_spin.setDecimals(2)
-        deposit_spin.setPrefix("$")
-        notes_input = QTextEdit()
-        notes_input.setMaximumHeight(90)
-        form.addRow("Anticipo", deposit_spin)
-        form.addRow("Fecha compromiso", due_input)
-        form.addRow("Observacion", notes_input)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addLayout(form)
-        layout.addLayout(line_row)
-        layout.addWidget(items_table)
-        layout.addWidget(total_label)
-        layout.addWidget(buttons)
-        refresh_items_table()
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return None
-        if not items:
-            QMessageBox.warning(self, "Sin presentaciones", "Agrega al menos una presentacion al apartado.")
-            return None
-        return {
-            "cliente_id": (
-                int(client_selector.currentData()["id"])
-                if isinstance(client_selector.currentData(), dict)
-                else None
-            ),
-            "cliente_nombre": customer_input.text().strip(),
-            "cliente_telefono": phone_input.text().strip(),
-            "items": [
-                ApartadoItemInput(
-                    sku=str(item["sku"]),
-                    cantidad=int(item["cantidad"]),
-                )
-                for item in items
-            ],
-            "anticipo": Decimal(str(deposit_spin.value())),
-            "fecha_compromiso": due_input.text().strip(),
-            "observacion": notes_input.toPlainText().strip(),
-        }
-
     def _handle_create_layaway(self) -> None:
         if self.current_role not in {RolUsuario.ADMIN, RolUsuario.CAJERO}:
             QMessageBox.warning(self, "Sin permisos", "No tienes permisos para crear apartados.")
             return
         if not self._ensure_cash_session_current_day_for_operation("crear apartados"):
             return
-        payload = self._prompt_create_layaway_data()
+        payload = build_create_layaway_dialog(
+            self,
+            initial_items=None,
+            selected_catalog_row=self._selected_catalog_row(),
+        )
         if payload is None:
             return
 
@@ -11125,7 +10460,11 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, "Carrito vacio", "Agrega al menos una linea antes de convertirla en apartado.")
                 return
 
-        payload = self._prompt_create_layaway_data(initial_items=self.sale_cart)
+        payload = build_create_layaway_dialog(
+            self,
+            initial_items=self.sale_cart,
+            selected_catalog_row=self._selected_catalog_row(),
+        )
         if payload is None:
             return
 
@@ -11584,33 +10923,24 @@ class MainWindow(QMainWindow):
 
     def _refresh_sale_cart_table(self) -> None:
         self.sale_cart_table.setRowCount(len(self.sale_cart))
-        table_view = build_sale_cart_table_view(self.sale_cart)
-        for row_index, row in enumerate(table_view.rows):
+        pricing = self._calculate_sale_pricing()
+        breakdown = self._sale_discount_breakdown()
+        cashier_view = build_sale_cashier_view(
+            sale_cart=self.sale_cart,
+            subtotal=pricing.subtotal,
+            applied_discount=pricing.applied_discount,
+            rounding_adjustment=pricing.rounding_adjustment,
+            collected_total=pricing.collected_total,
+            payment_method=self.sale_payment_combo.currentText().strip() or "Efectivo",
+            winner_label=str(breakdown["winner_label"]),
+        )
+        for row_index, row in enumerate(cashier_view.table_view.rows):
             for column_index, value in enumerate(row.values):
                 self.sale_cart_table.setItem(row_index, column_index, _table_item(value))
         self.sale_cart_table.resizeColumnsToContents()
-        pricing = self._calculate_sale_pricing()
-        subtotal = pricing.subtotal
-        applied_discount = pricing.applied_discount
-        rounding_adjustment = pricing.rounding_adjustment
-        total = pricing.collected_total
-        breakdown = self._sale_discount_breakdown()
-        winner_label = str(breakdown["winner_label"])
-        payment_method = self.sale_payment_combo.currentText().strip() or "Efectivo"
-        summary = build_sale_cashier_summary(
-            has_items=bool(self.sale_cart),
-            lines_count=len(self.sale_cart),
-            total_items=table_view.total_items,
-            subtotal=subtotal,
-            applied_discount=applied_discount,
-            rounding_adjustment=rounding_adjustment,
-            collected_total=total,
-            payment_method=payment_method,
-            winner_label=winner_label,
-        )
-        self.sale_total_label.setText(summary.total_label)
-        self.sale_total_meta_label.setText(summary.meta_label)
-        self.sale_summary_label.setText(summary.summary_label)
+        self.sale_total_label.setText(cashier_view.summary.total_label)
+        self.sale_total_meta_label.setText(cashier_view.summary.meta_label)
+        self.sale_summary_label.setText(cashier_view.summary.summary_label)
         self._refresh_payment_fields()
         can_sell = self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
         self.sale_remove_button.setEnabled(can_sell and bool(self.sale_cart))
@@ -11618,31 +10948,14 @@ class MainWindow(QMainWindow):
         self._refresh_permissions()
 
     def _refresh_quote_cart_table(self) -> None:
-        self.quote_cart_table.setRowCount(len(self.quote_cart))
-        total_items = 0
-        total = Decimal("0.00")
-        for row_index, item in enumerate(self.quote_cart):
-            line_subtotal = Decimal(item["precio_unitario"]) * int(item["cantidad"])
-            total_items += int(item["cantidad"])
-            total += line_subtotal
-            values = [
-                item["sku"],
-                item["producto_nombre"],
-                item["cantidad"],
-                item["precio_unitario"],
-                line_subtotal,
-            ]
-            for column_index, value in enumerate(values):
+        quote_cart_view = build_quote_cart_view(self.quote_cart)
+        self.quote_cart_table.setRowCount(len(quote_cart_view.rows))
+        for row_index, row in enumerate(quote_cart_view.rows):
+            for column_index, value in enumerate(row.values):
                 self.quote_cart_table.setItem(row_index, column_index, _table_item(value))
         self.quote_cart_table.resizeColumnsToContents()
-        self.quote_total_label.setText(f"${total.quantize(Decimal('0.01'))}")
-        self.quote_summary_label.setText(
-            (
-                f"Lineas: {len(self.quote_cart)} | Piezas: {total_items} | Total estimado: ${total.quantize(Decimal('0.01'))}"
-            )
-            if self.quote_cart
-            else "Presupuesto vacio."
-        )
+        self.quote_total_label.setText(quote_cart_view.summary.total_label)
+        self.quote_summary_label.setText(quote_cart_view.summary.summary_label)
         self._refresh_permissions()
 
     def _selected_catalog_row(self) -> dict[str, object] | None:
@@ -11713,34 +11026,28 @@ class MainWindow(QMainWindow):
 
         menu = QMenu(self)
         qr_exists = (QrGenerator.output_dir() / f"{selected['sku']}.png").exists()
-        edit_action = menu.addAction("Editar presentacion")
-        entry_action = menu.addAction("Registrar entrada")
-        adjust_action = menu.addAction("Corregir stock")
-        qr_action = menu.addAction("Regenerar QR" if qr_exists else "Generar QR")
-        print_action = menu.addAction("Imprimir etiqueta")
-        toggle_action = menu.addAction(
-            "Activar presentacion" if not bool(selected["variante_activo"]) else "Desactivar presentacion"
-        )
-
-        is_admin = self.current_role == RolUsuario.ADMIN
-        edit_action.setEnabled(is_admin)
-        entry_action.setEnabled(is_admin)
-        adjust_action.setEnabled(is_admin)
-        toggle_action.setEnabled(is_admin)
-        print_action.setEnabled(is_admin)
+        action_map = {}
+        for action_spec in build_inventory_context_menu_actions(
+            is_admin=self.current_role == RolUsuario.ADMIN,
+            qr_exists=qr_exists,
+            variante_activa=bool(selected["variante_activo"]),
+        ):
+            action = menu.addAction(action_spec.label)
+            action.setEnabled(action_spec.enabled)
+            action_map[action_spec.key] = action
 
         chosen = menu.exec(self.inventory_table.viewport().mapToGlobal(pos))
-        if chosen == edit_action:
+        if chosen == action_map["edit"]:
             self._handle_update_variant()
-        elif chosen == entry_action:
+        elif chosen == action_map["entry"]:
             self._handle_purchase()
-        elif chosen == adjust_action:
+        elif chosen == action_map["adjust"]:
             self._handle_inventory_adjustment()
-        elif chosen == qr_action:
+        elif chosen == action_map["qr"]:
             self._handle_generate_selected_qr()
-        elif chosen == print_action:
+        elif chosen == action_map["print"]:
             self._handle_inventory_print_label()
-        elif chosen == toggle_action:
+        elif chosen == action_map["toggle"]:
             self._handle_toggle_variant()
 
     def _sync_inventory_table_selection(self, variant_id: object) -> None:
@@ -11759,13 +11066,7 @@ class MainWindow(QMainWindow):
     def _refresh_inventory_overview(self) -> None:
         variante_id = self.inventory_variant_combo.currentData()
         if not variante_id:
-            self.inventory_overview_label.setText("Selecciona una presentacion")
-            self.inventory_product_label.setText("Elige una fila para ver su ficha rapida.")
-            self._set_badge_state(self.inventory_status_badge, "Sin seleccion", "neutral")
-            self._set_badge_state(self.inventory_stock_badge, "Sin stock", "neutral")
-            self.inventory_stock_hint_label.setText("")
-            self.inventory_meta_label.setText("")
-            self.inventory_last_movement_label.setText("")
+            self._apply_inventory_overview_view(build_empty_inventory_overview_view())
             return
 
         try:
@@ -11773,8 +11074,6 @@ class MainWindow(QMainWindow):
                 variante = session.get(Variante, int(variante_id))
                 if variante is None:
                     raise ValueError
-                status = "ACTIVA" if variante.activo else "INACTIVA"
-                stock_label = "agotado" if variante.stock_actual == 0 else "bajo" if variante.stock_actual <= 3 else "saludable"
                 movement = session.scalar(
                     select(MovimientoInventario)
                     .where(MovimientoInventario.variante_id == variante.id)
@@ -11785,61 +11084,54 @@ class MainWindow(QMainWindow):
                     (row for row in self.catalog_rows if int(row["variante_id"]) == int(variante_id)),
                     None,
                 )
-                self.inventory_overview_label.setText(variante.sku)
-                self.inventory_product_label.setText(
-                    matching_row["producto_nombre_base"] if matching_row is not None else variante.producto.nombre
-                )
-                self._set_badge_state(
-                    self.inventory_status_badge,
-                    status,
-                    "positive" if variante.activo else "muted",
-                )
-                stock_tone = "danger" if variante.stock_actual == 0 else "warning" if variante.stock_actual <= 3 else "positive"
-                self._set_badge_state(
-                    self.inventory_stock_badge,
-                    stock_label.capitalize(),
-                    stock_tone,
-                )
-                self.inventory_stock_hint_label.setText(
-                    f"Talla {variante.talla} | Color {variante.color} | Precio {variante.precio_venta} | {matching_row['origen_etiqueta'] if matching_row is not None else 'NUEVO'}"
-                )
-                self.inventory_meta_label.setText(
-                    f"Stock actual {variante.stock_actual} | Apartado {matching_row['apartado_cantidad'] if matching_row is not None else 0} | Escuela {matching_row['escuela_nombre'] if matching_row is not None else 'General'}"
-                )
-                if movement is None:
-                    self.inventory_last_movement_label.setText("Sin movimientos registrados.")
-                else:
-                    movement_date = movement.created_at.strftime("%Y-%m-%d %H:%M") if movement.created_at else ""
-                    movement_type = movement.tipo_movimiento.value.replace("_", " ").title()
-                    self.inventory_last_movement_label.setText(
-                        f"Ultimo movimiento: {movement_type} | {movement.cantidad:+} | {movement_date}"
+                movement_date = movement.created_at.strftime("%Y-%m-%d %H:%M") if movement and movement.created_at else ""
+                movement_type = movement.tipo_movimiento.value.replace("_", " ").title() if movement else None
+                self._apply_inventory_overview_view(
+                    build_inventory_overview_view(
+                        sku=variante.sku,
+                        product_name=matching_row["producto_nombre_base"] if matching_row is not None else variante.producto.nombre,
+                        product_active=bool(matching_row["producto_activo"]) if matching_row is not None else True,
+                        variant_active=bool(matching_row["variante_activo"]) if matching_row is not None else bool(variante.activo),
+                        stock_actual=int(variante.stock_actual),
+                        apartado_cantidad=int(matching_row["apartado_cantidad"]) if matching_row is not None else 0,
+                        talla=str(variante.talla),
+                        color=str(variante.color),
+                        precio_venta=variante.precio_venta,
+                        origen_etiqueta=matching_row["origen_etiqueta"] if matching_row is not None else "NUEVO",
+                        escuela_nombre=matching_row["escuela_nombre"] if matching_row is not None else "General",
+                        tipo_prenda_nombre=matching_row["tipo_prenda_nombre"] if matching_row is not None else "-",
+                        tipo_pieza_nombre=matching_row["tipo_pieza_nombre"] if matching_row is not None else "-",
+                        movement_type=movement_type,
+                        movement_quantity=int(movement.cantidad) if movement is not None else None,
+                        movement_date=movement_date,
                     )
-                self.catalog_selection_label.setText(
-                    f"{variante.sku} | {matching_row['producto_nombre_base'] if matching_row is not None else variante.producto.nombre} | {matching_row['tipo_prenda_nombre'] if matching_row is not None else '-'} | "
-                    f"{matching_row['tipo_pieza_nombre'] if matching_row is not None else '-'} | precio {variante.precio_venta} | "
-                    f"stock {variante.stock_actual} | apartado {matching_row['apartado_cantidad'] if matching_row is not None else 0}"
                 )
-                if matching_row is not None:
-                    self.toggle_product_button.setText(
-                        "Activar prod." if matching_row["producto_activo"] is False else "Desactivar prod."
-                    )
-                    self.toggle_variant_button.setText(
-                        "Activar var." if matching_row["variante_activo"] is False else "Desactivar var."
-                    )
         except Exception:  # noqa: BLE001
-            self.inventory_overview_label.setText("No se pudo cargar la presentacion seleccionada.")
-            self.inventory_product_label.setText("")
-            self._set_badge_state(self.inventory_status_badge, "Error", "danger")
-            self._set_badge_state(self.inventory_stock_badge, "Sin stock", "neutral")
-            self.inventory_stock_hint_label.setText("")
-            self.inventory_meta_label.setText("")
-            self.inventory_last_movement_label.setText("")
+            self._apply_inventory_overview_view(build_error_inventory_overview_view())
+
+    def _apply_inventory_overview_view(self, overview_view) -> None:
+        self.inventory_overview_label.setText(overview_view.overview_label)
+        self.inventory_product_label.setText(overview_view.product_label)
+        self._set_badge_state(
+            self.inventory_status_badge,
+            overview_view.status_badge.text,
+            overview_view.status_badge.tone,
+        )
+        self._set_badge_state(
+            self.inventory_stock_badge,
+            overview_view.stock_badge.text,
+            overview_view.stock_badge.tone,
+        )
+        self.inventory_stock_hint_label.setText(overview_view.stock_hint_label)
+        self.inventory_meta_label.setText(overview_view.meta_label)
+        self.inventory_last_movement_label.setText(overview_view.last_movement_label)
+        self.catalog_selection_label.setText(overview_view.catalog_selection_label)
+        self.toggle_product_button.setText(overview_view.toggle_product_label)
+        self.toggle_variant_button.setText(overview_view.toggle_variant_label)
 
     def _clear_catalog_editor(self) -> None:
         self.catalog_selection_label.setText("Selecciona una presentacion en inventario para gestionar cambios.")
-        self.products_selection_label.setText(
-            "Consulta uniformes y usa filtros macro como Deportivo, Oficial, Basico, Escolta o Accesorio."
-        )
+        self.products_selection_label.setText(build_empty_catalog_selection_view().selection_label)
         self.toggle_product_button.setText("Prod.")
         self.toggle_variant_button.setText("Pres.")
 
@@ -11915,692 +11207,7 @@ class MainWindow(QMainWindow):
         return card
 
     def _apply_styles(self) -> None:
-        self.setStyleSheet(
-            """
-            QMainWindow, QWidget {
-                background: #f3efe8;
-                color: #1f1f1b;
-                font-family: "Avenir Next", "Helvetica Neue", sans-serif;
-                font-size: 14px;
-            }
-            QTabWidget::pane {
-                border: 1px solid #d7d0c4;
-                border-radius: 18px;
-                background: #fbf8f2;
-                top: -1px;
-                padding: 10px;
-            }
-            QTabBar::tab {
-                background: transparent;
-                color: #6d665e;
-                padding: 10px 16px;
-                margin-right: 6px;
-                border-radius: 12px;
-                font-weight: 600;
-            }
-            QTabBar::tab:selected {
-                background: #a84f2d;
-                color: #f7f1e8;
-            }
-            QTabBar::tab:hover:!selected {
-                background: #e7ded0;
-                color: #2d2b27;
-            }
-            #heroPanel {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #6f331d, stop:0.55 #a84f2d, stop:1 #c96a35);
-                border-radius: 14px;
-                border: 1px solid rgba(255, 255, 255, 0.08);
-            }
-            #heroTitle {
-                color: #f9f4ea;
-                font-size: 22px;
-                font-weight: 800;
-            }
-            #heroSubtitle {
-                color: #f4d5bf;
-                font-size: 12px;
-            }
-            #heroInfoCard {
-                background: rgba(249, 244, 234, 0.09);
-                border: 1px solid rgba(249, 244, 234, 0.14);
-                border-radius: 14px;
-            }
-            #heroPrimaryText {
-                color: #f9f4ea;
-                font-size: 16px;
-                font-weight: 800;
-                background: transparent;
-                border: none;
-                padding: 0;
-            }
-            #heroMetaText {
-                color: #f6ddca;
-                font-size: 11px;
-                font-weight: 700;
-                background: rgba(255, 255, 255, 0.08);
-                border: 1px solid rgba(255, 255, 255, 0.10);
-                border-radius: 999px;
-                padding: 5px 9px;
-            }
-            #statusLine, #subtleLine, #analyticsLine {
-                background: #fffaf2;
-                border: 1px solid #e1d8cb;
-                border-radius: 12px;
-                padding: 6px 10px;
-            }
-            #templatePreviewLabel {
-                background: transparent;
-                border: none;
-                padding: 0;
-                color: #4a433d;
-                font-size: 12px;
-                line-height: 1.35em;
-            }
-            #liveNameCaption {
-                background: transparent;
-                border: none;
-                padding: 0;
-                color: #7e3a22;
-                font-size: 11px;
-                font-weight: 800;
-                text-transform: uppercase;
-                letter-spacing: 0.08em;
-            }
-            #liveNameValue {
-                background: transparent;
-                border: none;
-                padding: 0;
-                color: #4a362c;
-                font-size: 22px;
-                font-weight: 900;
-                line-height: 1.15em;
-            }
-            #liveNameHint {
-                background: transparent;
-                border: none;
-                padding: 0;
-                color: #7a7067;
-                font-size: 12px;
-                font-weight: 600;
-            }
-            #chipButton {
-                background: #efe7d9;
-                color: #6b4b3a;
-                border: 1px solid #ddcbb8;
-                border-radius: 999px;
-                padding: 6px 10px;
-                font-size: 12px;
-                font-weight: 700;
-            }
-            #chipButton:hover {
-                background: #f8dfcf;
-                border-color: #dfb496;
-                color: #8f4527;
-            }
-            #chipButton[active="true"] {
-                background: #a84f2d;
-                color: #f9f4ea;
-                border-color: #8a4326;
-            }
-            #stepButton {
-                background: #efe7d9;
-                color: #6e675f;
-                border: 1px solid #ddd3c6;
-                border-radius: 999px;
-                padding: 7px 12px;
-                font-size: 12px;
-                font-weight: 800;
-            }
-            #stepButton[active="true"] {
-                background: #a84f2d;
-                color: #f7f1e8;
-                border-color: #8a4326;
-            }
-            #stepButton:hover {
-                background: #f8dfcf;
-                color: #8f4527;
-                border-color: #dfb496;
-            }
-            #analyticsLine {
-                background: #efe7d9;
-                color: #4a433d;
-            }
-            #cashierSummaryCard {
-                background: #faeadf;
-                color: #7e3a22;
-                border: 1px solid #efccb8;
-                border-radius: 14px;
-                padding: 10px 12px;
-                font-size: 15px;
-                font-weight: 800;
-            }
-            #cashierWarningLine {
-                background: #fbf0cf;
-                color: #8a5a00;
-                border: 1px solid #e7d49b;
-                border-radius: 12px;
-                padding: 7px 10px;
-                font-size: 12px;
-                font-weight: 700;
-            }
-            #cashierFeedbackLabel {
-                background: #fbf3ec;
-                color: #8c6656;
-                border: 1px solid #ecd5c5;
-                border-radius: 12px;
-                padding: 8px 10px;
-                font-size: 12px;
-                font-weight: 700;
-            }
-            #cashierFeedbackLabel[tone="positive"] {
-                background: #f8dfcf;
-                color: #8f4527;
-                border: 1px solid #dfb496;
-            }
-            #cashierFeedbackLabel[tone="warning"] {
-                background: #fbf0cf;
-                color: #8a5a00;
-                border: 1px solid #e7d49b;
-            }
-            #cashierFeedbackLabel[tone="danger"] {
-                background: #f8dfd9;
-                color: #9a2f22;
-                border: 1px solid #dfb3aa;
-            }
-            #cashierFeedbackLabel[tone="neutral"] {
-                background: #fbf3ec;
-                color: #8c6656;
-                border: 1px solid #ecd5c5;
-            }
-            #cashierTotalsCard {
-                background: #a84f2d;
-                border: 1px solid #8a4326;
-                border-radius: 16px;
-            }
-            #cashierTotalValue {
-                background: transparent;
-                color: #f9f4ea;
-                border: none;
-                padding: 0;
-                font-size: 30px;
-                font-weight: 900;
-            }
-            #cashierMetaLabel {
-                background: transparent;
-                color: #f1d7c5;
-                border: none;
-                padding: 0;
-                font-size: 12px;
-                font-weight: 700;
-            }
-            #cashierChangeValue {
-                background: #faeadf;
-                color: #7e3a22;
-                border: 1px solid #efccb8;
-                border-radius: 12px;
-                padding: 7px 10px;
-                font-size: 13px;
-                font-weight: 800;
-            }
-            #readOnlyField {
-                background: #f2eee6;
-                color: #564d45;
-                border: 1px solid #ddd3c6;
-                border-radius: 12px;
-                padding: 9px 12px;
-                font-weight: 700;
-            }
-            #settingsLaunchCard {
-                background: #fffaf2;
-                border: 1px solid #ddd3c6;
-                border-radius: 18px;
-            }
-            QPushButton#settingsLaunchButton {
-                background: #a84f2d;
-                color: #f9f4ea;
-                border: none;
-                border-radius: 14px;
-                padding: 14px 16px;
-                text-align: left;
-                font-size: 15px;
-                font-weight: 800;
-            }
-            QPushButton#settingsLaunchButton:hover {
-                background: #bb613c;
-            }
-            #inventoryTitle {
-                color: #7e3a22;
-                font-size: 20px;
-                font-weight: 800;
-                background: transparent;
-                border: none;
-                padding: 0;
-            }
-            #inventorySubtitle {
-                color: #6f665f;
-                font-size: 13px;
-                font-weight: 600;
-                background: transparent;
-                border: none;
-                padding: 0;
-            }
-            #inventoryStatusBadge {
-                background: #f6decd;
-                color: #7e3a22;
-                border: 1px solid #e1b89d;
-                border-radius: 999px;
-                padding: 4px 10px;
-                font-size: 11px;
-                font-weight: 800;
-            }
-            #inventoryStatusBadge[tone="positive"] {
-                background: #f8dfcf;
-                color: #8f4527;
-                border: 1px solid #dfb496;
-            }
-            #inventoryStatusBadge[tone="warning"] {
-                background: #fbf0cf;
-                color: #8a5a00;
-                border: 1px solid #e7d49b;
-            }
-            #inventoryStatusBadge[tone="danger"] {
-                background: #f8dfd9;
-                color: #9a2f22;
-                border: 1px solid #dfb3aa;
-            }
-            #inventoryStatusBadge[tone="muted"], #inventoryStatusBadge[tone="neutral"] {
-                background: #ece8e1;
-                color: #6e675f;
-                border: 1px solid #d7cec1;
-            }
-            #inventoryMetaCard, #inventoryMetaCardAlt {
-                border-radius: 14px;
-                padding: 10px 12px;
-                border: 1px solid #e4dacd;
-                font-weight: 600;
-            }
-            #inventoryMetaCard {
-                background: #faeadf;
-                color: #8a4326;
-                border: 1px solid #efccb8;
-            }
-            #inventoryMetaCardAlt {
-                background: #fbf3ec;
-                color: #8c6656;
-                border: 1px solid #ecd5c5;
-            }
-            #inventoryQrCaption {
-                color: #6f665f;
-                font-size: 12px;
-                background: transparent;
-                border: none;
-                padding: 0 4px 2px 4px;
-            }
-            #inventoryCounterChip {
-                background: #fae9dc;
-                color: #92492a;
-                border: 1px solid #ecc7ac;
-                border-radius: 999px;
-                padding: 5px 10px;
-                font-size: 12px;
-                font-weight: 700;
-            }
-            #inventoryCounterChip[tone="positive"], #inventoryQrStatus[tone="positive"] {
-                background: #f8dfcf;
-                color: #8f4527;
-                border: 1px solid #dfb496;
-            }
-            #inventoryCounterChip[tone="warning"], #inventoryQrStatus[tone="warning"] {
-                background: #fbf0cf;
-                color: #8a5a00;
-                border: 1px solid #e7d49b;
-            }
-            #inventoryCounterChip[tone="danger"], #inventoryQrStatus[tone="danger"] {
-                background: #f8dfd9;
-                color: #9a2f22;
-                border: 1px solid #dfb3aa;
-            }
-            #inventoryCounterChip[tone="muted"], #inventoryCounterChip[tone="neutral"],
-            #inventoryQrStatus[tone="muted"], #inventoryQrStatus[tone="neutral"] {
-                background: #ece8e1;
-                color: #6e675f;
-                border: 1px solid #d7cec1;
-            }
-            #inventoryQrStatus {
-                border-radius: 12px;
-                padding: 8px 10px;
-                font-size: 12px;
-                font-weight: 700;
-            }
-            #analyticsFlagCard {
-                border-radius: 14px;
-                padding: 10px 12px;
-                border: 1px solid #ecd5c5;
-                background: #fbf3ec;
-                color: #8c6656;
-                font-size: 13px;
-                font-weight: 800;
-            }
-            #analyticsFlagCard[tone="positive"] {
-                background: #f8dfcf;
-                color: #8f4527;
-                border: 1px solid #dfb496;
-            }
-            #analyticsFlagCard[tone="warning"] {
-                background: #fbf0cf;
-                color: #8a5a00;
-                border: 1px solid #e7d49b;
-            }
-            #analyticsFlagCard[tone="danger"] {
-                background: #f8dfd9;
-                color: #9a2f22;
-                border: 1px solid #dfb3aa;
-            }
-            #analyticsFlagCard[tone="neutral"], #analyticsFlagCard[tone="muted"] {
-                background: #fbf3ec;
-                color: #8c6656;
-                border: 1px solid #ecd5c5;
-            }
-            QGroupBox, #infoCard {
-                background: #fffaf2;
-                border: 1px solid #ddd3c6;
-                border-radius: 18px;
-                margin-top: 12px;
-                padding-top: 12px;
-                font-weight: 700;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 16px;
-                padding: 0 6px;
-                color: #51483f;
-            }
-            #kpiCard {
-                background: #fffaf2;
-                border: 1px solid #ddd3c6;
-                border-radius: 20px;
-            }
-            #kpiTitle {
-                color: #6b625a;
-                font-size: 12px;
-                text-transform: uppercase;
-                letter-spacing: 0.06em;
-                font-weight: 700;
-            }
-            #kpiValue {
-                color: #7a351d;
-                font-size: 30px;
-                font-weight: 800;
-            }
-            #kpiSubtitle {
-                color: #857b70;
-                font-size: 12px;
-            }
-            QPushButton {
-                background: #a84f2d;
-                color: #f9f4ea;
-                border: none;
-                border-radius: 12px;
-                padding: 10px 16px;
-                font-weight: 700;
-            }
-            QPushButton#adminCompactButton {
-                border-radius: 10px;
-                padding: 7px 12px;
-                min-height: 30px;
-            }
-            QPushButton#inventoryActionButton {
-                border-radius: 10px;
-                padding: 6px 10px;
-                min-height: 30px;
-                font-size: 13px;
-                text-align: left;
-            }
-            QToolButton#inventoryMenuButton, QToolButton#inventoryMenuSecondaryButton {
-                border-radius: 10px;
-                padding: 6px 12px;
-                min-height: 30px;
-                font-size: 13px;
-                font-weight: 800;
-                text-align: left;
-            }
-            QToolButton#inventoryMenuButton {
-                background: #a84f2d;
-                color: #f7f1e8;
-                border: 1px solid #8a4326;
-            }
-            QToolButton#inventoryMenuButton:hover {
-                background: #bb613c;
-            }
-            QToolButton#inventoryMenuSecondaryButton {
-                background: #efe7d9;
-                color: #2c2a27;
-                border: 1px solid #d6ccbe;
-            }
-            QToolButton#inventoryMenuSecondaryButton:hover {
-                background: #e6dccd;
-            }
-            QToolButton#inventoryMenuButton::menu-indicator, QToolButton#inventoryMenuSecondaryButton::menu-indicator {
-                subcontrol-origin: padding;
-                subcontrol-position: right center;
-                right: 8px;
-            }
-            QPushButton#inventoryDangerButton {
-                background: #f4e1dc;
-                color: #7e2f1f;
-                border: 1px solid #d9b4ab;
-                border-radius: 10px;
-                padding: 6px 10px;
-                min-height: 30px;
-                font-size: 13px;
-                text-align: left;
-            }
-            QPushButton#inventoryDangerButton:hover {
-                background: #ecd1ca;
-            }
-            QPushButton#cashierDangerButton {
-                background: #f4e1dc;
-                color: #7e2f1f;
-                border: 1px solid #d9b4ab;
-                border-radius: 10px;
-                padding: 6px 12px;
-                min-height: 30px;
-            }
-            QPushButton#cashierDangerButton:hover {
-                background: #ecd1ca;
-            }
-            QPushButton#inventorySecondaryButton {
-                background: #efe7d9;
-                color: #2c2a27;
-                border: 1px solid #d6ccbe;
-                border-radius: 10px;
-                padding: 6px 10px;
-                min-height: 30px;
-                font-size: 13px;
-                text-align: left;
-            }
-            QPushButton#inventorySecondaryButton:hover {
-                background: #e6dccd;
-            }
-            QPushButton#iconButton {
-                border-radius: 10px;
-                min-width: 34px;
-                max-width: 34px;
-                min-height: 34px;
-                max-height: 34px;
-                padding: 0;
-                font-size: 18px;
-            }
-            QPushButton#toolbarSecondaryButton, QPushButton#toolbarGhostButton, QPushButton#toolbarPrimaryButton,
-            QPushButton#toolbarSoftButton, QPushButton#toolbarActionButton, QPushButton#toolbarDangerButton,
-            QPushButton#toolbarAccentButton, QToolButton#toolbarSecondaryButton, QToolButton#toolbarGhostButton,
-            QToolButton#toolbarSoftButton, QToolButton#toolbarActionButton, QToolButton#toolbarDangerButton,
-            QToolButton#toolbarAccentButton {
-                border-radius: 10px;
-                padding: 6px 12px;
-                min-height: 34px;
-                font-size: 11px;
-                font-weight: 800;
-            }
-            QPushButton:hover {
-                background: #bb613c;
-            }
-            QPushButton:pressed {
-                background: #6f331d;
-            }
-            QPushButton:disabled {
-                background: #c8c0b6;
-                color: #f7f1e8;
-            }
-            QPushButton#primaryButton {
-                background: #a84f2d;
-            }
-            QPushButton#primaryButton:hover {
-                background: #bb613c;
-            }
-            QPushButton#ghostButton, QPushButton#secondaryButton, QPushButton#toolbarSecondaryButton, QPushButton#toolbarGhostButton,
-            QToolButton#toolbarSecondaryButton, QToolButton#toolbarGhostButton {
-                background: #efe7d9;
-                color: #2c2a27;
-                border: 1px solid #d6ccbe;
-            }
-            QPushButton#ghostButton:hover, QPushButton#secondaryButton:hover, QPushButton#toolbarSecondaryButton:hover, QPushButton#toolbarGhostButton:hover,
-            QToolButton#toolbarSecondaryButton:hover, QToolButton#toolbarGhostButton:hover {
-                background: #e6dccd;
-            }
-            QPushButton#toolbarPrimaryButton, QToolButton#toolbarPrimaryButton {
-                background: #a84f2d;
-            }
-            QPushButton#toolbarPrimaryButton:hover, QToolButton#toolbarPrimaryButton:hover {
-                background: #bb613c;
-            }
-            QPushButton#toolbarSoftButton, QToolButton#toolbarSoftButton {
-                background: #fae9dc;
-                color: #a84f2d;
-                border: 1px solid #ecc7ac;
-            }
-            QPushButton#toolbarSoftButton:hover, QToolButton#toolbarSoftButton:hover {
-                background: #f8dfcf;
-            }
-            QPushButton#toolbarActionButton, QToolButton#toolbarActionButton {
-                background: #a84f2d;
-                color: #f7f1e8;
-                border: 1px solid #8a4326;
-            }
-            QPushButton#toolbarActionButton:hover, QToolButton#toolbarActionButton:hover {
-                background: #bb613c;
-            }
-            QPushButton#toolbarDangerButton, QToolButton#toolbarDangerButton {
-                background: #f4e1dc;
-                color: #7e2f1f;
-                border: 1px solid #d9b4ab;
-            }
-            QPushButton#toolbarDangerButton:hover, QToolButton#toolbarDangerButton:hover {
-                background: #ecd1ca;
-            }
-            QPushButton#toolbarAccentButton, QToolButton#toolbarAccentButton {
-                background: #a84f2d;
-                color: #f9f4ea;
-                border: 1px solid #944226;
-            }
-            QPushButton#toolbarAccentButton:hover, QToolButton#toolbarAccentButton:hover {
-                background: #bb613c;
-            }
-            QToolButton#toolbarSoftButton::menu-indicator, QToolButton#toolbarActionButton::menu-indicator,
-            QToolButton#toolbarSecondaryButton::menu-indicator, QToolButton#toolbarGhostButton::menu-indicator {
-                subcontrol-origin: padding;
-                subcontrol-position: right center;
-                right: 8px;
-            }
-            QLineEdit, QComboBox, QSpinBox, QTextEdit {
-                background: #fffdf8;
-                border: 1px solid #d8cfc3;
-                border-radius: 12px;
-                padding: 8px 12px;
-                min-height: 34px;
-                selection-background-color: #a84f2d;
-            }
-            QLineEdit#inventoryFilterInput, QComboBox#inventoryFilterCombo {
-                border-radius: 10px;
-                padding: 6px 10px;
-                min-height: 30px;
-            }
-            QLabel#inventoryFilterLabel {
-                color: #5f564d;
-                font-size: 12px;
-                font-weight: 700;
-                background: transparent;
-                border: none;
-                padding: 0 2px;
-            }
-            QComboBox#inventoryFilterCombo:hover, QLineEdit#inventoryFilterInput:hover {
-                background: #f9efe7;
-                border: 1px solid #dfb496;
-            }
-            QLineEdit:focus, QComboBox:focus, QSpinBox:focus, QTextEdit:focus {
-                border: 2px solid #c96a35;
-            }
-            QComboBox::drop-down, QSpinBox::up-button, QSpinBox::down-button {
-                border: none;
-                width: 22px;
-            }
-            QComboBox QAbstractItemView {
-                background: #fffdf8;
-                color: #1f1f1b;
-                border: 1px solid #d8cfc3;
-                selection-background-color: #f8dfcf;
-                selection-color: #8f4527;
-                outline: 0;
-            }
-            QComboBox QAbstractItemView::item {
-                min-height: 30px;
-                padding: 6px 10px;
-            }
-            QComboBox QAbstractItemView::item:hover {
-                background: #fae9dc;
-                color: #8f4527;
-            }
-            QComboBox QAbstractItemView::item:selected {
-                background: #f4d4bb;
-                color: #73341c;
-                font-weight: 700;
-            }
-            QComboBox QAbstractItemView::item:selected:hover {
-                background: #efc39f;
-                color: #6a2f1a;
-            }
-            #dataTable {
-                background: #fffdf8;
-                alternate-background-color: #f5efe6;
-                gridline-color: #e2d9cc;
-                border: 1px solid #ddd3c6;
-                border-radius: 16px;
-                selection-background-color: #efccb5;
-                selection-color: #5a2816;
-                font-size: 13px;
-            }
-            QHeaderView::section {
-                background: #efe7d9;
-                color: #4a433d;
-                border: none;
-                border-right: 1px solid #ddd3c6;
-                border-bottom: 1px solid #ddd3c6;
-                padding: 8px 10px;
-                font-weight: 700;
-            }
-            #qrPreview {
-                border: 1px dashed #b7ad9e;
-                border-radius: 18px;
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #ffffff, stop:1 #f6f1e8);
-                color: #8a8075;
-                max-width: 180px;
-                max-height: 180px;
-                padding: 10px;
-            }
-            """
-        )
+        self.setStyleSheet(build_main_window_stylesheet())
 
 
 def main() -> int:
