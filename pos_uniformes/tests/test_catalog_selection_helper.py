@@ -5,7 +5,10 @@ import unittest
 
 from pos_uniformes.ui.helpers.catalog_selection_helper import (
     build_catalog_selection_view,
+    build_catalog_selection_view_from_row,
     build_empty_catalog_selection_view,
+    find_catalog_row_index_by_variant_id,
+    resolve_catalog_row,
 )
 
 
@@ -63,6 +66,55 @@ class CatalogSelectionHelperTests(unittest.TestCase):
             view.selection_label,
             "Falda oficial | SKU-002 | Colegio Norte | Falda | precio 249.00 | stock 0",
         )
+
+    def test_builds_selection_view_from_catalog_row(self) -> None:
+        view = build_catalog_selection_view_from_row(
+            is_admin=True,
+            row={
+                "sku": "SKU-003",
+                "producto_nombre": "Pants Deportivo | Morelos | Pants #3",
+                "producto_nombre_base": "Pants Deportivo",
+                "escuela_nombre": "Morelos",
+                "tipo_prenda_nombre": "Deportivo",
+                "tipo_pieza_nombre": "Pants",
+                "precio_venta": Decimal("219.00"),
+                "stock_actual": 5,
+                "apartado_cantidad": 2,
+                "variante_estado": "ACTIVA",
+                "origen_etiqueta": "LEGACY",
+                "origen_legacy": True,
+                "nombre_legacy": "Pants viejo",
+            },
+        )
+
+        self.assertEqual(
+            view.selection_label,
+            "SKU-003 | Pants Deportivo | Morelos | Deportivo | Pants | precio 219.00 | stock 5 | apartado 2 | ACTIVA | LEGACY | legacy: Pants viejo",
+        )
+
+    def test_resolve_catalog_row_returns_none_for_invalid_index(self) -> None:
+        self.assertIsNone(resolve_catalog_row([{"sku": "SKU-001"}], -1))
+        self.assertIsNone(resolve_catalog_row([{"sku": "SKU-001"}], 4))
+
+    def test_find_catalog_row_index_by_variant_id_supports_string_and_int(self) -> None:
+        row_index = find_catalog_row_index_by_variant_id(
+            [
+                {"variante_id": "7"},
+                {"variante_id": 8},
+                {"variante_id": "9"},
+            ],
+            "8",
+        )
+
+        self.assertEqual(row_index, 1)
+
+    def test_find_catalog_row_index_by_variant_id_returns_none_for_missing_value(self) -> None:
+        row_index = find_catalog_row_index_by_variant_id(
+            [{"variante_id": 7}],
+            "xyz",
+        )
+
+        self.assertIsNone(row_index)
 
 
 if __name__ == "__main__":

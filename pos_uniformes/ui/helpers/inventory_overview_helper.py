@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
+from pos_uniformes.utils.product_name import sanitize_product_display_name
+
 
 @dataclass(frozen=True)
 class InventoryBadgeState:
@@ -75,6 +77,7 @@ def build_inventory_overview_view(
     movement_quantity: int | None,
     movement_date: str,
 ) -> InventoryOverviewView:
+    clean_product_name = sanitize_product_display_name(product_name)
     stock_status = "agotado" if stock_actual == 0 else "bajo" if stock_actual <= 3 else "saludable"
     stock_tone = "danger" if stock_actual == 0 else "warning" if stock_actual <= 3 else "positive"
     if movement_type is None or movement_quantity is None:
@@ -83,7 +86,7 @@ def build_inventory_overview_view(
         last_movement_label = f"Ultimo movimiento: {movement_type} | {movement_quantity:+} | {movement_date}"
     return InventoryOverviewView(
         overview_label=sku,
-        product_label=product_name,
+        product_label=clean_product_name,
         status_badge=InventoryBadgeState(
             text="ACTIVA" if variant_active else "INACTIVA",
             tone="positive" if variant_active else "muted",
@@ -96,7 +99,7 @@ def build_inventory_overview_view(
         meta_label=f"Stock actual {stock_actual} | Apartado {apartado_cantidad} | Escuela {escuela_nombre}",
         last_movement_label=last_movement_label,
         catalog_selection_label=(
-            f"{sku} | {product_name} | {tipo_prenda_nombre} | {tipo_pieza_nombre} | "
+            f"{sku} | {clean_product_name} | {tipo_prenda_nombre} | {tipo_pieza_nombre} | "
             f"precio {precio_venta} | stock {stock_actual} | apartado {apartado_cantidad}"
         ),
         toggle_product_label="Activar prod." if not product_active else "Desactivar prod.",

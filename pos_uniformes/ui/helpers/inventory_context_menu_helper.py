@@ -50,3 +50,13 @@ def build_inventory_context_menu_actions(
             enabled=is_admin,
         ),
     )
+
+
+def resolve_inventory_context_action_key(
+    action_map: dict[str, object],
+    chosen_action: object,
+) -> str | None:
+    for key, action in action_map.items():
+        if action == chosen_action:
+            return key
+    return None

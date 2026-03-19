@@ -5,6 +5,11 @@ from PIL import Image, ImageDraw
 
 logger = logging.getLogger(__name__)
 
+QR_ERROR_CORRECTION = qrcode.constants.ERROR_CORRECT_H
+QR_BOX_SIZE = 12
+QR_BORDER = 3
+MIN_PRINT_QR_SIZE = 290
+
 def validate_string(arg, name, allow_empty=False):
     """
     Valida que el argumento sea una cadena. Si es None, lo convierte a una cadena vacía.
@@ -58,10 +63,10 @@ def generar_qr(data, output_path, tipo_pieza=None):
             logger.debug("Archivo existente eliminado: %s", output_path)
 
         qr = qrcode.QRCode(
-            version=1,
-            error_correction=qrcode.constants.ERROR_CORRECT_H,
-            box_size=6,
-            border=4
+            version=None,
+            error_correction=QR_ERROR_CORRECTION,
+            box_size=QR_BOX_SIZE,
+            border=QR_BORDER
         )
         qr.add_data(data)
         qr.make(fit=True)
@@ -152,3 +157,37 @@ def generar_qr(data, output_path, tipo_pieza=None):
     except Exception as e:
         logger.error(f"Error al generar QR: {str(e)}")
         raise
+
+
+def qr_needs_regeneration(qr_path, min_size=MIN_PRINT_QR_SIZE):
+    """
+    Indica si un QR existente es demasiado pequeño para imprimirse con buena definición.
+    """
+    try:
+        if not qr_path or not os.path.exists(qr_path):
+            return True
+        with Image.open(qr_path) as qr_image:
+            width, height = qr_image.size
+        needs_regeneration = width < min_size or height < min_size
+        if needs_regeneration:
+            logger.debug(
+                "QR con resolución insuficiente detectado en %s: %sx%s < %s",
+                qr_path,
+                width,
+                height,
+                min_size,
+            )
+        return needs_regeneration
+    except Exception as exc:
+        logger.warning("No se pudo validar la resolución del QR %s: %s", qr_path, exc)
+        return True
+
+
+def ensure_print_quality_qr(data, output_path, tipo_pieza=None, min_size=MIN_PRINT_QR_SIZE):
+    """
+    Regenera el QR si no existe o si su resolución es insuficiente para impresión.
+    """
+    if qr_needs_regeneration(output_path, min_size=min_size):
+        generar_qr(data, output_path, tipo_pieza)
+        return True
+    return False

@@ -12,10 +12,11 @@
 1. Localizar el bloque exacto.
 2. Detectar si es UI, regla de negocio o persistencia.
 3. Si es regla pura, extraerla a `services/`.
-4. Agregar o ampliar pruebas.
-5. Dejar a `ui/main_window.py` delegando.
-6. Correr verificaciones.
-7. Documentar el cambio.
+4. Si es una mejora nueva, crearla fuera de `ui/main_window.py` y conectar desde ahi.
+5. Agregar o ampliar pruebas.
+6. Dejar a `ui/main_window.py` delegando.
+7. Correr verificaciones.
+8. Documentar el cambio.
 
 ## Verificaciones minimas
 
@@ -58,6 +59,8 @@
 - No hacer refactor grande en una sola entrega.
 - No mezclar estructura y comportamiento nuevo.
 - No mover dos dominios a la vez.
+- No agregar mejoras nuevas directamente dentro de `ui/main_window.py`.
+- Si una mejora necesita UI nueva, crear dialog, helper, vista o servicio propio y dejar a `main_window.py` solo enlazando.
 - Si un cambio toca caja, cerrar con checkpoint documentado.
 
 ## Criterio para detenerse

@@ -16,8 +16,8 @@ from urllib.parse import quote
 from uuid import uuid4
 import webbrowser
 
-from PyQt6.QtCore import QDate, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QAction, QColor, QImage, QKeySequence, QPainter, QPixmap, QShortcut
+from PyQt6.QtCore import QDate, QMarginsF, QSizeF, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QAction, QColor, QImage, QKeySequence, QPainter, QPageLayout, QPageSize, QPixmap, QShortcut
 from PyQt6.QtPrintSupport import QPrintDialog, QPrinter
 from PyQt6.QtWidgets import (
     QApplication,
@@ -118,6 +118,11 @@ from pos_uniformes.services.inventario_service import (
     InventarioService,
 )
 from pos_uniformes.services.loyalty_service import LoyaltyService
+from pos_uniformes.services.inventory_label_service import (
+    load_inventory_label_context,
+    render_inventory_label,
+)
+from pos_uniformes.services.inventory_overview_service import load_inventory_overview_snapshot
 from pos_uniformes.services.manual_promo_flow_service import (
     build_manual_promo_state,
     clear_manual_promo_state,
@@ -161,6 +166,10 @@ from pos_uniformes.services.sale_discount_service import (
 )
 from pos_uniformes.services.recent_sale_service import list_recent_sale_rows
 from pos_uniformes.services.search_filter_service import row_matches_search
+from pos_uniformes.services.search_suggestion_service import (
+    build_catalog_search_suggestions,
+    build_inventory_search_suggestions,
+)
 from pos_uniformes.services.supplier_service import SupplierService
 from pos_uniformes.services.user_service import UserService
 from pos_uniformes.services.venta_service import VentaItemInput, VentaService
@@ -186,6 +195,8 @@ from pos_uniformes.ui.dialogs.settings_prompt_dialogs import (
 )
 from pos_uniformes.ui.dialogs.layaway_payment_dialog import build_layaway_payment_dialog
 from pos_uniformes.ui.dialogs.create_layaway_dialog import build_create_layaway_dialog
+from pos_uniformes.ui.dialogs.inventory_context_menu_dialog import prompt_inventory_context_action
+from pos_uniformes.ui.dialogs.inventory_label_dialog import build_inventory_label_dialog
 from pos_uniformes.ui.dialogs.marketing_history_dialog import build_marketing_history_dialog
 from pos_uniformes.ui.dialogs.printable_text_dialog import open_printable_text_dialog
 from pos_uniformes.ui.dialogs.cash_session_prompt_dialogs import (
@@ -196,6 +207,7 @@ from pos_uniformes.ui.dialogs.cash_session_prompt_dialogs import (
     prompt_open_cash_session,
 )
 from pos_uniformes.ui.helpers.catalog_access_helper import build_catalog_access_view
+from pos_uniformes.ui.helpers.catalog_action_guard_helper import build_catalog_action_guard_feedback
 from pos_uniformes.ui.helpers.catalog_macro_filter_helper import (
     build_catalog_uniform_macro_button_states,
     resolve_catalog_uniform_macro_selection,
@@ -204,8 +216,10 @@ from pos_uniformes.ui.helpers.history_filter_helper import build_history_type_op
 from pos_uniformes.ui.helpers.history_summary_helper import build_history_summary_view
 from pos_uniformes.ui.helpers.history_table_helper import build_history_table_rows
 from pos_uniformes.ui.helpers.catalog_selection_helper import (
-    build_catalog_selection_view,
+    build_catalog_selection_view_from_row,
     build_empty_catalog_selection_view,
+    find_catalog_row_index_by_variant_id,
+    resolve_catalog_row,
 )
 from pos_uniformes.ui.helpers.catalog_summary_helper import build_catalog_summary_view
 from pos_uniformes.ui.helpers.inventory_context_menu_helper import build_inventory_context_menu_actions
@@ -213,6 +227,19 @@ from pos_uniformes.ui.helpers.inventory_overview_helper import (
     build_empty_inventory_overview_view,
     build_error_inventory_overview_view,
     build_inventory_overview_view,
+)
+from pos_uniformes.ui.helpers.inventory_qr_preview_helper import (
+    InventoryQrPreviewView,
+    build_available_inventory_qr_preview_view,
+    build_empty_inventory_qr_preview_view,
+    build_error_inventory_qr_preview_view,
+    build_pending_inventory_qr_preview_view,
+)
+from pos_uniformes.ui.helpers.inventory_selection_helper import (
+    collect_selected_inventory_variant_ids,
+    find_inventory_row_index_by_variant_id,
+    normalize_inventory_variant_id,
+    resolve_selected_catalog_row,
 )
 from pos_uniformes.ui.helpers.inventory_summary_helper import build_inventory_summary_view
 from pos_uniformes.ui.helpers.layaway_alerts_helper import build_layaway_alerts_view
@@ -238,6 +265,7 @@ from pos_uniformes.ui.helpers.sale_client_selection_helper import (
 from pos_uniformes.ui.helpers.sale_cashier_view_helper import build_sale_cashier_view
 from pos_uniformes.ui.helpers.sale_payment_helper import collect_sale_payment_details
 from pos_uniformes.ui.helpers.sale_scanned_client_helper import build_sale_scanned_client_ui_state
+from pos_uniformes.ui.helpers.search_input_helper import apply_search_suggestions
 from pos_uniformes.ui.helpers.settings_backup_helper import (
     build_settings_backup_error_view,
     build_settings_backup_view,
@@ -272,6 +300,12 @@ from pos_uniformes.ui.helpers.settings_users_helper import (
 from pos_uniformes.ui.helpers.settings_whatsapp_preview_helper import (
     build_settings_whatsapp_preview_text,
 )
+from pos_uniformes.ui.helpers.qt_image_scale_helper import (
+    build_centered_paint_rect,
+    normalize_scaled_target_size,
+    normalize_printable_image,
+)
+from pos_uniformes.ui.helpers.inventory_label_print_helper import build_inventory_label_print_layout
 from pos_uniformes.ui.views.analytics_view import build_analytics_tab
 from pos_uniformes.ui.views.cashier_view import build_cashier_tab
 from pos_uniformes.ui.views.dashboard_view import build_dashboard_tab
@@ -282,6 +316,7 @@ from pos_uniformes.ui.views.products_view import build_products_tab
 from pos_uniformes.ui.views.quotes_view import build_quotes_tab
 from pos_uniformes.ui.views.settings_view import build_settings_tab
 from pos_uniformes.ui.styles.main_window_styles import build_main_window_stylesheet
+from pos_uniformes.utils.product_name import sanitize_product_display_name
 from pos_uniformes.utils.product_templates import (
     build_price_blocks,
     build_product_template_preview,
@@ -295,7 +330,6 @@ from pos_uniformes.utils.product_templates import (
     suggest_presentation_template,
     step_template_defaults,
 )
-from pos_uniformes.utils.label_generator import LabelGenerator
 from pos_uniformes.utils.qr_generator import QrGenerator
 
 
@@ -1255,11 +1289,11 @@ class MainWindow(QMainWindow):
             "Filtra la lista para mostrar solo presentaciones con piezas comprometidas por apartados."
         )
         self.catalog_search_input.setToolTip(
-            "Acepta busqueda libre y prefijos como sku:, escuela:, tipo:, pieza:, producto:, legacy:, talla:, color:."
+            "Busca por producto, color, talla, marca, escuela o SKU. Si quieres mas precision, tambien acepta prefijos como sku:, producto: o color:."
         )
         self.catalog_clear_filters_button.setToolTip("Limpia todos los filtros del catalogo y muestra nuevamente todo el catalogo.")
         self.inventory_search_input.setToolTip(
-            "Acepta busqueda libre y prefijos como sku:, escuela:, tipo:, pieza:, producto:, legacy:, talla:, color:."
+            "Busca por producto, color, talla, marca, escuela o SKU. Si quieres mas precision, tambien acepta prefijos como sku:, producto: o color:."
         )
         self.inventory_clear_filters_button.setToolTip("Limpia todos los filtros del inventario y muestra nuevamente todas las presentaciones.")
         self.inventory_table.setToolTip("Selecciona una presentacion para gestionar inventario, precio, QR o estado.")
@@ -5213,7 +5247,12 @@ class MainWindow(QMainWindow):
                 ).all()
             ]
             variantes = [
-                (variante.id, variante.sku, variante.producto.nombre, variante.stock_actual)
+                (
+                    variante.id,
+                    variante.sku,
+                    sanitize_product_display_name(variante.producto.nombre),
+                    variante.stock_actual,
+                )
                 for variante in session.scalars(
                     select(Variante).where(Variante.activo.is_(True)).order_by(Variante.sku)
                 ).all()
@@ -5268,7 +5307,12 @@ class MainWindow(QMainWindow):
     def _prompt_inventory_adjustment_data(self) -> dict[str, object] | None:
         with get_session() as session:
             variantes = [
-                (variante.id, variante.sku, variante.producto.nombre, variante.stock_actual)
+                (
+                    variante.id,
+                    variante.sku,
+                    sanitize_product_display_name(variante.producto.nombre),
+                    variante.stock_actual,
+                )
                 for variante in session.scalars(
                     select(Variante).where(Variante.activo.is_(True)).order_by(Variante.sku)
                 ).all()
@@ -5359,7 +5403,14 @@ class MainWindow(QMainWindow):
     def _prompt_inventory_count_data(self) -> dict[str, object] | None:
         with get_session() as session:
             variantes = [
-                (variante.id, variante.sku, variante.producto.nombre, variante.talla, variante.color, variante.stock_actual)
+                (
+                    variante.id,
+                    variante.sku,
+                    sanitize_product_display_name(variante.producto.nombre),
+                    variante.talla,
+                    variante.color,
+                    variante.stock_actual,
+                )
                 for variante in session.scalars(select(Variante).order_by(Variante.sku)).all()
             ]
 
@@ -6593,38 +6644,28 @@ class MainWindow(QMainWindow):
         )
 
     def _handle_catalog_selection(self) -> None:
-        selected_row = self.catalog_table.currentRow()
-        if selected_row < 0 or selected_row >= len(self.catalog_rows):
+        row = resolve_catalog_row(self.catalog_rows, self.catalog_table.currentRow())
+        if row is None:
             self.products_selection_label.setText(build_empty_catalog_selection_view().selection_label)
             return
 
-        row = self.catalog_rows[selected_row]
-        selection_view = build_catalog_selection_view(
+        selection_view = build_catalog_selection_view_from_row(
             is_admin=self.current_role == RolUsuario.ADMIN,
-            sku=str(row["sku"]),
-            product_name=str(row["producto_nombre"]),
-            product_base_name=str(row["producto_nombre_base"]),
-            school_name=str(row["escuela_nombre"]),
-            uniform_type_name=str(row["tipo_prenda_nombre"]),
-            piece_type_name=str(row["tipo_pieza_nombre"]),
-            sale_price=row["precio_venta"],
-            stock_actual=int(row["stock_actual"]),
-            layaway_reserved=int(row["apartado_cantidad"]),
-            variant_status=str(row["variante_estado"]),
-            origin_label=str(row["origen_etiqueta"]),
-            origin_legacy=bool(row["origen_legacy"]),
-            legacy_name=str(row["nombre_legacy"] or ""),
+            row=row,
         )
         self.products_selection_label.setText(selection_view.selection_label)
 
     def _handle_update_product(self) -> None:
         selected = self._selected_catalog_row()
-        if selected is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona una presentacion para editar su producto.")
+        feedback = build_catalog_action_guard_feedback(
+            action_key="update_product",
+            has_selection=selected is not None,
+            is_admin=self.current_role == RolUsuario.ADMIN,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede editar productos.")
-            return
+        assert selected is not None
 
         try:
             data = self._prompt_product_data(selected)
@@ -6683,12 +6724,15 @@ class MainWindow(QMainWindow):
 
     def _handle_update_variant(self) -> None:
         selected = self._selected_catalog_row()
-        if selected is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona una presentacion para editarla.")
+        feedback = build_catalog_action_guard_feedback(
+            action_key="update_variant",
+            has_selection=selected is not None,
+            is_admin=self.current_role == RolUsuario.ADMIN,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede editar presentaciones.")
-            return
+        assert selected is not None
 
         result = self._create_or_edit_presentation(initial=selected, include_stock=False)
         if result is None:
@@ -6711,12 +6755,15 @@ class MainWindow(QMainWindow):
 
     def _handle_toggle_product(self) -> None:
         selected = self._selected_catalog_row()
-        if selected is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona una presentacion para cambiar el estado del producto.")
+        feedback = build_catalog_action_guard_feedback(
+            action_key="toggle_product",
+            has_selection=selected is not None,
+            is_admin=self.current_role == RolUsuario.ADMIN,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede activar o desactivar productos.")
-            return
+        assert selected is not None
 
         target_state = not bool(selected["producto_activo"])
         action = "activar" if target_state else "desactivar"
@@ -6739,12 +6786,15 @@ class MainWindow(QMainWindow):
 
     def _handle_toggle_variant(self) -> None:
         selected = self._selected_catalog_row()
-        if selected is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona una presentacion para cambiar su estado.")
+        feedback = build_catalog_action_guard_feedback(
+            action_key="toggle_variant",
+            has_selection=selected is not None,
+            is_admin=self.current_role == RolUsuario.ADMIN,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede activar o desactivar presentaciones.")
-            return
+        assert selected is not None
 
         target_state = not bool(selected["variante_activo"])
         action = "activar" if target_state else "desactivar"
@@ -6767,12 +6817,15 @@ class MainWindow(QMainWindow):
 
     def _handle_delete_product(self) -> None:
         selected = self._selected_catalog_row()
-        if selected is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona una presentacion del producto que quieres eliminar.")
+        feedback = build_catalog_action_guard_feedback(
+            action_key="delete_product",
+            has_selection=selected is not None,
+            is_admin=self.current_role == RolUsuario.ADMIN,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede eliminar productos.")
-            return
+        assert selected is not None
 
         product_name = str(selected["producto_nombre"])
         confirmation = QMessageBox.question(
@@ -6805,12 +6858,15 @@ class MainWindow(QMainWindow):
 
     def _handle_delete_variant(self) -> None:
         selected = self._selected_catalog_row()
-        if selected is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona una presentacion para eliminarla.")
+        feedback = build_catalog_action_guard_feedback(
+            action_key="delete_variant",
+            has_selection=selected is not None,
+            is_admin=self.current_role == RolUsuario.ADMIN,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede eliminar presentaciones.")
-            return
+        assert selected is not None
 
         sku = str(selected["sku"])
         confirmation = QMessageBox.question(
@@ -7474,7 +7530,7 @@ class MainWindow(QMainWindow):
                         {
                             "sku": sku,
                             "variante_id": variante.id,
-                            "producto_nombre": variante.producto.nombre,
+                            "producto_nombre": sanitize_product_display_name(variante.producto.nombre),
                             "cantidad": quantity,
                             "precio_unitario": Decimal(variante.precio_venta),
                         }
@@ -8127,9 +8183,17 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "QR fallido", str(exc))
             return
 
-        self.qr_status_label.setText(f"Ultimo QR generado: {path.name}")
+        self._apply_inventory_qr_preview_view(
+            build_available_inventory_qr_preview_view(
+                sku=str(variante.sku),
+                product_name=str(variante.producto.nombre),
+                talla=str(variante.talla),
+                color=str(variante.color),
+                file_name=path.name,
+            ),
+            preview_path=path,
+        )
         self._set_combo_value(self.inventory_variant_combo, variante_id)
-        self._load_qr_preview(path)
         self._handle_inventory_filters_changed()
         QMessageBox.information(self, "QR generado", f"QR guardado en:\n{path}")
 
@@ -8543,7 +8607,7 @@ class MainWindow(QMainWindow):
         origin_filter = str(self.catalog_origin_filter_combo.currentData() or "")
         duplicate_filter = str(self.catalog_duplicate_filter_combo.currentData() or "")
 
-        self.catalog_rows = [
+        catalog_snapshot_rows = [
             {
                 "variante_id": row[0],
                 "producto_id": row[1],
@@ -8556,7 +8620,7 @@ class MainWindow(QMainWindow):
                 "escuela_nombre": row[8] or "General",
                 "tipo_prenda_nombre": row[9] or "-",
                 "tipo_pieza_nombre": row[10] or "-",
-                "producto_nombre": row[11],
+                "producto_nombre": sanitize_product_display_name(row[11]),
                 "producto_nombre_base": row[12],
                 "producto_descripcion": row[13],
                 "nombre_legacy": row[14],
@@ -8573,63 +8637,52 @@ class MainWindow(QMainWindow):
                 "variante_estado": "ACTIVA" if row[23] else "INACTIVA",
                 "origen_etiqueta": "LEGACY" if row[15] else "NUEVO",
                 "fallback_importacion": bool(row[24]),
+                "fallback_text": "fallback" if bool(row[24]) else "",
             }
             for row in rows
+        ]
+        apply_search_suggestions(
+            self.catalog_search_input,
+            build_catalog_search_suggestions(catalog_snapshot_rows, search_text=search_text),
+        )
+        self.catalog_rows = [
+            row
+            for row in catalog_snapshot_rows
             if (
-                self._catalog_row_matches_search(
-                    {
-                        "sku": row[5],
-                        "categoria_nombre": row[6],
-                        "marca_nombre": row[7],
-                        "escuela_nombre": row[8] or "General",
-                        "tipo_prenda_nombre": row[9] or "-",
-                        "tipo_pieza_nombre": row[10] or "-",
-                        "producto_nombre": row[11],
-                        "producto_nombre_base": row[12],
-                        "producto_descripcion": row[13],
-                        "nombre_legacy": row[14],
-                        "origen_etiqueta": "LEGACY" if row[15] else "NUEVO",
-                        "producto_estado": "ACTIVO" if row[22] else "INACTIVO",
-                        "variante_estado": "ACTIVA" if row[23] else "INACTIVA",
-                        "fallback_text": "fallback" if bool(row[24]) else "",
-                        "talla": row[16],
-                        "color": row[17],
-                    },
-                    search_text,
-                )
-                and (not category_filters or str(row[6] or "") in category_filters)
-                and (not brand_filters or str(row[7] or "") in brand_filters)
-                and (not school_filters or str(row[8] or "General") in school_filters)
-                and (not type_filters or str(row[9] or "-") in type_filters)
-                and (not piece_filters or str(row[10] or "-") in piece_filters)
-                and (not size_filters or str(row[16] or "") in size_filters)
-                and (not color_filters or str(row[17] or "") in color_filters)
+                self._catalog_row_matches_search(row, search_text)
+                and (not category_filters or str(row["categoria_nombre"] or "") in category_filters)
+                and (not brand_filters or str(row["marca_nombre"] or "") in brand_filters)
+                and (not school_filters or str(row["escuela_nombre"] or "General") in school_filters)
+                and (not type_filters or str(row["tipo_prenda_nombre"] or "-") in type_filters)
+                and (not piece_filters or str(row["tipo_pieza_nombre"] or "-") in piece_filters)
+                and (not size_filters or str(row["talla"] or "") in size_filters)
+                and (not color_filters or str(row["color"] or "") in color_filters)
                 and (
                     not status_filter
-                    or (status_filter == "active" and bool(row[23]))
-                    or (status_filter == "inactive" and not bool(row[23]))
+                    or (status_filter == "active" and bool(row["variante_activo"]))
+                    or (status_filter == "inactive" and not bool(row["variante_activo"]))
                 )
                 and (
                     not stock_filter
-                    or (stock_filter == "in_stock" and int(row[20]) > 0)
-                    or (stock_filter == "out_of_stock" and int(row[20]) == 0)
-                    or (stock_filter == "low_stock" and 0 < int(row[20]) <= 3)
-                    or (stock_filter == "available_over_reserved" and int(row[20]) > int(row[21]))
+                    or (stock_filter == "in_stock" and int(row["stock_actual"]) > 0)
+                    or (stock_filter == "out_of_stock" and int(row["stock_actual"]) == 0)
+                    or (stock_filter == "low_stock" and 0 < int(row["stock_actual"]) <= 3)
+                    or (stock_filter == "available_over_reserved" and int(row["stock_actual"]) > int(row["apartado_cantidad"]))
                 )
                 and (
                     not catalog_filter
-                    or (catalog_filter == "reserved" and int(row[21]) > 0)
-                    or (catalog_filter == "free" and int(row[21]) == 0)
+                    or (catalog_filter == "reserved" and int(row["apartado_cantidad"]) > 0)
+                    or (catalog_filter == "free" and int(row["apartado_cantidad"]) == 0)
                 )
                 and (
                     not origin_filter
-                    or (origin_filter == "legacy" and bool(row[15]))
-                    or (origin_filter == "native" and not bool(row[15]))
+                    or (origin_filter == "legacy" and bool(row["origen_legacy"]))
+                    or (origin_filter == "native" and not bool(row["origen_legacy"]))
                 )
                 and (
                     not duplicate_filter
-                    or (duplicate_filter == "fallback_only" and bool(row[24]))
-                    or (duplicate_filter == "fallback_exclude" and not bool(row[24]))
+                    or (duplicate_filter == "fallback_only" and bool(row["fallback_importacion"]))
+                    or (duplicate_filter == "fallback_exclude" and not bool(row["fallback_importacion"]))
                 )
             )
         ]
@@ -8833,11 +8886,23 @@ class MainWindow(QMainWindow):
         self.inventory_color_filter_combo.set_items([(str(color), str(color)) for color in colores if color])
         self._populate_combo(
             self.variant_product_combo,
-            [(f"{producto.nombre} | {producto.marca.nombre}", producto.id) for producto in productos],
+            [
+                (
+                    f"{sanitize_product_display_name(producto.nombre)} | {producto.marca.nombre}",
+                    producto.id,
+                )
+                for producto in productos
+            ],
         )
         self._populate_combo(
             self.edit_variant_product_combo,
-            [(f"{producto.nombre} | {producto.marca.nombre}", producto.id) for producto in productos],
+            [
+                (
+                    f"{sanitize_product_display_name(producto.nombre)} | {producto.marca.nombre}",
+                    producto.id,
+                )
+                for producto in productos
+            ],
         )
         self._populate_combo(
             self.purchase_provider_combo,
@@ -8868,11 +8933,19 @@ class MainWindow(QMainWindow):
             [(f"{cliente.codigo_cliente} · {cliente.nombre}", cliente.id) for cliente in clientes],
         )
         purchase_variant_items = [
-            (f"{variante.sku} | {variante.producto.nombre} | stock {variante.stock_actual}", variante.id)
+            (
+                f"{variante.sku} | {sanitize_product_display_name(variante.producto.nombre)} | "
+                f"stock {variante.stock_actual}",
+                variante.id,
+            )
             for variante in variantes_activas
         ]
         inventory_variant_items = [
-            (f"{variante.sku} | {variante.producto.nombre} | stock {variante.stock_actual}", variante.id)
+            (
+                f"{variante.sku} | {sanitize_product_display_name(variante.producto.nombre)} | "
+                f"stock {variante.stock_actual}",
+                variante.id,
+            )
             for variante in variantes_inventario
         ]
         self._populate_combo(self.purchase_variant_combo, purchase_variant_items)
@@ -9081,7 +9154,7 @@ class MainWindow(QMainWindow):
         origin_filter = str(self.inventory_origin_filter_combo.currentData() or "")
         duplicate_filter = str(self.inventory_duplicate_filter_combo.currentData() or "")
 
-        visible_rows: list[dict[str, object]] = []
+        inventory_snapshot_rows: list[dict[str, object]] = []
         for row in rows:
             qr_exists = (QrGenerator.output_dir() / f"{row[1]}.png").exists()
             row_data = {
@@ -9089,7 +9162,7 @@ class MainWindow(QMainWindow):
                 "sku": row[1],
                 "categoria_nombre": row[2],
                 "marca_nombre": row[3],
-                "producto_nombre": row[4],
+                "producto_nombre": sanitize_product_display_name(row[4]),
                 "producto_nombre_base": row[5],
                 "escuela_nombre": row[6] or "General",
                 "tipo_prenda_nombre": row[7] or "-",
@@ -9109,6 +9182,15 @@ class MainWindow(QMainWindow):
                 "variante_estado": "ACTIVA" if row[17] else "INACTIVA",
                 "fallback_text": "fallback" if bool(row[18]) else "",
             }
+            inventory_snapshot_rows.append(row_data)
+
+        apply_search_suggestions(
+            self.inventory_search_input,
+            build_inventory_search_suggestions(inventory_snapshot_rows, search_text=search_text),
+        )
+
+        visible_rows: list[dict[str, object]] = []
+        for row_data in inventory_snapshot_rows:
             if not self._inventory_row_matches_search(row_data, search_text):
                 continue
             if category_filters and str(row_data["categoria_nombre"]) not in category_filters:
@@ -9135,9 +9217,9 @@ class MainWindow(QMainWindow):
                 continue
             if stock_filter == "available" and int(row_data["stock_actual"]) <= 0:
                 continue
-            if qr_filter == "ready" and not qr_exists:
+            if qr_filter == "ready" and not bool(row_data["qr_exists"]):
                 continue
-            if qr_filter == "missing" and qr_exists:
+            if qr_filter == "missing" and bool(row_data["qr_exists"]):
                 continue
             if origin_filter == "legacy" and not bool(row_data["origen_legacy"]):
                 continue
@@ -9372,7 +9454,13 @@ class MainWindow(QMainWindow):
 
         self.top_products_table.setRowCount(len(rows))
         for row_index, row in enumerate(rows):
-            for column_index, value in enumerate(row):
+            display_row = (
+                row[0],
+                sanitize_product_display_name(row[1]),
+                row[2],
+                row[3],
+            )
+            for column_index, value in enumerate(display_row):
                 self.top_products_table.setItem(row_index, column_index, _table_item(value))
         self.top_products_table.resizeColumnsToContents()
 
@@ -9472,7 +9560,13 @@ class MainWindow(QMainWindow):
         ).all()
         self.analytics_stock_table.setRowCount(len(stock_rows))
         for row_index, row in enumerate(stock_rows):
-            values = [row[0], row[1], row[2], row[3], "ACTIVA" if bool(row[4]) else "INACTIVA"]
+            values = [
+                row[0],
+                sanitize_product_display_name(row[1]),
+                row[2],
+                row[3],
+                "ACTIVA" if bool(row[4]) else "INACTIVA",
+            ]
             for column_index, value in enumerate(values):
                 self.analytics_stock_table.setItem(row_index, column_index, _table_item(value))
             stock_item = self.analytics_stock_table.item(row_index, 2)
@@ -9556,7 +9650,7 @@ class MainWindow(QMainWindow):
                                 "cliente": sale.cliente.nombre if sale.cliente is not None else "Mostrador",
                                 "sku": detalle.variante.sku if detalle.variante else None,
                                 "producto": (
-                                    detalle.variante.producto.nombre
+                                    sanitize_product_display_name(detalle.variante.producto.nombre)
                                     if detalle.variante is not None and detalle.variante.producto is not None
                                     else None
                                 ),
@@ -9607,7 +9701,7 @@ class MainWindow(QMainWindow):
                         "fecha": movimiento.created_at,
                         "sku": movimiento.variante.sku if movimiento.variante is not None else None,
                         "producto": (
-                            movimiento.variante.producto.nombre
+                            sanitize_product_display_name(movimiento.variante.producto.nombre)
                             if movimiento.variante is not None and movimiento.variante.producto is not None
                             else None
                         ),
@@ -9663,7 +9757,7 @@ class MainWindow(QMainWindow):
                                 "proveedor": compra.proveedor.nombre if compra.proveedor is not None else None,
                                 "sku": detalle.variante.sku if detalle.variante is not None else None,
                                 "producto": (
-                                    detalle.variante.producto.nombre
+                                    sanitize_product_display_name(detalle.variante.producto.nombre)
                                     if detalle.variante is not None and detalle.variante.producto is not None
                                     else None
                                 ),
@@ -10303,7 +10397,7 @@ class MainWindow(QMainWindow):
                     detail_rows=[
                         {
                             "sku": detalle.variante.sku,
-                            "product_name": detalle.variante.producto.nombre,
+                            "product_name": sanitize_product_display_name(detalle.variante.producto.nombre),
                             "quantity": detalle.cantidad,
                             "unit_price": detalle.precio_unitario,
                             "subtotal": detalle.subtotal_linea,
@@ -10652,72 +10746,62 @@ class MainWindow(QMainWindow):
     def _refresh_selected_qr_preview(self) -> None:
         variante_id = self.inventory_variant_combo.currentData()
         if not variante_id:
-            self.inventory_generate_qr_button.setText("Generar QR")
-            self.qr_preview_label.clear()
-            self.qr_preview_label.setText("QR pendiente")
-            self.qr_preview_info_label.setText("")
-            self._set_badge_state(self.qr_status_label, "Sin seleccion", "neutral")
+            self._apply_inventory_qr_preview_view(build_empty_inventory_qr_preview_view())
             self._refresh_inventory_overview()
             return
 
+        preview_path: Path | None = None
         try:
             with get_session() as session:
                 variante = session.get(Variante, int(variante_id))
                 if variante is None:
                     raise ValueError("Presentacion no encontrada.")
                 path = QrGenerator.path_for_variant(variante)
-                self.qr_preview_info_label.setText(
-                    f"{variante.sku} | {variante.producto.nombre} | talla {variante.talla} | color {variante.color}"
-                )
                 if not path.exists():
-                    self.inventory_generate_qr_button.setText("Generar QR")
-                    self.qr_preview_label.clear()
-                    self.qr_preview_label.setText("QR pendiente")
-                    self._set_badge_state(
-                        self.qr_status_label,
-                        "QR pendiente. Genera la etiqueta cuando la necesites.",
-                        "warning",
+                    self._apply_inventory_qr_preview_view(
+                        build_pending_inventory_qr_preview_view(
+                            sku=str(variante.sku),
+                            product_name=str(variante.producto.nombre),
+                            talla=str(variante.talla),
+                            color=str(variante.color),
+                        )
                     )
                     self._refresh_inventory_overview()
                     self._sync_inventory_table_selection(variante_id)
                     return
+                preview_path = path
         except Exception:  # noqa: BLE001
-            self.inventory_generate_qr_button.setText("Generar QR")
-            self.qr_preview_label.clear()
-            self.qr_preview_label.setText("QR pendiente")
-            self.qr_preview_info_label.setText("")
-            self._set_badge_state(self.qr_status_label, "Sin datos de QR", "muted")
+            self._apply_inventory_qr_preview_view(build_error_inventory_qr_preview_view())
             self._refresh_inventory_overview()
             return
 
-        self.inventory_generate_qr_button.setText("Regenerar QR")
-        self._load_qr_preview(path)
-        self._set_badge_state(self.qr_status_label, f"QR disponible: {path.name}", "positive")
+        self._apply_inventory_qr_preview_view(
+            build_available_inventory_qr_preview_view(
+                sku=str(variante.sku),
+                product_name=str(variante.producto.nombre),
+                talla=str(variante.talla),
+                color=str(variante.color),
+                file_name=path.name,
+            ),
+            preview_path=preview_path,
+        )
         self._refresh_inventory_overview()
         self._sync_inventory_table_selection(variante_id)
 
-    def _render_inventory_label(
+    def _apply_inventory_qr_preview_view(
         self,
+        view: InventoryQrPreviewView,
         *,
-        variant_id: int,
-        mode: str,
-        requested_copies: int,
-    ):
-        with get_session() as session:
-            variante = session.get(Variante, int(variant_id))
-            if variante is None:
-                raise ValueError("Presentacion no encontrada.")
-            # Forzar carga de relaciones usadas en el render antes de salir de sesion.
-            _ = variante.producto.nombre
-            if variante.producto.escuela is not None:
-                _ = variante.producto.escuela.nombre
-            if variante.producto.nivel_educativo is not None:
-                _ = variante.producto.nivel_educativo.nombre
-            return LabelGenerator.render_for_variant(
-                variante,
-                mode=mode,
-                requested_copies=requested_copies,
-            )
+        preview_path: Path | None = None,
+    ) -> None:
+        self.inventory_generate_qr_button.setText(view.button_label)
+        self.qr_preview_info_label.setText(view.info_label)
+        self._set_badge_state(self.qr_status_label, view.status_text, view.status_tone)
+        if view.preview_available and preview_path is not None:
+            self._load_qr_preview(preview_path)
+            return
+        self.qr_preview_label.clear()
+        self.qr_preview_label.setText(view.placeholder_text)
 
     def _print_image_path(
         self,
@@ -10730,7 +10814,24 @@ class MainWindow(QMainWindow):
         image = QImage(str(image_path))
         if image.isNull():
             raise ValueError(f"No se pudo abrir la imagen de etiqueta:\n{image_path}")
-        printer = QPrinter()
+        image = normalize_printable_image(image)
+        print_layout = build_inventory_label_print_layout(image.width(), image.height())
+        printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+        printer.setFullPage(True)
+        printer.setResolution(300)
+        printer.setPageOrientation(
+            QPageLayout.Orientation.Landscape
+            if print_layout.orientation == "landscape"
+            else QPageLayout.Orientation.Portrait
+        )
+        printer.setPageMargins(QMarginsF(0.0, 0.0, 0.0, 0.0), QPageLayout.Unit.Millimeter)
+        printer.setPageSize(
+            QPageSize(
+                QSizeF(print_layout.width_mm, print_layout.height_mm),
+                QPageSize.Unit.Millimeter,
+                "inventory-label",
+            )
+        )
         try:
             with get_session() as session:
                 config = BusinessSettingsService.get_or_create(session)
@@ -10749,17 +10850,17 @@ class MainWindow(QMainWindow):
             raise ValueError("No se pudo iniciar la impresion de la etiqueta.")
         try:
             page_rect = printer.pageRect(QPrinter.Unit.DevicePixel)
+            target_size = normalize_scaled_target_size(page_rect.size())
             scaled = image.scaled(
-                page_rect.size(),
+                target_size,
                 Qt.AspectRatioMode.KeepAspectRatio,
-                Qt.TransformationMode.SmoothTransformation,
+                Qt.TransformationMode.FastTransformation,
             )
-            x_pos = page_rect.x() + max(0, (page_rect.width() - scaled.width()) // 2)
-            y_pos = page_rect.y() + max(0, (page_rect.height() - scaled.height()) // 2)
+            target_rect = build_centered_paint_rect(page_rect, scaled.size())
             for copy_index in range(max(1, copies)):
                 if copy_index > 0:
                     printer.newPage()
-                painter.drawImage(x_pos, y_pos, scaled)
+                painter.drawImage(target_rect, scaled)
         finally:
             painter.end()
         return True
@@ -10774,139 +10875,56 @@ class MainWindow(QMainWindow):
             )
             return
 
+        variant_ids = [
+            int(item_data)
+            for index in range(self.inventory_variant_combo.count())
+            if (item_data := self.inventory_variant_combo.itemData(index))
+        ]
+        current_index = 0
+        if int(variante_id) in variant_ids:
+            current_index = variant_ids.index(int(variante_id))
+
         try:
             with get_session() as session:
-                variante = session.get(Variante, int(variante_id))
-                if variante is None:
-                    raise ValueError("Presentacion no encontrada.")
-                product_name = variante.producto.nombre
-                sku = variante.sku
-                talla = variante.talla
-                color = variante.color
+                label_context = load_inventory_label_context(session, int(variante_id))
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Impresion no disponible", str(exc))
             return
 
-        dialog = QDialog(self)
-        dialog.setWindowTitle("Imprimir etiqueta")
-        dialog.resize(720, 620)
-        layout = QVBoxLayout()
-        header = QLabel(f"{sku} | {product_name} | talla {talla} | color {color}")
-        header.setWordWrap(True)
-        header.setObjectName("inventoryMetaCard")
-        layout.addWidget(header)
+        def load_context(variant_id: int):
+            with get_session() as session:
+                return load_inventory_label_context(session, int(variant_id))
 
-        controls = QGridLayout()
-        mode_combo = QComboBox()
-        mode_combo.addItem("Normal", "standard")
-        mode_combo.addItem("Split", "split")
-        copies_spin = QSpinBox()
-        copies_spin.setRange(1, 500)
-        copies_spin.setValue(1)
-        mode_hint = QLabel(
-            "Normal imprime una etiqueta por pieza. Split mantiene la hoja dividida en 4 y calcula hojas automaticamente."
+        label_render_state = {"variant_id": label_context.variant_id}
+
+        def render_label(mode: str, requested_copies: int):
+            with get_session() as session:
+                return render_inventory_label(
+                    session,
+                    int(label_render_state["variant_id"]),
+                    mode=mode,
+                    requested_copies=requested_copies,
+                )
+
+        def load_context_for_dialog(variant_id: int):
+            context = load_context(int(variant_id))
+            label_render_state["variant_id"] = context.variant_id
+            return context
+
+        build_inventory_label_dialog(
+            self,
+            initial_context=label_context,
+            variant_ids=variant_ids or [label_context.variant_id],
+            current_index=current_index,
+            load_context=load_context_for_dialog,
+            render_label=render_label,
+            print_label=lambda image_path, copies, sku, parent: self._print_image_path(
+                image_path,
+                title=f"Etiqueta {sku}",
+                copies=copies,
+                parent=parent,
+            ),
         )
-        mode_hint.setWordWrap(True)
-        mode_hint.setObjectName("subtleLine")
-        controls.addWidget(QLabel("Modo"), 0, 0)
-        controls.addWidget(mode_combo, 0, 1)
-        controls.addWidget(QLabel("Piezas / copias"), 0, 2)
-        controls.addWidget(copies_spin, 0, 3)
-        controls.addWidget(mode_hint, 1, 0, 1, 4)
-        layout.addLayout(controls)
-
-        preview_label = QLabel("Generando vista previa...")
-        preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        preview_label.setMinimumHeight(280)
-        preview_label.setObjectName("qrPreview")
-        summary_label = QLabel("")
-        summary_label.setWordWrap(True)
-        summary_label.setObjectName("subtleLine")
-        layout.addWidget(preview_label, 1)
-        layout.addWidget(summary_label)
-
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-        print_button = buttons.addButton("Imprimir", QDialogButtonBox.ButtonRole.ActionRole)
-
-        preview_state: dict[str, object] = {"result": None}
-
-        def refresh_preview() -> None:
-            try:
-                result = self._render_inventory_label(
-                    variant_id=int(variante_id),
-                    mode=str(mode_combo.currentData() or "standard"),
-                    requested_copies=int(copies_spin.value()),
-                )
-            except Exception as exc:  # noqa: BLE001
-                preview_state["result"] = None
-                preview_label.clear()
-                preview_label.setText("No se pudo generar la etiqueta")
-                summary_label.setText(str(exc))
-                print_button.setEnabled(False)
-                return
-
-            preview_state["result"] = result
-            pixmap = QPixmap(str(result.image_path))
-            if pixmap.isNull():
-                preview_label.clear()
-                preview_label.setText("Sin vista previa")
-            else:
-                scaled = pixmap.scaled(
-                    preview_label.size(),
-                    Qt.AspectRatioMode.KeepAspectRatio,
-                    Qt.TransformationMode.SmoothTransformation,
-                )
-                preview_label.setPixmap(scaled)
-            mode_label = "Split" if result.mode == "split" else "Normal"
-            if result.mode == "split":
-                summary_label.setText(
-                    f"Modo {mode_label} | Piezas solicitadas: {result.requested_copies} | "
-                    f"Hojas a imprimir: {result.effective_copies} | Archivo: {result.image_path.name}"
-                )
-            else:
-                summary_label.setText(
-                    f"Modo {mode_label} | Copias a imprimir: {result.effective_copies} | Archivo: {result.image_path.name}"
-                )
-            print_button.setEnabled(True)
-
-        def handle_print() -> None:
-            result = preview_state.get("result")
-            if result is None:
-                refresh_preview()
-                result = preview_state.get("result")
-            if result is None:
-                return
-            try:
-                printed = self._print_image_path(
-                    result.image_path,
-                    title=f"Etiqueta {sku}",
-                    copies=int(result.effective_copies),
-                    parent=dialog,
-                )
-            except Exception as exc:  # noqa: BLE001
-                QMessageBox.critical(dialog, "Impresion fallida", str(exc))
-                return
-            if printed:
-                QMessageBox.information(
-                    dialog,
-                    "Etiqueta enviada",
-                    (
-                        f"Se envio la etiqueta de '{sku}' a impresion.\n\n"
-                        f"Modo: {'Split' if result.mode == 'split' else 'Normal'}\n"
-                        f"Piezas solicitadas: {result.requested_copies}\n"
-                        f"Copias/hojas impresas: {result.effective_copies}"
-                    ),
-                )
-
-        mode_combo.currentIndexChanged.connect(lambda _: refresh_preview())
-        copies_spin.valueChanged.connect(lambda _: refresh_preview())
-        print_button.clicked.connect(handle_print)
-        buttons.rejected.connect(dialog.reject)
-        buttons.accepted.connect(dialog.accept)
-        layout.addWidget(buttons)
-        dialog.setLayout(layout)
-        refresh_preview()
-        dialog.exec()
 
     def _load_qr_preview(self, path: Path) -> None:
         pixmap = QPixmap(str(path))
@@ -10959,49 +10977,24 @@ class MainWindow(QMainWindow):
         self._refresh_permissions()
 
     def _selected_catalog_row(self) -> dict[str, object] | None:
-        selected_inventory_row = self.inventory_table.currentRow()
-        if selected_inventory_row >= 0:
-            item = self.inventory_table.item(selected_inventory_row, 0)
-            if item is not None:
-                variant_id = item.data(Qt.ItemDataRole.UserRole)
-                if variant_id is not None:
-                    return next(
-                        (row for row in self.catalog_rows if int(row["variante_id"]) == int(variant_id)),
-                        None,
-                    )
-
-        selected_row = self.catalog_table.currentRow()
-        if selected_row < 0 or selected_row >= len(self.catalog_rows):
-            return None
-        return self.catalog_rows[selected_row]
+        return resolve_selected_catalog_row(
+            inventory_variant_id=self._inventory_table_variant_id_at_row(self.inventory_table.currentRow()),
+            catalog_table_row=self.catalog_table.currentRow(),
+            catalog_rows=self.catalog_rows,
+        )
 
     def _handle_inventory_table_selection(self) -> None:
-        selected_row = self.inventory_table.currentRow()
-        if selected_row < 0:
-            return
-        item = self.inventory_table.item(selected_row, 0)
-        if item is None:
-            return
-        variant_id = item.data(Qt.ItemDataRole.UserRole)
+        variant_id = self._inventory_table_variant_id_at_row(self.inventory_table.currentRow())
         if variant_id is None:
             return
         self._set_combo_value(self.inventory_variant_combo, variant_id)
 
     def _selected_inventory_variant_ids(self) -> list[int]:
-        ids: list[int] = []
-        seen: set[int] = set()
-        for item in self.inventory_table.selectedItems():
-            if item.column() != 0:
-                continue
-            variant_id = item.data(Qt.ItemDataRole.UserRole)
-            if variant_id is None:
-                continue
-            parsed = int(variant_id)
-            if parsed in seen:
-                continue
-            seen.add(parsed)
-            ids.append(parsed)
-        return ids
+        return collect_selected_inventory_variant_ids(
+            item.data(Qt.ItemDataRole.UserRole)
+            for item in self.inventory_table.selectedItems()
+            if item.column() == 0
+        )
 
     def _handle_inventory_table_double_click(self) -> None:
         if self.current_role != RolUsuario.ADMIN:
@@ -11024,44 +11017,48 @@ class MainWindow(QMainWindow):
         if selected is None:
             return
 
-        menu = QMenu(self)
         qr_exists = (QrGenerator.output_dir() / f"{selected['sku']}.png").exists()
-        action_map = {}
-        for action_spec in build_inventory_context_menu_actions(
-            is_admin=self.current_role == RolUsuario.ADMIN,
-            qr_exists=qr_exists,
-            variante_activa=bool(selected["variante_activo"]),
-        ):
-            action = menu.addAction(action_spec.label)
-            action.setEnabled(action_spec.enabled)
-            action_map[action_spec.key] = action
+        action_key = prompt_inventory_context_action(
+            self,
+            global_pos=self.inventory_table.viewport().mapToGlobal(pos),
+            action_specs=build_inventory_context_menu_actions(
+                is_admin=self.current_role == RolUsuario.ADMIN,
+                qr_exists=qr_exists,
+                variante_activa=bool(selected["variante_activo"]),
+            ),
+        )
+        self._handle_inventory_context_action(action_key)
 
-        chosen = menu.exec(self.inventory_table.viewport().mapToGlobal(pos))
-        if chosen == action_map["edit"]:
-            self._handle_update_variant()
-        elif chosen == action_map["entry"]:
-            self._handle_purchase()
-        elif chosen == action_map["adjust"]:
-            self._handle_inventory_adjustment()
-        elif chosen == action_map["qr"]:
-            self._handle_generate_selected_qr()
-        elif chosen == action_map["print"]:
-            self._handle_inventory_print_label()
-        elif chosen == action_map["toggle"]:
-            self._handle_toggle_variant()
+    def _handle_inventory_context_action(self, action_key: str | None) -> None:
+        handlers = {
+            "edit": self._handle_update_variant,
+            "entry": self._handle_purchase,
+            "adjust": self._handle_inventory_adjustment,
+            "qr": self._handle_generate_selected_qr,
+            "print": self._handle_inventory_print_label,
+            "toggle": self._handle_toggle_variant,
+        }
+        handler = handlers.get(action_key or "")
+        if handler is not None:
+            handler()
 
     def _sync_inventory_table_selection(self, variant_id: object) -> None:
         if variant_id is None:
             self.inventory_table.clearSelection()
             return
+        row_variant_ids = [
+            self._inventory_table_variant_id_at_row(row_index)
+            for row_index in range(self.inventory_table.rowCount())
+        ]
+        row_index = find_inventory_row_index_by_variant_id(row_variant_ids, variant_id)
+        if row_index is None:
+            return
         self.inventory_table.blockSignals(True)
-        for row_index in range(self.inventory_table.rowCount()):
-            item = self.inventory_table.item(row_index, 0)
-            if item is not None and item.data(Qt.ItemDataRole.UserRole) == variant_id:
-                self.inventory_table.setCurrentCell(row_index, 0)
-                self.inventory_table.selectRow(row_index)
-                break
-        self.inventory_table.blockSignals(False)
+        try:
+            self.inventory_table.setCurrentCell(row_index, 0)
+            self.inventory_table.selectRow(row_index)
+        finally:
+            self.inventory_table.blockSignals(False)
 
     def _refresh_inventory_overview(self) -> None:
         variante_id = self.inventory_variant_combo.currentData()
@@ -11071,39 +11068,29 @@ class MainWindow(QMainWindow):
 
         try:
             with get_session() as session:
-                variante = session.get(Variante, int(variante_id))
-                if variante is None:
-                    raise ValueError
-                movement = session.scalar(
-                    select(MovimientoInventario)
-                    .where(MovimientoInventario.variante_id == variante.id)
-                    .order_by(desc(MovimientoInventario.created_at))
-                    .limit(1)
+                overview_snapshot = load_inventory_overview_snapshot(
+                    session,
+                    variant_id=int(variante_id),
+                    catalog_rows=self.catalog_rows,
                 )
-                matching_row = next(
-                    (row for row in self.catalog_rows if int(row["variante_id"]) == int(variante_id)),
-                    None,
-                )
-                movement_date = movement.created_at.strftime("%Y-%m-%d %H:%M") if movement and movement.created_at else ""
-                movement_type = movement.tipo_movimiento.value.replace("_", " ").title() if movement else None
                 self._apply_inventory_overview_view(
                     build_inventory_overview_view(
-                        sku=variante.sku,
-                        product_name=matching_row["producto_nombre_base"] if matching_row is not None else variante.producto.nombre,
-                        product_active=bool(matching_row["producto_activo"]) if matching_row is not None else True,
-                        variant_active=bool(matching_row["variante_activo"]) if matching_row is not None else bool(variante.activo),
-                        stock_actual=int(variante.stock_actual),
-                        apartado_cantidad=int(matching_row["apartado_cantidad"]) if matching_row is not None else 0,
-                        talla=str(variante.talla),
-                        color=str(variante.color),
-                        precio_venta=variante.precio_venta,
-                        origen_etiqueta=matching_row["origen_etiqueta"] if matching_row is not None else "NUEVO",
-                        escuela_nombre=matching_row["escuela_nombre"] if matching_row is not None else "General",
-                        tipo_prenda_nombre=matching_row["tipo_prenda_nombre"] if matching_row is not None else "-",
-                        tipo_pieza_nombre=matching_row["tipo_pieza_nombre"] if matching_row is not None else "-",
-                        movement_type=movement_type,
-                        movement_quantity=int(movement.cantidad) if movement is not None else None,
-                        movement_date=movement_date,
+                        sku=overview_snapshot.sku,
+                        product_name=overview_snapshot.product_name,
+                        product_active=overview_snapshot.product_active,
+                        variant_active=overview_snapshot.variant_active,
+                        stock_actual=overview_snapshot.stock_actual,
+                        apartado_cantidad=overview_snapshot.apartado_cantidad,
+                        talla=overview_snapshot.talla,
+                        color=overview_snapshot.color,
+                        precio_venta=overview_snapshot.precio_venta,
+                        origen_etiqueta=overview_snapshot.origen_etiqueta,
+                        escuela_nombre=overview_snapshot.escuela_nombre,
+                        tipo_prenda_nombre=overview_snapshot.tipo_prenda_nombre,
+                        tipo_pieza_nombre=overview_snapshot.tipo_pieza_nombre,
+                        movement_type=overview_snapshot.movement_type,
+                        movement_quantity=overview_snapshot.movement_quantity,
+                        movement_date=overview_snapshot.movement_date,
                     )
                 )
         except Exception:  # noqa: BLE001
@@ -11129,6 +11116,14 @@ class MainWindow(QMainWindow):
         self.toggle_product_button.setText(overview_view.toggle_product_label)
         self.toggle_variant_button.setText(overview_view.toggle_variant_label)
 
+    def _inventory_table_variant_id_at_row(self, row_index: int) -> int | None:
+        if row_index < 0:
+            return None
+        item = self.inventory_table.item(row_index, 0)
+        if item is None:
+            return None
+        return normalize_inventory_variant_id(item.data(Qt.ItemDataRole.UserRole))
+
     def _clear_catalog_editor(self) -> None:
         self.catalog_selection_label.setText("Selecciona una presentacion en inventario para gestionar cambios.")
         self.products_selection_label.setText(build_empty_catalog_selection_view().selection_label)
@@ -11136,15 +11131,17 @@ class MainWindow(QMainWindow):
         self.toggle_variant_button.setText("Pres.")
 
     def _select_catalog_variant(self, variant_id: int) -> bool:
-        for row_index, row in enumerate(self.catalog_rows):
-            if int(row["variante_id"]) == variant_id:
-                self.catalog_table.blockSignals(True)
-                self.catalog_table.setCurrentCell(row_index, 0)
-                self.catalog_table.selectRow(row_index)
-                self.catalog_table.blockSignals(False)
-                self._handle_catalog_selection()
-                return True
-        return False
+        row_index = find_catalog_row_index_by_variant_id(self.catalog_rows, variant_id)
+        if row_index is None:
+            return False
+        self.catalog_table.blockSignals(True)
+        try:
+            self.catalog_table.setCurrentCell(row_index, 0)
+            self.catalog_table.selectRow(row_index)
+        finally:
+            self.catalog_table.blockSignals(False)
+        self._handle_catalog_selection()
+        return True
 
     @staticmethod
     def _set_combo_value(combo: QComboBox, value: object) -> None:

@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 
 from PyQt6.QtWidgets import QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
 
+from pos_uniformes.ui.helpers.search_input_helper import apply_search_suggestions
+
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
 
@@ -54,10 +56,11 @@ def build_products_tab(window: "MainWindow") -> QWidget:
     window.catalog_layaway_filter_combo.currentIndexChanged.connect(window._handle_catalog_filters_changed)
 
     window.catalog_search_input.setPlaceholderText(
-        "Buscar por texto o prefijos: sku:, escuela:, tipo:, pieza:, producto:, legacy:, talla:, color:"
+        "Buscar producto, color, talla, marca, escuela o SKU"
     )
     window.catalog_search_input.setClearButtonEnabled(True)
     window.catalog_search_input.setObjectName("inventoryFilterInput")
+    apply_search_suggestions(window.catalog_search_input, [])
     window.catalog_category_filter_combo.setObjectName("secondaryButton")
     window.catalog_brand_filter_combo.setObjectName("secondaryButton")
     window.catalog_school_filter_combo.setObjectName("secondaryButton")

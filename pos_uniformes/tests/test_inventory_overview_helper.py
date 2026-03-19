@@ -74,6 +74,29 @@ class InventoryOverviewHelperTests(unittest.TestCase):
         self.assertEqual(view.toggle_product_label, "Desactivar prod.")
         self.assertEqual(view.toggle_variant_label, "Activar var.")
 
+    def test_sanitizes_legacy_hash_in_product_name(self) -> None:
+        view = build_inventory_overview_view(
+            sku="SKU-001",
+            product_name="Playera deportiva | Patria | Deportivo | Playera #4",
+            product_active=True,
+            variant_active=True,
+            stock_actual=5,
+            apartado_cantidad=0,
+            talla="14",
+            color="Azul",
+            precio_venta=Decimal("199.00"),
+            origen_etiqueta="LEGACY",
+            escuela_nombre="Patria",
+            tipo_prenda_nombre="Deportivo",
+            tipo_pieza_nombre="Playera",
+            movement_type=None,
+            movement_quantity=None,
+            movement_date="",
+        )
+
+        self.assertEqual(view.product_label, "Playera deportiva | Patria | Deportivo | Playera")
+        self.assertNotIn("#4", view.product_label)
+
 
 if __name__ == "__main__":
     unittest.main()

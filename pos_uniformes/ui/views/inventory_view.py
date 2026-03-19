@@ -19,6 +19,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from pos_uniformes.ui.helpers.search_input_helper import apply_search_suggestions
+
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
 
@@ -225,10 +227,11 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_results_label.setObjectName("subtleLine")
     window.inventory_active_filters_label.setObjectName("subtleLine")
     window.inventory_search_input.setPlaceholderText(
-        "Buscar por texto o prefijos: sku:, escuela:, tipo:, pieza:, producto:, legacy:, talla:, color:"
+        "Buscar producto, color, talla, marca, escuela o SKU"
     )
     window.inventory_search_input.setClearButtonEnabled(True)
     window.inventory_search_input.setObjectName("inventoryFilterInput")
+    apply_search_suggestions(window.inventory_search_input, [])
     window.inventory_category_filter_combo.setObjectName("secondaryButton")
     window.inventory_brand_filter_combo.setObjectName("secondaryButton")
     window.inventory_school_filter_combo.setObjectName("secondaryButton")

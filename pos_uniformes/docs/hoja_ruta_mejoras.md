@@ -34,6 +34,9 @@ Registrar mejoras propuestas por operacion o producto y ubicarlas dentro del pla
   - sugerir SKU, producto, color, talla, marca y escuela conforme se escribe
   - permitir seleccionar una sugerencia para llenar el input o insertar un alias como `sku:`, `producto:`, `color:`
   - mantener intacta la busqueda actual si el operador decide seguir escribiendo libre
+- Estado:
+  - `2026-03-18`: base `V1` implementada con `QCompleter` y logica compartida en `services/search_suggestion_service.py`; validada con pruebas y precheck, con validacion manual de UI aun pendiente
+  - `2026-03-18`: ajuste `V2` aplicado para priorizar sugerencias en lenguaje natural cuando el usuario escribe texto normal y dejar los prefijos como capa avanzada
 - Alcance recomendado v2:
   - ordenar sugerencias por frecuencia de uso, ventas recientes o coincidencia historica
   - evaluar esta capa despues, idealmente en `Fase 5`, cuando ya tengamos el flujo estable y medible

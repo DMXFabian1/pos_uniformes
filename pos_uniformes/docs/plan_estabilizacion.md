@@ -9,6 +9,8 @@ Reducir riesgo operativo, sacar logica critica fuera de `ui/main_window.py`, mej
 - Un bloque funcional por vez.
 - Cada bloque debe cerrar con checkpoint.
 - No mezclar refactor y nuevas funciones en la misma fase.
+- Las mejoras nuevas no deben cargarse dentro de `ui/main_window.py`; a lo mucho deben conectarse desde ahi.
+- `ui/main_window.py` debe quedar como coordinador, no como propietario de nuevas reglas, dialogs o pantallas.
 - Si una fase toca caja, inventario o descuentos: pruebas y verificacion manual obligatorias.
 - Todo cambio estructural debe dejar una nota en `docs/historial_refactors.md`.
 
@@ -118,6 +120,7 @@ Reducir el rol de `ui/main_window.py` a coordinador.
 - Crear controladores o coordinadores por dominio.
 - Mover handlers grandes fuera de la ventana principal.
 - Dejar `main_window.py` orquestando UI y llamadas.
+- Toda mejora nueva debe nacer fuera de `main_window.py` y solo integrarse desde el coordinador.
 
 ### Checkpoint
 

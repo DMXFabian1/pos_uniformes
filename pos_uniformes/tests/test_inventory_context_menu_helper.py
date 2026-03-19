@@ -2,7 +2,10 @@ from __future__ import annotations
 
 import unittest
 
-from pos_uniformes.ui.helpers.inventory_context_menu_helper import build_inventory_context_menu_actions
+from pos_uniformes.ui.helpers.inventory_context_menu_helper import (
+    build_inventory_context_menu_actions,
+    resolve_inventory_context_action_key,
+)
 
 
 class InventoryContextMenuHelperTests(unittest.TestCase):
@@ -43,6 +46,30 @@ class InventoryContextMenuHelperTests(unittest.TestCase):
                 ("toggle", "Activar presentacion", False),
             ],
         )
+
+    def test_resolve_inventory_context_action_key_returns_matching_key(self) -> None:
+        edit_action = object()
+        qr_action = object()
+
+        resolved = resolve_inventory_context_action_key(
+            {
+                "edit": edit_action,
+                "qr": qr_action,
+            },
+            qr_action,
+        )
+
+        self.assertEqual(resolved, "qr")
+
+    def test_resolve_inventory_context_action_key_returns_none_for_unknown_action(self) -> None:
+        resolved = resolve_inventory_context_action_key(
+            {
+                "edit": object(),
+            },
+            object(),
+        )
+
+        self.assertIsNone(resolved)
 
 
 if __name__ == "__main__":

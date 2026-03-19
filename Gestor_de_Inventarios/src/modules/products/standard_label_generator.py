@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 from PIL import Image, ImageDraw, ImageFont
 from src.modules.products.label_text_builder import build_label_text
 
@@ -52,7 +53,8 @@ def clean_nombre(nombre, talla):
             nombre_clean = nombre_clean[:talla_idx].strip()
         else:
             nombre_clean = nombre_clean.split("_")[0].strip()
-        
+
+        nombre_clean = re.sub(r"(?i)\b(?:talla|t)\s*[:#-]?\s*\S+\s*$", "", nombre_clean).strip(" |,-")
         nombre_clean = " ".join(nombre_clean.split())
         logger.debug("Nombre limpio: %s", nombre_clean)
         return nombre_clean
@@ -137,13 +139,13 @@ def generar_etiqueta(sku, escuela, nivel_educativo, nombre, talla, genero, tipo_
 
         label_width = 992  # Updated to match previous qr_generator.py
         label_height = 271  # Updated to match previous qr_generator.py
-        label_image = Image.new("1", (label_width, label_height), 1)
+        label_image = Image.new("L", (label_width, label_height), 255)
         draw = ImageDraw.Draw(label_image)
 
         qr_image = Image.open(qr_path)
         qr_size = 231  # Updated to match previous qr_generator.py
-        qr_image = qr_image.resize((qr_size, qr_size), Image.Resampling.LANCZOS)
-        qr_image = qr_image.convert("1")
+        qr_image = qr_image.resize((qr_size, qr_size), Image.Resampling.NEAREST)
+        qr_image = qr_image.convert("L")
         qr_x = label_width - qr_size - 20
         qr_y = (label_height - qr_size) // 2
         label_image.paste(qr_image, (qr_x, qr_y))
@@ -155,7 +157,7 @@ def generar_etiqueta(sku, escuela, nivel_educativo, nombre, talla, genero, tipo_
         max_text_width = qr_x - 40
 
         nombre_clean = clean_nombre(nombre, talla)
-        label_text = build_label_text(nombre_clean, talla)
+        label_text = build_label_text(nombre_clean, talla, escuela=escuela, nivel_educativo=nivel_educativo)
 
         if escuela in ["Sin escuela", "", None]:
             escuela = ""
@@ -166,7 +168,6 @@ def generar_etiqueta(sku, escuela, nivel_educativo, nombre, talla, genero, tipo_
         if escuela.strip() and nivel_educativo.strip():
             fields.append(f"{nivel_educativo} - {escuela}")
         fields.append(label_text)
-        fields.append(f"Talla: {talla}" if talla else "Sin Talla")
         fields.append(sku)
 
         line_height = 40

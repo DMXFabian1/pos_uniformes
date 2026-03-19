@@ -91,7 +91,7 @@ class LegacyProductsImporter:
         self.sqlite_path = sqlite_path.expanduser().resolve()
         self.report_dir = (report_dir or Path(__file__).resolve().parents[1] / "exports" / "imports").resolve()
         self._schools_by_legacy_id: dict[int, str] = {}
-        self._family_name_counts: defaultdict[tuple[str, str], int] = defaultdict(int)
+        self._display_name_counts: defaultdict[tuple[str, str], int] = defaultdict(int)
         self._stats: dict[str, int] = {
             "categories_created": 0,
             "brands_created": 0,
@@ -470,17 +470,14 @@ class LegacyProductsImporter:
         garment_type_name: str | None,
         piece_type_name: str | None,
     ) -> str:
-        primary_key = (brand_name, base_name)
-        count = self._family_name_counts[primary_key]
-        self._family_name_counts[primary_key] += 1
-        if count == 0:
-            return base_name
-
         suffix_parts = [part for part in (school_name, garment_type_name, piece_type_name) if part]
-        suffix = " | ".join(suffix_parts) if suffix_parts else f"Legacy {count + 1}"
-        if count > 1:
-            suffix = f"{suffix} #{count + 1}"
-        return f"{base_name} | {suffix}"
+        display_name = f"{base_name} | {' | '.join(suffix_parts)}" if suffix_parts else base_name
+        dedupe_key = (brand_name, display_name)
+        count = self._display_name_counts[dedupe_key]
+        self._display_name_counts[dedupe_key] += 1
+        if count == 0:
+            return display_name
+        return f"{display_name} #{count + 1}"
 
     def _create_duplicate_product_fallback(
         self,

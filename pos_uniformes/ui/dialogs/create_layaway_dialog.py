@@ -28,6 +28,7 @@ from pos_uniformes.database.connection import get_session
 from pos_uniformes.services.apartado_service import ApartadoItemInput, ApartadoService
 from pos_uniformes.services.client_service import ClientService
 from pos_uniformes.services.inventario_service import InventarioService
+from pos_uniformes.utils.product_name import sanitize_product_display_name
 
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
@@ -150,7 +151,7 @@ def build_create_layaway_dialog(
                 if variante is None:
                     raise ValueError(f"El SKU '{sku}' no existe o esta inactivo.")
                 InventarioService.validar_stock_disponible(variante, cantidad)
-                producto_nombre = variante.producto.nombre
+                producto_nombre = sanitize_product_display_name(variante.producto.nombre)
                 precio_unitario = Decimal(variante.precio_venta)
         except Exception as exc:  # noqa: BLE001
             message = str(exc)

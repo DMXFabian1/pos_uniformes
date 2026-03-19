@@ -1,14 +1,16 @@
 import sqlite3
 import logging
 import os
+import re
 from PIL import Image, ImageDraw, ImageFont, ImageWin
 import customtkinter as ctk
 from tkinter import messagebox
 import win32print
 import win32ui
 import textwrap
-import qrcode
 from src.core.config.db_manager import DatabaseManager
+from src.modules.products.label_text_builder import build_label_text as build_compact_label_text
+from src.modules.products.qr_code_generator import ensure_print_quality_qr, generar_qr
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +43,8 @@ def clean_nombre(nombre, talla):
             nombre_clean = nombre_clean[:talla_idx].strip()
         else:
             nombre_clean = nombre_clean.split("_")[0].strip()
-        
+
+        nombre_clean = re.sub(r"(?i)\b(?:talla|t)\s*[:#-]?\s*\S+\s*$", "", nombre_clean).strip(" |,-")
         nombre_clean = " ".join(nombre_clean.split())
         logger.debug("Nombre limpio: %s", nombre_clean)
         return nombre_clean
@@ -94,9 +97,7 @@ def build_label_text(nombre, talla):
     """
     nombre = validate_string(nombre, "nombre")
     talla = validate_string(talla, "talla", allow_empty=True)
-    if talla and talla.lower() not in ["", "sin talla", "sin_talla"]:
-        return f"{nombre}\nTalla: {talla}"
-    return nombre
+    return build_compact_label_text(nombre, talla).replace(" T: ", "\nT: ")
 
 def generar_etiqueta_split(sku, nombre, qr_path, output_path, talla=None):
     """
@@ -122,13 +123,13 @@ def generar_etiqueta_split(sku, nombre, qr_path, output_path, talla=None):
 
         label_width = 976
         label_height = 342
-        label_image = Image.new("1", (label_width, label_height), 1)
+        label_image = Image.new("L", (label_width, label_height), 255)
         draw = ImageDraw.Draw(label_image)
 
         qr_image = Image.open(qr_path)
         qr_size = 231
-        qr_image = qr_image.resize((qr_size, qr_size), Image.Resampling.LANCZOS)
-        qr_image = qr_image.convert("1")
+        qr_image = qr_image.resize((qr_size, qr_size), Image.Resampling.NEAREST)
+        qr_image = qr_image.convert("L")
 
         font_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "assets", "fonts", "arial.ttf")
         initial_font_size = 36
@@ -236,18 +237,9 @@ class ScanAndPrintApp:
         Genera un código QR para el SKU y lo guarda en el directorio de QRs.
         """
         try:
-            qr = qrcode.QRCode(
-                version=1,
-                error_correction=qrcode.constants.ERROR_CORRECT_L,
-                box_size=10,
-                border=4,
-            )
-            qr.add_data(sku)
-            qr.make(fit=True)
-            qr_image = qr.make_image(fill_color="black", back_color="white")
             qr_path = os.path.join(self.root_folder, f"labels/qr/{sku}_qr.png")
             os.makedirs(os.path.dirname(qr_path), exist_ok=True)
-            qr_image.save(qr_path)
+            generar_qr(sku, qr_path)
             logger.debug(f"Código QR generado y guardado en: {qr_path}")
 
             # Actualizar la base de datos con la nueva ruta del QR
@@ -272,7 +264,7 @@ class ScanAndPrintApp:
             with self.db_manager as db:
                 cursor = db.get_cursor()
                 cursor.execute(
-                    "SELECT sku, nombre, talla, qr_path, label_split_path FROM productos WHERE sku = ? AND store_id = ?",
+                    "SELECT sku, nombre, talla, tipo_pieza, qr_path, label_split_path FROM productos WHERE sku = ? AND store_id = ?",
                     (sku.upper(), self.store_id)
                 )
                 result = cursor.fetchone()
@@ -281,6 +273,7 @@ class ScanAndPrintApp:
                         "sku": result["sku"],
                         "nombre": result["nombre"],
                         "talla": result["talla"],
+                        "tipo_pieza": result["tipo_pieza"],
                         "qr_path": result["qr_path"],
                         "label_split_path": result["label_split_path"]
                     }
@@ -308,12 +301,18 @@ class ScanAndPrintApp:
             if not qr_path or not os.path.exists(os.path.join(self.root_folder, qr_path)):
                 logger.info(f"Archivo QR no encontrado para SKU {sku}, generando uno nuevo")
                 qr_path = self.generate_qr_code(sku)
+                qr_regenerated = True
             else:
                 qr_path = os.path.join(self.root_folder, qr_path)
+                qr_regenerated = ensure_print_quality_qr(
+                    product["sku"],
+                    qr_path,
+                    product.get("tipo_pieza"),
+                )
 
             # Generar o recuperar la etiqueta dividida
             label_split_path = product["label_split_path"]
-            if not label_split_path or not os.path.exists(os.path.join(self.root_folder, label_split_path)):
+            if qr_regenerated or not label_split_path or not os.path.exists(os.path.join(self.root_folder, label_split_path)):
                 output_path = os.path.join(self.root_folder, f"labels/split/{sku}_split.png")
                 generar_etiqueta_split(
                     sku=product["sku"],
@@ -357,6 +356,8 @@ class ScanAndPrintApp:
         """
         Imprime la etiqueta dividida usando la impresora Brother QL-800.
         """
+        hprinter = None
+        hdc = None
         try:
             printer_name = "Brother QL-800"
             printers = win32print.EnumPrinters(win32print.PRINTER_ENUM_LOCAL | win32print.PRINTER_ENUM_CONNECTIONS)

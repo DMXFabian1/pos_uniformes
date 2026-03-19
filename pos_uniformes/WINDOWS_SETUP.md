@@ -1,6 +1,93 @@
-# Instalacion en Windows
+# Instalacion y paquete para Windows
 
-## Requisitos
+## Opcion recomendada para probar en Windows
+
+Si quieres llevar la app como paquete y no instalar Python ni dependencias de la app en la PC destino:
+
+1. Genera la build en una PC Windows de desarrollo con:
+
+```powershell
+scripts\build_windows_bundle.ps1
+```
+
+2. Eso produce:
+
+- `dist\POSUniformes-<VERSION>\`
+- `dist\POSUniformes-<VERSION>-windows.zip`
+
+3. En la PC destino:
+
+- descomprime `POSUniformes-<VERSION>-windows.zip`
+- copia `pos_uniformes.env.example` como `pos_uniformes.env`
+- ajusta host, puerto, base, usuario y password
+- ejecuta `POSUniformes-<VERSION>.exe`
+
+Importante:
+
+- esta build ya incluye Python y librerias de la app
+- no incluye PostgreSQL
+- la PC destino solo necesita acceso a la base PostgreSQL correspondiente
+
+## Opcion recomendada para dejar app + base local listas
+
+Si quieres que el bundle de Windows llegue con una base semilla lista para restaurar:
+
+1. En la PC Windows de build genera la build con respaldo semilla:
+
+```powershell
+scripts\build_windows_bundle.ps1 -CreateSeedBackup
+```
+
+O si ya tienes un `.dump` especifico:
+
+```powershell
+scripts\build_windows_bundle.ps1 -SeedBackupPath .\ruta\mi_base_inicial.dump
+```
+
+2. Eso deja dentro del bundle:
+
+- `setup_windows_local_bundle.ps1`
+- `setup_windows_local_bundle.bat`
+- `seed\initial.dump` si se incluyo semilla
+
+3. En la PC destino, despues de instalar PostgreSQL local, ejecuta:
+
+```powershell
+.\setup_windows_local_bundle.ps1 `
+  -DbHost localhost `
+  -DbPort 5432 `
+  -DbName pos_uniformes `
+  -DbUser postgres `
+  -DbPassword postgres
+```
+
+Si el usuario que crea la base es distinto, puedes pasar tambien:
+
+```powershell
+.\setup_windows_local_bundle.ps1 `
+  -DbHost localhost `
+  -DbPort 5432 `
+  -DbName pos_uniformes `
+  -DbUser pos_app `
+  -DbPassword app_password `
+  -AdminUser postgres `
+  -AdminPassword admin_password
+```
+
+Ese script:
+
+- crea la base si no existe
+- restaura `seed\initial.dump` si viene incluido
+- genera `pos_uniformes.env` junto al ejecutable
+- deja la app lista para abrirse localmente
+
+Si el bundle no trae semilla y aun asi quieres solo dejar la conexion preparada:
+
+```powershell
+.\setup_windows_local_bundle.ps1 -AllowEmptySchema
+```
+
+## Requisitos para generar la build
 
 - Windows 10 u 11
 - Python 3.12
@@ -59,13 +146,77 @@ Si prefieres dejarlo fijo, puedes crear un script `.ps1` local para exportarlas 
 .venv\Scripts\python -m alembic upgrade head
 ```
 
-## 6. Ejecutar la app
+## 6. Ejecutar la app en modo desarrollo
 
 ```powershell
 .venv\Scripts\python -m pos_uniformes.main
 ```
 
-## 7. Respaldo de base en Windows
+## 7. Generar paquete portable
+
+```powershell
+scripts\build_windows_bundle.ps1
+```
+
+Si tambien quieres validar la conexion y esquema en esa misma PC de build:
+
+```powershell
+scripts\build_windows_bundle.ps1 -WithPrecheck
+```
+
+Si ademas quieres incluir una base semilla dentro del bundle:
+
+```powershell
+scripts\build_windows_bundle.ps1 -CreateSeedBackup
+```
+
+O usando un `.dump` ya existente:
+
+```powershell
+scripts\build_windows_bundle.ps1 -SeedBackupPath .\ruta\mi_base_inicial.dump
+```
+
+Resultado:
+
+- carpeta: `dist\POSUniformes-<VERSION>\`
+- zip portable: `dist\POSUniformes-<VERSION>-windows.zip`
+
+La build incluye:
+
+- ejecutable `POSUniformes-<VERSION>.exe`
+- dependencias de Python
+- assets y migraciones necesarias
+- archivo `pos_uniformes.env.example`
+- archivo `VERSION`
+- `setup_windows_local_bundle.ps1`
+- `setup_windows_local_bundle.bat`
+- `seed\initial.dump` cuando se genero o copio una semilla
+
+La version sale del archivo `VERSION` en la raiz del proyecto.
+
+## 8. Configuracion del paquete
+
+En la carpeta final de la build:
+
+1. copia `pos_uniformes.env.example`
+2. renombralo a `pos_uniformes.env`
+3. ajusta sus valores
+
+Ejemplo:
+
+```ini
+POS_UNIFORMES_DB_HOST=localhost
+POS_UNIFORMES_DB_PORT=5432
+POS_UNIFORMES_DB_NAME=pos_uniformes
+POS_UNIFORMES_DB_USER=postgres
+POS_UNIFORMES_DB_PASSWORD=postgres
+```
+
+La app leera ese archivo automaticamente al arrancar.
+
+Si usas `setup_windows_local_bundle.ps1`, este archivo se genera automaticamente.
+
+## 9. Respaldo de base en Windows
 
 El proyecto ya incluye un script portable:
 
@@ -81,7 +232,7 @@ Por defecto:
 
 Si `pg_dump` no esta en `PATH`, instala PostgreSQL con herramientas cliente o agrega su carpeta `bin`.
 
-## 8. Sobre lector QR o pistola
+## 10. Sobre lector QR o pistola
 
 La app funciona si el lector emula teclado HID.
 
@@ -93,7 +244,7 @@ Flujo:
 
 Si tu lector usa modo serial o SDK propietario, necesitarias integracion adicional.
 
-## 9. Validacion minima
+## 11. Validacion minima
 
 - abrir login
 - entrar con `admin`

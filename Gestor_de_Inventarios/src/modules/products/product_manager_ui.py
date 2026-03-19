@@ -7,11 +7,13 @@ import logging
 import sqlite3
 from src.core.utils.utils import sanitize_filename
 from src.modules.products import generar_qr, generar_etiqueta
+from src.modules.products.standard_label_generator import clean_nombre
 import os
 from src.core.paths import BASE_DIR, ICONS_DIR
 from src.ui.ui_components import create_check_combobox
 from src.core.utils.logging_config import setup_logging
 from src.core.utils.treeview_utils import apply_treeview_styles
+from src.modules.products.qr_code_generator import ensure_print_quality_qr
 import math
 
 logger = setup_logging()
@@ -987,7 +989,7 @@ class ProductManagerUI:
                     self.current_label_path = None
                     return
 
-                nombre_base = nombre.rsplit(" ", 1)[0] if " " in nombre else nombre
+                nombre_base = clean_nombre(nombre, talla)
                 talla = talla if talla else "Sin talla"
                 escuela = escuela if escuela else "Sin escuela"
                 nivel_educativo = nivel_educativo if nivel_educativo else "Sin nivel educativo"
@@ -1016,9 +1018,11 @@ class ProductManagerUI:
                         logger.warning(f"qr_path existente no encontrado: {qr_path_absolute}. Generando nueva etiqueta.")
                         qr_path = None
 
+                qr_regenerated = False
                 if not os.path.exists(qr_file_path):
                     try:
                         generar_qr(sku, qr_file_path, tipo_pieza)
+                        qr_regenerated = True
                         logger.debug(f"QR generado en: {qr_file_path}")
                     except Exception as e:
                         logger.error(f"Error al generar QR para SKU {sku}: {str(e)}", exc_info=True)
@@ -1027,8 +1031,18 @@ class ProductManagerUI:
                         self.qr_label.image = self.empty_image_photo
                         self.current_label_path = None
                         return
+                else:
+                    try:
+                        qr_regenerated = ensure_print_quality_qr(sku, qr_file_path, tipo_pieza)
+                    except Exception as e:
+                        logger.error(f"Error al regenerar QR de alta resolución para SKU {sku}: {str(e)}", exc_info=True)
+                        messagebox.showerror("Error", f"No se pudo preparar el QR para impresión: {str(e)}")
+                        self.qr_label.configure(image=self.empty_image_photo, text="Error al preparar QR")
+                        self.qr_label.image = self.empty_image_photo
+                        self.current_label_path = None
+                        return
 
-                if not qr_path or qr_path == "" or not os.path.exists(label_file_path) or qr_path != os.path.relpath(label_file_path, self.manager.root_folder):
+                if qr_regenerated or not qr_path or qr_path == "" or not os.path.exists(label_file_path) or qr_path != os.path.relpath(label_file_path, self.manager.root_folder):
                     try:
                         generar_etiqueta(sku, escuela, nivel_educativo, nombre_base, talla, genero, tipo_pieza, qr_file_path, label_file_path)
                         new_qr_path = os.path.relpath(label_file_path, self.manager.root_folder)
@@ -1052,7 +1066,7 @@ class ProductManagerUI:
                         self.current_label_path = None
                         return
 
-                if not label_split_path or label_split_path == "" or not os.path.exists(label_split_file_path) or label_split_path != os.path.relpath(label_split_file_path, self.manager.root_folder):
+                if qr_regenerated or not label_split_path or label_split_path == "" or not os.path.exists(label_split_file_path) or label_split_path != os.path.relpath(label_split_file_path, self.manager.root_folder):
                     try:
                         from src.modules.products.qr_generator import generar_etiqueta_split
                         generar_etiqueta_split(sku, nombre_base, qr_file_path, label_split_file_path)

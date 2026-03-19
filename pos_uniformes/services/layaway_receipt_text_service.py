@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pos_uniformes.utils.product_name import sanitize_product_display_name
+
 
 def build_layaway_receipt_text(
     *,
@@ -49,7 +51,11 @@ def build_layaway_receipt_text(
     ]
     for detalle in detalles:
         variante = getattr(detalle, "variante", None)
-        producto = getattr(getattr(variante, "producto", None), "nombre", "") if variante else ""
+        producto = (
+            sanitize_product_display_name(getattr(getattr(variante, "producto", None), "nombre", ""))
+            if variante
+            else ""
+        )
         sku = getattr(variante, "sku", "") if variante else ""
         lines.append(
             f"- {producto} | {sku} | {getattr(detalle, 'cantidad', '')} x "

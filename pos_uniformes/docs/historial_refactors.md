@@ -17,6 +17,18 @@
 - Inventario delega el resumen visible del listado y los chips de estado a `ui/helpers/inventory_summary_helper.py`.
 - Inventario delega la ficha rapida de la seleccion actual a `ui/helpers/inventory_overview_helper.py`.
 - Inventario delega el plan visible de acciones contextuales a `ui/helpers/inventory_context_menu_helper.py`.
+- Inventario delega el estado visible del panel QR a `ui/helpers/inventory_qr_preview_helper.py`, dejando a `MainWindow` solo cargar la presentacion y aplicar la vista.
+- Inventario delega la carga del snapshot de la ficha rapida a `services/inventory_overview_service.py`, dejando a `MainWindow` sin consultas ni fallbacks manuales para ese panel.
+- Inventario delega la resolucion de seleccion y sincronizacion de `variant_id` a `ui/helpers/inventory_selection_helper.py`, dejando a `MainWindow` sin deduplicacion ni busquedas manuales de filas.
+- Inventario delega el popup del menu contextual a `ui/dialogs/inventory_context_menu_dialog.py` y la resolucion de la accion elegida a `ui/helpers/inventory_context_menu_helper.py`, dejando a `MainWindow` solo despachando por `action_key`.
+- Catalogo delega la resolucion de la fila seleccionada y el armado de la ficha visible desde `catalog_rows` a `ui/helpers/catalog_selection_helper.py`, dejando a `MainWindow` sin mapear diccionarios ni recorrer variantes a mano.
+- Catalogo delega las guardas de seleccion/permisos para editar, activar/desactivar y eliminar a `ui/helpers/catalog_action_guard_helper.py`, dejando a `MainWindow` sin repetir el mismo copy operativo en cada handler.
+- Catalogo e Inventario ya ofrecen sugerencias incrementales de busqueda mediante `services/search_suggestion_service.py` y `ui/helpers/search_input_helper.py`, conectadas desde sus vistas y con `MainWindow` solo empujando snapshots.
+- La `V2` de sugerencias prioriza lenguaje natural para el operador medio y deja los prefijos como apoyo; ademas, las flechas del teclado ya solo navegan el popup sin reescribir el input en cada highlight.
+- Impresion de etiquetas ya delega el dialogo de preview e impresion a `ui/dialogs/inventory_label_dialog.py`, dejando a `MainWindow` solo cargando la presentacion y enlazando render/print.
+- Impresion de etiquetas ya delega la carga del contexto visible y el render de etiqueta a `services/inventory_label_service.py`, dejando a `MainWindow` sin logica real de render.
+- Impresion de etiquetas ya delega el resumen visible del preview y el mensaje de confirmacion a `ui/helpers/inventory_label_preview_helper.py`, dejando el dialogo mas testeable.
+- Windows ya tiene base de empaquetado preparada: `packaging/windows/pos_uniformes_windows.spec`, scripts de build y soporte de configuracion local con `pos_uniformes.env` junto al ejecutable.
 - Dialogos de cobro extraidos a `ui/dialogs/payment_dialogs.py`.
 - Modal imprimible de ticket y comprobante extraido a `ui/dialogs/printable_text_dialog.py`.
 - Cobro mixto ajustado para captura por teclado fisico con confirmacion por `Enter` y cancelacion por `Esc`.
@@ -107,22 +119,69 @@
   - Busqueda textual compartida.
   - Degrada con gracia cuando el operador deja una comilla sin cerrar en un prefijo como `producto:"...`.
   - Normaliza acentos para que `corbatin` siga encontrando `Corbatín` en texto general y por alias.
+- `services/search_suggestion_service.py`
+  - Sugerencias incrementales compartidas para Catalogo e Inventario con soporte para texto libre y prefijos como `sku:` o `producto:`.
 - `services/active_filter_service.py`
   - Etiquetas y resumenes de filtros activos.
+- `ui/helpers/search_input_helper.py`
+  - Completer reutilizable para inputs de busqueda, reemplazando solo el ultimo termino y sin cargar comportamiento nuevo en `MainWindow`.
 - `ui/helpers/inventory_summary_helper.py`
   - Resumen visible del listado filtrado y chips de agotados, bajo stock, sin QR e inactivas.
 - `ui/helpers/inventory_overview_helper.py`
   - Ficha rapida visible de la seleccion actual: badges, textos secundarios y etiquetas de activar/desactivar.
+- `services/inventory_overview_service.py`
+  - Carga el snapshot de la ficha rapida de Inventario: presentacion, fallbacks desde `catalog_rows` y ultimo movimiento visible fuera de `MainWindow`.
+- `ui/helpers/inventory_selection_helper.py`
+  - Resuelve la fila/catalogo seleccionado, normaliza `variant_id`, deduplica seleccion multiple y encuentra la fila visible a sincronizar en Inventario.
 - `ui/helpers/inventory_context_menu_helper.py`
   - Etiquetas y disponibilidad visible de las acciones contextuales de inventario segun permisos y estado de la presentacion.
+- `ui/dialogs/inventory_context_menu_dialog.py`
+  - Popup reutilizable para acciones contextuales de Inventario que devuelve un `action_key` en lugar de dejar el armado del menu inline en `MainWindow`.
+- `ui/helpers/inventory_qr_preview_helper.py`
+  - Estado visible del panel QR en Inventario: boton, texto secundario, badge y placeholder del preview segun seleccion, QR pendiente o QR disponible.
 - `ui/helpers/catalog_summary_helper.py`
   - Resumen visible del listado de catalogo y etiqueta de filtros activos fuera de `MainWindow`.
 - `ui/helpers/catalog_selection_helper.py`
   - Ficha breve visible de la presentacion seleccionada en catalogo, con estado vacio y variante segun permisos.
+  - Ahora tambien resuelve filas validas, arma la vista directamente desde `catalog_rows` y encuentra la fila correcta por `variant_id`.
+- `ui/helpers/catalog_action_guard_helper.py`
+  - Copy y validacion ligera para acciones de Catalogo que requieren seleccion y permisos de ADMIN antes de editar, activar/desactivar o eliminar.
 - `ui/helpers/catalog_access_helper.py`
   - Estado visible del tab Catalogo segun rol: mensaje de permiso, acciones habilitadas y visibilidad de caja rapida.
 - `ui/helpers/catalog_macro_filter_helper.py`
   - Toggle y estado visual de los chips de macro uniforme en Catalogo fuera de `MainWindow`.
+- `ui/dialogs/inventory_label_dialog.py`
+  - Dialogo reutilizable para vista previa e impresion de etiquetas de inventario, con callbacks de render e impresion y sin UI inline en `MainWindow`.
+- `services/inventory_label_service.py`
+  - Carga el contexto visible de la presentacion para cabecera de impresion y delega el render real a `LabelGenerator` fuera de `MainWindow`.
+- `ui/helpers/inventory_label_preview_helper.py`
+  - Estado visible del preview de etiquetas: error de render, resumen de copias/hojas y mensaje de confirmacion de impresion.
+  - Ahora tambien resuelve copy visible por modo y resumen multilinea para una vista previa mas clara.
+- `ui/dialogs/inventory_label_dialog.py`
+  - Vista de impresion de etiquetas reorganizada: preview protagonista, controles compactos arriba, resumen inferior, acciones mas limpias y navegacion `Anterior/Siguiente` entre presentaciones sin devolver logica a `MainWindow`.
+- `utils/qr_generator.py`
+  - Los QR de presentaciones ahora incrustan un icono central desde `assets/qr_icons`, eligiendo por `tipo_prenda` o nombre de producto y usando `default.png` como fallback seguro.
+
+### Empaquetado
+
+- `packaging/windows/pos_uniformes_windows.spec`
+  - Build `onedir` para Windows con assets, migraciones, soporte de `alembic.ini` y nombre versionado a partir de `VERSION`.
+  - Ahora tambien incluye `setup_windows_local_bundle.ps1/.bat` y un `seed/initial.dump` opcional cuando se prepara una base semilla.
+- `scripts/build_windows_bundle.ps1`
+  - Build reproducible en Windows: instala dependencias de build, corre pruebas, lee `VERSION`, genera `dist/POSUniformes-<VERSION>/` y produce `POSUniformes-<VERSION>-windows.zip`.
+  - Puede incluir una base semilla con `-CreateSeedBackup` o `-SeedBackupPath`.
+- `scripts/build_windows_bundle.bat`
+  - Wrapper simple para disparar el build desde consola de Windows.
+- `scripts/setup_windows_local_bundle.ps1`
+  - Setup automatico en la PC destino: crea la base si falta, restaura `seed\initial.dump` cuando existe y escribe `pos_uniformes.env` junto al `.exe`.
+- `scripts/setup_windows_local_bundle.bat`
+  - Wrapper para correr el setup automatico de base local desde Windows.
+- `pos_uniformes.env.example`
+  - Plantilla de configuracion local para ejecutar la app empaquetada sin depender de variables de entorno del sistema.
+- `VERSION`
+  - Fuente unica de version para nombrar el ejecutable y el bundle de Windows.
+- `utils/config.py`
+  - Lee `pos_uniformes.env` o `.env` en la raiz del proyecto o junto al ejecutable empaquetado.
 
 ### Presupuestos
 

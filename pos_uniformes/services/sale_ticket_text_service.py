@@ -6,6 +6,7 @@ from decimal import Decimal
 import re
 
 from pos_uniformes.services.sale_ticket_totals_service import resolve_sale_ticket_totals
+from pos_uniformes.utils.product_name import sanitize_product_display_name
 
 
 def _extract_payment_method(observacion: str) -> str:
@@ -102,7 +103,11 @@ def build_sale_ticket_text(
     lines.extend(["", "Articulos"])
     for detalle in detalles:
         variante = getattr(detalle, "variante", None)
-        producto = getattr(getattr(variante, "producto", None), "nombre", "") if variante else ""
+        producto = (
+            sanitize_product_display_name(getattr(getattr(variante, "producto", None), "nombre", ""))
+            if variante
+            else ""
+        )
         sku = getattr(variante, "sku", "") if variante else ""
         lines.append(
             f"- {producto} | {sku} | {getattr(detalle, 'cantidad', '')} x "
