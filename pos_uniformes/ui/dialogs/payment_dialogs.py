@@ -32,6 +32,11 @@ from pos_uniformes.services.sale_payment_note_service import (
     build_mixed_payment_details,
     build_transfer_payment_details,
 )
+from pos_uniformes.services.sale_payment_validation_service import (
+    validate_cash_payment,
+    validate_mixed_payment,
+    validate_transfer_payment_availability,
+)
 
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
@@ -61,19 +66,13 @@ def build_cash_payment_dialog(window: "MainWindow", total: Decimal):
         return parse_keypad_amount_text(keypad_display.text())
 
     def update_cash_labels() -> None:
-        received = parse_received()
-        change = received - total
-        if change < Decimal("0.00"):
-            change = Decimal("0.00")
-            status_label.setText("Falta efectivo para cubrir el total.")
-            status_label.setProperty("tone", "warning")
-        else:
-            status_label.setText("Monto suficiente para cobrar.")
-            status_label.setProperty("tone", "positive")
+        validation = validate_cash_payment(total=total, received=parse_received())
+        status_label.setText(validation.status_message)
+        status_label.setProperty("tone", validation.status_tone)
         status_label.style().unpolish(status_label)
         status_label.style().polish(status_label)
-        received_label.setText(f"${received}")
-        change_label.setText(f"${change}")
+        received_label.setText(f"${validation.received}")
+        change_label.setText(f"${validation.change}")
 
     def append_keypad(value: str) -> None:
         keypad_display.setText(append_keypad_text(keypad_display.text(), value))
@@ -159,24 +158,24 @@ def build_cash_payment_dialog(window: "MainWindow", total: Decimal):
     if dialog.exec() != int(QDialog.DialogCode.Accepted):
         return None
 
-    received = parse_received()
-    if received < total:
+    validation = validate_cash_payment(total=total, received=parse_received())
+    if not validation.is_sufficient:
         QMessageBox.warning(window, "Pago insuficiente", "El monto recibido debe cubrir el total de la venta.")
         return None
-    change = (received - total).quantize(Decimal("0.01"))
     return build_cash_payment_details(
-        received=received,
-        change=change,
+        received=validation.received,
+        change=validation.change,
         reference=reference_input.text(),
     )
 
 
 def build_transfer_payment_dialog(window: "MainWindow", total: Decimal, business):
-    if not business.transfer_clabe and not business.transfer_instructions:
+    error_message = validate_transfer_payment_availability(business)
+    if error_message is not None:
         QMessageBox.warning(
             window,
             "Transferencia no configurada",
-            "Configura CLABE o instrucciones de transferencia en Configuracion > Negocio e impresion.",
+            error_message,
         )
         return None
 
@@ -267,16 +266,13 @@ def build_mixed_payment_dialog(window: "MainWindow", total: Decimal, business):
         input_field.setText(f"{parse_keypad_amount_text(input_field.text()):.2f}")
 
     def update_mixed_labels() -> None:
-        transfer_amount = parse_transfer_amount()
-        cash_received = parse_cash_received()
-        remaining_cash = total - transfer_amount
-        if remaining_cash < Decimal("0.00"):
-            remaining_cash = Decimal("0.00")
-        change = cash_received - remaining_cash
-        if change < Decimal("0.00"):
-            change = Decimal("0.00")
-        remaining_label.setText(f"${remaining_cash}")
-        change_label.setText(f"${change}")
+        validation = validate_mixed_payment(
+            total=total,
+            transfer_amount=parse_transfer_amount(),
+            cash_received=parse_cash_received(),
+        )
+        remaining_label.setText(f"${validation.cash_due}")
+        change_label.setText(f"${validation.change}")
 
     transfer_input.textChanged.connect(update_mixed_labels)
     transfer_input.editingFinished.connect(lambda: normalize_amount_input(transfer_input))
@@ -318,20 +314,17 @@ def build_mixed_payment_dialog(window: "MainWindow", total: Decimal, business):
     if dialog.exec() != int(QDialog.DialogCode.Accepted):
         return None
 
-    transfer_amount = parse_transfer_amount()
-    cash_received = parse_cash_received()
-    cash_due = total - transfer_amount
-    if cash_due < Decimal("0.00"):
-        cash_due = Decimal("0.00")
-    if transfer_amount + cash_received < total:
+    validation = validate_mixed_payment(
+        total=total,
+        transfer_amount=parse_transfer_amount(),
+        cash_received=parse_cash_received(),
+    )
+    if not validation.is_sufficient:
         QMessageBox.warning(window, "Pago insuficiente", "La suma de transferencia y efectivo debe cubrir el total.")
         return None
-    change = (cash_received - cash_due).quantize(Decimal("0.01"))
-    if change < Decimal("0.00"):
-        change = Decimal("0.00")
     return build_mixed_payment_details(
-        transfer_amount=transfer_amount,
-        cash_received=cash_received,
-        change=change,
+        transfer_amount=validation.transfer_amount,
+        cash_received=validation.cash_received,
+        change=validation.change,
         reference=reference_input.text(),
     )

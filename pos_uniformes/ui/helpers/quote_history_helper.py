@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from pos_uniformes.database.models import EstadoPresupuesto
-
 
 def build_quote_history_rows(
     *,
@@ -40,8 +38,8 @@ def build_quote_history_rows(
 
 def _quote_status_tone(state_value: str) -> str:
     return {
-        EstadoPresupuesto.EMITIDO.value: "positive",
-        EstadoPresupuesto.BORRADOR.value: "warning",
-        EstadoPresupuesto.CANCELADO.value: "danger",
-        EstadoPresupuesto.CONVERTIDO.value: "muted",
+        "EMITIDO": "positive",
+        "BORRADOR": "warning",
+        "CANCELADO": "danger",
+        "CONVERTIDO": "muted",
     }.get(state_value, "muted")

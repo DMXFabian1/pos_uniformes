@@ -4,6 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
 from pos_uniformes.services.recent_sale_service import list_recent_sale_rows
 
@@ -34,7 +35,13 @@ class RecentSaleServiceTests(unittest.TestCase):
             scalars=lambda _stmt: SimpleNamespace(all=lambda: sales),
         )
 
-        rows = list_recent_sale_rows(session, limit=20)
+        fake_query = SimpleNamespace(order_by=lambda *args, **kwargs: SimpleNamespace(limit=lambda _limit: object()))
+
+        with patch(
+            "pos_uniformes.services.recent_sale_service._resolve_recent_sale_dependencies",
+            return_value=(lambda value: value, lambda model: fake_query, SimpleNamespace(created_at=object())),
+        ):
+            rows = list_recent_sale_rows(session, limit=20)
 
         self.assertEqual(len(rows), 2)
         self.assertEqual(rows[0].sale_id, 10)

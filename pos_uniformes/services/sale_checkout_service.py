@@ -6,13 +6,10 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Callable
 
-from pos_uniformes.database.models import Cliente
-from pos_uniformes.services.loyalty_service import LoyaltyService
-
 
 @dataclass(frozen=True)
 class SaleClientCheckoutSnapshot:
-    client: Cliente | None = None
+    client: object | None = None
     previous_level: object | None = None
     previous_discount: Decimal | None = None
     previous_level_label: str = ""
@@ -27,13 +24,14 @@ def load_sale_client_checkout_snapshot(
     if selected_client_id in {None, ""}:
         return SaleClientCheckoutSnapshot()
 
-    client = session.get(Cliente, int(selected_client_id))
+    cliente_model, loyalty_service = _resolve_sale_checkout_dependencies()
+    client = session.get(cliente_model, int(selected_client_id))
     if client is None:
         raise ValueError("No se pudo cargar el cliente seleccionado.")
 
-    previous_level = LoyaltyService.coerce_level(client.nivel_lealtad)
+    previous_level = loyalty_service.coerce_level(client.nivel_lealtad)
     previous_discount = Decimal(str(client.descuento_preferente or Decimal("0.00"))).quantize(Decimal("0.01"))
-    previous_level_label = LoyaltyService.visual_spec(previous_level).label
+    previous_level_label = loyalty_service.visual_spec(previous_level).label
     return SaleClientCheckoutSnapshot(
         client=client,
         previous_level=previous_level,
@@ -51,17 +49,25 @@ def resolve_sale_loyalty_transition_notice(
     if snapshot.client is None or snapshot.previous_level is None or snapshot.previous_discount is None:
         return ""
 
-    updated_level = LoyaltyService.coerce_level(snapshot.client.nivel_lealtad)
+    _cliente_model, loyalty_service = _resolve_sale_checkout_dependencies()
+    updated_level = loyalty_service.coerce_level(snapshot.client.nivel_lealtad)
     updated_discount = Decimal(str(snapshot.client.descuento_preferente or Decimal("0.00"))).quantize(
         Decimal("0.01")
     )
     if updated_level == snapshot.previous_level and updated_discount == snapshot.previous_discount:
         return ""
 
-    updated_label = LoyaltyService.visual_spec(updated_level).label
+    updated_label = loyalty_service.visual_spec(updated_level).label
     return build_notice(
         snapshot.client_name_for_notice,
         snapshot.previous_level_label,
         updated_label,
         updated_discount,
     )
+
+
+def _resolve_sale_checkout_dependencies():
+    from pos_uniformes.database.models import Cliente
+    from pos_uniformes.services.loyalty_service import LoyaltyService
+
+    return Cliente, LoyaltyService

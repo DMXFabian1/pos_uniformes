@@ -20,19 +20,28 @@ class SaleCheckoutServiceTests(unittest.TestCase):
         self.assertEqual(snapshot.client_name_for_notice, "")
 
     def test_load_sale_client_checkout_snapshot_raises_when_client_missing(self) -> None:
-        with self.assertRaisesRegex(ValueError, "No se pudo cargar el cliente seleccionado"):
-            load_sale_client_checkout_snapshot(SimpleNamespace(get=lambda *_args: None), selected_client_id=14)
+        fake_loyalty = SimpleNamespace(
+            coerce_level=lambda level: level,
+            visual_spec=lambda level: SimpleNamespace(label=str(level)),
+        )
+        with patch(
+            "pos_uniformes.services.sale_checkout_service._resolve_sale_checkout_dependencies",
+            return_value=(object(), fake_loyalty),
+        ):
+            with self.assertRaisesRegex(ValueError, "No se pudo cargar el cliente seleccionado"):
+                load_sale_client_checkout_snapshot(SimpleNamespace(get=lambda *_args: None), selected_client_id=14)
 
     def test_load_sale_client_checkout_snapshot_loads_previous_loyalty_state(self) -> None:
         client = SimpleNamespace(nombre="Maria", nivel_lealtad="LEAL", descuento_preferente=Decimal("10.00"))
         session = SimpleNamespace(get=lambda *_args: client)
+        fake_loyalty = SimpleNamespace(
+            coerce_level=lambda level: "LEAL",
+            visual_spec=lambda level: SimpleNamespace(label="Leal"),
+        )
 
         with patch(
-            "pos_uniformes.services.sale_checkout_service.LoyaltyService.coerce_level",
-            return_value="LEAL",
-        ), patch(
-            "pos_uniformes.services.sale_checkout_service.LoyaltyService.visual_spec",
-            return_value=SimpleNamespace(label="Leal"),
+            "pos_uniformes.services.sale_checkout_service._resolve_sale_checkout_dependencies",
+            return_value=(object(), fake_loyalty),
         ):
             snapshot = load_sale_client_checkout_snapshot(session, selected_client_id=5)
 
@@ -51,10 +60,14 @@ class SaleCheckoutServiceTests(unittest.TestCase):
             previous_level_label="Leal",
             client_name_for_notice="Maria",
         )
+        fake_loyalty = SimpleNamespace(
+            coerce_level=lambda level: "LEAL",
+            visual_spec=lambda level: SimpleNamespace(label="Leal"),
+        )
 
         with patch(
-            "pos_uniformes.services.sale_checkout_service.LoyaltyService.coerce_level",
-            return_value="LEAL",
+            "pos_uniformes.services.sale_checkout_service._resolve_sale_checkout_dependencies",
+            return_value=(object(), fake_loyalty),
         ):
             notice = resolve_sale_loyalty_transition_notice(
                 snapshot,
@@ -72,13 +85,14 @@ class SaleCheckoutServiceTests(unittest.TestCase):
             previous_level_label="Leal",
             client_name_for_notice="Maria",
         )
+        fake_loyalty = SimpleNamespace(
+            coerce_level=lambda level: "PRO",
+            visual_spec=lambda level: SimpleNamespace(label="Profesor"),
+        )
 
         with patch(
-            "pos_uniformes.services.sale_checkout_service.LoyaltyService.coerce_level",
-            return_value="PRO",
-        ), patch(
-            "pos_uniformes.services.sale_checkout_service.LoyaltyService.visual_spec",
-            return_value=SimpleNamespace(label="Profesor"),
+            "pos_uniformes.services.sale_checkout_service._resolve_sale_checkout_dependencies",
+            return_value=(object(), fake_loyalty),
         ):
             notice = resolve_sale_loyalty_transition_notice(
                 snapshot,

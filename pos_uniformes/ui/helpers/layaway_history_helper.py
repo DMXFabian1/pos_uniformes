@@ -4,8 +4,6 @@ from __future__ import annotations
 
 from decimal import Decimal
 
-from pos_uniformes.database.models import EstadoApartado
-
 
 def build_layaway_history_rows(
     *,
@@ -44,8 +42,8 @@ def build_layaway_history_rows(
 
 def _layaway_status_tone(state_value: str) -> str:
     return {
-        EstadoApartado.ACTIVO.value: "warning",
-        EstadoApartado.LIQUIDADO.value: "positive",
-        EstadoApartado.ENTREGADO.value: "muted",
-        EstadoApartado.CANCELADO.value: "danger",
+        "ACTIVO": "warning",
+        "LIQUIDADO": "positive",
+        "ENTREGADO": "muted",
+        "CANCELADO": "danger",
     }.get(state_value, "muted")

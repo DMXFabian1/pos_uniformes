@@ -51,7 +51,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-from sqlalchemy import and_, desc, func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
 
 if __package__ in {None, ""}:
@@ -63,7 +63,6 @@ from pos_uniformes.database.models import (
     Apartado,
     ApartadoAbono,
     ApartadoDetalle,
-    CambioCatalogo,
     Categoria,
     Cliente,
     Compra,
@@ -82,11 +81,7 @@ from pos_uniformes.database.models import (
     Proveedor,
     RolUsuario,
     SesionCaja,
-    TipoCliente,
-    TipoCambioCatalogo,
     TipoMovimientoCaja,
-    TipoMovimientoInventario,
-    TipoEntidadCatalogo,
     TipoPieza,
     TipoPrenda,
     Usuario,
@@ -100,79 +95,156 @@ from pos_uniformes.services.active_filter_service import (
     build_active_filters_summary,
 )
 from pos_uniformes.services.bootstrap_service import BootstrapService
+from pos_uniformes.services.analytics_snapshot_service import (
+    build_analytics_sales_snapshot,
+    load_confirmed_sales_for_analytics,
+)
+from pos_uniformes.services.analytics_layaway_service import load_analytics_layaway_snapshot
+from pos_uniformes.services.analytics_top_clients_service import load_analytics_top_client_snapshot_rows
+from pos_uniformes.services.analytics_top_products_service import load_analytics_top_product_snapshot_rows
+from pos_uniformes.services.analytics_stock_service import load_analytics_stock_snapshot_rows
 from pos_uniformes.services.backup_service import (
     backup_output_dir,
-    create_backup,
     format_size,
     list_backups,
-    restore_backup,
 )
 from pos_uniformes.services.business_settings_service import BusinessSettingsInput, BusinessSettingsService
+from pos_uniformes.services.settings_business_action_service import (
+    load_settings_business_form_snapshot,
+    save_settings_business_payload,
+)
+from pos_uniformes.services.cash_session_action_service import (
+    close_cash_session_action,
+    correct_cash_opening_action,
+    load_cash_cut_prompt_snapshot,
+    load_cash_movement_target_snapshot,
+    load_cash_opening_amount,
+    load_cash_opening_suggested_amount,
+    load_cash_session_gate_snapshot,
+    open_cash_session_action,
+    register_cash_movement_action,
+)
 from pos_uniformes.services.caja_service import CajaService
 from pos_uniformes.services.client_service import ClientService
 from pos_uniformes.services.catalog_service import CatalogService
+from pos_uniformes.services.catalog_snapshot_service import load_catalog_snapshot_rows
+from pos_uniformes.services.catalog_mutation_service import (
+    delete_catalog_product,
+    delete_catalog_variant,
+    toggle_catalog_product_state,
+    toggle_catalog_variant_state,
+)
 from pos_uniformes.services.compra_service import CompraItemInput, CompraService
 from pos_uniformes.services.customer_card_service import CustomerCardRenderInput, CustomerCardService
+from pos_uniformes.services.history_snapshot_service import (
+    HistorySnapshotFilters,
+    load_history_snapshot_rows,
+)
 from pos_uniformes.services.inventario_service import (
     AjusteMasivoFilaInput,
     InventarioService,
 )
-from pos_uniformes.services.loyalty_service import LoyaltyService
+from pos_uniformes.services.layaway_snapshot_service import (
+    build_layaway_history_input_rows,
+    load_layaway_snapshot_rows,
+)
 from pos_uniformes.services.inventory_label_service import (
     load_inventory_label_context,
     render_inventory_label,
 )
 from pos_uniformes.services.inventory_overview_service import load_inventory_overview_snapshot
-from pos_uniformes.services.manual_promo_flow_service import (
-    build_manual_promo_state,
-    clear_manual_promo_state,
-    current_manual_promo_percent,
-    decide_manual_promo_change,
-    resolve_manual_promo_transition,
-)
+from pos_uniformes.services.inventory_snapshot_service import load_inventory_snapshot_rows
+ 
 from pos_uniformes.services.manual_promo_service import ManualPromoService
-from pos_uniformes.services.marketing_audit_service import MarketingAuditService
 from pos_uniformes.services.presupuesto_service import PresupuestoItemInput, PresupuestoService
-from pos_uniformes.services.business_print_settings_service import load_business_print_settings_snapshot
-from pos_uniformes.services.layaway_receipt_text_service import build_layaway_receipt_text
-from pos_uniformes.services.sale_note_service import build_sale_note_parts
+from pos_uniformes.services.quote_snapshot_service import (
+    build_quote_history_input_rows,
+    load_quote_snapshot_rows,
+)
+from pos_uniformes.services.quote_detail_service import load_quote_detail_snapshot
+from pos_uniformes.services.quote_action_service import cancel_quote
+from pos_uniformes.services.layaway_alerts_service import load_layaway_alerts_snapshot
+from pos_uniformes.services.layaway_closure_service import cancel_layaway, deliver_layaway
+from pos_uniformes.services.layaway_creation_service import create_layaway_from_payload
+from pos_uniformes.services.layaway_detail_service import load_layaway_detail_snapshot
+from pos_uniformes.services.layaway_payment_action_service import register_layaway_payment
 from pos_uniformes.services.sale_loyalty_notice_service import build_sale_loyalty_transition_notice
-from pos_uniformes.services.sale_checkout_service import (
-    load_sale_client_checkout_snapshot,
-    resolve_sale_loyalty_transition_notice,
+from pos_uniformes.services.sale_payment_context_service import build_sale_payment_note_context
+from pos_uniformes.services.sale_checkout_action_service import complete_sale_checkout
+from pos_uniformes.services.sale_discount_context_service import (
+    build_sale_discount_context,
+    build_sale_manual_promo_snapshot,
+    calculate_sale_discount_pricing,
+    calculate_sale_discount_totals,
+    clear_sale_manual_promo_snapshot,
+    load_sale_discount_presets,
+    resolve_sale_client_discount_ui_state,
+    resolve_sale_manual_discount_transition,
+    verify_sale_manual_promo_code,
 )
 from pos_uniformes.services.sale_discount_option_service import (
     build_sale_discount_options,
     expected_discount_option_label,
 )
-from pos_uniformes.services.sale_ticket_text_service import build_sale_ticket_text
-from pos_uniformes.services.sale_document_service import (
-    load_layaway_for_receipt,
-    load_sale_for_layaway_ticket,
-    load_sale_for_ticket,
+from pos_uniformes.services.sale_document_view_service import (
+    build_layaway_receipt_document_view,
+    build_layaway_sale_ticket_document_view,
+    build_sale_ticket_document_view,
 )
 from pos_uniformes.services.sale_selected_client_service import (
     find_active_sale_client_by_code,
     load_sale_selected_client_discount_percent,
-    resolve_sale_selected_client_sync_state,
 )
 from pos_uniformes.services.sale_discount_service import (
-    build_sale_discount_breakdown,
-    calculate_sale_pricing,
-    calculate_sale_totals,
-    effective_sale_discount_percent,
     format_discount_label,
     normalize_discount_value,
 )
 from pos_uniformes.services.recent_sale_service import list_recent_sale_rows
+from pos_uniformes.services.recent_sale_action_service import cancel_recent_sale
 from pos_uniformes.services.search_filter_service import row_matches_search
 from pos_uniformes.services.search_suggestion_service import (
     build_catalog_search_suggestions,
     build_inventory_search_suggestions,
 )
+from pos_uniformes.services.settings_backup_action_service import (
+    create_settings_backup,
+    open_settings_backup_folder,
+    restore_settings_backup,
+)
+from pos_uniformes.services.settings_client_action_service import (
+    create_settings_client,
+    generate_settings_client_qr,
+    load_settings_client_prompt_snapshot,
+    toggle_settings_client,
+    update_settings_client,
+)
+from pos_uniformes.services.settings_marketing_action_service import (
+    load_settings_marketing_history_rows,
+    recalculate_settings_loyalty_levels,
+)
+from pos_uniformes.services.settings_supplier_action_service import (
+    create_settings_supplier,
+    load_settings_supplier_prompt_snapshot,
+    toggle_settings_supplier,
+    update_settings_supplier,
+)
+from pos_uniformes.services.settings_whatsapp_template_service import (
+    build_default_settings_whatsapp_templates,
+    build_settings_whatsapp_template_map,
+    render_settings_whatsapp_template,
+    resolve_settings_whatsapp_templates,
+)
+from pos_uniformes.services.settings_user_action_service import (
+    change_settings_user_password,
+    change_settings_user_role,
+    create_settings_user,
+    load_settings_user_prompt_snapshot,
+    toggle_settings_user,
+    update_settings_user,
+)
 from pos_uniformes.services.supplier_service import SupplierService
 from pos_uniformes.services.user_service import UserService
-from pos_uniformes.services.venta_service import VentaItemInput, VentaService
+from pos_uniformes.services.venta_service import VentaService
 from pos_uniformes.ui.login_dialog import LoginDialog
 from pos_uniformes.ui.dialogs.settings_dialogs import (
     build_backup_settings_dialog,
@@ -208,11 +280,44 @@ from pos_uniformes.ui.dialogs.cash_session_prompt_dialogs import (
 )
 from pos_uniformes.ui.helpers.catalog_access_helper import build_catalog_access_view
 from pos_uniformes.ui.helpers.catalog_action_guard_helper import build_catalog_action_guard_feedback
+from pos_uniformes.ui.helpers.catalog_action_feedback_helper import (
+    build_catalog_delete_confirmation,
+    build_catalog_error_title,
+    build_catalog_success_result,
+)
+from pos_uniformes.ui.helpers.catalog_filter_helper import (
+    CatalogVisibleFilterState,
+    filter_visible_catalog_rows,
+)
 from pos_uniformes.ui.helpers.catalog_macro_filter_helper import (
     build_catalog_uniform_macro_button_states,
     resolve_catalog_uniform_macro_selection,
 )
+from pos_uniformes.ui.helpers.analytics_payment_helper import build_analytics_payment_rows
+from pos_uniformes.ui.helpers.analytics_layaway_helper import build_analytics_layaway_labels_view
+from pos_uniformes.ui.helpers.analytics_export_helper import (
+    build_analytics_layaway_export_rows,
+    build_table_export_rows,
+)
+from pos_uniformes.ui.helpers.analytics_period_helper import (
+    build_analytics_export_status_text,
+    is_manual_analytics_period,
+    resolve_analytics_period_bounds,
+)
+from pos_uniformes.ui.helpers.analytics_top_clients_helper import build_analytics_top_client_row_views
+from pos_uniformes.ui.helpers.analytics_top_products_helper import build_analytics_top_product_rows
+from pos_uniformes.ui.helpers.analytics_stock_helper import build_analytics_stock_row_views
+from pos_uniformes.ui.helpers.catalog_refresh_helper import (
+    build_catalog_snapshot_rows,
+    build_catalog_table_values,
+)
 from pos_uniformes.ui.helpers.history_filter_helper import build_history_type_options
+from pos_uniformes.ui.helpers.history_filter_state_helper import (
+    build_history_clear_filter_state,
+    build_history_filter_state,
+    build_history_today_filter_dates,
+    build_history_type_options_state,
+)
 from pos_uniformes.ui.helpers.history_summary_helper import build_history_summary_view
 from pos_uniformes.ui.helpers.history_table_helper import build_history_table_rows
 from pos_uniformes.ui.helpers.catalog_selection_helper import (
@@ -222,7 +327,17 @@ from pos_uniformes.ui.helpers.catalog_selection_helper import (
     resolve_catalog_row,
 )
 from pos_uniformes.ui.helpers.catalog_summary_helper import build_catalog_summary_view
+from pos_uniformes.ui.helpers.cash_session_feedback_helper import (
+    build_cash_close_success_feedback,
+    build_cash_movement_success_feedback,
+    build_cash_opening_correction_success_feedback,
+    build_cash_session_gate_feedback,
+)
 from pos_uniformes.ui.helpers.inventory_context_menu_helper import build_inventory_context_menu_actions
+from pos_uniformes.ui.helpers.inventory_filter_helper import (
+    InventoryVisibleFilterState,
+    filter_visible_inventory_rows,
+)
 from pos_uniformes.ui.helpers.inventory_overview_helper import (
     build_empty_inventory_overview_view,
     build_error_inventory_overview_view,
@@ -242,6 +357,8 @@ from pos_uniformes.ui.helpers.inventory_selection_helper import (
     resolve_selected_catalog_row,
 )
 from pos_uniformes.ui.helpers.inventory_summary_helper import build_inventory_summary_view
+from pos_uniformes.ui.helpers.inventory_table_row_helper import build_inventory_table_row_views
+from pos_uniformes.ui.helpers.layaway_action_helper import build_layaway_action_state
 from pos_uniformes.ui.helpers.layaway_alerts_helper import build_layaway_alerts_view
 from pos_uniformes.ui.helpers.layaway_detail_helper import (
     build_empty_layaway_detail_view,
@@ -250,6 +367,16 @@ from pos_uniformes.ui.helpers.layaway_detail_helper import (
 )
 from pos_uniformes.ui.helpers.layaway_history_helper import build_layaway_history_rows
 from pos_uniformes.ui.helpers.layaway_summary_helper import build_layaway_summary_view
+from pos_uniformes.ui.helpers.layaway_table_row_helper import build_layaway_table_row_views
+from pos_uniformes.ui.helpers.recent_sale_table_helper import build_recent_sale_table_row_views
+from pos_uniformes.ui.helpers.recent_sale_selection_helper import (
+    build_recent_sale_action_state,
+    resolve_selected_recent_sale_id,
+)
+from pos_uniformes.ui.helpers.recent_sale_feedback_helper import (
+    build_recent_sale_guard_feedback,
+    build_recent_sale_permission_label,
+)
 from pos_uniformes.ui.helpers.quote_cart_view_helper import build_quote_cart_view
 from pos_uniformes.ui.helpers.quote_history_helper import build_quote_history_rows
 from pos_uniformes.ui.helpers.quote_detail_helper import (
@@ -257,18 +384,60 @@ from pos_uniformes.ui.helpers.quote_detail_helper import (
     build_error_quote_detail_view,
     build_quote_detail_view,
 )
+from pos_uniformes.ui.helpers.quote_feedback_helper import (
+    build_quote_guard_feedback,
+    build_quote_result_feedback,
+)
+from pos_uniformes.ui.helpers.quote_selection_helper import (
+    build_quote_action_state,
+    resolve_selected_quote_id,
+)
 from pos_uniformes.ui.helpers.quote_summary_helper import build_quote_summary_view
+from pos_uniformes.ui.helpers.quote_table_row_helper import build_quote_table_row_views
+from pos_uniformes.ui.helpers.printable_document_flow_helper import open_printable_document_flow
 from pos_uniformes.ui.helpers.sale_client_selection_helper import (
     build_empty_sale_client_selection_ui_state,
     build_sale_client_selection_ui_state,
 )
-from pos_uniformes.ui.helpers.sale_cashier_view_helper import build_sale_cashier_view
+from pos_uniformes.ui.helpers.sale_cashier_panel_helper import build_sale_cashier_panel_view
+from pos_uniformes.ui.helpers.sale_checkout_feedback_helper import (
+    build_sale_checkout_error_message,
+)
+from pos_uniformes.ui.helpers.sale_post_action_feedback_helper import (
+    SalePostActionView,
+    build_sale_cancel_post_action_view,
+    build_sale_checkout_post_action_view,
+)
 from pos_uniformes.ui.helpers.sale_payment_helper import collect_sale_payment_details
 from pos_uniformes.ui.helpers.sale_scanned_client_helper import build_sale_scanned_client_ui_state
 from pos_uniformes.ui.helpers.search_input_helper import apply_search_suggestions
 from pos_uniformes.ui.helpers.settings_backup_helper import (
     build_settings_backup_error_view,
     build_settings_backup_view,
+)
+from pos_uniformes.ui.helpers.settings_backup_feedback_helper import (
+    build_settings_backup_guard_feedback,
+    build_settings_backup_restore_confirmation,
+    build_settings_backup_result_feedback,
+)
+from pos_uniformes.ui.helpers.settings_business_feedback_helper import (
+    build_settings_business_guard_feedback,
+    build_settings_business_result_feedback,
+)
+from pos_uniformes.ui.helpers.settings_backup_selection_helper import (
+    resolve_selected_settings_backup_path,
+)
+from pos_uniformes.ui.helpers.settings_crm_feedback_helper import (
+    build_settings_client_guard_feedback,
+    build_settings_client_result_feedback,
+    build_settings_marketing_guard_feedback,
+    build_settings_marketing_result_feedback,
+    build_settings_supplier_guard_feedback,
+    build_settings_supplier_result_feedback,
+)
+from pos_uniformes.ui.helpers.settings_crm_selection_helper import (
+    resolve_selected_settings_client_id,
+    resolve_selected_settings_supplier_id,
 )
 from pos_uniformes.ui.helpers.settings_cash_history_helper import (
     build_settings_cash_history_rows,
@@ -296,6 +465,13 @@ from pos_uniformes.ui.helpers.settings_suppliers_helper import (
 from pos_uniformes.ui.helpers.settings_users_helper import (
     build_settings_users_error_view,
     build_settings_users_view,
+)
+from pos_uniformes.ui.helpers.settings_user_feedback_helper import (
+    build_settings_user_guard_feedback,
+    build_settings_user_result_feedback,
+)
+from pos_uniformes.ui.helpers.settings_user_selection_helper import (
+    resolve_selected_settings_user_id,
 )
 from pos_uniformes.ui.helpers.settings_whatsapp_preview_helper import (
     build_settings_whatsapp_preview_text,
@@ -621,15 +797,6 @@ def _set_table_badge_style(item: QTableWidgetItem, tone: str) -> None:
     item.setBackground(QColor(background))
     item.setForeground(QColor(foreground))
     item.setTextAlignment(int(Qt.AlignmentFlag.AlignCenter))
-
-
-def _stock_table_text(stock_value: int) -> str:
-    if stock_value == 0:
-        return "0 Agotado"
-    if stock_value <= 3:
-        return f"{stock_value} Bajo"
-    return f"{stock_value} OK"
-
 
 COMMON_COLORS = [
     "Negro",
@@ -1984,48 +2151,41 @@ class MainWindow(QMainWindow):
     def _refresh_business_settings_form(self) -> None:
         try:
             with get_session() as session:
-                config = BusinessSettingsService.get_or_create(session)
-                defaults = self._default_whatsapp_templates()
-                self.settings_business_name_input.setText(config.nombre_negocio)
-                self.settings_business_logo_input.setText(config.logo_path or "")
-                self._refresh_business_logo_preview(config.logo_path or "")
-                self.settings_marketing_review_days_spin.setValue(config.loyalty_review_window_days or 365)
-                self.settings_marketing_leal_spend_spin.setValue(float(config.leal_spend_threshold or 3000))
-                self.settings_marketing_leal_purchase_count_spin.setValue(config.leal_purchase_count_threshold or 3)
-                self.settings_marketing_leal_purchase_sum_spin.setValue(float(config.leal_purchase_sum_threshold or 2000))
-                self.settings_marketing_discount_basico_spin.setValue(float(config.discount_basico or 5))
-                self.settings_marketing_discount_leal_spin.setValue(float(config.discount_leal or 10))
-                self.settings_marketing_discount_profesor_spin.setValue(float(config.discount_profesor or 15))
-                self.settings_marketing_discount_mayorista_spin.setValue(float(config.discount_mayorista or 20))
-                self.settings_business_phone_input.setText(config.telefono or "")
-                self.settings_business_address_input.setPlainText(config.direccion or "")
-                self.settings_business_footer_input.setPlainText(config.pie_ticket or "")
-                self.settings_business_transfer_bank_input.setText(config.transferencia_banco or "")
-                self.settings_business_transfer_beneficiary_input.setText(config.transferencia_beneficiario or "")
-                self.settings_business_transfer_clabe_input.setText(config.transferencia_clabe or "")
-                self.settings_business_transfer_instructions_input.setPlainText(config.transferencia_instrucciones or "")
+                defaults = build_default_settings_whatsapp_templates()
+                snapshot = load_settings_business_form_snapshot(
+                    session,
+                    default_templates=defaults,
+                )
+                self.settings_business_name_input.setText(snapshot.business_name)
+                self.settings_business_logo_input.setText(snapshot.logo_path)
+                self._refresh_business_logo_preview(snapshot.logo_path)
+                self.settings_marketing_review_days_spin.setValue(snapshot.loyalty_review_window_days)
+                self.settings_marketing_leal_spend_spin.setValue(snapshot.leal_spend_threshold)
+                self.settings_marketing_leal_purchase_count_spin.setValue(snapshot.leal_purchase_count_threshold)
+                self.settings_marketing_leal_purchase_sum_spin.setValue(snapshot.leal_purchase_sum_threshold)
+                self.settings_marketing_discount_basico_spin.setValue(snapshot.discount_basico)
+                self.settings_marketing_discount_leal_spin.setValue(snapshot.discount_leal)
+                self.settings_marketing_discount_profesor_spin.setValue(snapshot.discount_profesor)
+                self.settings_marketing_discount_mayorista_spin.setValue(snapshot.discount_mayorista)
+                self.settings_business_phone_input.setText(snapshot.phone)
+                self.settings_business_address_input.setPlainText(snapshot.address)
+                self.settings_business_footer_input.setPlainText(snapshot.footer)
+                self.settings_business_transfer_bank_input.setText(snapshot.transfer_bank)
+                self.settings_business_transfer_beneficiary_input.setText(snapshot.transfer_beneficiary)
+                self.settings_business_transfer_clabe_input.setText(snapshot.transfer_clabe)
+                self.settings_business_transfer_instructions_input.setPlainText(snapshot.transfer_instructions)
                 self.settings_business_promo_code_input.clear()
                 self.settings_business_promo_code_input.setPlaceholderText(
                     "Deja vacio para conservar el codigo actual"
                 )
-                self.settings_whatsapp_layaway_reminder_input.setPlainText(
-                    config.whatsapp_apartado_recordatorio or defaults["layaway_reminder"]
-                )
-                self.settings_whatsapp_layaway_liquidated_input.setPlainText(
-                    config.whatsapp_apartado_liquidado or defaults["layaway_liquidated"]
-                )
-                self.settings_whatsapp_client_promotion_input.setPlainText(
-                    config.whatsapp_cliente_promocion or defaults["client_promotion"]
-                )
-                self.settings_whatsapp_client_followup_input.setPlainText(
-                    config.whatsapp_cliente_seguimiento or defaults["client_followup"]
-                )
-                self.settings_whatsapp_client_greeting_input.setPlainText(
-                    config.whatsapp_cliente_saludo or defaults["client_greeting"]
-                )
-                printer_index = self.settings_business_printer_combo.findData(config.impresora_preferida or "")
+                self.settings_whatsapp_layaway_reminder_input.setPlainText(snapshot.whatsapp_layaway_reminder)
+                self.settings_whatsapp_layaway_liquidated_input.setPlainText(snapshot.whatsapp_layaway_liquidated)
+                self.settings_whatsapp_client_promotion_input.setPlainText(snapshot.whatsapp_client_promotion)
+                self.settings_whatsapp_client_followup_input.setPlainText(snapshot.whatsapp_client_followup)
+                self.settings_whatsapp_client_greeting_input.setPlainText(snapshot.whatsapp_client_greeting)
+                printer_index = self.settings_business_printer_combo.findData(snapshot.preferred_printer)
                 self.settings_business_printer_combo.setCurrentIndex(printer_index if printer_index >= 0 else 0)
-                self.settings_business_copies_spin.setValue(config.copias_ticket or 1)
+                self.settings_business_copies_spin.setValue(snapshot.ticket_copies)
                 self.settings_business_status_label.setText("Configuracion cargada correctamente.")
                 self.settings_marketing_status_label.setText("Reglas de marketing cargadas correctamente.")
                 self.settings_whatsapp_status_label.setText("Plantillas cargadas correctamente.")
@@ -2075,17 +2235,17 @@ class MainWindow(QMainWindow):
         )
 
     def _save_business_settings(self, success_message: str) -> bool:
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede actualizar esta configuracion.")
+        feedback = build_settings_business_guard_feedback(
+            is_admin=self.current_role == RolUsuario.ADMIN,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return False
         try:
             with get_session() as session:
-                admin_user = session.get(Usuario, self.user_id)
-                if admin_user is None:
-                    raise ValueError("Administrador no encontrado.")
-                BusinessSettingsService.update_settings(
-                    session=session,
-                    admin_user=admin_user,
+                save_settings_business_payload(
+                    session,
+                    admin_user_id=self.user_id,
                     payload=self._build_business_settings_payload(),
                 )
                 session.commit()
@@ -2098,7 +2258,8 @@ class MainWindow(QMainWindow):
         self.settings_marketing_status_label.setText(success_message)
         self.settings_whatsapp_status_label.setText(success_message)
         self.settings_business_promo_code_input.clear()
-        QMessageBox.information(self, "Configuracion guardada", success_message)
+        result_feedback = build_settings_business_result_feedback(success_message)
+        QMessageBox.information(self, result_feedback.title, result_feedback.message)
         return True
 
     def _handle_save_business_settings(self) -> None:
@@ -2189,8 +2350,12 @@ class MainWindow(QMainWindow):
         self._save_business_settings("Las plantillas de WhatsApp se actualizaron correctamente.")
 
     def _handle_recalculate_loyalty_levels(self) -> None:
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede recalcular niveles.")
+        feedback = build_settings_marketing_guard_feedback(
+            "recalculate_levels",
+            is_admin=self.current_role == RolUsuario.ADMIN,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
         confirmation = QMessageBox.question(
             self,
@@ -2201,13 +2366,9 @@ class MainWindow(QMainWindow):
             return
         try:
             with get_session() as session:
-                admin_user = session.get(Usuario, self.user_id)
-                if admin_user is None:
-                    raise ValueError("Administrador no encontrado.")
-                summary = LoyaltyService.recalculate_all_clients(
+                result = recalculate_settings_loyalty_levels(
                     session,
-                    actor_user=admin_user,
-                    reason="recalculo_manual_marketing",
+                    admin_user_id=self.user_id,
                 )
                 session.commit()
                 self._refresh_marketing_summary(session)
@@ -2216,38 +2377,31 @@ class MainWindow(QMainWindow):
             return
 
         self.refresh_all()
-        message = (
-            f"Niveles revisados: {summary['total']}\n"
-            f"Clientes con cambio aplicado: {summary['changed']}"
+        result_feedback = build_settings_marketing_result_feedback(
+            total=result.total,
+            changed=result.changed,
         )
-        self.settings_marketing_status_label.setText(message)
-        QMessageBox.information(self, "Recalculo completado", message)
+        self.settings_marketing_status_label.setText(result_feedback.message)
+        QMessageBox.information(self, result_feedback.title, result_feedback.message)
 
     def _handle_open_marketing_history(self) -> None:
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede consultar este historial.")
+        feedback = build_settings_marketing_guard_feedback(
+            "open_history",
+            is_admin=self.current_role == RolUsuario.ADMIN,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
 
         try:
             with get_session() as session:
-                changes = MarketingAuditService.list_recent(session, limit=120)
+                changes = load_settings_marketing_history_rows(session, limit=120)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Historial no disponible", str(exc))
             return
         build_marketing_history_dialog(
             self,
-            changes=[
-                {
-                    "created_at_label": change.created_at.strftime("%Y-%m-%d %H:%M") if change.created_at else "",
-                    "username": change.usuario.username if change.usuario is not None else "-",
-                    "role_label": change.rol_usuario or "-",
-                    "section_label": change.seccion.title(),
-                    "field_label": change.etiqueta_campo,
-                    "old_value": change.valor_anterior or "-",
-                    "new_value": change.valor_nuevo or "-",
-                }
-                for change in changes
-            ],
+            changes=changes,
         )
 
     def _refresh_settings_users(self) -> None:
@@ -2377,53 +2531,49 @@ class MainWindow(QMainWindow):
 
     def _selected_settings_user_id(self) -> int | None:
         selected_row = self.settings_users_table.currentRow()
-        if selected_row < 0:
-            return None
         item = self.settings_users_table.item(selected_row, 0)
-        if item is None:
-            return None
-        user_id = item.data(Qt.ItemDataRole.UserRole)
-        return int(user_id) if user_id is not None else None
+        raw_user_id = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+        return resolve_selected_settings_user_id(
+            current_row=selected_row,
+            raw_user_id=raw_user_id,
+        )
 
     def _selected_settings_supplier_id(self) -> int | None:
         selected_row = self.settings_suppliers_table.currentRow()
-        if selected_row < 0:
-            return None
         item = self.settings_suppliers_table.item(selected_row, 0)
-        if item is None:
-            return None
-        supplier_id = item.data(Qt.ItemDataRole.UserRole)
-        return int(supplier_id) if supplier_id is not None else None
+        raw_supplier_id = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+        return resolve_selected_settings_supplier_id(
+            current_row=selected_row,
+            raw_supplier_id=raw_supplier_id,
+        )
 
     def _selected_settings_client_id(self) -> int | None:
         selected_row = self.settings_clients_table.currentRow()
-        if selected_row < 0:
-            return None
         item = self.settings_clients_table.item(selected_row, 1)
-        if item is None:
-            return None
-        client_id = item.data(Qt.ItemDataRole.UserRole)
-        return int(client_id) if client_id is not None else None
+        raw_client_id = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+        return resolve_selected_settings_client_id(
+            current_row=selected_row,
+            raw_client_id=raw_client_id,
+        )
 
     def _handle_create_user(self) -> None:
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede crear usuarios.")
+        feedback = build_settings_user_guard_feedback(
+            "create_user",
+            is_admin=self.current_role == RolUsuario.ADMIN,
+            has_selection=False,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
         data = prompt_create_user_data(self)
         if data is None:
             return
         try:
             with get_session() as session:
-                admin_user = session.get(Usuario, self.user_id)
-                if admin_user is None:
-                    raise ValueError("Administrador no encontrado.")
-                UserService.create_user(
-                    session=session,
-                    admin_user=admin_user,
-                    username=str(data["username"]),
-                    nombre_completo=str(data["nombre_completo"]),
-                    rol=data["rol"],
-                    password=str(data["password"]),
+                result = create_settings_user(
+                    session,
+                    admin_user_id=self.user_id,
+                    payload=data,
                 )
                 session.commit()
         except Exception as exc:  # noqa: BLE001
@@ -2431,41 +2581,56 @@ class MainWindow(QMainWindow):
             return
 
         self._refresh_settings_users()
-        QMessageBox.information(self, "Usuario creado", f"Usuario '{data['username']}' creado correctamente.")
+        result_feedback = build_settings_user_result_feedback(
+            "create_user",
+            username=result.username,
+        )
+        QMessageBox.information(self, result_feedback.title, result_feedback.message)
 
     def _handle_toggle_user(self) -> None:
         user_id = self._selected_settings_user_id()
-        if user_id is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona un usuario en la tabla.")
+        feedback = build_settings_user_guard_feedback(
+            "toggle_user",
+            is_admin=self.current_role == RolUsuario.ADMIN,
+            has_selection=user_id is not None,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
         try:
             with get_session() as session:
-                admin_user = session.get(Usuario, self.user_id)
-                target_user = session.get(Usuario, user_id)
-                if admin_user is None or target_user is None:
-                    raise ValueError("No se pudo cargar el usuario seleccionado.")
-                UserService.toggle_active(session, admin_user, target_user)
+                result = toggle_settings_user(
+                    session,
+                    admin_user_id=self.user_id,
+                    user_id=user_id,
+                )
                 session.commit()
-                username = target_user.username
-                status = "activado" if target_user.activo else "desactivado"
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Operacion fallida", str(exc))
             return
 
         self._refresh_settings_users()
-        QMessageBox.information(self, "Estado actualizado", f"Usuario '{username}' {status} correctamente.")
+        result_feedback = build_settings_user_result_feedback(
+            "toggle_user",
+            username=result.username,
+            status_text=result.status_text,
+        )
+        QMessageBox.information(self, result_feedback.title, result_feedback.message)
 
     def _handle_change_user_role(self) -> None:
         user_id = self._selected_settings_user_id()
-        if user_id is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona un usuario en la tabla.")
+        feedback = build_settings_user_guard_feedback(
+            "change_user_role",
+            is_admin=self.current_role == RolUsuario.ADMIN,
+            has_selection=user_id is not None,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
         try:
             with get_session() as session:
-                target_user = session.get(Usuario, user_id)
-                if target_user is None:
-                    raise ValueError("No se encontro el usuario seleccionado.")
-                new_role = prompt_role_change(self, target_user.rol)
+                prompt_snapshot = load_settings_user_prompt_snapshot(session, user_id=user_id)
+                new_role = prompt_role_change(self, prompt_snapshot.current_role)
                 if new_role is None:
                     return
         except Exception as exc:  # noqa: BLE001
@@ -2474,24 +2639,34 @@ class MainWindow(QMainWindow):
 
         try:
             with get_session() as session:
-                admin_user = session.get(Usuario, self.user_id)
-                target_user = session.get(Usuario, user_id)
-                if admin_user is None or target_user is None:
-                    raise ValueError("No se pudo cargar el usuario seleccionado.")
-                UserService.change_role(session, admin_user, target_user, new_role)
+                result = change_settings_user_role(
+                    session,
+                    admin_user_id=self.user_id,
+                    user_id=user_id,
+                    new_role=new_role,
+                )
                 session.commit()
-                username = target_user.username
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "No se pudo cambiar rol", str(exc))
             return
 
         self._refresh_settings_users()
-        QMessageBox.information(self, "Rol actualizado", f"Usuario '{username}' ahora es {new_role.value}.")
+        result_feedback = build_settings_user_result_feedback(
+            "change_user_role",
+            username=result.username,
+            role_label=result.role_label,
+        )
+        QMessageBox.information(self, result_feedback.title, result_feedback.message)
 
     def _handle_change_user_password(self) -> None:
         user_id = self._selected_settings_user_id()
-        if user_id is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona un usuario en la tabla.")
+        feedback = build_settings_user_guard_feedback(
+            "change_user_password",
+            is_admin=self.current_role == RolUsuario.ADMIN,
+            has_selection=user_id is not None,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
         try:
             new_password = prompt_password_change(self)
@@ -2503,34 +2678,41 @@ class MainWindow(QMainWindow):
 
         try:
             with get_session() as session:
-                admin_user = session.get(Usuario, self.user_id)
-                target_user = session.get(Usuario, user_id)
-                if admin_user is None or target_user is None:
-                    raise ValueError("No se pudo cargar el usuario seleccionado.")
-                UserService.change_password(session, admin_user, target_user, new_password)
+                result = change_settings_user_password(
+                    session,
+                    admin_user_id=self.user_id,
+                    user_id=user_id,
+                    new_password=new_password,
+                )
                 session.commit()
-                username = target_user.username
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "No se pudo cambiar contrasena", str(exc))
             return
 
-        QMessageBox.information(self, "Contrasena actualizada", f"Contrasena de '{username}' actualizada correctamente.")
+        result_feedback = build_settings_user_result_feedback(
+            "change_user_password",
+            username=result.username,
+        )
+        QMessageBox.information(self, result_feedback.title, result_feedback.message)
 
     def _handle_edit_user(self) -> None:
         user_id = self._selected_settings_user_id()
-        if user_id is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona un usuario en la tabla.")
+        feedback = build_settings_user_guard_feedback(
+            "edit_user",
+            is_admin=self.current_role == RolUsuario.ADMIN,
+            has_selection=user_id is not None,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
         try:
             with get_session() as session:
-                target_user = session.get(Usuario, user_id)
-                if target_user is None:
-                    raise ValueError("No se encontro el usuario seleccionado.")
+                prompt_snapshot = load_settings_user_prompt_snapshot(session, user_id=user_id)
                 data = prompt_edit_user_data(
                     self,
-                    username=target_user.username,
-                    nombre_completo=target_user.nombre_completo,
-                    current_role=target_user.rol,
+                    username=prompt_snapshot.username,
+                    nombre_completo=prompt_snapshot.full_name,
+                    current_role=prompt_snapshot.current_role,
                 )
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "No se pudo abrir", str(exc))
@@ -2540,30 +2722,32 @@ class MainWindow(QMainWindow):
 
         try:
             with get_session() as session:
-                admin_user = session.get(Usuario, self.user_id)
-                target_user = session.get(Usuario, user_id)
-                if admin_user is None or target_user is None:
-                    raise ValueError("No se pudo cargar el usuario seleccionado.")
-                UserService.update_user(
-                    session=session,
-                    admin_user=admin_user,
-                    target_user=target_user,
-                    username=str(data["username"]),
-                    nombre_completo=str(data["nombre_completo"]),
-                    rol=data["rol"],
+                result = update_settings_user(
+                    session,
+                    admin_user_id=self.user_id,
+                    user_id=user_id,
+                    payload=data,
                 )
                 session.commit()
-                updated_username = target_user.username
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "No se pudo actualizar", str(exc))
             return
 
         self._refresh_settings_users()
-        QMessageBox.information(self, "Usuario actualizado", f"Usuario '{updated_username}' actualizado correctamente.")
+        result_feedback = build_settings_user_result_feedback(
+            "edit_user",
+            username=result.username,
+        )
+        QMessageBox.information(self, result_feedback.title, result_feedback.message)
 
     def _handle_create_supplier(self) -> None:
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede crear proveedores.")
+        feedback = build_settings_supplier_guard_feedback(
+            "create_supplier",
+            is_admin=self.current_role == RolUsuario.ADMIN,
+            has_selection=False,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
         data = prompt_supplier_data(
             self,
@@ -2574,16 +2758,10 @@ class MainWindow(QMainWindow):
             return
         try:
             with get_session() as session:
-                admin_user = session.get(Usuario, self.user_id)
-                if admin_user is None:
-                    raise ValueError("Administrador no encontrado.")
-                SupplierService.create_supplier(
-                    session=session,
-                    admin_user=admin_user,
-                    nombre=data["nombre"],
-                    telefono=data["telefono"],
-                    email=data["email"],
-                    direccion=data["direccion"],
+                result = create_settings_supplier(
+                    session,
+                    admin_user_id=self.user_id,
+                    payload=data,
                 )
                 session.commit()
         except Exception as exc:  # noqa: BLE001
@@ -2591,27 +2769,34 @@ class MainWindow(QMainWindow):
             return
 
         self.refresh_all()
-        QMessageBox.information(self, "Proveedor creado", f"Proveedor '{data['nombre']}' creado correctamente.")
+        result_feedback = build_settings_supplier_result_feedback(
+            "create_supplier",
+            supplier_name=result.supplier_name,
+        )
+        QMessageBox.information(self, result_feedback.title, result_feedback.message)
 
     def _handle_update_supplier(self) -> None:
         supplier_id = self._selected_settings_supplier_id()
-        if supplier_id is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona un proveedor en la tabla.")
+        feedback = build_settings_supplier_guard_feedback(
+            "update_supplier",
+            is_admin=self.current_role == RolUsuario.ADMIN,
+            has_selection=supplier_id is not None,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
         try:
             with get_session() as session:
-                supplier = session.get(Proveedor, supplier_id)
-                if supplier is None:
-                    raise ValueError("No se encontro el proveedor seleccionado.")
+                prompt_snapshot = load_settings_supplier_prompt_snapshot(session, supplier_id=supplier_id)
                 data = prompt_supplier_data(
                     self,
                     title="Editar proveedor",
                     helper_text="Actualiza contacto, correo o direccion del proveedor.",
                     current_values={
-                        "nombre": supplier.nombre,
-                        "telefono": supplier.telefono or "",
-                        "email": supplier.email or "",
-                        "direccion": supplier.direccion or "",
+                        "nombre": prompt_snapshot.name,
+                        "telefono": prompt_snapshot.phone,
+                        "email": prompt_snapshot.email,
+                        "direccion": prompt_snapshot.address,
                     },
                 )
         except Exception as exc:  # noqa: BLE001
@@ -2622,18 +2807,11 @@ class MainWindow(QMainWindow):
 
         try:
             with get_session() as session:
-                admin_user = session.get(Usuario, self.user_id)
-                supplier = session.get(Proveedor, supplier_id)
-                if admin_user is None or supplier is None:
-                    raise ValueError("No se pudo cargar el proveedor seleccionado.")
-                SupplierService.update_supplier(
-                    session=session,
-                    admin_user=admin_user,
-                    supplier=supplier,
-                    nombre=data["nombre"],
-                    telefono=data["telefono"],
-                    email=data["email"],
-                    direccion=data["direccion"],
+                result = update_settings_supplier(
+                    session,
+                    admin_user_id=self.user_id,
+                    supplier_id=supplier_id,
+                    payload=data,
                 )
                 session.commit()
         except Exception as exc:  # noqa: BLE001
@@ -2641,37 +2819,50 @@ class MainWindow(QMainWindow):
             return
 
         self.refresh_all()
-        QMessageBox.information(self, "Proveedor actualizado", f"Proveedor '{data['nombre']}' actualizado.")
+        result_feedback = build_settings_supplier_result_feedback(
+            "update_supplier",
+            supplier_name=result.supplier_name,
+        )
+        QMessageBox.information(self, result_feedback.title, result_feedback.message)
 
     def _handle_toggle_supplier(self) -> None:
         supplier_id = self._selected_settings_supplier_id()
-        if supplier_id is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona un proveedor en la tabla.")
+        feedback = build_settings_supplier_guard_feedback(
+            "toggle_supplier",
+            is_admin=self.current_role == RolUsuario.ADMIN,
+            has_selection=supplier_id is not None,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
         try:
             with get_session() as session:
-                admin_user = session.get(Usuario, self.user_id)
-                supplier = session.get(Proveedor, supplier_id)
-                if admin_user is None or supplier is None:
-                    raise ValueError("No se pudo cargar el proveedor seleccionado.")
-                SupplierService.toggle_active(session, admin_user, supplier)
+                result = toggle_settings_supplier(
+                    session,
+                    admin_user_id=self.user_id,
+                    supplier_id=supplier_id,
+                )
                 session.commit()
-                supplier_name = supplier.nombre
-                status_text = "activado" if supplier.activo else "desactivado"
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Operacion fallida", str(exc))
             return
 
         self.refresh_all()
-        QMessageBox.information(
-            self,
-            "Proveedor actualizado",
-            f"Proveedor '{supplier_name}' {status_text} correctamente.",
+        result_feedback = build_settings_supplier_result_feedback(
+            "toggle_supplier",
+            supplier_name=result.supplier_name,
+            status_text=result.status_text,
         )
+        QMessageBox.information(self, result_feedback.title, result_feedback.message)
 
     def _handle_create_client(self) -> None:
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede crear clientes.")
+        feedback = build_settings_client_guard_feedback(
+            "create_client",
+            is_admin=self.current_role == RolUsuario.ADMIN,
+            has_selection=False,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
         data = prompt_client_data(
             self,
@@ -2682,53 +2873,49 @@ class MainWindow(QMainWindow):
             return
         try:
             with get_session() as session:
-                admin_user = session.get(Usuario, self.user_id)
-                if admin_user is None:
-                    raise ValueError("Administrador no encontrado.")
-                client = ClientService.create_client(
-                    session=session,
-                    admin_user=admin_user,
-                    nombre=data["nombre"],
-                    tipo_cliente=TipoCliente(str(data["tipo_cliente"])),
-                    descuento_preferente=Decimal(str(data["descuento_preferente"])),
-                    telefono=data["telefono"],
-                    notas=data["notas"],
+                result = create_settings_client(
+                    session,
+                    admin_user_id=self.user_id,
+                    payload=data,
+                    render_card=self._render_client_card_safe,
                 )
-                session.flush()
-                card_path, card_error = self._render_client_card_safe(client)
                 session.commit()
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "No se pudo crear", str(exc))
             return
 
         self.refresh_all()
-        message = f"Cliente '{data['nombre']}' creado correctamente."
-        if card_path is not None:
-            message = f"{message}\nCredencial lista en:\n{card_path}"
-        elif card_error:
-            message = f"{message}\nLa credencial quedo pendiente: {card_error}"
-        QMessageBox.information(self, "Cliente creado", message)
+        result_feedback = build_settings_client_result_feedback(
+            "create_client",
+            client_name=result.client_name,
+            asset_path=str(result.card_path) if result.card_path is not None else None,
+            asset_error=result.card_error,
+        )
+        QMessageBox.information(self, result_feedback.title, result_feedback.message)
 
     def _handle_update_client(self) -> None:
         client_id = self._selected_settings_client_id()
-        if client_id is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona un cliente en la tabla.")
+        feedback = build_settings_client_guard_feedback(
+            "update_client",
+            is_admin=self.current_role == RolUsuario.ADMIN,
+            has_selection=client_id is not None,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
         try:
             with get_session() as session:
-                client = session.get(Cliente, client_id)
-                if client is None:
-                    raise ValueError("No se encontro el cliente seleccionado.")
+                prompt_snapshot = load_settings_client_prompt_snapshot(session, client_id=client_id)
                 data = prompt_client_data(
                     self,
                     title="Editar cliente",
                     helper_text="Actualiza telefono, tipo comercial, descuento o notas del cliente.",
                     current_values={
-                        "nombre": client.nombre,
-                        "tipo_cliente": client.tipo_cliente.value,
-                        "descuento_preferente": str(Decimal(client.descuento_preferente).quantize(Decimal("0.01"))),
-                        "telefono": client.telefono or "",
-                        "notas": client.notas or "",
+                        "nombre": prompt_snapshot.name,
+                        "tipo_cliente": prompt_snapshot.client_type,
+                        "descuento_preferente": prompt_snapshot.discount_label,
+                        "telefono": prompt_snapshot.phone,
+                        "notas": prompt_snapshot.notes,
                     },
                 )
         except Exception as exc:  # noqa: BLE001
@@ -2739,82 +2926,82 @@ class MainWindow(QMainWindow):
 
         try:
             with get_session() as session:
-                admin_user = session.get(Usuario, self.user_id)
-                client = session.get(Cliente, client_id)
-                if admin_user is None or client is None:
-                    raise ValueError("No se pudo cargar el cliente seleccionado.")
-                ClientService.update_client(
-                    session=session,
-                    admin_user=admin_user,
-                    client=client,
-                    nombre=data["nombre"],
-                    tipo_cliente=TipoCliente(str(data["tipo_cliente"])),
-                    descuento_preferente=Decimal(str(data["descuento_preferente"])),
-                    telefono=data["telefono"],
-                    notas=data["notas"],
+                result = update_settings_client(
+                    session,
+                    admin_user_id=self.user_id,
+                    client_id=client_id,
+                    payload=data,
+                    render_card=self._render_client_card_safe,
                 )
-                session.flush()
-                card_path, card_error = self._render_client_card_safe(client)
                 session.commit()
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "No se pudo actualizar", str(exc))
             return
 
         self.refresh_all()
-        message = f"Cliente '{data['nombre']}' actualizado."
-        if card_path is not None:
-            message = f"{message}\nCredencial regenerada en:\n{card_path}"
-        elif card_error:
-            message = f"{message}\nLa credencial sigue pendiente: {card_error}"
-        QMessageBox.information(self, "Cliente actualizado", message)
+        result_feedback = build_settings_client_result_feedback(
+            "update_client",
+            client_name=result.client_name,
+            asset_path=str(result.card_path) if result.card_path is not None else None,
+            asset_error=result.card_error,
+        )
+        QMessageBox.information(self, result_feedback.title, result_feedback.message)
 
     def _handle_toggle_client(self) -> None:
         client_id = self._selected_settings_client_id()
-        if client_id is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona un cliente en la tabla.")
+        feedback = build_settings_client_guard_feedback(
+            "toggle_client",
+            is_admin=self.current_role == RolUsuario.ADMIN,
+            has_selection=client_id is not None,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
         try:
             with get_session() as session:
-                admin_user = session.get(Usuario, self.user_id)
-                client = session.get(Cliente, client_id)
-                if admin_user is None or client is None:
-                    raise ValueError("No se pudo cargar el cliente seleccionado.")
-                ClientService.toggle_active(session, admin_user, client)
+                result = toggle_settings_client(
+                    session,
+                    admin_user_id=self.user_id,
+                    client_id=client_id,
+                )
                 session.commit()
-                client_name = client.nombre
-                status_text = "activado" if client.activo else "desactivado"
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Operacion fallida", str(exc))
             return
 
         self.refresh_all()
-        QMessageBox.information(
-            self,
-            "Cliente actualizado",
-            f"Cliente '{client_name}' {status_text} correctamente.",
+        result_feedback = build_settings_client_result_feedback(
+            "toggle_client",
+            client_name=result.client_name,
+            status_text=result.status_text,
         )
+        QMessageBox.information(self, result_feedback.title, result_feedback.message)
 
     def _handle_generate_client_qr(self) -> None:
         client_id = self._selected_settings_client_id()
-        if client_id is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona un cliente en la tabla.")
+        feedback = build_settings_client_guard_feedback(
+            "generate_client_qr",
+            is_admin=self.current_role == RolUsuario.ADMIN,
+            has_selection=client_id is not None,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
         try:
             with get_session() as session:
-                client = session.get(Cliente, client_id)
-                if client is None:
-                    raise ValueError("No se encontro el cliente seleccionado.")
-                path = QrGenerator.generate_for_client(client)
+                result = generate_settings_client_qr(session, client_id=client_id)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "QR fallido", str(exc))
             return
 
         self._refresh_settings_clients()
-        QMessageBox.information(
-            self,
-            "QR generado",
-            f"QR del cliente '{client.codigo_cliente}' guardado en:\n{path}",
+        result_feedback = build_settings_client_result_feedback(
+            "generate_client_qr",
+            client_name=result.client_name,
+            client_code=result.client_code,
+            asset_path=str(result.card_path) if result.card_path is not None else "",
         )
+        QMessageBox.information(self, result_feedback.title, result_feedback.message)
 
     def _handle_open_client_whatsapp(self) -> None:
         client_id = self._selected_settings_client_id()
@@ -2837,7 +3024,7 @@ class MainWindow(QMainWindow):
                     "greeting": templates["client_greeting"],
                     "followup": templates["client_followup"],
                 }.get(message_type, templates["client_followup"])
-                base_message = self._render_whatsapp_template(
+                base_message = render_settings_whatsapp_template(
                     base_message,
                     {"cliente": client.nombre, "codigo_cliente": client.codigo_cliente},
                 )
@@ -2905,24 +3092,24 @@ class MainWindow(QMainWindow):
 
     def _selected_backup_path(self) -> Path | None:
         selected_row = self.settings_backup_table.currentRow()
-        if selected_row < 0:
-            return None
         item = self.settings_backup_table.item(selected_row, 0)
-        if item is None:
-            return None
-        raw_path = item.data(Qt.ItemDataRole.UserRole)
-        if not raw_path:
-            return None
-        return Path(str(raw_path))
+        raw_path = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+        return resolve_selected_settings_backup_path(
+            current_row=selected_row,
+            raw_path=raw_path,
+        )
 
     def _handle_create_backup(self) -> None:
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede crear respaldos manuales.")
+        feedback = build_settings_backup_guard_feedback(
+            "create_backup",
+            is_admin=self.current_role == RolUsuario.ADMIN,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
         dump_format = str(self.settings_backup_format_combo.currentData() or "plain")
         try:
-            backup_file, deleted_files = create_backup(
-                output_dir=backup_output_dir(),
+            result = create_settings_backup(
                 dump_format=dump_format,
                 retention_days=7,
             )
@@ -2931,19 +3118,16 @@ class MainWindow(QMainWindow):
             return
 
         self._refresh_settings_backups()
-        deleted_note = f" | Rotacion elimino {len(deleted_files)} respaldo(s)." if deleted_files else ""
-        QMessageBox.information(self, "Respaldo creado", f"Se genero {backup_file.name}{deleted_note}")
+        result_feedback = build_settings_backup_result_feedback(
+            "create_backup",
+            backup_name=result.backup_file.name,
+            deleted_count=len(result.deleted_files),
+        )
+        QMessageBox.information(self, result_feedback.title, result_feedback.message)
 
     def _handle_open_backup_folder(self) -> None:
-        target_dir = backup_output_dir()
-        target_dir.mkdir(parents=True, exist_ok=True)
         try:
-            if sys.platform == "darwin":
-                subprocess.run(["open", str(target_dir)], check=True)
-            elif os.name == "nt":
-                os.startfile(str(target_dir))
-            else:
-                subprocess.run(["xdg-open", str(target_dir)], check=True)
+            open_settings_backup_folder()
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "No se pudo abrir", str(exc))
 
@@ -2960,43 +3144,41 @@ class MainWindow(QMainWindow):
             return
 
     def _handle_restore_backup(self) -> None:
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede restaurar respaldos.")
-            return
         backup_path = self._selected_backup_path()
-        if backup_path is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona un respaldo en la tabla.")
-            return
-        if backup_path.suffix != ".dump":
-            QMessageBox.warning(
-                self,
-                "Formato no soportado",
-                "La restauracion desde la app solo soporta respaldos .dump. Crea uno en formato restaurable.",
-            )
+        feedback = build_settings_backup_guard_feedback(
+            "restore_backup",
+            is_admin=self.current_role == RolUsuario.ADMIN,
+            backup_path=backup_path,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
 
+        assert backup_path is not None
+        confirmation_view = build_settings_backup_restore_confirmation(backup_path.name)
         confirmation = QMessageBox.question(
             self,
-            "Restaurar respaldo",
-            (
-                f"Se restaurara el respaldo '{backup_path.name}' sobre la base actual.\n\n"
-                "Esta accion reemplaza la informacion actual del POS.\n"
-                "Asegurate de tener un respaldo reciente antes de continuar.\n\n"
-                "Deseas continuar?"
-            ),
+            confirmation_view.title,
+            confirmation_view.message,
         )
         if confirmation != QMessageBox.StandardButton.Yes:
             return
 
         try:
-            engine.dispose()
-            restore_backup(backup_path)
+            restore_settings_backup(
+                backup_path,
+                dispose_database=engine.dispose,
+            )
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Restauracion fallida", str(exc))
             return
 
         self.refresh_all()
-        QMessageBox.information(self, "Restauracion completada", f"Se restauro {backup_path.name} correctamente.")
+        result_feedback = build_settings_backup_result_feedback(
+            "restore_backup",
+            backup_name=backup_path.name,
+        )
+        QMessageBox.information(self, result_feedback.title, result_feedback.message)
 
     def _create_modal_dialog(
         self,
@@ -3056,47 +3238,25 @@ class MainWindow(QMainWindow):
     def ensure_cash_session(self) -> bool:
         try:
             with get_session() as session:
-                active_session = CajaService.obtener_sesion_activa(session)
-                if active_session is not None:
-                    self.active_cash_session_id = active_session.id
-                    self.cash_session_requires_cut = self._is_stale_cash_session(active_session)
-                    opened_by = (
-                        active_session.abierta_por.nombre_completo
-                        if active_session.abierta_por is not None
-                        else "otro usuario"
+                gate_snapshot = load_cash_session_gate_snapshot(
+                    session,
+                    user_id=self.user_id,
+                    is_stale_session=self._is_stale_cash_session,
+                )
+                if gate_snapshot.has_active_session:
+                    self.active_cash_session_id = gate_snapshot.active_session_id
+                    self.cash_session_requires_cut = gate_snapshot.requires_cut
+                    feedback = build_cash_session_gate_feedback(
+                        requires_cut=gate_snapshot.requires_cut,
+                        opened_at_label=gate_snapshot.opened_at_label,
+                        opened_by=gate_snapshot.opened_by,
+                        opening_amount=gate_snapshot.opening_amount,
                     )
-                    opened_at = (
-                        active_session.abierta_at.strftime("%Y-%m-%d %H:%M")
-                        if active_session.abierta_at is not None
-                        else "sin fecha"
-                    )
-                    if self.cash_session_requires_cut:
-                        QMessageBox.warning(
-                            self,
-                            "Caja pendiente de corte",
-                            (
-                                "Se detecto una caja abierta de un dia anterior.\n\n"
-                                "Debes realizar el corte antes de registrar ventas, apartados o abonos.\n\n"
-                                f"Apertura: {opened_at}\n"
-                                f"Abierta por: {opened_by}\n"
-                                f"Reactivo inicial: ${Decimal(active_session.monto_apertura).quantize(Decimal('0.01'))}"
-                            ),
-                        )
+                    if gate_snapshot.requires_cut:
+                        QMessageBox.warning(self, feedback.title, feedback.message)
                     else:
-                        QMessageBox.information(
-                            self,
-                            "Caja abierta detectada",
-                            (
-                                "Ya existe una caja abierta. Se reanudara la sesion actual.\n\n"
-                                f"Apertura: {opened_at}\n"
-                                f"Abierta por: {opened_by}\n"
-                                f"Reactivo inicial: ${Decimal(active_session.monto_apertura).quantize(Decimal('0.01'))}"
-                            ),
-                        )
+                        QMessageBox.information(self, feedback.title, feedback.message)
                     return True
-                user = session.get(Usuario, self.user_id)
-                if user is None:
-                    raise ValueError("No se encontro el usuario autenticado.")
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Caja no disponible", str(exc))
             return False
@@ -3107,17 +3267,12 @@ class MainWindow(QMainWindow):
 
         try:
             with get_session() as session:
-                user = session.get(Usuario, self.user_id)
-                if user is None:
-                    raise ValueError("No se encontro el usuario autenticado.")
-                cash_session = CajaService.abrir_sesion(
-                    session=session,
-                    usuario=user,
-                    monto_apertura=payload["monto_apertura"],
-                    observacion=payload["observacion"],
+                self.active_cash_session_id = open_cash_session_action(
+                    session,
+                    user_id=self.user_id,
+                    opening_amount=Decimal(payload["monto_apertura"]),
+                    opening_note=str(payload["observacion"]),
                 )
-                session.commit()
-                self.active_cash_session_id = cash_session.id
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "No se pudo abrir caja", str(exc))
             return False
@@ -3127,7 +3282,7 @@ class MainWindow(QMainWindow):
         suggested_amount: Decimal | None = None
         try:
             with get_session() as session:
-                suggested_amount = CajaService.obtener_ultimo_reactivo_sugerido(session)
+                suggested_amount = load_cash_opening_suggested_amount(session)
         except Exception:
             suggested_amount = None
         return prompt_open_cash_session(
@@ -3137,18 +3292,16 @@ class MainWindow(QMainWindow):
 
     def _prompt_cash_movement_data(self, movement_type: TipoMovimientoCaja) -> dict[str, object] | None:
         target_total: Decimal | None = None
-        if movement_type == TipoMovimientoCaja.REACTIVO:
-            try:
-                with get_session() as session:
-                    cash_session = session.get(SesionCaja, self.active_cash_session_id)
-                    if cash_session is not None:
-                        resumen = CajaService.resumir_sesion(session, cash_session)
-                        target_total = (
-                            Decimal(cash_session.monto_apertura).quantize(Decimal("0.01"))
-                            + resumen.reactivo_total
-                        ).quantize(Decimal("0.01"))
-            except Exception:
-                target_total = None
+        try:
+            with get_session() as session:
+                target_snapshot = load_cash_movement_target_snapshot(
+                    session,
+                    active_cash_session_id=self.active_cash_session_id,
+                    movement_type=movement_type,
+                )
+                target_total = target_snapshot.target_total
+        except Exception:
+            target_total = None
         return prompt_cash_movement_data(
             self,
             movement_type=movement_type,
@@ -3159,9 +3312,10 @@ class MainWindow(QMainWindow):
         current_amount = Decimal("0.00")
         try:
             with get_session() as session:
-                cash_session = session.get(SesionCaja, self.active_cash_session_id)
-                if cash_session is not None:
-                    current_amount = Decimal(cash_session.monto_apertura).quantize(Decimal("0.01"))
+                current_amount = load_cash_opening_amount(
+                    session,
+                    active_cash_session_id=self.active_cash_session_id,
+                )
         except Exception:
             current_amount = Decimal("0.00")
         return prompt_cash_opening_correction(
@@ -3182,37 +3336,24 @@ class MainWindow(QMainWindow):
             return
         try:
             with get_session() as session:
-                cash_session = session.get(SesionCaja, self.active_cash_session_id)
-                user = session.get(Usuario, self.user_id)
-                if cash_session is None or user is None:
-                    raise ValueError("No se pudo cargar la caja activa o el usuario.")
-                CajaService.registrar_movimiento(
-                    session=session,
-                    cash_session=cash_session,
-                    usuario=user,
-                    tipo=movement_type,
-                    monto=Decimal(payload["monto"]),
-                    concepto=str(payload["concepto"]) or None,
+                register_cash_movement_action(
+                    session,
+                    active_cash_session_id=int(self.active_cash_session_id),
+                    user_id=self.user_id,
+                    movement_type=movement_type,
+                    amount=Decimal(payload["monto"]),
+                    concept=str(payload["concepto"]) or None,
                 )
-                session.commit()
         except Exception as exc:
             QMessageBox.critical(self, "Movimiento no registrado", str(exc))
             return
         self.refresh_all()
-        label = {
-            TipoMovimientoCaja.REACTIVO: "Ajuste de reactivo",
-            TipoMovimientoCaja.INGRESO: "Ingreso",
-            TipoMovimientoCaja.RETIRO: "Retiro",
-        }[movement_type]
-        QMessageBox.information(
-            self,
-            "Movimiento registrado",
-            (
-                f"{label} ajustado correctamente. Total objetivo: ${payload['total_objetivo']}."
-                if movement_type == TipoMovimientoCaja.REACTIVO
-                else f"{label} por ${payload['monto']} registrado correctamente."
-            ),
+        feedback = build_cash_movement_success_feedback(
+            movement_type=movement_type,
+            amount=Decimal(payload["monto"]),
+            target_total=payload.get("total_objetivo"),
         )
+        QMessageBox.information(self, feedback.title, feedback.message)
 
     def _handle_correct_cash_opening(self) -> None:
         if self.current_role not in {RolUsuario.ADMIN, RolUsuario.CAJERO}:
@@ -3227,30 +3368,22 @@ class MainWindow(QMainWindow):
             return
         try:
             with get_session() as session:
-                cash_session = session.get(SesionCaja, self.active_cash_session_id)
-                user = session.get(Usuario, self.user_id)
-                if cash_session is None or user is None:
-                    raise ValueError("No se pudo cargar la caja activa o el usuario.")
-                CajaService.corregir_apertura(
-                    session=session,
-                    cash_session=cash_session,
-                    usuario=user,
-                    nuevo_monto_apertura=Decimal(payload["nuevo_monto"]),
-                    observacion=str(payload["motivo"]) or None,
+                result = correct_cash_opening_action(
+                    session,
+                    active_cash_session_id=int(self.active_cash_session_id),
+                    user_id=self.user_id,
+                    new_amount=Decimal(payload["nuevo_monto"]),
+                    note=str(payload["motivo"]) or None,
                 )
-                session.commit()
         except Exception as exc:
             QMessageBox.critical(self, "Correccion no registrada", str(exc))
             return
         self.refresh_all()
-        QMessageBox.information(
-            self,
-            "Apertura corregida",
-            (
-                f"Reactivo inicial actualizado de ${payload['monto_anterior']} "
-                f"a ${payload['nuevo_monto']}."
-            ),
+        feedback = build_cash_opening_correction_success_feedback(
+            previous_amount=result.previous_amount,
+            new_amount=result.new_amount,
         )
+        QMessageBox.information(self, feedback.title, feedback.message)
 
     def _handle_cash_cut(self) -> None:
         if self.current_role not in {RolUsuario.ADMIN, RolUsuario.CAJERO}:
@@ -3263,10 +3396,10 @@ class MainWindow(QMainWindow):
 
         try:
             with get_session() as session:
-                cash_session = session.get(SesionCaja, self.active_cash_session_id)
-                if cash_session is None:
-                    raise ValueError("No se encontro la caja activa.")
-                resumen = CajaService.resumir_sesion(session, cash_session)
+                prompt_snapshot = load_cash_cut_prompt_snapshot(
+                    session,
+                    active_cash_session_id=int(self.active_cash_session_id),
+                )
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Corte no disponible", str(exc))
             return
@@ -3274,19 +3407,19 @@ class MainWindow(QMainWindow):
         payload = prompt_cash_cut_data(
             self,
             summary_view=CashCutSummaryView(
-                opened_at_label=cash_session.abierta_at.strftime("%Y-%m-%d %H:%M") if cash_session.abierta_at else "",
-                opening_amount=Decimal(cash_session.monto_apertura),
-                reactivo_count=resumen.reactivo_count,
-                reactivo_total=resumen.reactivo_total,
-                ingresos_count=resumen.ingresos_count,
-                ingresos_total=resumen.ingresos_total,
-                retiros_count=resumen.retiros_count,
-                retiros_total=resumen.retiros_total,
-                cash_sales_count=resumen.ventas_efectivo_count,
-                cash_sales_total=resumen.efectivo_ventas,
-                cash_payments_count=resumen.abonos_efectivo_count,
-                cash_payments_total=resumen.efectivo_abonos,
-                expected_amount=resumen.esperado_en_caja,
+                opened_at_label=prompt_snapshot.opened_at_label,
+                opening_amount=prompt_snapshot.opening_amount,
+                reactivo_count=prompt_snapshot.reactivo_count,
+                reactivo_total=prompt_snapshot.reactivo_total,
+                ingresos_count=prompt_snapshot.ingresos_count,
+                ingresos_total=prompt_snapshot.ingresos_total,
+                retiros_count=prompt_snapshot.retiros_count,
+                retiros_total=prompt_snapshot.retiros_total,
+                cash_sales_count=prompt_snapshot.cash_sales_count,
+                cash_sales_total=prompt_snapshot.cash_sales_total,
+                cash_payments_count=prompt_snapshot.cash_payments_count,
+                cash_payments_total=prompt_snapshot.cash_payments_total,
+                expected_amount=prompt_snapshot.expected_amount,
             ),
         )
         if payload is None:
@@ -3294,34 +3427,25 @@ class MainWindow(QMainWindow):
 
         try:
             with get_session() as session:
-                cash_session = session.get(SesionCaja, self.active_cash_session_id)
-                user = session.get(Usuario, self.user_id)
-                if cash_session is None or user is None:
-                    raise ValueError("No se pudo cargar la caja o el usuario.")
-                closed_session = CajaService.cerrar_sesion(
-                    session=session,
-                    cash_session=cash_session,
-                    usuario=user,
-                    monto_contado=Decimal(payload["monto_contado"]),
-                    observacion=str(payload["observacion"]),
+                result = close_cash_session_action(
+                    session,
+                    active_cash_session_id=int(self.active_cash_session_id),
+                    user_id=self.user_id,
+                    counted_amount=Decimal(payload["monto_contado"]),
+                    closing_note=str(payload["observacion"]),
                 )
-                session.commit()
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "No se pudo cerrar caja", str(exc))
             return
 
         self.active_cash_session_id = None
         self.refresh_all()
-        QMessageBox.information(
-            self,
-            "Caja cerrada",
-            (
-                "El corte se registro correctamente.\n"
-                f"Esperado: ${closed_session.monto_esperado_cierre} | "
-                f"Contado: ${closed_session.monto_cierre_declarado} | "
-                f"Diferencia: ${closed_session.diferencia_cierre}"
-            ),
+        feedback = build_cash_close_success_feedback(
+            expected_amount=result.expected_amount,
+            counted_amount=result.counted_amount,
+            difference=result.difference,
         )
+        QMessageBox.information(self, feedback.title, feedback.message)
 
     def _handle_logout(self) -> None:
         confirmation = QMessageBox.question(
@@ -6720,7 +6844,11 @@ class MainWindow(QMainWindow):
 
         self.refresh_all()
         self._select_catalog_variant(int(selected["variante_id"]))
-        QMessageBox.information(self, "Producto actualizado", f"Producto '{nombre}' actualizado correctamente.")
+        result_view = build_catalog_success_result(
+            action_key="update_product",
+            item_label=nombre,
+        )
+        QMessageBox.information(self, result_view.title, result_view.message)
 
     def _handle_update_variant(self) -> None:
         selected = self._selected_catalog_row()
@@ -6751,7 +6879,11 @@ class MainWindow(QMainWindow):
         self.refresh_all()
         self._set_combo_value(self.inventory_variant_combo, variant_id)
         self._select_catalog_variant(variant_id)
-        QMessageBox.information(self, "Presentacion actualizada", f"Presentacion '{sku.upper()}' actualizada correctamente.")
+        result_view = build_catalog_success_result(
+            action_key="update_variant",
+            item_label=sku.upper(),
+        )
+        QMessageBox.information(self, result_view.title, result_view.message)
 
     def _handle_toggle_product(self) -> None:
         selected = self._selected_catalog_row()
@@ -6770,19 +6902,24 @@ class MainWindow(QMainWindow):
 
         try:
             with get_session() as session:
-                usuario = session.get(Usuario, self.user_id)
-                producto = session.get(Producto, int(selected["producto_id"]))
-                if usuario is None or producto is None:
-                    raise ValueError("No se pudo cargar el producto.")
-                CatalogService.cambiar_estado_producto(session, usuario, producto, target_state)
+                toggle_catalog_product_state(
+                    session,
+                    user_id=self.user_id,
+                    product_id=int(selected["producto_id"]),
+                    target_state=target_state,
+                )
                 session.commit()
         except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Estado no actualizado", str(exc))
+            QMessageBox.critical(self, build_catalog_error_title("toggle_product"), str(exc))
             return
 
         self.refresh_all()
         self._select_catalog_variant(int(selected["variante_id"]))
-        QMessageBox.information(self, "Producto actualizado", f"Producto listo para {action} correctamente.")
+        result_view = build_catalog_success_result(
+            action_key=f"toggle_product_{action}",
+            item_label=str(selected["producto_nombre"]),
+        )
+        QMessageBox.information(self, result_view.title, result_view.message)
 
     def _handle_toggle_variant(self) -> None:
         selected = self._selected_catalog_row()
@@ -6801,19 +6938,24 @@ class MainWindow(QMainWindow):
 
         try:
             with get_session() as session:
-                usuario = session.get(Usuario, self.user_id)
-                variante = session.get(Variante, int(selected["variante_id"]))
-                if usuario is None or variante is None:
-                    raise ValueError("No se pudo cargar la presentacion.")
-                CatalogService.cambiar_estado_variante(session, usuario, variante, target_state)
+                toggle_catalog_variant_state(
+                    session,
+                    user_id=self.user_id,
+                    variant_id=int(selected["variante_id"]),
+                    target_state=target_state,
+                )
                 session.commit()
         except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Estado no actualizado", str(exc))
+            QMessageBox.critical(self, build_catalog_error_title("toggle_variant"), str(exc))
             return
 
         self.refresh_all()
         self._select_catalog_variant(int(selected["variante_id"]))
-        QMessageBox.information(self, "Presentacion actualizada", f"Presentacion lista para {action} correctamente.")
+        result_view = build_catalog_success_result(
+            action_key=f"toggle_variant_{action}",
+            item_label=str(selected["sku"]),
+        )
+        QMessageBox.information(self, result_view.title, result_view.message)
 
     def _handle_delete_product(self) -> None:
         selected = self._selected_catalog_row()
@@ -6828,33 +6970,32 @@ class MainWindow(QMainWindow):
         assert selected is not None
 
         product_name = str(selected["producto_nombre"])
-        confirmation = QMessageBox.question(
-            self,
-            "Eliminar producto",
-            (
-                f"Se intentara eliminar el producto '{product_name}'.\n\n"
-                "Solo se eliminara si ninguna presentacion tiene stock ni historial.\n"
-                "Si existe historial, usa desactivar en lugar de eliminar.\n\n"
-                "Deseas continuar?"
-            ),
+        confirmation_view = build_catalog_delete_confirmation(
+            action_key="delete_product",
+            item_label=product_name,
         )
+        confirmation = QMessageBox.question(self, confirmation_view.title, confirmation_view.message)
         if confirmation != QMessageBox.StandardButton.Yes:
             return
 
         try:
             with get_session() as session:
-                usuario = session.get(Usuario, self.user_id)
-                producto = session.get(Producto, int(selected["producto_id"]))
-                if usuario is None or producto is None:
-                    raise ValueError("No se pudo cargar el producto.")
-                CatalogService.eliminar_producto(session, usuario, producto)
+                delete_catalog_product(
+                    session,
+                    user_id=self.user_id,
+                    product_id=int(selected["producto_id"]),
+                )
                 session.commit()
         except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "No se pudo eliminar", str(exc))
+            QMessageBox.critical(self, build_catalog_error_title("delete_product"), str(exc))
             return
 
         self.refresh_all()
-        QMessageBox.information(self, "Producto eliminado", f"Producto '{product_name}' eliminado correctamente.")
+        result_view = build_catalog_success_result(
+            action_key="delete_product",
+            item_label=product_name,
+        )
+        QMessageBox.information(self, result_view.title, result_view.message)
 
     def _handle_delete_variant(self) -> None:
         selected = self._selected_catalog_row()
@@ -6869,33 +7010,32 @@ class MainWindow(QMainWindow):
         assert selected is not None
 
         sku = str(selected["sku"])
-        confirmation = QMessageBox.question(
-            self,
-            "Eliminar presentacion",
-            (
-                f"Se intentara eliminar la presentacion '{sku}'.\n\n"
-                "Solo se eliminara si no tiene stock ni historial.\n"
-                "Si existe historial, usa desactivar en lugar de eliminar.\n\n"
-                "Deseas continuar?"
-            ),
+        confirmation_view = build_catalog_delete_confirmation(
+            action_key="delete_variant",
+            item_label=sku,
         )
+        confirmation = QMessageBox.question(self, confirmation_view.title, confirmation_view.message)
         if confirmation != QMessageBox.StandardButton.Yes:
             return
 
         try:
             with get_session() as session:
-                usuario = session.get(Usuario, self.user_id)
-                variante = session.get(Variante, int(selected["variante_id"]))
-                if usuario is None or variante is None:
-                    raise ValueError("No se pudo cargar la presentacion.")
-                CatalogService.eliminar_variante(session, usuario, variante)
+                delete_catalog_variant(
+                    session,
+                    user_id=self.user_id,
+                    variant_id=int(selected["variante_id"]),
+                )
                 session.commit()
         except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "No se pudo eliminar", str(exc))
+            QMessageBox.critical(self, build_catalog_error_title("delete_variant"), str(exc))
             return
 
         self.refresh_all()
-        QMessageBox.information(self, "Presentacion eliminada", f"Presentacion '{sku}' eliminada correctamente.")
+        result_view = build_catalog_success_result(
+            action_key="delete_variant",
+            item_label=sku,
+        )
+        QMessageBox.information(self, result_view.title, result_view.message)
 
     def _handle_purchase(self) -> None:
         if self.current_role != RolUsuario.ADMIN:
@@ -6970,6 +7110,7 @@ class MainWindow(QMainWindow):
             self.cancel_permission_label.setObjectName("cashierWarningLine")
             self.cancel_permission_label.setWordWrap(True)
             self.sale_ticket_button.setObjectName("toolbarSecondaryButton")
+            self.recent_sales_table.itemSelectionChanged.connect(self._apply_recent_sale_action_state)
             self.cancel_button.clicked.connect(self._handle_cancel_sale)
             self.sale_ticket_button.clicked.connect(self._handle_view_sale_ticket)
 
@@ -6984,87 +7125,45 @@ class MainWindow(QMainWindow):
             dialog.setLayout(layout)
             self.sales_dialog = dialog
 
+        self._apply_recent_sale_action_state()
         self.recent_sales_table.resizeColumnsToContents()
         self.sales_dialog.show()
         self.sales_dialog.raise_()
         self.sales_dialog.activateWindow()
 
     def _selected_recent_sale_id(self) -> int | None:
-        selected_row = self.recent_sales_table.currentRow()
-        if selected_row < 0:
-            return None
-        sale_id_item = self.recent_sales_table.item(selected_row, 0)
-        if sale_id_item is None:
-            return None
-        try:
-            return int(sale_id_item.text())
-        except (TypeError, ValueError):
-            return None
+        return resolve_selected_recent_sale_id(self.recent_sales_table)
 
-    def _build_sale_ticket_text(self, sale: Venta) -> str:
-        try:
-            with get_session() as session:
-                settings = load_business_print_settings_snapshot(session)
-        except Exception:
-            settings = SimpleNamespace(
-                business_name="POS Uniformes",
-                business_phone="",
-                business_address="",
-                ticket_footer="Gracias por tu compra.",
-                preferred_printer="",
-                ticket_copies=1,
-            )
-        return build_sale_ticket_text(
-            sale=sale,
-            business_name=settings.business_name,
-            business_phone=settings.business_phone,
-            business_address=settings.business_address,
-            ticket_footer=settings.ticket_footer,
-            preferred_printer=settings.preferred_printer,
-            ticket_copies=settings.ticket_copies,
+    def _apply_recent_sale_action_state(self) -> None:
+        action_state = build_recent_sale_action_state(
+            has_selection=self._selected_recent_sale_id() is not None,
+            is_admin=self.current_role == RolUsuario.ADMIN,
         )
+        self.sale_ticket_button.setEnabled(action_state.ticket_enabled)
+        self.cancel_button.setEnabled(action_state.cancel_enabled)
 
     def _handle_view_sale_ticket(self) -> None:
         sale_id = self._selected_recent_sale_id()
-        if sale_id is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona una venta para ver su ticket.")
+        feedback = build_recent_sale_guard_feedback(
+            "view_ticket",
+            has_selection=sale_id is not None,
+            is_admin=self.current_role == RolUsuario.ADMIN,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
+        assert sale_id is not None
 
         try:
-            with get_session() as session:
-                sale = load_sale_for_ticket(session, sale_id)
-                ticket_text = self._build_sale_ticket_text(sale)
+            open_printable_document_flow(
+                parent=self,
+                session_factory=get_session,
+                build_document_view=lambda session: build_sale_ticket_document_view(session, sale_id=sale_id),
+                open_dialog=open_printable_text_dialog,
+            )
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Ticket no disponible", str(exc))
             return
-
-        open_printable_text_dialog(self, f"Ticket {sale_id}", ticket_text)
-
-    def _build_layaway_receipt_text(self, layaway: Apartado) -> str:
-        try:
-            with get_session() as session:
-                settings = load_business_print_settings_snapshot(
-                    session,
-                    default_ticket_footer="Gracias por tu preferencia.",
-                )
-        except Exception:
-            settings = SimpleNamespace(
-                business_name="POS Uniformes",
-                business_phone="",
-                business_address="",
-                ticket_footer="Gracias por tu preferencia.",
-                preferred_printer="",
-                ticket_copies=1,
-            )
-        return build_layaway_receipt_text(
-            layaway=layaway,
-            business_name=settings.business_name,
-            business_phone=settings.business_phone,
-            business_address=settings.business_address,
-            ticket_footer=settings.ticket_footer,
-            preferred_printer=settings.preferred_printer,
-            ticket_copies=settings.ticket_copies,
-        )
 
     def _handle_view_layaway_receipt(self) -> None:
         apartado_id = self._selected_layaway_id()
@@ -7073,14 +7172,15 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            with get_session() as session:
-                layaway = load_layaway_for_receipt(session, apartado_id)
-                receipt_text = self._build_layaway_receipt_text(layaway)
+            open_printable_document_flow(
+                parent=self,
+                session_factory=get_session,
+                build_document_view=lambda session: build_layaway_receipt_document_view(session, layaway_id=apartado_id),
+                open_dialog=open_printable_text_dialog,
+            )
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Comprobante no disponible", str(exc))
             return
-
-        open_printable_text_dialog(self, f"Apartado {apartado_id}", receipt_text)
 
     def _handle_view_layaway_sale_ticket(self) -> None:
         apartado_id = self._selected_layaway_id()
@@ -7089,14 +7189,15 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            with get_session() as session:
-                sale = load_sale_for_layaway_ticket(session, apartado_id)
-                ticket_text = self._build_sale_ticket_text(sale)
+            open_printable_document_flow(
+                parent=self,
+                session_factory=get_session,
+                build_document_view=lambda session: build_layaway_sale_ticket_document_view(session, layaway_id=apartado_id),
+                open_dialog=open_printable_text_dialog,
+            )
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Ticket no disponible", str(exc))
             return
-
-        open_printable_text_dialog(self, f"Ticket de entrega {apartado_id}", ticket_text)
 
     @staticmethod
     def _generate_sale_folio() -> str:
@@ -7147,6 +7248,26 @@ class MainWindow(QMainWindow):
         if self.sale_feedback_label.text() == "Listo para escanear.":
             return
         self._set_sale_feedback("Listo para escanear.", "neutral")
+
+    def _apply_sale_post_action_view(self, view: SalePostActionView) -> None:
+        if view.play_feedback_sound:
+            self._play_sale_feedback_sound()
+        if view.clear_sale_cart:
+            self.sale_cart.clear()
+            self._refresh_sale_cart_table()
+        if view.reset_sale_form:
+            self._reset_sale_form()
+        if view.refresh_all:
+            self.refresh_all()
+        if view.focus_sale_input:
+            self.sale_sku_input.setFocus()
+        self._set_sale_feedback(
+            view.feedback_message,
+            view.feedback_tone,
+            auto_clear_ms=view.feedback_auto_clear_ms,
+        )
+        if view.notice_title and view.notice_message:
+            QMessageBox.information(self, view.notice_title, view.notice_message)
 
     def _set_sale_processing(self, active: bool) -> None:
         self.sale_processing = active
@@ -7264,24 +7385,17 @@ class MainWindow(QMainWindow):
         )
 
     def _sale_discount_presets(self) -> list[Decimal]:
-        default_values = [
-            Decimal("5.00"),
-            Decimal("10.00"),
-            Decimal("15.00"),
-            Decimal("20.00"),
-        ]
         try:
             with get_session() as session:
-                config = BusinessSettingsService.get_or_create(session)
-                values = [
-                    self._normalize_discount_value(config.discount_basico),
-                    self._normalize_discount_value(config.discount_leal),
-                    self._normalize_discount_value(config.discount_profesor),
-                    self._normalize_discount_value(config.discount_mayorista),
-                ]
+                return load_sale_discount_presets(
+                    session,
+                    normalize_discount_value=self._normalize_discount_value,
+                )
         except Exception:
-            values = default_values
-        return sorted({value for value in values if value > Decimal("0.00")})
+            return load_sale_discount_presets(
+                None,
+                normalize_discount_value=self._normalize_discount_value,
+            )
 
     def _refresh_sale_discount_options(self, *, selected_discount: Decimal | int | float | str | None = None) -> None:
         current_discount = (
@@ -7333,12 +7447,12 @@ class MainWindow(QMainWindow):
         self.sale_discount_combo.blockSignals(previous_state)
 
     def _clear_sale_manual_promo_authorization(self) -> None:
-        state = clear_manual_promo_state()
+        state = clear_sale_manual_promo_snapshot()
         self.sale_manual_promo_authorized = state.authorized
         self.sale_manual_promo_authorized_percent = state.authorized_percent
 
     def _sale_manual_promo_state(self):
-        return build_manual_promo_state(
+        return build_sale_manual_promo_snapshot(
             authorized=self.sale_manual_promo_authorized,
             authorized_percent=self.sale_manual_promo_authorized_percent,
         )
@@ -7358,10 +7472,14 @@ class MainWindow(QMainWindow):
         self.sale_discount_combo.setToolTip(ui_state.lock_tooltip)
 
     def _current_manual_promo_percent(self) -> Decimal:
-        return current_manual_promo_percent(
-            selected_percent=self.sale_discount_combo.currentData(),
-            state=self._sale_manual_promo_state(),
-        )
+        return build_sale_discount_context(
+            locked_to_client=self.sale_discount_locked_to_client,
+            locked_discount_percent=self.sale_locked_discount_percent,
+            locked_source_label=self.sale_locked_discount_source,
+            selected_discount_percent=self.sale_discount_combo.currentData(),
+            manual_promo_authorized=self.sale_manual_promo_authorized,
+            manual_promo_authorized_percent=self.sale_manual_promo_authorized_percent,
+        ).promo_discount
 
     def _prompt_manual_promo_authorization(self, promo_percent: Decimal) -> bool:
         code, accepted = QInputDialog.getText(
@@ -7377,8 +7495,7 @@ class MainWindow(QMainWindow):
             return False
         try:
             with get_session() as session:
-                if not ManualPromoService.verify_authorization_code(session, code):
-                    raise ValueError("Codigo invalido.")
+                verify_sale_manual_promo_code(session, code)
                 session.commit()
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Codigo invalido", str(exc))
@@ -7386,19 +7503,12 @@ class MainWindow(QMainWindow):
         return True
 
     def _handle_sale_discount_changed(self) -> None:
-        decision = decide_manual_promo_change(
+        transition = resolve_sale_manual_discount_transition(
             selected_percent=self.sale_discount_combo.currentData(),
-            state=self._sale_manual_promo_state(),
-        )
-        authorization_granted = (
-            self._prompt_manual_promo_authorization(decision.selected_percent)
-            if decision.action == "authorize"
-            else False
-        )
-        transition = resolve_manual_promo_transition(
-            decision=decision,
-            authorization_granted=authorization_granted,
+            authorized=self.sale_manual_promo_authorized,
+            authorized_percent=self.sale_manual_promo_authorized_percent,
             format_discount_label=self._format_discount_label,
+            authorize_manual_promo=self._prompt_manual_promo_authorization,
         )
         self._apply_sale_manual_promo_state(transition.next_state)
         self._set_sale_discount_combo_percent(transition.combo_percent)
@@ -7413,70 +7523,79 @@ class MainWindow(QMainWindow):
     def _sync_sale_discount_with_selected_client(self, *, reset_manual: bool = False) -> None:
         try:
             with get_session() as session:
-                state = resolve_sale_selected_client_sync_state(
+                ui_state = resolve_sale_client_discount_ui_state(
                     session,
                     selected_client_id=self.sale_client_combo.currentData(),
+                    reset_manual=reset_manual,
                     normalize_discount_value=self._normalize_discount_value,
+                    format_discount_label=self._format_discount_label,
                 )
         except Exception:
-            state = resolve_sale_selected_client_sync_state(
+            ui_state = resolve_sale_client_discount_ui_state(
                 None,
                 selected_client_id=None,
-                normalize_discount_value=self._normalize_discount_value,
-            )
-        self._apply_sale_client_selection_ui_state(
-            build_sale_client_selection_ui_state(
-                sync_state=state,
                 reset_manual=reset_manual,
                 normalize_discount_value=self._normalize_discount_value,
                 format_discount_label=self._format_discount_label,
             )
-        )
+        self._apply_sale_client_selection_ui_state(ui_state)
         self._refresh_sale_cart_table()
 
     def _handle_sale_client_changed(self) -> None:
         self._sync_sale_discount_with_selected_client(reset_manual=True)
 
     def _effective_sale_discount_percent(self) -> Decimal:
-        loyalty_discount = self.sale_locked_discount_percent if self.sale_discount_locked_to_client else Decimal("0.00")
-        promo_discount = self._current_manual_promo_percent()
-        return effective_sale_discount_percent(
-            loyalty_discount=loyalty_discount,
-            promo_discount=promo_discount,
-        )
+        return build_sale_discount_context(
+            locked_to_client=self.sale_discount_locked_to_client,
+            locked_discount_percent=self.sale_locked_discount_percent,
+            locked_source_label=self.sale_locked_discount_source,
+            selected_discount_percent=self.sale_discount_combo.currentData(),
+            manual_promo_authorized=self.sale_manual_promo_authorized,
+            manual_promo_authorized_percent=self.sale_manual_promo_authorized_percent,
+        ).effective_discount
 
     def _sale_discount_breakdown(self) -> dict[str, object]:
-        loyalty_discount = self.sale_locked_discount_percent if self.sale_discount_locked_to_client else Decimal("0.00")
-        promo_discount = self._current_manual_promo_percent()
-        return build_sale_discount_breakdown(
-            loyalty_discount=loyalty_discount,
-            promo_discount=promo_discount,
-            loyalty_source=self.sale_locked_discount_source or "Cliente",
-        )
+        return build_sale_discount_context(
+            locked_to_client=self.sale_discount_locked_to_client,
+            locked_discount_percent=self.sale_locked_discount_percent,
+            locked_source_label=self.sale_locked_discount_source,
+            selected_discount_percent=self.sale_discount_combo.currentData(),
+            manual_promo_authorized=self.sale_manual_promo_authorized,
+            manual_promo_authorized_percent=self.sale_manual_promo_authorized_percent,
+        ).breakdown
 
     def _calculate_sale_totals(self) -> tuple[Decimal, Decimal, Decimal, Decimal]:
-        loyalty_discount = self.sale_locked_discount_percent if self.sale_discount_locked_to_client else Decimal("0.00")
-        promo_discount = self._current_manual_promo_percent()
-        return calculate_sale_totals(
+        return calculate_sale_discount_totals(
             self.sale_cart,
-            loyalty_discount=loyalty_discount,
-            promo_discount=promo_discount,
+            locked_to_client=self.sale_discount_locked_to_client,
+            locked_discount_percent=self.sale_locked_discount_percent,
+            selected_discount_percent=self.sale_discount_combo.currentData(),
+            manual_promo_authorized=self.sale_manual_promo_authorized,
+            manual_promo_authorized_percent=self.sale_manual_promo_authorized_percent,
         )
 
     def _calculate_sale_pricing(self):
-        loyalty_discount = self.sale_locked_discount_percent if self.sale_discount_locked_to_client else Decimal("0.00")
-        promo_discount = self._current_manual_promo_percent()
-        return calculate_sale_pricing(
+        return calculate_sale_discount_pricing(
             self.sale_cart,
-            loyalty_discount=loyalty_discount,
-            promo_discount=promo_discount,
+            locked_to_client=self.sale_discount_locked_to_client,
+            locked_discount_percent=self.sale_locked_discount_percent,
+            selected_discount_percent=self.sale_discount_combo.currentData(),
+            manual_promo_authorized=self.sale_manual_promo_authorized,
+            manual_promo_authorized_percent=self.sale_manual_promo_authorized_percent,
         )
 
     def _refresh_payment_fields(self) -> None:
-        payment_method = self.sale_payment_combo.currentText() or "Efectivo"
-        self.sale_feedback_label.setToolTip(
-            f"El cobro se completara en una ventana aparte para {payment_method.lower()}."
+        panel_view = build_sale_cashier_panel_view(
+            sale_cart=self.sale_cart,
+            subtotal=Decimal("0.00"),
+            applied_discount=Decimal("0.00"),
+            rounding_adjustment=Decimal("0.00"),
+            collected_total=Decimal("0.00"),
+            payment_method=self.sale_payment_combo.currentText(),
+            winner_label="",
+            can_sell=self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO},
         )
+        self.sale_feedback_label.setToolTip(panel_view.payment_tooltip)
 
     def _handle_add_sale_item(self) -> None:
         if self.current_role not in {RolUsuario.ADMIN, RolUsuario.CAJERO}:
@@ -7600,8 +7719,12 @@ class MainWindow(QMainWindow):
         }
 
     def _handle_create_quote_client(self) -> None:
-        if self.current_role not in {RolUsuario.ADMIN, RolUsuario.CAJERO}:
-            QMessageBox.warning(self, "Sin permisos", "Tu usuario no puede crear clientes desde Presupuestos.")
+        feedback = build_quote_guard_feedback(
+            "create_client",
+            can_operate=self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO},
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
         data = self._prompt_quick_quote_client_data()
         if data is None:
@@ -7646,8 +7769,12 @@ class MainWindow(QMainWindow):
         )
 
     def _handle_add_quote_item(self) -> None:
-        if self.current_role not in {RolUsuario.ADMIN, RolUsuario.CAJERO}:
-            QMessageBox.warning(self, "Sin permisos", "Tu usuario no puede crear presupuestos.")
+        feedback = build_quote_guard_feedback(
+            "add_item",
+            can_operate=self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO},
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
 
         sku = self.quote_sku_input.text().strip().upper()
@@ -7685,8 +7812,12 @@ class MainWindow(QMainWindow):
 
     def _handle_remove_quote_item(self) -> None:
         selected_row = self.quote_cart_table.currentRow()
-        if selected_row < 0 or selected_row >= len(self.quote_cart):
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona una linea del presupuesto.")
+        feedback = build_quote_guard_feedback(
+            "remove_item",
+            has_selection=0 <= selected_row < len(self.quote_cart),
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
         self.quote_cart.pop(selected_row)
         self._refresh_quote_cart_table()
@@ -7697,14 +7828,19 @@ class MainWindow(QMainWindow):
         self._reset_quote_form()
 
     def _handle_save_quote(self) -> None:
-        if self.current_role not in {RolUsuario.ADMIN, RolUsuario.CAJERO}:
-            QMessageBox.warning(self, "Sin permisos", "Tu usuario no puede crear presupuestos.")
+        feedback = build_quote_guard_feedback(
+            "save_quote",
+            can_operate=self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO},
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
         if not self.quote_cart:
             if self.quote_sku_input.text().strip():
                 self._handle_add_quote_item()
-            if not self.quote_cart:
-                QMessageBox.warning(self, "Presupuesto vacio", "Agrega al menos una linea al presupuesto.")
+            feedback = build_quote_guard_feedback("save_quote", has_items=bool(self.quote_cart))
+            if feedback is not None:
+                QMessageBox.warning(self, feedback.title, feedback.message)
                 return
 
         selected_client = self.quote_client_combo.currentData()
@@ -7744,21 +7880,23 @@ class MainWindow(QMainWindow):
         self._refresh_quote_cart_table()
         self._reset_quote_form()
         self.refresh_all()
-        QMessageBox.information(self, "Presupuesto guardado", f"Presupuesto {presupuesto_folio} registrado correctamente.")
+        result_view = build_quote_result_feedback("save_quote", item_label=presupuesto_folio)
+        QMessageBox.information(self, result_view.title, result_view.message)
 
     def _selected_quote_id(self) -> int | None:
-        selected_row = self.quote_table.currentRow()
-        if selected_row < 0:
-            return None
-        item = self.quote_table.item(selected_row, 0)
-        if item is None:
-            return None
-        quote_id = item.data(Qt.ItemDataRole.UserRole)
-        return int(quote_id) if quote_id is not None else None
+        return resolve_selected_quote_id(self.quote_table)
 
     def _handle_quote_selection(self) -> None:
         self._refresh_quote_detail(self._selected_quote_id())
+        self._apply_quote_action_state()
         self._refresh_permissions()
+
+    def _apply_quote_action_state(self) -> None:
+        action_state = build_quote_action_state(
+            can_sell=self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO},
+            has_selection=self._selected_quote_id() is not None,
+        )
+        self.quote_cancel_button.setEnabled(action_state.cancel_enabled)
 
     def _handle_quote_filters_changed(self) -> None:
         try:
@@ -7769,9 +7907,11 @@ class MainWindow(QMainWindow):
 
     def _handle_cancel_quote(self) -> None:
         quote_id = self._selected_quote_id()
-        if quote_id is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona un presupuesto para cancelarlo.")
+        feedback = build_quote_guard_feedback("cancel_quote", has_selection=quote_id is not None)
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
+        assert quote_id is not None
         if QMessageBox.question(
             self,
             "Cancelar presupuesto",
@@ -7780,22 +7920,14 @@ class MainWindow(QMainWindow):
             return
         try:
             with get_session() as session:
-                presupuesto = PresupuestoService.obtener_presupuesto(session, quote_id)
-                usuario = session.get(Usuario, self.user_id)
-                if presupuesto is None or usuario is None:
-                    raise ValueError("No se pudo cargar el presupuesto seleccionado.")
-                PresupuestoService.cancelar_presupuesto(
-                    session=session,
-                    presupuesto=presupuesto,
-                    usuario=usuario,
-                    observacion=f"Cancelado desde interfaz por {usuario.username}.",
-                )
+                cancel_quote(session, quote_id=quote_id, user_id=self.user_id)
                 session.commit()
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "No se pudo cancelar", str(exc))
             return
         self.refresh_all()
-        QMessageBox.information(self, "Presupuesto cancelado", "El presupuesto se marco como cancelado.")
+        result_view = build_quote_result_feedback("cancel_quote")
+        QMessageBox.information(self, result_view.title, result_view.message)
 
     def _handle_sale(self) -> None:
         if self.sale_processing:
@@ -7823,8 +7955,6 @@ class MainWindow(QMainWindow):
         payment_method = self.sale_payment_combo.currentText().strip() or "Efectivo"
         selected_client_id = self.sale_client_combo.currentData()
         breakdown = self._sale_discount_breakdown()
-        loyalty_discount = self._normalize_discount_value(breakdown["loyalty_discount"])
-        promo_discount = self._normalize_discount_value(breakdown["promo_discount"])
         payment_details = collect_sale_payment_details(
             self,
             payment_method=payment_method,
@@ -7832,117 +7962,75 @@ class MainWindow(QMainWindow):
         )
         if payment_details is None:
             return
-        sale_note_parts = build_sale_note_parts(
+        payment_context = build_sale_payment_note_context(
             payment_method=payment_method,
             discount_percent=discount_percent,
             applied_discount=applied_discount,
             rounding_adjustment=rounding_adjustment,
             breakdown=breakdown,
             format_discount_label=self._format_discount_label,
-            extra_notes=list(payment_details.note_lines),
+            payment_details=payment_details,
         )
-        loyalty_transition_notice = ""
 
         self._set_sale_processing(True)
         try:
             with get_session() as session:
-                usuario = session.get(Usuario, self.user_id)
-                if usuario is None:
-                    raise ValueError("Usuario no encontrado.")
-                client_snapshot = load_sale_client_checkout_snapshot(
+                result = complete_sale_checkout(
                     session,
-                    selected_client_id=selected_client_id,
-                )
-                cliente = client_snapshot.client
-                venta = VentaService.crear_borrador(
-                    session=session,
-                    usuario=usuario,
+                    user_id=self.user_id,
                     folio=folio,
-                    items=[
-                        VentaItemInput(sku=str(item["sku"]), cantidad=int(item["cantidad"]))
-                        for item in self.sale_cart
-                    ],
-                    observacion=" | ".join(sale_note_parts),
-                    cliente=cliente,
-                )
-                venta.subtotal = subtotal
-                venta.descuento_porcentaje = discount_percent
-                venta.descuento_monto = applied_discount
-                venta.total = total
-                VentaService.confirmar_venta(session, venta)
-                if promo_discount > Decimal("0.00"):
-                    ManualPromoService.log_authorized_promo(
-                        session,
-                        venta=venta,
-                        actor_user=usuario,
-                        cliente=cliente,
-                        loyalty_percent=loyalty_discount,
-                        promo_percent=promo_discount,
-                        applied_percent=discount_percent,
-                        applied_source=str(breakdown["winner_source"]),
-                        note="Promocion manual autorizada con codigo en caja.",
-                    )
-                loyalty_transition_notice = resolve_sale_loyalty_transition_notice(
-                    client_snapshot,
+                    sale_cart=self.sale_cart,
+                    subtotal=subtotal,
+                    discount_percent=discount_percent,
+                    applied_discount=applied_discount,
+                    total=total,
+                    selected_client_id=selected_client_id,
+                    breakdown=breakdown,
+                    payment_method=payment_context.payment_method,
+                    note_parts=list(payment_context.note_parts),
                     build_notice=self._build_sale_loyalty_transition_notice,
                 )
                 session.commit()
         except Exception as exc:  # noqa: BLE001
             self._set_sale_processing(False)
-            message = str(exc)
-            if "Stock insuficiente" in message:
-                message = "Uno de los productos ya no tiene stock suficiente. Revisa el carrito y vuelve a intentar."
-            QMessageBox.critical(self, "Venta no completada", message)
+            QMessageBox.critical(
+                self,
+                "Venta no completada",
+                build_sale_checkout_error_message(str(exc)),
+            )
             return
         finally:
             self._set_sale_processing(False)
 
-        self._play_sale_feedback_sound()
-        self.sale_cart.clear()
-        self._refresh_sale_cart_table()
-        self._reset_sale_form()
-        self.refresh_all()
-        self.sale_sku_input.setFocus()
-        self._set_sale_feedback(
-            f"Venta {folio} registrada. Total cobrado: {total} via {payment_method}.",
-            "positive",
-            auto_clear_ms=2200,
+        post_action_view = build_sale_checkout_post_action_view(
+            folio=result.folio,
+            total=result.total,
+            payment_method=result.payment_method,
+            loyalty_transition_notice=result.loyalty_transition_notice,
         )
-        if loyalty_transition_notice:
-            QMessageBox.information(
-                self,
-                "Nivel actualizado para siguiente compra",
-                loyalty_transition_notice,
-            )
+        self._apply_sale_post_action_view(post_action_view)
 
     def _handle_cancel_sale(self) -> None:
         sale_id = self._selected_recent_sale_id()
-        if sale_id is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona una venta en la tabla.")
+        feedback = build_recent_sale_guard_feedback(
+            "cancel_sale",
+            has_selection=sale_id is not None,
+            is_admin=self.current_role == RolUsuario.ADMIN,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
             return
-        if self.current_role != RolUsuario.ADMIN:
-            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede cancelar ventas.")
-            return
+        assert sale_id is not None
 
         try:
             with get_session() as session:
-                venta = session.get(Venta, sale_id)
-                admin = session.get(Usuario, self.user_id)
-                if venta is None or admin is None:
-                    raise ValueError("Venta o usuario ADMIN no encontrado.")
-                VentaService.cancelar_venta(
-                    session=session,
-                    venta=venta,
-                    admin_usuario=admin,
-                    observacion="Cancelacion desde interfaz POS.",
-                )
+                cancel_recent_sale(session, sale_id=sale_id, admin_user_id=self.user_id)
                 session.commit()
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Cancelacion fallida", str(exc))
             return
 
-        self.refresh_all()
-        self._set_sale_feedback("Venta cancelada correctamente.", "warning", auto_clear_ms=1800)
+        self._apply_sale_post_action_view(build_sale_cancel_post_action_view())
 
     def _handle_inventory_adjustment(self) -> None:
         if self.current_role != RolUsuario.ADMIN:
@@ -8316,7 +8404,6 @@ class MainWindow(QMainWindow):
         self.quote_save_button.setEnabled(can_sell)
         self.quote_remove_button.setEnabled(can_sell and bool(self.quote_cart))
         self.quote_clear_button.setEnabled(can_sell and bool(self.quote_cart))
-        self.quote_cancel_button.setEnabled(can_sell and self._selected_quote_id() is not None)
         self.quote_refresh_button.setEnabled(can_sell)
         if self.header_more_button is not None:
             self.header_more_button.setVisible(is_admin)
@@ -8324,24 +8411,31 @@ class MainWindow(QMainWindow):
             self.connection_action.setEnabled(is_admin)
         if self.seed_action is not None:
             self.seed_action.setEnabled(is_admin)
-        self.cancel_button.setEnabled(is_admin)
         self.inventory_adjust_button.setEnabled(is_admin)
-        self.layaway_create_button.setEnabled(can_manage_layaways and can_operate_open_cash)
-        self.layaway_payment_button.setEnabled(can_manage_layaways and can_operate_open_cash)
-        self.layaway_deliver_button.setEnabled(can_manage_layaways and can_operate_open_cash)
-        self.layaway_cancel_button.setEnabled(is_admin)
-        self.layaway_receipt_button.setEnabled(can_manage_layaways)
-        self.layaway_sale_ticket_button.setEnabled(can_manage_layaways and self._selected_layaway_id() is not None)
-        self.layaway_whatsapp_button.setEnabled(can_manage_layaways and self._selected_layaway_id() is not None)
-        self.sale_layaway_button.setEnabled(can_manage_layaways and can_operate_open_cash and bool(self.sale_cart))
-        self.sale_layaway_button.setVisible(can_manage_layaways)
+        layaway_action_state = build_layaway_action_state(
+            can_manage_layaways=can_manage_layaways,
+            can_operate_open_cash=can_operate_open_cash,
+            is_admin=is_admin,
+            has_selected_layaway=self._selected_layaway_id() is not None,
+            has_sale_cart=bool(self.sale_cart),
+        )
+        self.layaway_create_button.setEnabled(layaway_action_state.create_enabled)
+        self.layaway_payment_button.setEnabled(layaway_action_state.payment_enabled)
+        self.layaway_deliver_button.setEnabled(layaway_action_state.deliver_enabled)
+        self.layaway_cancel_button.setEnabled(layaway_action_state.cancel_enabled)
+        self.layaway_receipt_button.setEnabled(layaway_action_state.receipt_enabled)
+        self.layaway_sale_ticket_button.setEnabled(layaway_action_state.sale_ticket_enabled)
+        self.layaway_whatsapp_button.setEnabled(layaway_action_state.whatsapp_enabled)
+        self.sale_layaway_button.setEnabled(layaway_action_state.convert_sale_enabled)
+        self.sale_layaway_button.setVisible(layaway_action_state.convert_sale_visible)
         self.cash_cut_button.setEnabled(can_sell)
         self.cash_movement_button.setEnabled(can_sell and has_cash_session)
         self.logout_button.setEnabled(True)
         self.sale_add_button.setEnabled(can_sell and can_operate_open_cash)
         self.sale_button.setEnabled(can_sell and can_operate_open_cash)
         self.sale_recent_button.setEnabled(True)
-        self.sale_ticket_button.setEnabled(True)
+        self._apply_quote_action_state()
+        self._apply_recent_sale_action_state()
         self.sale_remove_button.setEnabled(can_sell and can_operate_open_cash and bool(self.sale_cart))
         self.sale_clear_button.setEnabled(can_sell and can_operate_open_cash and bool(self.sale_cart))
         self.sale_layaway_button.setEnabled(can_manage_layaways and can_operate_open_cash and bool(self.sale_cart))
@@ -8409,9 +8503,7 @@ class MainWindow(QMainWindow):
         self.purchase_permission_label.setText(
             "" if is_admin else "Compras y carga de datos demo disponibles solo para ADMIN."
         )
-        self.cancel_permission_label.setText(
-            "" if is_admin else "La cancelacion de ventas esta restringida a ADMIN."
-        )
+        self.cancel_permission_label.setText(build_recent_sale_permission_label(is_admin=is_admin))
         self.inventory_permission_label.setText(
             "" if is_admin else "Las altas, entradas, conteos, ajustes, cambios de precio y eliminacion estan restringidos a ADMIN."
         )
@@ -8436,30 +8528,7 @@ class MainWindow(QMainWindow):
             select(func.coalesce(func.sum(Compra.total), 0)).where(Compra.estado == EstadoCompra.CONFIRMADA)
         ) or Decimal("0.00")
         stock_bajo = session.scalar(select(func.count(Variante.id)).where(Variante.stock_actual <= 3)) or 0
-        hoy = date.today()
-        semana = hoy + timedelta(days=7)
-        apartados_vencidos = session.scalar(
-            select(func.count(Apartado.id)).where(
-                Apartado.estado.in_([EstadoApartado.ACTIVO, EstadoApartado.LIQUIDADO]),
-                Apartado.fecha_compromiso.is_not(None),
-                func.date(Apartado.fecha_compromiso) < hoy,
-            )
-        ) or 0
-        apartados_hoy = session.scalar(
-            select(func.count(Apartado.id)).where(
-                Apartado.estado.in_([EstadoApartado.ACTIVO, EstadoApartado.LIQUIDADO]),
-                Apartado.fecha_compromiso.is_not(None),
-                func.date(Apartado.fecha_compromiso) == hoy,
-            )
-        ) or 0
-        apartados_semana = session.scalar(
-            select(func.count(Apartado.id)).where(
-                Apartado.estado.in_([EstadoApartado.ACTIVO, EstadoApartado.LIQUIDADO]),
-                Apartado.fecha_compromiso.is_not(None),
-                func.date(Apartado.fecha_compromiso) > hoy,
-                func.date(Apartado.fecha_compromiso) <= semana,
-            )
-        ) or 0
+        layaway_alerts_snapshot = load_layaway_alerts_snapshot(session, today=date.today())
         manual_promo_summary = ManualPromoService.summarize_today(session, limit=4)
 
         is_admin = self.current_role == RolUsuario.ADMIN
@@ -8503,9 +8572,9 @@ class MainWindow(QMainWindow):
             )
         )
         layaway_alerts_view = build_layaway_alerts_view(
-            overdue_count=apartados_vencidos,
-            due_today_count=apartados_hoy,
-            due_week_count=apartados_semana,
+            overdue_count=layaway_alerts_snapshot.overdue_count,
+            due_today_count=layaway_alerts_snapshot.due_today_count,
+            due_week_count=layaway_alerts_snapshot.due_week_count,
         )
         self.layaway_alerts_label.setTextFormat(Qt.TextFormat.RichText)
         self.layaway_alerts_label.setText(layaway_alerts_view.alerts_rich_text)
@@ -8537,61 +8606,7 @@ class MainWindow(QMainWindow):
         if 0 <= selected_row < len(self.catalog_rows):
             selected_variant_id = int(self.catalog_rows[selected_row]["variante_id"])
 
-        layaway_reserved_subquery = (
-            select(
-                ApartadoDetalle.variante_id.label("variante_id"),
-                func.coalesce(func.sum(ApartadoDetalle.cantidad), 0).label("apartado_cantidad"),
-            )
-            .join(ApartadoDetalle.apartado)
-            .where(Apartado.estado.in_([EstadoApartado.ACTIVO, EstadoApartado.LIQUIDADO]))
-            .group_by(ApartadoDetalle.variante_id)
-            .subquery()
-        )
-
-        rows = session.execute(
-            select(
-                Variante.id,
-                Producto.id,
-                Categoria.id,
-                Marca.id,
-                Escuela.id,
-                Variante.sku,
-                Categoria.nombre,
-                Marca.nombre,
-                Escuela.nombre,
-                TipoPrenda.nombre,
-                TipoPieza.nombre,
-                Producto.nombre,
-                Producto.nombre_base,
-                Producto.descripcion,
-                Variante.nombre_legacy,
-                Variante.origen_legacy,
-                Variante.talla,
-                Variante.color,
-                Variante.precio_venta,
-                Variante.costo_referencia,
-                Variante.stock_actual,
-                func.coalesce(layaway_reserved_subquery.c.apartado_cantidad, 0),
-                Producto.activo,
-                Variante.activo,
-                func.coalesce(ImportacionCatalogoFila.producto_fallback, False),
-            )
-            .join(Variante.producto)
-            .join(Producto.categoria)
-            .join(Producto.marca)
-            .outerjoin(Producto.escuela)
-            .outerjoin(Producto.tipo_prenda)
-            .outerjoin(Producto.tipo_pieza)
-            .outerjoin(ImportacionCatalogoFila, ImportacionCatalogoFila.variante_id == Variante.id)
-            .outerjoin(layaway_reserved_subquery, layaway_reserved_subquery.c.variante_id == Variante.id)
-            .order_by(
-                Categoria.nombre.asc(),
-                Escuela.nombre.asc().nullslast(),
-                Marca.nombre.asc(),
-                Producto.nombre.asc(),
-                Variante.sku.asc(),
-            )
-        ).all()
+        catalog_snapshot_rows = load_catalog_snapshot_rows(session)
 
         search_text = self.catalog_search_input.text().strip()
         category_filters = self.catalog_category_filter_combo.selected_values()
@@ -8607,108 +8622,38 @@ class MainWindow(QMainWindow):
         origin_filter = str(self.catalog_origin_filter_combo.currentData() or "")
         duplicate_filter = str(self.catalog_duplicate_filter_combo.currentData() or "")
 
-        catalog_snapshot_rows = [
-            {
-                "variante_id": row[0],
-                "producto_id": row[1],
-                "categoria_id": row[2],
-                "marca_id": row[3],
-                "escuela_id": row[4],
-                "sku": row[5],
-                "categoria_nombre": row[6],
-                "marca_nombre": row[7],
-                "escuela_nombre": row[8] or "General",
-                "tipo_prenda_nombre": row[9] or "-",
-                "tipo_pieza_nombre": row[10] or "-",
-                "producto_nombre": sanitize_product_display_name(row[11]),
-                "producto_nombre_base": row[12],
-                "producto_descripcion": row[13],
-                "nombre_legacy": row[14],
-                "origen_legacy": bool(row[15]),
-                "talla": row[16],
-                "color": row[17],
-                "precio_venta": row[18],
-                "costo_referencia": row[19],
-                "stock_actual": row[20],
-                "apartado_cantidad": row[21],
-                "producto_activo": row[22],
-                "variante_activo": row[23],
-                "producto_estado": "ACTIVO" if row[22] else "INACTIVO",
-                "variante_estado": "ACTIVA" if row[23] else "INACTIVA",
-                "origen_etiqueta": "LEGACY" if row[15] else "NUEVO",
-                "fallback_importacion": bool(row[24]),
-                "fallback_text": "fallback" if bool(row[24]) else "",
-            }
-            for row in rows
-        ]
         apply_search_suggestions(
             self.catalog_search_input,
             build_catalog_search_suggestions(catalog_snapshot_rows, search_text=search_text),
         )
-        self.catalog_rows = [
-            row
-            for row in catalog_snapshot_rows
-            if (
-                self._catalog_row_matches_search(row, search_text)
-                and (not category_filters or str(row["categoria_nombre"] or "") in category_filters)
-                and (not brand_filters or str(row["marca_nombre"] or "") in brand_filters)
-                and (not school_filters or str(row["escuela_nombre"] or "General") in school_filters)
-                and (not type_filters or str(row["tipo_prenda_nombre"] or "-") in type_filters)
-                and (not piece_filters or str(row["tipo_pieza_nombre"] or "-") in piece_filters)
-                and (not size_filters or str(row["talla"] or "") in size_filters)
-                and (not color_filters or str(row["color"] or "") in color_filters)
-                and (
-                    not status_filter
-                    or (status_filter == "active" and bool(row["variante_activo"]))
-                    or (status_filter == "inactive" and not bool(row["variante_activo"]))
-                )
-                and (
-                    not stock_filter
-                    or (stock_filter == "in_stock" and int(row["stock_actual"]) > 0)
-                    or (stock_filter == "out_of_stock" and int(row["stock_actual"]) == 0)
-                    or (stock_filter == "low_stock" and 0 < int(row["stock_actual"]) <= 3)
-                    or (stock_filter == "available_over_reserved" and int(row["stock_actual"]) > int(row["apartado_cantidad"]))
-                )
-                and (
-                    not catalog_filter
-                    or (catalog_filter == "reserved" and int(row["apartado_cantidad"]) > 0)
-                    or (catalog_filter == "free" and int(row["apartado_cantidad"]) == 0)
-                )
-                and (
-                    not origin_filter
-                    or (origin_filter == "legacy" and bool(row["origen_legacy"]))
-                    or (origin_filter == "native" and not bool(row["origen_legacy"]))
-                )
-                and (
-                    not duplicate_filter
-                    or (duplicate_filter == "fallback_only" and bool(row["fallback_importacion"]))
-                    or (duplicate_filter == "fallback_exclude" and not bool(row["fallback_importacion"]))
-                )
-            )
-        ]
+        self.catalog_rows = filter_visible_catalog_rows(
+            catalog_snapshot_rows,
+            filters=CatalogVisibleFilterState(
+                search_text=search_text,
+                category_filters=tuple(category_filters),
+                brand_filters=tuple(brand_filters),
+                school_filters=tuple(school_filters),
+                type_filters=tuple(type_filters),
+                piece_filters=tuple(piece_filters),
+                size_filters=tuple(size_filters),
+                color_filters=tuple(color_filters),
+                status_filter=status_filter,
+                stock_filter=stock_filter,
+                layaway_filter=catalog_filter,
+                origin_filter=origin_filter,
+                duplicate_filter=duplicate_filter,
+            ),
+            search_matcher=self._catalog_row_matches_search,
+        )
 
         self.catalog_table.setRowCount(len(self.catalog_rows))
-        for row_index, row in enumerate(self.catalog_rows):
-            values = [
-                row["sku"],
-                row["escuela_nombre"],
-                row["tipo_prenda_nombre"],
-                row["tipo_pieza_nombre"],
-                row["marca_nombre"],
-                row["producto_nombre_base"],
-                row["talla"],
-                row["color"],
-                row["precio_venta"],
-                row["stock_actual"],
-                row["apartado_cantidad"],
-                row["variante_estado"],
-            ]
+        for row_index, values in enumerate(build_catalog_table_values(self.catalog_rows)):
             for column_index, value in enumerate(values):
                 self.catalog_table.setItem(row_index, column_index, _table_item(value))
         self.catalog_table.resizeColumnsToContents()
         active_filter_labels = self._catalog_active_filter_labels()
         catalog_summary_view = build_catalog_summary_view(
-            total_rows=len(rows),
+            total_rows=len(catalog_snapshot_rows),
             visible_rows=self.catalog_rows,
             active_filter_labels=active_filter_labels,
         )
@@ -8953,41 +8898,20 @@ class MainWindow(QMainWindow):
         self._refresh_selected_qr_preview()
 
     def _refresh_sales_table(self, session) -> None:
-        rows = list_recent_sale_rows(session, limit=20)
-        self.recent_sales_table.setRowCount(len(rows))
-        for row_index, row in enumerate(rows):
-            for column_index, value in enumerate(row.values):
+        row_views = build_recent_sale_table_row_views(list_recent_sale_rows(session, limit=20))
+        self.recent_sales_table.setRowCount(len(row_views))
+        for row_index, row_view in enumerate(row_views):
+            for column_index, value in enumerate(row_view.values):
                 self.recent_sales_table.setItem(row_index, column_index, _table_item(value))
         self.recent_sales_table.resizeColumnsToContents()
+        self._apply_recent_sale_action_state()
         self._refresh_sale_cart_table()
 
     def _refresh_quotes(self, session) -> None:
         selected_quote_id = self._selected_quote_id()
         search_text = self.quote_search_input.text().strip().lower()
         state_filter = str(self.quote_state_combo.currentData() or "")
-        presupuestos = PresupuestoService.listar_presupuestos(session, limit=200)
-        quote_snapshots = [
-            {
-                "id": int(presupuesto.id),
-                "folio": presupuesto.folio,
-                "cliente": presupuesto.cliente_nombre
-                or (presupuesto.cliente.nombre if presupuesto.cliente else "Mostrador / sin cliente"),
-                "estado": presupuesto.estado.value,
-                "total": Decimal(presupuesto.total),
-                "usuario": presupuesto.usuario.username if presupuesto.usuario else "",
-                "vigencia": presupuesto.vigencia_hasta.strftime("%Y-%m-%d") if presupuesto.vigencia_hasta else "Sin vigencia",
-                "fecha": presupuesto.created_at.strftime("%Y-%m-%d %H:%M") if presupuesto.created_at else "",
-                "searchable": " ".join(
-                    [
-                        presupuesto.folio,
-                        presupuesto.cliente_nombre or "",
-                        presupuesto.cliente_telefono or "",
-                        " ".join(detalle.sku_snapshot for detalle in presupuesto.detalles),
-                    ]
-                ),
-            }
-            for presupuesto in presupuestos
-        ]
+        quote_snapshots = build_quote_history_input_rows(load_quote_snapshot_rows(session, limit=200))
         rows = build_quote_history_rows(
             quote_snapshots=quote_snapshots,
             search_text=search_text,
@@ -9001,28 +8925,21 @@ class MainWindow(QMainWindow):
         )
 
         self.quote_rows = rows
-        self.quote_table.setRowCount(len(rows))
-        for row_index, row in enumerate(rows):
-            values = [
-                row["folio"],
-                row["cliente"],
-                row["estado"],
-                row["total"],
-                row["usuario"],
-                row["vigencia"],
-                row["fecha"],
-            ]
-            for column_index, value in enumerate(values):
+        row_views = build_quote_table_row_views(rows)
+        self.quote_table.setRowCount(len(row_views))
+        for row_index, row_view in enumerate(row_views):
+            for column_index, value in enumerate(row_view.values):
                 self.quote_table.setItem(row_index, column_index, _table_item(value))
-            self.quote_table.item(row_index, 0).setData(Qt.ItemDataRole.UserRole, row["id"])
+            self.quote_table.item(row_index, 0).setData(Qt.ItemDataRole.UserRole, row_view.quote_id)
             status_item = self.quote_table.item(row_index, 2)
             total_item = self.quote_table.item(row_index, 3)
             if status_item is not None:
-                _set_table_badge_style(status_item, str(row["status_tone"]))
+                _set_table_badge_style(status_item, row_view.status_tone)
             if total_item is not None:
-                _set_table_badge_style(total_item, "positive")
+                _set_table_badge_style(total_item, row_view.total_tone)
         self.quote_table.resizeColumnsToContents()
         self.quote_status_label.setText(quote_summary_view.status_label)
+        self._apply_quote_action_state()
 
         if selected_quote_id is not None:
             self.quote_table.blockSignals(True)
@@ -9040,105 +8957,57 @@ class MainWindow(QMainWindow):
     def _refresh_quote_detail(self, quote_id: int | None) -> None:
         if not quote_id:
             detail_view = build_empty_quote_detail_view()
-            self.quote_customer_label.setText(detail_view.customer_label)
-            self.quote_meta_label.setText(detail_view.meta_label)
-            self.quote_notes_label.setText(detail_view.notes_label)
-            self.quote_detail_table.setRowCount(len(detail_view.detail_rows))
+            self._apply_quote_detail_view(detail_view)
             return
 
         try:
             with get_session() as session:
-                presupuesto = PresupuestoService.obtener_presupuesto(session, quote_id)
-                if presupuesto is None:
-                    raise ValueError("Presupuesto no encontrado.")
-                client_text = presupuesto.cliente_nombre or (presupuesto.cliente.nombre if presupuesto.cliente else "Mostrador / sin cliente")
-                phone_text = presupuesto.cliente_telefono or (presupuesto.cliente.telefono if presupuesto.cliente else "Sin telefono")
+                quote_snapshot = load_quote_detail_snapshot(session, quote_id=quote_id)
                 detail_view = build_quote_detail_view(
-                    folio=presupuesto.folio,
-                    client_name=client_text,
-                    status_label=presupuesto.estado.value,
-                    phone_text=phone_text,
-                    total=Decimal(presupuesto.total),
-                    validity_label=presupuesto.vigencia_hasta.strftime("%Y-%m-%d") if presupuesto.vigencia_hasta else "Sin vigencia",
-                    user_label=presupuesto.usuario.username if presupuesto.usuario else "-",
-                    notes_text=presupuesto.observacion or "Sin observaciones.",
+                    folio=quote_snapshot.folio,
+                    client_name=quote_snapshot.customer_label,
+                    status_label=quote_snapshot.status_label,
+                    phone_text=quote_snapshot.phone_text,
+                    total=quote_snapshot.total,
+                    validity_label=quote_snapshot.validity_label,
+                    user_label=quote_snapshot.user_label,
+                    notes_text=quote_snapshot.notes_text,
                     detail_rows=[
                         {
-                            "sku": detalle.sku_snapshot,
-                            "description": detalle.descripcion_snapshot,
-                            "quantity": detalle.cantidad,
-                            "unit_price": detalle.precio_unitario,
-                            "subtotal": detalle.subtotal_linea,
+                            "sku": detail.sku,
+                            "description": detail.description,
+                            "quantity": detail.quantity,
+                            "unit_price": detail.unit_price,
+                            "subtotal": detail.subtotal,
                         }
-                        for detalle in presupuesto.detalles
+                        for detail in quote_snapshot.detail_rows
                     ],
                 )
-                self.quote_customer_label.setText(detail_view.customer_label)
-                self.quote_meta_label.setText(detail_view.meta_label)
-                self.quote_notes_label.setText(detail_view.notes_label)
-                self.quote_detail_table.setRowCount(len(detail_view.detail_rows))
-                for row_index, detalle in enumerate(detail_view.detail_rows):
-                    values = [
-                        detalle.sku,
-                        detalle.description,
-                        detalle.quantity,
-                        detalle.unit_price,
-                        detalle.subtotal,
-                    ]
-                    for column_index, value in enumerate(values):
-                        self.quote_detail_table.setItem(row_index, column_index, _table_item(value))
-                self.quote_detail_table.resizeColumnsToContents()
+                self._apply_quote_detail_view(detail_view)
         except Exception as exc:  # noqa: BLE001
             detail_view = build_error_quote_detail_view(str(exc))
-            self.quote_customer_label.setText(detail_view.customer_label)
-            self.quote_meta_label.setText(detail_view.meta_label)
-            self.quote_notes_label.setText(detail_view.notes_label)
-            self.quote_detail_table.setRowCount(len(detail_view.detail_rows))
+            self._apply_quote_detail_view(detail_view)
+
+    def _apply_quote_detail_view(self, detail_view) -> None:
+        self.quote_customer_label.setText(detail_view.customer_label)
+        self.quote_meta_label.setText(detail_view.meta_label)
+        self.quote_notes_label.setText(detail_view.notes_label)
+        self.quote_detail_table.setRowCount(len(detail_view.detail_rows))
+        for row_index, detalle in enumerate(detail_view.detail_rows):
+            values = [
+                detalle.sku,
+                detalle.description,
+                detalle.quantity,
+                detalle.unit_price,
+                detalle.subtotal,
+            ]
+            for column_index, value in enumerate(values):
+                self.quote_detail_table.setItem(row_index, column_index, _table_item(value))
+        self.quote_detail_table.resizeColumnsToContents()
 
     def _refresh_inventory_table(self, session) -> None:
         current_variant_id = self.inventory_variant_combo.currentData()
-        layaway_reserved_subquery = (
-            select(
-                ApartadoDetalle.variante_id.label("variante_id"),
-                func.coalesce(func.sum(ApartadoDetalle.cantidad), 0).label("apartado_cantidad"),
-            )
-            .join(ApartadoDetalle.apartado)
-            .where(Apartado.estado.in_([EstadoApartado.ACTIVO, EstadoApartado.LIQUIDADO]))
-            .group_by(ApartadoDetalle.variante_id)
-            .subquery()
-        )
-        statement = (
-            select(
-                Variante.id,
-                Variante.sku,
-                Categoria.nombre,
-                Marca.nombre,
-                Producto.nombre,
-                Producto.nombre_base,
-                Escuela.nombre,
-                TipoPrenda.nombre,
-                TipoPieza.nombre,
-                Variante.nombre_legacy,
-                Variante.origen_legacy,
-                Variante.talla,
-                Variante.color,
-                Variante.precio_venta,
-                Variante.costo_referencia,
-                Variante.stock_actual,
-                func.coalesce(layaway_reserved_subquery.c.apartado_cantidad, 0),
-                Variante.activo,
-                func.coalesce(ImportacionCatalogoFila.producto_fallback, False),
-            )
-            .join(Variante.producto)
-            .join(Producto.categoria)
-            .join(Producto.marca)
-            .outerjoin(Producto.escuela)
-            .outerjoin(Producto.tipo_prenda)
-            .outerjoin(Producto.tipo_pieza)
-            .outerjoin(ImportacionCatalogoFila, ImportacionCatalogoFila.variante_id == Variante.id)
-            .outerjoin(layaway_reserved_subquery, layaway_reserved_subquery.c.variante_id == Variante.id)
-        )
-        rows = session.execute(statement.order_by(Producto.nombre.asc(), Variante.sku.asc())).all()
+        inventory_snapshot_rows = load_inventory_snapshot_rows(session)
 
         search_text = self.inventory_search_input.text().strip()
         category_filters = self.inventory_category_filter_combo.selected_values()
@@ -9154,85 +9023,33 @@ class MainWindow(QMainWindow):
         origin_filter = str(self.inventory_origin_filter_combo.currentData() or "")
         duplicate_filter = str(self.inventory_duplicate_filter_combo.currentData() or "")
 
-        inventory_snapshot_rows: list[dict[str, object]] = []
-        for row in rows:
-            qr_exists = (QrGenerator.output_dir() / f"{row[1]}.png").exists()
-            row_data = {
-                "variante_id": row[0],
-                "sku": row[1],
-                "categoria_nombre": row[2],
-                "marca_nombre": row[3],
-                "producto_nombre": sanitize_product_display_name(row[4]),
-                "producto_nombre_base": row[5],
-                "escuela_nombre": row[6] or "General",
-                "tipo_prenda_nombre": row[7] or "-",
-                "tipo_pieza_nombre": row[8] or "-",
-                "nombre_legacy": row[9],
-                "origen_legacy": bool(row[10]),
-                "talla": row[11],
-                "color": row[12],
-                "precio_venta": Decimal(row[13]).quantize(Decimal("0.01")),
-                "costo_referencia": Decimal(row[14]).quantize(Decimal("0.01")) if row[14] is not None else None,
-                "stock_actual": int(row[15]),
-                "apartado_cantidad": int(row[16]),
-                "variante_activa": bool(row[17]),
-                "fallback_importacion": bool(row[18]),
-                "qr_exists": qr_exists,
-                "origen_etiqueta": "LEGACY" if row[10] else "NUEVO",
-                "variante_estado": "ACTIVA" if row[17] else "INACTIVA",
-                "fallback_text": "fallback" if bool(row[18]) else "",
-            }
-            inventory_snapshot_rows.append(row_data)
-
         apply_search_suggestions(
             self.inventory_search_input,
             build_inventory_search_suggestions(inventory_snapshot_rows, search_text=search_text),
         )
 
-        visible_rows: list[dict[str, object]] = []
-        for row_data in inventory_snapshot_rows:
-            if not self._inventory_row_matches_search(row_data, search_text):
-                continue
-            if category_filters and str(row_data["categoria_nombre"]) not in category_filters:
-                continue
-            if brand_filters and str(row_data["marca_nombre"]) not in brand_filters:
-                continue
-            if school_filters and str(row_data["escuela_nombre"]) not in school_filters:
-                continue
-            if type_filters and str(row_data["tipo_prenda_nombre"]) not in type_filters:
-                continue
-            if piece_filters and str(row_data["tipo_pieza_nombre"]) not in piece_filters:
-                continue
-            if size_filters and str(row_data["talla"]) not in size_filters:
-                continue
-            if color_filters and str(row_data["color"]) not in color_filters:
-                continue
-            if status_filter == "active" and not bool(row_data["variante_activa"]):
-                continue
-            if status_filter == "inactive" and bool(row_data["variante_activa"]):
-                continue
-            if stock_filter == "zero" and int(row_data["stock_actual"]) != 0:
-                continue
-            if stock_filter == "low" and not (0 < int(row_data["stock_actual"]) <= 3):
-                continue
-            if stock_filter == "available" and int(row_data["stock_actual"]) <= 0:
-                continue
-            if qr_filter == "ready" and not bool(row_data["qr_exists"]):
-                continue
-            if qr_filter == "missing" and bool(row_data["qr_exists"]):
-                continue
-            if origin_filter == "legacy" and not bool(row_data["origen_legacy"]):
-                continue
-            if origin_filter == "native" and bool(row_data["origen_legacy"]):
-                continue
-            if duplicate_filter == "fallback_only" and not bool(row_data["fallback_importacion"]):
-                continue
-            if duplicate_filter == "fallback_exclude" and bool(row_data["fallback_importacion"]):
-                continue
-            visible_rows.append(row_data)
+        visible_rows = filter_visible_inventory_rows(
+            inventory_snapshot_rows,
+            filters=InventoryVisibleFilterState(
+                search_text=search_text,
+                category_filters=tuple(category_filters),
+                brand_filters=tuple(brand_filters),
+                school_filters=tuple(school_filters),
+                type_filters=tuple(type_filters),
+                piece_filters=tuple(piece_filters),
+                size_filters=tuple(size_filters),
+                color_filters=tuple(color_filters),
+                status_filter=status_filter,
+                stock_filter=stock_filter,
+                qr_filter=qr_filter,
+                origin_filter=origin_filter,
+                duplicate_filter=duplicate_filter,
+            ),
+            search_matcher=self._inventory_row_matches_search,
+        )
 
         summary_view = build_inventory_summary_view(
-            total_rows=len(rows),
+            total_rows=len(inventory_snapshot_rows),
             visible_rows=visible_rows,
             active_filter_labels=self._inventory_active_filter_labels(),
         )
@@ -9249,41 +9066,25 @@ class MainWindow(QMainWindow):
             summary_view.inactive_counter.tone,
         )
 
-        self.inventory_table.setRowCount(len(visible_rows))
+        table_row_views = build_inventory_table_row_views(visible_rows)
+        self.inventory_table.setRowCount(len(table_row_views))
         self.inventory_rows = visible_rows
-        for row_index, row in enumerate(visible_rows):
-            stock_value = int(row["stock_actual"])
-            committed_value = int(row["apartado_cantidad"])
-            stock_tone = "danger" if stock_value == 0 else "warning" if stock_value <= 3 else "positive"
-            estado_text = "ACTIVA" if row["variante_activa"] else "INACTIVA"
-            estado_tone = "positive" if row["variante_activa"] else "muted"
-            qr_text = "Listo" if row["qr_exists"] else "Pendiente"
-            qr_tone = "positive" if row["qr_exists"] else "warning"
-            values = [
-                row["sku"],
-                row["producto_nombre_base"],
-                row["talla"],
-                row["color"],
-                _stock_table_text(stock_value),
-                committed_value,
-                estado_text,
-                qr_text,
-            ]
-            for column_index, value in enumerate(values):
+        for row_index, row_view in enumerate(table_row_views):
+            for column_index, value in enumerate(row_view.values):
                 self.inventory_table.setItem(row_index, column_index, _table_item(value))
-            self.inventory_table.item(row_index, 0).setData(Qt.ItemDataRole.UserRole, row["variante_id"])
+            self.inventory_table.item(row_index, 0).setData(Qt.ItemDataRole.UserRole, row_view.variant_id)
             stock_item = self.inventory_table.item(row_index, 4)
             committed_item = self.inventory_table.item(row_index, 5)
             status_item = self.inventory_table.item(row_index, 6)
             qr_item = self.inventory_table.item(row_index, 7)
             if stock_item is not None:
-                _set_table_badge_style(stock_item, stock_tone)
-            if committed_item is not None and committed_value > 0:
-                _set_table_badge_style(committed_item, "warning")
+                _set_table_badge_style(stock_item, row_view.stock_tone)
+            if committed_item is not None and row_view.committed_tone is not None:
+                _set_table_badge_style(committed_item, row_view.committed_tone)
             if status_item is not None:
-                _set_table_badge_style(status_item, estado_tone)
+                _set_table_badge_style(status_item, row_view.status_tone)
             if qr_item is not None:
-                _set_table_badge_style(qr_item, qr_tone)
+                _set_table_badge_style(qr_item, row_view.qr_tone)
         self.inventory_table.resizeColumnsToContents()
         self.inventory_results_label.setText(summary_view.results_summary)
         self.inventory_active_filters_label.setText(self._build_inventory_active_filters_summary())
@@ -9322,32 +9123,15 @@ class MainWindow(QMainWindow):
         self._handle_inventory_filters_changed()
 
     def _analytics_period_bounds(self) -> tuple[datetime, datetime]:
-        period_key = str(self.analytics_period_combo.currentData() or "today")
-        today = date.today()
-        if period_key == "7d":
-            start_date = today - timedelta(days=6)
-            end_date = today
-        elif period_key == "30d":
-            start_date = today - timedelta(days=29)
-            end_date = today
-        elif period_key == "month":
-            start_date = today.replace(day=1)
-            end_date = today
-        elif period_key == "manual":
-            start_date = self.analytics_from_input.date().toPyDate()
-            end_date = self.analytics_to_input.date().toPyDate()
-        else:
-            start_date = today
-            end_date = today
-        if end_date < start_date:
-            start_date, end_date = end_date, start_date
-        return (
-            datetime.combine(start_date, datetime.min.time()),
-            datetime.combine(end_date + timedelta(days=1), datetime.min.time()),
+        return resolve_analytics_period_bounds(
+            self.analytics_period_combo.currentData(),
+            today=date.today(),
+            manual_from=self.analytics_from_input.date().toPyDate(),
+            manual_to=self.analytics_to_input.date().toPyDate(),
         )
 
     def _handle_analytics_period_changed(self) -> None:
-        is_manual = str(self.analytics_period_combo.currentData() or "") == "manual"
+        is_manual = is_manual_analytics_period(self.analytics_period_combo.currentData())
         self.analytics_from_input.setEnabled(is_manual)
         self.analytics_to_input.setEnabled(is_manual)
         try:
@@ -9359,174 +9143,81 @@ class MainWindow(QMainWindow):
     def _refresh_analytics(self, session) -> None:
         period_start, period_end = self._analytics_period_bounds()
         selected_client_id = self.analytics_client_combo.currentData()
-        sales = list(
-            session.scalars(
-                select(Venta).where(
-                    Venta.estado == EstadoVenta.CONFIRMADA,
-                    Venta.confirmada_at.is_not(None),
-                    Venta.confirmada_at >= period_start,
-                    Venta.confirmada_at < period_end,
-                    *((Venta.cliente_id == int(selected_client_id),) if selected_client_id not in {None, ""} else ()),
-                )
-            )
+        sales = load_confirmed_sales_for_analytics(
+            session,
+            period_start=period_start,
+            period_end=period_end,
+            selected_client_id=selected_client_id,
         )
-        total_sales = sum((Decimal(sale.total) for sale in sales), Decimal("0.00"))
-        total_tickets = len(sales)
-        total_units = sum((sum(int(detalle.cantidad) for detalle in sale.detalles) for sale in sales), 0)
-        average_ticket = (
-            (total_sales / Decimal(total_tickets)).quantize(Decimal("0.01"))
-            if total_tickets
-            else Decimal("0.00")
-        )
-        self.analytics_sales_value.setText(f"${total_sales}")
-        self.analytics_tickets_value.setText(str(total_tickets))
-        self.analytics_average_value.setText(f"${average_ticket}")
-        self.analytics_units_value.setText(str(total_units))
-        identified_sales = [sale for sale in sales if sale.cliente_id is not None]
-        identified_income = sum((Decimal(sale.total) for sale in identified_sales), Decimal("0.00"))
-        unique_clients = {int(sale.cliente_id) for sale in identified_sales if sale.cliente_id is not None}
-        repeat_clients = 0
-        if identified_sales:
-            counts_by_client: dict[int, int] = {}
-            for sale in identified_sales:
-                if sale.cliente_id is None:
-                    continue
-                counts_by_client[int(sale.cliente_id)] = counts_by_client.get(int(sale.cliente_id), 0) + 1
-            repeat_clients = sum(1 for count in counts_by_client.values() if count > 1)
-        average_per_client = (
-            (identified_income / Decimal(len(unique_clients))).quantize(Decimal("0.01"))
-            if unique_clients
-            else Decimal("0.00")
-        )
-        self.analytics_identified_sales_value.setText(str(len(identified_sales)))
-        self.analytics_identified_income_value.setText(f"${identified_income}")
-        self.analytics_repeat_clients_value.setText(str(repeat_clients))
-        self.analytics_average_client_value.setText(f"${average_per_client}")
+        sales_snapshot = build_analytics_sales_snapshot(sales)
+        self.analytics_sales_value.setText(f"${sales_snapshot.total_sales}")
+        self.analytics_tickets_value.setText(str(sales_snapshot.total_tickets))
+        self.analytics_average_value.setText(f"${sales_snapshot.average_ticket}")
+        self.analytics_units_value.setText(str(sales_snapshot.total_units))
+        self.analytics_identified_sales_value.setText(str(sales_snapshot.identified_sales_count))
+        self.analytics_identified_income_value.setText(f"${sales_snapshot.identified_income}")
+        self.analytics_repeat_clients_value.setText(str(sales_snapshot.repeat_clients))
+        self.analytics_average_client_value.setText(f"${sales_snapshot.average_per_client}")
 
-        payment_buckets: dict[str, dict[str, Decimal | int]] = {
-            "Efectivo": {"count": 0, "amount": Decimal("0.00")},
-            "Tarjeta": {"count": 0, "amount": Decimal("0.00")},
-            "Transferencia": {"count": 0, "amount": Decimal("0.00")},
-            "Mixto": {"count": 0, "amount": Decimal("0.00")},
-        }
-        for sale in sales:
-            note = sale.observacion or ""
-            method = "Efectivo"
-            for candidate in payment_buckets:
-                if f"Metodo de pago: {candidate}" in note:
-                    method = candidate
-                    break
-            payment_buckets[method]["count"] = int(payment_buckets[method]["count"]) + 1
-            payment_buckets[method]["amount"] = Decimal(payment_buckets[method]["amount"]) + Decimal(sale.total)
-
-        payment_rows = [
-            (method, int(data["count"]), Decimal(data["amount"]))
-            for method, data in payment_buckets.items()
-            if int(data["count"]) > 0 or Decimal(data["amount"]) > Decimal("0.00")
-        ]
+        payment_rows = build_analytics_payment_rows(sales)
         self.analytics_payment_table.setRowCount(len(payment_rows))
         for row_index, row in enumerate(payment_rows):
             for column_index, value in enumerate(row):
                 self.analytics_payment_table.setItem(row_index, column_index, _table_item(value))
         self.analytics_payment_table.resizeColumnsToContents()
 
-        rows = session.execute(
-            select(
-                Variante.sku,
-                Producto.nombre,
-                func.coalesce(func.sum(VentaDetalle.cantidad), 0),
-                func.coalesce(func.sum(VentaDetalle.subtotal_linea), 0),
-            )
-            .join(VentaDetalle.variante)
-            .join(Variante.producto)
-            .join(VentaDetalle.venta)
-            .where(
-                Venta.estado == EstadoVenta.CONFIRMADA,
-                Venta.confirmada_at.is_not(None),
-                Venta.confirmada_at >= period_start,
-                Venta.confirmada_at < period_end,
-                *((Venta.cliente_id == int(selected_client_id),) if selected_client_id not in {None, ""} else ()),
-            )
-            .group_by(Variante.sku, Producto.nombre)
-            .order_by(desc(func.sum(VentaDetalle.cantidad)), Variante.sku.asc())
-            .limit(10)
-        ).all()
-
-        self.top_products_table.setRowCount(len(rows))
-        for row_index, row in enumerate(rows):
-            display_row = (
-                row[0],
-                sanitize_product_display_name(row[1]),
-                row[2],
-                row[3],
-            )
+        top_product_snapshot_rows = load_analytics_top_product_snapshot_rows(
+            session,
+            period_start=period_start,
+            period_end=period_end,
+            selected_client_id=selected_client_id,
+        )
+        top_product_rows = build_analytics_top_product_rows(top_product_snapshot_rows)
+        self.top_products_table.setRowCount(len(top_product_rows))
+        for row_index, display_row in enumerate(top_product_rows):
             for column_index, value in enumerate(display_row):
                 self.top_products_table.setItem(row_index, column_index, _table_item(value))
         self.top_products_table.resizeColumnsToContents()
 
-        top_client_rows = session.execute(
-            select(
-                Cliente.nombre,
-                Cliente.codigo_cliente,
-                func.count(Venta.id),
-                func.coalesce(func.sum(Venta.total), 0),
-            )
-            .join(Venta, Venta.cliente_id == Cliente.id)
-            .where(
-                Venta.estado == EstadoVenta.CONFIRMADA,
-                Venta.confirmada_at.is_not(None),
-                Venta.confirmada_at >= period_start,
-                Venta.confirmada_at < period_end,
-                *((Venta.cliente_id == int(selected_client_id),) if selected_client_id not in {None, ""} else ()),
-            )
-            .group_by(Cliente.id, Cliente.nombre, Cliente.codigo_cliente)
-            .order_by(desc(func.sum(Venta.total)), Cliente.nombre.asc())
-            .limit(10)
-        ).all()
-        self.analytics_clients_table.setRowCount(len(top_client_rows))
-        for row_index, row in enumerate(top_client_rows):
-            for column_index, value in enumerate(row):
+        top_client_snapshot_rows = load_analytics_top_client_snapshot_rows(
+            session,
+            period_start=period_start,
+            period_end=period_end,
+            selected_client_id=selected_client_id,
+        )
+        top_client_row_views = build_analytics_top_client_row_views(top_client_snapshot_rows)
+        self.analytics_clients_table.setRowCount(len(top_client_row_views))
+        for row_index, row_view in enumerate(top_client_row_views):
+            for column_index, value in enumerate(row_view.values):
                 self.analytics_clients_table.setItem(row_index, column_index, _table_item(value))
             sales_item = self.analytics_clients_table.item(row_index, 2)
             amount_item = self.analytics_clients_table.item(row_index, 3)
             if sales_item is not None:
-                _set_table_badge_style(sales_item, "positive" if int(row[2]) >= 2 else "warning")
+                _set_table_badge_style(sales_item, row_view.sales_tone)
             if amount_item is not None:
-                _set_table_badge_style(amount_item, "positive")
+                _set_table_badge_style(amount_item, row_view.amount_tone)
         self.analytics_clients_table.resizeColumnsToContents()
 
-        active_layaways = session.scalar(
-            select(func.count(Apartado.id)).where(Apartado.estado.in_([EstadoApartado.ACTIVO, EstadoApartado.LIQUIDADO]))
-        ) or 0
-        pending_balance = session.scalar(
-            select(func.coalesce(func.sum(Apartado.saldo_pendiente), 0)).where(
-                Apartado.estado.in_([EstadoApartado.ACTIVO, EstadoApartado.LIQUIDADO])
-            )
-        ) or Decimal("0.00")
-        overdue_count = session.scalar(
-            select(func.count(Apartado.id)).where(
-                Apartado.estado.in_([EstadoApartado.ACTIVO, EstadoApartado.LIQUIDADO]),
-                Apartado.fecha_compromiso.is_not(None),
-                func.date(Apartado.fecha_compromiso) < date.today(),
-            )
-        ) or 0
-        delivered_in_period = session.scalar(
-            select(func.count(Apartado.id)).where(
-                Apartado.estado == EstadoApartado.ENTREGADO,
-                Apartado.entregado_at.is_not(None),
-                Apartado.entregado_at >= period_start,
-                Apartado.entregado_at < period_end,
-            )
-        ) or 0
-        self.analytics_layaway_active_label.setText(f"Apartados activos\n{active_layaways}")
-        self.analytics_layaway_balance_label.setText(f"Saldo pendiente\n${pending_balance}")
-        self.analytics_layaway_overdue_label.setText(f"Vencidos\n{overdue_count}")
-        self.analytics_layaway_delivered_label.setText(f"Entregados periodo\n{delivered_in_period}")
+        layaway_snapshot = load_analytics_layaway_snapshot(
+            session,
+            period_start=period_start,
+            period_end=period_end,
+        )
+        layaway_labels_view = build_analytics_layaway_labels_view(
+            active_count=layaway_snapshot.active_count,
+            pending_balance=layaway_snapshot.pending_balance,
+            overdue_count=layaway_snapshot.overdue_count,
+            delivered_in_period=layaway_snapshot.delivered_in_period,
+        )
+        self.analytics_layaway_active_label.setText(layaway_labels_view.active.text)
+        self.analytics_layaway_balance_label.setText(layaway_labels_view.balance.text)
+        self.analytics_layaway_overdue_label.setText(layaway_labels_view.overdue.text)
+        self.analytics_layaway_delivered_label.setText(layaway_labels_view.delivered.text)
         layaway_label_states = (
-            (self.analytics_layaway_active_label, "positive" if active_layaways else "neutral"),
-            (self.analytics_layaway_balance_label, "warning" if Decimal(pending_balance) > Decimal("0.00") else "neutral"),
-            (self.analytics_layaway_overdue_label, "danger" if overdue_count else "neutral"),
-            (self.analytics_layaway_delivered_label, "positive" if delivered_in_period else "neutral"),
+            (self.analytics_layaway_active_label, layaway_labels_view.active.tone),
+            (self.analytics_layaway_balance_label, layaway_labels_view.balance.tone),
+            (self.analytics_layaway_overdue_label, layaway_labels_view.overdue.tone),
+            (self.analytics_layaway_delivered_label, layaway_labels_view.delivered.tone),
         )
         for label, tone in layaway_label_states:
             label.setProperty("tone", tone)
@@ -9534,60 +9225,28 @@ class MainWindow(QMainWindow):
             label.style().polish(label)
             label.update()
 
-        layaway_reserved_subquery = (
-            select(
-                ApartadoDetalle.variante_id.label("variante_id"),
-                func.coalesce(func.sum(ApartadoDetalle.cantidad), 0).label("apartado_cantidad"),
-            )
-            .join(ApartadoDetalle.apartado)
-            .where(Apartado.estado.in_([EstadoApartado.ACTIVO, EstadoApartado.LIQUIDADO]))
-            .group_by(ApartadoDetalle.variante_id)
-            .subquery()
-        )
-        stock_rows = session.execute(
-            select(
-                Variante.sku,
-                Producto.nombre,
-                Variante.stock_actual,
-                func.coalesce(layaway_reserved_subquery.c.apartado_cantidad, 0),
-                Variante.activo,
-            )
-            .join(Variante.producto)
-            .outerjoin(layaway_reserved_subquery, layaway_reserved_subquery.c.variante_id == Variante.id)
-            .where(or_(Variante.stock_actual <= 3, Variante.activo.is_(False)))
-            .order_by(Variante.stock_actual.asc(), Producto.nombre.asc(), Variante.sku.asc())
-            .limit(10)
-        ).all()
-        self.analytics_stock_table.setRowCount(len(stock_rows))
-        for row_index, row in enumerate(stock_rows):
-            values = [
-                row[0],
-                sanitize_product_display_name(row[1]),
-                row[2],
-                row[3],
-                "ACTIVA" if bool(row[4]) else "INACTIVA",
-            ]
-            for column_index, value in enumerate(values):
+        stock_snapshot_rows = load_analytics_stock_snapshot_rows(session)
+        stock_row_views = build_analytics_stock_row_views(stock_snapshot_rows)
+        self.analytics_stock_table.setRowCount(len(stock_row_views))
+        for row_index, row_view in enumerate(stock_row_views):
+            for column_index, value in enumerate(row_view.values):
                 self.analytics_stock_table.setItem(row_index, column_index, _table_item(value))
             stock_item = self.analytics_stock_table.item(row_index, 2)
             reserved_item = self.analytics_stock_table.item(row_index, 3)
             state_item = self.analytics_stock_table.item(row_index, 4)
             if stock_item is not None:
-                stock_value = int(row[2])
-                _set_table_badge_style(
-                    stock_item,
-                    "danger" if stock_value == 0 else "warning" if stock_value <= 3 else "positive",
-                )
+                _set_table_badge_style(stock_item, row_view.stock_tone)
             if reserved_item is not None:
-                _set_table_badge_style(
-                    reserved_item,
-                    "warning" if int(row[3]) > 0 else "muted",
-                )
+                _set_table_badge_style(reserved_item, row_view.reserved_tone)
             if state_item is not None:
-                _set_table_badge_style(state_item, "positive" if bool(row[4]) else "muted")
+                _set_table_badge_style(state_item, row_view.state_tone)
         self.analytics_stock_table.resizeColumnsToContents()
-        client_label = "todos" if selected_client_id in {None, ""} else self.analytics_client_combo.currentText()
-        self.analytics_export_status_label.setText(f"Periodo listo para analisis. Cliente: {client_label}.")
+        self.analytics_export_status_label.setText(
+            build_analytics_export_status_text(
+                selected_client_id=selected_client_id,
+                selected_client_label=self.analytics_client_combo.currentText(),
+            )
+        )
 
     @staticmethod
     def _analytics_export_dir() -> Path:
@@ -9660,42 +9319,42 @@ class MainWindow(QMainWindow):
                             }
                         )
 
-                top_products_rows = [
-                    {
-                        "sku": self.top_products_table.item(row, 0).text() if self.top_products_table.item(row, 0) else "",
-                        "producto": self.top_products_table.item(row, 1).text() if self.top_products_table.item(row, 1) else "",
-                        "unidades_vendidas": self.top_products_table.item(row, 2).text() if self.top_products_table.item(row, 2) else "",
-                        "ingreso": self.top_products_table.item(row, 3).text() if self.top_products_table.item(row, 3) else "",
-                    }
-                    for row in range(self.top_products_table.rowCount())
-                ]
-                top_clients_rows = [
-                    {
-                        "cliente": self.analytics_clients_table.item(row, 0).text() if self.analytics_clients_table.item(row, 0) else "",
-                        "codigo_cliente": self.analytics_clients_table.item(row, 1).text() if self.analytics_clients_table.item(row, 1) else "",
-                        "ventas": self.analytics_clients_table.item(row, 2).text() if self.analytics_clients_table.item(row, 2) else "",
-                        "monto": self.analytics_clients_table.item(row, 3).text() if self.analytics_clients_table.item(row, 3) else "",
-                    }
-                    for row in range(self.analytics_clients_table.rowCount())
-                ]
-                payment_rows = [
-                    {
-                        "metodo": self.analytics_payment_table.item(row, 0).text() if self.analytics_payment_table.item(row, 0) else "",
-                        "ventas": self.analytics_payment_table.item(row, 1).text() if self.analytics_payment_table.item(row, 1) else "",
-                        "monto": self.analytics_payment_table.item(row, 2).text() if self.analytics_payment_table.item(row, 2) else "",
-                    }
-                    for row in range(self.analytics_payment_table.rowCount())
-                ]
-                stock_rows = [
-                    {
-                        "sku": self.analytics_stock_table.item(row, 0).text() if self.analytics_stock_table.item(row, 0) else "",
-                        "producto": self.analytics_stock_table.item(row, 1).text() if self.analytics_stock_table.item(row, 1) else "",
-                        "stock": self.analytics_stock_table.item(row, 2).text() if self.analytics_stock_table.item(row, 2) else "",
-                        "apartado": self.analytics_stock_table.item(row, 3).text() if self.analytics_stock_table.item(row, 3) else "",
-                        "estado": self.analytics_stock_table.item(row, 4).text() if self.analytics_stock_table.item(row, 4) else "",
-                    }
-                    for row in range(self.analytics_stock_table.rowCount())
-                ]
+                top_products_rows = build_table_export_rows(
+                    self.top_products_table,
+                    (
+                        ("sku", 0),
+                        ("producto", 1),
+                        ("unidades_vendidas", 2),
+                        ("ingreso", 3),
+                    ),
+                )
+                top_clients_rows = build_table_export_rows(
+                    self.analytics_clients_table,
+                    (
+                        ("cliente", 0),
+                        ("codigo_cliente", 1),
+                        ("ventas", 2),
+                        ("monto", 3),
+                    ),
+                )
+                payment_rows = build_table_export_rows(
+                    self.analytics_payment_table,
+                    (
+                        ("metodo", 0),
+                        ("ventas", 1),
+                        ("monto", 2),
+                    ),
+                )
+                stock_rows = build_table_export_rows(
+                    self.analytics_stock_table,
+                    (
+                        ("sku", 0),
+                        ("producto", 1),
+                        ("stock", 2),
+                        ("apartado", 3),
+                        ("estado", 4),
+                    ),
+                )
                 movement_rows = [
                     {
                         "fecha": movimiento.created_at,
@@ -9797,14 +9456,12 @@ class MainWindow(QMainWindow):
                     )
                 ]
 
-                layaway_rows = [
-                    {
-                        "activos": self.analytics_layaway_active_label.text(),
-                        "saldo_pendiente": self.analytics_layaway_balance_label.text(),
-                        "vencidos": self.analytics_layaway_overdue_label.text(),
-                        "entregados_periodo": self.analytics_layaway_delivered_label.text(),
-                    }
-                ]
+                layaway_rows = build_analytics_layaway_export_rows(
+                    active_text=self.analytics_layaway_active_label.text(),
+                    pending_balance_text=self.analytics_layaway_balance_label.text(),
+                    overdue_text=self.analytics_layaway_overdue_label.text(),
+                    delivered_text=self.analytics_layaway_delivered_label.text(),
+                )
 
                 export_sets = {
                     "ventas": sales_rows,
@@ -9853,137 +9510,29 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "Exportacion lista", f"Se generaron archivos CSV y JSON en:\n{export_dir}")
 
     def _refresh_history(self, session) -> None:
-        source_filter = str(self.history_source_combo.currentData() or "")
-        entity_filter = str(self.history_entity_combo.currentData() or "")
-        sku_filter = self.history_sku_input.text().strip()
-        type_filter = str(self.history_type_combo.currentData() or "")
-        start_date_label = ""
-        end_date_label = ""
-
-        start_datetime = None
-        if self.history_from_input.date() > self.history_from_input.minimumDate():
-            start_date = self.history_from_input.date().toPyDate()
-            start_datetime = datetime.combine(start_date, datetime.min.time())
-            start_date_label = start_date.isoformat()
-
-        end_datetime = None
-        if self.history_to_input.date() > self.history_to_input.minimumDate():
-            end_date = self.history_to_input.date().toPyDate() + timedelta(days=1)
-            end_datetime = datetime.combine(end_date, datetime.min.time())
-            end_date_label = (end_date - timedelta(days=1)).isoformat()
-
-        rows: list[dict[str, object]] = []
-
-        if source_filter in {"", "inventory"}:
-            inventory_statement = (
-                select(
-                    MovimientoInventario.created_at,
-                    Variante.sku,
-                    MovimientoInventario.tipo_movimiento,
-                    MovimientoInventario.cantidad,
-                    MovimientoInventario.stock_posterior,
-                    MovimientoInventario.referencia,
-                    MovimientoInventario.creado_por,
-                    MovimientoInventario.observacion,
-                    Producto.nombre,
-                )
-                .join(MovimientoInventario.variante)
-                .join(Variante.producto)
-                .order_by(desc(MovimientoInventario.created_at))
-                .limit(200)
-            )
-
-            if sku_filter:
-                inventory_statement = inventory_statement.where(
-                    or_(
-                        Variante.sku.ilike(f"%{sku_filter}%"),
-                        Producto.nombre.ilike(f"%{sku_filter}%"),
-                        MovimientoInventario.referencia.ilike(f"%{sku_filter}%"),
-                        MovimientoInventario.creado_por.ilike(f"%{sku_filter}%"),
-                        MovimientoInventario.observacion.ilike(f"%{sku_filter}%"),
-                    )
-                )
-            if entity_filter and entity_filter != "PRESENTACION":
-                inventory_statement = inventory_statement.where(Variante.id == -1)
-            if type_filter.startswith("inventory:"):
-                inventory_statement = inventory_statement.where(
-                    MovimientoInventario.tipo_movimiento == TipoMovimientoInventario(type_filter.split(":", 1)[1])
-                )
-            if start_datetime is not None:
-                inventory_statement = inventory_statement.where(MovimientoInventario.created_at >= start_datetime)
-            if end_datetime is not None:
-                inventory_statement = inventory_statement.where(MovimientoInventario.created_at < end_datetime)
-
-            for row in session.execute(inventory_statement).all():
-                rows.append(
-                    {
-                        "fecha": row[0],
-                        "origen": "Inventario",
-                        "registro": row[1],
-                        "entidad": "PRESENTACION",
-                        "tipo": row[2].value if row[2] else "",
-                        "cambio": row[3],
-                        "resultado": row[4],
-                        "usuario": row[6],
-                        "detalle": " | ".join(part for part in [row[8], row[5], row[7]] if part),
-                    }
-                )
-
-        if source_filter in {"", "catalog"}:
-            catalog_statement = (
-                select(
-                    CambioCatalogo.created_at,
-                    CambioCatalogo.descripcion_entidad,
-                    CambioCatalogo.accion,
-                    CambioCatalogo.campo,
-                    CambioCatalogo.valor_anterior,
-                    CambioCatalogo.valor_nuevo,
-                    Usuario.username,
-                    CambioCatalogo.observacion,
-                    CambioCatalogo.entidad_tipo,
-                )
-                .join(CambioCatalogo.usuario)
-                .order_by(desc(CambioCatalogo.created_at))
-                .limit(200)
-            )
-
-            if sku_filter:
-                catalog_statement = catalog_statement.where(
-                    or_(
-                        CambioCatalogo.descripcion_entidad.ilike(f"%{sku_filter}%"),
-                        CambioCatalogo.campo.ilike(f"%{sku_filter}%"),
-                        CambioCatalogo.valor_anterior.ilike(f"%{sku_filter}%"),
-                        CambioCatalogo.valor_nuevo.ilike(f"%{sku_filter}%"),
-                        CambioCatalogo.observacion.ilike(f"%{sku_filter}%"),
-                        Usuario.username.ilike(f"%{sku_filter}%"),
-                    )
-                )
-            if entity_filter:
-                catalog_statement = catalog_statement.where(CambioCatalogo.entidad_tipo == TipoEntidadCatalogo(entity_filter))
-            if type_filter.startswith("catalog:"):
-                catalog_statement = catalog_statement.where(
-                    CambioCatalogo.accion == TipoCambioCatalogo(type_filter.split(":", 1)[1])
-                )
-            if start_datetime is not None:
-                catalog_statement = catalog_statement.where(CambioCatalogo.created_at >= start_datetime)
-            if end_datetime is not None:
-                catalog_statement = catalog_statement.where(CambioCatalogo.created_at < end_datetime)
-
-            for row in session.execute(catalog_statement).all():
-                rows.append(
-                    {
-                        "fecha": row[0],
-                        "origen": "Catalogo",
-                        "registro": row[1],
-                        "entidad": row[8].value if row[8] else "",
-                        "tipo": f"{row[2].value} · {row[3]}",
-                        "cambio": row[4] if row[4] is not None else "—",
-                        "resultado": row[5] if row[5] is not None else "—",
-                        "usuario": row[6],
-                        "detalle": row[7] or "",
-                    }
-                )
-
+        filter_state = build_history_filter_state(
+            source_filter=self.history_source_combo.currentData(),
+            entity_filter=self.history_entity_combo.currentData(),
+            sku_filter=self.history_sku_input.text(),
+            type_filter=self.history_type_combo.currentData(),
+            source_filter_text=self.history_source_combo.currentText(),
+            entity_filter_text=self.history_entity_combo.currentText(),
+            type_filter_text=self.history_type_combo.currentText(),
+            from_date=self.history_from_input.date().toPyDate(),
+            to_date=self.history_to_input.date().toPyDate(),
+            minimum_date=self.history_from_input.minimumDate().toPyDate(),
+        )
+        rows = load_history_snapshot_rows(
+            session,
+            filters=HistorySnapshotFilters(
+                source_filter=filter_state.source_filter,
+                entity_filter=filter_state.entity_filter,
+                sku_filter=filter_state.sku_filter,
+                type_filter=filter_state.type_filter,
+                start_datetime=filter_state.date_range.start_datetime,
+                end_datetime=filter_state.date_range.end_datetime,
+            ),
+        )
         history_rows = build_history_table_rows(rows)
 
         self.movements_table.setRowCount(len(history_rows))
@@ -9998,15 +9547,15 @@ class MainWindow(QMainWindow):
         self.movements_table.resizeColumnsToContents()
         history_summary = build_history_summary_view(
             visible_count=len(history_rows),
-            search_text=sku_filter,
-            source_filter_value=source_filter,
-            source_filter_text=self.history_source_combo.currentText(),
-            entity_filter_value=entity_filter,
-            entity_filter_text=self.history_entity_combo.currentText(),
-            type_filter_value=type_filter,
-            type_filter_text=self.history_type_combo.currentText(),
-            date_from_label=start_date_label,
-            date_to_label=end_date_label,
+            search_text=filter_state.sku_filter,
+            source_filter_value=filter_state.source_filter,
+            source_filter_text=filter_state.source_filter_text,
+            entity_filter_value=filter_state.entity_filter,
+            entity_filter_text=filter_state.entity_filter_text,
+            type_filter_value=filter_state.type_filter,
+            type_filter_text=filter_state.type_filter_text,
+            date_from_label=filter_state.date_range.start_date_label,
+            date_to_label=filter_state.date_range.end_date_label,
         )
         self.history_status_label.setText(history_summary.status_label)
 
@@ -10052,70 +9601,37 @@ class MainWindow(QMainWindow):
             return f"52{digits}"
         return digits
 
-    @staticmethod
-    def _default_whatsapp_templates() -> dict[str, str]:
-        return {
-            "layaway_reminder": (
-                "Hola {cliente}, te recordamos tu apartado {folio}. "
-                "Saldo pendiente: ${saldo}. Estado de vencimiento: {vencimiento}. "
-                "Fecha compromiso: {fecha_compromiso}."
-            ),
-            "layaway_liquidated": (
-                "Hola {cliente}, tu apartado {folio} ya esta liquidado y listo para entrega. "
-                "Fecha compromiso: {fecha_compromiso}."
-            ),
-            "client_promotion": (
-                "Hola {cliente}, queremos compartirte una promocion especial disponible en tienda."
-            ),
-            "client_followup": (
-                "Hola {cliente}, te escribimos para dar seguimiento y ponernos a tus ordenes."
-            ),
-            "client_greeting": (
-                "Hola {cliente}, gracias por seguir en contacto con nosotros."
-            ),
-        }
-
-    @staticmethod
-    def _render_whatsapp_template(template: str, values: dict[str, object]) -> str:
-        rendered = template
-        for key, value in values.items():
-            rendered = rendered.replace(f"{{{key}}}", str(value))
-        return rendered
-
     def _get_whatsapp_templates(self) -> dict[str, str]:
-        defaults = self._default_whatsapp_templates()
+        defaults = build_default_settings_whatsapp_templates()
         try:
             with get_session() as session:
                 config = BusinessSettingsService.get_or_create(session)
-                return {
-                    "layaway_reminder": config.whatsapp_apartado_recordatorio or defaults["layaway_reminder"],
-                    "layaway_liquidated": config.whatsapp_apartado_liquidado or defaults["layaway_liquidated"],
-                    "client_promotion": config.whatsapp_cliente_promocion or defaults["client_promotion"],
-                    "client_followup": config.whatsapp_cliente_seguimiento or defaults["client_followup"],
-                    "client_greeting": config.whatsapp_cliente_saludo or defaults["client_greeting"],
-                }
+                return resolve_settings_whatsapp_templates(
+                    config,
+                    default_templates=defaults,
+                )
         except Exception:
             return defaults
 
     def _refresh_whatsapp_preview(self) -> None:
         template_key = str(self.settings_whatsapp_preview_combo.currentData() or "layaway_reminder")
-        template_map = {
-            "layaway_reminder": self.settings_whatsapp_layaway_reminder_input.toPlainText().strip(),
-            "layaway_liquidated": self.settings_whatsapp_layaway_liquidated_input.toPlainText().strip(),
-            "client_promotion": self.settings_whatsapp_client_promotion_input.toPlainText().strip(),
-            "client_followup": self.settings_whatsapp_client_followup_input.toPlainText().strip(),
-            "client_greeting": self.settings_whatsapp_client_greeting_input.toPlainText().strip(),
-        }
+        template_map = build_settings_whatsapp_template_map(
+            layaway_reminder=self.settings_whatsapp_layaway_reminder_input.toPlainText(),
+            layaway_liquidated=self.settings_whatsapp_layaway_liquidated_input.toPlainText(),
+            client_promotion=self.settings_whatsapp_client_promotion_input.toPlainText(),
+            client_followup=self.settings_whatsapp_client_followup_input.toPlainText(),
+            client_greeting=self.settings_whatsapp_client_greeting_input.toPlainText(),
+        )
         self.settings_whatsapp_preview_output.setPlainText(
             build_settings_whatsapp_preview_text(
                 template_key=template_key,
                 template_map=template_map,
-                default_templates=self._default_whatsapp_templates(),
+                default_templates=build_default_settings_whatsapp_templates(),
             )
         )
 
     def _handle_reset_whatsapp_templates(self) -> None:
-        defaults = self._default_whatsapp_templates()
+        defaults = build_default_settings_whatsapp_templates()
         self.settings_whatsapp_layaway_reminder_input.setPlainText(defaults["layaway_reminder"])
         self.settings_whatsapp_layaway_liquidated_input.setPlainText(defaults["layaway_liquidated"])
         self.settings_whatsapp_client_promotion_input.setPlainText(defaults["client_promotion"])
@@ -10150,8 +9666,8 @@ class MainWindow(QMainWindow):
                 "Si necesitas apoyo, escribenos."
             )
         if Decimal(apartado.saldo_pendiente) <= Decimal("0.00"):
-            return self._render_whatsapp_template(templates["layaway_liquidated"], values)
-        return self._render_whatsapp_template(templates["layaway_reminder"], values)
+            return render_settings_whatsapp_template(templates["layaway_liquidated"], values)
+        return render_settings_whatsapp_template(templates["layaway_reminder"], values)
 
     def _handle_layaway_selection(self) -> None:
         self._refresh_layaway_detail(self._selected_layaway_id())
@@ -10220,83 +9736,51 @@ class MainWindow(QMainWindow):
             button.style().polish(button)
 
     def _handle_history_source_changed(self) -> None:
-        current_source = str(self.history_source_combo.currentData() or "")
-        current_type = str(self.history_type_combo.currentData() or "")
+        options_state = build_history_type_options_state(
+            source_filter=str(self.history_source_combo.currentData() or ""),
+            current_type=str(self.history_type_combo.currentData() or ""),
+            build_options=build_history_type_options,
+        )
         self.history_type_combo.blockSignals(True)
         self.history_type_combo.clear()
-        for label, value in build_history_type_options(current_source):
+        for label, value in options_state.options:
             self.history_type_combo.addItem(label, value)
-        if current_type:
-            index = self.history_type_combo.findData(current_type)
+        if options_state.selected_type_value:
+            index = self.history_type_combo.findData(options_state.selected_type_value)
             if index >= 0:
                 self.history_type_combo.setCurrentIndex(index)
         self.history_type_combo.blockSignals(False)
         self._handle_history_filter()
 
     def _set_history_today(self) -> None:
-        today = QDate.currentDate()
-        self.history_from_input.setDate(today)
-        self.history_to_input.setDate(today)
+        today = QDate.currentDate().toPyDate()
+        from_date, to_date = build_history_today_filter_dates(today)
+        self.history_from_input.setDate(QDate(from_date.year, from_date.month, from_date.day))
+        self.history_to_input.setDate(QDate(to_date.year, to_date.month, to_date.day))
         self._handle_history_filter()
 
     def _clear_history_filters(self) -> None:
-        empty_date = self.history_from_input.minimumDate()
+        reset_state = build_history_clear_filter_state(self.history_from_input.minimumDate().toPyDate())
         self.history_sku_input.clear()
-        self.history_source_combo.setCurrentIndex(0)
-        self.history_entity_combo.setCurrentIndex(0)
-        self.history_type_combo.setCurrentIndex(0)
-        self.history_from_input.setDate(empty_date)
-        self.history_to_input.setDate(empty_date)
+        self.history_source_combo.setCurrentIndex(reset_state.source_index)
+        self.history_entity_combo.setCurrentIndex(reset_state.entity_index)
+        self.history_type_combo.setCurrentIndex(reset_state.type_index)
+        self.history_from_input.setDate(QDate(reset_state.from_date.year, reset_state.from_date.month, reset_state.from_date.day))
+        self.history_to_input.setDate(QDate(reset_state.to_date.year, reset_state.to_date.month, reset_state.to_date.day))
         self._handle_history_filter()
 
     def _refresh_layaways(self, session) -> None:
-        apartados = ApartadoService.listar_apartados(session)
         search_text = self.layaway_search_input.text().strip().lower()
         state_filter = str(self.layaway_state_combo.currentData() or "")
         due_filter = str(self.layaway_due_combo.currentData() or "")
         selected_id = self._selected_layaway_id()
-        today = date.today()
-        week_limit = today + timedelta(days=7)
-
-        layaway_snapshots: list[dict[str, object]] = []
-        for apartado in apartados:
-            searchable = " ".join(
-                [
-                    apartado.folio,
-                    apartado.cliente.codigo_cliente if apartado.cliente is not None else "",
-                    apartado.cliente_nombre,
-                    apartado.cliente_telefono or "",
-                ]
-            ).lower()
-            due_date = apartado.fecha_compromiso.date() if apartado.fecha_compromiso else None
-            due_bucket = "none"
-            if due_date is not None and apartado.estado not in {EstadoApartado.ENTREGADO, EstadoApartado.CANCELADO}:
-                if due_date < today:
-                    due_bucket = "overdue"
-                elif due_date == today:
-                    due_bucket = "today"
-                elif due_date <= week_limit:
-                    due_bucket = "week"
-            due_text, due_tone = self._classify_layaway_due(apartado.fecha_compromiso, apartado.estado)
-            layaway_snapshots.append(
-                {
-                    "id": apartado.id,
-                    "folio": apartado.folio,
-                    "cliente": (
-                        f"{apartado.cliente.codigo_cliente} · {apartado.cliente_nombre}"
-                        if apartado.cliente is not None
-                        else f"Manual · {apartado.cliente_nombre}"
-                    ),
-                    "estado": apartado.estado.value,
-                    "total": Decimal(apartado.total),
-                    "abonado": Decimal(apartado.total_abonado),
-                    "saldo": Decimal(apartado.saldo_pendiente),
-                    "due_bucket": due_bucket,
-                    "due_text": due_text,
-                    "due_tone": due_tone,
-                    "searchable": searchable,
-                }
+        layaway_snapshots = build_layaway_history_input_rows(
+            load_layaway_snapshot_rows(
+                session,
+                today=date.today(),
+                classify_due=self._classify_layaway_due,
             )
+        )
         rows = build_layaway_history_rows(
             layaway_snapshots=layaway_snapshots,
             search_text=search_text,
@@ -10313,32 +9797,21 @@ class MainWindow(QMainWindow):
         )
 
         self.layaway_rows = rows
-        self.layaway_table.setRowCount(len(rows))
-        for row_index, row in enumerate(rows):
-            values = [
-                row["folio"],
-                row["cliente"],
-                row["estado"],
-                row["total"],
-                row["abonado"],
-                row["saldo"],
-                row["due_text"],
-            ]
-            for column_index, value in enumerate(values):
+        row_views = build_layaway_table_row_views(rows)
+        self.layaway_table.setRowCount(len(row_views))
+        for row_index, row_view in enumerate(row_views):
+            for column_index, value in enumerate(row_view.values):
                 self.layaway_table.setItem(row_index, column_index, _table_item(value))
-            self.layaway_table.item(row_index, 0).setData(Qt.ItemDataRole.UserRole, int(row["id"]))
+            self.layaway_table.item(row_index, 0).setData(Qt.ItemDataRole.UserRole, row_view.layaway_id)
             status_item = self.layaway_table.item(row_index, 2)
             balance_item = self.layaway_table.item(row_index, 5)
             due_item = self.layaway_table.item(row_index, 6)
             if status_item is not None:
-                _set_table_badge_style(status_item, str(row["status_tone"]))
+                _set_table_badge_style(status_item, row_view.status_tone)
             if balance_item is not None:
-                _set_table_badge_style(
-                    balance_item,
-                    "positive" if Decimal(row["saldo"]) == Decimal("0.00") else "warning",
-                )
+                _set_table_badge_style(balance_item, row_view.balance_tone)
             if due_item is not None:
-                _set_table_badge_style(due_item, str(row["due_tone"]))
+                _set_table_badge_style(due_item, row_view.due_tone)
         self.layaway_table.resizeColumnsToContents()
         self.layaway_status_label.setText(layaway_summary_view.status_label)
 
@@ -10357,105 +9830,82 @@ class MainWindow(QMainWindow):
     def _refresh_layaway_detail(self, apartado_id: int | None) -> None:
         if not apartado_id:
             detail_view = build_empty_layaway_detail_view()
-            self.layaway_summary_label.setText(detail_view.summary_label)
-            self.layaway_customer_label.setText(detail_view.customer_label)
-            self.layaway_balance_label.setText(detail_view.balance_label)
-            self.layaway_commitment_label.setText(detail_view.commitment_label)
-            self._set_badge_state(
-                self.layaway_due_status_label,
-                detail_view.due_badge.text,
-                detail_view.due_badge.tone,
-            )
-            self.layaway_notes_label.setText(detail_view.notes_label)
-            self.layaway_detail_table.setRowCount(len(detail_view.detail_rows))
-            self.layaway_payments_table.setRowCount(len(detail_view.payment_rows))
-            self.layaway_sale_ticket_button.setEnabled(detail_view.sale_ticket_enabled)
-            self.layaway_whatsapp_button.setEnabled(detail_view.whatsapp_enabled)
+            self._apply_layaway_detail_view(detail_view)
             return
 
         try:
             with get_session() as session:
-                apartado = ApartadoService.obtener_apartado(session, apartado_id)
-                if apartado is None:
-                    raise ValueError("Apartado no encontrado.")
-
-                due_text, due_tone = self._classify_layaway_due(apartado.fecha_compromiso, apartado.estado)
-                can_manage_layaways = self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
+                detail_snapshot = load_layaway_detail_snapshot(
+                    session,
+                    layaway_id=apartado_id,
+                    current_role=self.current_role,
+                    classify_due=self._classify_layaway_due,
+                )
                 detail_view = build_layaway_detail_view(
-                    folio=apartado.folio,
-                    estado=apartado.estado.value,
-                    customer_code=apartado.cliente.codigo_cliente if apartado.cliente is not None else "Manual",
-                    customer_name=apartado.cliente_nombre,
-                    customer_phone=apartado.cliente_telefono or "",
-                    total=Decimal(apartado.total),
-                    total_paid=Decimal(apartado.total_abonado),
-                    balance_due=Decimal(apartado.saldo_pendiente),
-                    commitment_label=apartado.fecha_compromiso.strftime("%Y-%m-%d") if apartado.fecha_compromiso else "Sin fecha",
-                    due_text=due_text,
-                    due_tone=due_tone,
-                    notes_text=apartado.observacion or "Sin observaciones.",
+                    folio=detail_snapshot.folio,
+                    estado=detail_snapshot.estado,
+                    customer_code=detail_snapshot.customer_code,
+                    customer_name=detail_snapshot.customer_name,
+                    customer_phone=detail_snapshot.customer_phone,
+                    total=detail_snapshot.total,
+                    total_paid=detail_snapshot.total_paid,
+                    balance_due=detail_snapshot.balance_due,
+                    commitment_label=detail_snapshot.commitment_label,
+                    due_text=detail_snapshot.due_text,
+                    due_tone=detail_snapshot.due_tone,
+                    notes_text=detail_snapshot.notes_text,
                     detail_rows=[
                         {
-                            "sku": detalle.variante.sku,
-                            "product_name": sanitize_product_display_name(detalle.variante.producto.nombre),
-                            "quantity": detalle.cantidad,
-                            "unit_price": detalle.precio_unitario,
-                            "subtotal": detalle.subtotal_linea,
+                            "sku": row.sku,
+                            "product_name": row.product_name,
+                            "quantity": row.quantity,
+                            "unit_price": row.unit_price,
+                            "subtotal": row.subtotal,
                         }
-                        for detalle in apartado.detalles
+                        for row in detail_snapshot.detail_rows
                     ],
                     payment_rows=[
                         {
-                            "created_at": abono.created_at.strftime("%Y-%m-%d %H:%M") if abono.created_at else "",
-                            "amount": abono.monto,
-                            "reference": abono.referencia or "",
-                            "username": abono.usuario.username,
+                            "created_at": row.created_at_label,
+                            "amount": row.amount,
+                            "reference": row.reference,
+                            "username": row.username,
                         }
-                        for abono in apartado.abonos
+                        for row in detail_snapshot.payment_rows
                     ],
-                    sale_ticket_enabled=can_manage_layaways and apartado.estado == EstadoApartado.ENTREGADO,
-                    whatsapp_enabled=can_manage_layaways and bool((apartado.cliente_telefono or "").strip()),
+                    sale_ticket_enabled=detail_snapshot.sale_ticket_enabled,
+                    whatsapp_enabled=detail_snapshot.whatsapp_enabled,
                 )
-                self.layaway_summary_label.setText(detail_view.summary_label)
-                self.layaway_customer_label.setText(detail_view.customer_label)
-                self.layaway_balance_label.setText(detail_view.balance_label)
-                self.layaway_commitment_label.setText(detail_view.commitment_label)
-                self._set_badge_state(
-                    self.layaway_due_status_label,
-                    detail_view.due_badge.text,
-                    detail_view.due_badge.tone,
-                )
-                self.layaway_notes_label.setText(detail_view.notes_label)
-                self.layaway_sale_ticket_button.setEnabled(detail_view.sale_ticket_enabled)
-                self.layaway_whatsapp_button.setEnabled(detail_view.whatsapp_enabled)
-
-                self.layaway_detail_table.setRowCount(len(detail_view.detail_rows))
-                for row_index, detail_row in enumerate(detail_view.detail_rows):
-                    for column_index, value in enumerate(detail_row.values):
-                        self.layaway_detail_table.setItem(row_index, column_index, _table_item(value))
-                self.layaway_detail_table.resizeColumnsToContents()
-
-                self.layaway_payments_table.setRowCount(len(detail_view.payment_rows))
-                for row_index, payment_row in enumerate(detail_view.payment_rows):
-                    for column_index, value in enumerate(payment_row.values):
-                        self.layaway_payments_table.setItem(row_index, column_index, _table_item(value))
-                self.layaway_payments_table.resizeColumnsToContents()
+                self._apply_layaway_detail_view(detail_view)
         except Exception as exc:  # noqa: BLE001
             detail_view = build_error_layaway_detail_view(str(exc))
-            self.layaway_summary_label.setText(detail_view.summary_label)
-            self.layaway_customer_label.setText(detail_view.customer_label)
-            self.layaway_balance_label.setText(detail_view.balance_label)
-            self.layaway_commitment_label.setText(detail_view.commitment_label)
-            self._set_badge_state(
-                self.layaway_due_status_label,
-                detail_view.due_badge.text,
-                detail_view.due_badge.tone,
-            )
-            self.layaway_notes_label.setText(detail_view.notes_label)
-            self.layaway_detail_table.setRowCount(len(detail_view.detail_rows))
-            self.layaway_payments_table.setRowCount(len(detail_view.payment_rows))
-            self.layaway_sale_ticket_button.setEnabled(detail_view.sale_ticket_enabled)
-            self.layaway_whatsapp_button.setEnabled(detail_view.whatsapp_enabled)
+            self._apply_layaway_detail_view(detail_view)
+
+    def _apply_layaway_detail_view(self, detail_view) -> None:
+        self.layaway_summary_label.setText(detail_view.summary_label)
+        self.layaway_customer_label.setText(detail_view.customer_label)
+        self.layaway_balance_label.setText(detail_view.balance_label)
+        self.layaway_commitment_label.setText(detail_view.commitment_label)
+        self._set_badge_state(
+            self.layaway_due_status_label,
+            detail_view.due_badge.text,
+            detail_view.due_badge.tone,
+        )
+        self.layaway_notes_label.setText(detail_view.notes_label)
+        self.layaway_sale_ticket_button.setEnabled(detail_view.sale_ticket_enabled)
+        self.layaway_whatsapp_button.setEnabled(detail_view.whatsapp_enabled)
+
+        self.layaway_detail_table.setRowCount(len(detail_view.detail_rows))
+        for row_index, detail_row in enumerate(detail_view.detail_rows):
+            for column_index, value in enumerate(detail_row.values):
+                self.layaway_detail_table.setItem(row_index, column_index, _table_item(value))
+        self.layaway_detail_table.resizeColumnsToContents()
+
+        self.layaway_payments_table.setRowCount(len(detail_view.payment_rows))
+        for row_index, payment_row in enumerate(detail_view.payment_rows):
+            for column_index, value in enumerate(payment_row.values):
+                self.layaway_payments_table.setItem(row_index, column_index, _table_item(value))
+        self.layaway_payments_table.resizeColumnsToContents()
 
     def _handle_open_layaway_whatsapp(self) -> None:
         apartado_id = self._selected_layaway_id()
@@ -10501,34 +9951,16 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            due_value = None
-            if payload["fecha_compromiso"]:
-                due_date = date.fromisoformat(str(payload["fecha_compromiso"]))
-                due_value = datetime.combine(due_date, datetime.min.time())
             with get_session() as session:
-                usuario = session.get(Usuario, self.user_id)
-                if usuario is None:
-                    raise ValueError("No se pudo cargar el usuario actual.")
-                cliente = None
-                if payload["cliente_id"] is not None:
-                    cliente = session.get(Cliente, int(payload["cliente_id"]))
-                    if cliente is None:
-                        raise ValueError("No se pudo cargar el cliente seleccionado.")
-                apartado = ApartadoService.crear_apartado(
+                result = create_layaway_from_payload(
                     session=session,
-                    usuario=usuario,
+                    user_id=self.user_id,
                     folio=self._generate_layaway_folio(),
-                    cliente_nombre=str(payload["cliente_nombre"]),
-                    cliente_telefono=str(payload["cliente_telefono"]),
-                    items=list(payload["items"]),
-                    anticipo=Decimal(payload["anticipo"]),
-                    fecha_compromiso=due_value,
-                    observacion=str(payload["observacion"]) or None,
-                    cliente=cliente,
+                    payload=payload,
                 )
                 session.commit()
-                apartado_id = apartado.id
-                apartado_folio = apartado.folio
+                apartado_id = result.layaway_id
+                apartado_folio = result.layaway_folio
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Apartado no creado", str(exc))
             return
@@ -10563,34 +9995,17 @@ class MainWindow(QMainWindow):
             return
 
         try:
-            due_value = None
-            if payload["fecha_compromiso"]:
-                due_date = date.fromisoformat(str(payload["fecha_compromiso"]))
-                due_value = datetime.combine(due_date, datetime.min.time())
             with get_session() as session:
-                usuario = session.get(Usuario, self.user_id)
-                if usuario is None:
-                    raise ValueError("No se pudo cargar el usuario actual.")
-                cliente = None
-                if payload["cliente_id"] is not None:
-                    cliente = session.get(Cliente, int(payload["cliente_id"]))
-                    if cliente is None:
-                        raise ValueError("No se pudo cargar el cliente seleccionado.")
-                apartado = ApartadoService.crear_apartado(
+                result = create_layaway_from_payload(
                     session=session,
-                    usuario=usuario,
+                    user_id=self.user_id,
                     folio=self._generate_layaway_folio(),
-                    cliente_nombre=str(payload["cliente_nombre"]),
-                    cliente_telefono=str(payload["cliente_telefono"]),
-                    items=list(payload["items"]),
-                    anticipo=Decimal(payload["anticipo"]),
-                    fecha_compromiso=due_value,
-                    observacion=str(payload["observacion"]) or "Creado desde Caja.",
-                    cliente=cliente,
+                    payload=payload,
+                    default_note="Creado desde Caja.",
                 )
                 session.commit()
-                apartado_id = apartado.id
-                apartado_folio = apartado.folio
+                apartado_id = result.layaway_id
+                apartado_folio = result.layaway_folio
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "No se pudo convertir", str(exc))
             return
@@ -10625,19 +10040,11 @@ class MainWindow(QMainWindow):
             return
         try:
             with get_session() as session:
-                usuario = session.get(Usuario, self.user_id)
-                apartado = ApartadoService.obtener_apartado(session, apartado_id)
-                if usuario is None or apartado is None:
-                    raise ValueError("No se pudo cargar el apartado seleccionado.")
-                ApartadoService.registrar_abono(
-                    session=session,
-                    apartado=apartado,
-                    usuario=usuario,
-                    monto=payload.amount,
-                    metodo_pago=payload.payment_method,
-                    monto_efectivo=payload.cash_amount,
-                    referencia=payload.reference or None,
-                    observacion=payload.notes or None,
+                register_layaway_payment(
+                    session,
+                    layaway_id=apartado_id,
+                    user_id=self.user_id,
+                    payment_input=payload,
                 )
                 session.commit()
         except Exception as exc:  # noqa: BLE001
@@ -10668,20 +10075,13 @@ class MainWindow(QMainWindow):
             return
         try:
             with get_session() as session:
-                usuario = session.get(Usuario, self.user_id)
-                apartado = ApartadoService.obtener_apartado(session, apartado_id)
-                if usuario is None or apartado is None:
-                    raise ValueError("No se pudo cargar el apartado seleccionado.")
-                sale = VentaService.crear_confirmada_desde_apartado(
-                    session=session,
-                    usuario=usuario,
-                    apartado=apartado,
-                    folio=f"ENT-{apartado.folio}",
-                    observacion=f"Entrega de apartado {apartado.folio}",
+                result = deliver_layaway(
+                    session,
+                    layaway_id=apartado_id,
+                    user_id=self.user_id,
                 )
-                ApartadoService.entregar_apartado(session, apartado, usuario)
                 session.commit()
-                sale_folio = sale.folio
+                sale_folio = result.sale_folio
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "No se pudo entregar", str(exc))
             return
@@ -10713,15 +10113,11 @@ class MainWindow(QMainWindow):
 
         try:
             with get_session() as session:
-                usuario = session.get(Usuario, self.user_id)
-                apartado = ApartadoService.obtener_apartado(session, apartado_id)
-                if usuario is None or apartado is None:
-                    raise ValueError("No se pudo cargar el apartado seleccionado.")
-                ApartadoService.cancelar_apartado(
-                    session=session,
-                    apartado=apartado,
-                    usuario=usuario,
-                    observacion=note_input.toPlainText().strip() or None,
+                cancel_layaway(
+                    session,
+                    layaway_id=apartado_id,
+                    user_id=self.user_id,
+                    note=note_input.toPlainText().strip() or None,
                 )
                 session.commit()
         except Exception as exc:  # noqa: BLE001
@@ -10943,7 +10339,7 @@ class MainWindow(QMainWindow):
         self.sale_cart_table.setRowCount(len(self.sale_cart))
         pricing = self._calculate_sale_pricing()
         breakdown = self._sale_discount_breakdown()
-        cashier_view = build_sale_cashier_view(
+        panel_view = build_sale_cashier_panel_view(
             sale_cart=self.sale_cart,
             subtotal=pricing.subtotal,
             applied_discount=pricing.applied_discount,
@@ -10951,18 +10347,18 @@ class MainWindow(QMainWindow):
             collected_total=pricing.collected_total,
             payment_method=self.sale_payment_combo.currentText().strip() or "Efectivo",
             winner_label=str(breakdown["winner_label"]),
+            can_sell=self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO},
         )
-        for row_index, row in enumerate(cashier_view.table_view.rows):
+        for row_index, row in enumerate(panel_view.cashier_view.table_view.rows):
             for column_index, value in enumerate(row.values):
                 self.sale_cart_table.setItem(row_index, column_index, _table_item(value))
         self.sale_cart_table.resizeColumnsToContents()
-        self.sale_total_label.setText(cashier_view.summary.total_label)
-        self.sale_total_meta_label.setText(cashier_view.summary.meta_label)
-        self.sale_summary_label.setText(cashier_view.summary.summary_label)
-        self._refresh_payment_fields()
-        can_sell = self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
-        self.sale_remove_button.setEnabled(can_sell and bool(self.sale_cart))
-        self.sale_clear_button.setEnabled(can_sell and bool(self.sale_cart))
+        self.sale_total_label.setText(panel_view.cashier_view.summary.total_label)
+        self.sale_total_meta_label.setText(panel_view.cashier_view.summary.meta_label)
+        self.sale_summary_label.setText(panel_view.cashier_view.summary.summary_label)
+        self.sale_feedback_label.setToolTip(panel_view.payment_tooltip)
+        self.sale_remove_button.setEnabled(panel_view.remove_enabled)
+        self.sale_clear_button.setEnabled(panel_view.clear_enabled)
         self._refresh_permissions()
 
     def _refresh_quote_cart_table(self) -> None:
