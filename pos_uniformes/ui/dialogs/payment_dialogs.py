@@ -17,7 +17,6 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
-    QVBoxLayout,
 )
 
 from pos_uniformes.ui.keypad_input_helper import (

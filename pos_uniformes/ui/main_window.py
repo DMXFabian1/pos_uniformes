@@ -10,7 +10,6 @@ from pathlib import Path
 import subprocess
 import sys
 from time import monotonic
-from types import SimpleNamespace
 import unicodedata
 from urllib.parse import quote
 from uuid import uuid4
@@ -61,8 +60,6 @@ from pos_uniformes.database.connection import engine, get_session, test_connecti
 from pos_uniformes.database.models import (
     AtributoProducto,
     Apartado,
-    ApartadoAbono,
-    ApartadoDetalle,
     Categoria,
     Cliente,
     Compra,
@@ -73,10 +70,7 @@ from pos_uniformes.database.models import (
     EstadoVenta,
     Marca,
     MovimientoInventario,
-    ImportacionCatalogoFila,
-    NivelLealtad,
     NivelEducativo,
-    Presupuesto,
     Producto,
     Proveedor,
     RolUsuario,
@@ -87,9 +81,8 @@ from pos_uniformes.database.models import (
     Usuario,
     Variante,
     Venta,
-    VentaDetalle,
 )
-from pos_uniformes.services.apartado_service import ApartadoItemInput, ApartadoService
+from pos_uniformes.services.apartado_service import ApartadoService
 from pos_uniformes.services.active_filter_service import (
     build_active_filter_labels,
     build_active_filters_summary,
@@ -154,7 +147,6 @@ from pos_uniformes.services.inventory_label_service import (
 )
 from pos_uniformes.services.inventory_overview_service import load_inventory_overview_snapshot
 from pos_uniformes.services.inventory_snapshot_service import load_inventory_snapshot_rows
- 
 from pos_uniformes.services.manual_promo_service import ManualPromoService
 from pos_uniformes.services.presupuesto_service import PresupuestoItemInput, PresupuestoService
 from pos_uniformes.services.quote_snapshot_service import (
@@ -308,7 +300,6 @@ from pos_uniformes.ui.helpers.analytics_top_clients_helper import build_analytic
 from pos_uniformes.ui.helpers.analytics_top_products_helper import build_analytics_top_product_rows
 from pos_uniformes.ui.helpers.analytics_stock_helper import build_analytics_stock_row_views
 from pos_uniformes.ui.helpers.catalog_refresh_helper import (
-    build_catalog_snapshot_rows,
     build_catalog_table_values,
 )
 from pos_uniformes.ui.helpers.history_filter_helper import build_history_type_options
@@ -397,7 +388,6 @@ from pos_uniformes.ui.helpers.quote_table_row_helper import build_quote_table_ro
 from pos_uniformes.ui.helpers.printable_document_flow_helper import open_printable_document_flow
 from pos_uniformes.ui.helpers.sale_client_selection_helper import (
     build_empty_sale_client_selection_ui_state,
-    build_sale_client_selection_ui_state,
 )
 from pos_uniformes.ui.helpers.sale_cashier_panel_helper import build_sale_cashier_panel_view
 from pos_uniformes.ui.helpers.sale_checkout_feedback_helper import (
