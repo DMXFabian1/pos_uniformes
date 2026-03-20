@@ -10,7 +10,6 @@ from pathlib import Path
 import subprocess
 import sys
 from time import monotonic
-import unicodedata
 from urllib.parse import quote
 from uuid import uuid4
 import webbrowser
@@ -41,7 +40,6 @@ from PyQt6.QtWidgets import (
     QPushButton,
     QScrollArea,
     QSpinBox,
-    QStackedWidget,
     QTabWidget,
     QTableWidget,
     QTableWidgetItem,
@@ -257,6 +255,11 @@ from pos_uniformes.ui.dialogs.settings_prompt_dialogs import (
     prompt_role_change,
     prompt_supplier_data,
 )
+from pos_uniformes.ui.dialogs.catalog_product_dialog import build_catalog_product_dialog
+from pos_uniformes.ui.dialogs.catalog_variant_dialog import (
+    build_catalog_batch_variant_dialog,
+    build_catalog_variant_dialog,
+)
 from pos_uniformes.ui.dialogs.layaway_payment_dialog import build_layaway_payment_dialog
 from pos_uniformes.ui.dialogs.create_layaway_dialog import build_create_layaway_dialog
 from pos_uniformes.ui.dialogs.inventory_context_menu_dialog import prompt_inventory_context_action
@@ -284,6 +287,10 @@ from pos_uniformes.ui.helpers.catalog_filter_helper import (
 from pos_uniformes.ui.helpers.catalog_macro_filter_helper import (
     build_catalog_uniform_macro_button_states,
     resolve_catalog_uniform_macro_selection,
+)
+from pos_uniformes.ui.helpers.catalog_form_payload_helper import (
+    validate_catalog_product_submission,
+    validate_catalog_variant_submission,
 )
 from pos_uniformes.ui.helpers.analytics_payment_helper import build_analytics_payment_rows
 from pos_uniformes.ui.helpers.analytics_layaway_helper import build_analytics_layaway_labels_view
@@ -483,19 +490,6 @@ from pos_uniformes.ui.views.quotes_view import build_quotes_tab
 from pos_uniformes.ui.views.settings_view import build_settings_tab
 from pos_uniformes.ui.styles.main_window_styles import build_main_window_stylesheet
 from pos_uniformes.utils.product_name import sanitize_product_display_name
-from pos_uniformes.utils.product_templates import (
-    build_price_blocks,
-    build_product_template_preview,
-    build_step_template_preview,
-    load_legacy_config_choices,
-    load_legacy_product_templates,
-    load_step_product_templates,
-    merge_choice_lists,
-    product_template_defaults,
-    suggest_price_capture_mode,
-    suggest_presentation_template,
-    step_template_defaults,
-)
 from pos_uniformes.utils.qr_generator import QrGenerator
 
 
@@ -962,11 +956,12 @@ class MainWindow(QMainWindow):
         self.catalog_category_filter_combo = MultiSelectFilterButton("Categoria: todas")
         self.catalog_brand_filter_combo = MultiSelectFilterButton("Marca: todas")
         self.catalog_school_filter_combo = MultiSelectFilterButton("Escuela: todas")
-        self.catalog_type_filter_combo = MultiSelectFilterButton("Tipo uniforme: todos")
+        self.catalog_type_filter_combo = MultiSelectFilterButton("Linea: todas")
         self.catalog_piece_filter_combo = MultiSelectFilterButton("Pieza: todas")
         self.catalog_size_filter_combo = MultiSelectFilterButton("Talla: todas")
         self.catalog_color_filter_combo = MultiSelectFilterButton("Color: todos")
         self.catalog_uniform_macro_buttons: dict[str, QPushButton] = {}
+        self.catalog_school_scope_filter_combo = QComboBox()
         self.catalog_status_filter_combo = QComboBox()
         self.catalog_stock_filter_combo = QComboBox()
         self.catalog_layaway_filter_combo = QComboBox()
@@ -1447,6 +1442,9 @@ class MainWindow(QMainWindow):
         )
         self.catalog_search_input.setToolTip(
             "Busca por producto, color, talla, marca, escuela o SKU. Si quieres mas precision, tambien acepta prefijos como sku:, producto: o color:."
+        )
+        self.catalog_school_scope_filter_combo.setToolTip(
+            "Separa el catalogo entre uniforme escolar y ropa normal segun la categoria real del producto."
         )
         self.catalog_clear_filters_button.setToolTip("Limpia todos los filtros del catalogo y muestra nuevamente todo el catalogo.")
         self.inventory_search_input.setToolTip(
@@ -3489,1540 +3487,16 @@ class MainWindow(QMainWindow):
         self._set_sale_feedback("Sesion actualizada correctamente.", "positive", auto_clear_ms=1800)
 
     def _prompt_product_data(self, initial: dict[str, object] | None = None) -> dict[str, object] | None:
-        with get_session() as session:
-            categorias = [
-                (categoria.id, categoria.nombre)
-                for categoria in session.scalars(
-                    select(Categoria).where(Categoria.activo.is_(True)).order_by(Categoria.nombre)
-                ).all()
-            ]
-            marcas = [
-                (marca.id, marca.nombre)
-                for marca in session.scalars(
-                    select(Marca).where(Marca.activo.is_(True)).order_by(Marca.nombre)
-                ).all()
-            ]
-            escuelas = [escuela.nombre for escuela in session.scalars(select(Escuela).where(Escuela.activo.is_(True)).order_by(Escuela.nombre)).all()]
-            tipos_prenda = [tipo.nombre for tipo in session.scalars(select(TipoPrenda).where(TipoPrenda.activo.is_(True)).order_by(TipoPrenda.nombre)).all()]
-            tipos_pieza = [tipo.nombre for tipo in session.scalars(select(TipoPieza).where(TipoPieza.activo.is_(True)).order_by(TipoPieza.nombre)).all()]
-            atributos = [atributo.nombre for atributo in session.scalars(select(AtributoProducto).where(AtributoProducto.activo.is_(True)).order_by(AtributoProducto.nombre)).all()]
-            niveles = [nivel.nombre for nivel in session.scalars(select(NivelEducativo).where(NivelEducativo.activo.is_(True)).order_by(NivelEducativo.nombre)).all()]
-            product_initial = None
-            if initial is not None:
-                producto = session.get(Producto, int(initial["producto_id"]))
-                if producto is not None:
-                    product_initial = {
-                        "categoria_id": producto.categoria_id,
-                        "marca_id": producto.marca_id,
-                        "nombre_base": producto.nombre_base,
-                        "descripcion": producto.descripcion or "",
-                        "escuela": producto.escuela.nombre if producto.escuela else "",
-                        "tipo_prenda": producto.tipo_prenda.nombre if producto.tipo_prenda else "",
-                        "tipo_pieza": producto.tipo_pieza.nombre if producto.tipo_pieza else "",
-                        "atributo": producto.atributo.nombre if producto.atributo else "",
-                        "nivel_educativo": producto.nivel_educativo.nombre if producto.nivel_educativo else "",
-                        "genero": producto.genero or "",
-                        "escudo": producto.escudo or "",
-                        "ubicacion": producto.ubicacion or "",
-                    }
-
-        if not categorias or not marcas:
-            raise ValueError("Primero necesitas al menos una categoria y una marca activas.")
-
-        legacy_choices = load_legacy_config_choices()
-        escuelas = merge_choice_lists(escuelas)
-        tipos_uniforme = ["Deportivo", "Oficial", "Basico", "Escolta", "Accesorio"]
-        tipos_prenda = merge_choice_lists(tipos_prenda, legacy_choices.get("TIPOS_PRENDA", []), tipos_uniforme)
-        tipos_pieza = merge_choice_lists(tipos_pieza, legacy_choices.get("TIPOS_PIEZA", []))
-        atributos = merge_choice_lists(atributos, legacy_choices.get("ATRIBUTOS", []))
-        niveles = merge_choice_lists(niveles, legacy_choices.get("NIVELES_EDUCATIVOS", []))
-        generos_disponibles = merge_choice_lists(legacy_choices.get("GENEROS", []))
-        escudos_disponibles = merge_choice_lists(legacy_choices.get("ESCUDOS", []))
-        ubicaciones_disponibles = merge_choice_lists(legacy_choices.get("UBICACIONES", []))
-
-        dialog, layout = self._create_modal_dialog(
-            "Producto",
-            "Captura los datos base del producto. Esta accion no altera inventario por si sola.",
-            width=1040,
-            expand_to_screen=True,
+        return build_catalog_product_dialog(
+            self,
+            initial=initial,
+            picker_button_class=MultiSelectPickerButton,
+            product_templates=PRODUCT_TEMPLATES,
+            common_sizes=COMMON_SIZES,
+            common_colors=COMMON_COLORS,
+            default_variant_size=DEFAULT_VARIANT_SIZE,
+            default_variant_color=DEFAULT_VARIANT_COLOR,
         )
-        legacy_templates = load_legacy_product_templates()
-        template_entries: list[dict[str, object]] = [
-            {
-                "source": "builtin",
-                "label": str(template["label"]),
-                "category": str(template["category"]),
-                "name": str(template["name"]),
-                "description": str(template["description"]),
-            }
-            for template in PRODUCT_TEMPLATES
-        ]
-        template_entries.extend(legacy_templates)
-        base_step_templates = load_step_product_templates("base")
-        context_step_templates = load_step_product_templates("context")
-        presentation_step_templates = load_step_product_templates("presentation")
-        template_combo = QComboBox()
-        template_combo.addItem("Selecciona una plantilla", None)
-        for template_entry in template_entries:
-            template_combo.addItem(str(template_entry["label"]), template_entry)
-        base_template_combo = QComboBox()
-        base_template_combo.addItem("Selecciona plantilla base", None)
-        for template_entry in base_step_templates:
-            base_template_combo.addItem(str(template_entry["label"]), template_entry)
-        context_template_combo = QComboBox()
-        context_template_combo.addItem("Selecciona plantilla de contexto", None)
-        for template_entry in context_step_templates:
-            context_template_combo.addItem(str(template_entry["label"]), template_entry)
-        presentation_template_combo = QComboBox()
-        presentation_template_combo.addItem("Selecciona plantilla de presentaciones", None)
-        for template_entry in presentation_step_templates:
-            presentation_template_combo.addItem(str(template_entry["label"]), template_entry)
-        categoria_combo = QComboBox()
-        categoria_combo.addItem("Selecciona categoria", None)
-        for categoria_id, categoria_nombre in categorias:
-            categoria_combo.addItem(categoria_nombre, categoria_id)
-        marca_combo = QComboBox()
-        marca_combo.addItem("Selecciona marca", None)
-        for marca_id, marca_nombre in marcas:
-            marca_combo.addItem(marca_nombre, marca_id)
-        add_category_button = QPushButton("+")
-        add_brand_button = QPushButton("+")
-        add_category_button.setObjectName("iconButton")
-        add_brand_button.setObjectName("iconButton")
-        add_category_button.setToolTip("Crear una categoria nueva sin salir de esta ventana.")
-        add_brand_button.setToolTip("Crear una marca nueva sin salir de esta ventana.")
-        uniform_category_label = QLabel("Uniformes")
-        uniform_category_label.setObjectName("readOnlyField")
-        nombre_input = QLineEdit()
-        descripcion_input = QTextEdit()
-        descripcion_input.setFixedHeight(90)
-        escuela_combo = QComboBox()
-        escuela_combo.setEditable(True)
-        escuela_combo.addItem("")
-        escuela_combo.addItems(escuelas)
-        tipo_prenda_combo = QComboBox()
-        tipo_prenda_combo.setEditable(True)
-        tipo_prenda_combo.addItem("")
-        tipo_prenda_combo.addItems(tipos_prenda)
-        tipo_pieza_combo = QComboBox()
-        tipo_pieza_combo.setEditable(True)
-        tipo_pieza_combo.addItem("")
-        tipo_pieza_combo.addItems(tipos_pieza)
-        atributo_combo = QComboBox()
-        atributo_combo.setEditable(True)
-        atributo_combo.addItem("")
-        atributo_combo.addItems(atributos)
-        nivel_combo = QComboBox()
-        nivel_combo.setEditable(True)
-        nivel_combo.addItem("")
-        nivel_combo.addItems(niveles)
-        genero_input = QComboBox()
-        genero_input.setEditable(True)
-        genero_input.addItem("")
-        genero_input.addItems(generos_disponibles)
-        escudo_input = QComboBox()
-        escudo_input.setEditable(True)
-        escudo_input.addItem("")
-        escudo_input.addItems(escudos_disponibles)
-        ubicacion_input = QComboBox()
-        ubicacion_input.setEditable(True)
-        ubicacion_input.addItem("")
-        ubicacion_input.addItems(ubicaciones_disponibles)
-        variant_sizes_button = MultiSelectPickerButton(
-            "Tallas: ninguna",
-            title="Seleccionar tallas",
-            helper_text="Marca varias tallas sin que el selector se cierre a cada clic. Puedes filtrar, elegir varias y aplicar al final.",
-            columns=5,
-            presets=[
-                ("Basicas", ["2", "4", "6", "8", "10", "12", "14", "16"]),
-                ("Pants", ["16", "CH", "MD", "GD", "EXG"]),
-                ("Mallas", ["0-0", "0-2", "3-5", "6-8", "9-12", "13-18", "CH-MD", "GD-EXG", "Dama"]),
-                ("Pares", lambda values: [value for value in values if value.isdigit() and int(value) % 2 == 0]),
-                ("Todas", lambda values: list(values)),
-                ("Ninguna", []),
-            ],
-        )
-        variant_colors_button = MultiSelectPickerButton(
-            "Colores: ninguno",
-            title="Seleccionar colores",
-            helper_text="Marca uno o varios colores para generar las presentaciones en lote. Si no eliges color, se usara Sin color.",
-            columns=4,
-            presets=[
-                ("Todos", lambda values: [value for value in values if value != DEFAULT_VARIANT_COLOR]),
-                ("Ninguno", []),
-            ],
-        )
-        variant_price_input = QLineEdit()
-        variant_price_input.setPlaceholderText("Ej. 199.00")
-        variant_cost_input = QLineEdit()
-        variant_cost_input.setPlaceholderText("Opcional")
-        variant_stock_spin = QSpinBox()
-        variant_stock_spin.setRange(0, 10000)
-        variant_sizes_summary = QLabel("Sin tallas seleccionadas.")
-        variant_colors_summary = QLabel("Sin colores seleccionados.")
-        variant_count_summary = QLabel("Si eliges tallas y colores, al guardar podremos crear presentaciones por lote.")
-        price_mode_combo = QComboBox()
-        price_mode_combo.addItem("Precio unico", "single")
-        price_mode_combo.addItem("Precio por bloques", "blocks")
-        price_mode_combo.addItem("Precio manual por talla", "manual")
-        configure_prices_button = QPushButton("Configurar precios")
-        price_mode_hint = QLabel("Captura un solo precio para todas las tallas o usa bloques si manejas escalones.")
-        price_mode_hint.setWordWrap(True)
-        price_mode_hint.setObjectName("subtleLine")
-        price_strategy_summary = QLabel("Todavia no hay estructura de precios definida.")
-        price_strategy_summary.setWordWrap(True)
-        price_strategy_summary.setObjectName("subtleLine")
-        variant_sizes_summary.setObjectName("subtleLine")
-        variant_colors_summary.setObjectName("subtleLine")
-        variant_count_summary.setObjectName("subtleLine")
-        auto_name_checkbox = QCheckBox("Auto")
-        auto_name_checkbox.setChecked(initial is None)
-        generate_name_button = QPushButton("Generar")
-        final_name_preview = QLabel("Nombre final pendiente.")
-        final_name_preview.setWordWrap(True)
-        final_name_preview.setObjectName("subtleLine")
-        live_name_card = QFrame()
-        live_name_card.setObjectName("infoCard")
-        live_name_card_layout = QVBoxLayout()
-        live_name_card_layout.setContentsMargins(16, 14, 16, 14)
-        live_name_card_layout.setSpacing(4)
-        live_name_caption = QLabel("Nombre del producto")
-        live_name_caption.setObjectName("liveNameCaption")
-        live_name_title = QLabel("Nombre en construccion")
-        live_name_title.setWordWrap(True)
-        live_name_title.setObjectName("liveNameValue")
-        live_name_hint = QLabel(
-            "Se construye conforme avanzas en base, contexto y presentaciones."
-        )
-        live_name_hint.setWordWrap(True)
-        live_name_hint.setObjectName("liveNameHint")
-        live_name_card_layout.addWidget(live_name_caption)
-        live_name_card_layout.addWidget(live_name_title)
-        live_name_card_layout.addWidget(live_name_hint)
-        live_name_card.setLayout(live_name_card_layout)
-        capture_summary_card = QFrame()
-        capture_summary_card.setObjectName("infoCard")
-        capture_summary_layout = QVBoxLayout()
-        capture_summary_layout.setContentsMargins(12, 10, 12, 10)
-        capture_summary_layout.setSpacing(4)
-        capture_summary_label = QLabel("Completa los datos para ver un resumen en vivo.")
-        capture_summary_label.setWordWrap(True)
-        capture_summary_label.setTextFormat(Qt.TextFormat.RichText)
-        capture_summary_label.setObjectName("templatePreviewLabel")
-        capture_summary_layout.addWidget(capture_summary_label)
-        capture_summary_card.setLayout(capture_summary_layout)
-        apply_template_button = QPushButton("Aplicar")
-        apply_template_button.setEnabled(False)
-        apply_template_button.setToolTip(
-            "Aplica los valores visibles de la plantilla al producto base para que revises el resultado antes de guardar."
-        )
-        apply_base_template_button = QPushButton("Aplicar base")
-        apply_base_template_button.setEnabled(False)
-        base_template_preview = QLabel("Selecciona una plantilla base para sugerir familia, pieza y descripcion.")
-        base_template_preview.setWordWrap(True)
-        base_template_preview.setTextFormat(Qt.TextFormat.RichText)
-        base_template_preview.setObjectName("templatePreviewLabel")
-        apply_context_template_button = QPushButton("Aplicar contexto")
-        apply_context_template_button.setEnabled(False)
-        context_template_preview = QLabel("Selecciona una plantilla de contexto para sugerir nivel, prenda y escudo.")
-        context_template_preview.setWordWrap(True)
-        context_template_preview.setTextFormat(Qt.TextFormat.RichText)
-        context_template_preview.setObjectName("templatePreviewLabel")
-        context_inheritance_hint = QLabel("La herencia desde plantilla base aparecera aqui cuando aplique.")
-        context_inheritance_hint.setWordWrap(True)
-        context_inheritance_hint.setObjectName("subtleLine")
-        apply_presentation_template_button = QPushButton("Aplicar presentaciones")
-        apply_presentation_template_button.setEnabled(False)
-        presentation_template_preview = QLabel("Selecciona una plantilla de presentaciones para sugerir tallas y colores.")
-        presentation_template_preview.setWordWrap(True)
-        presentation_template_preview.setTextFormat(Qt.TextFormat.RichText)
-        presentation_template_preview.setObjectName("templatePreviewLabel")
-        presentation_template_hint = QLabel("Aun no hay una sugerencia automatica para este paso.")
-        presentation_template_hint.setWordWrap(True)
-        presentation_template_hint.setObjectName("subtleLine")
-        template_preview_card = QFrame()
-        template_preview_card.setObjectName("infoCard")
-        template_preview_layout = QVBoxLayout()
-        template_preview_layout.setContentsMargins(12, 10, 12, 10)
-        template_preview_layout.setSpacing(4)
-        template_preview = QLabel("Selecciona una plantilla para revisar su resumen antes de aplicarla.")
-        template_preview.setWordWrap(True)
-        template_preview.setTextFormat(Qt.TextFormat.RichText)
-        template_preview.setObjectName("templatePreviewLabel")
-        template_preview_layout.addWidget(template_preview)
-        template_preview_card.setLayout(template_preview_layout)
-        template_preview_card.setMinimumHeight(132)
-        template_preview_card.setMaximumHeight(180)
-        base_template_preview_card = QFrame()
-        base_template_preview_card.setObjectName("infoCard")
-        base_template_preview_card_layout = QVBoxLayout()
-        base_template_preview_card_layout.setContentsMargins(12, 10, 12, 10)
-        base_template_preview_card_layout.setSpacing(4)
-        base_template_preview_card_layout.addWidget(base_template_preview)
-        base_template_preview_card.setLayout(base_template_preview_card_layout)
-        base_template_preview_card.setMaximumHeight(132)
-        context_template_preview_card = QFrame()
-        context_template_preview_card.setObjectName("infoCard")
-        context_template_preview_card_layout = QVBoxLayout()
-        context_template_preview_card_layout.setContentsMargins(12, 10, 12, 10)
-        context_template_preview_card_layout.setSpacing(4)
-        context_template_preview_card_layout.addWidget(context_template_preview)
-        context_template_preview_card_layout.addWidget(context_inheritance_hint)
-        context_template_preview_card.setLayout(context_template_preview_card_layout)
-        context_template_preview_card.setMaximumHeight(132)
-        presentation_template_preview_card = QFrame()
-        presentation_template_preview_card.setObjectName("infoCard")
-        presentation_template_preview_card_layout = QVBoxLayout()
-        presentation_template_preview_card_layout.setContentsMargins(12, 10, 12, 10)
-        presentation_template_preview_card_layout.setSpacing(4)
-        presentation_template_preview_card_layout.addWidget(presentation_template_preview)
-        presentation_template_preview_card_layout.addWidget(presentation_template_hint)
-        presentation_template_preview_card.setLayout(presentation_template_preview_card_layout)
-        presentation_template_preview_card.setMaximumHeight(148)
-
-        def unique_values(values: list[str]) -> list[str]:
-            return [value for value in dict.fromkeys(values) if value]
-
-        def normalize_values(raw_values: object) -> list[str]:
-            if not isinstance(raw_values, list):
-                return []
-            normalized: list[str] = []
-            for raw_value in raw_values:
-                value = str(raw_value or "").strip()
-                if value:
-                    normalized.append(value)
-            return unique_values(normalized)
-
-        def preview_values(values: list[str], *, max_items: int = 6) -> str:
-            if not values:
-                return "ninguno"
-            if len(values) <= max_items:
-                return ", ".join(values)
-            return f"{', '.join(values[:max_items])} ... (+{len(values) - max_items})"
-
-        def normalize_lookup_text(value: str) -> str:
-            decomposed = unicodedata.normalize("NFKD", value.strip().casefold())
-            return "".join(char for char in decomposed if not unicodedata.combining(char))
-
-        def is_placeholder_brand(value: str) -> bool:
-            normalized = normalize_lookup_text(value)
-            return normalized in {"", "sin marca", "selecciona marca"}
-
-        def select_combo_text(combo: QComboBox, text: str) -> bool:
-            normalized_target = normalize_lookup_text(text)
-            if not normalized_target:
-                return False
-            for index in range(combo.count()):
-                if normalize_lookup_text(combo.itemText(index)) == normalized_target:
-                    combo.setCurrentIndex(index)
-                    return True
-            return False
-
-        def set_editable_combo_text(combo: QComboBox, text: str) -> None:
-            normalized_text = text.strip()
-            if not normalized_text:
-                return
-            if not select_combo_text(combo, normalized_text):
-                combo.setEditText(normalized_text)
-
-        def current_base_template_defaults() -> dict[str, object]:
-            template_entry = base_template_combo.currentData()
-            if isinstance(template_entry, dict):
-                return step_template_defaults("base", template_entry)
-            return {}
-
-        def merged_context_defaults(template_entry: dict[str, object]) -> dict[str, object]:
-            resolved = dict(step_template_defaults("context", template_entry))
-            base_defaults = current_base_template_defaults()
-            for key in ("garment_type", "piece_type", "attribute", "gender"):
-                if not str(resolved.get(key) or "").strip():
-                    inherited_value = str(base_defaults.get(key) or "").strip()
-                    if inherited_value:
-                        resolved[key] = inherited_value
-            return resolved
-
-        def update_context_inheritance_hint() -> None:
-            template_entry = context_template_combo.currentData()
-            if not isinstance(template_entry, dict):
-                context_inheritance_hint.setText("La herencia desde plantilla base aparecera aqui cuando aplique.")
-                return
-            base_defaults = current_base_template_defaults()
-            inherited_parts: list[str] = []
-            for key, label in (
-                ("piece_type", "pieza"),
-                ("attribute", "atributo"),
-                ("gender", "genero"),
-            ):
-                context_value = str(template_entry.get(key) or "").strip()
-                base_value = str(base_defaults.get(key) or "").strip()
-                if not context_value and base_value:
-                    inherited_parts.append(f"{label}: {base_value}")
-            if inherited_parts:
-                context_inheritance_hint.setText(
-                    f"Si aplicas este contexto, heredara desde la plantilla base: {' | '.join(inherited_parts)}."
-                )
-            else:
-                context_inheritance_hint.setText(
-                    "Este contexto ya trae sus propios datos clave o no necesita herencia adicional."
-                )
-
-        def ensure_uniform_category() -> bool:
-            normalized_name = "Uniformes"
-            if not normalized_name:
-                return False
-            if select_combo_text(categoria_combo, normalized_name):
-                return True
-            if self.current_role != RolUsuario.ADMIN:
-                return False
-            try:
-                with get_session() as session:
-                    user = session.get(Usuario, self.user_id)
-                    if user is None:
-                        raise ValueError("Usuario no encontrado.")
-                    categoria = CatalogService.crear_categoria(
-                        session,
-                        user,
-                        normalized_name,
-                        descripcion=f"Creada desde plantilla: {normalized_name}.",
-                    )
-                    session.commit()
-                    categoria_id = int(categoria.id)
-            except Exception:
-                return False
-            categoria_combo.addItem(normalized_name, categoria_id)
-            categoria_combo.setCurrentIndex(categoria_combo.count() - 1)
-            return True
-
-        def update_variant_summary() -> None:
-            selected_sizes = variant_sizes_button.selected_labels()
-            selected_colors = variant_colors_button.selected_labels()
-            variant_sizes_summary.setText(
-                f"Tallas elegidas: {preview_values(selected_sizes)}"
-                if selected_sizes
-                else "Tallas elegidas: ninguna. Si el producto no maneja talla, usaremos Unitalla."
-            )
-            variant_colors_summary.setText(
-                f"Colores elegidos: {preview_values(selected_colors, max_items=5)}"
-                if selected_colors
-                else "Colores elegidos: ninguno. Si el producto no maneja color, usaremos Sin color."
-            )
-            total_sizes = max(1, len(selected_sizes))
-            total_colors = max(1, len(selected_colors))
-            total_variants = total_sizes * total_colors
-            variant_count_summary.setText(
-                f"Presentaciones previstas: {total_variants}. Se generaran despues de guardar el producto base."
-            )
-            update_capture_summary()
-
-        auto_name_enabled = {"value": bool(initial is None)}
-        last_auto_name = {"value": ""}
-        presentation_template_state = {"suggested_label": ""}
-        price_mode_state = {"manual_override": False}
-        price_value_store: dict[str, dict[str, str] | str] = {
-            "single": "",
-            "blocks": {},
-            "manual": {},
-        }
-
-        def gender_abbreviation(raw_value: str) -> str:
-            normalized = raw_value.strip().casefold()
-            mapping = {
-                "hombre": "H",
-                "mujer": "M",
-                "unisex": "U",
-                "nino": "N",
-                "niño": "N",
-                "nina": "N",
-                "niña": "N",
-            }
-            return mapping.get(normalized, raw_value.strip())
-
-        def looks_feminine_piece(raw_value: str) -> bool:
-            normalized = normalize_lookup_text(raw_value)
-            feminine_terms = (
-                "chamarra",
-                "playera",
-                "blusa",
-                "falda",
-                "malla",
-                "sudadera",
-                "camisa",
-            )
-            return any(term in normalized for term in feminine_terms)
-
-        def garment_descriptor(piece_value: str, garment_value: str) -> str:
-            normalized = normalize_lookup_text(garment_value)
-            if not normalized:
-                return ""
-            if normalized == "deportivo":
-                return "deportiva" if looks_feminine_piece(piece_value) else "deportivo"
-            if normalized == "basico":
-                return "basica" if looks_feminine_piece(piece_value) else "basico"
-            if normalized == "accesorio":
-                return "escolar"
-            return garment_value.strip()
-
-        def build_suggested_base_name() -> str:
-            base_template_entry = base_template_combo.currentData()
-            if isinstance(base_template_entry, dict):
-                base_template_label = str(base_template_entry.get("label") or "").strip()
-                if base_template_label:
-                    return base_template_label
-
-            template_entry = template_combo.currentData()
-            template_name = ""
-            if isinstance(template_entry, dict):
-                template_name = str(template_entry.get("name") or "").strip()
-            piece_type = tipo_pieza_combo.currentText().strip()
-            garment_type = tipo_prenda_combo.currentText().strip()
-            brand = marca_combo.currentText().strip() if marca_combo.currentData() is not None else ""
-            if is_placeholder_brand(brand):
-                brand = ""
-            attribute = atributo_combo.currentText().strip()
-            gender = gender_abbreviation(genero_input.currentText()) if genero_input.currentIndex() > 0 else ""
-            parts: list[str] = []
-            if piece_type:
-                parts.append(piece_type)
-            elif template_name:
-                parts.append(template_name)
-            descriptor = attribute or garment_descriptor(piece_type or template_name, garment_type)
-            for candidate in (descriptor, brand, gender):
-                if candidate and candidate.casefold() not in {part.casefold() for part in parts}:
-                    parts.append(candidate)
-            return " ".join(part for part in parts if part).strip()
-
-        def build_display_name_preview(base_name: str) -> str:
-            if not base_name.strip():
-                return "Nombre final pendiente."
-            normalized_base = normalize_lookup_text(base_name)
-            suffix_parts: list[str] = []
-            seen_suffixes: set[str] = set()
-            for value in (
-                escuela_combo.currentText().strip(),
-                tipo_prenda_combo.currentText().strip(),
-                tipo_pieza_combo.currentText().strip(),
-            ):
-                normalized_value = normalize_lookup_text(value)
-                if not normalized_value or normalized_value in seen_suffixes:
-                    continue
-                if normalized_value in normalized_base:
-                    continue
-                seen_suffixes.add(normalized_value)
-                suffix_parts.append(value)
-            if not suffix_parts:
-                return base_name.strip()
-            return f"{base_name.strip()} | {' | '.join(suffix_parts)}"
-
-        def update_final_name_preview() -> None:
-            preview_text = build_display_name_preview(nombre_input.text().strip())
-            final_name_preview.setText(
-                preview_text
-                if preview_text != "Nombre final pendiente."
-                else "El nombre completo aparecera arriba en cuanto haya base suficiente."
-            )
-            live_name_title.setText(
-                preview_text if preview_text != "Nombre final pendiente." else "Nombre en construccion"
-            )
-
-        def build_variant_examples_preview(sizes: list[str], colors: list[str], *, max_items: int = 4) -> str:
-            normalized_sizes = sizes or [DEFAULT_VARIANT_SIZE]
-            normalized_colors = colors or [DEFAULT_VARIANT_COLOR]
-            examples: list[str] = []
-            for size in normalized_sizes:
-                for color in normalized_colors:
-                    examples.append(f"{size} / {color}")
-                    if len(examples) >= max_items:
-                        return ", ".join(examples)
-            return ", ".join(examples)
-
-        def preview_next_skus(count: int) -> list[str]:
-            normalized_count = max(0, int(count))
-            if normalized_count == 0:
-                return []
-            try:
-                with get_session() as session:
-                    return CatalogService.preview_next_skus(session, normalized_count)
-            except Exception:
-                return []
-
-        def format_sku_preview(count: int) -> str:
-            preview_list = preview_next_skus(count)
-            if not preview_list:
-                return "SKU pendiente."
-            if len(preview_list) == 1:
-                return preview_list[0]
-            preview_head = ", ".join(preview_list[:4])
-            if len(preview_list) <= 4:
-                return f"{preview_head} | rango {preview_list[0]} -> {preview_list[-1]}"
-            return f"{preview_head} ... (+{len(preview_list) - 4}) | rango {preview_list[0]} -> {preview_list[-1]}"
-
-        def selected_sizes_for_pricing() -> list[str]:
-            selected_sizes = variant_sizes_button.selected_labels()
-            return selected_sizes or [DEFAULT_VARIANT_SIZE]
-
-        def current_price_block_definitions() -> list[dict[str, object]]:
-            return build_price_blocks(
-                {
-                    "garment_type": tipo_prenda_combo.currentText(),
-                    "piece_type": tipo_pieza_combo.currentText(),
-                    "education_level": nivel_combo.currentText(),
-                    "gender": genero_input.currentText(),
-                },
-                selected_sizes_for_pricing(),
-            )
-
-        def build_price_assignment() -> tuple[dict[str, str], list[str], str]:
-            normalized_sizes = selected_sizes_for_pricing()
-            mode = str(price_mode_combo.currentData() or "single")
-            price_map: dict[str, str] = {}
-            missing: list[str] = []
-            if mode == "single":
-                price_text = variant_price_input.text().strip()
-                if not price_text:
-                    missing.append("precio unico")
-                else:
-                    for size in normalized_sizes:
-                        price_map[size] = price_text
-                summary = f"Precio unico: {price_text or '-'}"
-                return price_map, missing, summary
-            if mode == "blocks":
-                block_values = price_value_store["blocks"]
-                assert isinstance(block_values, dict)
-                summary_parts: list[str] = []
-                for block in current_price_block_definitions():
-                    block_key = str(block["key"])
-                    block_label = str(block["label"])
-                    block_sizes = [str(value) for value in block.get("sizes", [])]
-                    price_text = str(block_values.get(block_key) or "").strip()
-                    if not price_text:
-                        missing.append(block_label)
-                    else:
-                        for size in block_sizes:
-                            price_map[size] = price_text
-                    summary_parts.append(
-                        f"{block_label} ({preview_values(block_sizes, max_items=8)}): {price_text or '-'}"
-                    )
-                return price_map, missing, " | ".join(summary_parts) if summary_parts else "Sin bloques disponibles."
-            manual_values = price_value_store["manual"]
-            assert isinstance(manual_values, dict)
-            summary_parts = []
-            for size in normalized_sizes:
-                price_text = str(manual_values.get(size) or "").strip()
-                if not price_text:
-                    missing.append(size)
-                else:
-                    price_map[size] = price_text
-                summary_parts.append(f"{size}: {price_text or '-'}")
-            return price_map, missing, " | ".join(summary_parts) if summary_parts else "Sin precios por talla."
-
-        def update_price_inputs_ui() -> None:
-            mode = str(price_mode_combo.currentData() or "single")
-            if mode == "single":
-                configure_prices_button.setText("Capturar precio")
-                price_mode_hint.setText(
-                    "Usa un solo precio para todas las presentaciones y configuralo desde el popup."
-                )
-            elif mode == "blocks":
-                configure_prices_button.setText("Configurar bloques")
-                price_mode_hint.setText(
-                    "Captura un precio por bloque de tallas desde el popup. Es ideal cuando infantil, numericas o letras cambian de precio."
-                )
-            else:
-                configure_prices_button.setText("Configurar por talla")
-                price_mode_hint.setText(
-                    "Define un precio por talla desde el popup solo cuando haya muchas excepciones."
-                )
-            price_map, missing_prices, strategy_summary = build_price_assignment()
-            missing_label = (
-                f"Faltan precios en: {', '.join(missing_prices)}."
-                if missing_prices
-                else f"Precios listos para {len(price_map)} talla(s)."
-            )
-            price_strategy_summary.setText(f"{strategy_summary}\n{missing_label}")
-
-        def open_price_configuration_dialog() -> None:
-            mode = str(price_mode_combo.currentData() or "single")
-            temp_single_price = variant_price_input.text().strip()
-            temp_blocks = dict(price_value_store["blocks"]) if isinstance(price_value_store["blocks"], dict) else {}
-            temp_manual = dict(price_value_store["manual"]) if isinstance(price_value_store["manual"], dict) else {}
-
-            pricing_dialog, pricing_layout = self._create_modal_dialog(
-                "Configurar precios",
-                "Captura la estructura de precios sin saturar el formulario principal.",
-                width=640,
-            )
-            context_label = QLabel(
-                f"Modo actual: {price_mode_combo.currentText()} | Tallas: {preview_values(selected_sizes_for_pricing(), max_items=10)}"
-            )
-            context_label.setWordWrap(True)
-            context_label.setObjectName("subtleLine")
-            pricing_layout.addWidget(context_label)
-
-            if mode == "single":
-                editor_form = QFormLayout()
-                single_input = QLineEdit(temp_single_price)
-                single_input.setPlaceholderText("Ej. 199.00")
-                helper_label = QLabel("Este precio se aplicara a todas las tallas seleccionadas.")
-                helper_label.setWordWrap(True)
-                helper_label.setObjectName("subtleLine")
-                editor_form.addRow("Precio unico", single_input)
-                editor_form.addRow("", helper_label)
-                pricing_layout.addLayout(editor_form)
-            else:
-                editor_scroll = QScrollArea()
-                editor_scroll.setWidgetResizable(True)
-                editor_container = QWidget()
-                editor_container_layout = QVBoxLayout()
-                editor_container_layout.setContentsMargins(0, 0, 0, 0)
-                editor_container_layout.setSpacing(8)
-                editor_inputs: dict[str, QLineEdit] = {}
-                if mode == "blocks":
-                    for block in current_price_block_definitions():
-                        block_key = str(block["key"])
-                        block_label = str(block["label"])
-                        block_sizes = [str(value) for value in block.get("sizes", [])]
-                        row_box = QFrame()
-                        row_box.setObjectName("infoCard")
-                        row_layout = QVBoxLayout()
-                        row_layout.setContentsMargins(10, 10, 10, 10)
-                        row_layout.setSpacing(4)
-                        title_label = QLabel(block_label)
-                        title_label.setObjectName("tableSectionTitle")
-                        price_input = QLineEdit(str(temp_blocks.get(block_key) or ""))
-                        price_input.setPlaceholderText("Ej. 199.00")
-                        sizes_label = QLabel(f"Tallas: {preview_values(block_sizes, max_items=10)}")
-                        sizes_label.setWordWrap(True)
-                        sizes_label.setObjectName("subtleLine")
-                        row_layout.addWidget(title_label)
-                        row_layout.addWidget(price_input)
-                        row_layout.addWidget(sizes_label)
-                        row_box.setLayout(row_layout)
-                        editor_container_layout.addWidget(row_box)
-                        editor_inputs[block_key] = price_input
-                else:
-                    for size in selected_sizes_for_pricing():
-                        row_box = QFrame()
-                        row_box.setObjectName("infoCard")
-                        row_layout = QVBoxLayout()
-                        row_layout.setContentsMargins(10, 10, 10, 10)
-                        row_layout.setSpacing(4)
-                        title_label = QLabel(f"Talla {size}")
-                        title_label.setObjectName("tableSectionTitle")
-                        price_input = QLineEdit(str(temp_manual.get(size) or ""))
-                        price_input.setPlaceholderText("Ej. 199.00")
-                        row_layout.addWidget(title_label)
-                        row_layout.addWidget(price_input)
-                        row_box.setLayout(row_layout)
-                        editor_container_layout.addWidget(row_box)
-                        editor_inputs[size] = price_input
-                editor_container_layout.addStretch(1)
-                editor_container.setLayout(editor_container_layout)
-                editor_scroll.setWidget(editor_container)
-                pricing_layout.addWidget(editor_scroll, 1)
-
-            buttons = QDialogButtonBox(
-                QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-            )
-            buttons.accepted.connect(pricing_dialog.accept)
-            buttons.rejected.connect(pricing_dialog.reject)
-            pricing_layout.addWidget(buttons)
-            if pricing_dialog.exec() != int(QDialog.DialogCode.Accepted):
-                return
-
-            if mode == "single":
-                variant_price_input.setText(single_input.text().strip())
-            elif mode == "blocks":
-                price_value_store["blocks"] = {
-                    key: input_widget.text().strip()
-                    for key, input_widget in editor_inputs.items()
-                }
-            else:
-                price_value_store["manual"] = {
-                    key: input_widget.text().strip()
-                    for key, input_widget in editor_inputs.items()
-                }
-            update_capture_summary()
-            update_review_details()
-
-        def sync_price_mode_suggestion(*, force: bool = False) -> None:
-            suggested_mode = suggest_price_capture_mode(
-                {
-                    "garment_type": tipo_prenda_combo.currentText(),
-                    "piece_type": tipo_pieza_combo.currentText(),
-                    "education_level": nivel_combo.currentText(),
-                    "gender": genero_input.currentText(),
-                },
-                selected_sizes_for_pricing(),
-            )
-            if force or not price_mode_state["manual_override"]:
-                target_index = price_mode_combo.findData(suggested_mode)
-                if target_index >= 0 and price_mode_combo.currentIndex() != target_index:
-                    price_mode_combo.blockSignals(True)
-                    price_mode_combo.setCurrentIndex(target_index)
-                    price_mode_combo.blockSignals(False)
-            update_price_inputs_ui()
-
-        def update_capture_summary() -> None:
-            final_name = build_display_name_preview(nombre_input.text().strip())
-            selected_sizes = variant_sizes_button.selected_labels()
-            selected_colors = variant_colors_button.selected_labels()
-            total_sizes = max(1, len(selected_sizes))
-            total_colors = max(1, len(selected_colors))
-            total_variants = total_sizes * total_colors
-            price_map, missing_prices, price_summary = build_price_assignment()
-            stock_text = str(variant_stock_spin.value())
-            sku_summary = format_sku_preview(total_variants)
-            notes: list[str] = []
-            if not nombre_input.text().strip():
-                notes.append("Define el nombre base para evitar guardar un producto incompleto.")
-            if not selected_sizes:
-                notes.append("Sin tallas elegidas: se usara Unitalla si creas el lote.")
-            if not selected_colors:
-                notes.append("Sin colores elegidos: se usara Sin color si creas el lote.")
-            if missing_prices:
-                notes.append(
-                    "Todavia faltan precios para poder crear presentaciones sin correcciones: "
-                    + ", ".join(missing_prices)
-                    + "."
-                )
-            price_strategy_summary.setText(
-                f"{price_summary}\n"
-                + (
-                    f"Faltan precios en: {', '.join(missing_prices)}."
-                    if missing_prices
-                    else f"Precios listos para {len(price_map)} talla(s)."
-                )
-            )
-            capture_summary_label.setText(
-                "<div><b>Resumen en vivo</b></div>"
-                f"<div><b>Producto:</b> {final_name}</div>"
-                f"<div><b>Presentaciones previstas:</b> {total_variants}</div>"
-                f"<div><b>SKU previstos:</b> {sku_summary}</div>"
-                "<div><b>QR:</b> Manual bajo demanda. Puedes generarlo al final o desde Inventario.</div>"
-                f"<div><b>Ejemplos:</b> {build_variant_examples_preview(selected_sizes, selected_colors)}</div>"
-                f"<div><b>Precio / stock inicial:</b> {price_summary} / {stock_text}</div>"
-                f"<div style='color:#7e3a22;'>{' | '.join(notes) if notes else 'Listo para guardar el producto y crear el lote de presentaciones.'}</div>"
-            )
-
-        def sync_name_suggestion(*, force: bool = False) -> None:
-            suggested_name = build_suggested_base_name()
-            previous_auto = last_auto_name["value"]
-            last_auto_name["value"] = suggested_name
-            if force or auto_name_enabled["value"] or nombre_input.text().strip() == previous_auto:
-                if suggested_name:
-                    nombre_input.setText(suggested_name)
-            update_final_name_preview()
-
-        def handle_name_manual_edit(value: str) -> None:
-            normalized_value = value.strip()
-            auto_name_enabled["value"] = auto_name_checkbox.isChecked() and normalized_value == last_auto_name["value"]
-            if normalized_value and normalized_value != last_auto_name["value"]:
-                auto_name_checkbox.setChecked(False)
-                auto_name_enabled["value"] = False
-            update_final_name_preview()
-            update_capture_summary()
-
-        def sync_variant_options(
-            template_entry: dict[str, object] | None,
-            *,
-            apply_defaults: bool,
-        ) -> None:
-            suggested_sizes = normalize_values(template_entry.get("tallas")) if template_entry else []
-            suggested_colors = normalize_values(template_entry.get("colores")) if template_entry else []
-            available_sizes = merge_choice_lists(
-                suggested_sizes,
-                legacy_choices.get("TALLAS", []),
-                COMMON_SIZES,
-                [DEFAULT_VARIANT_SIZE],
-            )
-            available_colors = merge_choice_lists(
-                suggested_colors,
-                legacy_choices.get("COLORES", []),
-                COMMON_COLORS,
-                [DEFAULT_VARIANT_COLOR],
-            )
-            variant_sizes_button.set_items([(value, value) for value in available_sizes])
-            variant_colors_button.set_items([(value, value) for value in available_colors])
-            if apply_defaults:
-                variant_sizes_button.set_selected_values(suggested_sizes)
-                variant_colors_button.set_selected_values(suggested_colors)
-            update_variant_summary()
-
-        def presentation_template_index_by_label(label: str) -> int:
-            normalized = normalize_lookup_text(label)
-            if not normalized:
-                return -1
-            for index in range(presentation_template_combo.count()):
-                if normalize_lookup_text(presentation_template_combo.itemText(index)) == normalized:
-                    return index
-            return -1
-
-        def update_presentation_template_suggestion() -> None:
-            suggested_label = suggest_presentation_template(
-                {
-                    "garment_type": tipo_prenda_combo.currentText(),
-                    "piece_type": tipo_pieza_combo.currentText(),
-                    "education_level": nivel_combo.currentText(),
-                    "gender": genero_input.currentText(),
-                }
-            ) or ""
-            previous_label = presentation_template_state["suggested_label"]
-            current_entry = presentation_template_combo.currentData()
-            current_label = (
-                str(current_entry.get("label") or "").strip()
-                if isinstance(current_entry, dict)
-                else ""
-            )
-            if suggested_label:
-                presentation_template_hint.setText(
-                    f"Sugerida por el contexto actual: {suggested_label}. Puedes aplicarla o cambiarla."
-                )
-            else:
-                presentation_template_hint.setText(
-                    "Aun no hay una sugerencia automatica para este paso."
-                )
-            should_sync_selection = not current_label or current_label == previous_label
-            presentation_template_state["suggested_label"] = suggested_label
-            if should_sync_selection:
-                target_index = presentation_template_index_by_label(suggested_label) if suggested_label else 0
-                if presentation_template_combo.currentIndex() != target_index:
-                    presentation_template_combo.blockSignals(True)
-                    presentation_template_combo.setCurrentIndex(target_index)
-                    presentation_template_combo.blockSignals(False)
-                    update_presentation_template_preview()
-            sync_price_mode_suggestion()
-
-        sync_variant_options(None, apply_defaults=False)
-
-        def create_inline_category() -> None:
-            if self.current_role != RolUsuario.ADMIN:
-                QMessageBox.warning(dialog, "Sin permisos", "Solo ADMIN puede crear categorias.")
-                return
-            name = self._prompt_text_value("Nueva categoria", "Categoria", "Nueva categoria")
-            if name is None or not name:
-                return
-            try:
-                with get_session() as session:
-                    user = session.get(Usuario, self.user_id)
-                    if user is None:
-                        raise ValueError("Usuario no encontrado.")
-                    categoria = CatalogService.crear_categoria(session, user, name)
-                    session.commit()
-                    categoria_id = int(categoria.id)
-            except Exception as exc:  # noqa: BLE001
-                QMessageBox.critical(dialog, "Categoria fallida", str(exc))
-                return
-            categoria_combo.addItem(name, categoria_id)
-            categoria_combo.setCurrentIndex(categoria_combo.count() - 1)
-
-        def create_inline_brand() -> None:
-            if self.current_role != RolUsuario.ADMIN:
-                QMessageBox.warning(dialog, "Sin permisos", "Solo ADMIN puede crear marcas.")
-                return
-            name = self._prompt_text_value("Nueva marca", "Marca", "Nueva marca")
-            if name is None or not name:
-                return
-            try:
-                with get_session() as session:
-                    user = session.get(Usuario, self.user_id)
-                    if user is None:
-                        raise ValueError("Usuario no encontrado.")
-                    marca = CatalogService.crear_marca(session, user, name)
-                    session.commit()
-                    marca_id = int(marca.id)
-            except Exception as exc:  # noqa: BLE001
-                QMessageBox.critical(dialog, "Marca fallida", str(exc))
-                return
-            marca_combo.addItem(name, marca_id)
-            marca_combo.setCurrentIndex(marca_combo.count() - 1)
-
-        add_category_button.clicked.connect(create_inline_category)
-        add_brand_button.clicked.connect(create_inline_brand)
-
-        def update_template_preview() -> None:
-            template_entry = template_combo.currentData()
-            if not isinstance(template_entry, dict):
-                apply_template_button.setEnabled(False)
-                template_preview.setText("Selecciona una plantilla para revisar su resumen antes de aplicarla.")
-                sync_variant_options(None, apply_defaults=False)
-                return
-            apply_template_button.setEnabled(True)
-            template_preview.setText(build_product_template_preview(template_entry))
-            sync_variant_options(template_entry, apply_defaults=False)
-
-        def apply_selected_template() -> None:
-            template_entry = template_combo.currentData()
-            if not isinstance(template_entry, dict):
-                return
-
-            defaults = product_template_defaults(template_entry)
-
-            category_name = defaults["category"]
-            if category_name:
-                ensure_uniform_category()
-
-            brand_name = defaults["brand"]
-            if brand_name and not is_placeholder_brand(brand_name):
-                select_combo_text(marca_combo, brand_name)
-
-            if defaults["name"]:
-                nombre_input.setText(defaults["name"])
-            if defaults["description"]:
-                descripcion_input.setPlainText(defaults["description"])
-            if defaults["school"]:
-                set_editable_combo_text(escuela_combo, defaults["school"])
-            if defaults["garment_type"]:
-                set_editable_combo_text(tipo_prenda_combo, defaults["garment_type"])
-            if defaults["piece_type"]:
-                set_editable_combo_text(tipo_pieza_combo, defaults["piece_type"])
-            if defaults["attribute"]:
-                set_editable_combo_text(atributo_combo, defaults["attribute"])
-            if defaults["education_level"]:
-                set_editable_combo_text(nivel_combo, defaults["education_level"])
-            if defaults["gender"]:
-                set_editable_combo_text(genero_input, defaults["gender"])
-            if defaults["shield"]:
-                set_editable_combo_text(escudo_input, defaults["shield"])
-            if defaults["location"]:
-                set_editable_combo_text(ubicacion_input, defaults["location"])
-            if str(template_entry.get("precio") or "").strip():
-                variant_price_input.setText(str(template_entry.get("precio") or "").strip())
-                price_mode_state["manual_override"] = False
-                target_index = price_mode_combo.findData("single")
-                if target_index >= 0:
-                    price_mode_combo.setCurrentIndex(target_index)
-            sync_variant_options(template_entry, apply_defaults=True)
-            sync_price_mode_suggestion(force=bool(template_entry.get("precio")))
-            if auto_name_checkbox.isChecked():
-                sync_name_suggestion(force=True)
-
-        def update_base_template_preview() -> None:
-            template_entry = base_template_combo.currentData()
-            if not isinstance(template_entry, dict):
-                apply_base_template_button.setEnabled(False)
-                base_template_preview.setText("Selecciona una plantilla base para sugerir familia, pieza y descripcion.")
-                update_context_inheritance_hint()
-                return
-            apply_base_template_button.setEnabled(True)
-            base_template_preview.setText(build_step_template_preview("base", template_entry))
-            update_context_inheritance_hint()
-
-        def apply_base_step_template() -> None:
-            template_entry = base_template_combo.currentData()
-            if not isinstance(template_entry, dict):
-                return
-            defaults = step_template_defaults("base", template_entry)
-            ensure_uniform_category()
-            if defaults.get("garment_type"):
-                set_editable_combo_text(tipo_prenda_combo, str(defaults["garment_type"]))
-            if defaults.get("piece_type"):
-                set_editable_combo_text(tipo_pieza_combo, str(defaults["piece_type"]))
-            if defaults.get("attribute"):
-                set_editable_combo_text(atributo_combo, str(defaults["attribute"]))
-            if defaults.get("gender"):
-                set_editable_combo_text(genero_input, str(defaults["gender"]))
-            if defaults.get("description"):
-                descripcion_input.setPlainText(str(defaults["description"]))
-            if auto_name_checkbox.isChecked():
-                sync_name_suggestion(force=True)
-            elif defaults.get("name") and not nombre_input.text().strip():
-                nombre_input.setText(str(defaults["name"]))
-                update_final_name_preview()
-                update_capture_summary()
-            update_review_details()
-
-        def update_context_template_preview() -> None:
-            template_entry = context_template_combo.currentData()
-            if not isinstance(template_entry, dict):
-                apply_context_template_button.setEnabled(False)
-                context_template_preview.setText("Selecciona una plantilla de contexto para sugerir nivel, prenda y escudo.")
-                update_context_inheritance_hint()
-                return
-            apply_context_template_button.setEnabled(True)
-            context_template_preview.setText(build_step_template_preview("context", template_entry))
-            update_context_inheritance_hint()
-
-        def apply_context_step_template() -> None:
-            template_entry = context_template_combo.currentData()
-            if not isinstance(template_entry, dict):
-                return
-            defaults = merged_context_defaults(template_entry)
-            ensure_uniform_category()
-            if defaults.get("garment_type"):
-                set_editable_combo_text(tipo_prenda_combo, str(defaults["garment_type"]))
-            if defaults.get("piece_type"):
-                set_editable_combo_text(tipo_pieza_combo, str(defaults["piece_type"]))
-            if defaults.get("attribute"):
-                set_editable_combo_text(atributo_combo, str(defaults["attribute"]))
-            if defaults.get("education_level"):
-                set_editable_combo_text(nivel_combo, str(defaults["education_level"]))
-            if defaults.get("gender"):
-                set_editable_combo_text(genero_input, str(defaults["gender"]))
-            if defaults.get("shield"):
-                set_editable_combo_text(escudo_input, str(defaults["shield"]))
-            if defaults.get("location"):
-                set_editable_combo_text(ubicacion_input, str(defaults["location"]))
-            if auto_name_checkbox.isChecked():
-                sync_name_suggestion(force=True)
-            update_capture_summary()
-            update_review_details()
-            update_context_inheritance_hint()
-
-        def update_presentation_template_preview() -> None:
-            template_entry = presentation_template_combo.currentData()
-            if not isinstance(template_entry, dict):
-                apply_presentation_template_button.setEnabled(False)
-                presentation_template_preview.setText("Selecciona una plantilla de presentaciones para sugerir tallas y colores.")
-                return
-            apply_presentation_template_button.setEnabled(True)
-            presentation_template_preview.setText(build_step_template_preview("presentation", template_entry))
-
-        def apply_presentation_step_template() -> None:
-            template_entry = presentation_template_combo.currentData()
-            if not isinstance(template_entry, dict):
-                return
-            defaults = step_template_defaults("presentation", template_entry)
-            variant_sizes_button.set_selected_values(list(defaults.get("sizes", [])))
-            variant_colors_button.set_selected_values(list(defaults.get("colors", [])))
-            if defaults.get("price"):
-                variant_price_input.setText(str(defaults["price"]))
-                price_mode_state["manual_override"] = False
-                target_index = price_mode_combo.findData("single")
-                if target_index >= 0:
-                    price_mode_combo.setCurrentIndex(target_index)
-            if defaults.get("stock"):
-                variant_stock_spin.setValue(int(defaults["stock"]))
-            sync_price_mode_suggestion(force=not bool(defaults.get("price")))
-            update_capture_summary()
-            update_review_details()
-
-        template_combo.currentIndexChanged.connect(lambda _: update_template_preview())
-        apply_template_button.clicked.connect(apply_selected_template)
-        base_template_combo.currentIndexChanged.connect(lambda _: update_base_template_preview())
-        apply_base_template_button.clicked.connect(apply_base_step_template)
-        context_template_combo.currentIndexChanged.connect(lambda _: update_context_template_preview())
-        apply_context_template_button.clicked.connect(apply_context_step_template)
-        presentation_template_combo.currentIndexChanged.connect(lambda _: update_presentation_template_preview())
-        apply_presentation_template_button.clicked.connect(apply_presentation_step_template)
-        variant_sizes_button.selectionChanged.connect(
-            lambda: (update_variant_summary(), sync_price_mode_suggestion())
-        )
-        variant_colors_button.selectionChanged.connect(update_variant_summary)
-        auto_name_checkbox.toggled.connect(
-            lambda checked: (
-                auto_name_enabled.__setitem__("value", bool(checked)),
-                sync_name_suggestion(force=bool(checked)),
-            )
-        )
-        generate_name_button.clicked.connect(lambda: sync_name_suggestion(force=True))
-        nombre_input.textEdited.connect(handle_name_manual_edit)
-        marca_combo.currentTextChanged.connect(lambda _: sync_name_suggestion())
-        tipo_pieza_combo.currentTextChanged.connect(lambda _: sync_name_suggestion())
-        atributo_combo.currentTextChanged.connect(lambda _: sync_name_suggestion())
-        genero_input.currentTextChanged.connect(lambda _: sync_name_suggestion())
-        escuela_combo.currentTextChanged.connect(lambda _: (update_final_name_preview(), update_capture_summary()))
-        tipo_prenda_combo.currentTextChanged.connect(
-            lambda _: (
-                update_final_name_preview(),
-                update_capture_summary(),
-                update_presentation_template_suggestion(),
-                sync_price_mode_suggestion(),
-            )
-        )
-        tipo_pieza_combo.currentTextChanged.connect(
-            lambda _: (
-                update_final_name_preview(),
-                update_capture_summary(),
-                update_presentation_template_suggestion(),
-                sync_price_mode_suggestion(),
-            )
-        )
-        nivel_combo.currentTextChanged.connect(
-            lambda _: (update_presentation_template_suggestion(), sync_price_mode_suggestion())
-        )
-        genero_input.currentTextChanged.connect(
-            lambda _: (update_presentation_template_suggestion(), sync_price_mode_suggestion())
-        )
-        price_mode_combo.currentIndexChanged.connect(
-            lambda _: (
-                price_mode_state.__setitem__("manual_override", True),
-                update_price_inputs_ui(),
-                update_capture_summary(),
-            )
-        )
-        configure_prices_button.clicked.connect(open_price_configuration_dialog)
-        variant_price_input.textChanged.connect(lambda _: update_capture_summary())
-        variant_stock_spin.valueChanged.connect(lambda _: update_capture_summary())
-
-        if product_initial:
-            self._set_combo_value(categoria_combo, product_initial["categoria_id"])
-            self._set_combo_value(marca_combo, product_initial["marca_id"])
-            nombre_input.setText(str(product_initial["nombre_base"]))
-            descripcion_input.setPlainText(str(product_initial["descripcion"]))
-            set_editable_combo_text(escuela_combo, str(product_initial["escuela"]))
-            set_editable_combo_text(tipo_prenda_combo, str(product_initial["tipo_prenda"]))
-            set_editable_combo_text(tipo_pieza_combo, str(product_initial["tipo_pieza"]))
-            set_editable_combo_text(atributo_combo, str(product_initial["atributo"]))
-            set_editable_combo_text(nivel_combo, str(product_initial["nivel_educativo"]))
-            set_editable_combo_text(genero_input, str(product_initial["genero"]))
-            set_editable_combo_text(escudo_input, str(product_initial["escudo"]))
-            set_editable_combo_text(ubicacion_input, str(product_initial["ubicacion"]))
-            auto_name_checkbox.setChecked(False)
-            auto_name_enabled["value"] = False
-
-        ensure_uniform_category()
-        sync_name_suggestion(force=bool(initial is None and not nombre_input.text().strip()))
-        update_final_name_preview()
-        update_capture_summary()
-        update_context_inheritance_hint()
-        update_presentation_template_suggestion()
-        sync_price_mode_suggestion(force=True)
-
-        template_row = QHBoxLayout()
-        template_row.setSpacing(10)
-        template_row.addWidget(template_combo, 1)
-        template_row.addWidget(apply_template_button)
-        base_template_row = QHBoxLayout()
-        base_template_row.setSpacing(10)
-        base_template_row.addWidget(base_template_combo, 1)
-        base_template_row.addWidget(apply_base_template_button)
-        context_template_row = QHBoxLayout()
-        context_template_row.setSpacing(10)
-        context_template_row.addWidget(context_template_combo, 1)
-        context_template_row.addWidget(apply_context_template_button)
-        presentation_template_row = QHBoxLayout()
-        presentation_template_row.setSpacing(10)
-        presentation_template_row.addWidget(presentation_template_combo, 1)
-        presentation_template_row.addWidget(apply_presentation_template_button)
-        marca_row = QHBoxLayout()
-        marca_row.setSpacing(10)
-        marca_row.addWidget(marca_combo)
-        marca_row.addWidget(add_brand_button)
-        name_row = QHBoxLayout()
-        name_row.setSpacing(10)
-        name_row.addWidget(nombre_input, 1)
-        name_row.addWidget(auto_name_checkbox)
-        name_row.addWidget(generate_name_button)
-        template_box = QGroupBox("Paso 1 · Base")
-        template_box.setObjectName("infoCard")
-        template_box_layout = QVBoxLayout()
-        template_box_layout.setContentsMargins(16, 18, 16, 16)
-        template_box_layout.setSpacing(14)
-        template_hint = QLabel(
-            "Empieza por plantilla, marca y nombre base. La categoria se maneja internamente como Uniformes."
-        )
-        template_hint.setWordWrap(True)
-        template_hint.setObjectName("subtleLine")
-        base_templates_panel = QFrame()
-        base_templates_panel.setObjectName("infoCard")
-        base_templates_layout = QFormLayout()
-        base_templates_layout.setContentsMargins(14, 14, 14, 14)
-        base_templates_layout.setSpacing(10)
-        base_templates_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-        base_templates_layout.addRow("Plantilla global", template_row)
-        base_templates_layout.addRow("Vista global", template_preview_card)
-        base_templates_layout.addRow("Plantilla base", base_template_row)
-        base_templates_layout.addRow("Resumen base", base_template_preview_card)
-        base_templates_panel.setLayout(base_templates_layout)
-        base_fields_panel = QFrame()
-        base_fields_panel.setObjectName("infoCard")
-        base_fields_layout = QGridLayout()
-        base_fields_layout.setContentsMargins(14, 14, 14, 14)
-        base_fields_layout.setHorizontalSpacing(12)
-        base_fields_layout.setVerticalSpacing(10)
-        base_fields_layout.addWidget(QLabel("Categoria"), 0, 0)
-        base_fields_layout.addWidget(uniform_category_label, 0, 1)
-        base_fields_layout.addWidget(QLabel("Marca"), 0, 2)
-        base_fields_layout.addLayout(marca_row, 0, 3)
-        base_fields_layout.addWidget(QLabel("Nombre base"), 1, 0)
-        base_fields_layout.addLayout(name_row, 1, 1, 1, 3)
-        base_fields_layout.addWidget(QLabel("Descripcion"), 2, 0)
-        base_fields_layout.addWidget(descripcion_input, 2, 1, 1, 3)
-        base_fields_layout.addWidget(final_name_preview, 3, 0, 1, 4)
-        base_fields_layout.setColumnStretch(1, 3)
-        base_fields_layout.setColumnStretch(3, 3)
-        base_fields_panel.setLayout(base_fields_layout)
-        base_content_row = QHBoxLayout()
-        base_content_row.setSpacing(14)
-        base_content_row.addWidget(base_templates_panel, 5)
-        base_content_row.addWidget(base_fields_panel, 6)
-        template_box_layout.addWidget(template_hint)
-        template_box_layout.addLayout(base_content_row)
-        template_box_layout.addStretch(1)
-        template_box.setLayout(template_box_layout)
-
-        context_box = QGroupBox("Paso 2 · Contexto")
-        context_box.setObjectName("infoCard")
-        context_layout = QVBoxLayout()
-        context_layout.setContentsMargins(16, 18, 16, 16)
-        context_layout.setSpacing(14)
-        context_hint = QLabel(
-            "Define el contexto escolar del producto. Aqui decides tipo de uniforme, nivel, pieza y detalles."
-        )
-        context_hint.setWordWrap(True)
-        context_hint.setObjectName("subtleLine")
-        context_template_panel = QFrame()
-        context_template_panel.setObjectName("infoCard")
-        context_template_layout = QFormLayout()
-        context_template_layout.setContentsMargins(14, 14, 14, 14)
-        context_template_layout.setSpacing(10)
-        context_template_layout.setLabelAlignment(Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
-        context_template_layout.addRow("Plantilla contexto", context_template_row)
-        context_template_layout.addRow("Resumen contexto", context_template_preview_card)
-        context_template_panel.setLayout(context_template_layout)
-        context_fields_panel = QFrame()
-        context_fields_panel.setObjectName("infoCard")
-        context_fields_layout = QGridLayout()
-        context_fields_layout.setContentsMargins(14, 14, 14, 14)
-        context_fields_layout.setHorizontalSpacing(12)
-        context_fields_layout.setVerticalSpacing(10)
-        context_fields_layout.addWidget(QLabel("Escuela"), 0, 0)
-        context_fields_layout.addWidget(escuela_combo, 0, 1, 1, 3)
-        context_fields_layout.addWidget(QLabel("Tipo de uniforme"), 1, 0)
-        context_fields_layout.addWidget(tipo_prenda_combo, 1, 1)
-        context_fields_layout.addWidget(QLabel("Tipo pieza"), 1, 2)
-        context_fields_layout.addWidget(tipo_pieza_combo, 1, 3)
-        context_fields_layout.addWidget(QLabel("Atributo"), 2, 0)
-        context_fields_layout.addWidget(atributo_combo, 2, 1)
-        context_fields_layout.addWidget(QLabel("Nivel educativo"), 2, 2)
-        context_fields_layout.addWidget(nivel_combo, 2, 3)
-        context_fields_layout.addWidget(QLabel("Genero"), 3, 0)
-        context_fields_layout.addWidget(genero_input, 3, 1)
-        context_fields_layout.addWidget(QLabel("Escudo"), 3, 2)
-        context_fields_layout.addWidget(escudo_input, 3, 3)
-        context_fields_layout.addWidget(QLabel("Ubicacion"), 4, 0)
-        context_fields_layout.addWidget(ubicacion_input, 4, 1)
-        context_fields_layout.setColumnStretch(1, 3)
-        context_fields_layout.setColumnStretch(3, 3)
-        context_fields_panel.setLayout(context_fields_layout)
-        context_content_row = QHBoxLayout()
-        context_content_row.setSpacing(14)
-        context_content_row.addWidget(context_template_panel, 4)
-        context_content_row.addWidget(context_fields_panel, 7)
-        context_layout.addWidget(context_hint)
-        context_layout.addLayout(context_content_row)
-        context_layout.addStretch(1)
-        context_box.setLayout(context_layout)
-
-        variants_box = QGroupBox("Paso 3 · Presentaciones")
-        variants_box.setObjectName("infoCard")
-        variants_layout = QGridLayout()
-        variants_layout.setContentsMargins(16, 18, 16, 16)
-        variants_layout.setHorizontalSpacing(12)
-        variants_layout.setVerticalSpacing(10)
-        variants_hint = QLabel(
-            "Define tallas, colores y precio. Aqui decides si el producto creara presentaciones por lote despues de guardar."
-        )
-        variants_hint.setWordWrap(True)
-        variants_hint.setObjectName("subtleLine")
-        variants_layout.addWidget(variants_hint, 0, 0, 1, 4)
-        variants_layout.addWidget(QLabel("Plantilla present."), 1, 0)
-        variants_layout.addLayout(presentation_template_row, 1, 1, 1, 3)
-        variants_layout.addWidget(presentation_template_preview_card, 2, 0, 1, 4)
-        variants_layout.addWidget(QLabel("Tallas"), 3, 0)
-        variants_layout.addWidget(variant_sizes_button, 3, 1)
-        variants_layout.addWidget(QLabel("Colores"), 3, 2)
-        variants_layout.addWidget(variant_colors_button, 3, 3)
-        variants_layout.addWidget(variant_sizes_summary, 4, 0, 1, 2)
-        variants_layout.addWidget(variant_colors_summary, 4, 2, 1, 2)
-        variants_layout.addWidget(QLabel("Modo precio"), 5, 0)
-        variants_layout.addWidget(price_mode_combo, 5, 1, 1, 2)
-        variants_layout.addWidget(configure_prices_button, 5, 3)
-        variants_layout.addWidget(price_mode_hint, 6, 0, 1, 4)
-        variants_layout.addWidget(price_strategy_summary, 7, 0, 1, 4)
-        variants_layout.addWidget(QLabel("Costo ref."), 8, 0)
-        variants_layout.addWidget(variant_cost_input, 8, 1)
-        variants_layout.addWidget(QLabel("Stock inicial"), 8, 2)
-        variants_layout.addWidget(variant_stock_spin, 8, 3)
-        variants_layout.addWidget(variant_count_summary, 9, 0, 1, 4)
-        variants_box.setLayout(variants_layout)
-
-        review_box = QGroupBox("Paso 4 · Revisar")
-        review_box.setObjectName("infoCard")
-        review_layout = QVBoxLayout()
-        review_layout.setContentsMargins(16, 18, 16, 16)
-        review_layout.setSpacing(10)
-        review_hint = QLabel(
-            "Revisa el resumen final. Si algo no cuadra, vuelve al paso correspondiente antes de guardar."
-        )
-        review_hint.setWordWrap(True)
-        review_hint.setObjectName("subtleLine")
-        review_details_label = QLabel("Aun no hay suficiente informacion para revisar.")
-        review_details_label.setWordWrap(True)
-        review_details_label.setTextFormat(Qt.TextFormat.RichText)
-        review_details_label.setObjectName("templatePreviewLabel")
-        review_layout.addWidget(review_hint)
-        review_layout.addWidget(review_details_label)
-        review_layout.addStretch(1)
-        review_box.setLayout(review_layout)
-
-        def update_review_details() -> None:
-            selected_sizes = variant_sizes_button.selected_labels()
-            selected_colors = variant_colors_button.selected_labels()
-            _, missing_prices, price_summary = build_price_assignment()
-            total_variants = max(1, len(selected_sizes) or 1) * max(1, len(selected_colors) or 1)
-            sku_summary = format_sku_preview(total_variants)
-            review_notes: list[str] = []
-            if categoria_combo.currentData() is None:
-                review_notes.append("Falta categoria.")
-            if marca_combo.currentData() is None:
-                review_notes.append("Falta marca.")
-            if not nombre_input.text().strip():
-                review_notes.append("Falta nombre base.")
-            if missing_prices:
-                review_notes.append(
-                    "Hay precios pendientes en: " + ", ".join(missing_prices) + "."
-                )
-            review_details_label.setText(
-                "<div><b>Revision final</b></div>"
-                f"<div><b>Producto:</b> {build_display_name_preview(nombre_input.text().strip())}</div>"
-                f"<div><b>Categoria / marca:</b> Uniformes / {marca_combo.currentText().strip() or '-'}</div>"
-                f"<div><b>Contexto:</b> {' | '.join(value for value in [escuela_combo.currentText().strip(), tipo_prenda_combo.currentText().strip(), tipo_pieza_combo.currentText().strip(), atributo_combo.currentText().strip()] if value) or 'Sin contexto adicional'}</div>"
-                f"<div><b>Tallas:</b> {preview_values(selected_sizes)}</div>"
-                f"<div><b>Colores:</b> {preview_values(selected_colors, max_items=5)}</div>"
-                f"<div><b>SKU previstos:</b> {sku_summary}</div>"
-                "<div><b>QR:</b> Quedara pendiente. Puedes generarlo al terminar el lote o despues desde Inventario.</div>"
-                f"<div><b>Precio / stock:</b> {price_summary} / {variant_stock_spin.value()}</div>"
-                f"<div style='color:#7e3a22;'>{' | '.join(review_notes) if review_notes else 'Todo listo para guardar.'}</div>"
-            )
-
-        step_stack = QStackedWidget()
-        step_pages: list[QWidget] = []
-        for box in (template_box, context_box, variants_box, review_box):
-            page = QWidget()
-            page_layout = QVBoxLayout()
-            page_layout.setContentsMargins(0, 0, 0, 0)
-            page_layout.setSpacing(0)
-            page_layout.addWidget(box)
-            page.setLayout(page_layout)
-            step_stack.addWidget(page)
-            step_pages.append(page)
-
-        summary_box = QGroupBox("Resumen")
-        summary_box.setObjectName("infoCard")
-        summary_box.setMinimumWidth(300)
-        summary_box.setMaximumWidth(360)
-        summary_layout = QVBoxLayout()
-        summary_layout.setContentsMargins(16, 18, 16, 16)
-        summary_layout.setSpacing(10)
-        summary_hint = QLabel(
-            "Este panel se actualiza en tiempo real mientras avanzas por los pasos."
-        )
-        summary_hint.setWordWrap(True)
-        summary_hint.setObjectName("subtleLine")
-        summary_layout.addWidget(summary_hint)
-        summary_layout.addWidget(capture_summary_card)
-        summary_layout.addStretch(1)
-        summary_box.setLayout(summary_layout)
-
-        step_titles = ["1 Base", "2 Contexto", "3 Presentaciones", "4 Revisar"]
-        step_buttons: list[QPushButton] = []
-        stepper_row = QHBoxLayout()
-        stepper_row.setSpacing(8)
-        current_step = {"index": 0}
-
-        def validate_step(step_index: int) -> bool:
-            if step_index == 0:
-                if categoria_combo.currentData() is None:
-                    QMessageBox.warning(dialog, "Paso 1 incompleto", "Selecciona una categoria antes de continuar.")
-                    return False
-                if marca_combo.currentData() is None:
-                    QMessageBox.warning(dialog, "Paso 1 incompleto", "Selecciona una marca antes de continuar.")
-                    return False
-                if not nombre_input.text().strip():
-                    QMessageBox.warning(dialog, "Paso 1 incompleto", "Captura o genera el nombre base antes de continuar.")
-                    return False
-            if step_index == 2:
-                has_variant_intent = bool(variant_sizes_button.selected_labels() or variant_colors_button.selected_labels())
-                _, missing_prices, _ = build_price_assignment()
-                if has_variant_intent and missing_prices:
-                    QMessageBox.warning(
-                        dialog,
-                        "Paso 3 incompleto",
-                        "Todavia faltan precios para algunas tallas o bloques. Revísalos antes de continuar.",
-                    )
-                    return False
-            return True
-
-        def refresh_step_ui() -> None:
-            for index, button in enumerate(step_buttons):
-                is_active = index == current_step["index"]
-                button.setProperty("active", "true" if is_active else "false")
-                button.style().unpolish(button)
-                button.style().polish(button)
-            previous_button.setEnabled(current_step["index"] > 0)
-            next_button.setVisible(current_step["index"] < len(step_titles) - 1)
-            save_button.setVisible(current_step["index"] == len(step_titles) - 1)
-            step_stack.setCurrentIndex(current_step["index"])
-            update_review_details()
-
-        def go_to_step(target_index: int) -> None:
-            if target_index > current_step["index"] and not validate_step(current_step["index"]):
-                return
-            current_step["index"] = max(0, min(target_index, len(step_titles) - 1))
-            refresh_step_ui()
-
-        for index, title in enumerate(step_titles):
-            button = QPushButton(title)
-            button.setObjectName("stepButton")
-            button.clicked.connect(lambda _checked=False, target=index: go_to_step(target))
-            step_buttons.append(button)
-            stepper_row.addWidget(button)
-        stepper_row.addStretch(1)
-
-        main_content_row = QHBoxLayout()
-        main_content_row.setSpacing(14)
-        main_content_row.addWidget(step_stack, 7)
-        main_content_row.addWidget(summary_box, 4)
-
-        navigation_row = QHBoxLayout()
-        navigation_row.setSpacing(10)
-        previous_button = QPushButton("Anterior")
-        next_button = QPushButton("Siguiente")
-        save_button = QPushButton("Guardar")
-        cancel_button = QPushButton("Cancelar")
-        previous_button.clicked.connect(lambda: go_to_step(current_step["index"] - 1))
-        next_button.clicked.connect(lambda: go_to_step(current_step["index"] + 1))
-        save_button.clicked.connect(
-            lambda: dialog.accept() if validate_step(0) and validate_step(2) else None
-        )
-        cancel_button.clicked.connect(dialog.reject)
-        navigation_row.addWidget(previous_button)
-        navigation_row.addWidget(next_button)
-        navigation_row.addStretch(1)
-        navigation_row.addWidget(cancel_button)
-        navigation_row.addWidget(save_button)
-
-        refresh_step_ui()
-        layout.addWidget(live_name_card)
-        layout.addLayout(stepper_row)
-        layout.addLayout(main_content_row)
-        layout.addLayout(navigation_row)
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return None
-        prices_by_size, _, price_summary = build_price_assignment()
-        return {
-            "categoria_id": categoria_combo.currentData(),
-            "marca_id": marca_combo.currentData(),
-            "nombre": nombre_input.text().strip(),
-            "escuela": escuela_combo.currentText().strip(),
-            "tipo_prenda": tipo_prenda_combo.currentText().strip(),
-            "tipo_pieza": tipo_pieza_combo.currentText().strip(),
-            "atributo": atributo_combo.currentText().strip(),
-            "nivel_educativo": nivel_combo.currentText().strip(),
-            "genero": genero_input.currentText().strip(),
-            "escudo": escudo_input.currentText().strip(),
-            "ubicacion": ubicacion_input.currentText().strip(),
-            "descripcion": descripcion_input.toPlainText().strip(),
-            "tallas": variant_sizes_button.selected_labels(),
-            "colores": variant_colors_button.selected_labels(),
-            "precio_variante": variant_price_input.text().strip(),
-            "precio_modo": str(price_mode_combo.currentData() or "single"),
-            "precios_por_talla": prices_by_size,
-            "resumen_precio": price_summary,
-            "costo_variante": variant_cost_input.text().strip(),
-            "stock_inicial_variante": variant_stock_spin.value(),
-        }
 
     def _prompt_batch_variant_data(
         self,
@@ -5036,77 +3510,19 @@ class MainWindow(QMainWindow):
         initial_cost: str = "",
         initial_stock: int = 0,
     ) -> dict[str, object] | None:
-        normalized_sizes = [value for value in sizes if str(value).strip()] or [DEFAULT_VARIANT_SIZE]
-        normalized_colors = [value for value in colors if str(value).strip()] or [DEFAULT_VARIANT_COLOR]
-        total_variants = len(normalized_sizes) * len(normalized_colors)
-
-        dialog, layout = self._create_modal_dialog(
-            "Presentaciones por lote",
-            "Confirma las tallas, colores y estructura de precio para crear las presentaciones del producto en una sola operacion.",
-            width=720,
+        return build_catalog_batch_variant_dialog(
+            self,
+            sizes=sizes,
+            colors=colors,
+            initial_price=initial_price,
+            pricing_mode=pricing_mode,
+            prices_by_size=prices_by_size,
+            price_summary=price_summary,
+            initial_cost=initial_cost,
+            initial_stock=initial_stock,
+            default_variant_size=DEFAULT_VARIANT_SIZE,
+            default_variant_color=DEFAULT_VARIANT_COLOR,
         )
-        form = QFormLayout()
-        sizes_label = QLabel(", ".join(normalized_sizes))
-        sizes_label.setWordWrap(True)
-        sizes_label.setObjectName("subtleLine")
-        colors_label = QLabel(", ".join(normalized_colors))
-        colors_label.setWordWrap(True)
-        colors_label.setObjectName("subtleLine")
-        summary_label = QLabel(f"Se crearan {total_variants} presentaciones.")
-        summary_label.setObjectName("subtleLine")
-        sku_summary_label = QLabel(self._format_sku_preview(total_variants))
-        sku_summary_label.setWordWrap(True)
-        sku_summary_label.setObjectName("subtleLine")
-        pricing_map = {
-            str(size).strip(): str(price).strip()
-            for size, price in (prices_by_size or {}).items()
-            if str(size).strip() and str(price).strip()
-        }
-        effective_price_summary = price_summary.strip() or (initial_price.strip() if initial_price.strip() else "-")
-        price_label = QLabel(effective_price_summary)
-        price_label.setWordWrap(True)
-        price_label.setObjectName("subtleLine")
-        price_mode_label = QLabel(
-            {
-                "single": "Precio unico",
-                "blocks": "Precio por bloques",
-                "manual": "Precio manual por talla",
-            }.get(pricing_mode, "Precio unico")
-        )
-        price_mode_label.setObjectName("subtleLine")
-        cost_input = QLineEdit()
-        cost_input.setPlaceholderText("Opcional")
-        cost_input.setText(initial_cost)
-        stock_spin = QSpinBox()
-        stock_spin.setRange(0, 10000)
-        stock_spin.setValue(initial_stock)
-        form.addRow("Tallas", sizes_label)
-        form.addRow("Colores", colors_label)
-        form.addRow("", summary_label)
-        form.addRow("SKU previstos", sku_summary_label)
-        form.addRow("Modo precio", price_mode_label)
-        form.addRow("Precio venta", price_label)
-        form.addRow("Costo ref.", cost_input)
-        form.addRow("Stock inicial", stock_spin)
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addLayout(form)
-        layout.addWidget(buttons)
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return None
-        return {
-            "tallas": normalized_sizes,
-            "colores": normalized_colors,
-            "precio": initial_price.strip(),
-            "precio_modo": pricing_mode,
-            "precios_por_talla": pricing_map,
-            "resumen_precio": effective_price_summary,
-            "costo": cost_input.text().strip(),
-            "stock_inicial": stock_spin.value(),
-        }
 
     def _create_variants_batch(
         self,
@@ -5182,162 +3598,16 @@ class MainWindow(QMainWindow):
         include_stock: bool = False,
         default_product_id: int | None = None,
     ) -> dict[str, object] | None:
-        legacy_choices = load_legacy_config_choices()
-        with get_session() as session:
-            productos = [
-                {
-                    "id": producto.id,
-                    "nombre": producto.nombre,
-                    "nombre_base": producto.nombre_base,
-                    "marca": producto.marca.nombre,
-                    "escuela": producto.escuela.nombre if producto.escuela else "",
-                    "tipo_prenda": producto.tipo_prenda.nombre if producto.tipo_prenda else "",
-                    "tipo_pieza": producto.tipo_pieza.nombre if producto.tipo_pieza else "",
-                }
-                for producto in session.scalars(
-                    select(Producto).where(Producto.activo.is_(True)).order_by(Producto.nombre)
-                ).all()
-            ]
-
-        if not productos:
-            raise ValueError("Primero necesitas al menos un producto activo.")
-
-        dialog, layout = self._create_modal_dialog(
-            "Presentacion",
-            "Cada presentacion representa una combinacion vendible de producto, talla y color con su propio SKU, precio y stock.",
+        return build_catalog_variant_dialog(
+            self,
+            initial=initial,
+            include_stock=include_stock,
+            default_product_id=default_product_id,
+            common_sizes=COMMON_SIZES,
+            common_colors=COMMON_COLORS,
+            default_variant_size=DEFAULT_VARIANT_SIZE,
+            default_variant_color=DEFAULT_VARIANT_COLOR,
         )
-        form = QFormLayout()
-        producto_combo = QComboBox()
-        product_map = {producto["id"]: producto for producto in productos}
-        for producto in productos:
-            context = " | ".join(
-                part for part in (producto["escuela"], producto["tipo_prenda"], producto["tipo_pieza"]) if part
-            )
-            if context:
-                producto_combo.addItem(
-                    f"{producto['nombre_base']} | {context} | {producto['marca']}",
-                    producto["id"],
-                )
-            else:
-                producto_combo.addItem(f"{producto['nombre_base']} | {producto['marca']}", producto["id"])
-        sku_input = QLineEdit()
-        sku_input.setPlaceholderText("Se genera automaticamente si lo dejas vacio")
-        talla_combo = QComboBox()
-        talla_combo.setEditable(True)
-        talla_combo.addItems(merge_choice_lists(legacy_choices.get("TALLAS", []), COMMON_SIZES, [DEFAULT_VARIANT_SIZE]))
-        if talla_combo.lineEdit() is not None:
-            talla_combo.lineEdit().setPlaceholderText("Selecciona o escribe una talla")
-        color_combo = QComboBox()
-        color_combo.setEditable(True)
-        color_combo.addItems(merge_choice_lists(legacy_choices.get("COLORES", []), COMMON_COLORS, [DEFAULT_VARIANT_COLOR]))
-        if color_combo.lineEdit() is not None:
-            color_combo.lineEdit().setPlaceholderText("Selecciona o escribe un color")
-        precio_input = QLineEdit()
-        costo_input = QLineEdit()
-        stock_spin = QSpinBox()
-        stock_spin.setRange(0, 10000)
-        sku_hint = QLabel()
-        sku_hint.setObjectName("subtleLine")
-        auto_sku_enabled = {"value": True}
-        last_auto_sku = {"value": ""}
-
-        def refresh_sku_suggestion() -> None:
-            producto_id = producto_combo.currentData()
-            talla = talla_combo.currentText().strip()
-            color = color_combo.currentText().strip()
-            producto_info = product_map.get(producto_id)
-            if producto_info is None or not talla or not color:
-                sku_hint.setText("Completa producto, talla y color para sugerir un SKU.")
-                return
-
-            class _FakeMarca:
-                def __init__(self, nombre: str) -> None:
-                    self.nombre = nombre
-
-            class _FakeProducto:
-                def __init__(self, nombre: str, marca_nombre: str) -> None:
-                    self.nombre = nombre
-                    self.marca = _FakeMarca(marca_nombre)
-
-            fake_producto = _FakeProducto(producto_info["nombre_base"], producto_info["marca"])
-            with get_session() as session:
-                suggested = CatalogService.generar_sku_sugerido(
-                    session=session,
-                    producto=fake_producto,  # type: ignore[arg-type]
-                    talla=talla,
-                    color=color,
-                    excluding_variant_id=int(initial["variante_id"]) if initial else None,
-                )
-            previous_auto = last_auto_sku["value"]
-            last_auto_sku["value"] = suggested
-            sku_hint.setText(f"SKU sugerido: {suggested}")
-            if auto_sku_enabled["value"] or sku_input.text().strip().upper() == previous_auto:
-                auto_sku_enabled["value"] = True
-                sku_input.setText(suggested)
-
-        def mark_manual_override(value: str) -> None:
-            auto_sku_enabled["value"] = value.strip().upper() == last_auto_sku["value"]
-
-        if initial:
-            self._set_combo_value(producto_combo, initial["producto_id"])
-            sku_input.setText(str(initial["sku"]))
-            last_auto_sku["value"] = str(initial["sku"]).strip().upper()
-            talla_text = str(initial["talla"])
-            talla_index = talla_combo.findText(talla_text)
-            if talla_index >= 0:
-                talla_combo.setCurrentIndex(talla_index)
-            else:
-                talla_combo.setEditText(talla_text)
-            color_text = str(initial["color"])
-            color_index = color_combo.findText(color_text)
-            if color_index >= 0:
-                color_combo.setCurrentIndex(color_index)
-            else:
-                color_combo.setEditText(color_text)
-            precio_input.setText(str(initial["precio_venta"]))
-            costo_input.setText("" if initial["costo_referencia"] is None else str(initial["costo_referencia"]))
-            sku_hint.setText(f"SKU actual: {initial['sku']}")
-        elif default_product_id is not None:
-            self._set_combo_value(producto_combo, default_product_id)
-            sku_hint.setText("Completa talla y color para sugerir un SKU.")
-        else:
-            sku_hint.setText("Completa producto, talla y color para sugerir un SKU.")
-
-        form.addRow("Producto", producto_combo)
-        form.addRow("SKU", sku_input)
-        form.addRow("", sku_hint)
-        form.addRow("Talla", talla_combo)
-        form.addRow("Color", color_combo)
-        form.addRow("Precio venta", precio_input)
-        form.addRow("Costo referencia", costo_input)
-        if include_stock:
-            form.addRow("Stock inicial", stock_spin)
-
-        producto_combo.currentIndexChanged.connect(lambda _: refresh_sku_suggestion())
-        talla_combo.currentTextChanged.connect(lambda _: refresh_sku_suggestion())
-        color_combo.currentTextChanged.connect(lambda _: refresh_sku_suggestion())
-        sku_input.textEdited.connect(mark_manual_override)
-        if not initial:
-            refresh_sku_suggestion()
-
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-        layout.addLayout(form)
-        layout.addWidget(buttons)
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
-            return None
-        return {
-            "producto_id": producto_combo.currentData(),
-            "sku": sku_input.text().strip(),
-            "talla": talla_combo.currentText().strip(),
-            "color": color_combo.currentText().strip(),
-            "precio": precio_input.text().strip(),
-            "costo": costo_input.text().strip(),
-            "stock_inicial": stock_spin.value(),
-        }
 
     @staticmethod
     def _resolve_named_taxonomy(session, model, raw_name: str):
@@ -6455,19 +4725,17 @@ class MainWindow(QMainWindow):
         if default_product_id is not None:
             data["producto_id"] = default_product_id
 
+        validation_feedback = validate_catalog_variant_submission(data, require_stock=include_stock)
+        if validation_feedback is not None:
+            QMessageBox.warning(self, "Datos incompletos", validation_feedback)
+            return None
+
         producto_id = data["producto_id"]
         sku = str(data["sku"]).strip()
         talla = str(data["talla"]).strip()
         color = str(data["color"]).strip() or "Sin color"
         price_text = str(data["precio"]).strip()
         cost_text = str(data["costo"]).strip()
-        if not producto_id or not talla or not price_text:
-            QMessageBox.warning(
-                self,
-                "Datos incompletos",
-                "Selecciona producto y captura talla y precio.",
-            )
-            return None
 
         try:
             precio = Decimal(price_text)
@@ -6578,13 +4846,16 @@ class MainWindow(QMainWindow):
         if data is None:
             return
 
+        validation_feedback = validate_catalog_product_submission(data)
+        if validation_feedback is not None:
+            QMessageBox.warning(self, "Datos incompletos", validation_feedback)
+            return
+
         categoria_id = data["categoria_id"]
+        categoria_nombre = str(data.get("categoria_nombre") or "")
         marca_id = data["marca_id"]
         nombre = str(data["nombre"]).strip()
         descripcion = str(data["descripcion"]).strip()
-        if not categoria_id or not marca_id or not nombre:
-            QMessageBox.warning(self, "Datos incompletos", "Selecciona categoria, marca y nombre.")
-            return
 
         created_product_id: int | None = None
         selected_sizes = [str(value).strip() for value in data.get("tallas", []) if str(value).strip()]
@@ -6592,7 +4863,11 @@ class MainWindow(QMainWindow):
         try:
             with get_session() as session:
                 user = session.get(Usuario, self.user_id)
-                categoria = session.get(Categoria, int(categoria_id))
+                categoria = (
+                    session.get(Categoria, int(categoria_id))
+                    if categoria_id is not None
+                    else self._resolve_named_taxonomy(session, Categoria, categoria_nombre)
+                )
                 marca = session.get(Marca, int(marca_id))
                 if user is None or categoria is None or marca is None:
                     raise ValueError("Usuario, categoria o marca no encontrada.")
@@ -6790,18 +5065,20 @@ class MainWindow(QMainWindow):
             return
 
         categoria_id = data["categoria_id"]
+        categoria_nombre = str(data.get("categoria_nombre") or "")
         marca_id = data["marca_id"]
         nombre = str(data["nombre"]).strip()
         descripcion = str(data["descripcion"]).strip()
-        if not categoria_id or not marca_id or not nombre:
-            QMessageBox.warning(self, "Datos incompletos", "Categoria, marca y nombre son obligatorios.")
-            return
 
         try:
             with get_session() as session:
                 usuario = session.get(Usuario, self.user_id)
                 producto = session.get(Producto, int(selected["producto_id"]))
-                categoria = session.get(Categoria, int(categoria_id))
+                categoria = (
+                    session.get(Categoria, int(categoria_id))
+                    if categoria_id is not None
+                    else self._resolve_named_taxonomy(session, Categoria, categoria_nombre)
+                )
                 marca = session.get(Marca, int(marca_id))
                 if usuario is None or producto is None or categoria is None or marca is None:
                     raise ValueError("No se pudo cargar el producto, categoria o marca.")
@@ -8599,6 +6876,7 @@ class MainWindow(QMainWindow):
         catalog_snapshot_rows = load_catalog_snapshot_rows(session)
 
         search_text = self.catalog_search_input.text().strip()
+        school_scope_filter = str(self.catalog_school_scope_filter_combo.currentData() or "")
         category_filters = self.catalog_category_filter_combo.selected_values()
         brand_filters = self.catalog_brand_filter_combo.selected_values()
         school_filters = self.catalog_school_filter_combo.selected_values()
@@ -8620,6 +6898,7 @@ class MainWindow(QMainWindow):
             catalog_snapshot_rows,
             filters=CatalogVisibleFilterState(
                 search_text=search_text,
+                school_scope_filter=school_scope_filter,
                 category_filters=tuple(category_filters),
                 brand_filters=tuple(brand_filters),
                 school_filters=tuple(school_filters),
@@ -8711,6 +6990,7 @@ class MainWindow(QMainWindow):
                 ("color", self.catalog_color_filter_combo.selected_labels()),
             ),
             combo_filters=(
+                ("seccion", self.catalog_school_scope_filter_combo.currentData(), self.catalog_school_scope_filter_combo.currentText()),
                 ("estado", self.catalog_status_filter_combo.currentData(), self.catalog_status_filter_combo.currentText()),
                 ("stock", self.catalog_stock_filter_combo.currentData(), self.catalog_stock_filter_combo.currentText()),
                 ("apartados", self.catalog_layaway_filter_combo.currentData(), self.catalog_layaway_filter_combo.currentText()),
@@ -8885,6 +7165,7 @@ class MainWindow(QMainWindow):
         ]
         self._populate_combo(self.purchase_variant_combo, purchase_variant_items)
         self._populate_combo(self.inventory_variant_combo, inventory_variant_items)
+        self._refresh_catalog_section_controls()
         self._refresh_selected_qr_preview()
 
     def _refresh_sales_table(self, session) -> None:
@@ -9671,6 +7952,7 @@ class MainWindow(QMainWindow):
 
     def _handle_catalog_filters_changed(self) -> None:
         self._refresh_catalog_uniform_macro_buttons()
+        self._refresh_catalog_section_controls()
         try:
             with get_session() as session:
                 self._refresh_catalog(session)
@@ -9680,6 +7962,7 @@ class MainWindow(QMainWindow):
     def _handle_clear_catalog_filters(self) -> None:
         self.catalog_search_input.clear()
         for combo in (
+            self.catalog_school_scope_filter_combo,
             self.catalog_status_filter_combo,
             self.catalog_stock_filter_combo,
             self.catalog_layaway_filter_combo,
@@ -9700,6 +7983,7 @@ class MainWindow(QMainWindow):
         ):
             widget.clear_selection()
         self._refresh_catalog_uniform_macro_buttons()
+        self._refresh_catalog_section_controls()
         self._handle_catalog_filters_changed()
 
     def _set_catalog_uniform_macro_filter(self, macro_type: str) -> None:
@@ -9724,6 +8008,12 @@ class MainWindow(QMainWindow):
             button.setProperty("active", "true" if is_active else "false")
             button.style().unpolish(button)
             button.style().polish(button)
+
+    def _refresh_catalog_section_controls(self) -> None:
+        is_general_only = str(self.catalog_school_scope_filter_combo.currentData() or "") == "general_only"
+        if is_general_only and self.catalog_school_filter_combo.selected_values():
+            self.catalog_school_filter_combo.clear_selection()
+        self.catalog_school_filter_combo.setEnabled(not is_general_only)
 
     def _handle_history_source_changed(self) -> None:
         options_state = build_history_type_options_state(
@@ -10137,19 +8427,27 @@ class MainWindow(QMainWindow):
             return
 
         preview_path: Path | None = None
+        sku = ""
+        product_name = ""
+        talla = ""
+        color = ""
         try:
             with get_session() as session:
                 variante = session.get(Variante, int(variante_id))
                 if variante is None:
                     raise ValueError("Presentacion no encontrada.")
                 path = QrGenerator.path_for_variant(variante)
+                sku = str(variante.sku)
+                product_name = str(variante.producto.nombre)
+                talla = str(variante.talla)
+                color = str(variante.color)
                 if not path.exists():
                     self._apply_inventory_qr_preview_view(
                         build_pending_inventory_qr_preview_view(
-                            sku=str(variante.sku),
-                            product_name=str(variante.producto.nombre),
-                            talla=str(variante.talla),
-                            color=str(variante.color),
+                            sku=sku,
+                            product_name=product_name,
+                            talla=talla,
+                            color=color,
                         )
                     )
                     self._refresh_inventory_overview()
@@ -10163,10 +8461,10 @@ class MainWindow(QMainWindow):
 
         self._apply_inventory_qr_preview_view(
             build_available_inventory_qr_preview_view(
-                sku=str(variante.sku),
-                product_name=str(variante.producto.nombre),
-                talla=str(variante.talla),
-                color=str(variante.color),
+                sku=sku,
+                product_name=product_name,
+                talla=talla,
+                color=color,
                 file_name=path.name,
             ),
             preview_path=preview_path,

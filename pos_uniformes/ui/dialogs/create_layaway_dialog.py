@@ -28,6 +28,11 @@ from pos_uniformes.database.connection import get_session
 from pos_uniformes.services.apartado_service import ApartadoItemInput, ApartadoService
 from pos_uniformes.services.client_service import ClientService
 from pos_uniformes.services.inventario_service import InventarioService
+from pos_uniformes.services.layaway_pricing_service import (
+    resolve_layaway_client_discount_percent,
+    resolve_layaway_min_deposit,
+    resolve_layaway_unit_price,
+)
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 
 if TYPE_CHECKING:
@@ -89,7 +94,6 @@ def build_create_layaway_dialog(
             phone_input.clear()
         last_autofill = {"nombre": "", "telefono": ""}
 
-    client_selector.currentIndexChanged.connect(sync_selected_client)
     form.addRow("Cliente guardado", client_selector)
     form.addRow("Cliente", customer_input)
     form.addRow("Telefono", phone_input)
@@ -100,6 +104,7 @@ def build_create_layaway_dialog(
             "producto_nombre": str(item["producto_nombre"]),
             "cantidad": int(item["cantidad"]),
             "precio_unitario": Decimal(item["precio_unitario"]),
+            "precio_base": Decimal(item.get("precio_base", item["precio_unitario"])),
         }
         for item in (initial_items or [])
     ]
@@ -120,6 +125,39 @@ def build_create_layaway_dialog(
     items_table.setAlternatingRowColors(True)
     total_label = QLabel("Total estimado: $0.00")
     total_label.setObjectName("analyticsLine")
+    minimum_deposit_label = QLabel("Anticipo minimo (20%): $0.00")
+    minimum_deposit_label.setObjectName("analyticsLine")
+
+    def current_selected_client_id() -> int | None:
+        selected_client = client_selector.currentData()
+        if not isinstance(selected_client, dict):
+            return None
+        try:
+            return int(selected_client["id"])
+        except (KeyError, TypeError, ValueError):
+            return None
+
+    def current_client_discount_percent() -> Decimal:
+        client_id = current_selected_client_id()
+        if client_id is None:
+            return Decimal("0.00")
+        try:
+            with get_session() as session:
+                return resolve_layaway_client_discount_percent(
+                    session,
+                    selected_client_id=client_id,
+                )
+        except Exception:
+            return Decimal("0.00")
+
+    def reprice_items_for_selected_client() -> Decimal:
+        discount_percent = current_client_discount_percent()
+        for item in items:
+            item["precio_unitario"] = resolve_layaway_unit_price(
+                Decimal(item["precio_base"]),
+                discount_percent=discount_percent,
+            )
+        return discount_percent
 
     def refresh_items_table() -> None:
         total = Decimal("0.00")
@@ -138,6 +176,11 @@ def build_create_layaway_dialog(
                 items_table.setItem(row_index, column_index, _table_item(value))
         items_table.resizeColumnsToContents()
         total_label.setText(f"Total estimado: ${total}")
+        minimum_deposit = resolve_layaway_min_deposit(total)
+        minimum_deposit_label.setText(f"Anticipo minimo (20%): ${minimum_deposit}")
+        deposit_spin.setMinimum(float(minimum_deposit))
+        if deposit_spin.value() < float(minimum_deposit):
+            deposit_spin.setValue(float(minimum_deposit))
 
     def handle_add_item() -> None:
         sku = sku_input.text().strip().upper()
@@ -152,7 +195,12 @@ def build_create_layaway_dialog(
                     raise ValueError(f"El SKU '{sku}' no existe o esta inactivo.")
                 InventarioService.validar_stock_disponible(variante, cantidad)
                 producto_nombre = sanitize_product_display_name(variante.producto.nombre)
-                precio_unitario = Decimal(variante.precio_venta)
+                base_price = Decimal(variante.precio_venta)
+                discount_percent = current_client_discount_percent()
+                precio_unitario = resolve_layaway_unit_price(
+                    base_price,
+                    discount_percent=discount_percent,
+                )
         except Exception as exc:  # noqa: BLE001
             message = str(exc)
             if "Stock insuficiente" in message:
@@ -182,6 +230,7 @@ def build_create_layaway_dialog(
                     "sku": sku,
                     "producto_nombre": producto_nombre,
                     "cantidad": cantidad,
+                    "precio_base": base_price,
                     "precio_unitario": precio_unitario,
                 }
             )
@@ -197,8 +246,15 @@ def build_create_layaway_dialog(
         items.pop(row_index)
         refresh_items_table()
 
+    def handle_selected_client_changed() -> None:
+        sync_selected_client()
+        reprice_items_for_selected_client()
+        refresh_items_table()
+
     add_item_button.clicked.connect(handle_add_item)
     remove_item_button.clicked.connect(handle_remove_item)
+    sku_input.returnPressed.connect(handle_add_item)
+    client_selector.currentIndexChanged.connect(handle_selected_client_changed)
 
     line_row = QHBoxLayout()
     line_row.setSpacing(8)
@@ -213,9 +269,10 @@ def build_create_layaway_dialog(
     due_input.setPlaceholderText("YYYY-MM-DD")
     due_input.setText((date.today() + timedelta(days=15)).isoformat())
     deposit_spin = QDoubleSpinBox()
-    deposit_spin.setRange(0.0, 999999.99)
+    deposit_spin.setRange(0.01, 999999.99)
     deposit_spin.setDecimals(2)
     deposit_spin.setPrefix("$")
+    deposit_spin.setValue(0.01)
     notes_input = QTextEdit()
     notes_input.setMaximumHeight(90)
     form.addRow("Anticipo", deposit_spin)
@@ -228,8 +285,11 @@ def build_create_layaway_dialog(
     layout.addLayout(line_row)
     layout.addWidget(items_table)
     layout.addWidget(total_label)
+    layout.addWidget(minimum_deposit_label)
     layout.addWidget(buttons)
     refresh_items_table()
+    sku_input.setFocus()
+    sku_input.selectAll()
     if dialog.exec() != int(QDialog.DialogCode.Accepted):
         return None
     if not items:

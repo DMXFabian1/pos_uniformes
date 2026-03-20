@@ -12,6 +12,30 @@ from pos_uniformes.services.layaway_creation_service import (
 
 
 class LayawayCreationServiceTests(unittest.TestCase):
+    def test_create_layaway_from_payload_requires_positive_deposit(self) -> None:
+        session = SimpleNamespace(get=lambda _model, _id: object())
+
+        with patch(
+            "pos_uniformes.services.layaway_creation_service._resolve_layaway_creation_dependencies",
+            return_value=(SimpleNamespace(), object(), object()),
+        ):
+            with self.assertRaisesRegex(ValueError, "anticipo mayor a cero"):
+                create_layaway_from_payload(
+                    session,
+                    user_id=7,
+                    folio="AP-001",
+                    payload={
+                        "cliente_id": None,
+                        "cliente_nombre": "Maria",
+                        "cliente_telefono": "555",
+                        "items": [SimpleNamespace(sku="SKU-1", cantidad=1)],
+                        "anticipo": Decimal("0.00"),
+                        "fecha_compromiso": "2026-03-20",
+                        "observacion": "",
+                    },
+                    default_note="Creado desde Caja.",
+                )
+
     def test_create_layaway_from_payload_uses_apartado_service(self) -> None:
         usuario = object()
         cliente = object()

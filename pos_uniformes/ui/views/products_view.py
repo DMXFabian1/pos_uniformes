@@ -68,6 +68,7 @@ def build_products_tab(window: "MainWindow") -> QWidget:
     window.catalog_piece_filter_combo.setObjectName("secondaryButton")
     window.catalog_size_filter_combo.setObjectName("secondaryButton")
     window.catalog_color_filter_combo.setObjectName("secondaryButton")
+    window.catalog_school_scope_filter_combo.setObjectName("inventoryFilterCombo")
     window.catalog_status_filter_combo.setObjectName("inventoryFilterCombo")
     window.catalog_stock_filter_combo.setObjectName("inventoryFilterCombo")
     window.catalog_layaway_filter_combo.setObjectName("inventoryFilterCombo")
@@ -92,12 +93,17 @@ def build_products_tab(window: "MainWindow") -> QWidget:
     window.catalog_duplicate_filter_combo.addItem("Incidencias: todas", "")
     window.catalog_duplicate_filter_combo.addItem("Solo fallbacks importados", "fallback_only")
     window.catalog_duplicate_filter_combo.addItem("Ocultar fallbacks", "fallback_exclude")
+    window.catalog_school_scope_filter_combo.clear()
+    window.catalog_school_scope_filter_combo.addItem("Seccion: todas", "")
+    window.catalog_school_scope_filter_combo.addItem("Solo uniforme escolar", "school_only")
+    window.catalog_school_scope_filter_combo.addItem("Solo ropa normal", "general_only")
 
     search_label = QLabel("Buscar")
+    scope_label = QLabel("Seccion")
     category_label = QLabel("Categoria")
     brand_label = QLabel("Marca")
     school_label = QLabel("Escuela")
-    type_label = QLabel("Tipo de uniforme")
+    type_label = QLabel("Linea")
     piece_label = QLabel("Pieza")
     size_label = QLabel("Talla")
     color_label = QLabel("Color")
@@ -108,6 +114,7 @@ def build_products_tab(window: "MainWindow") -> QWidget:
     duplicate_label = QLabel("Incidencias")
     for label in (
         search_label,
+        scope_label,
         category_label,
         brand_label,
         school_label,
@@ -123,7 +130,7 @@ def build_products_tab(window: "MainWindow") -> QWidget:
     ):
         label.setObjectName("inventoryFilterLabel")
 
-    macro_label = QLabel("Macro uniforme")
+    macro_label = QLabel("Linea rapida")
     macro_label.setObjectName("inventoryFilterLabel")
     macro_row = QHBoxLayout()
     macro_row.setSpacing(6)
@@ -141,8 +148,10 @@ def build_products_tab(window: "MainWindow") -> QWidget:
     filters_grid.setHorizontalSpacing(6)
     filters_grid.setVerticalSpacing(4)
     filters_grid.addWidget(search_label, 0, 0)
-    filters_grid.addWidget(window.catalog_search_input, 0, 1, 1, 5)
-    filters_grid.addWidget(window.catalog_clear_filters_button, 0, 6)
+    filters_grid.addWidget(window.catalog_search_input, 0, 1, 1, 3)
+    filters_grid.addWidget(scope_label, 0, 4)
+    filters_grid.addWidget(window.catalog_school_scope_filter_combo, 0, 5, 1, 2)
+    filters_grid.addWidget(window.catalog_clear_filters_button, 0, 7)
     filters_grid.addWidget(macro_label, 1, 0)
     filters_grid.addLayout(macro_row, 1, 1, 1, 7)
     filters_grid.addWidget(category_label, 2, 0)
@@ -182,12 +191,16 @@ def build_products_tab(window: "MainWindow") -> QWidget:
     window.catalog_piece_filter_combo.selectionChanged.connect(window._handle_catalog_filters_changed)
     window.catalog_size_filter_combo.selectionChanged.connect(window._handle_catalog_filters_changed)
     window.catalog_color_filter_combo.selectionChanged.connect(window._handle_catalog_filters_changed)
+    window.catalog_school_scope_filter_combo.currentIndexChanged.connect(window._handle_catalog_filters_changed)
     window.catalog_status_filter_combo.currentIndexChanged.connect(window._handle_catalog_filters_changed)
     window.catalog_stock_filter_combo.currentIndexChanged.connect(window._handle_catalog_filters_changed)
     window.catalog_origin_filter_combo.currentIndexChanged.connect(window._handle_catalog_filters_changed)
     window.catalog_duplicate_filter_combo.currentIndexChanged.connect(window._handle_catalog_filters_changed)
     window.catalog_clear_filters_button.clicked.connect(window._handle_clear_catalog_filters)
-    window.catalog_type_filter_combo.setToolTip("Filtro detallado por tipo de uniforme o tipo de prenda.")
+    window.catalog_type_filter_combo.setToolTip("Filtro detallado por linea o tipo de prenda.")
+    window.catalog_school_scope_filter_combo.setToolTip(
+        "Separa rapido entre uniforme escolar y ropa normal segun la categoria real del producto."
+    )
 
     summary_layout.addLayout(filters_grid)
     summary_layout.addWidget(window.products_selection_label)

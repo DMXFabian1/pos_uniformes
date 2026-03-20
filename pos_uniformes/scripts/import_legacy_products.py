@@ -25,6 +25,12 @@ def parse_args() -> argparse.Namespace:
         default="exports/imports",
         help="Directorio donde se guardara el resumen de importacion.",
     )
+    parser.add_argument(
+        "--mode",
+        choices=("initial", "missing_only"),
+        default="initial",
+        help="initial importa sobre base vacia; missing_only agrega solo SKUs legacy faltantes.",
+    )
     return parser.parse_args()
 
 
@@ -33,11 +39,13 @@ def main() -> int:
     importer = LegacyProductsImporter(
         sqlite_path=Path(args.sqlite_path),
         report_dir=Path(args.report_dir),
+        import_mode=args.mode,
     )
     with get_session() as session:
         summary = importer.run(session)
 
     print(f"Productos leidos: {summary.products_read}")
+    print(f"SKUs omitidos por existir: {summary.rows_skipped_existing}")
     print(f"Familias creadas: {summary.product_families_created}")
     print(f"Variantes creadas: {summary.variants_created}")
     print(f"Assets creados: {summary.assets_created}")

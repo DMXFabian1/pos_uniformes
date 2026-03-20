@@ -24,7 +24,10 @@ def resolve_catalog_row(
 
 def build_empty_catalog_selection_view() -> CatalogSelectionView:
     return CatalogSelectionView(
-        selection_label="Consulta uniformes y usa filtros macro como Deportivo, Oficial, Basico, Escolta o Accesorio."
+        selection_label=(
+            "Consulta catalogo general y separa rapido uniforme escolar o ropa normal. "
+            "Despues afina por linea, pieza, talla, color o escuela."
+        )
     )
 
 

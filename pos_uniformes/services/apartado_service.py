@@ -20,6 +20,11 @@ from pos_uniformes.database.models import (
     Variante,
 )
 from pos_uniformes.services.inventario_service import InventarioService
+from pos_uniformes.services.layaway_pricing_service import (
+    resolve_layaway_client_discount_percent,
+    resolve_layaway_min_deposit,
+    resolve_layaway_unit_price,
+)
 
 
 @dataclass(frozen=True)
@@ -83,8 +88,8 @@ class ApartadoService:
             raise ValueError("Debes capturar el nombre del cliente.")
         if not items:
             raise ValueError("El apartado debe contener al menos una presentacion.")
-        if anticipo < Decimal("0.00"):
-            raise ValueError("El anticipo no puede ser negativo.")
+        if anticipo <= Decimal("0.00"):
+            raise ValueError("El apartado debe iniciar con un anticipo mayor a cero.")
 
         apartado = Apartado(
             usuario=usuario,
@@ -99,6 +104,10 @@ class ApartadoService:
 
         total = Decimal("0.00")
         seen_skus: set[str] = set()
+        client_discount_percent = resolve_layaway_client_discount_percent(
+            session,
+            selected_client_id=getattr(cliente, "id", None),
+        )
         for item in items:
             sku = item.sku.strip().upper()
             if not sku:
@@ -114,16 +123,25 @@ class ApartadoService:
                 raise ValueError(f"No existe una presentacion activa para el SKU '{sku}'.")
 
             InventarioService.validar_stock_disponible(variante, item.cantidad)
-            subtotal_linea = Decimal(item.cantidad) * Decimal(variante.precio_venta)
+            precio_unitario = resolve_layaway_unit_price(
+                variante.precio_venta,
+                discount_percent=client_discount_percent,
+            )
+            subtotal_linea = Decimal(item.cantidad) * precio_unitario
             detalle = ApartadoDetalle(
                 variante=variante,
                 cantidad=item.cantidad,
-                precio_unitario=variante.precio_venta,
+                precio_unitario=precio_unitario,
                 subtotal_linea=subtotal_linea,
             )
             apartado.detalles.append(detalle)
             total += subtotal_linea
 
+        minimum_deposit = resolve_layaway_min_deposit(total)
+        if anticipo < minimum_deposit:
+            raise ValueError(
+                f"El anticipo minimo para este apartado es ${minimum_deposit} (20% del total)."
+            )
         if anticipo > total:
             raise ValueError("El anticipo no puede ser mayor al total del apartado.")
 

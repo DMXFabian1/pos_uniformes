@@ -18,7 +18,7 @@ class CatalogSelectionHelperTests(unittest.TestCase):
 
         self.assertEqual(
             view.selection_label,
-            "Consulta uniformes y usa filtros macro como Deportivo, Oficial, Basico, Escolta o Accesorio.",
+            "Consulta catalogo general y separa rapido uniforme escolar o ropa normal. Despues afina por linea, pieza, talla, color o escuela.",
         )
 
     def test_builds_admin_selection_view_with_legacy_note(self) -> None:

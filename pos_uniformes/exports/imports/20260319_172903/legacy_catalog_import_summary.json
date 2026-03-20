@@ -1,0 +1,18 @@
+{
+  "source": "/Users/danielfabian/Documents/Playground 2/Gestor_de_Inventarios/data/productos.db",
+  "rows_read": 4032,
+  "max_legacy_sku": 4633,
+  "rows_skipped_existing": 3376,
+  "categories_created": 0,
+  "brands_created": 1,
+  "schools_created": 9,
+  "garment_types_created": 0,
+  "piece_types_created": 0,
+  "education_levels_created": 0,
+  "attributes_created": 1,
+  "product_families_created": 74,
+  "variants_created": 656,
+  "assets_created": 1263,
+  "stock_movements_created": 430,
+  "duplicated_variant_fallbacks": 0
+}

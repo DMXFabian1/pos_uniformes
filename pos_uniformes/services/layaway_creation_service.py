@@ -25,6 +25,9 @@ def create_layaway_from_payload(
     usuario = session.get(usuario_model, user_id)
     if usuario is None:
         raise ValueError("No se pudo cargar el usuario actual.")
+    anticipo = Decimal(payload["anticipo"])
+    if anticipo <= Decimal("0.00"):
+        raise ValueError("El apartado debe iniciar con un anticipo mayor a cero.")
 
     cliente = None
     if payload["cliente_id"] is not None:
@@ -44,7 +47,7 @@ def create_layaway_from_payload(
         cliente_nombre=str(payload["cliente_nombre"]),
         cliente_telefono=str(payload["cliente_telefono"]),
         items=list(payload["items"]),
-        anticipo=Decimal(payload["anticipo"]),
+        anticipo=anticipo,
         fecha_compromiso=due_value,
         observacion=str(payload["observacion"]) or default_note,
         cliente=cliente,

@@ -13,7 +13,7 @@ import sqlite3
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from pos_uniformes.database.models import (
     AtributoProducto,
@@ -68,6 +68,7 @@ class LegacyProductRow:
 @dataclass(frozen=True)
 class ImportSummary:
     products_read: int
+    rows_skipped_existing: int
     categories_created: int
     brands_created: int
     schools_created: int
@@ -87,12 +88,22 @@ class ImportSummary:
 class LegacyProductsImporter:
     """Importa productos legacy respetando SKU y metadata etiquetada."""
 
-    def __init__(self, sqlite_path: Path, report_dir: Path | None = None) -> None:
+    def __init__(
+        self,
+        sqlite_path: Path,
+        report_dir: Path | None = None,
+        import_mode: str = "initial",
+    ) -> None:
         self.sqlite_path = sqlite_path.expanduser().resolve()
         self.report_dir = (report_dir or Path(__file__).resolve().parents[1] / "exports" / "imports").resolve()
+        normalized_mode = str(import_mode or "initial").strip().lower()
+        if normalized_mode not in {"initial", "missing_only"}:
+            raise ValueError("import_mode debe ser 'initial' o 'missing_only'.")
+        self.import_mode = normalized_mode
         self._schools_by_legacy_id: dict[int, str] = {}
         self._display_name_counts: defaultdict[tuple[str, str], int] = defaultdict(int)
         self._stats: dict[str, int] = {
+            "rows_skipped_existing": 0,
             "categories_created": 0,
             "brands_created": 0,
             "schools_created": 0,
@@ -108,14 +119,28 @@ class LegacyProductsImporter:
         }
 
     def run(self, session: Session) -> ImportSummary:
-        self._assert_safe_destination(session)
-        rows = self._read_legacy_rows()
+        if self.import_mode == "initial":
+            self._assert_safe_destination(session)
+
+        source_rows = self._read_legacy_rows()
         self._load_legacy_schools()
+        rows = source_rows
+        if self.import_mode == "missing_only":
+            rows = self._filter_rows_by_missing_skus(session, source_rows)
+        skipped_existing = len(source_rows) - len(rows)
+        self._stats["rows_skipped_existing"] = skipped_existing
+
+        observation = "Importacion inicial desde SQLite legacy hacia POS Uniformes."
+        if self.import_mode == "missing_only":
+            observation = (
+                "Importacion delta desde SQLite legacy hacia POS Uniformes. "
+                f"Se omitieron {skipped_existing} SKUs ya existentes."
+            )
         import_batch = ImportacionCatalogo(
             fuente_nombre=LEGACY_SOURCE,
             fuente_ruta=str(self.sqlite_path),
-            observaciones="Importacion inicial desde SQLite legacy hacia POS Uniformes.",
-            filas_leidas=len(rows),
+            observaciones=observation,
+            filas_leidas=len(source_rows),
         )
         session.add(import_batch)
         session.flush()
@@ -129,7 +154,13 @@ class LegacyProductsImporter:
         attributes: dict[str, AtributoProducto] = {}
         products: dict[tuple[str, str, str | None, str | None, str | None, str | None, str | None, str | None], Producto] = {}
         variant_keys: set[tuple[int, str, str]] = set()
-        max_legacy_sku = 0
+        if self.import_mode == "missing_only":
+            self._prime_existing_catalog_state(
+                session,
+                products=products,
+                variant_keys=variant_keys,
+            )
+        max_legacy_sku = max((self._parse_legacy_sku_number(row.sku) for row in source_rows), default=0)
 
         for row in rows:
             base_name, parsed_size = self._split_name_and_size(row.nombre, row.talla)
@@ -320,12 +351,8 @@ class LegacyProductsImporter:
                 session.add(variant)
                 self._stats["stock_movements_created"] += 1
 
-            parsed_sku = self._parse_legacy_sku_number(row.sku)
-            if parsed_sku > max_legacy_sku:
-                max_legacy_sku = parsed_sku
-
         self._sync_sku_sequence(session, max_legacy_sku)
-        report_path = self._write_report(rows_count=len(rows), max_legacy_sku=max_legacy_sku)
+        report_path = self._write_report(rows_count=len(source_rows), max_legacy_sku=max_legacy_sku)
         import_batch.familias_creadas = self._stats["product_families_created"]
         import_batch.variantes_creadas = self._stats["variants_created"]
         import_batch.assets_creados = self._stats["assets_created"]
@@ -337,7 +364,8 @@ class LegacyProductsImporter:
         session.add(import_batch)
         session.commit()
         return ImportSummary(
-            products_read=len(rows),
+            products_read=len(source_rows),
+            rows_skipped_existing=skipped_existing,
             categories_created=self._stats["categories_created"],
             brands_created=self._stats["brands_created"],
             schools_created=self._stats["schools_created"],
@@ -429,6 +457,52 @@ class LegacyProductsImporter:
             )
             for row in raw_rows
         ]
+
+    @staticmethod
+    def _filter_rows_by_missing_skus(session: Session, rows: list[LegacyProductRow]) -> list[LegacyProductRow]:
+        existing_skus = {sku for sku in session.scalars(select(Variante.sku))}
+        return [row for row in rows if row.sku not in existing_skus]
+
+    def _prime_existing_catalog_state(
+        self,
+        session: Session,
+        *,
+        products: dict[tuple[str, str, str | None, str | None, str | None, str | None, str | None, str | None], Producto],
+        variant_keys: set[tuple[int, str, str]],
+    ) -> None:
+        existing_products = session.scalars(
+            select(Producto).options(
+                selectinload(Producto.marca),
+                selectinload(Producto.escuela),
+                selectinload(Producto.tipo_prenda),
+                selectinload(Producto.tipo_pieza),
+                selectinload(Producto.nivel_educativo),
+                selectinload(Producto.atributo),
+                selectinload(Producto.variantes),
+            )
+        ).all()
+
+        for product in existing_products:
+            brand_name = product.marca.nombre
+            school_name = product.escuela.nombre if product.escuela else None
+            garment_type_name = product.tipo_prenda.nombre if product.tipo_prenda else None
+            piece_type_name = product.tipo_pieza.nombre if product.tipo_pieza else None
+            education_level_name = product.nivel_educativo.nombre if product.nivel_educativo else None
+            attribute_name = product.atributo.nombre if product.atributo else None
+            family_key = (
+                product.nombre_base,
+                brand_name,
+                school_name,
+                garment_type_name,
+                piece_type_name,
+                education_level_name,
+                attribute_name,
+                product.genero or None,
+            )
+            products.setdefault(family_key, product)
+            self._display_name_counts[(brand_name, product.nombre)] += 1
+            for variant in product.variantes:
+                variant_keys.add((int(product.id), variant.talla, variant.color))
 
     @staticmethod
     def _clean_text(value: object | None) -> str:

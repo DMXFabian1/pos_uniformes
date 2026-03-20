@@ -5,6 +5,9 @@
 - Precheck de arranque activo.
 - Suite de pruebas activa.
 - Base actual validada con `check_startup_health.py`.
+- Base de datos catalogada como checkpoint bueno despues del delta legacy del `2026-03-19`, con respaldo en `backups/database/pos_uniformes_20260319_173442.dump`.
+- Delta legacy aplicado desde `Gestor_de_Inventarios/data/productos.db`: `656` variantes nuevas, `74` familias nuevas y `0` SKUs `SKU%` pendientes; se omitieron `2` filas de prueba sin prefijo `SKU`.
+- Checklist especifica de cierre para `Fase 4` y validacion manual pendiente de `Fase 1` creada en `docs/checklist_cierre_fase_4.md`.
 - Busqueda textual endurecida para tolerar alias con comillas mal cerradas sin dejar al operador con resultados vacios silenciosos.
 - Busqueda textual endurecida para tolerar comparaciones sin acento contra catalogo real con nombres y variantes acentuadas.
 - Ticket de venta documentado y con correccion tolerante para descuentos faltantes en ventas antiguas.
@@ -21,6 +24,7 @@
 - Cobro delega las notas operativas del pago a `services/sale_payment_context_service.py` y el tooltip visible del metodo a `ui/helpers/sale_payment_summary_helper.py`, dejando a `MainWindow` y al panel de caja sin copy hardcodeado por metodo.
 - Cobro delega validaciones de efectivo, transferencia y mixto a `services/sale_payment_validation_service.py`, dejando a `payment_dialogs.py` sin reglas inline de suficiencia, cambio y configuracion.
 - Caja delega apertura, movimientos, correccion de apertura y corte a `services/cash_session_action_service.py`, y los mensajes visibles asociados a `ui/helpers/cash_session_feedback_helper.py`, dejando a `MainWindow` sin cargar entidades ni construir feedback operacional inline.
+- Existe una bateria operativa reusable en `scripts/check_operational_flows.py` para revisar Caja/Cobro y Apartados/Tickets con una sola corrida enfocada.
 - Cliente escaneado en Caja delega su plan visible de confirmacion y feedback a `ui/helpers/sale_scanned_client_helper.py`.
 - Cliente seleccionado en Caja delega el reset de promo manual, el bloqueo de descuento y el tooltip visible a `ui/helpers/sale_client_selection_helper.py`.
 - El beneficio del cliente seleccionado se resuelve desde `services/sale_selected_client_service.py` y el flujo de cliente escaneado reutiliza la misma sesion activa.
@@ -37,6 +41,9 @@
 - Catalogo delega el mapeo de resultados crudos y las columnas visibles del listado a `ui/helpers/catalog_refresh_helper.py`, dejando a `MainWindow` sin traducir tuplas SQL a mano para la tabla.
 - Catalogo delega las mutaciones de toggle/delete con sesion a `services/catalog_mutation_service.py`, dejando a `MainWindow` sin cargar entidades ni llamar `CatalogService` directamente para esos casos.
 - Catalogo delega el filtrado visible del listado a `ui/helpers/catalog_filter_helper.py`, dejando a `MainWindow` sin cadenas largas de condiciones inline para filtros macro y estados.
+- Catalogo ahora separa `Uniforme escolar` y `Ropa normal` con un filtro visible por contexto de escuela (`General` vs escuela asignada), y deja deshabilitado el filtro de escuela cuando el operador entra a ropa normal para no mezclar criterios.
+- Catalogo ahora ofrece un modo de captura `Uniforme escolar / Ropa normal` dentro del formulario de producto, con hints, labels, categoria y campos de contexto adaptados segun el flujo.
+- Catalogo delega el nombre visible, el resumen en vivo y la revision final del formulario de producto a `ui/helpers/catalog_product_form_summary_helper.py`, dejando a `MainWindow` sin construir esos HTML inline.
 - Inventario delega el filtrado visible del listado a `ui/helpers/inventory_filter_helper.py`, dejando a `MainWindow` sin ramas repetidas por filtro antes de pintar la tabla.
 - Catalogo e Inventario comparten predicados de visibilidad en `ui/helpers/listing_visibility_helper.py`, reduciendo duplicacion en filtros de seleccion multiple, estado, origen e incidencias.
 - Catalogo delega la carga del query y el snapshot base del listado a `services/catalog_snapshot_service.py`, dejando a `MainWindow` sin construir el query SQL completo de catalogo.
@@ -86,6 +93,8 @@
   - Verificacion de conexion y revision de esquema.
 - `scripts/check_startup_health.py`
   - Smoke operativo reutilizable.
+- `scripts/check_operational_flows.py`
+  - Bateria enfocada de regresion para Caja/Cobro y Apartados/Tickets.
 
 ### Caja
 
@@ -242,6 +251,11 @@
   - Mapea filas crudas del query de Catalogo a `catalog_rows` y arma las columnas visibles de la tabla fuera de `MainWindow`.
 - `ui/helpers/catalog_filter_helper.py`
   - Filtra el listado visible de Catalogo a partir del snapshot, el texto de busqueda y los filtros activos sin dejar la condicion completa inline en `MainWindow`.
+  - Ahora tambien separa `Uniforme escolar` y `Ropa normal` segun el contexto visible de escuela, para que el operador pueda aislar prendas generales sin depender de escuelas especificas.
+- `ui/helpers/catalog_product_form_mode_helper.py`
+  - Decide y describe el modo visible del formulario de producto (`uniform` o `regular`) para adaptar categoria, hints y campos de contexto sin cargar esa logica en `MainWindow`.
+- `ui/helpers/catalog_product_form_summary_helper.py`
+  - Construye el nombre visible, los ejemplos de presentaciones, el resumen en vivo y la revision final del formulario de producto fuera de `MainWindow`.
 - `ui/helpers/catalog_access_helper.py`
   - Estado visible del tab Catalogo segun rol: mensaje de permiso, acciones habilitadas y visibilidad de caja rapida.
 - `services/catalog_snapshot_service.py`
@@ -390,6 +404,20 @@
 
 - `ui/dialogs/create_layaway_dialog.py`
   - Prompt inline de crear apartado extraido de `MainWindow`, reutilizado tanto para alta directa como para convertir carrito.
+
+### Catalogo
+
+- `ui/dialogs/catalog_product_dialog.py`
+  - Modal grande de producto extraido de `MainWindow`; la ventana principal ya solo delega la apertura y el payload final.
+  - El modo `Ropa normal` ya oculta las plantillas y los campos/opciones escolares en vez de dejarlos visibles pero deshabilitados.
+  - El modo `Ropa normal` ya ofrece sugerencias propias de categoria, linea, pieza, detalle y ubicacion para capturar prendas comerciales nuevas.
+- `ui/dialogs/catalog_variant_dialog.py`
+  - Dialogos de presentacion simple y por lote extraidos de `MainWindow`, manteniendo el guardado en los mismos handlers.
+- `ui/helpers/catalog_form_payload_helper.py`
+  - Armado y validaciones puras del payload de producto/presentacion fuera de `MainWindow`, reutilizadas por dialogos y handlers.
+  - El payload de producto ya acepta categoria regular por nombre para poder resolverla/crearla al guardar.
+- `ui/helpers/catalog_filter_helper.py`
+  - La separacion `uniforme escolar / ropa normal` ya se basa en categoria uniforme vs no uniforme, no en `escuela = General`.
 
 ### Historial
 
