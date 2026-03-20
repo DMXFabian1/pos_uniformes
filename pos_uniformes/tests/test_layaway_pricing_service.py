@@ -5,6 +5,7 @@ import unittest
 from unittest.mock import patch
 
 from pos_uniformes.services.layaway_pricing_service import (
+    build_layaway_pricing,
     resolve_layaway_client_discount_percent,
     resolve_layaway_min_deposit,
     resolve_layaway_unit_price,
@@ -41,6 +42,13 @@ class LayawayPricingServiceTests(unittest.TestCase):
             resolve_layaway_unit_price(Decimal("200.00"), discount_percent=Decimal("10.00")),
             Decimal("180.00"),
         )
+
+    def test_build_layaway_pricing_uses_sale_rounding_rule(self) -> None:
+        pricing = build_layaway_pricing(Decimal("439.24"))
+
+        self.assertEqual(pricing.subtotal, Decimal("439.24"))
+        self.assertEqual(pricing.rounding_adjustment, Decimal("0.26"))
+        self.assertEqual(pricing.total, Decimal("439.50"))
 
     def test_resolve_layaway_min_deposit_uses_20_percent_of_total(self) -> None:
         self.assertEqual(resolve_layaway_min_deposit(Decimal("439.00")), Decimal("87.80"))

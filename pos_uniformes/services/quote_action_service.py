@@ -3,6 +3,20 @@
 from __future__ import annotations
 
 
+def emit_quote(session, *, quote_id: int, user_id: int) -> None:
+    presupuesto_service, usuario_model = _resolve_quote_action_dependencies()
+    presupuesto = presupuesto_service.obtener_presupuesto(session, quote_id)
+    usuario = session.get(usuario_model, user_id)
+    if presupuesto is None or usuario is None:
+        raise ValueError("No se pudo cargar el presupuesto seleccionado.")
+    presupuesto_service.emitir_presupuesto(
+        session=session,
+        presupuesto=presupuesto,
+        usuario=usuario,
+        observacion=f"Emitido desde interfaz por {usuario.username}.",
+    )
+
+
 def cancel_quote(session, *, quote_id: int, user_id: int) -> None:
     presupuesto_service, usuario_model = _resolve_quote_action_dependencies()
     presupuesto = presupuesto_service.obtener_presupuesto(session, quote_id)

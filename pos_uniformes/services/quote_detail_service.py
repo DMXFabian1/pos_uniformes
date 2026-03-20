@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
+from pos_uniformes.utils.date_format import format_display_date
+
 
 @dataclass(frozen=True)
 class QuoteDetailLineSnapshot:
@@ -41,7 +43,7 @@ def load_quote_detail_snapshot(session, *, quote_id: int) -> QuoteDetailSnapshot
         phone_text=str(phone_text),
         status_label=str(quote.estado.value),
         total=Decimal(quote.total),
-        validity_label=quote.vigencia_hasta.strftime("%Y-%m-%d") if quote.vigencia_hasta else "Sin vigencia",
+        validity_label=format_display_date(quote.vigencia_hasta, empty="Sin vigencia"),
         user_label=str(quote.usuario.username if quote.usuario else "-"),
         notes_text=str(quote.observacion or "Sin observaciones."),
         detail_rows=tuple(

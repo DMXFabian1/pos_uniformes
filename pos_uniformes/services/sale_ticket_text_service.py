@@ -6,6 +6,7 @@ from decimal import Decimal
 import re
 
 from pos_uniformes.services.sale_ticket_totals_service import resolve_sale_ticket_totals
+from pos_uniformes.utils.date_format import format_display_datetime
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 
 
@@ -78,7 +79,7 @@ def build_sale_ticket_text(
         "Ticket de venta",
         "",
         f"Folio: {getattr(sale, 'folio', '')}",
-        f"Fecha: {created_at.strftime('%Y-%m-%d %H:%M') if created_at else ''}",
+        f"Fecha: {format_display_datetime(created_at)}",
         "",
     ]
 
@@ -109,10 +110,15 @@ def build_sale_ticket_text(
             else ""
         )
         sku = getattr(variante, "sku", "") if variante else ""
+        lines.append(producto)
         lines.append(
-            f"- {producto} | {sku} | {getattr(detalle, 'cantidad', '')} x "
-            f"{getattr(detalle, 'precio_unitario', '')} = {getattr(detalle, 'subtotal_linea', '')}"
+            f"{sku} | {getattr(detalle, 'cantidad', '')} x "
+            f"${getattr(detalle, 'precio_unitario', '')} = ${getattr(detalle, 'subtotal_linea', '')}"
         )
+        lines.append("")
+
+    if lines and lines[-1] == "":
+        lines.pop()
 
     ticket_totals = resolve_sale_ticket_totals(
         subtotal=getattr(sale, "subtotal", Decimal("0.00")),

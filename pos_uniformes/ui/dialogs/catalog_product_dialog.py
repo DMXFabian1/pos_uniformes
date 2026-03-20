@@ -684,8 +684,10 @@ def build_catalog_product_dialog(
             ensure_uniform_category()
             add_category_button.setEnabled(False)
         else:
-            if clear_uniform_only_fields and categoria_combo.currentText().strip() == "Uniformes":
+            if clear_uniform_only_fields and normalize_lookup_text(categoria_combo.currentText()) in UNIFORM_CATEGORIES:
                 categoria_combo.setCurrentIndex(0)
+                if categoria_combo.isEditable() and categoria_combo.lineEdit() is not None:
+                    categoria_combo.lineEdit().clear()
             add_category_button.setEnabled(True)
         template_hint.setText(mode_view.base_hint)
         context_hint.setText(mode_view.context_hint)

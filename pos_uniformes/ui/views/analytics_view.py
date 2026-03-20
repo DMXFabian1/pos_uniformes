@@ -5,7 +5,18 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import QDate, Qt
-from PyQt6.QtWidgets import QGridLayout, QGroupBox, QHBoxLayout, QLabel, QTableWidget, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import (
+    QGridLayout,
+    QGroupBox,
+    QHBoxLayout,
+    QHeaderView,
+    QLabel,
+    QTableWidget,
+    QVBoxLayout,
+    QWidget,
+)
+
+from pos_uniformes.ui.helpers.date_field_helper import configure_friendly_date_edit
 
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
@@ -18,41 +29,44 @@ def build_analytics_tab(window: "MainWindow") -> QWidget:
 
     filters_box = QGroupBox("Periodo de analitica")
     filters_box.setObjectName("infoCard")
-    filters_layout = QHBoxLayout()
-    filters_layout.setSpacing(8)
+    filters_layout = QGridLayout()
+    filters_layout.setHorizontalSpacing(10)
+    filters_layout.setVerticalSpacing(8)
     window.analytics_period_combo.clear()
     window.analytics_period_combo.addItem("Hoy", "today")
     window.analytics_period_combo.addItem("Ultimos 7 dias", "7d")
     window.analytics_period_combo.addItem("Ultimos 30 dias", "30d")
     window.analytics_period_combo.addItem("Mes actual", "month")
     window.analytics_period_combo.addItem("Manual", "manual")
-    window.analytics_from_input.setCalendarPopup(True)
-    window.analytics_to_input.setCalendarPopup(True)
     today = QDate.currentDate()
-    window.analytics_from_input.setDate(today)
-    window.analytics_to_input.setDate(today)
+    configure_friendly_date_edit(window.analytics_from_input, initial_date=today)
+    configure_friendly_date_edit(window.analytics_to_input, initial_date=today)
     window.analytics_period_combo.currentIndexChanged.connect(window._handle_analytics_period_changed)
     window.analytics_client_combo.currentIndexChanged.connect(window._handle_analytics_period_changed)
     window.analytics_from_input.dateChanged.connect(window._handle_analytics_period_changed)
     window.analytics_to_input.dateChanged.connect(window._handle_analytics_period_changed)
-    filters_layout.addWidget(QLabel("Ver"))
-    filters_layout.addWidget(window.analytics_period_combo)
-    filters_layout.addWidget(QLabel("Desde"))
-    filters_layout.addWidget(window.analytics_from_input)
-    filters_layout.addWidget(QLabel("Hasta"))
-    filters_layout.addWidget(window.analytics_to_input)
-    filters_layout.addWidget(window.analytics_export_button)
-    filters_layout.addStretch()
+    filters_layout.addWidget(QLabel("Ver"), 0, 0)
+    filters_layout.addWidget(window.analytics_period_combo, 0, 1)
+    filters_layout.addWidget(QLabel("Desde"), 0, 2)
+    filters_layout.addWidget(window.analytics_from_input, 0, 3)
+    filters_layout.addWidget(QLabel("Hasta"), 0, 4)
+    filters_layout.addWidget(window.analytics_to_input, 0, 5)
+    filters_layout.addWidget(QLabel("Cliente"), 1, 0)
+    filters_layout.addWidget(window.analytics_client_combo, 1, 1, 1, 3)
+    filters_layout.addWidget(window.analytics_export_button, 0, 6, 2, 1)
+    filters_layout.setColumnStretch(1, 1)
+    filters_layout.setColumnStretch(3, 1)
+    filters_layout.setColumnStretch(5, 1)
     filters_box.setLayout(filters_layout)
     window.analytics_export_status_label.setObjectName("analyticsLine")
     window.analytics_export_button.clicked.connect(window._handle_export_analytics)
 
-    business_title = QLabel("Negocio")
+    business_title = QLabel("Resumen del periodo")
     business_title.setObjectName("inventoryTitle")
-    business_subtitle = QLabel("Ventas, caja comercial, apartados y stock critico del periodo seleccionado.")
+    business_subtitle = QLabel("Ventas, clientes, equipo, apartados y stock critico del rango seleccionado.")
     business_subtitle.setObjectName("inventorySubtitle")
 
-    business_box = QGroupBox("Negocio")
+    business_box = QGroupBox("Vista general")
     business_box.setObjectName("infoCard")
     business_layout = QVBoxLayout()
     business_layout.setSpacing(10)
@@ -109,7 +123,11 @@ def build_analytics_tab(window: "MainWindow") -> QWidget:
     window.analytics_payment_table.verticalHeader().setVisible(False)
     window.analytics_payment_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
     window.analytics_payment_table.setAlternatingRowColors(True)
-    window.analytics_payment_table.setMinimumHeight(180)
+    window.analytics_payment_table.setMinimumHeight(150)
+    payment_header = window.analytics_payment_table.horizontalHeader()
+    payment_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+    payment_header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+    payment_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
     payments_layout.addWidget(window.analytics_payment_table)
     payments_box.setLayout(payments_layout)
 
@@ -139,7 +157,12 @@ def build_analytics_tab(window: "MainWindow") -> QWidget:
     window.top_products_table.verticalHeader().setVisible(False)
     window.top_products_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
     window.top_products_table.setAlternatingRowColors(True)
-    window.top_products_table.setMinimumHeight(220)
+    window.top_products_table.setMinimumHeight(170)
+    top_products_header = window.top_products_table.horizontalHeader()
+    top_products_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+    top_products_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+    top_products_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+    top_products_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
     top_products_layout.addWidget(window.top_products_table)
     top_products_box.setLayout(top_products_layout)
 
@@ -153,7 +176,12 @@ def build_analytics_tab(window: "MainWindow") -> QWidget:
     window.analytics_clients_table.verticalHeader().setVisible(False)
     window.analytics_clients_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
     window.analytics_clients_table.setAlternatingRowColors(True)
-    window.analytics_clients_table.setMinimumHeight(220)
+    window.analytics_clients_table.setMinimumHeight(170)
+    top_clients_header = window.analytics_clients_table.horizontalHeader()
+    top_clients_header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+    top_clients_header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+    top_clients_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+    top_clients_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
     top_clients_layout.addWidget(window.analytics_clients_table)
     top_clients_box.setLayout(top_clients_layout)
 
@@ -167,9 +195,57 @@ def build_analytics_tab(window: "MainWindow") -> QWidget:
     window.analytics_stock_table.verticalHeader().setVisible(False)
     window.analytics_stock_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
     window.analytics_stock_table.setAlternatingRowColors(True)
-    window.analytics_stock_table.setMinimumHeight(220)
+    window.analytics_stock_table.setMinimumHeight(170)
+    stock_header = window.analytics_stock_table.horizontalHeader()
+    stock_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+    stock_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+    stock_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+    stock_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+    stock_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
     stock_layout.addWidget(window.analytics_stock_table)
     stock_box.setLayout(stock_layout)
+
+    customer_kpi_grid = QGridLayout()
+    customer_kpi_grid.setHorizontalSpacing(12)
+    customer_kpi_grid.setVerticalSpacing(10)
+    customer_kpi_grid.addWidget(
+        window._create_kpi_card(
+            "Ventas identificadas",
+            window.analytics_identified_sales_value,
+            "Con cliente ligado",
+        ),
+        0,
+        0,
+    )
+    customer_kpi_grid.addWidget(
+        window._create_kpi_card(
+            "Ingreso identificado",
+            window.analytics_identified_income_value,
+            "Ventas con cliente",
+        ),
+        0,
+        1,
+    )
+    customer_kpi_grid.addWidget(
+        window._create_kpi_card(
+            "Clientes recurrentes",
+            window.analytics_repeat_clients_value,
+            "Mas de una compra",
+        ),
+        1,
+        0,
+    )
+    customer_kpi_grid.addWidget(
+        window._create_kpi_card(
+            "Promedio por cliente",
+            window.analytics_average_client_value,
+            "Ingreso por cliente identificado",
+        ),
+        1,
+        1,
+    )
+    customer_kpi_grid.setColumnStretch(0, 1)
+    customer_kpi_grid.setColumnStretch(1, 1)
 
     lower_grid = QGridLayout()
     lower_grid.setSpacing(12)
@@ -182,79 +258,24 @@ def build_analytics_tab(window: "MainWindow") -> QWidget:
     lower_grid.setColumnStretch(1, 1)
 
     business_layout.addLayout(business_kpi_grid)
+    business_layout.addWidget(_wrap_metric_block("Clientes", customer_kpi_grid))
     business_layout.addLayout(lower_grid)
     business_box.setLayout(business_layout)
-
-    clients_title = QLabel("Clientes")
-    clients_title.setObjectName("inventoryTitle")
-    clients_subtitle = QLabel("Seguimiento comercial y base para fidelizacion futura.")
-    clients_subtitle.setObjectName("inventorySubtitle")
-
-    clients_box = QGroupBox("Clientes")
-    clients_box.setObjectName("infoCard")
-    clients_layout = QVBoxLayout()
-    clients_layout.setSpacing(10)
-
-    client_filter_row = QHBoxLayout()
-    client_filter_row.setSpacing(8)
-    client_filter_row.addWidget(QLabel("Cliente"))
-    client_filter_row.addWidget(window.analytics_client_combo, 1)
-    client_filter_row.addStretch()
-
-    client_kpi_grid = QGridLayout()
-    client_kpi_grid.setHorizontalSpacing(12)
-    client_kpi_grid.setVerticalSpacing(10)
-    client_kpi_grid.addWidget(
-        window._create_kpi_card(
-            "Ventas identificadas",
-            window.analytics_identified_sales_value,
-            "Con cliente ligado",
-        ),
-        0,
-        0,
-    )
-    client_kpi_grid.addWidget(
-        window._create_kpi_card(
-            "Ingreso identificado",
-            window.analytics_identified_income_value,
-            "Ventas con cliente",
-        ),
-        0,
-        1,
-    )
-    client_kpi_grid.addWidget(
-        window._create_kpi_card(
-            "Clientes recurrentes",
-            window.analytics_repeat_clients_value,
-            "Mas de una compra",
-        ),
-        0,
-        2,
-    )
-    client_kpi_grid.addWidget(
-        window._create_kpi_card(
-            "Promedio por cliente",
-            window.analytics_average_client_value,
-            "Ingreso por cliente identificado",
-        ),
-        0,
-        3,
-    )
-    for column in range(4):
-        client_kpi_grid.setColumnStretch(column, 1)
-
-    clients_layout.addLayout(client_filter_row)
-    clients_layout.addLayout(client_kpi_grid)
-    clients_layout.addWidget(top_clients_box)
-    clients_box.setLayout(clients_layout)
 
     layout.addWidget(filters_box)
     layout.addWidget(window.analytics_export_status_label)
     layout.addWidget(business_title)
     layout.addWidget(business_subtitle)
     layout.addWidget(business_box)
-    layout.addWidget(clients_title)
-    layout.addWidget(clients_subtitle)
-    layout.addWidget(clients_box)
     widget.setLayout(layout)
     return widget
+
+
+def _wrap_metric_block(title: str, grid: QGridLayout) -> QGroupBox:
+    box = QGroupBox(title)
+    box.setObjectName("infoCard")
+    layout = QVBoxLayout()
+    layout.setSpacing(8)
+    layout.addLayout(grid)
+    box.setLayout(layout)
+    return box

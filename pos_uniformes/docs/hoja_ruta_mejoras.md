@@ -56,9 +56,9 @@ Registrar mejoras propuestas por operacion o producto y ubicarlas dentro del pla
 #### 2. Empleados, atribucion de ventas y comisiones derivadas del POS
 
 - Idea:
-  Soportar empleados vendedores con comisiones y analitica sin permitir reportes manuales de productos vendidos. Toda comision y toda estadistica debe salir del flujo real de venta confirmado dentro del POS.
+  Soportar empleadas vendedoras con comisiones y analitica sin permitir reportes manuales de productos vendidos. Toda comision y toda estadistica debe salir del flujo real de venta confirmado dentro del POS. El modelo futuro debe nacer pensando tambien en kiosko y app movil, no solo en la caja principal.
 - Dominios:
-  `caja`, `venta`, `configuracion`, `analitica`
+  `caja`, `venta`, `configuracion`, `analitica`, `kiosko`, `movil`
 - Prioridad:
   alta
 - Principios no negociables:
@@ -66,6 +66,7 @@ Registrar mejoras propuestas por operacion o producto y ubicarlas dentro del pla
   - la salida de inventario debe seguir naciendo solo de `VentaService` e `InventarioService`
   - no debe existir captura manual de "vendi X piezas" para comisiones
   - cancelaciones y devoluciones futuras deben poder corregir atribucion y metricas
+  - el modulo debe contemplar desde el diseno la reutilizacion de identidad en POS, kiosko y app movil
 - Observacion de arquitectura actual:
   - `Venta` ya guarda `usuario_id`, lo que cubre al usuario operador actual
   - antes de introducir `employee_id`, hay que definir si `usuario que opera caja` y `empleado vendedor` son siempre la misma persona
@@ -74,35 +75,34 @@ Registrar mejoras propuestas por operacion o producto y ubicarlas dentro del pla
   - opcion A: reutilizar `usuario_id` como vendedor si el operador de caja y el vendedor siempre coinciden
   - opcion B: mantener `usuario_id` como operador del POS e introducir `employee_id` o `seller_employee_id` en la venta cuando el vendedor acreditado puede ser distinto
   - recomendacion actual: tratar esta decision como un checkpoint de diseno antes de abrir migraciones o UI
+  - decision vigente: modelar `empleada` como identidad comercial transversal y dejar `usuario` como operador tecnico del sistema
 - Fases seguras de implementacion:
-  - `Fase 1. Caja`
-    - documentar el subflujo de asignacion de empleado en venta
-    - resolver el modelo base de atribucion `usuario` vs `empleado`
-    - capturar el vendedor al inicio de la venta o al abrir un ticket, sin cambiar aun calculos de comision
-    - asegurar que la venta confirmada y la cancelacion conservan trazabilidad coherente
-  - `Fase 3. Configuracion y Marketing`
-    - crear administracion de empleados y, si aplica, reglas administrativas de comision
-    - mantener estas reglas fuera de la pantalla principal de Caja
-    - documentar permisos y estados activos/inactivos
-  - `Fase 4. Extraccion estructural`
-    - extraer servicios dedicados para atribucion, comisiones y analitica por empleado
-    - mover agregaciones grandes fuera de `ui/main_window.py`
-    - dejar la UI solo consumiendo resultados preparados
-  - `Fase 5. Optimizacion fina`
-    - agregar tablas derivadas o snapshots como `employee_sales_stats` solo si hacen falta por rendimiento
-    - evaluar alertas de patrones sospechosos y rankings historicos
-    - medir costo real antes de introducir cache o materializaciones
+  - `Despues de Fase 5`
+    - documentar el contrato final `usuario` vs `empleada`
+    - crear la ficha base de `empleada`
+    - introducir QR + PIN
+    - agregar atribucion comercial a ventas reales
+  - `Iteracion 2`
+    - integrar kiosko con identidad rapida por QR
+    - permitir tomar atenciones o ventas atribuidas desde kiosko
+  - `Iteracion 3`
+    - abrir analitica por empleada sobre ventas reales ya atribuidas
+    - exportacion y comparativos por operadora POS vs vendedora acreditada
+  - `Iteracion 4`
+    - abrir comisiones y liquidacion
+    - integrar app movil para metas, seguimiento y consulta de desempeno
 - Orden de extraccion conservador:
-  - 1. documentar subflujo de venta con empleado antes de tocar esquema
-  - 2. cerrar contrato de atribucion en un servicio puro, separado de la UI
-  - 3. persistir el identificador del vendedor en la venta real
-  - 4. extraer el calculo de comisiones a un servicio puro derivado de ventas confirmadas y canceladas
-  - 5. extraer agregaciones de analitica por empleado a un servicio dedicado
-  - 6. integrar selector y visualizacion en UI como capa final
-  - 7. dejar alertas de patrones sospechosos para cuando la atribucion y analitica ya sean confiables
+  - 1. documentar el modelo en `docs/empleadas_y_comisiones.md`
+  - 2. cerrar contrato `usuario` vs `empleada`
+  - 3. crear identidad base de empleada con QR + PIN
+  - 4. persistir el identificador comercial en la venta real
+  - 5. integrar kiosko como consumidor de esa identidad
+  - 6. abrir analitica por empleada
+  - 7. abrir comisiones y liquidacion
+  - 8. integrar app movil sobre la misma identidad
 - Impacto por capa:
   - base de datos
-    - posible tabla `employees` si el vendedor no coincide siempre con `usuario`
+    - tabla `employees` o `empleadas` como identidad comercial
     - extension de `venta` para guardar vendedor acreditado
     - posible relacion o snapshot derivado para comisiones
     - `employee_sales_stats` solo como tabla derivada opcional, nunca como fuente primaria
@@ -111,6 +111,13 @@ Registrar mejoras propuestas por operacion o producto y ubicarlas dentro del pla
     - visibilidad clara del vendedor activo dentro de Caja
     - administracion de empleados desde configuracion si el modelo lo requiere
     - nuevas vistas o filtros en analitica por empleado
+  - kiosko
+    - identificacion rapida con QR
+    - confirmacion por PIN si aplica
+    - toma de atencion o atribucion comercial
+  - app movil
+    - consulta de ventas, metas y comisiones
+    - seguimiento operativo y comercial
   - logica de negocio
     - servicio de atribucion de vendedor por venta
     - servicio de comisiones derivadas desde ventas reales
@@ -118,30 +125,37 @@ Registrar mejoras propuestas por operacion o producto y ubicarlas dentro del pla
     - servicio futuro de deteccion de patrones sospechosos
 - Alcance recomendado por entregas:
   - v1
-    - atribucion confiable de vendedor en la venta
+    - ficha de empleada
+    - QR + PIN
+    - atribucion confiable de vendedora en la venta
     - trazabilidad de venta y cancelacion
-    - sin captura manual de productos vendidos
   - v2
-    - comisiones calculadas sobre ventas confirmadas y reversadas en cancelaciones
-    - consulta basica de ventas e ingresos por empleado
+    - integracion base con kiosko
+    - consulta basica de ventas e ingresos por empleada
   - v3
     - ticket promedio, frecuencia de ventas y desempeno por categoria
-    - filtros/exportacion por empleado en analitica
+    - filtros/exportacion por empleada en analitica
   - v4
+    - comisiones calculadas sobre ventas confirmadas y reversadas
+    - app movil con lectura operativa y comercial
+  - v5
     - patrones sospechosos y alertas operativas
 - Donde implementarla:
   - base actual a revisar: `database/models.py`, `services/venta_service.py`, `services/inventario_service.py`
   - capa UI probable: `ui/views/cashier_view.py`, `ui/views/analytics_view.py`, `ui/dialogs/settings_dialogs.py`
+  - integracion futura adicional: `ui/quote_satellite_window.py`, kiosko y cliente movil
   - coordinacion existente a adelgazar: `ui/main_window.py`
   - servicios candidatos nuevos:
     - `services/sale_employee_assignment_service.py`
     - `services/employee_commission_service.py`
     - `services/employee_analytics_service.py`
+    - `services/employee_identity_service.py`
+    - `services/employee_auth_service.py`
     - `services/employee_alert_service.py` solo en fase tardia
 - Riesgos a cuidar:
   - mezclar operador de caja con vendedor acreditado sin definir el modelo
   - recalcular comisiones desde datos manuales en lugar de ventas confirmadas
-  - olvidar cancelaciones, apartados convertidos o flujos especiales de venta
+  - olvidar cancelaciones, apartados convertidos, ventas nacidas en kiosko o cierres desde movil
   - meter agregaciones pesadas directamente en `main_window.py`
   - crear una tabla derivada que luego diverja de la venta real
 - Documentacion recomendada:
@@ -159,4 +173,44 @@ Registrar mejoras propuestas por operacion o producto y ubicarlas dentro del pla
   - cada venta queda atribuida a un vendedor real desde el flujo del POS
   - las comisiones salen de ventas confirmadas, no de declaraciones manuales
   - inventario y comisiones permanecen sincronizados
+  - kiosko y app movil reutilizan la misma identidad comercial
   - la analitica por empleado reutiliza ventas y detalles existentes como fuente de verdad
+
+### 2026-03-20
+
+#### 3. Respaldos automaticos y recuperacion segura
+
+- Idea:
+  Fortalecer la proteccion de la base de datos con una estrategia de respaldo automatico y recuperacion segura, sin depender solo del respaldo manual desde la app.
+- Dominios:
+  `configuracion`, `operacion`, `deploy`
+- Prioridad:
+  alta
+- Aclaracion tecnica:
+  - respaldo automatico y proteccion ante apagones no son la misma cosa
+  - el `.dump` ayuda a recuperar
+  - la resistencia a cortes depende tambien de PostgreSQL, disco y, de preferencia, UPS
+- Fase sugerida:
+  `Fase 5. Optimizacion fina`
+- Alcance recomendado:
+  - mantener respaldo manual en la app
+  - programar respaldos automaticos con tarea externa del sistema
+  - estandarizar `.dump` como formato principal restaurable
+  - agregar copia externa de respaldos
+  - documentar recuperacion
+- Implementacion recomendada:
+  - Windows: `Task Scheduler`
+  - macOS: `launchd`
+  - script base existente: `scripts/backup_database.py`
+- Documentacion base:
+  - `docs/estrategia_respaldos_automaticos.md`
+- Riesgos a cuidar:
+  - confiar solo en respaldos manuales
+  - dejar todos los respaldos en la misma maquina
+  - meter el scheduler dentro de la UI principal
+  - asumir que `.dump` evita corrupcion por apagones
+- Criterio de cierre esperado:
+  - existe politica oficial de frecuencia y retencion
+  - existe ruta automatica local
+  - existe copia externa
+  - existe guia clara de restauracion

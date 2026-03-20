@@ -68,6 +68,7 @@ class SaleTicketTextServiceTests(unittest.TestCase):
         )
 
         self.assertIn("POS Uniformes", ticket)
+        self.assertIn("Fecha: 12/03/2026 18:35", ticket)
         self.assertIn("Forma de pago: Efectivo", ticket)
         self.assertIn("Cliente: Maria Fernanda", ticket)
         self.assertIn("Codigo cliente: CLI-001", ticket)
@@ -75,7 +76,7 @@ class SaleTicketTextServiceTests(unittest.TestCase):
         self.assertNotIn("Usuario:", ticket)
         self.assertNotIn("Estado:", ticket)
         self.assertIn("Articulos", ticket)
-        self.assertIn("- Playera deportiva | SKU0001 | 1 x 199.00 = 199.00", ticket)
+        self.assertIn("Playera deportiva\nSKU0001 | 1 x $199.00 = $199.00", ticket)
         self.assertIn("Subtotal: 199.00", ticket)
         self.assertIn("Descuento aplicado: 10.00% (-19.90)", ticket)
         self.assertIn("Total a pagar: 179.10", ticket)

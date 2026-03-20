@@ -19,6 +19,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from pos_uniformes.ui.helpers.date_field_helper import configure_friendly_date_edit
+
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
 
@@ -262,12 +264,13 @@ def build_business_settings_dialog(window: "MainWindow") -> QDialog:
         window,
         "Negocio e impresion",
         "Actualiza los datos visibles del negocio, la informacion de transferencia y la impresion preferida del ticket.",
-        width=760,
+        width=920,
     )
     window.settings_business_status_label.setObjectName("analyticsLine")
     form_box = QGroupBox("Datos del negocio")
     form_box.setObjectName("infoCard")
-    form = QFormLayout()
+    form_layout = QVBoxLayout()
+    form_layout.setSpacing(12)
     window.settings_business_name_input.setPlaceholderText("Nombre comercial")
     window.settings_business_logo_input.setPlaceholderText("Ruta del logo para credenciales")
     window.settings_business_logo_input.setReadOnly(True)
@@ -305,19 +308,62 @@ def build_business_settings_dialog(window: "MainWindow") -> QDialog:
     logo_preview_widget.setLayout(logo_preview_box)
     window.settings_business_logo_pick_button.clicked.connect(window._handle_select_business_logo)
     window.settings_business_logo_clear_button.clicked.connect(window._handle_clear_business_logo)
-    form.addRow("Negocio", window.settings_business_name_input)
-    form.addRow("Logo credencial", logo_preview_widget)
-    form.addRow("Telefono", window.settings_business_phone_input)
-    form.addRow("Direccion", window.settings_business_address_input)
-    form.addRow("Pie ticket", window.settings_business_footer_input)
-    form.addRow("Banco", window.settings_business_transfer_bank_input)
-    form.addRow("Beneficiario", window.settings_business_transfer_beneficiary_input)
-    form.addRow("CLABE", window.settings_business_transfer_clabe_input)
-    form.addRow("Instrucciones pago", window.settings_business_transfer_instructions_input)
-    form.addRow("Codigo promo manual", window.settings_business_promo_code_input)
-    form.addRow("Impresora", window.settings_business_printer_combo)
-    form.addRow("Copias", window.settings_business_copies_spin)
-    form_box.setLayout(form)
+
+    identity_box = QGroupBox("Identidad visible")
+    identity_box.setObjectName("infoCard")
+    identity_form = QFormLayout()
+    identity_form.setSpacing(10)
+    identity_form.addRow("Negocio", window.settings_business_name_input)
+    identity_form.addRow("Telefono", window.settings_business_phone_input)
+    identity_form.addRow("Direccion", window.settings_business_address_input)
+    identity_form.addRow("Pie ticket", window.settings_business_footer_input)
+    identity_box.setLayout(identity_form)
+
+    logo_box = QGroupBox("Logo credencial")
+    logo_box.setObjectName("infoCard")
+    logo_box_layout = QVBoxLayout()
+    logo_box_layout.setSpacing(10)
+    logo_hint = QLabel("Este logo se usa para credenciales y vistas relacionadas. Si no hay logo, el sistema seguira funcionando.")
+    logo_hint.setWordWrap(True)
+    logo_hint.setObjectName("subtleLine")
+    logo_box_layout.addWidget(logo_hint)
+    logo_box_layout.addWidget(logo_preview_widget)
+    logo_box_layout.addStretch(1)
+    logo_box.setLayout(logo_box_layout)
+
+    transfer_box = QGroupBox("Transferencia")
+    transfer_box.setObjectName("infoCard")
+    transfer_form = QFormLayout()
+    transfer_form.setSpacing(10)
+    transfer_form.addRow("Banco", window.settings_business_transfer_bank_input)
+    transfer_form.addRow("Beneficiario", window.settings_business_transfer_beneficiary_input)
+    transfer_form.addRow("CLABE", window.settings_business_transfer_clabe_input)
+    transfer_form.addRow("Instrucciones pago", window.settings_business_transfer_instructions_input)
+    transfer_box.setLayout(transfer_form)
+
+    print_box = QGroupBox("Ticket e impresion")
+    print_box.setObjectName("infoCard")
+    print_form = QFormLayout()
+    print_form.setSpacing(10)
+    print_form.addRow("Codigo promo manual", window.settings_business_promo_code_input)
+    print_form.addRow("Impresora", window.settings_business_printer_combo)
+    print_form.addRow("Copias", window.settings_business_copies_spin)
+    print_box.setLayout(print_form)
+
+    top_row = QHBoxLayout()
+    top_row.setSpacing(12)
+    top_row.addWidget(identity_box, 3)
+    top_row.addWidget(logo_box, 2)
+
+    bottom_row = QHBoxLayout()
+    bottom_row.setSpacing(12)
+    bottom_row.addWidget(transfer_box, 3)
+    bottom_row.addWidget(print_box, 2)
+
+    form_layout.addLayout(top_row)
+    form_layout.addLayout(bottom_row)
+    form_box.setLayout(form_layout)
+
     window.settings_business_save_button.setObjectName("toolbarPrimaryButton")
     window.settings_business_demo_button.setObjectName("toolbarSecondaryButton")
     window.settings_business_save_button.clicked.connect(window._handle_save_business_settings)
@@ -497,10 +543,8 @@ def build_cash_history_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_cash_history_state_combo.addItem("Todas", "todas")
     window.settings_cash_history_state_combo.addItem("Abiertas", "abiertas")
     window.settings_cash_history_state_combo.addItem("Cerradas", "cerradas")
-    window.settings_cash_history_from_input.setCalendarPopup(True)
-    window.settings_cash_history_to_input.setCalendarPopup(True)
-    window.settings_cash_history_from_input.setDisplayFormat("yyyy-MM-dd")
-    window.settings_cash_history_to_input.setDisplayFormat("yyyy-MM-dd")
+    configure_friendly_date_edit(window.settings_cash_history_from_input)
+    configure_friendly_date_edit(window.settings_cash_history_to_input)
     window.settings_cash_history_refresh_button.setObjectName("toolbarPrimaryButton")
     window.settings_cash_history_detail_button.setObjectName("toolbarSecondaryButton")
     window.settings_cash_history_state_combo.currentIndexChanged.connect(window._refresh_settings_cash_history)

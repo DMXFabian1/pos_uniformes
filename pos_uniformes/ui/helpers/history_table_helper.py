@@ -22,7 +22,7 @@ def build_history_table_rows(rows: list[dict[str, object]]) -> tuple[HistoryTabl
     return tuple(
         HistoryTableRowView(
             values=(
-                row["fecha"].strftime("%Y-%m-%d %H:%M") if row["fecha"] else "",
+                row["fecha"].strftime("%d/%m/%Y %H:%M") if row["fecha"] else "",
                 row["origen"],
                 row["registro"],
                 row["tipo"],

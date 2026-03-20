@@ -34,7 +34,7 @@ class HistoryTableHelperTests(unittest.TestCase):
         )
 
         self.assertEqual(len(rows), 2)
-        self.assertEqual(rows[0].values[0], "2026-03-18 09:30")
+        self.assertEqual(rows[0].values[0], "18/03/2026 09:30")
         self.assertEqual(rows[0].source_tone, "positive")
         self.assertEqual(rows[0].type_tone, "danger")
         self.assertEqual(rows[1].source_tone, "warning")

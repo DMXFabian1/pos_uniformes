@@ -54,7 +54,7 @@ class RecentSaleServiceTests(unittest.TestCase):
                 "cajero",
                 "CONFIRMADA",
                 Decimal("199.00"),
-                "2026-03-18 11:05",
+                "18/03/2026 11:05",
             ),
         )
         self.assertEqual(

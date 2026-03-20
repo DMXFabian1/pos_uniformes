@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pos_uniformes.ui.helpers.catalog_product_form_mode_helper import UNIFORM_CATEGORIES
+
 
 def validate_catalog_product_base_step(
     *,
@@ -34,14 +36,22 @@ def validate_catalog_product_presentations_step(
 
 def validate_catalog_product_submission(payload: dict[str, object]) -> str | None:
     category_id = payload.get("categoria_id")
+    category_name = str(payload.get("categoria_nombre") or "")
     brand_id = payload.get("marca_id")
     base_name = str(payload.get("nombre") or "")
-    return validate_catalog_product_base_step(
+    validation_feedback = validate_catalog_product_base_step(
         category_id=category_id,
-        category_name=str(payload.get("categoria_nombre") or ""),
+        category_name=category_name,
         brand_id=brand_id,
         base_name=base_name,
     )
+    if validation_feedback is not None:
+        return validation_feedback
+    if str(payload.get("modo_catalogo") or "").strip() == "regular":
+        normalized_category_name = category_name.strip().lower()
+        if normalized_category_name in UNIFORM_CATEGORIES:
+            return "Ropa normal no puede guardarse dentro de una categoria de uniforme."
+    return None
 
 
 def build_catalog_product_dialog_payload(

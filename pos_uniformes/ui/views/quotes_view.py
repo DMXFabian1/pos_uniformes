@@ -10,12 +10,15 @@ from PyQt6.QtWidgets import (
     QFrame,
     QGridLayout,
     QGroupBox,
+    QHeaderView,
     QHBoxLayout,
     QLabel,
     QSpinBox,
     QVBoxLayout,
     QWidget,
 )
+
+from pos_uniformes.ui.helpers.date_field_helper import configure_friendly_date_edit
 
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
@@ -36,8 +39,7 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
     window.quote_folio_input.setObjectName("readOnlyField")
     window.quote_client_combo.setObjectName("toolbarSelect")
     window.quote_create_client_button.setObjectName("toolbarGhostButton")
-    window.quote_validity_input.setCalendarPopup(True)
-    window.quote_validity_input.setDate(QDate.currentDate().addDays(15))
+    configure_friendly_date_edit(window.quote_validity_input, initial_date=QDate.currentDate().addDays(15))
     window.quote_note_input.setMaximumHeight(80)
     window.quote_note_input.setPlaceholderText("Observacion o condiciones del presupuesto")
     window.quote_add_button.setObjectName("toolbarSecondaryButton")
@@ -96,12 +98,24 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
     totals_layout.addWidget(window.quote_total_label)
     totals_box.setLayout(totals_layout)
 
-    quote_layout.addLayout(quote_form)
+    quote_top = QHBoxLayout()
+    quote_top.setSpacing(10)
+    quote_top.addLayout(quote_form, 1)
+    quote_top.addWidget(totals_box, 0, Qt.AlignmentFlag.AlignTop)
+
+    quote_layout.addLayout(quote_top)
     quote_layout.addLayout(quote_actions)
     quote_layout.addWidget(window.quote_cart_table)
-    quote_layout.addWidget(totals_box, 0, Qt.AlignmentFlag.AlignRight)
     quote_layout.addWidget(window.quote_summary_label)
     quote_box.setLayout(quote_layout)
+
+    quote_cart_header = window.quote_cart_table.horizontalHeader()
+    quote_cart_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+    quote_cart_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+    quote_cart_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+    quote_cart_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+    quote_cart_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+    quote_cart_header.setStretchLastSection(False)
 
     history_box = QGroupBox("Presupuestos recientes")
     history_box.setObjectName("infoCard")
@@ -131,7 +145,17 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
     window.quote_table.verticalHeader().setVisible(False)
     window.quote_table.setSelectionBehavior(window.quote_table.SelectionBehavior.SelectRows)
     window.quote_table.setAlternatingRowColors(True)
+    window.quote_table.setMinimumHeight(220)
     window.quote_table.itemSelectionChanged.connect(window._handle_quote_selection)
+    quote_table_header = window.quote_table.horizontalHeader()
+    quote_table_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+    quote_table_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+    quote_table_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+    quote_table_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+    quote_table_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+    quote_table_header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+    quote_table_header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
+    quote_table_header.setStretchLastSection(False)
 
     detail_box = QGroupBox("Detalle seleccionado")
     detail_box.setObjectName("infoCard")
@@ -148,6 +172,14 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
     window.quote_detail_table.verticalHeader().setVisible(False)
     window.quote_detail_table.setSelectionBehavior(window.quote_detail_table.SelectionBehavior.SelectRows)
     window.quote_detail_table.setAlternatingRowColors(True)
+    window.quote_detail_table.setMinimumHeight(220)
+    quote_detail_header = window.quote_detail_table.horizontalHeader()
+    quote_detail_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+    quote_detail_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+    quote_detail_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+    quote_detail_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+    quote_detail_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+    quote_detail_header.setStretchLastSection(False)
     detail_layout.addWidget(window.quote_customer_label)
     detail_layout.addWidget(window.quote_meta_label)
     detail_layout.addWidget(window.quote_notes_label)
@@ -156,8 +188,11 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
 
     history_layout.addWidget(window.quote_status_label)
     history_layout.addLayout(filters_row)
-    history_layout.addWidget(window.quote_table)
-    history_layout.addWidget(detail_box)
+    history_content = QHBoxLayout()
+    history_content.setSpacing(10)
+    history_content.addWidget(window.quote_table, 3)
+    history_content.addWidget(detail_box, 2)
+    history_layout.addLayout(history_content)
     history_box.setLayout(history_layout)
 
     layout.addWidget(quote_box)

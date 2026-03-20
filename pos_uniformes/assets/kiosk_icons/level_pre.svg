@@ -1,0 +1,6 @@
+<svg width="72" height="44" viewBox="0 0 72 44" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="72" height="44" rx="14" fill="#F5E8D6"/>
+  <circle cx="19" cy="22" r="10" fill="#9A4E28"/>
+  <path d="M14 22H24M19 17V27" stroke="#FFF8F0" stroke-width="2.5" stroke-linecap="round"/>
+  <text x="34" y="27" fill="#9A4E28" font-size="13" font-family="Arial, sans-serif" font-weight="700">PRE</text>
+</svg>

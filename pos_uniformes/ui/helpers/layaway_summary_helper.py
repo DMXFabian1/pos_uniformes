@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from decimal import Decimal
 
 from pos_uniformes.services.active_filter_service import (
     build_active_filter_labels,
@@ -34,10 +33,9 @@ def build_layaway_summary_view(
             ("vencimiento", due_filter_value, due_filter_text),
         ),
     )
-    pending_total = sum(Decimal(row["saldo"]) for row in visible_rows)
     if visible_rows:
         status_label = (
-            f"Apartados visibles: {len(visible_rows)} | Pendiente total: ${pending_total} | "
+            f"Apartados visibles: {len(visible_rows)} | "
             f"Filtros: {build_filters_label(active_filter_labels)}"
         )
     elif active_filter_labels:

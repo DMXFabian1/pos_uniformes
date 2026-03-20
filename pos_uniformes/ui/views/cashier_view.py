@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QFrame,
     QGridLayout,
     QGroupBox,
+    QHeaderView,
     QHBoxLayout,
     QLabel,
     QSpinBox,
@@ -103,10 +104,20 @@ def build_cashier_tab(window: "MainWindow") -> QWidget:
     window.sale_cart_table.setHorizontalHeaderLabels(["SKU", "Producto", "Cantidad", "Precio", "Subtotal"])
     window.sale_cart_table.setObjectName("dataTable")
     window.sale_cart_table.verticalHeader().setVisible(False)
+    window.sale_cart_table.verticalHeader().setDefaultSectionSize(36)
     window.sale_cart_table.setSelectionBehavior(window.sale_cart_table.SelectionBehavior.SelectRows)
     window.sale_cart_table.setAlternatingRowColors(True)
-    window.sale_cart_table.setMinimumHeight(180)
+    window.sale_cart_table.setMinimumHeight(150)
+    sale_cart_header = window.sale_cart_table.horizontalHeader()
+    sale_cart_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+    sale_cart_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+    sale_cart_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+    sale_cart_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+    sale_cart_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+    sale_cart_header.setStretchLastSection(False)
     window.sale_summary_label.setObjectName("cashierSummaryCard")
+    sale_cart_hint_label = QLabel("Doble clic en la columna Cantidad para ajustar piezas sin volver a escanear.")
+    sale_cart_hint_label.setObjectName("subtleLine")
     cart_actions = QHBoxLayout()
     cart_actions.addWidget(window.sale_remove_button)
     cart_actions.addWidget(window.sale_clear_button)
@@ -124,7 +135,9 @@ def build_cashier_tab(window: "MainWindow") -> QWidget:
     window.sale_clear_button.clicked.connect(window._handle_clear_sale_cart)
     window.sale_layaway_button.clicked.connect(window._handle_convert_sale_cart_to_layaway)
     window.sale_recent_button.clicked.connect(window._open_recent_sales_dialog)
+    window.sale_cart_table.itemDoubleClicked.connect(window._handle_sale_cart_item_double_click)
     cart_layout.addWidget(window.sale_cart_table)
+    cart_layout.addWidget(sale_cart_hint_label)
     cart_layout.addLayout(cart_actions)
     cart_layout.addWidget(totals_box, 0, Qt.AlignmentFlag.AlignRight)
     cart_layout.addWidget(window.sale_summary_label)

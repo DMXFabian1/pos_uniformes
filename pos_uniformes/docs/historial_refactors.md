@@ -2,8 +2,20 @@
 
 ## Checkpoint actual
 
+- `2026-03-20`: `Fase 4` queda cerrada con checkpoint `validated-manual`.
+- Precheck tecnico validado.
+- Bateria operativa validada.
+- Validacion manual confirmada para Caja, sesion operativa, Apartados, Catalogo, Inventario y Configuracion.
+- El siguiente frente ya no es extraccion estructural, sino `Fase 5. Optimizacion fina`.
 - Precheck de arranque activo.
 - Suite de pruebas activa.
+- Base compartida de Presupuestos preparada para una app satelite: soporte de `BORRADOR`, emision posterior y servicios reutilizables para texto, WhatsApp e impresion sin cambiar la UI principal.
+- Existe entrada separada `presupuestos_satelite_main.py`, ventana dedicada `ui/quote_satellite_window.py` y spec de Windows independiente para distribuir el satelite sin mezclarlo con el POS principal.
+- La ventana satelite ahora abre priorizando un kiosko de escaneo rapido: consulta SKU, muestra precio/detalles y desde ahi agrega lineas al presupuesto.
+- La UI satelite se reorganizo como navegacion lateral con paginas `Kiosko`, `Presupuesto`, `Buscar` y `Compartir`, para evitar mezclar funciones en una sola pantalla.
+- La UI satelite suma una pagina `Catalogo` para cotizar por escuela: filtra uniformes por escuela, permite incluir extras generales y agrega variantes directo al presupuesto.
+- `Catalogo` del satelite ahora soporta filtro por `nivel educativo`, y `Presupuesto` conserva una sola cotizacion multi-escuela con salto por escuela sin perder lineas ya capturadas.
+- Checkpoint `validated-tests` para servicios de Presupuestos orientados a la app satelite; validacion manual de esa UI queda `pending-manual`.
 - Base actual validada con `check_startup_health.py`.
 - Base de datos catalogada como checkpoint bueno despues del delta legacy del `2026-03-19`, con respaldo en `backups/database/pos_uniformes_20260319_173442.dump`.
 - Delta legacy aplicado desde `Gestor_de_Inventarios/data/productos.db`: `656` variantes nuevas, `74` familias nuevas y `0` SKUs `SKU%` pendientes; se omitieron `2` filas de prueba sin prefijo `SKU`.
@@ -431,11 +443,11 @@
 ## Riesgo residual conocido
 
 - `ui/main_window.py` sigue siendo el coordinador mas grande y sensible.
-- Configuracion y algunas acciones de inventario aun dependen mucho de handlers largos.
+- Impresion y validacion Windows siguen como frente separado.
+- Configuracion y algunas acciones de inventario aun dependen de handlers largos, pero ya no bloquean el cierre de `Fase 4`.
 - Falta documentar por dominio con mas detalle.
-- Falta validacion manual visual de caja con redondeo ya conectado al total de cobro.
 
 ## Proximo paso recomendado
 
-- Si seguimos buscando recortes grandes y seguros, el siguiente candidato natural es un lote masivo de inventario.
-- Registrar aqui cada nuevo checkpoint antes de pasar a otro dominio.
+- Entrar a `Fase 5. Optimizacion fina`.
+- Priorizar polish visual, consistencia de vistas, respaldo automatico y estabilidad operativa antes de abrir modulos grandes nuevos.

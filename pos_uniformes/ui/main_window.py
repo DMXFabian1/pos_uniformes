@@ -154,7 +154,12 @@ from pos_uniformes.services.quote_snapshot_service import (
 from pos_uniformes.services.quote_detail_service import load_quote_detail_snapshot
 from pos_uniformes.services.quote_action_service import cancel_quote
 from pos_uniformes.services.layaway_alerts_service import load_layaway_alerts_snapshot
-from pos_uniformes.services.layaway_closure_service import cancel_layaway, deliver_layaway
+from pos_uniformes.services.layaway_closure_service import (
+    cancel_layaway,
+    deliver_layaway,
+    load_layaway_delivery_confirmation,
+    settle_and_deliver_layaway,
+)
 from pos_uniformes.services.layaway_creation_service import create_layaway_from_payload
 from pos_uniformes.services.layaway_detail_service import load_layaway_detail_snapshot
 from pos_uniformes.services.layaway_payment_action_service import register_layaway_payment
@@ -181,6 +186,7 @@ from pos_uniformes.services.sale_document_view_service import (
     build_layaway_sale_ticket_document_view,
     build_sale_ticket_document_view,
 )
+from pos_uniformes.services.sale_cart_update_service import update_sale_cart_item_quantity
 from pos_uniformes.services.sale_selected_client_service import (
     find_active_sale_client_by_code,
     load_sale_selected_client_discount_percent,
@@ -309,6 +315,7 @@ from pos_uniformes.ui.helpers.analytics_stock_helper import build_analytics_stoc
 from pos_uniformes.ui.helpers.catalog_refresh_helper import (
     build_catalog_table_values,
 )
+from pos_uniformes.ui.helpers.catalog_table_row_helper import build_catalog_table_row_views
 from pos_uniformes.ui.helpers.history_filter_helper import build_history_type_options
 from pos_uniformes.ui.helpers.history_filter_state_helper import (
     build_history_clear_filter_state,
@@ -363,6 +370,10 @@ from pos_uniformes.ui.helpers.layaway_detail_helper import (
     build_error_layaway_detail_view,
     build_layaway_detail_view,
 )
+from pos_uniformes.ui.helpers.layaway_delivery_feedback_helper import (
+    build_layaway_delivery_confirmation_view,
+    build_layaway_delivery_result_view,
+)
 from pos_uniformes.ui.helpers.layaway_history_helper import build_layaway_history_rows
 from pos_uniformes.ui.helpers.layaway_summary_helper import build_layaway_summary_view
 from pos_uniformes.ui.helpers.layaway_table_row_helper import build_layaway_table_row_views
@@ -408,6 +419,7 @@ from pos_uniformes.ui.helpers.sale_post_action_feedback_helper import (
 from pos_uniformes.ui.helpers.sale_payment_helper import collect_sale_payment_details
 from pos_uniformes.ui.helpers.sale_scanned_client_helper import build_sale_scanned_client_ui_state
 from pos_uniformes.ui.helpers.search_input_helper import apply_search_suggestions
+from pos_uniformes.ui.helpers.size_option_sort_helper import sort_size_options
 from pos_uniformes.ui.helpers.settings_backup_helper import (
     build_settings_backup_error_view,
     build_settings_backup_view,
@@ -489,6 +501,7 @@ from pos_uniformes.ui.views.products_view import build_products_tab
 from pos_uniformes.ui.views.quotes_view import build_quotes_tab
 from pos_uniformes.ui.views.settings_view import build_settings_tab
 from pos_uniformes.ui.styles.main_window_styles import build_main_window_stylesheet
+from pos_uniformes.utils.date_format import format_display_date, format_display_datetime
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 from pos_uniformes.utils.qr_generator import QrGenerator
 
@@ -781,6 +794,19 @@ def _set_table_badge_style(item: QTableWidgetItem, tone: str) -> None:
     item.setBackground(QColor(background))
     item.setForeground(QColor(foreground))
     item.setTextAlignment(int(Qt.AlignmentFlag.AlignCenter))
+
+
+def _set_table_row_tint(item: QTableWidgetItem, tone: str) -> None:
+    palette = {
+        "danger": ("#fff1ec", "#7a2b1d"),
+        "warning": ("#fff8e7", "#7a5a14"),
+        "muted": ("#f3f0ea", "#6e675f"),
+        "neutral": ("#f7f3ee", "#645d56"),
+        "reserved": ("#fff3ea", "#8a4d22"),
+    }
+    background, foreground = palette.get(tone, palette["neutral"])
+    item.setBackground(QColor(background))
+    item.setForeground(QColor(foreground))
 
 COMMON_COLORS = [
     "Negro",
@@ -1124,6 +1150,7 @@ class MainWindow(QMainWindow):
         self.layaway_summary_label = QLabel("Selecciona un apartado")
         self.layaway_customer_label = QLabel("Sin detalle.")
         self.layaway_balance_label = QLabel("")
+        self.layaway_breakdown_label = QLabel("")
         self.layaway_commitment_label = QLabel("")
         self.layaway_due_status_label = QLabel("")
         self.layaway_notes_label = QLabel("")
@@ -1452,7 +1479,7 @@ class MainWindow(QMainWindow):
         )
         self.inventory_clear_filters_button.setToolTip("Limpia todos los filtros del inventario y muestra nuevamente todas las presentaciones.")
         self.inventory_table.setToolTip("Selecciona una presentacion para gestionar inventario, precio, QR o estado.")
-        self.layaway_table.setToolTip("Consulta apartados, saldo pendiente y fechas compromiso.")
+        self.layaway_table.setToolTip("Consulta apartados, saldo pendiente y fechas de vencimiento.")
         self.layaway_due_combo.setToolTip("Filtra apartados por vencimiento.")
         self.recent_sales_table.setToolTip("Historial reciente de ventas registradas en el sistema.")
         self.sale_payment_combo.setToolTip("Selecciona el metodo de pago de la venta actual.")
@@ -1727,7 +1754,7 @@ class MainWindow(QMainWindow):
                     "path_value": str(backup.path),
                     "name": backup.path.name,
                     "format_label": "Dump" if backup.dump_format == "custom" else "SQL",
-                    "modified_label": backup.modified_at.strftime("%Y-%m-%d %H:%M"),
+                    "modified_label": format_display_datetime(backup.modified_at),
                     "size_label": format_size(backup.size_bytes),
                     "restorable_label": "Si" if backup.dump_format == "custom" else "No",
                 }
@@ -1850,7 +1877,7 @@ class MainWindow(QMainWindow):
             closed_by = cash_session.cerrada_por.nombre_completo if cash_session.cerrada_por is not None else "-"
             self.settings_cash_history_rows[cash_session.id] = [
                 {
-                    "fecha": movement.created_at.strftime("%Y-%m-%d %H:%M") if movement.created_at else "-",
+                    "fecha": format_display_datetime(movement.created_at, empty="-"),
                     "tipo": movement.tipo.value,
                     "monto": Decimal(movement.monto).quantize(Decimal("0.01")),
                     "usuario": movement.usuario.nombre_completo if movement.usuario is not None else "-",
@@ -1863,10 +1890,10 @@ class MainWindow(QMainWindow):
                     "session_id": cash_session.id,
                     "is_closed": is_closed,
                     "status_label": "Cerrada" if is_closed else "Abierta",
-                    "opened_at": cash_session.abierta_at.strftime("%Y-%m-%d %H:%M") if cash_session.abierta_at else "",
+                    "opened_at": format_display_datetime(cash_session.abierta_at),
                     "opened_by": opened_by,
                     "opening_amount": f"${Decimal(cash_session.monto_apertura or 0).quantize(Decimal('0.01'))}",
-                    "closed_at": cash_session.cerrada_at.strftime("%Y-%m-%d %H:%M") if cash_session.cerrada_at else "-",
+                    "closed_at": format_display_datetime(cash_session.cerrada_at, empty="-"),
                     "closed_by": closed_by,
                     "expected_amount": f"${Decimal(cash_session.monto_esperado_cierre or 0).quantize(Decimal('0.01'))}" if is_closed else "-",
                     "declared_amount": f"${Decimal(cash_session.monto_cierre_declarado or 0).quantize(Decimal('0.01'))}" if is_closed else "-",
@@ -1956,7 +1983,7 @@ class MainWindow(QMainWindow):
                 for movement in cash_session.movimientos:
                     movement_rows.append(
                         {
-                            "fecha": movement.created_at.strftime("%Y-%m-%d %H:%M") if movement.created_at else "-",
+                            "fecha": format_display_datetime(movement.created_at, empty="-"),
                             "tipo": movement.tipo.value,
                             "monto": Decimal(movement.monto).quantize(Decimal("0.01")),
                             "usuario": movement.usuario.nombre_completo if movement.usuario is not None else "-",
@@ -1966,12 +1993,12 @@ class MainWindow(QMainWindow):
                 detail = {
                     "id": cash_session.id,
                     "status": "Cerrada" if cash_session.cerrada_at else "Abierta",
-                    "opened_at": cash_session.abierta_at.strftime("%Y-%m-%d %H:%M") if cash_session.abierta_at else "-",
+                    "opened_at": format_display_datetime(cash_session.abierta_at, empty="-"),
                     "opened_by": opened_by,
                     "opening_amount": Decimal(cash_session.monto_apertura or 0).quantize(Decimal("0.01")),
                     "opening_note": cash_session.observacion_apertura or "Sin observacion",
                     "opening_corrections": self._extract_opening_corrections(cash_session.observacion_apertura or ""),
-                    "closed_at": cash_session.cerrada_at.strftime("%Y-%m-%d %H:%M") if cash_session.cerrada_at else "-",
+                    "closed_at": format_display_datetime(cash_session.cerrada_at, empty="-"),
                     "closed_by": closed_by,
                     "expected_amount": Decimal(cash_session.monto_esperado_cierre or 0).quantize(Decimal("0.01")),
                     "declared_amount": Decimal(cash_session.monto_cierre_declarado or 0).quantize(Decimal("0.01")),
@@ -2410,7 +2437,7 @@ class MainWindow(QMainWindow):
                     "full_name": user.nombre_completo,
                     "role": user.rol.value,
                     "active_label": "ACTIVO" if user.activo else "INACTIVO",
-                    "updated_label": user.updated_at.strftime("%Y-%m-%d %H:%M") if user.updated_at else "",
+                    "updated_label": format_display_datetime(user.updated_at),
                 }
                 for user in users
             ]
@@ -2445,7 +2472,7 @@ class MainWindow(QMainWindow):
                     "address": supplier.direccion or "",
                     "active": bool(supplier.activo),
                     "active_label": "ACTIVO" if supplier.activo else "INACTIVO",
-                    "updated_label": supplier.updated_at.strftime("%Y-%m-%d %H:%M") if supplier.updated_at else "",
+                    "updated_label": format_display_datetime(supplier.updated_at),
                 }
                 for supplier in suppliers
             ]
@@ -2488,7 +2515,7 @@ class MainWindow(QMainWindow):
                     "card_label": "Lista" if bool(client.card_image_path) and Path(str(client.card_image_path)).exists() else "Pendiente",
                     "active": bool(client.activo),
                     "active_label": "ACTIVO" if client.activo else "INACTIVO",
-                    "updated_label": client.updated_at.strftime("%Y-%m-%d %H:%M") if client.updated_at else "",
+                    "updated_label": format_display_datetime(client.updated_at),
                 }
                 for client in clients
             ]
@@ -5960,6 +5987,54 @@ class MainWindow(QMainWindow):
         self._reset_sale_form()
         self._set_sale_feedback("Carrito limpiado.", "neutral", auto_clear_ms=1400)
 
+    def _handle_sale_cart_item_double_click(self, item) -> None:
+        if item is None or item.column() != 2:
+            return
+        self._handle_update_sale_item_quantity()
+
+    def _handle_update_sale_item_quantity(self) -> None:
+        selected_row = self.sale_cart_table.currentRow()
+        if selected_row < 0 or selected_row >= len(self.sale_cart):
+            QMessageBox.warning(self, "Sin seleccion", "Selecciona una linea del carrito.")
+            return
+
+        selected_item = self.sale_cart[selected_row]
+        sku = str(selected_item.get("sku") or "").strip().upper()
+        current_quantity = int(selected_item.get("cantidad") or 1)
+        new_quantity, accepted = QInputDialog.getInt(
+            self,
+            "Actualizar cantidad",
+            f"Cantidad para {sku}:",
+            current_quantity,
+            1,
+            1000,
+            1,
+        )
+        if not accepted or new_quantity == current_quantity:
+            return
+
+        try:
+            with get_session() as session:
+                update_sale_cart_item_quantity(
+                    session,
+                    sale_cart=self.sale_cart,
+                    row_index=selected_row,
+                    new_quantity=new_quantity,
+                )
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Cantidad no actualizada", str(exc))
+            return
+
+        self._refresh_sale_cart_table()
+        if 0 <= selected_row < self.sale_cart_table.rowCount():
+            self.sale_cart_table.setCurrentCell(selected_row, 2)
+            self.sale_cart_table.selectRow(selected_row)
+        self._set_sale_feedback(
+            f"{sku} actualizado a {new_quantity} pieza(s).",
+            "positive",
+            auto_clear_ms=1600,
+        )
+
     def _prompt_quick_quote_client_data(self) -> dict[str, str] | None:
         dialog, layout = self._create_modal_dialog(
             "Nuevo cliente rapido",
@@ -6915,10 +6990,25 @@ class MainWindow(QMainWindow):
             search_matcher=self._catalog_row_matches_search,
         )
 
-        self.catalog_table.setRowCount(len(self.catalog_rows))
-        for row_index, values in enumerate(build_catalog_table_values(self.catalog_rows)):
-            for column_index, value in enumerate(values):
+        table_row_views = build_catalog_table_row_views(self.catalog_rows)
+        self.catalog_table.setRowCount(len(table_row_views))
+        for row_index, row_view in enumerate(table_row_views):
+            for column_index, value in enumerate(row_view.values):
                 self.catalog_table.setItem(row_index, column_index, _table_item(value))
+            if row_view.row_tone is not None:
+                for column_index in range(len(row_view.values)):
+                    item = self.catalog_table.item(row_index, column_index)
+                    if item is not None:
+                        _set_table_row_tint(item, row_view.row_tone)
+            stock_item = self.catalog_table.item(row_index, 9)
+            layaway_item = self.catalog_table.item(row_index, 10)
+            status_item = self.catalog_table.item(row_index, 11)
+            if stock_item is not None:
+                _set_table_badge_style(stock_item, row_view.stock_tone)
+            if layaway_item is not None and row_view.layaway_tone is not None:
+                _set_table_badge_style(layaway_item, row_view.layaway_tone)
+            if status_item is not None:
+                _set_table_badge_style(status_item, row_view.status_tone)
         self.catalog_table.resizeColumnsToContents()
         active_filter_labels = self._catalog_active_filter_labels()
         catalog_summary_view = build_catalog_summary_view(
@@ -7071,7 +7161,7 @@ class MainWindow(QMainWindow):
         escuelas = session.scalars(select(Escuela).where(Escuela.activo.is_(True)).order_by(Escuela.nombre)).all()
         tipos_prenda = session.scalars(select(TipoPrenda).where(TipoPrenda.activo.is_(True)).order_by(TipoPrenda.nombre)).all()
         tipos_pieza = session.scalars(select(TipoPieza).where(TipoPieza.activo.is_(True)).order_by(TipoPieza.nombre)).all()
-        tallas = session.execute(select(Variante.talla).distinct().order_by(Variante.talla)).scalars().all()
+        tallas = sort_size_options(session.execute(select(Variante.talla).distinct()).scalars().all())
         colores = session.execute(select(Variante.color).distinct().order_by(Variante.color)).scalars().all()
         productos = session.scalars(select(Producto).where(Producto.activo.is_(True)).order_by(Producto.nombre)).all()
         proveedores = session.scalars(select(Proveedor).where(Proveedor.activo.is_(True)).order_by(Proveedor.nombre)).all()
@@ -7090,14 +7180,14 @@ class MainWindow(QMainWindow):
         self.catalog_school_filter_combo.set_items([(escuela.nombre, escuela.nombre) for escuela in escuelas])
         self.catalog_type_filter_combo.set_items([(tipo.nombre, tipo.nombre) for tipo in tipos_prenda])
         self.catalog_piece_filter_combo.set_items([(tipo.nombre, tipo.nombre) for tipo in tipos_pieza])
-        self.catalog_size_filter_combo.set_items([(str(talla), str(talla)) for talla in tallas if talla])
+        self.catalog_size_filter_combo.set_items([(talla, talla) for talla in tallas])
         self.catalog_color_filter_combo.set_items([(str(color), str(color)) for color in colores if color])
         self.inventory_category_filter_combo.set_items([(categoria.nombre, categoria.nombre) for categoria in categorias])
         self.inventory_brand_filter_combo.set_items([(marca.nombre, marca.nombre) for marca in marcas])
         self.inventory_school_filter_combo.set_items([(escuela.nombre, escuela.nombre) for escuela in escuelas])
         self.inventory_type_filter_combo.set_items([(tipo.nombre, tipo.nombre) for tipo in tipos_prenda])
         self.inventory_piece_filter_combo.set_items([(tipo.nombre, tipo.nombre) for tipo in tipos_pieza])
-        self.inventory_size_filter_combo.set_items([(str(talla), str(talla)) for talla in tallas if talla])
+        self.inventory_size_filter_combo.set_items([(talla, talla) for talla in tallas])
         self.inventory_color_filter_combo.set_items([(str(color), str(color)) for color in colores if color])
         self._populate_combo(
             self.variant_product_combo,
@@ -7343,6 +7433,11 @@ class MainWindow(QMainWindow):
         for row_index, row_view in enumerate(table_row_views):
             for column_index, value in enumerate(row_view.values):
                 self.inventory_table.setItem(row_index, column_index, _table_item(value))
+            if row_view.row_tone is not None:
+                for column_index in range(len(row_view.values)):
+                    item = self.inventory_table.item(row_index, column_index)
+                    if item is not None:
+                        _set_table_row_tint(item, row_view.row_tone)
             self.inventory_table.item(row_index, 0).setData(Qt.ItemDataRole.UserRole, row_view.variant_id)
             stock_item = self.inventory_table.item(row_index, 4)
             committed_item = self.inventory_table.item(row_index, 5)
@@ -7435,7 +7530,6 @@ class MainWindow(QMainWindow):
         for row_index, row in enumerate(payment_rows):
             for column_index, value in enumerate(row):
                 self.analytics_payment_table.setItem(row_index, column_index, _table_item(value))
-        self.analytics_payment_table.resizeColumnsToContents()
 
         top_product_snapshot_rows = load_analytics_top_product_snapshot_rows(
             session,
@@ -7448,7 +7542,6 @@ class MainWindow(QMainWindow):
         for row_index, display_row in enumerate(top_product_rows):
             for column_index, value in enumerate(display_row):
                 self.top_products_table.setItem(row_index, column_index, _table_item(value))
-        self.top_products_table.resizeColumnsToContents()
 
         top_client_snapshot_rows = load_analytics_top_client_snapshot_rows(
             session,
@@ -7467,7 +7560,6 @@ class MainWindow(QMainWindow):
                 _set_table_badge_style(sales_item, row_view.sales_tone)
             if amount_item is not None:
                 _set_table_badge_style(amount_item, row_view.amount_tone)
-        self.analytics_clients_table.resizeColumnsToContents()
 
         layaway_snapshot = load_analytics_layaway_snapshot(
             session,
@@ -7511,7 +7603,6 @@ class MainWindow(QMainWindow):
                 _set_table_badge_style(reserved_item, row_view.reserved_tone)
             if state_item is not None:
                 _set_table_badge_style(state_item, row_view.state_tone)
-        self.analytics_stock_table.resizeColumnsToContents()
         self.analytics_export_status_label.setText(
             build_analytics_export_status_text(
                 selected_client_id=selected_client_id,
@@ -7842,16 +7933,16 @@ class MainWindow(QMainWindow):
         if commitment is None:
             return ("Sin fecha", "muted")
         if estado in {EstadoApartado.ENTREGADO, EstadoApartado.CANCELADO}:
-            return (commitment.strftime("%Y-%m-%d"), "muted")
+            return (format_display_date(commitment), "muted")
         today = date.today()
         due_date = commitment.date()
         if due_date < today:
-            return (f"Vencido desde {due_date.isoformat()}", "danger")
+            return (f"Vencido desde {format_display_date(due_date)}", "danger")
         if due_date == today:
             return ("Vence hoy", "warning")
         if due_date <= today + timedelta(days=7):
-            return (f"Vence {due_date.isoformat()}", "warning")
-        return (f"Vence {due_date.isoformat()}", "positive")
+            return (f"Vence {format_display_date(due_date)}", "warning")
+        return (f"Vence {format_display_date(due_date)}", "positive")
 
     def _selected_layaway_id(self) -> int | None:
         selected_row = self.layaway_table.currentRow()
@@ -7914,7 +8005,7 @@ class MainWindow(QMainWindow):
     def _build_layaway_whatsapp_message(self, apartado: Apartado) -> str:
         due_text, _ = self._classify_layaway_due(apartado.fecha_compromiso, apartado.estado)
         due_date_text = (
-            apartado.fecha_compromiso.strftime("%Y-%m-%d")
+            format_display_date(apartado.fecha_compromiso)
             if apartado.fecha_compromiso
             else "sin fecha definida"
         )
@@ -8127,6 +8218,8 @@ class MainWindow(QMainWindow):
                     customer_code=detail_snapshot.customer_code,
                     customer_name=detail_snapshot.customer_name,
                     customer_phone=detail_snapshot.customer_phone,
+                    subtotal=detail_snapshot.subtotal,
+                    rounding_adjustment=detail_snapshot.rounding_adjustment,
                     total=detail_snapshot.total,
                     total_paid=detail_snapshot.total_paid,
                     balance_due=detail_snapshot.balance_due,
@@ -8165,6 +8258,7 @@ class MainWindow(QMainWindow):
         self.layaway_summary_label.setText(detail_view.summary_label)
         self.layaway_customer_label.setText(detail_view.customer_label)
         self.layaway_balance_label.setText(detail_view.balance_label)
+        self.layaway_breakdown_label.setText(detail_view.breakdown_label)
         self.layaway_commitment_label.setText(detail_view.commitment_label)
         self._set_badge_state(
             self.layaway_due_status_label,
@@ -8179,6 +8273,11 @@ class MainWindow(QMainWindow):
         for row_index, detail_row in enumerate(detail_view.detail_rows):
             for column_index, value in enumerate(detail_row.values):
                 self.layaway_detail_table.setItem(row_index, column_index, _table_item(value))
+            if detail_row.tone:
+                for column_index in (1, 4):
+                    item = self.layaway_detail_table.item(row_index, column_index)
+                    if item is not None:
+                        _set_table_badge_style(item, detail_row.tone)
         self.layaway_detail_table.resizeColumnsToContents()
 
         self.layaway_payments_table.setRowCount(len(detail_view.payment_rows))
@@ -8346,33 +8445,71 @@ class MainWindow(QMainWindow):
             return
         if not self._ensure_cash_session_current_day_for_operation("entregar apartados"):
             return
-        confirmation = QMessageBox.question(
-            self,
-            "Entregar apartado",
-            "El apartado se marcara como entregado. Esta accion no cambia stock porque ya estaba reservado.\n\nContinuar?",
-        )
-        if confirmation != QMessageBox.StandardButton.Yes:
-            return
         try:
             with get_session() as session:
-                result = deliver_layaway(
-                    session,
-                    layaway_id=apartado_id,
-                    user_id=self.user_id,
-                )
+                confirmation_snapshot = load_layaway_delivery_confirmation(session, layaway_id=apartado_id)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "No se pudo preparar la entrega", str(exc))
+            return
+
+        confirmation_view = build_layaway_delivery_confirmation_view(confirmation_snapshot)
+        confirmation_box = QMessageBox(self)
+        confirmation_box.setIcon(QMessageBox.Icon.Question)
+        confirmation_box.setWindowTitle(confirmation_view.title)
+        confirmation_box.setText(confirmation_view.message)
+        deliver_button = confirmation_box.addButton("Entregar", QMessageBox.ButtonRole.AcceptRole)
+        confirmation_box.addButton(QMessageBox.StandardButton.Cancel)
+        confirmation_box.exec()
+        if confirmation_box.clickedButton() is not deliver_button:
+            return
+        payment_payload = None
+        if confirmation_snapshot.balance_due > Decimal("0.00"):
+            payment_payload = build_layaway_payment_dialog(
+                self,
+                title="Liquidar y entregar apartado",
+                helper_text=(
+                    f"Saldo pendiente actual: ${confirmation_snapshot.balance_due}. "
+                    "Registra el abono final para completar la entrega."
+                ),
+                initial_amount=confirmation_snapshot.balance_due,
+                fixed_amount=True,
+                default_notes=f"Liquidacion final previa a la entrega del apartado {confirmation_snapshot.layaway_folio}.",
+                accept_button_label="Liquidar y entregar",
+            )
+            if payment_payload is None:
+                return
+        try:
+            with get_session() as session:
+                if payment_payload is None:
+                    result = deliver_layaway(
+                        session,
+                        layaway_id=apartado_id,
+                        user_id=self.user_id,
+                    )
+                else:
+                    result = settle_and_deliver_layaway(
+                        session,
+                        layaway_id=apartado_id,
+                        user_id=self.user_id,
+                        payment_input=payment_payload,
+                    )
                 session.commit()
-                sale_folio = result.sale_folio
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "No se pudo entregar", str(exc))
             return
 
         self.refresh_all()
         self._select_layaway(apartado_id)
-        QMessageBox.information(
-            self,
-            "Apartado entregado",
-            f"La mercancia quedo marcada como entregada y se genero la venta {sale_folio}.",
-        )
+        result_view = build_layaway_delivery_result_view(result)
+        result_box = QMessageBox(self)
+        result_box.setIcon(QMessageBox.Icon.Information)
+        result_box.setWindowTitle(result_view.title)
+        result_box.setText(result_view.message)
+        open_ticket_button = result_box.addButton("Ver ticket", QMessageBox.ButtonRole.ActionRole)
+        result_box.addButton(QMessageBox.StandardButton.Close)
+        result_box.exec()
+        if result_box.clickedButton() is open_ticket_button:
+            self._handle_view_layaway_sale_ticket()
 
     def _handle_cancel_layaway(self) -> None:
         apartado_id = self._selected_layaway_id()
@@ -8640,7 +8777,8 @@ class MainWindow(QMainWindow):
         for row_index, row in enumerate(panel_view.cashier_view.table_view.rows):
             for column_index, value in enumerate(row.values):
                 self.sale_cart_table.setItem(row_index, column_index, _table_item(value))
-        self.sale_cart_table.resizeColumnsToContents()
+        for column_index in (0, 2, 3):
+            self.sale_cart_table.resizeColumnToContents(column_index)
         self.sale_total_label.setText(panel_view.cashier_view.summary.total_label)
         self.sale_total_meta_label.setText(panel_view.cashier_view.summary.meta_label)
         self.sale_summary_label.setText(panel_view.cashier_view.summary.summary_label)

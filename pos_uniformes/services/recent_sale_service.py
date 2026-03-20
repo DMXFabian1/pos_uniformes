@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
+from pos_uniformes.utils.date_format import format_display_datetime
+
 
 @dataclass(frozen=True)
 class RecentSaleRow:
@@ -27,7 +29,7 @@ def list_recent_sale_rows(session, *, limit: int = 20) -> tuple[RecentSaleRow, .
                     sale.usuario.username if sale.usuario else "",
                     sale.estado.value,
                     Decimal(sale.total),
-                    sale.created_at.strftime("%Y-%m-%d %H:%M") if sale.created_at else "",
+                    format_display_datetime(sale.created_at),
                 ),
             )
         )

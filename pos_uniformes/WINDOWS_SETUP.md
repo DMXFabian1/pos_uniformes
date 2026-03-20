@@ -28,6 +28,50 @@ Importante:
 - no incluye PostgreSQL
 - la PC destino solo necesita acceso a la base PostgreSQL correspondiente
 
+## App satelite de Presupuestos
+
+La app satelite de Presupuestos se distribuye por separado del POS principal. Usa la misma base PostgreSQL y los mismos servicios compartidos, pero abre una ventana dedicada solo para:
+
+- escaneo rapido de SKU como pantalla principal
+- consulta inmediata de precio y detalles de la presentacion
+- catalogo simplificado para cotizar por escuela y extras generales
+- consultar presupuestos
+- guardar borradores
+- emitir presupuestos
+- reencontrarlos por folio o telefono
+- compartir por WhatsApp
+- imprimir despues
+
+Build en Windows:
+
+```powershell
+scripts\build_presupuestos_satelite_windows.ps1
+```
+
+Si tambien quieres correr el precheck de base en la PC de build:
+
+```powershell
+scripts\build_presupuestos_satelite_windows.ps1 -WithPrecheck
+```
+
+Eso produce:
+
+- `dist\PresupuestosSatelite-<VERSION>\`
+- `dist\PresupuestosSatelite-<VERSION>-windows.zip`
+
+En la PC satelite:
+
+1. descomprime `PresupuestosSatelite-<VERSION>-windows.zip`
+2. copia `pos_uniformes.env.example` como `pos_uniformes.env`
+3. apunta ese `.env` a la misma base PostgreSQL del sistema principal
+4. ejecuta `PresupuestosSatelite-<VERSION>.exe`
+
+Importante:
+
+- no necesitas instalar el POS principal en esa PC
+- la app satelite no abre caja ni sesion de efectivo
+- ambas PCs deben ver la misma base para compartir presupuestos y clientes
+
 ## Opcion recomendada para dejar app + base local listas
 
 Si quieres que el bundle de Windows llegue con una base semilla lista para restaurar:

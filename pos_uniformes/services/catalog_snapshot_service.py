@@ -20,6 +20,7 @@ def _execute_catalog_snapshot_query(session) -> list[tuple[object, ...]]:
         EstadoApartado,
         ImportacionCatalogoFila,
         Marca,
+        NivelEducativo,
         Producto,
         TipoPieza,
         TipoPrenda,
@@ -49,6 +50,8 @@ def _execute_catalog_snapshot_query(session) -> list[tuple[object, ...]]:
                 Categoria.nombre,
                 Marca.nombre,
                 Escuela.nombre,
+                NivelEducativo.nombre,
+                Producto.genero,
                 TipoPrenda.nombre,
                 TipoPieza.nombre,
                 Producto.nombre,
@@ -70,6 +73,7 @@ def _execute_catalog_snapshot_query(session) -> list[tuple[object, ...]]:
             .join(Producto.categoria)
             .join(Producto.marca)
             .outerjoin(Producto.escuela)
+            .outerjoin(Producto.nivel_educativo)
             .outerjoin(Producto.tipo_prenda)
             .outerjoin(Producto.tipo_pieza)
             .outerjoin(ImportacionCatalogoFila, ImportacionCatalogoFila.variante_id == Variante.id)

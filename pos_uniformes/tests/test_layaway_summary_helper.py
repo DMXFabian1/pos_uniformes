@@ -22,7 +22,7 @@ class LayawaySummaryHelperTests(unittest.TestCase):
 
         self.assertEqual(
             view.status_label,
-            "Apartados visibles: 2 | Pendiente total: $249.00 | Filtros: sin filtros",
+            "Apartados visibles: 2 | Filtros: sin filtros",
         )
         self.assertEqual(view.active_filter_labels, [])
 
@@ -38,7 +38,7 @@ class LayawaySummaryHelperTests(unittest.TestCase):
 
         self.assertEqual(
             view.status_label,
-            'Apartados visibles: 1 | Pendiente total: $0.00 | Filtros: texto="maria", estado=Activos, vencimiento=Proximos 7 dias',
+            'Apartados visibles: 1 | Filtros: texto="maria", estado=Activos, vencimiento=Proximos 7 dias',
         )
         self.assertEqual(
             view.active_filter_labels,

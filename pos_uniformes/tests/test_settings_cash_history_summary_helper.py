@@ -19,7 +19,7 @@ class SettingsCashHistorySummaryHelperTests(unittest.TestCase):
 
         self.assertEqual(
             label,
-            "Cortes registrados: 12 | Abiertas: 1 | Cerradas: 11 | Rango: 2026-02-17 a 2026-03-18",
+            "Cortes registrados: 12 | Abiertas: 1 | Cerradas: 11 | Rango: 17/02/2026 a 18/03/2026",
         )
 
 

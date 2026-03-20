@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
+from pos_uniformes.utils.date_format import format_display_date, format_display_datetime
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 
 
@@ -32,6 +33,8 @@ class LayawayDetailSnapshot:
     customer_code: str
     customer_name: str
     customer_phone: str
+    subtotal: Decimal
+    rounding_adjustment: Decimal
     total: Decimal
     total_paid: Decimal
     balance_due: Decimal
@@ -65,10 +68,12 @@ def load_layaway_detail_snapshot(
         customer_code=layaway.cliente.codigo_cliente if layaway.cliente is not None else "Manual",
         customer_name=str(layaway.cliente_nombre),
         customer_phone=str(layaway.cliente_telefono or ""),
+        subtotal=Decimal(layaway.subtotal),
+        rounding_adjustment=(Decimal(layaway.total) - Decimal(layaway.subtotal)).quantize(Decimal("0.01")),
         total=Decimal(layaway.total),
         total_paid=Decimal(layaway.total_abonado),
         balance_due=Decimal(layaway.saldo_pendiente),
-        commitment_label=layaway.fecha_compromiso.strftime("%Y-%m-%d") if layaway.fecha_compromiso else "Sin fecha",
+        commitment_label=format_display_date(layaway.fecha_compromiso, empty="Sin fecha"),
         due_text=str(due_text),
         due_tone=str(due_tone),
         notes_text=str(layaway.observacion or "Sin observaciones."),
@@ -84,7 +89,7 @@ def load_layaway_detail_snapshot(
         ),
         payment_rows=tuple(
             LayawayPaymentLineSnapshot(
-                created_at_label=abono.created_at.strftime("%Y-%m-%d %H:%M") if abono.created_at else "",
+                created_at_label=format_display_datetime(abono.created_at),
                 amount=abono.monto,
                 reference=str(abono.referencia or ""),
                 username=str(abono.usuario.username),

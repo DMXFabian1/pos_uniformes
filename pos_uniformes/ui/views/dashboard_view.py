@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PyQt6.QtWidgets import QGridLayout, QGroupBox, QLabel, QVBoxLayout, QWidget
+from PyQt6.QtCore import Qt
+from PyQt6.QtWidgets import QGridLayout, QGroupBox, QLabel, QVBoxLayout, QWidget, QHBoxLayout
 
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
@@ -13,9 +14,25 @@ if TYPE_CHECKING:
 def build_dashboard_tab(window: "MainWindow") -> QWidget:
     widget = QWidget()
     layout = QVBoxLayout()
-    layout.setSpacing(10)
+    layout.setSpacing(12)
 
-    layout.addWidget(window.status_label)
+    status_box = QGroupBox("Estado general")
+    status_box.setObjectName("infoCard")
+    status_layout = QVBoxLayout()
+    status_layout.setSpacing(8)
+    status_intro = QLabel("Snapshot rapido del sistema y sincronizacion actual.")
+    status_intro.setObjectName("inventorySubtitle")
+    window.status_label.setWordWrap(True)
+    window.status_label.setMinimumHeight(42)
+    status_layout.addWidget(status_intro)
+    status_layout.addWidget(window.status_label)
+    status_box.setLayout(status_layout)
+    layout.addWidget(status_box)
+
+    kpi_box = QGroupBox("Indicadores clave")
+    kpi_box.setObjectName("infoCard")
+    kpi_layout = QVBoxLayout()
+    kpi_layout.setSpacing(10)
 
     kpi_grid = QGridLayout()
     kpi_grid.setHorizontalSpacing(12)
@@ -55,6 +72,9 @@ def build_dashboard_tab(window: "MainWindow") -> QWidget:
     )
     for column in range(4):
         kpi_grid.setColumnStretch(column, 1)
+    kpi_layout.addLayout(kpi_grid)
+    kpi_box.setLayout(kpi_layout)
+    layout.addWidget(kpi_box)
 
     window.dashboard_help_box = None
 
@@ -65,8 +85,10 @@ def build_dashboard_tab(window: "MainWindow") -> QWidget:
     business_intro = QLabel("Resumen operativo del periodo actual.")
     business_intro.setObjectName("inventorySubtitle")
     window.analytics_label.setObjectName("inventoryMetaCard")
+    window.analytics_label.setWordWrap(True)
     business_layout.addWidget(business_intro)
     business_layout.addWidget(window.analytics_label)
+    business_layout.addStretch(1)
     business_box.setLayout(business_layout)
 
     alerts_box = QGroupBox("Alertas prioritarias")
@@ -76,8 +98,10 @@ def build_dashboard_tab(window: "MainWindow") -> QWidget:
     alerts_intro = QLabel("Seguimiento rapido de apartados y pendientes.")
     alerts_intro.setObjectName("inventorySubtitle")
     window.layaway_alerts_label.setObjectName("analyticsFlagCard")
+    window.layaway_alerts_label.setWordWrap(True)
     alerts_layout.addWidget(alerts_intro)
     alerts_layout.addWidget(window.layaway_alerts_label)
+    alerts_layout.addStretch(1)
     alerts_box.setLayout(alerts_layout)
 
     manual_promo_box = QGroupBox("Promos manuales")
@@ -90,20 +114,21 @@ def build_dashboard_tab(window: "MainWindow") -> QWidget:
     window.dashboard_manual_promo_label.setObjectName("analyticsFlagCard")
     manual_promo_layout.addWidget(manual_promo_intro)
     manual_promo_layout.addWidget(window.dashboard_manual_promo_label)
+    manual_promo_layout.addStretch(1)
     manual_promo_box.setLayout(manual_promo_layout)
     window.dashboard_manual_promo_box = manual_promo_box
 
-    info_grid = QGridLayout()
-    info_grid.setHorizontalSpacing(10)
-    info_grid.setVerticalSpacing(10)
-    info_grid.addWidget(business_box, 0, 0)
-    info_grid.addWidget(alerts_box, 0, 1)
-    info_grid.addWidget(manual_promo_box, 1, 0, 1, 2)
-    info_grid.setColumnStretch(0, 1)
-    info_grid.setColumnStretch(1, 1)
+    side_stack = QVBoxLayout()
+    side_stack.setSpacing(10)
+    side_stack.addWidget(alerts_box)
+    side_stack.addWidget(manual_promo_box)
 
-    layout.addLayout(kpi_grid)
-    layout.addLayout(info_grid)
+    info_row = QHBoxLayout()
+    info_row.setSpacing(10)
+    info_row.addWidget(business_box, 3)
+    info_row.addLayout(side_stack, 2)
+
+    layout.addLayout(info_row)
     layout.addStretch()
     widget.setLayout(layout)
     return widget

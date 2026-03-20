@@ -9,6 +9,7 @@ from PyQt6.QtWidgets import (
     QFrame,
     QGridLayout,
     QGroupBox,
+    QHeaderView,
     QHBoxLayout,
     QLabel,
     QMenu,
@@ -214,6 +215,16 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_table.setAlternatingRowColors(True)
     window.inventory_table.setMinimumHeight(320)
     window.inventory_table.horizontalHeader().setStretchLastSection(True)
+    inventory_header = window.inventory_table.horizontalHeader()
+    inventory_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+    inventory_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+    inventory_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+    inventory_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+    inventory_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+    inventory_header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+    inventory_header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
+    inventory_header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)
+    inventory_header.setStretchLastSection(False)
     window.inventory_table.itemSelectionChanged.connect(window._handle_inventory_table_selection)
     window.inventory_table.currentCellChanged.connect(lambda *_: window._handle_inventory_table_selection())
     window.inventory_table.itemDoubleClicked.connect(window._handle_inventory_table_double_click)
@@ -304,7 +315,9 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     table_layout.addWidget(window.inventory_results_label)
     table_layout.addWidget(window.inventory_active_filters_label)
     table_layout.addLayout(counters_row)
-    table_layout.addWidget(QLabel("Doble clic para editar la presentacion seleccionada."))
+    inventory_hint_label = QLabel("Doble clic para editar la presentacion seleccionada.")
+    inventory_hint_label.setObjectName("subtleLine")
+    table_layout.addWidget(inventory_hint_label)
     table_layout.addWidget(window.inventory_table)
     table_box.setLayout(table_layout)
     window.inventory_search_input.textChanged.connect(lambda _: window._handle_inventory_filters_changed())

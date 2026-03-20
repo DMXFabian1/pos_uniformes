@@ -81,7 +81,7 @@ def build_layaway_tab(window: "MainWindow") -> QWidget:
 
     window.layaway_table.setColumnCount(7)
     window.layaway_table.setHorizontalHeaderLabels(
-        ["Folio", "Cliente", "Estado", "Total", "Abonado", "Saldo", "Compromiso"]
+        ["Folio", "Cliente", "Estado", "Total", "Abonado", "Saldo", "Vencimiento"]
     )
     window.layaway_table.setObjectName("dataTable")
     window.layaway_table.verticalHeader().setVisible(False)
@@ -106,6 +106,7 @@ def build_layaway_tab(window: "MainWindow") -> QWidget:
     window.layaway_summary_label.setObjectName("inventoryTitle")
     window.layaway_customer_label.setObjectName("inventorySubtitle")
     window.layaway_balance_label.setObjectName("inventoryMetaCard")
+    window.layaway_breakdown_label.setObjectName("inventoryMetaCardAlt")
     window.layaway_commitment_label.setObjectName("inventoryMetaCardAlt")
     window.layaway_due_status_label.setObjectName("inventoryMetaCardAlt")
     window.layaway_notes_label.setObjectName("inventoryMetaCardAlt")
@@ -133,9 +134,10 @@ def build_layaway_tab(window: "MainWindow") -> QWidget:
     detail_meta_grid.setHorizontalSpacing(6)
     detail_meta_grid.setVerticalSpacing(6)
     detail_meta_grid.addWidget(window.layaway_balance_label, 0, 0)
+    detail_meta_grid.addWidget(window.layaway_breakdown_label, 1, 0)
     detail_meta_grid.addWidget(window.layaway_commitment_label, 0, 1)
-    detail_meta_grid.addWidget(window.layaway_due_status_label, 1, 0)
-    detail_meta_grid.addWidget(window.layaway_notes_label, 1, 1)
+    detail_meta_grid.addWidget(window.layaway_due_status_label, 1, 1)
+    detail_meta_grid.addWidget(window.layaway_notes_label, 2, 0, 1, 2)
 
     detail_layout.addWidget(window.layaway_summary_label)
     detail_layout.addWidget(window.layaway_customer_label)

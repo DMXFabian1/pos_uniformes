@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pos_uniformes.utils.date_format import format_display_datetime
+
 
 @dataclass(frozen=True)
 class SettingsMarketingRecalculationResult:
@@ -32,7 +34,7 @@ def load_settings_marketing_history_rows(session, *, limit: int = 120) -> list[d
     changes = marketing_audit_service.list_recent(session, limit=limit)
     return [
         {
-            "created_at_label": change.created_at.strftime("%Y-%m-%d %H:%M") if change.created_at else "",
+            "created_at_label": format_display_datetime(change.created_at),
             "username": change.usuario.username if change.usuario is not None else "-",
             "role_label": change.rol_usuario or "-",
             "section_label": change.seccion.title(),

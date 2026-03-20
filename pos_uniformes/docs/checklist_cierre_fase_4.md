@@ -79,6 +79,21 @@ Cerrar la fase de extraccion estructural con una validacion corta pero suficient
 - No aparece una regresion estructural nueva ligada a extracciones recientes.
 - `main_window.py` ya no recibe nuevas reglas densas; solo integracion.
 
+## Cierre formal
+
+- Fecha de cierre: `2026-03-20`
+- Estado: `validated-manual`
+- Resultado:
+  - precheck tecnico validado
+  - bateria operativa validada
+  - validacion manual confirmada en Caja, sesion operativa, Apartados, Catalogo, Inventario y Configuracion
+  - `ui/main_window.py` queda aceptado como coordinador principal, con la mayor parte de la logica operativa ya extraida a servicios, helpers y dialogs
+- Riesgo residual aceptado:
+  - impresion y validacion Windows siguen como frente separado
+  - quedan mejoras de UX y estabilidad operativa para `Fase 5`
+- Paso siguiente:
+  - entrar a `Fase 5. Optimizacion fina`
+
 ## Criterio para considerar Fase 1 suficientemente cerrada
 
 - Venta manual validada con cliente y sin cliente.

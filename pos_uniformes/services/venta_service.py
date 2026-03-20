@@ -156,7 +156,15 @@ class VentaService:
             total += Decimal(detalle_apartado.subtotal_linea)
 
         venta.subtotal = total
-        venta.total = total
+        layaway_total = Decimal(getattr(apartado, "total", total) or total).quantize(Decimal("0.01"))
+        venta.total = layaway_total
+        rounding_adjustment = (layaway_total - total).quantize(Decimal("0.01"))
+        if rounding_adjustment != Decimal("0.00"):
+            adjustment_note = f"Ajuste redondeo: {rounding_adjustment}"
+            if observacion and observacion.strip():
+                venta.observacion = f"{observacion} | {adjustment_note}"
+            else:
+                venta.observacion = adjustment_note
         session.add(venta)
         session.flush()
         LoyaltyService.refresh_client_level_from_sales(

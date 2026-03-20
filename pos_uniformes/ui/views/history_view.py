@@ -5,8 +5,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import QDate
-from PyQt6.QtWidgets import QGridLayout, QGroupBox, QLabel, QTableWidget, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QGridLayout, QGroupBox, QHBoxLayout, QLabel, QTableWidget, QVBoxLayout, QWidget
 
+from pos_uniformes.ui.helpers.date_field_helper import configure_friendly_date_edit
 from pos_uniformes.ui.helpers.history_filter_helper import build_history_type_options
 
 if TYPE_CHECKING:
@@ -42,18 +43,36 @@ def build_history_tab(window: "MainWindow") -> QWidget:
         (window.history_from_input, "Desde"),
         (window.history_to_input, "Hasta"),
     ):
-        field.setCalendarPopup(True)
-        field.setDisplayFormat("yyyy-MM-dd")
-        field.setMinimumDate(empty_date)
-        field.setSpecialValueText(text)
-        field.setDate(empty_date)
+        configure_friendly_date_edit(
+            field,
+            placeholder_text=text,
+            minimum_date=empty_date,
+            initial_date=empty_date,
+            minimum_width=180,
+        )
         field.setObjectName("compactDateField")
+    window.history_today_button.setText("Hoy")
+    window.history_clear_button.setText("Limpiar fechas")
+    window.history_filter_button.setText("Aplicar")
     window.history_filter_button.clicked.connect(window._handle_history_filter)
     window.history_today_button.setObjectName("toolbarSecondaryButton")
     window.history_clear_button.setObjectName("toolbarGhostButton")
+    window.history_today_button.setMinimumWidth(88)
+    window.history_clear_button.setMinimumWidth(140)
+    window.history_filter_button.setMinimumWidth(132)
     window.history_today_button.clicked.connect(window._set_history_today)
     window.history_clear_button.clicked.connect(window._clear_history_filters)
     window.history_source_combo.currentIndexChanged.connect(window._handle_history_source_changed)
+
+    date_actions = QWidget()
+    date_actions_layout = QHBoxLayout()
+    date_actions_layout.setContentsMargins(0, 0, 0, 0)
+    date_actions_layout.setSpacing(8)
+    date_actions_layout.addWidget(window.history_today_button)
+    date_actions_layout.addWidget(window.history_clear_button)
+    date_actions_layout.addWidget(window.history_filter_button)
+    date_actions_layout.addStretch(1)
+    date_actions.setLayout(date_actions_layout)
 
     filters.addWidget(QLabel("Buscar"), 0, 0)
     filters.addWidget(window.history_sku_input, 0, 1, 1, 3)
@@ -67,9 +86,7 @@ def build_history_tab(window: "MainWindow") -> QWidget:
     filters.addWidget(window.history_from_input, 1, 3)
     filters.addWidget(QLabel("Hasta"), 1, 4)
     filters.addWidget(window.history_to_input, 1, 5)
-    filters.addWidget(window.history_today_button, 1, 6)
-    filters.addWidget(window.history_clear_button, 1, 7)
-    filters.addWidget(window.history_filter_button, 1, 8)
+    filters.addWidget(date_actions, 1, 6, 1, 3)
     filters.setColumnStretch(1, 1)
     filters.setColumnStretch(3, 1)
     filters.setColumnStretch(5, 1)

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 class InventoryTableRowView:
     variant_id: int
     values: tuple[object, ...]
+    row_tone: str | None
     stock_tone: str
     committed_tone: str | None
     status_tone: str
@@ -23,6 +24,12 @@ def build_inventory_table_row_view(row: dict[str, object]) -> InventoryTableRowV
     stock_value = int(row["stock_actual"])
     committed_value = int(row["apartado_cantidad"])
     stock_tone = "danger" if stock_value == 0 else "warning" if stock_value <= 3 else "positive"
+    row_tone = _build_inventory_row_tone(
+        stock_value=stock_value,
+        committed_value=committed_value,
+        variant_active=bool(row["variante_activa"]),
+        qr_exists=bool(row["qr_exists"]),
+    )
     status_text = "ACTIVA" if row["variante_activa"] else "INACTIVA"
     status_tone = "positive" if row["variante_activa"] else "muted"
     qr_text = "Listo" if row["qr_exists"] else "Pendiente"
@@ -39,6 +46,7 @@ def build_inventory_table_row_view(row: dict[str, object]) -> InventoryTableRowV
             status_text,
             qr_text,
         ),
+        row_tone=row_tone,
         stock_tone=stock_tone,
         committed_tone="warning" if committed_value > 0 else None,
         status_tone=status_tone,
@@ -52,3 +60,23 @@ def _build_stock_table_text(stock_value: int) -> str:
     if stock_value <= 3:
         return f"{stock_value} Bajo"
     return f"{stock_value} OK"
+
+
+def _build_inventory_row_tone(
+    *,
+    stock_value: int,
+    committed_value: int,
+    variant_active: bool,
+    qr_exists: bool,
+) -> str | None:
+    if not variant_active:
+        return "muted"
+    if stock_value == 0:
+        return "danger"
+    if stock_value <= 3:
+        return "warning"
+    if committed_value > 0:
+        return "reserved"
+    if not qr_exists:
+        return "neutral"
+    return None

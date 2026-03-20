@@ -29,6 +29,7 @@ class InventoryTableRowHelperTests(unittest.TestCase):
             view.values,
             ("SKU-008", "Pants Deportivo", "16", "Azul Marino", "2 Bajo", 1, "INACTIVA", "Pendiente"),
         )
+        self.assertEqual(view.row_tone, "muted")
         self.assertEqual(view.stock_tone, "warning")
         self.assertEqual(view.committed_tone, "warning")
         self.assertEqual(view.status_tone, "muted")
@@ -64,8 +65,10 @@ class InventoryTableRowHelperTests(unittest.TestCase):
 
         self.assertEqual(len(views), 2)
         self.assertEqual(views[0].values[4], "0 Agotado")
+        self.assertEqual(views[0].row_tone, "danger")
         self.assertEqual(views[0].stock_tone, "danger")
         self.assertEqual(views[1].values[4], "6 OK")
+        self.assertEqual(views[1].row_tone, "neutral")
         self.assertEqual(views[1].stock_tone, "positive")
 
 

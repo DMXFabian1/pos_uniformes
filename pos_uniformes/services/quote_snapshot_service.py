@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
+from pos_uniformes.utils.date_format import format_display_date, format_display_datetime
+
 
 @dataclass(frozen=True)
 class QuoteSnapshotRow:
@@ -33,8 +35,8 @@ def load_quote_snapshot_rows(session, *, limit: int = 200) -> tuple[QuoteSnapsho
             estado=str(quote.estado.value),
             total=Decimal(quote.total),
             username=str(quote.usuario.username if quote.usuario else ""),
-            validity_label=quote.vigencia_hasta.strftime("%Y-%m-%d") if quote.vigencia_hasta else "Sin vigencia",
-            created_at_label=quote.created_at.strftime("%Y-%m-%d %H:%M") if quote.created_at else "",
+            validity_label=format_display_date(quote.vigencia_hasta, empty="Sin vigencia"),
+            created_at_label=format_display_datetime(quote.created_at),
             searchable=" ".join(
                 [
                     quote.folio,

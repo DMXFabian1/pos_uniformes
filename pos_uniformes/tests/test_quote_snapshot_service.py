@@ -61,8 +61,8 @@ class QuoteSnapshotServiceTests(unittest.TestCase):
                     estado="EMITIDO",
                     total=Decimal("350.00"),
                     username="cajero",
-                    validity_label="2026-03-25",
-                    created_at_label="2026-03-19 11:05",
+                    validity_label="25/03/2026",
+                    created_at_label="19/03/2026 11:05",
                     searchable="PRE-001 Maria 555 SKU-1 SKU-2",
                 ),
                 QuoteSnapshotRow(
@@ -89,8 +89,8 @@ class QuoteSnapshotServiceTests(unittest.TestCase):
                     estado="EMITIDO",
                     total=Decimal("350.00"),
                     username="cajero",
-                    validity_label="2026-03-25",
-                    created_at_label="2026-03-19 11:05",
+                    validity_label="25/03/2026",
+                    created_at_label="19/03/2026 11:05",
                     searchable="PRE-001 Maria 555 SKU-1 SKU-2",
                 ),
             )
@@ -106,8 +106,8 @@ class QuoteSnapshotServiceTests(unittest.TestCase):
                     "estado": "EMITIDO",
                     "total": Decimal("350.00"),
                     "usuario": "cajero",
-                    "vigencia": "2026-03-25",
-                    "fecha": "2026-03-19 11:05",
+                    "vigencia": "25/03/2026",
+                    "fecha": "19/03/2026 11:05",
                     "searchable": "PRE-001 Maria 555 SKU-1 SKU-2",
                 }
             ],

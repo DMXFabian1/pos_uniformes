@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
+from pos_uniformes.utils.date_format import format_display_datetime
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 
 
@@ -45,7 +46,7 @@ def load_inventory_overview_snapshot(
         (row for row in catalog_rows if int(row["variante_id"]) == int(variant_id)),
         None,
     )
-    movement_date = movement.created_at.strftime("%Y-%m-%d %H:%M") if movement and movement.created_at else ""
+    movement_date = format_display_datetime(movement.created_at) if movement and movement.created_at else ""
     movement_type = movement.tipo_movimiento.value.replace("_", " ").title() if movement else None
 
     return InventoryOverviewSnapshot(

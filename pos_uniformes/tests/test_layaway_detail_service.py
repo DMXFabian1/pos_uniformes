@@ -22,6 +22,7 @@ class LayawayDetailServiceTests(unittest.TestCase):
             cliente=SimpleNamespace(codigo_cliente="C001"),
             cliente_nombre="Maria",
             cliente_telefono="555",
+            subtotal=Decimal("500.00"),
             total=Decimal("500.00"),
             total_abonado=Decimal("500.00"),
             saldo_pendiente=Decimal("0.00"),
@@ -59,7 +60,7 @@ class LayawayDetailServiceTests(unittest.TestCase):
                 SimpleNamespace(),
                 layaway_id=10,
                 current_role="ADMIN",
-                classify_due=lambda fecha, estado: ("Vence 2026-03-20", "warning"),
+                classify_due=lambda fecha, estado: ("Vence 20/03/2026", "warning"),
             )
 
         self.assertEqual(
@@ -70,11 +71,13 @@ class LayawayDetailServiceTests(unittest.TestCase):
                 customer_code="C001",
                 customer_name="Maria",
                 customer_phone="555",
+                subtotal=Decimal("500.00"),
+                rounding_adjustment=Decimal("0.00"),
                 total=Decimal("500.00"),
                 total_paid=Decimal("500.00"),
                 balance_due=Decimal("0.00"),
-                commitment_label="2026-03-20",
-                due_text="Vence 2026-03-20",
+                commitment_label="20/03/2026",
+                due_text="Vence 20/03/2026",
                 due_tone="warning",
                 notes_text="Observacion",
                 detail_rows=(
@@ -88,7 +91,7 @@ class LayawayDetailServiceTests(unittest.TestCase):
                 ),
                 payment_rows=(
                     LayawayPaymentLineSnapshot(
-                        created_at_label="2026-03-19 10:30",
+                        created_at_label="19/03/2026 10:30",
                         amount=Decimal("500.00"),
                         reference="REF-1",
                         username="admin",

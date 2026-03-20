@@ -69,7 +69,7 @@ class InventoryOverviewServiceTests(unittest.TestCase):
                 tipo_pieza_nombre="Chamarra",
                 movement_type="Ajuste Entrada",
                 movement_quantity=3,
-                movement_date="2026-03-19 09:45",
+                movement_date="19/03/2026 09:45",
             ),
         )
 

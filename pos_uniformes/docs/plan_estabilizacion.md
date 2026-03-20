@@ -134,6 +134,11 @@ Reducir el rol de `ui/main_window.py` a coordinador.
 - Imports cruzados entre controladores y vistas.
 - Doble responsabilidad entre UI y servicios.
 
+### Estado actual
+
+- `2026-03-20`: `Fase 4` se considera cerrada con checkpoint `validated-manual`.
+- La siguiente etapa recomendada es `Fase 5. Optimizacion fina`.
+
 ## Fase 5. Optimizacion fina
 
 ### Objetivo
@@ -146,6 +151,7 @@ Mejorar mantenibilidad y rendimiento con el sistema ya estabilizado.
 - Revisar consultas repetidas.
 - Revisar refrescos de UI costosos.
 - Consolidar utilidades compartidas.
+- Cerrar mejoras de estabilidad operativa como politica de respaldos automaticos y recuperacion.
 
 ### Checkpoint
 
@@ -157,6 +163,19 @@ Mejorar mantenibilidad y rendimiento con el sistema ya estabilizado.
 - Refrescos parciales que dejan datos viejos.
 - Consultas duplicadas que afectan tiempos de respuesta.
 - Servicios nuevos que repiten reglas ya extraidas.
+
+## Despues de Fase 5
+
+### Iniciativa funcional siguiente recomendada
+
+- `Empleadas, atribucion comercial y comisiones`
+
+### Regla de entrada
+
+- No abrir este modulo dentro de la estabilizacion estructural.
+- Entrar solo despues de cerrar el pulido general de `Fase 5`.
+- Disenar primero la separacion `usuario` vs `empleada`.
+- Pensarlo desde el inicio para `POS`, `kiosko` y `app movil`.
 
 ## Cierre por fase
 

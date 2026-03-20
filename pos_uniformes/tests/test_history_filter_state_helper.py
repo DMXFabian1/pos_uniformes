@@ -21,8 +21,8 @@ class HistoryFilterStateHelperTests(unittest.TestCase):
         )
         self.assertEqual(state.start_datetime, datetime(2026, 3, 10, 0, 0))
         self.assertEqual(state.end_datetime, datetime(2026, 3, 13, 0, 0))
-        self.assertEqual(state.start_date_label, "2026-03-10")
-        self.assertEqual(state.end_date_label, "2026-03-12")
+        self.assertEqual(state.start_date_label, "10/03/2026")
+        self.assertEqual(state.end_date_label, "12/03/2026")
 
     def test_build_history_filter_state(self) -> None:
         state = build_history_filter_state(
@@ -38,7 +38,7 @@ class HistoryFilterStateHelperTests(unittest.TestCase):
             minimum_date=date(2000, 1, 1),
         )
         self.assertEqual(state.sku_filter, "sku-01")
-        self.assertEqual(state.date_range.start_date_label, "2026-03-01")
+        self.assertEqual(state.date_range.start_date_label, "01/03/2026")
 
     def test_build_history_type_options_state_and_resets(self) -> None:
         type_state = build_history_type_options_state(

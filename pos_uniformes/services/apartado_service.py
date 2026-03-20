@@ -21,6 +21,7 @@ from pos_uniformes.database.models import (
 )
 from pos_uniformes.services.inventario_service import InventarioService
 from pos_uniformes.services.layaway_pricing_service import (
+    build_layaway_pricing,
     resolve_layaway_client_discount_percent,
     resolve_layaway_min_deposit,
     resolve_layaway_unit_price,
@@ -137,18 +138,19 @@ class ApartadoService:
             apartado.detalles.append(detalle)
             total += subtotal_linea
 
-        minimum_deposit = resolve_layaway_min_deposit(total)
+        pricing = build_layaway_pricing(total)
+        minimum_deposit = resolve_layaway_min_deposit(pricing.total)
         if anticipo < minimum_deposit:
             raise ValueError(
                 f"El anticipo minimo para este apartado es ${minimum_deposit} (20% del total)."
             )
-        if anticipo > total:
+        if anticipo > pricing.total:
             raise ValueError("El anticipo no puede ser mayor al total del apartado.")
 
-        apartado.subtotal = total
-        apartado.total = total
+        apartado.subtotal = pricing.subtotal
+        apartado.total = pricing.total
         apartado.total_abonado = anticipo
-        apartado.saldo_pendiente = total - anticipo
+        apartado.saldo_pendiente = pricing.total - anticipo
 
         session.add(apartado)
         session.flush()

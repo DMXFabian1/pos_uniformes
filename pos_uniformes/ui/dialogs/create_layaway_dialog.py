@@ -6,9 +6,10 @@ from datetime import date, timedelta
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QDate, Qt
 from PyQt6.QtWidgets import (
     QComboBox,
+    QDateEdit,
     QDialog,
     QDialogButtonBox,
     QDoubleSpinBox,
@@ -29,10 +30,12 @@ from pos_uniformes.services.apartado_service import ApartadoItemInput, ApartadoS
 from pos_uniformes.services.client_service import ClientService
 from pos_uniformes.services.inventario_service import InventarioService
 from pos_uniformes.services.layaway_pricing_service import (
+    build_layaway_pricing,
     resolve_layaway_client_discount_percent,
     resolve_layaway_min_deposit,
     resolve_layaway_unit_price,
 )
+from pos_uniformes.ui.helpers.date_field_helper import configure_friendly_date_edit
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 
 if TYPE_CHECKING:
@@ -125,6 +128,8 @@ def build_create_layaway_dialog(
     items_table.setAlternatingRowColors(True)
     total_label = QLabel("Total estimado: $0.00")
     total_label.setObjectName("analyticsLine")
+    subtotal_label = QLabel("Subtotal estimado: $0.00")
+    subtotal_label.setObjectName("analyticsLine")
     minimum_deposit_label = QLabel("Anticipo minimo (20%): $0.00")
     minimum_deposit_label.setObjectName("analyticsLine")
 
@@ -160,23 +165,30 @@ def build_create_layaway_dialog(
         return discount_percent
 
     def refresh_items_table() -> None:
-        total = Decimal("0.00")
+        subtotal = Decimal("0.00")
         items_table.setRowCount(len(items))
         for row_index, item in enumerate(items):
-            subtotal = Decimal(item["precio_unitario"]) * int(item["cantidad"])
-            total += subtotal
+            line_subtotal = Decimal(item["precio_unitario"]) * int(item["cantidad"])
+            subtotal += line_subtotal
             values = [
                 item["sku"],
                 item["producto_nombre"],
                 item["cantidad"],
                 item["precio_unitario"],
-                subtotal,
+                line_subtotal,
             ]
             for column_index, value in enumerate(values):
                 items_table.setItem(row_index, column_index, _table_item(value))
         items_table.resizeColumnsToContents()
-        total_label.setText(f"Total estimado: ${total}")
-        minimum_deposit = resolve_layaway_min_deposit(total)
+        pricing = build_layaway_pricing(subtotal)
+        subtotal_label.setText(f"Subtotal estimado: ${pricing.subtotal}")
+        if pricing.rounding_adjustment != Decimal("0.00"):
+            total_label.setText(
+                f"Total estimado: ${pricing.total} | Ajuste: ${pricing.rounding_adjustment}"
+            )
+        else:
+            total_label.setText(f"Total estimado: ${pricing.total}")
+        minimum_deposit = resolve_layaway_min_deposit(pricing.total)
         minimum_deposit_label.setText(f"Anticipo minimo (20%): ${minimum_deposit}")
         deposit_spin.setMinimum(float(minimum_deposit))
         if deposit_spin.value() < float(minimum_deposit):
@@ -251,6 +263,10 @@ def build_create_layaway_dialog(
         reprice_items_for_selected_client()
         refresh_items_table()
 
+    def set_due_date_from_offset(days: int) -> None:
+        target_date = date.today() + timedelta(days=days)
+        due_input.setDate(QDate(target_date.year, target_date.month, target_date.day))
+
     add_item_button.clicked.connect(handle_add_item)
     remove_item_button.clicked.connect(handle_remove_item)
     sku_input.returnPressed.connect(handle_add_item)
@@ -265,9 +281,24 @@ def build_create_layaway_dialog(
     line_row.addWidget(add_item_button)
     line_row.addWidget(remove_item_button)
 
-    due_input = QLineEdit()
-    due_input.setPlaceholderText("YYYY-MM-DD")
-    due_input.setText((date.today() + timedelta(days=15)).isoformat())
+    due_input = QDateEdit()
+    due_date = date.today() + timedelta(days=15)
+    configure_friendly_date_edit(
+        due_input,
+        initial_date=QDate(due_date.year, due_date.month, due_date.day),
+    )
+    due_quick_row = QHBoxLayout()
+    due_quick_row.setSpacing(6)
+    due_plus_15_button = QPushButton("+15 dias")
+    due_plus_30_button = QPushButton("+30 dias")
+    due_plus_60_button = QPushButton("+60 dias")
+    due_quick_row.addWidget(due_plus_15_button)
+    due_quick_row.addWidget(due_plus_30_button)
+    due_quick_row.addWidget(due_plus_60_button)
+    due_quick_row.addStretch()
+    due_plus_15_button.clicked.connect(lambda: set_due_date_from_offset(15))
+    due_plus_30_button.clicked.connect(lambda: set_due_date_from_offset(30))
+    due_plus_60_button.clicked.connect(lambda: set_due_date_from_offset(60))
     deposit_spin = QDoubleSpinBox()
     deposit_spin.setRange(0.01, 999999.99)
     deposit_spin.setDecimals(2)
@@ -276,7 +307,8 @@ def build_create_layaway_dialog(
     notes_input = QTextEdit()
     notes_input.setMaximumHeight(90)
     form.addRow("Anticipo", deposit_spin)
-    form.addRow("Fecha compromiso", due_input)
+    form.addRow("Fecha de vencimiento", due_input)
+    form.addRow("", due_quick_row)
     form.addRow("Observacion", notes_input)
     buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
     buttons.accepted.connect(dialog.accept)
@@ -284,6 +316,7 @@ def build_create_layaway_dialog(
     layout.addLayout(form)
     layout.addLayout(line_row)
     layout.addWidget(items_table)
+    layout.addWidget(subtotal_label)
     layout.addWidget(total_label)
     layout.addWidget(minimum_deposit_label)
     layout.addWidget(buttons)
@@ -311,6 +344,6 @@ def build_create_layaway_dialog(
             for item in items
         ],
         "anticipo": Decimal(str(deposit_spin.value())),
-        "fecha_compromiso": due_input.text().strip(),
+        "fecha_compromiso": due_input.date().toPyDate().isoformat(),
         "observacion": notes_input.toPlainText().strip(),
     }

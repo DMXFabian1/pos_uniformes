@@ -51,7 +51,7 @@ class QuoteDetailServiceTests(unittest.TestCase):
                 phone_text="555",
                 status_label="EMITIDO",
                 total=Decimal("350.00"),
-                validity_label="2026-03-25",
+                validity_label="25/03/2026",
                 user_label="cajero",
                 notes_text="Observacion",
                 detail_rows=(

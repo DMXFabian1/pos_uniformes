@@ -60,9 +60,12 @@ class LayawayReceiptTextServiceTests(unittest.TestCase):
         )
 
         self.assertIn("Comprobante de apartado: APA-001", receipt)
+        self.assertIn("Fecha: 13/03/2026 09:30", receipt)
+        self.assertIn("Vencimiento: 20/03/2026", receipt)
         self.assertIn("Cliente: Maria Fernanda", receipt)
         self.assertIn("Codigo cliente: CLI-123", receipt)
         self.assertIn("Abonos:", receipt)
+        self.assertIn("13/03/2026 10:15", receipt)
         self.assertIn("ABN-01", receipt)
         self.assertIn("Notas: Entrega sabado", receipt)
         self.assertIn("Copias configuradas: 2", receipt)

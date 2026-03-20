@@ -23,6 +23,8 @@ class CatalogRefreshHelperTests(unittest.TestCase):
                     "Uniforme",
                     "Marca Norte",
                     None,
+                    "Preescolar",
+                    "Niño",
                     "Deportivo",
                     None,
                     "Pants Deportivo | Morelos | Pants #4",
@@ -46,6 +48,8 @@ class CatalogRefreshHelperTests(unittest.TestCase):
         self.assertEqual(len(snapshot_rows), 1)
         row = snapshot_rows[0]
         self.assertEqual(row["escuela_nombre"], "General")
+        self.assertEqual(row["nivel_educativo_nombre"], "Preescolar")
+        self.assertEqual(row["producto_genero"], "Niño")
         self.assertEqual(row["tipo_pieza_nombre"], "-")
         self.assertEqual(row["producto_nombre"], "Pants Deportivo | Morelos | Pants")
         self.assertEqual(row["producto_estado"], "ACTIVO")

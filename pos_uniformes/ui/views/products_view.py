@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PyQt6.QtWidgets import QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget, QHeaderView
 
 from pos_uniformes.ui.helpers.search_input_helper import apply_search_suggestions
 
@@ -39,6 +39,21 @@ def build_products_tab(window: "MainWindow") -> QWidget:
     window.catalog_table.setSelectionBehavior(window.catalog_table.SelectionBehavior.SelectRows)
     window.catalog_table.setAlternatingRowColors(True)
     window.catalog_table.setMinimumHeight(420)
+    window.catalog_table.verticalHeader().setDefaultSectionSize(34)
+    catalog_header = window.catalog_table.horizontalHeader()
+    catalog_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+    catalog_header.setSectionResizeMode(1, QHeaderView.ResizeMode.ResizeToContents)
+    catalog_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+    catalog_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+    catalog_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+    catalog_header.setSectionResizeMode(5, QHeaderView.ResizeMode.Stretch)
+    catalog_header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
+    catalog_header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)
+    catalog_header.setSectionResizeMode(8, QHeaderView.ResizeMode.ResizeToContents)
+    catalog_header.setSectionResizeMode(9, QHeaderView.ResizeMode.ResizeToContents)
+    catalog_header.setSectionResizeMode(10, QHeaderView.ResizeMode.ResizeToContents)
+    catalog_header.setSectionResizeMode(11, QHeaderView.ResizeMode.ResizeToContents)
+    catalog_header.setStretchLastSection(False)
     window.catalog_table.itemSelectionChanged.connect(window._handle_catalog_selection)
 
     summary_box = QGroupBox("Consulta de productos")
@@ -210,7 +225,11 @@ def build_products_tab(window: "MainWindow") -> QWidget:
     summary_box.setLayout(summary_layout)
     window.products_quick_setup_box = None
 
+    catalog_hint_label = QLabel("Doble clic para revisar rapido la presentacion seleccionada.")
+    catalog_hint_label.setObjectName("subtleLine")
+
     layout.addWidget(summary_box)
+    layout.addWidget(catalog_hint_label)
     layout.addWidget(window.catalog_table, 1)
     widget.setLayout(layout)
     return widget

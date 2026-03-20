@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pos_uniformes.utils.date_format import format_display_date, format_display_datetime
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 
 
@@ -34,14 +35,14 @@ def build_layaway_receipt_text(
         ),
         f"Telefono: {getattr(layaway, 'cliente_telefono', '') or 'Sin telefono'}",
         (
-            f"Fecha: {layaway.created_at.strftime('%Y-%m-%d %H:%M')}"
+            f"Fecha: {format_display_datetime(layaway.created_at)}"
             if getattr(layaway, 'created_at', None)
             else "Fecha: "
         ),
         (
-            "Compromiso: "
+            "Vencimiento: "
             + (
-                layaway.fecha_compromiso.strftime("%Y-%m-%d")
+                format_display_date(layaway.fecha_compromiso)
                 if getattr(layaway, "fecha_compromiso", None)
                 else "Sin fecha"
             )
@@ -74,13 +75,21 @@ def build_layaway_receipt_text(
         for abono in abonos:
             usuario = getattr(abono, "usuario", None)
             lines.append(
-                f"- {abono.created_at.strftime('%Y-%m-%d %H:%M') if getattr(abono, 'created_at', None) else ''} | "
+                f"- {format_display_datetime(abono.created_at) if getattr(abono, 'created_at', None) else ''} | "
                 f"{getattr(abono, 'monto', '')} | {getattr(abono, 'referencia', '') or 'Sin referencia'} | "
                 f"{getattr(usuario, 'username', '')}"
             )
     observacion = getattr(layaway, "observacion", "")
+    subtotal = getattr(layaway, "subtotal", "")
+    total = getattr(layaway, "total", "")
     if observacion:
         lines.extend(["", f"Notas: {observacion}"])
+    try:
+        adjustment = total - subtotal
+    except Exception:
+        adjustment = None
+    if adjustment not in {None, 0}:
+        lines.extend(["", f"Ajuste: {adjustment}"])
     lines.extend(["", ticket_footer, f"Copias configuradas: {ticket_copies}"])
     lines.append(f"Impresora preferida: {preferred_printer or 'Preguntar siempre'}")
     return "\n".join(lines)
