@@ -3,6 +3,7 @@
 ## Checkpoint actual
 
 - `2026-03-20`: `Fase 4` queda cerrada con checkpoint `validated-manual`.
+- `2026-03-20`: `Resumen` entra a `Fase 5` con mejor jerarquia visual: KPIs arriba, contexto debajo y zona reservada para futuras notificaciones sin construir todavia el sistema completo. El dashboard ahora suma tarjetas con contexto corto, tonos suaves y microalertas operativas legibles sin duplicar reglas de Analytics. Checkpoint `validated-tests`.
 - Precheck tecnico validado.
 - Bateria operativa validada.
 - Validacion manual confirmada para Caja, sesion operativa, Apartados, Catalogo, Inventario y Configuracion.
@@ -439,6 +440,23 @@
   - Resumen visible de movimientos y filtros aplicados en la pestana Historial.
 - `ui/helpers/history_table_helper.py`
   - Shape visible, orden, limite y tonos de la tabla de historial de inventario/catalogo fuera de `MainWindow`.
+
+### Fase 5
+
+- `services/backup_service.py`
+  - Ahora tambien concentra el estado visible del respaldo automatico, para que la tarea programada y Configuracion lean la misma fuente de verdad.
+- `scripts/run_scheduled_backup.py`
+  - Runner listo para tarea programada; genera respaldo automatico, aplica rotacion y actualiza el estado visible para Configuracion.
+- `ui/helpers/settings_backup_helper.py`
+  - Resume si el respaldo automatico esta OK, viejo o si fallo la ultima ejecucion, sin cargar esa logica a `MainWindow`.
+- `ui/dialogs/settings_dialogs.py`
+  - La vista de respaldos ahora muestra un bloque propio con el estado del respaldo automatico.
+- `ui/views/analytics_view.py`
+  - Analitica se compacta con rangos rapidos, mejor jerarquia visual y una franja corta de alertas operativas.
+- `ui/helpers/analytics_summary_helper.py`
+  - Comparativos del periodo actual vs el anterior y alertas pequenas de stock, apartados vencidos y respaldo automatico.
+- `ui/helpers/analytics_payment_helper.py`, `ui/helpers/analytics_top_products_helper.py`, `ui/helpers/analytics_top_clients_helper.py`, `ui/helpers/analytics_stock_helper.py`
+  - Las tablas de Analitica ahora cargan tonos y jerarquia visual mas claros para resaltar top 1, caidas y stock critico.
 
 ## Riesgo residual conocido
 

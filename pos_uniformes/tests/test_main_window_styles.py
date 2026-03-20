@@ -22,6 +22,7 @@ class MainWindowStylesTests(unittest.TestCase):
         self.assertIn("#cashierFeedbackLabel[tone=\"warning\"]", stylesheet)
         self.assertIn("QPushButton#toolbarAccentButton", stylesheet)
         self.assertIn("#qrPreview", stylesheet)
+        self.assertIn("#kpiCard[tone=\"warning\"]", stylesheet)
 
     def test_builds_control_style_section(self) -> None:
         stylesheet = build_main_window_control_styles()

@@ -4,6 +4,7 @@ import unittest
 
 from pos_uniformes.ui.helpers.analytics_export_helper import (
     build_analytics_layaway_export_rows,
+    build_analytics_summary_export_rows,
     build_table_export_rows,
 )
 
@@ -73,6 +74,30 @@ class AnalyticsExportHelperTests(unittest.TestCase):
                     "saldo_pendiente": "Saldo pendiente\n$980.50",
                     "vencidos": "Vencidos\n2",
                     "entregados_periodo": "Entregados periodo\n4",
+                }
+            ],
+        )
+
+    def test_build_analytics_summary_export_rows(self) -> None:
+        rows = build_analytics_summary_export_rows(
+            period_label="Hoy",
+            client_label="todos",
+            total_sales="$351.50",
+            total_tickets="1",
+            average_ticket="$351.50",
+            total_units="1",
+        )
+
+        self.assertEqual(
+            rows,
+            [
+                {
+                    "periodo": "Hoy",
+                    "cliente": "todos",
+                    "ingreso_periodo": "$351.50",
+                    "tickets": "1",
+                    "promedio_venta": "$351.50",
+                    "unidades_vendidas": "1",
                 }
             ],
         )

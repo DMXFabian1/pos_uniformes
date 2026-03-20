@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import QDate, Qt
 from PyQt6.QtWidgets import (
+    QPushButton,
     QGridLayout,
     QGroupBox,
     QHBoxLayout,
@@ -17,6 +18,7 @@ from PyQt6.QtWidgets import (
 )
 
 from pos_uniformes.ui.helpers.date_field_helper import configure_friendly_date_edit
+from pos_uniformes.ui.helpers.analytics_period_helper import ANALYTICS_QUICK_PERIODS
 
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
@@ -54,11 +56,21 @@ def build_analytics_tab(window: "MainWindow") -> QWidget:
     filters_layout.addWidget(QLabel("Cliente"), 1, 0)
     filters_layout.addWidget(window.analytics_client_combo, 1, 1, 1, 3)
     filters_layout.addWidget(window.analytics_export_button, 0, 6, 2, 1)
+    quick_actions = QHBoxLayout()
+    quick_actions.setSpacing(8)
+    for button_label, button_key in ANALYTICS_QUICK_PERIODS:
+        button = QPushButton(button_label)
+        button.setObjectName("toolbarGhostButton")
+        button.clicked.connect(lambda _checked=False, key=button_key: window._apply_analytics_quick_period(key))
+        quick_actions.addWidget(button)
+    quick_actions.addStretch()
+    filters_layout.addLayout(quick_actions, 2, 0, 1, 6)
     filters_layout.setColumnStretch(1, 1)
     filters_layout.setColumnStretch(3, 1)
     filters_layout.setColumnStretch(5, 1)
     filters_box.setLayout(filters_layout)
     window.analytics_export_status_label.setObjectName("analyticsLine")
+    window.analytics_alerts_label.setObjectName("analyticsLine")
     window.analytics_export_button.clicked.connect(window._handle_export_analytics)
 
     business_title = QLabel("Resumen del periodo")
@@ -79,6 +91,7 @@ def build_analytics_tab(window: "MainWindow") -> QWidget:
             "Ingreso del periodo",
             window.analytics_sales_value,
             "Ventas confirmadas",
+            window.analytics_sales_context_label,
         ),
         0,
         0,
@@ -88,6 +101,7 @@ def build_analytics_tab(window: "MainWindow") -> QWidget:
             "Tickets",
             window.analytics_tickets_value,
             "Documentos confirmados",
+            window.analytics_tickets_context_label,
         ),
         0,
         1,
@@ -97,6 +111,7 @@ def build_analytics_tab(window: "MainWindow") -> QWidget:
             "Promedio por venta",
             window.analytics_average_value,
             "Ticket promedio",
+            window.analytics_average_context_label,
         ),
         0,
         2,
@@ -106,6 +121,7 @@ def build_analytics_tab(window: "MainWindow") -> QWidget:
             "Unidades vendidas",
             window.analytics_units_value,
             "Piezas del periodo",
+            window.analytics_units_context_label,
         ),
         0,
         3,
@@ -258,8 +274,9 @@ def build_analytics_tab(window: "MainWindow") -> QWidget:
     lower_grid.setColumnStretch(1, 1)
 
     business_layout.addLayout(business_kpi_grid)
-    business_layout.addWidget(_wrap_metric_block("Clientes", customer_kpi_grid))
+    business_layout.addWidget(window.analytics_alerts_label)
     business_layout.addLayout(lower_grid)
+    business_layout.addWidget(_wrap_metric_block("Clientes", customer_kpi_grid))
     business_box.setLayout(business_layout)
 
     layout.addWidget(filters_box)

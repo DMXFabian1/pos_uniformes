@@ -1,5 +1,18 @@
 # Mapa de Modulos
 
+## Estado actual del proyecto
+
+- Fase vigente:
+  - `Fase 5. Optimizacion fina`
+- Ultimo checkpoint formal:
+  - `2026-03-20`
+  - `Fase 4` cerrada con estado `validated-manual`
+- Regla vigente:
+  - `ui/main_window.py` se acepta como coordinador principal, pero las mejoras nuevas deben nacer fuera de ahi y solo integrarse desde la ventana
+- Siguiente iniciativa grande despues de `Fase 5`:
+  - `Empleadas, atribucion comercial y comisiones`
+  - pensada desde el inicio para `POS`, `kiosko` y `app movil`
+
 ## Entrada
 
 - `main.py`
@@ -20,7 +33,8 @@
 
 - `ui/main_window.py`
   - Coordinador central de eventos, refrescos y acciones.
-  - Aun es el archivo mas sensible del sistema.
+  - Sigue siendo el archivo mas sensible del sistema.
+  - Ya no debe recibir reglas densas nuevas; solo integracion y orquestacion.
 - `ui/login_dialog.py`
   - Autenticacion de entrada.
 
@@ -49,6 +63,14 @@
 
 - `ui/dialogs/settings_dialogs.py`
   - Dialogs de configuracion y ajustes administrativos.
+- `ui/dialogs/catalog_product_dialog.py`
+  - Alta y edicion de producto con modos `Uniforme escolar` y `Ropa normal`.
+- `ui/dialogs/catalog_variant_dialog.py`
+  - Alta y edicion de presentaciones simples o por lote.
+- `ui/dialogs/create_layaway_dialog.py`
+  - Alta operativa de apartados con calendario, botones rapidos de vencimiento y pricing alineado al cliente.
+- `ui/dialogs/layaway_payment_dialog.py`
+  - Registro de abonos y cierre `Liquidar y entregar` con calculadora tipo Caja.
 
 ## Servicios de dominio
 
@@ -85,7 +107,7 @@
 - `services/apartado_service.py`
   - Apartados.
 - `services/backup_service.py`
-  - Respaldos de DB.
+  - Respaldos de DB y estado visible del ultimo respaldo automatico.
 - `services/bootstrap_service.py`
   - Datos base/demo.
 - `services/customer_card_service.py`
@@ -113,6 +135,12 @@
   - Busqueda textual compartida.
 - `services/active_filter_service.py`
   - Formateo de filtros activos.
+- `services/layaway_pricing_service.py`
+  - Reglas de precio efectivo, redondeo y anticipo minimo en Apartados.
+- `services/layaway_closure_service.py`
+  - Cierre operativo de apartados, confirmacion de entrega y liquidacion final.
+- `services/sale_cart_update_service.py`
+  - Ajuste seguro de cantidades del carrito sin volver a escanear lineas.
 
 ## Utilidades
 
@@ -120,6 +148,8 @@
   - Generacion de QR.
 - `utils/label_generator.py`
   - Generacion de etiquetas.
+- `utils/date_format.py`
+  - Formato visible consistente de fechas y horas en todo el POS.
 - `utils/product_templates.py`
   - Plantillas y sugerencias de productos.
 - `utils/config.py`
@@ -131,6 +161,8 @@
   - Precheck rapido para detectar anomalias base.
 - `scripts/backup_database.py`
   - Respaldo manual.
+- `scripts/run_scheduled_backup.py`
+  - Runner listo para tarea programada de respaldo automatico.
 - `scripts/restore_database.py`
   - Restauracion.
 - `scripts/create_initial_users.py`
@@ -145,3 +177,39 @@
   - Reglas puras extraidas de caja.
   - Filtros y busquedas.
   - Textos y decisiones operativas.
+  - Respaldo manual y automatico.
+  - Apartados, entrega, redondeo y pricing.
+  - Fechas visibles y helpers compartidos.
+
+## Mapa operativo rapido
+
+- Si el cambio toca ventas, cobro o carrito:
+  - revisar `ui/views/cashier_view.py`
+  - revisar `services/venta_service.py`
+  - revisar servicios `sale_*`
+- Si el cambio toca apartados:
+  - revisar `ui/views/layaway_view.py`
+  - revisar `ui/dialogs/create_layaway_dialog.py`
+  - revisar `ui/dialogs/layaway_payment_dialog.py`
+  - revisar servicios `layaway_*` y `apartado_service.py`
+- Si el cambio toca catalogo o inventario:
+  - revisar `ui/views/products_view.py`
+  - revisar `ui/views/inventory_view.py`
+  - revisar helpers de tabla/filtros
+- Si el cambio toca respaldos:
+  - revisar `services/backup_service.py`
+  - revisar `scripts/backup_database.py`
+  - revisar `scripts/run_scheduled_backup.py`
+  - revisar `ui/dialogs/settings_dialogs.py`
+- Si el cambio toca fechas visibles:
+  - revisar `utils/date_format.py`
+  - revisar `ui/helpers/date_field_helper.py`
+
+## Proximo foco recomendado
+
+- `Fase 5`:
+  - respaldo automatico y visibilidad operativa
+  - polish visual y consistencia de UX
+  - mejoras localizadas de estabilidad
+- Despues:
+  - abrir modulo de `Empleadas / atribucion / comisiones`

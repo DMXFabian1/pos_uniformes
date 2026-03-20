@@ -6,6 +6,7 @@
 2. Confirmar si ya existe un servicio puro para esa regla.
 3. Revisar `docs/mapa_modulos.md`.
 4. Revisar `docs/historial_refactors.md`.
+5. Revisar `docs/plan_estabilizacion.md` y `docs/hoja_ruta_mejoras.md` para no abrir una iniciativa fuera de fase o repetir un frente ya documentado.
 
 ## Orden obligatorio de trabajo
 

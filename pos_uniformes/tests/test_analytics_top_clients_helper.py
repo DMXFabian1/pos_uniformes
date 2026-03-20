@@ -36,11 +36,13 @@ class AnalyticsTopClientsHelperTests(unittest.TestCase):
                     values=("Maria Perez", "C001", 4, Decimal("1200.00")),
                     sales_tone="positive",
                     amount_tone="positive",
+                    row_tone="positive",
                 ),
                 AnalyticsTopClientRowView(
                     values=("Juan Lopez", "C002", 1, Decimal("280.00")),
                     sales_tone="warning",
-                    amount_tone="positive",
+                    amount_tone="warning",
+                    row_tone=None,
                 ),
             ),
         )

@@ -38,12 +38,14 @@ class AnalyticsStockHelperTests(unittest.TestCase):
                     stock_tone="danger",
                     reserved_tone="warning",
                     state_tone="muted",
+                    row_tone="danger",
                 ),
                 AnalyticsStockRowView(
                     values=("SKU-2", "Pantalon de vestir", 3, 0, "ACTIVA"),
                     stock_tone="warning",
                     reserved_tone="muted",
                     state_tone="positive",
+                    row_tone="warning",
                 ),
             ),
         )

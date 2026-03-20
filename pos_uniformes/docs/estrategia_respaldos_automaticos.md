@@ -44,6 +44,8 @@ Hoy el sistema ya tiene:
 - restauracion de `.dump`
 - script reutilizable de respaldo:
   - `scripts/backup_database.py`
+- runner listo para tarea programada:
+  - `scripts/run_scheduled_backup.py`
 - servicio base:
   - `services/backup_service.py`
 
@@ -148,7 +150,7 @@ Usar:
 Tarea sugerida:
 
 - ejecutar el Python de la `.venv`
-- correr `scripts/backup_database.py --format custom --retention-days 14`
+- correr `scripts/run_scheduled_backup.py --format custom --retention-days 14`
 
 Si se agrega copia externa:
 
@@ -161,6 +163,19 @@ Usar:
 - `launchd`
 
 Y ejecutar el mismo script con la `.venv`.
+
+## Estado visible dentro del POS
+
+La vista de `Configuracion > Respaldo y restauracion` ya puede mostrar:
+
+- ultimo respaldo automatico correcto
+- antiguedad del ultimo automatico
+- si el ultimo automatico ya esta viejo
+- si la ultima ejecucion automatica fallo
+
+Esto depende del archivo de estado que mantiene:
+
+- `scripts/run_scheduled_backup.py`
 
 ## Recuperacion ante falla
 

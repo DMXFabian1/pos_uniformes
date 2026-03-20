@@ -4,8 +4,10 @@ from datetime import date, datetime
 import unittest
 
 from pos_uniformes.ui.helpers.analytics_period_helper import (
+    ANALYTICS_QUICK_PERIODS,
     build_analytics_export_status_text,
     is_manual_analytics_period,
+    resolve_previous_analytics_period_bounds,
     resolve_analytics_period_bounds,
 )
 
@@ -47,6 +49,18 @@ class AnalyticsPeriodHelperTests(unittest.TestCase):
             build_analytics_export_status_text(selected_client_id=7, selected_client_label="Cliente X"),
             "Periodo listo para analisis. Cliente: Cliente X.",
         )
+
+    def test_quick_periods_and_previous_bounds(self) -> None:
+        self.assertEqual(
+            ANALYTICS_QUICK_PERIODS,
+            (("Hoy", "today"), ("7 dias", "7d"), ("30 dias", "30d"), ("Mes actual", "month")),
+        )
+        start, end = resolve_previous_analytics_period_bounds(
+            period_start=datetime(2026, 3, 13, 0, 0, 0),
+            period_end=datetime(2026, 3, 20, 0, 0, 0),
+        )
+        self.assertEqual(start, datetime(2026, 3, 6, 0, 0, 0))
+        self.assertEqual(end, datetime(2026, 3, 13, 0, 0, 0))
 
 
 if __name__ == "__main__":

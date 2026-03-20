@@ -183,6 +183,22 @@ def _build_main_window_shell_styles() -> str:
                 border: 1px solid #ddd3c6;
                 border-radius: 20px;
             }
+            #kpiCard[tone="positive"] {
+                background: #fff8f0;
+                border: 1px solid #e1c5b2;
+            }
+            #kpiCard[tone="warning"] {
+                background: #fff9ec;
+                border: 1px solid #ead7a8;
+            }
+            #kpiCard[tone="danger"] {
+                background: #fff4f1;
+                border: 1px solid #e3c0b8;
+            }
+            #kpiCard[tone="neutral"], #kpiCard[tone="muted"] {
+                background: #fffaf2;
+                border: 1px solid #ddd3c6;
+            }
             #kpiTitle {
                 color: #6b625a;
                 font-size: 12px;
@@ -198,5 +214,14 @@ def _build_main_window_shell_styles() -> str:
             #kpiSubtitle {
                 color: #857b70;
                 font-size: 12px;
+            }
+            #kpiSubtitle[tone="positive"] {
+                color: #8f4527;
+            }
+            #kpiSubtitle[tone="warning"] {
+                color: #8a5a00;
+            }
+            #kpiSubtitle[tone="danger"] {
+                color: #9a2f22;
             }
             """

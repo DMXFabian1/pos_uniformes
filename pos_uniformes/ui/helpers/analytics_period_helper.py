@@ -5,6 +5,14 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 
 
+ANALYTICS_QUICK_PERIODS: tuple[tuple[str, str], ...] = (
+    ("Hoy", "today"),
+    ("7 dias", "7d"),
+    ("30 dias", "30d"),
+    ("Mes actual", "month"),
+)
+
+
 def is_manual_analytics_period(period_key: object) -> bool:
     return str(period_key or "") == "manual"
 
@@ -45,3 +53,14 @@ def resolve_analytics_period_bounds(
 def build_analytics_export_status_text(*, selected_client_id: object, selected_client_label: str) -> str:
     client_label = "todos" if selected_client_id in {None, ""} else selected_client_label
     return f"Periodo listo para analisis. Cliente: {client_label}."
+
+
+def resolve_previous_analytics_period_bounds(
+    *,
+    period_start: datetime,
+    period_end: datetime,
+) -> tuple[datetime, datetime]:
+    span = period_end - period_start
+    previous_end = period_start
+    previous_start = previous_end - span
+    return previous_start, previous_end

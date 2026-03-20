@@ -95,6 +95,8 @@ from pos_uniformes.services.analytics_top_clients_service import load_analytics_
 from pos_uniformes.services.analytics_top_products_service import load_analytics_top_product_snapshot_rows
 from pos_uniformes.services.analytics_stock_service import load_analytics_stock_snapshot_rows
 from pos_uniformes.services.backup_service import (
+    AutomaticBackupStatus,
+    read_automatic_backup_status,
     backup_output_dir,
     format_size,
     list_backups,
@@ -302,12 +304,26 @@ from pos_uniformes.ui.helpers.analytics_payment_helper import build_analytics_pa
 from pos_uniformes.ui.helpers.analytics_layaway_helper import build_analytics_layaway_labels_view
 from pos_uniformes.ui.helpers.analytics_export_helper import (
     build_analytics_layaway_export_rows,
+    build_analytics_summary_export_rows,
     build_table_export_rows,
 )
 from pos_uniformes.ui.helpers.analytics_period_helper import (
     build_analytics_export_status_text,
     is_manual_analytics_period,
     resolve_analytics_period_bounds,
+    resolve_previous_analytics_period_bounds,
+)
+from pos_uniformes.ui.helpers.analytics_summary_helper import (
+    build_analytics_alerts_text,
+    build_analytics_operational_alerts,
+    build_analytics_summary_trend_view,
+)
+from pos_uniformes.ui.helpers.dashboard_summary_helper import (
+    build_dashboard_future_alerts_view,
+    build_dashboard_kpi_cards_view,
+    build_dashboard_operational_alerts_view,
+    build_dashboard_operations_view,
+    build_dashboard_status_view,
 )
 from pos_uniformes.ui.helpers.analytics_top_clients_helper import build_analytics_top_client_row_views
 from pos_uniformes.ui.helpers.analytics_top_products_helper import build_analytics_top_product_rows
@@ -917,22 +933,34 @@ class MainWindow(QMainWindow):
         self.status_label = QLabel()
         self.metrics_label = QLabel()
         self.analytics_label = QLabel()
+        self.dashboard_operations_label = QLabel()
+        self.dashboard_future_alerts_label = QLabel()
         self.layaway_alerts_label = QLabel()
         self.cash_session_label = QLabel()
         self.kpi_users_value = QLabel("0")
         self.kpi_products_value = QLabel("0")
         self.kpi_stock_value = QLabel("0")
         self.kpi_sales_value = QLabel("0")
+        self.dashboard_users_context_label = QLabel("")
+        self.dashboard_products_context_label = QLabel("")
+        self.dashboard_stock_context_label = QLabel("")
+        self.dashboard_sales_context_label = QLabel("")
+        self.dashboard_operational_alerts_label = QLabel("")
         self.analytics_period_combo = QComboBox()
         self.analytics_client_combo = QComboBox()
         self.analytics_from_input = QDateEdit()
         self.analytics_to_input = QDateEdit()
         self.analytics_export_button = QPushButton("Exportar CSV/JSON")
         self.analytics_export_status_label = QLabel()
+        self.analytics_alerts_label = QLabel("Sin alertas operativas relevantes en este momento.")
         self.analytics_sales_value = QLabel("$0.00")
+        self.analytics_sales_context_label = QLabel("")
         self.analytics_tickets_value = QLabel("0")
+        self.analytics_tickets_context_label = QLabel("")
         self.analytics_average_value = QLabel("$0.00")
+        self.analytics_average_context_label = QLabel("")
         self.analytics_units_value = QLabel("0")
+        self.analytics_units_context_label = QLabel("")
         self.analytics_identified_sales_value = QLabel("0")
         self.analytics_identified_income_value = QLabel("$0.00")
         self.analytics_repeat_clients_value = QLabel("0")
@@ -945,6 +973,9 @@ class MainWindow(QMainWindow):
         self.analytics_layaway_overdue_label = QLabel()
         self.analytics_layaway_delivered_label = QLabel()
         self.dashboard_users_card: QFrame | None = None
+        self.dashboard_products_card: QFrame | None = None
+        self.dashboard_stock_card: QFrame | None = None
+        self.dashboard_sales_card: QFrame | None = None
         self.dashboard_manual_promo_box: QWidget | None = None
         self.dashboard_help_box: QWidget | None = None
         self.products_quick_setup_box: QWidget | None = None
@@ -1169,6 +1200,8 @@ class MainWindow(QMainWindow):
         self.settings_backup_format_combo = QComboBox()
         self.settings_backup_table = QTableWidget()
         self.settings_backup_status_label = QLabel("Sin respaldos cargados.")
+        self.settings_backup_automatic_status_label = QLabel("Automatico: sin informacion todavia.")
+        self.settings_backup_automatic_detail_label = QLabel("")
         self.settings_backup_location_label = QLabel(str(backup_output_dir()))
         self.settings_create_backup_button = QPushButton("Crear respaldo")
         self.settings_refresh_backups_button = QPushButton("Refrescar lista")
@@ -1273,6 +1306,7 @@ class MainWindow(QMainWindow):
         self.cash_retiro_action: QAction | None = None
         self.connection_action: QAction | None = None
         self.seed_action: QAction | None = None
+        self.quick_backup_action: QAction | None = None
         self.page_help_button: QPushButton | None = None
         self.refresh_button: QPushButton | None = None
 
@@ -1301,6 +1335,8 @@ class MainWindow(QMainWindow):
         self.connection_action.triggered.connect(self._handle_test_connection)
         self.seed_action = header_menu.addAction("Cargar datos iniciales")
         self.seed_action.triggered.connect(self._handle_seed_data)
+        self.quick_backup_action = header_menu.addAction("Respaldo rapido (.dump)")
+        self.quick_backup_action.triggered.connect(self._handle_quick_backup)
         self.header_more_button = QToolButton()
         self.header_more_button.setText("Mas")
         self.header_more_button.setObjectName("toolbarSoftButton")
@@ -1452,6 +1488,7 @@ class MainWindow(QMainWindow):
             self.cash_cut_button: "Abre el corte de caja actual o permite cerrar la caja abierta.",
             self.cash_movement_button: "Registra movimientos manuales de caja: Corregir apertura, Ajustar reactivo, Ingreso o Retiro.",
             self.logout_button: "Cierra la sesion actual y permite entrar con otro usuario.",
+            self.quick_backup_action: "Genera un respaldo rapido restaurable (.dump) sin abrir Configuracion.",
             self.settings_create_user_button: "Crea un usuario nuevo con rol y contrasena inicial.",
             self.settings_toggle_user_button: "Activa o desactiva el usuario seleccionado.",
             self.settings_change_role_button: "Cambia el rol del usuario seleccionado.",
@@ -1604,6 +1641,10 @@ class MainWindow(QMainWindow):
         remove_shortcut.activated.connect(self._handle_remove_sale_item)
         clear_capture_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
         clear_capture_shortcut.activated.connect(self._clear_sale_capture)
+        quick_backup_shortcut = QShortcut(QKeySequence("Ctrl+Shift+B"), self)
+        quick_backup_shortcut.activated.connect(self._handle_quick_backup)
+        quick_backup_shortcut_mac = QShortcut(QKeySequence("Meta+Shift+B"), self)
+        quick_backup_shortcut_mac.activated.connect(self._handle_quick_backup)
 
     def _focus_sale_capture(self) -> None:
         self.sale_sku_input.setFocus()
@@ -1735,15 +1776,39 @@ class MainWindow(QMainWindow):
 
     def _refresh_settings_backups(self) -> None:
         backup_dir = backup_output_dir()
+        automatic_status = None
+        try:
+            automatic = read_automatic_backup_status(backup_dir)
+        except Exception as exc:  # noqa: BLE001
+            automatic = None
+            automatic_status = {
+                "last_run_at": None,
+                "last_success_at": None,
+                "backup_name": None,
+                "retention_days": None,
+                "last_error": f"Estado automatico invalido: {exc}",
+            }
+        else:
+            if automatic is not None:
+                automatic_status = {
+                    "last_run_at": automatic.last_run_at,
+                    "last_success_at": automatic.last_success_at,
+                    "backup_name": automatic.last_backup_path.name if automatic.last_backup_path else None,
+                    "retention_days": automatic.retention_days,
+                    "last_error": automatic.last_error,
+                }
         try:
             backups = list_backups(backup_dir)
         except Exception as exc:  # noqa: BLE001
             backup_view = build_settings_backup_error_view(
                 backup_dir=str(backup_dir),
                 error_message=str(exc),
+                automatic_status=automatic_status,
             )
             self.settings_backup_location_label.setText(backup_view.location_label)
             self.settings_backup_status_label.setText(backup_view.status_label)
+            self.settings_backup_automatic_status_label.setText(backup_view.automatic_status_label)
+            self.settings_backup_automatic_detail_label.setText(backup_view.automatic_detail_label)
             self.settings_backup_table.setRowCount(len(backup_view.rows))
             return
 
@@ -1760,8 +1825,11 @@ class MainWindow(QMainWindow):
                 }
                 for backup in backups
             ],
+            automatic_status=automatic_status,
         )
         self.settings_backup_location_label.setText(backup_view.location_label)
+        self.settings_backup_automatic_status_label.setText(backup_view.automatic_status_label)
+        self.settings_backup_automatic_detail_label.setText(backup_view.automatic_detail_label)
         self.settings_backup_table.setRowCount(len(backup_view.rows))
         for row_index, backup_row in enumerate(backup_view.rows):
             for column_index, value in enumerate(backup_row.values):
@@ -3140,6 +3208,44 @@ class MainWindow(QMainWindow):
         )
         QMessageBox.information(self, result_feedback.title, result_feedback.message)
 
+    def _run_quick_backup_flow(self, *, allow_continue_on_error: bool = False) -> bool:
+        feedback = build_settings_backup_guard_feedback(
+            "create_backup",
+            is_admin=self.current_role == RolUsuario.ADMIN,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
+            return False
+        try:
+            result = create_settings_backup(
+                dump_format="custom",
+                retention_days=14,
+            )
+        except Exception as exc:  # noqa: BLE001
+            if not allow_continue_on_error:
+                QMessageBox.critical(self, "Respaldo fallido", str(exc))
+                return False
+            continue_after_error = QMessageBox.question(
+                self,
+                "Respaldo fallido",
+                f"No se pudo generar el respaldo antes de salir.\n\n{exc}\n\nQuieres continuar de todos modos?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            return continue_after_error == QMessageBox.StandardButton.Yes
+
+        self._refresh_settings_backups()
+        result_feedback = build_settings_backup_result_feedback(
+            "create_backup",
+            backup_name=result.backup_file.name,
+            deleted_count=len(result.deleted_files),
+        )
+        QMessageBox.information(self, "Respaldo rapido listo", result_feedback.message)
+        return True
+
+    def _handle_quick_backup(self) -> None:
+        self._run_quick_backup_flow()
+
     def _handle_open_backup_folder(self) -> None:
         try:
             open_settings_backup_folder()
@@ -3470,6 +3576,23 @@ class MainWindow(QMainWindow):
         )
         if confirmation != QMessageBox.StandardButton.Yes:
             return
+
+        if self.current_role == RolUsuario.ADMIN:
+            backup_prompt = QMessageBox.question(
+                self,
+                "Respaldo antes de salir",
+                "Quieres crear un respaldo restaurable (.dump) antes de cerrar sesion?\n\n"
+                "Te deja un checkpoint rapido antes de cambiar de usuario o salir del POS.",
+                QMessageBox.StandardButton.Yes
+                | QMessageBox.StandardButton.No
+                | QMessageBox.StandardButton.Cancel,
+                QMessageBox.StandardButton.Yes,
+            )
+            if backup_prompt == QMessageBox.StandardButton.Cancel:
+                return
+            if backup_prompt == QMessageBox.StandardButton.Yes:
+                if not self._run_quick_backup_flow(allow_continue_on_error=True):
+                    return
 
         for dialog in (
             self.sales_dialog,
@@ -6678,12 +6801,7 @@ class MainWindow(QMainWindow):
         self._refresh_settings_users()
         self._refresh_settings_suppliers()
         self._refresh_settings_clients()
-        metrics_text = self.metrics_label.text().strip()
-        self.status_label.setText(
-            "Estado: datos sincronizados con PostgreSQL."
-            if not metrics_text
-            else f"Estado: datos sincronizados con PostgreSQL. | {metrics_text}"
-        )
+        self.status_label.setText("Estado: datos sincronizados con PostgreSQL.")
 
     def _refresh_current_user(self, session) -> None:
         user = session.get(Usuario, self.user_id)
@@ -6874,45 +6992,63 @@ class MainWindow(QMainWindow):
         manual_promo_summary = ManualPromoService.summarize_today(session, limit=4)
 
         is_admin = self.current_role == RolUsuario.ADMIN
-        self.metrics_label.setText(
-            " | ".join(
-                [
-                    f"Usuarios: {usuarios}",
-                    f"Proveedores: {proveedores}",
-                    f"Productos: {productos}",
-                    f"Presentaciones: {variantes}",
-                    f"Stock total: {stock_total}",
-                    f"Compras: {compras}",
-                    f"Ventas: {ventas}",
-                ]
-                if is_admin
-                else [
-                    f"Productos: {productos}",
-                    f"Presentaciones: {variantes}",
-                    f"Stock total: {stock_total}",
-                    f"Ventas: {ventas}",
-                ]
-            )
+        status_view = build_dashboard_status_view(
+            usuarios=usuarios,
+            proveedores=proveedores,
+            productos=productos,
+            variantes=variantes,
+            stock_total=stock_total,
+            compras=compras,
+            ventas=ventas,
+            is_admin=is_admin,
         )
+        operations_view = build_dashboard_operations_view(
+            ventas_confirmadas=ventas_confirmadas,
+            ingresos=Decimal(ingresos),
+            compras_confirmadas=Decimal(compras_confirmadas),
+            stock_bajo=stock_bajo,
+            is_admin=is_admin,
+        )
+        future_alerts_view = build_dashboard_future_alerts_view(is_admin=is_admin)
+        kpi_cards_view = build_dashboard_kpi_cards_view(
+            usuarios=usuarios,
+            productos=productos,
+            variantes=variantes,
+            stock_total=stock_total,
+            ventas=ventas,
+            ventas_confirmadas=ventas_confirmadas,
+            stock_bajo=stock_bajo,
+            is_admin=is_admin,
+        )
+
+        self.metrics_label.setText(status_view.metrics_text)
         self.kpi_users_value.setText(str(usuarios))
         self.kpi_products_value.setText(str(productos))
         self.kpi_stock_value.setText(str(stock_total))
         self.kpi_sales_value.setText(str(ventas))
-        self.analytics_label.setText(
-            " | ".join(
-                [
-                    f"Ventas confirmadas: {ventas_confirmadas}",
-                    f"Ingreso confirmado: {ingresos}",
-                    f"Compras confirmadas: {compras_confirmadas}",
-                    f"Presentaciones con stock bajo (<=3): {stock_bajo}",
-                ]
-                if is_admin
-                else [
-                    f"Ventas confirmadas: {ventas_confirmadas}",
-                    f"Ingreso confirmado: {ingresos}",
-                ]
-            )
+        self.dashboard_users_context_label.setText(kpi_cards_view.users.detail_text)
+        self.dashboard_products_context_label.setText(kpi_cards_view.products.detail_text)
+        self.dashboard_stock_context_label.setText(kpi_cards_view.stock.detail_text)
+        self.dashboard_sales_context_label.setText(kpi_cards_view.sales.detail_text)
+        self.analytics_label.setText(operations_view.primary_text)
+        self.dashboard_operations_label.setText(operations_view.secondary_text)
+        try:
+            automatic_backup_status = read_automatic_backup_status(backup_output_dir())
+        except Exception:  # noqa: BLE001
+            automatic_backup_status = None
+        operational_alerts = build_analytics_operational_alerts(
+            stock_critical_count=stock_bajo,
+            overdue_layaways=layaway_alerts_snapshot.overdue_count,
+            automatic_backup_status=automatic_backup_status,
+            now=datetime.now(),
         )
+        dashboard_alerts_view = build_dashboard_operational_alerts_view(operational_alerts)
+        self.dashboard_operational_alerts_label.setText(dashboard_alerts_view.text)
+        self.dashboard_operational_alerts_label.setProperty("tone", dashboard_alerts_view.tone)
+        self.dashboard_future_alerts_label.setText(
+            f"{future_alerts_view.title_text}\n{future_alerts_view.body_text}"
+        )
+        self.dashboard_future_alerts_label.setProperty("tone", "neutral")
         layaway_alerts_view = build_layaway_alerts_view(
             overdue_count=layaway_alerts_snapshot.overdue_count,
             due_today_count=layaway_alerts_snapshot.due_today_count,
@@ -6920,7 +7056,36 @@ class MainWindow(QMainWindow):
         )
         self.layaway_alerts_label.setTextFormat(Qt.TextFormat.RichText)
         self.layaway_alerts_label.setText(layaway_alerts_view.alerts_rich_text)
-        self.layaway_quick_alerts_label.setText(layaway_alerts_view.quick_alerts_text)
+        for card, tone in (
+            (self.dashboard_users_card, kpi_cards_view.users.tone),
+            (self.dashboard_products_card, kpi_cards_view.products.tone),
+            (self.dashboard_stock_card, kpi_cards_view.stock.tone),
+            (self.dashboard_sales_card, kpi_cards_view.sales.tone),
+        ):
+            if card is None:
+                continue
+            card.setProperty("tone", tone)
+            card.style().unpolish(card)
+            card.style().polish(card)
+            card.update()
+        for label, tone in (
+            (self.dashboard_users_context_label, kpi_cards_view.users.tone),
+            (self.dashboard_products_context_label, kpi_cards_view.products.tone),
+            (self.dashboard_stock_context_label, kpi_cards_view.stock.tone),
+            (self.dashboard_sales_context_label, kpi_cards_view.sales.tone),
+        ):
+            label.setProperty("tone", tone)
+            label.style().unpolish(label)
+            label.style().polish(label)
+            label.update()
+        for label, tone in (
+            (self.dashboard_operational_alerts_label, dashboard_alerts_view.tone),
+            (self.dashboard_future_alerts_label, "neutral"),
+        ):
+            label.setProperty("tone", tone)
+            label.style().unpolish(label)
+            label.style().polish(label)
+            label.update()
         if manual_promo_summary.total_hoy <= 0:
             self.dashboard_manual_promo_label.setText("Sin promociones manuales autorizadas hoy.")
             self.dashboard_manual_promo_label.setProperty("tone", "neutral")
@@ -7496,6 +7661,12 @@ class MainWindow(QMainWindow):
             manual_to=self.analytics_to_input.date().toPyDate(),
         )
 
+    def _apply_analytics_quick_period(self, period_key: str) -> None:
+        for index in range(self.analytics_period_combo.count()):
+            if self.analytics_period_combo.itemData(index) == period_key:
+                self.analytics_period_combo.setCurrentIndex(index)
+                return
+
     def _handle_analytics_period_changed(self) -> None:
         is_manual = is_manual_analytics_period(self.analytics_period_combo.currentData())
         self.analytics_from_input.setEnabled(is_manual)
@@ -7508,6 +7679,10 @@ class MainWindow(QMainWindow):
 
     def _refresh_analytics(self, session) -> None:
         period_start, period_end = self._analytics_period_bounds()
+        previous_period_start, previous_period_end = resolve_previous_analytics_period_bounds(
+            period_start=period_start,
+            period_end=period_end,
+        )
         selected_client_id = self.analytics_client_combo.currentData()
         sales = load_confirmed_sales_for_analytics(
             session,
@@ -7515,21 +7690,55 @@ class MainWindow(QMainWindow):
             period_end=period_end,
             selected_client_id=selected_client_id,
         )
+        previous_sales = load_confirmed_sales_for_analytics(
+            session,
+            period_start=previous_period_start,
+            period_end=previous_period_end,
+            selected_client_id=selected_client_id,
+        )
         sales_snapshot = build_analytics_sales_snapshot(sales)
+        previous_snapshot = build_analytics_sales_snapshot(previous_sales)
+        trend_view = build_analytics_summary_trend_view(sales_snapshot, previous_snapshot)
         self.analytics_sales_value.setText(f"${sales_snapshot.total_sales}")
+        self.analytics_sales_context_label.setText(trend_view.sales.text)
         self.analytics_tickets_value.setText(str(sales_snapshot.total_tickets))
+        self.analytics_tickets_context_label.setText(trend_view.tickets.text)
         self.analytics_average_value.setText(f"${sales_snapshot.average_ticket}")
+        self.analytics_average_context_label.setText(trend_view.average.text)
         self.analytics_units_value.setText(str(sales_snapshot.total_units))
+        self.analytics_units_context_label.setText(trend_view.units.text)
         self.analytics_identified_sales_value.setText(str(sales_snapshot.identified_sales_count))
         self.analytics_identified_income_value.setText(f"${sales_snapshot.identified_income}")
         self.analytics_repeat_clients_value.setText(str(sales_snapshot.repeat_clients))
         self.analytics_average_client_value.setText(f"${sales_snapshot.average_per_client}")
+        for label, tone in (
+            (self.analytics_sales_context_label, trend_view.sales.tone),
+            (self.analytics_tickets_context_label, trend_view.tickets.tone),
+            (self.analytics_average_context_label, trend_view.average.tone),
+            (self.analytics_units_context_label, trend_view.units.tone),
+        ):
+            label.setProperty("tone", tone)
+            label.setObjectName("kpiSubtitle")
+            label.style().unpolish(label)
+            label.style().polish(label)
+            label.update()
 
         payment_rows = build_analytics_payment_rows(sales)
         self.analytics_payment_table.setRowCount(len(payment_rows))
         for row_index, row in enumerate(payment_rows):
-            for column_index, value in enumerate(row):
+            for column_index, value in enumerate(row.values):
                 self.analytics_payment_table.setItem(row_index, column_index, _table_item(value))
+            if row.row_tone is not None:
+                for column_index in range(len(row.values)):
+                    item = self.analytics_payment_table.item(row_index, column_index)
+                    if item is not None:
+                        _set_table_row_tint(item, row.row_tone)
+            sales_item = self.analytics_payment_table.item(row_index, 1)
+            amount_item = self.analytics_payment_table.item(row_index, 2)
+            if sales_item is not None:
+                _set_table_badge_style(sales_item, row.sales_tone)
+            if amount_item is not None:
+                _set_table_badge_style(amount_item, row.amount_tone)
 
         top_product_snapshot_rows = load_analytics_top_product_snapshot_rows(
             session,
@@ -7539,9 +7748,20 @@ class MainWindow(QMainWindow):
         )
         top_product_rows = build_analytics_top_product_rows(top_product_snapshot_rows)
         self.top_products_table.setRowCount(len(top_product_rows))
-        for row_index, display_row in enumerate(top_product_rows):
-            for column_index, value in enumerate(display_row):
+        for row_index, row_view in enumerate(top_product_rows):
+            for column_index, value in enumerate(row_view.values):
                 self.top_products_table.setItem(row_index, column_index, _table_item(value))
+            if row_view.row_tone is not None:
+                for column_index in range(len(row_view.values)):
+                    item = self.top_products_table.item(row_index, column_index)
+                    if item is not None:
+                        _set_table_row_tint(item, row_view.row_tone)
+            units_item = self.top_products_table.item(row_index, 2)
+            revenue_item = self.top_products_table.item(row_index, 3)
+            if units_item is not None:
+                _set_table_badge_style(units_item, row_view.units_tone)
+            if revenue_item is not None:
+                _set_table_badge_style(revenue_item, row_view.revenue_tone)
 
         top_client_snapshot_rows = load_analytics_top_client_snapshot_rows(
             session,
@@ -7554,6 +7774,11 @@ class MainWindow(QMainWindow):
         for row_index, row_view in enumerate(top_client_row_views):
             for column_index, value in enumerate(row_view.values):
                 self.analytics_clients_table.setItem(row_index, column_index, _table_item(value))
+            if row_view.row_tone is not None:
+                for column_index in range(len(row_view.values)):
+                    item = self.analytics_clients_table.item(row_index, column_index)
+                    if item is not None:
+                        _set_table_row_tint(item, row_view.row_tone)
             sales_item = self.analytics_clients_table.item(row_index, 2)
             amount_item = self.analytics_clients_table.item(row_index, 3)
             if sales_item is not None:
@@ -7594,6 +7819,11 @@ class MainWindow(QMainWindow):
         for row_index, row_view in enumerate(stock_row_views):
             for column_index, value in enumerate(row_view.values):
                 self.analytics_stock_table.setItem(row_index, column_index, _table_item(value))
+            if row_view.row_tone is not None:
+                for column_index in range(len(row_view.values)):
+                    item = self.analytics_stock_table.item(row_index, column_index)
+                    if item is not None:
+                        _set_table_row_tint(item, row_view.row_tone)
             stock_item = self.analytics_stock_table.item(row_index, 2)
             reserved_item = self.analytics_stock_table.item(row_index, 3)
             state_item = self.analytics_stock_table.item(row_index, 4)
@@ -7603,6 +7833,18 @@ class MainWindow(QMainWindow):
                 _set_table_badge_style(reserved_item, row_view.reserved_tone)
             if state_item is not None:
                 _set_table_badge_style(state_item, row_view.state_tone)
+        automatic_backup_status: AutomaticBackupStatus | None
+        try:
+            automatic_backup_status = read_automatic_backup_status(backup_output_dir())
+        except Exception:  # noqa: BLE001
+            automatic_backup_status = None
+        alerts = build_analytics_operational_alerts(
+            stock_critical_count=len(stock_row_views),
+            overdue_layaways=layaway_snapshot.overdue_count,
+            automatic_backup_status=automatic_backup_status,
+            now=datetime.now(),
+        )
+        self.analytics_alerts_label.setText(build_analytics_alerts_text(alerts))
         self.analytics_export_status_label.setText(
             build_analytics_export_status_text(
                 selected_client_id=selected_client_id,
@@ -7824,24 +8066,35 @@ class MainWindow(QMainWindow):
                     overdue_text=self.analytics_layaway_overdue_label.text(),
                     delivered_text=self.analytics_layaway_delivered_label.text(),
                 )
+                summary_rows = build_analytics_summary_export_rows(
+                    period_label=self.analytics_period_combo.currentText(),
+                    client_label="todos"
+                    if selected_client_id in {None, ""}
+                    else self.analytics_client_combo.currentText(),
+                    total_sales=self.analytics_sales_value.text(),
+                    total_tickets=self.analytics_tickets_value.text(),
+                    average_ticket=self.analytics_average_value.text(),
+                    total_units=self.analytics_units_value.text(),
+                )
 
-                export_sets = {
-                    "ventas": sales_rows,
-                    "detalle_ventas": detail_rows,
-                    "top_productos": top_products_rows,
-                    "top_clientes": top_clients_rows,
-                    "metodos_pago": payment_rows,
-                    "stock_critico": stock_rows,
-                    "movimientos": movement_rows,
-                    "compras": purchase_rows,
-                    "detalle_compras": purchase_detail_rows,
-                    "cortes_caja": cash_cut_rows,
-                    "apartados_resumen": layaway_rows,
-                }
+                export_sets = [
+                    ("00_resumen_general", summary_rows),
+                    ("01_metodos_pago", payment_rows),
+                    ("02_apartados_resumen", layaway_rows),
+                    ("03_top_productos", top_products_rows),
+                    ("04_top_clientes", top_clients_rows),
+                    ("05_stock_critico", stock_rows),
+                    ("06_ventas", sales_rows),
+                    ("07_detalle_ventas", detail_rows),
+                    ("08_movimientos", movement_rows),
+                    ("09_compras", purchase_rows),
+                    ("10_detalle_compras", purchase_detail_rows),
+                    ("11_cortes_caja", cash_cut_rows),
+                ]
 
                 export_dir = self._analytics_export_dir() / datetime.now().strftime("%Y%m%d_%H%M%S")
                 export_dir.mkdir(parents=True, exist_ok=True)
-                for name, rows in export_sets.items():
+                for name, rows in export_sets:
                     json_path = export_dir / f"{name}.json"
                     json_path.write_text(
                         json.dumps(
@@ -9006,7 +9259,13 @@ class MainWindow(QMainWindow):
         label.style().polish(label)
         label.update()
 
-    def _create_kpi_card(self, title: str, value_label: QLabel, subtitle: str) -> QFrame:
+    def _create_kpi_card(
+        self,
+        title: str,
+        value_label: QLabel,
+        subtitle: str,
+        detail_label: QLabel | None = None,
+    ) -> QFrame:
         card = QFrame()
         card.setObjectName("kpiCard")
         layout = QVBoxLayout()
@@ -9022,6 +9281,10 @@ class MainWindow(QMainWindow):
         layout.addWidget(title_label)
         layout.addWidget(value_label)
         layout.addWidget(subtitle_label)
+        if detail_label is not None:
+            detail_label.setObjectName("kpiSubtitle")
+            detail_label.setWordWrap(True)
+            layout.addWidget(detail_label)
         card.setLayout(layout)
         return card
 

@@ -4,7 +4,10 @@ from decimal import Decimal
 from types import SimpleNamespace
 import unittest
 
-from pos_uniformes.ui.helpers.analytics_payment_helper import build_analytics_payment_rows
+from pos_uniformes.ui.helpers.analytics_payment_helper import (
+    AnalyticsPaymentRowView,
+    build_analytics_payment_rows,
+)
 
 
 class AnalyticsPaymentHelperTests(unittest.TestCase):
@@ -21,8 +24,18 @@ class AnalyticsPaymentHelperTests(unittest.TestCase):
         self.assertEqual(
             rows,
             (
-                ("Efectivo", 2, Decimal("150.00")),
-                ("Transferencia", 2, Decimal("330.00")),
+                AnalyticsPaymentRowView(
+                    values=("Transferencia", 2, Decimal("330.00")),
+                    sales_tone="positive",
+                    amount_tone="positive",
+                    row_tone="positive",
+                ),
+                AnalyticsPaymentRowView(
+                    values=("Efectivo", 2, Decimal("150.00")),
+                    sales_tone="warning",
+                    amount_tone="warning",
+                    row_tone=None,
+                ),
             ),
         )
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+import json
 from pathlib import Path
 import os
 import shutil
@@ -28,8 +29,24 @@ class BackupEntry:
     size_bytes: int
 
 
+@dataclass(frozen=True)
+class AutomaticBackupStatus:
+    last_run_at: datetime | None
+    last_success_at: datetime | None
+    last_backup_path: Path | None
+    dump_format: str | None
+    retention_days: int | None
+    deleted_count: int
+    last_error: str | None
+
+
 def backup_output_dir() -> Path:
     return Path(__file__).resolve().parents[1] / "backups" / "database"
+
+
+def automatic_backup_status_path(output_dir: Path | None = None) -> Path:
+    target_dir = (output_dir or backup_output_dir()).expanduser().resolve()
+    return target_dir / ".automatic_backup_status.json"
 
 
 def _resolve_postgres_binary(binary_name: str, windows_name: str | None = None) -> str:
@@ -88,6 +105,67 @@ def _base_env() -> dict[str, str]:
     return env
 
 
+def _serialize_optional_datetime(value: datetime | None) -> str | None:
+    return value.isoformat() if value is not None else None
+
+
+def _parse_optional_datetime(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    return datetime.fromisoformat(value)
+
+
+def _status_to_payload(status: AutomaticBackupStatus) -> dict[str, object]:
+    return {
+        "last_run_at": _serialize_optional_datetime(status.last_run_at),
+        "last_success_at": _serialize_optional_datetime(status.last_success_at),
+        "last_backup_path": str(status.last_backup_path) if status.last_backup_path else None,
+        "dump_format": status.dump_format,
+        "retention_days": status.retention_days,
+        "deleted_count": status.deleted_count,
+        "last_error": status.last_error,
+    }
+
+
+def _status_from_payload(payload: dict[str, object]) -> AutomaticBackupStatus:
+    backup_path_value = payload.get("last_backup_path")
+    return AutomaticBackupStatus(
+        last_run_at=_parse_optional_datetime(payload.get("last_run_at") if isinstance(payload.get("last_run_at"), str) else None),
+        last_success_at=_parse_optional_datetime(
+            payload.get("last_success_at") if isinstance(payload.get("last_success_at"), str) else None
+        ),
+        last_backup_path=Path(backup_path_value) if isinstance(backup_path_value, str) and backup_path_value else None,
+        dump_format=payload.get("dump_format") if isinstance(payload.get("dump_format"), str) else None,
+        retention_days=int(payload["retention_days"]) if payload.get("retention_days") is not None else None,
+        deleted_count=int(payload.get("deleted_count") or 0),
+        last_error=payload.get("last_error") if isinstance(payload.get("last_error"), str) else None,
+    )
+
+
+def read_automatic_backup_status(output_dir: Path | None = None) -> AutomaticBackupStatus | None:
+    status_path = automatic_backup_status_path(output_dir)
+    if not status_path.exists():
+        return None
+    payload = json.loads(status_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError("El archivo de estado del respaldo automatico es invalido.")
+    return _status_from_payload(payload)
+
+
+def write_automatic_backup_status(
+    status: AutomaticBackupStatus,
+    *,
+    output_dir: Path | None = None,
+) -> Path:
+    status_path = automatic_backup_status_path(output_dir)
+    status_path.parent.mkdir(parents=True, exist_ok=True)
+    status_path.write_text(
+        json.dumps(_status_to_payload(status), ensure_ascii=True, indent=2),
+        encoding="utf-8",
+    )
+    return status_path
+
+
 def prune_old_backups(output_dir: Path, dump_format: str, retention_days: int) -> list[Path]:
     if retention_days < 0:
         raise ValueError("retention_days no puede ser negativo.")
@@ -115,6 +193,47 @@ def create_backup(output_dir: Path | None = None, dump_format: str = "plain", re
     subprocess.run(command, check=True, env=_base_env())
     deleted_files = prune_old_backups(target_dir, dump_format, retention_days)
     return output_file, deleted_files
+
+
+def run_automatic_backup(
+    *,
+    output_dir: Path | None = None,
+    dump_format: str = "custom",
+    retention_days: int = 14,
+) -> tuple[Path, list[Path], AutomaticBackupStatus]:
+    target_dir = (output_dir or backup_output_dir()).expanduser().resolve()
+    previous_status = read_automatic_backup_status(target_dir)
+    started_at = datetime.now()
+    try:
+        backup_file, deleted_files = create_backup(
+            output_dir=target_dir,
+            dump_format=dump_format,
+            retention_days=retention_days,
+        )
+    except Exception as exc:  # noqa: BLE001
+        failed_status = AutomaticBackupStatus(
+            last_run_at=started_at,
+            last_success_at=previous_status.last_success_at if previous_status else None,
+            last_backup_path=previous_status.last_backup_path if previous_status else None,
+            dump_format=previous_status.dump_format if previous_status else dump_format,
+            retention_days=retention_days,
+            deleted_count=previous_status.deleted_count if previous_status else 0,
+            last_error=str(exc),
+        )
+        write_automatic_backup_status(failed_status, output_dir=target_dir)
+        raise
+
+    status = AutomaticBackupStatus(
+        last_run_at=started_at,
+        last_success_at=started_at,
+        last_backup_path=backup_file,
+        dump_format=dump_format,
+        retention_days=retention_days,
+        deleted_count=len(deleted_files),
+        last_error=None,
+    )
+    write_automatic_backup_status(status, output_dir=target_dir)
+    return backup_file, deleted_files, status
 
 
 def list_backups(output_dir: Path | None = None) -> list[BackupEntry]:

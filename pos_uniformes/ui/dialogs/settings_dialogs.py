@@ -480,6 +480,9 @@ def build_backup_settings_dialog(window: "MainWindow") -> QDialog:
         width=980,
     )
     window.settings_backup_status_label.setObjectName("analyticsLine")
+    window.settings_backup_automatic_status_label.setObjectName("analyticsLine")
+    window.settings_backup_automatic_detail_label.setObjectName("subtleLine")
+    window.settings_backup_automatic_detail_label.setWordWrap(True)
     window.settings_backup_location_label.setObjectName("subtleLine")
     window.settings_backup_location_label.setWordWrap(True)
     window.settings_backup_format_combo.clear()
@@ -495,9 +498,16 @@ def build_backup_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_restore_backup_button.clicked.connect(window._handle_restore_backup)
 
     backup_hint = QLabel(
-        "Los respaldos diarios siguen corriendo por script. Desde aqui puedes crear uno manual, revisar la carpeta y restaurar respaldos .dump."
+        "Los respaldos automaticos deben correr por tarea externa usando scripts/run_scheduled_backup.py. Desde aqui puedes crear uno manual, revisar la carpeta y restaurar respaldos .dump."
     )
     backup_hint.setWordWrap(True)
+    automatic_box = QGroupBox("Estado del respaldo automatico")
+    automatic_box.setObjectName("infoCard")
+    automatic_layout = QVBoxLayout()
+    automatic_layout.setSpacing(6)
+    automatic_layout.addWidget(window.settings_backup_automatic_status_label)
+    automatic_layout.addWidget(window.settings_backup_automatic_detail_label)
+    automatic_box.setLayout(automatic_layout)
     backup_actions = QHBoxLayout()
     backup_actions.addWidget(QLabel("Formato"))
     backup_actions.addWidget(window.settings_backup_format_combo)
@@ -522,6 +532,7 @@ def build_backup_settings_dialog(window: "MainWindow") -> QDialog:
     close_buttons.rejected.connect(dialog.reject)
     close_buttons.accepted.connect(dialog.accept)
     layout.addWidget(backup_hint)
+    layout.addWidget(automatic_box)
     layout.addWidget(window.settings_backup_status_label)
     layout.addWidget(window.settings_backup_location_label)
     layout.addLayout(backup_actions)

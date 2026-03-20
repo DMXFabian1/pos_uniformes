@@ -13,6 +13,7 @@ class AnalyticsStockRowView:
     stock_tone: str
     reserved_tone: str
     state_tone: str
+    row_tone: str | None
 
 
 def build_analytics_stock_row_views(rows: list[object] | tuple[object, ...]) -> tuple[AnalyticsStockRowView, ...]:
@@ -33,6 +34,7 @@ def build_analytics_stock_row_views(rows: list[object] | tuple[object, ...]) -> 
                 stock_tone="danger" if stock_value == 0 else "warning" if stock_value <= 3 else "positive",
                 reserved_tone="warning" if reserved_value > 0 else "muted",
                 state_tone="positive" if is_active else "muted",
+                row_tone="danger" if stock_value == 0 else "warning" if stock_value <= 3 else None,
             )
         )
     return tuple(row_views)

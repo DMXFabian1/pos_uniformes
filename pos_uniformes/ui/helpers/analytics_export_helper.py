@@ -30,3 +30,24 @@ def build_analytics_layaway_export_rows(
             "entregados_periodo": delivered_text,
         }
     ]
+
+
+def build_analytics_summary_export_rows(
+    *,
+    period_label: str,
+    client_label: str,
+    total_sales: str,
+    total_tickets: str,
+    average_ticket: str,
+    total_units: str,
+) -> list[dict[str, str]]:
+    return [
+        {
+            "periodo": period_label,
+            "cliente": client_label,
+            "ingreso_periodo": total_sales,
+            "tickets": total_tickets,
+            "promedio_venta": average_ticket,
+            "unidades_vendidas": total_units,
+        }
+    ]

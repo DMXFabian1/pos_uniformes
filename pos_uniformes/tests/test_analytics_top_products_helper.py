@@ -4,7 +4,10 @@ from decimal import Decimal
 import unittest
 
 from pos_uniformes.services.analytics_top_products_service import AnalyticsTopProductSnapshotRow
-from pos_uniformes.ui.helpers.analytics_top_products_helper import build_analytics_top_product_rows
+from pos_uniformes.ui.helpers.analytics_top_products_helper import (
+    AnalyticsTopProductRowView,
+    build_analytics_top_product_rows,
+)
 
 
 class AnalyticsTopProductsHelperTests(unittest.TestCase):
@@ -29,8 +32,18 @@ class AnalyticsTopProductsHelperTests(unittest.TestCase):
         self.assertEqual(
             display_rows,
             (
-                ("SKU-1", "Playera Deportiva | Patria | Deportivo | Playera", 7, Decimal("840.00")),
-                ("SKU-2", "Pantalon de vestir", 3, Decimal("450.00")),
+                AnalyticsTopProductRowView(
+                    values=("SKU-1", "Playera Deportiva | Patria | Deportivo | Playera", 7, Decimal("840.00")),
+                    units_tone="positive",
+                    revenue_tone="positive",
+                    row_tone="positive",
+                ),
+                AnalyticsTopProductRowView(
+                    values=("SKU-2", "Pantalon de vestir", 3, Decimal("450.00")),
+                    units_tone="warning",
+                    revenue_tone="warning",
+                    row_tone=None,
+                ),
             ),
         )
 
