@@ -159,6 +159,13 @@ Si aun no existe la base:
 createdb -U postgres pos_uniformes
 ```
 
+## 2.1. Requisito extra si vas a imprimir etiquetas en Windows
+
+- Para impresion real de etiquetas con Brother QL-800, instala el driver oficial de Brother antes de probar la app.
+- Enlace validado:
+  - https://support.brother.com/g/b/downloadhowto.aspx?c=mx&lang=es&prod=lpql800eus&os=10069&dlid=dlfp101277_000&flang=201&type3=347
+- Sin ese driver, Windows puede dejar visible solo impresoras virtuales o no exponer correctamente la impresora de etiquetas.
+
 ## 3. Crear entorno virtual
 
 Desde la carpeta del proyecto:
@@ -295,5 +302,6 @@ Si tu lector usa modo serial o SDK propietario, necesitarias integracion adicion
 - abrir `Inventario`
 - registrar una entrada
 - generar un QR
+- si vas a imprimir etiquetas, confirmar que la Brother QL-800 aparece en Windows con su driver oficial instalado
 - vender por SKU en `Caja`
 - revisar `Historial`

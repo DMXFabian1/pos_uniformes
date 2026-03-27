@@ -21,8 +21,14 @@
 - Probar con la impresora real de etiquetas instalada en Windows.
 - Confirmar tamano fisico, driver y comportamiento del spooler con la Brother objetivo.
 
+## Requisito real confirmado
+
+- Para imprimir etiquetas en Windows con la Brother QL-800, hay que instalar el driver oficial de Brother.
+- Descarga usada y validada en esta PC:
+  - https://support.brother.com/g/b/downloadhowto.aspx?c=mx&lang=es&prod=lpql800eus&os=10069&dlid=dlfp101277_000&flang=201&type3=347
+- Sin ese driver, Windows puede no exponer correctamente la impresora real y la app no podra imprimir etiquetas como se espera.
+
 ## Estado de esta PC
 
-- Impresora detectada actualmente por Windows: `Microsoft Print to PDF`
-- Con el comportamiento actual, eso no cuenta como impresora valida de etiquetas.
+- Impresora de etiquetas validada: Brother QL-800 con driver oficial instalado.
 - `pywin32` instalado en la `.venv`
