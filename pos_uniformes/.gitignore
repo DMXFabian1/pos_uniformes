@@ -1,0 +1,28 @@
+# Sistema operativo y editores
+.DS_Store
+Thumbs.db
+.vscode/
+
+# Entornos locales
+.venv/
+.venv-*/
+pos_uniformes.env
+.env
+
+# Cache de Python
+__pycache__/
+*.py[cod]
+
+# Artefactos de build
+build/
+dist/
+
+# Salidas locales generadas durante operacion o pruebas
+generated/
+exports/
+packaging/windows/seed/generated/
+
+# Respaldos locales
+backups/database/*.sql
+backups/database/*.dump
+backups/database/.automatic_backup_status.json

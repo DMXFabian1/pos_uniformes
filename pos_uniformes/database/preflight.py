@@ -34,7 +34,7 @@ def _project_root() -> Path:
 
 def _upgrade_hint() -> str:
     return (
-        "Actualiza el esquema con `alembic upgrade head` ejecutado dentro de la carpeta "
+        "Actualiza el esquema con `python -m alembic upgrade head` ejecutado dentro de la carpeta "
         f"`{_project_root()}`."
     )
 
