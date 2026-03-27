@@ -97,6 +97,18 @@ git fetch
 git pull
 ```
 
+Si quieres un comando unico para recibir cambios sin pisar trabajo local por accidente:
+
+```bash
+python scripts/receive_updates.py
+```
+
+Para recibir una rama especifica, por ejemplo `codex/etiquetas-windows`:
+
+```bash
+python scripts/receive_updates.py --branch codex/etiquetas-windows
+```
+
 ## Notas importantes
 
 - `.venv` no se copia entre sistemas operativos; cada maquina crea la suya.
