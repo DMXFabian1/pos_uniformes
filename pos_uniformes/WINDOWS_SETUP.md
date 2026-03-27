@@ -165,6 +165,19 @@ createdb -U postgres pos_uniformes
 - Enlace validado:
   - https://support.brother.com/g/b/downloadhowto.aspx?c=mx&lang=es&prod=lpql800eus&os=10069&dlid=dlfp101277_000&flang=201&type3=347
 - Sin ese driver, Windows puede dejar visible solo impresoras virtuales o no exponer correctamente la impresora de etiquetas.
+- Si quieres que el bundle de Windows tambien lleve el instalador del driver, genera la build con:
+
+```powershell
+scripts\build_windows_bundle.ps1 -BrotherDriverInstallerPath .\ruta\BrotherDriverInstaller.exe
+```
+
+- Luego, en la PC destino, puedes correr:
+
+```powershell
+.\setup_windows_local_bundle.ps1 -InstallBrotherDriver
+```
+
+- Nota: lo mas seguro es incluir el instalador oficial descargado manualmente por ti. El proyecto no descarga drivers de terceros automaticamente.
 
 ## 3. Crear entorno virtual
 
@@ -225,6 +238,12 @@ O usando un `.dump` ya existente:
 
 ```powershell
 scripts\build_windows_bundle.ps1 -SeedBackupPath .\ruta\mi_base_inicial.dump
+```
+
+Si tambien quieres incluir el instalador oficial del driver Brother para etiquetas:
+
+```powershell
+scripts\build_windows_bundle.ps1 -BrotherDriverInstallerPath .\ruta\BrotherDriverInstaller.exe
 ```
 
 Resultado:

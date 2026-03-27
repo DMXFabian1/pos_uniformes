@@ -28,6 +28,12 @@ seed_backup = PROJECT_ROOT / "packaging" / "windows" / "seed" / "initial.dump"
 if seed_backup.exists():
     datas.append((str(seed_backup), "seed"))
 
+driver_dir = PROJECT_ROOT / "packaging" / "windows" / "drivers"
+if driver_dir.exists():
+    for installer in driver_dir.iterdir():
+        if installer.is_file():
+            datas.append((str(installer), "drivers"))
+
 hiddenimports = []
 hiddenimports += collect_submodules("psycopg")
 hiddenimports += collect_submodules("alembic")

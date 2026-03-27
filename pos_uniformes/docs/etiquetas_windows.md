@@ -27,6 +27,8 @@
 - Descarga usada y validada en esta PC:
   - https://support.brother.com/g/b/downloadhowto.aspx?c=mx&lang=es&prod=lpql800eus&os=10069&dlid=dlfp101277_000&flang=201&type3=347
 - Sin ese driver, Windows puede no exponer correctamente la impresora real y la app no podra imprimir etiquetas como se espera.
+- El bundle de Windows ya puede incluir el instalador oficial del driver si se genera con `-BrotherDriverInstallerPath`.
+- En la PC destino, `setup_windows_local_bundle.ps1 -InstallBrotherDriver` lanza ese instalador si viene dentro del bundle.
 
 ## Estado de esta PC
 

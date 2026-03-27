@@ -1,7 +1,8 @@
 param(
     [switch]$WithPrecheck,
     [string]$SeedBackupPath = "",
-    [switch]$CreateSeedBackup
+    [switch]$CreateSeedBackup,
+    [string]$BrotherDriverInstallerPath = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -17,6 +18,7 @@ $bundleDir = Join-Path $distDir $appName
 $zipPath = Join-Path $distDir "$appName-windows.zip"
 $seedDir = Join-Path $projectRoot "packaging\windows\seed"
 $bundledSeedPath = Join-Path $seedDir "initial.dump"
+$driverDir = Join-Path $projectRoot "packaging\windows\drivers"
 
 if ($CreateSeedBackup -and $SeedBackupPath) {
     throw "Usa solo una opcion: -CreateSeedBackup o -SeedBackupPath."
@@ -30,10 +32,13 @@ if (-not (Test-Path $venvPython)) {
 & $venvPython -m pip install -r (Join-Path $projectRoot "requirements.txt") -r (Join-Path $projectRoot "requirements-build.txt")
 
 New-Item -ItemType Directory -Path $seedDir -Force | Out-Null
+New-Item -ItemType Directory -Path $driverDir -Force | Out-Null
 
 if (Test-Path $bundledSeedPath) {
     Remove-Item $bundledSeedPath -Force
 }
+
+Get-ChildItem -Path $driverDir -File -ErrorAction SilentlyContinue | Remove-Item -Force
 
 if ($CreateSeedBackup) {
     $generatedSeedDir = Join-Path $projectRoot "packaging\windows\seed\generated"
@@ -55,6 +60,11 @@ elseif ($SeedBackupPath) {
         throw "El respaldo semilla debe ser .dump."
     }
     Copy-Item $resolvedSeed $bundledSeedPath -Force
+}
+
+if ($BrotherDriverInstallerPath) {
+    $resolvedDriverInstaller = (Resolve-Path $BrotherDriverInstallerPath).Path
+    Copy-Item $resolvedDriverInstaller (Join-Path $driverDir ([System.IO.Path]::GetFileName($resolvedDriverInstaller))) -Force
 }
 
 if (Test-Path $buildDir) {
@@ -85,6 +95,12 @@ if (Test-Path $bundledSeedPath) {
 }
 else {
     Write-Host "  Seed:    no incluido"
+}
+if (Get-ChildItem -Path $driverDir -File -ErrorAction SilentlyContinue) {
+    Write-Host "  Driver:  instalador Brother incluido"
+}
+else {
+    Write-Host "  Driver:  no incluido"
 }
 Write-Host ""
 Write-Host "Antes de ejecutar en otra PC, usa 'setup_windows_local_bundle.ps1' dentro del bundle para dejar la base local lista."
