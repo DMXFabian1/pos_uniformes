@@ -54,8 +54,7 @@ def inventory_row_matches_visible_filters(
     search_matcher: Callable[[dict[str, object], str], bool],
 ) -> bool:
     return (
-        search_matcher(row, filters.search_text)
-        and matches_selected_values(row["categoria_nombre"], filters.category_filters)
+        matches_selected_values(row["categoria_nombre"], filters.category_filters)
         and matches_selected_values(row["marca_nombre"], filters.brand_filters)
         and matches_selected_values(row["escuela_nombre"], filters.school_filters)
         and matches_selected_values(row["tipo_prenda_nombre"], filters.type_filters)
@@ -67,6 +66,7 @@ def inventory_row_matches_visible_filters(
         and _matches_inventory_qr_filter(bool(row["qr_exists"]), filters.qr_filter)
         and matches_origin_legacy(bool(row["origen_legacy"]), filters.origin_filter)
         and matches_fallback_duplicate(bool(row["fallback_importacion"]), filters.duplicate_filter)
+        and search_matcher(row, filters.search_text)
     )
 
 

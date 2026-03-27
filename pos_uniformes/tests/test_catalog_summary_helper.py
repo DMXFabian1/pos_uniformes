@@ -15,7 +15,7 @@ class CatalogSummaryHelperTests(unittest.TestCase):
 
         self.assertEqual(
             view.results_summary,
-            "Resultados: 0 de 0 | Stock visible: 0 | Con apartados: 0 | Fallbacks: 0 | Filtros: sin filtros",
+            "0/0 resultados | stock 0 | ap. 0 | fallbacks 0",
         )
         self.assertEqual(view.active_filters_summary, "Filtros activos: ninguno")
 
@@ -41,7 +41,7 @@ class CatalogSummaryHelperTests(unittest.TestCase):
 
         self.assertEqual(
             view.results_summary,
-            'Resultados: 2 de 5 | Stock visible: 10 | Con apartados: 1 | Fallbacks: 1 | Filtros: texto="deportivo", estado=Activas',
+            "2/5 resultados | stock 10 | ap. 1 | fallbacks 1",
         )
         self.assertEqual(
             view.active_filters_summary,

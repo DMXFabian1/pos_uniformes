@@ -61,6 +61,78 @@ def _build_main_window_shell_styles() -> str:
                 border-radius: 12px;
                 padding: 6px 10px;
             }
+            #catalogSpotlightCard, #catalogFiltersCard, #catalogStatusStrip {
+                background: #fffaf4;
+                border: 1px solid #e4d7c8;
+                border-radius: 16px;
+                padding: 10px 12px;
+            }
+            #catalogSpotlightCard {
+                background: qlineargradient(
+                    x1: 0, y1: 0, x2: 1, y2: 1,
+                    stop: 0 #fff7ef,
+                    stop: 1 #f8ecdf
+                );
+                border: 1px solid #e7cdb8;
+            }
+            #catalogStatusStrip {
+                background: #fffaf2;
+            }
+            #catalogSectionTitle {
+                background: transparent;
+                border: none;
+                padding: 0;
+                color: #5a3224;
+                font-size: 14px;
+                font-weight: 800;
+            }
+            #catalogSectionHint {
+                background: transparent;
+                border: none;
+                padding: 0;
+                color: #786d62;
+                font-size: 11px;
+                line-height: 1.35em;
+            }
+            #catalogSectionCaption {
+                background: transparent;
+                border: none;
+                padding: 0;
+                color: #8a4b2f;
+                font-size: 11px;
+                font-weight: 800;
+                text-transform: uppercase;
+                letter-spacing: 0.08em;
+            }
+            #catalogSelectionLine {
+                background: rgba(255, 250, 242, 0.72);
+                border: 1px solid #ead7c6;
+                border-radius: 14px;
+                padding: 6px 10px;
+                color: #4a4038;
+                font-weight: 700;
+            }
+            #catalogSummaryLine {
+                background: #fff7ee;
+                border: 1px solid #ebd3c1;
+                border-radius: 14px;
+                padding: 6px 10px;
+                color: #4a352b;
+                font-weight: 800;
+            }
+            #catalogPagerLine, #catalogSupportLine {
+                background: #fffaf2;
+                border: 1px solid #e6ddcf;
+                border-radius: 12px;
+                padding: 5px 9px;
+            }
+            #catalogPagerLine {
+                color: #6c6055;
+                font-weight: 700;
+            }
+            #catalogSupportLine {
+                color: #6e665e;
+            }
             #templatePreviewLabel {
                 background: transparent;
                 border: none;
@@ -145,6 +217,37 @@ def _build_main_window_shell_styles() -> str:
                 border-radius: 12px;
                 padding: 9px 12px;
                 font-weight: 700;
+            }
+            #quoteDetailCard {
+                background: #fff9f1;
+                border: 1px solid #eadccc;
+                border-radius: 14px;
+            }
+            #quoteDetailTitle {
+                background: transparent;
+                border: none;
+                color: #3f2c23;
+                font-size: 18px;
+                font-weight: 900;
+                padding: 0;
+            }
+            #quoteDetailMetaText {
+                background: transparent;
+                border: none;
+                color: #61564d;
+                font-size: 12px;
+                font-weight: 700;
+                line-height: 1.35em;
+                padding: 0;
+            }
+            #quoteDetailNotesText {
+                background: transparent;
+                border: none;
+                color: #6a6057;
+                font-size: 12px;
+                font-weight: 600;
+                line-height: 1.35em;
+                padding: 0;
             }
             #settingsLaunchCard {
                 background: #fffaf2;

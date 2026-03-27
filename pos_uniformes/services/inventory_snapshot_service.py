@@ -4,6 +4,14 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from pos_uniformes.services.search_filter_service import (
+    INVENTORY_SEARCH_ALIAS_MAP,
+    INVENTORY_SEARCH_GENERAL_FIELDS,
+    attach_row_search_cache,
+)
+
+_inventory_qr_exists_cache: dict[str, bool] = {}
+
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 
 
@@ -16,37 +24,54 @@ def load_inventory_snapshot_rows(session) -> list[dict[str, object]]:
 
 def _build_inventory_snapshot_row(row: tuple[object, ...]) -> dict[str, object]:
     qr_exists = _inventory_qr_exists(str(row[1]))
-    return {
-        "variante_id": row[0],
-        "sku": row[1],
-        "categoria_nombre": row[2],
-        "marca_nombre": row[3],
-        "producto_nombre": sanitize_product_display_name(row[4]),
-        "producto_nombre_base": row[5],
-        "escuela_nombre": row[6] or "General",
-        "tipo_prenda_nombre": row[7] or "-",
-        "tipo_pieza_nombre": row[8] or "-",
-        "nombre_legacy": row[9],
-        "origen_legacy": bool(row[10]),
-        "talla": row[11],
-        "color": row[12],
-        "precio_venta": Decimal(row[13]).quantize(Decimal("0.01")),
-        "costo_referencia": Decimal(row[14]).quantize(Decimal("0.01")) if row[14] is not None else None,
-        "stock_actual": int(row[15]),
-        "apartado_cantidad": int(row[16]),
-        "variante_activa": bool(row[17]),
-        "fallback_importacion": bool(row[18]),
-        "qr_exists": qr_exists,
-        "origen_etiqueta": "LEGACY" if row[10] else "NUEVO",
-        "variante_estado": "ACTIVA" if row[17] else "INACTIVA",
-        "fallback_text": "fallback" if bool(row[18]) else "",
-    }
+    return attach_row_search_cache(
+        {
+            "variante_id": row[0],
+            "sku": row[1],
+            "categoria_nombre": row[2],
+            "marca_nombre": row[3],
+            "producto_nombre": sanitize_product_display_name(row[4]),
+            "producto_nombre_base": row[5],
+            "escuela_nombre": row[6] or "General",
+            "tipo_prenda_nombre": row[7] or "-",
+            "tipo_pieza_nombre": row[8] or "-",
+            "nombre_legacy": row[9],
+            "origen_legacy": bool(row[10]),
+            "talla": row[11],
+            "color": row[12],
+            "precio_venta": Decimal(row[13]).quantize(Decimal("0.01")),
+            "costo_referencia": Decimal(row[14]).quantize(Decimal("0.01")) if row[14] is not None else None,
+            "stock_actual": int(row[15]),
+            "apartado_cantidad": int(row[16]),
+            "variante_activa": bool(row[17]),
+            "fallback_importacion": bool(row[18]),
+            "qr_exists": qr_exists,
+            "origen_etiqueta": "LEGACY" if row[10] else "NUEVO",
+            "variante_estado": "ACTIVA" if row[17] else "INACTIVA",
+            "fallback_text": "fallback" if bool(row[18]) else "",
+        },
+        alias_map=INVENTORY_SEARCH_ALIAS_MAP,
+        general_fields=INVENTORY_SEARCH_GENERAL_FIELDS,
+    )
 
 
 def _inventory_qr_exists(sku: str) -> bool:
+    cached_value = _inventory_qr_exists_cache.get(sku)
+    if cached_value is not None:
+        return cached_value
+
     from pos_uniformes.utils.qr_generator import QrGenerator
 
-    return (QrGenerator.output_dir() / f"{sku}.png").exists()
+    exists = (QrGenerator.output_dir() / f"{sku}.png").exists()
+    _inventory_qr_exists_cache[sku] = exists
+    return exists
+
+
+def invalidate_inventory_qr_exists_cache(*, sku: str | None = None) -> None:
+    if sku is None:
+        _inventory_qr_exists_cache.clear()
+        return
+    _inventory_qr_exists_cache.pop(sku, None)
 
 
 def _execute_inventory_snapshot_query(session) -> list[tuple[object, ...]]:

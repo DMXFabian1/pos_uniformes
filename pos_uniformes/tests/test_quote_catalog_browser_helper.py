@@ -67,6 +67,21 @@ class QuoteCatalogBrowserHelperTests(unittest.TestCase):
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0].sku, "SKU-2")
 
+    def test_filters_by_search_text_without_accent_regression(self) -> None:
+        rows, _ = build_quote_catalog_browser(
+            snapshot_rows=[
+                _row("SKU-1", "Primaria", "Colegio Mexico", "Pantalon", "Pantalon", "32", "Azul"),
+                _row("SKU-2", "Primaria", "General", "Básico escolar", "Accesorio", "U", "Blanco"),
+            ],
+            level_filter="",
+            school_filter="",
+            include_general=True,
+            search_text="basico",
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].sku, "SKU-2")
+
     def test_build_level_options_skips_empty_and_sin_nivel(self) -> None:
         options = build_quote_catalog_level_options(
             [

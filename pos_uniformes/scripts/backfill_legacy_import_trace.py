@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import argparse
 from pathlib import Path
 import sys
 
@@ -27,8 +28,25 @@ from pos_uniformes.database.models import (
     TipoPrenda,
     Variante,
 )
+from pos_uniformes.utils.legacy_paths import detect_legacy_sqlite_path
 
-LEGACY_SOURCE_PATH = Path("/Users/danielfabian/Downloads/productos.db")
+
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    default_source_path = detect_legacy_sqlite_path()
+    parser = argparse.ArgumentParser(
+        description="Reconstruye la trazabilidad formal de una importacion legacy ya aplicada.",
+    )
+    parser.add_argument(
+        "--legacy-source-path",
+        default=str(default_source_path),
+        help=(
+            "Ruta que se registrara como fuente original del catalogo legacy. "
+            "Si no se indica, se intenta detectar en la carpeta actual, "
+            "en data/productos.db, en Gestor_de_Inventarios/data/productos.db "
+            "o en Downloads/productos.db."
+        ),
+    )
+    return parser.parse_args(argv)
 
 
 def _latest_import_report() -> str | None:
@@ -40,6 +58,9 @@ def _latest_import_report() -> str | None:
 
 
 def main() -> None:
+    args = parse_args()
+    legacy_source_path = Path(args.legacy_source_path).expanduser()
+
     with get_session() as session:
         existing_batch = session.scalar(select(ImportacionCatalogo.id).limit(1))
         if existing_batch is not None:
@@ -66,8 +87,8 @@ def main() -> None:
         report_path = _latest_import_report()
 
         batch = ImportacionCatalogo(
-            fuente_nombre=LEGACY_SOURCE_PATH.name,
-            fuente_ruta=str(LEGACY_SOURCE_PATH),
+            fuente_nombre=legacy_source_path.name,
+            fuente_ruta=str(legacy_source_path),
             reporte_ruta=report_path,
             filas_leidas=len(legacy_variants),
             familias_creadas=families_created,

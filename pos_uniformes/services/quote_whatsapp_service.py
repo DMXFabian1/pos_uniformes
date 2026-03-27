@@ -41,19 +41,21 @@ def build_quote_whatsapp_view(session, *, quote_id: int) -> QuoteWhatsappView:
 def _build_quote_whatsapp_message(*, quote, business_name: str) -> str:
     customer_label = quote.cliente_nombre or (quote.cliente.nombre if quote.cliente else "cliente")
     lines = [
-        f"Hola {customer_label}, te compartimos tu presupuesto {quote.folio} de {business_name}.",
-        f"Estado: {quote.estado.value}",
+        f"Hola {customer_label}, te compartimos tu presupuesto {quote.folio}.",
+        business_name,
         f"Total estimado: ${Decimal(quote.total).quantize(Decimal('0.01'))}",
     ]
     if quote.vigencia_hasta is not None:
-        lines.append(f"Vigencia: {quote.vigencia_hasta.strftime('%Y-%m-%d')}")
+        lines.append(f"Vigencia: {quote.vigencia_hasta.strftime('%d/%m/%Y')}")
     lines.append("Piezas:")
     for detail in quote.detalles:
+        unit_price = Decimal(detail.precio_unitario).quantize(Decimal("0.01"))
         subtotal = Decimal(detail.subtotal_linea).quantize(Decimal("0.01"))
-        lines.append(f"- {detail.descripcion_snapshot} | {detail.cantidad} pza(s) | ${subtotal}")
+        lines.append(f"- {detail.descripcion_snapshot}")
+        lines.append(f"  SKU {detail.sku_snapshot} | {detail.cantidad} x {unit_price} = {subtotal}")
     if quote.observacion:
         lines.append(f"Observaciones: {quote.observacion}")
-    lines.append("Si deseas retomarlo, responde con tu folio o este mismo mensaje.")
+    lines.append(f"Si deseas retomarlo, responde con tu folio {quote.folio}.")
     return "\n".join(lines)
 
 

@@ -49,8 +49,8 @@ def build_quote_cart_view(quote_cart: list[dict[str, object]], *, school_filter:
             QuoteCartRowView(
                 values=(
                     item["sku"],
-                    item.get("nivel_educativo_nombre", "Sin nivel"),
-                    item.get("escuela_nombre", "General"),
+                    item.get("nivel_educativo_nombre") or "Sin nivel",
+                    item.get("escuela_nombre") or "General",
                     item["producto_nombre"],
                     item["cantidad"],
                     item["precio_unitario"],

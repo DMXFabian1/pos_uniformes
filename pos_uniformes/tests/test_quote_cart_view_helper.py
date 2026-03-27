@@ -41,7 +41,15 @@ class QuoteCartViewHelperTests(unittest.TestCase):
         self.assertEqual(len(view.rows), 2)
         self.assertEqual(
             view.rows[0].values,
-            ("SKU-001", "Primaria", "Colegio Norte", "Playera deportiva", 2, Decimal("199.00"), Decimal("398.00")),
+            (
+                "SKU-001",
+                "Primaria",
+                "Colegio Norte",
+                "Playera deportiva",
+                2,
+                Decimal("199.00"),
+                Decimal("398.00"),
+            ),
         )
         self.assertEqual(view.total_items, 3)
         self.assertEqual(view.total, Decimal("748.50"))

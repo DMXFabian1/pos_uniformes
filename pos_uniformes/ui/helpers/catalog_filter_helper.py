@@ -56,8 +56,7 @@ def catalog_row_matches_visible_filters(
     search_matcher: Callable[[dict[str, object], str], bool],
 ) -> bool:
     return (
-        search_matcher(row, filters.search_text)
-        and _matches_catalog_school_scope(str(row["categoria_nombre"]), filters.school_scope_filter)
+        _matches_catalog_school_scope(str(row["categoria_nombre"]), filters.school_scope_filter)
         and matches_selected_values(row["categoria_nombre"], filters.category_filters)
         and matches_selected_values(row["marca_nombre"], filters.brand_filters)
         and matches_selected_values(row["escuela_nombre"], filters.school_filters, fallback="General")
@@ -77,6 +76,7 @@ def catalog_row_matches_visible_filters(
         )
         and matches_origin_legacy(bool(row["origen_legacy"]), filters.origin_filter)
         and matches_fallback_duplicate(bool(row["fallback_importacion"]), filters.duplicate_filter)
+        and search_matcher(row, filters.search_text)
     )
 
 

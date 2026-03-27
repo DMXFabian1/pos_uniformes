@@ -45,6 +45,12 @@ class HistoryFilterResetState:
     to_date: date
 
 
+@dataclass(frozen=True)
+class HistoryQuickRangeState:
+    from_date: date
+    to_date: date
+
+
 def build_history_date_range_state(
     *,
     from_date: date,
@@ -117,6 +123,21 @@ def build_history_type_options_state(
 
 def build_history_today_filter_dates(today: date) -> tuple[date, date]:
     return today, today
+
+
+def build_history_last_days_filter_dates(*, today: date, days: int) -> HistoryQuickRangeState:
+    safe_days = max(days, 1)
+    return HistoryQuickRangeState(
+        from_date=today - timedelta(days=safe_days - 1),
+        to_date=today,
+    )
+
+
+def build_history_current_month_filter_dates(today: date) -> HistoryQuickRangeState:
+    return HistoryQuickRangeState(
+        from_date=date(today.year, today.month, 1),
+        to_date=today,
+    )
 
 
 def build_history_clear_filter_state(minimum_date: date) -> HistoryFilterResetState:

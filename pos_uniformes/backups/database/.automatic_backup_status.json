@@ -1,0 +1,13 @@
+{
+  "last_run_at": "2026-03-23T11:23:49.317704",
+  "last_success_at": "2026-03-23T11:23:49.317704",
+  "last_backup_path": "/Users/danielfabian/Documents/Playground 2/pos_uniformes/backups/database/pos_uniformes_20260323_112349.dump",
+  "dump_format": "custom",
+  "retention_days": 14,
+  "deleted_count": 0,
+  "last_error": null,
+  "external_copy_dir": "/Users/danielfabian/Library/Mobile Documents/com~apple~CloudDocs/Respaldos POS Uniformes",
+  "external_last_success_at": "2026-03-23T11:23:49.317704",
+  "external_last_backup_path": "/Users/danielfabian/Library/Mobile Documents/com~apple~CloudDocs/Respaldos POS Uniformes/pos_uniformes_20260323_112349.dump",
+  "external_last_error": null
+}

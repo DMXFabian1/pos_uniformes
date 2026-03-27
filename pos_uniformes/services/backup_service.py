@@ -38,10 +38,20 @@ class AutomaticBackupStatus:
     retention_days: int | None
     deleted_count: int
     last_error: str | None
+    external_copy_dir: Path | None = None
+    external_last_success_at: datetime | None = None
+    external_last_backup_path: Path | None = None
+    external_last_error: str | None = None
 
 
 def backup_output_dir() -> Path:
     return Path(__file__).resolve().parents[1] / "backups" / "database"
+
+
+def configured_external_backup_dir() -> Path | None:
+    if not settings.backup_external_dir:
+        return None
+    return Path(settings.backup_external_dir).expanduser().resolve()
 
 
 def automatic_backup_status_path(output_dir: Path | None = None) -> Path:
@@ -124,11 +134,17 @@ def _status_to_payload(status: AutomaticBackupStatus) -> dict[str, object]:
         "retention_days": status.retention_days,
         "deleted_count": status.deleted_count,
         "last_error": status.last_error,
+        "external_copy_dir": str(status.external_copy_dir) if status.external_copy_dir else None,
+        "external_last_success_at": _serialize_optional_datetime(status.external_last_success_at),
+        "external_last_backup_path": str(status.external_last_backup_path) if status.external_last_backup_path else None,
+        "external_last_error": status.external_last_error,
     }
 
 
 def _status_from_payload(payload: dict[str, object]) -> AutomaticBackupStatus:
     backup_path_value = payload.get("last_backup_path")
+    external_copy_dir_value = payload.get("external_copy_dir")
+    external_backup_path_value = payload.get("external_last_backup_path")
     return AutomaticBackupStatus(
         last_run_at=_parse_optional_datetime(payload.get("last_run_at") if isinstance(payload.get("last_run_at"), str) else None),
         last_success_at=_parse_optional_datetime(
@@ -139,6 +155,24 @@ def _status_from_payload(payload: dict[str, object]) -> AutomaticBackupStatus:
         retention_days=int(payload["retention_days"]) if payload.get("retention_days") is not None else None,
         deleted_count=int(payload.get("deleted_count") or 0),
         last_error=payload.get("last_error") if isinstance(payload.get("last_error"), str) else None,
+        external_copy_dir=(
+            Path(external_copy_dir_value)
+            if isinstance(external_copy_dir_value, str) and external_copy_dir_value
+            else None
+        ),
+        external_last_success_at=_parse_optional_datetime(
+            payload.get("external_last_success_at")
+            if isinstance(payload.get("external_last_success_at"), str)
+            else None
+        ),
+        external_last_backup_path=(
+            Path(external_backup_path_value)
+            if isinstance(external_backup_path_value, str) and external_backup_path_value
+            else None
+        ),
+        external_last_error=payload.get("external_last_error")
+        if isinstance(payload.get("external_last_error"), str)
+        else None,
     )
 
 
@@ -195,14 +229,25 @@ def create_backup(output_dir: Path | None = None, dump_format: str = "plain", re
     return output_file, deleted_files
 
 
+def copy_backup_to_external(backup_file: Path, external_dir: Path) -> Path:
+    source_path = backup_file.expanduser().resolve()
+    target_dir = external_dir.expanduser().resolve()
+    target_dir.mkdir(parents=True, exist_ok=True)
+    target_path = target_dir / source_path.name
+    shutil.copy2(source_path, target_path)
+    return target_path
+
+
 def run_automatic_backup(
     *,
     output_dir: Path | None = None,
     dump_format: str = "custom",
     retention_days: int = 14,
+    external_dir: Path | None = None,
 ) -> tuple[Path, list[Path], AutomaticBackupStatus]:
     target_dir = (output_dir or backup_output_dir()).expanduser().resolve()
     previous_status = read_automatic_backup_status(target_dir)
+    resolved_external_dir = (external_dir.expanduser().resolve() if external_dir is not None else configured_external_backup_dir())
     started_at = datetime.now()
     try:
         backup_file, deleted_files = create_backup(
@@ -219,9 +264,28 @@ def run_automatic_backup(
             retention_days=retention_days,
             deleted_count=previous_status.deleted_count if previous_status else 0,
             last_error=str(exc),
+            external_copy_dir=(
+                resolved_external_dir
+                if resolved_external_dir is not None
+                else previous_status.external_copy_dir if previous_status else None
+            ),
+            external_last_success_at=previous_status.external_last_success_at if previous_status else None,
+            external_last_backup_path=previous_status.external_last_backup_path if previous_status else None,
+            external_last_error=previous_status.external_last_error if previous_status else None,
         )
         write_automatic_backup_status(failed_status, output_dir=target_dir)
         raise
+
+    external_backup_path: Path | None = previous_status.external_last_backup_path if previous_status else None
+    external_last_success_at = previous_status.external_last_success_at if previous_status else None
+    external_last_error = previous_status.external_last_error if previous_status else None
+    if resolved_external_dir is not None:
+        try:
+            external_backup_path = copy_backup_to_external(backup_file, resolved_external_dir)
+            external_last_success_at = started_at
+            external_last_error = None
+        except Exception as exc:  # noqa: BLE001
+            external_last_error = str(exc)
 
     status = AutomaticBackupStatus(
         last_run_at=started_at,
@@ -231,6 +295,10 @@ def run_automatic_backup(
         retention_days=retention_days,
         deleted_count=len(deleted_files),
         last_error=None,
+        external_copy_dir=resolved_external_dir,
+        external_last_success_at=external_last_success_at,
+        external_last_backup_path=external_backup_path,
+        external_last_error=external_last_error,
     )
     write_automatic_backup_status(status, output_dir=target_dir)
     return backup_file, deleted_files, status

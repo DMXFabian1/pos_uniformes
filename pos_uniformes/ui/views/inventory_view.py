@@ -20,8 +20,6 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
-from pos_uniformes.ui.helpers.search_input_helper import apply_search_suggestions
-
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
 
@@ -235,14 +233,16 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     table_box.setObjectName("infoCard")
     table_layout = QVBoxLayout()
     table_layout.setSpacing(5)
-    window.inventory_results_label.setObjectName("subtleLine")
-    window.inventory_active_filters_label.setObjectName("subtleLine")
+    window.inventory_results_label.setObjectName("catalogSummaryLine")
+    window.inventory_active_filters_label.setObjectName("catalogSupportLine")
+    window.inventory_pagination_label.setObjectName("catalogPagerLine")
+    window.inventory_previous_page_button.setObjectName("secondaryButton")
+    window.inventory_next_page_button.setObjectName("secondaryButton")
     window.inventory_search_input.setPlaceholderText(
         "Buscar producto, color, talla, marca, escuela o SKU"
     )
     window.inventory_search_input.setClearButtonEnabled(True)
     window.inventory_search_input.setObjectName("inventoryFilterInput")
-    apply_search_suggestions(window.inventory_search_input, [])
     window.inventory_category_filter_combo.setObjectName("secondaryButton")
     window.inventory_brand_filter_combo.setObjectName("secondaryButton")
     window.inventory_school_filter_combo.setObjectName("secondaryButton")
@@ -311,39 +311,47 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
         counter.setObjectName("inventoryCounterChip")
         counters_row.addWidget(counter)
     counters_row.addStretch()
+    summary_row = QHBoxLayout()
+    summary_row.setSpacing(8)
+    summary_row.addWidget(window.inventory_results_label, 1)
+    summary_row.addWidget(window.inventory_pagination_label)
+    summary_row.addWidget(window.inventory_previous_page_button)
+    summary_row.addWidget(window.inventory_next_page_button)
     table_layout.addLayout(filters_row)
-    table_layout.addWidget(window.inventory_results_label)
-    table_layout.addWidget(window.inventory_active_filters_label)
+    table_layout.addLayout(summary_row)
     table_layout.addLayout(counters_row)
     inventory_hint_label = QLabel("Doble clic para editar la presentacion seleccionada.")
     inventory_hint_label.setObjectName("subtleLine")
     table_layout.addWidget(inventory_hint_label)
     table_layout.addWidget(window.inventory_table)
     table_box.setLayout(table_layout)
-    window.inventory_search_input.textChanged.connect(lambda _: window._handle_inventory_filters_changed())
-    window.inventory_category_filter_combo.selectionChanged.connect(window._handle_inventory_filters_changed)
-    window.inventory_brand_filter_combo.selectionChanged.connect(window._handle_inventory_filters_changed)
-    window.inventory_school_filter_combo.selectionChanged.connect(window._handle_inventory_filters_changed)
-    window.inventory_type_filter_combo.selectionChanged.connect(window._handle_inventory_filters_changed)
-    window.inventory_piece_filter_combo.selectionChanged.connect(window._handle_inventory_filters_changed)
-    window.inventory_size_filter_combo.selectionChanged.connect(window._handle_inventory_filters_changed)
-    window.inventory_color_filter_combo.selectionChanged.connect(window._handle_inventory_filters_changed)
+    window.inventory_search_input.textChanged.connect(lambda _: window._schedule_inventory_filter_refresh_reset_page())
+    window.inventory_search_input.returnPressed.connect(window._handle_inventory_filters_changed_reset_page)
+    window.inventory_category_filter_combo.selectionChanged.connect(window._handle_inventory_filters_changed_reset_page)
+    window.inventory_brand_filter_combo.selectionChanged.connect(window._handle_inventory_filters_changed_reset_page)
+    window.inventory_school_filter_combo.selectionChanged.connect(window._handle_inventory_filters_changed_reset_page)
+    window.inventory_type_filter_combo.selectionChanged.connect(window._handle_inventory_filters_changed_reset_page)
+    window.inventory_piece_filter_combo.selectionChanged.connect(window._handle_inventory_filters_changed_reset_page)
+    window.inventory_size_filter_combo.selectionChanged.connect(window._handle_inventory_filters_changed_reset_page)
+    window.inventory_color_filter_combo.selectionChanged.connect(window._handle_inventory_filters_changed_reset_page)
     window.inventory_status_filter_combo.currentIndexChanged.connect(
-        lambda _: window._handle_inventory_filters_changed()
+        lambda _: window._handle_inventory_filters_changed_reset_page()
     )
     window.inventory_stock_filter_combo.currentIndexChanged.connect(
-        lambda _: window._handle_inventory_filters_changed()
+        lambda _: window._handle_inventory_filters_changed_reset_page()
     )
     window.inventory_qr_filter_combo.currentIndexChanged.connect(
-        lambda _: window._handle_inventory_filters_changed()
+        lambda _: window._handle_inventory_filters_changed_reset_page()
     )
     window.inventory_origin_filter_combo.currentIndexChanged.connect(
-        lambda _: window._handle_inventory_filters_changed()
+        lambda _: window._handle_inventory_filters_changed_reset_page()
     )
     window.inventory_duplicate_filter_combo.currentIndexChanged.connect(
-        lambda _: window._handle_inventory_filters_changed()
+        lambda _: window._handle_inventory_filters_changed_reset_page()
     )
     window.inventory_clear_filters_button.clicked.connect(window._handle_clear_inventory_filters)
+    window.inventory_previous_page_button.clicked.connect(window._handle_inventory_previous_page)
+    window.inventory_next_page_button.clicked.connect(window._handle_inventory_next_page)
 
     content_layout = QGridLayout()
     content_layout.setSpacing(10)

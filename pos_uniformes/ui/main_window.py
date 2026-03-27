@@ -10,6 +10,7 @@ from pathlib import Path
 import subprocess
 import sys
 from time import monotonic
+import unicodedata
 from urllib.parse import quote
 from uuid import uuid4
 import webbrowser
@@ -146,7 +147,10 @@ from pos_uniformes.services.inventory_label_service import (
     render_inventory_label,
 )
 from pos_uniformes.services.inventory_overview_service import load_inventory_overview_snapshot
-from pos_uniformes.services.inventory_snapshot_service import load_inventory_snapshot_rows
+from pos_uniformes.services.inventory_snapshot_service import (
+    invalidate_inventory_qr_exists_cache,
+    load_inventory_snapshot_rows,
+)
 from pos_uniformes.services.manual_promo_service import ManualPromoService
 from pos_uniformes.services.presupuesto_service import PresupuestoItemInput, PresupuestoService
 from pos_uniformes.services.quote_snapshot_service import (
@@ -155,6 +159,7 @@ from pos_uniformes.services.quote_snapshot_service import (
 )
 from pos_uniformes.services.quote_detail_service import load_quote_detail_snapshot
 from pos_uniformes.services.quote_action_service import cancel_quote
+from pos_uniformes.services.quote_whatsapp_service import build_quote_whatsapp_view
 from pos_uniformes.services.layaway_alerts_service import load_layaway_alerts_snapshot
 from pos_uniformes.services.layaway_closure_service import (
     cancel_layaway,
@@ -199,10 +204,13 @@ from pos_uniformes.services.sale_discount_service import (
 )
 from pos_uniformes.services.recent_sale_service import list_recent_sale_rows
 from pos_uniformes.services.recent_sale_action_service import cancel_recent_sale
-from pos_uniformes.services.search_filter_service import row_matches_search
-from pos_uniformes.services.search_suggestion_service import (
-    build_catalog_search_suggestions,
-    build_inventory_search_suggestions,
+from pos_uniformes.services.search_filter_service import (
+    CATALOG_SEARCH_ALIAS_MAP,
+    CATALOG_SEARCH_GENERAL_FIELDS,
+    INVENTORY_SEARCH_ALIAS_MAP,
+    INVENTORY_SEARCH_GENERAL_FIELDS,
+    compile_search_terms,
+    row_matches_search,
 )
 from pos_uniformes.services.settings_backup_action_service import (
     create_settings_backup,
@@ -271,6 +279,7 @@ from pos_uniformes.ui.dialogs.catalog_variant_dialog import (
 from pos_uniformes.ui.dialogs.layaway_payment_dialog import build_layaway_payment_dialog
 from pos_uniformes.ui.dialogs.create_layaway_dialog import build_create_layaway_dialog
 from pos_uniformes.ui.dialogs.inventory_context_menu_dialog import prompt_inventory_context_action
+from pos_uniformes.ui.dialogs.inventory_count_dialog import prompt_inventory_count_data
 from pos_uniformes.ui.dialogs.inventory_label_dialog import build_inventory_label_dialog
 from pos_uniformes.ui.dialogs.marketing_history_dialog import build_marketing_history_dialog
 from pos_uniformes.ui.dialogs.printable_text_dialog import open_printable_text_dialog
@@ -292,6 +301,7 @@ from pos_uniformes.ui.helpers.catalog_filter_helper import (
     CatalogVisibleFilterState,
     filter_visible_catalog_rows,
 )
+from pos_uniformes.ui.helpers.catalog_pagination_helper import build_catalog_pagination_view
 from pos_uniformes.ui.helpers.catalog_macro_filter_helper import (
     build_catalog_uniform_macro_button_states,
     resolve_catalog_uniform_macro_selection,
@@ -335,9 +345,16 @@ from pos_uniformes.ui.helpers.catalog_table_row_helper import build_catalog_tabl
 from pos_uniformes.ui.helpers.history_filter_helper import build_history_type_options
 from pos_uniformes.ui.helpers.history_filter_state_helper import (
     build_history_clear_filter_state,
+    build_history_current_month_filter_dates,
     build_history_filter_state,
+    build_history_last_days_filter_dates,
     build_history_today_filter_dates,
     build_history_type_options_state,
+)
+from pos_uniformes.ui.helpers.history_detail_helper import build_history_detail_view
+from pos_uniformes.ui.helpers.history_export_helper import (
+    build_history_export_dir_name,
+    build_history_export_rows,
 )
 from pos_uniformes.ui.helpers.history_summary_helper import build_history_summary_view
 from pos_uniformes.ui.helpers.history_table_helper import build_history_table_rows
@@ -373,9 +390,9 @@ from pos_uniformes.ui.helpers.inventory_qr_preview_helper import (
 )
 from pos_uniformes.ui.helpers.inventory_selection_helper import (
     collect_selected_inventory_variant_ids,
+    find_catalog_row_by_variant_id,
     find_inventory_row_index_by_variant_id,
     normalize_inventory_variant_id,
-    resolve_selected_catalog_row,
 )
 from pos_uniformes.ui.helpers.inventory_summary_helper import build_inventory_summary_view
 from pos_uniformes.ui.helpers.inventory_table_row_helper import build_inventory_table_row_views
@@ -434,8 +451,8 @@ from pos_uniformes.ui.helpers.sale_post_action_feedback_helper import (
 )
 from pos_uniformes.ui.helpers.sale_payment_helper import collect_sale_payment_details
 from pos_uniformes.ui.helpers.sale_scanned_client_helper import build_sale_scanned_client_ui_state
-from pos_uniformes.ui.helpers.search_input_helper import apply_search_suggestions
 from pos_uniformes.ui.helpers.size_option_sort_helper import sort_size_options
+from pos_uniformes.ui.helpers.snapshot_cache_helper import SnapshotCache
 from pos_uniformes.ui.helpers.settings_backup_helper import (
     build_settings_backup_error_view,
     build_settings_backup_view,
@@ -521,11 +538,21 @@ from pos_uniformes.utils.date_format import format_display_date, format_display_
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 from pos_uniformes.utils.qr_generator import QrGenerator
 
+LISTING_SEARCH_DEBOUNCE_MS = 300
+CATALOG_PAGE_SIZE = 25
+INVENTORY_PAGE_SIZE = 25
+
 
 def _table_item(value: object) -> QTableWidgetItem:
     item = QTableWidgetItem("" if value is None else str(value))
     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
     return item
+
+
+def _normalize_filter_value(value: object) -> str:
+    text = str(value or "").strip().casefold()
+    decomposed = unicodedata.normalize("NFKD", text)
+    return "".join(char for char in decomposed if not unicodedata.combining(char))
 
 
 class MultiSelectFilterButton(QToolButton):
@@ -543,14 +570,14 @@ class MultiSelectFilterButton(QToolButton):
         self._update_text()
 
     def set_items(self, items: list[tuple[str, str]]) -> None:
-        selected_values = self.selected_values()
+        selected_values = {_normalize_filter_value(value) for value in self.selected_values()}
         self._updating = True
         self._menu.clear()
         for label, data in items:
             action = QAction(label, self)
             action.setCheckable(True)
             action.setData(str(data))
-            action.setChecked(str(data) in selected_values)
+            action.setChecked(_normalize_filter_value(data) in selected_values)
             action.toggled.connect(self._handle_action_toggled)
             self._menu.addAction(action)
         self._updating = False
@@ -583,11 +610,15 @@ class MultiSelectFilterButton(QToolButton):
         self.selectionChanged.emit()
 
     def set_selected_values(self, values: list[str] | set[str]) -> None:
-        normalized = {str(value) for value in values if str(value).strip()}
+        normalized = {
+            _normalize_filter_value(value)
+            for value in values
+            if str(value).strip()
+        }
         self._updating = True
         for action in self._menu.actions():
             if action.isCheckable():
-                action.setChecked(str(action.data()) in normalized)
+                action.setChecked(_normalize_filter_value(action.data()) in normalized)
         self._updating = False
         self._update_text()
         self.selectionChanged.emit()
@@ -920,11 +951,29 @@ class MainWindow(QMainWindow):
         self.cash_session_requires_cut = False
         self.cash_session_cut_reminder_key: tuple[int, date] | None = None
         self.catalog_rows: list[dict[str, object]] = []
+        self.catalog_filtered_rows: list[dict[str, object]] = []
+        self.catalog_page_index = 0
+        self.catalog_preserve_selection_on_refresh = True
         self.inventory_rows: list[dict[str, object]] = []
+        self.inventory_filtered_rows: list[dict[str, object]] = []
+        self.inventory_page_index = 0
+        self.catalog_snapshot_cache: SnapshotCache[list[dict[str, object]]] = SnapshotCache()
+        self.inventory_snapshot_cache: SnapshotCache[list[dict[str, object]]] = SnapshotCache()
+        self.catalog_filter_debounce_timer = QTimer(self)
+        self.catalog_filter_debounce_timer.setSingleShot(True)
+        self.catalog_filter_debounce_timer.setInterval(LISTING_SEARCH_DEBOUNCE_MS)
+        self.catalog_filter_debounce_timer.timeout.connect(lambda: self._run_catalog_filter_refresh())
+        self.inventory_filter_debounce_timer = QTimer(self)
+        self.inventory_filter_debounce_timer.setSingleShot(True)
+        self.inventory_filter_debounce_timer.setInterval(LISTING_SEARCH_DEBOUNCE_MS)
+        self.inventory_filter_debounce_timer.timeout.connect(lambda: self._run_inventory_filter_refresh())
         self.sale_cart: list[dict[str, object]] = []
         self.layaway_rows: list[dict[str, object]] = []
+        self.history_rows: list[dict[str, object]] = []
         self.quote_cart: list[dict[str, object]] = []
         self.quote_rows: list[dict[str, object]] = []
+        self.selected_quote_state = ""
+        self.selected_quote_phone = ""
 
         self.setWindowTitle("POS Uniformes")
         self.resize(1320, 860)
@@ -1007,6 +1056,7 @@ class MainWindow(QMainWindow):
         self.catalog_permission_label = QLabel()
         self.catalog_results_label = QLabel()
         self.catalog_active_filters_label = QLabel()
+        self.catalog_pagination_label = QLabel()
         self.catalog_selection_label = QLabel("Selecciona una presentacion en inventario para gestionar cambios.")
         self.products_selection_label = QLabel(build_empty_catalog_selection_view().selection_label)
         self.catalog_search_input = QLineEdit()
@@ -1025,6 +1075,8 @@ class MainWindow(QMainWindow):
         self.catalog_origin_filter_combo = QComboBox()
         self.catalog_duplicate_filter_combo = QComboBox()
         self.catalog_clear_filters_button = QPushButton("Limpiar filtros")
+        self.catalog_previous_page_button = QPushButton("Anterior")
+        self.catalog_next_page_button = QPushButton("Siguiente")
         self.edit_product_category_combo = QComboBox()
         self.edit_product_brand_combo = QComboBox()
         self.edit_product_name_input = QLineEdit()
@@ -1054,6 +1106,7 @@ class MainWindow(QMainWindow):
         self.sale_qty_spin = QSpinBox()
         self.sale_folio_input = QLabel()
         self.sale_client_combo = QComboBox()
+        self.sale_client_display_label = QLabel("Mostrador / sin cliente")
         self.sale_payment_combo = QComboBox()
         self.sale_discount_combo = QComboBox()
         self.sale_add_button = QPushButton("Agregar al carrito")
@@ -1064,11 +1117,15 @@ class MainWindow(QMainWindow):
         self.cancel_button = QPushButton("Cancelar venta seleccionada")
         self.cancel_permission_label = QLabel()
         self.sale_cart_table = QTableWidget()
+        self.sale_qty_down_button = QPushButton("-1")
+        self.sale_qty_up_button = QPushButton("+1")
         self.sale_remove_button = QPushButton("Quitar linea")
         self.sale_clear_button = QPushButton("Vaciar carrito")
         self.sale_summary_label = QLabel("Carrito vacio.")
+        self.sale_context_label = QLabel("Cliente: Mostrador / sin cliente | Pago: Efectivo | Descuento: Sin descuento")
         self.sale_total_label = QLabel("$0.00")
         self.sale_total_meta_label = QLabel("Total a cobrar")
+        self.sale_status_label = QLabel("Escanea un SKU para empezar a vender.")
         self.sale_feedback_label = QLabel("Listo para escanear.")
         self.sales_dialog: QDialog | None = None
         self.sale_processing = False
@@ -1091,9 +1148,12 @@ class MainWindow(QMainWindow):
         self.quote_note_input = QTextEdit()
         self.quote_add_button = QPushButton("Agregar al presupuesto")
         self.quote_save_button = QPushButton("Guardar presupuesto")
+        self.quote_qty_down_button = QPushButton("-1")
+        self.quote_qty_up_button = QPushButton("+1")
         self.quote_remove_button = QPushButton("Quitar linea")
         self.quote_clear_button = QPushButton("Vaciar presupuesto")
         self.quote_cancel_button = QPushButton("Cancelar presupuesto")
+        self.quote_whatsapp_button = QPushButton("WhatsApp")
         self.quote_refresh_button = QPushButton("Refrescar")
         self.quote_status_label = QLabel("Sin presupuestos cargados.")
         self.quote_summary_label = QLabel("Presupuesto vacio.")
@@ -1139,6 +1199,7 @@ class MainWindow(QMainWindow):
         self.inventory_last_movement_label = QLabel("")
         self.inventory_results_label = QLabel()
         self.inventory_active_filters_label = QLabel()
+        self.inventory_pagination_label = QLabel()
         self.inventory_search_input = QLineEdit()
         self.inventory_category_filter_combo = MultiSelectFilterButton("Categoria: todas")
         self.inventory_brand_filter_combo = MultiSelectFilterButton("Marca: todas")
@@ -1153,6 +1214,8 @@ class MainWindow(QMainWindow):
         self.inventory_origin_filter_combo = QComboBox()
         self.inventory_duplicate_filter_combo = QComboBox()
         self.inventory_clear_filters_button = QPushButton("Limpiar filtros")
+        self.inventory_previous_page_button = QPushButton("Anterior")
+        self.inventory_next_page_button = QPushButton("Siguiente")
         self.inventory_out_counter = QLabel("Agotados: 0")
         self.inventory_low_counter = QLabel("Bajo stock: 0")
         self.inventory_qr_pending_counter = QLabel("Sin QR: 0")
@@ -1193,9 +1256,18 @@ class MainWindow(QMainWindow):
         self.history_from_input = QDateEdit()
         self.history_to_input = QDateEdit()
         self.history_today_button = QPushButton("Hoy")
+        self.history_last_7_button = QPushButton("7 dias")
+        self.history_last_30_button = QPushButton("30 dias")
+        self.history_month_button = QPushButton("Mes actual")
         self.history_clear_button = QPushButton("Limpiar")
         self.history_filter_button = QPushButton("Aplicar filtros")
+        self.history_export_button = QPushButton("Exportar")
         self.history_status_label = QLabel("Sin movimientos cargados.")
+        self.history_search_hint_label = QLabel("")
+        self.history_detail_summary_label = QLabel("Selecciona un movimiento para ver el detalle.")
+        self.history_detail_meta_label = QLabel("Sin movimiento seleccionado.")
+        self.history_detail_change_label = QLabel("Cambio y resultado visibles aqui cuando elijas una fila.")
+        self.history_detail_notes_label = QLabel("El detalle extendido aparecera aqui para revisar la trazabilidad.")
 
         self.settings_backup_format_combo = QComboBox()
         self.settings_backup_table = QTableWidget()
@@ -1456,9 +1528,12 @@ class MainWindow(QMainWindow):
             self.sale_layaway_button: "Convierte el carrito actual en un apartado y reserva el stock de sus lineas.",
             self.quote_add_button: "Agrega el SKU capturado al presupuesto actual sin afectar inventario.",
             self.quote_create_client_button: "Crea un cliente rapido desde Presupuestos usando solo nombre y telefono.",
-            self.quote_save_button: "Guarda el presupuesto actual con folio, cliente opcional y vigencia.",
+            self.quote_save_button: "Emite el presupuesto rapido actual con folio, cliente opcional y vigencia.",
+            self.quote_qty_down_button: "Reduce una pieza de la linea seleccionada del presupuesto.",
+            self.quote_qty_up_button: "Aumenta una pieza de la linea seleccionada del presupuesto.",
             self.quote_remove_button: "Quita la linea seleccionada del presupuesto en armado.",
             self.quote_clear_button: "Vacía por completo el presupuesto actual.",
+            self.quote_whatsapp_button: "Abre WhatsApp con un mensaje prellenado para el cliente del presupuesto seleccionado.",
             self.quote_cancel_button: "Marca como cancelado el presupuesto seleccionado sin tocar inventario.",
             self.quote_refresh_button: "Vuelve a leer los presupuestos recientes con los filtros actuales.",
             self.sale_add_button: "Agrega el SKU capturado al carrito de venta.",
@@ -3935,103 +4010,21 @@ class MainWindow(QMainWindow):
         }
 
     def _prompt_inventory_count_data(self) -> dict[str, object] | None:
-        with get_session() as session:
-            variantes = [
-                (
-                    variante.id,
-                    variante.sku,
-                    sanitize_product_display_name(variante.producto.nombre),
-                    variante.talla,
-                    variante.color,
-                    variante.stock_actual,
-                )
-                for variante in session.scalars(select(Variante).order_by(Variante.sku)).all()
-            ]
-
-        if not variantes:
-            raise ValueError("No hay presentaciones disponibles para conteo.")
-
-        dialog, layout = self._create_modal_dialog(
-            "Conteo fisico",
-            "Captura el stock contado de cada presentacion. Solo se aplicaran filas con diferencia.",
-            width=760,
-        )
-        referencia_input = QLineEdit()
-        referencia_input.setPlaceholderText("CONTEO-0001")
-        observacion_input = QLineEdit()
-        observacion_input.setPlaceholderText("Conteo general de piso o almacen")
-
-        header_form = QFormLayout()
-        header_form.addRow("Referencia", referencia_input)
-        header_form.addRow("Observacion", observacion_input)
-
-        table = QTableWidget()
-        table.setColumnCount(6)
-        table.setHorizontalHeaderLabels(["SKU", "Producto", "Talla", "Color", "Sistema", "Contado"])
-        table.setObjectName("dataTable")
-        table.verticalHeader().setVisible(False)
-        table.setRowCount(len(variantes))
-
-        selected_variant_id = self.inventory_variant_combo.currentData()
-        selected_row_index = None
-        for row_index, (variante_id, sku, producto_nombre, talla, color, stock_actual) in enumerate(variantes):
-            values = [sku, producto_nombre, talla, color, stock_actual]
-            for column_index, value in enumerate(values):
-                item = _table_item(value)
-                table.setItem(row_index, column_index, item)
-            contado_spin = QSpinBox()
-            contado_spin.setRange(0, 100000)
-            contado_spin.setValue(int(stock_actual))
-            table.setCellWidget(row_index, 5, contado_spin)
-            table.item(row_index, 0).setData(Qt.ItemDataRole.UserRole, variante_id)
-            if selected_variant_id is not None and int(variante_id) == int(selected_variant_id):
-                selected_row_index = row_index
-
-        if selected_row_index is not None:
-            table.setCurrentCell(selected_row_index, 0)
-            table.selectRow(selected_row_index)
-
-        buttons = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
-        )
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
-
-        layout.addLayout(header_form)
-        layout.addWidget(table)
-        layout.addWidget(buttons)
-
-        if dialog.exec() != int(QDialog.DialogCode.Accepted):
+        payload = prompt_inventory_count_data(self)
+        if payload is None:
             return None
-
-        conteos: list[dict[str, int]] = []
-        for row_index in range(table.rowCount()):
-            item = table.item(row_index, 0)
-            if item is None:
-                continue
-            variante_id = item.data(Qt.ItemDataRole.UserRole)
-            system_stock_item = table.item(row_index, 4)
-            counted_widget = table.cellWidget(row_index, 5)
-            if variante_id is None or system_stock_item is None or not isinstance(counted_widget, QSpinBox):
-                continue
-            stock_sistema = int(system_stock_item.text())
-            stock_contado = counted_widget.value()
-            delta = stock_contado - stock_sistema
-            if delta == 0:
-                continue
-            conteos.append(
-                {
-                    "variante_id": int(variante_id),
-                    "stock_sistema": stock_sistema,
-                    "stock_contado": stock_contado,
-                    "delta": delta,
-                }
-            )
-
         return {
-            "referencia": referencia_input.text().strip(),
-            "observacion": observacion_input.text().strip(),
-            "conteos": conteos,
+            "referencia": str(payload.get("reference", "")).strip(),
+            "observacion": str(payload.get("observation", "")).strip(),
+            "conteos": [
+                {
+                    "variante_id": int(row["variante_id"]),
+                    "stock_sistema": int(row["stock_sistema"]),
+                    "stock_contado": int(row["stock_contado"]),
+                    "delta": int(row["delta"]),
+                }
+                for row in list(payload.get("rows", []))
+            ],
         }
 
     @staticmethod
@@ -4041,7 +4034,7 @@ class MainWindow(QMainWindow):
 
     def _prompt_inventory_bulk_adjustment_data(self) -> dict[str, object] | None:
         selected_ids = self._selected_inventory_variant_ids()
-        filtered_rows = list(self.inventory_rows)
+        filtered_rows = list(self.inventory_filtered_rows)
         if not selected_ids and not filtered_rows:
             raise ValueError("No hay presentaciones disponibles para ajuste masivo.")
 
@@ -4380,7 +4373,7 @@ class MainWindow(QMainWindow):
 
     def _prompt_inventory_bulk_price_data(self) -> dict[str, object] | None:
         selected_ids = self._selected_inventory_variant_ids()
-        filtered_rows = list(self.inventory_rows)
+        filtered_rows = list(self.inventory_filtered_rows)
         if not selected_ids and not filtered_rows:
             raise ValueError("No hay presentaciones disponibles para cambio masivo de precio.")
 
@@ -5629,6 +5622,7 @@ class MainWindow(QMainWindow):
         self.sale_qty_spin.setValue(1)
         self.sale_payment_combo.setCurrentText("Efectivo")
         self.sale_client_combo.setCurrentIndex(0)
+        self._refresh_sale_client_display()
         self._apply_sale_client_selection_ui_state(
             build_empty_sale_client_selection_ui_state(
                 normalize_discount_value=self._normalize_discount_value,
@@ -5641,11 +5635,15 @@ class MainWindow(QMainWindow):
         self.sale_last_scanned_at = 0.0
         self._refresh_payment_fields()
 
+    def _refresh_sale_client_display(self) -> None:
+        current_label = self.sale_client_combo.currentText().strip() or "Mostrador / sin cliente"
+        self.sale_client_display_label.setText(current_label)
+
     def _reset_quote_form(self) -> None:
         self.quote_sku_input.clear()
         self.quote_qty_spin.setValue(1)
         self.quote_client_combo.setCurrentIndex(0)
-        self.quote_validity_input.setDate(QDate.currentDate().addDays(15))
+        self.quote_validity_input.setDate(QDate.currentDate().addDays(7))
         self.quote_note_input.clear()
         self.quote_folio_input.setText(self._generate_quote_folio())
 
@@ -5690,6 +5688,7 @@ class MainWindow(QMainWindow):
         self.sale_processing = active
         self.sale_button.setEnabled(not active and self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO})
         self.sale_button.setText("Procesando..." if active else "Cobrar")
+        self._refresh_payment_fields()
 
     @staticmethod
     def _normalize_discount_value(value: object | None) -> Decimal:
@@ -5772,6 +5771,7 @@ class MainWindow(QMainWindow):
             raise ValueError(f"El cliente escaneado '{scanned_code}' no esta disponible en Caja.")
 
         self.sale_client_combo.setCurrentIndex(combo_index)
+        self._refresh_sale_client_display()
         self.sale_last_scanned_sku = client.codigo_cliente
         self.sale_last_scanned_at = monotonic()
         self.sale_sku_input.clear()
@@ -5959,6 +5959,7 @@ class MainWindow(QMainWindow):
         self._refresh_sale_cart_table()
 
     def _handle_sale_client_changed(self) -> None:
+        self._refresh_sale_client_display()
         self._sync_sale_discount_with_selected_client(reset_manual=True)
 
     def _effective_sale_discount_percent(self) -> Decimal:
@@ -6010,9 +6011,18 @@ class MainWindow(QMainWindow):
             collected_total=Decimal("0.00"),
             payment_method=self.sale_payment_combo.currentText(),
             winner_label="",
+            selected_client_label=self.sale_client_combo.currentText(),
             can_sell=self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO},
+            has_cash_session=self.active_cash_session_id is not None,
+            is_processing=self.sale_processing,
         )
         self.sale_feedback_label.setToolTip(panel_view.payment_tooltip)
+        self.sale_context_label.setText(panel_view.context_label)
+        self.sale_status_label.setText(panel_view.status_label)
+        self.sale_status_label.setProperty("tone", panel_view.status_tone)
+        self.sale_status_label.style().unpolish(self.sale_status_label)
+        self.sale_status_label.style().polish(self.sale_status_label)
+        self.sale_status_label.update()
 
     def _handle_add_sale_item(self) -> None:
         if self.current_role not in {RolUsuario.ADMIN, RolUsuario.CAJERO}:
@@ -6103,6 +6113,42 @@ class MainWindow(QMainWindow):
 
         self.sale_cart.pop(selected_row)
         self._refresh_sale_cart_table()
+
+    def _change_selected_sale_item_quantity(self, delta: int) -> None:
+        selected_row = self.sale_cart_table.currentRow()
+        if selected_row < 0 or selected_row >= len(self.sale_cart):
+            QMessageBox.warning(self, "Sin seleccion", "Selecciona una linea del carrito.")
+            return
+
+        selected_item = self.sale_cart[selected_row]
+        current_quantity = int(selected_item.get("cantidad") or 1)
+        new_quantity = current_quantity + int(delta)
+        if new_quantity <= 0:
+            QMessageBox.information(
+                self,
+                "Cantidad minima",
+                "Usa 'Quitar linea' si quieres sacar por completo el articulo del carrito.",
+            )
+            return
+        try:
+            with get_session() as session:
+                update_sale_cart_item_quantity(
+                    session,
+                    sale_cart=self.sale_cart,
+                    row_index=selected_row,
+                    new_quantity=new_quantity,
+                )
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Cantidad no actualizada", str(exc))
+            return
+        self._refresh_sale_cart_table()
+        self.sale_cart_table.selectRow(selected_row)
+
+    def _handle_decrease_sale_item_quantity(self) -> None:
+        self._change_selected_sale_item_quantity(-1)
+
+    def _handle_increase_sale_item_quantity(self) -> None:
+        self._change_selected_sale_item_quantity(1)
 
     def _handle_clear_sale_cart(self) -> None:
         self.sale_cart.clear()
@@ -6247,7 +6293,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Datos incompletos", "Captura un SKU antes de agregar al presupuesto.")
             return
 
-        quantity = self.quote_qty_spin.value()
+        quantity = 1
         try:
             with get_session() as session:
                 variante = PresupuestoService.obtener_variante_por_sku(session, sku)
@@ -6271,7 +6317,6 @@ class MainWindow(QMainWindow):
             return
 
         self.quote_sku_input.clear()
-        self.quote_qty_spin.setValue(1)
         self._refresh_quote_cart_table()
         self.quote_sku_input.setFocus()
 
@@ -6286,6 +6331,44 @@ class MainWindow(QMainWindow):
             return
         self.quote_cart.pop(selected_row)
         self._refresh_quote_cart_table()
+
+    def _change_selected_quote_item_quantity(self, delta: int) -> None:
+        selected_row = self.quote_cart_table.currentRow()
+        if selected_row < 0 or selected_row >= len(self.quote_cart):
+            QMessageBox.warning(self, "Sin seleccion", "Selecciona una linea del presupuesto.")
+            return
+
+        selected_item = self.quote_cart[selected_row]
+        current_quantity = int(selected_item.get("cantidad") or 1)
+        new_quantity = current_quantity + int(delta)
+        if new_quantity <= 0:
+            QMessageBox.information(
+                self,
+                "Cantidad minima",
+                "Usa 'Quitar linea' si quieres sacar por completo el articulo del presupuesto.",
+            )
+            return
+        try:
+            with get_session() as session:
+                update_sale_cart_item_quantity(
+                    session,
+                    sale_cart=self.quote_cart,
+                    row_index=selected_row,
+                    new_quantity=new_quantity,
+                    variant_loader=PresupuestoService.obtener_variante_por_sku,
+                    stock_validator=lambda _variante, _cantidad: None,
+                )
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Cantidad no actualizada", str(exc))
+            return
+        self._refresh_quote_cart_table()
+        self.quote_cart_table.selectRow(selected_row)
+
+    def _handle_decrease_quote_item_quantity(self) -> None:
+        self._change_selected_quote_item_quantity(-1)
+
+    def _handle_increase_quote_item_quantity(self) -> None:
+        self._change_selected_quote_item_quantity(1)
 
     def _handle_clear_quote_cart(self) -> None:
         self.quote_cart.clear()
@@ -6303,6 +6386,8 @@ class MainWindow(QMainWindow):
         if not self.quote_cart:
             if self.quote_sku_input.text().strip():
                 self._handle_add_quote_item()
+                if not self.quote_cart:
+                    return
             feedback = build_quote_guard_feedback("save_quote", has_items=bool(self.quote_cart))
             if feedback is not None:
                 QMessageBox.warning(self, feedback.title, feedback.message)
@@ -6360,8 +6445,11 @@ class MainWindow(QMainWindow):
         action_state = build_quote_action_state(
             can_sell=self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO},
             has_selection=self._selected_quote_id() is not None,
+            selected_state=self.selected_quote_state,
+            has_phone=bool(self.selected_quote_phone.strip()),
         )
         self.quote_cancel_button.setEnabled(action_state.cancel_enabled)
+        self.quote_whatsapp_button.setEnabled(action_state.whatsapp_enabled)
 
     def _handle_quote_filters_changed(self) -> None:
         try:
@@ -6393,6 +6481,37 @@ class MainWindow(QMainWindow):
         self.refresh_all()
         result_view = build_quote_result_feedback("cancel_quote")
         QMessageBox.information(self, result_view.title, result_view.message)
+
+    def _handle_open_quote_whatsapp(self) -> None:
+        quote_id = self._selected_quote_id()
+        feedback = build_quote_guard_feedback("open_whatsapp", has_selection=quote_id is not None)
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
+            return
+
+        assert quote_id is not None
+        try:
+            with get_session() as session:
+                whatsapp_view = build_quote_whatsapp_view(session, quote_id=quote_id)
+            normalized_phone = self._normalize_whatsapp_phone(whatsapp_view.phone_number)
+            if len(normalized_phone) < 10:
+                raise ValueError("El telefono del cliente no parece valido para WhatsApp.")
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "WhatsApp no disponible", str(exc))
+            return
+
+        whatsapp_url = f"https://wa.me/{normalized_phone}?text={quote(whatsapp_view.message)}"
+        if not webbrowser.open(whatsapp_url):
+            QMessageBox.warning(
+                self,
+                "No se pudo abrir WhatsApp",
+                "No se pudo abrir WhatsApp automaticamente. Verifica que tengas navegador disponible.",
+            )
+            return
+
+        self.quote_status_label.setText(
+            f"WhatsApp preparado para {whatsapp_view.customer_label}."
+        )
 
     def _handle_sale(self) -> None:
         if self.sale_processing:
@@ -6747,6 +6866,8 @@ class MainWindow(QMainWindow):
             preview_path=path,
         )
         self._set_combo_value(self.inventory_variant_combo, variante_id)
+        invalidate_inventory_qr_exists_cache(sku=str(variante.sku))
+        self._invalidate_listing_snapshot_caches(catalog=False, inventory=True)
         self._handle_inventory_filters_changed()
         QMessageBox.information(self, "QR generado", f"QR guardado en:\n{path}")
 
@@ -6763,6 +6884,8 @@ class MainWindow(QMainWindow):
 
         directory = QrGenerator.output_dir()
         self.qr_status_label.setText(f"QRs generados en: {directory}")
+        invalidate_inventory_qr_exists_cache()
+        self._invalidate_listing_snapshot_caches(catalog=False, inventory=True)
         self._handle_inventory_filters_changed()
         self._refresh_selected_qr_preview()
         QMessageBox.information(
@@ -6779,6 +6902,7 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Filtros invalidos", str(exc))
 
     def refresh_all(self) -> None:
+        self._invalidate_listing_snapshot_caches()
         try:
             with get_session() as session:
                 self._refresh_current_user(session)
@@ -6862,6 +6986,8 @@ class MainWindow(QMainWindow):
         self.quote_add_button.setEnabled(can_sell)
         self.quote_create_client_button.setEnabled(can_sell)
         self.quote_save_button.setEnabled(can_sell)
+        self.quote_qty_down_button.setEnabled(can_sell and bool(self.quote_cart))
+        self.quote_qty_up_button.setEnabled(can_sell and bool(self.quote_cart))
         self.quote_remove_button.setEnabled(can_sell and bool(self.quote_cart))
         self.quote_clear_button.setEnabled(can_sell and bool(self.quote_cart))
         self.quote_refresh_button.setEnabled(can_sell)
@@ -6899,17 +7025,17 @@ class MainWindow(QMainWindow):
         self.sale_remove_button.setEnabled(can_sell and can_operate_open_cash and bool(self.sale_cart))
         self.sale_clear_button.setEnabled(can_sell and can_operate_open_cash and bool(self.sale_cart))
         self.sale_layaway_button.setEnabled(can_manage_layaways and can_operate_open_cash and bool(self.sale_cart))
-        self.sale_client_combo.setEnabled(is_admin)
+        self.sale_client_combo.setEnabled(False)
         self.sale_discount_combo.setEnabled(is_admin)
         if is_admin:
-            self.sale_client_combo.setToolTip(
-                "Asocia un cliente manualmente o por QR. Puedes dejar Mostrador para venta general."
+            self.sale_client_display_label.setToolTip(
+                "El cliente visible en Caja se enlaza al escanear su QR o codigo. Por defecto la venta queda en Mostrador."
             )
             self.sale_discount_combo.setToolTip(
                 "Aplica una promocion manual no acumulable. Si hay lealtad, se aplicara el mayor beneficio."
             )
         else:
-            self.sale_client_combo.setToolTip(
+            self.sale_client_display_label.setToolTip(
                 "Para CAJERO, el cliente solo se enlaza al escanear su QR o codigo."
             )
             self.sale_discount_combo.setToolTip(
@@ -7107,15 +7233,47 @@ class MainWindow(QMainWindow):
         self.dashboard_manual_promo_label.style().polish(self.dashboard_manual_promo_label)
         self.dashboard_manual_promo_label.update()
 
-    def _refresh_catalog(self, session) -> None:
-        selected_variant_id = None
-        selected_row = self.catalog_table.currentRow()
-        if 0 <= selected_row < len(self.catalog_rows):
-            selected_variant_id = int(self.catalog_rows[selected_row]["variante_id"])
+    def _invalidate_listing_snapshot_caches(
+        self,
+        *,
+        catalog: bool = True,
+        inventory: bool = True,
+    ) -> None:
+        if catalog:
+            self.catalog_snapshot_cache.invalidate()
+        if inventory:
+            self.inventory_snapshot_cache.invalidate()
 
-        catalog_snapshot_rows = load_catalog_snapshot_rows(session)
+    def _load_catalog_snapshot_rows(self, session=None) -> list[dict[str, object]]:
+        def loader() -> list[dict[str, object]]:
+            if session is not None:
+                return load_catalog_snapshot_rows(session)
+            with get_session() as local_session:
+                return load_catalog_snapshot_rows(local_session)
+
+        return self.catalog_snapshot_cache.get_or_load(loader)
+
+    def _load_inventory_snapshot_rows(self, session=None) -> list[dict[str, object]]:
+        def loader() -> list[dict[str, object]]:
+            if session is not None:
+                return load_inventory_snapshot_rows(session)
+            with get_session() as local_session:
+                return load_inventory_snapshot_rows(local_session)
+
+        return self.inventory_snapshot_cache.get_or_load(loader)
+
+    def _refresh_catalog(self, session=None) -> None:
+        selected_variant_id = None
+        if self.catalog_preserve_selection_on_refresh:
+            selected_row = self.catalog_table.currentRow()
+            if 0 <= selected_row < len(self.catalog_rows):
+                selected_variant_id = int(self.catalog_rows[selected_row]["variante_id"])
+        self.catalog_preserve_selection_on_refresh = True
+
+        catalog_snapshot_rows = self._load_catalog_snapshot_rows(session)
 
         search_text = self.catalog_search_input.text().strip()
+        search_terms = compile_search_terms(search_text)
         school_scope_filter = str(self.catalog_school_scope_filter_combo.currentData() or "")
         category_filters = self.catalog_category_filter_combo.selected_values()
         brand_filters = self.catalog_brand_filter_combo.selected_values()
@@ -7130,11 +7288,7 @@ class MainWindow(QMainWindow):
         origin_filter = str(self.catalog_origin_filter_combo.currentData() or "")
         duplicate_filter = str(self.catalog_duplicate_filter_combo.currentData() or "")
 
-        apply_search_suggestions(
-            self.catalog_search_input,
-            build_catalog_search_suggestions(catalog_snapshot_rows, search_text=search_text),
-        )
-        self.catalog_rows = filter_visible_catalog_rows(
+        self.catalog_filtered_rows = filter_visible_catalog_rows(
             catalog_snapshot_rows,
             filters=CatalogVisibleFilterState(
                 search_text=search_text,
@@ -7152,11 +7306,72 @@ class MainWindow(QMainWindow):
                 origin_filter=origin_filter,
                 duplicate_filter=duplicate_filter,
             ),
-            search_matcher=self._catalog_row_matches_search,
+            search_matcher=lambda row, _search_text: row_matches_search(
+                row,
+                search_text=search_text,
+                search_terms=search_terms,
+                alias_map=CATALOG_SEARCH_ALIAS_MAP,
+                general_fields=CATALOG_SEARCH_GENERAL_FIELDS,
+            ),
         )
 
+        if selected_variant_id is not None:
+            selected_filtered_index = find_catalog_row_index_by_variant_id(
+                self.catalog_filtered_rows,
+                selected_variant_id,
+            )
+            if selected_filtered_index is not None:
+                self.catalog_page_index = selected_filtered_index // CATALOG_PAGE_SIZE
+
+        pagination_view = build_catalog_pagination_view(
+            self.catalog_filtered_rows,
+            current_page_index=self.catalog_page_index,
+            page_size=CATALOG_PAGE_SIZE,
+        )
+        self.catalog_page_index = pagination_view.current_page_index
+        self.catalog_rows = pagination_view.page_rows
+
         table_row_views = build_catalog_table_row_views(self.catalog_rows)
-        self.catalog_table.setRowCount(len(table_row_views))
+        self._reload_table_widget(
+            self.catalog_table,
+            row_count=len(table_row_views),
+            populate_rows=lambda: self._populate_catalog_table_rows(table_row_views),
+        )
+        active_filter_labels = self._catalog_active_filter_labels()
+        catalog_summary_view = build_catalog_summary_view(
+            total_rows=len(catalog_snapshot_rows),
+            visible_rows=self.catalog_filtered_rows,
+            active_filter_labels=active_filter_labels,
+        )
+        self.catalog_results_label.setText(catalog_summary_view.results_summary)
+        self.catalog_active_filters_label.setText(catalog_summary_view.active_filters_summary)
+        self.catalog_pagination_label.setText(pagination_view.page_label)
+        self.catalog_previous_page_button.setEnabled(pagination_view.previous_enabled)
+        self.catalog_next_page_button.setEnabled(pagination_view.next_enabled)
+        if selected_variant_id is not None and not self._select_catalog_variant(selected_variant_id):
+            self._clear_catalog_editor()
+        elif selected_variant_id is None:
+            self._clear_catalog_editor()
+
+    @staticmethod
+    def _reload_table_widget(
+        table: QTableWidget,
+        *,
+        row_count: int,
+        populate_rows: Callable[[], None],
+    ) -> None:
+        previous_updates_enabled = table.updatesEnabled()
+        previous_signals_blocked = table.blockSignals(True)
+        table.setUpdatesEnabled(False)
+        try:
+            table.setRowCount(row_count)
+            populate_rows()
+        finally:
+            table.blockSignals(previous_signals_blocked)
+            table.setUpdatesEnabled(previous_updates_enabled)
+            table.viewport().update()
+
+    def _populate_catalog_table_rows(self, table_row_views) -> None:
         for row_index, row_view in enumerate(table_row_views):
             for column_index, value in enumerate(row_view.values):
                 self.catalog_table.setItem(row_index, column_index, _table_item(value))
@@ -7174,37 +7389,22 @@ class MainWindow(QMainWindow):
                 _set_table_badge_style(layaway_item, row_view.layaway_tone)
             if status_item is not None:
                 _set_table_badge_style(status_item, row_view.status_tone)
-        self.catalog_table.resizeColumnsToContents()
-        active_filter_labels = self._catalog_active_filter_labels()
-        catalog_summary_view = build_catalog_summary_view(
-            total_rows=len(catalog_snapshot_rows),
-            visible_rows=self.catalog_rows,
-            active_filter_labels=active_filter_labels,
-        )
-        self.catalog_results_label.setText(catalog_summary_view.results_summary)
-        self.catalog_active_filters_label.setText(catalog_summary_view.active_filters_summary)
-        if selected_variant_id is not None and not self._select_catalog_variant(selected_variant_id):
-            self._clear_catalog_editor()
-        elif selected_variant_id is None:
-            self._clear_catalog_editor()
+
+    def _handle_catalog_previous_page(self) -> None:
+        if self.catalog_page_index <= 0:
+            return
+        self.catalog_page_index -= 1
+        self.catalog_preserve_selection_on_refresh = False
+        self._handle_catalog_filters_changed()
+
+    def _handle_catalog_next_page(self) -> None:
+        self.catalog_page_index += 1
+        self.catalog_preserve_selection_on_refresh = False
+        self._handle_catalog_filters_changed()
 
     @staticmethod
     def _catalog_search_alias_map() -> dict[str, tuple[str, ...]]:
-        return {
-            "sku": ("sku",),
-            "escuela": ("escuela_nombre",),
-            "tipo": ("tipo_prenda_nombre",),
-            "pieza": ("tipo_pieza_nombre",),
-            "producto": ("producto_nombre_base", "producto_nombre"),
-            "legacy": ("nombre_legacy",),
-            "talla": ("talla",),
-            "color": ("color",),
-            "marca": ("marca_nombre",),
-            "categoria": ("categoria_nombre",),
-            "origen": ("origen_etiqueta",),
-            "estado": ("producto_estado", "variante_estado"),
-            "fallback": ("fallback_text",),
-        }
+        return CATALOG_SEARCH_ALIAS_MAP
 
     @classmethod
     def _catalog_row_matches_search(cls, row: dict[str, object], search_text: str) -> bool:
@@ -7212,24 +7412,7 @@ class MainWindow(QMainWindow):
             row,
             search_text=search_text,
             alias_map=cls._catalog_search_alias_map(),
-            general_fields=(
-                "sku",
-                "categoria_nombre",
-                "marca_nombre",
-                "escuela_nombre",
-                "tipo_prenda_nombre",
-                "tipo_pieza_nombre",
-                "producto_nombre",
-                "producto_nombre_base",
-                "producto_descripcion",
-                "nombre_legacy",
-                "talla",
-                "color",
-                "origen_etiqueta",
-                "producto_estado",
-                "variante_estado",
-                "fallback_text",
-            ),
+            general_fields=CATALOG_SEARCH_GENERAL_FIELDS,
         )
 
     def _catalog_active_filter_labels(self) -> list[str]:
@@ -7256,21 +7439,7 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _inventory_search_alias_map() -> dict[str, tuple[str, ...]]:
-        return {
-            "sku": ("sku",),
-            "escuela": ("escuela_nombre",),
-            "tipo": ("tipo_prenda_nombre",),
-            "pieza": ("tipo_pieza_nombre",),
-            "producto": ("producto_nombre_base", "producto_nombre"),
-            "legacy": ("nombre_legacy",),
-            "talla": ("talla",),
-            "color": ("color",),
-            "marca": ("marca_nombre",),
-            "categoria": ("categoria_nombre",),
-            "origen": ("origen_etiqueta",),
-            "estado": ("variante_estado",),
-            "fallback": ("fallback_text",),
-        }
+        return INVENTORY_SEARCH_ALIAS_MAP
 
     @classmethod
     def _inventory_row_matches_search(cls, row: dict[str, object], search_text: str) -> bool:
@@ -7278,22 +7447,7 @@ class MainWindow(QMainWindow):
             row,
             search_text=search_text,
             alias_map=cls._inventory_search_alias_map(),
-            general_fields=(
-                "sku",
-                "categoria_nombre",
-                "marca_nombre",
-                "escuela_nombre",
-                "tipo_prenda_nombre",
-                "tipo_pieza_nombre",
-                "producto_nombre",
-                "producto_nombre_base",
-                "nombre_legacy",
-                "talla",
-                "color",
-                "origen_etiqueta",
-                "variante_estado",
-                "fallback_text",
-            ),
+            general_fields=INVENTORY_SEARCH_GENERAL_FIELDS,
         )
 
     def _inventory_active_filter_labels(self) -> list[str]:
@@ -7383,10 +7537,11 @@ class MainWindow(QMainWindow):
             "Mostrador / sin cliente",
             [(f"{cliente.codigo_cliente} · {cliente.nombre}", cliente.id) for cliente in clientes],
         )
+        self._refresh_sale_client_display()
         self._refresh_sale_discount_options()
         self.quote_client_combo.blockSignals(True)
         self.quote_client_combo.clear()
-        self.quote_client_combo.addItem("Manual / sin cliente", None)
+        self.quote_client_combo.addItem("Sin cliente asignado", None)
         for cliente in clientes:
             self.quote_client_combo.addItem(
                 f"{cliente.codigo_cliente} · {cliente.nombre}",
@@ -7482,13 +7637,22 @@ class MainWindow(QMainWindow):
 
     def _refresh_quote_detail(self, quote_id: int | None) -> None:
         if not quote_id:
+            self.selected_quote_state = ""
+            self.selected_quote_phone = ""
             detail_view = build_empty_quote_detail_view()
             self._apply_quote_detail_view(detail_view)
+            self._apply_quote_action_state()
             return
 
         try:
             with get_session() as session:
                 quote_snapshot = load_quote_detail_snapshot(session, quote_id=quote_id)
+                self.selected_quote_state = str(quote_snapshot.status_label)
+                self.selected_quote_phone = (
+                    ""
+                    if str(quote_snapshot.phone_text).strip().lower() == "sin telefono"
+                    else str(quote_snapshot.phone_text).strip()
+                )
                 detail_view = build_quote_detail_view(
                     folio=quote_snapshot.folio,
                     client_name=quote_snapshot.customer_label,
@@ -7511,8 +7675,11 @@ class MainWindow(QMainWindow):
                 )
                 self._apply_quote_detail_view(detail_view)
         except Exception as exc:  # noqa: BLE001
+            self.selected_quote_state = ""
+            self.selected_quote_phone = ""
             detail_view = build_error_quote_detail_view(str(exc))
             self._apply_quote_detail_view(detail_view)
+        self._apply_quote_action_state()
 
     def _apply_quote_detail_view(self, detail_view) -> None:
         self.quote_customer_label.setText(detail_view.customer_label)
@@ -7531,11 +7698,12 @@ class MainWindow(QMainWindow):
                 self.quote_detail_table.setItem(row_index, column_index, _table_item(value))
         self.quote_detail_table.resizeColumnsToContents()
 
-    def _refresh_inventory_table(self, session) -> None:
+    def _refresh_inventory_table(self, session=None) -> None:
         current_variant_id = self.inventory_variant_combo.currentData()
-        inventory_snapshot_rows = load_inventory_snapshot_rows(session)
+        inventory_snapshot_rows = self._load_inventory_snapshot_rows(session)
 
         search_text = self.inventory_search_input.text().strip()
+        search_terms = compile_search_terms(search_text)
         category_filters = self.inventory_category_filter_combo.selected_values()
         brand_filters = self.inventory_brand_filter_combo.selected_values()
         school_filters = self.inventory_school_filter_combo.selected_values()
@@ -7549,12 +7717,7 @@ class MainWindow(QMainWindow):
         origin_filter = str(self.inventory_origin_filter_combo.currentData() or "")
         duplicate_filter = str(self.inventory_duplicate_filter_combo.currentData() or "")
 
-        apply_search_suggestions(
-            self.inventory_search_input,
-            build_inventory_search_suggestions(inventory_snapshot_rows, search_text=search_text),
-        )
-
-        visible_rows = filter_visible_inventory_rows(
+        self.inventory_filtered_rows = filter_visible_inventory_rows(
             inventory_snapshot_rows,
             filters=InventoryVisibleFilterState(
                 search_text=search_text,
@@ -7571,12 +7734,18 @@ class MainWindow(QMainWindow):
                 origin_filter=origin_filter,
                 duplicate_filter=duplicate_filter,
             ),
-            search_matcher=self._inventory_row_matches_search,
+            search_matcher=lambda row, _search_text: row_matches_search(
+                row,
+                search_text=search_text,
+                search_terms=search_terms,
+                alias_map=INVENTORY_SEARCH_ALIAS_MAP,
+                general_fields=INVENTORY_SEARCH_GENERAL_FIELDS,
+            ),
         )
 
         summary_view = build_inventory_summary_view(
             total_rows=len(inventory_snapshot_rows),
-            visible_rows=visible_rows,
+            visible_rows=self.inventory_filtered_rows,
             active_filter_labels=self._inventory_active_filter_labels(),
         )
         self._set_badge_state(self.inventory_out_counter, summary_view.out_counter.text, summary_view.out_counter.tone)
@@ -7592,9 +7761,28 @@ class MainWindow(QMainWindow):
             summary_view.inactive_counter.tone,
         )
 
-        table_row_views = build_inventory_table_row_views(visible_rows)
-        self.inventory_table.setRowCount(len(table_row_views))
-        self.inventory_rows = visible_rows
+        pagination_view = build_catalog_pagination_view(
+            self.inventory_filtered_rows,
+            current_page_index=self.inventory_page_index,
+            page_size=INVENTORY_PAGE_SIZE,
+        )
+        self.inventory_page_index = pagination_view.current_page_index
+        self.inventory_rows = pagination_view.page_rows
+        table_row_views = build_inventory_table_row_views(self.inventory_rows)
+        self._reload_table_widget(
+            self.inventory_table,
+            row_count=len(table_row_views),
+            populate_rows=lambda: self._populate_inventory_table_rows(table_row_views),
+        )
+        self.inventory_results_label.setText(summary_view.results_summary)
+        self.inventory_active_filters_label.setText(self._build_inventory_active_filters_summary())
+        self.inventory_pagination_label.setText(pagination_view.page_label)
+        self.inventory_previous_page_button.setEnabled(pagination_view.previous_enabled)
+        self.inventory_next_page_button.setEnabled(pagination_view.next_enabled)
+        self._sync_inventory_table_selection(current_variant_id)
+        self._refresh_inventory_overview()
+
+    def _populate_inventory_table_rows(self, table_row_views) -> None:
         for row_index, row_view in enumerate(table_row_views):
             for column_index, value in enumerate(row_view.values):
                 self.inventory_table.setItem(row_index, column_index, _table_item(value))
@@ -7616,20 +7804,31 @@ class MainWindow(QMainWindow):
                 _set_table_badge_style(status_item, row_view.status_tone)
             if qr_item is not None:
                 _set_table_badge_style(qr_item, row_view.qr_tone)
-        self.inventory_table.resizeColumnsToContents()
-        self.inventory_results_label.setText(summary_view.results_summary)
-        self.inventory_active_filters_label.setText(self._build_inventory_active_filters_summary())
-        self._sync_inventory_table_selection(current_variant_id)
-        self._refresh_inventory_overview()
 
-    def _handle_inventory_filters_changed(self) -> None:
+    def _schedule_inventory_filter_refresh(self) -> None:
+        self.inventory_filter_debounce_timer.start()
+
+    def _schedule_inventory_filter_refresh_reset_page(self) -> None:
+        self.inventory_page_index = 0
+        self._schedule_inventory_filter_refresh()
+
+    def _run_inventory_filter_refresh(self) -> None:
         try:
-            with get_session() as session:
-                self._refresh_inventory_table(session)
+            self._refresh_inventory_table()
         except SQLAlchemyError:
             self.status_label.setText("Estado: no se pudieron aplicar los filtros de inventario.")
 
+    def _handle_inventory_filters_changed(self) -> None:
+        if self.inventory_filter_debounce_timer.isActive():
+            self.inventory_filter_debounce_timer.stop()
+        self._run_inventory_filter_refresh()
+
+    def _handle_inventory_filters_changed_reset_page(self) -> None:
+        self.inventory_page_index = 0
+        self._handle_inventory_filters_changed()
+
     def _handle_clear_inventory_filters(self) -> None:
+        self.inventory_page_index = 0
         self.inventory_search_input.clear()
         for combo in (
             self.inventory_status_filter_combo,
@@ -7651,6 +7850,16 @@ class MainWindow(QMainWindow):
             self.inventory_color_filter_combo,
         ):
             widget.clear_selection()
+        self._handle_inventory_filters_changed()
+
+    def _handle_inventory_previous_page(self) -> None:
+        if self.inventory_page_index <= 0:
+            return
+        self.inventory_page_index -= 1
+        self._handle_inventory_filters_changed()
+
+    def _handle_inventory_next_page(self) -> None:
+        self.inventory_page_index += 1
         self._handle_inventory_filters_changed()
 
     def _analytics_period_bounds(self) -> tuple[datetime, datetime]:
@@ -8149,6 +8358,7 @@ class MainWindow(QMainWindow):
             ),
         )
         history_rows = build_history_table_rows(rows)
+        self.history_rows = [row.source_row for row in history_rows]
 
         self.movements_table.setRowCount(len(history_rows))
         for row_index, row in enumerate(history_rows):
@@ -8158,8 +8368,15 @@ class MainWindow(QMainWindow):
                     _set_table_badge_style(item, row.source_tone)
                 elif column_index == 3:
                     _set_table_badge_style(item, row.type_tone)
+                elif column_index in {4, 5}:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                if row.row_tone != "muted":
+                    _set_table_row_tint(item, row.row_tone)
                 self.movements_table.setItem(row_index, column_index, item)
         self.movements_table.resizeColumnsToContents()
+        header = self.movements_table.horizontalHeader()
+        if header is not None:
+            header.setStretchLastSection(True)
         history_summary = build_history_summary_view(
             visible_count=len(history_rows),
             search_text=filter_state.sku_filter,
@@ -8173,6 +8390,16 @@ class MainWindow(QMainWindow):
             date_to_label=filter_state.date_range.end_date_label,
         )
         self.history_status_label.setText(history_summary.status_label)
+        self._refresh_history_detail()
+
+    def _refresh_history_detail(self) -> None:
+        selected_row = self.movements_table.currentRow()
+        source_row = self.history_rows[selected_row] if 0 <= selected_row < len(self.history_rows) else None
+        detail_view = build_history_detail_view(source_row)
+        self.history_detail_summary_label.setText(detail_view.summary_label)
+        self.history_detail_meta_label.setText(detail_view.meta_label)
+        self.history_detail_change_label.setText(detail_view.change_label)
+        self.history_detail_notes_label.setText(detail_view.notes_label)
 
     @staticmethod
     def _generate_layaway_folio() -> str:
@@ -8297,13 +8524,29 @@ class MainWindow(QMainWindow):
     def _handle_catalog_filters_changed(self) -> None:
         self._refresh_catalog_uniform_macro_buttons()
         self._refresh_catalog_section_controls()
+        if self.catalog_filter_debounce_timer.isActive():
+            self.catalog_filter_debounce_timer.stop()
+        self._run_catalog_filter_refresh()
+
+    def _handle_catalog_filters_changed_reset_page(self) -> None:
+        self.catalog_page_index = 0
+        self._handle_catalog_filters_changed()
+
+    def _schedule_catalog_filter_refresh(self) -> None:
+        self.catalog_filter_debounce_timer.start()
+
+    def _schedule_catalog_filter_refresh_reset_page(self) -> None:
+        self.catalog_page_index = 0
+        self._schedule_catalog_filter_refresh()
+
+    def _run_catalog_filter_refresh(self) -> None:
         try:
-            with get_session() as session:
-                self._refresh_catalog(session)
+            self._refresh_catalog()
         except SQLAlchemyError:
             self.status_label.setText("Estado: no se pudieron aplicar los filtros de productos.")
 
     def _handle_clear_catalog_filters(self) -> None:
+        self.catalog_page_index = 0
         self.catalog_search_input.clear()
         for combo in (
             self.catalog_school_scope_filter_combo,
@@ -8383,6 +8626,24 @@ class MainWindow(QMainWindow):
         self.history_to_input.setDate(QDate(to_date.year, to_date.month, to_date.day))
         self._handle_history_filter()
 
+    def _set_history_last_7_days(self) -> None:
+        range_state = build_history_last_days_filter_dates(today=QDate.currentDate().toPyDate(), days=7)
+        self.history_from_input.setDate(QDate(range_state.from_date.year, range_state.from_date.month, range_state.from_date.day))
+        self.history_to_input.setDate(QDate(range_state.to_date.year, range_state.to_date.month, range_state.to_date.day))
+        self._handle_history_filter()
+
+    def _set_history_last_30_days(self) -> None:
+        range_state = build_history_last_days_filter_dates(today=QDate.currentDate().toPyDate(), days=30)
+        self.history_from_input.setDate(QDate(range_state.from_date.year, range_state.from_date.month, range_state.from_date.day))
+        self.history_to_input.setDate(QDate(range_state.to_date.year, range_state.to_date.month, range_state.to_date.day))
+        self._handle_history_filter()
+
+    def _set_history_current_month(self) -> None:
+        range_state = build_history_current_month_filter_dates(QDate.currentDate().toPyDate())
+        self.history_from_input.setDate(QDate(range_state.from_date.year, range_state.from_date.month, range_state.from_date.day))
+        self.history_to_input.setDate(QDate(range_state.to_date.year, range_state.to_date.month, range_state.to_date.day))
+        self._handle_history_filter()
+
     def _clear_history_filters(self) -> None:
         reset_state = build_history_clear_filter_state(self.history_from_input.minimumDate().toPyDate())
         self.history_sku_input.clear()
@@ -8392,6 +8653,37 @@ class MainWindow(QMainWindow):
         self.history_from_input.setDate(QDate(reset_state.from_date.year, reset_state.from_date.month, reset_state.from_date.day))
         self.history_to_input.setDate(QDate(reset_state.to_date.year, reset_state.to_date.month, reset_state.to_date.day))
         self._handle_history_filter()
+
+    @staticmethod
+    def _history_export_dir() -> Path:
+        output_dir = Path(__file__).resolve().parents[1] / "exports" / "history"
+        output_dir.mkdir(parents=True, exist_ok=True)
+        return output_dir
+
+    def _export_history_filtered(self) -> None:
+        export_rows = build_history_export_rows(self.history_rows)
+        export_dir = self._history_export_dir() / build_history_export_dir_name()
+        export_dir.mkdir(parents=True, exist_ok=True)
+        json_path = export_dir / "history_filtered.json"
+        json_path.write_text(
+            json.dumps(export_rows, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        csv_path = export_dir / "history_filtered.csv"
+        with csv_path.open("w", newline="", encoding="utf-8") as fh:
+            if export_rows:
+                fieldnames = list(export_rows[0].keys())
+                writer = csv.DictWriter(fh, fieldnames=fieldnames)
+                writer.writeheader()
+                for row in export_rows:
+                    writer.writerow(row)
+            else:
+                fh.write("")
+        QMessageBox.information(
+            self,
+            "Historial exportado",
+            f"Se exporto el historial filtrado actual en:\n{export_dir}",
+        )
 
     def _refresh_layaways(self, session) -> None:
         search_text = self.layaway_search_input.text().strip().lower()
@@ -9025,17 +9317,33 @@ class MainWindow(QMainWindow):
             collected_total=pricing.collected_total,
             payment_method=self.sale_payment_combo.currentText().strip() or "Efectivo",
             winner_label=str(breakdown["winner_label"]),
+            selected_client_label=self.sale_client_combo.currentText(),
             can_sell=self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO},
+            has_cash_session=self.active_cash_session_id is not None,
+            is_processing=self.sale_processing,
         )
         for row_index, row in enumerate(panel_view.cashier_view.table_view.rows):
             for column_index, value in enumerate(row.values):
-                self.sale_cart_table.setItem(row_index, column_index, _table_item(value))
-        for column_index in (0, 2, 3):
+                item = _table_item(value)
+                if column_index == 2:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                elif column_index in {3, 4}:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                self.sale_cart_table.setItem(row_index, column_index, item)
+        for column_index in (0, 2, 3, 4):
             self.sale_cart_table.resizeColumnToContents(column_index)
         self.sale_total_label.setText(panel_view.cashier_view.summary.total_label)
         self.sale_total_meta_label.setText(panel_view.cashier_view.summary.meta_label)
         self.sale_summary_label.setText(panel_view.cashier_view.summary.summary_label)
+        self.sale_context_label.setText(panel_view.context_label)
+        self.sale_status_label.setText(panel_view.status_label)
+        self.sale_status_label.setProperty("tone", panel_view.status_tone)
+        self.sale_status_label.style().unpolish(self.sale_status_label)
+        self.sale_status_label.style().polish(self.sale_status_label)
+        self.sale_status_label.update()
         self.sale_feedback_label.setToolTip(panel_view.payment_tooltip)
+        self.sale_qty_down_button.setEnabled(panel_view.quick_adjust_enabled)
+        self.sale_qty_up_button.setEnabled(panel_view.quick_adjust_enabled)
         self.sale_remove_button.setEnabled(panel_view.remove_enabled)
         self.sale_clear_button.setEnabled(panel_view.clear_enabled)
         self._refresh_permissions()
@@ -9052,11 +9360,14 @@ class MainWindow(QMainWindow):
         self._refresh_permissions()
 
     def _selected_catalog_row(self) -> dict[str, object] | None:
-        return resolve_selected_catalog_row(
-            inventory_variant_id=self._inventory_table_variant_id_at_row(self.inventory_table.currentRow()),
-            catalog_table_row=self.catalog_table.currentRow(),
-            catalog_rows=self.catalog_rows,
+        inventory_variant_id = self._inventory_table_variant_id_at_row(self.inventory_table.currentRow())
+        selected_from_inventory = find_catalog_row_by_variant_id(
+            self.catalog_filtered_rows,
+            inventory_variant_id,
         )
+        if selected_from_inventory is not None:
+            return selected_from_inventory
+        return resolve_catalog_row(self.catalog_rows, self.catalog_table.currentRow())
 
     def _handle_inventory_table_selection(self) -> None:
         variant_id = self._inventory_table_variant_id_at_row(self.inventory_table.currentRow())
@@ -9146,7 +9457,7 @@ class MainWindow(QMainWindow):
                 overview_snapshot = load_inventory_overview_snapshot(
                     session,
                     variant_id=int(variante_id),
-                    catalog_rows=self.catalog_rows,
+                    catalog_rows=self.catalog_filtered_rows,
                 )
                 self._apply_inventory_overview_view(
                     build_inventory_overview_view(
@@ -9206,6 +9517,13 @@ class MainWindow(QMainWindow):
         self.toggle_variant_button.setText("Pres.")
 
     def _select_catalog_variant(self, variant_id: int) -> bool:
+        filtered_row_index = find_catalog_row_index_by_variant_id(self.catalog_filtered_rows, variant_id)
+        if filtered_row_index is None:
+            return False
+        target_page_index = filtered_row_index // CATALOG_PAGE_SIZE
+        if target_page_index != self.catalog_page_index:
+            self.catalog_page_index = target_page_index
+            self._run_catalog_filter_refresh()
         row_index = find_catalog_row_index_by_variant_id(self.catalog_rows, variant_id)
         if row_index is None:
             return False

@@ -4,9 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from pos_uniformes.services.active_filter_service import build_filters_label
-
-
 @dataclass(frozen=True)
 class InventoryCounterState:
     text: str
@@ -35,11 +32,10 @@ def build_inventory_summary_view(
     count_low = sum(1 for row in visible_rows if 0 < int(row["stock_actual"]) <= 3)
     count_missing_qr = sum(1 for row in visible_rows if not bool(row.get("qr_exists")))
     count_inactive = sum(1 for row in visible_rows if not bool(row.get("variante_activa")))
-    filters_label = build_filters_label(active_filter_labels)
     return InventorySummaryView(
         results_summary=(
-            f"Resultados: {len(visible_rows)} de {total_rows} | Stock visible: {total_stock} | "
-            f"Con apartados: {reserved_count} | Fallbacks: {fallback_count} | Filtros: {filters_label}"
+            f"{len(visible_rows)}/{total_rows} resultados | stock {total_stock} | "
+            f"ap. {reserved_count} | fallbacks {fallback_count}"
         ),
         out_counter=InventoryCounterState(
             text=f"Agotados: {count_out}",

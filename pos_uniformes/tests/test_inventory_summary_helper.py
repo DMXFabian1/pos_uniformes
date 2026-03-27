@@ -15,7 +15,7 @@ class InventorySummaryHelperTests(unittest.TestCase):
 
         self.assertEqual(
             view.results_summary,
-            "Resultados: 0 de 0 | Stock visible: 0 | Con apartados: 0 | Fallbacks: 0 | Filtros: sin filtros",
+            "0/0 resultados | stock 0 | ap. 0 | fallbacks 0",
         )
         self.assertEqual(view.out_counter.text, "Agotados: 0")
         self.assertEqual(view.out_counter.tone, "positive")
@@ -56,7 +56,7 @@ class InventorySummaryHelperTests(unittest.TestCase):
 
         self.assertEqual(
             view.results_summary,
-            'Resultados: 3 de 5 | Stock visible: 10 | Con apartados: 1 | Fallbacks: 1 | Filtros: texto="pants", estado="Activas"',
+            "3/5 resultados | stock 10 | ap. 1 | fallbacks 1",
         )
         self.assertEqual(view.out_counter.text, "Agotados: 1")
         self.assertEqual(view.out_counter.tone, "danger")

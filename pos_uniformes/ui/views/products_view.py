@@ -4,9 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from PyQt6.QtWidgets import QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget, QHeaderView
-
-from pos_uniformes.ui.helpers.search_input_helper import apply_search_suggestions
+from PyQt6.QtWidgets import QFrame, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget, QHeaderView
 
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
@@ -15,7 +13,7 @@ if TYPE_CHECKING:
 def build_products_tab(window: "MainWindow") -> QWidget:
     widget = QWidget()
     layout = QVBoxLayout()
-    layout.setSpacing(10)
+    layout.setSpacing(8)
 
     window.catalog_table.setColumnCount(12)
     window.catalog_table.setHorizontalHeaderLabels(
@@ -59,23 +57,25 @@ def build_products_tab(window: "MainWindow") -> QWidget:
     summary_box = QGroupBox("Consulta de productos")
     summary_box.setObjectName("infoCard")
     summary_layout = QVBoxLayout()
-    summary_layout.setSpacing(6)
-    window.products_selection_label.setObjectName("analyticsLine")
-    window.catalog_permission_label.setObjectName("subtleLine")
-    window.catalog_results_label.setObjectName("subtleLine")
-    window.catalog_active_filters_label.setObjectName("subtleLine")
+    summary_layout.setSpacing(8)
+    window.products_selection_label.setObjectName("catalogSelectionLine")
+    window.catalog_permission_label.setObjectName("catalogSupportLine")
+    window.catalog_results_label.setObjectName("catalogSummaryLine")
+    window.catalog_active_filters_label.setObjectName("catalogSupportLine")
+    window.catalog_pagination_label.setObjectName("catalogPagerLine")
+    window.catalog_previous_page_button.setObjectName("secondaryButton")
+    window.catalog_next_page_button.setObjectName("secondaryButton")
     window.catalog_layaway_filter_combo.clear()
     window.catalog_layaway_filter_combo.addItem("Apartados: todos", "")
     window.catalog_layaway_filter_combo.addItem("Solo apartados", "reserved")
     window.catalog_layaway_filter_combo.addItem("Sin apartados", "free")
-    window.catalog_layaway_filter_combo.currentIndexChanged.connect(window._handle_catalog_filters_changed)
+    window.catalog_layaway_filter_combo.currentIndexChanged.connect(window._handle_catalog_filters_changed_reset_page)
 
     window.catalog_search_input.setPlaceholderText(
         "Buscar producto, color, talla, marca, escuela o SKU"
     )
     window.catalog_search_input.setClearButtonEnabled(True)
     window.catalog_search_input.setObjectName("inventoryFilterInput")
-    apply_search_suggestions(window.catalog_search_input, [])
     window.catalog_category_filter_combo.setObjectName("secondaryButton")
     window.catalog_brand_filter_combo.setObjectName("secondaryButton")
     window.catalog_school_filter_combo.setObjectName("secondaryButton")
@@ -113,40 +113,10 @@ def build_products_tab(window: "MainWindow") -> QWidget:
     window.catalog_school_scope_filter_combo.addItem("Solo uniforme escolar", "school_only")
     window.catalog_school_scope_filter_combo.addItem("Solo ropa normal", "general_only")
 
-    search_label = QLabel("Buscar")
-    scope_label = QLabel("Seccion")
-    category_label = QLabel("Categoria")
-    brand_label = QLabel("Marca")
-    school_label = QLabel("Escuela")
-    type_label = QLabel("Linea")
-    piece_label = QLabel("Pieza")
-    size_label = QLabel("Talla")
-    color_label = QLabel("Color")
-    status_label = QLabel("Estado")
-    stock_label = QLabel("Stock")
-    layaway_label = QLabel("Apartados")
-    origin_label = QLabel("Origen")
-    duplicate_label = QLabel("Incidencias")
-    for label in (
-        search_label,
-        scope_label,
-        category_label,
-        brand_label,
-        school_label,
-        type_label,
-        piece_label,
-        size_label,
-        color_label,
-        status_label,
-        stock_label,
-        layaway_label,
-        origin_label,
-        duplicate_label,
-    ):
-        label.setObjectName("inventoryFilterLabel")
-
-    macro_label = QLabel("Linea rapida")
-    macro_label.setObjectName("inventoryFilterLabel")
+    search_title = QLabel("Busqueda rapida")
+    search_title.setObjectName("catalogSectionTitle")
+    search_hint = QLabel("Ubica una prenda por texto, separa por seccion y entra por linea con un solo clic.")
+    search_hint.setObjectName("catalogSectionHint")
     macro_row = QHBoxLayout()
     macro_row.setSpacing(6)
     for macro_type in ("Deportivo", "Oficial", "Basico", "Escolta", "Accesorio"):
@@ -159,77 +129,108 @@ def build_products_tab(window: "MainWindow") -> QWidget:
         macro_row.addWidget(button)
     macro_row.addStretch(1)
 
+    hero_card = QFrame()
+    hero_card.setObjectName("catalogSpotlightCard")
+    hero_layout = QVBoxLayout()
+    hero_layout.setSpacing(8)
+    hero_layout.addWidget(search_title)
+    hero_layout.addWidget(search_hint)
+    hero_layout.addWidget(window.products_selection_label)
+
+    search_row = QHBoxLayout()
+    search_row.setSpacing(6)
+    search_row.addWidget(window.catalog_search_input, 4)
+    search_row.addWidget(window.catalog_school_scope_filter_combo, 2)
+    search_row.addWidget(window.catalog_clear_filters_button, 1)
+    hero_layout.addLayout(search_row)
+
+    macro_caption = QLabel("Linea rapida")
+    macro_caption.setObjectName("catalogSectionCaption")
+    hero_layout.addWidget(macro_caption)
+    hero_layout.addLayout(macro_row)
+    hero_card.setLayout(hero_layout)
+
+    filters_card = QFrame()
+    filters_card.setObjectName("catalogFiltersCard")
+    filters_layout = QVBoxLayout()
+    filters_layout.setSpacing(6)
+    filters_title = QLabel("Filtros finos")
+    filters_title.setObjectName("catalogSectionTitle")
+    filters_hint = QLabel("Afina por contexto comercial, disponibilidad y origen sin saturar la tabla.")
+    filters_hint.setObjectName("catalogSectionHint")
+    filters_layout.addWidget(filters_title)
+    filters_layout.addWidget(filters_hint)
+
     filters_grid = QGridLayout()
     filters_grid.setHorizontalSpacing(6)
-    filters_grid.setVerticalSpacing(4)
-    filters_grid.addWidget(search_label, 0, 0)
-    filters_grid.addWidget(window.catalog_search_input, 0, 1, 1, 3)
-    filters_grid.addWidget(scope_label, 0, 4)
-    filters_grid.addWidget(window.catalog_school_scope_filter_combo, 0, 5, 1, 2)
-    filters_grid.addWidget(window.catalog_clear_filters_button, 0, 7)
-    filters_grid.addWidget(macro_label, 1, 0)
-    filters_grid.addLayout(macro_row, 1, 1, 1, 7)
-    filters_grid.addWidget(category_label, 2, 0)
-    filters_grid.addWidget(window.catalog_category_filter_combo, 2, 1)
-    filters_grid.addWidget(brand_label, 2, 2)
-    filters_grid.addWidget(window.catalog_brand_filter_combo, 2, 3)
-    filters_grid.addWidget(school_label, 2, 4)
-    filters_grid.addWidget(window.catalog_school_filter_combo, 2, 5)
-    filters_grid.addWidget(type_label, 2, 6)
-    filters_grid.addWidget(window.catalog_type_filter_combo, 2, 7)
-    filters_grid.addWidget(piece_label, 3, 0)
-    filters_grid.addWidget(window.catalog_piece_filter_combo, 3, 1)
-    filters_grid.addWidget(size_label, 3, 2)
-    filters_grid.addWidget(window.catalog_size_filter_combo, 3, 3)
-    filters_grid.addWidget(color_label, 3, 4)
-    filters_grid.addWidget(window.catalog_color_filter_combo, 3, 5)
-    filters_grid.addWidget(status_label, 3, 6)
-    filters_grid.addWidget(window.catalog_status_filter_combo, 3, 7)
-    filters_grid.addWidget(stock_label, 4, 0)
-    filters_grid.addWidget(window.catalog_stock_filter_combo, 4, 1)
-    filters_grid.addWidget(layaway_label, 4, 2)
-    filters_grid.addWidget(window.catalog_layaway_filter_combo, 4, 3)
-    filters_grid.addWidget(origin_label, 4, 4)
-    filters_grid.addWidget(window.catalog_origin_filter_combo, 4, 5)
-    filters_grid.addWidget(duplicate_label, 4, 6)
-    filters_grid.addWidget(window.catalog_duplicate_filter_combo, 4, 7)
-    filters_grid.setColumnStretch(1, 1)
-    filters_grid.setColumnStretch(3, 1)
-    filters_grid.setColumnStretch(5, 1)
-    filters_grid.setColumnStretch(7, 1)
+    filters_grid.setVerticalSpacing(6)
+    filters_grid.addWidget(window.catalog_category_filter_combo, 0, 0)
+    filters_grid.addWidget(window.catalog_brand_filter_combo, 0, 1)
+    filters_grid.addWidget(window.catalog_school_filter_combo, 0, 2)
+    filters_grid.addWidget(window.catalog_type_filter_combo, 0, 3)
+    filters_grid.addWidget(window.catalog_piece_filter_combo, 1, 0)
+    filters_grid.addWidget(window.catalog_size_filter_combo, 1, 1)
+    filters_grid.addWidget(window.catalog_color_filter_combo, 1, 2)
+    filters_grid.addWidget(window.catalog_status_filter_combo, 1, 3)
+    filters_grid.addWidget(window.catalog_stock_filter_combo, 2, 0)
+    filters_grid.addWidget(window.catalog_layaway_filter_combo, 2, 1)
+    filters_grid.addWidget(window.catalog_origin_filter_combo, 2, 2)
+    filters_grid.addWidget(window.catalog_duplicate_filter_combo, 2, 3)
+    for column in range(4):
+        filters_grid.setColumnStretch(column, 1)
+    filters_layout.addLayout(filters_grid)
+    filters_card.setLayout(filters_layout)
 
-    window.catalog_search_input.textChanged.connect(window._handle_catalog_filters_changed)
-    window.catalog_category_filter_combo.selectionChanged.connect(window._handle_catalog_filters_changed)
-    window.catalog_brand_filter_combo.selectionChanged.connect(window._handle_catalog_filters_changed)
-    window.catalog_school_filter_combo.selectionChanged.connect(window._handle_catalog_filters_changed)
-    window.catalog_type_filter_combo.selectionChanged.connect(window._handle_catalog_filters_changed)
-    window.catalog_piece_filter_combo.selectionChanged.connect(window._handle_catalog_filters_changed)
-    window.catalog_size_filter_combo.selectionChanged.connect(window._handle_catalog_filters_changed)
-    window.catalog_color_filter_combo.selectionChanged.connect(window._handle_catalog_filters_changed)
-    window.catalog_school_scope_filter_combo.currentIndexChanged.connect(window._handle_catalog_filters_changed)
-    window.catalog_status_filter_combo.currentIndexChanged.connect(window._handle_catalog_filters_changed)
-    window.catalog_stock_filter_combo.currentIndexChanged.connect(window._handle_catalog_filters_changed)
-    window.catalog_origin_filter_combo.currentIndexChanged.connect(window._handle_catalog_filters_changed)
-    window.catalog_duplicate_filter_combo.currentIndexChanged.connect(window._handle_catalog_filters_changed)
+    status_card = QFrame()
+    status_card.setObjectName("catalogStatusStrip")
+    status_layout = QVBoxLayout()
+    status_layout.setSpacing(6)
+
+    status_header = QHBoxLayout()
+    status_header.setSpacing(8)
+    status_header.addWidget(window.catalog_results_label, 1)
+    status_header.addWidget(window.catalog_pagination_label)
+    status_header.addWidget(window.catalog_previous_page_button)
+    status_header.addWidget(window.catalog_next_page_button)
+    status_layout.addLayout(status_header)
+    status_card.setLayout(status_layout)
+
+    filters_grid.setContentsMargins(0, 0, 0, 0)
+    filters_grid.setColumnStretch(1, 1)
+
+    window.catalog_search_input.textChanged.connect(lambda _: window._schedule_catalog_filter_refresh_reset_page())
+    window.catalog_search_input.returnPressed.connect(window._handle_catalog_filters_changed_reset_page)
+    window.catalog_category_filter_combo.selectionChanged.connect(window._handle_catalog_filters_changed_reset_page)
+    window.catalog_brand_filter_combo.selectionChanged.connect(window._handle_catalog_filters_changed_reset_page)
+    window.catalog_school_filter_combo.selectionChanged.connect(window._handle_catalog_filters_changed_reset_page)
+    window.catalog_type_filter_combo.selectionChanged.connect(window._handle_catalog_filters_changed_reset_page)
+    window.catalog_piece_filter_combo.selectionChanged.connect(window._handle_catalog_filters_changed_reset_page)
+    window.catalog_size_filter_combo.selectionChanged.connect(window._handle_catalog_filters_changed_reset_page)
+    window.catalog_color_filter_combo.selectionChanged.connect(window._handle_catalog_filters_changed_reset_page)
+    window.catalog_school_scope_filter_combo.currentIndexChanged.connect(window._handle_catalog_filters_changed_reset_page)
+    window.catalog_status_filter_combo.currentIndexChanged.connect(window._handle_catalog_filters_changed_reset_page)
+    window.catalog_stock_filter_combo.currentIndexChanged.connect(window._handle_catalog_filters_changed_reset_page)
+    window.catalog_origin_filter_combo.currentIndexChanged.connect(window._handle_catalog_filters_changed_reset_page)
+    window.catalog_duplicate_filter_combo.currentIndexChanged.connect(window._handle_catalog_filters_changed_reset_page)
     window.catalog_clear_filters_button.clicked.connect(window._handle_clear_catalog_filters)
+    window.catalog_previous_page_button.clicked.connect(window._handle_catalog_previous_page)
+    window.catalog_next_page_button.clicked.connect(window._handle_catalog_next_page)
     window.catalog_type_filter_combo.setToolTip("Filtro detallado por linea o tipo de prenda.")
     window.catalog_school_scope_filter_combo.setToolTip(
         "Separa rapido entre uniforme escolar y ropa normal segun la categoria real del producto."
     )
 
-    summary_layout.addLayout(filters_grid)
-    summary_layout.addWidget(window.products_selection_label)
-    summary_layout.addWidget(window.catalog_results_label)
-    summary_layout.addWidget(window.catalog_active_filters_label)
-    summary_layout.addWidget(window.catalog_permission_label)
+    top_cards_row = QHBoxLayout()
+    top_cards_row.setSpacing(8)
+    top_cards_row.addWidget(hero_card, 5)
+    top_cards_row.addWidget(filters_card, 7)
+
+    summary_layout.addLayout(top_cards_row)
+    summary_layout.addWidget(status_card)
     summary_box.setLayout(summary_layout)
     window.products_quick_setup_box = None
 
-    catalog_hint_label = QLabel("Doble clic para revisar rapido la presentacion seleccionada.")
-    catalog_hint_label.setObjectName("subtleLine")
-
     layout.addWidget(summary_box)
-    layout.addWidget(catalog_hint_label)
     layout.addWidget(window.catalog_table, 1)
     widget.setLayout(layout)
     return widget

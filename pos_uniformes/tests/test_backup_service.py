@@ -39,6 +39,63 @@ class BackupServiceTests(unittest.TestCase):
             self.assertEqual(saved_status.last_backup_path, backup_path)
             self.assertEqual(saved_status.retention_days, 14)
             self.assertIsNone(saved_status.last_error)
+            self.assertIsNone(saved_status.external_copy_dir)
+            self.assertIsNone(saved_status.external_last_backup_path)
+            self.assertIsNone(saved_status.external_last_error)
+
+    def test_run_automatic_backup_copies_to_external_dir_when_configured(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir, tempfile.TemporaryDirectory() as external_temp_dir:
+            output_dir = Path(temp_dir)
+            external_dir = Path(external_temp_dir).resolve()
+            backup_path = output_dir / "pos_uniformes_20260320_020000.dump"
+            backup_path.write_text("dump", encoding="utf-8")
+
+            with patch(
+                "pos_uniformes.services.backup_service.create_backup",
+                return_value=(backup_path, []),
+            ):
+                _, _, status = run_automatic_backup(
+                    output_dir=output_dir,
+                    dump_format="custom",
+                    retention_days=14,
+                    external_dir=external_dir,
+                )
+
+            expected_external_path = external_dir / backup_path.name
+            self.assertTrue(expected_external_path.exists())
+            self.assertEqual(expected_external_path.read_text(encoding="utf-8"), "dump")
+            self.assertEqual(status.external_copy_dir, external_dir)
+            self.assertEqual(status.external_last_backup_path, expected_external_path)
+            self.assertIsNotNone(status.external_last_success_at)
+            self.assertIsNone(status.external_last_error)
+
+    def test_run_automatic_backup_persists_external_copy_warning_without_failing_local_backup(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir, tempfile.TemporaryDirectory() as external_temp_dir:
+            output_dir = Path(temp_dir)
+            external_dir = Path(external_temp_dir).resolve()
+            backup_path = output_dir / "pos_uniformes_20260320_020000.dump"
+            backup_path.write_text("dump", encoding="utf-8")
+
+            with patch(
+                "pos_uniformes.services.backup_service.create_backup",
+                return_value=(backup_path, []),
+            ), patch(
+                "pos_uniformes.services.backup_service.copy_backup_to_external",
+                side_effect=PermissionError("sin permiso en carpeta externa"),
+            ):
+                _, _, status = run_automatic_backup(
+                    output_dir=output_dir,
+                    dump_format="custom",
+                    retention_days=14,
+                    external_dir=external_dir,
+                )
+
+            self.assertEqual(status.last_backup_path, backup_path)
+            self.assertEqual(status.external_copy_dir, external_dir)
+            self.assertEqual(status.external_last_error, "sin permiso en carpeta externa")
+            saved_status = read_automatic_backup_status(output_dir)
+            assert saved_status is not None
+            self.assertEqual(saved_status.external_last_error, "sin permiso en carpeta externa")
 
     def test_run_automatic_backup_persists_failure_state(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -79,7 +136,11 @@ class BackupServiceTests(unittest.TestCase):
   "dump_format": "custom",
   "retention_days": 14,
   "deleted_count": 2,
-  "last_error": null
+  "last_error": null,
+  "external_copy_dir": "/tmp/externo",
+  "external_last_success_at": "2026-03-20T02:05:00",
+  "external_last_backup_path": "/tmp/externo/demo.dump",
+  "external_last_error": null
 }""",
                 encoding="utf-8",
             )
@@ -96,6 +157,10 @@ class BackupServiceTests(unittest.TestCase):
                     retention_days=14,
                     deleted_count=2,
                     last_error=None,
+                    external_copy_dir=Path("/tmp/externo"),
+                    external_last_success_at=datetime(2026, 3, 20, 2, 5),
+                    external_last_backup_path=Path("/tmp/externo/demo.dump"),
+                    external_last_error=None,
                 ),
             )
 

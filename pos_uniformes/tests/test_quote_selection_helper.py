@@ -38,8 +38,22 @@ class QuoteSelectionHelperTests(unittest.TestCase):
 
     def test_build_quote_action_state(self) -> None:
         self.assertEqual(
-            build_quote_action_state(can_sell=True, has_selection=True),
-            QuoteActionState(cancel_enabled=True),
+            build_quote_action_state(
+                can_sell=True,
+                has_selection=True,
+                selected_state="EMITIDO",
+                has_phone=True,
+            ),
+            QuoteActionState(cancel_enabled=True, whatsapp_enabled=True),
+        )
+        self.assertEqual(
+            build_quote_action_state(
+                can_sell=False,
+                has_selection=False,
+                selected_state="CANCELADO",
+                has_phone=False,
+            ),
+            QuoteActionState(cancel_enabled=False, whatsapp_enabled=False),
         )
 
 

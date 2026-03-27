@@ -27,7 +27,7 @@ class QuoteFeedbackHelperTests(unittest.TestCase):
     def test_build_quote_result_feedback(self) -> None:
         self.assertEqual(
             build_quote_result_feedback("save_quote", item_label="PRE-001"),
-            QuoteFeedbackView("Presupuesto guardado", "Presupuesto PRE-001 registrado correctamente."),
+            QuoteFeedbackView("Presupuesto emitido", "Presupuesto PRE-001 emitido correctamente."),
         )
         self.assertEqual(
             build_quote_result_feedback("cancel_quote"),

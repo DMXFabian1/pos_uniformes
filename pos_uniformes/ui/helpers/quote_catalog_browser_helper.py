@@ -5,6 +5,13 @@ from __future__ import annotations
 from dataclasses import dataclass
 from decimal import Decimal
 
+from pos_uniformes.services.search_filter_service import (
+    CATALOG_SEARCH_ALIAS_MAP,
+    CATALOG_SEARCH_GENERAL_FIELDS,
+    compile_search_terms,
+    row_matches_search,
+)
+
 
 @dataclass(frozen=True)
 class QuoteCatalogBrowserRow:
@@ -62,7 +69,8 @@ def build_quote_catalog_browser(
 ) -> tuple[tuple[QuoteCatalogBrowserRow, ...], QuoteCatalogBrowserSummary]:
     normalized_level = level_filter.strip()
     normalized_school = school_filter.strip()
-    normalized_search = search_text.strip().lower()
+    normalized_search = search_text.strip()
+    search_terms = compile_search_terms(normalized_search)
     rows: list[QuoteCatalogBrowserRow] = []
 
     for row in snapshot_rows:
@@ -79,7 +87,13 @@ def build_quote_catalog_browser(
             if not matches_school and not matches_general:
                 continue
 
-        if normalized_search and normalized_search not in _searchable_text(row):
+        if normalized_search and not row_matches_search(
+            row,
+            search_text=normalized_search,
+            search_terms=search_terms,
+            alias_map=CATALOG_SEARCH_ALIAS_MAP,
+            general_fields=CATALOG_SEARCH_GENERAL_FIELDS,
+        ):
             continue
 
         rows.append(
@@ -115,19 +129,3 @@ def build_quote_catalog_browser(
         status_label=" | ".join(status_parts),
     )
     return tuple(rows), summary
-
-
-def _searchable_text(row: dict[str, object]) -> str:
-    parts = (
-        row.get("sku", ""),
-        row.get("nivel_educativo_nombre", ""),
-        row.get("escuela_nombre", ""),
-        row.get("producto_nombre", ""),
-        row.get("producto_nombre_base", ""),
-        row.get("tipo_prenda_nombre", ""),
-        row.get("tipo_pieza_nombre", ""),
-        row.get("talla", ""),
-        row.get("color", ""),
-        row.get("producto_descripcion", ""),
-    )
-    return " ".join(str(part).strip().lower() for part in parts if str(part).strip())

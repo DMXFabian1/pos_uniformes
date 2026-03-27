@@ -48,6 +48,9 @@ Hoy el sistema ya tiene:
   - `scripts/run_scheduled_backup.py`
 - servicio base:
   - `services/backup_service.py`
+- copia externa opcional desde el runner automatico:
+  - `--external-dir "/ruta/destino"`
+  - o variable `POS_UNIFORMES_BACKUP_EXTERNAL_DIR`
 
 No existe todavia un programador automatico dentro del POS.
 
@@ -88,7 +91,7 @@ Sirve para:
 
 Programar una tarea externa que ejecute:
 
-- `scripts/backup_database.py`
+- `scripts/run_scheduled_backup.py --format custom --retention-days 14`
 
 Formato recomendado:
 
@@ -151,10 +154,9 @@ Tarea sugerida:
 
 - ejecutar el Python de la `.venv`
 - correr `scripts/run_scheduled_backup.py --format custom --retention-days 14`
-
-Si se agrega copia externa:
-
-- segunda tarea o script post-respaldo para copiar a carpeta sincronizada
+- si ya existe carpeta externa sincronizada o disco montado:
+  - agregar `--external-dir "RUTA_EXTERNA"`
+  - o configurar `POS_UNIFORMES_BACKUP_EXTERNAL_DIR`
 
 ### macOS
 
@@ -163,6 +165,11 @@ Usar:
 - `launchd`
 
 Y ejecutar el mismo script con la `.venv`.
+
+Si ya existe carpeta externa real:
+
+- agregar `--external-dir "/ruta/externa"`
+- o configurar `POS_UNIFORMES_BACKUP_EXTERNAL_DIR`
 
 ## Estado visible dentro del POS
 
@@ -198,6 +205,26 @@ Esto depende del archivo de estado que mantiene:
 
 No conviene restaurar por reflejo si el motor puede recuperarse solo.
 
+## Checklist corta de restauracion
+
+Usar esta secuencia minima antes de restaurar un `.dump`:
+
+1. confirmar que la base actual realmente esta danada o incoherente
+2. identificar el `.dump` correcto y validar fecha/hora
+3. crear un respaldo manual inmediato antes de sobrescribir
+4. cerrar la app POS en todas las estaciones activas
+5. correr la restauracion sobre ese `.dump`
+6. abrir la app y correr `scripts/check_startup_health.py`
+7. validar login, Caja, Catalogo e Inventario
+8. revisar si hubo movimientos posteriores al respaldo que deban recapturarse
+
+Senales de salida minima:
+
+- el precheck abre sin error
+- la revision Alembic coincide
+- el POS carga sin imports ni fallas de conexion
+- se puede consultar al menos una venta reciente y un producto real
+
 ## Recomendaciones de resiliencia
 
 ### Muy recomendadas
@@ -224,15 +251,15 @@ No conviene restaurar por reflejo si el motor puede recuperarse solo.
 
 ### v2
 
-- agregar script auxiliar para copia externa
+- habilitar copia externa directa desde `scripts/run_scheduled_backup.py`
 - documentar instalacion en Windows y macOS
 
 ### v3
 
-- considerar una pequena vista en Configuracion para mostrar:
-  - ultimo respaldo automatico detectado
-  - estado de antiguedad
-  - advertencia si el ultimo respaldo es viejo
+- extender la visibilidad en Configuracion si luego hace falta mostrar tambien:
+  - estado de copia externa
+  - ultimo error de copia externa
+  - carpeta externa configurada
 
 ## Lo que no conviene hacer
 

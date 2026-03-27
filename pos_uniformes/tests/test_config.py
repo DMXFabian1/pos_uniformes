@@ -48,6 +48,7 @@ class ConfigTests(unittest.TestCase):
                         "POS_UNIFORMES_DB_PASSWORD=secreto",
                         "POS_UNIFORMES_DB_ECHO=1",
                         "POS_UNIFORMES_AUTO_CREATE_SCHEMA=true",
+                        "POS_UNIFORMES_BACKUP_EXTERNAL_DIR=/tmp/respaldos-externos",
                     ]
                 ),
                 encoding="utf-8",
@@ -66,6 +67,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(settings.db_password, "secreto")
         self.assertTrue(settings.db_echo)
         self.assertTrue(settings.auto_create_schema)
+        self.assertEqual(settings.backup_external_dir, "/tmp/respaldos-externos")
 
     def test_settings_from_env_prefers_real_environment_over_file(self) -> None:
         with patch(
@@ -75,6 +77,7 @@ class ConfigTests(unittest.TestCase):
             settings = Settings.from_env()
 
         self.assertEqual(settings.db_host, "entorno")
+        self.assertIsNone(settings.backup_external_dir)
 
 
 if __name__ == "__main__":

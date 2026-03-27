@@ -27,6 +27,7 @@ class SearchInputHelperTests(unittest.TestCase):
 
         controller = getattr(line_edit, "_search_suggestion_controller")
         popup = controller.popup
+        self.assertIs(popup.parentWidget(), line_edit.window())
         self.assertEqual(popup.count(), 2)
         self.assertEqual(popup.item(0).text(), "sku:SKU-001")
         self.assertEqual(popup.item(1).text(), "Azul Marino")

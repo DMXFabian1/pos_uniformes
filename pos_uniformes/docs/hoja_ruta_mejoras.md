@@ -12,6 +12,45 @@ Registrar mejoras propuestas por operacion o producto y ubicarlas dentro del pla
 
 ## Solicitudes abiertas
 
+### 2026-03-26
+
+#### 4. Selector visible de usuarios en login
+
+- Idea:
+  En el login, mostrar una lista de usuarios para elegir en lugar de depender solo de captura manual del nombre o usuario.
+- Estado:
+  resuelto el `2026-03-27`
+
+#### 5. Mejora futura de conteo fisico
+
+- Idea:
+  Revisar y mejorar la experiencia de `Conteo fisico` en `Inventario`.
+- Estado:
+  `2026-03-27`: `V1` construida con flujo rapido por `SKU`, lote y confirmacion final; queda pendiente validacion manual de UI y, despues, una segunda iteracion para `conteo por lote filtrado`
+
+### 2026-03-27
+
+#### 6. Quitar login en la app satelite de presupuestos
+
+- Idea:
+  La app satelite debe abrir directo al flujo operativo sin pedir login.
+- Estado:
+  resuelto el `2026-03-27`
+
+#### 7. Pulido de WhatsApp en presupuestos
+
+- Idea:
+  Refinar el flujo y el copy de `WhatsApp` en presupuestos. El ajuste se hara primero en el POS principal y despues se portara al satelite.
+- Estado:
+  resuelto en POS principal y satelite el `2026-03-27`
+
+#### 8. Pulido de pantalla WhatsApp y mensajes
+
+- Idea:
+  Mejorar la experiencia de edicion de plantillas en `Configuracion > WhatsApp y mensajes` para que sea mas clara y comoda de usar.
+- Estado:
+  resuelto el `2026-03-27` con tarjetas por plantilla, placeholders visibles, chips de insercion rapida y vista previa que se actualiza al escribir
+
 ### 2026-03-13
 
 #### 1. Sugerencias de busqueda en Catalogo e Inventario
@@ -37,9 +76,11 @@ Registrar mejoras propuestas por operacion o producto y ubicarlas dentro del pla
 - Estado:
   - `2026-03-18`: base `V1` implementada con `QCompleter` y logica compartida en `services/search_suggestion_service.py`; validada con pruebas y precheck, con validacion manual de UI aun pendiente
   - `2026-03-18`: ajuste `V2` aplicado para priorizar sugerencias en lenguaje natural cuando el usuario escribe texto normal y dejar los prefijos como capa avanzada
+  - `2026-03-25`: sugerencias pausadas temporalmente en `Catalogo` e `Inventario` para preservar estabilidad operativa mientras se rediseña un motor reusable, desacoplado del refresh pesado de tablas y con limites claros de costo por tecla
 - Alcance recomendado v2:
   - ordenar sugerencias por frecuencia de uso, ventas recientes o coincidencia historica
   - evaluar esta capa despues, idealmente en `Fase 5`, cuando ya tengamos el flujo estable y medible
+  - reintroducirla solo cuando exista un flujo reusable con debounce, minimo de caracteres, limite duro de resultados y costo acotado sobre catalogos grandes
 - Donde implementarla:
   - logica pura de sugerencias en un servicio nuevo, por ejemplo `services/search_suggestion_service.py`
   - integracion visual del input en `ui/views/products_view.py` y `ui/views/inventory_view.py`

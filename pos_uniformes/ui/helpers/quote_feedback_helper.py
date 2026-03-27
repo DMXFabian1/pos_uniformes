@@ -22,12 +22,14 @@ def build_quote_guard_feedback(action_key: str, *, can_operate: bool = True, has
         return QuoteFeedbackView("Presupuesto vacio", "Agrega al menos una linea al presupuesto.")
     if action_key == "cancel_quote" and not has_selection:
         return QuoteFeedbackView("Sin seleccion", "Selecciona un presupuesto para cancelarlo.")
+    if action_key == "open_whatsapp" and not has_selection:
+        return QuoteFeedbackView("Sin seleccion", "Selecciona un presupuesto para abrir WhatsApp.")
     return None
 
 
 def build_quote_result_feedback(action_key: str, *, item_label: str = "") -> QuoteFeedbackView:
     if action_key == "save_quote":
-        return QuoteFeedbackView("Presupuesto guardado", f"Presupuesto {item_label} registrado correctamente.")
+        return QuoteFeedbackView("Presupuesto emitido", f"Presupuesto {item_label} emitido correctamente.")
     if action_key == "cancel_quote":
         return QuoteFeedbackView("Presupuesto cancelado", "El presupuesto se marco como cancelado.")
     raise ValueError(f"Accion no soportada: {action_key}")

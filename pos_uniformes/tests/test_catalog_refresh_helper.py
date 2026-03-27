@@ -3,6 +3,10 @@ from __future__ import annotations
 from decimal import Decimal
 import unittest
 
+from pos_uniformes.services.search_filter_service import (
+    SEARCH_ALIAS_BLOBS_KEY,
+    SEARCH_GENERAL_BLOB_KEY,
+)
 from pos_uniformes.ui.helpers.catalog_refresh_helper import (
     build_catalog_snapshot_rows,
     build_catalog_table_values,
@@ -57,6 +61,8 @@ class CatalogRefreshHelperTests(unittest.TestCase):
         self.assertEqual(row["origen_etiqueta"], "LEGACY")
         self.assertTrue(row["fallback_importacion"])
         self.assertEqual(row["fallback_text"], "fallback")
+        self.assertIn("pants deportivo", row[SEARCH_GENERAL_BLOB_KEY])
+        self.assertIn("pants legacy", row[SEARCH_ALIAS_BLOBS_KEY]["legacy"])
 
     def test_build_catalog_table_values_returns_visible_columns_in_order(self) -> None:
         table_values = build_catalog_table_values(

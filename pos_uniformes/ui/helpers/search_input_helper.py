@@ -20,7 +20,7 @@ def merge_search_completion(current_text: str, completion: str) -> str:
 
 class _SearchSuggestionPopup(QListWidget):
     def __init__(self, line_edit: QLineEdit) -> None:
-        super().__init__(None)
+        super().__init__(line_edit.window())
         self._line_edit = line_edit
         self.setWindowFlag(Qt.WindowType.Popup, True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
@@ -33,7 +33,7 @@ class _SearchSuggestionPopup(QListWidget):
 
     def show_for_line_edit(self) -> None:
         row_count = self.count()
-        if row_count <= 0:
+        if row_count <= 0 or not self._line_edit.isVisible():
             self.hide()
             return
 
@@ -45,7 +45,8 @@ class _SearchSuggestionPopup(QListWidget):
         bottom_left = self._line_edit.mapToGlobal(QPoint(0, self._line_edit.height()))
         self.setGeometry(bottom_left.x(), bottom_left.y(), popup_width, popup_height)
         self.show()
-        self.raise_()
+        if self.window().isVisible():
+            self.raise_()
 
 
 class _SearchSuggestionController(QObject):

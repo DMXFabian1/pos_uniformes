@@ -7,14 +7,18 @@ from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt
 from PyQt6.QtPrintSupport import QPrinterInfo
 from PyQt6.QtWidgets import (
+    QApplication,
     QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QGridLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QPushButton,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -195,33 +199,153 @@ def build_whatsapp_settings_dialog(window: "MainWindow") -> QDialog:
     dialog, layout = _create_settings_dialog(
         window,
         "WhatsApp y mensajes",
-        "Administra plantillas para recordatorios de apartados y mensajes a clientes. Usa placeholders como {cliente}, {folio}, {saldo}, {vencimiento}, {fecha_compromiso} y {codigo_cliente}.",
-        width=820,
+        "Configura mensajes reutilizables para apartados y seguimiento a clientes. Ajusta el texto, revisa una vista previa y guarda solo cuando te guste el resultado.",
+        width=980,
     )
     window.settings_whatsapp_status_label.setObjectName("analyticsLine")
+    quick_reference = QLabel(
+        "Placeholders disponibles: {cliente}, {folio}, {saldo}, {vencimiento}, "
+        "{fecha_compromiso} y {codigo_cliente}."
+    )
+    quick_reference.setObjectName("subtleLine")
+    quick_reference.setWordWrap(True)
+    placeholder_hint = QLabel(
+        "Toca un placeholder para insertarlo en la plantilla activa o en la que tengas seleccionada en la vista previa."
+    )
+    placeholder_hint.setObjectName("catalogSectionHint")
+    placeholder_hint.setWordWrap(True)
+    placeholder_actions = QHBoxLayout()
+    placeholder_actions.setSpacing(8)
     whatsapp_box = QGroupBox("Plantillas WhatsApp")
     whatsapp_box.setObjectName("infoCard")
-    whatsapp_form = QFormLayout()
+    whatsapp_grid = QGridLayout()
+    whatsapp_grid.setHorizontalSpacing(12)
+    whatsapp_grid.setVerticalSpacing(12)
+
+    def _build_template_card(
+        title: str,
+        hint: str,
+        placeholder: str,
+        editor: QWidget,
+    ) -> QWidget:
+        card = QWidget()
+        card.setObjectName("infoCard")
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(14, 12, 14, 12)
+        card_layout.setSpacing(6)
+
+        title_label = QLabel(title)
+        title_label.setObjectName("catalogSectionTitle")
+        hint_label = QLabel(hint)
+        hint_label.setObjectName("catalogSectionHint")
+        hint_label.setWordWrap(True)
+
+        if hasattr(editor, "setPlaceholderText"):
+            editor.setPlaceholderText(placeholder)
+        if hasattr(editor, "setMinimumHeight"):
+            editor.setMinimumHeight(92)
+
+        card_layout.addWidget(title_label)
+        card_layout.addWidget(hint_label)
+        card_layout.addWidget(editor)
+        return card
+
+    template_editors: dict[str, QTextEdit] = {
+        "layaway_reminder": window.settings_whatsapp_layaway_reminder_input,
+        "layaway_liquidated": window.settings_whatsapp_layaway_liquidated_input,
+        "client_promotion": window.settings_whatsapp_client_promotion_input,
+        "client_followup": window.settings_whatsapp_client_followup_input,
+        "client_greeting": window.settings_whatsapp_client_greeting_input,
+    }
+
+    def _resolve_active_editor() -> QTextEdit:
+        focus_widget = QApplication.focusWidget()
+        if isinstance(focus_widget, QTextEdit) and focus_widget in template_editors.values():
+            return focus_widget
+        template_key = str(window.settings_whatsapp_preview_combo.currentData() or "layaway_reminder")
+        return template_editors.get(template_key, window.settings_whatsapp_layaway_reminder_input)
+
+    def _insert_placeholder(token: str) -> None:
+        editor = _resolve_active_editor()
+        editor.insertPlainText(token)
+        editor.setFocus()
+
+    for token in (
+        "{cliente}",
+        "{folio}",
+        "{saldo}",
+        "{vencimiento}",
+        "{fecha_compromiso}",
+        "{codigo_cliente}",
+    ):
+        button = QPushButton(token)
+        button.setObjectName("chipButton")
+        button.clicked.connect(lambda _checked=False, value=token: _insert_placeholder(value))
+        placeholder_actions.addWidget(button)
+    placeholder_actions.addStretch()
+
     window.settings_whatsapp_layaway_reminder_input.setPlaceholderText(
         "Usa {cliente}, {folio}, {saldo}, {vencimiento}, {fecha_compromiso}"
     )
-    window.settings_whatsapp_layaway_reminder_input.setMinimumHeight(70)
     window.settings_whatsapp_layaway_liquidated_input.setPlaceholderText(
         "Usa {cliente}, {folio}, {fecha_compromiso}"
     )
-    window.settings_whatsapp_layaway_liquidated_input.setMinimumHeight(70)
     window.settings_whatsapp_client_promotion_input.setPlaceholderText("Usa {cliente}, {codigo_cliente}")
-    window.settings_whatsapp_client_promotion_input.setMinimumHeight(70)
     window.settings_whatsapp_client_followup_input.setPlaceholderText("Usa {cliente}, {codigo_cliente}")
-    window.settings_whatsapp_client_followup_input.setMinimumHeight(70)
     window.settings_whatsapp_client_greeting_input.setPlaceholderText("Usa {cliente}, {codigo_cliente}")
-    window.settings_whatsapp_client_greeting_input.setMinimumHeight(70)
-    whatsapp_form.addRow("Apartado recordatorio", window.settings_whatsapp_layaway_reminder_input)
-    whatsapp_form.addRow("Apartado liquidado", window.settings_whatsapp_layaway_liquidated_input)
-    whatsapp_form.addRow("Cliente promocion", window.settings_whatsapp_client_promotion_input)
-    whatsapp_form.addRow("Cliente seguimiento", window.settings_whatsapp_client_followup_input)
-    whatsapp_form.addRow("Cliente saludo", window.settings_whatsapp_client_greeting_input)
-    whatsapp_box.setLayout(whatsapp_form)
+    whatsapp_grid.addWidget(
+        _build_template_card(
+            "Apartado recordatorio",
+            "Usalo para recordar saldo, vencimiento o fecha compromiso.",
+            "Hola {cliente}, te recordamos tu apartado {folio}...",
+            window.settings_whatsapp_layaway_reminder_input,
+        ),
+        0,
+        0,
+    )
+    whatsapp_grid.addWidget(
+        _build_template_card(
+            "Apartado liquidado",
+            "Confirmacion breve cuando el apartado ya esta listo o pagado.",
+            "Hola {cliente}, tu apartado {folio} ya esta liquidado...",
+            window.settings_whatsapp_layaway_liquidated_input,
+        ),
+        0,
+        1,
+    )
+    whatsapp_grid.addWidget(
+        _build_template_card(
+            "Cliente promocion",
+            "Mensaje corto para campaña, descuento o invitacion a volver.",
+            "Hola {cliente}, queremos compartirte una promocion...",
+            window.settings_whatsapp_client_promotion_input,
+        ),
+        1,
+        0,
+    )
+    whatsapp_grid.addWidget(
+        _build_template_card(
+            "Cliente seguimiento",
+            "Seguimiento amable para retomar conversacion o resolver dudas.",
+            "Hola {cliente}, te escribimos para dar seguimiento...",
+            window.settings_whatsapp_client_followup_input,
+        ),
+        1,
+        1,
+    )
+    whatsapp_grid.addWidget(
+        _build_template_card(
+            "Cliente saludo",
+            "Saludo corto de bienvenida o continuidad de contacto.",
+            "Hola {cliente}, gracias por seguir en contacto...",
+            window.settings_whatsapp_client_greeting_input,
+        ),
+        2,
+        0,
+        1,
+        2,
+    )
+    whatsapp_box.setLayout(whatsapp_grid)
     preview_box = QGroupBox("Vista previa")
     preview_box.setObjectName("infoCard")
     preview_layout = QVBoxLayout()
@@ -239,10 +363,20 @@ def build_whatsapp_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_whatsapp_preview_combo.currentIndexChanged.connect(window._refresh_whatsapp_preview)
     window.settings_whatsapp_preview_output.setReadOnly(True)
     window.settings_whatsapp_preview_output.setMinimumHeight(140)
-    preview_actions.addWidget(QLabel("Mensaje"))
+    preview_hint = QLabel(
+        "Elige una plantilla para revisar como se veria con datos reales antes de guardarla."
+    )
+    preview_hint.setObjectName("templatePreviewLabel")
+    preview_hint.setWordWrap(True)
     preview_actions.addWidget(window.settings_whatsapp_preview_combo, 1)
     preview_actions.addWidget(window.settings_whatsapp_preview_button)
     preview_actions.addWidget(window.settings_whatsapp_reset_button)
+    window.settings_whatsapp_layaway_reminder_input.textChanged.connect(window._refresh_whatsapp_preview)
+    window.settings_whatsapp_layaway_liquidated_input.textChanged.connect(window._refresh_whatsapp_preview)
+    window.settings_whatsapp_client_promotion_input.textChanged.connect(window._refresh_whatsapp_preview)
+    window.settings_whatsapp_client_followup_input.textChanged.connect(window._refresh_whatsapp_preview)
+    window.settings_whatsapp_client_greeting_input.textChanged.connect(window._refresh_whatsapp_preview)
+    preview_layout.addWidget(preview_hint)
     preview_layout.addLayout(preview_actions)
     preview_layout.addWidget(window.settings_whatsapp_preview_output)
     preview_box.setLayout(preview_layout)
@@ -251,6 +385,9 @@ def build_whatsapp_settings_dialog(window: "MainWindow") -> QDialog:
     close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
     close_buttons.rejected.connect(dialog.reject)
     close_buttons.accepted.connect(dialog.accept)
+    layout.addWidget(quick_reference)
+    layout.addWidget(placeholder_hint)
+    layout.addLayout(placeholder_actions)
     layout.addWidget(window.settings_whatsapp_status_label)
     layout.addWidget(whatsapp_box)
     layout.addWidget(preview_box)

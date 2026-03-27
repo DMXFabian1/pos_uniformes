@@ -36,17 +36,27 @@ def parse_args() -> argparse.Namespace:
         default=14,
         help="Cantidad de dias que se conservaran respaldos del mismo formato. Default: 14",
     )
+    parser.add_argument(
+        "--external-dir",
+        default=None,
+        help=(
+            "Carpeta opcional para copiar el respaldo a una segunda ubicacion. "
+            "Si se omite, se usa POS_UNIFORMES_BACKUP_EXTERNAL_DIR cuando exista."
+        ),
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
     output_dir = Path(args.output_dir).expanduser().resolve()
+    external_dir = Path(args.external_dir).expanduser().resolve() if args.external_dir else None
     try:
-        backup_file, deleted_files, _status = run_automatic_backup(
+        backup_file, deleted_files, status = run_automatic_backup(
             output_dir=output_dir,
             dump_format=args.format,
             retention_days=args.retention_days,
+            external_dir=external_dir,
         )
     except Exception as exc:  # noqa: BLE001
         print(f"Fallo respaldo automatico: {exc}", file=sys.stderr)
@@ -58,6 +68,12 @@ def main() -> int:
 
     print(f"Respaldo automatico generado: {backup_file}")
     print(f"Estado actualizado en: {automatic_backup_status_path(output_dir)}")
+    if status.external_copy_dir is None:
+        print("Copia externa: no configurada.")
+    elif status.external_last_error:
+        print(f"Copia externa con advertencia: {status.external_last_error}", file=sys.stderr)
+    elif status.external_last_backup_path is not None:
+        print(f"Copia externa actualizada: {status.external_last_backup_path}")
     if deleted_files:
         print("Respaldos eliminados por rotacion:")
         for deleted_file in deleted_files:

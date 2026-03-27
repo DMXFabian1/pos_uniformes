@@ -41,7 +41,7 @@ class CatalogSelectionHelperTests(unittest.TestCase):
 
         self.assertEqual(
             view.selection_label,
-            "SKU-001 | Playera deportiva | General | Deportivo | Playera | precio 199.00 | stock 4 | apartado 1 | ACTIVA | LEGACY | legacy: Legacy azul",
+            "SKU-001 | Playera deportiva | General / Deportivo / Playera | $199.00 | stock 4 | ap. 1 | ACTIVA | LEGACY",
         )
 
     def test_builds_cashier_selection_view_without_admin_fields(self) -> None:
@@ -64,7 +64,7 @@ class CatalogSelectionHelperTests(unittest.TestCase):
 
         self.assertEqual(
             view.selection_label,
-            "Falda oficial | SKU-002 | Colegio Norte | Falda | precio 249.00 | stock 0",
+            "Falda oficial | SKU-002 | Colegio Norte / Falda | $249.00 | stock 0",
         )
 
     def test_builds_selection_view_from_catalog_row(self) -> None:
@@ -89,7 +89,30 @@ class CatalogSelectionHelperTests(unittest.TestCase):
 
         self.assertEqual(
             view.selection_label,
-            "SKU-003 | Pants Deportivo | Morelos | Deportivo | Pants | precio 219.00 | stock 5 | apartado 2 | ACTIVA | LEGACY | legacy: Pants viejo",
+            "SKU-003 | Pants Deportivo | Morelos / Deportivo / Pants | $219.00 | stock 5 | ap. 2 | ACTIVA | LEGACY",
+        )
+
+    def test_truncates_long_product_name_in_selection_view(self) -> None:
+        view = build_catalog_selection_view(
+            is_admin=True,
+            sku="SKU-004",
+            product_name="Camisa Prowear Manga Corta Blanca",
+            product_base_name="Camisa Prowear Manga Corta Blanca General Basico",
+            school_name="General",
+            uniform_type_name="Básico",
+            piece_type_name="Camisa",
+            sale_price=Decimal("145.00"),
+            stock_actual=0,
+            layaway_reserved=0,
+            variant_status="ACTIVA",
+            origin_label="LEGACY",
+            origin_legacy=True,
+            legacy_name="Camisa Prowear Manga Corta Blanca Talla 14",
+        )
+
+        self.assertEqual(
+            view.selection_label,
+            "SKU-004 | Camisa Prowear Manga Corta Blanca Gener… | General / Básico / Camisa | $145.00 | stock 0 | ap. 0 | ACTIVA | LEGACY",
         )
 
     def test_resolve_catalog_row_returns_none_for_invalid_index(self) -> None:

@@ -49,6 +49,7 @@ class Settings:
     db_password: str
     db_echo: bool
     auto_create_schema: bool
+    backup_external_dir: str | None
 
     @property
     def database_url(self) -> str:
@@ -64,6 +65,13 @@ class Settings:
         def env_value(name: str, default: str) -> str:
             return os.getenv(name, file_overrides.get(name, default))
 
+        def optional_env_value(name: str) -> str | None:
+            raw_value = os.getenv(name, file_overrides.get(name))
+            if raw_value is None:
+                return None
+            normalized_value = raw_value.strip()
+            return normalized_value or None
+
         return cls(
             db_host=env_value("POS_UNIFORMES_DB_HOST", "localhost"),
             db_port=int(env_value("POS_UNIFORMES_DB_PORT", "5432")),
@@ -78,6 +86,7 @@ class Settings:
                 ),
                 default=False,
             ),
+            backup_external_dir=optional_env_value("POS_UNIFORMES_BACKUP_EXTERNAL_DIR"),
         )
 
 

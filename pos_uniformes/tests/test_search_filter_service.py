@@ -2,7 +2,14 @@ from __future__ import annotations
 
 import unittest
 
-from pos_uniformes.services.search_filter_service import row_matches_search, tokenize_search_text
+from pos_uniformes.services.search_filter_service import (
+    SEARCH_ALIAS_BLOBS_KEY,
+    SEARCH_GENERAL_BLOB_KEY,
+    attach_row_search_cache,
+    compile_search_terms,
+    row_matches_search,
+    tokenize_search_text,
+)
 
 
 class SearchFilterServiceTests(unittest.TestCase):
@@ -69,6 +76,12 @@ class SearchFilterServiceTests(unittest.TestCase):
         self.assertEqual(
             tokenize_search_text('producto:"pants azul'),
             ['producto:"pants', "azul"],
+        )
+
+    def test_compile_search_terms_reuses_normalized_tokens(self) -> None:
+        self.assertEqual(
+            compile_search_terms('producto:"Pants Deportivo" color:Azul'),
+            ("producto:pants deportivo", "color:azul"),
         )
 
     def test_row_matches_general_text(self) -> None:
@@ -144,6 +157,55 @@ class SearchFilterServiceTests(unittest.TestCase):
             row_matches_search(
                 self.row,
                 search_text='producto:"pants azul',
+                alias_map=self.alias_map,
+                general_fields=self.general_fields,
+            )
+        )
+
+    def test_attach_row_search_cache_builds_normalized_general_and_alias_blobs(self) -> None:
+        cached_row = attach_row_search_cache(
+            dict(
+                self.row,
+                producto_nombre="Corbatín Rojo",
+                producto_nombre_base="Corbatín",
+                producto_descripcion="Corbatín escolar",
+            ),
+            alias_map=self.alias_map,
+            general_fields=self.general_fields,
+        )
+
+        self.assertIn("corbatin rojo", cached_row[SEARCH_GENERAL_BLOB_KEY])
+        self.assertIn("corbatin", cached_row[SEARCH_ALIAS_BLOBS_KEY]["producto"])
+
+    def test_row_matches_search_uses_precomputed_cache_when_available(self) -> None:
+        cached_row = attach_row_search_cache(
+            dict(self.row),
+            alias_map=self.alias_map,
+            general_fields=self.general_fields,
+        )
+        cached_row.update(
+            {
+                "producto_nombre": "SIN COINCIDENCIA",
+                "producto_nombre_base": "SIN COINCIDENCIA",
+                "producto_descripcion": "SIN COINCIDENCIA",
+            }
+        )
+
+        self.assertTrue(
+            row_matches_search(
+                cached_row,
+                search_text="producto:pants",
+                alias_map=self.alias_map,
+                general_fields=self.general_fields,
+            )
+        )
+
+    def test_row_matches_search_accepts_precompiled_terms(self) -> None:
+        self.assertTrue(
+            row_matches_search(
+                self.row,
+                search_text="",
+                search_terms=compile_search_terms("tipo:deportivo escuela:mexico"),
                 alias_map=self.alias_map,
                 general_fields=self.general_fields,
             )

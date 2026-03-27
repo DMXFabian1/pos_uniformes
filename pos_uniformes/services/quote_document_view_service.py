@@ -14,7 +14,7 @@ def build_quote_document_view(session, *, quote_id: int) -> PrintableDocumentVie
 
     settings = load_print_settings_snapshot(
         session,
-        default_ticket_footer="Gracias por tu preferencia.",
+        default_ticket_footer="",
     )
     return PrintableDocumentView(
         title=f"Presupuesto {quote.folio}",
@@ -23,7 +23,7 @@ def build_quote_document_view(session, *, quote_id: int) -> PrintableDocumentVie
             business_name=settings.business_name,
             business_phone=settings.business_phone,
             business_address=settings.business_address,
-            ticket_footer=settings.ticket_footer,
+            ticket_footer="",
         ),
     )
 

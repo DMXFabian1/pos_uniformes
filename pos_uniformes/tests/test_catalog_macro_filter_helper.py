@@ -54,6 +54,29 @@ class CatalogMacroFilterHelperTests(unittest.TestCase):
             },
         )
 
+    def test_marks_basico_macro_active_even_when_selected_value_has_accent(self) -> None:
+        states = build_catalog_uniform_macro_button_states(
+            available_macros=["Deportivo", "Basico", "Escolta"],
+            selected_types={"Básico"},
+        )
+
+        self.assertEqual(
+            states,
+            {
+                "Deportivo": False,
+                "Basico": True,
+                "Escolta": False,
+            },
+        )
+
+    def test_clears_selection_when_basico_macro_matches_accented_value(self) -> None:
+        selection = resolve_catalog_uniform_macro_selection(
+            current_selection={"Básico"},
+            macro_type="Basico",
+        )
+
+        self.assertEqual(selection, [])
+
 
 if __name__ == "__main__":
     unittest.main()

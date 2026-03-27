@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import Mock
 
 from pos_uniformes.ui.helpers.catalog_filter_helper import (
     CatalogVisibleFilterState,
@@ -261,6 +262,47 @@ class CatalogFilterHelperTests(unittest.TestCase):
         )
 
         self.assertTrue(matches)
+
+    def test_catalog_row_matches_visible_filters_skips_search_matcher_when_exact_filter_already_fails(self) -> None:
+        row = {
+            "categoria_nombre": "Uniforme",
+            "marca_nombre": "Marca Norte",
+            "escuela_nombre": "General",
+            "tipo_prenda_nombre": "Deportivo",
+            "tipo_pieza_nombre": "Pants",
+            "talla": "16",
+            "color": "Azul",
+            "variante_activo": True,
+            "stock_actual": 5,
+            "apartado_cantidad": 0,
+            "origen_legacy": False,
+            "fallback_importacion": False,
+        }
+        search_matcher = Mock(return_value=True)
+
+        matches = catalog_row_matches_visible_filters(
+            row,
+            filters=CatalogVisibleFilterState(
+                search_text="pants",
+                school_scope_filter="",
+                category_filters=("Calzado",),
+                brand_filters=(),
+                school_filters=(),
+                type_filters=(),
+                piece_filters=(),
+                size_filters=(),
+                color_filters=(),
+                status_filter="",
+                stock_filter="",
+                layaway_filter="",
+                origin_filter="",
+                duplicate_filter="",
+            ),
+            search_matcher=search_matcher,
+        )
+
+        self.assertFalse(matches)
+        search_matcher.assert_not_called()
 
 
 if __name__ == "__main__":

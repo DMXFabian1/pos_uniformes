@@ -48,28 +48,31 @@ def build_catalog_selection_view(
     origin_legacy: bool,
     legacy_name: str,
 ) -> CatalogSelectionView:
-    clean_product_name = sanitize_product_display_name(product_name)
     clean_product_base_name = sanitize_product_display_name(product_base_name)
-    clean_legacy_name = sanitize_product_display_name(legacy_name)
     context_parts = [str(school_name), str(uniform_type_name), str(piece_type_name)]
-    context_text = " | ".join(part for part in context_parts if part and part != "-")
-    legacy_note = (
-        f" | legacy: {clean_legacy_name}"
-        if origin_legacy and clean_legacy_name and clean_legacy_name != clean_product_name
-        else ""
-    )
+    context_text = " / ".join(part for part in context_parts if part and part != "-")
+    compact_product_name = _truncate_catalog_label(clean_product_base_name, max_length=40)
+    compact_context = _truncate_catalog_label(context_text or "General", max_length=34)
+    compact_price = f"${sale_price}"
     if is_admin:
+        admin_parts = [
+            sku,
+            compact_product_name,
+            compact_context,
+            compact_price,
+            f"stock {stock_actual}",
+            f"ap. {layaway_reserved}",
+            str(variant_status),
+        ]
+        if str(origin_label).strip() and str(origin_label).strip().upper() != "NUEVO":
+            admin_parts.append(str(origin_label))
         return CatalogSelectionView(
-            selection_label=(
-                f"{sku} | {clean_product_base_name} | {context_text or 'General'} | "
-                f"precio {sale_price} | stock {stock_actual} | apartado {layaway_reserved} | "
-                f"{variant_status} | {origin_label}{legacy_note}"
-            )
+            selection_label=" | ".join(admin_parts)
         )
     return CatalogSelectionView(
         selection_label=(
-            f"{clean_product_base_name} | {sku} | {context_text or 'General'} | "
-            f"precio {sale_price} | stock {stock_actual}"
+            f"{compact_product_name} | {sku} | {compact_context} | "
+            f"{compact_price} | stock {stock_actual}"
         )
     )
 
@@ -117,3 +120,10 @@ def _normalize_catalog_variant_id(raw_variant_id: object) -> int | None:
         return int(raw_variant_id)
     except (TypeError, ValueError):
         return None
+
+
+def _truncate_catalog_label(value: str, *, max_length: int) -> str:
+    clean_value = " ".join(str(value).split())
+    if len(clean_value) <= max_length:
+        return clean_value
+    return clean_value[: max_length - 1].rstrip() + "…"

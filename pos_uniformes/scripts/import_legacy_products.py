@@ -11,14 +11,21 @@ if __package__ in {None, ""}:
 
 from pos_uniformes.database.connection import get_session
 from pos_uniformes.importers.legacy_products_importer import LegacyProductsImporter
+from pos_uniformes.utils.legacy_paths import detect_legacy_sqlite_path
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    default_sqlite_path = detect_legacy_sqlite_path()
     parser = argparse.ArgumentParser(description="Importa productos legacy SQLite hacia POS Uniformes.")
     parser.add_argument(
         "--sqlite-path",
-        default="/Users/danielfabian/Downloads/productos.db",
-        help="Ruta a la base SQLite legacy.",
+        default=str(default_sqlite_path),
+        help=(
+            "Ruta a la base SQLite legacy. "
+            "Si no se indica, se intenta detectar en la carpeta actual, "
+            "en data/productos.db, en Gestor_de_Inventarios/data/productos.db "
+            "o en Downloads/productos.db."
+        ),
     )
     parser.add_argument(
         "--report-dir",
@@ -31,7 +38,7 @@ def parse_args() -> argparse.Namespace:
         default="initial",
         help="initial importa sobre base vacia; missing_only agrega solo SKUs legacy faltantes.",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def main() -> int:

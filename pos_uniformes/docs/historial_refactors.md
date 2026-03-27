@@ -2,8 +2,26 @@
 
 ## Checkpoint actual
 
+- `2026-03-27`: el pulido de `WhatsApp` queda alineado entre `Presupuestos` del POS principal y la app satelite: mismo servicio de mensaje, copy mas claro, boton `Compartir por WhatsApp` y bloque de salida consistente en ambos flujos. Checkpoint `validated-manual`.
+- `2026-03-27`: `WhatsApp y mensajes` en `Configuracion` entra a un checkpoint `validated-tests` de pulido UX: dialogo mas ancho, tarjetas por plantilla, guia visible de placeholders, chips para insertar variables rapido y vista previa que se actualiza al escribir. Se mantiene intacta la logica de guardado actual.
+- `2026-03-27`: `Conteo fisico` entra a una `V1` con checkpoint `validated-tests`: flujo rapido por `SKU`, lote acumulado, resumen visible y confirmacion final antes de aplicar. La aplicacion real del ajuste sigue reutilizando `InventarioService.registrar_ajuste_manual(...)`. Validacion manual de UI queda `pending-manual`.
+- `2026-03-27`: el `login` del POS principal queda `validated-manual` con selector visible de usuarios activos en `ComboBox`, nombre limpio sin sufijos de marca, ultimo usuario recordado y foco automatico a contrasena al elegir usuario.
+- `2026-03-27`: `Presupuestos` del POS principal entra a un checkpoint `validated-manual` de pulido fino: bloque `Presupuesto actual` reordenado y alineado visualmente con la app satelite, `vigencia` por defecto a `+7 dias`, cliente base `Sin cliente asignado`, captura rapida sin cantidad arriba, ajuste por linea con `-1 / +1`, `WhatsApp` integrado en presupuestos recientes y `Detalle seleccionado` con mejor jerarquia visual.
+- `2026-03-27`: la app satelite de Presupuestos ya arranca sin `login`, resolviendo automaticamente un operador activo con rol `CAJERO` o `ADMIN` desde base de datos. Checkpoint `validated-manual`.
+- `2026-03-27`: la app satelite de Presupuestos queda `validated-manual` para `Kiosko`, `Catalogo`, `Presupuesto guiado`, `Presupuesto`, `Buscar`, `Compartir` e impresion. `WhatsApp` queda funcional, con pulido de UX/copy pendiente a resolver primero en el POS principal y luego portar al satelite.
+- `2026-03-26`: validacion manual operativa confirmada para `Catalogo` e `Inventario` despues de la optimizacion de filtros, resumen compacto y paginacion visible de `25` filas. Checkpoint `validated-manual`.
+- `2026-03-25`: `Catalogo` e `Inventario` reutilizan el snapshot base entre cambios de filtros y busqueda, evitando reconstruir toda la consulta en cada tecla. La invalidacion ocurre en `refresh_all()` y cuando Inventario regenera QR. Checkpoint `validated-tests`.
+- `2026-03-25`: `Inventario` memoiza la presencia de QR por `SKU` durante la sesion y limpia ese cache al generar QR individuales o masivos, reduciendo chequeos repetidos al filesystem. Checkpoint `validated-tests`.
+- `2026-03-25`: la busqueda de `Catalogo` e `Inventario` ahora aplica debounce corto solo al tecleo del input, mientras `Enter` y los demas filtros siguen actualizando al momento. Checkpoint `validated-tests`.
+- `2026-03-25`: `Catalogo` e `Inventario` reconstruyen sus tablas con updates/senales suspendidos y ya no fuerzan `resizeColumnsToContents()` en cada refresh, reduciendo repintado y recalculo de layout. Checkpoint `validated-tests`.
+- `2026-03-25`: el snapshot de `Catalogo` e `Inventario` ahora precalcula blobs normalizados de busqueda general y por alias, evitando volver a normalizar los mismos campos en cada filtro o tecleo. Checkpoint `validated-tests`.
+- `2026-03-25`: la busqueda textual ahora compila sus terminos una sola vez por refresh y `Catalogo`/`Inventario` evaluan primero filtros exactos antes del matcher textual, reduciendo trabajo repetido cuando cambian busqueda y filtros. Checkpoint `validated-tests`.
+- `2026-03-25`: `Catalogo` ahora pagina el listado visible en bloques de `25` resultados con controles `Anterior/Siguiente`, reduciendo el costo de pintar miles de celdas por refresh sin cambiar el filtrado base. Checkpoint `validated-tests`.
+- `2026-03-25`: `Inventario` ahora replica el patron compacto de `Catalogo`: resumen corto, navegacion `Anterior/Siguiente` y tabla paginada en bloques de `25` resultados, manteniendo la lista filtrada completa para acciones masivas. Checkpoint `validated-tests`.
+- `2026-03-26`: se elimina la indicacion de doble clic en `Catalogo` para no prometer una accion que hoy no existe en esa tabla. Checkpoint `validated-manual`.
 - `2026-03-20`: `Fase 4` queda cerrada con checkpoint `validated-manual`.
 - `2026-03-20`: `Resumen` entra a `Fase 5` con mejor jerarquia visual: KPIs arriba, contexto debajo y zona reservada para futuras notificaciones sin construir todavia el sistema completo. El dashboard ahora suma tarjetas con contexto corto, tonos suaves y microalertas operativas legibles sin duplicar reglas de Analytics. Checkpoint `validated-tests`.
+- `2026-03-20`: `Historial` entra a `Fase 5` con rangos rapidos (`Hoy`, `7 dias`, `30 dias`, `Mes actual`), tabla mas legible, panel lateral de detalle, busqueda mas guiada y exportacion del filtro actual a CSV/JSON. Checkpoint `validated-tests`.
 - Precheck tecnico validado.
 - Bateria operativa validada.
 - Validacion manual confirmada para Caja, sesion operativa, Apartados, Catalogo, Inventario y Configuracion.
@@ -457,6 +475,10 @@
   - Comparativos del periodo actual vs el anterior y alertas pequenas de stock, apartados vencidos y respaldo automatico.
 - `ui/helpers/analytics_payment_helper.py`, `ui/helpers/analytics_top_products_helper.py`, `ui/helpers/analytics_top_clients_helper.py`, `ui/helpers/analytics_stock_helper.py`
   - Las tablas de Analitica ahora cargan tonos y jerarquia visual mas claros para resaltar top 1, caidas y stock critico.
+- `ui/views/cashier_view.py`, `ui/helpers/sale_cashier_panel_helper.py`, `services/sale_cart_update_service.py`
+  - Caja entra a pulido fino: el cliente visible queda fijo en `Mostrador / sin cliente` salvo QR/codigo, el carrito gana ajustes rapidos de cantidad `-1 / +1`, y la tabla/contexto de venta se ordenan para leer mejor cliente, pago y descuento.
+- `ui/helpers/sale_cashier_panel_helper.py`, `ui/views/cashier_view.py`, `ui/main_window.py`
+  - Caja ahora muestra un estado vivo de cobro (`lista`, `caja cerrada`, `procesando`, `solo lectura`) separado del feedback transitorio, para que el operador vea de un vistazo si la venta ya puede cobrarse y por que.
 
 ## Riesgo residual conocido
 

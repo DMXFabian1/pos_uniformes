@@ -5,8 +5,10 @@ import unittest
 
 from pos_uniformes.ui.helpers.history_filter_state_helper import (
     build_history_clear_filter_state,
+    build_history_current_month_filter_dates,
     build_history_date_range_state,
     build_history_filter_state,
+    build_history_last_days_filter_dates,
     build_history_today_filter_dates,
     build_history_type_options_state,
 )
@@ -51,6 +53,14 @@ class HistoryFilterStateHelperTests(unittest.TestCase):
         today_from, today_to = build_history_today_filter_dates(date(2026, 3, 19))
         self.assertEqual(today_from, date(2026, 3, 19))
         self.assertEqual(today_to, date(2026, 3, 19))
+
+        last_7 = build_history_last_days_filter_dates(today=date(2026, 3, 19), days=7)
+        self.assertEqual(last_7.from_date, date(2026, 3, 13))
+        self.assertEqual(last_7.to_date, date(2026, 3, 19))
+
+        month_state = build_history_current_month_filter_dates(date(2026, 3, 19))
+        self.assertEqual(month_state.from_date, date(2026, 3, 1))
+        self.assertEqual(month_state.to_date, date(2026, 3, 19))
 
         clear_state = build_history_clear_filter_state(date(2000, 1, 1))
         self.assertEqual(clear_state.sku_text, "")

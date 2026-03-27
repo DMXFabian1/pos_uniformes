@@ -37,6 +37,8 @@ class HistoryTableHelperTests(unittest.TestCase):
         self.assertEqual(rows[0].values[0], "18/03/2026 09:30")
         self.assertEqual(rows[0].source_tone, "positive")
         self.assertEqual(rows[0].type_tone, "danger")
+        self.assertEqual(rows[0].row_tone, "danger")
+        self.assertEqual(rows[0].source_row["fecha_label"], "18/03/2026 09:30")
         self.assertEqual(rows[1].source_tone, "warning")
         self.assertEqual(rows[1].type_tone, "positive")
 
