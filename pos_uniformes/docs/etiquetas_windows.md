@@ -29,6 +29,7 @@
 - Sin ese driver, Windows puede no exponer correctamente la impresora real y la app no podra imprimir etiquetas como se espera.
 - El bundle de Windows ya puede incluir el instalador oficial del driver si se genera con `-BrotherDriverInstallerPath`.
 - En la PC destino, `setup_windows_local_bundle.ps1 -InstallBrotherDriver` lanza ese instalador si viene dentro del bundle.
+- Si el instalador ya esta guardado en `packaging\windows\drivers\`, el bundle futuro lo conserva automaticamente.
 
 ## Estado de esta PC
 

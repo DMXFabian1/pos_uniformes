@@ -178,6 +178,7 @@ scripts\build_windows_bundle.ps1 -BrotherDriverInstallerPath .\ruta\BrotherDrive
 ```
 
 - Nota: lo mas seguro es incluir el instalador oficial descargado manualmente por ti. El proyecto no descarga drivers de terceros automaticamente.
+- Si ya copiaste el instalador a `packaging\windows\drivers\`, las futuras builds tambien lo incluiran aunque no vuelvas a pasar `-BrotherDriverInstallerPath`.
 
 ## 3. Crear entorno virtual
 
@@ -245,6 +246,14 @@ Si tambien quieres incluir el instalador oficial del driver Brother para etiquet
 ```powershell
 scripts\build_windows_bundle.ps1 -BrotherDriverInstallerPath .\ruta\BrotherDriverInstaller.exe
 ```
+
+Tambien puedes dejarlo guardado una vez en:
+
+```text
+packaging\windows\drivers\
+```
+
+y las siguientes builds lo incluiran automaticamente.
 
 Resultado:
 

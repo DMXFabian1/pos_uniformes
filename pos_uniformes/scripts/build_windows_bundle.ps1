@@ -38,8 +38,6 @@ if (Test-Path $bundledSeedPath) {
     Remove-Item $bundledSeedPath -Force
 }
 
-Get-ChildItem -Path $driverDir -File -ErrorAction SilentlyContinue | Remove-Item -Force
-
 if ($CreateSeedBackup) {
     $generatedSeedDir = Join-Path $projectRoot "packaging\windows\seed\generated"
     if (Test-Path $generatedSeedDir) {
@@ -64,6 +62,9 @@ elseif ($SeedBackupPath) {
 
 if ($BrotherDriverInstallerPath) {
     $resolvedDriverInstaller = (Resolve-Path $BrotherDriverInstallerPath).Path
+    Get-ChildItem -Path $driverDir -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -ne ".gitignore" } |
+        Remove-Item -Force
     Copy-Item $resolvedDriverInstaller (Join-Path $driverDir ([System.IO.Path]::GetFileName($resolvedDriverInstaller))) -Force
 }
 

@@ -21,6 +21,8 @@ dist/
 generated/
 exports/
 packaging/windows/seed/generated/
+packaging/windows/drivers/*
+!packaging/windows/drivers/.gitignore
 
 # Respaldos locales
 backups/database/*.sql
