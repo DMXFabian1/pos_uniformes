@@ -43,19 +43,58 @@ def list_windows_printer_names() -> list[str]:
     return names
 
 
+def is_virtual_windows_printer(printer_name: str) -> bool:
+    """Detecta impresoras virtuales que no sirven para la etiqueta fisica."""
+    normalized = str(printer_name or "").strip().casefold()
+    virtual_markers = (
+        "microsoft print to pdf",
+        "onenote",
+        "xps",
+        "fax",
+        "pdf",
+    )
+    return any(marker in normalized for marker in virtual_markers)
+
+
+def _physical_windows_printer_names(printer_names: list[str]) -> list[str]:
+    return [name for name in printer_names if not is_virtual_windows_printer(name)]
+
+
 def resolve_windows_inventory_label_printer(preferred_printer_name: str) -> WindowsInventoryLabelPrinterResolution:
-    """Resuelve la impresora a usar priorizando la configurada y luego la predeterminada."""
+    """Resuelve la impresora a usar evitando impresoras virtuales como PDF."""
     win32print, _win32ui = _load_win32_modules()
     preferred = str(preferred_printer_name or "").strip()
     available = list_windows_printer_names()
     if not available:
         raise ValueError("No hay impresoras disponibles en Windows para imprimir etiquetas.")
+    physical_printers = _physical_windows_printer_names(available)
 
-    if preferred and preferred in available:
+    if preferred and preferred in available and is_virtual_windows_printer(preferred):
+        raise ValueError(
+            f'La impresora configurada "{preferred}" es virtual y no sirve para imprimir etiquetas fisicas.'
+        )
+
+    if preferred and preferred in physical_printers:
         return WindowsInventoryLabelPrinterResolution(
             printer_name=preferred,
             available_printers=available,
             fallback_used=False,
+        )
+
+    brother_exact = next((name for name in physical_printers if name.casefold() == "brother ql-800"), "")
+    if brother_exact:
+        return WindowsInventoryLabelPrinterResolution(
+            printer_name=brother_exact,
+            available_printers=available,
+            fallback_used=bool(preferred and preferred != brother_exact),
+        )
+
+    brother_family = next((name for name in physical_printers if "brother" in name.casefold()), "")
+    if brother_family:
+        return WindowsInventoryLabelPrinterResolution(
+            printer_name=brother_family,
+            available_printers=available,
+            fallback_used=bool(preferred and preferred != brother_family),
         )
 
     try:
@@ -63,15 +102,27 @@ def resolve_windows_inventory_label_printer(preferred_printer_name: str) -> Wind
     except Exception:
         default_printer = ""
 
-    if default_printer and default_printer in available:
+    if default_printer and default_printer in physical_printers:
         return WindowsInventoryLabelPrinterResolution(
             printer_name=default_printer,
             available_printers=available,
             fallback_used=bool(preferred),
         )
 
+    if len(physical_printers) == 1:
+        return WindowsInventoryLabelPrinterResolution(
+            printer_name=physical_printers[0],
+            available_printers=available,
+            fallback_used=bool(preferred),
+        )
+
+    if not physical_printers:
+        raise ValueError(
+            "Windows solo detecta impresoras virtuales. Instala o conecta la impresora real de etiquetas."
+        )
+
     return WindowsInventoryLabelPrinterResolution(
-        printer_name=available[0],
+        printer_name=physical_printers[0],
         available_printers=available,
         fallback_used=bool(preferred),
     )

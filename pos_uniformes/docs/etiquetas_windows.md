@@ -7,7 +7,8 @@
   - `win32print`
   - `win32ui`
   - `PIL.ImageWin`
-- Si la impresora preferida no esta disponible, se usa la predeterminada de Windows o la primera disponible.
+- No se usa `Microsoft Print to PDF` como salida automatica para etiquetas.
+- Si no hay una impresora fisica real disponible, la app muestra error claro en vez de mandar a PDF.
 - Fuera de Windows se conserva el fallback con `QPrinter`.
 
 ## Referencia usada
@@ -23,4 +24,5 @@
 ## Estado de esta PC
 
 - Impresora detectada actualmente por Windows: `Microsoft Print to PDF`
+- Con el comportamiento actual, eso no cuenta como impresora valida de etiquetas.
 - `pywin32` instalado en la `.venv`
