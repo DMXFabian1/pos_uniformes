@@ -102,6 +102,7 @@ from pos_uniformes.services.backup_service import (
     format_size,
     list_backups,
 )
+from pos_uniformes.services.business_print_settings_service import load_business_print_settings_snapshot
 from pos_uniformes.services.business_settings_service import BusinessSettingsInput, BusinessSettingsService
 from pos_uniformes.services.settings_business_action_service import (
     load_settings_business_form_snapshot,
@@ -524,6 +525,7 @@ from pos_uniformes.ui.helpers.qt_image_scale_helper import (
     normalize_printable_image,
 )
 from pos_uniformes.ui.helpers.inventory_label_print_helper import build_inventory_label_print_layout
+from pos_uniformes.ui.helpers.inventory_label_windows_print_helper import print_inventory_label_via_windows
 from pos_uniformes.ui.views.analytics_view import build_analytics_tab
 from pos_uniformes.ui.views.cashier_view import build_cashier_tab
 from pos_uniformes.ui.views.dashboard_view import build_dashboard_tab
@@ -9180,6 +9182,30 @@ class MainWindow(QMainWindow):
         image = QImage(str(image_path))
         if image.isNull():
             raise ValueError(f"No se pudo abrir la imagen de etiqueta:\n{image_path}")
+        try:
+            with get_session() as session:
+                preferred_printer = load_business_print_settings_snapshot(session).preferred_printer
+        except Exception:
+            preferred_printer = ""
+
+        if sys.platform.startswith("win"):
+            resolution = print_inventory_label_via_windows(
+                image_path,
+                sku=title.replace("Etiqueta ", "", 1),
+                copies=copies,
+                preferred_printer_name=preferred_printer,
+            )
+            if resolution.fallback_used:
+                QMessageBox.information(
+                    parent or self,
+                    "Impresora ajustada",
+                    (
+                        f'Se envio la etiqueta a "{resolution.printer_name}" '
+                        "porque la impresora preferida no estaba disponible en esta PC."
+                    ),
+                )
+            return True
+
         image = normalize_printable_image(image)
         print_layout = build_inventory_label_print_layout(image.width(), image.height())
         printer = QPrinter(QPrinter.PrinterMode.HighResolution)
@@ -9198,12 +9224,6 @@ class MainWindow(QMainWindow):
                 "inventory-label",
             )
         )
-        try:
-            with get_session() as session:
-                config = BusinessSettingsService.get_or_create(session)
-                preferred_printer = config.impresora_preferida or ""
-        except Exception:
-            preferred_printer = ""
         if preferred_printer:
             printer.setPrinterName(preferred_printer)
         print_dialog = QPrintDialog(printer, parent or self)
