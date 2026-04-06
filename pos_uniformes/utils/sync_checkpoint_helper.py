@@ -230,4 +230,4 @@ def _run_git(repo_root: Path, *args: str) -> str:
         stdout = (process.stdout or "").strip()
         detail = stderr or stdout or f"git {' '.join(args)} fallo"
         raise RuntimeError(detail)
-    return (process.stdout or "").strip()
+    return (process.stdout or "").rstrip("\r\n")

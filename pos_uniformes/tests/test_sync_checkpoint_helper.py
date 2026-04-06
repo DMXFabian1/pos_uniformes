@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 import tempfile
 import unittest
 
@@ -171,6 +172,22 @@ class SyncCheckpointHelperTests(unittest.TestCase):
                 helper_module._run_git = original_run_git
 
             self.assertEqual(branch, "codex/etiquetas-windows")
+
+    def test_run_git_preserves_leading_spaces_in_stdout(self) -> None:
+        from utils import sync_checkpoint_helper as helper_module
+
+        original_subprocess_run = helper_module.subprocess.run
+        try:
+            helper_module.subprocess.run = lambda *args, **kwargs: SimpleNamespace(  # type: ignore[assignment]
+                returncode=0,
+                stdout=" M pos_uniformes/docs/sync_checkpoint_status.json\n",
+                stderr="",
+            )
+            output = helper_module._run_git(Path("/tmp/repo"), "status", "--porcelain")
+        finally:
+            helper_module.subprocess.run = original_subprocess_run
+
+        self.assertEqual(output, " M pos_uniformes/docs/sync_checkpoint_status.json")
 
 
 if __name__ == "__main__":
