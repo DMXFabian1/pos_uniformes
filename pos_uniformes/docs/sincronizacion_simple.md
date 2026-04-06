@@ -7,6 +7,7 @@ Programa minimo para marcar un checkpoint desde Windows o Mac y subirlo a GitHub
 - muestra dos botones
 - `Commit en Windows`
 - `Commit en Mac`
+- muestra la rama actual para confirmar donde va el push
 - abajo muestra la ultima fecha registrada para cada lado
 - al hacer clic:
   - actualiza `docs/sync_checkpoint_status.json`
@@ -51,4 +52,4 @@ Ese archivo viaja por GitHub, asi que ambos equipos ven la misma fecha al hacer 
 
 ## Nota importante
 
-Este programa no usa `git add -A` a ciegas. Intenta subir solo cambios utiles del proyecto y deja fuera archivos generados tipicos.
+Este programa no usa `git add -A` a ciegas. La ventana tambien deja visible la rama actual para reducir errores al sincronizar, y sigue dejando fuera archivos generados tipicos.

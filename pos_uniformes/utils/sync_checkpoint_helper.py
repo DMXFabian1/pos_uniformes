@@ -48,6 +48,11 @@ def resolve_status_file(project_root: Path) -> Path:
     return project_root / "docs" / "sync_checkpoint_status.json"
 
 
+def get_current_branch_name(project_root: Path) -> str:
+    repo_root = resolve_repo_root(project_root)
+    return _run_git(repo_root, "rev-parse", "--abbrev-ref", "HEAD")
+
+
 def load_sync_checkpoint_state(project_root: Path) -> SyncCheckpointState:
     status_file = resolve_status_file(project_root)
     if not status_file.exists():

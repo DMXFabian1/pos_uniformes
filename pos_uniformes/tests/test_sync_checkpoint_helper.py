@@ -7,6 +7,7 @@ import unittest
 from utils.sync_checkpoint_helper import (
     SyncCheckpointState,
     format_timestamp_display,
+    get_current_branch_name,
     list_changed_repo_paths,
     load_sync_checkpoint_state,
     resolve_project_root,
@@ -70,6 +71,9 @@ class SyncCheckpointHelperTests(unittest.TestCase):
         self.assertFalse(_is_sync_candidate_path("pos_uniformes/__pycache__/main.cpython-312.pyc"))
         self.assertFalse(_is_sync_candidate_path("pos_uniformes/generated/labels/standard/SKU000001.png"))
         self.assertFalse(_is_sync_candidate_path("pos_uniformes/packaging/windows/seed/initial.dump"))
+        self.assertFalse(_is_sync_candidate_path("pos_uniformes/backups/database/manual.dump"))
+        self.assertFalse(_is_sync_candidate_path("pos_uniformes/exports/reporte.zip"))
+        self.assertFalse(_is_sync_candidate_path("pos_uniformes/packaging/windows/app.exe"))
         self.assertTrue(_is_sync_candidate_path("pos_uniformes/docs/sync_checkpoint_status.json"))
         self.assertTrue(_is_sync_candidate_path("pos_uniformes/scripts/sync_checkpoint_gui.py"))
 
@@ -142,6 +146,31 @@ class SyncCheckpointHelperTests(unittest.TestCase):
                 helper_module._run_git = original_run_git
 
             self.assertEqual(changed, ("pos_uniformes/scripts/new_name.py",))
+
+    def test_get_current_branch_name_uses_git_rev_parse(self) -> None:
+        with tempfile.TemporaryDirectory() as tmpdir:
+            repo_root = Path(tmpdir) / "repo"
+            project_root = repo_root / "pos_uniformes"
+            repo_root.mkdir()
+            project_root.mkdir()
+            (repo_root / ".git").mkdir()
+            (project_root / "docs").mkdir()
+            (project_root / "scripts").mkdir()
+
+            def fake_run_git(_repo_root: Path, *args: str) -> str:
+                self.assertEqual(args, ("rev-parse", "--abbrev-ref", "HEAD"))
+                return "codex/etiquetas-windows"
+
+            from utils import sync_checkpoint_helper as helper_module
+
+            original_run_git = helper_module._run_git
+            try:
+                helper_module._run_git = fake_run_git
+                branch = get_current_branch_name(project_root)
+            finally:
+                helper_module._run_git = original_run_git
+
+            self.assertEqual(branch, "codex/etiquetas-windows")
 
 
 if __name__ == "__main__":

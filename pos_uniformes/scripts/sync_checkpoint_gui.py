@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 import tkinter as tk
+from tkinter import font as tkfont
 from tkinter import messagebox
 
 if __package__ in {None, ""}:
@@ -13,6 +14,7 @@ if __package__ in {None, ""}:
 from utils.sync_checkpoint_helper import (
     commit_sync_checkpoint,
     format_timestamp_display,
+    get_current_branch_name,
     load_sync_checkpoint_state,
     resolve_project_root,
 )
@@ -22,8 +24,13 @@ class SyncCheckpointApp:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.project_root = resolve_project_root(Path(__file__).resolve().parents[1])
+        self.branch_name = get_current_branch_name(self.project_root)
         self.root.title("Sincronizacion simple")
         self.root.resizable(False, False)
+
+        default_font = tkfont.nametofont("TkDefaultFont")
+        title_font = default_font.copy()
+        title_font.configure(size=14, weight="bold")
 
         frame = tk.Frame(root, padx=18, pady=18)
         frame.pack(fill="both", expand=True)
@@ -31,17 +38,26 @@ class SyncCheckpointApp:
         title = tk.Label(
             frame,
             text="Sincronizacion Mac / Windows",
-            font=("Segoe UI", 14, "bold"),
+            font=title_font,
         )
         title.pack(anchor="w")
 
         hint = tk.Label(
             frame,
-            text="Cada boton hace git add -A, commit y push de la rama actual.",
-            font=("Segoe UI", 9),
+            text="Cada boton guarda el checkpoint, agrega solo archivos utiles y hace commit + push.",
             justify="left",
+            wraplength=420,
         )
         hint.pack(anchor="w", pady=(4, 14))
+
+        self.branch_label = tk.Label(
+            frame,
+            text=f"Rama actual: {self.branch_name}",
+            anchor="w",
+            justify="left",
+            fg="#374151",
+        )
+        self.branch_label.pack(fill="x", pady=(0, 14))
 
         self.windows_button = tk.Button(
             frame,
