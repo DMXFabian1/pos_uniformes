@@ -5,11 +5,15 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PyQt6.QtWidgets import QApplication, QMessageBox
-from sqlalchemy.exc import SQLAlchemyError
-
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+
+from pos_uniformes.utils.venv_bootstrap import ensure_local_venv_site_packages
+
+ensure_local_venv_site_packages(Path(__file__))
+
+from PyQt6.QtWidgets import QApplication, QMessageBox
+from sqlalchemy.exc import SQLAlchemyError
 
 from pos_uniformes.database.connection import init_db
 from pos_uniformes.database.preflight import DatabasePreflightError, assert_database_ready
@@ -58,4 +62,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-

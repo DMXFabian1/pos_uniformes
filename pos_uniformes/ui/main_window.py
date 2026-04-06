@@ -15,6 +15,13 @@ from urllib.parse import quote
 from uuid import uuid4
 import webbrowser
 
+if __package__ in {None, ""}:
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+
+from pos_uniformes.utils.venv_bootstrap import ensure_local_venv_site_packages
+
+ensure_local_venv_site_packages(Path(__file__))
+
 from PyQt6.QtCore import QDate, QMarginsF, QSizeF, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction, QColor, QImage, QKeySequence, QPainter, QPageLayout, QPageSize, QPixmap, QShortcut
 from PyQt6.QtPrintSupport import QPrintDialog, QPrinter
@@ -51,9 +58,6 @@ from PyQt6.QtWidgets import (
 )
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.exc import SQLAlchemyError
-
-if __package__ in {None, ""}:
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from pos_uniformes.database.connection import engine, get_session, test_connection
 from pos_uniformes.database.models import (
