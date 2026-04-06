@@ -46,7 +46,6 @@ def _build_adjustment_detail_row(rounding_adjustment: Decimal) -> LayawayDetailL
             "",
             "Ajuste redondeo",
             "",
-            "",
             rounding_adjustment,
         ),
         tone="warning",
@@ -118,9 +117,8 @@ def build_layaway_detail_view(
     detail_line_views = [
         LayawayDetailLineView(
             values=(
-                row["sku"],
-                row["product_name"],
                 row["quantity"],
+                row["product_name"],
                 row["unit_price"],
                 row["subtotal"],
             )

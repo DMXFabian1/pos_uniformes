@@ -32,7 +32,7 @@ def build_analytics_stock_row_views(rows: list[object] | tuple[object, ...]) -> 
                     "ACTIVA" if is_active else "INACTIVA",
                 ),
                 stock_tone="danger" if stock_value == 0 else "warning" if stock_value <= 3 else "positive",
-                reserved_tone="warning" if reserved_value > 0 else "muted",
+                reserved_tone="reserved" if reserved_value > 0 else "muted",
                 state_tone="positive" if is_active else "muted",
                 row_tone="danger" if stock_value == 0 else "warning" if stock_value <= 3 else None,
             )

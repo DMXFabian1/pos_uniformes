@@ -255,3 +255,302 @@ Registrar mejoras propuestas por operacion o producto y ubicarlas dentro del pla
   - existe ruta automatica local
   - existe copia externa
   - existe guia clara de restauracion
+
+### 2026-04-06
+
+#### 9. Empaquetado Windows, QR y branding de build
+
+- Idea:
+  Blindar la build de pruebas para Windows, asegurar assets QR y hacer visible que build/version se esta probando.
+- Estado:
+  - `2026-04-06`: `validated-tests` para inclusion de `migrations` y `assets/qr_icons` en specs de PyInstaller con helper dedicado
+  - `2026-04-06`: `validated-tests` para flujo QR mas tolerante a fallos de asset; si falta el icono central el PNG se genera sin cerrar la app
+  - `2026-04-06`: `validated-tests` para branding visible en login con logo, nombre y version de la build
+  - `2026-04-06`: `pending-manual` en Windows para bundle real, presencia de `_internal/pos_uniformes/migrations`, `_internal/pos_uniformes/assets/qr_icons` y validacion del icono final del ejecutable
+
+#### 10. Arranque con carga visible y cierre seguro
+
+- Idea:
+  Hacer mas claro el arranque y las operaciones pesadas para que la app no parezca congelada ni cierre de forma brusca.
+- Estado:
+  - `2026-04-06`: `validated-tests` para login persistente mientras carga la principal, mensaje `Cargando aplicacion...`, cursor de espera y limpieza correcta del cursor al terminar
+  - `2026-04-06`: `validated-tests` para estados de carga reutilizables en operaciones pesadas y bloqueo de cierre durante proceso activo
+  - `2026-04-06`: `pending-manual` para confirmar sensacion operativa en Mac y Windows durante recargas, QR y salida segura
+
+#### 11. Coherencia visual en tablas, Caja, Catalogo e Inventario
+
+- Idea:
+  Mantener el naranja como identidad, pero quitarlo de la lectura pesada de tablas y superficies donde parecia seleccion permanente.
+- Estado:
+  - `2026-04-06`: `validated-tests` para nueva paleta compartida en tablas, cards, tabs, KPIs y banners operativos
+  - `2026-04-06`: `validated-tests` para reorden de columnas en Caja, Apartados y Presupuestos: `Cantidad` al inicio y `SKU` removido en los flujos acordados
+  - `2026-04-06`: `validated-tests` para semantica de tonos mas limpia en Catalogo, Inventario y Analitica; `positive` deja de verse naranja y `reserved` pasa a azul suave
+  - `2026-04-06`: `pending-manual` para revisar en Windows contraste, tablas y dialogs operativos con la nueva paleta
+
+#### 12. Flexibilizacion temporal por stock insuficiente
+
+- Idea:
+  Quitar temporalmente el bloqueo operativo por stock insuficiente sin borrar la posibilidad de endurecerlo despues.
+- Estado:
+  - `2026-04-06`: `validated-tests` con politica centralizada en `services/sale_stock_policy.py`; Caja ya no bloquea venta o escaneo por falta de stock
+  - `2026-04-06`: riesgo operativo asumido de stock negativo temporal; queda `pending-manual` validar flujo real de venta con bajo stock
+
+#### 13. Maqueta deportivo 2pz -> 3pz
+
+- Idea:
+  Probar una composicion guiada `pants 2pz + playera` sin cerrarla aun como regla definitiva.
+- Estado:
+  - `2026-04-06`: `validated-tests` para pregunta en Caja, validacion de misma escuela, seleccion/escaneo de playera y trazabilidad interna de maqueta
+  - `2026-04-06`: `validated-tests` para sugerencia de tallas `Exacta / Sugerida / Atipica` como guia reusable
+  - `2026-04-06`: decision tomada de tratarlo como `maqueta operativa`, no como regla final ni SKU unico de `3pz`
+  - `2026-04-06`: `pending-manual` en Windows y operacion real antes de expandirlo a otros flujos
+
+#### 14. Comprobante de apartado y cierre de caja
+
+- Idea:
+  Simplificar el comprobante del cliente y alinear cierre/historial de caja con apartados cancelados.
+- Estado:
+  - `2026-04-06`: `validated-tests` para comprobante de apartado mas limpio, sin campos internos irrelevantes al cliente
+  - `2026-04-06`: `validated-tests` para excluir apartados cancelados del esperado en cierre de caja
+  - `2026-04-06`: `validated-tests` para historial de cierres recalculado con montos consistentes
+  - `2026-04-06`: `pending-manual` para revisar ticket final del cliente e historial de cierres en datos reales
+
+#### 9. Estabilizacion de build Windows, assets QR y branding de la build de pruebas
+
+- Idea:
+  Consolidar la build de pruebas para Windows con todos los recursos que el ejecutable realmente necesita en tiempo de ejecucion, corrigiendo faltantes del bundle, crash posterior a `Generar QR` y visibilidad clara de version/logo en la app.
+- Dominios:
+  `deploy`, `build`, `qr`, `assets`, `startup`
+- Prioridad:
+  alta
+- Fase sugerida:
+  `Fase 5. Optimizacion fina`
+- Momento recomendado dentro de la fase:
+  primero, antes de tocar UX pesada de Caja o reglas nuevas de venta, porque una build inestable invalida la validacion de todo lo demas
+- Linea base funcional a tomar:
+  - checkpoint local actual: `57c2092` `Limpiar base Mac y retirar sync simple`
+  - cambios utiles ya incorporados desde la rama previa:
+    - etiquetas Windows
+    - tickets 58 mm
+    - bundle Windows con driver Brother
+    - ajuste de setup real del bundle
+  - no usar como baseline:
+    - `Solo Referencia`
+    - `dist/`, `build/`, `generated/`, `exports/`, `__pycache__/`, `.DS_Store`
+    - el experimento de `sync simple`, ya retirado de la base local
+- Alcance propuesto:
+  - incluir `_internal/pos_uniformes/migrations` en el bundle
+  - incluir `_internal/pos_uniformes/assets/qr_icons` en el bundle
+  - revisar el crash observado al terminar `Generar QR`, aunque el PNG si se escriba
+  - restaurar la imagen central de los QR
+  - agregar logo e icono del programa
+  - mostrar nombre y version de forma visible en login o pantalla inicial
+- Donde implementarla:
+  - `packaging/windows/pos_uniformes_windows.spec`
+  - `scripts/build_windows_bundle.ps1`
+  - `utils/qr_generator.py`
+  - `ui/main_window.py`
+  - `ui/login_dialog.py`
+  - `assets/`
+- Riesgos a cuidar:
+  - mezclar errores de empaquetado con errores de flujo Qt y no aislar la causa real del crash
+  - volver a depender de assets que solo existen en entornos manuales pero no en la build
+  - meter branding o deteccion de version directo en muchos widgets en vez de una fuente unica
+- Orden de ejecucion recomendado:
+  - 1. corregir bundle y carga de assets
+  - 2. reproducir y aislar crash de `Generar QR`
+  - 3. cerrar branding visible de build
+- Criterio de cierre esperado:
+  - la build de Windows arranca con recursos completos
+  - `Generar QR` no cierra la app
+  - el QR vuelve a mostrar imagen central
+  - operador identifica build y version sin abrir archivos externos
+
+#### 10. Estados de carga, salida segura y legibilidad del login
+
+- Idea:
+  Mejorar la percepcion de estabilidad de la app mostrando estados de carga, evitando cierres bruscos y corrigiendo problemas de legibilidad del selector de usuarios.
+- Dominios:
+  `startup`, `login`, `ux`, `shell`
+- Prioridad:
+  alta
+- Fase sugerida:
+  `Fase 5. Optimizacion fina`
+- Momento recomendado dentro de la fase:
+  despues de estabilizar la build y antes de un pulido visual mas amplio, porque estos cambios afectan toda la experiencia de entrada y salida
+- Alcance propuesto:
+  - estado visible de carga en acciones pesadas
+  - cursor de espera mientras hay procesos en progreso
+  - salida segura al cerrar la app
+  - corregir contraste del selector de usuarios
+  - evaluar mantener login visible mientras termina de cargar la app principal
+- Donde implementarla:
+  - `ui/login_dialog.py`
+  - `ui/main_window.py`
+  - helpers de carga o feedback reutilizable en `ui/helpers/`
+- Riesgos a cuidar:
+  - duplicar indicadores de carga sin una politica unica
+  - dejar la app bloqueada con cursor de espera si ocurre una excepcion
+  - mezclar el problema visual del selector con logica de autenticacion
+- Dependencias:
+  - conviene cerrar primero la estabilidad de startup y empaquetado de la mejora 9
+- Criterio de cierre esperado:
+  - el operador siempre sabe cuando la app esta procesando
+  - cerrar la ventana no provoca terminacion abrupta ni estados intermedios raros
+  - el login se lee correctamente desde el primer vistazo
+
+#### 11. Rebalanceo visual de tablas y homologacion operativa entre Caja, Apartados y Presupuestos
+
+- Idea:
+  Reducir la saturacion naranja de la UI, mejorar legibilidad de tablas y homologar el orden de columnas entre los flujos comerciales para que la operacion se sienta consistente.
+- Dominios:
+  `caja`, `apartados`, `presupuestos`, `ui`, `styles`
+- Prioridad:
+  media-alta
+- Fase sugerida:
+  `Fase 5. Optimizacion fina`
+- Momento recomendado dentro de la fase:
+  despues de cerrar carga/login, porque aqui ya cambiaremos estructura visual y jerarquia de informacion en varias tablas
+- Alcance propuesto:
+  - quitar tono naranja base de tablas en `Catalogo` e `Inventario`
+  - dejar colores para estados reales como alertas o poco stock
+  - ampliar paleta visual de `Caja`
+  - en `Caja`, quitar `SKU`, mover `Cantidad` al inicio y mejorar contraste/tipografia
+  - aplicar renglones alternados
+  - replicar la misma estructura de columnas en `Apartados` y `Presupuestos`
+- Donde implementarla:
+  - `ui/views/cashier_view.py`
+  - `ui/views/layaway_view.py`
+  - `ui/views/quotes_view.py`
+  - `ui/views/products_view.py`
+  - `ui/views/inventory_view.py`
+  - `ui/styles/`
+  - helpers de filas/tabla en `ui/helpers/`
+- Riesgos a cuidar:
+  - cambiar solo los headers y dejar desfasados accesos por indice o formateo de filas
+  - romper pruebas o acciones que aun dependan de la columna `SKU` visible
+  - tocar estilos globales y afectar dialogs o widgets no relacionados
+- Estrategia recomendada:
+  - separar en dos cortes:
+    - paleta y tablas generales
+    - homologacion de columnas de `Caja`, `Apartados` y `Presupuestos`
+- Criterio de cierre esperado:
+  - tablas con lectura mas limpia
+  - columnas consistentes entre flujos de venta diferida y presupuesto
+  - el color vuelve a significar estado, no fondo permanente
+
+#### 12. Flexibilizacion temporal del bloqueo por stock insuficiente
+
+- Idea:
+  Desactivar temporalmente el bloqueo operativo que impide vender o escanear por stock insuficiente, sin borrar para siempre la politica ni dejarla imposible de restaurar despues.
+- Dominios:
+  `caja`, `inventario`, `venta`
+- Prioridad:
+  alta
+- Fase sugerida:
+  `Fase 5. Optimizacion fina`
+- Momento recomendado dentro de la fase:
+  despues de estabilizar UI principal de Caja, porque es una regla operativa que conviene aislar con claridad
+- Alcance propuesto:
+  - localizar el punto exacto donde hoy se bloquea el escaneo o agregado al carrito
+  - sustituir el bloqueo por una politica temporal controlada
+  - si aplica, dejar aviso visual suave en lugar de error bloqueante
+- Donde implementarla:
+  - servicios de venta y validacion de inventario
+  - coordinacion de Caja en `ui/main_window.py` o helpers ya extraidos
+- Riesgos a cuidar:
+  - quitar el bloqueo en un punto y dejar otro bloqueo oculto en otra ruta
+  - confundir stock comprometido vs stock fisico vs stock visible
+  - perder trazabilidad de la decision temporal
+- Decision de implementacion recomendada:
+  - no borrar la regla; encapsularla para poder restaurarla despues con un solo cambio
+- Criterio de cierre esperado:
+  - la operacion ya no se interrumpe por el bloqueo actual
+  - la app sigue registrando la venta de forma consistente
+  - queda claro en codigo que es una excepcion temporal
+
+#### 13. Regla comercial para uniforme deportivo de 2 a 3 piezas
+
+- Idea:
+  Cuando se escanee un uniforme deportivo de 2 piezas, abrir un subflujo que pregunte si tambien lleva playera y, en caso afirmativo, convierta la operacion a `pants 3 piezas` validando escuela y permitiendo talla distinta.
+- Dominios:
+  `caja`, `catalogo`, `venta`, `reglas_comerciales`
+- Prioridad:
+  alta
+- Fase sugerida:
+  `Fase 5. Optimizacion fina`
+- Momento recomendado dentro de la fase:
+  despues de cerrar el ajuste temporal de stock, porque es una regla operativa nueva dentro del flujo de venta y conviene montarla sobre una Caja ya despejada
+- Alcance propuesto:
+  - detectar el caso de uniforme deportivo de 2 piezas
+  - preguntar si tambien lleva playera
+  - solicitar escaneo o seleccion de la playera
+  - permitir talla distinta
+  - impedir escuela distinta
+  - convertir la operacion al producto o combinacion correcta de `3 piezas`
+- Donde implementarla:
+  - servicios de seleccion/composicion de venta
+  - catalogo o reglas de equivalencia de productos
+  - UI de Caja para el prompt
+- Riesgos a cuidar:
+  - incrustar demasiada regla de negocio nueva en `ui/main_window.py`
+  - resolver mal la equivalencia entre SKU compuesto y piezas separadas
+  - permitir una playera incompatible y solo detectarlo despues de cobrar
+- Estrategia recomendada:
+  - primero documentar el subflujo y el modelo de compatibilidad
+  - luego cerrar una implementacion minima con validacion de escuela
+- Criterio de cierre esperado:
+  - el operador puede completar el caso comercial sin atajos manuales
+  - la composicion final de la venta queda consistente
+  - la validacion de escuela bloquea combinaciones invalidas
+
+#### 14. Simplificacion del comprobante de apartado y correccion del cierre de caja
+
+- Idea:
+  Limpiar el comprobante que ve el cliente y corregir la logica para que apartados cancelados no inflen los montos esperados del cierre de caja, incluyendo el historial de cierres.
+- Dominios:
+  `apartados`, `ticket`, `cierres`, `historial`, `caja`
+- Prioridad:
+  alta
+- Fase sugerida:
+  `Fase 5. Optimizacion fina`
+- Momento recomendado dentro de la fase:
+  al final de esta ronda, porque toca ticket del cliente, logica de cancelacion y cierre contable; conviene entrar con build, UI y Caja ya estabilizadas
+- Alcance propuesto:
+  - simplificar ticket de apartado para cliente final
+  - retirar campos internos o de pruebas que no aportan valor
+  - reforzar jerarquia visual de total, abonado y saldo pendiente
+  - ajustar cierre de caja para que apartados cancelados no cuenten como venta esperada
+  - corregir historial de cierres
+- Donde implementarla:
+  - servicios de texto de apartado y ticket
+  - servicios de cierre de caja e historial
+  - dialogs o vistas de cierre
+- Riesgos a cuidar:
+  - tocar ticket y cierre en la misma pasada sin tests focalizados
+  - corregir el monto esperado actual pero romper cierres historicos o lectura retrocompatibles
+  - quitar del ticket datos que aun se usen como referencia operativa interna
+- Estrategia recomendada:
+  - separar en dos cortes:
+    - ticket del cliente
+    - logica e historial de cierres
+- Criterio de cierre esperado:
+  - comprobante de apartado entendible para el cliente
+  - cancelaciones no inflan el cierre esperado
+  - historial de cierres vuelve a ser usable y coherente
+
+## Orden recomendado de esta ronda
+
+- 1. `Estabilizacion de build Windows, assets QR y branding de la build de pruebas`
+- 2. `Estados de carga, salida segura y legibilidad del login`
+- 3. `Rebalanceo visual de tablas y homologacion operativa entre Caja, Apartados y Presupuestos`
+- 4. `Flexibilizacion temporal del bloqueo por stock insuficiente`
+- 5. `Regla comercial para uniforme deportivo de 2 a 3 piezas`
+- 6. `Simplificacion del comprobante de apartado y correccion del cierre de caja`
+
+## Nota de baseline para esta ronda
+
+- La referencia funcional actual de trabajo es la base local posterior a `57c2092`.
+- La base incluye los cambios utiles de etiquetas Windows, tickets 58 mm y bundle Windows.
+- La referencia no incluye el experimento de `sync simple`, ya retirado.
+- No tomar `Solo Referencia`, `dist/`, `build/`, `generated/`, `exports/`, `__pycache__/` o `.DS_Store` como parte del producto vigente.

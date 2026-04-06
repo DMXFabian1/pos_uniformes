@@ -15,7 +15,13 @@ class SaleCheckoutActionServiceTests(unittest.TestCase):
     def test_complete_sale_checkout_confirms_sale_and_logs_manual_promo(self) -> None:
         usuario = object()
         cliente = object()
-        venta = SimpleNamespace(subtotal=None, descuento_porcentaje=None, descuento_monto=None, total=None)
+        venta = SimpleNamespace(
+            subtotal=None,
+            descuento_porcentaje=None,
+            descuento_monto=None,
+            total=None,
+            observacion=None,
+        )
         client_snapshot = SimpleNamespace(client=cliente)
         fake_checkout = SimpleNamespace(
             load_sale_client_checkout_snapshot=lambda session, selected_client_id: client_snapshot,
@@ -23,9 +29,12 @@ class SaleCheckoutActionServiceTests(unittest.TestCase):
         )
         manual_calls: list[dict[str, object]] = []
         fake_manual = SimpleNamespace(log_authorized_promo=lambda session, **kwargs: manual_calls.append(kwargs))
+        confirm_calls: list[dict[str, object]] = []
         fake_venta_service = SimpleNamespace(
-            crear_borrador=lambda **kwargs: venta,
-            confirmar_venta=lambda session, venta: None,
+            crear_borrador=lambda **kwargs: _capture_sale_creation(kwargs, venta),
+            confirmar_venta=lambda session, venta, movement_observacion=None: confirm_calls.append(
+                {"venta": venta, "movement_observacion": movement_observacion}
+            ),
         )
         fake_item_input = lambda **kwargs: kwargs
         session = SimpleNamespace(get=lambda model, item_id: usuario if item_id == 7 else None)
@@ -51,6 +60,7 @@ class SaleCheckoutActionServiceTests(unittest.TestCase):
                 },
                 payment_method="Efectivo",
                 note_parts=["nota"],
+                internal_note_parts=["Maqueta prueba deportivo 3pz: P2-001 + PLY-001"],
                 build_notice=lambda *args: "Cambio de nivel",
             )
 
@@ -64,7 +74,25 @@ class SaleCheckoutActionServiceTests(unittest.TestCase):
             ),
         )
         self.assertEqual(venta.total, Decimal("180.00"))
+        self.assertEqual(
+            venta.observacion,
+            "nota | Interno: Maqueta prueba deportivo 3pz: P2-001 + PLY-001",
+        )
+        self.assertEqual(
+            confirm_calls,
+            [
+                {
+                    "venta": venta,
+                    "movement_observacion": "Maqueta prueba deportivo 3pz: P2-001 + PLY-001",
+                }
+            ],
+        )
         self.assertEqual(len(manual_calls), 1)
+
+
+def _capture_sale_creation(kwargs: dict[str, object], venta: SimpleNamespace) -> SimpleNamespace:
+    venta.observacion = kwargs.get("observacion")
+    return venta
 
 
 if __name__ == "__main__":

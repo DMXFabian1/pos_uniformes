@@ -48,11 +48,10 @@ def build_quote_cart_view(quote_cart: list[dict[str, object]], *, school_filter:
         rows.append(
             QuoteCartRowView(
                 values=(
-                    item["sku"],
+                    item["cantidad"],
+                    item["producto_nombre"],
                     item.get("nivel_educativo_nombre") or "Sin nivel",
                     item.get("escuela_nombre") or "General",
-                    item["producto_nombre"],
-                    item["cantidad"],
                     item["precio_unitario"],
                     line_subtotal,
                 )

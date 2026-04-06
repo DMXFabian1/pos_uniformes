@@ -8,7 +8,7 @@ from decimal import Decimal
 
 @dataclass(frozen=True)
 class SaleCartTableRow:
-    values: tuple[object, object, object, object, Decimal]
+    values: tuple[object, object, object, Decimal]
 
 
 @dataclass(frozen=True)
@@ -27,9 +27,8 @@ def build_sale_cart_table_view(sale_cart: list[dict[str, object]]) -> SaleCartTa
         rows.append(
             SaleCartTableRow(
                 values=(
-                    item["sku"],
-                    item["producto_nombre"],
                     quantity,
+                    item["producto_nombre"],
                     item["precio_unitario"],
                     line_subtotal,
                 )

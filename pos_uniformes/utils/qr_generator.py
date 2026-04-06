@@ -42,9 +42,7 @@ class QrGenerator:
     def generate_for_variant(cls, variante: Variante) -> Path:
         output_path = cls.path_for_variant(variante)
         qr_image = cls._build_qr_image(str(variante.sku))
-        icon_path = cls.icon_path_for_variant(variante)
-        if icon_path is not None:
-            qr_image = cls._embed_center_icon(qr_image, icon_path)
+        qr_image = cls._build_variant_qr_image(variante, qr_image=qr_image)
         qr_image.save(output_path)
         return output_path
 
@@ -74,6 +72,20 @@ class QrGenerator:
         qr_image = cls._build_qr_image(str(cliente.codigo_cliente))
         qr_image.save(output_path)
         return output_path
+
+    @classmethod
+    def _build_variant_qr_image(cls, variante: Variante, *, qr_image: Image.Image | None = None) -> Image.Image:
+        """Genera la imagen QR final de variante sin reventar si falla el icono central."""
+        if qr_image is None:
+            qr_image = cls._build_qr_image(str(variante.sku))
+
+        try:
+            icon_path = cls.icon_path_for_variant(variante)
+            if icon_path is not None:
+                return cls._embed_center_icon(qr_image, icon_path)
+        except Exception:
+            return qr_image
+        return qr_image
 
     @staticmethod
     def _build_qr_image(payload: str) -> Image.Image:

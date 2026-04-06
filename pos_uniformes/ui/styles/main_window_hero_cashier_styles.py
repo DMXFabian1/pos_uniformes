@@ -43,9 +43,9 @@ def build_main_window_hero_cashier_styles() -> str:
                 padding: 5px 9px;
             }
             #cashierSummaryCard {
-                background: #faeadf;
-                color: #7e3a22;
-                border: 1px solid #efccb8;
+                background: #edf3f7;
+                color: #29485d;
+                border: 1px solid #d6e2ea;
                 border-radius: 14px;
                 padding: 10px 12px;
                 font-size: 15px;
@@ -61,9 +61,9 @@ def build_main_window_hero_cashier_styles() -> str:
                 font-weight: 700;
             }
             #cashierFeedbackLabel {
-                background: #fbf3ec;
-                color: #8c6656;
-                border: 1px solid #ecd5c5;
+                background: #f1f5f8;
+                color: #5a6774;
+                border: 1px solid #d6e2ea;
                 border-radius: 12px;
                 padding: 8px 10px;
                 font-size: 12px;
@@ -85,18 +85,42 @@ def build_main_window_hero_cashier_styles() -> str:
                 border: 1px solid #dfb3aa;
             }
             #cashierFeedbackLabel[tone="neutral"] {
-                background: #fbf3ec;
-                color: #8c6656;
-                border: 1px solid #ecd5c5;
+                background: #f1f5f8;
+                color: #5a6774;
+                border: 1px solid #d6e2ea;
             }
             #cashierTotalsCard {
-                background: #a84f2d;
-                border: 1px solid #8a4326;
+                background: #324252;
+                border: 1px solid #263443;
                 border-radius: 16px;
+            }
+            #cashierCartTable {
+                background: #fcfbf8;
+                alternate-background-color: #eef3f7;
+                gridline-color: #d8e0e7;
+                border: 1px solid #d8e0e7;
+                border-radius: 18px;
+                selection-background-color: #d5e3ef;
+                selection-color: #233c51;
+                font-size: 14px;
+                font-weight: 700;
+            }
+            #cashierCartTable::item {
+                padding: 8px 10px;
+            }
+            #cashierCartTable QHeaderView::section {
+                background: #dde7ef;
+                color: #3f4e5a;
+                border: none;
+                border-right: 1px solid #d0dbe4;
+                border-bottom: 1px solid #d0dbe4;
+                padding: 9px 10px;
+                font-size: 12px;
+                font-weight: 800;
             }
             #cashierTotalValue {
                 background: transparent;
-                color: #f9f4ea;
+                color: #f4d5bf;
                 border: none;
                 padding: 0;
                 font-size: 30px;
@@ -104,16 +128,16 @@ def build_main_window_hero_cashier_styles() -> str:
             }
             #cashierMetaLabel {
                 background: transparent;
-                color: #f1d7c5;
+                color: #d8e3ec;
                 border: none;
                 padding: 0;
                 font-size: 12px;
                 font-weight: 700;
             }
             #cashierChangeValue {
-                background: #faeadf;
-                color: #7e3a22;
-                border: 1px solid #efccb8;
+                background: #e5f2eb;
+                color: #245241;
+                border: 1px solid #bfdccd;
                 border-radius: 12px;
                 padding: 7px 10px;
                 font-size: 13px;

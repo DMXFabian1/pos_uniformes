@@ -42,11 +42,10 @@ class QuoteCartViewHelperTests(unittest.TestCase):
         self.assertEqual(
             view.rows[0].values,
             (
-                "SKU-001",
+                2,
+                "Playera deportiva",
                 "Primaria",
                 "Colegio Norte",
-                "Playera deportiva",
-                2,
                 Decimal("199.00"),
                 Decimal("398.00"),
             ),

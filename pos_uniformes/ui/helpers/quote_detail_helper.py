@@ -14,6 +14,15 @@ class QuoteDetailLineView:
     unit_price: Decimal | str | int | float
     subtotal: Decimal | str | int | float
 
+    @property
+    def table_values(self) -> tuple[object, object, object, object]:
+        return (
+            self.quantity,
+            self.description,
+            self.unit_price,
+            self.subtotal,
+        )
+
 
 @dataclass(frozen=True)
 class QuoteDetailView:

@@ -23,7 +23,7 @@ from pos_uniformes.utils.venv_bootstrap import ensure_local_venv_site_packages
 ensure_local_venv_site_packages(Path(__file__))
 
 from PyQt6.QtCore import QDate, QMarginsF, QSizeF, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QAction, QColor, QImage, QKeySequence, QPainter, QPageLayout, QPageSize, QPixmap, QShortcut
+from PyQt6.QtGui import QAction, QCloseEvent, QColor, QImage, QKeySequence, QPainter, QPageLayout, QPageSize, QPixmap, QShortcut
 from PyQt6.QtPrintSupport import QPrintDialog, QPrinter
 from PyQt6.QtWidgets import (
     QApplication,
@@ -123,6 +123,7 @@ from pos_uniformes.services.cash_session_action_service import (
     open_cash_session_action,
     register_cash_movement_action,
 )
+from pos_uniformes.services.cash_session_history_service import build_cash_session_history_amounts
 from pos_uniformes.services.caja_service import CajaService
 from pos_uniformes.services.client_service import ClientService
 from pos_uniformes.services.catalog_service import CatalogService
@@ -198,7 +199,7 @@ from pos_uniformes.services.sale_document_view_service import (
     build_layaway_sale_ticket_document_view,
     build_sale_ticket_document_view,
 )
-from pos_uniformes.services.sale_cart_update_service import update_sale_cart_item_quantity
+from pos_uniformes.services.sale_cart_update_service import add_sale_cart_variants, update_sale_cart_item_quantity
 from pos_uniformes.services.sale_selected_client_service import (
     find_active_sale_client_by_code,
     load_sale_selected_client_discount_percent,
@@ -295,6 +296,7 @@ from pos_uniformes.ui.dialogs.cash_session_prompt_dialogs import (
     prompt_cash_opening_correction,
     prompt_open_cash_session,
 )
+from pos_uniformes.ui.helpers.busy_feedback_helper import BusyFeedbackController
 from pos_uniformes.ui.helpers.catalog_access_helper import build_catalog_access_view
 from pos_uniformes.ui.helpers.catalog_action_guard_helper import build_catalog_action_guard_feedback
 from pos_uniformes.ui.helpers.catalog_action_feedback_helper import (
@@ -392,6 +394,7 @@ from pos_uniformes.ui.helpers.inventory_qr_preview_helper import (
     build_empty_inventory_qr_preview_view,
     build_error_inventory_qr_preview_view,
     build_pending_inventory_qr_preview_view,
+    build_inventory_qr_preview_selection,
 )
 from pos_uniformes.ui.helpers.inventory_selection_helper import (
     collect_selected_inventory_variant_ids,
@@ -420,6 +423,7 @@ from pos_uniformes.ui.helpers.recent_sale_selection_helper import (
     build_recent_sale_action_state,
     resolve_selected_recent_sale_id,
 )
+from pos_uniformes.ui.helpers.window_close_helper import build_main_window_close_decision
 from pos_uniformes.ui.helpers.recent_sale_feedback_helper import (
     build_recent_sale_guard_feedback,
     build_recent_sale_permission_label,
@@ -456,6 +460,12 @@ from pos_uniformes.ui.helpers.sale_post_action_feedback_helper import (
 )
 from pos_uniformes.ui.helpers.sale_payment_helper import collect_sale_payment_details
 from pos_uniformes.ui.helpers.sale_scanned_client_helper import build_sale_scanned_client_ui_state
+from pos_uniformes.ui.helpers.sale_sports_uniform_helper import (
+    attach_sports_uniform_trace_to_cart_lines,
+    build_sports_uniform_prototype_note,
+    collect_internal_sale_cart_notes,
+    resolve_sale_scan_variants,
+)
 from pos_uniformes.ui.helpers.size_option_sort_helper import sort_size_options
 from pos_uniformes.ui.helpers.snapshot_cache_helper import SnapshotCache
 from pos_uniformes.ui.helpers.settings_backup_helper import (
@@ -838,9 +848,10 @@ class MultiSelectPickerButton(QPushButton):
 
 def _set_table_badge_style(item: QTableWidgetItem, tone: str) -> None:
     palette = {
-        "positive": ("#f8dfcf", "#8f4527"),
+        "positive": ("#e5f2eb", "#245241"),
         "warning": ("#fbf0cf", "#8a5a00"),
         "danger": ("#f8dfd9", "#9a2f22"),
+        "reserved": ("#e5edf6", "#2d5068"),
         "muted": ("#ece8e1", "#6e675f"),
     }
     background, foreground = palette.get(tone, palette["muted"])
@@ -851,11 +862,11 @@ def _set_table_badge_style(item: QTableWidgetItem, tone: str) -> None:
 
 def _set_table_row_tint(item: QTableWidgetItem, tone: str) -> None:
     palette = {
-        "danger": ("#fff1ec", "#7a2b1d"),
-        "warning": ("#fff8e7", "#7a5a14"),
-        "muted": ("#f3f0ea", "#6e675f"),
-        "neutral": ("#f7f3ee", "#645d56"),
-        "reserved": ("#fff3ea", "#8a4d22"),
+        "danger": ("#fff2ef", "#7a2b1d"),
+        "warning": ("#fffaf0", "#7a5a14"),
+        "muted": ("#f2f4f6", "#6a727a"),
+        "neutral": ("#f8fafb", "#5f6770"),
+        "reserved": ("#eef4f8", "#385266"),
     }
     background, foreground = palette.get(tone, palette["neutral"])
     item.setBackground(QColor(background))
@@ -954,6 +965,8 @@ class MainWindow(QMainWindow):
         self.current_username = ""
         self.current_full_name = ""
         self.current_role = RolUsuario.CAJERO
+        self._busy_feedback = BusyFeedbackController()
+        self._force_close = False
         self.cash_session_requires_cut = False
         self.cash_session_cut_reminder_key: tuple[int, date] | None = None
         self.catalog_rows: list[dict[str, object]] = []
@@ -1397,6 +1410,36 @@ class MainWindow(QMainWindow):
         self.operational_check_timer.timeout.connect(self._run_operational_checks)
         self.operational_check_timer.start()
         self.refresh_all()
+
+    def _busy_scope(self, message: str, *, status_label: QLabel | None = None):
+        return self._busy_feedback.scope(
+            status_label=status_label or self.status_label,
+            message=message,
+        )
+
+    def closeEvent(self, event: QCloseEvent) -> None:  # type: ignore[override]
+        if self._force_close:
+            self._force_close = False
+            event.accept()
+            return
+
+        decision = build_main_window_close_decision(is_busy=self._busy_feedback.is_busy)
+        if decision.should_block:
+            QMessageBox.warning(self, decision.title, decision.message)
+            event.ignore()
+            return
+
+        confirm = QMessageBox.question(
+            self,
+            decision.title,
+            decision.message,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
+            QMessageBox.StandardButton.Cancel,
+        )
+        if confirm == QMessageBox.StandardButton.Yes:
+            event.accept()
+            return
+        event.ignore()
 
     def _build_ui(self) -> None:
         self.session_label.setObjectName("heroPrimaryText")
@@ -2018,6 +2061,11 @@ class MainWindow(QMainWindow):
         cash_session_snapshots: list[dict[str, object]] = []
         for row_index, cash_session in enumerate(cash_sessions):
             is_closed = cash_session.cerrada_at is not None
+            resumen = CajaService.resumir_sesion(session, cash_session)
+            history_amounts = build_cash_session_history_amounts(
+                cash_session,
+                summary=resumen,
+            )
             if is_closed:
                 cerradas += 1
             else:
@@ -2044,10 +2092,22 @@ class MainWindow(QMainWindow):
                     "opening_amount": f"${Decimal(cash_session.monto_apertura or 0).quantize(Decimal('0.01'))}",
                     "closed_at": format_display_datetime(cash_session.cerrada_at, empty="-"),
                     "closed_by": closed_by,
-                    "expected_amount": f"${Decimal(cash_session.monto_esperado_cierre or 0).quantize(Decimal('0.01'))}" if is_closed else "-",
-                    "declared_amount": f"${Decimal(cash_session.monto_cierre_declarado or 0).quantize(Decimal('0.01'))}" if is_closed else "-",
-                    "difference_amount": f"${Decimal(cash_session.diferencia_cierre or 0).quantize(Decimal('0.01'))}" if is_closed else "-",
-                    "difference": str(Decimal(cash_session.diferencia_cierre or 0).quantize(Decimal("0.01"))),
+                    "expected_amount": (
+                        f"${history_amounts.expected_amount}"
+                        if history_amounts.expected_amount is not None
+                        else "-"
+                    ),
+                    "declared_amount": (
+                        f"${history_amounts.declared_amount}"
+                        if history_amounts.declared_amount is not None
+                        else "-"
+                    ),
+                    "difference_amount": (
+                        f"${history_amounts.difference_amount}"
+                        if history_amounts.difference_amount is not None
+                        else "-"
+                    ),
+                    "difference": str(history_amounts.difference_amount or Decimal("0.00")),
                 }
             )
         cash_history_rows = build_settings_cash_history_rows(cash_session_snapshots)
@@ -2126,6 +2186,10 @@ class MainWindow(QMainWindow):
                 if cash_session is None:
                     raise ValueError("No se encontro la sesion de caja seleccionada.")
                 resumen = CajaService.resumir_sesion(session, cash_session)
+                history_amounts = build_cash_session_history_amounts(
+                    cash_session,
+                    summary=resumen,
+                )
                 opened_by = cash_session.abierta_por.nombre_completo if cash_session.abierta_por is not None else "-"
                 closed_by = cash_session.cerrada_por.nombre_completo if cash_session.cerrada_por is not None else "-"
                 movement_rows = []
@@ -2149,9 +2213,9 @@ class MainWindow(QMainWindow):
                     "opening_corrections": self._extract_opening_corrections(cash_session.observacion_apertura or ""),
                     "closed_at": format_display_datetime(cash_session.cerrada_at, empty="-"),
                     "closed_by": closed_by,
-                    "expected_amount": Decimal(cash_session.monto_esperado_cierre or 0).quantize(Decimal("0.01")),
-                    "declared_amount": Decimal(cash_session.monto_cierre_declarado or 0).quantize(Decimal("0.01")),
-                    "difference": Decimal(cash_session.diferencia_cierre or 0).quantize(Decimal("0.01")),
+                    "expected_amount": history_amounts.expected_amount or Decimal("0.00"),
+                    "declared_amount": history_amounts.declared_amount or Decimal("0.00"),
+                    "difference": history_amounts.difference_amount or Decimal("0.00"),
                     "closing_note": cash_session.observacion_cierre or "Sin observacion",
                     "is_closed": cash_session.cerrada_at is not None,
                     "cash_sales_count": resumen.ventas_efectivo_count,
@@ -3152,7 +3216,10 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, feedback.title, feedback.message)
             return
         try:
-            with get_session() as session:
+            with self._busy_scope(
+                "Clientes: generando QR del cliente...",
+                status_label=self.settings_clients_status_label,
+            ), get_session() as session:
                 result = generate_settings_client_qr(session, client_id=client_id)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "QR fallido", str(exc))
@@ -3691,6 +3758,7 @@ class MainWindow(QMainWindow):
         self.hide()
         dialog = LoginDialog()
         if dialog.exec() != LoginDialog.DialogCode.Accepted or dialog.user_id is None:
+            self._force_close = True
             self.close()
             return
 
@@ -4136,22 +4204,22 @@ class MainWindow(QMainWindow):
         summary_label = QLabel("Sin filas cargadas.")
         summary_label.setObjectName("subtleLine")
         summary_label.setStyleSheet(
-            "padding: 8px 10px; border-radius: 12px; background: #fbf3ec; border: 1px solid #e4d2c2;"
-            "color: #694a3e; font-weight: 600;"
+            "padding: 8px 10px; border-radius: 12px; background: #f3f7fa; border: 1px solid #d7e2ea;"
+            "color: #50606c; font-weight: 600;"
         )
         status_banner_label = QLabel("Carga un lote para validar resultados.")
         status_banner_label.setObjectName("subtleLine")
         status_banner_label.setStyleSheet(
-            "padding: 8px 10px; border-radius: 12px; background: #fbf3ec; border: 1px solid #e4d2c2;"
-            "color: #8c6656; font-weight: 700;"
+            "padding: 8px 10px; border-radius: 12px; background: #f3f7fa; border: 1px solid #d7e2ea;"
+            "color: #5f6d78; font-weight: 700;"
         )
 
         def set_banner_style(tone: str) -> None:
             palette = {
-                "positive": ("#f8dfcf", "#8f4527", "#dfb496"),
+                "positive": ("#e5f2eb", "#245241", "#bfdccd"),
                 "warning": ("#fbf0cf", "#8a5a00", "#e7d49b"),
                 "danger": ("#f8dfd9", "#9a2f22", "#dfb3aa"),
-                "neutral": ("#fbf3ec", "#8c6656", "#e4d2c2"),
+                "neutral": ("#f3f7fa", "#5f6d78", "#d7e2ea"),
             }
             background, foreground, border = palette.get(tone, palette["neutral"])
             status_banner_label.setStyleSheet(
@@ -4441,7 +4509,7 @@ class MainWindow(QMainWindow):
 
         operation_hint_label = QLabel()
         operation_hint_label.setObjectName("subtleLine")
-        operation_hint_label.setStyleSheet("padding: 4px 2px; color: #8c6656;")
+        operation_hint_label.setStyleSheet("padding: 4px 2px; color: #5f6d78;")
 
         quick_actions_row = QHBoxLayout()
         quick_actions_row.setSpacing(6)
@@ -4481,22 +4549,22 @@ class MainWindow(QMainWindow):
         summary_label = QLabel("Sin filas cargadas.")
         summary_label.setObjectName("subtleLine")
         summary_label.setStyleSheet(
-            "padding: 8px 10px; border-radius: 12px; background: #fbf3ec; border: 1px solid #e4d2c2;"
-            "color: #694a3e; font-weight: 600;"
+            "padding: 8px 10px; border-radius: 12px; background: #f3f7fa; border: 1px solid #d7e2ea;"
+            "color: #50606c; font-weight: 600;"
         )
         status_banner_label = QLabel("Carga un lote para validar resultados.")
         status_banner_label.setObjectName("subtleLine")
         status_banner_label.setStyleSheet(
-            "padding: 8px 10px; border-radius: 12px; background: #fbf3ec; border: 1px solid #e4d2c2;"
-            "color: #8c6656; font-weight: 700;"
+            "padding: 8px 10px; border-radius: 12px; background: #f3f7fa; border: 1px solid #d7e2ea;"
+            "color: #5f6d78; font-weight: 700;"
         )
 
         def set_banner_style(tone: str) -> None:
             palette = {
-                "positive": ("#f8dfcf", "#8f4527", "#dfb496"),
+                "positive": ("#e5f2eb", "#245241", "#bfdccd"),
                 "warning": ("#fbf0cf", "#8a5a00", "#e7d49b"),
                 "danger": ("#f8dfd9", "#9a2f22", "#dfb3aa"),
-                "neutral": ("#fbf3ec", "#8c6656", "#e4d2c2"),
+                "neutral": ("#f3f7fa", "#5f6d78", "#d7e2ea"),
             }
             background, foreground, border = palette.get(tone, palette["neutral"])
             status_banner_label.setStyleSheet(
@@ -6072,23 +6140,36 @@ class MainWindow(QMainWindow):
                 variante = VentaService.obtener_variante_por_sku(session, sku)
                 if variante is None:
                     raise ValueError(f"El SKU '{sku}' no existe o esta inactivo.")
+                resolution = resolve_sale_scan_variants(self, session, variante)
+                if resolution is None:
+                    self.sale_sku_input.setFocus()
+                    self.sale_sku_input.selectAll()
+                    return
 
-                existing = next((item for item in self.sale_cart if item["sku"] == sku), None)
-                new_quantity = quantity if existing is None else int(existing["cantidad"]) + quantity
-                VentaService.validar_stock_disponible(variante, new_quantity)
-
-                if existing is None:
-                    self.sale_cart.append(
-                        {
-                            "sku": sku,
-                            "variante_id": variante.id,
-                            "producto_nombre": sanitize_product_display_name(variante.producto.nombre),
-                            "cantidad": quantity,
-                            "precio_unitario": Decimal(variante.precio_venta),
-                        }
+                add_sale_cart_variants(
+                    self.sale_cart,
+                    variants=list(resolution.variants),
+                    quantity=quantity,
+                    stock_validator=VentaService.validar_stock_disponible,
+                )
+                if resolution.composed_as_three_pieces and len(resolution.variants) >= 2:
+                    trace_note = build_sports_uniform_prototype_note(
+                        resolution.variants[0],
+                        resolution.variants[1],
                     )
-                else:
-                    existing["cantidad"] = new_quantity
+                    affected_lines = [
+                        item
+                        for item in self.sale_cart
+                        if str(item.get("sku") or "").strip().upper()
+                        in {
+                            str(getattr(resolution.variants[0], "sku", "") or "").strip().upper(),
+                            str(getattr(resolution.variants[1], "sku", "") or "").strip().upper(),
+                        }
+                    ]
+                    attach_sports_uniform_trace_to_cart_lines(
+                        affected_lines,
+                        trace_note=trace_note,
+                    )
         except Exception as exc:  # noqa: BLE001
             message = str(exc)
             if "Stock insuficiente" in message:
@@ -6101,8 +6182,17 @@ class MainWindow(QMainWindow):
         self.sale_last_scanned_sku = sku
         self.sale_last_scanned_at = now
         self._play_sale_feedback_sound()
+        feedback_message = f"{sku} agregado al carrito."
+        if resolution.composed_as_three_pieces and resolution.selected_playera_sku:
+            feedback_message = (
+                "Prueba deportivo 3pz: "
+                f"{sku} + {resolution.selected_playera_sku}. "
+                "Se guardo trazabilidad interna."
+            )
+            if resolution.size_hint:
+                feedback_message = f"{feedback_message} {resolution.size_hint}"
         self._set_sale_feedback(
-            f"{sku} agregado al carrito.",
+            feedback_message,
             "positive",
             auto_clear_ms=1600,
         )
@@ -6561,6 +6651,10 @@ class MainWindow(QMainWindow):
             format_discount_label=self._format_discount_label,
             payment_details=payment_details,
         )
+        internal_note_parts = collect_internal_sale_cart_notes(
+            self.sale_cart,
+            scope="SPORTS_UNIFORM_PROTOTYPE",
+        )
 
         self._set_sale_processing(True)
         try:
@@ -6578,6 +6672,7 @@ class MainWindow(QMainWindow):
                     breakdown=breakdown,
                     payment_method=payment_context.payment_method,
                     note_parts=list(payment_context.note_parts),
+                    internal_note_parts=internal_note_parts,
                     build_notice=self._build_sale_loyalty_transition_notice,
                 )
                 session.commit()
@@ -6851,35 +6946,47 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Sin presentacion", "Selecciona una presentacion para generar su QR.")
             return
 
+        preview_selection = None
         try:
-            with get_session() as session:
+            with self._busy_scope(
+                "Inventario: generando QR...",
+                status_label=self.qr_status_label,
+            ), get_session() as session:
                 variante = session.get(Variante, int(variante_id))
                 if variante is None:
                     raise ValueError("Presentacion no encontrada.")
+                preview_selection = build_inventory_qr_preview_selection(variante)
                 path = QrGenerator.generate_for_variant(variante)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "QR fallido", str(exc))
             return
 
+        if preview_selection is None:
+            QMessageBox.critical(self, "QR fallido", "No fue posible preparar la vista previa del QR.")
+            return
+
         self._apply_inventory_qr_preview_view(
             build_available_inventory_qr_preview_view(
-                sku=str(variante.sku),
-                product_name=str(variante.producto.nombre),
-                talla=str(variante.talla),
-                color=str(variante.color),
+                sku=preview_selection.sku,
+                product_name=preview_selection.product_name,
+                talla=preview_selection.talla,
+                color=preview_selection.color,
                 file_name=path.name,
             ),
             preview_path=path,
         )
         self._set_combo_value(self.inventory_variant_combo, variante_id)
-        invalidate_inventory_qr_exists_cache(sku=str(variante.sku))
+        invalidate_inventory_qr_exists_cache(sku=preview_selection.sku)
         self._invalidate_listing_snapshot_caches(catalog=False, inventory=True)
         self._handle_inventory_filters_changed()
         QMessageBox.information(self, "QR generado", f"QR guardado en:\n{path}")
 
     def _handle_generate_all_qr(self) -> None:
         try:
-            with get_session() as session:
+            with self._busy_scope(
+                "Inventario: generando todos los QR...",
+                status_label=self.qr_status_label,
+            ), get_session() as session:
                 variantes = session.scalars(
                     select(Variante).where(Variante.activo.is_(True)).order_by(Variante.sku)
                 ).all()
@@ -6910,7 +7017,7 @@ class MainWindow(QMainWindow):
     def refresh_all(self) -> None:
         self._invalidate_listing_snapshot_caches()
         try:
-            with get_session() as session:
+            with self._busy_scope("Estado: cargando datos..."), get_session() as session:
                 self._refresh_current_user(session)
                 self._refresh_cash_session(session)
                 self._refresh_permissions()
@@ -7693,15 +7800,14 @@ class MainWindow(QMainWindow):
         self.quote_notes_label.setText(detail_view.notes_label)
         self.quote_detail_table.setRowCount(len(detail_view.detail_rows))
         for row_index, detalle in enumerate(detail_view.detail_rows):
-            values = [
-                detalle.sku,
-                detalle.description,
-                detalle.quantity,
-                detalle.unit_price,
-                detalle.subtotal,
-            ]
+            values = list(detalle.table_values)
             for column_index, value in enumerate(values):
-                self.quote_detail_table.setItem(row_index, column_index, _table_item(value))
+                item = _table_item(value)
+                if column_index == 0:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                elif column_index in {2, 3}:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                self.quote_detail_table.setItem(row_index, column_index, item)
         self.quote_detail_table.resizeColumnsToContents()
 
     def _refresh_inventory_table(self, session=None) -> None:
@@ -8823,9 +8929,14 @@ class MainWindow(QMainWindow):
         self.layaway_detail_table.setRowCount(len(detail_view.detail_rows))
         for row_index, detail_row in enumerate(detail_view.detail_rows):
             for column_index, value in enumerate(detail_row.values):
-                self.layaway_detail_table.setItem(row_index, column_index, _table_item(value))
+                item = _table_item(value)
+                if column_index == 0:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                elif column_index in {2, 3}:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                self.layaway_detail_table.setItem(row_index, column_index, item)
             if detail_row.tone:
-                for column_index in (1, 4):
+                for column_index in (1, 3):
                     item = self.layaway_detail_table.item(row_index, column_index)
                     if item is not None:
                         _set_table_badge_style(item, detail_row.tone)
@@ -9115,27 +9226,21 @@ class MainWindow(QMainWindow):
             return
 
         preview_path: Path | None = None
-        sku = ""
-        product_name = ""
-        talla = ""
-        color = ""
+        preview_selection = None
         try:
             with get_session() as session:
                 variante = session.get(Variante, int(variante_id))
                 if variante is None:
                     raise ValueError("Presentacion no encontrada.")
+                preview_selection = build_inventory_qr_preview_selection(variante)
                 path = QrGenerator.path_for_variant(variante)
-                sku = str(variante.sku)
-                product_name = str(variante.producto.nombre)
-                talla = str(variante.talla)
-                color = str(variante.color)
                 if not path.exists():
                     self._apply_inventory_qr_preview_view(
                         build_pending_inventory_qr_preview_view(
-                            sku=sku,
-                            product_name=product_name,
-                            talla=talla,
-                            color=color,
+                            sku=preview_selection.sku,
+                            product_name=preview_selection.product_name,
+                            talla=preview_selection.talla,
+                            color=preview_selection.color,
                         )
                     )
                     self._refresh_inventory_overview()
@@ -9147,12 +9252,17 @@ class MainWindow(QMainWindow):
             self._refresh_inventory_overview()
             return
 
+        if preview_selection is None:
+            self._apply_inventory_qr_preview_view(build_error_inventory_qr_preview_view())
+            self._refresh_inventory_overview()
+            return
+
         self._apply_inventory_qr_preview_view(
             build_available_inventory_qr_preview_view(
-                sku=sku,
-                product_name=product_name,
-                talla=talla,
-                color=color,
+                sku=preview_selection.sku,
+                product_name=preview_selection.product_name,
+                talla=preview_selection.talla,
+                color=preview_selection.color,
                 file_name=path.name,
             ),
             preview_path=preview_path,
@@ -9349,12 +9459,12 @@ class MainWindow(QMainWindow):
         for row_index, row in enumerate(panel_view.cashier_view.table_view.rows):
             for column_index, value in enumerate(row.values):
                 item = _table_item(value)
-                if column_index == 2:
+                if column_index == 0:
                     item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                elif column_index in {3, 4}:
+                elif column_index in {2, 3}:
                     item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 self.sale_cart_table.setItem(row_index, column_index, item)
-        for column_index in (0, 2, 3, 4):
+        for column_index in (0, 2, 3):
             self.sale_cart_table.resizeColumnToContents(column_index)
         self.sale_total_label.setText(panel_view.cashier_view.summary.total_label)
         self.sale_total_meta_label.setText(panel_view.cashier_view.summary.meta_label)
@@ -9377,7 +9487,12 @@ class MainWindow(QMainWindow):
         self.quote_cart_table.setRowCount(len(quote_cart_view.rows))
         for row_index, row in enumerate(quote_cart_view.rows):
             for column_index, value in enumerate(row.values):
-                self.quote_cart_table.setItem(row_index, column_index, _table_item(value))
+                item = _table_item(value)
+                if column_index == 0:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                elif column_index in {4, 5}:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                self.quote_cart_table.setItem(row_index, column_index, item)
         self.quote_cart_table.resizeColumnsToContents()
         self.quote_total_label.setText(quote_cart_view.summary.total_label)
         self.quote_summary_label.setText(quote_cart_view.summary.summary_label)

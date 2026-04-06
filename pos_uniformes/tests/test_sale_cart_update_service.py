@@ -3,10 +3,72 @@ from __future__ import annotations
 from types import SimpleNamespace
 import unittest
 
-from pos_uniformes.services.sale_cart_update_service import update_sale_cart_item_quantity
+from pos_uniformes.services.sale_cart_update_service import (
+    add_sale_cart_variant,
+    add_sale_cart_variants,
+    update_sale_cart_item_quantity,
+)
 
 
 class SaleCartUpdateServiceTests(unittest.TestCase):
+    def test_adds_new_variant_line(self) -> None:
+        sale_cart: list[dict[str, object]] = []
+        variant = SimpleNamespace(
+            id=101,
+            sku="SKU-NEW",
+            precio_venta="149.90",
+            producto=SimpleNamespace(nombre="Pants Deportivo | Primaria | Pants 2pz #3"),
+        )
+
+        line_item = add_sale_cart_variant(
+            sale_cart,
+            variante=variant,
+            quantity=2,
+            stock_validator=lambda variante, cantidad: None,
+        )
+
+        self.assertEqual(line_item["sku"], "SKU-NEW")
+        self.assertEqual(line_item["cantidad"], 2)
+        self.assertEqual(line_item["producto_nombre"], "Pants Deportivo | Primaria | Pants 2pz")
+        self.assertEqual(len(sale_cart), 1)
+
+    def test_increments_existing_variant_line(self) -> None:
+        variant = SimpleNamespace(
+            id=101,
+            sku="SKU-NEW",
+            precio_venta="149.90",
+            producto=SimpleNamespace(nombre="Pants Deportivo"),
+        )
+        sale_cart = [{"sku": "SKU-NEW", "cantidad": 1, "precio_unitario": "149.90"}]
+
+        line_item = add_sale_cart_variant(
+            sale_cart,
+            variante=variant,
+            quantity=2,
+            stock_validator=lambda variante, cantidad: None,
+        )
+
+        self.assertEqual(line_item["cantidad"], 3)
+        self.assertEqual(sale_cart[0]["cantidad"], 3)
+
+    def test_add_sale_cart_variants_validates_batched_target_quantities(self) -> None:
+        variant = SimpleNamespace(
+            id=201,
+            sku="SKU-001",
+            precio_venta="99.00",
+            producto=SimpleNamespace(nombre="Playera Deportiva"),
+        )
+        validated_quantities: list[int] = []
+
+        add_sale_cart_variants(
+            [],
+            variants=[variant, variant],
+            quantity=2,
+            stock_validator=lambda variante, cantidad: validated_quantities.append(cantidad),
+        )
+
+        self.assertEqual(validated_quantities, [4])
+
     def test_updates_selected_line_quantity(self) -> None:
         sale_cart = [{"sku": "SKU-001", "cantidad": 1}]
 

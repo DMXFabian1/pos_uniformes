@@ -48,7 +48,7 @@ def build_inventory_table_row_view(row: dict[str, object]) -> InventoryTableRowV
         ),
         row_tone=row_tone,
         stock_tone=stock_tone,
-        committed_tone="warning" if committed_value > 0 else None,
+        committed_tone="reserved" if committed_value > 0 else None,
         status_tone=status_tone,
         qr_tone=qr_tone,
     )
@@ -73,10 +73,4 @@ def _build_inventory_row_tone(
         return "muted"
     if stock_value == 0:
         return "danger"
-    if stock_value <= 3:
-        return "warning"
-    if committed_value > 0:
-        return "reserved"
-    if not qr_exists:
-        return "neutral"
     return None

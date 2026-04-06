@@ -11,7 +11,9 @@ from sqlalchemy import and_, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from pos_uniformes.database.models import (
+    Apartado,
     ApartadoAbono,
+    EstadoApartado,
     EstadoVenta,
     MovimientoCaja,
     RolUsuario,
@@ -95,7 +97,7 @@ class CajaService:
                     ),
                 )
             )
-        return session.scalars(query).all()
+        return list(session.scalars(query).unique().all())
 
     @staticmethod
     def obtener_ultimo_reactivo_sugerido(session: Session) -> Decimal | None:
@@ -228,6 +230,13 @@ class CajaService:
             return cash_amount.quantize(Decimal("0.01"))
         return Decimal("0.00")
 
+    @staticmethod
+    def _include_layaway_payment_in_cash_summary(payment: ApartadoAbono) -> bool:
+        apartado = getattr(payment, "apartado", None)
+        if apartado is None:
+            return True
+        return getattr(apartado, "estado", None) != EstadoApartado.CANCELADO
+
     @classmethod
     def resumir_sesion(cls, session: Session, cash_session: SesionCaja) -> ResumenCaja:
         start = cash_session.abierta_at
@@ -247,14 +256,20 @@ class CajaService:
                 ventas_count += 1
                 efectivo_total += cash_amount
         payments = session.scalars(
-            select(ApartadoAbono).where(
+            select(ApartadoAbono)
+            .join(ApartadoAbono.apartado)
+            .options(joinedload(ApartadoAbono.apartado))
+            .where(
                 ApartadoAbono.created_at >= start,
                 ApartadoAbono.created_at <= end,
+                Apartado.estado != EstadoApartado.CANCELADO,
             )
         ).all()
         abonos_efectivo_total = Decimal("0.00")
         abonos_count = 0
         for payment in payments:
+            if not cls._include_layaway_payment_in_cash_summary(payment):
+                continue
             cash_amount = (
                 Decimal(payment.monto_efectivo).quantize(Decimal("0.01"))
                 if payment.monto_efectivo is not None

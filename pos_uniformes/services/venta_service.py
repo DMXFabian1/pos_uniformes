@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 from pos_uniformes.database.models import Apartado, Cliente, EstadoVenta, RolUsuario, Usuario, Variante, Venta, VentaDetalle
 from pos_uniformes.services.inventario_service import InventarioService
 from pos_uniformes.services.loyalty_service import LoyaltyService
+from pos_uniformes.services.sale_stock_policy import sale_stock_guard_enabled
 
 
 @dataclass(frozen=True)
@@ -39,6 +40,9 @@ class VentaService:
     def validar_stock_disponible(variante: Variante, cantidad: int) -> None:
         if cantidad <= 0:
             raise ValueError("La cantidad de venta debe ser mayor a cero.")
+
+        if not sale_stock_guard_enabled():
+            return
 
         if variante.stock_actual < cantidad:
             raise ValueError("Stock insuficiente para confirmar la venta.")
@@ -93,7 +97,11 @@ class VentaService:
         return venta
 
     @staticmethod
-    def confirmar_venta(session: Session, venta: Venta) -> Venta:
+    def confirmar_venta(
+        session: Session,
+        venta: Venta,
+        movement_observacion: str | None = None,
+    ) -> Venta:
         VentaService._validar_usuario_venta(venta.usuario)
         if venta.estado != EstadoVenta.BORRADOR:
             raise ValueError("Las ventas confirmadas o canceladas no se pueden editar ni reconfirmar.")
@@ -107,6 +115,7 @@ class VentaService:
                 variante=detalle.variante,
                 cantidad=detalle.cantidad,
                 referencia=venta.folio,
+                observacion=movement_observacion,
                 creado_por=venta.usuario.username,
             )
 

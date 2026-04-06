@@ -1,20 +1,28 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 from pathlib import Path
+import sys
 
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_submodules
 
 
 PROJECT_ROOT = Path(SPEC).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT.parent))
+
+from pos_uniformes.utils.pyinstaller_data_helper import collect_tree_datas
+
 VERSION = (PROJECT_ROOT / "VERSION").read_text(encoding="utf-8").strip()
 APP_NAME = f"POSUniformes-{VERSION}"
 
-datas = collect_data_files(
-    "pos_uniformes",
-    includes=[
-        "assets/**/*",
-        "migrations/**/*",
-    ],
+datas = []
+datas += collect_tree_datas(
+    PROJECT_ROOT / "assets",
+    "pos_uniformes/assets",
+)
+datas += collect_tree_datas(
+    PROJECT_ROOT / "migrations",
+    "pos_uniformes/migrations",
+    include_python_files=True,
 )
 datas += [
     (str(PROJECT_ROOT / "alembic.ini"), "pos_uniformes"),

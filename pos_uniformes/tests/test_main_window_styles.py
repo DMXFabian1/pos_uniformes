@@ -37,6 +37,7 @@ class MainWindowStylesTests(unittest.TestCase):
         self.assertIn("#heroPanel", stylesheet)
         self.assertIn("#cashierFeedbackLabel[tone=\"danger\"]", stylesheet)
         self.assertIn("#cashierTotalValue", stylesheet)
+        self.assertIn("#cashierCartTable", stylesheet)
 
     def test_builds_inventory_analytics_style_section(self) -> None:
         stylesheet = build_main_window_inventory_analytics_styles()

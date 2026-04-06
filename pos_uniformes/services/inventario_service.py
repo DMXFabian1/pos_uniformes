@@ -20,6 +20,7 @@ from pos_uniformes.database.models import (
     Usuario,
     Variante,
 )
+from pos_uniformes.services.sale_stock_policy import allow_negative_sale_stock
 
 
 @dataclass(frozen=True)
@@ -77,6 +78,7 @@ class InventarioService:
         referencia: str | None = None,
         observacion: str | None = None,
         creado_por: str = "SYSTEM",
+        allow_negative_stock: bool = False,
     ) -> MovimientoInventario:
         if cantidad == 0:
             raise ValueError("La cantidad del movimiento no puede ser cero.")
@@ -84,7 +86,7 @@ class InventarioService:
         stock_anterior = variante.stock_actual
         stock_posterior = stock_anterior + cantidad
 
-        if stock_posterior < 0:
+        if stock_posterior < 0 and not allow_negative_stock:
             raise ValueError("No se puede registrar un movimiento que deje stock negativo.")
 
         variante.stock_actual = stock_posterior
@@ -141,6 +143,7 @@ class InventarioService:
             referencia=referencia,
             observacion=observacion,
             creado_por=creado_por,
+            allow_negative_stock=allow_negative_sale_stock(),
         )
 
     @classmethod

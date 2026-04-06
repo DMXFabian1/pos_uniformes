@@ -90,6 +90,37 @@ class QrGeneratorTests(unittest.TestCase):
             self.assertNotEqual(center_pixel[:3], (255, 255, 255))
             self.assertNotEqual(center_pixel[:3], (0, 0, 0))
 
+    def test_generate_for_variant_falls_back_when_center_icon_fails(self) -> None:
+        variant = SimpleNamespace(
+            sku="SKU-777",
+            producto=SimpleNamespace(
+                tipo_prenda=SimpleNamespace(nombre="Camisa"),
+                categoria=None,
+                tipo_pieza=None,
+                atributo=None,
+                nombre_base="Camisa Escolar",
+                nombre="Camisa Escolar Blanca",
+            ),
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            output_path = temp_path / "SKU-777.png"
+            icon_path = temp_path / "camisa.png"
+            Image.new("RGBA", (120, 120), (210, 40, 40, 255)).save(icon_path)
+
+            with (
+                patch.object(QrGenerator, "path_for_variant", return_value=output_path),
+                patch.object(QrGenerator, "icon_path_for_variant", return_value=icon_path),
+                patch.object(QrGenerator, "_embed_center_icon", side_effect=OSError("asset missing")),
+            ):
+                generated = QrGenerator.generate_for_variant(variant)
+
+            self.assertEqual(generated, output_path)
+            self.assertTrue(output_path.exists())
+            image = Image.open(output_path).convert("RGBA")
+            self.assertGreater(image.width, 0)
+            self.assertGreater(image.height, 0)
+
 
 if __name__ == "__main__":
     unittest.main()

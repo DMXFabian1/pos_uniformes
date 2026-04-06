@@ -38,12 +38,12 @@ if TYPE_CHECKING:
 def _build_inventory_label_dialog_styles() -> str:
     return """
         QWidget#inventoryLabelControlsCard, QWidget#inventoryLabelPreviewCard {
-            background: #fbf6ee;
-            border: 1px solid #e4d8c9;
+            background: #f8fafb;
+            border: 1px solid #dce5eb;
             border-radius: 18px;
         }
         QLabel#inventoryLabelSectionTitle {
-            color: #7e3a22;
+            color: #355167;
             font-size: 15px;
             font-weight: 800;
             background: transparent;
@@ -51,24 +51,24 @@ def _build_inventory_label_dialog_styles() -> str:
             padding: 0;
         }
         QLabel#inventoryLabelPreviewCaption, QLabel#inventoryLabelModeHint {
-            color: #6f665f;
+            color: #68737d;
             font-size: 12px;
             background: transparent;
             border: none;
             padding: 0;
         }
         QLabel#inventoryLabelPreviewImage {
-            background: #fffdf9;
-            border: 1px dashed #c5b8a7;
+            background: #fcfdfd;
+            border: 1px dashed #c9d6e0;
             border-radius: 18px;
-            color: #857a70;
+            color: #7a858e;
             padding: 18px;
         }
         QLabel#inventoryLabelSummaryCard {
-            background: #fffaf2;
-            border: 1px solid #e4d8c9;
+            background: #f2f7fa;
+            border: 1px solid #d8e2ea;
             border-radius: 16px;
-            color: #5f564d;
+            color: #55636f;
             padding: 12px 14px;
             font-size: 13px;
             font-weight: 600;

@@ -29,6 +29,7 @@ def complete_sale_checkout(
     breakdown: dict[str, object],
     payment_method: str,
     note_parts: list[str],
+    internal_note_parts: list[str],
     build_notice: Callable[[str, str, str, Decimal], str],
 ) -> SaleCheckoutResult:
     (
@@ -48,6 +49,10 @@ def complete_sale_checkout(
         selected_client_id=selected_client_id,
     )
     cliente = client_snapshot.client
+    sale_observation_parts = list(note_parts)
+    sale_observation_parts.extend(f"Interno: {part}" for part in internal_note_parts if str(part).strip())
+    movement_note = " | ".join(str(part).strip() for part in internal_note_parts if str(part).strip()) or None
+
     venta = venta_service.crear_borrador(
         session=session,
         usuario=usuario,
@@ -56,14 +61,14 @@ def complete_sale_checkout(
             venta_item_input(sku=str(item["sku"]), cantidad=int(item["cantidad"]))
             for item in sale_cart
         ],
-        observacion=" | ".join(note_parts),
+        observacion=" | ".join(sale_observation_parts),
         cliente=cliente,
     )
     venta.subtotal = subtotal
     venta.descuento_porcentaje = discount_percent
     venta.descuento_monto = applied_discount
     venta.total = total
-    venta_service.confirmar_venta(session, venta)
+    venta_service.confirmar_venta(session, venta, movement_observacion=movement_note)
 
     loyalty_discount = Decimal(str(breakdown["loyalty_discount"] or Decimal("0.00"))).quantize(Decimal("0.01"))
     promo_discount = Decimal(str(breakdown["promo_discount"] or Decimal("0.00"))).quantize(Decimal("0.01"))

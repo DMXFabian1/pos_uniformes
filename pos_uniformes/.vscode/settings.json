@@ -1,7 +1,7 @@
 {
-  "python.defaultInterpreterPath": "/Users/danielfabian/Documents/Playground/pos_system/.venv/bin/python",
+  "python.defaultInterpreterPath": "/Users/danielfabian/Documents/Playground 2/pos_uniformes/.venv/bin/python",
   "python.analysis.extraPaths": [
-    "/Users/danielfabian/Documents/Playground"
+    "/Users/danielfabian/Documents/Playground 2"
   ],
   "python.terminal.activateEnvironment": true,
   "python-envs.defaultEnvManager": "ms-python.python:system"

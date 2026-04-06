@@ -34,6 +34,19 @@ class _FakeVentaDetalle:
 
 
 class VentaServiceLayawayTests(unittest.TestCase):
+    def test_validar_stock_disponible_allows_sale_when_guard_is_disabled(self) -> None:
+        variante = SimpleNamespace(stock_actual=0)
+
+        with patch("pos_uniformes.services.venta_service.sale_stock_guard_enabled", return_value=False):
+            VentaService.validar_stock_disponible(variante, 3)
+
+    def test_validar_stock_disponible_blocks_when_guard_is_enabled(self) -> None:
+        variante = SimpleNamespace(stock_actual=0)
+
+        with patch("pos_uniformes.services.venta_service.sale_stock_guard_enabled", return_value=True):
+            with self.assertRaisesRegex(ValueError, "Stock insuficiente"):
+                VentaService.validar_stock_disponible(variante, 3)
+
     def test_crear_confirmada_desde_apartado_preserves_rounded_total(self) -> None:
         session = _SessionStub()
         usuario = SimpleNamespace(activo=True, rol="CAJERO", username="caja")

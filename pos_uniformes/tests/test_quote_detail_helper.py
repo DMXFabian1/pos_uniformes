@@ -67,6 +67,10 @@ class QuoteDetailHelperTests(unittest.TestCase):
         self.assertEqual(view.detail_rows[0].quantity, 2)
         self.assertEqual(view.detail_rows[0].unit_price, Decimal("149.50"))
         self.assertEqual(view.detail_rows[0].subtotal, Decimal("299.00"))
+        self.assertEqual(
+            view.detail_rows[0].table_values,
+            (2, "Playera deportiva CH azul", Decimal("149.50"), Decimal("299.00")),
+        )
 
 
 if __name__ == "__main__":

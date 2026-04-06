@@ -188,6 +188,26 @@ class SaleTicketTextServiceTests(unittest.TestCase):
         self.assertIn("Ajuste: -0.15", ticket)
         self.assertIn("Total a pagar: 169.00", ticket)
 
+    def test_omits_internal_operational_notes_from_customer_ticket(self) -> None:
+        sale = _build_sale(
+            with_client=False,
+            stored_discount_percent="0.00",
+            stored_discount_amount="0.00",
+            total="199.00",
+            observacion=(
+                "Metodo de pago: Efectivo | Cambio: 1.00 | "
+                "Interno: Maqueta prueba deportivo 3pz: P2-001 + PLY-001"
+            ),
+        )
+
+        ticket = build_sale_ticket_text(
+            sale=sale,
+            business_name="POS Uniformes",
+        )
+
+        self.assertIn("Notas:\n- Cambio: 1.00", ticket)
+        self.assertNotIn("Interno:", ticket)
+
 
 if __name__ == "__main__":
     unittest.main()

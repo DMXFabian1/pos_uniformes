@@ -239,21 +239,21 @@ def build_main_window_control_styles() -> str:
                 color: #6a2f1a;
             }
             #dataTable {
-                background: #fffdf8;
-                alternate-background-color: #f5efe6;
-                gridline-color: #e2d9cc;
-                border: 1px solid #ddd3c6;
+                background: #fdfcf9;
+                alternate-background-color: #f1f5f8;
+                gridline-color: #d8e0e7;
+                border: 1px solid #d8e0e7;
                 border-radius: 16px;
-                selection-background-color: #efccb5;
-                selection-color: #5a2816;
+                selection-background-color: #d9e7f2;
+                selection-color: #244158;
                 font-size: 13px;
             }
             QHeaderView::section {
-                background: #efe7d9;
-                color: #4a433d;
+                background: #e8eef3;
+                color: #43515e;
                 border: none;
-                border-right: 1px solid #ddd3c6;
-                border-bottom: 1px solid #ddd3c6;
+                border-right: 1px solid #d8e0e7;
+                border-bottom: 1px solid #d8e0e7;
                 padding: 8px 10px;
                 font-weight: 700;
             }

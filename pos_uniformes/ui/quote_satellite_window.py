@@ -111,7 +111,9 @@ class QuoteSatelliteWindow(QMainWindow):
         self.lookup_snapshot: QuoteKioskLookupSnapshot | None = None
         self.lookup_history: list[QuoteKioskLookupSnapshot] = []
         self.catalog_snapshot_rows: list[dict[str, object]] = []
+        self.catalog_browser_visible_skus: tuple[str, ...] = ()
         self.catalog_browser_page_index = 0
+        self.current_page_key = "kiosk"
         self.catalog_browser_debounce_timer = QTimer(self)
         self.catalog_browser_debounce_timer.setSingleShot(True)
         self.catalog_browser_debounce_timer.setInterval(SATELLITE_SEARCH_DEBOUNCE_MS)
@@ -1399,6 +1401,7 @@ class QuoteSatelliteWindow(QMainWindow):
             "search": "Busqueda y seguimiento de presupuestos.",
             "share": "Compartir por WhatsApp o imprimir.",
         }
+        self.current_page_key = page_key
         self.page_stack.setCurrentIndex(page_index_map[page_key])
         button_map[page_key].setChecked(True)
         self._set_status(page_title_map[page_key])
@@ -1521,6 +1524,7 @@ class QuoteSatelliteWindow(QMainWindow):
             page_size=SATELLITE_CATALOG_PAGE_SIZE,
         )
         self.catalog_browser_page_index = pagination_view.current_page_index
+        self.catalog_browser_visible_skus = tuple(str(row.sku) for row in pagination_view.page_rows)
         _reload_satellite_table_widget(
             self.catalog_table,
             row_count=len(pagination_view.page_rows),
@@ -1570,12 +1574,20 @@ class QuoteSatelliteWindow(QMainWindow):
             self.catalog_detail_notes_label.setText("")
             return
         self.catalog_visual_icon_label.setPixmap(_catalog_row_icon(row))
+        product_name = str(row.get("producto_nombre_base") or row.get("producto_nombre") or "Producto")
+        school_name = str(row.get("escuela_nombre") or "General")
+        level_name = str(row.get("nivel_educativo_nombre") or "Sin nivel")
+        garment_name = str(row.get("tipo_prenda_nombre") or "-")
+        piece_name = str(row.get("tipo_pieza_nombre") or "-")
+        size_label = str(row.get("talla") or "-")
+        color_label = str(row.get("color") or "-")
+        price_value = Decimal(str(row.get("precio_venta") or "0")).quantize(Decimal("0.01"))
         self.catalog_detail_title_label.setText(
-            f"{row['sku']} | {row['producto_nombre_base']}"
+            f"{row.get('sku', '')} | {product_name}"
         )
         self.catalog_detail_meta_label.setText(
-            f"Nivel {row['nivel_educativo_nombre']} | Escuela {row['escuela_nombre']} | {row['tipo_prenda_nombre']} | {row['tipo_pieza_nombre']} | "
-            f"Talla {row['talla']} | Color {row['color']} | Precio ${Decimal(str(row['precio_venta'])).quantize(Decimal('0.01'))}"
+            f"Nivel {level_name} | Escuela {school_name} | {garment_name} | {piece_name} | "
+            f"Talla {size_label} | Color {color_label} | Precio ${price_value}"
         )
         self.catalog_detail_notes_label.setText(str(row.get("producto_descripcion") or "Sin descripcion adicional."))
 
@@ -2518,8 +2530,15 @@ class QuoteSatelliteWindow(QMainWindow):
         selected_row = self.catalog_table.currentRow()
         if selected_row < 0:
             return ""
+        current_row_count = self.catalog_table.rowCount()
+        if current_row_count == len(self.catalog_snapshot_rows) and selected_row < len(self.catalog_snapshot_rows):
+            return str(self.catalog_snapshot_rows[selected_row].get("sku") or "").strip()
+        if current_row_count == len(self.catalog_browser_visible_skus) and selected_row < len(self.catalog_browser_visible_skus):
+            return self.catalog_browser_visible_skus[selected_row].strip()
         item = self.catalog_table.item(selected_row, 0)
         if item is None:
+            if selected_row < len(self.catalog_snapshot_rows):
+                return str(self.catalog_snapshot_rows[selected_row].get("sku") or "").strip()
             return ""
         return str(item.data(Qt.ItemDataRole.UserRole) or item.text()).strip()
 

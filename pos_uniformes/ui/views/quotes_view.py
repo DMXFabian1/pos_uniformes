@@ -95,9 +95,11 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
     quote_actions.addWidget(window.quote_remove_button)
     quote_actions.addWidget(window.quote_clear_button)
 
-    window.quote_cart_table.setColumnCount(5)
-    window.quote_cart_table.setHorizontalHeaderLabels(["SKU", "Producto", "Cantidad", "Precio", "Subtotal"])
-    window.quote_cart_table.setObjectName("dataTable")
+    window.quote_cart_table.setColumnCount(6)
+    window.quote_cart_table.setHorizontalHeaderLabels(
+        ["Cantidad", "Producto", "Nivel", "Escuela", "Precio", "Subtotal"]
+    )
+    window.quote_cart_table.setObjectName("cashierCartTable")
     window.quote_cart_table.verticalHeader().setVisible(False)
     window.quote_cart_table.setSelectionBehavior(window.quote_cart_table.SelectionBehavior.SelectRows)
     window.quote_cart_table.setAlternatingRowColors(True)
@@ -133,6 +135,7 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
     quote_cart_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
     quote_cart_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
     quote_cart_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+    quote_cart_header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
     quote_cart_header.setStretchLastSection(False)
 
     history_box = QGroupBox("Presupuestos recientes")
