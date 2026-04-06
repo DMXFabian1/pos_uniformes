@@ -22,11 +22,25 @@ cd C:\dev\pos_uniformes\pos_uniformes
 .venv\Scripts\python.exe scripts\sync_checkpoint_gui.py
 ```
 
+O mas simple:
+
+```powershell
+cd C:\dev\pos_uniformes\pos_uniformes
+.venv\Scripts\python.exe main_sync.py
+```
+
 ## Como abrirlo en Mac
 
 ```bash
 cd /ruta/a/pos_uniformes
 python3 scripts/sync_checkpoint_gui.py
+```
+
+O mas simple:
+
+```bash
+cd /ruta/a/pos_uniformes
+python3 main_sync.py
 ```
 
 ## Archivo compartido de estado
