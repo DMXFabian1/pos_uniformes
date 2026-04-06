@@ -32,6 +32,18 @@ cd C:\dev\pos_uniformes\pos_uniformes
 
 ## Como abrirlo en Mac
 
+La opcion mas simple en esta Mac es:
+
+```bash
+cd /ruta/a/pos_uniformes
+chmod +x main_sync_mac.command
+./main_sync_mac.command
+```
+
+Ese launcher busca primero un `.venv/bin/python` y, si no existe, prueba `python3.12`, `python3.11`, `python3.10` y luego `python3`. Solo usa uno que realmente pueda abrir Tkinter.
+
+Tambien puedes abrirlo manualmente con un Python compatible:
+
 ```bash
 cd /ruta/a/pos_uniformes
 python3 scripts/sync_checkpoint_gui.py
