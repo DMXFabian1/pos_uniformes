@@ -273,6 +273,30 @@ La build incluye:
 
 La version sale del archivo `VERSION` en la raiz del proyecto.
 
+## Versiones y builds de prueba
+
+Para no confundirnos:
+
+- `VERSION` define la version visible del producto dentro de la app.
+- `VERSION` tambien define el nombre base del ejecutable y del bundle:
+  - `POSUniformes-<VERSION>.exe`
+  - `POSUniformes-<VERSION>-windows.zip`
+- La rama y el commit no cambian la version del producto por si solos.
+
+Si usas GitHub Actions para builds de prueba en Windows:
+
+- el artifact subido agrega `rama + commit corto` al nombre para distinguir pruebas entre si
+- ejemplo:
+  - producto: `2026.03.18`
+  - rama: `codex/etiquetas-windows`
+  - commit: `fa050e0`
+  - artifact: `POSUniformes-2026.03.18-codex-etiquetas-windows-fa050e0-windows.zip`
+
+Regla recomendada:
+
+- mientras estemos probando internamente, podemos repetir `VERSION` y distinguirnos por `rama + commit`
+- cuando decidamos una build candidata real para entregar, entonces si actualizamos `VERSION`
+
 ## 8. Configuracion del paquete
 
 En la carpeta final de la build:
