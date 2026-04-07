@@ -74,7 +74,7 @@ Sigue este orden para validar sin mezclar causas ni perder tiempo entre pantalla
 - [ ] Confirmar `_internal/pos_uniformes/migrations`.
 - [ ] Confirmar `_internal/pos_uniformes/assets/qr_icons`.
 - [ ] Revisar icono de ventana.
-- [ ] Recordatorio: antes del empaquetado final, preparar `assets/app_icon.ico`.
+- [x] `assets/app_icon.ico` ya quedo preparado para el empaquetado final.
 
 ## Windows
 
@@ -83,7 +83,7 @@ Sigue este orden para validar sin mezclar causas ni perder tiempo entre pantalla
 - [ ] Probar `Generar QR` en Windows simulando falta de asset y confirmar que el PNG se genere sin cerrar la app.
 - [ ] Revisar en Windows que el logo, nombre y version visible se muestren correctamente al arrancar.
 - [ ] Revisar en Windows que el selector de usuarios del login tenga contraste correcto sin pasar el mouse.
-- [ ] Revisar en Windows si el icono de ventana se ve consistente; recordar que antes del empaquetado final falta preparar un `.ico` dedicado.
+- [ ] Revisar en Windows si el icono de ventana y del `.exe` se ven consistentes con el `.ico` dedicado.
 
 ## Arranque y carga
 
@@ -134,7 +134,7 @@ Sigue este orden para validar sin mezclar causas ni perder tiempo entre pantalla
 
 ## Nota pendiente
 
-- [ ] Antes del empaquetado final de Windows, preparar `assets/app_icon.ico` y conectarlo al `.spec`.
+- [ ] Confirmar en una build real de Windows que `assets/app_icon.ico` se aplique correctamente al `.exe` y al acceso directo.
 
 ## Estado del checkpoint tecnico
 
