@@ -33,6 +33,14 @@ class LabelRenderResult:
     requested_copies: int
 
 
+@dataclass(frozen=True)
+class SplitLabelLine:
+    text: str
+    base_size: int
+    min_size: int
+    gap_after: int = 6
+
+
 class LabelGenerator:
     """Renderiza etiquetas basicas con los dos formatos heredados del sistema legacy."""
 
@@ -112,13 +120,26 @@ class LabelGenerator:
             qr_x = section_x + (SPLIT_SECTION_WIDTH - QR_SIZE_SPLIT) // 2
             qr_y = 10
             label_image.paste(qr_image, (qr_x, qr_y))
-            text_y = qr_y + QR_SIZE_SPLIT + 6
+            text_area_x = section_x + 10
+            text_area_width = SPLIT_SECTION_WIDTH - 20
+            text_area_y = qr_y + QR_SIZE_SPLIT + 8
+            text_area_height = SPLIT_SIZE[1] - text_area_y - 10
+            text_y = text_area_y + max(
+                (text_area_height - cls._measure_split_lines(draw, label_lines, text_area_width)) // 2,
+                0,
+            )
             for line in label_lines:
-                font = cls._fit_font(draw, line, QR_SIZE_SPLIT, base_size=36, min_size=16)
-                text_width = cls._text_width(draw, line, font)
-                text_x = qr_x + (QR_SIZE_SPLIT - text_width) // 2
-                draw.text((text_x, text_y), line, font=font, fill=0)
-                text_y += cls._line_height(font) + 6
+                font = cls._fit_font(
+                    draw,
+                    line.text,
+                    text_area_width,
+                    base_size=line.base_size,
+                    min_size=line.min_size,
+                )
+                text_width = cls._text_width(draw, line.text, font)
+                text_x = text_area_x + (text_area_width - text_width) // 2
+                draw.text((text_x, text_y), line.text, font=font, fill=0)
+                text_y += cls._line_height(font) + line.gap_after
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
         label_image.save(output_path, "PNG")
@@ -144,14 +165,29 @@ class LabelGenerator:
         return [piece for piece in pieces if piece]
 
     @classmethod
-    def _split_label_lines(cls, variante: Variante) -> list[str]:
+    def _split_label_lines(cls, variante: Variante) -> list[SplitLabelLine]:
         producto = variante.producto
-        title = cls._clean_name(producto.nombre, variante.talla)
         profile = resolve_inventory_label_profile(variante)
+        title = cls._clean_name(producto.nombre, variante.talla)
+        if profile.family == "ropa_normal":
+            name_lines = textwrap.wrap(title, width=18) or [title]
+            lines = [
+                SplitLabelLine(text=line, base_size=30, min_size=18, gap_after=4)
+                for line in name_lines
+            ]
+            lines.append(
+                SplitLabelLine(
+                    text=build_inventory_label_price_line(variante).replace("Precio: ", ""),
+                    base_size=38,
+                    min_size=24,
+                    gap_after=0,
+                )
+            )
+            return lines
         lines = textwrap.wrap(cls._build_label_text(title, variante.talla), width=20) or [title]
         if profile.show_price:
             lines.append(build_inventory_label_price_line(variante))
-        return lines
+        return [SplitLabelLine(text=line, base_size=34, min_size=16, gap_after=6) for line in lines]
 
     @staticmethod
     def _clean_name(nombre: str, talla: str) -> str:
@@ -242,3 +278,22 @@ class LabelGenerator:
             font = cls._fit_font(draw, line, max_width, base_size=base_size, min_size=min_size)
             total += cls._line_height(font) + 10
         return max(total - 10, 0)
+
+    @classmethod
+    def _measure_split_lines(
+        cls,
+        draw: ImageDraw.ImageDraw,
+        lines: list[SplitLabelLine],
+        max_width: int,
+    ) -> int:
+        total = 0
+        for line in lines:
+            font = cls._fit_font(
+                draw,
+                line.text,
+                max_width,
+                base_size=line.base_size,
+                min_size=line.min_size,
+            )
+            total += cls._line_height(font) + line.gap_after
+        return max(total, 0)
