@@ -108,6 +108,22 @@ class LayawayReceiptTextServiceTests(unittest.TestCase):
         self.assertNotIn("Ambiente de pruebas", receipt)
         self.assertNotIn("Interno:", receipt)
 
+    def test_marks_three_piece_playera_in_customer_receipt(self) -> None:
+        layaway = _build_layaway(with_client=True, with_payments=False)
+        layaway.detalles[0].precio_unitario = Decimal("100.00")
+        layaway.detalles[0].subtotal_linea = Decimal("200.00")
+        layaway.detalles[0].variante.producto.nombre = "Playera deportiva"
+        layaway.detalles[0].variante.producto.escuela = SimpleNamespace(nombre="Patria")
+        layaway.detalles[0].variante.producto.tipo_prenda = SimpleNamespace(nombre="Deportivo")
+        layaway.detalles[0].variante.producto.tipo_pieza = SimpleNamespace(nombre="Playera")
+
+        receipt = build_layaway_receipt_text(
+            layaway=layaway,
+            business_name="POS Uniformes",
+        )
+
+        self.assertIn("Playera deportiva (Conjunto deportivo 3pz - Patria)", receipt)
+
 
 if __name__ == "__main__":
     unittest.main()

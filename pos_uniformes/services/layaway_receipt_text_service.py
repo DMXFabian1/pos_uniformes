@@ -4,6 +4,11 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from pos_uniformes.services.sports_uniform_pricing_service import (
+    THREE_PIECE_PLAYERA_PRICE,
+    THREE_PIECE_PLAYERA_PRICING_LABEL,
+)
+from pos_uniformes.ui.helpers.sale_sports_uniform_helper import is_deportivo_playera_variant
 from pos_uniformes.utils.date_format import format_display_date, format_display_datetime
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 
@@ -88,6 +93,10 @@ def _format_layaway_product_line(detalle, variante) -> str:
         if variante
         else ""
     )
+    if variante is not None and _is_three_piece_playera_detail(detalle, variante):
+        school_name = str(getattr(getattr(getattr(variante, "producto", None), "escuela", None), "nombre", "") or "").strip()
+        label = f"{THREE_PIECE_PLAYERA_PRICING_LABEL} - {school_name}" if school_name else THREE_PIECE_PLAYERA_PRICING_LABEL
+        producto = f"{producto} ({label})"
     talla = str(getattr(variante, "talla", "") or "").strip()
     color = str(getattr(variante, "color", "") or "").strip()
     detail_parts = [part for part in (f"Talla {talla}" if talla else "", f"Color {color}" if color else "") if part]
@@ -136,3 +145,11 @@ def _format_amount(value: object) -> str:
         return str(Decimal(value).quantize(Decimal("0.01")))
     except Exception:
         return str(value)
+
+
+def _is_three_piece_playera_detail(detalle, variante) -> bool:
+    try:
+        unit_price = Decimal(getattr(detalle, "precio_unitario", "0.00")).quantize(Decimal("0.01"))
+    except Exception:
+        return False
+    return unit_price == THREE_PIECE_PLAYERA_PRICE and is_deportivo_playera_variant(variante)
