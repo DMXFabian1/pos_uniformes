@@ -58,6 +58,31 @@ Si solo quieres revisar los pasos sin ejecutarlos:
 py scripts\windows_build_runner.py --branch codex/etiquetas-windows --dry-run
 ```
 
+## Opcion recomendada para correr la app local con pasos visibles
+
+Si quieres abrir la app en Windows y ver claramente en que paso va:
+
+```powershell
+py scripts\windows_run_dev.py
+```
+
+Ese script:
+
+- revisa si existe `pos_uniformes.env`
+- si falta, lo copia desde `pos_uniformes.env.example`
+- corre `alembic upgrade head`
+- corre `check_startup_health.py`
+- abre la app
+- imprime tiempos por paso para que sepas si sigue avanzando
+
+Opciones utiles:
+
+```powershell
+py scripts\windows_run_dev.py --dry-run
+py scripts\windows_run_dev.py --skip-precheck
+py scripts\windows_run_dev.py --skip-migrations
+```
+
 ## App satelite de Presupuestos
 
 La app satelite de Presupuestos se distribuye por separado del POS principal. Usa la misma base PostgreSQL y los mismos servicios compartidos, pero abre una ventana dedicada solo para:
