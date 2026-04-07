@@ -10,6 +10,10 @@ import textwrap
 from PIL import Image, ImageDraw, ImageFont
 
 from pos_uniformes.database.models import Variante
+from pos_uniformes.utils.inventory_label_content_helper import (
+    build_inventory_label_price_line,
+    resolve_inventory_label_profile,
+)
 from pos_uniformes.utils.qr_generator import QrGenerator
 
 LABELS_OUTPUT_DIR = Path(__file__).resolve().parents[1] / "generated" / "labels"
@@ -102,16 +106,15 @@ class LabelGenerator:
         label_image = Image.new("1", SPLIT_SIZE, 1)
         draw = ImageDraw.Draw(label_image)
         qr_image = Image.open(qr_path).convert("1").resize((QR_SIZE_SPLIT, QR_SIZE_SPLIT))
-        label_text = cls._split_label_text(variante)
-        lines = textwrap.wrap(label_text, width=20) or [label_text]
+        label_lines = cls._split_label_lines(variante)
         for section in range(4):
             section_x = section * SPLIT_SECTION_WIDTH
             qr_x = section_x + (SPLIT_SECTION_WIDTH - QR_SIZE_SPLIT) // 2
             qr_y = 10
             label_image.paste(qr_image, (qr_x, qr_y))
-            font = cls._fit_font(draw, label_text, QR_SIZE_SPLIT, base_size=36, min_size=16)
             text_y = qr_y + QR_SIZE_SPLIT + 6
-            for line in lines:
+            for line in label_lines:
+                font = cls._fit_font(draw, line, QR_SIZE_SPLIT, base_size=36, min_size=16)
                 text_width = cls._text_width(draw, line, font)
                 text_x = qr_x + (QR_SIZE_SPLIT - text_width) // 2
                 draw.text((text_x, text_y), line, font=font, fill=0)
@@ -123,6 +126,7 @@ class LabelGenerator:
     @classmethod
     def _standard_fields(cls, variante: Variante) -> list[str]:
         producto = variante.producto
+        profile = resolve_inventory_label_profile(variante)
         escuela = getattr(getattr(producto, "escuela", None), "nombre", "") or ""
         nivel = getattr(getattr(producto, "nivel_educativo", None), "nombre", "") or ""
         title = cls._clean_name(producto.nombre, variante.talla)
@@ -135,13 +139,19 @@ class LabelGenerator:
             pieces.append(nivel)
         pieces.append(cls._build_label_text(title, variante.talla))
         pieces.append(variante.sku)
+        if profile.show_price:
+            pieces.append(build_inventory_label_price_line(variante))
         return [piece for piece in pieces if piece]
 
     @classmethod
-    def _split_label_text(cls, variante: Variante) -> str:
+    def _split_label_lines(cls, variante: Variante) -> list[str]:
         producto = variante.producto
         title = cls._clean_name(producto.nombre, variante.talla)
-        return cls._build_label_text(title, variante.talla)
+        profile = resolve_inventory_label_profile(variante)
+        lines = textwrap.wrap(cls._build_label_text(title, variante.talla), width=20) or [title]
+        if profile.show_price:
+            lines.append(build_inventory_label_price_line(variante))
+        return lines
 
     @staticmethod
     def _clean_name(nombre: str, talla: str) -> str:

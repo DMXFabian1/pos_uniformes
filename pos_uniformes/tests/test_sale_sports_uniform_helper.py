@@ -16,6 +16,7 @@ from pos_uniformes.ui.helpers.sale_sports_uniform_helper import (
     is_deportivo_playera_variant,
     is_deportivo_two_piece_variant,
     resolve_sale_scan_variants,
+    restore_sports_uniform_playera_price_if_needed,
     validate_sports_playera_match,
 )
 
@@ -207,6 +208,45 @@ class SaleSportsUniformHelperTests(unittest.TestCase):
             [note],
         )
         self.assertIn("100.00", note)
+
+    def test_restore_playera_price_when_two_piece_base_line_is_removed(self) -> None:
+        scanned_variant = _build_variant(sku="P2-001", product_name="Pants 2pz Deportivo")
+        playera_variant = _build_variant(
+            sku="PLY-001",
+            product_name="Playera Deportiva Escolar",
+            piece_type="Playera",
+        )
+        note = build_sports_uniform_prototype_note(scanned_variant, playera_variant)
+        sale_cart = [
+            {"sku": "P2-001", "cantidad": 1},
+            {
+                "sku": "PLY-001",
+                "cantidad": 1,
+                "precio_unitario": 100,
+                "precio_base": 189,
+                "pricing_rule_key": "SPORTS_UNIFORM_3PZ_PLAYERA",
+                "pricing_rule_label": "Conjunto deportivo 3pz",
+            },
+        ]
+
+        attach_sports_uniform_trace_to_cart_lines(
+            sale_cart,
+            trace_note=note,
+            base_sku="P2-001",
+            playera_sku="PLY-001",
+        )
+        removed_line = dict(sale_cart[0])
+        remaining_cart = [sale_cart[1]]
+
+        message = restore_sports_uniform_playera_price_if_needed(
+            remaining_cart,
+            removed_line_item=removed_line,
+        )
+
+        self.assertIn("precio original", message)
+        self.assertEqual(remaining_cart[0]["precio_unitario"], 189)
+        self.assertEqual(remaining_cart[0]["pricing_rule_key"], "")
+        self.assertNotIn("internal_trace_note", remaining_cart[0])
 
 
 if __name__ == "__main__":

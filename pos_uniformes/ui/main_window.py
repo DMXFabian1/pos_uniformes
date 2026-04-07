@@ -465,6 +465,7 @@ from pos_uniformes.ui.helpers.sale_sports_uniform_helper import (
     build_sports_uniform_prototype_note,
     collect_internal_sale_cart_notes,
     resolve_sale_scan_variants,
+    restore_sports_uniform_playera_price_if_needed,
 )
 from pos_uniformes.services.sports_uniform_pricing_service import (
     THREE_PIECE_PLAYERA_PRICE,
@@ -6182,6 +6183,8 @@ class MainWindow(QMainWindow):
                     attach_sports_uniform_trace_to_cart_lines(
                         affected_lines,
                         trace_note=trace_note,
+                        base_sku=str(getattr(resolution.variants[0], "sku", "") or ""),
+                        playera_sku=str(getattr(resolution.variants[1], "sku", "") or ""),
                     )
         except Exception as exc:  # noqa: BLE001
             message = str(exc)
@@ -6220,8 +6223,15 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Sin seleccion", "Selecciona una linea del carrito.")
             return
 
+        removed_line_item = dict(self.sale_cart[selected_row])
         self.sale_cart.pop(selected_row)
+        restore_message = restore_sports_uniform_playera_price_if_needed(
+            self.sale_cart,
+            removed_line_item=removed_line_item,
+        )
         self._refresh_sale_cart_table()
+        if restore_message:
+            self._set_sale_feedback(restore_message, "warning", auto_clear_ms=2200)
 
     def _change_selected_sale_item_quantity(self, delta: int) -> None:
         selected_row = self.sale_cart_table.currentRow()

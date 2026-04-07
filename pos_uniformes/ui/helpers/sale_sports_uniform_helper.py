@@ -105,10 +105,61 @@ def attach_sports_uniform_trace_to_cart_lines(
     line_items: list[dict[str, object]],
     *,
     trace_note: str,
+    base_sku: str = "",
+    playera_sku: str = "",
 ) -> None:
     for line_item in line_items:
         line_item["internal_trace_note"] = trace_note
         line_item["internal_trace_scope"] = "SPORTS_UNIFORM_PROTOTYPE"
+        normalized_sku = str(line_item.get("sku") or "").strip().upper()
+        normalized_base_sku = str(base_sku or "").strip().upper()
+        normalized_playera_sku = str(playera_sku or "").strip().upper()
+        if normalized_base_sku:
+            line_item["sports_uniform_base_sku"] = normalized_base_sku
+        if normalized_playera_sku:
+            line_item["sports_uniform_playera_sku"] = normalized_playera_sku
+        if normalized_sku and normalized_sku == normalized_base_sku:
+            line_item["sports_uniform_role"] = "base"
+        elif normalized_sku and normalized_sku == normalized_playera_sku:
+            line_item["sports_uniform_role"] = "playera"
+
+
+def restore_sports_uniform_playera_price_if_needed(
+    sale_cart: list[dict[str, object]],
+    *,
+    removed_line_item: dict[str, object],
+) -> str:
+    removed_scope = str(removed_line_item.get("internal_trace_scope") or "")
+    removed_role = str(removed_line_item.get("sports_uniform_role") or "")
+    if removed_scope != "SPORTS_UNIFORM_PROTOTYPE" or removed_role != "base":
+        return ""
+
+    playera_sku = str(removed_line_item.get("sports_uniform_playera_sku") or "").strip().upper()
+    if not playera_sku:
+        return ""
+
+    restored = False
+    for line_item in sale_cart:
+        if str(line_item.get("sku") or "").strip().upper() != playera_sku:
+            continue
+        if str(line_item.get("sports_uniform_role") or "") != "playera":
+            continue
+        if "precio_base" not in line_item:
+            continue
+
+        line_item["precio_unitario"] = line_item["precio_base"]
+        line_item["pricing_rule_key"] = ""
+        line_item["pricing_rule_label"] = ""
+        line_item.pop("internal_trace_note", None)
+        line_item.pop("internal_trace_scope", None)
+        line_item.pop("sports_uniform_base_sku", None)
+        line_item.pop("sports_uniform_playera_sku", None)
+        line_item.pop("sports_uniform_role", None)
+        restored = True
+
+    if not restored:
+        return ""
+    return "Se quito el pants 2pz; la playera regreso a su precio original."
 
 
 def collect_internal_sale_cart_notes(
