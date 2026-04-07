@@ -50,7 +50,7 @@ from pos_uniformes.database.connection import get_session
 from pos_uniformes.database.models import Cliente, EstadoPresupuesto, RolUsuario, Usuario
 from pos_uniformes.services.catalog_snapshot_service import load_catalog_snapshot_rows
 from pos_uniformes.services.client_service import ClientService
-from pos_uniformes.services.presupuesto_service import PresupuestoItemInput, PresupuestoService
+from pos_uniformes.services.presupuesto_service import PresupuestoService
 from pos_uniformes.services.quote_action_service import cancel_quote, emit_quote
 from pos_uniformes.services.quote_detail_service import load_quote_detail_snapshot
 from pos_uniformes.services.quote_document_view_service import build_quote_document_view
@@ -76,6 +76,10 @@ from pos_uniformes.ui.helpers.quote_catalog_browser_helper import (
     build_quote_catalog_school_options,
 )
 from pos_uniformes.ui.helpers.quote_scanned_client_helper import build_quote_scanned_client_ui_state
+from pos_uniformes.ui.helpers.quote_sports_uniform_helper import (
+    add_quote_scan_variants,
+    build_quote_presupuesto_inputs,
+)
 from pos_uniformes.ui.helpers.quote_guided_catalog_helper import build_guided_catalog_view
 from pos_uniformes.ui.helpers.quote_kiosk_lookup_helper import (
     build_empty_quote_kiosk_lookup_view,
@@ -91,6 +95,7 @@ from pos_uniformes.ui.helpers.quote_satellite_filter_helper import (
 from pos_uniformes.ui.helpers.quote_summary_helper import build_quote_summary_view
 from pos_uniformes.ui.helpers.quote_table_row_helper import build_quote_table_row_views
 from pos_uniformes.ui.styles.interactive_hover_styles import build_combo_popup_hover_styles
+from pos_uniformes.ui.helpers.sale_sports_uniform_helper import restore_sports_uniform_playera_price_if_needed
 
 SATELLITE_SEARCH_DEBOUNCE_MS = 300
 SATELLITE_CATALOG_PAGE_SIZE = 25
@@ -1924,31 +1929,24 @@ class QuoteSatelliteWindow(QMainWindow):
                 variant = PresupuestoService.obtener_variante_por_sku(session, normalized_sku)
                 if variant is None:
                     raise ValueError(f"El SKU '{normalized_sku}' no existe o esta inactivo.")
-                existing = next((item for item in self.quote_cart if item["sku"] == normalized_sku), None)
-                if existing is None:
-                    self.quote_cart.append(
-                        {
-                            "sku": normalized_sku,
-                            "producto_nombre": str(variant.producto.nombre_base),
-                            "escuela_nombre": str(variant.producto.escuela.nombre if variant.producto.escuela else "General"),
-                            "nivel_educativo_nombre": str(
-                                variant.producto.nivel_educativo.nombre
-                                if variant.producto.nivel_educativo
-                                else "Sin nivel"
-                            ),
-                            "cantidad": quantity,
-                            "precio_unitario": Decimal(variant.precio_venta),
-                        }
-                    )
-                else:
-                    existing["cantidad"] = int(existing["cantidad"]) + quantity
+                result = add_quote_scan_variants(
+                    self,
+                    session,
+                    quote_cart=self.quote_cart,
+                    scanned_variant=variant,
+                    quantity=quantity,
+                    variant_loader=PresupuestoService.obtener_variante_por_sku,
+                )
+                if result is None:
+                    self.kiosk_scan_input.setFocus()
+                    return
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "No se pudo agregar", str(exc))
             return
 
         self._refresh_quote_cart_table()
         self.kiosk_scan_input.setFocus()
-        self._set_status(f"{normalized_sku} agregado al presupuesto.")
+        self._set_status(result.feedback_message)
 
     def _handle_recent_scan_selection(self) -> None:
         selected_row = self.kiosk_recent_table.currentRow()
@@ -1968,8 +1966,15 @@ class QuoteSatelliteWindow(QMainWindow):
         if feedback is not None:
             QMessageBox.warning(self, feedback.title, feedback.message)
             return
+        removed_line_item = dict(self.quote_cart[selected_row])
         self.quote_cart.pop(selected_row)
+        restore_message = restore_sports_uniform_playera_price_if_needed(
+            self.quote_cart,
+            removed_line_item=removed_line_item,
+        )
         self._refresh_quote_cart_table()
+        if restore_message:
+            self._set_status(restore_message)
 
     def _change_selected_quote_item_quantity(self, delta: int) -> None:
         selected_row = self.quote_cart_table.currentRow()
@@ -2063,10 +2068,7 @@ class QuoteSatelliteWindow(QMainWindow):
                 datetime.min.time(),
             ),
             notes_text=self.quote_note_input.toPlainText().strip(),
-            items=tuple(
-                PresupuestoItemInput(sku=str(item["sku"]), cantidad=int(item["cantidad"]))
-                for item in self.quote_cart
-            ),
+            items=tuple(build_quote_presupuesto_inputs(self.quote_cart)),
             target_state=target_state,
         )
 

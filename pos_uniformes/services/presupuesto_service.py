@@ -24,6 +24,10 @@ from pos_uniformes.database.models import (
 class PresupuestoItemInput:
     sku: str
     cantidad: int
+    precio_unitario: Decimal | None = None
+    descripcion_snapshot: str | None = None
+    pricing_rule_key: str = ""
+    pricing_rule_label: str = ""
 
 
 class PresupuestoService:
@@ -56,29 +60,39 @@ class PresupuestoService:
             raise ValueError("El presupuesto debe contener al menos una linea.")
 
         total = Decimal("0.00")
-        skus: set[str] = set()
+        line_keys: set[tuple[str, str]] = set()
         detail_rows: list[PresupuestoDetalle] = []
         for item in items:
             sku = item.sku.strip().upper()
+            pricing_rule_key = item.pricing_rule_key.strip()
             if not sku:
                 raise ValueError("Cada linea del presupuesto necesita SKU.")
-            if sku in skus:
+            line_key = (sku, pricing_rule_key)
+            if line_key in line_keys:
                 raise ValueError(f"El SKU '{sku}' esta repetido en el presupuesto.")
             if item.cantidad <= 0:
                 raise ValueError("La cantidad debe ser mayor a cero.")
-            skus.add(sku)
+            line_keys.add(line_key)
 
             variante = cls.obtener_variante_por_sku(session, sku)
             if variante is None:
                 raise ValueError(f"No existe una presentacion activa para el SKU '{sku}'.")
 
-            precio_unitario = cls._money(variante.precio_venta)
+            precio_unitario = cls._money(item.precio_unitario if item.precio_unitario is not None else variante.precio_venta)
+            descripcion_snapshot = (
+                (item.descripcion_snapshot or "").strip()
+                or (
+                    f"{variante.producto.nombre_base} ({item.pricing_rule_label})"
+                    if item.pricing_rule_label.strip()
+                    else variante.producto.nombre_base
+                )
+            )
             subtotal_linea = (precio_unitario * Decimal(item.cantidad)).quantize(Decimal("0.01"))
             detail_rows.append(
                 PresupuestoDetalle(
                     variante=variante,
                     sku_snapshot=variante.sku,
-                    descripcion_snapshot=variante.producto.nombre_base,
+                    descripcion_snapshot=descripcion_snapshot,
                     talla_snapshot=variante.talla,
                     color_snapshot=variante.color,
                     precio_unitario=precio_unitario,

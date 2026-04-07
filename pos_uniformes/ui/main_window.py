@@ -159,7 +159,7 @@ from pos_uniformes.services.inventory_snapshot_service import (
     load_inventory_snapshot_rows,
 )
 from pos_uniformes.services.manual_promo_service import ManualPromoService
-from pos_uniformes.services.presupuesto_service import PresupuestoItemInput, PresupuestoService
+from pos_uniformes.services.presupuesto_service import PresupuestoService
 from pos_uniformes.services.quote_snapshot_service import (
     build_quote_history_input_rows,
     load_quote_snapshot_rows,
@@ -439,6 +439,10 @@ from pos_uniformes.ui.helpers.quote_detail_helper import (
     build_empty_quote_detail_view,
     build_error_quote_detail_view,
     build_quote_detail_view,
+)
+from pos_uniformes.ui.helpers.quote_sports_uniform_helper import (
+    add_quote_scan_variants,
+    build_quote_presupuesto_inputs,
 )
 from pos_uniformes.ui.helpers.quote_feedback_helper import (
     build_quote_guard_feedback,
@@ -6423,19 +6427,18 @@ class MainWindow(QMainWindow):
                 variante = PresupuestoService.obtener_variante_por_sku(session, sku)
                 if variante is None:
                     raise ValueError(f"El SKU '{sku}' no existe o esta inactivo.")
-                existing = next((item for item in self.quote_cart if item["sku"] == sku), None)
-                if existing is None:
-                    self.quote_cart.append(
-                        {
-                            "sku": sku,
-                            "variante_id": variante.id,
-                            "producto_nombre": variante.producto.nombre_base,
-                            "cantidad": quantity,
-                            "precio_unitario": Decimal(variante.precio_venta),
-                        }
-                    )
-                else:
-                    existing["cantidad"] = int(existing["cantidad"]) + quantity
+                result = add_quote_scan_variants(
+                    self,
+                    session,
+                    quote_cart=self.quote_cart,
+                    scanned_variant=variante,
+                    quantity=quantity,
+                    variant_loader=PresupuestoService.obtener_variante_por_sku,
+                )
+                if result is None:
+                    self.quote_sku_input.setFocus()
+                    self.quote_sku_input.selectAll()
+                    return
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "No se pudo agregar", str(exc))
             return
@@ -6453,8 +6456,15 @@ class MainWindow(QMainWindow):
         if feedback is not None:
             QMessageBox.warning(self, feedback.title, feedback.message)
             return
+        removed_line_item = dict(self.quote_cart[selected_row])
         self.quote_cart.pop(selected_row)
+        restore_message = restore_sports_uniform_playera_price_if_needed(
+            self.quote_cart,
+            removed_line_item=removed_line_item,
+        )
         self._refresh_quote_cart_table()
+        if restore_message:
+            QMessageBox.information(self, "Precio restaurado", restore_message)
 
     def _change_selected_quote_item_quantity(self, delta: int) -> None:
         selected_row = self.quote_cart_table.currentRow()
@@ -6530,10 +6540,7 @@ class MainWindow(QMainWindow):
                     session=session,
                     usuario=usuario,
                     folio=self.quote_folio_input.text().strip() or self._generate_quote_folio(),
-                    items=[
-                        PresupuestoItemInput(sku=str(item["sku"]), cantidad=int(item["cantidad"]))
-                        for item in self.quote_cart
-                    ],
+                    items=build_quote_presupuesto_inputs(self.quote_cart),
                     cliente=cliente,
                     cliente_nombre=cliente.nombre if cliente is not None else None,
                     cliente_telefono=cliente.telefono if cliente is not None else None,
