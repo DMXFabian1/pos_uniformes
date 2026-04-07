@@ -45,6 +45,7 @@ from PyQt6.QtWidgets import (
     QMainWindow,
     QMenu,
     QMessageBox,
+    QProgressDialog,
     QPushButton,
     QScrollArea,
     QSpinBox,
@@ -297,6 +298,10 @@ from pos_uniformes.ui.dialogs.cash_session_prompt_dialogs import (
     prompt_open_cash_session,
 )
 from pos_uniformes.ui.helpers.busy_feedback_helper import BusyFeedbackController
+from pos_uniformes.ui.helpers.inventory_bulk_qr_helper import (
+    InventoryBulkQrCancelled,
+    generate_inventory_bulk_qr,
+)
 from pos_uniformes.ui.helpers.catalog_access_helper import build_catalog_access_view
 from pos_uniformes.ui.helpers.catalog_action_guard_helper import build_catalog_action_guard_feedback
 from pos_uniformes.ui.helpers.catalog_action_feedback_helper import (
@@ -7005,6 +7010,7 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "QR generado", f"QR guardado en:\n{path}")
 
     def _handle_generate_all_qr(self) -> None:
+        progress_dialog: QProgressDialog | None = None
         try:
             with self._busy_scope(
                 "Inventario: generando todos los QR...",
@@ -7013,10 +7019,51 @@ class MainWindow(QMainWindow):
                 variantes = session.scalars(
                     select(Variante).where(Variante.activo.is_(True)).order_by(Variante.sku)
                 ).all()
-                paths = QrGenerator.generate_many(list(variantes))
+                if not variantes:
+                    raise ValueError("No se encontraron presentaciones activas para generar QR.")
+
+                progress_dialog = QProgressDialog("Preparando generacion de etiquetas...", "Cancelar", 0, len(variantes), self)
+                progress_dialog.setWindowTitle("Generando QR")
+                progress_dialog.setWindowModality(Qt.WindowModality.ApplicationModal)
+                progress_dialog.setMinimumDuration(0)
+                progress_dialog.setAutoClose(False)
+                progress_dialog.setAutoReset(False)
+                progress_dialog.setValue(0)
+                QApplication.processEvents()
+
+                def _on_progress(progress) -> None:
+                    if progress_dialog is None:
+                        return
+                    progress_dialog.setLabelText(progress.message)
+                    progress_dialog.setValue(progress.current - 1)
+                    self.qr_status_label.setText(progress.message)
+                    QApplication.processEvents()
+
+                paths = generate_inventory_bulk_qr(
+                    list(variantes),
+                    on_progress=_on_progress,
+                    is_cancelled=(progress_dialog.wasCanceled if progress_dialog is not None else None),
+                )
+                if progress_dialog is not None:
+                    progress_dialog.setValue(len(variantes))
+                    QApplication.processEvents()
+        except InventoryBulkQrCancelled:
+            if progress_dialog is not None:
+                progress_dialog.close()
+            self.qr_status_label.setText("Generacion de QR cancelada por el usuario.")
+            QMessageBox.information(
+                self,
+                "Generacion cancelada",
+                "La generacion masiva se cancelo. Los QR ya procesados quedaron guardados.",
+            )
+            return
         except Exception as exc:  # noqa: BLE001
+            if progress_dialog is not None:
+                progress_dialog.close()
             QMessageBox.critical(self, "QR fallido", str(exc))
             return
+        if progress_dialog is not None:
+            progress_dialog.close()
 
         directory = QrGenerator.output_dir()
         self.qr_status_label.setText(f"QRs generados en: {directory}")
