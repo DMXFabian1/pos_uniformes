@@ -19,6 +19,9 @@ from pos_uniformes.services.sale_stock_policy import sale_stock_guard_enabled
 class VentaItemInput:
     sku: str
     cantidad: int
+    precio_unitario: Decimal | None = None
+    precio_base: Decimal | None = None
+    pricing_rule_label: str = ""
 
 
 class VentaService:
@@ -70,22 +73,30 @@ class VentaService:
         )
 
         total = Decimal("0.00")
-        skus: set[str] = set()
+        cumulative_quantities: dict[str, int] = {}
+        variants_by_sku: dict[str, Variante] = {}
         for item in items:
-            if item.sku in skus:
-                raise ValueError(f"El SKU '{item.sku}' esta repetido en la venta.")
-            skus.add(item.sku)
-
             variante = cls.obtener_variante_por_sku(session, item.sku)
             if variante is None:
                 raise ValueError(f"No existe una variante activa para el SKU '{item.sku}'.")
+            variants_by_sku[item.sku] = variante
+            cumulative_quantities[item.sku] = cumulative_quantities.get(item.sku, 0) + int(item.cantidad)
 
-            cls.validar_stock_disponible(variante, item.cantidad)
-            subtotal_linea = Decimal(item.cantidad) * variante.precio_venta
+        for sku, quantity in cumulative_quantities.items():
+            cls.validar_stock_disponible(variants_by_sku[sku], quantity)
+
+        for item in items:
+            variante = variants_by_sku[item.sku]
+            unit_price = (
+                Decimal(str(item.precio_unitario)).quantize(Decimal("0.01"))
+                if item.precio_unitario is not None
+                else Decimal(variante.precio_venta).quantize(Decimal("0.01"))
+            )
+            subtotal_linea = (Decimal(item.cantidad) * unit_price).quantize(Decimal("0.01"))
             detalle = VentaDetalle(
                 variante=variante,
                 cantidad=item.cantidad,
-                precio_unitario=variante.precio_venta,
+                precio_unitario=unit_price,
                 subtotal_linea=subtotal_linea,
             )
             venta.detalles.append(detalle)

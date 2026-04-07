@@ -36,6 +36,7 @@ class SaleCheckoutActionServiceTests(unittest.TestCase):
                 {"venta": venta, "movement_observacion": movement_observacion}
             ),
         )
+        _capture_sale_creation.target_service = fake_venta_service
         fake_item_input = lambda **kwargs: kwargs
         session = SimpleNamespace(get=lambda model, item_id: usuario if item_id == 7 else None)
 
@@ -47,7 +48,15 @@ class SaleCheckoutActionServiceTests(unittest.TestCase):
                 session,
                 user_id=7,
                 folio="V-001",
-                sale_cart=[{"sku": "SKU-1", "cantidad": 2}],
+                sale_cart=[
+                    {
+                        "sku": "SKU-1",
+                        "cantidad": 2,
+                        "precio_unitario": Decimal("100.00"),
+                        "precio_base": Decimal("189.00"),
+                        "pricing_rule_label": "Conjunto deportivo 3pz",
+                    }
+                ],
                 subtotal=Decimal("200.00"),
                 discount_percent=Decimal("10.00"),
                 applied_discount=Decimal("20.00"),
@@ -88,10 +97,23 @@ class SaleCheckoutActionServiceTests(unittest.TestCase):
             ],
         )
         self.assertEqual(len(manual_calls), 1)
+        self.assertEqual(
+            fake_venta_service.crear_borrador_kwargs["items"],
+            [
+                {
+                    "sku": "SKU-1",
+                    "cantidad": 2,
+                    "precio_unitario": Decimal("100.00"),
+                    "precio_base": Decimal("189.00"),
+                    "pricing_rule_label": "Conjunto deportivo 3pz",
+                }
+            ],
+        )
 
 
 def _capture_sale_creation(kwargs: dict[str, object], venta: SimpleNamespace) -> SimpleNamespace:
     venta.observacion = kwargs.get("observacion")
+    _capture_sale_creation.target_service.crear_borrador_kwargs = kwargs
     return venta
 
 

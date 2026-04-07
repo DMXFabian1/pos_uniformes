@@ -30,6 +30,7 @@ def add_sale_cart_variants(
     variants: list[object] | tuple[object, ...],
     quantity: int,
     stock_validator: Callable | None = None,
+    line_overrides_by_sku: dict[str, dict[str, object]] | None = None,
 ) -> list[dict[str, object]]:
     normalized_quantity = int(quantity)
     if normalized_quantity <= 0:
@@ -68,6 +69,7 @@ def add_sale_cart_variants(
                 sale_cart,
                 variante=variant_by_sku[sku],
                 quantity=increment_by_sku[sku],
+                line_override=(line_overrides_by_sku or {}).get(sku),
             )
         )
     return updated_lines
@@ -103,15 +105,20 @@ def update_sale_cart_item_quantity(
     variante = loader(session, sku)
     if variante is None:
         raise ValueError(f"El SKU '{sku}' ya no existe o esta inactivo.")
-    validator(variante, int(new_quantity))
+    existing_total = _current_sale_cart_quantity(sale_cart, sku)
+    current_line_quantity = int(line_item.get("cantidad", 0))
+    validator(variante, (existing_total - current_line_quantity) + int(new_quantity))
 
     line_item["cantidad"] = int(new_quantity)
     return line_item
 
 
 def _current_sale_cart_quantity(sale_cart: list[dict[str, object]], sku: str) -> int:
-    existing = next((item for item in sale_cart if str(item.get("sku") or "").strip().upper() == sku), None)
-    return int(existing["cantidad"]) if existing is not None else 0
+    return sum(
+        int(item.get("cantidad", 0))
+        for item in sale_cart
+        if str(item.get("sku") or "").strip().upper() == sku
+    )
 
 
 def _apply_sale_cart_variant(
@@ -119,16 +126,31 @@ def _apply_sale_cart_variant(
     *,
     variante,
     quantity: int,
+    line_override: dict[str, object] | None = None,
 ) -> dict[str, object]:
     sku = str(getattr(variante, "sku", "") or "").strip().upper()
-    existing = next((item for item in sale_cart if str(item.get("sku") or "").strip().upper() == sku), None)
+    pricing_rule_key = str((line_override or {}).get("pricing_rule_key") or "")
+    existing = next(
+        (
+            item
+            for item in sale_cart
+            if str(item.get("sku") or "").strip().upper() == sku
+            and str(item.get("pricing_rule_key") or "") == pricing_rule_key
+        ),
+        None,
+    )
+    unit_price = Decimal(str((line_override or {}).get("precio_unitario", getattr(variante, "precio_venta", 0))))
+    base_price = Decimal(str((line_override or {}).get("precio_base", getattr(variante, "precio_venta", 0))))
     if existing is None:
         line_item = {
             "sku": sku,
             "variante_id": getattr(variante, "id", None),
             "producto_nombre": sanitize_product_display_name(getattr(getattr(variante, "producto", None), "nombre", "")),
             "cantidad": int(quantity),
-            "precio_unitario": Decimal(getattr(variante, "precio_venta", 0)),
+            "precio_unitario": unit_price,
+            "precio_base": base_price,
+            "pricing_rule_key": pricing_rule_key,
+            "pricing_rule_label": str((line_override or {}).get("pricing_rule_label") or ""),
         }
         sale_cart.append(line_item)
         return line_item

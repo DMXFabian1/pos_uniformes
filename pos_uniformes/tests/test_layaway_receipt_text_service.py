@@ -37,6 +37,7 @@ def _build_layaway(*, with_client: bool, with_payments: bool) -> SimpleNamespace
         created_at=datetime(2026, 3, 13, 9, 30),
         fecha_compromiso=datetime(2026, 3, 20),
         detalles=[detalle],
+        subtotal=Decimal("397.50"),
         total=Decimal("398.00"),
         total_abonado=Decimal("100.00"),
         saldo_pendiente=Decimal("298.00"),
@@ -67,11 +68,13 @@ class LayawayReceiptTextServiceTests(unittest.TestCase):
         self.assertIn("Productos", receipt)
         self.assertIn("- Playera | Talla 14 | Color Azul Marino | 2 x 199.00 = 398.00", receipt)
         self.assertIn("Total: 398.00", receipt)
+        self.assertIn("Ajuste: 0.50", receipt)
         self.assertIn("Abonado: 100.00", receipt)
         self.assertIn("Saldo pendiente: 298.00", receipt)
         self.assertIn("Abonos:", receipt)
         self.assertIn("- 13/03/2026 10:15 | 100.00 | ABN-01", receipt)
         self.assertIn("Notas: Entrega sabado", receipt)
+        self.assertIn("Por favor conserve su comprobante.", receipt)
         self.assertNotIn("Codigo cliente:", receipt)
         self.assertNotIn("Estado:", receipt)
         self.assertNotIn("Telefono:", receipt)

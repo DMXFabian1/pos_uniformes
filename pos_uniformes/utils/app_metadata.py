@@ -26,9 +26,23 @@ def app_build_label() -> str:
     return f"Version {app_version()}"
 
 
+def app_windows_icon_path() -> Path | None:
+    assets_root = project_root() / "assets"
+    candidates = (
+        assets_root / "app_icon.ico",
+        assets_root / "logo.ico",
+        assets_root / "customer_card_template" / "brand" / "store-logo.ico",
+    )
+    for candidate in candidates:
+        if candidate.exists():
+            return candidate
+    return None
+
+
 def app_icon_path() -> Path | None:
     assets_root = project_root() / "assets"
     candidates = (
+        *(path for path in (app_windows_icon_path(),) if path is not None),
         assets_root / "logo.png",
         assets_root / "logo.jpg",
         assets_root / "logo.jpeg",

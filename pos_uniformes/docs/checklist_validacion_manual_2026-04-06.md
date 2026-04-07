@@ -5,6 +5,77 @@ Fecha base: `2026-04-06`
 Objetivo:
 Registrar las validaciones manuales pendientes de esta ronda para no olvidarlas mientras seguimos implementando.
 
+## Orden sugerido de ejecucion en Windows
+
+Sigue este orden para validar sin mezclar causas ni perder tiempo entre pantallas.
+
+### 1. Arranque base
+
+- [ ] Abrir la app y confirmar que el login carga sin errores.
+- [ ] Confirmar que se vean logo, nombre y version.
+- [ ] Confirmar que el selector de usuarios tenga contraste legible.
+- [ ] Iniciar sesion y verificar `Cargando aplicacion...`.
+- [ ] Confirmar que el cursor vuelve a normal al terminar de abrir la principal.
+
+### 2. QR y etiquetas
+
+- [ ] Ir a `Inventario` y generar un QR individual.
+- [ ] Confirmar que la app no se cierre al generar el QR.
+- [ ] Confirmar que el preview se refresque despues de generar el QR.
+- [ ] Confirmar que el QR tenga imagen central cuando los assets existen.
+- [ ] Probar `Imprimir etiqueta` y confirmar que siga operativo en Windows.
+
+### 3. Carga y salida segura
+
+- [ ] Probar una recarga general y confirmar cursor de espera.
+- [ ] Probar `Generar todos los QR` y confirmar cursor de espera y regreso a normal.
+- [ ] Intentar cerrar la app en reposo y confirmar que pide confirmacion.
+- [ ] Intentar cerrar la app durante una operacion pesada y confirmar que no se cierra.
+
+### 4. Caja
+
+- [ ] Revisar tabla de Caja y confirmar que ya no aparezca `SKU`.
+- [ ] Confirmar que `Cantidad` este al inicio.
+- [ ] Confirmar que la lectura visual de filas sea mas clara.
+- [ ] Probar una venta con stock insuficiente y confirmar que no bloquea.
+
+### 5. Apartados y Presupuestos
+
+- [ ] Revisar carrito de Presupuestos y confirmar que ya no aparezca `SKU`.
+- [ ] Revisar detalle de Presupuestos y confirmar estructura consistente con Caja.
+- [ ] Revisar detalle de Apartados y confirmar estructura consistente con Caja.
+- [ ] Generar un comprobante de apartado y revisar limpieza del ticket.
+
+### 6. Deportivo 2pz -> 3pz
+
+- [ ] Escanear `Pants 2pz` deportivo y confirmar pregunta de playera.
+- [ ] Confirmar que una playera valida de la misma escuela se agrega bien.
+- [ ] Confirmar que una playera de otra escuela se bloquea.
+- [ ] Confirmar que la lista muestre `Exacta`, `Sugerida` y `Atipica`.
+- [ ] Cobrar una venta de prueba y revisar ticket.
+
+### 7. Caja y cierres
+
+- [ ] Revisar cierre de caja con apartados cancelados.
+- [ ] Confirmar que no inflen el esperado.
+- [ ] Revisar historial de cierres y confirmar que abra y cuadre.
+
+### 8. Visual general
+
+- [ ] Revisar `Catalogo`.
+- [ ] Revisar `Inventario`.
+- [ ] Revisar `Analitica`.
+- [ ] Revisar `Configuracion`.
+- [ ] Revisar dialogs operativos.
+
+### 9. Empaquetado Windows
+
+- [ ] Generar bundle de Windows.
+- [ ] Confirmar `_internal/pos_uniformes/migrations`.
+- [ ] Confirmar `_internal/pos_uniformes/assets/qr_icons`.
+- [ ] Revisar icono de ventana.
+- [ ] Recordatorio: antes del empaquetado final, preparar `assets/app_icon.ico`.
+
 ## Windows
 
 - [ ] Generar un bundle de Windows y confirmar que existan `_internal/pos_uniformes/migrations` y `_internal/pos_uniformes/assets/qr_icons`.

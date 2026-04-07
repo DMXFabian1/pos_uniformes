@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 from types import SimpleNamespace
 import unittest
 
@@ -68,6 +69,61 @@ class SaleCartUpdateServiceTests(unittest.TestCase):
         )
 
         self.assertEqual(validated_quantities, [4])
+
+    def test_add_sale_cart_variants_applies_price_override_to_matching_line(self) -> None:
+        variant = SimpleNamespace(
+            id=301,
+            sku="PLY-001",
+            precio_venta="189.00",
+            producto=SimpleNamespace(nombre="Playera Deportiva"),
+        )
+        sale_cart: list[dict[str, object]] = []
+
+        updated_lines = add_sale_cart_variants(
+            sale_cart,
+            variants=[variant],
+            quantity=1,
+            stock_validator=lambda variante, cantidad: None,
+            line_overrides_by_sku={
+                "PLY-001": {
+                    "precio_unitario": Decimal("100.00"),
+                    "precio_base": Decimal("189.00"),
+                    "pricing_rule_key": "SPORTS_UNIFORM_3PZ_PLAYERA",
+                    "pricing_rule_label": "Conjunto deportivo 3pz",
+                }
+            },
+        )
+
+        self.assertEqual(updated_lines[0]["precio_unitario"], Decimal("100.00"))
+        self.assertEqual(updated_lines[0]["precio_base"], Decimal("189.00"))
+        self.assertEqual(updated_lines[0]["pricing_rule_key"], "SPORTS_UNIFORM_3PZ_PLAYERA")
+
+    def test_add_sale_cart_variants_keeps_separate_line_when_same_sku_uses_different_pricing_rule(self) -> None:
+        variant = SimpleNamespace(
+            id=302,
+            sku="PLY-001",
+            precio_venta="189.00",
+            producto=SimpleNamespace(nombre="Playera Deportiva"),
+        )
+        sale_cart = [{"sku": "PLY-001", "cantidad": 1, "precio_unitario": Decimal("189.00"), "pricing_rule_key": ""}]
+
+        add_sale_cart_variants(
+            sale_cart,
+            variants=[variant],
+            quantity=1,
+            stock_validator=lambda variante, cantidad: None,
+            line_overrides_by_sku={
+                "PLY-001": {
+                    "precio_unitario": Decimal("100.00"),
+                    "precio_base": Decimal("189.00"),
+                    "pricing_rule_key": "SPORTS_UNIFORM_3PZ_PLAYERA",
+                    "pricing_rule_label": "Conjunto deportivo 3pz",
+                }
+            },
+        )
+
+        self.assertEqual(len(sale_cart), 2)
+        self.assertEqual(sale_cart[1]["precio_unitario"], Decimal("100.00"))
 
     def test_updates_selected_line_quantity(self) -> None:
         sale_cart = [{"sku": "SKU-001", "cantidad": 1}]

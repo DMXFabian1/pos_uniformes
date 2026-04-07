@@ -51,10 +51,22 @@ def build_layaway_receipt_text(
     for detalle in detalles:
         variante = getattr(detalle, "variante", None)
         lines.append(_format_layaway_product_line(detalle, variante))
+    subtotal = getattr(layaway, "subtotal", "")
+    total = getattr(layaway, "total", "")
+    try:
+        adjustment = total - subtotal
+    except Exception:
+        adjustment = None
     lines.extend(
         [
             "",
             f"Total: {_format_amount(getattr(layaway, 'total', ''))}",
+        ]
+    )
+    if adjustment not in {None, 0}:
+        lines.append(f"Ajuste: {_format_amount(adjustment)}")
+    lines.extend(
+        [
             f"Abonado: {_format_amount(getattr(layaway, 'total_abonado', ''))}",
             f"Saldo pendiente: {_format_amount(getattr(layaway, 'saldo_pendiente', ''))}",
         ]
@@ -64,17 +76,9 @@ def build_layaway_receipt_text(
         for abono in abonos:
             lines.append(_format_layaway_payment_line(abono))
     observacion = _clean_customer_layaway_note(getattr(layaway, "observacion", ""))
-    subtotal = getattr(layaway, "subtotal", "")
-    total = getattr(layaway, "total", "")
     if observacion:
         lines.extend(["", f"Notas: {observacion}"])
-    try:
-        adjustment = total - subtotal
-    except Exception:
-        adjustment = None
-    if adjustment not in {None, 0}:
-        lines.extend(["", f"Ajuste: {_format_amount(adjustment)}"])
-    lines.extend(["", ticket_footer])
+    lines.extend(["", "Por favor conserve su comprobante.", ticket_footer])
     return "\n".join(lines)
 
 

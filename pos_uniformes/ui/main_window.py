@@ -466,6 +466,10 @@ from pos_uniformes.ui.helpers.sale_sports_uniform_helper import (
     collect_internal_sale_cart_notes,
     resolve_sale_scan_variants,
 )
+from pos_uniformes.services.sports_uniform_pricing_service import (
+    THREE_PIECE_PLAYERA_PRICE,
+    build_three_piece_playera_price_override,
+)
 from pos_uniformes.ui.helpers.size_option_sort_helper import sort_size_options
 from pos_uniformes.ui.helpers.snapshot_cache_helper import SnapshotCache
 from pos_uniformes.ui.helpers.settings_backup_helper import (
@@ -6151,6 +6155,15 @@ class MainWindow(QMainWindow):
                     variants=list(resolution.variants),
                     quantity=quantity,
                     stock_validator=VentaService.validar_stock_disponible,
+                    line_overrides_by_sku=(
+                        {
+                            str(getattr(resolution.variants[1], "sku", "") or "").strip().upper(): (
+                                build_three_piece_playera_price_override(resolution.variants[1])
+                            )
+                        }
+                        if resolution.composed_as_three_pieces and len(resolution.variants) >= 2
+                        else None
+                    ),
                 )
                 if resolution.composed_as_three_pieces and len(resolution.variants) >= 2:
                     trace_note = build_sports_uniform_prototype_note(
@@ -6187,7 +6200,7 @@ class MainWindow(QMainWindow):
             feedback_message = (
                 "Prueba deportivo 3pz: "
                 f"{sku} + {resolution.selected_playera_sku}. "
-                "Se guardo trazabilidad interna."
+                f"Playera aplicada a ${THREE_PIECE_PLAYERA_PRICE}. Se guardo trazabilidad interna."
             )
             if resolution.size_hint:
                 feedback_message = f"{feedback_message} {resolution.size_hint}"

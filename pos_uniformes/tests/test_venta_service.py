@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from pos_uniformes.services.venta_service import VentaService
+from pos_uniformes.services.venta_service import VentaItemInput, VentaService
 
 
 class _SessionStub:
@@ -116,6 +116,38 @@ class VentaServiceLayawayTests(unittest.TestCase):
         self.assertEqual(venta.subtotal, Decimal("439.50"))
         self.assertEqual(venta.total, Decimal("439.50"))
         self.assertEqual(venta.observacion, "Entrega limpia")
+
+    def test_crear_borrador_preserves_custom_unit_price_for_same_sku(self) -> None:
+        session = _SessionStub()
+        usuario = SimpleNamespace(activo=True, rol="CAJERO")
+        variant = SimpleNamespace(sku="PLY-001", precio_venta=Decimal("189.00"))
+
+        with patch("pos_uniformes.services.venta_service.Venta", _FakeVenta), patch(
+            "pos_uniformes.services.venta_service.VentaDetalle", _FakeVentaDetalle
+        ), patch.object(
+            VentaService,
+            "obtener_variante_por_sku",
+            side_effect=lambda session, sku: variant if sku == "PLY-001" else None,
+        ), patch.object(
+            VentaService,
+            "validar_stock_disponible",
+            return_value=None,
+        ):
+            venta = VentaService.crear_borrador(
+                session=session,
+                usuario=usuario,
+                folio="V-3PZ-001",
+                items=[
+                    VentaItemInput(sku="PLY-001", cantidad=1, precio_unitario=Decimal("100.00")),
+                    VentaItemInput(sku="PLY-001", cantidad=1, precio_unitario=Decimal("189.00")),
+                ],
+                observacion="Prueba deportivo",
+            )
+
+        self.assertEqual(len(venta.detalles), 2)
+        self.assertEqual(venta.detalles[0].precio_unitario, Decimal("100.00"))
+        self.assertEqual(venta.detalles[1].precio_unitario, Decimal("189.00"))
+        self.assertEqual(venta.subtotal, Decimal("289.00"))
 
 
 if __name__ == "__main__":

@@ -206,6 +206,7 @@ class SaleSportsUniformHelperTests(unittest.TestCase):
             collect_internal_sale_cart_notes(sale_cart, scope="SPORTS_UNIFORM_PROTOTYPE"),
             [note],
         )
+        self.assertIn("100.00", note)
 
 
 if __name__ == "__main__":

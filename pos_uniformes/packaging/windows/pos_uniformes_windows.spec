@@ -9,10 +9,12 @@ from PyInstaller.utils.hooks import collect_submodules
 PROJECT_ROOT = Path(SPEC).resolve().parents[2]
 sys.path.insert(0, str(PROJECT_ROOT.parent))
 
+from pos_uniformes.utils.app_metadata import app_windows_icon_path
 from pos_uniformes.utils.pyinstaller_data_helper import collect_tree_datas
 
 VERSION = (PROJECT_ROOT / "VERSION").read_text(encoding="utf-8").strip()
 APP_NAME = f"POSUniformes-{VERSION}"
+WINDOWS_ICON = app_windows_icon_path()
 
 datas = []
 datas += collect_tree_datas(
@@ -73,6 +75,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,
+    icon=str(WINDOWS_ICON) if WINDOWS_ICON is not None else None,
 )
 
 coll = COLLECT(

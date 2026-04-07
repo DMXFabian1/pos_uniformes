@@ -34,6 +34,20 @@ class AppMetadataTests(unittest.TestCase):
             with patch("pos_uniformes.utils.app_metadata.project_root", return_value=root):
                 self.assertEqual(app_metadata.app_icon_path(), logo_path)
 
+    def test_app_icon_path_prefers_windows_ico_when_present(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            ico_path = root / "assets" / "app_icon.ico"
+            ico_path.parent.mkdir(parents=True, exist_ok=True)
+            ico_path.write_bytes(b"ico")
+            logo_path = root / "assets" / "customer_card_template" / "brand" / "store-logo.PNG"
+            logo_path.parent.mkdir(parents=True, exist_ok=True)
+            logo_path.write_bytes(b"png")
+
+            with patch("pos_uniformes.utils.app_metadata.project_root", return_value=root):
+                self.assertEqual(app_metadata.app_windows_icon_path(), ico_path)
+                self.assertEqual(app_metadata.app_icon_path(), ico_path)
+
 
 if __name__ == "__main__":
     unittest.main()

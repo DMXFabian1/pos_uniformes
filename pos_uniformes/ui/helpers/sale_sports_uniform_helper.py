@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
 from pos_uniformes.database.models import Producto, Variante
+from pos_uniformes.services.sports_uniform_pricing_service import build_three_piece_playera_price_note
 from pos_uniformes.services.sports_uniform_size_service import (
     build_sports_uniform_size_guidance,
     build_sports_uniform_size_hint,
@@ -94,6 +95,7 @@ def build_sports_uniform_prototype_note(base_variant, playera_variant) -> str:
     return (
         "Maqueta prueba deportivo 3pz: "
         f"{getattr(base_variant, 'sku', '')} + {getattr(playera_variant, 'sku', '')}. "
+        f"{build_three_piece_playera_price_note(playera_variant)} "
         f"{build_sports_uniform_size_hint(getattr(base_variant, 'talla', ''), getattr(playera_variant, 'talla', ''))} "
         "Regla provisional; validar equivalencia de tallas despues."
     )

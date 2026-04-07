@@ -58,7 +58,13 @@ def complete_sale_checkout(
         usuario=usuario,
         folio=folio,
         items=[
-            venta_item_input(sku=str(item["sku"]), cantidad=int(item["cantidad"]))
+            venta_item_input(
+                sku=str(item["sku"]),
+                cantidad=int(item["cantidad"]),
+                precio_unitario=item.get("precio_unitario"),
+                precio_base=item.get("precio_base"),
+                pricing_rule_label=str(item.get("pricing_rule_label") or ""),
+            )
             for item in sale_cart
         ],
         observacion=" | ".join(sale_observation_parts),
