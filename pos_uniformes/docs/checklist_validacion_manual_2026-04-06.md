@@ -11,54 +11,54 @@ Sigue este orden para validar sin mezclar causas ni perder tiempo entre pantalla
 
 ### 1. Arranque base
 
-- [ ] Abrir la app y confirmar que el login carga sin errores.
-- [ ] Confirmar que se vean logo, nombre y version.
-- [ ] Confirmar que el selector de usuarios tenga contraste legible.
-- [ ] Iniciar sesion y verificar `Cargando aplicacion...`.
-- [ ] Confirmar que el cursor vuelve a normal al terminar de abrir la principal.
+- [x] Abrir la app y confirmar que el login carga sin errores.
+- [x] Confirmar que se vean logo, nombre y version.
+- [x] Confirmar que el selector de usuarios tenga contraste legible.
+- [x] Iniciar sesion y verificar `Cargando aplicacion...`.
+- [x] Confirmar que el cursor vuelve a normal al terminar de abrir la principal.
 
 ### 2. QR y etiquetas
 
-- [ ] Ir a `Inventario` y generar un QR individual.
-- [ ] Confirmar que la app no se cierre al generar el QR.
-- [ ] Confirmar que el preview se refresque despues de generar el QR.
-- [ ] Confirmar que el QR tenga imagen central cuando los assets existen.
-- [ ] Probar `Imprimir etiqueta` y confirmar que siga operativo en Windows.
+- [x] Ir a `Inventario` y generar un QR individual.
+- [x] Confirmar que la app no se cierre al generar el QR.
+- [x] Confirmar que el preview se refresque despues de generar el QR.
+- [x] Confirmar que el QR tenga imagen central cuando los assets existen.
+- [x] Probar `Imprimir etiqueta` y confirmar que siga operativo en Windows.
 
 ### 3. Carga y salida segura
 
-- [ ] Probar una recarga general y confirmar cursor de espera.
+- [x] Probar una recarga general y confirmar cursor de espera.
 - [ ] Probar `Generar todos los QR` y confirmar cursor de espera y regreso a normal.
-- [ ] Intentar cerrar la app en reposo y confirmar que pide confirmacion.
-- [ ] Intentar cerrar la app durante una operacion pesada y confirmar que no se cierra.
+- [x] Intentar cerrar la app en reposo y confirmar que pide confirmacion.
+- [x] Intentar cerrar la app durante una operacion pesada y confirmar que no se cierra.
 
 ### 4. Caja
 
-- [ ] Revisar tabla de Caja y confirmar que ya no aparezca `SKU`.
-- [ ] Confirmar que `Cantidad` este al inicio.
-- [ ] Confirmar que la lectura visual de filas sea mas clara.
-- [ ] Probar una venta con stock insuficiente y confirmar que no bloquea.
+- [x] Revisar tabla de Caja y confirmar que ya no aparezca `SKU`.
+- [x] Confirmar que `Cantidad` este al inicio.
+- [x] Confirmar que la lectura visual de filas sea mas clara.
+- [x] Probar una venta con stock insuficiente y confirmar que no bloquea.
 
 ### 5. Apartados y Presupuestos
 
-- [ ] Revisar carrito de Presupuestos y confirmar que ya no aparezca `SKU`.
-- [ ] Revisar detalle de Presupuestos y confirmar estructura consistente con Caja.
-- [ ] Revisar detalle de Apartados y confirmar estructura consistente con Caja.
-- [ ] Generar un comprobante de apartado y revisar limpieza del ticket.
+- [x] Revisar carrito de Presupuestos y confirmar que ya no aparezca `SKU`.
+- [x] Revisar detalle de Presupuestos y confirmar estructura consistente con Caja.
+- [x] Revisar detalle de Apartados y confirmar estructura consistente con Caja.
+- [x] Generar un comprobante de apartado y revisar limpieza del ticket.
 
 ### 6. Deportivo 2pz -> 3pz
 
-- [ ] Escanear `Pants 2pz` deportivo y confirmar pregunta de playera.
-- [ ] Confirmar que una playera valida de la misma escuela se agrega bien.
-- [ ] Confirmar que una playera de otra escuela se bloquea.
-- [ ] Confirmar que la lista muestre `Exacta`, `Sugerida` y `Atipica`.
-- [ ] Cobrar una venta de prueba y revisar ticket.
+- [x] Escanear `Pants 2pz` deportivo y confirmar pregunta de playera.
+- [x] Confirmar que una playera valida de la misma escuela se agrega bien.
+- [x] Confirmar que una playera de otra escuela se bloquea.
+- [x] Confirmar que la lista muestre `Exacta`, `Sugerida` y `Atipica`.
+- [x] Cobrar una venta de prueba y revisar ticket.
 
 ### 7. Caja y cierres
 
-- [ ] Revisar cierre de caja con apartados cancelados.
-- [ ] Confirmar que no inflen el esperado.
-- [ ] Revisar historial de cierres y confirmar que abra y cuadre.
+- [x] Revisar cierre de caja con apartados cancelados.
+- [x] Confirmar que no inflen el esperado.
+- [x] Revisar historial de cierres y confirmar que abra y cuadre.
 
 ### 8. Visual general
 
@@ -101,6 +101,7 @@ Sigue este orden para validar sin mezclar causas ni perder tiempo entre pantalla
 - [ ] En Caja, confirmar que la tabla ya no muestre `SKU`.
 - [ ] En Caja, confirmar que `Cantidad` quede al inicio y que la lectura de renglones sea mas clara.
 - [ ] En Presupuestos, confirmar que el carrito ya no muestre `SKU` y que `Cantidad` quede al inicio.
+- [ ] Revisar en Presupuestos que al escanear/agregar productos la tabla respire mejor y no se vea recortada; idealmente debe sentirse tan amplia y legible como Caja.
 - [ ] En detalle de Presupuestos, confirmar la misma estructura visual que en Caja.
 - [ ] En detalle de Apartados, confirmar la misma estructura visual que en Caja.
 - [ ] En Caja, probar una venta con stock insuficiente y confirmar que ya no bloquea la operacion.
@@ -123,6 +124,7 @@ Sigue este orden para validar sin mezclar causas ni perder tiempo entre pantalla
 - [ ] Confirmar que el mensaje en Caja aclare que es una `Prueba deportivo 3pz`.
 - [ ] Cobrar una venta con esa composicion y confirmar que el ticket del cliente no muestre la nota interna de maqueta.
 - [ ] Mas adelante, revisar en historial o trazabilidad que la venta y el movimiento si conserven la nota interna de maqueta.
+- [ ] Tomar una decision sobre los SKUs legacy catalogados como `3pz`: definir si se conservan solo como compatibilidad temporal, si se migran a `2pz + playera` guiado, o si se ocultan del flujo operativo una vez validada la nueva regla.
 
 ## Comprobante de apartado
 
@@ -141,3 +143,12 @@ Sigue este orden para validar sin mezclar causas ni perder tiempo entre pantalla
 - [x] `check_startup_health.py` en verde el `2026-04-06`.
 - [x] suite completa `unittest discover` en verde el `2026-04-06` con `636` pruebas.
 - [x] regresiones tecnicas de `catalog_snapshot_service` y `quote_satellite_window` corregidas antes de cerrar este checkpoint.
+- [x] validacion manual fuerte en Windows del flujo principal completada hasta `2026-04-07` para arranque, QR individual, etiquetas, carga/salida segura, Caja, Presupuestos, Apartados y regla deportivo `2pz -> 3pz`.
+
+## Pendiente despues de este checkpoint
+
+- [ ] Generar bundle final de Windows con la version `2026.04.07`.
+- [ ] Confirmar dentro del bundle `_internal/pos_uniformes/migrations`.
+- [ ] Confirmar dentro del bundle `_internal/pos_uniformes/assets/qr_icons`.
+- [ ] Revisar el `.exe` empaquetado con el nuevo `.ico`.
+- [ ] Tomar decision operativa sobre los SKUs legacy `3pz`.

@@ -12,6 +12,17 @@ Registrar mejoras propuestas por operacion o producto y ubicarlas dentro del pla
 
 ## Solicitudes abiertas
 
+### 2026-04-07
+
+#### 9. Checkpoint operativo Windows y regla deportivo 3pz
+
+- Idea:
+  Cerrar una ronda amplia de pruebas reales en Windows antes de entrar al bloque de kiosko y satelite desacoplada.
+- Estado:
+  - `2026-04-07`: checkpoint operativo validado en Windows para login, branding visible, QR individual, impresion de etiqueta, carga/salida segura, tablas de Caja/Apartados/Presupuestos, regla `2pz -> 3pz` en Caja, Presupuestos y Apartados, hover reusable en filtros/desplegables de Inventario y respiracion del carrito de Presupuestos principal
+  - `2026-04-07`: pendiente solo el cierre de empaquetado final de Windows con validacion del `.ico` y de recursos dentro del bundle
+  - `2026-04-07`: la siguiente decision grande ya no es funcional sino de producto/operacion: que hacer con los SKUs legacy `3pz` y cuando desacoplar la satelite para kiosko
+
 ### 2026-03-26
 
 #### 4. Selector visible de usuarios en login
@@ -304,6 +315,22 @@ Registrar mejoras propuestas por operacion o producto y ubicarlas dentro del pla
   - `2026-04-06`: `validated-tests` para sugerencia de tallas `Exacta / Sugerida / Atipica` como guia reusable
   - `2026-04-06`: decision tomada de tratarlo como `maqueta operativa`, no como regla final ni SKU unico de `3pz`
   - `2026-04-06`: `pending-manual` en Windows y operacion real antes de expandirlo a otros flujos
+  - `2026-04-07`: expandido a `Presupuestos` y `Apartados`, con precio especial de playera, restauracion al quitar el `2pz` y texto visible `Conjunto deportivo 3pz - Escuela`
+  - `2026-04-07`: pendiente decision sobre SKUs legacy `3pz` ya catalogados; recomendacion tecnica actual: no borrarlos aun, marcarlos como legado/compatibilidad y planear una migracion operativa hacia el flujo guiado `2pz + playera` si la validacion real confirma que la nueva regla cubre todos los casos
+
+#### 15. Respiro visual de la tabla en Presupuestos
+
+- Idea:
+  Hacer que la tabla operativa de `Presupuestos`, especialmente al escanear/agregar productos, respire igual que `Caja` y no se sienta recortada o apretada.
+- Estado:
+  - `2026-04-07`: detectado en revision manual de Windows; pendiente ajuste visual fino
+- Alcance sugerido:
+  - revisar anchos de columnas
+  - revisar altura de filas
+  - revisar margenes/padding alrededor del bloque de tabla
+  - empatar sensacion visual con `Caja` sin tocar la logica ya estable
+- Prioridad:
+  media-alta
 
 #### 14. Comprobante de apartado y cierre de caja
 
