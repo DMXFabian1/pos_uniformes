@@ -102,6 +102,11 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         add_item.assert_called_once_with("SKU000003", 1)
         self.assertEqual(window.current_page_key, "kiosk")
 
+    def test_stylesheet_includes_combo_hover_feedback(self) -> None:
+        window = QuoteSatelliteWindow(user_id=1)
+
+        self.assertIn("QComboBox QAbstractItemView::item:hover", window.styleSheet())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -90,6 +90,7 @@ from pos_uniformes.ui.helpers.quote_satellite_filter_helper import (
 )
 from pos_uniformes.ui.helpers.quote_summary_helper import build_quote_summary_view
 from pos_uniformes.ui.helpers.quote_table_row_helper import build_quote_table_row_views
+from pos_uniformes.ui.styles.interactive_hover_styles import build_combo_popup_hover_styles
 
 SATELLITE_SEARCH_DEBOUNCE_MS = 300
 SATELLITE_CATALOG_PAGE_SIZE = 25
@@ -268,8 +269,21 @@ class QuoteSatelliteWindow(QMainWindow):
         self.quote_open_share_button.setIconSize(QSize(18, 18))
 
     def _apply_styles(self) -> None:
+        combo_popup_styles = build_combo_popup_hover_styles(
+            popup_background="#fffaf2",
+            popup_color="#2f2a24",
+            popup_border="#d5c9b9",
+            selected_background="#dfb48f",
+            selected_color="#1f1c19",
+            hover_background="#ece6f3",
+            hover_color="#4e3f67",
+            selected_hover_background="#d8c7ec",
+            selected_hover_color="#35294c",
+        )
         self.setStyleSheet(
-            """
+            "\n".join(
+                [
+                    """
             QMainWindow {
                 background: #f4efe7;
                 color: #1f1c19;
@@ -429,17 +443,11 @@ class QuoteSatelliteWindow(QMainWindow):
                 border: 2px solid #c76b39;
             }
             QComboBox QAbstractItemView {
-                background: #fffaf2;
-                color: #2f2a24;
-                border: 1px solid #d5c9b9;
-                selection-background-color: #dfb48f;
-                selection-color: #1f1c19;
-                outline: 0;
+                border-radius: 10px;
             }
-            QComboBox QAbstractItemView::item {
-                min-height: 26px;
-                padding: 6px 10px;
-            }
+            """,
+                    combo_popup_styles,
+                    """
             QLineEdit#satScanInput {
                 font-size: 15px;
                 font-weight: 700;
@@ -539,7 +547,9 @@ class QuoteSatelliteWindow(QMainWindow):
                 background: #f4efe7;
                 border: none;
             }
-            """
+            """,
+                ]
+            )
         )
 
     def _build_ui(self) -> None:
