@@ -50,6 +50,18 @@ class AppMetadataTests(unittest.TestCase):
                 self.assertEqual(app_metadata.app_windows_icon_path(), ico_path)
                 self.assertEqual(app_metadata.app_icon_path(), ico_path)
 
+    def test_satellite_windows_icon_path_prefers_kiosk_icon(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            root = Path(temp_dir)
+            kiosk_ico_path = root / "assets" / "kiosk_app_icon.ico"
+            kiosk_ico_path.parent.mkdir(parents=True, exist_ok=True)
+            kiosk_ico_path.write_bytes(b"kiosk")
+            app_ico_path = root / "assets" / "app_icon.ico"
+            app_ico_path.write_bytes(b"app")
+
+            with patch("pos_uniformes.utils.app_metadata.project_root", return_value=root):
+                self.assertEqual(app_metadata.satellite_windows_icon_path(), kiosk_ico_path)
+
 
 if __name__ == "__main__":
     unittest.main()

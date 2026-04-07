@@ -24,7 +24,7 @@ from pos_uniformes.database.models import Usuario
 from pos_uniformes.database.preflight import DatabasePreflightError, assert_database_ready
 from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
 from pos_uniformes.utils.config import settings
-from pos_uniformes.utils.app_metadata import app_icon_path, satellite_display_name
+from pos_uniformes.utils.app_metadata import satellite_display_name, satellite_windows_icon_path
 
 
 def bootstrap_schema() -> None:
@@ -61,7 +61,7 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName(satellite_display_name())
     app.setOrganizationName("POSUniformes")
-    icon_path = app_icon_path()
+    icon_path = satellite_windows_icon_path()
     if icon_path is not None:
         app.setWindowIcon(QIcon(str(icon_path)))
     try:

@@ -96,7 +96,7 @@ from pos_uniformes.ui.helpers.quote_summary_helper import build_quote_summary_vi
 from pos_uniformes.ui.helpers.quote_table_row_helper import build_quote_table_row_views
 from pos_uniformes.ui.styles.interactive_hover_styles import build_combo_popup_hover_styles
 from pos_uniformes.ui.helpers.sale_sports_uniform_helper import restore_sports_uniform_playera_price_if_needed
-from pos_uniformes.utils.app_metadata import app_icon_path, satellite_build_label, satellite_display_name
+from pos_uniformes.utils.app_metadata import satellite_build_label, satellite_display_name, satellite_windows_icon_path
 
 SATELLITE_SEARCH_DEBOUNCE_MS = 300
 SATELLITE_CATALOG_PAGE_SIZE = 25
@@ -562,7 +562,7 @@ class QuoteSatelliteWindow(QMainWindow):
     def _build_ui(self) -> None:
         self.setWindowTitle(f"{satellite_display_name()} | {satellite_build_label()}")
         self.resize(1560, 980)
-        icon_path = app_icon_path()
+        icon_path = satellite_windows_icon_path()
         if icon_path is not None:
             self.setWindowIcon(QIcon(str(icon_path)))
 

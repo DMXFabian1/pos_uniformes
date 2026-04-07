@@ -35,6 +35,19 @@ def satellite_build_label() -> str:
     return app_build_label()
 
 
+def satellite_windows_icon_path() -> Path | None:
+    assets_root = project_root() / "assets"
+    candidates = (
+        assets_root / "kiosk_app_icon.ico",
+        assets_root / "satellite_app_icon.ico",
+        app_windows_icon_path(),
+    )
+    for candidate in candidates:
+        if candidate is not None and candidate.exists():
+            return candidate
+    return None
+
+
 def app_windows_icon_path() -> Path | None:
     assets_root = project_root() / "assets"
     candidates = (
