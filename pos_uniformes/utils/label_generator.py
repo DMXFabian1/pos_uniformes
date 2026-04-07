@@ -170,20 +170,15 @@ class LabelGenerator:
         profile = resolve_inventory_label_profile(variante)
         title = cls._clean_name(producto.nombre, variante.talla)
         if profile.family == "ropa_normal":
-            name_lines = textwrap.wrap(title, width=18) or [title]
-            lines = [
-                SplitLabelLine(text=line, base_size=30, min_size=18, gap_after=4)
-                for line in name_lines
-            ]
-            lines.append(
+            return [
+                SplitLabelLine(text=title, base_size=30, min_size=14, gap_after=8),
                 SplitLabelLine(
                     text=build_inventory_label_price_line(variante).replace("Precio: ", ""),
                     base_size=38,
                     min_size=24,
                     gap_after=0,
-                )
-            )
-            return lines
+                ),
+            ]
         lines = textwrap.wrap(cls._build_label_text(title, variante.talla), width=20) or [title]
         if profile.show_price:
             lines.append(build_inventory_label_price_line(variante))
