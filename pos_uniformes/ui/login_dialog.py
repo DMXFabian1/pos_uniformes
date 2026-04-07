@@ -28,6 +28,7 @@ from pos_uniformes.database.connection import get_session
 from pos_uniformes.services.auth_service import AuthService
 from pos_uniformes.services.user_service import UserService
 from pos_uniformes.ui.helpers.login_user_list_helper import build_login_user_options
+from pos_uniformes.ui.styles.interactive_hover_styles import build_combo_popup_hover_styles
 from pos_uniformes.utils.app_metadata import APP_DISPLAY_NAME, app_build_label, app_icon_path
 
 
@@ -51,8 +52,21 @@ class LoginDialog(QDialog):
         self._caps_timer.start()
 
     def _apply_styles(self) -> None:
+        combo_popup_styles = build_combo_popup_hover_styles(
+            popup_background="#fffaf2",
+            popup_color="#2d2b27",
+            popup_border="#d2c7b8",
+            selected_background="#8f4527",
+            selected_color="#f9f4ea",
+            hover_background="#f1e7da",
+            hover_color="#5a3224",
+            selected_hover_background="#a25531",
+            selected_hover_color="#fff7ef",
+        )
         self.setStyleSheet(
-            """
+            "\n".join(
+                [
+                    """
             QDialog {
                 background: #f3efe8;
                 color: #1f1f1b;
@@ -145,22 +159,12 @@ class LoginDialog(QDialog):
                 border: 2px solid #c85a4b;
             }
             QComboBox QAbstractItemView {
-                background: #fffaf2;
-                color: #2d2b27;
-                border: 1px solid #d2c7b8;
                 border-radius: 10px;
                 padding: 4px;
-                selection-background-color: #8f4527;
-                selection-color: #f9f4ea;
             }
-            QComboBox QAbstractItemView::item {
-                min-height: 28px;
-                padding: 6px 10px;
-            }
-            QComboBox QAbstractItemView::item:selected {
-                background: #8f4527;
-                color: #f9f4ea;
-            }
+            """,
+                    combo_popup_styles,
+                    """
             QPushButton {
                 border-radius: 12px;
                 padding: 8px 14px;
@@ -188,7 +192,9 @@ class LoginDialog(QDialog):
             QPushButton#loginTinyButton:hover {
                 background: #f8dfcf;
             }
-            """
+            """,
+                ]
+            )
         )
 
     def _build_ui(self) -> None:

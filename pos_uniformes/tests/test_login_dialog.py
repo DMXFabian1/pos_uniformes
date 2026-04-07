@@ -66,6 +66,7 @@ class LoginDialogTests(unittest.TestCase):
         stylesheet = dialog.styleSheet()
 
         self.assertIn("selection-color: #f9f4ea;", stylesheet)
+        self.assertIn("QComboBox QAbstractItemView::item:hover", stylesheet)
         self.assertNotIn("selection-background-color: #8f4527;\n                color: #f9f4ea;", stylesheet)
 
 

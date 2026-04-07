@@ -2,9 +2,24 @@
 
 from __future__ import annotations
 
+from pos_uniformes.ui.styles.interactive_hover_styles import build_combo_popup_hover_styles
+
 
 def build_main_window_control_styles() -> str:
-    return """
+    combo_popup_styles = build_combo_popup_hover_styles(
+        popup_background="#fffdf8",
+        popup_color="#1f1f1b",
+        popup_border="#d8cfc3",
+        selected_background="#f4d4bb",
+        selected_color="#73341c",
+        hover_background="#e7eef5",
+        hover_color="#2d475d",
+        selected_hover_background="#d8e4ee",
+        selected_hover_color="#20384d",
+    )
+    return "\n".join(
+        [
+            """
             QPushButton {
                 background: #a84f2d;
                 color: #f9f4ea;
@@ -213,31 +228,9 @@ def build_main_window_control_styles() -> str:
                 border: none;
                 width: 22px;
             }
-            QComboBox QAbstractItemView {
-                background: #fffdf8;
-                color: #1f1f1b;
-                border: 1px solid #d8cfc3;
-                selection-background-color: #f8dfcf;
-                selection-color: #8f4527;
-                outline: 0;
-            }
-            QComboBox QAbstractItemView::item {
-                min-height: 30px;
-                padding: 6px 10px;
-            }
-            QComboBox QAbstractItemView::item:hover {
-                background: #fae9dc;
-                color: #8f4527;
-            }
-            QComboBox QAbstractItemView::item:selected {
-                background: #f4d4bb;
-                color: #73341c;
-                font-weight: 700;
-            }
-            QComboBox QAbstractItemView::item:selected:hover {
-                background: #efc39f;
-                color: #6a2f1a;
-            }
+            """,
+            combo_popup_styles,
+            """
             #dataTable {
                 background: #fdfcf9;
                 alternate-background-color: #f1f5f8;
@@ -267,4 +260,6 @@ def build_main_window_control_styles() -> str:
                 max-height: 180px;
                 padding: 10px;
             }
-            """
+            """,
+        ]
+    )

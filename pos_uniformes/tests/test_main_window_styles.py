@@ -30,6 +30,7 @@ class MainWindowStylesTests(unittest.TestCase):
         self.assertIn("QPushButton#inventoryActionButton", stylesheet)
         self.assertIn("QLineEdit, QComboBox, QSpinBox, QTextEdit", stylesheet)
         self.assertIn("#dataTable", stylesheet)
+        self.assertIn("QComboBox QAbstractItemView::item:hover", stylesheet)
 
     def test_builds_hero_cashier_style_section(self) -> None:
         stylesheet = build_main_window_hero_cashier_styles()
