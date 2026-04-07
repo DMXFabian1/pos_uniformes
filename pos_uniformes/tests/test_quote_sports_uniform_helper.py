@@ -67,7 +67,7 @@ class QuoteSportsUniformHelperTests(unittest.TestCase):
         self.assertEqual(playera_line["precio_unitario"], Decimal("100.00"))
         self.assertEqual(playera_line["pricing_rule_key"], THREE_PIECE_PLAYERA_PRICING_KEY)
         self.assertEqual(playera_line["pricing_rule_label"], THREE_PIECE_PLAYERA_PRICING_LABEL)
-        self.assertIn(THREE_PIECE_PLAYERA_PRICING_LABEL, str(playera_line["producto_nombre"]))
+        self.assertIn("Conjunto deportivo 3pz - Patria", str(playera_line["producto_nombre"]))
         self.assertIn("Playera aplicada a $100.00", result.feedback_message)
 
     def test_build_quote_presupuesto_inputs_preserves_special_pricing_metadata(self) -> None:
@@ -77,7 +77,7 @@ class QuoteSportsUniformHelperTests(unittest.TestCase):
                     "sku": "PLY-001",
                     "cantidad": 2,
                     "precio_unitario": Decimal("100.00"),
-                    "producto_nombre": "Playera deportiva (Conjunto deportivo 3pz)",
+                    "producto_nombre": "Playera deportiva (Conjunto deportivo 3pz - Patria)",
                     "pricing_rule_key": THREE_PIECE_PLAYERA_PRICING_KEY,
                     "pricing_rule_label": THREE_PIECE_PLAYERA_PRICING_LABEL,
                 }
@@ -88,7 +88,7 @@ class QuoteSportsUniformHelperTests(unittest.TestCase):
         self.assertEqual(inputs[0].precio_unitario, Decimal("100.00"))
         self.assertEqual(inputs[0].pricing_rule_key, THREE_PIECE_PLAYERA_PRICING_KEY)
         self.assertEqual(inputs[0].pricing_rule_label, THREE_PIECE_PLAYERA_PRICING_LABEL)
-        self.assertEqual(inputs[0].descripcion_snapshot, "Playera deportiva (Conjunto deportivo 3pz)")
+        self.assertEqual(inputs[0].descripcion_snapshot, "Playera deportiva (Conjunto deportivo 3pz - Patria)")
 
 
 if __name__ == "__main__":

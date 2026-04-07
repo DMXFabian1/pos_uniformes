@@ -97,7 +97,7 @@ class QuoteTextServiceTests(unittest.TestCase):
             observacion="",
             detalles=[
                 SimpleNamespace(
-                    descripcion_snapshot="Playera deportiva azul (Conjunto deportivo 3pz)",
+                    descripcion_snapshot="Playera deportiva azul (Conjunto deportivo 3pz - Patria)",
                     sku_snapshot="PLY-001",
                     cantidad=1,
                     precio_unitario=Decimal("100.00"),
@@ -115,7 +115,7 @@ class QuoteTextServiceTests(unittest.TestCase):
 
         text = build_quote_text(quote=quote)
 
-        self.assertIn("Playera deportiva azul (Conjunto deportivo 3pz)", text)
+        self.assertIn("Playera deportiva azul (Conjunto deportivo 3pz - Patria)", text)
         self.assertIn("PLY-001 | 1 x 100.00 = 100.00", text)
 
 

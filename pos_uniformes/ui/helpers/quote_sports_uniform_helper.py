@@ -114,26 +114,33 @@ def build_quote_presupuesto_inputs(quote_cart: list[dict[str, object]]) -> list[
     return inputs
 
 
-def build_three_piece_quote_description(base_name: str) -> str:
+def build_three_piece_quote_description(base_name: str, *, school_name: str = "") -> str:
     normalized = str(base_name or "").strip()
+    normalized_school = str(school_name or "").strip()
+    visible_label = (
+        f"{THREE_PIECE_PLAYERA_PRICING_LABEL} - {normalized_school}"
+        if normalized_school
+        else THREE_PIECE_PLAYERA_PRICING_LABEL
+    )
     if not normalized:
-        return THREE_PIECE_PLAYERA_PRICING_LABEL
+        return visible_label
     if THREE_PIECE_PLAYERA_PRICING_LABEL.casefold() in normalized.casefold():
         return normalized
-    return f"{normalized} ({THREE_PIECE_PLAYERA_PRICING_LABEL})"
+    return f"{normalized} ({visible_label})"
 
 
 def _enrich_quote_line_item(line_item: dict[str, object], *, variant) -> None:
     product = getattr(variant, "producto", None)
     pricing_rule_label = _resolve_line_pricing_rule_label(line_item)
+    school_name = str(getattr(getattr(product, "escuela", None), "nombre", "") or "General")
 
     base_name = str(getattr(product, "nombre_base", "") or getattr(product, "nombre", "") or "").strip()
     line_item["producto_nombre"] = (
-        build_three_piece_quote_description(base_name)
+        build_three_piece_quote_description(base_name, school_name=school_name)
         if pricing_rule_label == THREE_PIECE_PLAYERA_PRICING_LABEL
         else base_name
     )
-    line_item["escuela_nombre"] = str(getattr(getattr(product, "escuela", None), "nombre", "") or "General")
+    line_item["escuela_nombre"] = school_name
     line_item["nivel_educativo_nombre"] = str(
         getattr(getattr(product, "nivel_educativo", None), "nombre", "") or "Sin nivel"
     )
