@@ -150,7 +150,7 @@ class LabelGenerator:
         profile = resolve_inventory_label_profile(variante)
         escuela = getattr(getattr(producto, "escuela", None), "nombre", "") or ""
         nivel = getattr(getattr(producto, "nivel_educativo", None), "nombre", "") or ""
-        title = cls._clean_name(producto.nombre, variante.talla)
+        title = cls._label_title(variante)
         pieces: list[str] = []
         if nivel and escuela:
             pieces.append(f"{nivel} - {escuela}")
@@ -168,7 +168,7 @@ class LabelGenerator:
     def _split_label_lines(cls, variante: Variante) -> list[SplitLabelLine]:
         producto = variante.producto
         profile = resolve_inventory_label_profile(variante)
-        title = cls._clean_name(producto.nombre, variante.talla)
+        title = cls._label_title(variante)
         if profile.family == "ropa_normal":
             return [
                 SplitLabelLine(text=title, base_size=30, min_size=14, gap_after=8),
@@ -183,6 +183,15 @@ class LabelGenerator:
         if profile.show_price:
             lines.append(build_inventory_label_price_line(variante))
         return [SplitLabelLine(text=line, base_size=34, min_size=16, gap_after=6) for line in lines]
+
+    @classmethod
+    def _label_title(cls, variante: Variante) -> str:
+        producto = variante.producto
+        preferred_name = getattr(producto, "nombre_base", "") or getattr(producto, "nombre", "")
+        title = cls._clean_name(preferred_name, variante.talla)
+        if title:
+            return title
+        return cls._clean_name(getattr(producto, "nombre", ""), variante.talla)
 
     @staticmethod
     def _clean_name(nombre: str, talla: str) -> str:

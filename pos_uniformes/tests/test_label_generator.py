@@ -10,6 +10,7 @@ from pos_uniformes.utils.label_generator import LabelGenerator
 def _build_variant(
     *,
     product_name: str,
+    product_base_name: str = "",
     talla: str = "",
     price: str = "249.00",
     school_name: str = "",
@@ -23,6 +24,7 @@ def _build_variant(
         precio_venta=Decimal(price),
         producto=SimpleNamespace(
             nombre=product_name,
+            nombre_base=product_base_name,
             escuela_id=1 if school_name else None,
             escuela=school,
             nivel_educativo_id=1 if level_name else None,
@@ -36,7 +38,8 @@ def _build_variant(
 class LabelGeneratorTests(unittest.TestCase):
     def test_split_label_for_ropa_normal_shows_only_name_and_price(self) -> None:
         variante = _build_variant(
-            product_name="Sudadera Premium Talla Chica",
+            product_name="Categoria Sudadera Premium Talla Chica",
+            product_base_name="Sudadera Premium",
             talla="CH",
             price="349.00",
             garment_type="Basico",
@@ -48,7 +51,7 @@ class LabelGeneratorTests(unittest.TestCase):
         self.assertEqual(lines[-1].text, "$349.00")
         self.assertNotIn("Precio:", " ".join(line.text for line in lines))
         self.assertNotIn("T:", " ".join(line.text for line in lines))
-        self.assertIn("Sudadera", " ".join(line.text for line in lines[:-1]))
+        self.assertEqual(lines[0].text, "Sudadera Premium")
 
     def test_split_label_for_uniform_keeps_name_and_size_without_price(self) -> None:
         variante = _build_variant(
