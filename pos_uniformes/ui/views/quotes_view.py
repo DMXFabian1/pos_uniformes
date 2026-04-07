@@ -101,10 +101,10 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
     )
     window.quote_cart_table.setObjectName("cashierCartTable")
     window.quote_cart_table.verticalHeader().setVisible(False)
-    window.quote_cart_table.verticalHeader().setDefaultSectionSize(46)
+    window.quote_cart_table.verticalHeader().setDefaultSectionSize(48)
     window.quote_cart_table.setSelectionBehavior(window.quote_cart_table.SelectionBehavior.SelectRows)
     window.quote_cart_table.setAlternatingRowColors(True)
-    window.quote_cart_table.setMinimumHeight(220)
+    window.quote_cart_table.setMinimumHeight(260)
 
     totals_box = QFrame()
     totals_box.setObjectName("cashierTotalsCard")
@@ -241,8 +241,8 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
     history_layout.addLayout(history_content)
     history_box.setLayout(history_layout)
 
-    layout.addWidget(quote_box)
-    layout.addWidget(history_box, 1)
+    layout.addWidget(quote_box, 3)
+    layout.addWidget(history_box, 2)
 
     window.quote_add_button.clicked.connect(window._handle_add_quote_item)
     window.quote_sku_input.returnPressed.connect(window._handle_add_quote_item)

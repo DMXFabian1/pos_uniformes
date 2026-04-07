@@ -60,6 +60,13 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             self.assertEqual(reloaded_rows, first_rows)
             self.assertEqual(loader.call_count, 2)
 
+    def test_quote_cart_table_keeps_cashier_breathing_in_main_window(self) -> None:
+        window = MainWindow(user_id=1)
+
+        self.assertEqual(window.quote_cart_table.objectName(), "cashierCartTable")
+        self.assertEqual(window.quote_cart_table.verticalHeader().defaultSectionSize(), 48)
+        self.assertEqual(window.quote_cart_table.minimumHeight(), 260)
+
     def test_catalog_search_refresh_uses_single_debounce_timer(self) -> None:
         window = MainWindow(user_id=1)
         callback = Mock()
