@@ -36,6 +36,14 @@ python -m pos_uniformes.main
 scripts\build_windows_bundle.ps1
 ```
 
+Si tienes una PC Windows dedicada solo a empaquetar, puedes automatizar ese paso con:
+
+```powershell
+py scripts\windows_build_runner.py --branch codex/etiquetas-windows --with-precheck
+```
+
+Ese wrapper hace `git pull`, prepara `.venv`, instala dependencias y deja listo `dist\POSUniformes-<VERSION>-windows.zip`.
+
 ## Setup rapido de desarrollo
 
 Desde la raiz del proyecto, en cualquiera de las dos maquinas:

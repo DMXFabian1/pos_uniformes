@@ -28,6 +28,36 @@ Importante:
 - no incluye PostgreSQL
 - la PC destino solo necesita acceso a la base PostgreSQL correspondiente
 
+## Opcion recomendada para una PC solo de empaquetado
+
+Si tienes otra PC Windows y quieres usarla solo para sacar el zip listo:
+
+```powershell
+py scripts\windows_build_runner.py --branch codex/etiquetas-windows --with-precheck
+```
+
+Ese wrapper:
+
+- hace `git fetch + checkout + pull` de la rama indicada
+- asegura `.venv`
+- instala dependencias de runtime y build
+- ejecuta `scripts\build_windows_bundle.ps1`
+- te deja listo `dist\POSUniformes-<VERSION>-windows.zip`
+
+Opciones utiles:
+
+```powershell
+py scripts\windows_build_runner.py --branch codex/etiquetas-windows --skip-git
+py scripts\windows_build_runner.py --branch codex/etiquetas-windows --create-seed-backup
+py scripts\windows_build_runner.py --branch codex/etiquetas-windows --brother-driver-installer-path .\ruta\BrotherDriverInstaller.exe
+```
+
+Si solo quieres revisar los pasos sin ejecutarlos:
+
+```powershell
+py scripts\windows_build_runner.py --branch codex/etiquetas-windows --dry-run
+```
+
 ## App satelite de Presupuestos
 
 La app satelite de Presupuestos se distribuye por separado del POS principal. Usa la misma base PostgreSQL y los mismos servicios compartidos, pero abre una ventana dedicada solo para:
