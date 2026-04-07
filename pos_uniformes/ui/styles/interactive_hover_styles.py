@@ -42,3 +42,50 @@ def build_combo_popup_hover_styles(
                 color: {selected_hover_color};
             }}
             """
+
+
+def build_menu_popup_hover_styles(
+    *,
+    menu_background: str,
+    menu_color: str,
+    menu_border: str,
+    hover_background: str,
+    hover_color: str,
+    selected_background: str,
+    selected_color: str,
+) -> str:
+    return f"""
+            QMenu {{
+                background: {menu_background};
+                color: {menu_color};
+                border: 1px solid {menu_border};
+                border-radius: 12px;
+                padding: 6px;
+            }}
+            QMenu::item {{
+                padding: 8px 12px;
+                margin: 2px 0;
+                border-radius: 8px;
+                background: transparent;
+            }}
+            QMenu::item:selected {{
+                background: {hover_background};
+                color: {hover_color};
+            }}
+            QMenu::item:checked {{
+                background: {selected_background};
+                color: {selected_color};
+            }}
+            QMenu::item:selected:disabled {{
+                background: transparent;
+                color: {menu_color};
+            }}
+            QMenu::item:disabled {{
+                color: #8f8a82;
+            }}
+            QMenu::separator {{
+                height: 1px;
+                background: {menu_border};
+                margin: 6px 8px;
+            }}
+            """

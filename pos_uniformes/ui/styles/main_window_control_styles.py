@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from pos_uniformes.ui.styles.interactive_hover_styles import build_combo_popup_hover_styles
+from pos_uniformes.ui.styles.interactive_hover_styles import (
+    build_combo_popup_hover_styles,
+    build_menu_popup_hover_styles,
+)
 
 
 def build_main_window_control_styles() -> str:
@@ -16,6 +19,15 @@ def build_main_window_control_styles() -> str:
         hover_color="#2d475d",
         selected_hover_background="#d8e4ee",
         selected_hover_color="#20384d",
+    )
+    menu_popup_styles = build_menu_popup_hover_styles(
+        menu_background="#fffdf8",
+        menu_color="#2c2a27",
+        menu_border="#d8cfc3",
+        hover_background="#e7eef5",
+        hover_color="#2d475d",
+        selected_background="#d8e4ee",
+        selected_color="#20384d",
     )
     return "\n".join(
         [
@@ -230,6 +242,23 @@ def build_main_window_control_styles() -> str:
             }
             """,
             combo_popup_styles,
+            menu_popup_styles,
+            """
+            QToolButton#secondaryButton {
+                background: #efe7d9;
+                color: #2c2a27;
+                border: 1px solid #d6ccbe;
+                border-radius: 10px;
+                padding: 6px 10px;
+                min-height: 30px;
+                font-size: 13px;
+                font-weight: 700;
+                text-align: left;
+            }
+            QToolButton#secondaryButton:hover {
+                background: #e6dccd;
+            }
+            """,
             """
             #dataTable {
                 background: #fdfcf9;
