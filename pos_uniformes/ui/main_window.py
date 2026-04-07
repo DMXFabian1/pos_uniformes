@@ -1214,7 +1214,7 @@ class MainWindow(QMainWindow):
         self.inventory_bulk_price_button = QPushButton("Precio masivo")
         self.inventory_generate_qr_button = QPushButton("Generar QR de presentacion")
         self.inventory_print_label_button = QPushButton("Imprimir etiqueta")
-        self.inventory_generate_all_qr_button = QPushButton("Generar QR de todas las presentaciones")
+        self.inventory_generate_all_qr_button = QPushButton("Generar QR en lote")
         self.inventory_permission_label = QLabel()
         self.qr_status_label = QLabel()
         self.qr_preview_label = QLabel("Preview QR")
@@ -1572,7 +1572,7 @@ class MainWindow(QMainWindow):
             self.inventory_bulk_price_button: "Actualiza precios por lote con preview, aumentos, descuentos y auditoria de catalogo.",
             self.inventory_generate_qr_button: "Genera el codigo QR de la presentacion seleccionada.",
             self.inventory_print_label_button: "Abre la impresion de etiquetas para la presentacion seleccionada. La logica completa se integrara en la siguiente fase.",
-            self.inventory_generate_all_qr_button: "Genera codigos QR para todas las presentaciones activas.",
+            self.inventory_generate_all_qr_button: "Genera codigos QR en lote para las presentaciones seleccionadas en Inventario.",
             self.inventory_new_button: "Crea catalogo base, productos o presentaciones nuevas desde un solo menu.",
             self.inventory_edit_button: "Edita el producto o la presentacion seleccionada.",
             self.inventory_stock_button: "Abre acciones de stock como entrada, conteo fisico y correccion.",
@@ -7010,17 +7010,30 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "QR generado", f"QR guardado en:\n{path}")
 
     def _handle_generate_all_qr(self) -> None:
+        selected_variant_ids = self._selected_inventory_variant_ids()
+        if not selected_variant_ids:
+            QMessageBox.warning(
+                self,
+                "Sin seleccion",
+                "Selecciona una o mas presentaciones en Inventario para generar su lote de QR.",
+            )
+            return
         progress_dialog: QProgressDialog | None = None
         try:
             with self._busy_scope(
-                "Inventario: generando todos los QR...",
+                "Inventario: generando QR en lote...",
                 status_label=self.qr_status_label,
             ), get_session() as session:
                 variantes = session.scalars(
-                    select(Variante).where(Variante.activo.is_(True)).order_by(Variante.sku)
+                    select(Variante)
+                    .where(
+                        Variante.id.in_(selected_variant_ids),
+                        Variante.activo.is_(True),
+                    )
+                    .order_by(Variante.sku)
                 ).all()
                 if not variantes:
-                    raise ValueError("No se encontraron presentaciones activas para generar QR.")
+                    raise ValueError("No se encontraron presentaciones activas dentro de la seleccion para generar QR.")
 
                 progress_dialog = QProgressDialog("Preparando generacion de etiquetas...", "Cancelar", 0, len(variantes), self)
                 progress_dialog.setWindowTitle("Generando QR")
@@ -7074,7 +7087,7 @@ class MainWindow(QMainWindow):
         QMessageBox.information(
             self,
             "QRs generados",
-            f"Se generaron {len(paths)} archivos en:\n{directory}",
+            f"Se generaron {len(paths)} QR del lote seleccionado en:\n{directory}",
         )
 
     def _handle_history_filter(self) -> None:
