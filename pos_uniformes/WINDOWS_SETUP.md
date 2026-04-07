@@ -83,6 +83,37 @@ py scripts\windows_run_dev.py --skip-precheck
 py scripts\windows_run_dev.py --skip-migrations
 ```
 
+## Opcion recomendada para instalar y configurar PostgreSQL local
+
+Si la PC Windows es nueva y todavia no tiene PostgreSQL listo para POS Uniformes:
+
+```powershell
+py scripts\windows_setup_postgres.py --install-postgres
+```
+
+Ese script:
+
+- puede lanzar la instalacion de PostgreSQL via `winget`
+- te pide el password del usuario PostgreSQL si hace falta
+- crea o actualiza `pos_uniformes.env`
+- crea la base `pos_uniformes` si no existe
+- corre migraciones
+- corre precheck
+
+Opciones utiles:
+
+```powershell
+py scripts\windows_setup_postgres.py --dry-run
+py scripts\windows_setup_postgres.py --db-name pos_uniformes_pruebas
+py scripts\windows_setup_postgres.py --skip-precheck
+py scripts\windows_setup_postgres.py --skip-migrations
+```
+
+Nota:
+
+- para la parte de instalacion, lo mas seguro es correr PowerShell como administrador
+- el instalador de PostgreSQL puede abrir ventanas propias durante el paso interactivo
+
 ## App satelite de Presupuestos
 
 La app satelite de Presupuestos se distribuye por separado del POS principal. Usa la misma base PostgreSQL y los mismos servicios compartidos, pero abre una ventana dedicada solo para:
