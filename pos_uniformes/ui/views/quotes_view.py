@@ -101,9 +101,10 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
     )
     window.quote_cart_table.setObjectName("cashierCartTable")
     window.quote_cart_table.verticalHeader().setVisible(False)
+    window.quote_cart_table.verticalHeader().setDefaultSectionSize(46)
     window.quote_cart_table.setSelectionBehavior(window.quote_cart_table.SelectionBehavior.SelectRows)
     window.quote_cart_table.setAlternatingRowColors(True)
-    window.quote_cart_table.setMinimumHeight(180)
+    window.quote_cart_table.setMinimumHeight(220)
 
     totals_box = QFrame()
     totals_box.setObjectName("cashierTotalsCard")

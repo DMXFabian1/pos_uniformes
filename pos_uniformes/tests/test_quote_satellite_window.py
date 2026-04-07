@@ -107,6 +107,14 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
 
         self.assertIn("QComboBox QAbstractItemView::item:hover", window.styleSheet())
 
+    def test_quote_cart_uses_six_columns_and_cashier_style(self) -> None:
+        window = QuoteSatelliteWindow(user_id=1)
+
+        self.assertEqual(window.quote_cart_table.columnCount(), 6)
+        self.assertEqual(window.quote_cart_table.objectName(), "cashierCartTable")
+        self.assertEqual(window.quote_cart_table.horizontalHeaderItem(0).text(), "Cantidad")
+        self.assertEqual(window.quote_cart_table.horizontalHeaderItem(1).text(), "Producto")
+
 
 if __name__ == "__main__":
     unittest.main()

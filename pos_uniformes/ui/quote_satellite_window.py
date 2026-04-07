@@ -1199,18 +1199,20 @@ class QuoteSatelliteWindow(QMainWindow):
         cart_box = QGroupBox("Carrito")
         cart_layout = QVBoxLayout()
         cart_layout.setSpacing(10)
-        self.quote_cart_table.setColumnCount(7)
+        self.quote_cart_table.setColumnCount(6)
         self.quote_cart_table.setHorizontalHeaderLabels(
-            ["SKU", "Nivel", "Escuela", "Producto", "Cantidad", "Precio", "Subtotal"]
+            ["Cantidad", "Producto", "Nivel", "Escuela", "Precio", "Subtotal"]
         )
+        self.quote_cart_table.setObjectName("cashierCartTable")
         self.quote_cart_table.verticalHeader().setVisible(False)
+        self.quote_cart_table.verticalHeader().setDefaultSectionSize(46)
         self.quote_cart_table.setAlternatingRowColors(True)
         self.quote_cart_table.setSelectionBehavior(self.quote_cart_table.SelectionBehavior.SelectRows)
-        self.quote_cart_table.setMinimumHeight(260)
+        self.quote_cart_table.setMinimumHeight(320)
         _configure_satellite_table(
             self.quote_cart_table,
-            stretch_columns=(3,),
-            resize_columns=(0, 1, 2, 4, 5, 6),
+            stretch_columns=(1,),
+            resize_columns=(0, 2, 3, 4, 5),
         )
 
         totals_card = QFrame()
