@@ -6,6 +6,7 @@ from pathlib import Path
 
 APP_DISPLAY_NAME = "POS Uniformes"
 APP_ORGANIZATION_NAME = "POSUniformes"
+SATELLITE_DISPLAY_NAME = "Kiosko de Presupuestos"
 DEFAULT_APP_VERSION = "2026.03.18"
 
 
@@ -24,6 +25,14 @@ def app_version() -> str:
 
 def app_build_label() -> str:
     return f"Version {app_version()}"
+
+
+def satellite_display_name() -> str:
+    return SATELLITE_DISPLAY_NAME
+
+
+def satellite_build_label() -> str:
+    return app_build_label()
 
 
 def app_windows_icon_path() -> Path | None:

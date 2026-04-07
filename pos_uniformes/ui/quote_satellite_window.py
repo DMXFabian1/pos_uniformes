@@ -96,6 +96,7 @@ from pos_uniformes.ui.helpers.quote_summary_helper import build_quote_summary_vi
 from pos_uniformes.ui.helpers.quote_table_row_helper import build_quote_table_row_views
 from pos_uniformes.ui.styles.interactive_hover_styles import build_combo_popup_hover_styles
 from pos_uniformes.ui.helpers.sale_sports_uniform_helper import restore_sports_uniform_playera_price_if_needed
+from pos_uniformes.utils.app_metadata import app_icon_path, satellite_build_label, satellite_display_name
 
 SATELLITE_SEARCH_DEBOUNCE_MS = 300
 SATELLITE_CATALOG_PAGE_SIZE = 25
@@ -141,6 +142,7 @@ class QuoteSatelliteWindow(QMainWindow):
 
     def _build_widgets(self) -> None:
         self.operator_label = QLabel("Sin operador")
+        self.version_label = QLabel(satellite_build_label())
         self.status_label = QLabel("Listo.")
         self.quick_scan_input = QLineEdit()
         self.quick_scan_button = QPushButton("Escanear")
@@ -558,8 +560,11 @@ class QuoteSatelliteWindow(QMainWindow):
         )
 
     def _build_ui(self) -> None:
-        self.setWindowTitle("Kiosko de Presupuestos")
+        self.setWindowTitle(f"{satellite_display_name()} | {satellite_build_label()}")
         self.resize(1560, 980)
+        icon_path = app_icon_path()
+        if icon_path is not None:
+            self.setWindowIcon(QIcon(str(icon_path)))
 
         header_card = QFrame()
         header_card.setObjectName("satHeaderCard")
@@ -568,11 +573,13 @@ class QuoteSatelliteWindow(QMainWindow):
         header_layout.setSpacing(10)
         title_layout = QVBoxLayout()
         title_layout.setSpacing(2)
-        title = QLabel("Kiosko")
+        title = QLabel(satellite_display_name())
         title.setObjectName("satTitle")
         self.operator_label.setObjectName("satMeta")
+        self.version_label.setObjectName("satMeta")
         self.status_label.setObjectName("satStatus")
         title_layout.addWidget(title)
+        title_layout.addWidget(self.version_label)
         title_layout.addWidget(self.operator_label)
         header_layout.addLayout(title_layout, 1)
         header_layout.addWidget(self.status_label, 1, Qt.AlignmentFlag.AlignRight)

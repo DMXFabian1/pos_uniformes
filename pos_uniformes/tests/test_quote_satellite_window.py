@@ -115,6 +115,12 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         self.assertEqual(window.quote_cart_table.horizontalHeaderItem(0).text(), "Cantidad")
         self.assertEqual(window.quote_cart_table.horizontalHeaderItem(1).text(), "Producto")
 
+    def test_window_title_and_version_show_kiosk_build_identity(self) -> None:
+        window = QuoteSatelliteWindow(user_id=1)
+
+        self.assertIn("Kiosko de Presupuestos", window.windowTitle())
+        self.assertTrue(window.version_label.text().startswith("Version "))
+
 
 if __name__ == "__main__":
     unittest.main()

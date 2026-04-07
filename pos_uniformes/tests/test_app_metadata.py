@@ -17,6 +17,8 @@ class AppMetadataTests(unittest.TestCase):
             with patch("pos_uniformes.utils.app_metadata.project_root", return_value=root):
                 self.assertEqual(app_metadata.app_version(), "2026.04.06")
                 self.assertEqual(app_metadata.app_build_label(), "Version 2026.04.06")
+                self.assertEqual(app_metadata.satellite_display_name(), "Kiosko de Presupuestos")
+                self.assertEqual(app_metadata.satellite_build_label(), "Version 2026.04.06")
 
     def test_app_version_falls_back_when_file_is_missing(self) -> None:
         with tempfile.TemporaryDirectory() as temp_dir:
