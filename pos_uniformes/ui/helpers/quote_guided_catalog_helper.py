@@ -13,6 +13,7 @@ class GuidedCatalogOption:
     label: str
     count: int
     enabled: bool
+    group_label: str = ""
 
 
 @dataclass(frozen=True)
@@ -286,9 +287,16 @@ def _build_piece_options(rows: list[dict[str, object]]) -> tuple[GuidedCatalogOp
         if not piece_label:
             continue
         counts[piece_label] = counts.get(piece_label, 0) + 1
+    ordered_labels = sorted(counts, key=_piece_group_sort_key)
     return tuple(
-        GuidedCatalogOption(key=piece_label, label=piece_label, count=counts[piece_label], enabled=counts[piece_label] > 0)
-        for piece_label in sorted(counts)
+        GuidedCatalogOption(
+            key=piece_label,
+            label=piece_label,
+            count=counts[piece_label],
+            enabled=counts[piece_label] > 0,
+            group_label=_piece_group_label(piece_label),
+        )
+        for piece_label in ordered_labels
     )
 
 
@@ -617,6 +625,53 @@ def _variant_sort_key(row: dict[str, object]) -> tuple[tuple[int, object], str, 
         str(row.get("color") or "").strip().lower(),
         str(row.get("sku") or "").strip().lower(),
     )
+
+
+def _piece_group_sort_key(piece_label: str) -> tuple[int, str]:
+    return (_piece_group_rank(piece_label), piece_label.lower())
+
+
+def _piece_group_label(piece_label: str) -> str:
+    rank = _piece_group_rank(piece_label)
+    if rank == 0:
+        return "Prendas principales"
+    if rank == 1:
+        return "Complementos"
+    if rank == 2:
+        return "Accesorios"
+    return "Especial"
+
+
+def _piece_group_rank(piece_label: str) -> int:
+    normalized = _normalize_text(piece_label)
+    if normalized in {
+        "camisa",
+        "playera",
+        "falda",
+        "jumper",
+        "pantalon",
+        "pants 2pz",
+    }:
+        return 0
+    if normalized in {
+        "chaleco",
+        "chamarra",
+        "pants suelto",
+        "short",
+        "sueter",
+    }:
+        return 1
+    if normalized in {
+        "boina",
+        "calceta",
+        "corbata",
+        "corbatin",
+        "guante",
+        "malla",
+        "mono",
+    }:
+        return 2
+    return 3
 
 
 def _size_sort_key(raw_value: object) -> tuple[int, object]:

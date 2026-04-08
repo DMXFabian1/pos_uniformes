@@ -160,20 +160,20 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         window = QuoteSatelliteWindow(user_id=1)
 
         options = [
-            SimpleNamespace(key="Bata", label="Bata", enabled=True),
-            SimpleNamespace(key="Calceta", label="Calceta", enabled=True),
-            SimpleNamespace(key="Corbata", label="Corbata", enabled=True),
-            SimpleNamespace(key="Malla", label="Malla", enabled=True),
-            SimpleNamespace(key="Boina", label="Boina", enabled=True),
+            SimpleNamespace(key="Camisa", label="Camisa", enabled=True, group_label="Prendas principales"),
+            SimpleNamespace(key="Playera", label="Playera", enabled=True, group_label="Prendas principales"),
+            SimpleNamespace(key="Calceta", label="Calceta", enabled=True, group_label="Accesorios"),
+            SimpleNamespace(key="Corbata", label="Corbata", enabled=True, group_label="Accesorios"),
+            SimpleNamespace(key="Bata", label="Bata", enabled=True, group_label="Especial"),
         ]
 
         window._rebuild_guided_piece_buttons(options)
 
-        first_button = window.guided_piece_buttons["Bata"]
+        first_button = window.guided_piece_buttons["Camisa"]
         self.assertTrue(first_button.property("compactChoice"))
         self.assertEqual(first_button.minimumHeight(), 42)
         self.assertEqual(first_button.maximumWidth(), 170)
-        self.assertEqual(window.guided_piece_grid.count(), 5)
+        self.assertEqual(window.guided_piece_groups_layout.count(), 6)
 
     def test_guided_product_cards_use_flow_layout(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)

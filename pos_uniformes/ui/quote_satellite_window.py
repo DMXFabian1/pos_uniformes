@@ -488,6 +488,12 @@ class QuoteSatelliteWindow(QMainWindow):
                 color: #675f56;
                 font-size: 13px;
             }
+            QLabel#guidedGroupLabel {
+                color: #87492c;
+                font-size: 12px;
+                font-weight: 900;
+                padding-top: 2px;
+            }
             QLabel#guidedPath {
                 color: #5e574f;
                 background: #f1ebe2;
@@ -995,18 +1001,12 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_piece_hint_label = QLabel("Primero elige la familia de prenda que buscan.")
         self.guided_piece_hint_label.setObjectName("guidedStepHint")
         self.guided_piece_hint_label.setWordWrap(True)
-        self.guided_piece_grid = QGridLayout()
-        self.guided_piece_grid.setContentsMargins(0, 0, 0, 0)
-        self.guided_piece_grid.setHorizontalSpacing(4)
-        self.guided_piece_grid.setVerticalSpacing(6)
-        self.guided_piece_row = QHBoxLayout()
-        self.guided_piece_row.setContentsMargins(0, 0, 0, 0)
-        self.guided_piece_row.setSpacing(0)
-        self.guided_piece_row.addLayout(self.guided_piece_grid)
-        self.guided_piece_row.addStretch()
+        self.guided_piece_groups_layout = QVBoxLayout()
+        self.guided_piece_groups_layout.setContentsMargins(0, 0, 0, 0)
+        self.guided_piece_groups_layout.setSpacing(6)
         piece_section_layout.addWidget(self.guided_piece_title_label)
         piece_section_layout.addWidget(self.guided_piece_hint_label)
-        piece_section_layout.addLayout(self.guided_piece_row)
+        piece_section_layout.addLayout(self.guided_piece_groups_layout)
         self.guided_piece_section.setLayout(piece_section_layout)
         steps_layout.addWidget(self.guided_piece_section)
 
@@ -1952,28 +1952,51 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_bucket_row.addStretch()
 
     def _rebuild_guided_piece_buttons(self, options) -> None:
-        _clear_layout(self.guided_piece_grid)
+        _clear_layout(self.guided_piece_groups_layout)
         self.guided_piece_buttons = {}
         buttons_per_row = 3
-        for index, option in enumerate(options):
-            button = self._build_guided_choice_button(option.label)
-            button.setProperty("compactChoice", True)
-            button.setEnabled(option.enabled)
-            button.setChecked(self.guided_selected_piece == option.key)
-            button.setMinimumHeight(42)
-            button.setMinimumWidth(170)
-            button.setMaximumWidth(170)
-            button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-            button.style().unpolish(button)
-            button.style().polish(button)
-            button.clicked.connect(lambda checked=False, selected=option.key: self._handle_guided_piece_selected(selected))
-            self.guided_piece_grid.addWidget(
-                button,
-                index // buttons_per_row,
-                index % buttons_per_row,
-                alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
-            )
-            self.guided_piece_buttons[option.key] = button
+        grouped_options: dict[str, list[object]] = {}
+        for option in options:
+            group_label = getattr(option, "group_label", "") or "Piezas"
+            grouped_options.setdefault(group_label, []).append(option)
+
+        for group_label, group_options in grouped_options.items():
+            label = QLabel(group_label)
+            label.setObjectName("guidedGroupLabel")
+            self.guided_piece_groups_layout.addWidget(label)
+
+            row_layout = QHBoxLayout()
+            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.setSpacing(0)
+
+            grid = QGridLayout()
+            grid.setContentsMargins(0, 0, 0, 0)
+            grid.setHorizontalSpacing(4)
+            grid.setVerticalSpacing(6)
+
+            for index, option in enumerate(group_options):
+                button = self._build_guided_choice_button(option.label)
+                button.setProperty("compactChoice", True)
+                button.setEnabled(option.enabled)
+                button.setChecked(self.guided_selected_piece == option.key)
+                button.setMinimumHeight(42)
+                button.setMinimumWidth(170)
+                button.setMaximumWidth(170)
+                button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+                button.style().unpolish(button)
+                button.style().polish(button)
+                button.clicked.connect(lambda checked=False, selected=option.key: self._handle_guided_piece_selected(selected))
+                grid.addWidget(
+                    button,
+                    index // buttons_per_row,
+                    index % buttons_per_row,
+                    alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+                )
+                self.guided_piece_buttons[option.key] = button
+
+            row_layout.addLayout(grid)
+            row_layout.addStretch()
+            self.guided_piece_groups_layout.addLayout(row_layout)
 
     def _rebuild_guided_product_buttons(self, product_cards) -> None:
         _clear_layout(self.guided_product_flow_layout)

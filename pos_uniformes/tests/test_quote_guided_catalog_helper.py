@@ -23,6 +23,33 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
         self.assertEqual([option.label for option in view.school_options], ["Colegio Mexico", "Instituto Hidalgo"])
         self.assertEqual(view.empty_label, "Selecciona una escuela para ver productos sugeridos.")
 
+    def test_basics_mode_groups_piece_options_by_mental_category(self) -> None:
+        view = build_guided_catalog_view(
+            snapshot_rows=[
+                _row("SKU-1", "", "General", "", "Oficial", pieza="Camisa"),
+                _row("SKU-2", "", "General", "", "Oficial", pieza="Playera"),
+                _row("SKU-3", "", "General", "", "Oficial", pieza="Chaleco"),
+                _row("SKU-4", "", "General", "", "Oficial", pieza="Calceta"),
+                _row("SKU-5", "", "General", "", "Oficial", pieza="Bata"),
+            ],
+            mode_key="basics",
+            level_filter="",
+            school_filter="",
+            gender_filter="Todos",
+            bucket_filter="Todos",
+        )
+
+        self.assertEqual(
+            [(option.label, option.group_label) for option in view.piece_options],
+            [
+                ("Camisa", "Prendas principales"),
+                ("Playera", "Prendas principales"),
+                ("Chaleco", "Complementos"),
+                ("Calceta", "Accesorios"),
+                ("Bata", "Especial"),
+            ],
+        )
+
     def test_oficial_nina_keeps_official_unisex(self) -> None:
         view = build_guided_catalog_view(
             snapshot_rows=[
