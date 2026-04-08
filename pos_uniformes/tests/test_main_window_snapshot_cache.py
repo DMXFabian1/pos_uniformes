@@ -246,6 +246,24 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             ['Texto: "pants"  ×', "Linea: Deportivo  ×"],
         )
 
+    def test_catalog_and_inventory_hide_category_filters(self) -> None:
+        window = MainWindow(user_id=1)
+
+        self.assertTrue(window.catalog_category_filter_combo.isHidden())
+        self.assertTrue(window.inventory_category_filter_combo.isHidden())
+        self.assertFalse(window.catalog_type_filter_combo.isHidden())
+        self.assertFalse(window.inventory_type_filter_combo.isHidden())
+
+    def test_hidden_category_filter_does_not_generate_active_chips(self) -> None:
+        window = MainWindow(user_id=1)
+        window.catalog_category_filter_combo.set_items([("Básico", "Básico")])
+        window.catalog_category_filter_combo.set_selected_values(["Básico"])
+        window.inventory_category_filter_combo.set_items([("Básico", "Básico")])
+        window.inventory_category_filter_combo.set_selected_values(["Básico"])
+
+        self.assertEqual(window._catalog_active_filter_tokens(), [])
+        self.assertEqual(window._inventory_active_filter_tokens(), [])
+
     def test_remove_catalog_multi_filter_chip_keeps_other_selected_values(self) -> None:
         window = MainWindow(user_id=1)
         window.catalog_page_index = 3

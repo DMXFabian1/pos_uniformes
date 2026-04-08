@@ -7539,7 +7539,11 @@ class MainWindow(QMainWindow):
         search_text = self.catalog_search_input.text().strip()
         search_terms = compile_search_terms(search_text)
         school_scope_filter = str(self.catalog_school_scope_filter_combo.currentData() or "")
-        category_filters = self.catalog_category_filter_combo.selected_values()
+        category_filters = (
+            self.catalog_category_filter_combo.selected_values()
+            if not self.catalog_category_filter_combo.isHidden()
+            else set()
+        )
         brand_filters = self.catalog_brand_filter_combo.selected_values()
         school_filters = self.catalog_school_filter_combo.selected_values()
         type_filters = self.catalog_type_filter_combo.selected_values()
@@ -7684,7 +7688,6 @@ class MainWindow(QMainWindow):
         return build_active_filter_labels(
             search_text=self.catalog_search_input.text(),
             multi_filters=(
-                ("categoria", self.catalog_category_filter_combo.selected_labels()),
                 ("marca", self.catalog_brand_filter_combo.selected_labels()),
                 ("escuela", self.catalog_school_filter_combo.selected_labels()),
                 ("linea", self.catalog_type_filter_combo.selected_labels()),
@@ -7706,7 +7709,6 @@ class MainWindow(QMainWindow):
         return build_active_filter_tokens(
             search_text=self.catalog_search_input.text(),
             multi_filters=(
-                ("categoria", self.catalog_category_filter_combo.selected_labels()),
                 ("marca", self.catalog_brand_filter_combo.selected_labels()),
                 ("escuela", self.catalog_school_filter_combo.selected_labels()),
                 ("linea", self.catalog_type_filter_combo.selected_labels()),
@@ -7742,7 +7744,6 @@ class MainWindow(QMainWindow):
             "incidencias": self.catalog_duplicate_filter_combo,
         }
         multi_filters = {
-            "categoria": self.catalog_category_filter_combo,
             "marca": self.catalog_brand_filter_combo,
             "escuela": self.catalog_school_filter_combo,
             "linea": self.catalog_type_filter_combo,
@@ -7789,7 +7790,6 @@ class MainWindow(QMainWindow):
         return build_active_filter_labels(
             search_text=self.inventory_search_input.text(),
             multi_filters=(
-                ("categoria", self.inventory_category_filter_combo.selected_labels()),
                 ("marca", self.inventory_brand_filter_combo.selected_labels()),
                 ("escuela", self.inventory_school_filter_combo.selected_labels()),
                 ("tipo", self.inventory_type_filter_combo.selected_labels()),
@@ -7811,7 +7811,6 @@ class MainWindow(QMainWindow):
         return build_active_filter_tokens(
             search_text=self.inventory_search_input.text(),
             multi_filters=(
-                ("categoria", self.inventory_category_filter_combo.selected_labels()),
                 ("marca", self.inventory_brand_filter_combo.selected_labels()),
                 ("escuela", self.inventory_school_filter_combo.selected_labels()),
                 ("tipo", self.inventory_type_filter_combo.selected_labels()),
@@ -7850,7 +7849,6 @@ class MainWindow(QMainWindow):
             "incidencias": self.inventory_duplicate_filter_combo,
         }
         multi_filters = {
-            "categoria": self.inventory_category_filter_combo,
             "marca": self.inventory_brand_filter_combo,
             "escuela": self.inventory_school_filter_combo,
             "tipo": self.inventory_type_filter_combo,
@@ -8110,7 +8108,11 @@ class MainWindow(QMainWindow):
         search_text = self.inventory_search_input.text().strip()
         search_terms = compile_search_terms(search_text)
         use_filter = str(self.inventory_use_filter_combo.currentData() or "")
-        category_filters = self.inventory_category_filter_combo.selected_values()
+        category_filters = (
+            self.inventory_category_filter_combo.selected_values()
+            if not self.inventory_category_filter_combo.isHidden()
+            else set()
+        )
         brand_filters = self.inventory_brand_filter_combo.selected_values()
         school_filters = self.inventory_school_filter_combo.selected_values()
         type_filters = self.inventory_type_filter_combo.selected_values()
