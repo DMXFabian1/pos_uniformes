@@ -169,6 +169,8 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         self.assertIn("#a9c1d6", window.styleSheet())
         self.assertIn("QComboBox#satFilterCombo:hover", window.styleSheet())
         self.assertIn("QPushButton#chipButton[active=\"true\"]", window.styleSheet())
+        self.assertIn("background: #f8fafb;", window.styleSheet())
+        self.assertIn("background: #eef4f8;", window.styleSheet())
 
     def test_quote_cart_uses_six_columns_and_cashier_style(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)

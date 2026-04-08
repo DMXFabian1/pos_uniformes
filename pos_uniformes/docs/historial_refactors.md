@@ -2,6 +2,7 @@
 
 ## Checkpoint actual
 
+- `2026-04-08`: la app satelite acerca su paleta base al POS principal: cards, group boxes, estados, summaries, meta cards y cabeceras de tabla pasan a la familia azul/gris neutral, dejando el naranja como acento principal en lugar de color dominante. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.
 - `2026-04-08`: `Catalogo` en la app satelite elimina el footer inferior de estado porque duplicaba informacion ya visible en la paginacion superior y podia empalmarse con la ultima fila del listado. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.
 - `2026-04-08`: los chips removibles de `Catalogo` en la app satelite recuperan el mismo tratamiento visual del POS principal (`chipButton` base, hover y estado activo), corrigiendo el texto lavado/blanco que aparecia al no existir reglas locales para ese componente. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.
 - `2026-04-08`: `Catalogo` en la app satelite gana separacion real entre la tabla y el estado inferior, dejando el footer sin empalmarse con la ultima fila visible cuando el listado queda justo al borde. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.
