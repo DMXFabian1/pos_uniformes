@@ -2066,7 +2066,9 @@ class QuoteSatelliteWindow(QMainWindow):
         button = QPushButton("\n".join(button_lines))
         button.setObjectName("guidedProductButton")
         button.setCheckable(True)
-        compact_card = self.guided_mode == "basics" and bool(self.guided_selected_piece)
+        compact_card = (self.guided_mode == "basics" and bool(self.guided_selected_piece)) or (
+            self.guided_mode == "school" and bool(self.guided_selected_school)
+        )
         button.setProperty("compactCard", compact_card)
         if compact_card:
             button.setMinimumHeight(68)

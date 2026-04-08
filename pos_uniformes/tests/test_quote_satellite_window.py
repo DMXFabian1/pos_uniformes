@@ -156,6 +156,34 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         self.assertEqual(button.maximumWidth(), 252)
         self.assertEqual(button.sizePolicy().horizontalPolicy(), button.sizePolicy().Policy.Fixed)
 
+    def test_school_guided_product_cards_use_same_compact_layout(self) -> None:
+        window = QuoteSatelliteWindow(user_id=1)
+        window.guided_mode = "school"
+        window.guided_selected_school = "Colegio Mexico"
+        window.catalog_snapshot_rows = [
+            {
+                "sku": "SKU000200",
+                "producto_nombre_base": "Falda Escolar Tabla",
+                "tipo_pieza_nombre": "Falda",
+            }
+        ]
+
+        card = SimpleNamespace(
+            key="Falda||Falda Escolar Tabla",
+            sku="SKU000200",
+            title="Falda Escolar Tabla",
+            subtitle="Tallas: 10, 12",
+            price_label="$199.00",
+        )
+
+        button = window._build_guided_product_button(card)
+
+        self.assertTrue(button.property("compactCard"))
+        self.assertEqual(button.minimumHeight(), 68)
+        self.assertEqual(button.minimumWidth(), 252)
+        self.assertEqual(button.maximumWidth(), 252)
+        self.assertEqual(button.sizePolicy().horizontalPolicy(), button.sizePolicy().Policy.Fixed)
+
     def test_guided_piece_buttons_use_compact_symmetric_grid(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
 
