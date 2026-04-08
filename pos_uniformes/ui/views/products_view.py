@@ -198,7 +198,7 @@ def build_products_tab(window: "MainWindow") -> QWidget:
 
     status_header = QHBoxLayout()
     status_header.setSpacing(8)
-    status_header.addWidget(window.catalog_results_label, 1)
+    status_header.addStretch(1)
     status_header.addWidget(window.catalog_pagination_label)
     status_header.addWidget(window.catalog_previous_page_button)
     status_header.addWidget(window.catalog_next_page_button)
@@ -243,5 +243,6 @@ def build_products_tab(window: "MainWindow") -> QWidget:
 
     layout.addWidget(summary_box)
     layout.addWidget(window.catalog_table, 1)
+    layout.addWidget(window.catalog_results_label)
     widget.setLayout(layout)
     return widget
