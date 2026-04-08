@@ -66,7 +66,7 @@ def build_cashier_tab(window: "MainWindow") -> QWidget:
     sale_form.addWidget(window.sale_qty_spin, 0, 3)
     sale_form.addWidget(QLabel("Pago"), 0, 4)
     sale_form.addWidget(window.sale_payment_combo, 0, 5)
-    sale_form.addWidget(QLabel("Desc."), 0, 6)
+    sale_form.addWidget(window.sale_discount_field_label, 0, 6)
     sale_form.addWidget(window.sale_discount_combo, 0, 7)
     sale_form.addWidget(QLabel("Folio"), 1, 0)
     sale_form.addWidget(window.sale_folio_input, 1, 1, 1, 2)

@@ -1180,6 +1180,7 @@ class MainWindow(QMainWindow):
         self.sale_client_combo = QComboBox()
         self.sale_client_display_label = QLabel("Mostrador / sin cliente")
         self.sale_payment_combo = QComboBox()
+        self.sale_discount_field_label = QLabel("Desc.")
         self.sale_discount_combo = QComboBox()
         self.sale_add_button = QPushButton("Agregar al carrito")
         self.sale_button = QPushButton("Confirmar venta")
@@ -7202,10 +7203,12 @@ class MainWindow(QMainWindow):
             return
 
         self.cash_session_requires_cut = self._is_stale_cash_session(active_session)
-        resumen = CajaService.resumir_sesion(session, active_session)
+        if self.current_role == RolUsuario.ADMIN:
+            session_text = f"Rol {self.current_role.value} · Reactivo inicial ${Decimal(active_session.monto_apertura)}"
+        else:
+            session_text = f"Rol {self.current_role.value} · Caja abierta"
         self.cash_session_label.setText(
-            f"Rol {self.current_role.value} · Reactivo inicial ${Decimal(active_session.monto_apertura)}"
-            + (" · Corte pendiente" if self.cash_session_requires_cut else "")
+            session_text + (" · Corte pendiente" if self.cash_session_requires_cut else "")
         )
         self.cash_cut_button.setText("Corte")
 
@@ -7282,6 +7285,8 @@ class MainWindow(QMainWindow):
         self.sale_layaway_button.setEnabled(can_manage_layaways and can_operate_open_cash and bool(self.sale_cart))
         self.sale_client_combo.setEnabled(False)
         self.sale_discount_combo.setEnabled(is_admin)
+        self.sale_discount_field_label.setVisible(is_admin)
+        self.sale_discount_combo.setVisible(is_admin)
         if is_admin:
             self.sale_client_display_label.setToolTip(
                 "El cliente visible en Caja se enlaza al escanear su QR o codigo. Por defecto la venta queda en Mostrador."

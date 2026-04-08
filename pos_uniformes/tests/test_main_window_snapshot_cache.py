@@ -77,6 +77,39 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertIn("Corte pendiente", window.cash_session_label.text())
         self.assertNotIn("Esperado", window.cash_session_label.text())
 
+    def test_cashier_role_hides_opening_amount_from_hero(self) -> None:
+        window = MainWindow(user_id=1)
+        window.current_role = RolUsuario.CAJERO
+        active_session = SimpleNamespace(id=5, monto_apertura="1000.00")
+
+        with patch("pos_uniformes.ui.main_window.CajaService.obtener_sesion_activa", return_value=active_session), patch.object(
+            window, "_is_stale_cash_session", return_value=False
+        ):
+            window._refresh_cash_session(object())
+
+        self.assertEqual(window.cash_session_label.text(), "Rol CAJERO · Caja abierta")
+        self.assertNotIn("Reactivo inicial", window.cash_session_label.text())
+
+    def test_cashier_role_hides_manual_discount_controls(self) -> None:
+        window = MainWindow(user_id=1)
+        window.current_role = RolUsuario.CAJERO
+
+        window._apply_role_navigation()
+        window._refresh_permissions()
+
+        self.assertTrue(window.sale_discount_field_label.isHidden())
+        self.assertTrue(window.sale_discount_combo.isHidden())
+
+    def test_admin_role_keeps_manual_discount_controls_visible(self) -> None:
+        window = MainWindow(user_id=1)
+        window.current_role = RolUsuario.ADMIN
+
+        window._apply_role_navigation()
+        window._refresh_permissions()
+
+        self.assertFalse(window.sale_discount_field_label.isHidden())
+        self.assertFalse(window.sale_discount_combo.isHidden())
+
     def test_quote_cart_table_keeps_cashier_breathing_in_main_window(self) -> None:
         window = MainWindow(user_id=1)
 
