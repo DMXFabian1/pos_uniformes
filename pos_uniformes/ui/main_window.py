@@ -90,6 +90,7 @@ from pos_uniformes.services.apartado_service import ApartadoService
 from pos_uniformes.services.active_filter_service import (
     build_active_filter_labels,
     build_active_filters_summary,
+    build_active_filter_tokens,
 )
 from pos_uniformes.services.bootstrap_service import BootstrapService
 from pos_uniformes.services.analytics_snapshot_service import (
@@ -1232,6 +1233,8 @@ class MainWindow(QMainWindow):
         self.inventory_last_movement_label = QLabel("")
         self.inventory_results_label = QLabel()
         self.inventory_active_filters_label = QLabel()
+        self.inventory_active_filters_wrap = QWidget()
+        self.inventory_active_filters_flow_layout = None
         self.inventory_pagination_label = QLabel()
         self.inventory_search_input = QLineEdit()
         self.inventory_category_filter_combo = MultiSelectFilterButton("Categoria: todas")
@@ -7686,8 +7689,89 @@ class MainWindow(QMainWindow):
             ),
         )
 
+    def _inventory_active_filter_tokens(self):
+        return build_active_filter_tokens(
+            search_text=self.inventory_search_input.text(),
+            multi_filters=(
+                ("categoria", self.inventory_category_filter_combo.selected_labels()),
+                ("marca", self.inventory_brand_filter_combo.selected_labels()),
+                ("escuela", self.inventory_school_filter_combo.selected_labels()),
+                ("tipo", self.inventory_type_filter_combo.selected_labels()),
+                ("pieza", self.inventory_piece_filter_combo.selected_labels()),
+                ("talla", self.inventory_size_filter_combo.selected_labels()),
+                ("color", self.inventory_color_filter_combo.selected_labels()),
+            ),
+            combo_filters=(
+                ("uso", self.inventory_use_filter_combo.currentData(), self.inventory_use_filter_combo.currentText()),
+                ("estado", self.inventory_status_filter_combo.currentData(), self.inventory_status_filter_combo.currentText()),
+                ("stock", self.inventory_stock_filter_combo.currentData(), self.inventory_stock_filter_combo.currentText()),
+                ("qr", self.inventory_qr_filter_combo.currentData(), self.inventory_qr_filter_combo.currentText()),
+                ("origen", self.inventory_origin_filter_combo.currentData(), self.inventory_origin_filter_combo.currentText()),
+                ("incidencias", self.inventory_duplicate_filter_combo.currentData(), self.inventory_duplicate_filter_combo.currentText()),
+            ),
+        )
+
     def _build_inventory_active_filters_summary(self) -> str:
         return build_active_filters_summary(self._inventory_active_filter_labels())
+
+    def _refresh_inventory_active_filter_chips(self) -> None:
+        layout = self.inventory_active_filters_flow_layout
+        if layout is None:
+            return
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget() if item is not None else None
+            if widget is not None:
+                widget.deleteLater()
+        active_tokens = self._inventory_active_filter_tokens()
+        self.inventory_active_filters_wrap.setVisible(bool(active_tokens))
+        for token in active_tokens:
+            button = QPushButton(f"{token.display_text}  ×")
+            button.setObjectName("chipButton")
+            button.clicked.connect(
+                lambda _checked=False, active_token=token: self._handle_remove_inventory_filter_token(active_token)
+            )
+            layout.addWidget(button)
+
+    def _handle_remove_inventory_filter_token(self, token) -> None:
+        combo_filters = {
+            "uso": self.inventory_use_filter_combo,
+            "estado": self.inventory_status_filter_combo,
+            "stock": self.inventory_stock_filter_combo,
+            "qr": self.inventory_qr_filter_combo,
+            "origen": self.inventory_origin_filter_combo,
+            "incidencias": self.inventory_duplicate_filter_combo,
+        }
+        multi_filters = {
+            "categoria": self.inventory_category_filter_combo,
+            "marca": self.inventory_brand_filter_combo,
+            "escuela": self.inventory_school_filter_combo,
+            "tipo": self.inventory_type_filter_combo,
+            "pieza": self.inventory_piece_filter_combo,
+            "talla": self.inventory_size_filter_combo,
+            "color": self.inventory_color_filter_combo,
+        }
+        if token.key == "texto":
+            self.inventory_search_input.blockSignals(True)
+            self.inventory_search_input.clear()
+            self.inventory_search_input.blockSignals(False)
+            self._handle_inventory_filters_changed_reset_page()
+            return
+        combo = combo_filters.get(token.key)
+        if combo is not None:
+            combo.blockSignals(True)
+            combo.setCurrentIndex(0)
+            combo.blockSignals(False)
+            self._handle_inventory_filters_changed_reset_page()
+            return
+        multi_filter = multi_filters.get(token.key)
+        if multi_filter is not None:
+            selected_values = {
+                value
+                for value in multi_filter.selected_values()
+                if _normalize_filter_value(value) != _normalize_filter_value(token.value)
+            }
+            multi_filter.set_selected_values(selected_values)
 
     def _refresh_combos(self, session) -> None:
         categorias = session.scalars(select(Categoria).where(Categoria.activo.is_(True)).order_by(Categoria.nombre)).all()
@@ -7992,6 +8076,7 @@ class MainWindow(QMainWindow):
         )
         self.inventory_results_label.setText(summary_view.results_summary)
         self.inventory_active_filters_label.setText(self._build_inventory_active_filters_summary())
+        self._refresh_inventory_active_filter_chips()
         self.inventory_pagination_label.setText(pagination_view.page_label)
         self.inventory_previous_page_button.setEnabled(pagination_view.previous_enabled)
         self.inventory_next_page_button.setEnabled(pagination_view.next_enabled)

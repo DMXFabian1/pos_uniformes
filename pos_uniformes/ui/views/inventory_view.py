@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from pos_uniformes.ui.helpers.flow_layout import FlowLayout
 
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
@@ -307,6 +308,14 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     filters_row.setColumnStretch(4, 1)
     filters_row.setColumnStretch(5, 1)
     filters_row.setColumnStretch(6, 1)
+    window.inventory_active_filters_wrap.setVisible(False)
+    window.inventory_active_filters_flow_layout = FlowLayout(
+        window.inventory_active_filters_wrap,
+        margin=0,
+        h_spacing=6,
+        v_spacing=6,
+    )
+    window.inventory_active_filters_wrap.setLayout(window.inventory_active_filters_flow_layout)
     counters_row = QHBoxLayout()
     counters_row.setSpacing(6)
     for counter in (
@@ -325,6 +334,7 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     summary_row.addWidget(window.inventory_previous_page_button)
     summary_row.addWidget(window.inventory_next_page_button)
     table_layout.addLayout(filters_row)
+    table_layout.addWidget(window.inventory_active_filters_wrap)
     table_layout.addLayout(summary_row)
     table_layout.addLayout(counters_row)
     inventory_hint_label = QLabel("Doble clic para editar la presentacion seleccionada.")
