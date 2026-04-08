@@ -39,6 +39,41 @@ class CashCutSummaryView:
     expected_amount: Decimal
 
 
+def build_cash_cut_summary_lines(summary_view: CashCutSummaryView) -> list[str]:
+    lines = [
+        f"Apertura: {summary_view.opened_at_label}",
+        f"Reactivo inicial: ${summary_view.opening_amount}",
+    ]
+    has_extra_cash_movements = any(
+        (
+            summary_view.reactivo_count,
+            summary_view.ingresos_count,
+            summary_view.retiros_count,
+            summary_view.cash_sales_count,
+            summary_view.cash_payments_count,
+            summary_view.reactivo_total,
+            summary_view.ingresos_total,
+            summary_view.retiros_total,
+            summary_view.cash_sales_total,
+            summary_view.cash_payments_total,
+        )
+    )
+    if has_extra_cash_movements:
+        lines.extend(
+            [
+                f"Reactivos extra: {summary_view.reactivo_count} | ${summary_view.reactivo_total}",
+                f"Ingresos manuales: {summary_view.ingresos_count} | ${summary_view.ingresos_total}",
+                f"Retiros manuales: {summary_view.retiros_count} | ${summary_view.retiros_total}",
+                f"Ventas con efectivo: {summary_view.cash_sales_count}",
+                f"Efectivo por ventas: ${summary_view.cash_sales_total}",
+                f"Abonos con efectivo: {summary_view.cash_payments_count}",
+                f"Efectivo por abonos: ${summary_view.cash_payments_total}",
+            ]
+        )
+    lines.append(f"Esperado en caja: ${summary_view.expected_amount}")
+    return lines
+
+
 def _create_cash_prompt_dialog(
     parent: QWidget,
     title: str,
@@ -254,20 +289,7 @@ def prompt_cash_cut_data(
         width=520,
     )
     info = QLabel(
-        "\n".join(
-            [
-                f"Apertura: {summary_view.opened_at_label}",
-                f"Reactivo inicial: ${summary_view.opening_amount}",
-                f"Reactivos extra: {summary_view.reactivo_count} | ${summary_view.reactivo_total}",
-                f"Ingresos manuales: {summary_view.ingresos_count} | ${summary_view.ingresos_total}",
-                f"Retiros manuales: {summary_view.retiros_count} | ${summary_view.retiros_total}",
-                f"Ventas con efectivo: {summary_view.cash_sales_count}",
-                f"Efectivo por ventas: ${summary_view.cash_sales_total}",
-                f"Abonos con efectivo: {summary_view.cash_payments_count}",
-                f"Efectivo por abonos: ${summary_view.cash_payments_total}",
-                f"Esperado en caja: ${summary_view.expected_amount}",
-            ]
-        )
+        "\n".join(build_cash_cut_summary_lines(summary_view))
     )
     info.setWordWrap(True)
     info.setObjectName("inventoryMetaCard")
