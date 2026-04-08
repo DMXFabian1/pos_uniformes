@@ -63,6 +63,7 @@ from pos_uniformes.services.sale_selected_client_service import find_active_sale
 from pos_uniformes.services.sale_cart_update_service import update_sale_cart_item_quantity
 from pos_uniformes.ui.dialogs.printable_text_dialog import open_printable_text_dialog
 from pos_uniformes.ui.helpers.date_field_helper import configure_friendly_date_edit
+from pos_uniformes.ui.helpers.flow_layout import FlowLayout
 from pos_uniformes.ui.helpers.printable_document_flow_helper import open_printable_document_flow
 from pos_uniformes.ui.helpers.catalog_pagination_helper import build_catalog_pagination_view
 from pos_uniformes.ui.helpers.quote_cart_view_helper import build_quote_cart_view
@@ -1016,15 +1017,14 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_product_scroll.setWidgetResizable(True)
         self.guided_product_scroll.setFrameShape(QFrame.Shape.NoFrame)
         self.guided_product_scroll.setMinimumHeight(220)
+        self.guided_product_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.guided_product_scroll.setObjectName("guidedScrollArea")
         self.guided_product_scroll.viewport().setObjectName("guidedScrollViewport")
         self.guided_product_container = QWidget()
         self.guided_product_container.setObjectName("guidedGridSurface")
         self.guided_product_container.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.guided_product_rows_layout = QVBoxLayout()
-        self.guided_product_rows_layout.setContentsMargins(0, 0, 0, 0)
-        self.guided_product_rows_layout.setSpacing(8)
-        self.guided_product_container.setLayout(self.guided_product_rows_layout)
+        self.guided_product_flow_layout = FlowLayout(self.guided_product_container, margin=0, h_spacing=4, v_spacing=8)
+        self.guided_product_container.setLayout(self.guided_product_flow_layout)
         self.guided_product_scroll.setWidget(self.guided_product_container)
         products_section_layout.addWidget(self.guided_products_title_label)
         products_section_layout.addWidget(self.guided_products_hint_label)
@@ -1974,38 +1974,14 @@ class QuoteSatelliteWindow(QMainWindow):
                     row_layout.addStretch()
 
     def _rebuild_guided_product_buttons(self, product_cards) -> None:
-        _clear_layout(self.guided_product_rows_layout)
+        _clear_layout(self.guided_product_flow_layout)
         self.guided_product_buttons = {}
-        compact_mode = self.guided_mode == "basics" and bool(self.guided_selected_piece)
-        column_count = self._guided_product_column_count(compact_mode)
-        for index, card in enumerate(product_cards):
-            if index % column_count == 0:
-                row_layout = QHBoxLayout()
-                row_layout.setContentsMargins(0, 0, 0, 0)
-                row_layout.setSpacing(4)
-                self.guided_product_rows_layout.addLayout(row_layout)
+        for card in product_cards:
             button = self._build_guided_product_button(card)
             button.setChecked(self.guided_selected_product_key == card.key)
             button.clicked.connect(lambda checked=False, selected=card.key: self._handle_guided_product_selected(selected))
-            current_row = self.guided_product_rows_layout.itemAt(self.guided_product_rows_layout.count() - 1).layout()
-            assert current_row is not None
-            current_row.addWidget(button, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
+            self.guided_product_flow_layout.addWidget(button)
             self.guided_product_buttons[card.key] = button
-        if self.guided_product_rows_layout.count():
-            for row_index in range(self.guided_product_rows_layout.count()):
-                row_layout = self.guided_product_rows_layout.itemAt(row_index).layout()
-                if row_layout is not None:
-                    row_layout.addStretch()
-
-    def _guided_product_column_count(self, compact_mode: bool) -> int:
-        if not compact_mode:
-            return 3
-        card_width = 252
-        spacing = 4
-        viewport_width = self.guided_product_scroll.viewport().width()
-        available_width = max(viewport_width - 8, card_width)
-        estimated = max(1, (available_width + spacing) // (card_width + spacing))
-        return max(1, min(5, estimated))
 
     def _rebuild_guided_variant_buttons(self, variant_options) -> None:
         _clear_layout(self.guided_variant_row)

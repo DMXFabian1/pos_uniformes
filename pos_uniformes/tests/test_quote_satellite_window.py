@@ -10,6 +10,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication
 
+from pos_uniformes.ui.helpers.flow_layout import FlowLayout
 from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
 
 
@@ -173,14 +174,19 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         self.assertEqual(first_button.maximumWidth(), 190)
         self.assertEqual(window.guided_piece_rows_layout.count(), 2)
 
-    def test_guided_product_column_count_adapts_to_viewport_width(self) -> None:
+    def test_guided_product_cards_use_flow_layout(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
+        window.guided_mode = "basics"
+        window.guided_selected_piece = "Camisa"
+        cards = [
+            SimpleNamespace(key="a", sku="SKU1", title="Camisa Azul", subtitle="5 tallas disponibles", price_label="$139.00"),
+            SimpleNamespace(key="b", sku="SKU2", title="Camisa Blanca", subtitle="11 tallas disponibles", price_label="$139.00"),
+        ]
 
-        window.guided_product_scroll.viewport().resize(1040, 300)
-        self.assertEqual(window._guided_product_column_count(True), 4)
+        window._rebuild_guided_product_buttons(cards)
 
-        window.guided_product_scroll.viewport().resize(1320, 300)
-        self.assertEqual(window._guided_product_column_count(True), 5)
+        self.assertIsInstance(window.guided_product_flow_layout, FlowLayout)
+        self.assertEqual(window.guided_product_flow_layout.count(), 2)
 
 
 if __name__ == "__main__":
