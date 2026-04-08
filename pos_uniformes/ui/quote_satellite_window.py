@@ -504,9 +504,9 @@ class QuoteSatelliteWindow(QMainWindow):
                 padding-left: 14px;
             }
             QComboBox#satFilterCombo:hover {
-                background: #eadccf;
-                color: #231f1b;
-                border: 1px solid #d1a781;
+                background: #e2cfbd;
+                color: #1f1b17;
+                border: 1px solid #c69367;
             }
             QLineEdit:focus, QTextEdit:focus, QDateEdit:focus, QComboBox:focus, QSpinBox:focus {
                 border: 2px solid #c76b39;
