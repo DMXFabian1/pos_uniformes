@@ -288,6 +288,7 @@ from pos_uniformes.ui.dialogs.layaway_payment_dialog import build_layaway_paymen
 from pos_uniformes.ui.dialogs.create_layaway_dialog import build_create_layaway_dialog
 from pos_uniformes.ui.dialogs.inventory_context_menu_dialog import prompt_inventory_context_action
 from pos_uniformes.ui.dialogs.inventory_count_dialog import prompt_inventory_count_data
+from pos_uniformes.ui.dialogs.inventory_label_batch_dialog import build_inventory_label_batch_dialog
 from pos_uniformes.ui.dialogs.inventory_label_dialog import build_inventory_label_dialog
 from pos_uniformes.ui.dialogs.marketing_history_dialog import build_marketing_history_dialog
 from pos_uniformes.ui.dialogs.printable_text_dialog import open_printable_text_dialog
@@ -9670,7 +9671,16 @@ class MainWindow(QMainWindow):
         return True
 
     def _handle_inventory_print_label(self) -> None:
-        variante_id = self.inventory_variant_combo.currentData()
+        selected_variant_ids = self._selected_inventory_variant_ids()
+        if len(selected_variant_ids) > 1:
+            self._handle_inventory_print_label_batch(selected_variant_ids)
+            return
+
+        variante_id = (
+            selected_variant_ids[0]
+            if len(selected_variant_ids) == 1
+            else self.inventory_variant_combo.currentData()
+        )
         if not variante_id:
             QMessageBox.warning(
                 self,
@@ -9721,6 +9731,46 @@ class MainWindow(QMainWindow):
             variant_ids=variant_ids or [label_context.variant_id],
             current_index=current_index,
             load_context=load_context_for_dialog,
+            render_label=render_label,
+            print_label=lambda image_path, copies, sku, parent: self._print_image_path(
+                image_path,
+                title=f"Etiqueta {sku}",
+                copies=copies,
+                parent=parent,
+            ),
+        )
+
+    def _handle_inventory_print_label_batch(self, variant_ids: list[int]) -> None:
+        ordered_variant_ids = [int(variant_id) for variant_id in variant_ids if int(variant_id)]
+        if not ordered_variant_ids:
+            QMessageBox.warning(
+                self,
+                "Sin seleccion",
+                "Selecciona al menos dos presentaciones en Inventario para preparar el lote de etiquetas.",
+            )
+            return
+        try:
+            with get_session() as session:
+                contexts = [
+                    load_inventory_label_context(session, int(variant_id))
+                    for variant_id in ordered_variant_ids
+                ]
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Impresion por lote no disponible", str(exc))
+            return
+
+        def render_label(variant_id: int, mode: str, requested_copies: int):
+            with get_session() as session:
+                return render_inventory_label(
+                    session,
+                    int(variant_id),
+                    mode=mode,
+                    requested_copies=requested_copies,
+                )
+
+        build_inventory_label_batch_dialog(
+            self,
+            contexts=contexts,
             render_label=render_label,
             print_label=lambda image_path, copies, sku, parent: self._print_image_path(
                 image_path,

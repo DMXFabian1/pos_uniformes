@@ -173,7 +173,7 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.qr_preview_info_label.setObjectName("inventoryQrCaption")
     window.qr_status_label.setObjectName("inventoryQrStatus")
     window.inventory_generate_qr_button.setText("Generar QR")
-    window.inventory_print_label_button.setText("Imprimir etiqueta")
+    window.inventory_print_label_button.setText("Imprimir etiqueta(s)")
     header_row = QHBoxLayout()
     header_row.setSpacing(8)
     header_text = QVBoxLayout()
@@ -199,6 +199,9 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     side_layout.addWidget(window.qr_status_label)
     window.inventory_generate_qr_button.clicked.connect(window._handle_generate_selected_qr)
     window.inventory_print_label_button.clicked.connect(window._handle_inventory_print_label)
+    window.inventory_print_label_button.setToolTip(
+        "Con una fila seleccionada abre la impresion individual. Con varias filas abre el lote experimental."
+    )
     window.inventory_generate_all_qr_button.clicked.connect(window._handle_generate_all_qr)
     window.inventory_variant_combo.currentIndexChanged.connect(window._refresh_selected_qr_preview)
     side_box.setLayout(side_layout)

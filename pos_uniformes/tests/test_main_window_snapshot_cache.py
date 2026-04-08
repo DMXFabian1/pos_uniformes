@@ -189,6 +189,15 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         self.assertEqual(selected, hidden_row)
 
+    def test_inventory_print_label_uses_batch_dialog_for_multiple_selected_rows(self) -> None:
+        window = MainWindow(user_id=1)
+        window._selected_inventory_variant_ids = Mock(return_value=[7, 8])
+        window._handle_inventory_print_label_batch = Mock()
+
+        window._handle_inventory_print_label()
+
+        window._handle_inventory_print_label_batch.assert_called_once_with([7, 8])
+
     def test_catalog_search_refresh_uses_single_debounce_timer(self) -> None:
         window = MainWindow(user_id=1)
         callback = Mock()
