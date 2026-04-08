@@ -33,6 +33,7 @@ from PyQt6.QtWidgets import (
     QSplitter,
     QStackedWidget,
     QStyle,
+    QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
@@ -567,6 +568,9 @@ class QuoteSatelliteWindow(QMainWindow):
                 border: 1px solid #d5c9b9;
                 text-align: left;
                 padding: 10px 12px;
+            }
+            QPushButton#guidedProductButton[compactCard="true"] {
+                padding: 8px 10px;
             }
             QPushButton#guidedChoiceButton:checked, QPushButton#guidedProductButton:checked {
                 background: #87492c;
@@ -1952,11 +1956,12 @@ class QuoteSatelliteWindow(QMainWindow):
     def _rebuild_guided_product_buttons(self, product_cards) -> None:
         _clear_layout(self.guided_product_grid)
         self.guided_product_buttons = {}
+        column_count = 4 if self.guided_mode == "basics" and self.guided_selected_piece else 3
         for index, card in enumerate(product_cards):
             button = self._build_guided_product_button(card)
             button.setChecked(self.guided_selected_product_key == card.key)
             button.clicked.connect(lambda checked=False, selected=card.key: self._handle_guided_product_selected(selected))
-            self.guided_product_grid.addWidget(button, index // 3, index % 3)
+            self.guided_product_grid.addWidget(button, index // column_count, index % column_count)
             self.guided_product_buttons[card.key] = button
 
     def _rebuild_guided_variant_buttons(self, variant_options) -> None:
@@ -2007,12 +2012,22 @@ class QuoteSatelliteWindow(QMainWindow):
         button = QPushButton("\n".join(button_lines))
         button.setObjectName("guidedProductButton")
         button.setCheckable(True)
-        button.setMinimumHeight(94)
-        button.setMinimumWidth(250)
+        compact_card = self.guided_mode == "basics" and bool(self.guided_selected_piece)
+        button.setProperty("compactCard", compact_card)
+        if compact_card:
+            button.setMinimumHeight(76)
+            button.setMinimumWidth(190)
+            button.setMaximumWidth(260)
+            button.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
+        else:
+            button.setMinimumHeight(94)
+            button.setMinimumWidth(250)
         row = next((item for item in self.catalog_snapshot_rows if str(item.get("sku")) == card.sku), None)
         if row is not None:
             button.setIcon(QIcon(_catalog_row_icon(row)))
-            button.setIconSize(QSize(34, 34))
+            button.setIconSize(QSize(28, 28) if compact_card else QSize(34, 34))
+        button.style().unpolish(button)
+        button.style().polish(button)
         return button
 
     def _refresh_guided_product_checks(self) -> None:

@@ -126,6 +126,32 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         self.assertIn("Kiosko de Presupuestos", window.windowTitle())
         self.assertTrue(window.version_label.text().startswith("Version "))
 
+    def test_grouped_kiosk_product_cards_use_compact_layout(self) -> None:
+        window = QuoteSatelliteWindow(user_id=1)
+        window.guided_mode = "basics"
+        window.guided_selected_piece = "Bata"
+        window.catalog_snapshot_rows = [
+            {
+                "sku": "SKU000179",
+                "producto_nombre_base": "Bata Infantil Amarillo",
+                "tipo_pieza_nombre": "Bata",
+            }
+        ]
+
+        card = SimpleNamespace(
+            key="Bata||Bata Infantil Amarillo",
+            sku="SKU000179",
+            title="Bata Infantil Amarillo",
+            subtitle="Tallas: Uni",
+            price_label="$65.00",
+        )
+
+        button = window._build_guided_product_button(card)
+
+        self.assertTrue(button.property("compactCard"))
+        self.assertEqual(button.minimumHeight(), 76)
+        self.assertEqual(button.maximumWidth(), 260)
+
 
 if __name__ == "__main__":
     unittest.main()
