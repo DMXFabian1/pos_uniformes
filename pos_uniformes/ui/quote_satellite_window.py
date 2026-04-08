@@ -49,6 +49,7 @@ if __package__ in {None, ""}:
 
 from pos_uniformes.database.connection import get_session
 from pos_uniformes.database.models import Cliente, EstadoPresupuesto, RolUsuario, Usuario
+from pos_uniformes.services.active_filter_service import build_active_filter_tokens
 from pos_uniformes.services.catalog_snapshot_service import load_catalog_snapshot_rows
 from pos_uniformes.services.client_service import ClientService
 from pos_uniformes.services.presupuesto_service import PresupuestoService
@@ -64,6 +65,7 @@ from pos_uniformes.services.sale_cart_update_service import update_sale_cart_ite
 from pos_uniformes.ui.dialogs.printable_text_dialog import open_printable_text_dialog
 from pos_uniformes.ui.helpers.date_field_helper import configure_friendly_date_edit
 from pos_uniformes.ui.helpers.flow_layout import FlowLayout
+from pos_uniformes.ui.helpers.active_filter_chip_helper import rebuild_active_filter_chips
 from pos_uniformes.ui.helpers.printable_document_flow_helper import open_printable_document_flow
 from pos_uniformes.ui.helpers.catalog_pagination_helper import build_catalog_pagination_view
 from pos_uniformes.ui.helpers.quote_cart_view_helper import build_quote_cart_view
@@ -173,6 +175,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self.catalog_refresh_button = QPushButton("Refrescar")
         self.catalog_add_button = QPushButton("Agregar al presupuesto")
         self.catalog_status_label = QLabel("Sin catalogo cargado.")
+        self.catalog_active_filters_wrap = QWidget()
+        self.catalog_active_filters_flow_layout = None
         self.catalog_pagination_label = QLabel("0 de 0 | p. 1/1")
         self.catalog_previous_page_button = QPushButton("Anterior")
         self.catalog_next_page_button = QPushButton("Siguiente")
@@ -786,6 +790,14 @@ class QuoteSatelliteWindow(QMainWindow):
         self.catalog_include_general_combo.addItem("Solo generales", "general_only")
         self.catalog_include_general_combo.setCurrentIndex(1)
         self.catalog_school_combo.addItem("Todas las escuelas", "")
+        self.catalog_active_filters_wrap.setVisible(False)
+        self.catalog_active_filters_flow_layout = FlowLayout(
+            self.catalog_active_filters_wrap,
+            margin=0,
+            h_spacing=6,
+            v_spacing=6,
+        )
+        self.catalog_active_filters_wrap.setLayout(self.catalog_active_filters_flow_layout)
 
         filters = QHBoxLayout()
         filters.setSpacing(8)
@@ -817,6 +829,7 @@ class QuoteSatelliteWindow(QMainWindow):
 
         browser_layout.addLayout(filters)
         browser_layout.addLayout(search_row)
+        browser_layout.addWidget(self.catalog_active_filters_wrap)
         pager_row = QHBoxLayout()
         pager_row.setSpacing(8)
         pager_row.addWidget(self.catalog_pagination_label)
@@ -1708,6 +1721,7 @@ class QuoteSatelliteWindow(QMainWindow):
             populate_rows=lambda: self._populate_catalog_browser_rows(tuple(pagination_view.page_rows)),
         )
         self.catalog_status_label.setText(summary.status_label)
+        self._refresh_catalog_active_filter_chips()
         self.catalog_pagination_label.setText(
             (
                 f"Mostrando {pagination_view.start_row_number}-{pagination_view.end_row_number} de "
@@ -1724,6 +1738,47 @@ class QuoteSatelliteWindow(QMainWindow):
         elif self.catalog_table.rowCount() == 0:
             self._apply_catalog_detail(None)
         self._apply_action_state()
+
+    def _catalog_active_filter_tokens(self):
+        route_value = self.catalog_include_general_combo.currentData()
+        return build_active_filter_tokens(
+            search_text=self.catalog_search_input.text(),
+            multi_filters=(),
+            combo_filters=(
+                ("nivel", self.catalog_level_combo.currentData(), self.catalog_level_combo.currentText()),
+                ("escuela", self.catalog_school_combo.currentData(), self.catalog_school_combo.currentText()),
+                (
+                    "ruta",
+                    "" if route_value == "include_general" else route_value,
+                    self.catalog_include_general_combo.currentText(),
+                ),
+            ),
+        )
+
+    def _refresh_catalog_active_filter_chips(self) -> None:
+        rebuild_active_filter_chips(
+            container=self.catalog_active_filters_wrap,
+            layout=self.catalog_active_filters_flow_layout,
+            tokens=self._catalog_active_filter_tokens(),
+            on_remove=self._handle_remove_catalog_filter_token,
+        )
+
+    def _handle_remove_catalog_filter_token(self, token) -> None:
+        if token.key == "texto":
+            self.catalog_search_input.blockSignals(True)
+            self.catalog_search_input.clear()
+            self.catalog_search_input.blockSignals(False)
+            self._handle_catalog_browser_filters_changed_reset_page()
+            return
+        combo_filters = {
+            "nivel": self.catalog_level_combo,
+            "escuela": self.catalog_school_combo,
+            "ruta": self.catalog_include_general_combo,
+        }
+        combo = combo_filters.get(token.key)
+        if combo is None:
+            return
+        combo.setCurrentIndex(0)
 
     def _populate_catalog_browser_rows(self, rows: tuple[QuoteCatalogBrowserRow, ...]) -> None:
         for row_index, row_view in enumerate(rows):

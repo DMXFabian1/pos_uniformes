@@ -10,6 +10,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication
 
+from pos_uniformes.services.active_filter_service import ActiveFilterToken
 from pos_uniformes.ui.helpers.flow_layout import FlowLayout
 from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
 
@@ -83,6 +84,41 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         window = QuoteSatelliteWindow(user_id=1)
 
         self.assertFalse(window.catalog_table.horizontalHeader().isVisible())
+
+    def test_catalog_active_filter_chips_show_text_and_route(self) -> None:
+        window = QuoteSatelliteWindow(user_id=1)
+        window.catalog_search_input.blockSignals(True)
+        window.catalog_search_input.setText("pants")
+        window.catalog_search_input.blockSignals(False)
+
+        window._refresh_catalog_active_filter_chips()
+
+        layout = window.catalog_active_filters_flow_layout
+        texts = [layout.itemAt(index).widget().text() for index in range(layout.count())]
+        self.assertFalse(window.catalog_active_filters_wrap.isHidden())
+        self.assertEqual(
+            texts,
+            ['Texto: "pants"  ×', "Ruta: Solo escuela  ×"],
+        )
+
+    def test_remove_catalog_route_filter_token_resets_to_include_general(self) -> None:
+        window = QuoteSatelliteWindow(user_id=1)
+
+        window._handle_remove_catalog_filter_token(
+            ActiveFilterToken(
+                key="ruta",
+                display_text="Ruta: Solo escuela",
+                value="Solo escuela",
+            )
+        )
+
+        self.assertEqual(window.catalog_include_general_combo.currentData(), "include_general")
+        window._refresh_catalog_active_filter_chips()
+        texts = [
+            window.catalog_active_filters_flow_layout.itemAt(index).widget().text()
+            for index in range(window.catalog_active_filters_flow_layout.count())
+        ]
+        self.assertNotIn("Ruta: Escuela + extras generales  ×", texts)
 
     def test_add_from_catalog_keeps_current_page(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
