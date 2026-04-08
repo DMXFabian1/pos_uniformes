@@ -1021,11 +1021,10 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_product_container = QWidget()
         self.guided_product_container.setObjectName("guidedGridSurface")
         self.guided_product_container.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.guided_product_grid = QGridLayout()
-        self.guided_product_grid.setContentsMargins(0, 0, 0, 0)
-        self.guided_product_grid.setHorizontalSpacing(12)
-        self.guided_product_grid.setVerticalSpacing(12)
-        self.guided_product_container.setLayout(self.guided_product_grid)
+        self.guided_product_rows_layout = QVBoxLayout()
+        self.guided_product_rows_layout.setContentsMargins(0, 0, 0, 0)
+        self.guided_product_rows_layout.setSpacing(12)
+        self.guided_product_container.setLayout(self.guided_product_rows_layout)
         self.guided_product_scroll.setWidget(self.guided_product_container)
         products_section_layout.addWidget(self.guided_products_title_label)
         products_section_layout.addWidget(self.guided_products_hint_label)
@@ -1975,24 +1974,28 @@ class QuoteSatelliteWindow(QMainWindow):
                     row_layout.addStretch()
 
     def _rebuild_guided_product_buttons(self, product_cards) -> None:
-        _clear_layout(self.guided_product_grid)
+        _clear_layout(self.guided_product_rows_layout)
         self.guided_product_buttons = {}
         compact_mode = self.guided_mode == "basics" and bool(self.guided_selected_piece)
         column_count = 4 if compact_mode else 3
         for index, card in enumerate(product_cards):
+            if index % column_count == 0:
+                row_layout = QHBoxLayout()
+                row_layout.setContentsMargins(0, 0, 0, 0)
+                row_layout.setSpacing(12)
+                self.guided_product_rows_layout.addLayout(row_layout)
             button = self._build_guided_product_button(card)
             button.setChecked(self.guided_selected_product_key == card.key)
             button.clicked.connect(lambda checked=False, selected=card.key: self._handle_guided_product_selected(selected))
-            if compact_mode:
-                self.guided_product_grid.addWidget(
-                    button,
-                    index // column_count,
-                    index % column_count,
-                    alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
-                )
-            else:
-                self.guided_product_grid.addWidget(button, index // column_count, index % column_count)
+            current_row = self.guided_product_rows_layout.itemAt(self.guided_product_rows_layout.count() - 1).layout()
+            assert current_row is not None
+            current_row.addWidget(button, 0, Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop)
             self.guided_product_buttons[card.key] = button
+        if self.guided_product_rows_layout.count():
+            for row_index in range(self.guided_product_rows_layout.count()):
+                row_layout = self.guided_product_rows_layout.itemAt(row_index).layout()
+                if row_layout is not None:
+                    row_layout.addStretch()
 
     def _rebuild_guided_variant_buttons(self, variant_options) -> None:
         _clear_layout(self.guided_variant_row)
