@@ -30,6 +30,7 @@ class GuidedCatalogView:
     level_options: tuple[GuidedCatalogOption, ...]
     school_options: tuple[GuidedCatalogOption, ...]
     gender_options: tuple[GuidedCatalogOption, ...]
+    bucket_options: tuple[GuidedCatalogOption, ...]
     product_cards: tuple[GuidedCatalogProductCard, ...]
     status_label: str
     path_label: str
@@ -43,12 +44,14 @@ def build_guided_catalog_view(
     level_filter: str,
     school_filter: str,
     gender_filter: str,
+    bucket_filter: str = "TODOS",
 ) -> GuidedCatalogView:
     active_rows = [row for row in snapshot_rows if _is_active_row(row)]
     normalized_mode = "basics" if mode_key == "basics" else "school"
     normalized_level = level_filter.strip()
     normalized_school = school_filter.strip()
     normalized_gender = _normalize_segment_filter(gender_filter)
+    normalized_bucket = _normalize_bucket_filter(bucket_filter)
 
     mode_rows = [
         row for row in active_rows if _matches_mode(row=row, mode_key=normalized_mode)
@@ -65,6 +68,8 @@ def build_guided_catalog_view(
         school_filter=normalized_school,
     )
     gender_options = _build_segment_options(gender_source_rows)
+    bucket_source_rows = [row for row in gender_source_rows if _matches_segment_filter(normalized_gender, row)]
+    bucket_options = _build_bucket_options(bucket_source_rows) if normalized_mode == "basics" else tuple()
 
     product_rows, empty_label = _filter_product_rows(
         rows=mode_rows,
@@ -72,6 +77,7 @@ def build_guided_catalog_view(
         level_filter=normalized_level,
         school_filter=normalized_school,
         gender_filter=normalized_gender,
+        bucket_filter=normalized_bucket,
     )
 
     product_cards = tuple(_to_product_card(row) for row in product_rows)
@@ -81,17 +87,20 @@ def build_guided_catalog_view(
         level_filter=normalized_level,
         school_filter=normalized_school,
         gender_filter=normalized_gender,
+        bucket_filter=normalized_bucket,
     )
     path_label = _build_path_label(
         mode_key=normalized_mode,
         level_filter=normalized_level,
         school_filter=normalized_school,
         gender_filter=normalized_gender,
+        bucket_filter=normalized_bucket,
     )
     return GuidedCatalogView(
         level_options=level_options,
         school_options=school_options,
         gender_options=gender_options,
+        bucket_options=bucket_options,
         product_cards=product_cards,
         status_label=status_label,
         path_label=path_label,
@@ -181,6 +190,7 @@ def _filter_product_rows(
     level_filter: str,
     school_filter: str,
     gender_filter: str,
+    bucket_filter: str,
 ) -> tuple[list[dict[str, object]], str]:
     if mode_key == "school" and not level_filter:
         return [], "Selecciona un nivel para ver las escuelas disponibles."
@@ -194,11 +204,13 @@ def _filter_product_rows(
         school_filter=school_filter,
     )
     filtered_rows = [row for row in filtered_rows if _matches_segment_filter(gender_filter, row)]
+    filtered_rows = [row for row in filtered_rows if _matches_bucket_filter(bucket_filter, row)]
     filtered_rows.sort(key=lambda row: _product_sort_key(row, prefer_deportivo=gender_filter == "DEPORTIVO"))
     if filtered_rows:
         return filtered_rows, ""
     if mode_key == "basics":
-        return [], "No hay basicos disponibles para ese genero."
+        bucket_label = _bucket_label(bucket_filter)
+        return [], f"No hay {bucket_label.lower()} disponibles para ese filtro."
     return [], "No hay productos disponibles para esa combinacion."
 
 
@@ -212,6 +224,19 @@ def _build_segment_options(rows: list[dict[str, object]]) -> tuple[GuidedCatalog
     built_options: list[GuidedCatalogOption] = []
     for key, label in options:
         count = sum(1 for row in rows if _matches_segment_filter(key, row))
+        built_options.append(GuidedCatalogOption(key=key, label=label, count=count, enabled=count > 0))
+    return tuple(built_options)
+
+
+def _build_bucket_options(rows: list[dict[str, object]]) -> tuple[GuidedCatalogOption, ...]:
+    options = (
+        ("BASICO", "Basicos"),
+        ("EXTRA", "Extras"),
+        ("TODOS", "Todos"),
+    )
+    built_options: list[GuidedCatalogOption] = []
+    for key, label in options:
+        count = sum(1 for row in rows if _matches_bucket_filter(key, row))
         built_options.append(GuidedCatalogOption(key=key, label=label, count=count, enabled=count > 0))
     return tuple(built_options)
 
@@ -251,6 +276,7 @@ def _build_status_label(
     level_filter: str,
     school_filter: str,
     gender_filter: str,
+    bucket_filter: str,
 ) -> str:
     parts = [f"{visible_count} producto(s) sugeridos"]
     parts.append("Modo: Basicos" if mode_key == "basics" else "Modo: Uniformes")
@@ -260,6 +286,8 @@ def _build_status_label(
         parts.append(f"Escuela: {school_filter}")
     if gender_filter != "TODOS":
         parts.append(f"Linea: {_segment_label(gender_filter)}")
+    if mode_key == "basics" and bucket_filter != "TODOS":
+        parts.append(f"Grupo: {_bucket_label(bucket_filter)}")
     return " | ".join(parts)
 
 
@@ -269,12 +297,15 @@ def _build_path_label(
     level_filter: str,
     school_filter: str,
     gender_filter: str,
+    bucket_filter: str,
 ) -> str:
     if mode_key == "basics":
         path_parts = ["Basicos"]
     else:
         path_parts = ["Uniformes", level_filter or "sin nivel", school_filter or "sin escuela"]
     path_parts.append(_segment_label(gender_filter))
+    if mode_key == "basics" and bucket_filter != "TODOS":
+        path_parts.append(_bucket_label(bucket_filter))
     return " > ".join(path_parts)
 
 
@@ -298,6 +329,29 @@ def _normalize_segment_filter(value: str) -> str:
     if compact in {"oficialnino", "nino", "masculino"}:
         return "OFICIAL_NINO"
     return "TODOS"
+
+
+def _normalize_bucket_filter(value: str) -> str:
+    normalized = _normalize_text(value)
+    if normalized in {"basico", "basicos"}:
+        return "BASICO"
+    if normalized in {"extra", "extras"}:
+        return "EXTRA"
+    return "TODOS"
+
+
+def _bucket_label(bucket_key: str) -> str:
+    return {
+        "BASICO": "Basicos",
+        "EXTRA": "Extras",
+        "TODOS": "Todos",
+    }.get(bucket_key, "Todos")
+
+
+def _matches_bucket_filter(bucket_key: str, row: dict[str, object]) -> bool:
+    if bucket_key == "TODOS":
+        return True
+    return _classify_basics_bucket(row) == bucket_key
 
 
 def _matches_segment_filter(filter_key: str, row: dict[str, object]) -> bool:
@@ -346,6 +400,45 @@ def _classify_product_segment(row: dict[str, object]) -> str:
     if gender_key == "NINO":
         return "OFICIAL_NINO"
     return "OFICIAL_UNISEX"
+
+
+def _classify_basics_bucket(row: dict[str, object]) -> str:
+    piece_name = _normalize_text(row.get("tipo_pieza_nombre"))
+    garment_name = _normalize_text(row.get("tipo_prenda_nombre"))
+    searchable = " ".join(
+        [
+            piece_name,
+            garment_name,
+            _normalize_text(row.get("producto_nombre_base")),
+            _normalize_text(row.get("producto_nombre")),
+            _normalize_text(row.get("producto_descripcion")),
+        ]
+    )
+    if _contains_any(
+        searchable,
+        (
+            "pantalon",
+            "falda",
+            "pants 2pz",
+            "pants2pz",
+            "pants suelto",
+            "pantssuelto",
+            "chamarra",
+            "sueter",
+            "chaleco",
+            "camisa",
+            "playera",
+            "jumper",
+            "short",
+        ),
+    ):
+        return "BASICO"
+    if garment_name == "accesorio" or _contains_any(
+        searchable,
+        ("calceta", "malla", "bata", "boina", "guante", "corbata", "corbatin", "mono", "moño"),
+    ):
+        return "EXTRA"
+    return "BASICO"
 
 
 def _segment_row_label(segment_key: str, gender_key: str) -> str:

@@ -184,6 +184,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_selected_level = ""
         self.guided_selected_school = ""
         self.guided_selected_gender = "TODOS"
+        self.guided_selected_bucket = "TODOS"
         self.guided_selected_sku = ""
         self.guided_status_label = QLabel("Empieza eligiendo una ruta.")
         self.guided_path_label = QLabel("Uniformes > sin nivel > sin escuela > Todos")
@@ -198,6 +199,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_level_buttons: dict[str, QPushButton] = {}
         self.guided_school_buttons: dict[str, QPushButton] = {}
         self.guided_gender_buttons: dict[str, QPushButton] = {}
+        self.guided_bucket_buttons: dict[str, QPushButton] = {}
         self.guided_product_buttons: dict[str, QPushButton] = {}
 
         self.kiosk_scan_input = QLineEdit()
@@ -942,28 +944,45 @@ class QuoteSatelliteWindow(QMainWindow):
         gender_section_layout = QVBoxLayout()
         gender_section_layout.setContentsMargins(0, 0, 0, 0)
         gender_section_layout.setSpacing(8)
-        gender_title = QLabel("4. Elige tipo de uniforme")
-        gender_title.setObjectName("guidedStepTitle")
-        gender_hint = QLabel("Elige la linea mas cercana a lo que buscan.")
-        gender_hint.setObjectName("guidedStepHint")
-        gender_hint.setWordWrap(True)
+        self.guided_gender_title_label = QLabel("4. Elige tipo de uniforme")
+        self.guided_gender_title_label.setObjectName("guidedStepTitle")
+        self.guided_gender_hint_label = QLabel("Elige la linea mas cercana a lo que buscan.")
+        self.guided_gender_hint_label.setObjectName("guidedStepHint")
+        self.guided_gender_hint_label.setWordWrap(True)
         self.guided_gender_row = QHBoxLayout()
         self.guided_gender_row.setSpacing(8)
-        gender_section_layout.addWidget(gender_title)
-        gender_section_layout.addWidget(gender_hint)
+        gender_section_layout.addWidget(self.guided_gender_title_label)
+        gender_section_layout.addWidget(self.guided_gender_hint_label)
         gender_section_layout.addLayout(self.guided_gender_row)
         self.guided_gender_section.setLayout(gender_section_layout)
         steps_layout.addWidget(self.guided_gender_section)
+
+        self.guided_bucket_section = QWidget()
+        bucket_section_layout = QVBoxLayout()
+        bucket_section_layout.setContentsMargins(0, 0, 0, 0)
+        bucket_section_layout.setSpacing(8)
+        self.guided_bucket_title_label = QLabel("5. Elige grupo")
+        self.guided_bucket_title_label.setObjectName("guidedStepTitle")
+        self.guided_bucket_hint_label = QLabel("Separa basicos y extras para reducir la lista.")
+        self.guided_bucket_hint_label.setObjectName("guidedStepHint")
+        self.guided_bucket_hint_label.setWordWrap(True)
+        self.guided_bucket_row = QHBoxLayout()
+        self.guided_bucket_row.setSpacing(8)
+        bucket_section_layout.addWidget(self.guided_bucket_title_label)
+        bucket_section_layout.addWidget(self.guided_bucket_hint_label)
+        bucket_section_layout.addLayout(self.guided_bucket_row)
+        self.guided_bucket_section.setLayout(bucket_section_layout)
+        steps_layout.addWidget(self.guided_bucket_section)
 
         self.guided_products_section = QWidget()
         products_section_layout = QVBoxLayout()
         products_section_layout.setContentsMargins(0, 0, 0, 0)
         products_section_layout.setSpacing(8)
-        products_title = QLabel("5. Productos sugeridos")
-        products_title.setObjectName("guidedStepTitle")
-        products_hint = QLabel("Toca una tarjeta para agregarla.")
-        products_hint.setObjectName("guidedStepHint")
-        products_hint.setWordWrap(True)
+        self.guided_products_title_label = QLabel("5. Productos sugeridos")
+        self.guided_products_title_label.setObjectName("guidedStepTitle")
+        self.guided_products_hint_label = QLabel("Toca una tarjeta para agregarla.")
+        self.guided_products_hint_label.setObjectName("guidedStepHint")
+        self.guided_products_hint_label.setWordWrap(True)
         self.guided_empty_label.setObjectName("guidedPath")
         self.guided_product_scroll = QScrollArea()
         self.guided_product_scroll.setWidgetResizable(True)
@@ -980,8 +999,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_product_grid.setVerticalSpacing(12)
         self.guided_product_container.setLayout(self.guided_product_grid)
         self.guided_product_scroll.setWidget(self.guided_product_container)
-        products_section_layout.addWidget(products_title)
-        products_section_layout.addWidget(products_hint)
+        products_section_layout.addWidget(self.guided_products_title_label)
+        products_section_layout.addWidget(self.guided_products_hint_label)
         products_section_layout.addWidget(self.guided_empty_label)
         products_section_layout.addWidget(self.guided_product_scroll, 1)
         self.guided_products_section.setLayout(products_section_layout)
@@ -1692,6 +1711,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_mode = "basics" if mode_key == "basics" else "school"
         self.guided_selected_level = ""
         self.guided_selected_school = ""
+        self.guided_selected_bucket = "BASICO" if self.guided_mode == "basics" else "TODOS"
         self.guided_selected_sku = ""
         self._refresh_guided_browser()
 
@@ -1711,6 +1731,11 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_selected_sku = ""
         self._refresh_guided_browser()
 
+    def _handle_guided_bucket_selected(self, bucket_key: str) -> None:
+        self.guided_selected_bucket = bucket_key
+        self.guided_selected_sku = ""
+        self._refresh_guided_browser()
+
     def _handle_guided_product_selected(self, sku: str) -> None:
         self.guided_selected_sku = sku
         row = next((item for item in self.catalog_snapshot_rows if str(item.get("sku")) == sku), None)
@@ -1725,6 +1750,7 @@ class QuoteSatelliteWindow(QMainWindow):
             level_filter=self.guided_selected_level,
             school_filter=self.guided_selected_school,
             gender_filter=self.guided_selected_gender,
+            bucket_filter=self.guided_selected_bucket,
         )
         available_levels = {option.key for option in view.level_options}
         if self.guided_mode == "school" and self.guided_selected_level and self.guided_selected_level not in available_levels:
@@ -1739,12 +1765,19 @@ class QuoteSatelliteWindow(QMainWindow):
             self.guided_selected_sku = ""
             self._refresh_guided_browser()
             return
+        available_buckets = {option.key for option in view.bucket_options}
+        if self.guided_mode == "basics" and self.guided_selected_bucket and self.guided_selected_bucket not in available_buckets:
+            self.guided_selected_bucket = "BASICO" if "BASICO" in available_buckets else "TODOS"
+            self.guided_selected_sku = ""
+            self._refresh_guided_browser()
+            return
         self.guided_status_label.setText(view.status_label)
         self.guided_path_label.setText(view.path_label)
         self.guided_empty_label.setText(view.empty_label or "Toca un producto para ver detalle.")
         show_level = self.guided_mode == "school"
         show_school = self.guided_mode == "school" and bool(self.guided_selected_level)
         show_gender = self.guided_mode == "basics" or bool(self.guided_selected_school)
+        show_bucket = self.guided_mode == "basics" and bool(view.bucket_options)
         show_products = self.guided_mode == "basics" or bool(self.guided_selected_school)
         self.guided_level_section.setVisible(show_level)
         self.guided_school_section.setVisible(show_school)
@@ -1753,9 +1786,17 @@ class QuoteSatelliteWindow(QMainWindow):
         self._rebuild_guided_level_buttons(view.level_options)
         self._rebuild_guided_school_buttons(view.school_options)
         self._rebuild_guided_gender_buttons(view.gender_options)
+        self._rebuild_guided_bucket_buttons(view.bucket_options)
         self._rebuild_guided_product_buttons(view.product_cards)
         self.guided_gender_section.setVisible(show_gender)
+        self.guided_bucket_section.setVisible(show_bucket)
         self.guided_products_section.setVisible(show_products)
+        self.guided_products_title_label.setText("6. Productos sugeridos" if show_bucket else "5. Productos sugeridos")
+        self.guided_products_hint_label.setText(
+            "Elige Basicos, Extras o Todos; luego toca una tarjeta para agregarla."
+            if show_bucket
+            else "Toca una tarjeta para agregarla."
+        )
 
         visible_skus = {card.sku for card in view.product_cards}
         if self.guided_selected_sku not in visible_skus:
@@ -1813,6 +1854,18 @@ class QuoteSatelliteWindow(QMainWindow):
             self.guided_gender_row.addWidget(button)
             self.guided_gender_buttons[option.key] = button
         self.guided_gender_row.addStretch()
+
+    def _rebuild_guided_bucket_buttons(self, options) -> None:
+        _clear_layout(self.guided_bucket_row)
+        self.guided_bucket_buttons = {}
+        for option in options:
+            button = self._build_guided_choice_button(option.label)
+            button.setEnabled(option.enabled)
+            button.setChecked(self.guided_selected_bucket == option.key)
+            button.clicked.connect(lambda checked=False, selected=option.key: self._handle_guided_bucket_selected(selected))
+            self.guided_bucket_row.addWidget(button)
+            self.guided_bucket_buttons[option.key] = button
+        self.guided_bucket_row.addStretch()
 
     def _rebuild_guided_product_buttons(self, product_cards) -> None:
         _clear_layout(self.guided_product_grid)

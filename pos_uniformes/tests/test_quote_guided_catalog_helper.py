@@ -145,6 +145,35 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
         self.assertEqual([card.sku for card in view.product_cards], ["SKU-1"])
         self.assertEqual(view.path_label, "Basicos > Todos")
 
+    def test_basics_mode_can_filter_basicos_vs_extras(self) -> None:
+        snapshot_rows = [
+            _row("SKU-1", "Sin nivel", "General", "Unisex", "Básico", producto="Pantalón Escolar", pieza="Pantalón"),
+            _row("SKU-2", "Sin nivel", "General", "Unisex", "Accesorio", producto="Calceta Escolar", pieza="Calceta"),
+            _row("SKU-3", "Sin nivel", "General", "Unisex", "Accesorio", producto="Playera Polo Blanca", pieza="Playera"),
+        ]
+
+        basics_view = build_guided_catalog_view(
+            snapshot_rows=snapshot_rows,
+            mode_key="basics",
+            level_filter="",
+            school_filter="",
+            gender_filter="Todos",
+            bucket_filter="Basicos",
+        )
+        extras_view = build_guided_catalog_view(
+            snapshot_rows=snapshot_rows,
+            mode_key="basics",
+            level_filter="",
+            school_filter="",
+            gender_filter="Todos",
+            bucket_filter="Extras",
+        )
+
+        self.assertEqual([card.sku for card in basics_view.product_cards], ["SKU-1", "SKU-3"])
+        self.assertEqual([card.sku for card in extras_view.product_cards], ["SKU-2"])
+        self.assertEqual([option.label for option in basics_view.bucket_options], ["Basicos", "Extras", "Todos"])
+        self.assertEqual(basics_view.path_label, "Basicos > Todos > Basicos")
+
     def test_product_cards_only_keep_name_talla_color_and_price(self) -> None:
         view = build_guided_catalog_view(
             snapshot_rows=[
