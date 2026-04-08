@@ -171,10 +171,10 @@ def build_catalog_product_dialog(
     escudos_disponibles = merge_choice_lists(legacy_choices.get("ESCUDOS", []))
     ubicaciones_disponibles = merge_choice_lists(legacy_choices.get("UBICACIONES", []))
     regular_category_suggestions = merge_choice_lists(list(REGULAR_CATEGORY_SUGGESTIONS))
-    regular_garment_suggestions = merge_choice_lists(tipos_prenda, list(REGULAR_GARMENT_SUGGESTIONS))
-    regular_piece_suggestions = merge_choice_lists(tipos_pieza, list(REGULAR_PIECE_SUGGESTIONS))
-    regular_attribute_suggestions = merge_choice_lists(atributos, list(REGULAR_ATTRIBUTE_SUGGESTIONS))
-    regular_location_suggestions = merge_choice_lists(ubicaciones_disponibles, list(REGULAR_LOCATION_SUGGESTIONS))
+    regular_garment_suggestions = merge_choice_lists(list(REGULAR_GARMENT_SUGGESTIONS))
+    regular_piece_suggestions = merge_choice_lists(list(REGULAR_PIECE_SUGGESTIONS))
+    regular_attribute_suggestions = merge_choice_lists(list(REGULAR_ATTRIBUTE_SUGGESTIONS))
+    regular_location_suggestions = merge_choice_lists(list(REGULAR_LOCATION_SUGGESTIONS))
 
     dialog, layout = window._create_modal_dialog(
         "Producto",
@@ -524,6 +524,13 @@ def build_catalog_product_dialog(
     def refresh_mode_specific_combo_options(*, clear_uniform_only_fields: bool) -> None:
         mode_view = current_product_mode_view()
 
+        def _visible_choice_names(combo: QComboBox) -> set[str]:
+            return {
+                normalize_lookup_text(combo.itemText(index))
+                for index in range(combo.count())
+                if normalize_lookup_text(combo.itemText(index))
+            }
+
         current_category_data = categoria_combo.currentData()
         current_category_text = categoria_combo.currentText().strip()
         categoria_combo.blockSignals(True)
@@ -575,7 +582,7 @@ def build_catalog_product_dialog(
         tipo_prenda_combo.addItems(visible_garments)
         if current_garment_text:
             normalized_garment = normalize_lookup_text(current_garment_text)
-            if not clear_uniform_only_fields or normalized_garment not in UNIFORM_CATEGORIES:
+            if not clear_uniform_only_fields or normalized_garment in _visible_choice_names(tipo_prenda_combo):
                 set_editable_combo_text(tipo_prenda_combo, current_garment_text)
         tipo_prenda_combo.blockSignals(False)
 
@@ -585,7 +592,9 @@ def build_catalog_product_dialog(
         tipo_pieza_combo.clear()
         tipo_pieza_combo.addItem("")
         tipo_pieza_combo.addItems(visible_pieces)
-        if current_piece_text:
+        if current_piece_text and (
+            not clear_uniform_only_fields or normalize_lookup_text(current_piece_text) in _visible_choice_names(tipo_pieza_combo)
+        ):
             set_editable_combo_text(tipo_pieza_combo, current_piece_text)
         tipo_pieza_combo.blockSignals(False)
 
@@ -595,7 +604,9 @@ def build_catalog_product_dialog(
         atributo_combo.clear()
         atributo_combo.addItem("")
         atributo_combo.addItems(visible_attributes)
-        if current_attribute_text:
+        if current_attribute_text and (
+            not clear_uniform_only_fields or normalize_lookup_text(current_attribute_text) in _visible_choice_names(atributo_combo)
+        ):
             set_editable_combo_text(atributo_combo, current_attribute_text)
         atributo_combo.blockSignals(False)
 
@@ -605,7 +616,9 @@ def build_catalog_product_dialog(
         ubicacion_input.clear()
         ubicacion_input.addItem("")
         ubicacion_input.addItems(visible_locations)
-        if current_location_text:
+        if current_location_text and (
+            not clear_uniform_only_fields or normalize_lookup_text(current_location_text) in _visible_choice_names(ubicacion_input)
+        ):
             set_editable_combo_text(ubicacion_input, current_location_text)
         ubicacion_input.blockSignals(False)
 
