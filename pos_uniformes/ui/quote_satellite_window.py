@@ -784,6 +784,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.catalog_include_general_combo.addItem("Escuela + extras generales", "include_general")
         self.catalog_include_general_combo.addItem("Solo escuela", "school_only")
         self.catalog_include_general_combo.addItem("Solo generales", "general_only")
+        self.catalog_include_general_combo.setCurrentIndex(1)
         self.catalog_school_combo.addItem("Todas las escuelas", "")
 
         filters = QHBoxLayout()
@@ -813,7 +814,6 @@ class QuoteSatelliteWindow(QMainWindow):
             resize_columns=(0, 1, 2, 4, 5, 6, 7),
         )
 
-        browser_layout.addWidget(self.catalog_status_label)
         browser_layout.addLayout(filters)
         browser_layout.addLayout(search_row)
         pager_row = QHBoxLayout()
@@ -824,6 +824,7 @@ class QuoteSatelliteWindow(QMainWindow):
         pager_row.addWidget(self.catalog_next_page_button)
         browser_layout.addLayout(pager_row)
         browser_layout.addWidget(self.catalog_table)
+        browser_layout.addWidget(self.catalog_status_label)
         browser_box.setLayout(browser_layout)
 
         detail_box = QGroupBox("Detalle del catalogo")

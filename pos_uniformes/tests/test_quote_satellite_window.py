@@ -65,6 +65,20 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         self.assertFalse(window.catalog_previous_page_button.isEnabled())
         self.assertTrue(window.catalog_next_page_button.isEnabled())
 
+    def test_catalog_defaults_to_solo_escuela_mode(self) -> None:
+        window = QuoteSatelliteWindow(user_id=1)
+
+        self.assertEqual(window.catalog_include_general_combo.currentData(), "school_only")
+        self.assertEqual(window.catalog_include_general_combo.currentText(), "Solo escuela")
+
+    def test_catalog_status_label_sits_below_table(self) -> None:
+        window = QuoteSatelliteWindow(user_id=1)
+        catalog_page = window.page_stack.widget(1)
+        browser_box = catalog_page.layout().itemAt(0).widget()
+        browser_layout = browser_box.layout()
+
+        self.assertLess(browser_layout.indexOf(window.catalog_table), browser_layout.indexOf(window.catalog_status_label))
+
     def test_add_from_catalog_keeps_current_page(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
         window.catalog_snapshot_rows = [{"sku": "SKU000001"}]
