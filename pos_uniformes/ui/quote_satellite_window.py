@@ -569,6 +569,9 @@ class QuoteSatelliteWindow(QMainWindow):
                 text-align: left;
                 padding: 10px 12px;
             }
+            QPushButton#guidedChoiceButton[compactChoice="true"] {
+                padding: 8px 10px;
+            }
             QPushButton#guidedProductButton[compactCard="true"] {
                 padding: 8px 10px;
             }
@@ -991,11 +994,12 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_piece_hint_label = QLabel("Primero elige la familia de prenda que buscan.")
         self.guided_piece_hint_label.setObjectName("guidedStepHint")
         self.guided_piece_hint_label.setWordWrap(True)
-        self.guided_piece_row = QHBoxLayout()
-        self.guided_piece_row.setSpacing(8)
+        self.guided_piece_grid = QGridLayout()
+        self.guided_piece_grid.setHorizontalSpacing(8)
+        self.guided_piece_grid.setVerticalSpacing(8)
         piece_section_layout.addWidget(self.guided_piece_title_label)
         piece_section_layout.addWidget(self.guided_piece_hint_label)
-        piece_section_layout.addLayout(self.guided_piece_row)
+        piece_section_layout.addLayout(self.guided_piece_grid)
         self.guided_piece_section.setLayout(piece_section_layout)
         steps_layout.addWidget(self.guided_piece_section)
 
@@ -1942,16 +1946,28 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_bucket_row.addStretch()
 
     def _rebuild_guided_piece_buttons(self, options) -> None:
-        _clear_layout(self.guided_piece_row)
+        _clear_layout(self.guided_piece_grid)
         self.guided_piece_buttons = {}
+        column_count = 4
         for option in options:
             button = self._build_guided_choice_button(option.label)
+            button.setProperty("compactChoice", True)
             button.setEnabled(option.enabled)
             button.setChecked(self.guided_selected_piece == option.key)
+            button.setMinimumHeight(46)
+            button.setMaximumWidth(220)
+            button.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
+            button.style().unpolish(button)
+            button.style().polish(button)
             button.clicked.connect(lambda checked=False, selected=option.key: self._handle_guided_piece_selected(selected))
-            self.guided_piece_row.addWidget(button)
+            index = len(self.guided_piece_buttons)
+            self.guided_piece_grid.addWidget(
+                button,
+                index // column_count,
+                index % column_count,
+                alignment=Qt.AlignmentFlag.AlignLeft,
+            )
             self.guided_piece_buttons[option.key] = button
-        self.guided_piece_row.addStretch()
 
     def _rebuild_guided_product_buttons(self, product_cards) -> None:
         _clear_layout(self.guided_product_grid)

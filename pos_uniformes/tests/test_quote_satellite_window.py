@@ -152,6 +152,25 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         self.assertEqual(button.minimumHeight(), 76)
         self.assertEqual(button.sizePolicy().horizontalPolicy(), button.sizePolicy().Policy.Expanding)
 
+    def test_guided_piece_buttons_use_compact_wrapped_layout(self) -> None:
+        window = QuoteSatelliteWindow(user_id=1)
+
+        options = [
+            SimpleNamespace(key="Bata", label="Bata", enabled=True),
+            SimpleNamespace(key="Calceta", label="Calceta", enabled=True),
+            SimpleNamespace(key="Corbata", label="Corbata", enabled=True),
+            SimpleNamespace(key="Malla", label="Malla", enabled=True),
+            SimpleNamespace(key="Boina", label="Boina", enabled=True),
+        ]
+
+        window._rebuild_guided_piece_buttons(options)
+
+        first_button = window.guided_piece_buttons["Bata"]
+        self.assertTrue(first_button.property("compactChoice"))
+        self.assertEqual(first_button.minimumHeight(), 46)
+        self.assertEqual(first_button.maximumWidth(), 220)
+        self.assertEqual(window.guided_piece_grid.count(), 5)
+
 
 if __name__ == "__main__":
     unittest.main()
