@@ -133,17 +133,18 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
     def test_basics_mode_only_uses_general_products(self) -> None:
         view = build_guided_catalog_view(
             snapshot_rows=[
-                _row("SKU-1", "Primaria", "General", "Unisex"),
+                _row("SKU-1", "Primaria", "General", "Unisex", pieza="Uniforme"),
                 _row("SKU-2", "Primaria", "Colegio Mexico", "Unisex"),
             ],
             mode_key="basics",
             level_filter="",
             school_filter="",
             gender_filter="Todos",
+            piece_filter="Uniforme",
         )
 
         self.assertEqual([card.sku for card in view.product_cards], ["SKU-1"])
-        self.assertEqual(view.path_label, "Basicos > Todos")
+        self.assertEqual(view.path_label, "Basicos > Todos > Uniforme")
 
     def test_basics_mode_can_filter_basicos_vs_extras(self) -> None:
         snapshot_rows = [
@@ -159,6 +160,7 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
             school_filter="",
             gender_filter="Todos",
             bucket_filter="Basicos",
+            piece_filter="Pantalón",
         )
         extras_view = build_guided_catalog_view(
             snapshot_rows=snapshot_rows,
@@ -167,12 +169,49 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
             school_filter="",
             gender_filter="Todos",
             bucket_filter="Extras",
+            piece_filter="Calceta",
         )
 
-        self.assertEqual([card.sku for card in basics_view.product_cards], ["SKU-1", "SKU-3"])
+        self.assertEqual([card.sku for card in basics_view.product_cards], ["SKU-1"])
         self.assertEqual([card.sku for card in extras_view.product_cards], ["SKU-2"])
         self.assertEqual([option.label for option in basics_view.bucket_options], ["Basicos", "Extras", "Todos"])
-        self.assertEqual(basics_view.path_label, "Basicos > Todos > Basicos")
+        self.assertEqual([option.label for option in basics_view.piece_options], ["Pantalón", "Playera"])
+        self.assertEqual(basics_view.path_label, "Basicos > Todos > Basicos > Pantalón")
+
+    def test_basics_mode_requires_piece_and_groups_models_before_variants(self) -> None:
+        snapshot_rows = [
+            _row("SKU-1", "Sin nivel", "General", "Unisex", "Accesorio", producto="Bata Manga Corta Blanca", pieza="Bata", talla="40"),
+            _row("SKU-2", "Sin nivel", "General", "Unisex", "Accesorio", producto="Bata Manga Corta Blanca", pieza="Bata", talla="42"),
+            _row("SKU-3", "Sin nivel", "General", "Unisex", "Accesorio", producto="Bata Manga Larga Blanca", pieza="Bata", talla="12"),
+        ]
+
+        without_piece = build_guided_catalog_view(
+            snapshot_rows=snapshot_rows,
+            mode_key="basics",
+            level_filter="",
+            school_filter="",
+            gender_filter="Todos",
+            bucket_filter="Extras",
+        )
+        with_piece = build_guided_catalog_view(
+            snapshot_rows=snapshot_rows,
+            mode_key="basics",
+            level_filter="",
+            school_filter="",
+            gender_filter="Todos",
+            bucket_filter="Extras",
+            piece_filter="Bata",
+        )
+
+        self.assertEqual(without_piece.empty_label, "Selecciona un tipo de pieza para ver modelos.")
+        self.assertEqual([option.label for option in without_piece.piece_options], ["Bata"])
+        self.assertEqual(len(with_piece.product_cards), 2)
+        self.assertEqual(with_piece.product_cards[0].title, "Bata Manga Corta Blanca")
+        self.assertEqual(with_piece.selected_product_key, with_piece.product_cards[0].key)
+        self.assertEqual(
+            [option.label for option in with_piece.variant_options],
+            ["Talla 40 · Azul", "Talla 42 · Azul"],
+        )
 
     def test_product_cards_only_keep_name_talla_color_and_price(self) -> None:
         view = build_guided_catalog_view(
@@ -232,14 +271,15 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
     def test_oficial_filter_on_basics_keeps_only_official_general(self) -> None:
         view = build_guided_catalog_view(
             snapshot_rows=[
-                _row("SKU-1", "Primaria", "General", "Unisex", "Oficial"),
+                _row("SKU-1", "Primaria", "General", "Unisex", "Oficial", pieza="Uniforme"),
                 _row("SKU-2", "Primaria", "General", "", "Deportivo"),
-                _row("SKU-3", "Primaria", "General", "Niña", "Oficial"),
+                _row("SKU-3", "Primaria", "General", "Niña", "Oficial", pieza="Uniforme"),
             ],
             mode_key="basics",
             level_filter="",
             school_filter="",
             gender_filter="Oficial Niña",
+            piece_filter="Uniforme",
         )
 
         self.assertEqual([card.sku for card in view.product_cards], ["SKU-1", "SKU-3"])
@@ -253,6 +293,7 @@ def _row(
     tipo_prenda: str = "Oficial",
     producto: str | None = None,
     pieza: str = "Uniforme",
+    talla: str = "12",
 ) -> dict[str, object]:
     return {
         "sku": sku,
@@ -263,7 +304,7 @@ def _row(
         "producto_nombre_base": producto or f"Producto {sku}",
         "tipo_prenda_nombre": tipo_prenda,
         "tipo_pieza_nombre": pieza,
-        "talla": "12",
+        "talla": talla,
         "color": "Azul",
         "precio_venta": Decimal("199.00"),
         "stock_actual": 5,

@@ -17,6 +17,7 @@ class GuidedCatalogOption:
 
 @dataclass(frozen=True)
 class GuidedCatalogProductCard:
+    key: str
     sku: str
     title: str
     subtitle: str
@@ -26,12 +27,24 @@ class GuidedCatalogProductCard:
 
 
 @dataclass(frozen=True)
+class GuidedCatalogVariantOption:
+    sku: str
+    label: str
+    detail_label: str
+    price_label: str
+
+
+@dataclass(frozen=True)
 class GuidedCatalogView:
     level_options: tuple[GuidedCatalogOption, ...]
     school_options: tuple[GuidedCatalogOption, ...]
     gender_options: tuple[GuidedCatalogOption, ...]
     bucket_options: tuple[GuidedCatalogOption, ...]
+    piece_options: tuple[GuidedCatalogOption, ...]
     product_cards: tuple[GuidedCatalogProductCard, ...]
+    variant_options: tuple[GuidedCatalogVariantOption, ...]
+    selected_product_key: str
+    selected_sku: str
     status_label: str
     path_label: str
     empty_label: str
@@ -45,6 +58,9 @@ def build_guided_catalog_view(
     school_filter: str,
     gender_filter: str,
     bucket_filter: str = "TODOS",
+    piece_filter: str = "",
+    selected_product_key: str = "",
+    selected_sku: str = "",
 ) -> GuidedCatalogView:
     active_rows = [row for row in snapshot_rows if _is_active_row(row)]
     normalized_mode = "basics" if mode_key == "basics" else "school"
@@ -52,6 +68,7 @@ def build_guided_catalog_view(
     normalized_school = school_filter.strip()
     normalized_gender = _normalize_segment_filter(gender_filter)
     normalized_bucket = _normalize_bucket_filter(bucket_filter)
+    normalized_piece = piece_filter.strip()
 
     mode_rows = [
         row for row in active_rows if _matches_mode(row=row, mode_key=normalized_mode)
@@ -70,6 +87,8 @@ def build_guided_catalog_view(
     gender_options = _build_segment_options(gender_source_rows)
     bucket_source_rows = [row for row in gender_source_rows if _matches_segment_filter(normalized_gender, row)]
     bucket_options = _build_bucket_options(bucket_source_rows) if normalized_mode == "basics" else tuple()
+    piece_source_rows = [row for row in bucket_source_rows if _matches_bucket_filter(normalized_bucket, row)]
+    piece_options = _build_piece_options(piece_source_rows) if normalized_mode == "basics" else tuple()
 
     product_rows, empty_label = _filter_product_rows(
         rows=mode_rows,
@@ -78,9 +97,17 @@ def build_guided_catalog_view(
         school_filter=normalized_school,
         gender_filter=normalized_gender,
         bucket_filter=normalized_bucket,
+        piece_filter=normalized_piece,
     )
 
-    product_cards = tuple(_to_product_card(row) for row in product_rows)
+    product_cards = _build_product_cards(product_rows, mode_key=normalized_mode)
+    resolved_product_key = _resolve_selected_product_key(product_cards, selected_product_key)
+    variant_options = _build_variant_options(
+        rows=product_rows,
+        mode_key=normalized_mode,
+        selected_product_key=resolved_product_key,
+    )
+    resolved_sku = _resolve_selected_sku(variant_options, selected_sku)
     status_label = _build_status_label(
         visible_count=len(product_cards),
         mode_key=normalized_mode,
@@ -88,6 +115,7 @@ def build_guided_catalog_view(
         school_filter=normalized_school,
         gender_filter=normalized_gender,
         bucket_filter=normalized_bucket,
+        piece_filter=normalized_piece,
     )
     path_label = _build_path_label(
         mode_key=normalized_mode,
@@ -95,13 +123,18 @@ def build_guided_catalog_view(
         school_filter=normalized_school,
         gender_filter=normalized_gender,
         bucket_filter=normalized_bucket,
+        piece_filter=normalized_piece,
     )
     return GuidedCatalogView(
         level_options=level_options,
         school_options=school_options,
         gender_options=gender_options,
         bucket_options=bucket_options,
+        piece_options=piece_options,
         product_cards=product_cards,
+        variant_options=variant_options,
+        selected_product_key=resolved_product_key,
+        selected_sku=resolved_sku,
         status_label=status_label,
         path_label=path_label,
         empty_label=empty_label,
@@ -191,6 +224,7 @@ def _filter_product_rows(
     school_filter: str,
     gender_filter: str,
     bucket_filter: str,
+    piece_filter: str,
 ) -> tuple[list[dict[str, object]], str]:
     if mode_key == "school" and not level_filter:
         return [], "Selecciona un nivel para ver las escuelas disponibles."
@@ -205,6 +239,10 @@ def _filter_product_rows(
     )
     filtered_rows = [row for row in filtered_rows if _matches_segment_filter(gender_filter, row)]
     filtered_rows = [row for row in filtered_rows if _matches_bucket_filter(bucket_filter, row)]
+    if mode_key == "basics" and not piece_filter:
+        return [], "Selecciona un tipo de pieza para ver modelos."
+    if piece_filter:
+        filtered_rows = [row for row in filtered_rows if _piece_label(row) == piece_filter]
     filtered_rows.sort(key=lambda row: _product_sort_key(row, prefer_deportivo=gender_filter == "DEPORTIVO"))
     if filtered_rows:
         return filtered_rows, ""
@@ -241,6 +279,120 @@ def _build_bucket_options(rows: list[dict[str, object]]) -> tuple[GuidedCatalogO
     return tuple(built_options)
 
 
+def _build_piece_options(rows: list[dict[str, object]]) -> tuple[GuidedCatalogOption, ...]:
+    counts: dict[str, int] = {}
+    for row in rows:
+        piece_label = _piece_label(row)
+        if not piece_label:
+            continue
+        counts[piece_label] = counts.get(piece_label, 0) + 1
+    return tuple(
+        GuidedCatalogOption(key=piece_label, label=piece_label, count=counts[piece_label], enabled=counts[piece_label] > 0)
+        for piece_label in sorted(counts)
+    )
+
+
+def _build_product_cards(rows: list[dict[str, object]], *, mode_key: str) -> tuple[GuidedCatalogProductCard, ...]:
+    if mode_key != "basics":
+        return tuple(_to_product_card(row) for row in rows)
+
+    grouped: dict[str, list[dict[str, object]]] = {}
+    for row in rows:
+        grouped.setdefault(_build_family_key(row), []).append(row)
+
+    cards: list[GuidedCatalogProductCard] = []
+    for key, family_rows in grouped.items():
+        family_rows.sort(key=lambda row: _product_sort_key(row, prefer_deportivo=False))
+        representative = family_rows[0]
+        cards.append(_to_grouped_product_card(key, family_rows, representative))
+    cards.sort(key=lambda card: (card.title.lower(), card.subtitle.lower(), card.key.lower()))
+    return tuple(cards)
+
+
+def _to_grouped_product_card(
+    key: str,
+    family_rows: list[dict[str, object]],
+    representative: dict[str, object],
+) -> GuidedCatalogProductCard:
+    price = Decimal(str(representative.get("precio_venta") or "0")).quantize(Decimal("0.01"))
+    unique_sizes = []
+    seen_sizes: set[str] = set()
+    for row in family_rows:
+        size_label = str(row.get("talla") or "").strip()
+        if not size_label or size_label in seen_sizes:
+            continue
+        seen_sizes.add(size_label)
+        unique_sizes.append(size_label)
+    if not unique_sizes:
+        subtitle = "Sin variantes disponibles"
+    elif len(unique_sizes) <= 3:
+        subtitle = "Tallas: " + ", ".join(unique_sizes)
+    else:
+        subtitle = f"{len(unique_sizes)} tallas disponibles"
+    return GuidedCatalogProductCard(
+        key=key,
+        sku=str(representative.get("sku") or ""),
+        title=str(representative.get("producto_nombre_base") or representative.get("producto_nombre") or "Producto"),
+        subtitle=subtitle,
+        meta_label="",
+        price_label=f"${price}",
+        gender_key=_classify_gender(representative.get("producto_genero")),
+    )
+
+
+def _build_variant_options(
+    *,
+    rows: list[dict[str, object]],
+    mode_key: str,
+    selected_product_key: str,
+) -> tuple[GuidedCatalogVariantOption, ...]:
+    if not rows:
+        return tuple()
+    if mode_key != "basics":
+        return tuple()
+    family_rows = [row for row in rows if _build_family_key(row) == selected_product_key]
+    family_rows.sort(key=lambda row: _variant_sort_key(row))
+    return tuple(_to_variant_option(row) for row in family_rows)
+
+
+def _to_variant_option(row: dict[str, object]) -> GuidedCatalogVariantOption:
+    price = Decimal(str(row.get("precio_venta") or "0")).quantize(Decimal("0.01"))
+    size_label = str(row.get("talla") or "").strip()
+    color_label = _display_color_label(row.get("color"))
+    label_parts: list[str] = []
+    if size_label:
+        label_parts.append(f"Talla {size_label}")
+    if color_label:
+        label_parts.append(color_label)
+    label = " · ".join(label_parts) or str(row.get("sku") or "")
+    return GuidedCatalogVariantOption(
+        sku=str(row.get("sku") or ""),
+        label=label,
+        detail_label=label,
+        price_label=f"${price}",
+    )
+
+
+def _resolve_selected_product_key(
+    product_cards: tuple[GuidedCatalogProductCard, ...],
+    selected_product_key: str,
+) -> str:
+    available = {card.key for card in product_cards}
+    if selected_product_key in available:
+        return selected_product_key
+    return product_cards[0].key if product_cards else ""
+
+
+def _resolve_selected_sku(
+    variant_options: tuple[GuidedCatalogVariantOption, ...],
+    selected_sku: str,
+) -> str:
+    available = {option.sku for option in variant_options}
+    if selected_sku in available:
+        return selected_sku
+    return variant_options[0].sku if variant_options else ""
+
+
 def _to_product_card(row: dict[str, object]) -> GuidedCatalogProductCard:
     price = Decimal(str(row.get("precio_venta") or "0")).quantize(Decimal("0.01"))
     size_label = str(row.get("talla") or "").strip()
@@ -252,6 +404,7 @@ def _to_product_card(row: dict[str, object]) -> GuidedCatalogProductCard:
         subtitle_parts.append(color_label)
     subtitle = " · ".join(subtitle_parts) or "Sin talla ni color"
     return GuidedCatalogProductCard(
+        key=str(row.get("sku") or ""),
         sku=str(row.get("sku") or ""),
         title=str(row.get("producto_nombre_base") or row.get("producto_nombre") or "Producto"),
         subtitle=subtitle,
@@ -277,6 +430,7 @@ def _build_status_label(
     school_filter: str,
     gender_filter: str,
     bucket_filter: str,
+    piece_filter: str,
 ) -> str:
     parts = [f"{visible_count} producto(s) sugeridos"]
     parts.append("Modo: Basicos" if mode_key == "basics" else "Modo: Uniformes")
@@ -288,6 +442,8 @@ def _build_status_label(
         parts.append(f"Linea: {_segment_label(gender_filter)}")
     if mode_key == "basics" and bucket_filter != "TODOS":
         parts.append(f"Grupo: {_bucket_label(bucket_filter)}")
+    if mode_key == "basics" and piece_filter:
+        parts.append(f"Pieza: {piece_filter}")
     return " | ".join(parts)
 
 
@@ -298,6 +454,7 @@ def _build_path_label(
     school_filter: str,
     gender_filter: str,
     bucket_filter: str,
+    piece_filter: str,
 ) -> str:
     if mode_key == "basics":
         path_parts = ["Basicos"]
@@ -306,6 +463,8 @@ def _build_path_label(
     path_parts.append(_segment_label(gender_filter))
     if mode_key == "basics" and bucket_filter != "TODOS":
         path_parts.append(_bucket_label(bucket_filter))
+    if mode_key == "basics" and piece_filter:
+        path_parts.append(piece_filter)
     return " > ".join(path_parts)
 
 
@@ -439,6 +598,27 @@ def _classify_basics_bucket(row: dict[str, object]) -> str:
     ):
         return "EXTRA"
     return "BASICO"
+
+
+def _piece_label(row: dict[str, object]) -> str:
+    return str(row.get("tipo_pieza_nombre") or "Sin pieza").strip() or "Sin pieza"
+
+
+def _build_family_key(row: dict[str, object]) -> str:
+    return "||".join(
+        [
+            _piece_label(row),
+            str(row.get("producto_nombre_base") or row.get("producto_nombre") or "").strip(),
+        ]
+    )
+
+
+def _variant_sort_key(row: dict[str, object]) -> tuple[str, str, str]:
+    return (
+        str(row.get("talla") or "").strip().lower(),
+        str(row.get("color") or "").strip().lower(),
+        str(row.get("sku") or "").strip().lower(),
+    )
 
 
 def _segment_row_label(segment_key: str, gender_key: str) -> str:
