@@ -168,7 +168,7 @@ def _matches_mode(*, row: dict[str, object], mode_key: str) -> bool:
     school_name = str(row.get("escuela_nombre") or "General").strip() or "General"
     if mode_key == "basics":
         return school_name == "General"
-    return school_name != "General"
+    return school_name != "General" and _classify_line_type(row) in {"DEPORTIVO", "OFICIAL"}
 
 
 def _build_level_options(rows: list[dict[str, object]]) -> tuple[GuidedCatalogOption, ...]:
