@@ -218,21 +218,21 @@ def _build_segment_options(rows: list[dict[str, object]]) -> tuple[GuidedCatalog
 
 def _to_product_card(row: dict[str, object]) -> GuidedCatalogProductCard:
     price = Decimal(str(row.get("precio_venta") or "0")).quantize(Decimal("0.01"))
-    school_name = str(row.get("escuela_nombre") or "General").strip() or "General"
-    level_name = str(row.get("nivel_educativo_nombre") or "Sin nivel").strip() or "Sin nivel"
-    segment_key = _classify_product_segment(row)
-    gender_key = _classify_gender(row.get("producto_genero"))
-    segment_label = _segment_row_label(segment_key, gender_key)
+    size_label = str(row.get("talla") or "").strip()
+    color_label = str(row.get("color") or "").strip()
+    subtitle_parts: list[str] = []
+    if size_label:
+        subtitle_parts.append(f"Talla {size_label}")
+    if color_label and color_label.lower() != "sin color":
+        subtitle_parts.append(color_label)
+    subtitle = " · ".join(subtitle_parts) or "Sin talla ni color"
     return GuidedCatalogProductCard(
         sku=str(row.get("sku") or ""),
         title=str(row.get("producto_nombre_base") or row.get("producto_nombre") or "Producto"),
-        subtitle=(
-            f"{row.get('tipo_prenda_nombre') or '-'} · Talla {row.get('talla') or '-'} · "
-            f"{row.get('color') or 'Sin color'}"
-        ),
-        meta_label=f"{school_name} · {level_name} · {segment_label}",
+        subtitle=subtitle,
+        meta_label="",
         price_label=f"${price}",
-        gender_key=gender_key,
+        gender_key=_classify_gender(row.get("producto_genero")),
     )
 
 

@@ -1849,9 +1849,11 @@ class QuoteSatelliteWindow(QMainWindow):
         return button
 
     def _build_guided_product_button(self, card) -> QPushButton:
-        button = QPushButton(
-            f"{card.title}\n{card.subtitle}\n{card.meta_label}\n{card.price_label}"
-        )
+        button_lines = [card.title]
+        if card.subtitle:
+            button_lines.append(card.subtitle)
+        button_lines.append(card.price_label)
+        button = QPushButton("\n".join(button_lines))
         button.setObjectName("guidedProductButton")
         button.setCheckable(True)
         button.setMinimumHeight(94)

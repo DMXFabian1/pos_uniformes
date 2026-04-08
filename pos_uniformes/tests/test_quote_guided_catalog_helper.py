@@ -145,6 +145,30 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
         self.assertEqual([card.sku for card in view.product_cards], ["SKU-1"])
         self.assertEqual(view.path_label, "Basicos > Todos")
 
+    def test_product_cards_only_keep_name_talla_color_and_price(self) -> None:
+        view = build_guided_catalog_view(
+            snapshot_rows=[
+                _row(
+                    "SKU-1",
+                    "Secundaria",
+                    "ESTV 663",
+                    "Unisex",
+                    "Deportivo",
+                    producto="Pants 2pz Lobito Liso ESTV 663",
+                    pieza="Pants",
+                ),
+            ],
+            mode_key="school",
+            level_filter="Secundaria",
+            school_filter="ESTV 663",
+            gender_filter="Deportivo",
+        )
+
+        self.assertEqual(view.product_cards[0].title, "Pants 2pz Lobito Liso ESTV 663")
+        self.assertEqual(view.product_cards[0].subtitle, "Talla 12 · Azul")
+        self.assertEqual(view.product_cards[0].meta_label, "")
+        self.assertEqual(view.product_cards[0].price_label, "$199.00")
+
     def test_oficial_filter_on_basics_keeps_only_official_general(self) -> None:
         view = build_guided_catalog_view(
             snapshot_rows=[
