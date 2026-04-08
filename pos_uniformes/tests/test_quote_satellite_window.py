@@ -150,7 +150,7 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
 
         self.assertTrue(button.property("compactCard"))
         self.assertEqual(button.minimumHeight(), 76)
-        self.assertEqual(button.maximumWidth(), 260)
+        self.assertEqual(button.sizePolicy().horizontalPolicy(), button.sizePolicy().Policy.Expanding)
 
 
 if __name__ == "__main__":
