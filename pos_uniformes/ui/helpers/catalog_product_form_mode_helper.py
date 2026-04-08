@@ -7,6 +7,7 @@ from dataclasses import dataclass
 
 UNIFORM_CATEGORIES = {
     "uniformes",
+    "uniforme",
     "basico",
     "básico",
     "deportivo",

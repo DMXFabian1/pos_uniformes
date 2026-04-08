@@ -31,6 +31,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
             row,
             filters=InventoryVisibleFilterState(
                 search_text="sku",
+                use_filter="school_only",
                 category_filters=("Uniforme",),
                 brand_filters=("Marca Norte",),
                 school_filters=("General",),
@@ -69,6 +70,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
             row,
             filters=InventoryVisibleFilterState(
                 search_text="",
+                use_filter="",
                 category_filters=(),
                 brand_filters=(),
                 school_filters=(),
@@ -125,6 +127,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
             rows,
             filters=InventoryVisibleFilterState(
                 search_text="sku-001",
+                use_filter="",
                 category_filters=(),
                 brand_filters=(),
                 school_filters=(),
@@ -164,6 +167,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
             row,
             filters=InventoryVisibleFilterState(
                 search_text="sku",
+                use_filter="",
                 category_filters=("Calzado",),
                 brand_filters=(),
                 school_filters=(),
@@ -182,6 +186,94 @@ class InventoryFilterHelperTests(unittest.TestCase):
 
         self.assertFalse(matches)
         search_matcher.assert_not_called()
+
+    def test_inventory_row_matches_visible_filters_can_filter_by_use(self) -> None:
+        uniform_row = {
+            "categoria_nombre": "Básico",
+            "marca_nombre": "Marca Norte",
+            "escuela_nombre": "General",
+            "tipo_prenda_nombre": "Deportivo",
+            "tipo_pieza_nombre": "Pants",
+            "talla": "16",
+            "color": "Azul",
+            "variante_activa": True,
+            "stock_actual": 5,
+            "qr_exists": True,
+            "origen_legacy": False,
+            "fallback_importacion": False,
+        }
+        regular_row = {
+            **uniform_row,
+            "categoria_nombre": "Ropa casual",
+            "tipo_prenda_nombre": "Casual",
+        }
+
+        self.assertTrue(
+            inventory_row_matches_visible_filters(
+                uniform_row,
+                filters=InventoryVisibleFilterState(
+                    search_text="",
+                    use_filter="school_only",
+                    category_filters=(),
+                    brand_filters=(),
+                    school_filters=(),
+                    type_filters=(),
+                    piece_filters=(),
+                    size_filters=(),
+                    color_filters=(),
+                    status_filter="",
+                    stock_filter="",
+                    qr_filter="",
+                    origin_filter="",
+                    duplicate_filter="",
+                ),
+                search_matcher=lambda *_args: True,
+            )
+        )
+        self.assertTrue(
+            inventory_row_matches_visible_filters(
+                regular_row,
+                filters=InventoryVisibleFilterState(
+                    search_text="",
+                    use_filter="general_only",
+                    category_filters=(),
+                    brand_filters=(),
+                    school_filters=(),
+                    type_filters=(),
+                    piece_filters=(),
+                    size_filters=(),
+                    color_filters=(),
+                    status_filter="",
+                    stock_filter="",
+                    qr_filter="",
+                    origin_filter="",
+                    duplicate_filter="",
+                ),
+                search_matcher=lambda *_args: True,
+            )
+        )
+        self.assertFalse(
+            inventory_row_matches_visible_filters(
+                regular_row,
+                filters=InventoryVisibleFilterState(
+                    search_text="",
+                    use_filter="school_only",
+                    category_filters=(),
+                    brand_filters=(),
+                    school_filters=(),
+                    type_filters=(),
+                    piece_filters=(),
+                    size_filters=(),
+                    color_filters=(),
+                    status_filter="",
+                    stock_filter="",
+                    qr_filter="",
+                    origin_filter="",
+                    duplicate_filter="",
+                ),
+                search_matcher=lambda *_args: True,
+            )
+        )
 
 
 if __name__ == "__main__":

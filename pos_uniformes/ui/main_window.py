@@ -1241,6 +1241,7 @@ class MainWindow(QMainWindow):
         self.inventory_piece_filter_combo = MultiSelectFilterButton("Pieza: todas")
         self.inventory_size_filter_combo = MultiSelectFilterButton("Talla: todas")
         self.inventory_color_filter_combo = MultiSelectFilterButton("Color: todos")
+        self.inventory_use_filter_combo = QComboBox()
         self.inventory_status_filter_combo = QComboBox()
         self.inventory_stock_filter_combo = QComboBox()
         self.inventory_qr_filter_combo = QComboBox()
@@ -7676,6 +7677,7 @@ class MainWindow(QMainWindow):
                 ("color", self.inventory_color_filter_combo.selected_labels()),
             ),
             combo_filters=(
+                ("uso", self.inventory_use_filter_combo.currentData(), self.inventory_use_filter_combo.currentText()),
                 ("estado", self.inventory_status_filter_combo.currentData(), self.inventory_status_filter_combo.currentText()),
                 ("stock", self.inventory_stock_filter_combo.currentData(), self.inventory_stock_filter_combo.currentText()),
                 ("qr", self.inventory_qr_filter_combo.currentData(), self.inventory_qr_filter_combo.currentText()),
@@ -7916,6 +7918,7 @@ class MainWindow(QMainWindow):
 
         search_text = self.inventory_search_input.text().strip()
         search_terms = compile_search_terms(search_text)
+        use_filter = str(self.inventory_use_filter_combo.currentData() or "")
         category_filters = self.inventory_category_filter_combo.selected_values()
         brand_filters = self.inventory_brand_filter_combo.selected_values()
         school_filters = self.inventory_school_filter_combo.selected_values()
@@ -7933,6 +7936,7 @@ class MainWindow(QMainWindow):
             inventory_snapshot_rows,
             filters=InventoryVisibleFilterState(
                 search_text=search_text,
+                use_filter=use_filter,
                 category_filters=tuple(category_filters),
                 brand_filters=tuple(brand_filters),
                 school_filters=tuple(school_filters),
@@ -8043,6 +8047,7 @@ class MainWindow(QMainWindow):
         self.inventory_page_index = 0
         self.inventory_search_input.clear()
         for combo in (
+            self.inventory_use_filter_combo,
             self.inventory_status_filter_combo,
             self.inventory_stock_filter_combo,
             self.inventory_qr_filter_combo,
