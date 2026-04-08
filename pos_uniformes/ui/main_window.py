@@ -587,6 +587,10 @@ def _normalize_filter_value(value: object) -> str:
     return "".join(char for char in decomposed if not unicodedata.combining(char))
 
 
+def _catalog_toggle_feedback_action(target_state: bool) -> str:
+    return "activate" if target_state else "deactivate"
+
+
 class MultiSelectFilterButton(QToolButton):
     selectionChanged = pyqtSignal()
 
@@ -5449,7 +5453,7 @@ class MainWindow(QMainWindow):
         assert selected is not None
 
         target_state = not bool(selected["producto_activo"])
-        action = "activar" if target_state else "desactivar"
+        action = _catalog_toggle_feedback_action(target_state)
 
         try:
             with get_session() as session:
@@ -5485,7 +5489,7 @@ class MainWindow(QMainWindow):
         assert selected is not None
 
         target_state = not bool(selected["variante_activo"])
-        action = "activar" if target_state else "desactivar"
+        action = _catalog_toggle_feedback_action(target_state)
 
         try:
             with get_session() as session:

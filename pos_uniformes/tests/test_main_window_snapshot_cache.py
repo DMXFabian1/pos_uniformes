@@ -12,7 +12,12 @@ from PyQt6.QtWidgets import QApplication, QTableWidgetItem
 
 from pos_uniformes.services.active_filter_service import ActiveFilterToken
 from pos_uniformes.database.models import RolUsuario
-from pos_uniformes.ui.main_window import CATALOG_PAGE_SIZE, INVENTORY_PAGE_SIZE, MainWindow
+from pos_uniformes.ui.main_window import (
+    CATALOG_PAGE_SIZE,
+    INVENTORY_PAGE_SIZE,
+    MainWindow,
+    _catalog_toggle_feedback_action,
+)
 
 
 class MainWindowSnapshotCacheTests(unittest.TestCase):
@@ -40,6 +45,10 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
             self.assertEqual(reloaded_rows, first_rows)
             self.assertEqual(loader.call_count, 2)
+
+    def test_catalog_toggle_feedback_action_uses_supported_result_keys(self) -> None:
+        self.assertEqual(_catalog_toggle_feedback_action(True), "activate")
+        self.assertEqual(_catalog_toggle_feedback_action(False), "deactivate")
 
     def test_inventory_snapshot_cache_reuses_rows_until_invalidated(self) -> None:
         window = MainWindow(user_id=1)
