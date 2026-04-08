@@ -2,6 +2,7 @@
 
 ## Checkpoint actual
 
+- `2026-04-08`: `CAJERO` deja de ver la pestaña `Resumen` en el POS principal y, si por alguna razon cae en ese indice, la navegacion lo redirige a `Caja`. El objetivo es mantener el rol en pantallas operativas y evitar exponer contexto global innecesario. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.
 - `2026-04-08`: el hero del POS principal deja de mostrar `Esperado` en la linea publica de sesion de caja y conserva solo `Reactivo inicial` y `Corte pendiente`, reduciendo exposicion innecesaria de montos sensibles sin tocar calculos internos ni pantallas de arqueo. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.
 - `2026-04-08`: `Presupuestos` del POS principal recupera contraste legible en las etiquetas del formulario (`Escaneo`, `Folio`, `Vigencia`, `Observacion`) al dejar de reutilizar el estilo frio de `Caja` y usar un `quoteFormLabel` propio, coherente con el bloque beige del editor. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.
 - `2026-04-08`: `Inventario` corrige la agrupacion de tallas con guion dentro del selector multiple: los rangos numericos dejan de ir a un bloque aparte y ahora conviven con `Numericas`, reduciendo saltos visuales dentro de la misma familia de talla. El helper compartido deja a `Catalogo` con el mismo criterio. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.

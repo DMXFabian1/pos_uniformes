@@ -11,6 +11,7 @@ from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QTableWidgetItem
 
 from pos_uniformes.services.active_filter_service import ActiveFilterToken
+from pos_uniformes.database.models import RolUsuario
 from pos_uniformes.ui.main_window import CATALOG_PAGE_SIZE, INVENTORY_PAGE_SIZE, MainWindow
 
 
@@ -82,6 +83,24 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertEqual(window.quote_cart_table.objectName(), "cashierCartTable")
         self.assertEqual(window.quote_cart_table.verticalHeader().defaultSectionSize(), 48)
         self.assertEqual(window.quote_cart_table.minimumHeight(), 260)
+
+    def test_cashier_role_hides_dashboard_tab(self) -> None:
+        window = MainWindow(user_id=1)
+        window.current_role = RolUsuario.CAJERO
+
+        window._apply_role_navigation()
+
+        self.assertFalse(window.tabs.isTabVisible(0))
+        self.assertTrue(window.tabs.isTabVisible(1))
+
+    def test_cashier_role_redirects_from_hidden_dashboard_to_cashier(self) -> None:
+        window = MainWindow(user_id=1)
+        window.current_role = RolUsuario.CAJERO
+        window.tabs.setCurrentIndex(0)
+
+        window._apply_role_navigation()
+
+        self.assertEqual(window.tabs.currentIndex(), 1)
 
     def test_catalog_search_refresh_uses_single_debounce_timer(self) -> None:
         window = MainWindow(user_id=1)

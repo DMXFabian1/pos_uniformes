@@ -1844,7 +1844,7 @@ class MainWindow(QMainWindow):
         is_admin = self.current_role == RolUsuario.ADMIN
         can_manage_layaways = self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
         visible_by_index = {
-            0: True,      # Resumen
+            0: is_admin,  # Resumen
             1: True,      # Caja
             2: True,      # Presupuestos
             3: can_manage_layaways,  # Apartados
