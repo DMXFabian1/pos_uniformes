@@ -9810,6 +9810,12 @@ class MainWindow(QMainWindow):
         )
         if selected_from_inventory is not None:
             return selected_from_inventory
+        selected_from_snapshot = find_catalog_row_by_variant_id(
+            self._load_catalog_snapshot_rows(),
+            inventory_variant_id,
+        )
+        if selected_from_snapshot is not None:
+            return selected_from_snapshot
         return resolve_catalog_row(self.catalog_rows, self.catalog_table.currentRow())
 
     def _handle_inventory_table_selection(self) -> None:

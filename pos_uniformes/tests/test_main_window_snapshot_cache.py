@@ -165,6 +165,30 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertEqual(window.inventory_table.currentRow(), -1)
         self.assertIn("Selecciona una presentacion", window.catalog_selection_label.text())
 
+    def test_selected_catalog_row_falls_back_to_snapshot_when_variant_is_hidden_in_catalog(self) -> None:
+        window = MainWindow(user_id=1)
+        hidden_row = {
+            "variante_id": 101,
+            "producto_id": 15,
+            "producto_nombre": "Pants Deportivo",
+            "producto_activo": False,
+            "variante_activo": False,
+            "sku": "SKU-101",
+        }
+        window.catalog_filtered_rows = []
+        window.catalog_rows = []
+        window.inventory_table.setRowCount(1)
+        window.inventory_table.setColumnCount(1)
+        first_item = QTableWidgetItem("SKU-101")
+        first_item.setData(0x0100, 101)
+        window.inventory_table.setItem(0, 0, first_item)
+        window.inventory_table.setCurrentCell(0, 0)
+
+        with patch.object(window, "_load_catalog_snapshot_rows", return_value=[hidden_row]):
+            selected = window._selected_catalog_row()
+
+        self.assertEqual(selected, hidden_row)
+
     def test_catalog_search_refresh_uses_single_debounce_timer(self) -> None:
         window = MainWindow(user_id=1)
         callback = Mock()
