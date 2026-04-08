@@ -836,7 +836,8 @@ class QuoteSatelliteWindow(QMainWindow):
         pager_row.addWidget(self.catalog_previous_page_button)
         pager_row.addWidget(self.catalog_next_page_button)
         browser_layout.addLayout(pager_row)
-        browser_layout.addWidget(self.catalog_table)
+        browser_layout.addWidget(self.catalog_table, 1)
+        browser_layout.addSpacing(6)
         browser_layout.addWidget(self.catalog_status_label)
         browser_box.setLayout(browser_layout)
 
