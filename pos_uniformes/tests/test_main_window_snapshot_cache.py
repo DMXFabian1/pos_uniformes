@@ -61,6 +61,21 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             self.assertEqual(reloaded_rows, first_rows)
             self.assertEqual(loader.call_count, 2)
 
+    def test_cash_session_label_hides_expected_amount_from_hero(self) -> None:
+        window = MainWindow(user_id=1)
+        active_session = SimpleNamespace(id=5, monto_apertura="1000.00")
+        resumen = SimpleNamespace(esperado_en_caja="2450.00")
+
+        with patch("pos_uniformes.ui.main_window.CajaService.obtener_sesion_activa", return_value=active_session), patch(
+            "pos_uniformes.ui.main_window.CajaService.resumir_sesion",
+            return_value=resumen,
+        ), patch.object(window, "_is_stale_cash_session", return_value=True):
+            window._refresh_cash_session(object())
+
+        self.assertIn("Reactivo inicial $1000.00", window.cash_session_label.text())
+        self.assertIn("Corte pendiente", window.cash_session_label.text())
+        self.assertNotIn("Esperado", window.cash_session_label.text())
+
     def test_quote_cart_table_keeps_cashier_breathing_in_main_window(self) -> None:
         window = MainWindow(user_id=1)
 

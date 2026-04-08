@@ -7204,7 +7204,7 @@ class MainWindow(QMainWindow):
         self.cash_session_requires_cut = self._is_stale_cash_session(active_session)
         resumen = CajaService.resumir_sesion(session, active_session)
         self.cash_session_label.setText(
-            f"Rol {self.current_role.value} · Reactivo inicial ${Decimal(active_session.monto_apertura)} · Esperado ${resumen.esperado_en_caja}"
+            f"Rol {self.current_role.value} · Reactivo inicial ${Decimal(active_session.monto_apertura)}"
             + (" · Corte pendiente" if self.cash_session_requires_cut else "")
         )
         self.cash_cut_button.setText("Corte")
