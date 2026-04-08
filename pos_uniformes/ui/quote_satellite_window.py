@@ -1877,12 +1877,20 @@ class QuoteSatelliteWindow(QMainWindow):
             return
         self.guided_visual_icon_label.setPixmap(_catalog_row_icon(row))
         segmento = _guided_segment_label(row)
+        color_label = _guided_display_color_label(row.get("color"))
+        detail_parts = [
+            f"Nivel {row['nivel_educativo_nombre']}",
+            f"Escuela {row['escuela_nombre']}",
+            f"Linea {segmento}",
+            f"{row['tipo_prenda_nombre']}",
+            f"{row['tipo_pieza_nombre']}",
+            f"Talla {row['talla']}",
+        ]
+        if color_label:
+            detail_parts.append(f"Color {color_label}")
+        detail_parts.append(f"Precio ${Decimal(str(row['precio_venta'])).quantize(Decimal('0.01'))}")
         self.guided_detail_title_label.setText(f"{row['sku']} | {row['producto_nombre_base']}")
-        self.guided_detail_meta_label.setText(
-            f"Nivel {row['nivel_educativo_nombre']} | Escuela {row['escuela_nombre']} | Linea {segmento} | "
-            f"{row['tipo_prenda_nombre']} | {row['tipo_pieza_nombre']} | Talla {row['talla']} | Color {row['color']} | "
-            f"Precio ${Decimal(str(row['precio_venta'])).quantize(Decimal('0.01'))}"
-        )
+        self.guided_detail_meta_label.setText(" | ".join(detail_parts))
         self.guided_detail_notes_label.setText(str(row.get("producto_descripcion") or "Sin descripcion adicional."))
 
     def _handle_add_guided_selection_to_quote(self) -> None:
@@ -2829,6 +2837,14 @@ def _guided_segment_label(row: dict[str, object]) -> str:
     if "niño" in gender or "nino" in gender or "mascul" in gender or "caballero" in gender:
         return "Oficial Niño"
     return "Oficial"
+
+
+def _guided_display_color_label(raw_value: object) -> str:
+    color_label = str(raw_value or "").strip()
+    normalized = color_label.lower().replace(" ", "").replace("-", "")
+    if not color_label or normalized in {"sincolor", "adhoc"}:
+        return ""
+    return color_label
 
 
 def _clear_layout(layout) -> None:

@@ -219,11 +219,11 @@ def _build_segment_options(rows: list[dict[str, object]]) -> tuple[GuidedCatalog
 def _to_product_card(row: dict[str, object]) -> GuidedCatalogProductCard:
     price = Decimal(str(row.get("precio_venta") or "0")).quantize(Decimal("0.01"))
     size_label = str(row.get("talla") or "").strip()
-    color_label = str(row.get("color") or "").strip()
+    color_label = _display_color_label(row.get("color"))
     subtitle_parts: list[str] = []
     if size_label:
         subtitle_parts.append(f"Talla {size_label}")
-    if color_label and color_label.lower() != "sin color":
+    if color_label:
         subtitle_parts.append(color_label)
     subtitle = " · ".join(subtitle_parts) or "Sin talla ni color"
     return GuidedCatalogProductCard(
@@ -234,6 +234,14 @@ def _to_product_card(row: dict[str, object]) -> GuidedCatalogProductCard:
         price_label=f"${price}",
         gender_key=_classify_gender(row.get("producto_genero")),
     )
+
+
+def _display_color_label(raw_value: object) -> str:
+    color_label = str(raw_value or "").strip()
+    normalized = _normalize_text(color_label).replace(" ", "").replace("-", "")
+    if not color_label or normalized in {"sincolor", "adhoc"}:
+        return ""
+    return color_label
 
 
 def _build_status_label(

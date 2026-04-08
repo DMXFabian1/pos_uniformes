@@ -169,6 +169,37 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
         self.assertEqual(view.product_cards[0].meta_label, "")
         self.assertEqual(view.product_cards[0].price_label, "$199.00")
 
+    def test_product_cards_hide_ad_hoc_color(self) -> None:
+        view = build_guided_catalog_view(
+            snapshot_rows=[
+                _row(
+                    "SKU-1",
+                    "Secundaria",
+                    "ESTV 663",
+                    "Unisex",
+                    "Deportivo",
+                    producto="Playera Deportiva Blanca",
+                    pieza="Playera",
+                )
+            ],
+            mode_key="school",
+            level_filter="Secundaria",
+            school_filter="ESTV 663",
+            gender_filter="Deportivo",
+        )
+
+        row = dict(_row("SKU-1", "Secundaria", "ESTV 663", "Unisex", "Deportivo", producto="Playera Deportiva Blanca", pieza="Playera"))
+        row["color"] = "Ad hoc"
+        view = build_guided_catalog_view(
+            snapshot_rows=[row],
+            mode_key="school",
+            level_filter="Secundaria",
+            school_filter="ESTV 663",
+            gender_filter="Deportivo",
+        )
+
+        self.assertEqual(view.product_cards[0].subtitle, "Talla 12")
+
     def test_oficial_filter_on_basics_keeps_only_official_general(self) -> None:
         view = build_guided_catalog_view(
             snapshot_rows=[
