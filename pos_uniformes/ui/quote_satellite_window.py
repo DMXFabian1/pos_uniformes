@@ -548,6 +548,25 @@ class QuoteSatelliteWindow(QMainWindow):
                 padding: 9px 14px;
                 font-weight: 800;
             }
+            QPushButton#chipButton {
+                background: #eef3f7;
+                color: #465866;
+                border: 1px solid #d7e1e8;
+                border-radius: 999px;
+                padding: 6px 10px;
+                font-size: 12px;
+                font-weight: 700;
+            }
+            QPushButton#chipButton:hover {
+                background: #dfeaf2;
+                border-color: #c5d7e4;
+                color: #314c60;
+            }
+            QPushButton#chipButton[active="true"] {
+                background: #a84f2d;
+                color: #f9f4ea;
+                border-color: #8a4326;
+            }
             QPushButton#primaryButton {
                 background: #87492c;
                 color: #f9f4ea;
