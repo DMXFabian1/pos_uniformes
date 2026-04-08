@@ -995,11 +995,13 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_piece_hint_label = QLabel("Primero elige la familia de prenda que buscan.")
         self.guided_piece_hint_label.setObjectName("guidedStepHint")
         self.guided_piece_hint_label.setWordWrap(True)
-        self.guided_piece_rows_layout = QVBoxLayout()
-        self.guided_piece_rows_layout.setSpacing(8)
+        self.guided_piece_grid = QGridLayout()
+        self.guided_piece_grid.setContentsMargins(0, 0, 0, 0)
+        self.guided_piece_grid.setHorizontalSpacing(10)
+        self.guided_piece_grid.setVerticalSpacing(10)
         piece_section_layout.addWidget(self.guided_piece_title_label)
         piece_section_layout.addWidget(self.guided_piece_hint_label)
-        piece_section_layout.addLayout(self.guided_piece_rows_layout)
+        piece_section_layout.addLayout(self.guided_piece_grid)
         self.guided_piece_section.setLayout(piece_section_layout)
         steps_layout.addWidget(self.guided_piece_section)
 
@@ -1945,34 +1947,28 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_bucket_row.addStretch()
 
     def _rebuild_guided_piece_buttons(self, options) -> None:
-        _clear_layout(self.guided_piece_rows_layout)
+        _clear_layout(self.guided_piece_grid)
         self.guided_piece_buttons = {}
         buttons_per_row = 3
-        current_row = None
         for index, option in enumerate(options):
-            if index % buttons_per_row == 0:
-                current_row = QHBoxLayout()
-                current_row.setContentsMargins(0, 0, 0, 0)
-                current_row.setSpacing(8)
-                self.guided_piece_rows_layout.addLayout(current_row)
             button = self._build_guided_choice_button(option.label)
             button.setProperty("compactChoice", True)
             button.setEnabled(option.enabled)
             button.setChecked(self.guided_selected_piece == option.key)
             button.setMinimumHeight(42)
-            button.setMaximumWidth(190)
+            button.setMinimumWidth(170)
+            button.setMaximumWidth(170)
             button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
             button.style().unpolish(button)
             button.style().polish(button)
             button.clicked.connect(lambda checked=False, selected=option.key: self._handle_guided_piece_selected(selected))
-            assert current_row is not None
-            current_row.addWidget(button, 0, Qt.AlignmentFlag.AlignLeft)
+            self.guided_piece_grid.addWidget(
+                button,
+                index // buttons_per_row,
+                index % buttons_per_row,
+                alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+            )
             self.guided_piece_buttons[option.key] = button
-        if self.guided_piece_rows_layout.count():
-            for row_index in range(self.guided_piece_rows_layout.count()):
-                row_layout = self.guided_piece_rows_layout.itemAt(row_index).layout()
-                if row_layout is not None:
-                    row_layout.addStretch()
 
     def _rebuild_guided_product_buttons(self, product_cards) -> None:
         _clear_layout(self.guided_product_flow_layout)
