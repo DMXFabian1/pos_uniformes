@@ -2027,7 +2027,6 @@ class QuoteSatelliteWindow(QMainWindow):
         button_lines = [card.title]
         if card.subtitle:
             button_lines.append(card.subtitle)
-        button_lines.append(card.price_label)
         button = QPushButton("\n".join(button_lines))
         button.setObjectName("guidedProductButton")
         button.setCheckable(True)

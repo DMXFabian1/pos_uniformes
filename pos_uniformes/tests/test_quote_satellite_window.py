@@ -150,6 +150,7 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         button = window._build_guided_product_button(card)
 
         self.assertTrue(button.property("compactCard"))
+        self.assertNotIn("$65.00", button.text())
         self.assertEqual(button.minimumHeight(), 68)
         self.assertEqual(button.minimumWidth(), 252)
         self.assertEqual(button.maximumWidth(), 252)
@@ -191,9 +192,9 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
     def test_guided_variant_buttons_use_flow_layout_and_compact_size(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
         options = [
-            SimpleNamespace(sku="SKU-1", label="Talla 10 · Azul"),
-            SimpleNamespace(sku="SKU-2", label="Talla 12 · Azul"),
-            SimpleNamespace(sku="SKU-3", label="Talla 14 · Azul"),
+            SimpleNamespace(sku="SKU-1", label="Talla 10 · $239.00"),
+            SimpleNamespace(sku="SKU-2", label="Talla 12 · $239.00"),
+            SimpleNamespace(sku="SKU-3", label="Talla 14 · $239.00"),
         ]
 
         window._rebuild_guided_variant_buttons(options)

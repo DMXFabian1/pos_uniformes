@@ -210,7 +210,7 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
         self.assertEqual(with_piece.selected_product_key, with_piece.product_cards[0].key)
         self.assertEqual(
             [option.label for option in with_piece.variant_options],
-            ["Talla 40 · Azul", "Talla 42 · Azul"],
+            ["Talla 40 · $199.00", "Talla 42 · $199.00"],
         )
 
     def test_variant_options_sort_sizes_from_small_to_large(self) -> None:
@@ -233,7 +233,7 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
 
         self.assertEqual(
             [option.label for option in view.variant_options],
-            ["Talla 10 · Azul", "Talla 14 · Azul", "Talla 28 · Azul", "Talla 32 · Azul"],
+            ["Talla 10 · $199.00", "Talla 14 · $199.00", "Talla 28 · $199.00", "Talla 32 · $199.00"],
         )
 
     def test_product_cards_only_keep_name_talla_color_and_price(self) -> None:

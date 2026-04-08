@@ -358,12 +358,10 @@ def _build_variant_options(
 def _to_variant_option(row: dict[str, object]) -> GuidedCatalogVariantOption:
     price = Decimal(str(row.get("precio_venta") or "0")).quantize(Decimal("0.01"))
     size_label = str(row.get("talla") or "").strip()
-    color_label = _display_color_label(row.get("color"))
     label_parts: list[str] = []
     if size_label:
         label_parts.append(f"Talla {size_label}")
-    if color_label:
-        label_parts.append(color_label)
+    label_parts.append(f"${price}")
     label = " · ".join(label_parts) or str(row.get("sku") or "")
     return GuidedCatalogVariantOption(
         sku=str(row.get("sku") or ""),
