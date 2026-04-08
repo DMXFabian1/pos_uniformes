@@ -498,6 +498,16 @@ class QuoteSatelliteWindow(QMainWindow):
                 background: #f9efe7;
                 border: 1px solid #dfb496;
             }
+            QComboBox#satFilterCombo {
+                font-weight: 700;
+                color: #2f2a24;
+                padding-left: 14px;
+            }
+            QComboBox#satFilterCombo:hover {
+                background: #eadccf;
+                color: #231f1b;
+                border: 1px solid #d1a781;
+            }
             QLineEdit:focus, QTextEdit:focus, QDateEdit:focus, QComboBox:focus, QSpinBox:focus {
                 border: 2px solid #c76b39;
             }
@@ -745,6 +755,9 @@ class QuoteSatelliteWindow(QMainWindow):
         self.catalog_add_button.setObjectName("secondaryButton")
         self.catalog_previous_page_button.setObjectName("ghostButton")
         self.catalog_next_page_button.setObjectName("ghostButton")
+        self.catalog_level_combo.setObjectName("satFilterCombo")
+        self.catalog_school_combo.setObjectName("satFilterCombo")
+        self.catalog_include_general_combo.setObjectName("satFilterCombo")
         self.catalog_level_combo.addItem("Todos los niveles", "")
         self.catalog_include_general_combo.addItem("Escuela + extras generales", "include_general")
         self.catalog_include_general_combo.addItem("Solo escuela", "school_only")
