@@ -461,6 +461,28 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertEqual(window.inventory_page_index, 0)
         schedule_callback.assert_called_once()
 
+    def test_clear_inventory_filters_batches_refresh_into_single_pass(self) -> None:
+        window = MainWindow(user_id=1)
+        window.inventory_search_input.setText("pants")
+        window.inventory_brand_filter_combo.set_items([("Marca Norte", "Marca Norte")])
+        window.inventory_school_filter_combo.set_items([("General", "General")])
+        window.inventory_type_filter_combo.set_items([("Deportivo", "Deportivo")])
+        window.inventory_brand_filter_combo.set_selected_values(["Marca Norte"])
+        window.inventory_school_filter_combo.set_selected_values(["General"])
+        window.inventory_type_filter_combo.set_selected_values(["Deportivo"])
+        window.inventory_use_filter_combo.addItem("Solo escolar", "school_only")
+        window.inventory_use_filter_combo.setCurrentIndex(window.inventory_use_filter_combo.count() - 1)
+        window._run_inventory_filter_refresh = Mock()
+
+        window._handle_clear_inventory_filters()
+
+        self.assertEqual(window._run_inventory_filter_refresh.call_count, 1)
+        self.assertEqual(window.inventory_search_input.text(), "")
+        self.assertEqual(window.inventory_brand_filter_combo.selected_values(), set())
+        self.assertEqual(window.inventory_school_filter_combo.selected_values(), set())
+        self.assertEqual(window.inventory_type_filter_combo.selected_values(), set())
+        self.assertEqual(window.inventory_use_filter_combo.currentIndex(), 0)
+
     def test_reload_table_widget_restores_updates_and_signals(self) -> None:
         window = MainWindow(user_id=1)
         table = window.catalog_table

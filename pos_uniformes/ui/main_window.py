@@ -8240,7 +8240,9 @@ class MainWindow(QMainWindow):
 
     def _handle_clear_inventory_filters(self) -> None:
         self.inventory_page_index = 0
+        self.inventory_search_input.blockSignals(True)
         self.inventory_search_input.clear()
+        self.inventory_search_input.blockSignals(False)
         for combo in (
             self.inventory_use_filter_combo,
             self.inventory_status_filter_combo,
@@ -8261,7 +8263,9 @@ class MainWindow(QMainWindow):
             self.inventory_size_filter_combo,
             self.inventory_color_filter_combo,
         ):
+            widget.blockSignals(True)
             widget.clear_selection()
+            widget.blockSignals(False)
         self._handle_inventory_filters_changed()
 
     def _handle_inventory_previous_page(self) -> None:
