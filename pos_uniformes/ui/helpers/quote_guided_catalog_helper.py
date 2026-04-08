@@ -301,19 +301,16 @@ def _build_piece_options(rows: list[dict[str, object]]) -> tuple[GuidedCatalogOp
 
 
 def _build_product_cards(rows: list[dict[str, object]], *, mode_key: str) -> tuple[GuidedCatalogProductCard, ...]:
-    if mode_key != "basics":
-        return tuple(_to_product_card(row) for row in rows)
-
     grouped: dict[str, list[dict[str, object]]] = {}
     for row in rows:
         grouped.setdefault(_build_family_key(row), []).append(row)
 
     cards: list[GuidedCatalogProductCard] = []
     for key, family_rows in grouped.items():
-        family_rows.sort(key=lambda row: _product_sort_key(row, prefer_deportivo=False))
         representative = family_rows[0]
         cards.append(_to_grouped_product_card(key, family_rows, representative))
-    cards.sort(key=lambda card: (card.title.lower(), card.subtitle.lower(), card.key.lower()))
+    if mode_key == "basics":
+        cards.sort(key=lambda card: (card.title.lower(), card.subtitle.lower(), card.key.lower()))
     return tuple(cards)
 
 
@@ -355,8 +352,6 @@ def _build_variant_options(
     selected_product_key: str,
 ) -> tuple[GuidedCatalogVariantOption, ...]:
     if not rows:
-        return tuple()
-    if mode_key != "basics":
         return tuple()
     family_rows = [row for row in rows if _build_family_key(row) == selected_product_key]
     family_rows.sort(key=lambda row: _variant_sort_key(row))

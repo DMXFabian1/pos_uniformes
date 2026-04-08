@@ -1878,12 +1878,15 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_bucket_section.setVisible(show_bucket)
         self.guided_piece_section.setVisible(show_piece)
         self.guided_products_section.setVisible(show_products)
-        self.guided_products_title_label.setText("7. Modelos sugeridos" if show_piece else ("6. Productos sugeridos" if show_bucket else "5. Productos sugeridos"))
-        self.guided_products_hint_label.setText(
-            "Primero elige el tipo de pieza; luego toca un modelo."
-            if show_piece
-            else ("Elige Basicos, Extras o Todos; luego toca una tarjeta para agregarla." if show_bucket else "Toca una tarjeta para agregarla.")
-        )
+        if show_piece:
+            self.guided_products_title_label.setText("7. Modelos sugeridos")
+            self.guided_products_hint_label.setText("Primero elige el tipo de pieza; luego toca un modelo.")
+        elif show_bucket:
+            self.guided_products_title_label.setText("6. Modelos sugeridos")
+            self.guided_products_hint_label.setText("Elige Basicos, Extras o Todos; luego toca un modelo.")
+        else:
+            self.guided_products_title_label.setText("5. Modelos sugeridos")
+            self.guided_products_hint_label.setText("Primero toca un modelo; luego elige la variante que quieren.")
         if self.guided_selected_sku:
             row = next(
                 (item for item in self.catalog_snapshot_rows if str(item.get("sku")) == self.guided_selected_sku),

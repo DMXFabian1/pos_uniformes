@@ -240,6 +240,29 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
             ["Talla 40 · $199.00", "Talla 42 · $199.00"],
         )
 
+    def test_school_mode_groups_models_before_variants(self) -> None:
+        snapshot_rows = [
+            _row("SKU-1", "Primaria", "Colegio Mexico", "Niña", "Oficial", producto="Falda Escolar Tabla", pieza="Falda", talla="10"),
+            _row("SKU-2", "Primaria", "Colegio Mexico", "Niña", "Oficial", producto="Falda Escolar Tabla", pieza="Falda", talla="12"),
+            _row("SKU-3", "Primaria", "Colegio Mexico", "Niña", "Oficial", producto="Blusa Escolar Blanca", pieza="Camisa", talla="8"),
+        ]
+
+        view = build_guided_catalog_view(
+            snapshot_rows=snapshot_rows,
+            mode_key="school",
+            level_filter="Primaria",
+            school_filter="Colegio Mexico",
+            gender_filter="Oficial Niña",
+        )
+
+        self.assertEqual([card.title for card in view.product_cards], ["Blusa Escolar Blanca", "Falda Escolar Tabla"])
+        self.assertEqual(view.product_cards[0].subtitle, "Tallas: 8")
+        self.assertEqual(view.selected_product_key, view.product_cards[0].key)
+        self.assertEqual(
+            [option.label for option in view.variant_options],
+            ["Talla 8 · $199.00"],
+        )
+
     def test_variant_options_sort_sizes_from_small_to_large(self) -> None:
         snapshot_rows = [
             _row("SKU-1", "Sin nivel", "General", "Unisex", "Oficial", producto="Chaleco Claudia", pieza="Chaleco", talla="32"),
@@ -283,7 +306,7 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
         )
 
         self.assertEqual(view.product_cards[0].title, "Pants 2pz Lobito Liso ESTV 663")
-        self.assertEqual(view.product_cards[0].subtitle, "Talla 12 · Azul")
+        self.assertEqual(view.product_cards[0].subtitle, "Tallas: 12")
         self.assertEqual(view.product_cards[0].meta_label, "")
         self.assertEqual(view.product_cards[0].price_label, "$199.00")
 
@@ -316,7 +339,7 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
             gender_filter="Deportivo",
         )
 
-        self.assertEqual(view.product_cards[0].subtitle, "Talla 12")
+        self.assertEqual(view.product_cards[0].subtitle, "Tallas: 12")
 
     def test_oficial_filter_on_basics_keeps_only_official_general(self) -> None:
         view = build_guided_catalog_view(
