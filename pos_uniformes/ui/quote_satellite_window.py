@@ -280,51 +280,52 @@ class QuoteSatelliteWindow(QMainWindow):
 
     def _apply_styles(self) -> None:
         combo_popup_styles = build_combo_popup_hover_styles(
-            popup_background="#fffaf2",
-            popup_color="#2f2a24",
-            popup_border="#d5c9b9",
-            selected_background="#dfb48f",
-            selected_color="#1f1c19",
-            hover_background="#ece6f3",
-            hover_color="#4e3f67",
-            selected_hover_background="#d8c7ec",
-            selected_hover_color="#35294c",
+            popup_background="#fffdf8",
+            popup_color="#1f1f1b",
+            popup_border="#d8cfc3",
+            selected_background="#f4d4bb",
+            selected_color="#73341c",
+            hover_background="#e7eef5",
+            hover_color="#2d475d",
+            selected_hover_background="#d8e4ee",
+            selected_hover_color="#20384d",
         )
         button_hover_styles = "\n".join(
             (
                 build_button_hover_styles(
                     selector="QPushButton#primaryButton",
-                    hover_background="#9a5534",
-                    hover_color="#fff8ee",
+                    hover_background="#bb613c",
+                    hover_color="#f9f4ea",
                 ),
                 build_button_hover_styles(
                     selector="QPushButton#secondaryButton",
-                    hover_background="#ece6f3",
-                    hover_color="#4e3f67",
-                    hover_border="#d8c7ec",
+                    hover_background="#e6dccd",
+                    hover_color="#2c2a27",
+                    hover_border="#d6ccbe",
                 ),
                 build_button_hover_styles(
                     selector="QPushButton#ghostButton",
-                    hover_background="#ece6f3",
-                    hover_color="#4e3f67",
-                    hover_border="#d8c7ec",
+                    hover_background="#e6dccd",
+                    hover_color="#2c2a27",
+                    hover_border="#d6ccbe",
                 ),
                 build_button_hover_styles(
                     selector="QPushButton#dangerButton",
-                    hover_background="#c56455",
-                    hover_color="#fff8ee",
+                    hover_background="#ecd1ca",
+                    hover_color="#7e2f1f",
+                    hover_border="#d9b4ab",
                 ),
                 build_button_hover_styles(
                     selector="QPushButton#navButton",
-                    hover_background="#ece6f3",
-                    hover_color="#4e3f67",
-                    hover_border="#d8c7ec",
+                    hover_background="#e6dccd",
+                    hover_color="#2c2a27",
+                    hover_border="#d6ccbe",
                 ),
                 build_button_hover_styles(
                     selector="QPushButton#guidedChoiceButton, QPushButton#guidedProductButton",
-                    hover_background="#ece6f3",
-                    hover_color="#4e3f67",
-                    hover_border="#d8c7ec",
+                    hover_background="#e6dccd",
+                    hover_color="#2c2a27",
+                    hover_border="#d6ccbe",
                 ),
             )
         )
@@ -486,6 +487,10 @@ class QuoteSatelliteWindow(QMainWindow):
                 border-radius: 12px;
                 padding: 8px 10px;
                 color: #1f1c19;
+            }
+            QLineEdit:hover, QTextEdit:hover, QDateEdit:hover, QComboBox:hover, QSpinBox:hover {
+                background: #f9efe7;
+                border: 1px solid #dfb496;
             }
             QLineEdit:focus, QTextEdit:focus, QDateEdit:focus, QComboBox:focus, QSpinBox:focus {
                 border: 2px solid #c76b39;
