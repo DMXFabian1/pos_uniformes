@@ -2,6 +2,7 @@
 
 ## Checkpoint actual
 
+- `2026-04-08`: la tabla de `Catalogo` en la app satelite oculta su fila de encabezados para quedarse solo con el listado visual, sin tocar columnas, seleccion ni paginacion. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.
 - `2026-04-08`: el `Catalogo` de la app satelite adopta la misma jerarquia visual base del POS principal: el resumen visible baja debajo de la tabla y el tercer selector arranca en `Solo escuela` para mantener el flujo escolar como ruta por defecto. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.
 - `2026-04-08`: `Catalogo` ajusta la jerarquia del strip de filtros: la paginacion y los chips removibles quedan arriba, mientras el resumen `resultados | stock | ap. | fallbacks` baja debajo de la tabla para no competir con los controles activos. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.
 - `2026-04-08`: `Catalogo` porta el desmontaje visual de filtros activos con chips removibles, reutilizando la misma base de tokens que `Inventario` y dejando la etiqueta interna `tipo_uniforme` fuera de la UI visible en favor de `Linea`. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.

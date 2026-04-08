@@ -79,6 +79,11 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
 
         self.assertLess(browser_layout.indexOf(window.catalog_table), browser_layout.indexOf(window.catalog_status_label))
 
+    def test_catalog_table_hides_header_row(self) -> None:
+        window = QuoteSatelliteWindow(user_id=1)
+
+        self.assertFalse(window.catalog_table.horizontalHeader().isVisible())
+
     def test_add_from_catalog_keeps_current_page(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
         window.catalog_snapshot_rows = [{"sku": "SKU000001"}]
