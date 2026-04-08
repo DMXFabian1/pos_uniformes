@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 
 from PyQt6.QtWidgets import QFrame, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget, QHeaderView
 
+from pos_uniformes.ui.helpers.flow_layout import FlowLayout
+
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
 
@@ -185,6 +187,14 @@ def build_products_tab(window: "MainWindow") -> QWidget:
     status_card.setObjectName("catalogStatusStrip")
     status_layout = QVBoxLayout()
     status_layout.setSpacing(6)
+    window.catalog_active_filters_wrap.setVisible(False)
+    window.catalog_active_filters_flow_layout = FlowLayout(
+        window.catalog_active_filters_wrap,
+        margin=0,
+        h_spacing=6,
+        v_spacing=6,
+    )
+    window.catalog_active_filters_wrap.setLayout(window.catalog_active_filters_flow_layout)
 
     status_header = QHBoxLayout()
     status_header.setSpacing(8)
@@ -193,6 +203,7 @@ def build_products_tab(window: "MainWindow") -> QWidget:
     status_header.addWidget(window.catalog_previous_page_button)
     status_header.addWidget(window.catalog_next_page_button)
     status_layout.addLayout(status_header)
+    status_layout.addWidget(window.catalog_active_filters_wrap)
     status_card.setLayout(status_layout)
 
     filters_grid.setContentsMargins(0, 0, 0, 0)

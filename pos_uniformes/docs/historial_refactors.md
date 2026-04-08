@@ -2,6 +2,7 @@
 
 ## Checkpoint actual
 
+- `2026-04-08`: `Catalogo` porta el desmontaje visual de filtros activos con chips removibles, reutilizando la misma base de tokens que `Inventario` y dejando la etiqueta interna `tipo_uniforme` fuera de la UI visible en favor de `Linea`. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.
 - `2026-04-06`: checkpoint general `validated-tests` para la ronda de mejoras de QR/build/login/carga/tablas/cierre. `check_startup_health.py` queda en verde y la suite completa queda en verde con `636` pruebas.
 - `2026-04-06`: `build` de Windows queda mejor preparado con `packaging/windows/pos_uniformes_windows.spec`, `packaging/windows/presupuestos_satelite_windows.spec` y `utils/pyinstaller_data_helper.py` para incluir `pos_uniformes/migrations` y `pos_uniformes/assets/qr_icons`. Validacion real del bundle queda `pending-manual` en Windows.
 - `2026-04-06`: QR queda endurecido con checkpoint `validated-tests`: el preview ya no depende de relaciones fuera de sesion, y `utils/qr_generator.py` tolera la falta o fallo del icono central sin cerrar la app.

@@ -10,6 +10,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QTableWidgetItem
 
+from pos_uniformes.services.active_filter_service import ActiveFilterToken
 from pos_uniformes.ui.main_window import CATALOG_PAGE_SIZE, INVENTORY_PAGE_SIZE, MainWindow
 
 
@@ -123,6 +124,53 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         window.catalog_type_filter_combo.set_selected_values(["Basico"])
 
         self.assertEqual(window.catalog_type_filter_combo.selected_values(), {"Básico"})
+
+    def test_catalog_active_filter_chips_show_search_and_linea_tokens(self) -> None:
+        window = MainWindow(user_id=1)
+        window._handle_catalog_filters_changed = Mock()
+        window.catalog_search_input.blockSignals(True)
+        window.catalog_search_input.setText("pants")
+        window.catalog_search_input.blockSignals(False)
+        window.catalog_type_filter_combo.set_items(
+            [
+                ("Deportivo", "Deportivo"),
+                ("Oficial", "Oficial"),
+            ]
+        )
+        window.catalog_type_filter_combo.set_selected_values(["Deportivo"])
+
+        window._refresh_catalog_active_filter_chips()
+
+        layout = window.catalog_active_filters_flow_layout
+        texts = [layout.itemAt(index).widget().text() for index in range(layout.count())]
+        self.assertFalse(window.catalog_active_filters_wrap.isHidden())
+        self.assertEqual(
+            texts,
+            ['Texto: "pants"  ×', "Linea: Deportivo  ×"],
+        )
+
+    def test_remove_catalog_multi_filter_chip_keeps_other_selected_values(self) -> None:
+        window = MainWindow(user_id=1)
+        window.catalog_page_index = 3
+        window._handle_catalog_filters_changed = Mock()
+        window.catalog_type_filter_combo.set_items(
+            [
+                ("Deportivo", "Deportivo"),
+                ("Oficial", "Oficial"),
+            ]
+        )
+        window.catalog_type_filter_combo.set_selected_values(["Deportivo", "Oficial"])
+
+        window._handle_remove_catalog_filter_token(
+            ActiveFilterToken(
+                key="linea",
+                display_text="Linea: Deportivo",
+                value="Deportivo",
+            )
+        )
+
+        self.assertEqual(window.catalog_type_filter_combo.selected_values(), {"Oficial"})
+        self.assertEqual(window.catalog_page_index, 0)
 
     def test_refresh_catalog_does_not_force_explicit_column_resize(self) -> None:
         window = MainWindow(user_id=1)

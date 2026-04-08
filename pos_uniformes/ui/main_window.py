@@ -377,6 +377,7 @@ from pos_uniformes.ui.helpers.catalog_selection_helper import (
     find_catalog_row_index_by_variant_id,
     resolve_catalog_row,
 )
+from pos_uniformes.ui.helpers.active_filter_chip_helper import rebuild_active_filter_chips
 from pos_uniformes.ui.helpers.catalog_summary_helper import build_catalog_summary_view
 from pos_uniformes.ui.helpers.cash_session_feedback_helper import (
     build_cash_close_success_feedback,
@@ -1125,6 +1126,8 @@ class MainWindow(QMainWindow):
         self.catalog_permission_label = QLabel()
         self.catalog_results_label = QLabel()
         self.catalog_active_filters_label = QLabel()
+        self.catalog_active_filters_wrap = QWidget()
+        self.catalog_active_filters_flow_layout = None
         self.catalog_pagination_label = QLabel()
         self.catalog_selection_label = QLabel("Selecciona una presentacion en inventario para gestionar cambios.")
         self.products_selection_label = QLabel(build_empty_catalog_selection_view().selection_label)
@@ -7597,6 +7600,7 @@ class MainWindow(QMainWindow):
         )
         self.catalog_results_label.setText(catalog_summary_view.results_summary)
         self.catalog_active_filters_label.setText(catalog_summary_view.active_filters_summary)
+        self._refresh_catalog_active_filter_chips()
         self.catalog_pagination_label.setText(pagination_view.page_label)
         self.catalog_previous_page_button.setEnabled(pagination_view.previous_enabled)
         self.catalog_next_page_button.setEnabled(pagination_view.next_enabled)
@@ -7674,7 +7678,7 @@ class MainWindow(QMainWindow):
                 ("categoria", self.catalog_category_filter_combo.selected_labels()),
                 ("marca", self.catalog_brand_filter_combo.selected_labels()),
                 ("escuela", self.catalog_school_filter_combo.selected_labels()),
-                ("tipo_uniforme", self.catalog_type_filter_combo.selected_labels()),
+                ("linea", self.catalog_type_filter_combo.selected_labels()),
                 ("pieza", self.catalog_piece_filter_combo.selected_labels()),
                 ("talla", self.catalog_size_filter_combo.selected_labels()),
                 ("color", self.catalog_color_filter_combo.selected_labels()),
@@ -7688,6 +7692,76 @@ class MainWindow(QMainWindow):
                 ("incidencias", self.catalog_duplicate_filter_combo.currentData(), self.catalog_duplicate_filter_combo.currentText()),
             ),
         )
+
+    def _catalog_active_filter_tokens(self):
+        return build_active_filter_tokens(
+            search_text=self.catalog_search_input.text(),
+            multi_filters=(
+                ("categoria", self.catalog_category_filter_combo.selected_labels()),
+                ("marca", self.catalog_brand_filter_combo.selected_labels()),
+                ("escuela", self.catalog_school_filter_combo.selected_labels()),
+                ("linea", self.catalog_type_filter_combo.selected_labels()),
+                ("pieza", self.catalog_piece_filter_combo.selected_labels()),
+                ("talla", self.catalog_size_filter_combo.selected_labels()),
+                ("color", self.catalog_color_filter_combo.selected_labels()),
+            ),
+            combo_filters=(
+                ("seccion", self.catalog_school_scope_filter_combo.currentData(), self.catalog_school_scope_filter_combo.currentText()),
+                ("estado", self.catalog_status_filter_combo.currentData(), self.catalog_status_filter_combo.currentText()),
+                ("stock", self.catalog_stock_filter_combo.currentData(), self.catalog_stock_filter_combo.currentText()),
+                ("apartados", self.catalog_layaway_filter_combo.currentData(), self.catalog_layaway_filter_combo.currentText()),
+                ("origen", self.catalog_origin_filter_combo.currentData(), self.catalog_origin_filter_combo.currentText()),
+                ("incidencias", self.catalog_duplicate_filter_combo.currentData(), self.catalog_duplicate_filter_combo.currentText()),
+            ),
+        )
+
+    def _refresh_catalog_active_filter_chips(self) -> None:
+        rebuild_active_filter_chips(
+            container=self.catalog_active_filters_wrap,
+            layout=self.catalog_active_filters_flow_layout,
+            tokens=self._catalog_active_filter_tokens(),
+            on_remove=self._handle_remove_catalog_filter_token,
+        )
+
+    def _handle_remove_catalog_filter_token(self, token) -> None:
+        combo_filters = {
+            "seccion": self.catalog_school_scope_filter_combo,
+            "estado": self.catalog_status_filter_combo,
+            "stock": self.catalog_stock_filter_combo,
+            "apartados": self.catalog_layaway_filter_combo,
+            "origen": self.catalog_origin_filter_combo,
+            "incidencias": self.catalog_duplicate_filter_combo,
+        }
+        multi_filters = {
+            "categoria": self.catalog_category_filter_combo,
+            "marca": self.catalog_brand_filter_combo,
+            "escuela": self.catalog_school_filter_combo,
+            "linea": self.catalog_type_filter_combo,
+            "pieza": self.catalog_piece_filter_combo,
+            "talla": self.catalog_size_filter_combo,
+            "color": self.catalog_color_filter_combo,
+        }
+        if token.key == "texto":
+            self.catalog_search_input.blockSignals(True)
+            self.catalog_search_input.clear()
+            self.catalog_search_input.blockSignals(False)
+            self._handle_catalog_filters_changed_reset_page()
+            return
+        combo = combo_filters.get(token.key)
+        if combo is not None:
+            combo.blockSignals(True)
+            combo.setCurrentIndex(0)
+            combo.blockSignals(False)
+            self._handle_catalog_filters_changed_reset_page()
+            return
+        multi_filter = multi_filters.get(token.key)
+        if multi_filter is not None:
+            selected_values = {
+                value
+                for value in multi_filter.selected_values()
+                if _normalize_filter_value(value) != _normalize_filter_value(token.value)
+            }
+            multi_filter.set_selected_values(selected_values)
 
     @staticmethod
     def _inventory_search_alias_map() -> dict[str, tuple[str, ...]]:
@@ -7750,24 +7824,12 @@ class MainWindow(QMainWindow):
         return build_active_filters_summary(self._inventory_active_filter_labels())
 
     def _refresh_inventory_active_filter_chips(self) -> None:
-        layout = self.inventory_active_filters_flow_layout
-        if layout is None:
-            return
-        while layout.count():
-            item = layout.takeAt(0)
-            widget = item.widget() if item is not None else None
-            if widget is not None:
-                widget.deleteLater()
-        active_tokens = self._inventory_active_filter_tokens()
-        self.inventory_active_filters_wrap.setVisible(bool(active_tokens))
-        for token in active_tokens:
-            button = QPushButton(f"{token.display_text}  ×")
-            button.setObjectName("chipButton")
-            button.setProperty("active", True)
-            button.clicked.connect(
-                lambda _checked=False, active_token=token: self._handle_remove_inventory_filter_token(active_token)
-            )
-            layout.addWidget(button)
+        rebuild_active_filter_chips(
+            container=self.inventory_active_filters_wrap,
+            layout=self.inventory_active_filters_flow_layout,
+            tokens=self._inventory_active_filter_tokens(),
+            on_remove=self._handle_remove_inventory_filter_token,
+        )
 
     def _handle_remove_inventory_filter_token(self, token) -> None:
         combo_filters = {
