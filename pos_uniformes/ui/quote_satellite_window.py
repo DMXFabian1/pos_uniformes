@@ -372,7 +372,13 @@ class QuoteSatelliteWindow(QMainWindow):
                 padding: 0 6px;
                 color: #87492c;
             }
-            QFrame#satHeaderCard, QFrame#satTotalsCard {
+            QFrame#satHeaderCard {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #6f331d, stop:0.55 #a84f2d, stop:1 #c96a35);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 18px;
+            }
+            QFrame#satTotalsCard {
                 background: #f8fafb;
                 border: 1px solid #dce5eb;
                 border-radius: 18px;
@@ -385,10 +391,10 @@ class QuoteSatelliteWindow(QMainWindow):
             QLabel#satTitle {
                 font-size: 20px;
                 font-weight: 800;
-                color: #87492c;
+                color: #f9f4ea;
             }
             QLabel#satMeta {
-                color: #66717b;
+                color: #f6ddca;
                 font-size: 12px;
             }
             QLabel#satFieldLabel {
@@ -408,11 +414,11 @@ class QuoteSatelliteWindow(QMainWindow):
                 font-weight: 800;
             }
             QLabel#satStatus {
-                background: #f5f8fa;
-                border: 1px solid #dce5eb;
-                border-radius: 12px;
-                padding: 6px 10px;
-                color: #66717b;
+                background: rgba(249, 244, 234, 0.09);
+                border: 1px solid rgba(249, 244, 234, 0.14);
+                border-radius: 14px;
+                padding: 8px 12px;
+                color: #f9f4ea;
                 font-weight: 700;
             }
             QLabel#satTotal {
