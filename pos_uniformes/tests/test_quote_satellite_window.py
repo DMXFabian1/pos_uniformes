@@ -80,10 +80,10 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
 
         self.assertLess(browser_layout.indexOf(window.catalog_table), browser_layout.indexOf(window.catalog_status_label))
 
-    def test_catalog_table_hides_header_row(self) -> None:
+    def test_catalog_table_keeps_header_row_visible(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
 
-        self.assertFalse(window.catalog_table.horizontalHeader().isVisible())
+        self.assertFalse(window.catalog_table.horizontalHeader().isHidden())
 
     def test_catalog_active_filter_chips_show_text_and_route(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)

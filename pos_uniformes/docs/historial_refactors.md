@@ -2,6 +2,7 @@
 
 ## Checkpoint actual
 
+- `2026-04-08`: `Catalogo` en la app satelite restaura los encabezados visibles de la tabla despues de confirmar en validacion manual que seguian siendo necesarios para orientar lectura por columna. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.
 - `2026-04-08`: `Catalogo` en la app satelite suma chips removibles para `texto`, `nivel`, `escuela` y `ruta`, reutilizando la misma base de tokens/chips del POS principal y tratando `Escuela + extras generales` como estado base sin chip visible. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.
 - `2026-04-08`: la tabla de `Catalogo` en la app satelite oculta su fila de encabezados para quedarse solo con el listado visual, sin tocar columnas, seleccion ni paginacion. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.
 - `2026-04-08`: el `Catalogo` de la app satelite adopta la misma jerarquia visual base del POS principal: el resumen visible baja debajo de la tabla y el tercer selector arranca en `Solo escuela` para mantener el flujo escolar como ruta por defecto. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.

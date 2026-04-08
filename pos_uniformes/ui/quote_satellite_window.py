@@ -816,7 +816,6 @@ class QuoteSatelliteWindow(QMainWindow):
         self.catalog_table.setHorizontalHeaderLabels(
             ["SKU", "Nivel", "Escuela", "Producto", "Prenda", "Talla", "Color", "Precio"]
         )
-        self.catalog_table.horizontalHeader().setVisible(False)
         self.catalog_table.verticalHeader().setVisible(False)
         self.catalog_table.setAlternatingRowColors(True)
         self.catalog_table.setSelectionBehavior(self.catalog_table.SelectionBehavior.SelectRows)
