@@ -364,7 +364,7 @@ class QuoteSatelliteWindow(QMainWindow):
                 border-radius: 16px;
                 margin-top: 12px;
                 padding-top: 12px;
-                background: #f8fafb;
+                background: #fbf8f2;
                 font-weight: 700;
             }
             QGroupBox::title {
@@ -379,12 +379,12 @@ class QuoteSatelliteWindow(QMainWindow):
                 border-radius: 18px;
             }
             QFrame#satTotalsCard {
-                background: #f8fafb;
+                background: #fbf8f2;
                 border: 1px solid #dce5eb;
                 border-radius: 18px;
             }
             QFrame#satSidebarCard {
-                background: #f8fafb;
+                background: #fbf8f2;
                 border: 1px solid #dce5eb;
                 border-radius: 22px;
             }
@@ -428,7 +428,7 @@ class QuoteSatelliteWindow(QMainWindow):
             }
             QLabel#satSummary {
                 color: #304d60;
-                background: #eef4f8;
+                background: #f2ece3;
                 border: 1px solid #d8e2ea;
                 border-radius: 12px;
                 padding: 10px 12px;
@@ -445,7 +445,7 @@ class QuoteSatelliteWindow(QMainWindow):
             }
             QLabel#satSidebarSummary {
                 color: #66717b;
-                background: #f5f8fa;
+                background: #f1ebe2;
                 border: 1px solid #dce5eb;
                 border-radius: 12px;
                 padding: 10px 12px;
@@ -474,7 +474,7 @@ class QuoteSatelliteWindow(QMainWindow):
             }
             QLabel#satKioskBody {
                 color: #66717b;
-                background: #f5f8fa;
+                background: #f1ebe2;
                 border: 1px solid #dce5eb;
                 border-radius: 12px;
                 padding: 10px 12px;
@@ -492,7 +492,7 @@ class QuoteSatelliteWindow(QMainWindow):
             }
             QLabel#satDetailMeta {
                 color: #66717b;
-                background: #f5f8fa;
+                background: #f1ebe2;
                 border: 1px solid #dce5eb;
                 border-radius: 12px;
                 padding: 10px 12px;
@@ -520,7 +520,7 @@ class QuoteSatelliteWindow(QMainWindow):
             }
             QLabel#guidedPath {
                 color: #66717b;
-                background: #f5f8fa;
+                background: #f1ebe2;
                 border: 1px solid #dce5eb;
                 border-radius: 12px;
                 padding: 10px 12px;
@@ -637,7 +637,7 @@ class QuoteSatelliteWindow(QMainWindow):
             }
             QTableWidget {
                 background: #fffaf2;
-                alternate-background-color: #eef3f7;
+                alternate-background-color: #f5eee5;
                 border: 1px solid #dce5eb;
                 border-radius: 12px;
                 gridline-color: #dce5eb;
@@ -652,7 +652,7 @@ class QuoteSatelliteWindow(QMainWindow):
                 color: #1f1c19;
             }
             QHeaderView::section {
-                background: #eef4f8;
+                background: #efe4d5;
                 color: #304d60;
                 border: none;
                 border-bottom: 1px solid #d8e2ea;
@@ -660,10 +660,10 @@ class QuoteSatelliteWindow(QMainWindow):
                 font-weight: 800;
             }
             QHeaderView {
-                background: #eef4f8;
+                background: #efe4d5;
             }
             QTableCornerButton::section {
-                background: #eef4f8;
+                background: #efe4d5;
                 border: none;
                 border-bottom: 1px solid #d8e2ea;
                 border-right: 1px solid #d8e2ea;

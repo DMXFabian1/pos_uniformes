@@ -2,6 +2,7 @@
 
 ## Checkpoint actual
 
+- `2026-04-08`: la app satelite devuelve solo sus fondos y superficies de apoyo a la familia beige original para bajar la sensacion azul/gris, manteniendo intactos el hero naranja, los bordes y los acentos ya alineados con el POS principal. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.
 - `2026-04-08`: la app satelite recupera un header hero naranja alineado con el POS principal, manteniendo el resto de la paleta mas neutral. El ajuste se limita a `satHeaderCard`, `satTitle`, `satMeta` y `satStatus`. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.
 - `2026-04-08`: la app satelite acerca su paleta base al POS principal: cards, group boxes, estados, summaries, meta cards y cabeceras de tabla pasan a la familia azul/gris neutral, dejando el naranja como acento principal en lugar de color dominante. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.
 - `2026-04-08`: `Catalogo` en la app satelite elimina el footer inferior de estado porque duplicaba informacion ya visible en la paginacion superior y podia empalmarse con la ultima fila del listado. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.
