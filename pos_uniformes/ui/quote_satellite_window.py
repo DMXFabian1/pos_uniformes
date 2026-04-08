@@ -1977,12 +1977,21 @@ class QuoteSatelliteWindow(QMainWindow):
     def _rebuild_guided_product_buttons(self, product_cards) -> None:
         _clear_layout(self.guided_product_grid)
         self.guided_product_buttons = {}
-        column_count = 3
+        compact_mode = self.guided_mode == "basics" and bool(self.guided_selected_piece)
+        column_count = 4 if compact_mode else 3
         for index, card in enumerate(product_cards):
             button = self._build_guided_product_button(card)
             button.setChecked(self.guided_selected_product_key == card.key)
             button.clicked.connect(lambda checked=False, selected=card.key: self._handle_guided_product_selected(selected))
-            self.guided_product_grid.addWidget(button, index // column_count, index % column_count)
+            if compact_mode:
+                self.guided_product_grid.addWidget(
+                    button,
+                    index // column_count,
+                    index % column_count,
+                    alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+                )
+            else:
+                self.guided_product_grid.addWidget(button, index // column_count, index % column_count)
             self.guided_product_buttons[card.key] = button
 
     def _rebuild_guided_variant_buttons(self, variant_options) -> None:
@@ -2037,8 +2046,9 @@ class QuoteSatelliteWindow(QMainWindow):
         button.setProperty("compactCard", compact_card)
         if compact_card:
             button.setMinimumHeight(68)
-            button.setMinimumWidth(0)
-            button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            button.setMinimumWidth(240)
+            button.setMaximumWidth(330)
+            button.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         else:
             button.setMinimumHeight(94)
             button.setMinimumWidth(250)
