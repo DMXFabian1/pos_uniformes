@@ -149,7 +149,7 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         button = window._build_guided_product_button(card)
 
         self.assertTrue(button.property("compactCard"))
-        self.assertEqual(button.minimumHeight(), 76)
+        self.assertEqual(button.minimumHeight(), 68)
         self.assertEqual(button.sizePolicy().horizontalPolicy(), button.sizePolicy().Policy.Expanding)
 
     def test_guided_piece_buttons_use_compact_wrapped_layout(self) -> None:
@@ -167,9 +167,9 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
 
         first_button = window.guided_piece_buttons["Bata"]
         self.assertTrue(first_button.property("compactChoice"))
-        self.assertEqual(first_button.minimumHeight(), 46)
-        self.assertEqual(first_button.maximumWidth(), 220)
-        self.assertEqual(window.guided_piece_grid.count(), 5)
+        self.assertEqual(first_button.minimumHeight(), 42)
+        self.assertEqual(first_button.maximumWidth(), 190)
+        self.assertEqual(window.guided_piece_rows_layout.count(), 2)
 
 
 if __name__ == "__main__":

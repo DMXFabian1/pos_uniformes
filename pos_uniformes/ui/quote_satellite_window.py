@@ -570,10 +570,10 @@ class QuoteSatelliteWindow(QMainWindow):
                 padding: 10px 12px;
             }
             QPushButton#guidedChoiceButton[compactChoice="true"] {
-                padding: 8px 10px;
+                padding: 6px 10px;
             }
             QPushButton#guidedProductButton[compactCard="true"] {
-                padding: 8px 10px;
+                padding: 6px 10px;
             }
             QPushButton#guidedChoiceButton:checked, QPushButton#guidedProductButton:checked {
                 background: #87492c;
@@ -994,12 +994,11 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_piece_hint_label = QLabel("Primero elige la familia de prenda que buscan.")
         self.guided_piece_hint_label.setObjectName("guidedStepHint")
         self.guided_piece_hint_label.setWordWrap(True)
-        self.guided_piece_grid = QGridLayout()
-        self.guided_piece_grid.setHorizontalSpacing(8)
-        self.guided_piece_grid.setVerticalSpacing(8)
+        self.guided_piece_rows_layout = QVBoxLayout()
+        self.guided_piece_rows_layout.setSpacing(8)
         piece_section_layout.addWidget(self.guided_piece_title_label)
         piece_section_layout.addWidget(self.guided_piece_hint_label)
-        piece_section_layout.addLayout(self.guided_piece_grid)
+        piece_section_layout.addLayout(self.guided_piece_rows_layout)
         self.guided_piece_section.setLayout(piece_section_layout)
         steps_layout.addWidget(self.guided_piece_section)
 
@@ -1946,28 +1945,34 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_bucket_row.addStretch()
 
     def _rebuild_guided_piece_buttons(self, options) -> None:
-        _clear_layout(self.guided_piece_grid)
+        _clear_layout(self.guided_piece_rows_layout)
         self.guided_piece_buttons = {}
-        column_count = 4
-        for option in options:
+        buttons_per_row = 3
+        current_row = None
+        for index, option in enumerate(options):
+            if index % buttons_per_row == 0:
+                current_row = QHBoxLayout()
+                current_row.setContentsMargins(0, 0, 0, 0)
+                current_row.setSpacing(8)
+                self.guided_piece_rows_layout.addLayout(current_row)
             button = self._build_guided_choice_button(option.label)
             button.setProperty("compactChoice", True)
             button.setEnabled(option.enabled)
             button.setChecked(self.guided_selected_piece == option.key)
-            button.setMinimumHeight(46)
-            button.setMaximumWidth(220)
-            button.setSizePolicy(QSizePolicy.Policy.Maximum, QSizePolicy.Policy.Fixed)
+            button.setMinimumHeight(42)
+            button.setMaximumWidth(190)
+            button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
             button.style().unpolish(button)
             button.style().polish(button)
             button.clicked.connect(lambda checked=False, selected=option.key: self._handle_guided_piece_selected(selected))
-            index = len(self.guided_piece_buttons)
-            self.guided_piece_grid.addWidget(
-                button,
-                index // column_count,
-                index % column_count,
-                alignment=Qt.AlignmentFlag.AlignLeft,
-            )
+            assert current_row is not None
+            current_row.addWidget(button, 0, Qt.AlignmentFlag.AlignLeft)
             self.guided_piece_buttons[option.key] = button
+        if self.guided_piece_rows_layout.count():
+            for row_index in range(self.guided_piece_rows_layout.count()):
+                row_layout = self.guided_piece_rows_layout.itemAt(row_index).layout()
+                if row_layout is not None:
+                    row_layout.addStretch()
 
     def _rebuild_guided_product_buttons(self, product_cards) -> None:
         _clear_layout(self.guided_product_grid)
@@ -2031,7 +2036,7 @@ class QuoteSatelliteWindow(QMainWindow):
         compact_card = self.guided_mode == "basics" and bool(self.guided_selected_piece)
         button.setProperty("compactCard", compact_card)
         if compact_card:
-            button.setMinimumHeight(76)
+            button.setMinimumHeight(68)
             button.setMinimumWidth(0)
             button.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         else:
@@ -2040,7 +2045,7 @@ class QuoteSatelliteWindow(QMainWindow):
         row = next((item for item in self.catalog_snapshot_rows if str(item.get("sku")) == card.sku), None)
         if row is not None:
             button.setIcon(QIcon(_catalog_row_icon(row)))
-            button.setIconSize(QSize(28, 28) if compact_card else QSize(34, 34))
+            button.setIconSize(QSize(24, 24) if compact_card else QSize(34, 34))
         button.style().unpolish(button)
         button.style().polish(button)
         return button
