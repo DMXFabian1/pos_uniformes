@@ -1977,7 +1977,7 @@ class QuoteSatelliteWindow(QMainWindow):
         _clear_layout(self.guided_product_rows_layout)
         self.guided_product_buttons = {}
         compact_mode = self.guided_mode == "basics" and bool(self.guided_selected_piece)
-        column_count = 5 if compact_mode else 3
+        column_count = self._guided_product_column_count(compact_mode)
         for index, card in enumerate(product_cards):
             if index % column_count == 0:
                 row_layout = QHBoxLayout()
@@ -1996,6 +1996,16 @@ class QuoteSatelliteWindow(QMainWindow):
                 row_layout = self.guided_product_rows_layout.itemAt(row_index).layout()
                 if row_layout is not None:
                     row_layout.addStretch()
+
+    def _guided_product_column_count(self, compact_mode: bool) -> int:
+        if not compact_mode:
+            return 3
+        card_width = 252
+        spacing = 4
+        viewport_width = self.guided_product_scroll.viewport().width()
+        available_width = max(viewport_width - 8, card_width)
+        estimated = max(1, (available_width + spacing) // (card_width + spacing))
+        return max(1, min(5, estimated))
 
     def _rebuild_guided_variant_buttons(self, variant_options) -> None:
         _clear_layout(self.guided_variant_row)
