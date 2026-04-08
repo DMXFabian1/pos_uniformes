@@ -28,10 +28,18 @@ class SizeOptionSortHelperTests(unittest.TestCase):
         self.assertEqual(
             group_size_options(["MD", "4", "EXG", "CH", "10", "GD-EXG", "Unitalla", "0-2"]),
             [
-                ("Numericas", ["4", "10"]),
-                ("Rangos", ["0-2"]),
+                ("Numericas", ["0-2", "4", "10"]),
                 ("Letras", ["CH", "MD", "GD-EXG", "EXG"]),
                 ("Especiales", ["Unitalla"]),
+            ],
+        )
+
+    def test_groups_numeric_ranges_with_numeric_sizes(self) -> None:
+        self.assertEqual(
+            group_size_options(["12", "3-5", "8", "0-2", "CH"]),
+            [
+                ("Numericas", ["0-2", "3-5", "8", "12"]),
+                ("Letras", ["CH"]),
             ],
         )
 
