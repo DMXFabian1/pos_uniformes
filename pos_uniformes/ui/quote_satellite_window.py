@@ -285,10 +285,10 @@ class QuoteSatelliteWindow(QMainWindow):
             popup_border="#d8cfc3",
             selected_background="#f4d4bb",
             selected_color="#73341c",
-            hover_background="#e7eef5",
-            hover_color="#2d475d",
-            selected_hover_background="#d8e4ee",
-            selected_hover_color="#20384d",
+            hover_background="#d5e1ec",
+            hover_color="#1d3950",
+            selected_hover_background="#c7d7e5",
+            selected_hover_color="#173046",
         )
         button_hover_styles = "\n".join(
             (
@@ -322,7 +322,13 @@ class QuoteSatelliteWindow(QMainWindow):
                     hover_border="#d6ccbe",
                 ),
                 build_button_hover_styles(
-                    selector="QPushButton#guidedChoiceButton, QPushButton#guidedProductButton",
+                    selector="QPushButton#guidedChoiceButton",
+                    hover_background="#e6dccd",
+                    hover_color="#2c2a27",
+                    hover_border="#d6ccbe",
+                ),
+                build_button_hover_styles(
+                    selector="QPushButton#guidedProductButton",
                     hover_background="#e6dccd",
                     hover_color="#2c2a27",
                     hover_border="#d6ccbe",
