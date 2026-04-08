@@ -57,7 +57,7 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
 
     def form_label(text: str) -> QLabel:
         label = QLabel(text)
-        label.setObjectName("cashierMetaLabel")
+        label.setObjectName("quoteFormLabel")
         return label
 
     scan_stack = QVBoxLayout()

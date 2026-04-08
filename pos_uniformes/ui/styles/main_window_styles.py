@@ -218,6 +218,14 @@ def _build_main_window_shell_styles() -> str:
                 padding: 9px 12px;
                 font-weight: 700;
             }
+            #quoteFormLabel {
+                background: transparent;
+                border: none;
+                color: #7a4f39;
+                padding: 0;
+                font-size: 12px;
+                font-weight: 800;
+            }
             #quoteDetailCard {
                 background: #f8fafb;
                 border: 1px solid #dce5eb;

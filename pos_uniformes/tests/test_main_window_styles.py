@@ -20,6 +20,8 @@ class MainWindowStylesTests(unittest.TestCase):
 
         self.assertIn("QMainWindow, QWidget", stylesheet)
         self.assertIn("#cashierFeedbackLabel[tone=\"warning\"]", stylesheet)
+        self.assertIn("#quoteFormLabel", stylesheet)
+        self.assertIn("color: #7a4f39;", stylesheet)
         self.assertIn("QPushButton#toolbarAccentButton", stylesheet)
         self.assertIn("#qrPreview", stylesheet)
         self.assertIn("#kpiCard[tone=\"warning\"]", stylesheet)
