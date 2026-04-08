@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 import unicodedata
 
+from pos_uniformes.ui.helpers.catalog_product_form_mode_helper import REGULAR_CATEGORY_EXCLUSION_SET
+
 
 @dataclass(frozen=True)
 class GuidedCatalogOption:
@@ -167,7 +169,8 @@ def _is_active_row(row: dict[str, object]) -> bool:
 def _matches_mode(*, row: dict[str, object], mode_key: str) -> bool:
     school_name = str(row.get("escuela_nombre") or "General").strip() or "General"
     if mode_key == "basics":
-        return school_name == "General"
+        normalized_category_name = _normalize_text(row.get("categoria_nombre"))
+        return school_name == "General" and normalized_category_name not in REGULAR_CATEGORY_EXCLUSION_SET
     return school_name != "General" and _classify_line_type(row) in {"DEPORTIVO", "OFICIAL"}
 
 

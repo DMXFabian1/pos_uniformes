@@ -188,6 +188,40 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
         self.assertEqual([card.sku for card in view.product_cards], ["SKU-1"])
         self.assertEqual(view.path_label, "Basicos > Todos > Uniforme")
 
+    def test_basics_mode_excludes_regular_categories_even_if_school_is_general(self) -> None:
+        view = build_guided_catalog_view(
+            snapshot_rows=[
+                _row(
+                    "SKU-1",
+                    "Sin nivel",
+                    "General",
+                    "Unisex",
+                    "Básico",
+                    producto="Pants Escolar",
+                    pieza="Pants 2pz",
+                    categoria="Básico",
+                ),
+                _row(
+                    "SKU-2",
+                    "Sin nivel",
+                    "General",
+                    "Unisex",
+                    "Deportivo casual",
+                    producto="Short Deportivo",
+                    pieza="Short",
+                    categoria="Deportivo casual",
+                ),
+            ],
+            mode_key="basics",
+            level_filter="",
+            school_filter="",
+            gender_filter="Todos",
+            bucket_filter="Todos",
+            piece_filter="Pants 2pz",
+        )
+
+        self.assertEqual([card.sku for card in view.product_cards], ["SKU-1"])
+
     def test_basics_mode_can_filter_basicos_vs_extras(self) -> None:
         snapshot_rows = [
             _row("SKU-1", "Sin nivel", "General", "Unisex", "Básico", producto="Pantalón Escolar", pieza="Pantalón"),
@@ -427,11 +461,13 @@ def _row(
     producto: str | None = None,
     pieza: str = "Uniforme",
     talla: str = "12",
+    categoria: str = "Uniformes",
 ) -> dict[str, object]:
     return {
         "sku": sku,
         "nivel_educativo_nombre": nivel,
         "escuela_nombre": escuela,
+        "categoria_nombre": categoria,
         "producto_genero": genero,
         "producto_nombre": producto or f"Producto {sku}",
         "producto_nombre_base": producto or f"Producto {sku}",

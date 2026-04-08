@@ -15,6 +15,17 @@ UNIFORM_CATEGORIES = {
     "accesorio",
 }
 
+UNIFORM_GARMENT_TYPES = {
+    "uniformes",
+    "uniforme",
+    "basico",
+    "básico",
+    "deportivo",
+    "oficial",
+    "escolta",
+    "accesorio",
+}
+
 REGULAR_CATEGORY_SUGGESTIONS = (
     "Ropa casual",
     "Calzado",
@@ -24,6 +35,16 @@ REGULAR_CATEGORY_SUGGESTIONS = (
     "Pijamas",
     "Deportivo casual",
 )
+
+REGULAR_CATEGORY_EXCLUSION_SET = {
+    "ropa casual",
+    "calzado",
+    "accesorios",
+    "temporada",
+    "ropa interior",
+    "pijamas",
+    "deportivo casual",
+}
 
 REGULAR_GARMENT_SUGGESTIONS = (
     "Casual",

@@ -5087,6 +5087,7 @@ class MainWindow(QMainWindow):
         marca_id = data["marca_id"]
         nombre = str(data["nombre"]).strip()
         descripcion = str(data["descripcion"]).strip()
+        is_regular_product_mode = str(data.get("modo_catalogo") or "").strip() == "regular"
 
         created_product_id: int | None = None
         selected_sizes = [str(value).strip() for value in data.get("tallas", []) if str(value).strip()]
@@ -5102,11 +5103,15 @@ class MainWindow(QMainWindow):
                 marca = session.get(Marca, int(marca_id))
                 if user is None or categoria is None or marca is None:
                     raise ValueError("Usuario, categoria o marca no encontrada.")
-                escuela = self._resolve_named_taxonomy(session, Escuela, str(data["escuela"]))
+                escuela = None if is_regular_product_mode else self._resolve_named_taxonomy(session, Escuela, str(data["escuela"]))
                 tipo_prenda = self._resolve_named_taxonomy(session, TipoPrenda, str(data["tipo_prenda"]))
                 tipo_pieza = self._resolve_named_taxonomy(session, TipoPieza, str(data["tipo_pieza"]))
                 atributo = self._resolve_named_taxonomy(session, AtributoProducto, str(data["atributo"]))
-                nivel_educativo = self._resolve_named_taxonomy(session, NivelEducativo, str(data["nivel_educativo"]))
+                nivel_educativo = (
+                    None
+                    if is_regular_product_mode
+                    else self._resolve_named_taxonomy(session, NivelEducativo, str(data["nivel_educativo"]))
+                )
                 producto = CatalogService.crear_producto(
                     session,
                     user,
@@ -5120,7 +5125,7 @@ class MainWindow(QMainWindow):
                     nivel_educativo=nivel_educativo,
                     atributo=atributo,
                     genero=str(data["genero"]),
-                    escudo=str(data["escudo"]),
+                    escudo="" if is_regular_product_mode else str(data["escudo"]),
                     ubicacion=str(data["ubicacion"]),
                 )
                 session.commit()
@@ -5300,6 +5305,7 @@ class MainWindow(QMainWindow):
         marca_id = data["marca_id"]
         nombre = str(data["nombre"]).strip()
         descripcion = str(data["descripcion"]).strip()
+        is_regular_product_mode = str(data.get("modo_catalogo") or "").strip() == "regular"
 
         try:
             with get_session() as session:
@@ -5313,11 +5319,15 @@ class MainWindow(QMainWindow):
                 marca = session.get(Marca, int(marca_id))
                 if usuario is None or producto is None or categoria is None or marca is None:
                     raise ValueError("No se pudo cargar el producto, categoria o marca.")
-                escuela = self._resolve_named_taxonomy(session, Escuela, str(data["escuela"]))
+                escuela = None if is_regular_product_mode else self._resolve_named_taxonomy(session, Escuela, str(data["escuela"]))
                 tipo_prenda = self._resolve_named_taxonomy(session, TipoPrenda, str(data["tipo_prenda"]))
                 tipo_pieza = self._resolve_named_taxonomy(session, TipoPieza, str(data["tipo_pieza"]))
                 atributo = self._resolve_named_taxonomy(session, AtributoProducto, str(data["atributo"]))
-                nivel_educativo = self._resolve_named_taxonomy(session, NivelEducativo, str(data["nivel_educativo"]))
+                nivel_educativo = (
+                    None
+                    if is_regular_product_mode
+                    else self._resolve_named_taxonomy(session, NivelEducativo, str(data["nivel_educativo"]))
+                )
                 CatalogService.actualizar_producto(
                     session=session,
                     usuario=usuario,
@@ -5332,7 +5342,7 @@ class MainWindow(QMainWindow):
                     nivel_educativo=nivel_educativo,
                     atributo=atributo,
                     genero=str(data["genero"]),
-                    escudo=str(data["escudo"]),
+                    escudo="" if is_regular_product_mode else str(data["escudo"]),
                     ubicacion=str(data["ubicacion"]),
                 )
                 session.commit()
