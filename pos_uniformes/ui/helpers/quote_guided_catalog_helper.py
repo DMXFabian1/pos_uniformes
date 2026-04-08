@@ -40,6 +40,7 @@ class GuidedCatalogView:
     level_options: tuple[GuidedCatalogOption, ...]
     school_options: tuple[GuidedCatalogOption, ...]
     gender_options: tuple[GuidedCatalogOption, ...]
+    profile_options: tuple[GuidedCatalogOption, ...]
     bucket_options: tuple[GuidedCatalogOption, ...]
     piece_options: tuple[GuidedCatalogOption, ...]
     product_cards: tuple[GuidedCatalogProductCard, ...]
@@ -58,6 +59,7 @@ def build_guided_catalog_view(
     level_filter: str,
     school_filter: str,
     gender_filter: str,
+    profile_filter: str = "TODOS",
     bucket_filter: str = "TODOS",
     piece_filter: str = "",
     selected_product_key: str = "",
@@ -68,6 +70,7 @@ def build_guided_catalog_view(
     normalized_level = level_filter.strip()
     normalized_school = school_filter.strip()
     normalized_gender = _normalize_segment_filter(gender_filter)
+    normalized_profile = _normalize_school_profile_filter(profile_filter)
     normalized_bucket = _normalize_bucket_filter(bucket_filter)
     normalized_piece = piece_filter.strip()
 
@@ -85,8 +88,19 @@ def build_guided_catalog_view(
         level_filter=normalized_level,
         school_filter=normalized_school,
     )
-    gender_options = _build_segment_options(gender_source_rows)
+    gender_options = (
+        _build_school_line_options(gender_source_rows)
+        if normalized_mode == "school"
+        else _build_segment_options(gender_source_rows)
+    )
+    profile_options = (
+        _build_school_profile_options(gender_source_rows)
+        if normalized_mode == "school" and normalized_gender == "OFICIAL"
+        else tuple()
+    )
     bucket_source_rows = [row for row in gender_source_rows if _matches_segment_filter(normalized_gender, row)]
+    if normalized_mode == "school" and normalized_gender == "OFICIAL" and normalized_profile != "TODOS":
+        bucket_source_rows = [row for row in bucket_source_rows if _matches_school_profile_filter(normalized_profile, row)]
     bucket_options = _build_bucket_options(bucket_source_rows) if normalized_mode == "basics" else tuple()
     piece_source_rows = [row for row in bucket_source_rows if _matches_bucket_filter(normalized_bucket, row)]
     piece_options = _build_piece_options(piece_source_rows) if normalized_mode == "basics" else tuple()
@@ -97,6 +111,7 @@ def build_guided_catalog_view(
         level_filter=normalized_level,
         school_filter=normalized_school,
         gender_filter=normalized_gender,
+        profile_filter=normalized_profile,
         bucket_filter=normalized_bucket,
         piece_filter=normalized_piece,
     )
@@ -115,6 +130,7 @@ def build_guided_catalog_view(
         level_filter=normalized_level,
         school_filter=normalized_school,
         gender_filter=normalized_gender,
+        profile_filter=normalized_profile,
         bucket_filter=normalized_bucket,
         piece_filter=normalized_piece,
     )
@@ -123,6 +139,7 @@ def build_guided_catalog_view(
         level_filter=normalized_level,
         school_filter=normalized_school,
         gender_filter=normalized_gender,
+        profile_filter=normalized_profile,
         bucket_filter=normalized_bucket,
         piece_filter=normalized_piece,
     )
@@ -130,6 +147,7 @@ def build_guided_catalog_view(
         level_options=level_options,
         school_options=school_options,
         gender_options=gender_options,
+        profile_options=profile_options,
         bucket_options=bucket_options,
         piece_options=piece_options,
         product_cards=product_cards,
@@ -224,6 +242,7 @@ def _filter_product_rows(
     level_filter: str,
     school_filter: str,
     gender_filter: str,
+    profile_filter: str,
     bucket_filter: str,
     piece_filter: str,
 ) -> tuple[list[dict[str, object]], str]:
@@ -239,6 +258,8 @@ def _filter_product_rows(
         school_filter=school_filter,
     )
     filtered_rows = [row for row in filtered_rows if _matches_segment_filter(gender_filter, row)]
+    if mode_key == "school" and gender_filter == "OFICIAL" and profile_filter != "TODOS":
+        filtered_rows = [row for row in filtered_rows if _matches_school_profile_filter(profile_filter, row)]
     filtered_rows = [row for row in filtered_rows if _matches_bucket_filter(bucket_filter, row)]
     if mode_key == "basics" and not piece_filter:
         return [], "Selecciona un tipo de pieza para ver modelos."
@@ -263,6 +284,34 @@ def _build_segment_options(rows: list[dict[str, object]]) -> tuple[GuidedCatalog
     built_options: list[GuidedCatalogOption] = []
     for key, label in options:
         count = sum(1 for row in rows if _matches_segment_filter(key, row))
+        built_options.append(GuidedCatalogOption(key=key, label=label, count=count, enabled=count > 0))
+    return tuple(built_options)
+
+
+def _build_school_line_options(rows: list[dict[str, object]]) -> tuple[GuidedCatalogOption, ...]:
+    options = (
+        ("DEPORTIVO", "Deportivo"),
+        ("OFICIAL", "Oficial"),
+        ("TODOS", "Todos"),
+    )
+    built_options: list[GuidedCatalogOption] = []
+    for key, label in options:
+        count = sum(1 for row in rows if _matches_segment_filter(key, row))
+        built_options.append(GuidedCatalogOption(key=key, label=label, count=count, enabled=count > 0))
+    return tuple(built_options)
+
+
+def _build_school_profile_options(rows: list[dict[str, object]]) -> tuple[GuidedCatalogOption, ...]:
+    official_rows = [row for row in rows if _matches_segment_filter("OFICIAL", row)]
+    options = (
+        ("NINA", "Niña"),
+        ("NINO", "Niño"),
+        ("COMPARTIDO", "Compartido"),
+        ("TODOS", "Todos"),
+    )
+    built_options: list[GuidedCatalogOption] = []
+    for key, label in options:
+        count = sum(1 for row in official_rows if _matches_school_profile_filter(key, row))
         built_options.append(GuidedCatalogOption(key=key, label=label, count=count, enabled=count > 0))
     return tuple(built_options)
 
@@ -430,6 +479,7 @@ def _build_status_label(
     level_filter: str,
     school_filter: str,
     gender_filter: str,
+    profile_filter: str,
     bucket_filter: str,
     piece_filter: str,
 ) -> str:
@@ -441,6 +491,8 @@ def _build_status_label(
         parts.append(f"Escuela: {school_filter}")
     if gender_filter != "TODOS":
         parts.append(f"Linea: {_segment_label(gender_filter)}")
+    if gender_filter == "OFICIAL" and profile_filter != "TODOS":
+        parts.append(f"Perfil: {_school_profile_label(profile_filter)}")
     if mode_key == "basics" and bucket_filter != "TODOS":
         parts.append(f"Grupo: {_bucket_label(bucket_filter)}")
     if mode_key == "basics" and piece_filter:
@@ -454,6 +506,7 @@ def _build_path_label(
     level_filter: str,
     school_filter: str,
     gender_filter: str,
+    profile_filter: str,
     bucket_filter: str,
     piece_filter: str,
 ) -> str:
@@ -462,6 +515,8 @@ def _build_path_label(
     else:
         path_parts = ["Uniformes", level_filter or "sin nivel", school_filter or "sin escuela"]
     path_parts.append(_segment_label(gender_filter))
+    if gender_filter == "OFICIAL" and profile_filter != "TODOS":
+        path_parts.append(_school_profile_label(profile_filter))
     if mode_key == "basics" and bucket_filter != "TODOS":
         path_parts.append(_bucket_label(bucket_filter))
     if mode_key == "basics" and piece_filter:
@@ -469,9 +524,19 @@ def _build_path_label(
     return " > ".join(path_parts)
 
 
+def _school_profile_label(profile_key: str) -> str:
+    return {
+        "NINA": "Niña",
+        "NINO": "Niño",
+        "COMPARTIDO": "Compartido",
+        "TODOS": "Todos",
+    }.get(profile_key, "Todos")
+
+
 def _segment_label(gender_key: str) -> str:
     return {
         "DEPORTIVO": "Deportivo",
+        "OFICIAL": "Oficial",
         "OFICIAL_NINA": "Oficial Niña",
         "OFICIAL_NINO": "Oficial Niño",
         "TODOS": "Todos",
@@ -484,10 +549,23 @@ def _normalize_segment_filter(value: str) -> str:
     compact = normalized.replace(" ", "")
     if compact in {"deportivo", "deporte"}:
         return "DEPORTIVO"
+    if compact in {"oficial"}:
+        return "OFICIAL"
     if compact in {"oficialnina", "nina", "femenino"}:
         return "OFICIAL_NINA"
     if compact in {"oficialnino", "nino", "masculino"}:
         return "OFICIAL_NINO"
+    return "TODOS"
+
+
+def _normalize_school_profile_filter(value: str) -> str:
+    normalized = _normalize_text(value).replace(" ", "")
+    if normalized in {"nina", "femenino"}:
+        return "NINA"
+    if normalized in {"nino", "masculino"}:
+        return "NINO"
+    if normalized in {"compartido", "unisex", "mixto"}:
+        return "COMPARTIDO"
     return "TODOS"
 
 
@@ -518,6 +596,8 @@ def _matches_segment_filter(filter_key: str, row: dict[str, object]) -> bool:
     line_key = _classify_line_type(row)
     if filter_key == "DEPORTIVO":
         return line_key == "DEPORTIVO"
+    if filter_key == "OFICIAL":
+        return line_key == "OFICIAL"
     if filter_key == "OFICIAL_NINA":
         if line_key != "OFICIAL":
             return False
@@ -531,6 +611,26 @@ def _matches_segment_filter(filter_key: str, row: dict[str, object]) -> bool:
             return True
         return _classify_gender(row.get("producto_genero")) in {"NINO", "UNISEX"}
     return True
+
+
+def _matches_school_profile_filter(profile_key: str, row: dict[str, object]) -> bool:
+    if profile_key == "TODOS":
+        return True
+    return _classify_school_profile(row) == profile_key
+
+
+def _classify_school_profile(row: dict[str, object]) -> str:
+    normalized_piece = _normalize_text(row.get("tipo_pieza_nombre"))
+    if normalized_piece in {"pants", "pants 2pz", "pants suelto", "pantalon", "short"}:
+        return "COMPARTIDO"
+    if _is_shared_uniform_top(row):
+        return "COMPARTIDO"
+    gender_key = _classify_gender(row.get("producto_genero"))
+    if gender_key == "NINA":
+        return "NINA"
+    if gender_key == "NINO":
+        return "NINO"
+    return "COMPARTIDO"
 
 
 def _classify_gender(raw_value: object) -> str:

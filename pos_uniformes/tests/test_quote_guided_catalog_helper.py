@@ -263,6 +263,51 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
             ["Talla 8 · $199.00"],
         )
 
+    def test_school_mode_exposes_line_and_profile_options_for_official(self) -> None:
+        snapshot_rows = [
+            _row("SKU-1", "Primaria", "Colegio Mexico", "Niña", "Oficial", producto="Suéter Escolar", pieza="Suéter"),
+            _row("SKU-2", "Primaria", "Colegio Mexico", "Niño", "Oficial", producto="Suéter Escolar", pieza="Suéter"),
+            _row("SKU-3", "Primaria", "Colegio Mexico", "Unisex", "Deportivo", producto="Playera Deportiva", pieza="Playera"),
+        ]
+
+        view = build_guided_catalog_view(
+            snapshot_rows=snapshot_rows,
+            mode_key="school",
+            level_filter="Primaria",
+            school_filter="Colegio Mexico",
+            gender_filter="Oficial",
+        )
+
+        self.assertEqual([option.label for option in view.gender_options], ["Deportivo", "Oficial", "Todos"])
+        self.assertEqual([option.label for option in view.profile_options], ["Niña", "Niño", "Compartido", "Todos"])
+
+    def test_school_official_profile_ignores_shared_pants(self) -> None:
+        snapshot_rows = [
+            _row("SKU-1", "Primaria", "Colegio Mexico", "Niña", "Oficial", producto="Suéter Escolar", pieza="Suéter"),
+            _row("SKU-2", "Primaria", "Colegio Mexico", "Niño", "Oficial", producto="Suéter Escolar", pieza="Suéter"),
+            _row("SKU-3", "Primaria", "Colegio Mexico", "Unisex", "Oficial", producto="Pants Escolar", pieza="Pants Suelto"),
+        ]
+
+        nina_view = build_guided_catalog_view(
+            snapshot_rows=snapshot_rows,
+            mode_key="school",
+            level_filter="Primaria",
+            school_filter="Colegio Mexico",
+            gender_filter="Oficial",
+            profile_filter="Niña",
+        )
+        shared_view = build_guided_catalog_view(
+            snapshot_rows=snapshot_rows,
+            mode_key="school",
+            level_filter="Primaria",
+            school_filter="Colegio Mexico",
+            gender_filter="Oficial",
+            profile_filter="Compartido",
+        )
+
+        self.assertEqual([card.title for card in nina_view.product_cards], ["Suéter Escolar"])
+        self.assertEqual([card.title for card in shared_view.product_cards], ["Pants Escolar"])
+
     def test_variant_options_sort_sizes_from_small_to_large(self) -> None:
         snapshot_rows = [
             _row("SKU-1", "Sin nivel", "General", "Unisex", "Oficial", producto="Chaleco Claudia", pieza="Chaleco", talla="32"),

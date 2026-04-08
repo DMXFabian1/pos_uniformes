@@ -186,6 +186,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_selected_level = ""
         self.guided_selected_school = ""
         self.guided_selected_gender = "TODOS"
+        self.guided_selected_profile = "TODOS"
         self.guided_selected_bucket = "TODOS"
         self.guided_selected_piece = ""
         self.guided_selected_product_key = ""
@@ -203,6 +204,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_level_buttons: dict[str, QPushButton] = {}
         self.guided_school_buttons: dict[str, QPushButton] = {}
         self.guided_gender_buttons: dict[str, QPushButton] = {}
+        self.guided_profile_buttons: dict[str, QPushButton] = {}
         self.guided_bucket_buttons: dict[str, QPushButton] = {}
         self.guided_piece_buttons: dict[str, QPushButton] = {}
         self.guided_variant_buttons: dict[str, QPushButton] = {}
@@ -974,6 +976,23 @@ class QuoteSatelliteWindow(QMainWindow):
         gender_section_layout.addLayout(self.guided_gender_row)
         self.guided_gender_section.setLayout(gender_section_layout)
         steps_layout.addWidget(self.guided_gender_section)
+
+        self.guided_profile_section = QWidget()
+        profile_section_layout = QVBoxLayout()
+        profile_section_layout.setContentsMargins(0, 0, 0, 0)
+        profile_section_layout.setSpacing(8)
+        self.guided_profile_title_label = QLabel("5. Elige perfil oficial")
+        self.guided_profile_title_label.setObjectName("guidedStepTitle")
+        self.guided_profile_hint_label = QLabel("Usa este paso solo para separar niña, niño o compartido.")
+        self.guided_profile_hint_label.setObjectName("guidedStepHint")
+        self.guided_profile_hint_label.setWordWrap(True)
+        self.guided_profile_row = QHBoxLayout()
+        self.guided_profile_row.setSpacing(8)
+        profile_section_layout.addWidget(self.guided_profile_title_label)
+        profile_section_layout.addWidget(self.guided_profile_hint_label)
+        profile_section_layout.addLayout(self.guided_profile_row)
+        self.guided_profile_section.setLayout(profile_section_layout)
+        steps_layout.addWidget(self.guided_profile_section)
 
         self.guided_bucket_section = QWidget()
         bucket_section_layout = QVBoxLayout()
@@ -1758,6 +1777,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_mode = "basics" if mode_key == "basics" else "school"
         self.guided_selected_level = ""
         self.guided_selected_school = ""
+        self.guided_selected_gender = "TODOS"
+        self.guided_selected_profile = "TODOS"
         self.guided_selected_bucket = "BASICO" if self.guided_mode == "basics" else "TODOS"
         self.guided_selected_piece = ""
         self.guided_selected_product_key = ""
@@ -1767,19 +1788,28 @@ class QuoteSatelliteWindow(QMainWindow):
     def _handle_guided_level_selected(self, level_name: str) -> None:
         self.guided_selected_level = level_name
         self.guided_selected_school = ""
+        self.guided_selected_profile = "TODOS"
         self.guided_selected_product_key = ""
         self.guided_selected_sku = ""
         self._refresh_guided_browser()
 
     def _handle_guided_school_selected(self, school_name: str) -> None:
         self.guided_selected_school = school_name
+        self.guided_selected_profile = "TODOS"
         self.guided_selected_product_key = ""
         self.guided_selected_sku = ""
         self._refresh_guided_browser()
 
     def _handle_guided_gender_selected(self, gender_key: str) -> None:
         self.guided_selected_gender = gender_key
+        self.guided_selected_profile = "TODOS"
         self.guided_selected_piece = ""
+        self.guided_selected_product_key = ""
+        self.guided_selected_sku = ""
+        self._refresh_guided_browser()
+
+    def _handle_guided_profile_selected(self, profile_key: str) -> None:
+        self.guided_selected_profile = profile_key
         self.guided_selected_product_key = ""
         self.guided_selected_sku = ""
         self._refresh_guided_browser()
@@ -1817,6 +1847,7 @@ class QuoteSatelliteWindow(QMainWindow):
             level_filter=self.guided_selected_level,
             school_filter=self.guided_selected_school,
             gender_filter=self.guided_selected_gender,
+            profile_filter=self.guided_selected_profile,
             bucket_filter=self.guided_selected_bucket,
             piece_filter=self.guided_selected_piece,
             selected_product_key=self.guided_selected_product_key,
@@ -1832,6 +1863,14 @@ class QuoteSatelliteWindow(QMainWindow):
         available_schools = {option.key for option in view.school_options}
         if self.guided_mode == "school" and self.guided_selected_school and self.guided_selected_school not in available_schools:
             self.guided_selected_school = ""
+            self.guided_selected_profile = "TODOS"
+            self.guided_selected_sku = ""
+            self._refresh_guided_browser()
+            return
+        available_profiles = {option.key for option in view.profile_options}
+        if self.guided_mode == "school" and self.guided_selected_gender == "OFICIAL" and self.guided_selected_profile not in {"", "TODOS"} and self.guided_selected_profile not in available_profiles:
+            self.guided_selected_profile = "TODOS"
+            self.guided_selected_product_key = ""
             self.guided_selected_sku = ""
             self._refresh_guided_browser()
             return
@@ -1858,6 +1897,7 @@ class QuoteSatelliteWindow(QMainWindow):
         show_level = self.guided_mode == "school"
         show_school = self.guided_mode == "school" and bool(self.guided_selected_level)
         show_gender = self.guided_mode == "basics" or bool(self.guided_selected_school)
+        show_profile = self.guided_mode == "school" and self.guided_selected_gender == "OFICIAL" and bool(view.profile_options)
         show_bucket = self.guided_mode == "basics" and bool(view.bucket_options)
         show_piece = self.guided_mode == "basics" and bool(view.piece_options)
         show_products = (self.guided_mode == "basics" and bool(self.guided_selected_piece)) or (
@@ -1866,15 +1906,24 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_level_section.setVisible(show_level)
         self.guided_school_section.setVisible(show_school)
 
+        if self.guided_mode == "school":
+            self.guided_gender_title_label.setText("4. Elige linea")
+            self.guided_gender_hint_label.setText("Primero separa deportivo de oficial.")
+        else:
+            self.guided_gender_title_label.setText("4. Elige tipo de uniforme")
+            self.guided_gender_hint_label.setText("Elige la linea mas cercana a lo que buscan.")
+
         self._rebuild_guided_mode_buttons()
         self._rebuild_guided_level_buttons(view.level_options)
         self._rebuild_guided_school_buttons(view.school_options)
         self._rebuild_guided_gender_buttons(view.gender_options)
+        self._rebuild_guided_profile_buttons(view.profile_options)
         self._rebuild_guided_bucket_buttons(view.bucket_options)
         self._rebuild_guided_piece_buttons(view.piece_options)
         self._rebuild_guided_product_buttons(view.product_cards)
         self._rebuild_guided_variant_buttons(view.variant_options)
         self.guided_gender_section.setVisible(show_gender)
+        self.guided_profile_section.setVisible(show_profile)
         self.guided_bucket_section.setVisible(show_bucket)
         self.guided_piece_section.setVisible(show_piece)
         self.guided_products_section.setVisible(show_products)
@@ -1884,6 +1933,9 @@ class QuoteSatelliteWindow(QMainWindow):
         elif show_bucket:
             self.guided_products_title_label.setText("6. Modelos sugeridos")
             self.guided_products_hint_label.setText("Elige Basicos, Extras o Todos; luego toca un modelo.")
+        elif show_profile:
+            self.guided_products_title_label.setText("6. Modelos sugeridos")
+            self.guided_products_hint_label.setText("Primero elige el perfil oficial; luego toca un modelo.")
         else:
             self.guided_products_title_label.setText("5. Modelos sugeridos")
             self.guided_products_hint_label.setText("Primero toca un modelo; luego elige la variante que quieren.")
@@ -1941,6 +1993,18 @@ class QuoteSatelliteWindow(QMainWindow):
             self.guided_gender_row.addWidget(button)
             self.guided_gender_buttons[option.key] = button
         self.guided_gender_row.addStretch()
+
+    def _rebuild_guided_profile_buttons(self, options) -> None:
+        _clear_layout(self.guided_profile_row)
+        self.guided_profile_buttons = {}
+        for option in options:
+            button = self._build_guided_choice_button(option.label)
+            button.setEnabled(option.enabled)
+            button.setChecked(self.guided_selected_profile == option.key)
+            button.clicked.connect(lambda checked=False, selected=option.key: self._handle_guided_profile_selected(selected))
+            self.guided_profile_row.addWidget(button)
+            self.guided_profile_buttons[option.key] = button
+        self.guided_profile_row.addStretch()
 
     def _rebuild_guided_bucket_buttons(self, options) -> None:
         _clear_layout(self.guided_bucket_row)
