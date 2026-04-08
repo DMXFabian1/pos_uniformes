@@ -1977,12 +1977,12 @@ class QuoteSatelliteWindow(QMainWindow):
         _clear_layout(self.guided_product_rows_layout)
         self.guided_product_buttons = {}
         compact_mode = self.guided_mode == "basics" and bool(self.guided_selected_piece)
-        column_count = 4 if compact_mode else 3
+        column_count = 5 if compact_mode else 3
         for index, card in enumerate(product_cards):
             if index % column_count == 0:
                 row_layout = QHBoxLayout()
                 row_layout.setContentsMargins(0, 0, 0, 0)
-                row_layout.setSpacing(12)
+                row_layout.setSpacing(10)
                 self.guided_product_rows_layout.addLayout(row_layout)
             button = self._build_guided_product_button(card)
             button.setChecked(self.guided_selected_product_key == card.key)
@@ -2049,8 +2049,8 @@ class QuoteSatelliteWindow(QMainWindow):
         button.setProperty("compactCard", compact_card)
         if compact_card:
             button.setMinimumHeight(68)
-            button.setMinimumWidth(240)
-            button.setMaximumWidth(330)
+            button.setMinimumWidth(210)
+            button.setMaximumWidth(290)
             button.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
         else:
             button.setMinimumHeight(94)
