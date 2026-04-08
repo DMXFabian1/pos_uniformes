@@ -7728,6 +7728,7 @@ class MainWindow(QMainWindow):
         for token in active_tokens:
             button = QPushButton(f"{token.display_text}  ×")
             button.setObjectName("chipButton")
+            button.setProperty("active", True)
             button.clicked.connect(
                 lambda _checked=False, active_token=token: self._handle_remove_inventory_filter_token(active_token)
             )
