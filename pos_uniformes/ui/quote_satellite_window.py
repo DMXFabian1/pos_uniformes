@@ -1023,7 +1023,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_product_container.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         self.guided_product_rows_layout = QVBoxLayout()
         self.guided_product_rows_layout.setContentsMargins(0, 0, 0, 0)
-        self.guided_product_rows_layout.setSpacing(12)
+        self.guided_product_rows_layout.setSpacing(8)
         self.guided_product_container.setLayout(self.guided_product_rows_layout)
         self.guided_product_scroll.setWidget(self.guided_product_container)
         products_section_layout.addWidget(self.guided_products_title_label)
@@ -1982,7 +1982,7 @@ class QuoteSatelliteWindow(QMainWindow):
             if index % column_count == 0:
                 row_layout = QHBoxLayout()
                 row_layout.setContentsMargins(0, 0, 0, 0)
-                row_layout.setSpacing(10)
+                row_layout.setSpacing(4)
                 self.guided_product_rows_layout.addLayout(row_layout)
             button = self._build_guided_product_button(card)
             button.setChecked(self.guided_selected_product_key == card.key)
@@ -2049,9 +2049,8 @@ class QuoteSatelliteWindow(QMainWindow):
         button.setProperty("compactCard", compact_card)
         if compact_card:
             button.setMinimumHeight(68)
-            button.setMinimumWidth(210)
-            button.setMaximumWidth(290)
-            button.setSizePolicy(QSizePolicy.Policy.Preferred, QSizePolicy.Policy.Fixed)
+            button.setFixedWidth(252)
+            button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
         else:
             button.setMinimumHeight(94)
             button.setMinimumWidth(250)
