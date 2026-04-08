@@ -89,3 +89,20 @@ def build_menu_popup_hover_styles(
                 margin: 6px 8px;
             }}
             """
+
+
+def build_button_hover_styles(
+    *,
+    selector: str,
+    hover_background: str,
+    hover_color: str,
+    hover_border: str | None = None,
+) -> str:
+    border_line = f"border: 1px solid {hover_border};" if hover_border is not None else ""
+    return f"""
+            {selector}:hover {{
+                background: {hover_background};
+                color: {hover_color};
+                {border_line}
+            }}
+            """

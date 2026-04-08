@@ -106,6 +106,8 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         window = QuoteSatelliteWindow(user_id=1)
 
         self.assertIn("QComboBox QAbstractItemView::item:hover", window.styleSheet())
+        self.assertIn("QPushButton#secondaryButton:hover", window.styleSheet())
+        self.assertIn("QPushButton#navButton:hover", window.styleSheet())
 
     def test_quote_cart_uses_six_columns_and_cashier_style(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)

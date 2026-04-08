@@ -94,7 +94,10 @@ from pos_uniformes.ui.helpers.quote_satellite_filter_helper import (
 )
 from pos_uniformes.ui.helpers.quote_summary_helper import build_quote_summary_view
 from pos_uniformes.ui.helpers.quote_table_row_helper import build_quote_table_row_views
-from pos_uniformes.ui.styles.interactive_hover_styles import build_combo_popup_hover_styles
+from pos_uniformes.ui.styles.interactive_hover_styles import (
+    build_button_hover_styles,
+    build_combo_popup_hover_styles,
+)
 from pos_uniformes.ui.helpers.sale_sports_uniform_helper import restore_sports_uniform_playera_price_if_needed
 from pos_uniformes.utils.app_metadata import satellite_build_label, satellite_display_name, satellite_windows_icon_path
 
@@ -286,6 +289,44 @@ class QuoteSatelliteWindow(QMainWindow):
             hover_color="#4e3f67",
             selected_hover_background="#d8c7ec",
             selected_hover_color="#35294c",
+        )
+        button_hover_styles = "\n".join(
+            (
+                build_button_hover_styles(
+                    selector="QPushButton#primaryButton",
+                    hover_background="#9a5534",
+                    hover_color="#fff8ee",
+                ),
+                build_button_hover_styles(
+                    selector="QPushButton#secondaryButton",
+                    hover_background="#ece6f3",
+                    hover_color="#4e3f67",
+                    hover_border="#d8c7ec",
+                ),
+                build_button_hover_styles(
+                    selector="QPushButton#ghostButton",
+                    hover_background="#ece6f3",
+                    hover_color="#4e3f67",
+                    hover_border="#d8c7ec",
+                ),
+                build_button_hover_styles(
+                    selector="QPushButton#dangerButton",
+                    hover_background="#c56455",
+                    hover_color="#fff8ee",
+                ),
+                build_button_hover_styles(
+                    selector="QPushButton#navButton",
+                    hover_background="#ece6f3",
+                    hover_color="#4e3f67",
+                    hover_border="#d8c7ec",
+                ),
+                build_button_hover_styles(
+                    selector="QPushButton#guidedChoiceButton, QPushButton#guidedProductButton",
+                    hover_background="#ece6f3",
+                    hover_color="#4e3f67",
+                    hover_border="#d8c7ec",
+                ),
+            )
         )
         self.setStyleSheet(
             "\n".join(
@@ -555,6 +596,7 @@ class QuoteSatelliteWindow(QMainWindow):
                 border: none;
             }
             """,
+                    button_hover_styles,
                 ]
             )
         )
