@@ -72,13 +72,14 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         self.assertEqual(window.catalog_include_general_combo.currentData(), "school_only")
         self.assertEqual(window.catalog_include_general_combo.currentText(), "Solo escuela")
 
-    def test_catalog_status_label_sits_below_table(self) -> None:
+    def test_catalog_status_label_is_not_shown_in_browser_layout(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
         catalog_page = window.page_stack.widget(1)
         browser_box = catalog_page.layout().itemAt(0).widget()
         browser_layout = browser_box.layout()
 
-        self.assertLess(browser_layout.indexOf(window.catalog_table), browser_layout.indexOf(window.catalog_status_label))
+        self.assertEqual(browser_layout.indexOf(window.catalog_status_label), -1)
+        self.assertFalse(window.catalog_status_label.isVisible())
 
     def test_catalog_table_keeps_header_row_visible(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
