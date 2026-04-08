@@ -13,18 +13,21 @@ def _build_variant(
     product_base_name: str = "",
     talla: str = "",
     price: str = "249.00",
+    category_name: str = "",
     school_name: str = "",
     level_name: str = "",
     garment_type: str = "",
 ):
     school = SimpleNamespace(nombre=school_name) if school_name else None
     level = SimpleNamespace(nombre=level_name) if level_name else None
+    category = SimpleNamespace(nombre=category_name) if category_name else None
     return SimpleNamespace(
         talla=talla,
         precio_venta=Decimal(price),
         producto=SimpleNamespace(
             nombre=product_name,
             nombre_base=product_base_name,
+            categoria=category,
             escuela_id=1 if school_name else None,
             escuela=school,
             nivel_educativo_id=1 if level_name else None,
@@ -66,6 +69,22 @@ class LabelGeneratorTests(unittest.TestCase):
 
         rendered = " ".join(line.text for line in lines)
         self.assertIn("T: 16", rendered)
+        self.assertNotIn("$", rendered)
+
+    def test_split_label_hides_price_for_uniform_category_without_school_context(self) -> None:
+        variante = _build_variant(
+            product_name="Playera Basica",
+            product_base_name="Playera Basica",
+            talla="12",
+            category_name="Básico",
+            garment_type="Basico",
+            price="199.00",
+        )
+
+        lines = LabelGenerator._split_label_lines(variante)
+
+        rendered = " ".join(line.text for line in lines)
+        self.assertIn("T: 12", rendered)
         self.assertNotIn("$", rendered)
 
 

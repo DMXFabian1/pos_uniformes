@@ -10,12 +10,21 @@ from pos_uniformes.utils.inventory_label_content_helper import (
 )
 
 
-def _build_variant(*, garment_type: str = "", school_name: str = "", level_name: str = "", shield: str = ""):
+def _build_variant(
+    *,
+    category_name: str = "",
+    garment_type: str = "",
+    school_name: str = "",
+    level_name: str = "",
+    shield: str = "",
+):
     school = SimpleNamespace(nombre=school_name) if school_name else None
     level = SimpleNamespace(nombre=level_name) if level_name else None
+    category = SimpleNamespace(nombre=category_name) if category_name else None
     return SimpleNamespace(
         precio_venta=Decimal("249.00"),
         producto=SimpleNamespace(
+            categoria=category,
             escuela_id=1 if school_name else None,
             escuela=school,
             nivel_educativo_id=1 if level_name else None,
@@ -40,6 +49,12 @@ class InventoryLabelContentHelperTests(unittest.TestCase):
 
         self.assertEqual(profile.family, "ropa_normal")
         self.assertTrue(profile.show_price)
+
+    def test_resolve_inventory_label_profile_uses_category_to_hide_price_for_uniform(self) -> None:
+        profile = resolve_inventory_label_profile(_build_variant(category_name="Básico"))
+
+        self.assertEqual(profile.family, "uniforme")
+        self.assertFalse(profile.show_price)
 
     def test_build_inventory_label_price_line_formats_price(self) -> None:
         price_line = build_inventory_label_price_line(_build_variant())
