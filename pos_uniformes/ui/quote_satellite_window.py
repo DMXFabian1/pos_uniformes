@@ -1056,9 +1056,11 @@ class QuoteSatelliteWindow(QMainWindow):
         variant_section_layout.setSpacing(6)
         self.guided_variant_title_label = QLabel("Variantes disponibles")
         self.guided_variant_title_label.setObjectName("guidedStepHint")
-        self.guided_variant_flow = FlowLayout(margin=0, h_spacing=6, v_spacing=8)
+        self.guided_variant_groups_layout = QVBoxLayout()
+        self.guided_variant_groups_layout.setContentsMargins(0, 0, 0, 0)
+        self.guided_variant_groups_layout.setSpacing(6)
         variant_section_layout.addWidget(self.guided_variant_title_label)
-        variant_section_layout.addLayout(self.guided_variant_flow)
+        variant_section_layout.addLayout(self.guided_variant_groups_layout)
         self.guided_variant_section.setLayout(variant_section_layout)
         detail_actions = QHBoxLayout()
         detail_actions.setSpacing(8)
@@ -1983,20 +1985,27 @@ class QuoteSatelliteWindow(QMainWindow):
             self.guided_product_buttons[card.key] = button
 
     def _rebuild_guided_variant_buttons(self, variant_options) -> None:
-        _clear_layout(self.guided_variant_flow)
+        _clear_layout(self.guided_variant_groups_layout)
         self.guided_variant_buttons = {}
         if not variant_options:
             self.guided_variant_section.setVisible(False)
             return
         self.guided_variant_section.setVisible(True)
+        current_price = None
+        current_flow = None
         for option in variant_options:
+            price_label = getattr(option, "price_label", "") or str(option.label).split("·")[-1].strip()
+            if price_label != current_price or current_flow is None:
+                current_price = price_label
+                current_flow = FlowLayout(margin=0, h_spacing=6, v_spacing=8)
+                self.guided_variant_groups_layout.addLayout(current_flow)
             button = self._build_guided_choice_button(option.label)
             button.setProperty("compactChoice", True)
             button.setMinimumHeight(42)
             button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
             button.setChecked(self.guided_selected_sku == option.sku)
             button.clicked.connect(lambda checked=False, selected=option.sku: self._handle_guided_variant_selected(selected))
-            self.guided_variant_flow.addWidget(button)
+            current_flow.addWidget(button)
             self.guided_variant_buttons[option.sku] = button
 
     def _rebuild_guided_option_grid(self, *, layout: QGridLayout, options, selected_key: str, click_handler, icon_builder=None):
