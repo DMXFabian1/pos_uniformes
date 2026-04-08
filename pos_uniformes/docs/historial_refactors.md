@@ -2,6 +2,7 @@
 
 ## Checkpoint actual
 
+- `2026-04-08`: los handlers de activar/desactivar producto/presentacion endurecen la restauracion de seleccion despues del refresh. Si la fila ya no sigue visible tras la mutacion, `Catalogo` e `Inventario` limpian seleccion y celda actual en lugar de dejar foco colgado sobre una fila inexistente. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.
 - `2026-04-08`: el dialogo de `Corte de caja` simplifica su bloque informativo cuando no hubo movimientos: conserva `Apertura`, `Reactivo inicial` y `Esperado en caja`, y solo despliega el desglose de reactivos, ingresos, retiros, ventas y abonos cuando existe actividad real. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.
 - `2026-04-08`: el rol `CAJERO` deja de ver el descuento manual en `Caja` y el hero ya no muestra `Reactivo inicial`; en su lugar queda una linea operativa mas discreta (`Caja abierta` / `Corte pendiente`) sin exponer montos sensibles ni controles muertos de `ADMIN`. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.
 - `2026-04-08`: `CAJERO` deja de ver la pestaña `Resumen` en el POS principal y, si por alguna razon cae en ese indice, la navegacion lo redirige a `Caja`. El objetivo es mantener el rol en pantallas operativas y evitar exponer contexto global innecesario. Checkpoint `validated-tests`; validacion manual en Windows queda `pending-manual`.

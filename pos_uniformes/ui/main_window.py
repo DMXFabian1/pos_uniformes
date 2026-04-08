@@ -5465,7 +5465,7 @@ class MainWindow(QMainWindow):
             return
 
         self.refresh_all()
-        self._select_catalog_variant(int(selected["variante_id"]))
+        self._restore_catalog_selection_after_mutation(int(selected["variante_id"]))
         result_view = build_catalog_success_result(
             action_key=f"toggle_product_{action}",
             item_label=str(selected["producto_nombre"]),
@@ -5501,7 +5501,7 @@ class MainWindow(QMainWindow):
             return
 
         self.refresh_all()
-        self._select_catalog_variant(int(selected["variante_id"]))
+        self._restore_catalog_selection_after_mutation(int(selected["variante_id"]))
         result_view = build_catalog_success_result(
             action_key=f"toggle_variant_{action}",
             item_label=str(selected["sku"]),
@@ -9947,6 +9947,16 @@ class MainWindow(QMainWindow):
         self.products_selection_label.setText(build_empty_catalog_selection_view().selection_label)
         self.toggle_product_button.setText("Prod.")
         self.toggle_variant_button.setText("Pres.")
+
+    def _restore_catalog_selection_after_mutation(self, variant_id: int) -> None:
+        restored = self._select_catalog_variant(variant_id)
+        if restored:
+            return
+        self.catalog_table.clearSelection()
+        self.catalog_table.setCurrentCell(-1, -1)
+        self.inventory_table.clearSelection()
+        self.inventory_table.setCurrentCell(-1, -1)
+        self._clear_catalog_editor()
 
     def _select_catalog_variant(self, variant_id: int) -> bool:
         filtered_row_index = find_catalog_row_index_by_variant_id(self.catalog_filtered_rows, variant_id)

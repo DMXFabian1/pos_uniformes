@@ -135,6 +135,27 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         self.assertEqual(window.tabs.currentIndex(), 1)
 
+    def test_restore_catalog_selection_after_mutation_clears_stale_selection_when_row_disappears(self) -> None:
+        window = MainWindow(user_id=1)
+        window.catalog_table.setRowCount(1)
+        window.catalog_table.setColumnCount(1)
+        window.catalog_table.setCurrentCell(0, 0)
+        window.catalog_table.selectRow(0)
+        window.inventory_table.setRowCount(1)
+        window.inventory_table.setColumnCount(1)
+        first_item = QTableWidgetItem("SKU-001")
+        first_item.setData(0x0100, 101)
+        window.inventory_table.setItem(0, 0, first_item)
+        window.inventory_table.setCurrentCell(0, 0)
+        window.inventory_table.selectRow(0)
+
+        with patch.object(window, "_select_catalog_variant", return_value=False):
+            window._restore_catalog_selection_after_mutation(101)
+
+        self.assertEqual(window.catalog_table.currentRow(), -1)
+        self.assertEqual(window.inventory_table.currentRow(), -1)
+        self.assertIn("Selecciona una presentacion", window.catalog_selection_label.text())
+
     def test_catalog_search_refresh_uses_single_debounce_timer(self) -> None:
         window = MainWindow(user_id=1)
         callback = Mock()
