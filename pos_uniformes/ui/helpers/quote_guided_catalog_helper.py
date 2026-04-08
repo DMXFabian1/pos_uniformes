@@ -613,12 +613,48 @@ def _build_family_key(row: dict[str, object]) -> str:
     )
 
 
-def _variant_sort_key(row: dict[str, object]) -> tuple[str, str, str]:
+def _variant_sort_key(row: dict[str, object]) -> tuple[tuple[int, object], str, str]:
     return (
-        str(row.get("talla") or "").strip().lower(),
+        _size_sort_key(row.get("talla")),
         str(row.get("color") or "").strip().lower(),
         str(row.get("sku") or "").strip().lower(),
     )
+
+
+def _size_sort_key(raw_value: object) -> tuple[int, object]:
+    size = str(raw_value or "").strip()
+    normalized = _normalize_text(size).replace(" ", "")
+    if not normalized:
+        return (9, "")
+    if normalized.isdigit():
+        return (0, int(normalized))
+
+    alpha_sizes = {
+        "xxch": 0,
+        "2ch": 0,
+        "xch": 1,
+        "ch": 2,
+        "m": 3,
+        "md": 3,
+        "med": 3,
+        "g": 4,
+        "gd": 4,
+        "l": 4,
+        "xg": 5,
+        "eg": 5,
+        "exg": 5,
+        "xl": 5,
+        "xxg": 6,
+        "2xg": 6,
+        "xxl": 6,
+        "3xg": 7,
+        "xxxl": 7,
+        "uni": 8,
+        "u": 8,
+    }
+    if normalized in alpha_sizes:
+        return (1, alpha_sizes[normalized])
+    return (5, normalized)
 
 
 def _segment_row_label(segment_key: str, gender_key: str) -> str:

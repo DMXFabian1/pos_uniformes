@@ -188,6 +188,22 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         self.assertIsInstance(window.guided_product_flow_layout, FlowLayout)
         self.assertEqual(window.guided_product_flow_layout.count(), 2)
 
+    def test_guided_variant_buttons_use_flow_layout_and_compact_size(self) -> None:
+        window = QuoteSatelliteWindow(user_id=1)
+        options = [
+            SimpleNamespace(sku="SKU-1", label="Talla 10 · Azul"),
+            SimpleNamespace(sku="SKU-2", label="Talla 12 · Azul"),
+            SimpleNamespace(sku="SKU-3", label="Talla 14 · Azul"),
+        ]
+
+        window._rebuild_guided_variant_buttons(options)
+
+        first_button = window.guided_variant_buttons["SKU-1"]
+        self.assertIsInstance(window.guided_variant_flow, FlowLayout)
+        self.assertTrue(first_button.property("compactChoice"))
+        self.assertEqual(first_button.minimumHeight(), 42)
+        self.assertEqual(window.guided_variant_flow.count(), 3)
+
 
 if __name__ == "__main__":
     unittest.main()

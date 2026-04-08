@@ -1023,7 +1023,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_product_container = QWidget()
         self.guided_product_container.setObjectName("guidedGridSurface")
         self.guided_product_container.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.guided_product_flow_layout = FlowLayout(self.guided_product_container, margin=0, h_spacing=4, v_spacing=8)
+        self.guided_product_flow_layout = FlowLayout(margin=0, h_spacing=4, v_spacing=8)
         self.guided_product_container.setLayout(self.guided_product_flow_layout)
         self.guided_product_scroll.setWidget(self.guided_product_container)
         products_section_layout.addWidget(self.guided_products_title_label)
@@ -1056,10 +1056,9 @@ class QuoteSatelliteWindow(QMainWindow):
         variant_section_layout.setSpacing(6)
         self.guided_variant_title_label = QLabel("Variantes disponibles")
         self.guided_variant_title_label.setObjectName("guidedStepHint")
-        self.guided_variant_row = QHBoxLayout()
-        self.guided_variant_row.setSpacing(8)
+        self.guided_variant_flow = FlowLayout(margin=0, h_spacing=6, v_spacing=8)
         variant_section_layout.addWidget(self.guided_variant_title_label)
-        variant_section_layout.addLayout(self.guided_variant_row)
+        variant_section_layout.addLayout(self.guided_variant_flow)
         self.guided_variant_section.setLayout(variant_section_layout)
         detail_actions = QHBoxLayout()
         detail_actions.setSpacing(8)
@@ -1984,7 +1983,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self.guided_product_buttons[card.key] = button
 
     def _rebuild_guided_variant_buttons(self, variant_options) -> None:
-        _clear_layout(self.guided_variant_row)
+        _clear_layout(self.guided_variant_flow)
         self.guided_variant_buttons = {}
         if not variant_options:
             self.guided_variant_section.setVisible(False)
@@ -1992,12 +1991,13 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_variant_section.setVisible(True)
         for option in variant_options:
             button = self._build_guided_choice_button(option.label)
-            button.setMinimumHeight(48)
+            button.setProperty("compactChoice", True)
+            button.setMinimumHeight(42)
+            button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
             button.setChecked(self.guided_selected_sku == option.sku)
             button.clicked.connect(lambda checked=False, selected=option.sku: self._handle_guided_variant_selected(selected))
-            self.guided_variant_row.addWidget(button)
+            self.guided_variant_flow.addWidget(button)
             self.guided_variant_buttons[option.sku] = button
-        self.guided_variant_row.addStretch()
 
     def _rebuild_guided_option_grid(self, *, layout: QGridLayout, options, selected_key: str, click_handler, icon_builder=None):
         _clear_layout(layout)

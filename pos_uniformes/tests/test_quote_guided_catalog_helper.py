@@ -213,6 +213,29 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
             ["Talla 40 · Azul", "Talla 42 · Azul"],
         )
 
+    def test_variant_options_sort_sizes_from_small_to_large(self) -> None:
+        snapshot_rows = [
+            _row("SKU-1", "Sin nivel", "General", "Unisex", "Oficial", producto="Chaleco Claudia", pieza="Chaleco", talla="32"),
+            _row("SKU-2", "Sin nivel", "General", "Unisex", "Oficial", producto="Chaleco Claudia", pieza="Chaleco", talla="10"),
+            _row("SKU-3", "Sin nivel", "General", "Unisex", "Oficial", producto="Chaleco Claudia", pieza="Chaleco", talla="14"),
+            _row("SKU-4", "Sin nivel", "General", "Unisex", "Oficial", producto="Chaleco Claudia", pieza="Chaleco", talla="28"),
+        ]
+
+        view = build_guided_catalog_view(
+            snapshot_rows=snapshot_rows,
+            mode_key="basics",
+            level_filter="",
+            school_filter="",
+            gender_filter="Todos",
+            bucket_filter="Basicos",
+            piece_filter="Chaleco",
+        )
+
+        self.assertEqual(
+            [option.label for option in view.variant_options],
+            ["Talla 10 · Azul", "Talla 14 · Azul", "Talla 28 · Azul", "Talla 32 · Azul"],
+        )
+
     def test_product_cards_only_keep_name_talla_color_and_price(self) -> None:
         view = build_guided_catalog_view(
             snapshot_rows=[

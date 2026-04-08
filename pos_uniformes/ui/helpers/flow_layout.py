@@ -8,7 +8,9 @@ class FlowLayout(QLayout):
     """Layout simple que acomoda widgets por filas y envuelve al siguiente renglón."""
 
     def __init__(self, parent=None, *, margin: int = 0, h_spacing: int = 4, v_spacing: int = 8) -> None:
-        super().__init__(parent)
+        super().__init__()
+        if parent is not None:
+            self.setParent(parent)
         self._items: list[QWidgetItem] = []
         self._h_spacing = h_spacing
         self._v_spacing = v_spacing
