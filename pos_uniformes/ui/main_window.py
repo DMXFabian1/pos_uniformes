@@ -7550,7 +7550,11 @@ class MainWindow(QMainWindow):
         piece_filters = self.catalog_piece_filter_combo.selected_values()
         size_filters = self.catalog_size_filter_combo.selected_values()
         color_filters = self.catalog_color_filter_combo.selected_values()
-        status_filter = str(self.catalog_status_filter_combo.currentData() or "")
+        status_filter = (
+            str(self.catalog_status_filter_combo.currentData() or "")
+            if not self.catalog_status_filter_combo.isHidden()
+            else "active"
+        )
         stock_filter = str(self.catalog_stock_filter_combo.currentData() or "")
         catalog_filter = str(self.catalog_layaway_filter_combo.currentData() or "")
         origin_filter = str(self.catalog_origin_filter_combo.currentData() or "")
@@ -7697,7 +7701,6 @@ class MainWindow(QMainWindow):
             ),
             combo_filters=(
                 ("seccion", self.catalog_school_scope_filter_combo.currentData(), self.catalog_school_scope_filter_combo.currentText()),
-                ("estado", self.catalog_status_filter_combo.currentData(), self.catalog_status_filter_combo.currentText()),
                 ("stock", self.catalog_stock_filter_combo.currentData(), self.catalog_stock_filter_combo.currentText()),
                 ("apartados", self.catalog_layaway_filter_combo.currentData(), self.catalog_layaway_filter_combo.currentText()),
                 ("origen", self.catalog_origin_filter_combo.currentData(), self.catalog_origin_filter_combo.currentText()),
@@ -7718,7 +7721,6 @@ class MainWindow(QMainWindow):
             ),
             combo_filters=(
                 ("seccion", self.catalog_school_scope_filter_combo.currentData(), self.catalog_school_scope_filter_combo.currentText()),
-                ("estado", self.catalog_status_filter_combo.currentData(), self.catalog_status_filter_combo.currentText()),
                 ("stock", self.catalog_stock_filter_combo.currentData(), self.catalog_stock_filter_combo.currentText()),
                 ("apartados", self.catalog_layaway_filter_combo.currentData(), self.catalog_layaway_filter_combo.currentText()),
                 ("origen", self.catalog_origin_filter_combo.currentData(), self.catalog_origin_filter_combo.currentText()),
@@ -7737,7 +7739,6 @@ class MainWindow(QMainWindow):
     def _handle_remove_catalog_filter_token(self, token) -> None:
         combo_filters = {
             "seccion": self.catalog_school_scope_filter_combo,
-            "estado": self.catalog_status_filter_combo,
             "stock": self.catalog_stock_filter_combo,
             "apartados": self.catalog_layaway_filter_combo,
             "origen": self.catalog_origin_filter_combo,

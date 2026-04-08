@@ -264,6 +264,26 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertEqual(window._catalog_active_filter_tokens(), [])
         self.assertEqual(window._inventory_active_filter_tokens(), [])
 
+    def test_catalog_hides_status_filter_and_forces_active_rows(self) -> None:
+        window = MainWindow(user_id=1)
+        snapshot_rows = [{"variante_id": 1, "sku": "SKU-001"}]
+        summary_view = SimpleNamespace(results_summary="1 resultado", active_filters_summary="Sin filtros")
+
+        with patch.object(window, "_load_catalog_snapshot_rows", return_value=snapshot_rows), patch(
+            "pos_uniformes.ui.main_window.filter_visible_catalog_rows",
+            return_value=snapshot_rows,
+        ) as filter_mock, patch(
+            "pos_uniformes.ui.main_window.build_catalog_table_row_views",
+            return_value=[],
+        ), patch(
+            "pos_uniformes.ui.main_window.build_catalog_summary_view",
+            return_value=summary_view,
+        ):
+            window._refresh_catalog()
+
+        self.assertTrue(window.catalog_status_filter_combo.isHidden())
+        self.assertEqual(filter_mock.call_args.kwargs["filters"].status_filter, "active")
+
     def test_remove_catalog_multi_filter_chip_keeps_other_selected_values(self) -> None:
         window = MainWindow(user_id=1)
         window.catalog_page_index = 3
