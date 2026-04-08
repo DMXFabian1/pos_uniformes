@@ -9874,6 +9874,20 @@ class MainWindow(QMainWindow):
             return
         self._set_combo_value(self.inventory_variant_combo, variant_id)
 
+    def _clear_inventory_table_selection(self) -> None:
+        self.inventory_table.blockSignals(True)
+        try:
+            self.inventory_table.clearSelection()
+            self.inventory_table.setCurrentCell(-1, -1)
+        finally:
+            self.inventory_table.blockSignals(False)
+        self.inventory_variant_combo.blockSignals(True)
+        try:
+            self.inventory_variant_combo.setCurrentIndex(-1)
+        finally:
+            self.inventory_variant_combo.blockSignals(False)
+        self._apply_inventory_overview_view(build_empty_inventory_overview_view())
+
     def _selected_inventory_variant_ids(self) -> list[int]:
         return collect_selected_inventory_variant_ids(
             item.data(Qt.ItemDataRole.UserRole)

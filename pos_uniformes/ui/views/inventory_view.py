@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -232,6 +233,9 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_table.itemDoubleClicked.connect(window._handle_inventory_table_double_click)
     window.inventory_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
     window.inventory_table.customContextMenuRequested.connect(window._show_inventory_context_menu)
+    clear_selection_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Escape), window.inventory_table)
+    clear_selection_shortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
+    clear_selection_shortcut.activated.connect(window._clear_inventory_table_selection)
 
     table_box = QGroupBox("Presentaciones disponibles")
     table_box.setObjectName("infoCard")
@@ -340,7 +344,9 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     table_layout.addWidget(window.inventory_active_filters_wrap)
     table_layout.addLayout(summary_row)
     table_layout.addLayout(counters_row)
-    inventory_hint_label = QLabel("Doble clic para editar la presentacion seleccionada.")
+    inventory_hint_label = QLabel(
+        "Ctrl/Cmd + clic para seleccion salteada, Shift para rango, Esc para limpiar y doble clic para editar."
+    )
     inventory_hint_label.setObjectName("subtleLine")
     table_layout.addWidget(inventory_hint_label)
     table_layout.addWidget(window.inventory_table)

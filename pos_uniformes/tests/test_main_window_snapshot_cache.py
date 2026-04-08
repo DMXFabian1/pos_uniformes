@@ -189,6 +189,26 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         self.assertEqual(selected, hidden_row)
 
+    def test_clear_inventory_table_selection_resets_panel_state(self) -> None:
+        window = MainWindow(user_id=1)
+        window.inventory_table.setRowCount(1)
+        window.inventory_table.setColumnCount(1)
+        first_item = QTableWidgetItem("SKU-101")
+        first_item.setData(0x0100, 101)
+        window.inventory_table.setItem(0, 0, first_item)
+        window.inventory_table.setCurrentCell(0, 0)
+        window.inventory_table.selectRow(0)
+        window.inventory_overview_label.setText("SKU-101")
+        window.inventory_product_label.setText("Pants Deportivo")
+        window.catalog_selection_label.setText("SKU-101 | contexto")
+
+        window._clear_inventory_table_selection()
+
+        self.assertEqual(window.inventory_table.currentRow(), -1)
+        self.assertEqual(window.inventory_variant_combo.currentIndex(), -1)
+        self.assertEqual(window.inventory_overview_label.text(), "Selecciona una presentacion")
+        self.assertEqual(window.catalog_selection_label.text(), "Selecciona una presentacion en inventario para gestionar cambios.")
+
     def test_inventory_print_label_uses_batch_dialog_for_multiple_selected_rows(self) -> None:
         window = MainWindow(user_id=1)
         window._selected_inventory_variant_ids = Mock(return_value=[7, 8])
