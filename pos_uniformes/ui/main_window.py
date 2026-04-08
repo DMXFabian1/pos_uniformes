@@ -481,7 +481,7 @@ from pos_uniformes.services.sports_uniform_pricing_service import (
     THREE_PIECE_PLAYERA_PRICE,
     build_three_piece_playera_price_override,
 )
-from pos_uniformes.ui.helpers.size_option_sort_helper import sort_size_options
+from pos_uniformes.ui.helpers.size_option_sort_helper import group_size_options, sort_size_options
 from pos_uniformes.ui.helpers.snapshot_cache_helper import SnapshotCache
 from pos_uniformes.ui.helpers.settings_backup_helper import (
     build_settings_backup_error_view,
@@ -589,10 +589,11 @@ def _normalize_filter_value(value: object) -> str:
 class MultiSelectFilterButton(QToolButton):
     selectionChanged = pyqtSignal()
 
-    def __init__(self, default_label: str) -> None:
+    def __init__(self, default_label: str, *, group_values_by_format: bool = False) -> None:
         super().__init__()
         self._default_label = default_label
         self._short_label = default_label.split(":", 1)[0]
+        self._group_values_by_format = group_values_by_format
         self._updating = False
         self._menu = QMenu(self)
         self.setMenu(self._menu)
@@ -798,18 +799,50 @@ class MultiSelectPickerButton(QPushButton):
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         content = QWidget()
-        grid = QGridLayout()
-        grid.setContentsMargins(4, 4, 4, 4)
-        grid.setHorizontalSpacing(10)
-        grid.setVerticalSpacing(8)
+        content_layout = QVBoxLayout()
+        content_layout.setContentsMargins(4, 4, 4, 4)
+        content_layout.setSpacing(10)
         checkboxes: list[tuple[QCheckBox, str, str]] = []
-        for index, (label, data) in enumerate(self._items):
-            checkbox = QCheckBox(label)
-            checkbox.setChecked(data in self._selected_values)
-            checkbox.setProperty("search_text", label.casefold())
-            grid.addWidget(checkbox, index // self._columns, index % self._columns)
-            checkboxes.append((checkbox, label, data))
-        content.setLayout(grid)
+        checkbox_groups: list[tuple[QWidget, list[QCheckBox]]] = []
+
+        def add_group(group_label: str | None, items: list[tuple[str, str]]) -> None:
+            group_widget = QWidget()
+            group_layout = QVBoxLayout()
+            group_layout.setContentsMargins(0, 0, 0, 0)
+            group_layout.setSpacing(6)
+            visible_checkboxes: list[QCheckBox] = []
+            if group_label:
+                title = QLabel(group_label)
+                title.setObjectName("catalogSectionHint")
+                group_layout.addWidget(title)
+            grid = QGridLayout()
+            grid.setContentsMargins(0, 0, 0, 0)
+            grid.setHorizontalSpacing(10)
+            grid.setVerticalSpacing(8)
+            for index, (label, data) in enumerate(items):
+                checkbox = QCheckBox(label)
+                checkbox.setChecked(data in self._selected_values)
+                checkbox.setProperty("search_text", label.casefold())
+                grid.addWidget(checkbox, index // self._columns, index % self._columns)
+                checkboxes.append((checkbox, label, data))
+                visible_checkboxes.append(checkbox)
+            group_layout.addLayout(grid)
+            group_widget.setLayout(group_layout)
+            content_layout.addWidget(group_widget)
+            checkbox_groups.append((group_widget, visible_checkboxes))
+
+        if self._group_values_by_format:
+            grouped_items = [
+                (group_label, [(value, value) for value in group_values])
+                for group_label, group_values in group_size_options([data for _label, data in self._items])
+            ]
+            for group_label, items in grouped_items:
+                add_group(group_label, items)
+        else:
+            add_group(None, self._items)
+
+        content_layout.addStretch(1)
+        content.setLayout(content_layout)
         scroll.setWidget(content)
         layout.addWidget(scroll)
 
@@ -830,6 +863,8 @@ class MultiSelectPickerButton(QPushButton):
             for checkbox, label, _data in checkboxes:
                 visible = not needle or needle in label.casefold()
                 checkbox.setVisible(visible)
+            for group_widget, group_checkboxes in checkbox_groups:
+                group_widget.setVisible(any(checkbox.isVisible() for checkbox in group_checkboxes))
 
         def set_all_visible(checked: bool) -> None:
             for checkbox, _label, _data in checkboxes:
@@ -1099,7 +1134,7 @@ class MainWindow(QMainWindow):
         self.catalog_school_filter_combo = MultiSelectFilterButton("Escuela: todas")
         self.catalog_type_filter_combo = MultiSelectFilterButton("Linea: todas")
         self.catalog_piece_filter_combo = MultiSelectFilterButton("Pieza: todas")
-        self.catalog_size_filter_combo = MultiSelectFilterButton("Talla: todas")
+        self.catalog_size_filter_combo = MultiSelectFilterButton("Talla: todas", group_values_by_format=True)
         self.catalog_color_filter_combo = MultiSelectFilterButton("Color: todos")
         self.catalog_uniform_macro_buttons: dict[str, QPushButton] = {}
         self.catalog_school_scope_filter_combo = QComboBox()
@@ -1242,7 +1277,7 @@ class MainWindow(QMainWindow):
         self.inventory_school_filter_combo = MultiSelectFilterButton("Escuela: todas")
         self.inventory_type_filter_combo = MultiSelectFilterButton("Tipo: todos")
         self.inventory_piece_filter_combo = MultiSelectFilterButton("Pieza: todas")
-        self.inventory_size_filter_combo = MultiSelectFilterButton("Talla: todas")
+        self.inventory_size_filter_combo = MultiSelectFilterButton("Talla: todas", group_values_by_format=True)
         self.inventory_color_filter_combo = MultiSelectFilterButton("Color: todos")
         self.inventory_use_filter_combo = QComboBox()
         self.inventory_status_filter_combo = QComboBox()
