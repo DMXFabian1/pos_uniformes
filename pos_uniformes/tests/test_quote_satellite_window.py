@@ -109,7 +109,7 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         self.assertIn("QPushButton#secondaryButton:hover", window.styleSheet())
         self.assertIn("QPushButton#navButton:hover", window.styleSheet())
         self.assertIn("QComboBox:hover", window.styleSheet())
-        self.assertIn("#c8d8e6", window.styleSheet())
+        self.assertIn("#a9c1d6", window.styleSheet())
         self.assertIn("QComboBox#satFilterCombo:hover", window.styleSheet())
 
     def test_quote_cart_uses_six_columns_and_cashier_style(self) -> None:

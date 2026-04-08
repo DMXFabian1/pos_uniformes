@@ -285,10 +285,10 @@ class QuoteSatelliteWindow(QMainWindow):
             popup_border="#d8cfc3",
             selected_background="#f4d4bb",
             selected_color="#73341c",
-            hover_background="#c8d8e6",
-            hover_color="#173349",
-            selected_hover_background="#bccfe0",
-            selected_hover_color="#122b40",
+            hover_background="#a9c1d6",
+            hover_color="#0f2940",
+            selected_hover_background="#98b4cd",
+            selected_hover_color="#0b2237",
         )
         button_hover_styles = "\n".join(
             (
