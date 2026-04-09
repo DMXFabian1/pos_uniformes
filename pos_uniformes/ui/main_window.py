@@ -266,6 +266,7 @@ from pos_uniformes.services.settings_employee_action_service import (
     generate_settings_employee_card,
     generate_settings_employee_qr,
     load_settings_employee_prompt_snapshot,
+    set_settings_employee_pin,
     toggle_settings_employee,
     update_settings_employee,
 )
@@ -287,6 +288,7 @@ from pos_uniformes.ui.dialogs.settings_dialogs import (
 from pos_uniformes.ui.dialogs.settings_prompt_dialogs import (
     prompt_client_data,
     prompt_employee_data,
+    prompt_employee_pin,
     prompt_client_whatsapp_data,
     prompt_create_user_data,
     prompt_edit_user_data,
@@ -1510,6 +1512,7 @@ class MainWindow(QMainWindow):
         self.settings_create_employee_button = QPushButton("Crear empleada")
         self.settings_update_employee_button = QPushButton("Editar empleada")
         self.settings_toggle_employee_button = QPushButton("Activar / desactivar")
+        self.settings_set_employee_pin_button = QPushButton("Definir PIN")
         self.settings_generate_employee_qr_button = QPushButton("Generar QR")
         self.settings_generate_employee_card_button = QPushButton("Generar credencial")
         self.settings_employees_dialog: QDialog | None = None
@@ -2968,6 +2971,7 @@ class MainWindow(QMainWindow):
                     "code": employee.codigo,
                     "name": employee.nombre_completo,
                     "display_name": EmployeeIdentityService.build_visible_employee_name(employee.nombre_completo),
+                    "pin_label": "Listo" if EmployeeIdentityService.has_pin(employee) else "Pendiente",
                     "qr_label": "Listo" if QrGenerator.exists_for_employee(employee) else "Pendiente",
                     "card_label": "Lista" if EmployeeCardService.exists_for_employee(employee) else "Pendiente",
                     "active": bool(employee.activo),
@@ -2984,10 +2988,12 @@ class MainWindow(QMainWindow):
                 if column_index == 0:
                     item.setData(Qt.ItemDataRole.UserRole, employee_row.employee_id)
                 if column_index == 3:
-                    _set_table_badge_style(item, employee_row.qr_tone)
+                    _set_table_badge_style(item, employee_row.pin_tone)
                 if column_index == 4:
-                    _set_table_badge_style(item, employee_row.card_tone)
+                    _set_table_badge_style(item, employee_row.qr_tone)
                 if column_index == 5:
+                    _set_table_badge_style(item, employee_row.card_tone)
+                if column_index == 6:
                     _set_table_badge_style(item, employee_row.status_tone)
                 self.settings_employees_table.setItem(row_index, column_index, item)
         self.settings_employees_table.resizeColumnsToContents()
@@ -3644,6 +3650,47 @@ class MainWindow(QMainWindow):
             employee_name=result.employee_name,
             employee_code=result.employee_code,
             status_text=result.status_text,
+        )
+        QMessageBox.information(self, result_feedback.title, result_feedback.message)
+
+    def _handle_set_employee_pin(self) -> None:
+        employee_id = self._selected_settings_employee_id()
+        feedback = build_settings_employee_guard_feedback(
+            "set_employee_pin",
+            is_admin=self.current_role == RolUsuario.ADMIN,
+            has_selection=employee_id is not None,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
+            return
+        try:
+            with get_session() as session:
+                prompt_snapshot = load_settings_employee_prompt_snapshot(session, employee_id=employee_id)
+                pin = prompt_employee_pin(self, employee_name=prompt_snapshot.full_name)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "PIN invalido", str(exc))
+            return
+        if pin is None:
+            return
+
+        try:
+            with get_session() as session:
+                result = set_settings_employee_pin(
+                    session,
+                    admin_user_id=self.user_id,
+                    employee_id=employee_id,
+                    pin=pin,
+                )
+                session.commit()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "No se pudo guardar PIN", str(exc))
+            return
+
+        self.refresh_all()
+        result_feedback = build_settings_employee_result_feedback(
+            "set_employee_pin",
+            employee_name=result.employee_name,
+            employee_code=result.employee_code,
         )
         QMessageBox.information(self, result_feedback.title, result_feedback.message)
 
@@ -7878,6 +7925,7 @@ class MainWindow(QMainWindow):
         self.settings_create_employee_button.setEnabled(is_admin)
         self.settings_update_employee_button.setEnabled(is_admin)
         self.settings_toggle_employee_button.setEnabled(is_admin)
+        self.settings_set_employee_pin_button.setEnabled(is_admin)
         self.settings_generate_employee_qr_button.setEnabled(is_admin)
         self.settings_generate_employee_card_button.setEnabled(is_admin)
         self.settings_marketing_save_button.setEnabled(is_admin)

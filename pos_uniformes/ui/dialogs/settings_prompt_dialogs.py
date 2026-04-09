@@ -287,6 +287,31 @@ def prompt_employee_data(
     }
 
 
+def prompt_employee_pin(parent: QWidget, *, employee_name: str) -> str | None:
+    dialog, layout = _create_settings_prompt_dialog(
+        parent,
+        "Definir PIN de empleada",
+        f"Define un PIN numerico de 4 a 8 digitos para {employee_name}.",
+        width=420,
+    )
+    form = QFormLayout()
+    pin_input = QLineEdit()
+    pin_input.setEchoMode(QLineEdit.EchoMode.Password)
+    pin_input.setPlaceholderText("PIN numerico")
+    confirm_input = QLineEdit()
+    confirm_input.setEchoMode(QLineEdit.EchoMode.Password)
+    confirm_input.setPlaceholderText("Confirmar PIN")
+    form.addRow("PIN", pin_input)
+    form.addRow("Confirmar", confirm_input)
+    layout.addLayout(form)
+    layout.addWidget(_build_prompt_buttons(dialog))
+    if dialog.exec() != int(QDialog.DialogCode.Accepted):
+        return None
+    if pin_input.text() != confirm_input.text():
+        raise ValueError("La confirmacion del PIN no coincide.")
+    return pin_input.text().strip()
+
+
 def prompt_client_whatsapp_data(parent: QWidget, client_name: str) -> tuple[str, str] | None:
     dialog, layout = _create_settings_prompt_dialog(
         parent,

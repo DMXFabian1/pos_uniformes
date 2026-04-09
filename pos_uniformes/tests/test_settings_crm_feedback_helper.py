@@ -68,6 +68,17 @@ class SettingsCrmFeedbackHelperTests(unittest.TestCase):
                 "Credencial de staff 'VEND-1' guardada en:\n/tmp/employee_card.png",
             ),
         )
+        self.assertEqual(
+            build_settings_employee_result_feedback(
+                "set_employee_pin",
+                employee_name="Lupita Gomez",
+                employee_code="VEND-1",
+            ),
+            SettingsCrmFeedbackView(
+                "PIN actualizado",
+                "PIN de la empleada 'Lupita Gomez' configurado correctamente.",
+            ),
+        )
 
     def test_marketing_feedback(self) -> None:
         self.assertEqual(

@@ -4,6 +4,8 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock
 
+from pos_uniformes.database.models import RolUsuario
+from pos_uniformes.services.auth_service import AuthService
 from pos_uniformes.services.employee_identity_service import EmployeeIdentityService
 
 
@@ -38,6 +40,31 @@ class EmployeeIdentityServiceTests(unittest.TestCase):
         resolved = EmployeeIdentityService.resolve_employee_by_qr_code(session, "EMP:VEND-1")
 
         self.assertIsNone(resolved)
+
+    def test_normalize_pin_requires_digits_and_length(self) -> None:
+        self.assertEqual(EmployeeIdentityService.normalize_pin(" 634700 "), "634700")
+        with self.assertRaisesRegex(ValueError, "solo numeros"):
+            EmployeeIdentityService.normalize_pin("63A700")
+        with self.assertRaisesRegex(ValueError, "entre 4 y 8"):
+            EmployeeIdentityService.normalize_pin("123")
+
+    def test_set_pin_hashes_value_and_marks_employee_with_pin(self) -> None:
+        session = Mock()
+        admin_user = SimpleNamespace(activo=True, rol=RolUsuario.ADMIN)
+        employee = SimpleNamespace(pin_hash=None)
+
+        updated = EmployeeIdentityService.set_pin(
+            session,
+            admin_user=admin_user,
+            employee=employee,
+            pin="634700",
+        )
+
+        self.assertIs(updated, employee)
+        self.assertTrue(str(employee.pin_hash).startswith("pbkdf2_sha256$"))
+        self.assertTrue(AuthService.verify_password("634700", str(employee.pin_hash)))
+        self.assertTrue(EmployeeIdentityService.has_pin(employee))
+        session.add.assert_called_once_with(employee)
 
 
 if __name__ == "__main__":

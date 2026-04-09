@@ -85,6 +85,31 @@ def toggle_settings_employee(session, *, admin_user_id: int, employee_id: int) -
     )
 
 
+def set_settings_employee_pin(
+    session,
+    *,
+    admin_user_id: int,
+    employee_id: int,
+    pin: str,
+) -> SettingsEmployeeActionResult:
+    employee_service, usuario_model, employee_model = _resolve_settings_employee_update_dependencies()
+    admin_user = session.get(usuario_model, admin_user_id)
+    employee = session.get(employee_model, employee_id)
+    if admin_user is None or employee is None:
+        raise ValueError("No se pudo cargar la empleada seleccionada.")
+    updated_employee = employee_service.set_pin(
+        session=session,
+        admin_user=admin_user,
+        employee=employee,
+        pin=pin,
+    )
+    return SettingsEmployeeActionResult(
+        employee_name=str(updated_employee.nombre_completo),
+        employee_code=str(updated_employee.codigo),
+        status_text="configurado",
+    )
+
+
 def generate_settings_employee_qr(session, *, employee_id: int) -> SettingsEmployeeActionResult:
     employee_model, qr_generator = _resolve_settings_employee_qr_dependencies()
     employee = session.get(employee_model, employee_id)

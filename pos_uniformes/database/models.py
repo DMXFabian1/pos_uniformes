@@ -350,6 +350,7 @@ class Empleada(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     codigo: Mapped[str] = mapped_column(String(40), unique=True, nullable=False, index=True)
     nombre_completo: Mapped[str] = mapped_column(String(150), nullable=False, index=True)
+    pin_hash: Mapped[str | None] = mapped_column(String(255))
     activo: Mapped[bool] = mapped_column(default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

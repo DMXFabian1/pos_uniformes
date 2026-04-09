@@ -17,6 +17,7 @@ class SettingsEmployeesHelperTests(unittest.TestCase):
                     "code": "VEND-1",
                     "name": "Guadalupe Gomez Ruiz",
                     "display_name": "Guadalupe Ruiz",
+                    "pin_label": "Listo",
                     "qr_label": "Listo",
                     "card_label": "Lista",
                     "active": True,
@@ -28,6 +29,7 @@ class SettingsEmployeesHelperTests(unittest.TestCase):
                     "code": "VEND-2",
                     "name": "Andrea Lopez",
                     "display_name": "Andrea Lopez",
+                    "pin_label": "Pendiente",
                     "qr_label": "Pendiente",
                     "card_label": "Pendiente",
                     "active": False,
@@ -40,9 +42,11 @@ class SettingsEmployeesHelperTests(unittest.TestCase):
         self.assertEqual(view.status_label, "Empleadas registradas: 2")
         self.assertEqual(len(view.rows), 2)
         self.assertEqual(view.rows[0].employee_id, 4)
+        self.assertEqual(view.rows[0].pin_tone, "positive")
         self.assertEqual(view.rows[0].qr_tone, "positive")
         self.assertEqual(view.rows[0].card_tone, "positive")
         self.assertEqual(view.rows[0].status_tone, "positive")
+        self.assertEqual(view.rows[1].pin_tone, "warning")
         self.assertEqual(view.rows[1].card_tone, "muted")
         self.assertEqual(view.rows[1].status_tone, "muted")
 

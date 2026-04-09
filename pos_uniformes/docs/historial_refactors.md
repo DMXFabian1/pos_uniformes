@@ -526,6 +526,8 @@
   - `Empleadas` ahora puede generar una credencial visual propia, separada del QR, con layout sobrio tipo lealtad pero ajustado a `Staff`: sin `POS Uniformes`, sin leyenda extra y con acento negro; la tabla de Configuracion muestra `QR` y `Credencial` como estados independientes.
 - `assets/employee_card_template/employee-card.html`, `assets/employee_card_template/employee-card.css`, `services/employee_card_service.py`
   - La credencial de `Staff` ya no parte de un render austero en PIL: ahora usa una plantilla HTML/CSS hermana de la credencial de cliente para heredar mejor jerarquia visual, texturas y balance, manteniendo `Staff`, nombre corto, codigo y QR como unico contenido visible.
+- `database/models.py`, `services/employee_identity_service.py`, `services/settings_employee_action_service.py`, `ui/dialogs/settings_prompt_dialogs.py`, `ui/dialogs/settings_dialogs.py`, `ui/main_window.py`
+  - `Empleadas` ahora incluye `PIN` como parte de su identidad administrable: se guarda hasheado con PBKDF2, se define solo desde `Configuracion`, la tabla muestra `PIN` como `Listo/Pendiente` y el uso operativo del PIN en `Caja` queda separado para un corte posterior.
 
 ## Riesgo residual conocido
 

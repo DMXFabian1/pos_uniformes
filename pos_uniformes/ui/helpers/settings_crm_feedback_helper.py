@@ -139,6 +139,11 @@ def build_settings_employee_result_feedback(
             "Empleada actualizada",
             f"Empleada '{employee_name}' {status_text} correctamente.",
         )
+    if action_key == "set_employee_pin":
+        return SettingsCrmFeedbackView(
+            "PIN actualizado",
+            f"PIN de la empleada '{employee_name}' configurado correctamente.",
+        )
     if action_key == "generate_employee_qr":
         return SettingsCrmFeedbackView(
             "QR generado",

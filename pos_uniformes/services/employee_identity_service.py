@@ -6,6 +6,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from pos_uniformes.database.models import Empleada, RolUsuario, Usuario
+from pos_uniformes.services.auth_service import AuthService
 
 
 class EmployeeIdentityService:
@@ -80,6 +81,17 @@ class EmployeeIdentityService:
         session.add(employee)
         return employee
 
+    @staticmethod
+    def normalize_pin(raw_pin: str) -> str:
+        normalized = raw_pin.strip()
+        if not normalized:
+            raise ValueError("El PIN no puede estar vacio.")
+        if not normalized.isdigit():
+            raise ValueError("El PIN debe contener solo numeros.")
+        if len(normalized) < 4 or len(normalized) > 8:
+            raise ValueError("El PIN debe tener entre 4 y 8 digitos.")
+        return normalized
+
     @classmethod
     def update_employee(
         cls,
@@ -103,6 +115,25 @@ class EmployeeIdentityService:
         employee.activo = not employee.activo
         session.add(employee)
         return employee
+
+    @classmethod
+    def set_pin(
+        cls,
+        session: Session,
+        *,
+        admin_user: Usuario,
+        employee: Empleada,
+        pin: str,
+    ) -> Empleada:
+        cls._validar_admin(admin_user)
+        normalized_pin = cls.normalize_pin(pin)
+        employee.pin_hash = AuthService.hash_password(normalized_pin)
+        session.add(employee)
+        return employee
+
+    @staticmethod
+    def has_pin(employee: Empleada) -> bool:
+        return bool((employee.pin_hash or "").strip())
 
     @classmethod
     def resolve_employee_by_qr_code(cls, session: Session, scanned_code: str) -> Empleada | None:
