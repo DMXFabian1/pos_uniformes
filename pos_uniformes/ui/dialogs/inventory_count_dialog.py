@@ -86,6 +86,7 @@ class InventoryCountDialog(QDialog):
         helper.setWordWrap(True)
         helper.setObjectName("analyticsLine")
         helper.setStyleSheet("padding: 2px 0; color: #5f6d78;")
+        helper.setVisible(False)
         layout.addWidget(helper)
 
         self.initial_context_label = QLabel("")
@@ -94,6 +95,7 @@ class InventoryCountDialog(QDialog):
         self.initial_context_label.setStyleSheet(
             "padding: 6px 10px; border-radius: 12px; background: #eef5fb; color: #4a6072; border: 1px solid #d1e1ee;"
         )
+        self.initial_context_label.setVisible(False)
         layout.addWidget(self.initial_context_label)
 
         control_card = QFrame()

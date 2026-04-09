@@ -52,7 +52,7 @@ class InventoryCountDialogTests(unittest.TestCase):
         self.assertEqual(len(dialog._rows), 1)
         self.assertEqual(dialog._rows[0].stock_contado, 2)
         self.assertEqual(dialog.batch_table.rowCount(), 1)
-        self.assertIn("escaneo acumulado", dialog.initial_context_label.text().lower())
+        self.assertFalse(dialog.initial_context_label.isVisible())
 
     def test_dialog_starts_without_batch_row_selected(self) -> None:
         dialog = InventoryCountDialog(
