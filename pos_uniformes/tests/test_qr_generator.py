@@ -121,6 +121,21 @@ class QrGeneratorTests(unittest.TestCase):
             self.assertGreater(image.width, 0)
             self.assertGreater(image.height, 0)
 
+    def test_generate_for_employee_uses_emp_payload(self) -> None:
+        employee = SimpleNamespace(codigo="VEND-1")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "VEND-1.png"
+            fake_image = Image.new("RGBA", (20, 20), (255, 255, 255, 255))
+            with (
+                patch.object(QrGenerator, "path_for_employee", return_value=output_path),
+                patch.object(QrGenerator, "_build_qr_image", return_value=fake_image) as build_mock,
+            ):
+                generated = QrGenerator.generate_for_employee(employee)
+
+            self.assertEqual(generated, output_path)
+            build_mock.assert_called_once_with("EMP:VEND-1")
+            self.assertTrue(output_path.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -17,6 +17,7 @@ class SettingsEmployeesHelperTests(unittest.TestCase):
                     "code": "VEND-1",
                     "name": "Guadalupe Gomez Ruiz",
                     "display_name": "Guadalupe Ruiz",
+                    "qr_label": "Listo",
                     "active": True,
                     "active_label": "ACTIVA",
                     "updated_label": "2026-04-09 09:00",
@@ -26,6 +27,7 @@ class SettingsEmployeesHelperTests(unittest.TestCase):
                     "code": "VEND-2",
                     "name": "Andrea Lopez",
                     "display_name": "Andrea Lopez",
+                    "qr_label": "Pendiente",
                     "active": False,
                     "active_label": "INACTIVA",
                     "updated_label": "",
@@ -36,6 +38,7 @@ class SettingsEmployeesHelperTests(unittest.TestCase):
         self.assertEqual(view.status_label, "Empleadas registradas: 2")
         self.assertEqual(len(view.rows), 2)
         self.assertEqual(view.rows[0].employee_id, 4)
+        self.assertEqual(view.rows[0].qr_tone, "positive")
         self.assertEqual(view.rows[0].status_tone, "positive")
         self.assertEqual(view.rows[1].status_tone, "muted")
 

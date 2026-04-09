@@ -208,19 +208,22 @@ def build_employees_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_create_employee_button.setObjectName("toolbarPrimaryButton")
     window.settings_update_employee_button.setObjectName("toolbarSecondaryButton")
     window.settings_toggle_employee_button.setObjectName("toolbarGhostButton")
+    window.settings_generate_employee_qr_button.setObjectName("toolbarSecondaryButton")
     window.settings_employees_search_input.textChanged.connect(window._refresh_settings_employees)
     window.settings_create_employee_button.clicked.connect(window._handle_create_employee)
     window.settings_update_employee_button.clicked.connect(window._handle_update_employee)
     window.settings_toggle_employee_button.clicked.connect(window._handle_toggle_employee)
+    window.settings_generate_employee_qr_button.clicked.connect(window._handle_generate_employee_qr)
     actions.addWidget(QLabel("Buscar"))
     actions.addWidget(window.settings_employees_search_input, 1)
     actions.addWidget(window.settings_create_employee_button)
     actions.addWidget(window.settings_update_employee_button)
     actions.addWidget(window.settings_toggle_employee_button)
+    actions.addWidget(window.settings_generate_employee_qr_button)
 
-    window.settings_employees_table.setColumnCount(5)
+    window.settings_employees_table.setColumnCount(6)
     window.settings_employees_table.setHorizontalHeaderLabels(
-        ["Codigo", "Nombre completo", "Visible", "Estado", "Actualizado"]
+        ["Codigo", "Nombre completo", "Visible", "QR", "Estado", "Actualizado"]
     )
     window.settings_employees_table.setObjectName("dataTable")
     window.settings_employees_table.verticalHeader().setVisible(False)

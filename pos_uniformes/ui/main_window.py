@@ -262,6 +262,7 @@ from pos_uniformes.services.settings_user_action_service import (
 )
 from pos_uniformes.services.settings_employee_action_service import (
     create_settings_employee,
+    generate_settings_employee_qr,
     load_settings_employee_prompt_snapshot,
     toggle_settings_employee,
     update_settings_employee,
@@ -1507,6 +1508,7 @@ class MainWindow(QMainWindow):
         self.settings_create_employee_button = QPushButton("Crear empleada")
         self.settings_update_employee_button = QPushButton("Editar empleada")
         self.settings_toggle_employee_button = QPushButton("Activar / desactivar")
+        self.settings_generate_employee_qr_button = QPushButton("Generar QR")
         self.settings_employees_dialog: QDialog | None = None
         self.settings_backup_dialog: QDialog | None = None
         self.settings_cash_history_dialog: QDialog | None = None
@@ -2963,6 +2965,7 @@ class MainWindow(QMainWindow):
                     "code": employee.codigo,
                     "name": employee.nombre_completo,
                     "display_name": EmployeeIdentityService.build_visible_employee_name(employee.nombre_completo),
+                    "qr_label": "Listo" if QrGenerator.exists_for_employee(employee) else "Pendiente",
                     "active": bool(employee.activo),
                     "active_label": "ACTIVA" if employee.activo else "INACTIVA",
                     "updated_label": format_display_datetime(employee.updated_at),
@@ -2977,6 +2980,8 @@ class MainWindow(QMainWindow):
                 if column_index == 0:
                     item.setData(Qt.ItemDataRole.UserRole, employee_row.employee_id)
                 if column_index == 3:
+                    _set_table_badge_style(item, employee_row.qr_tone)
+                if column_index == 4:
                     _set_table_badge_style(item, employee_row.status_tone)
                 self.settings_employees_table.setItem(row_index, column_index, item)
         self.settings_employees_table.resizeColumnsToContents()
@@ -3633,6 +3638,35 @@ class MainWindow(QMainWindow):
             employee_name=result.employee_name,
             employee_code=result.employee_code,
             status_text=result.status_text,
+        )
+        QMessageBox.information(self, result_feedback.title, result_feedback.message)
+
+    def _handle_generate_employee_qr(self) -> None:
+        employee_id = self._selected_settings_employee_id()
+        feedback = build_settings_employee_guard_feedback(
+            "generate_employee_qr",
+            is_admin=self.current_role == RolUsuario.ADMIN,
+            has_selection=employee_id is not None,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
+            return
+        try:
+            with self._busy_scope(
+                "Empleadas: generando QR...",
+                status_label=self.settings_employees_status_label,
+            ), get_session() as session:
+                result = generate_settings_employee_qr(session, employee_id=employee_id)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "QR fallido", str(exc))
+            return
+
+        self._refresh_settings_employees()
+        result_feedback = build_settings_employee_result_feedback(
+            "generate_employee_qr",
+            employee_name=result.employee_name,
+            employee_code=result.employee_code,
+            asset_path=str(result.asset_path) if result.asset_path is not None else "",
         )
         QMessageBox.information(self, result_feedback.title, result_feedback.message)
 
@@ -7803,6 +7837,11 @@ class MainWindow(QMainWindow):
         self.settings_toggle_client_button.setEnabled(is_admin)
         self.settings_generate_client_qr_button.setEnabled(is_admin)
         self.settings_client_whatsapp_button.setEnabled(is_admin)
+        self.settings_employees_button.setEnabled(is_admin)
+        self.settings_create_employee_button.setEnabled(is_admin)
+        self.settings_update_employee_button.setEnabled(is_admin)
+        self.settings_toggle_employee_button.setEnabled(is_admin)
+        self.settings_generate_employee_qr_button.setEnabled(is_admin)
         self.settings_marketing_save_button.setEnabled(is_admin)
         self.settings_marketing_recalculate_button.setEnabled(is_admin)
         self.settings_marketing_history_button.setEnabled(is_admin)

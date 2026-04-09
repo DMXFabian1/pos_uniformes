@@ -9,6 +9,7 @@ from dataclasses import dataclass
 class SettingsEmployeeRowView:
     employee_id: int
     values: tuple[object, ...]
+    qr_tone: str
     status_tone: str
 
 
@@ -28,9 +29,11 @@ def build_settings_employees_view(employees: list[dict[str, object]]) -> Setting
                     employee["code"],
                     employee["name"],
                     employee["display_name"],
+                    employee["qr_label"],
                     employee["active_label"],
                     employee["updated_label"],
                 ),
+                qr_tone="positive" if str(employee["qr_label"]) == "Listo" else "warning",
                 status_tone="positive" if bool(employee["active"]) else "muted",
             )
             for employee in employees

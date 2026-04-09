@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -16,6 +17,7 @@ class SettingsEmployeeActionResult:
     employee_name: str
     employee_code: str
     status_text: str | None = None
+    asset_path: Path | None = None
 
 
 def load_settings_employee_prompt_snapshot(session, *, employee_id: int) -> SettingsEmployeePromptSnapshot:
@@ -83,6 +85,19 @@ def toggle_settings_employee(session, *, admin_user_id: int, employee_id: int) -
     )
 
 
+def generate_settings_employee_qr(session, *, employee_id: int) -> SettingsEmployeeActionResult:
+    employee_model, qr_generator = _resolve_settings_employee_qr_dependencies()
+    employee = session.get(employee_model, employee_id)
+    if employee is None:
+        raise ValueError("No se encontro la empleada seleccionada.")
+    path = qr_generator.generate_for_employee(employee)
+    return SettingsEmployeeActionResult(
+        employee_name=str(employee.nombre_completo),
+        employee_code=str(employee.codigo),
+        asset_path=Path(str(path)),
+    )
+
+
 def _resolve_settings_employee_model():
     from pos_uniformes.database.models import Empleada
 
@@ -101,3 +116,10 @@ def _resolve_settings_employee_update_dependencies():
     from pos_uniformes.services.employee_identity_service import EmployeeIdentityService
 
     return EmployeeIdentityService, Usuario, Empleada
+
+
+def _resolve_settings_employee_qr_dependencies():
+    from pos_uniformes.database.models import Empleada
+    from pos_uniformes.utils.qr_generator import QrGenerator
+
+    return Empleada, QrGenerator

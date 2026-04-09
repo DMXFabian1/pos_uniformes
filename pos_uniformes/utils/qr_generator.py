@@ -1,4 +1,4 @@
-"""Generacion de codigos QR para presentaciones y clientes."""
+"""Generacion de codigos QR para presentaciones, clientes y empleadas."""
 
 from __future__ import annotations
 
@@ -10,10 +10,11 @@ from PIL import Image, ImageDraw
 import qrcode
 from qrcode.constants import ERROR_CORRECT_H
 
-from pos_uniformes.database.models import Cliente, Variante
+from pos_uniformes.database.models import Cliente, Empleada, Variante
 
 QR_OUTPUT_DIR = Path(__file__).resolve().parents[1] / "generated" / "qrs"
 CLIENT_QR_OUTPUT_DIR = Path(__file__).resolve().parents[1] / "generated" / "client_qrs"
+EMPLOYEE_QR_OUTPUT_DIR = Path(__file__).resolve().parents[1] / "generated" / "employee_qrs"
 QR_ICON_DIR = Path(__file__).resolve().parents[1] / "assets" / "qr_icons"
 
 
@@ -29,6 +30,11 @@ class QrGenerator:
     def client_output_dir() -> Path:
         CLIENT_QR_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         return CLIENT_QR_OUTPUT_DIR
+
+    @staticmethod
+    def employee_output_dir() -> Path:
+        EMPLOYEE_QR_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        return EMPLOYEE_QR_OUTPUT_DIR
 
     @classmethod
     def path_for_variant(cls, variante: Variante) -> Path:
@@ -70,6 +76,21 @@ class QrGenerator:
     def generate_for_client(cls, cliente: Cliente) -> Path:
         output_path = cls.path_for_client(cliente)
         qr_image = cls._build_qr_image(str(cliente.codigo_cliente))
+        qr_image.save(output_path)
+        return output_path
+
+    @classmethod
+    def path_for_employee(cls, employee: Empleada) -> Path:
+        return cls.employee_output_dir() / f"{employee.codigo}.png"
+
+    @classmethod
+    def exists_for_employee(cls, employee: Empleada) -> bool:
+        return cls.path_for_employee(employee).exists()
+
+    @classmethod
+    def generate_for_employee(cls, employee: Empleada) -> Path:
+        output_path = cls.path_for_employee(employee)
+        qr_image = cls._build_qr_image(f"EMP:{employee.codigo}")
         qr_image.save(output_path)
         return output_path
 

@@ -122,6 +122,7 @@ def build_settings_employee_result_feedback(
     employee_name: str,
     employee_code: str,
     status_text: str | None = None,
+    asset_path: str | None = None,
 ) -> SettingsCrmFeedbackView:
     if action_key == "create_employee":
         return SettingsCrmFeedbackView(
@@ -137,6 +138,11 @@ def build_settings_employee_result_feedback(
         return SettingsCrmFeedbackView(
             "Empleada actualizada",
             f"Empleada '{employee_name}' {status_text} correctamente.",
+        )
+    if action_key == "generate_employee_qr":
+        return SettingsCrmFeedbackView(
+            "QR generado",
+            f"QR de la empleada '{employee_code}' guardado en:\n{asset_path}",
         )
     raise ValueError(f"Accion no soportada: {action_key}")
 
