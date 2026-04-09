@@ -212,6 +212,11 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertEqual(window.inventory_overview_label.text(), "Selecciona una presentacion")
         self.assertEqual(window.catalog_selection_label.text(), "Selecciona una presentacion en inventario para gestionar cambios.")
 
+    def test_inventory_hides_catalog_selection_summary_line(self) -> None:
+        window = MainWindow(user_id=1)
+
+        self.assertFalse(window.catalog_selection_label.isVisible())
+
     def test_inventory_print_label_uses_batch_dialog_for_multiple_selected_rows(self) -> None:
         window = MainWindow(user_id=1)
         window._selected_inventory_variant_ids = Mock(return_value=[7, 8])

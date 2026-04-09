@@ -43,6 +43,7 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     actions_layout = QVBoxLayout()
     actions_layout.setSpacing(6)
     window.catalog_selection_label.setObjectName("analyticsLine")
+    window.catalog_selection_label.setVisible(False)
     window.inventory_permission_label.setObjectName("catalogSectionHint")
     window.inventory_new_button.setText("Nuevo")
     window.inventory_edit_button.setText("Editar")
@@ -84,8 +85,6 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_bulk_price_button.setObjectName("inventorySecondaryButton")
     for button in (window.delete_product_button, window.delete_variant_button):
         button.setObjectName("inventoryDangerButton")
-
-    actions_layout.addWidget(window.catalog_selection_label)
 
     new_menu = QMenu(window)
     new_category_action = new_menu.addAction("Categoria")

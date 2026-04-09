@@ -512,6 +512,8 @@
   - Caja entra a pulido fino: el cliente visible queda fijo en `Mostrador / sin cliente` salvo QR/codigo, el carrito gana ajustes rapidos de cantidad `-1 / +1`, y la tabla/contexto de venta se ordenan para leer mejor cliente, pago y descuento.
 - `ui/helpers/sale_cashier_panel_helper.py`, `ui/views/cashier_view.py`, `ui/main_window.py`
   - Caja ahora muestra un estado vivo de cobro (`lista`, `caja cerrada`, `procesando`, `solo lectura`) separado del feedback transitorio, para que el operador vea de un vistazo si la venta ya puede cobrarse y por que.
+- `ui/views/inventory_view.py`
+  - Se oculto la banda superior de resumen contextual (`SKU | producto | precio | stock | apartado`) dentro de `Acciones rapidas` para desaturar la vista; la logica interna del label sigue viva para poder revertirlo facil si luego hace falta.
 
 ## Riesgo residual conocido
 
