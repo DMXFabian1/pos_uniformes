@@ -528,6 +528,8 @@
   - La credencial de `Staff` ya no parte de un render austero en PIL: ahora usa una plantilla HTML/CSS hermana de la credencial de cliente para heredar mejor jerarquia visual, texturas y balance, manteniendo `Staff`, nombre corto, codigo y QR como unico contenido visible.
 - `database/models.py`, `services/employee_identity_service.py`, `services/settings_employee_action_service.py`, `ui/dialogs/settings_prompt_dialogs.py`, `ui/dialogs/settings_dialogs.py`, `ui/main_window.py`
   - `Empleadas` ahora incluye `PIN` como parte de su identidad administrable: se guarda hasheado con PBKDF2, se define solo desde `Configuracion`, la tabla muestra `PIN` como `Listo/Pendiente` y el uso operativo del PIN en `Caja` queda separado para un corte posterior.
+- `services/employee_activity_service.py`, `ui/dialogs/settings_dialogs.py`, `ui/main_window.py`
+  - `Empleadas` gana un panel lateral pensado para `ADMIN`: muestra detalle de la seleccion y un resumen de los ultimos 7 dias con `Piezas`, `Tickets`, `Monto` y `Ultima venta`, sin saturar la tabla principal.
 
 ## Riesgo residual conocido
 

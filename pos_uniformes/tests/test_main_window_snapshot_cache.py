@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime
 from decimal import Decimal
 from types import SimpleNamespace
 import unittest
@@ -186,6 +187,49 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         self.assertEqual(window.sale_credit_mode, ModoOrigenVenta.OPERATOR_DIRECT)
         self.assertEqual(window.sale_origin_value_label.text(), "Directa")
+
+    def test_settings_employee_detail_panel_formats_recent_activity(self) -> None:
+        window = MainWindow(user_id=1)
+        window.settings_employees_table.setColumnCount(1)
+        window.settings_employees_table.setRowCount(1)
+        item = QTableWidgetItem("VEND-1")
+        item.setData(Qt.ItemDataRole.UserRole, 4)
+        window.settings_employees_table.setItem(0, 0, item)
+        window.settings_employees_table.setCurrentCell(0, 0)
+        snapshot = SimpleNamespace(
+            visible_name="Lupita Gomez",
+            full_name="Guadalupe Gomez Ruiz",
+            employee_code="VEND-1",
+            active_label="ACTIVA",
+            pin_label="Listo",
+            qr_label="Listo",
+            card_label="Lista",
+            today_pieces=8,
+            today_tickets=3,
+            today_amount=Decimal("1250.00"),
+            last_sale_at=datetime(2026, 4, 9, 18, 45),
+            day_rows=(
+                SimpleNamespace(day_label="09/04/2026", pieces=8, tickets=3, amount=Decimal("1250.00")),
+            ),
+        )
+
+        with patch("pos_uniformes.ui.main_window.get_session") as get_session_mock, patch(
+            "pos_uniformes.ui.main_window.load_employee_activity_snapshot",
+            return_value=snapshot,
+        ):
+            session = Mock()
+            context = Mock()
+            context.__enter__ = Mock(return_value=session)
+            context.__exit__ = Mock(return_value=False)
+            get_session_mock.return_value = context
+
+            window._refresh_settings_employee_detail()
+
+        self.assertEqual(window.settings_employee_detail_name_label.text(), "Lupita Gomez")
+        self.assertIn("Codigo: VEND-1", window.settings_employee_detail_meta_label.text())
+        self.assertIn("PIN: Listo", window.settings_employee_detail_assets_label.text())
+        self.assertIn("8 piezas", window.settings_employee_detail_today_label.text())
+        self.assertEqual(window.settings_employee_activity_table.rowCount(), 1)
 
     def test_admin_role_keeps_manual_discount_controls_visible(self) -> None:
         window = MainWindow(user_id=1)

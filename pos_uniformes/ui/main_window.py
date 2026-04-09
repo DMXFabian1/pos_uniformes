@@ -116,6 +116,10 @@ from pos_uniformes.services.settings_business_action_service import (
     load_settings_business_form_snapshot,
     save_settings_business_payload,
 )
+from pos_uniformes.services.employee_activity_service import (
+    build_employee_activity_empty_snapshot,
+    load_employee_activity_snapshot,
+)
 from pos_uniformes.services.cash_session_action_service import (
     close_cash_session_action,
     correct_cash_opening_action,
@@ -1515,6 +1519,19 @@ class MainWindow(QMainWindow):
         self.settings_set_employee_pin_button = QPushButton("Definir PIN")
         self.settings_generate_employee_qr_button = QPushButton("Generar QR")
         self.settings_generate_employee_card_button = QPushButton("Generar credencial")
+        self.settings_employee_detail_name_label = QLabel("Selecciona una empleada.")
+        self.settings_employee_detail_meta_label = QLabel(
+            "Aqui veras el nombre visible, codigo y estado de la seleccion."
+        )
+        self.settings_employee_detail_assets_label = QLabel("PIN, QR y credencial apareceran aqui.")
+        self.settings_employee_detail_today_label = QLabel("Hoy: -")
+        self.settings_employee_detail_last_sale_label = QLabel("Ultima venta: -")
+        self.settings_employee_activity_status_label = QLabel(
+            "Selecciona una empleada para revisar su actividad reciente."
+        )
+        self.settings_employee_activity_table = QTableWidget()
+        self.settings_employee_activity_table.setColumnCount(4)
+        self.settings_employee_activity_table.setHorizontalHeaderLabels(["Dia", "Piezas", "Tickets", "Monto"])
         self.settings_employees_dialog: QDialog | None = None
         self.settings_backup_dialog: QDialog | None = None
         self.settings_cash_history_dialog: QDialog | None = None
@@ -2956,6 +2973,7 @@ class MainWindow(QMainWindow):
 
     def _refresh_settings_employees(self) -> None:
         search_text = self.settings_employees_search_input.text().strip()
+        selected_employee_id = self._selected_settings_employee_id()
         try:
             with get_session() as session:
                 employees = EmployeeIdentityService.list_employees(session, search_text)
@@ -2963,6 +2981,7 @@ class MainWindow(QMainWindow):
             employees_view = build_settings_employees_error_view(str(exc))
             self.settings_employees_status_label.setText(employees_view.status_label)
             self.settings_employees_table.setRowCount(len(employees_view.rows))
+            self._refresh_settings_employee_detail()
             return
         employees_view = build_settings_employees_view(
             [
@@ -2981,6 +3000,7 @@ class MainWindow(QMainWindow):
                 for employee in employees
             ]
         )
+        self.settings_employees_table.blockSignals(True)
         self.settings_employees_table.setRowCount(len(employees_view.rows))
         for row_index, employee_row in enumerate(employees_view.rows):
             for column_index, value in enumerate(employee_row.values):
@@ -2997,7 +3017,88 @@ class MainWindow(QMainWindow):
                     _set_table_badge_style(item, employee_row.status_tone)
                 self.settings_employees_table.setItem(row_index, column_index, item)
         self.settings_employees_table.resizeColumnsToContents()
+        restored_row = -1
+        if selected_employee_id is not None:
+            for row_index in range(self.settings_employees_table.rowCount()):
+                item = self.settings_employees_table.item(row_index, 0)
+                if item is not None and item.data(Qt.ItemDataRole.UserRole) == selected_employee_id:
+                    restored_row = row_index
+                    break
+        if restored_row >= 0:
+            self.settings_employees_table.setCurrentCell(restored_row, 0)
+        elif self.settings_employees_table.rowCount() > 0:
+            self.settings_employees_table.clearSelection()
+            self.settings_employees_table.setCurrentItem(None)
+        self.settings_employees_table.blockSignals(False)
         self.settings_employees_status_label.setText(employees_view.status_label)
+        self._refresh_settings_employee_detail()
+
+    def _refresh_settings_employee_detail(self) -> None:
+        employee_id = self._selected_settings_employee_id()
+        if employee_id is None:
+            snapshot = build_employee_activity_empty_snapshot()
+            self._apply_settings_employee_detail_snapshot(snapshot, has_selection=False)
+            return
+        try:
+            with get_session() as session:
+                snapshot = load_employee_activity_snapshot(session, employee_id=employee_id)
+        except Exception as exc:  # noqa: BLE001
+            self.settings_employee_detail_name_label.setText("Detalle no disponible.")
+            self.settings_employee_detail_meta_label.setText(str(exc))
+            self.settings_employee_detail_assets_label.setText("No se pudo cargar el resumen de la empleada.")
+            self.settings_employee_detail_today_label.setText("Hoy: -")
+            self.settings_employee_detail_last_sale_label.setText("Ultima venta: -")
+            self.settings_employee_activity_status_label.setText("Actividad no disponible.")
+            self.settings_employee_activity_table.setRowCount(0)
+            return
+        self._apply_settings_employee_detail_snapshot(snapshot, has_selection=True)
+
+    def _apply_settings_employee_detail_snapshot(self, snapshot, *, has_selection: bool) -> None:
+        if not has_selection:
+            self.settings_employee_detail_name_label.setText("Selecciona una empleada.")
+            self.settings_employee_detail_meta_label.setText(
+                "Aqui veras el nombre visible, codigo y estado de la seleccion."
+            )
+            self.settings_employee_detail_assets_label.setText("PIN, QR y credencial apareceran aqui.")
+            self.settings_employee_detail_today_label.setText("Hoy: -")
+            self.settings_employee_detail_last_sale_label.setText("Ultima venta: -")
+            self.settings_employee_activity_status_label.setText(
+                "Selecciona una empleada para revisar sus ultimos 7 dias."
+            )
+        else:
+            self.settings_employee_detail_name_label.setText(snapshot.visible_name or snapshot.full_name or "Sin nombre")
+            self.settings_employee_detail_meta_label.setText(
+                f"Codigo: {snapshot.employee_code} | Estado: {snapshot.active_label}"
+            )
+            self.settings_employee_detail_assets_label.setText(
+                f"PIN: {snapshot.pin_label} | QR: {snapshot.qr_label} | Credencial: {snapshot.card_label}"
+            )
+            self.settings_employee_detail_today_label.setText(
+                "Hoy: "
+                f"{snapshot.today_pieces} piezas | {snapshot.today_tickets} tickets | ${snapshot.today_amount:,.2f}"
+            )
+            if snapshot.last_sale_at is None:
+                self.settings_employee_detail_last_sale_label.setText("Ultima venta: Sin ventas confirmadas.")
+            else:
+                self.settings_employee_detail_last_sale_label.setText(
+                    f"Ultima venta: {format_display_datetime(snapshot.last_sale_at)}"
+                )
+            self.settings_employee_activity_status_label.setText(
+                "Ultimos 7 dias de ventas confirmadas acreditadas a esta empleada."
+            )
+
+        self.settings_employee_activity_table.setRowCount(len(snapshot.day_rows) if has_selection else 0)
+        if has_selection:
+            for row_index, day_row in enumerate(snapshot.day_rows):
+                values = (
+                    day_row.day_label,
+                    str(day_row.pieces),
+                    str(day_row.tickets),
+                    f"${day_row.amount:,.2f}",
+                )
+                for column_index, value in enumerate(values):
+                    self.settings_employee_activity_table.setItem(row_index, column_index, _table_item(value))
+            self.settings_employee_activity_table.resizeColumnsToContents()
 
     def _selected_settings_user_id(self) -> int | None:
         selected_row = self.settings_users_table.currentRow()
