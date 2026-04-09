@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from html import escape
 from pathlib import Path
+import shutil
+import subprocess
+import tempfile
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
@@ -12,6 +16,9 @@ from pos_uniformes.services.employee_identity_service import EmployeeIdentitySer
 from pos_uniformes.utils.qr_generator import QrGenerator
 
 CARD_OUTPUT_DIR = Path(__file__).resolve().parents[1] / "generated" / "employee_cards"
+TEMPLATE_DIR = Path(__file__).resolve().parents[1] / "assets" / "employee_card_template"
+TEMPLATE_HTML_PATH = TEMPLATE_DIR / "employee-card.html"
+TEMPLATE_CSS_PATH = TEMPLATE_DIR / "employee-card.css"
 CARD_SIZE = (1080, 1350)
 BACKGROUND_COLOR = "#F6F0E8"
 SURFACE_COLOR = "#FFFCF7"
@@ -20,6 +27,7 @@ TEXT_MUTED = "#6E6258"
 DIVIDER_COLOR = "#DED2C4"
 ACCENT_COLOR = "#111111"
 ACCENT_SOFT = "#EEE8E0"
+SECONDARY_COLOR = "#E8DDD2"
 
 
 @dataclass(frozen=True)
@@ -67,7 +75,110 @@ class EmployeeCardService:
     def render_card(cls, payload: EmployeeCardRenderInput, output_path: str | Path) -> Path:
         target = Path(output_path)
         target.parent.mkdir(parents=True, exist_ok=True)
+        html_error: Exception | None = None
 
+        try:
+            return cls._render_card_from_html(payload, target)
+        except Exception as exc:
+            html_error = exc
+
+        try:
+            return cls._render_card_with_pil(payload, target)
+        except Exception as pil_error:
+            if html_error is not None:
+                raise RuntimeError(
+                    "No se pudo renderizar la credencial de staff ni con HTML ni con PIL."
+                ) from pil_error
+            raise
+
+    @classmethod
+    def _render_card_from_html(cls, payload: EmployeeCardRenderInput, output_path: Path) -> Path:
+        template_html = TEMPLATE_HTML_PATH.read_text(encoding="utf-8")
+        template_css = TEMPLATE_CSS_PATH.read_text(encoding="utf-8")
+        html_document = cls._build_html_document(payload, template_html, template_css)
+        browser_path = cls._resolve_browser_executable()
+        if browser_path is None:
+            raise FileNotFoundError("No se encontro un browser compatible para render headless.")
+
+        with tempfile.TemporaryDirectory(prefix="employee-card-") as temp_dir:
+            temp_html = Path(temp_dir) / "employee-card.html"
+            temp_html.write_text(html_document, encoding="utf-8")
+            command = [
+                browser_path,
+                "--headless",
+                "--disable-gpu",
+                "--hide-scrollbars",
+                "--force-device-scale-factor=1",
+                f"--window-size={CARD_SIZE[0]},{CARD_SIZE[1]}",
+                f"--screenshot={str(output_path)}",
+                "--allow-file-access-from-files",
+                temp_html.as_uri(),
+            ]
+            subprocess.run(command, check=True, capture_output=True, text=True)
+        return output_path
+
+    @classmethod
+    def _build_html_document(
+        cls,
+        payload: EmployeeCardRenderInput,
+        template_html: str,
+        template_css: str,
+    ) -> str:
+        replacements = {
+            "{{ primary_color }}": ACCENT_COLOR,
+            "{{ secondary_color }}": SECONDARY_COLOR,
+            "{{ name_size }}": cls._name_size_variant(payload.visible_name),
+            "{{ visible_name }}": escape(payload.visible_name),
+            "{{ employee_code }}": escape(payload.employee_code),
+            "{{ qr_path }}": cls._asset_src(payload.qr_path),
+        }
+        document = template_html.replace(
+            '<link rel="stylesheet" href="./employee-card.css" />',
+            f"<style>\n{template_css}\n</style>",
+        )
+        for placeholder, value in replacements.items():
+            document = document.replace(placeholder, value)
+        return document
+
+    @staticmethod
+    def _asset_src(path_value: str | None) -> str:
+        if path_value:
+            path = Path(path_value)
+            if path.exists():
+                return path.resolve().as_uri()
+        return ""
+
+    @staticmethod
+    def _name_size_variant(full_name: str) -> str:
+        normalized = " ".join((full_name or "").split())
+        if len(normalized) >= 28 or len(normalized.split()) >= 4:
+            return "dense"
+        if len(normalized) >= 22:
+            return "compact"
+        if len(normalized) >= 15 or len(normalized.split()) >= 3:
+            return "medium"
+        return "default"
+
+    @staticmethod
+    def _resolve_browser_executable() -> str | None:
+        candidates = [
+            Path("/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"),
+            Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
+            Path("/Applications/Chromium.app/Contents/MacOS/Chromium"),
+            Path("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"),
+            Path("/Applications/Arc.app/Contents/MacOS/Arc"),
+        ]
+        for candidate in candidates:
+            if candidate.exists():
+                return str(candidate)
+        for executable in ("brave-browser", "brave", "google-chrome", "chromium", "chromium-browser", "microsoft-edge"):
+            resolved = shutil.which(executable)
+            if resolved:
+                return resolved
+        return None
+
+    @classmethod
+    def _render_card_with_pil(cls, payload: EmployeeCardRenderInput, target: Path) -> Path:
         canvas = Image.new("RGBA", CARD_SIZE, BACKGROUND_COLOR)
         draw = ImageDraw.Draw(canvas)
 
