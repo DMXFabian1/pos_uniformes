@@ -26,17 +26,15 @@ No cubre:
 Para reducir friccion operativa, Caja no debe usar en pantalla palabras como:
 
 - `comision`
-- `vendedora acreditada`
-- `atribucion`
 - `venta de quien`
 
 El lenguaje visible recomendado es:
 
-- etiqueta principal: `Origen`
+- etiqueta principal: `Responsable`
 - estados:
-  - `Libre`
-  - `Asistido`
-  - `Directo`
+  - `Sin asignar`
+  - `Asignada`
+  - `Directa`
 - acciones:
   - `Identificar`
   - `Tomar directo`
@@ -57,17 +55,17 @@ Detras de ese lenguaje discreto, el modelo tecnico propuesto es:
 
 Mapeo entre UI e interno:
 
-- `Libre` -> `UNASSIGNED`
-- `Asistido` -> `EMPLOYEE`
-- `Directo` -> `OPERATOR_DIRECT`
+- `Sin asignar` -> `UNASSIGNED`
+- `Asignada` -> `EMPLOYEE`
+- `Directa` -> `OPERATOR_DIRECT`
 
 ## Regla principal
 
 1. Toda venta debe conservar `usuario_id` como operador tecnico.
 2. El origen comercial no debe asumirse como venta del operador por default.
-3. Si se escanea un QR del equipo comercial, el origen pasa a `Asistido`.
-4. Si el operador decide marcar que la venta fue tomada directamente por el mismo, el origen pasa a `Directo`.
-5. Si no ocurre ninguna de las dos cosas, la venta permanece en `Libre`.
+3. Si se escanea un QR del equipo comercial, el origen pasa a `Asignada`.
+4. Si el operador decide marcar que la venta fue tomada directamente por el mismo, el origen pasa a `Directa`.
+5. Si no ocurre ninguna de las dos cosas, la venta permanece en `Sin asignar`.
 6. La venta puede confirmarse en cualquiera de los tres estados durante la primera iteracion.
 
 ## Principio operativo
@@ -89,10 +87,10 @@ Esto evita mezclar:
 ### Caso A. Venta libre
 
 - Se abre una venta nueva.
-- Caja muestra `Origen: Libre`.
+- Caja muestra `Responsable: Sin asignar`.
 - No se escanea QR del equipo.
 - No se usa `Tomar directo`.
-- La venta se confirma en `Libre`.
+- La venta se confirma en `Sin asignar`.
 
 Uso esperado:
 
@@ -103,9 +101,9 @@ Uso esperado:
 ### Caso B. Venta asistida
 
 - Se abre una venta nueva.
-- Caja muestra `Origen: Libre`.
+- Caja muestra `Responsable: Sin asignar`.
 - Se escanea QR del equipo comercial.
-- Caja cambia a `Origen: Asistido`.
+- Caja cambia a `Responsable: Asignada`.
 - La venta queda vinculada a `seller_employee_id`.
 - Despues puede escanearse el QR del cliente y seguir el flujo normal.
 
@@ -117,9 +115,9 @@ Uso esperado:
 ### Caso C. Venta directa
 
 - Se abre una venta nueva.
-- Caja muestra `Origen: Libre`.
+- Caja muestra `Responsable: Sin asignar`.
 - El operador usa `Tomar directo`.
-- Caja cambia a `Origen: Directo`.
+- Caja cambia a `Responsable: Directa`.
 - La venta se confirma como atencion directa del operador, sin requerir que el operador exista como `empleada`.
 
 Uso esperado:
@@ -129,16 +127,16 @@ Uso esperado:
 ### Caso D. Cambio antes de confirmar
 
 - Mientras la venta siga en borrador:
-  - puede escanearse un QR del equipo para pasar a `Asistido`
+  - puede escanearse un QR del equipo para pasar a `Asignada`
   - puede usarse `Tomar directo`
-  - puede usarse `Liberar` para volver a `Libre`
+  - puede usarse `Liberar` para volver a `Sin asignar`
 - Al confirmar, el origen queda congelado.
 
 ## Contrato UX minimo
 
 Caja debe mostrar un bloque pequeno y siempre visible con:
 
-- `Origen: Libre | Asistido | Directo`
+- `Responsable: Sin asignar | Asignada | Directa`
 - `Identificar`
 - `Tomar directo`
 - `Liberar`
@@ -150,11 +148,16 @@ No debe mostrar en esa zona:
 - palabras de comision
 - lenguaje sensible para el equipo comercial
 
-Si el origen es `Asistido`, la UI puede mostrar el nombre corto de la persona identificada, pero sin explicar en pantalla para que se usa despues ese dato.
+Si el origen es `Asignada`, la UI puede mostrar el nombre corto de la persona identificada, por ejemplo:
+
+- `Responsable: Fer`
+- `Responsable: Andrea`
+
+sin explicar en pantalla para que se usa despues ese dato.
 
 ## Decision cerrada de uso
 
-- `Directo` puede usarse por cualquier operador con acceso a Caja.
+- `Tomar directo` puede usarse por cualquier operador con acceso a Caja.
 - No queda restringido solo a `ADMIN`.
 - La restriccion relevante no es el rol administrativo, sino tener permiso operativo para abrir y cobrar una venta.
 - Si despues hiciera falta un control adicional, debe resolverse por permisos de Caja, no por el concepto de origen comercial.
