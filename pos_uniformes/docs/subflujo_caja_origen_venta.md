@@ -261,6 +261,10 @@ Reglas:
 - en `Caja`, el bloque visible muestra `Responsable: Lupita`
 - en ticket final, debe imprimirse una linea discreta como `Responsable: Lupita`
 - en `Presupuestos` y `Apartados`, debe guardarse y mostrarse el mismo dato visible para no perder continuidad operativa
+- el formato visible recomendado del nombre es:
+  - un solo nombre
+  - un solo apellido
+  - ejemplo: `Lupita Gomez`
 - si el estado es `Sin asignar`, no debe inventarse nombre
 - si el estado es `Directa`, no debe mostrarse un nombre de empleada; solo el estado correspondiente
 - este dato visible sirve para seguimiento operativo, no para exponer reglas de comision
