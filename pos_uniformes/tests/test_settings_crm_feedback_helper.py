@@ -56,6 +56,18 @@ class SettingsCrmFeedbackHelperTests(unittest.TestCase):
                 "QR de la empleada 'VEND-1' guardado en:\n/tmp/employee_qr.png",
             ),
         )
+        self.assertEqual(
+            build_settings_employee_result_feedback(
+                "generate_employee_card",
+                employee_name="Lupita Gomez",
+                employee_code="VEND-1",
+                asset_path="/tmp/employee_card.png",
+            ),
+            SettingsCrmFeedbackView(
+                "Credencial generada",
+                "Credencial de staff 'VEND-1' guardada en:\n/tmp/employee_card.png",
+            ),
+        )
 
     def test_marketing_feedback(self) -> None:
         self.assertEqual(

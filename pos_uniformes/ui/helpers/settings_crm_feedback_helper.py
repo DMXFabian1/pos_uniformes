@@ -144,6 +144,11 @@ def build_settings_employee_result_feedback(
             "QR generado",
             f"QR de la empleada '{employee_code}' guardado en:\n{asset_path}",
         )
+    if action_key == "generate_employee_card":
+        return SettingsCrmFeedbackView(
+            "Credencial generada",
+            f"Credencial de staff '{employee_code}' guardada en:\n{asset_path}",
+        )
     raise ValueError(f"Accion no soportada: {action_key}")
 
 

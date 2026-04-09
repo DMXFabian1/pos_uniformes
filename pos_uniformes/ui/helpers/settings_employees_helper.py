@@ -10,6 +10,7 @@ class SettingsEmployeeRowView:
     employee_id: int
     values: tuple[object, ...]
     qr_tone: str
+    card_tone: str
     status_tone: str
 
 
@@ -30,10 +31,12 @@ def build_settings_employees_view(employees: list[dict[str, object]]) -> Setting
                     employee["name"],
                     employee["display_name"],
                     employee["qr_label"],
+                    employee["card_label"],
                     employee["active_label"],
                     employee["updated_label"],
                 ),
                 qr_tone="positive" if str(employee["qr_label"]) == "Listo" else "warning",
+                card_tone="positive" if str(employee["card_label"]) == "Lista" else "muted",
                 status_tone="positive" if bool(employee["active"]) else "muted",
             )
             for employee in employees

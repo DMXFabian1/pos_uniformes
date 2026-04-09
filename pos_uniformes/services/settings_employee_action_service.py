@@ -98,6 +98,19 @@ def generate_settings_employee_qr(session, *, employee_id: int) -> SettingsEmplo
     )
 
 
+def generate_settings_employee_card(session, *, employee_id: int) -> SettingsEmployeeActionResult:
+    employee_model, employee_card_service = _resolve_settings_employee_card_dependencies()
+    employee = session.get(employee_model, employee_id)
+    if employee is None:
+        raise ValueError("No se encontro la empleada seleccionada.")
+    path = employee_card_service.render_for_employee(employee)
+    return SettingsEmployeeActionResult(
+        employee_name=str(employee.nombre_completo),
+        employee_code=str(employee.codigo),
+        asset_path=Path(str(path)),
+    )
+
+
 def _resolve_settings_employee_model():
     from pos_uniformes.database.models import Empleada
 
@@ -123,3 +136,10 @@ def _resolve_settings_employee_qr_dependencies():
     from pos_uniformes.utils.qr_generator import QrGenerator
 
     return Empleada, QrGenerator
+
+
+def _resolve_settings_employee_card_dependencies():
+    from pos_uniformes.database.models import Empleada
+    from pos_uniformes.services.employee_card_service import EmployeeCardService
+
+    return Empleada, EmployeeCardService

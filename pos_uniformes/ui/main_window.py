@@ -141,6 +141,7 @@ from pos_uniformes.services.catalog_mutation_service import (
 )
 from pos_uniformes.services.compra_service import CompraItemInput, CompraService
 from pos_uniformes.services.customer_card_service import CustomerCardRenderInput, CustomerCardService
+from pos_uniformes.services.employee_card_service import EmployeeCardService
 from pos_uniformes.services.history_snapshot_service import (
     HistorySnapshotFilters,
     load_history_snapshot_rows,
@@ -262,6 +263,7 @@ from pos_uniformes.services.settings_user_action_service import (
 )
 from pos_uniformes.services.settings_employee_action_service import (
     create_settings_employee,
+    generate_settings_employee_card,
     generate_settings_employee_qr,
     load_settings_employee_prompt_snapshot,
     toggle_settings_employee,
@@ -1509,6 +1511,7 @@ class MainWindow(QMainWindow):
         self.settings_update_employee_button = QPushButton("Editar empleada")
         self.settings_toggle_employee_button = QPushButton("Activar / desactivar")
         self.settings_generate_employee_qr_button = QPushButton("Generar QR")
+        self.settings_generate_employee_card_button = QPushButton("Generar credencial")
         self.settings_employees_dialog: QDialog | None = None
         self.settings_backup_dialog: QDialog | None = None
         self.settings_cash_history_dialog: QDialog | None = None
@@ -2966,6 +2969,7 @@ class MainWindow(QMainWindow):
                     "name": employee.nombre_completo,
                     "display_name": EmployeeIdentityService.build_visible_employee_name(employee.nombre_completo),
                     "qr_label": "Listo" if QrGenerator.exists_for_employee(employee) else "Pendiente",
+                    "card_label": "Lista" if EmployeeCardService.exists_for_employee(employee) else "Pendiente",
                     "active": bool(employee.activo),
                     "active_label": "ACTIVA" if employee.activo else "INACTIVA",
                     "updated_label": format_display_datetime(employee.updated_at),
@@ -2982,6 +2986,8 @@ class MainWindow(QMainWindow):
                 if column_index == 3:
                     _set_table_badge_style(item, employee_row.qr_tone)
                 if column_index == 4:
+                    _set_table_badge_style(item, employee_row.card_tone)
+                if column_index == 5:
                     _set_table_badge_style(item, employee_row.status_tone)
                 self.settings_employees_table.setItem(row_index, column_index, item)
         self.settings_employees_table.resizeColumnsToContents()
@@ -3664,6 +3670,37 @@ class MainWindow(QMainWindow):
         self._refresh_settings_employees()
         result_feedback = build_settings_employee_result_feedback(
             "generate_employee_qr",
+            employee_name=result.employee_name,
+            employee_code=result.employee_code,
+            asset_path=str(result.asset_path) if result.asset_path is not None else "",
+        )
+        QMessageBox.information(self, result_feedback.title, result_feedback.message)
+
+    def _handle_generate_employee_card(self) -> None:
+        employee_id = self._selected_settings_employee_id()
+        feedback = build_settings_employee_guard_feedback(
+            "generate_employee_card",
+            is_admin=self.current_role == RolUsuario.ADMIN,
+            has_selection=employee_id is not None,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
+            return
+        try:
+            with self._busy_scope(
+                "Empleadas: generando credencial...",
+                status_label=self.settings_employees_status_label,
+            ), get_session() as session:
+                result = generate_settings_employee_card(session, employee_id=employee_id)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Credencial fallida", str(exc))
+            return
+
+        self._refresh_settings_employees()
+        if result.asset_path is not None:
+            self._reveal_path(result.asset_path)
+        result_feedback = build_settings_employee_result_feedback(
+            "generate_employee_card",
             employee_name=result.employee_name,
             employee_code=result.employee_code,
             asset_path=str(result.asset_path) if result.asset_path is not None else "",
@@ -7842,6 +7879,7 @@ class MainWindow(QMainWindow):
         self.settings_update_employee_button.setEnabled(is_admin)
         self.settings_toggle_employee_button.setEnabled(is_admin)
         self.settings_generate_employee_qr_button.setEnabled(is_admin)
+        self.settings_generate_employee_card_button.setEnabled(is_admin)
         self.settings_marketing_save_button.setEnabled(is_admin)
         self.settings_marketing_recalculate_button.setEnabled(is_admin)
         self.settings_marketing_history_button.setEnabled(is_admin)

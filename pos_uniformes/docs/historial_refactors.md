@@ -522,6 +522,8 @@
   - Primer corte real de `Origen en Caja`: la venta ya persiste `credit_mode` y campos base de responsable, `Caja` muestra el bloque `Responsable` y permite marcar `Directa` o volver a `Sin asignar`; `Identificar` queda visible como siguiente corte para enlazar QR de equipo sin mezclarlo aun con una tabla de empleadas.
 - `database/models.py`, `services/employee_identity_service.py`, `services/settings_employee_action_service.py`, `ui/views/settings_view.py`, `ui/dialogs/settings_dialogs.py`, `ui/main_window.py`
   - Segundo corte de `Origen en Caja`: ya existe la base minima de `Empleadas` en `Configuracion`, `Caja` resuelve escaneos `EMP:{codigo}` contra esa tabla y el bloque `Responsable` cambia a nombre humano corto; tambien se quito el boton visible `Identificar` para dejar el QR como camino principal.
+- `services/employee_card_service.py`, `services/settings_employee_action_service.py`, `ui/dialogs/settings_dialogs.py`, `ui/helpers/settings_employees_helper.py`, `ui/main_window.py`
+  - `Empleadas` ahora puede generar una credencial visual propia, separada del QR, con layout sobrio tipo lealtad pero ajustado a `Staff`: sin `POS Uniformes`, sin leyenda extra y con acento negro; la tabla de Configuracion muestra `QR` y `Credencial` como estados independientes.
 
 ## Riesgo residual conocido
 
