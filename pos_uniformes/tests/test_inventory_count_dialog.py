@@ -95,6 +95,35 @@ class InventoryCountDialogTests(unittest.TestCase):
         self.assertEqual(dialog.batch_table.currentRow(), -1)
         self.assertFalse(dialog.batch_table.selectionModel().hasSelection())
 
+    def test_escape_from_batch_count_spin_returns_focus_to_sku_input(self) -> None:
+        dialog = InventoryCountDialog(
+            initial_rows=[
+                InventoryCountRow(
+                    variante_id=11,
+                    sku="SKU000011",
+                    producto_nombre="Bata",
+                    stock_sistema=9,
+                    stock_contado=9,
+                    delta=0,
+                )
+            ],
+            initial_context_label="Filas seleccionadas (1)",
+        )
+        dialog.show()
+        counted_spin = dialog.batch_table.cellWidget(0, 3)
+        self.assertIsNotNone(counted_spin)
+        counted_line_edit = counted_spin.lineEdit()
+        self.assertIsNotNone(counted_line_edit)
+        dialog.batch_table.selectRow(0)
+        counted_line_edit.setFocus()
+
+        QTest.keyClick(counted_line_edit, Qt.Key.Key_Escape)
+        QTest.qWait(20)
+
+        self.assertFalse(dialog.batch_table.selectionModel().hasSelection())
+        self.assertEqual(dialog.batch_table.currentRow(), -1)
+        self.assertTrue(dialog.sku_input.hasFocus())
+
 
 if __name__ == "__main__":
     unittest.main()

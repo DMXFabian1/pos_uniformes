@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from PyQt6.QtCore import QEvent, Qt
+from PyQt6.QtCore import QEvent, QTimer, Qt
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QDialog,
@@ -428,18 +428,40 @@ class InventoryCountDialog(QDialog):
         self._refresh_batch_meta(batch_view)
 
     def _clear_batch_selection(self) -> None:
+        current_focus = self.focusWidget()
+        if self._is_batch_table_widget(current_focus):
+            current_focus.clearFocus()
+        for row_index in range(self.batch_table.rowCount()):
+            counted_spin = self.batch_table.cellWidget(row_index, 3)
+            if isinstance(counted_spin, QSpinBox):
+                counted_spin.clearFocus()
+                counted_line_edit = counted_spin.lineEdit()
+                if counted_line_edit is not None:
+                    counted_line_edit.deselect()
+                    counted_line_edit.clearFocus()
+        selection_model = self.batch_table.selectionModel()
+        if selection_model is not None:
+            selection_model.clearSelection()
+            selection_model.clearCurrentIndex()
         self.batch_table.clearSelection()
         self.batch_table.setCurrentCell(-1, -1)
+        self.batch_table.clearFocus()
+        self.sku_input.setFocus(Qt.FocusReason.ShortcutFocusReason)
+        QTimer.singleShot(0, lambda: self.sku_input.setFocus(Qt.FocusReason.ShortcutFocusReason))
+
+    def _is_batch_table_widget(self, watched) -> bool:
+        current = watched
+        while current is not None:
+            if current is self.batch_table or current is self.batch_table.viewport():
+                return True
+            parent_widget = getattr(current, "parentWidget", None)
+            current = parent_widget() if callable(parent_widget) else None
+        return False
 
     def eventFilter(self, watched, event):  # type: ignore[override]
-        if event.type() == QEvent.Type.KeyPress and event.key() == Qt.Key.Key_Escape:
-            if watched is self.batch_table or (
-                hasattr(watched, "parentWidget")
-                and watched.parentWidget() is not None
-                and self.batch_table.isAncestorOf(watched)
-            ):
+        if event.type() in (QEvent.Type.ShortcutOverride, QEvent.Type.KeyPress) and event.key() == Qt.Key.Key_Escape:
+            if self._is_batch_table_widget(watched):
                 self._clear_batch_selection()
-                self.sku_input.setFocus()
                 return True
         return super().eventFilter(watched, event)
 
