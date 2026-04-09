@@ -295,6 +295,7 @@ from pos_uniformes.ui.dialogs.marketing_history_dialog import build_marketing_hi
 from pos_uniformes.ui.dialogs.printable_text_dialog import open_printable_text_dialog
 from pos_uniformes.ui.dialogs.cash_session_prompt_dialogs import (
     CashCutSummaryView,
+    prompt_admin_cash_cut_data,
     prompt_cash_cut_data,
     prompt_cash_movement_data,
     prompt_cash_opening_correction,
@@ -1618,6 +1619,7 @@ class MainWindow(QMainWindow):
         self.cash_reactivo_action = self.cash_movement_menu.addAction("Ajustar reactivo")
         self.cash_ingreso_action = self.cash_movement_menu.addAction("Ingreso")
         self.cash_retiro_action = self.cash_movement_menu.addAction("Retiro")
+        self.cash_admin_cut_action = self.cash_movement_menu.addAction("Corte administrativo")
         self.cash_opening_correction_action.triggered.connect(self._handle_correct_cash_opening)
         self.cash_reactivo_action.triggered.connect(
             lambda: self._handle_cash_movement(TipoMovimientoCaja.REACTIVO)
@@ -1628,6 +1630,7 @@ class MainWindow(QMainWindow):
         self.cash_retiro_action.triggered.connect(
             lambda: self._handle_cash_movement(TipoMovimientoCaja.RETIRO)
         )
+        self.cash_admin_cut_action.triggered.connect(self._handle_admin_cash_cut)
         self.cash_movement_button.setText("Movimientos")
         self.cash_movement_button.setObjectName("toolbarSoftButton")
         self.cash_movement_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
@@ -3721,6 +3724,9 @@ class MainWindow(QMainWindow):
             target_total=target_total,
         )
 
+    def _prompt_admin_cash_cut_data(self) -> dict[str, object] | None:
+        return prompt_admin_cash_cut_data(self)
+
     def _prompt_cash_opening_correction(self) -> dict[str, object] | None:
         current_amount = Decimal("0.00")
         try:
@@ -3767,6 +3773,57 @@ class MainWindow(QMainWindow):
             target_total=payload.get("total_objetivo"),
         )
         QMessageBox.information(self, feedback.title, feedback.message)
+
+    def _prompt_admin_cash_authorization(self) -> bool:
+        code, accepted = QInputDialog.getText(
+            self,
+            "Autorizar corte administrativo",
+            "Captura el PIN administrativo para registrar el corte.",
+            QLineEdit.EchoMode.Password,
+        )
+        if not accepted:
+            return False
+        try:
+            with get_session() as session:
+                verify_sale_manual_promo_code(session, code)
+                session.commit()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "PIN invalido", str(exc))
+            return False
+        return True
+
+    def _handle_admin_cash_cut(self) -> None:
+        if self.current_role != RolUsuario.ADMIN:
+            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede registrar un corte administrativo.")
+            return
+        if self.active_cash_session_id is None:
+            if not self.ensure_cash_session():
+                return
+            self.refresh_all()
+        if not self._prompt_admin_cash_authorization():
+            return
+        payload = self._prompt_admin_cash_cut_data()
+        if payload is None:
+            return
+        try:
+            with get_session() as session:
+                register_cash_movement_action(
+                    session,
+                    active_cash_session_id=int(self.active_cash_session_id),
+                    user_id=self.user_id,
+                    movement_type=TipoMovimientoCaja.RETIRO,
+                    amount=Decimal(payload["monto"]),
+                    concept=str(payload["concepto"]) or None,
+                )
+        except Exception as exc:
+            QMessageBox.critical(self, "Corte no registrado", str(exc))
+            return
+        self.refresh_all()
+        QMessageBox.information(
+            self,
+            "Corte administrativo registrado",
+            f"Se registro un corte administrativo por ${Decimal(payload['monto']).quantize(Decimal('0.01'))}.",
+        )
 
     def _handle_correct_cash_opening(self) -> None:
         if self.current_role not in {RolUsuario.ADMIN, RolUsuario.CAJERO}:
@@ -7402,6 +7459,8 @@ class MainWindow(QMainWindow):
         self.sale_layaway_button.setVisible(layaway_action_state.convert_sale_visible)
         self.cash_cut_button.setEnabled(can_sell)
         self.cash_movement_button.setEnabled(can_sell and has_cash_session)
+        self.cash_admin_cut_action.setVisible(is_admin)
+        self.cash_admin_cut_action.setEnabled(is_admin and has_cash_session)
         self.logout_button.setEnabled(True)
         self.sale_add_button.setEnabled(can_sell and can_operate_open_cash)
         self.sale_button.setEnabled(can_sell and can_operate_open_cash)

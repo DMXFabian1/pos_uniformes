@@ -516,6 +516,8 @@
   - Se oculto la banda superior de resumen contextual (`SKU | producto | precio | stock | apartado`) dentro de `Acciones rapidas` para desaturar la vista; la logica interna del label sigue viva para poder revertirlo facil si luego hace falta.
 - `ui/dialogs/inventory_count_dialog.py`
   - La `Referencia` de `Conteo fisico` ahora se autogenera al abrir el dialogo y queda en solo lectura, para tratarla como folio fijo del lote y evitar ediciones manuales accidentales.
+- `ui/dialogs/cash_session_prompt_dialogs.py`, `ui/main_window.py`
+  - Caja ahora expone `Corte administrativo` como retiro formal solo para `ADMIN`, protegido con PIN y registrado como movimiento real de caja para que el esperado del cierre siga siendo consistente.
 
 ## Riesgo residual conocido
 

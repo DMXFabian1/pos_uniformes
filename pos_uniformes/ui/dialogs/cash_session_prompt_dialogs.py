@@ -219,6 +219,53 @@ def prompt_cash_movement_data(
     }
 
 
+def prompt_admin_cash_cut_data(parent: QWidget) -> dict[str, object] | None:
+    dialog, layout = _create_cash_prompt_dialog(
+        parent,
+        "Corte administrativo",
+        "Registra una salida administrativa real de efectivo. Este movimiento impacta el esperado del cierre como cualquier retiro.",
+        width=430,
+    )
+    amount_spin = QDoubleSpinBox()
+    amount_spin.setRange(0.00, 999999.99)
+    amount_spin.setDecimals(2)
+    amount_spin.setPrefix("$")
+    amount_spin.setSingleStep(50.0)
+    note_input = QTextEdit()
+    note_input.setPlaceholderText("Nota opcional para identificar el corte administrativo")
+    note_input.setMaximumHeight(90)
+    concept_label = QLabel("Concepto fijo: Corte administrativo")
+    concept_label.setObjectName("subtleLine")
+    concept_label.setWordWrap(True)
+    form = QFormLayout()
+    form.addRow("Monto", amount_spin)
+    form.addRow("Nota", note_input)
+    buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+    ok_button = buttons.button(QDialogButtonBox.StandardButton.Ok)
+    if ok_button is not None:
+        ok_button.setText("Registrar corte")
+    buttons.accepted.connect(dialog.accept)
+    buttons.rejected.connect(dialog.reject)
+    layout.addWidget(concept_label)
+    layout.addLayout(form)
+    layout.addWidget(buttons)
+    if dialog.exec() != int(QDialog.DialogCode.Accepted):
+        return None
+    amount = Decimal(str(amount_spin.value())).quantize(Decimal("0.01"))
+    if amount <= Decimal("0.00"):
+        QMessageBox.information(dialog, "Monto invalido", "Captura un monto mayor a cero para registrar el corte.")
+        return None
+    note = note_input.toPlainText().strip()
+    concept = "Corte administrativo"
+    if note:
+        concept = f"{concept} | {note}"
+    return {
+        "monto": amount,
+        "concepto": concept,
+        "nota": note,
+    }
+
+
 def prompt_cash_opening_correction(
     parent: QWidget,
     *,

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from decimal import Decimal
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
@@ -13,7 +14,7 @@ from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QDoubleSpinBox, QPushButton, QSpinBox, QTableWidgetItem
 
 from pos_uniformes.services.active_filter_service import ActiveFilterToken
-from pos_uniformes.database.models import RolUsuario
+from pos_uniformes.database.models import RolUsuario, TipoMovimientoCaja
 from pos_uniformes.ui.main_window import (
     CATALOG_PAGE_SIZE,
     INVENTORY_PAGE_SIZE,
@@ -121,6 +122,56 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         self.assertFalse(window.sale_discount_field_label.isHidden())
         self.assertFalse(window.sale_discount_combo.isHidden())
+
+    def test_cashier_role_hides_admin_cash_cut_action(self) -> None:
+        window = MainWindow(user_id=1)
+        window.current_role = RolUsuario.CAJERO
+        window.active_cash_session_id = 10
+
+        window._refresh_permissions()
+
+        self.assertFalse(window.cash_admin_cut_action.isVisible())
+        self.assertFalse(window.cash_admin_cut_action.isEnabled())
+
+    def test_admin_role_shows_admin_cash_cut_action(self) -> None:
+        window = MainWindow(user_id=1)
+        window.current_role = RolUsuario.ADMIN
+        window.active_cash_session_id = 10
+
+        window._refresh_permissions()
+
+        self.assertTrue(window.cash_admin_cut_action.isVisible())
+        self.assertTrue(window.cash_admin_cut_action.isEnabled())
+
+    def test_handle_admin_cash_cut_registers_retiro_with_fixed_concept(self) -> None:
+        window = MainWindow(user_id=1)
+        window.current_role = RolUsuario.ADMIN
+        window.active_cash_session_id = 9
+        window.refresh_all = Mock()
+        window._prompt_admin_cash_authorization = Mock(return_value=True)
+        window._prompt_admin_cash_cut_data = Mock(
+            return_value={
+                "monto": Decimal("150.00"),
+                "concepto": "Corte administrativo | mantenimiento",
+                "nota": "mantenimiento",
+            }
+        )
+
+        with patch("pos_uniformes.ui.main_window.get_session") as get_session_mock, patch(
+            "pos_uniformes.ui.main_window.register_cash_movement_action"
+        ) as register_movement, patch("pos_uniformes.ui.main_window.QMessageBox.information"):
+            session = Mock()
+            context = Mock()
+            context.__enter__ = Mock(return_value=session)
+            context.__exit__ = Mock(return_value=False)
+            get_session_mock.return_value = context
+
+            window._handle_admin_cash_cut()
+
+        register_movement.assert_called_once()
+        self.assertEqual(register_movement.call_args.kwargs["movement_type"], TipoMovimientoCaja.RETIRO)
+        self.assertEqual(register_movement.call_args.kwargs["amount"], Decimal("150.00"))
+        self.assertEqual(register_movement.call_args.kwargs["concept"], "Corte administrativo | mantenimiento")
 
     def test_quote_cart_table_keeps_cashier_breathing_in_main_window(self) -> None:
         window = MainWindow(user_id=1)
