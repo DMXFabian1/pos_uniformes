@@ -136,6 +136,20 @@ class QrGeneratorTests(unittest.TestCase):
             build_mock.assert_called_once_with("EMP:VEND-1")
             self.assertTrue(output_path.exists())
 
+    def test_generate_for_employee_embeds_monogram_badge(self) -> None:
+        employee = SimpleNamespace(codigo="VEND-1")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "VEND-1.png"
+            with patch.object(QrGenerator, "path_for_employee", return_value=output_path):
+                generated = QrGenerator.generate_for_employee(employee)
+
+            self.assertEqual(generated, output_path)
+            self.assertTrue(output_path.exists())
+            with Image.open(output_path).convert("RGBA") as image:
+                center_pixel = image.getpixel((image.width // 2, image.height // 2))
+                self.assertNotEqual(center_pixel[:3], (255, 255, 255))
+                self.assertNotEqual(center_pixel[:3], (0, 0, 0))
+
 
 if __name__ == "__main__":
     unittest.main()
