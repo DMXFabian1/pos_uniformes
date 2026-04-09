@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Callable
 
+from pos_uniformes.database.models import ModoOrigenVenta
+
 
 @dataclass(frozen=True)
 class SaleCheckoutResult:
@@ -30,6 +32,9 @@ def complete_sale_checkout(
     payment_method: str,
     note_parts: list[str],
     internal_note_parts: list[str],
+    credit_mode: ModoOrigenVenta,
+    seller_employee_code: str | None,
+    seller_employee_display_name: str | None,
     build_notice: Callable[[str, str, str, Decimal], str],
 ) -> SaleCheckoutResult:
     (
@@ -69,6 +74,9 @@ def complete_sale_checkout(
         ],
         observacion=" | ".join(sale_observation_parts),
         cliente=cliente,
+        credit_mode=credit_mode,
+        seller_employee_code=seller_employee_code,
+        seller_employee_display_name=seller_employee_display_name,
     )
     venta.subtotal = subtotal
     venta.descuento_porcentaje = discount_percent

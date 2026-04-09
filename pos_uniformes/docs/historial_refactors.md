@@ -518,6 +518,8 @@
   - La `Referencia` de `Conteo fisico` ahora se autogenera al abrir el dialogo y queda en solo lectura, para tratarla como folio fijo del lote y evitar ediciones manuales accidentales.
 - `ui/dialogs/cash_session_prompt_dialogs.py`, `ui/main_window.py`
   - Caja ahora expone `Corte administrativo` como retiro formal solo para `ADMIN`, protegido con PIN y registrado como movimiento real de caja para que el esperado del cierre siga siendo consistente.
+- `database/models.py`, `services/venta_service.py`, `services/sale_checkout_action_service.py`, `ui/views/cashier_view.py`, `ui/main_window.py`
+  - Primer corte real de `Origen en Caja`: la venta ya persiste `credit_mode` y campos base de responsable, `Caja` muestra el bloque `Responsable` y permite marcar `Directa` o volver a `Sin asignar`; `Identificar` queda visible como siguiente corte para enlazar QR de equipo sin mezclarlo aun con una tabla de empleadas.
 
 ## Riesgo residual conocido
 

@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
+from pos_uniformes.database.models import ModoOrigenVenta
 from pos_uniformes.services.venta_service import VentaItemInput, VentaService
 
 
@@ -148,6 +149,36 @@ class VentaServiceLayawayTests(unittest.TestCase):
         self.assertEqual(venta.detalles[0].precio_unitario, Decimal("100.00"))
         self.assertEqual(venta.detalles[1].precio_unitario, Decimal("189.00"))
         self.assertEqual(venta.subtotal, Decimal("289.00"))
+
+    def test_crear_borrador_persists_sale_origin_fields(self) -> None:
+        session = _SessionStub()
+        usuario = SimpleNamespace(activo=True, rol="CAJERO")
+        variant = SimpleNamespace(sku="SKU-001", precio_venta=Decimal("65.00"))
+
+        with patch("pos_uniformes.services.venta_service.Venta", _FakeVenta), patch(
+            "pos_uniformes.services.venta_service.VentaDetalle", _FakeVentaDetalle
+        ), patch.object(
+            VentaService,
+            "obtener_variante_por_sku",
+            return_value=variant,
+        ), patch.object(
+            VentaService,
+            "validar_stock_disponible",
+            return_value=None,
+        ):
+            venta = VentaService.crear_borrador(
+                session=session,
+                usuario=usuario,
+                folio="VTA-ORIGEN-001",
+                items=[VentaItemInput(sku="SKU-001", cantidad=1)],
+                credit_mode=ModoOrigenVenta.OPERATOR_DIRECT,
+                seller_employee_code="",
+                seller_employee_display_name="",
+            )
+
+        self.assertEqual(venta.credit_mode, ModoOrigenVenta.OPERATOR_DIRECT)
+        self.assertIsNone(venta.seller_employee_code)
+        self.assertIsNone(venta.seller_employee_display_name)
 
 
 if __name__ == "__main__":

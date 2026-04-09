@@ -9,7 +9,17 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from pos_uniformes.database.models import Apartado, Cliente, EstadoVenta, RolUsuario, Usuario, Variante, Venta, VentaDetalle
+from pos_uniformes.database.models import (
+    Apartado,
+    Cliente,
+    EstadoVenta,
+    ModoOrigenVenta,
+    RolUsuario,
+    Usuario,
+    Variante,
+    Venta,
+    VentaDetalle,
+)
 from pos_uniformes.services.inventario_service import InventarioService
 from pos_uniformes.services.loyalty_service import LoyaltyService
 from pos_uniformes.services.sale_stock_policy import sale_stock_guard_enabled
@@ -59,6 +69,9 @@ class VentaService:
         items: list[VentaItemInput],
         observacion: str | None = None,
         cliente: Cliente | None = None,
+        credit_mode: ModoOrigenVenta = ModoOrigenVenta.UNASSIGNED,
+        seller_employee_code: str | None = None,
+        seller_employee_display_name: str | None = None,
     ) -> Venta:
         cls._validar_usuario_venta(usuario)
         if not items:
@@ -70,6 +83,9 @@ class VentaService:
             folio=folio,
             observacion=observacion,
             estado=EstadoVenta.BORRADOR,
+            credit_mode=credit_mode,
+            seller_employee_code=(seller_employee_code or None),
+            seller_employee_display_name=(seller_employee_display_name or None),
         )
 
         total = Decimal("0.00")
@@ -162,6 +178,7 @@ class VentaService:
             observacion=observacion,
             estado=EstadoVenta.CONFIRMADA,
             confirmada_at=datetime.now(),
+            credit_mode=ModoOrigenVenta.UNASSIGNED,
         )
 
         total = Decimal("0.00")

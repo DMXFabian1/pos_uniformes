@@ -73,6 +73,7 @@ from pos_uniformes.database.models import (
     EstadoCompra,
     EstadoVenta,
     Marca,
+    ModoOrigenVenta,
     MovimientoInventario,
     NivelEducativo,
     Producto,
@@ -1267,6 +1268,10 @@ class MainWindow(QMainWindow):
         self.sale_folio_input = QLabel()
         self.sale_client_combo = QComboBox()
         self.sale_client_display_label = QLabel("Mostrador / sin cliente")
+        self.sale_origin_value_label = QLabel("Sin asignar")
+        self.sale_origin_identify_button = QPushButton("Identificar")
+        self.sale_origin_direct_button = QPushButton("Tomar directo")
+        self.sale_origin_release_button = QPushButton("Liberar")
         self.sale_payment_combo = QComboBox()
         self.sale_discount_field_label = QLabel("Desc.")
         self.sale_discount_combo = QComboBox()
@@ -1290,6 +1295,9 @@ class MainWindow(QMainWindow):
         self.sale_feedback_label = QLabel("Listo para escanear.")
         self.sales_dialog: QDialog | None = None
         self.sale_processing = False
+        self.sale_credit_mode = ModoOrigenVenta.UNASSIGNED
+        self.sale_seller_employee_code = ""
+        self.sale_seller_employee_display_name = ""
         self.sale_last_scanned_sku = ""
         self.sale_last_scanned_at = 0.0
         self.sale_discount_locked_to_client = False
@@ -5948,7 +5956,11 @@ class MainWindow(QMainWindow):
         self.sale_qty_spin.setValue(1)
         self.sale_payment_combo.setCurrentText("Efectivo")
         self.sale_client_combo.setCurrentIndex(0)
+        self.sale_credit_mode = ModoOrigenVenta.UNASSIGNED
+        self.sale_seller_employee_code = ""
+        self.sale_seller_employee_display_name = ""
         self._refresh_sale_client_display()
+        self._refresh_sale_origin_ui()
         self._apply_sale_client_selection_ui_state(
             build_empty_sale_client_selection_ui_state(
                 normalize_discount_value=self._normalize_discount_value,
@@ -5964,6 +5976,48 @@ class MainWindow(QMainWindow):
     def _refresh_sale_client_display(self) -> None:
         current_label = self.sale_client_combo.currentText().strip() or "Mostrador / sin cliente"
         self.sale_client_display_label.setText(current_label)
+
+    def _sale_origin_visible_label(self) -> str:
+        if self.sale_credit_mode == ModoOrigenVenta.OPERATOR_DIRECT:
+            return "Directa"
+        if self.sale_credit_mode == ModoOrigenVenta.EMPLOYEE:
+            return self.sale_seller_employee_display_name.strip() or "Sin asignar"
+        return "Sin asignar"
+
+    def _refresh_sale_origin_ui(self) -> None:
+        visible_label = self._sale_origin_visible_label()
+        self.sale_origin_value_label.setText(visible_label)
+        self.sale_origin_value_label.setToolTip(f"Responsable: {visible_label}")
+        is_unassigned = self.sale_credit_mode == ModoOrigenVenta.UNASSIGNED
+        self.sale_origin_release_button.setEnabled(not is_unassigned)
+        self.sale_origin_direct_button.setEnabled(self.sale_credit_mode != ModoOrigenVenta.OPERATOR_DIRECT)
+
+    def _handle_sale_origin_identify(self, scanned_code: str | None = None) -> None:
+        code_hint = f" ({scanned_code})" if scanned_code else ""
+        QMessageBox.information(
+            self,
+            "Identificar responsable",
+            (
+                "La identificacion por QR del equipo comercial"
+                f"{code_hint} se habilitara en el siguiente corte de Origen."
+            ),
+        )
+        self.sale_sku_input.setFocus()
+        self.sale_sku_input.selectAll()
+
+    def _handle_sale_origin_direct(self) -> None:
+        self.sale_credit_mode = ModoOrigenVenta.OPERATOR_DIRECT
+        self.sale_seller_employee_code = ""
+        self.sale_seller_employee_display_name = ""
+        self._refresh_sale_origin_ui()
+        self._set_sale_feedback("Responsable cambiado a Directa.", "neutral", auto_clear_ms=1600)
+
+    def _handle_sale_origin_release(self) -> None:
+        self.sale_credit_mode = ModoOrigenVenta.UNASSIGNED
+        self.sale_seller_employee_code = ""
+        self.sale_seller_employee_display_name = ""
+        self._refresh_sale_origin_ui()
+        self._set_sale_feedback("Responsable liberado.", "neutral", auto_clear_ms=1600)
 
     def _reset_quote_form(self) -> None:
         self.quote_sku_input.clear()
@@ -6364,6 +6418,9 @@ class MainWindow(QMainWindow):
         sku = self.sale_sku_input.text().strip().upper()
         if not sku:
             QMessageBox.warning(self, "Datos incompletos", "Captura un SKU antes de agregar al carrito.")
+            return
+        if sku.startswith("EMP:"):
+            self._handle_sale_origin_identify(scanned_code=sku)
             return
 
         quantity = self.sale_qty_spin.value()
@@ -6943,11 +7000,14 @@ class MainWindow(QMainWindow):
                     total=total,
                     selected_client_id=selected_client_id,
                     breakdown=breakdown,
-                    payment_method=payment_context.payment_method,
-                    note_parts=list(payment_context.note_parts),
-                    internal_note_parts=internal_note_parts,
-                    build_notice=self._build_sale_loyalty_transition_notice,
-                )
+                payment_method=payment_context.payment_method,
+                note_parts=list(payment_context.note_parts),
+                internal_note_parts=internal_note_parts,
+                credit_mode=self.sale_credit_mode,
+                seller_employee_code=self.sale_seller_employee_code or None,
+                seller_employee_display_name=self.sale_seller_employee_display_name or None,
+                build_notice=self._build_sale_loyalty_transition_notice,
+            )
                 session.commit()
         except Exception as exc:  # noqa: BLE001
             self._set_sale_processing(False)
@@ -7465,6 +7525,13 @@ class MainWindow(QMainWindow):
         self.sale_add_button.setEnabled(can_sell and can_operate_open_cash)
         self.sale_button.setEnabled(can_sell and can_operate_open_cash)
         self.sale_recent_button.setEnabled(True)
+        self.sale_origin_identify_button.setEnabled(can_sell and can_operate_open_cash)
+        self.sale_origin_direct_button.setEnabled(
+            can_sell and can_operate_open_cash and self.sale_credit_mode != ModoOrigenVenta.OPERATOR_DIRECT
+        )
+        self.sale_origin_release_button.setEnabled(
+            can_sell and can_operate_open_cash and self.sale_credit_mode != ModoOrigenVenta.UNASSIGNED
+        )
         self._apply_quote_action_state()
         self._apply_recent_sale_action_state()
         self.sale_remove_button.setEnabled(can_sell and can_operate_open_cash and bool(self.sale_cart))
@@ -7488,6 +7555,7 @@ class MainWindow(QMainWindow):
             self.sale_discount_combo.setToolTip(
                 "Para CAJERO, el descuento se refleja automaticamente segun el cliente escaneado."
             )
+        self.sale_origin_value_label.setToolTip(f"Responsable: {self._sale_origin_visible_label()}")
         self.settings_create_backup_button.setEnabled(is_admin)
         self.settings_refresh_backups_button.setEnabled(True)
         self.settings_open_backups_button.setEnabled(True)

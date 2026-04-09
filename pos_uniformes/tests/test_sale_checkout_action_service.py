@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
+from pos_uniformes.database.models import ModoOrigenVenta
 from pos_uniformes.services.sale_checkout_action_service import (
     SaleCheckoutResult,
     complete_sale_checkout,
@@ -70,6 +71,9 @@ class SaleCheckoutActionServiceTests(unittest.TestCase):
                 payment_method="Efectivo",
                 note_parts=["nota"],
                 internal_note_parts=["Maqueta prueba deportivo 3pz: P2-001 + PLY-001"],
+                credit_mode=ModoOrigenVenta.OPERATOR_DIRECT,
+                seller_employee_code=None,
+                seller_employee_display_name=None,
                 build_notice=lambda *args: "Cambio de nivel",
             )
 
@@ -108,6 +112,10 @@ class SaleCheckoutActionServiceTests(unittest.TestCase):
                     "pricing_rule_label": "Conjunto deportivo 3pz",
                 }
             ],
+        )
+        self.assertEqual(
+            fake_venta_service.crear_borrador_kwargs["credit_mode"],
+            ModoOrigenVenta.OPERATOR_DIRECT,
         )
 
 

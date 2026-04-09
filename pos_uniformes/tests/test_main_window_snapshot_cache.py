@@ -14,7 +14,7 @@ from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication, QDoubleSpinBox, QPushButton, QSpinBox, QTableWidgetItem
 
 from pos_uniformes.services.active_filter_service import ActiveFilterToken
-from pos_uniformes.database.models import RolUsuario, TipoMovimientoCaja
+from pos_uniformes.database.models import ModoOrigenVenta, RolUsuario, TipoMovimientoCaja
 from pos_uniformes.ui.main_window import (
     CATALOG_PAGE_SIZE,
     INVENTORY_PAGE_SIZE,
@@ -112,6 +112,25 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         self.assertTrue(window.sale_discount_field_label.isHidden())
         self.assertTrue(window.sale_discount_combo.isHidden())
+
+    def test_sale_origin_defaults_to_unassigned_after_reset(self) -> None:
+        window = MainWindow(user_id=1)
+
+        window._reset_sale_form()
+
+        self.assertEqual(window.sale_credit_mode, ModoOrigenVenta.UNASSIGNED)
+        self.assertEqual(window.sale_origin_value_label.text(), "Sin asignar")
+
+    def test_sale_origin_direct_and_release_update_visible_label(self) -> None:
+        window = MainWindow(user_id=1)
+
+        window._handle_sale_origin_direct()
+        self.assertEqual(window.sale_credit_mode, ModoOrigenVenta.OPERATOR_DIRECT)
+        self.assertEqual(window.sale_origin_value_label.text(), "Directa")
+
+        window._handle_sale_origin_release()
+        self.assertEqual(window.sale_credit_mode, ModoOrigenVenta.UNASSIGNED)
+        self.assertEqual(window.sale_origin_value_label.text(), "Sin asignar")
 
     def test_admin_role_keeps_manual_discount_controls_visible(self) -> None:
         window = MainWindow(user_id=1)

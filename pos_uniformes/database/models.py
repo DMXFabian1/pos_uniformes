@@ -53,6 +53,12 @@ class EstadoVenta(str, Enum):
     CANCELADA = "CANCELADA"
 
 
+class ModoOrigenVenta(str, Enum):
+    UNASSIGNED = "UNASSIGNED"
+    EMPLOYEE = "EMPLOYEE"
+    OPERATOR_DIRECT = "OPERATOR_DIRECT"
+
+
 class EstadoApartado(str, Enum):
     ACTIVO = "ACTIVO"
     LIQUIDADO = "LIQUIDADO"
@@ -1060,6 +1066,14 @@ class Venta(Base):
         ForeignKey("cliente.id", ondelete="SET NULL"),
         index=True,
     )
+    credit_mode: Mapped[ModoOrigenVenta] = mapped_column(
+        SqlEnum(ModoOrigenVenta, name="credit_mode_venta"),
+        default=ModoOrigenVenta.UNASSIGNED,
+        nullable=False,
+        index=True,
+    )
+    seller_employee_code: Mapped[str | None] = mapped_column(String(40), index=True)
+    seller_employee_display_name: Mapped[str | None] = mapped_column(String(120))
     folio: Mapped[str] = mapped_column(String(40), unique=True, nullable=False, index=True)
     estado: Mapped[EstadoVenta] = mapped_column(
         SqlEnum(EstadoVenta, name="estado_venta"),
