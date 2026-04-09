@@ -37,7 +37,6 @@ def create_settings_employee(session, *, admin_user_id: int, payload: dict[str, 
     employee = employee_service.create_employee(
         session=session,
         admin_user=admin_user,
-        codigo=str(payload["codigo"]),
         nombre_completo=str(payload["nombre_completo"]),
     )
     return SettingsEmployeeActionResult(
@@ -62,7 +61,6 @@ def update_settings_employee(
         session=session,
         admin_user=admin_user,
         employee=employee,
-        codigo=str(payload["codigo"]),
         nombre_completo=str(payload["nombre_completo"]),
     )
     return SettingsEmployeeActionResult(

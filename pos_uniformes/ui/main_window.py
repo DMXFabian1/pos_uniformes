@@ -3531,7 +3531,8 @@ class MainWindow(QMainWindow):
         data = prompt_employee_data(
             self,
             title="Crear empleada",
-            helper_text="Captura el codigo base EMP y el nombre completo del equipo comercial.",
+            helper_text="Captura el nombre completo del equipo comercial. El codigo EMP se genera automaticamente.",
+            generated_code="Se genera automaticamente",
         )
         if data is None:
             return
@@ -3571,7 +3572,7 @@ class MainWindow(QMainWindow):
                 data = prompt_employee_data(
                     self,
                     title="Editar empleada",
-                    helper_text="Actualiza codigo o nombre visible del equipo comercial.",
+                    helper_text="Actualiza el nombre visible del equipo comercial. El codigo se mantiene fijo.",
                     current_values={
                         "codigo": prompt_snapshot.code,
                         "nombre_completo": prompt_snapshot.full_name,

@@ -8,6 +8,14 @@ from pos_uniformes.services.employee_identity_service import EmployeeIdentitySer
 
 
 class EmployeeIdentityServiceTests(unittest.TestCase):
+    def test_generate_employee_code_uses_next_numeric_suffix(self) -> None:
+        session = Mock()
+        session.scalar.return_value = 7
+
+        code = EmployeeIdentityService.generate_employee_code(session)
+
+        self.assertEqual(code, "VEND-8")
+
     def test_build_visible_employee_name_uses_first_and_last_token(self) -> None:
         self.assertEqual(
             EmployeeIdentityService.build_visible_employee_name("Guadalupe Gomez Ruiz"),

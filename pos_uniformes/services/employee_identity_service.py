@@ -12,6 +12,7 @@ class EmployeeIdentityService:
     """Reglas minimas para alta y resolucion de empleadas comerciales."""
 
     QR_PREFIX = "EMP:"
+    CODE_PREFIX = "VEND-"
 
     @staticmethod
     def _validar_admin(admin_user: Usuario) -> None:
@@ -30,6 +31,11 @@ class EmployeeIdentityService:
         if any(char.isspace() for char in normalized):
             raise ValueError("El codigo de empleada no puede contener espacios.")
         return normalized
+
+    @classmethod
+    def generate_employee_code(cls, session: Session) -> str:
+        next_id = (session.scalar(select(func.coalesce(func.max(Empleada.id), 0))) or 0) + 1
+        return f"{cls.CODE_PREFIX}{int(next_id)}"
 
     @staticmethod
     def build_visible_employee_name(full_name: str) -> str:
@@ -60,19 +66,14 @@ class EmployeeIdentityService:
         session: Session,
         *,
         admin_user: Usuario,
-        codigo: str,
         nombre_completo: str,
     ) -> Empleada:
         cls._validar_admin(admin_user)
-        normalized_code = cls.normalize_employee_code(codigo)
         normalized_name = nombre_completo.strip()
         if not normalized_name:
             raise ValueError("El nombre de la empleada no puede estar vacio.")
-        existing = session.scalar(select(Empleada).where(func.upper(Empleada.codigo) == normalized_code))
-        if existing is not None:
-            raise ValueError(f"Ya existe una empleada con el codigo '{normalized_code}'.")
         employee = Empleada(
-            codigo=normalized_code,
+            codigo=cls.generate_employee_code(session),
             nombre_completo=normalized_name,
             activo=True,
         )
@@ -86,23 +87,12 @@ class EmployeeIdentityService:
         *,
         admin_user: Usuario,
         employee: Empleada,
-        codigo: str,
         nombre_completo: str,
     ) -> Empleada:
         cls._validar_admin(admin_user)
-        normalized_code = cls.normalize_employee_code(codigo)
         normalized_name = nombre_completo.strip()
         if not normalized_name:
             raise ValueError("El nombre de la empleada no puede estar vacio.")
-        existing = session.scalar(
-            select(Empleada).where(
-                func.upper(Empleada.codigo) == normalized_code,
-                Empleada.id != employee.id,
-            )
-        )
-        if existing is not None:
-            raise ValueError(f"Ya existe una empleada con el codigo '{normalized_code}'.")
-        employee.codigo = normalized_code
         employee.nombre_completo = normalized_name
         session.add(employee)
         return employee

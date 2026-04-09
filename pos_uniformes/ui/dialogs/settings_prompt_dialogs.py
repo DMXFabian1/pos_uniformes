@@ -262,24 +262,27 @@ def prompt_employee_data(
     title: str,
     helper_text: str,
     current_values: dict[str, str] | None = None,
+    generated_code: str | None = None,
 ) -> dict[str, str] | None:
     dialog, layout = _create_settings_prompt_dialog(parent, title, helper_text, width=520)
     form = QFormLayout()
-    code_input = QLineEdit()
     name_input = QLineEdit()
-    code_input.setPlaceholderText("VEND-1 o EMP:VEND-1")
     name_input.setPlaceholderText("Nombre completo visible en Caja")
+    code_value = current_values.get("codigo", "") if current_values else (generated_code or "")
+    code_label = QLineEdit()
+    code_label.setReadOnly(True)
+    code_label.setPlaceholderText("Se generara al guardar")
+    if code_value:
+        code_label.setText(code_value)
     if current_values:
-        code_input.setText(current_values.get("codigo", ""))
         name_input.setText(current_values.get("nombre_completo", ""))
-    form.addRow("Codigo", code_input)
+    form.addRow("Codigo", code_label)
     form.addRow("Nombre", name_input)
     layout.addLayout(form)
     layout.addWidget(_build_prompt_buttons(dialog))
     if dialog.exec() != int(QDialog.DialogCode.Accepted):
         return None
     return {
-        "codigo": code_input.text().strip(),
         "nombre_completo": name_input.text().strip(),
     }
 
