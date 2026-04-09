@@ -237,6 +237,15 @@ Reglas:
 - no usar JSON, Base64 ni payloads largos en V1
 - el scanner debe poder leerlo como texto plano y Caja debe resolverlo con comparacion exacta
 - si el codigo no existe, Caja debe mostrar error breve y mantener el estado actual de `Responsable`
+- el `codigo` no se muestra al cliente ni al equipo como estado final de la venta
+- el `codigo` solo sirve para resolver internamente a la empleada correcta
+
+Ejemplo de resolucion:
+
+- el QR lee `EMP:VEND-1`
+- Caja busca `codigo = VEND-1`
+- el sistema encuentra a `Lupita`
+- el bloque visible queda en `Responsable: Lupita` o en su nombre corto configurado
 
 Razon de esta decision:
 
