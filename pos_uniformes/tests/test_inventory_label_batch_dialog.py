@@ -91,6 +91,49 @@ class InventoryLabelBatchDialogTests(unittest.TestCase):
         self.assertEqual(print_calls, [("SKU-001", 2)])
         information_mock.assert_called_once()
 
+    def test_batch_dialog_sets_tab_order_through_mode_quantities_and_actions(self) -> None:
+        host = _DialogHost()
+        contexts = [
+            SimpleNamespace(variant_id=1, sku="SKU-001", product_name="Pants", talla="14", color="Azul"),
+            SimpleNamespace(variant_id=2, sku="SKU-002", product_name="Camisa", talla="16", color="Blanco"),
+        ]
+        tab_calls: list[tuple[QWidget, QWidget]] = []
+
+        def fake_exec(_dialog: QDialog) -> int:
+            return int(QDialog.DialogCode.Rejected)
+
+        def fake_set_tab_order(previous: QWidget, next_widget: QWidget) -> None:
+            tab_calls.append((previous, next_widget))
+
+        with (
+            patch("pos_uniformes.ui.dialogs.inventory_label_batch_dialog.QDialog.exec", new=fake_exec),
+            patch("pos_uniformes.ui.dialogs.inventory_label_batch_dialog.QWidget.setTabOrder", new=fake_set_tab_order),
+        ):
+            build_inventory_label_batch_dialog(
+                host,
+                contexts=contexts,
+                render_label=lambda variant_id, mode, requested_copies: LabelRenderResult(
+                    mode=mode,
+                    image_path=Path("/tmp/label.png"),
+                    effective_copies=requested_copies,
+                    requested_copies=requested_copies,
+                ),
+                print_label=lambda image_path, copies, sku, dialog: True,
+            )
+
+        self.assertEqual(len(tab_calls), 4)
+        self.assertEqual(tab_calls[0][0].metaObject().className(), "QComboBox")
+        self.assertIsInstance(tab_calls[0][1], QSpinBox)
+        self.assertIsInstance(tab_calls[1][0], QSpinBox)
+        self.assertIsInstance(tab_calls[1][1], QSpinBox)
+        self.assertIsInstance(tab_calls[2][0], QSpinBox)
+        self.assertIsInstance(tab_calls[2][1], QPushButton)
+        self.assertEqual(tab_calls[2][1].text(), "Cerrar")
+        self.assertIsInstance(tab_calls[3][0], QPushButton)
+        self.assertEqual(tab_calls[3][0].text(), "Cerrar")
+        self.assertIsInstance(tab_calls[3][1], QPushButton)
+        self.assertEqual(tab_calls[3][1].text(), "Imprimir lote")
+
 
 if __name__ == "__main__":
     unittest.main()

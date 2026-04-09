@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
+    QWidget,
 )
 
 from pos_uniformes.ui.helpers.inventory_label_preview_helper import build_inventory_label_mode_hint
@@ -174,5 +175,14 @@ def build_inventory_label_batch_dialog(
         quantity_spin.valueChanged.connect(lambda _value: refresh_summary())
     close_button.clicked.connect(dialog.reject)
     print_button.clicked.connect(handle_print)
+
+    # Fuerza una captura por teclado predecible en la prueba de impresion por lote.
+    previous_tab_widget: QWidget = mode_combo
+    for quantity_spin in quantity_spins:
+        QWidget.setTabOrder(previous_tab_widget, quantity_spin)
+        previous_tab_widget = quantity_spin
+    QWidget.setTabOrder(previous_tab_widget, close_button)
+    QWidget.setTabOrder(close_button, print_button)
+
     refresh_summary()
     dialog.exec()
