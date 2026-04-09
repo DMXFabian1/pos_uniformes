@@ -530,6 +530,8 @@
   - `Empleadas` ahora incluye `PIN` como parte de su identidad administrable: se guarda hasheado con PBKDF2, se define solo desde `Configuracion`, la tabla muestra `PIN` como `Listo/Pendiente` y el uso operativo del PIN en `Caja` queda separado para un corte posterior.
 - `services/employee_activity_service.py`, `ui/dialogs/settings_dialogs.py`, `ui/main_window.py`
   - `Empleadas` gana un panel lateral pensado para `ADMIN`: muestra detalle de la seleccion y un resumen de los ultimos 7 dias con `Piezas`, `Tickets`, `Monto` y `Ultima venta`, sin saturar la tabla principal.
+- `ui/dialogs/settings_dialogs.py`, `ui/main_window.py`
+  - El panel lateral de `Empleadas` ahora incluye un toggle local `Ocultar monto / Mostrar monto` para compartir la vista sin exponer importes; esconde la columna `Monto` y quita el importe del resumen `Hoy`.
 
 ## Riesgo residual conocido
 
