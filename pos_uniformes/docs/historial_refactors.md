@@ -514,6 +514,8 @@
   - Caja ahora muestra un estado vivo de cobro (`lista`, `caja cerrada`, `procesando`, `solo lectura`) separado del feedback transitorio, para que el operador vea de un vistazo si la venta ya puede cobrarse y por que.
 - `ui/views/inventory_view.py`
   - Se oculto la banda superior de resumen contextual (`SKU | producto | precio | stock | apartado`) dentro de `Acciones rapidas` para desaturar la vista; la logica interna del label sigue viva para poder revertirlo facil si luego hace falta.
+- `ui/dialogs/inventory_count_dialog.py`
+  - La `Referencia` de `Conteo fisico` ahora se autogenera al abrir el dialogo y queda en solo lectura, para tratarla como folio fijo del lote y evitar ediciones manuales accidentales.
 
 ## Riesgo residual conocido
 

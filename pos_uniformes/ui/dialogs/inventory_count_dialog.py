@@ -68,6 +68,7 @@ class InventoryCountDialog(QDialog):
         self._initial_context_label = str(initial_context_label or "").strip()
         self._scan_accumulation_enabled = not bool(initial_rows)
         self._result: dict[str, object] | None = None
+        self._reference_value = f"CONTEO-{uuid4().hex[:8].upper()}"
         self.setWindowTitle("Conteo fisico")
         self.setModal(True)
         self.resize(960, 720)
@@ -219,7 +220,8 @@ class InventoryCountDialog(QDialog):
         footer_form = QFormLayout()
         footer_form.setSpacing(8)
         self.reference_input = QLineEdit()
-        self.reference_input.setPlaceholderText("CONTEO-0001")
+        self.reference_input.setText(self._reference_value)
+        self.reference_input.setReadOnly(True)
         self.observation_input = QLineEdit()
         self.observation_input.setPlaceholderText("Conteo de piso, almacen o revision puntual")
         footer_form.addRow("Referencia", self.reference_input)

@@ -54,6 +54,12 @@ class InventoryCountDialogTests(unittest.TestCase):
         self.assertEqual(dialog.batch_table.rowCount(), 1)
         self.assertFalse(dialog.initial_context_label.isVisible())
 
+    def test_reference_is_generated_and_read_only(self) -> None:
+        dialog = InventoryCountDialog()
+
+        self.assertTrue(dialog.reference_input.isReadOnly())
+        self.assertTrue(dialog.reference_input.text().startswith("CONTEO-"))
+
     def test_dialog_starts_without_batch_row_selected(self) -> None:
         dialog = InventoryCountDialog(
             initial_rows=[
