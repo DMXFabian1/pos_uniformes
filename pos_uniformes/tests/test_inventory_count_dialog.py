@@ -7,9 +7,11 @@ from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PyQt6.QtCore import Qt
+from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication
 
-from pos_uniformes.services.inventory_count_service import InventoryCountVariantView
+from pos_uniformes.services.inventory_count_service import InventoryCountRow, InventoryCountVariantView
 from pos_uniformes.ui.dialogs.inventory_count_dialog import InventoryCountDialog
 
 
@@ -51,6 +53,47 @@ class InventoryCountDialogTests(unittest.TestCase):
         self.assertEqual(dialog._rows[0].stock_contado, 2)
         self.assertEqual(dialog.batch_table.rowCount(), 1)
         self.assertIn("escaneo acumulado", dialog.initial_context_label.text().lower())
+
+    def test_dialog_starts_without_batch_row_selected(self) -> None:
+        dialog = InventoryCountDialog(
+            initial_rows=[
+                InventoryCountRow(
+                    variante_id=11,
+                    sku="SKU000011",
+                    producto_nombre="Bata",
+                    stock_sistema=9,
+                    stock_contado=9,
+                    delta=0,
+                )
+            ],
+            initial_context_label="Filas seleccionadas (1)",
+        )
+
+        self.assertEqual(dialog.batch_table.currentRow(), -1)
+        self.assertFalse(dialog.batch_table.selectionModel().hasSelection())
+
+    def test_escape_clears_batch_table_selection(self) -> None:
+        dialog = InventoryCountDialog(
+            initial_rows=[
+                InventoryCountRow(
+                    variante_id=11,
+                    sku="SKU000011",
+                    producto_nombre="Bata",
+                    stock_sistema=9,
+                    stock_contado=9,
+                    delta=0,
+                )
+            ],
+            initial_context_label="Filas seleccionadas (1)",
+        )
+        dialog.show()
+        dialog.batch_table.selectRow(0)
+        dialog.batch_table.setFocus()
+
+        QTest.keyClick(dialog.batch_table, Qt.Key.Key_Escape)
+
+        self.assertEqual(dialog.batch_table.currentRow(), -1)
+        self.assertFalse(dialog.batch_table.selectionModel().hasSelection())
 
 
 if __name__ == "__main__":

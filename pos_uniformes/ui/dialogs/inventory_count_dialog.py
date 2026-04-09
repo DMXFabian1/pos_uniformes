@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from uuid import uuid4
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QEvent, Qt
+from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -72,6 +73,7 @@ class InventoryCountDialog(QDialog):
         self._build_ui()
         self._refresh_selected_variant_card()
         self._refresh_batch_table()
+        self._clear_batch_selection()
 
     def _build_ui(self) -> None:
         layout = QVBoxLayout()
@@ -156,12 +158,16 @@ class InventoryCountDialog(QDialog):
         self.batch_table.setSelectionBehavior(self.batch_table.SelectionBehavior.SelectRows)
         self.batch_table.setAlternatingRowColors(True)
         self.batch_table.setMinimumHeight(260)
+        self.batch_table.installEventFilter(self)
         header = self.batch_table.horizontalHeader()
         header.setSectionResizeMode(0, header.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, header.ResizeMode.Stretch)
         header.setSectionResizeMode(2, header.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(3, header.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(4, header.ResizeMode.ResizeToContents)
+        self.clear_batch_selection_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Escape), self.batch_table)
+        self.clear_batch_selection_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        self.clear_batch_selection_shortcut.activated.connect(self._clear_batch_selection)
         layout.addWidget(self.batch_table)
 
         self.batch_summary_label = QLabel("")
@@ -242,6 +248,7 @@ class InventoryCountDialog(QDialog):
             self.counted_spin.setEnabled(True)
             self.add_button.setEnabled(True)
             self._refresh_batch_table()
+            self._clear_batch_selection()
             if current_row is not None:
                 self.batch_status_label.setText(
                     f"Escaneo acumulado: {variant.sku} | contado {current_row.stock_contado} | sistema {current_row.stock_sistema} | delta {current_row.delta:+d}"
@@ -269,6 +276,7 @@ class InventoryCountDialog(QDialog):
         existed_before = any(int(row.variante_id) == int(new_row.variante_id) for row in self._rows)
         self._rows = upsert_inventory_count_row(self._rows, new_row)
         self._refresh_batch_table()
+        self._clear_batch_selection()
         QMessageBox.information(
             self,
             "Lote actualizado",
@@ -300,6 +308,7 @@ class InventoryCountDialog(QDialog):
             return
         self._rows = remove_inventory_count_row(self._rows, variante_id=int(variante_id))
         self._refresh_batch_table()
+        self._clear_batch_selection()
 
     def _refresh_selected_variant_card(self) -> None:
         if self._selected_variant is None:
@@ -332,6 +341,10 @@ class InventoryCountDialog(QDialog):
         if not isinstance(counted_spin, QSpinBox):
             counted_spin = QSpinBox()
             counted_spin.setRange(0, 100000)
+            counted_spin.installEventFilter(self)
+            counted_line_edit = counted_spin.lineEdit()
+            if counted_line_edit is not None:
+                counted_line_edit.installEventFilter(self)
             counted_spin.valueChanged.connect(
                 lambda value, variante_id=row.variante_id: self._handle_batch_count_changed(
                     variante_id=int(variante_id),
@@ -371,6 +384,22 @@ class InventoryCountDialog(QDialog):
                 self._apply_batch_table_row(row_index, row)
                 break
         self._refresh_batch_meta(batch_view)
+
+    def _clear_batch_selection(self) -> None:
+        self.batch_table.clearSelection()
+        self.batch_table.setCurrentCell(-1, -1)
+
+    def eventFilter(self, watched, event):  # type: ignore[override]
+        if event.type() == QEvent.Type.KeyPress and event.key() == Qt.Key.Key_Escape:
+            if watched is self.batch_table or (
+                hasattr(watched, "parentWidget")
+                and watched.parentWidget() is not None
+                and self.batch_table.isAncestorOf(watched)
+            ):
+                self._clear_batch_selection()
+                self.sku_input.setFocus()
+                return True
+        return super().eventFilter(watched, event)
 
     def _handle_confirm(self) -> None:
         payload = build_inventory_count_payload(
