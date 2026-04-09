@@ -6,7 +6,7 @@ from pathlib import Path
 import re
 import unicodedata
 
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw
 import qrcode
 from qrcode.constants import ERROR_CORRECT_H
 
@@ -98,6 +98,9 @@ class QrGenerator:
     @classmethod
     def _build_employee_qr_image(cls, qr_image: Image.Image) -> Image.Image:
         try:
+            employee_icon_path = QR_ICON_DIR / "default.png"
+            if employee_icon_path.exists():
+                return cls._embed_center_icon(qr_image, employee_icon_path)
             icon_image = cls._build_employee_monogram_icon()
             return cls._embed_center_badge_image(qr_image, icon_image)
         except Exception:

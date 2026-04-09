@@ -150,6 +150,27 @@ class QrGeneratorTests(unittest.TestCase):
                 self.assertNotEqual(center_pixel[:3], (255, 255, 255))
                 self.assertNotEqual(center_pixel[:3], (0, 0, 0))
 
+    def test_generate_for_employee_prefers_default_icon_asset(self) -> None:
+        employee = SimpleNamespace(codigo="VEND-1")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            output_path = temp_path / "VEND-1.png"
+            icon_dir = temp_path / "icons"
+            icon_dir.mkdir()
+            Image.new("RGBA", (128, 128), (0, 0, 0, 255)).save(icon_dir / "default.png")
+
+            with (
+                patch("pos_uniformes.utils.qr_generator.QR_ICON_DIR", icon_dir),
+                patch.object(QrGenerator, "path_for_employee", return_value=output_path),
+                patch.object(QrGenerator, "_embed_center_icon", wraps=QrGenerator._embed_center_icon) as embed_mock,
+            ):
+                generated = QrGenerator.generate_for_employee(employee)
+
+            self.assertEqual(generated, output_path)
+            self.assertTrue(output_path.exists())
+            self.assertEqual(embed_mock.call_count, 1)
+            self.assertEqual(embed_mock.call_args[0][1], icon_dir / "default.png")
+
 
 if __name__ == "__main__":
     unittest.main()
