@@ -22,6 +22,7 @@ Registrar mejoras propuestas por operacion o producto y ubicarlas dentro del pla
   - `2026-04-07`: checkpoint operativo validado en Windows para login, branding visible, QR individual, impresion de etiqueta, carga/salida segura, tablas de Caja/Apartados/Presupuestos, regla `2pz -> 3pz` en Caja, Presupuestos y Apartados, hover reusable en filtros/desplegables de Inventario y respiracion del carrito de Presupuestos principal
   - `2026-04-07`: pendiente solo el cierre de empaquetado final de Windows con validacion del `.ico` y de recursos dentro del bundle
   - `2026-04-07`: la siguiente decision grande ya no es funcional sino de producto/operacion: que hacer con los SKUs legacy `3pz` y cuando desacoplar la satelite para kiosko
+  - `2026-04-08`: anotacion operativa para kiosko/presupuesto guiado: la ruta actual no debe mostrar `ropa normal` aunque una prenda este catalogada con escuela; antes de abrir el bloque de `piezas generales`, conviene endurecer el filtro base de `Uniformes por escuela` para aceptar solo lineas escolares reales (`Deportivo` / `Oficial`) y dejar la ropa normal fuera de ese flujo
 
 ### 2026-03-26
 
@@ -581,3 +582,9 @@ Registrar mejoras propuestas por operacion o producto y ubicarlas dentro del pla
 - La base incluye los cambios utiles de etiquetas Windows, tickets 58 mm y bundle Windows.
 - La referencia no incluye el experimento de `sync simple`, ya retirado.
 - No tomar `Solo Referencia`, `dist/`, `build/`, `generated/`, `exports/`, `__pycache__/` o `.DS_Store` como parte del producto vigente.
+
+## Recordatorio de seguimiento inmediato
+
+- Manana retomar `Conteo fisico`.
+- Probar especificamente la apertura `desde el filtro actual de Inventario`.
+- Validar si ese flujo realmente se siente natural para operacion antes de implementarlo.
