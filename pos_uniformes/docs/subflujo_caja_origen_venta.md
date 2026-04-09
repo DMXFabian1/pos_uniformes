@@ -218,6 +218,32 @@ Reglas:
 - si se escanea `CLI:...`, Caja sigue el subflujo actual de cliente
 - no se debe adivinar el tipo de QR por formato ambiguo
 
+## Formato final del QR de equipo para V1
+
+Para la primera iteracion, el QR del equipo debe usar este formato exacto:
+
+- `EMP:{codigo}`
+
+Ejemplos validos:
+
+- `EMP:FER001`
+- `EMP:ANDREA02`
+- `EMP:VEND-14`
+
+Reglas:
+
+- `EMP:` debe ir en mayusculas
+- el valor posterior se trata como `codigo` comercial legible
+- no usar JSON, Base64 ni payloads largos en V1
+- el scanner debe poder leerlo como texto plano y Caja debe resolverlo con comparacion exacta
+- si el codigo no existe, Caja debe mostrar error breve y mantener el estado actual de `Responsable`
+
+Razon de esta decision:
+
+- facilita generar e imprimir codigos sin tooling extra
+- acelera pruebas manuales con cualquier generador QR
+- deja el flujo facil de depurar antes de introducir tokens mas opacos
+
 ## Modelo de datos recomendado para V1
 
 ### Nueva entidad comercial
