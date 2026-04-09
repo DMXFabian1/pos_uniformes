@@ -589,3 +589,9 @@ Registrar mejoras propuestas por operacion o producto y ubicarlas dentro del pla
 - Manana retomar `Conteo fisico`.
 - Probar especificamente la apertura `desde el filtro actual de Inventario`.
 - Validar si ese flujo realmente se siente natural para operacion antes de implementarlo.
+- Manana validar tambien `Empleadas / Staff`:
+  - regenerar QR con icono central
+  - escanearlo en `Caja`
+  - confirmar que `EMP:{codigo}` siga resolviendo normal al `Responsable`
+- Si esa validacion sale bien, el siguiente corte natural en ese frente es:
+  - reflejar `Responsable` tambien en ticket, `Presupuestos` y `Apartados`
