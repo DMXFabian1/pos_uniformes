@@ -161,6 +161,16 @@ sin explicar en pantalla para que se usa despues ese dato.
 - No queda restringido solo a `ADMIN`.
 - La restriccion relevante no es el rol administrativo, sino tener permiso operativo para abrir y cobrar una venta.
 - Si despues hiciera falta un control adicional, debe resolverse por permisos de Caja, no por el concepto de origen comercial.
+- `Sin asignar` se permite de forma permanente, no solo durante la adopcion inicial.
+- `Sin asignar` representa una venta valida sin atribucion comercial explicita.
+- Esto permite distinguir entre:
+  - ventas realmente tomadas por el operador
+  - ventas del equipo comercial
+  - ventas operadas o supervisadas sin acreditacion comercial
+- En fases futuras:
+  - `Asignada` podra entrar a comisiones
+  - `Directa` podra medirse aparte como atencion propia del operador
+  - `Sin asignar` no debera entrar a comisiones
 
 ## Contrato de QR
 
@@ -244,7 +254,6 @@ Servicios candidatos nuevos:
 
 ## Checklist de diseno antes de programar
 
-- decidir si `Libre` sera permitido permanentemente o solo durante la adopcion inicial
 - definir copy exacto de la banda visible en Caja
 - definir el formato final del QR de equipo
 - definir si el nombre de la persona identificada se muestra completo o resumido
