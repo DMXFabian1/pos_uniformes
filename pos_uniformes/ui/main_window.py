@@ -4920,6 +4920,13 @@ class MainWindow(QMainWindow):
                 spin.setValue(float(Decimal(str(row["precio_venta"])).quantize(Decimal("0.01"))) if mode == "SET" else 0.0)
                 spin.blockSignals(False)
                 recalc_row(row_index)
+            tab_navigator.set_inputs(
+                [
+                    spin
+                    for row_index in range(table.rowCount())
+                    if isinstance((spin := table.cellWidget(row_index, 5)), QDoubleSpinBox)
+                ]
+            )
             refresh_summary()
             table.resizeColumnsToContents()
 
@@ -4953,6 +4960,11 @@ class MainWindow(QMainWindow):
         ok_button = buttons.button(QDialogButtonBox.StandardButton.Ok)
         if ok_button is not None:
             ok_button.setText("Aplicar lote")
+        cancel_button = buttons.button(QDialogButtonBox.StandardButton.Cancel)
+        tab_navigator = _TableSpinTabNavigator(
+            anchor_before=quick_reset_button,
+            anchor_after=cancel_button or ok_button,
+        )
         buttons.accepted.connect(dialog.accept)
         buttons.rejected.connect(dialog.reject)
 
@@ -4964,6 +4976,8 @@ class MainWindow(QMainWindow):
         layout.addWidget(table)
         layout.addWidget(buttons)
         update_preview()
+        if ok_button is not None and cancel_button is not None:
+            QWidget.setTabOrder(cancel_button, ok_button)
         if dialog.exec() != int(QDialog.DialogCode.Accepted):
             return None
 

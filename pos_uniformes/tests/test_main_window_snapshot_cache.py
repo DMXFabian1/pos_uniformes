@@ -10,7 +10,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtTest import QTest
-from PyQt6.QtWidgets import QApplication, QPushButton, QSpinBox, QTableWidgetItem
+from PyQt6.QtWidgets import QApplication, QDoubleSpinBox, QPushButton, QSpinBox, QTableWidgetItem
 
 from pos_uniformes.services.active_filter_service import ActiveFilterToken
 from pos_uniformes.database.models import RolUsuario
@@ -259,6 +259,32 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         self.assertTrue(handled_backward)
         self.assertIn(("anchor_before", Qt.FocusReason.TabFocusReason), backward_calls)
+
+    def test_table_spin_tab_navigator_supports_double_spin_boxes(self) -> None:
+        host = MainWindow(user_id=1)
+        first_spin = QDoubleSpinBox(host)
+        second_spin = QDoubleSpinBox(host)
+        anchor_after = QPushButton("Cancelar", host)
+        navigator = _TableSpinTabNavigator(anchor_after=anchor_after)
+        navigator.set_inputs([first_spin, second_spin])
+
+        forward_calls: list[tuple[str, Qt.FocusReason]] = []
+        original_second_focus = second_spin.setFocus
+        second_spin.setFocus = lambda reason=Qt.FocusReason.OtherFocusReason: forward_calls.append(("second", reason))
+        original_second_select_all = second_spin.lineEdit().selectAll if second_spin.lineEdit() is not None else None
+        if second_spin.lineEdit() is not None:
+            second_spin.lineEdit().selectAll = lambda: forward_calls.append(("second_select_all", Qt.FocusReason.OtherFocusReason))
+        handled_forward = navigator.eventFilter(
+            first_spin.lineEdit(),
+            QKeyEvent(QEvent.Type.KeyPress, int(Qt.Key.Key_Tab), Qt.KeyboardModifier.NoModifier),
+        )
+        second_spin.setFocus = original_second_focus
+        if second_spin.lineEdit() is not None and original_second_select_all is not None:
+            second_spin.lineEdit().selectAll = original_second_select_all
+
+        self.assertTrue(handled_forward)
+        self.assertIn(("second", Qt.FocusReason.TabFocusReason), forward_calls)
+        self.assertIn(("second_select_all", Qt.FocusReason.OtherFocusReason), forward_calls)
 
     def test_catalog_search_refresh_uses_single_debounce_timer(self) -> None:
         window = MainWindow(user_id=1)
