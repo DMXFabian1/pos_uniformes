@@ -103,6 +103,7 @@ from pos_uniformes.services.analytics_layaway_service import load_analytics_laya
 from pos_uniformes.services.analytics_top_clients_service import load_analytics_top_client_snapshot_rows
 from pos_uniformes.services.analytics_top_products_service import load_analytics_top_product_snapshot_rows
 from pos_uniformes.services.analytics_stock_service import load_analytics_stock_snapshot_rows
+from pos_uniformes.services.auth_service import AuthService
 from pos_uniformes.services.backup_service import (
     AutomaticBackupStatus,
     read_automatic_backup_status,
@@ -1533,7 +1534,7 @@ class MainWindow(QMainWindow):
         self.settings_employee_activity_table = QTableWidget()
         self.settings_employee_activity_table.setColumnCount(4)
         self.settings_employee_activity_table.setHorizontalHeaderLabels(["Dia", "Piezas", "Tickets", "Monto"])
-        self.settings_employee_amounts_visible = True
+        self.settings_employee_amounts_visible = False
         self.settings_employees_dialog: QDialog | None = None
         self.settings_backup_dialog: QDialog | None = None
         self.settings_cash_history_dialog: QDialog | None = None
@@ -2202,6 +2203,7 @@ class MainWindow(QMainWindow):
         if self.settings_employees_dialog is None:
             self.settings_employees_dialog = build_employees_settings_dialog(self)
 
+        self.settings_employee_amounts_visible = False
         self._refresh_settings_employees()
         self.settings_employees_dialog.show()
         self.settings_employees_dialog.raise_()
@@ -3105,7 +3107,12 @@ class MainWindow(QMainWindow):
         self._refresh_settings_employee_amount_visibility()
 
     def _handle_toggle_settings_employee_amounts(self) -> None:
-        self.settings_employee_amounts_visible = not self.settings_employee_amounts_visible
+        if not self.settings_employee_amounts_visible:
+            if not self._prompt_settings_employee_amount_access():
+                return
+            self.settings_employee_amounts_visible = True
+        else:
+            self.settings_employee_amounts_visible = False
         self._refresh_settings_employee_detail()
 
     def _refresh_settings_employee_amount_visibility(self) -> None:
@@ -3113,6 +3120,27 @@ class MainWindow(QMainWindow):
             "Ocultar monto" if self.settings_employee_amounts_visible else "Mostrar monto"
         )
         self.settings_employee_activity_table.setColumnHidden(3, not self.settings_employee_amounts_visible)
+
+    def _prompt_settings_employee_amount_access(self) -> bool:
+        password, accepted = QInputDialog.getText(
+            self,
+            "Mostrar montos",
+            "Captura tu contrasena para ver montos en Empleadas.",
+            QLineEdit.EchoMode.Password,
+        )
+        if not accepted:
+            return False
+        try:
+            with get_session() as session:
+                user = session.get(Usuario, self.user_id)
+                if user is None or not user.activo:
+                    raise ValueError("No se pudo validar tu usuario actual.")
+                if not AuthService.verify_password(password, str(user.password_hash)):
+                    raise ValueError("La contrasena no coincide.")
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Acceso denegado", str(exc))
+            return False
+        return True
 
     def _selected_settings_user_id(self) -> int | None:
         selected_row = self.settings_users_table.currentRow()

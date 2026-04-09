@@ -531,7 +531,7 @@
 - `services/employee_activity_service.py`, `ui/dialogs/settings_dialogs.py`, `ui/main_window.py`
   - `Empleadas` gana un panel lateral pensado para `ADMIN`: muestra detalle de la seleccion y un resumen de los ultimos 7 dias con `Piezas`, `Tickets`, `Monto` y `Ultima venta`, sin saturar la tabla principal.
 - `ui/dialogs/settings_dialogs.py`, `ui/main_window.py`
-  - El panel lateral de `Empleadas` ahora incluye un toggle local `Ocultar monto / Mostrar monto` para compartir la vista sin exponer importes; esconde la columna `Monto` y quita el importe del resumen `Hoy`.
+  - El panel lateral de `Empleadas` ahora protege montos por defecto: arranca oculto y el toggle `Mostrar monto` pide la contrasena del usuario actual antes de revelar la columna `Monto` y el importe del resumen `Hoy`.
 
 ## Riesgo residual conocido
 
