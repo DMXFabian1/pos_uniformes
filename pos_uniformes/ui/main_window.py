@@ -22,7 +22,7 @@ from pos_uniformes.utils.venv_bootstrap import ensure_local_venv_site_packages
 
 ensure_local_venv_site_packages(Path(__file__))
 
-from PyQt6.QtCore import QDate, QMarginsF, QSizeF, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QDate, QEvent, QMarginsF, QObject, QSizeF, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import QAction, QCloseEvent, QColor, QImage, QKeySequence, QPainter, QPageLayout, QPageSize, QPixmap, QShortcut
 from PyQt6.QtPrintSupport import QPrintDialog, QPrinter
 from PyQt6.QtWidgets import (
@@ -580,6 +580,87 @@ def _table_item(value: object) -> QTableWidgetItem:
     item = QTableWidgetItem("" if value is None else str(value))
     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
     return item
+
+
+class _TableSpinTabNavigator(QObject):
+    def __init__(
+        self,
+        *,
+        anchor_before: QWidget | None = None,
+        anchor_after: QWidget | None = None,
+    ) -> None:
+        super().__init__(anchor_after or anchor_before)
+        self._anchor_before = anchor_before
+        self._anchor_after = anchor_after
+        self._inputs: list[QWidget] = []
+
+    def set_inputs(self, inputs: list[QWidget]) -> None:
+        self._inputs = list(inputs)
+        for input_widget in self._inputs:
+            input_widget.installEventFilter(self)
+            editor = self._editor_for(input_widget)
+            if editor is not None:
+                editor.installEventFilter(self)
+        if not self._inputs:
+            return
+        if self._anchor_before is not None:
+            QWidget.setTabOrder(self._anchor_before, self._inputs[0])
+        previous_widget = self._inputs[0]
+        for input_widget in self._inputs[1:]:
+            QWidget.setTabOrder(previous_widget, input_widget)
+            previous_widget = input_widget
+        if self._anchor_after is not None:
+            QWidget.setTabOrder(previous_widget, self._anchor_after)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if event.type() != QEvent.Type.KeyPress:
+            return super().eventFilter(watched, event)
+        key = event.key()
+        if key not in (Qt.Key.Key_Tab, Qt.Key.Key_Backtab):
+            return super().eventFilter(watched, event)
+        direction = -1 if key == Qt.Key.Key_Backtab else 1
+        owner_widget = self._resolve_input_owner(watched)
+        if owner_widget is None:
+            return super().eventFilter(watched, event)
+        return self._move_focus(owner_widget, direction)
+
+    def _resolve_input_owner(self, watched: QObject) -> QWidget | None:
+        if watched in self._inputs:
+            return watched if isinstance(watched, QWidget) else None
+        for input_widget in self._inputs:
+            if self._editor_for(input_widget) is watched:
+                return input_widget
+        return None
+
+    @staticmethod
+    def _editor_for(widget: QWidget) -> QWidget | None:
+        line_edit = getattr(widget, "lineEdit", None)
+        if callable(line_edit):
+            return line_edit()
+        return None
+
+    def _move_focus(self, source_widget: QWidget, direction: int) -> bool:
+        try:
+            current_index = self._inputs.index(source_widget)
+        except ValueError:
+            return False
+        if direction > 0:
+            if current_index + 1 < len(self._inputs):
+                target = self._inputs[current_index + 1]
+            else:
+                target = self._anchor_after
+        else:
+            if current_index - 1 >= 0:
+                target = self._inputs[current_index - 1]
+            else:
+                target = self._anchor_before
+        if not isinstance(target, QWidget):
+            return False
+        target.setFocus(Qt.FocusReason.TabFocusReason)
+        editor = self._editor_for(target)
+        if editor is not None and hasattr(editor, "selectAll"):
+            editor.selectAll()
+        return True
 
 
 def _normalize_filter_value(value: object) -> str:
@@ -4377,6 +4458,13 @@ class MainWindow(QMainWindow):
                 spin.setValue(int(row["stock_actual"]) if mode == "STOCK_FINAL" else 0)
                 spin.blockSignals(False)
                 recalc_row(row_index)
+            tab_navigator.set_inputs(
+                [
+                    spin
+                    for row_index in range(table.rowCount())
+                    if isinstance((spin := table.cellWidget(row_index, 6)), QSpinBox)
+                ]
+            )
             refresh_summary()
             table.resizeColumnsToContents()
 
@@ -4470,6 +4558,11 @@ class MainWindow(QMainWindow):
         ok_button = buttons.button(QDialogButtonBox.StandardButton.Ok)
         if ok_button is not None:
             ok_button.setText("Aplicar lote")
+        cancel_button = buttons.button(QDialogButtonBox.StandardButton.Cancel)
+        tab_navigator = _TableSpinTabNavigator(
+            anchor_before=quick_reset_button,
+            anchor_after=cancel_button or ok_button,
+        )
         buttons.accepted.connect(dialog.accept)
         buttons.rejected.connect(dialog.reject)
         layout.addLayout(header_grid)
@@ -4479,6 +4572,8 @@ class MainWindow(QMainWindow):
         layout.addWidget(table)
         layout.addWidget(buttons)
         update_preview()
+        if ok_button is not None and cancel_button is not None:
+            QWidget.setTabOrder(cancel_button, ok_button)
         if dialog.exec() != int(QDialog.DialogCode.Accepted):
             return None
 

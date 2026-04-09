@@ -7,8 +7,10 @@ from unittest.mock import Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PyQt6.QtCore import QEvent, Qt
+from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtTest import QTest
-from PyQt6.QtWidgets import QApplication, QTableWidgetItem
+from PyQt6.QtWidgets import QApplication, QPushButton, QSpinBox, QTableWidgetItem
 
 from pos_uniformes.services.active_filter_service import ActiveFilterToken
 from pos_uniformes.database.models import RolUsuario
@@ -16,6 +18,7 @@ from pos_uniformes.ui.main_window import (
     CATALOG_PAGE_SIZE,
     INVENTORY_PAGE_SIZE,
     MainWindow,
+    _TableSpinTabNavigator,
     _catalog_toggle_feedback_action,
 )
 
@@ -217,6 +220,45 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         window._handle_inventory_print_label()
 
         window._handle_inventory_print_label_batch.assert_called_once_with([7, 8])
+
+    def test_table_spin_tab_navigator_moves_between_bulk_adjust_inputs(self) -> None:
+        host = MainWindow(user_id=1)
+        anchor_before = QPushButton("Restablecer", host)
+        first_spin = QSpinBox(host)
+        second_spin = QSpinBox(host)
+        anchor_after = QPushButton("Cancelar", host)
+        navigator = _TableSpinTabNavigator(anchor_before=anchor_before, anchor_after=anchor_after)
+        navigator.set_inputs([first_spin, second_spin])
+
+        forward_calls: list[tuple[str, Qt.FocusReason]] = []
+        original_second_focus = second_spin.setFocus
+        second_spin.setFocus = lambda reason=Qt.FocusReason.OtherFocusReason: forward_calls.append(("second", reason))
+        original_second_select_all = second_spin.lineEdit().selectAll if second_spin.lineEdit() is not None else None
+        if second_spin.lineEdit() is not None:
+            second_spin.lineEdit().selectAll = lambda: forward_calls.append(("second_select_all", Qt.FocusReason.OtherFocusReason))
+        handled_forward = navigator.eventFilter(
+            first_spin.lineEdit(),
+            QKeyEvent(QEvent.Type.KeyPress, int(Qt.Key.Key_Tab), Qt.KeyboardModifier.NoModifier),
+        )
+        second_spin.setFocus = original_second_focus
+        if second_spin.lineEdit() is not None and original_second_select_all is not None:
+            second_spin.lineEdit().selectAll = original_second_select_all
+
+        self.assertTrue(handled_forward)
+        self.assertIn(("second", Qt.FocusReason.TabFocusReason), forward_calls)
+        self.assertIn(("second_select_all", Qt.FocusReason.OtherFocusReason), forward_calls)
+
+        backward_calls: list[tuple[str, Qt.FocusReason]] = []
+        original_anchor_focus = anchor_before.setFocus
+        anchor_before.setFocus = lambda reason=Qt.FocusReason.OtherFocusReason: backward_calls.append(("anchor_before", reason))
+        handled_backward = navigator.eventFilter(
+            first_spin.lineEdit(),
+            QKeyEvent(QEvent.Type.KeyPress, int(Qt.Key.Key_Backtab), Qt.KeyboardModifier.ShiftModifier),
+        )
+        anchor_before.setFocus = original_anchor_focus
+
+        self.assertTrue(handled_backward)
+        self.assertIn(("anchor_before", Qt.FocusReason.TabFocusReason), backward_calls)
 
     def test_catalog_search_refresh_uses_single_debounce_timer(self) -> None:
         window = MainWindow(user_id=1)
