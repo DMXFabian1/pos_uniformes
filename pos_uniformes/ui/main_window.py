@@ -7525,7 +7525,6 @@ class MainWindow(QMainWindow):
         self.sale_add_button.setEnabled(can_sell and can_operate_open_cash)
         self.sale_button.setEnabled(can_sell and can_operate_open_cash)
         self.sale_recent_button.setEnabled(True)
-        self.sale_origin_identify_button.setEnabled(can_sell)
         self.sale_origin_direct_button.setEnabled(
             can_sell and self.sale_credit_mode != ModoOrigenVenta.OPERATOR_DIRECT
         )

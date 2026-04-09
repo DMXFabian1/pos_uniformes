@@ -140,9 +140,13 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         window._refresh_permissions()
 
-        self.assertTrue(window.sale_origin_identify_button.isEnabled())
         self.assertTrue(window.sale_origin_direct_button.isEnabled())
         self.assertFalse(window.sale_origin_release_button.isEnabled())
+
+    def test_sale_origin_identify_button_is_not_visible_in_cashier_ui(self) -> None:
+        window = MainWindow(user_id=1)
+
+        self.assertFalse(window.sale_origin_identify_button.isVisible())
 
     def test_admin_role_keeps_manual_discount_controls_visible(self) -> None:
         window = MainWindow(user_id=1)
