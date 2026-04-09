@@ -247,6 +247,24 @@ Ejemplo de resolucion:
 - el sistema encuentra a `Lupita`
 - el bloque visible queda en `Responsable: Lupita` o en su nombre corto configurado
 
+## Superficies donde debe verse el nombre
+
+Cuando el origen comercial sea `EMPLOYEE`, el nombre visible de la empleada debe mostrarse tambien en:
+
+- `Caja`
+- ticket final de venta
+- `Presupuestos`
+- `Apartados`
+
+Reglas:
+
+- en `Caja`, el bloque visible muestra `Responsable: Lupita`
+- en ticket final, debe imprimirse una linea discreta como `Responsable: Lupita`
+- en `Presupuestos` y `Apartados`, debe guardarse y mostrarse el mismo dato visible para no perder continuidad operativa
+- si el estado es `Sin asignar`, no debe inventarse nombre
+- si el estado es `Directa`, no debe mostrarse un nombre de empleada; solo el estado correspondiente
+- este dato visible sirve para seguimiento operativo, no para exponer reglas de comision
+
 Razon de esta decision:
 
 - facilita generar e imprimir codigos sin tooling extra
