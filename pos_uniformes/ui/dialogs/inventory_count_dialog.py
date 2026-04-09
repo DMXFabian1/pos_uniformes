@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox,
     QFormLayout,
     QFrame,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -69,7 +70,7 @@ class InventoryCountDialog(QDialog):
         self._result: dict[str, object] | None = None
         self.setWindowTitle("Conteo fisico")
         self.setModal(True)
-        self.resize(860, 680)
+        self.resize(960, 720)
         self._build_ui()
         self._refresh_selected_variant_card()
         self._refresh_batch_table()
@@ -83,19 +84,24 @@ class InventoryCountDialog(QDialog):
             "Conteo rapido por SKU. Sin lote previo, cada escaneo suma 1 al contado; con lote base desde Inventario, puedes revisar y corregir fila por fila."
         )
         helper.setWordWrap(True)
-        helper.setObjectName("subtleLine")
+        helper.setObjectName("analyticsLine")
+        helper.setStyleSheet("padding: 2px 0; color: #5f6d78;")
         layout.addWidget(helper)
 
         self.initial_context_label = QLabel("")
         self.initial_context_label.setObjectName("analyticsLine")
         self.initial_context_label.setWordWrap(True)
+        self.initial_context_label.setStyleSheet(
+            "padding: 6px 10px; border-radius: 12px; background: #eef5fb; color: #4a6072; border: 1px solid #d1e1ee;"
+        )
         layout.addWidget(self.initial_context_label)
 
-        search_card = QFrame()
-        search_card.setObjectName("infoSubcard")
-        search_layout = QVBoxLayout()
-        search_layout.setContentsMargins(12, 10, 12, 10)
-        search_layout.setSpacing(8)
+        control_card = QFrame()
+        control_card.setObjectName("infoSubcard")
+        control_layout = QGridLayout()
+        control_layout.setContentsMargins(14, 12, 14, 12)
+        control_layout.setHorizontalSpacing(12)
+        control_layout.setVerticalSpacing(10)
 
         self.sku_input = QLineEdit()
         self.sku_input.setPlaceholderText("Escanea o captura SKU")
@@ -109,7 +115,7 @@ class InventoryCountDialog(QDialog):
         search_row.setSpacing(8)
         search_row.addWidget(self.sku_input, 1)
         search_row.addWidget(self.lookup_button)
-        search_layout.addLayout(search_row)
+        control_layout.addLayout(search_row, 0, 0, 1, 2)
 
         self.variant_title_label = QLabel("Sin SKU cargado.")
         self.variant_title_label.setObjectName("inventoryTitle")
@@ -118,36 +124,62 @@ class InventoryCountDialog(QDialog):
         self.variant_meta_label.setWordWrap(True)
         self.variant_stock_label = QLabel("Sistema: -")
         self.variant_stock_label.setObjectName("analyticsLine")
+        self.variant_meta_label.setStyleSheet(
+            "padding: 8px 10px; border-radius: 12px; background: #eef5fb; color: #294f69; border: 1px solid #d1e1ee;"
+        )
+        self.variant_stock_label.setStyleSheet(
+            "padding: 6px 10px; border-radius: 10px; background: #f5f9fc; color: #5a6b78; border: 1px solid #dbe6ef;"
+        )
 
-        search_layout.addWidget(self.variant_title_label)
-        search_layout.addWidget(self.variant_meta_label)
-        search_layout.addWidget(self.variant_stock_label)
-        search_card.setLayout(search_layout)
-        layout.addWidget(search_card)
+        variant_card = QFrame()
+        variant_card.setObjectName("infoSubcard")
+        variant_layout = QVBoxLayout()
+        variant_layout.setContentsMargins(0, 0, 0, 0)
+        variant_layout.setSpacing(6)
+        variant_layout.addWidget(self.variant_title_label)
+        variant_layout.addWidget(self.variant_meta_label)
+        variant_layout.addWidget(self.variant_stock_label)
+        variant_card.setLayout(variant_layout)
 
-        counted_card = QFrame()
-        counted_card.setObjectName("infoSubcard")
-        counted_layout = QHBoxLayout()
-        counted_layout.setContentsMargins(12, 10, 12, 10)
-        counted_layout.setSpacing(8)
-        counted_form = QFormLayout()
-        counted_form.setSpacing(8)
+        manual_card = QFrame()
+        manual_card.setObjectName("infoSubcard")
+        manual_layout = QVBoxLayout()
+        manual_layout.setContentsMargins(0, 0, 0, 0)
+        manual_layout.setSpacing(8)
+        manual_label = QLabel("Correccion manual")
+        manual_label.setObjectName("inventoryFilterLabel")
         self.counted_spin = QSpinBox()
         self.counted_spin.setRange(0, 100000)
         self.counted_spin.setEnabled(False)
-        counted_form.addRow("Contado manual", self.counted_spin)
-        counted_layout.addLayout(counted_form)
+        self.counted_spin.setMinimumWidth(140)
         self.add_button = QPushButton("Aplicar contado manual")
         self.add_button.setObjectName("toolbarPrimaryButton")
         self.add_button.setEnabled(False)
         self.add_button.clicked.connect(self._handle_add_to_batch)
-        counted_layout.addWidget(self.add_button)
-        counted_layout.addStretch()
-        counted_card.setLayout(counted_layout)
-        layout.addWidget(counted_card)
+        manual_hint = QLabel("Usa este ajuste si necesitas corregir una fila sin volver a escanear.")
+        manual_hint.setObjectName("analyticsLine")
+        manual_hint.setWordWrap(True)
+        manual_hint.setStyleSheet("color: #6b7b88; padding: 2px 0;")
+        manual_layout.addWidget(manual_label)
+        manual_layout.addWidget(self.counted_spin)
+        manual_layout.addWidget(self.add_button)
+        manual_layout.addWidget(manual_hint)
+        manual_layout.addStretch(1)
+        manual_card.setLayout(manual_layout)
+
+        control_layout.addWidget(variant_card, 1, 0)
+        control_layout.addWidget(manual_card, 1, 1)
+        control_layout.setColumnStretch(0, 3)
+        control_layout.setColumnStretch(1, 1)
+        control_card.setLayout(control_layout)
+        layout.addWidget(control_card)
 
         self.batch_status_label = QLabel("")
-        self.batch_status_label.setObjectName("subtleLine")
+        self.batch_status_label.setObjectName("analyticsLine")
+        self.batch_status_label.setWordWrap(True)
+        self.batch_status_label.setStyleSheet(
+            "padding: 8px 10px; border-radius: 12px; background: #eef5fb; color: #4f6475; border: 1px solid #d1e1ee;"
+        )
         layout.addWidget(self.batch_status_label)
 
         self.batch_table = QTableWidget()
@@ -157,7 +189,7 @@ class InventoryCountDialog(QDialog):
         self.batch_table.verticalHeader().setVisible(False)
         self.batch_table.setSelectionBehavior(self.batch_table.SelectionBehavior.SelectRows)
         self.batch_table.setAlternatingRowColors(True)
-        self.batch_table.setMinimumHeight(260)
+        self.batch_table.setMinimumHeight(340)
         self.batch_table.installEventFilter(self)
         header = self.batch_table.horizontalHeader()
         header.setSectionResizeMode(0, header.ResizeMode.ResizeToContents)
@@ -172,8 +204,16 @@ class InventoryCountDialog(QDialog):
 
         self.batch_summary_label = QLabel("")
         self.batch_summary_label.setObjectName("analyticsLine")
+        self.batch_summary_label.setStyleSheet(
+            "padding: 8px 10px; border-radius: 12px; background: #eef5fb; color: #4f6475; border: 1px solid #d1e1ee;"
+        )
         layout.addWidget(self.batch_summary_label)
 
+        footer_card = QFrame()
+        footer_card.setObjectName("infoSubcard")
+        footer_layout = QHBoxLayout()
+        footer_layout.setContentsMargins(12, 10, 12, 10)
+        footer_layout.setSpacing(12)
         footer_form = QFormLayout()
         footer_form.setSpacing(8)
         self.reference_input = QLineEdit()
@@ -182,15 +222,15 @@ class InventoryCountDialog(QDialog):
         self.observation_input.setPlaceholderText("Conteo de piso, almacen o revision puntual")
         footer_form.addRow("Referencia", self.reference_input)
         footer_form.addRow("Observacion", self.observation_input)
-        layout.addLayout(footer_form)
+        footer_layout.addLayout(footer_form, 1)
 
-        buttons_row = QHBoxLayout()
-        buttons_row.setSpacing(8)
+        actions_column = QVBoxLayout()
+        actions_column.setSpacing(8)
         self.remove_button = QPushButton("Quitar fila")
         self.remove_button.setObjectName("toolbarGhostButton")
         self.remove_button.clicked.connect(self._handle_remove_selected_row)
-        buttons_row.addWidget(self.remove_button)
-        buttons_row.addStretch()
+        actions_column.addWidget(self.remove_button)
+        actions_column.addStretch()
 
         buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -203,8 +243,10 @@ class InventoryCountDialog(QDialog):
         if cancel_button is not None:
             cancel_button.setText("Cancelar")
             cancel_button.clicked.connect(self.reject)
-        buttons_row.addWidget(buttons)
-        layout.addLayout(buttons_row)
+        actions_column.addWidget(buttons)
+        footer_layout.addLayout(actions_column)
+        footer_card.setLayout(footer_layout)
+        layout.addWidget(footer_card)
 
         self.setLayout(layout)
         self.sku_input.setFocus()
