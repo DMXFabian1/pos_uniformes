@@ -152,6 +152,13 @@ No debe mostrar en esa zona:
 
 Si el origen es `Asistido`, la UI puede mostrar el nombre corto de la persona identificada, pero sin explicar en pantalla para que se usa despues ese dato.
 
+## Decision cerrada de uso
+
+- `Directo` puede usarse por cualquier operador con acceso a Caja.
+- No queda restringido solo a `ADMIN`.
+- La restriccion relevante no es el rol administrativo, sino tener permiso operativo para abrir y cobrar una venta.
+- Si despues hiciera falta un control adicional, debe resolverse por permisos de Caja, no por el concepto de origen comercial.
+
 ## Contrato de QR
 
 Para evitar ambiguedades entre codigos:
@@ -234,7 +241,6 @@ Servicios candidatos nuevos:
 
 ## Checklist de diseno antes de programar
 
-- cerrar si `Directo` puede usarse por cualquier operador o solo por ciertos roles
 - decidir si `Libre` sera permitido permanentemente o solo durante la adopcion inicial
 - definir copy exacto de la banda visible en Caja
 - definir el formato final del QR de equipo
