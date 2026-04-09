@@ -9,9 +9,11 @@ from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt6.QtWidgets import QApplication, QDialog, QMessageBox, QPushButton, QSpinBox, QTableWidget, QVBoxLayout, QWidget
+from PyQt6.QtCore import QEvent, Qt
+from PyQt6.QtGui import QKeyEvent
+from PyQt6.QtWidgets import QApplication, QComboBox, QDialog, QMessageBox, QPushButton, QSpinBox, QTableWidget, QVBoxLayout, QWidget
 
-from pos_uniformes.ui.dialogs.inventory_label_batch_dialog import build_inventory_label_batch_dialog
+from pos_uniformes.ui.dialogs.inventory_label_batch_dialog import _BatchQuantityTabNavigator, build_inventory_label_batch_dialog
 from pos_uniformes.utils.label_generator import LabelRenderResult
 
 
@@ -133,6 +135,59 @@ class InventoryLabelBatchDialogTests(unittest.TestCase):
         self.assertEqual(tab_calls[3][0].text(), "Cerrar")
         self.assertIsInstance(tab_calls[3][1], QPushButton)
         self.assertEqual(tab_calls[3][1].text(), "Imprimir lote")
+
+    def test_tab_navigator_moves_focus_forward_and_backward_between_quantities(self) -> None:
+        dialog = QDialog()
+        mode_combo = QComboBox(dialog)
+        mode_combo.addItem("Normal", "standard")
+        first_spin = QSpinBox(dialog)
+        second_spin = QSpinBox(dialog)
+        close_button = QPushButton("Cerrar", dialog)
+        print_button = QPushButton("Imprimir lote", dialog)
+        navigator = _BatchQuantityTabNavigator(
+            mode_combo=mode_combo,
+            quantity_spins=[first_spin, second_spin],
+            close_button=close_button,
+            print_button=print_button,
+        )
+
+        line_edit = first_spin.lineEdit()
+        self.assertIsNotNone(line_edit)
+        focus_calls: list[tuple[str, Qt.FocusReason]] = []
+        original_second_focus = second_spin.setFocus
+        second_spin.setFocus = lambda reason=Qt.FocusReason.OtherFocusReason: focus_calls.append(("second", reason))
+        original_second_select_all = second_spin.lineEdit().selectAll if second_spin.lineEdit() is not None else None
+        if second_spin.lineEdit() is not None:
+            second_spin.lineEdit().selectAll = lambda: focus_calls.append(("second_select_all", Qt.FocusReason.OtherFocusReason))
+        handled_forward = navigator.eventFilter(
+            line_edit,
+            QKeyEvent(QEvent.Type.KeyPress, int(Qt.Key.Key_Tab), Qt.KeyboardModifier.NoModifier),
+        )
+        second_spin.setFocus = original_second_focus
+        if second_spin.lineEdit() is not None and original_second_select_all is not None:
+            second_spin.lineEdit().selectAll = original_second_select_all
+        self.assertTrue(handled_forward)
+        self.assertIn(("second", Qt.FocusReason.TabFocusReason), focus_calls)
+        self.assertIn(("second_select_all", Qt.FocusReason.OtherFocusReason), focus_calls)
+
+        second_line_edit = second_spin.lineEdit()
+        self.assertIsNotNone(second_line_edit)
+        backward_calls: list[tuple[str, Qt.FocusReason]] = []
+        original_first_focus = first_spin.setFocus
+        first_spin.setFocus = lambda reason=Qt.FocusReason.OtherFocusReason: backward_calls.append(("first", reason))
+        original_first_select_all = first_spin.lineEdit().selectAll if first_spin.lineEdit() is not None else None
+        if first_spin.lineEdit() is not None:
+            first_spin.lineEdit().selectAll = lambda: backward_calls.append(("first_select_all", Qt.FocusReason.OtherFocusReason))
+        handled_backward = navigator.eventFilter(
+            second_line_edit,
+            QKeyEvent(QEvent.Type.KeyPress, int(Qt.Key.Key_Backtab), Qt.KeyboardModifier.ShiftModifier),
+        )
+        first_spin.setFocus = original_first_focus
+        if first_spin.lineEdit() is not None and original_first_select_all is not None:
+            first_spin.lineEdit().selectAll = original_first_select_all
+        self.assertTrue(handled_backward)
+        self.assertIn(("first", Qt.FocusReason.TabFocusReason), backward_calls)
+        self.assertIn(("first_select_all", Qt.FocusReason.OtherFocusReason), backward_calls)
 
 
 if __name__ == "__main__":

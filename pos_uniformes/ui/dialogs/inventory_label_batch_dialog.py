@@ -6,7 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QEvent, QObject, Qt
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -35,6 +35,71 @@ def _table_item(value: object) -> QTableWidgetItem:
     item = QTableWidgetItem("" if value is None else str(value))
     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
     return item
+
+
+class _BatchQuantityTabNavigator(QObject):
+    def __init__(
+        self,
+        *,
+        mode_combo: QComboBox,
+        quantity_spins: list[QSpinBox],
+        close_button: QPushButton,
+        print_button: QPushButton,
+    ) -> None:
+        super().__init__(close_button.window())
+        self._mode_combo = mode_combo
+        self._quantity_spins = quantity_spins
+        self._close_button = close_button
+        self._print_button = print_button
+
+    def install(self) -> None:
+        for quantity_spin in self._quantity_spins:
+            quantity_spin.installEventFilter(self)
+            line_edit = quantity_spin.lineEdit()
+            if line_edit is not None:
+                line_edit.installEventFilter(self)
+
+    def eventFilter(self, watched: QObject, event: QEvent) -> bool:
+        if event.type() != QEvent.Type.KeyPress:
+            return super().eventFilter(watched, event)
+        key_event = event
+        if key_event.key() not in (Qt.Key.Key_Tab, Qt.Key.Key_Backtab):
+            return super().eventFilter(watched, event)
+        direction = -1 if key_event.key() == Qt.Key.Key_Backtab else 1
+        owner_spin = self._resolve_spin_owner(watched)
+        if owner_spin is None:
+            return super().eventFilter(watched, event)
+        return self._focus_relative_to(owner_spin, direction)
+
+    def _resolve_spin_owner(self, watched: QObject) -> QSpinBox | None:
+        if isinstance(watched, QSpinBox):
+            return watched
+        for quantity_spin in self._quantity_spins:
+            if quantity_spin.lineEdit() is watched:
+                return quantity_spin
+        return None
+
+    def _focus_relative_to(self, source_spin: QSpinBox, direction: int) -> bool:
+        try:
+            current_index = self._quantity_spins.index(source_spin)
+        except ValueError:
+            return False
+        if direction > 0:
+            if current_index + 1 < len(self._quantity_spins):
+                target: QWidget = self._quantity_spins[current_index + 1]
+            else:
+                target = self._close_button
+        else:
+            if current_index - 1 >= 0:
+                target = self._quantity_spins[current_index - 1]
+            else:
+                target = self._mode_combo
+        target.setFocus(Qt.FocusReason.TabFocusReason)
+        if isinstance(target, QSpinBox):
+            line_edit = target.lineEdit()
+            if line_edit is not None:
+                line_edit.selectAll()
+        return True
 
 
 def build_inventory_label_batch_dialog(
@@ -183,6 +248,14 @@ def build_inventory_label_batch_dialog(
         previous_tab_widget = quantity_spin
     QWidget.setTabOrder(previous_tab_widget, close_button)
     QWidget.setTabOrder(close_button, print_button)
+    tab_navigator = _BatchQuantityTabNavigator(
+        mode_combo=mode_combo,
+        quantity_spins=quantity_spins,
+        close_button=close_button,
+        print_button=print_button,
+    )
+    tab_navigator.install()
+    dialog._batch_tab_navigator = tab_navigator
 
     refresh_summary()
     dialog.exec()
