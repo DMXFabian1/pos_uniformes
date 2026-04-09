@@ -155,6 +155,37 @@ Si el origen es `Asignada`, la UI puede mostrar el nombre corto de la persona id
 
 sin explicar en pantalla para que se usa despues ese dato.
 
+## Copy exacto del bloque en Caja
+
+El bloque visible debe quedar asi:
+
+- etiqueta fija del bloque:
+  - `Responsable`
+- valor visible del estado:
+  - `Sin asignar`
+  - nombre corto de la persona identificada, por ejemplo `Fer` o `Andrea`
+  - `Directa`
+- botones visibles:
+  - `Identificar`
+  - `Tomar directo`
+  - `Liberar`
+
+Render esperado del bloque:
+
+- estado vacio:
+  - `Responsable: Sin asignar`
+- estado con QR del equipo:
+  - `Responsable: Fer`
+- estado tomado por el operador:
+  - `Responsable: Directa`
+
+Reglas de copy:
+
+- no mostrar la palabra `Asignada` como estado visible final si ya existe nombre corto
+- no mostrar `comision`, `acreditacion`, `origen comercial` o frases similares dentro del bloque
+- mantener `Tomar directo` como el unico texto discretamente codificado
+- `Liberar` solo aparece habilitado cuando el estado actual no es `Sin asignar`
+
 ## Decision cerrada de uso
 
 - `Tomar directo` puede usarse por cualquier operador con acceso a Caja.
