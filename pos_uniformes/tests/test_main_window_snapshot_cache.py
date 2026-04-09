@@ -221,6 +221,41 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         window._handle_inventory_print_label_batch.assert_called_once_with([7, 8])
 
+    def test_inventory_count_prefills_selected_rows_from_inventory(self) -> None:
+        window = MainWindow(user_id=1)
+        window.inventory_filtered_rows = [
+            {
+                "variante_id": 11,
+                "sku": "SKU000011",
+                "producto_nombre_base": "Bata",
+                "talla": "12",
+                "color": "Blanca",
+                "escuela_nombre": "General",
+                "stock_actual": 9,
+            },
+            {
+                "variante_id": 12,
+                "sku": "SKU000012",
+                "producto_nombre_base": "Playera",
+                "talla": "14",
+                "color": "Azul",
+                "escuela_nombre": "General",
+                "stock_actual": 4,
+            },
+        ]
+        window._selected_inventory_variant_ids = Mock(return_value=[12])
+
+        with patch("pos_uniformes.ui.main_window.prompt_inventory_count_data", return_value=None) as prompt_mock:
+            result = window._prompt_inventory_count_data()
+
+        self.assertIsNone(result)
+        prompt_mock.assert_called_once()
+        self.assertEqual(prompt_mock.call_args.kwargs["initial_context_label"], "Filas seleccionadas (1)")
+        initial_rows = prompt_mock.call_args.kwargs["initial_rows"]
+        self.assertEqual(len(initial_rows), 1)
+        self.assertEqual(initial_rows[0].variante_id, 12)
+        self.assertEqual(initial_rows[0].stock_contado, 4)
+
     def test_table_spin_tab_navigator_moves_between_bulk_adjust_inputs(self) -> None:
         host = MainWindow(user_id=1)
         anchor_before = QPushButton("Restablecer", host)

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from typing import Mapping
 
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 
@@ -67,6 +68,20 @@ def load_inventory_count_variant_by_sku(session, sku: str) -> InventoryCountVari
     )
 
 
+def build_inventory_count_variant_view_from_snapshot_row(
+    row: Mapping[str, object],
+) -> InventoryCountVariantView:
+    return InventoryCountVariantView(
+        variante_id=int(row["variante_id"]),
+        sku=str(row["sku"]),
+        producto_nombre=str(row.get("producto_nombre_base") or row.get("producto_nombre") or "-"),
+        talla=str(row.get("talla") or "-"),
+        color=str(row.get("color") or "-"),
+        escuela_nombre=str(row.get("escuela_nombre") or "General"),
+        stock_actual=int(row.get("stock_actual") or 0),
+    )
+
+
 def build_inventory_count_row(
     variant: InventoryCountVariantView,
     *,
@@ -84,6 +99,19 @@ def build_inventory_count_row(
     )
 
 
+def build_inventory_count_rows_from_snapshot_rows(
+    rows: list[Mapping[str, object]],
+) -> list[InventoryCountRow]:
+    batch_rows: list[InventoryCountRow] = []
+    for row in rows:
+        variant = build_inventory_count_variant_view_from_snapshot_row(row)
+        batch_rows = upsert_inventory_count_row(
+            batch_rows,
+            build_inventory_count_row(variant, counted_stock=int(variant.stock_actual)),
+        )
+    return batch_rows
+
+
 def upsert_inventory_count_row(
     rows: list[InventoryCountRow],
     new_row: InventoryCountRow,
@@ -95,6 +123,28 @@ def upsert_inventory_count_row(
 
 def remove_inventory_count_row(rows: list[InventoryCountRow], *, variante_id: int) -> list[InventoryCountRow]:
     return [row for row in rows if int(row.variante_id) != int(variante_id)]
+
+
+def update_inventory_count_row_counted_stock(
+    rows: list[InventoryCountRow],
+    *,
+    variante_id: int,
+    counted_stock: int,
+) -> list[InventoryCountRow]:
+    updated_rows: list[InventoryCountRow] = []
+    for row in rows:
+        if int(row.variante_id) != int(variante_id):
+            updated_rows.append(row)
+            continue
+        stock_contado = int(counted_stock)
+        updated_rows.append(
+            replace(
+                row,
+                stock_contado=stock_contado,
+                delta=stock_contado - int(row.stock_sistema),
+            )
+        )
+    return updated_rows
 
 
 def build_inventory_count_summary(rows: list[InventoryCountRow]) -> InventoryCountSummary:

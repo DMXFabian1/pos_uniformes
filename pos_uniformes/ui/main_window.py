@@ -155,6 +155,7 @@ from pos_uniformes.services.inventory_label_service import (
     render_inventory_label,
 )
 from pos_uniformes.services.inventory_overview_service import load_inventory_overview_snapshot
+from pos_uniformes.services.inventory_count_service import build_inventory_count_rows_from_snapshot_rows
 from pos_uniformes.services.inventory_snapshot_service import (
     invalidate_inventory_qr_exists_cache,
     load_inventory_snapshot_rows,
@@ -4227,7 +4228,20 @@ class MainWindow(QMainWindow):
         }
 
     def _prompt_inventory_count_data(self) -> dict[str, object] | None:
-        payload = prompt_inventory_count_data(self)
+        selected_ids = self._selected_inventory_variant_ids()
+        filtered_rows = list(self.inventory_filtered_rows)
+        initial_rows = None
+        initial_context_label = None
+        if selected_ids:
+            selected_rows = [row for row in filtered_rows if int(row["variante_id"]) in set(selected_ids)]
+            if selected_rows:
+                initial_rows = build_inventory_count_rows_from_snapshot_rows(selected_rows)
+                initial_context_label = f"Filas seleccionadas ({len(selected_rows)})"
+        payload = prompt_inventory_count_data(
+            self,
+            initial_rows=initial_rows,
+            initial_context_label=initial_context_label,
+        )
         if payload is None:
             return None
         return {

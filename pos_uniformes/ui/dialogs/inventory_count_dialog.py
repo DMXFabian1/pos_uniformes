@@ -28,24 +28,41 @@ from pos_uniformes.services.inventory_count_service import (
     build_inventory_count_payload,
     build_inventory_count_row,
     load_inventory_count_variant_by_sku,
-    upsert_inventory_count_row,
     remove_inventory_count_row,
+    update_inventory_count_row_counted_stock,
+    upsert_inventory_count_row,
 )
 from pos_uniformes.ui.helpers.inventory_count_view_helper import build_inventory_count_batch_view
 
 
-def prompt_inventory_count_data(parent=None) -> dict[str, object] | None:
-    dialog = InventoryCountDialog(parent=parent)
+def prompt_inventory_count_data(
+    parent=None,
+    *,
+    initial_rows: list[InventoryCountRow] | None = None,
+    initial_context_label: str | None = None,
+) -> dict[str, object] | None:
+    dialog = InventoryCountDialog(
+        parent=parent,
+        initial_rows=initial_rows,
+        initial_context_label=initial_context_label,
+    )
     if dialog.exec() != int(QDialog.DialogCode.Accepted):
         return None
     return dialog.get_result()
 
 
 class InventoryCountDialog(QDialog):
-    def __init__(self, parent=None) -> None:
+    def __init__(
+        self,
+        parent=None,
+        *,
+        initial_rows: list[InventoryCountRow] | None = None,
+        initial_context_label: str | None = None,
+    ) -> None:
         super().__init__(parent)
         self._selected_variant: InventoryCountVariantView | None = None
-        self._rows: list[InventoryCountRow] = []
+        self._rows: list[InventoryCountRow] = list(initial_rows or [])
+        self._initial_context_label = str(initial_context_label or "").strip()
         self._result: dict[str, object] | None = None
         self.setWindowTitle("Conteo fisico")
         self.setModal(True)
@@ -59,11 +76,16 @@ class InventoryCountDialog(QDialog):
         layout.setSpacing(12)
 
         helper = QLabel(
-            "Modo rapido por SKU. Captura diferencias puntuales y revisa el lote antes de aplicarlo."
+            "Modo rapido por SKU. Tambien puedes abrir un lote base desde Inventario y ajustar el contado por fila antes de aplicarlo."
         )
         helper.setWordWrap(True)
         helper.setObjectName("subtleLine")
         layout.addWidget(helper)
+
+        self.initial_context_label = QLabel("")
+        self.initial_context_label.setObjectName("analyticsLine")
+        self.initial_context_label.setWordWrap(True)
+        layout.addWidget(self.initial_context_label)
 
         search_card = QFrame()
         search_card.setObjectName("infoSubcard")
@@ -270,15 +292,54 @@ class InventoryCountDialog(QDialog):
         batch_view = build_inventory_count_batch_view(self._rows)
         self.batch_table.setRowCount(len(batch_view.rows))
         for row_index, row in enumerate(batch_view.rows):
-            for column_index, value in enumerate(row.values):
-                item = QTableWidgetItem(str(value))
-                if column_index == 0:
-                    item.setData(Qt.ItemDataRole.UserRole, row.variante_id)
-                self.batch_table.setItem(row_index, column_index, item)
+            self._apply_batch_table_row(row_index, row)
+        self._refresh_batch_meta(batch_view)
 
+    def _apply_batch_table_row(self, row_index: int, row) -> None:
+        sku_item = QTableWidgetItem(str(row.values[0]))
+        sku_item.setData(Qt.ItemDataRole.UserRole, row.variante_id)
+        self.batch_table.setItem(row_index, 0, sku_item)
+        self.batch_table.setItem(row_index, 1, QTableWidgetItem(str(row.values[1])))
+        self.batch_table.setItem(row_index, 2, QTableWidgetItem(str(row.values[2])))
+        counted_spin = self.batch_table.cellWidget(row_index, 3)
+        if not isinstance(counted_spin, QSpinBox):
+            counted_spin = QSpinBox()
+            counted_spin.setRange(0, 100000)
+            counted_spin.valueChanged.connect(
+                lambda value, variante_id=row.variante_id: self._handle_batch_count_changed(
+                    variante_id=int(variante_id),
+                    counted_stock=int(value),
+                )
+            )
+            self.batch_table.setCellWidget(row_index, 3, counted_spin)
+        counted_spin.blockSignals(True)
+        counted_spin.setValue(int(row.values[3]))
+        counted_spin.blockSignals(False)
+        self.batch_table.setItem(row_index, 4, QTableWidgetItem(str(row.values[4])))
+
+    def _refresh_batch_meta(self, batch_view) -> None:
         self.batch_summary_label.setText(batch_view.summary_label)
         self.batch_status_label.setText(batch_view.status_label)
+        if self._initial_context_label:
+            self.initial_context_label.setText(
+                f"Lote base: {self._initial_context_label}. Puedes ajustar el contado por fila o seguir agregando SKU."
+            )
+        else:
+            self.initial_context_label.setText("Escanea SKU para construir o complementar el lote.")
         self.remove_button.setEnabled(bool(batch_view.rows))
+
+    def _handle_batch_count_changed(self, *, variante_id: int, counted_stock: int) -> None:
+        self._rows = update_inventory_count_row_counted_stock(
+            self._rows,
+            variante_id=int(variante_id),
+            counted_stock=int(counted_stock),
+        )
+        batch_view = build_inventory_count_batch_view(self._rows)
+        for row_index, row in enumerate(batch_view.rows):
+            if int(row.variante_id) == int(variante_id):
+                self._apply_batch_table_row(row_index, row)
+                break
+        self._refresh_batch_meta(batch_view)
 
     def _handle_confirm(self) -> None:
         payload = build_inventory_count_payload(
