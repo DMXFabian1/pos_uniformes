@@ -213,6 +213,7 @@ Registrar mejoras propuestas por operacion o producto y ubicarlas dentro del pla
   - crear una tabla derivada que luego diverja de la venta real
 - Documentacion recomendada:
   - `docs/empleados_y_comisiones.md`
+  - `docs/subflujo_caja_origen_venta.md`
   - `docs/subflujo_caja_venta_empleado.md`
   - `docs/subflujo_analitica_empleado.md`
   - `docs/politica_comisiones.md`
