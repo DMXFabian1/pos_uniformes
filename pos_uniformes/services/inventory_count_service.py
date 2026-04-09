@@ -112,6 +112,26 @@ def build_inventory_count_rows_from_snapshot_rows(
     return batch_rows
 
 
+def accumulate_inventory_count_scan(
+    rows: list[InventoryCountRow],
+    *,
+    variant: InventoryCountVariantView,
+    step: int = 1,
+) -> list[InventoryCountRow]:
+    normalized_step = max(1, int(step))
+    existing_row = next((row for row in rows if int(row.variante_id) == int(variant.variante_id)), None)
+    if existing_row is None:
+        return upsert_inventory_count_row(
+            rows,
+            build_inventory_count_row(variant, counted_stock=normalized_step),
+        )
+    return update_inventory_count_row_counted_stock(
+        rows,
+        variante_id=int(variant.variante_id),
+        counted_stock=int(existing_row.stock_contado) + normalized_step,
+    )
+
+
 def upsert_inventory_count_row(
     rows: list[InventoryCountRow],
     new_row: InventoryCountRow,

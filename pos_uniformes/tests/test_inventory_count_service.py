@@ -5,6 +5,7 @@ import unittest
 from pos_uniformes.services.inventory_count_service import (
     InventoryCountRow,
     InventoryCountVariantView,
+    accumulate_inventory_count_scan,
     build_inventory_count_payload,
     build_inventory_count_row,
     build_inventory_count_rows_from_snapshot_rows,
@@ -164,6 +165,32 @@ class InventoryCountServiceTests(unittest.TestCase):
 
         self.assertEqual(updated_rows[0].stock_contado, 6)
         self.assertEqual(updated_rows[0].delta, -3)
+
+    def test_accumulate_inventory_count_scan_increments_existing_variant(self) -> None:
+        variant = InventoryCountVariantView(
+            variante_id=11,
+            sku="SKU000011",
+            producto_nombre="Bata",
+            talla="12",
+            color="Blanca",
+            escuela_nombre="General",
+            stock_actual=9,
+        )
+        rows = [
+            InventoryCountRow(
+                variante_id=11,
+                sku="SKU000011",
+                producto_nombre="Bata",
+                stock_sistema=9,
+                stock_contado=1,
+                delta=-8,
+            )
+        ]
+
+        updated_rows = accumulate_inventory_count_scan(rows, variant=variant)
+
+        self.assertEqual(updated_rows[0].stock_contado, 2)
+        self.assertEqual(updated_rows[0].delta, -7)
 
 
 if __name__ == "__main__":

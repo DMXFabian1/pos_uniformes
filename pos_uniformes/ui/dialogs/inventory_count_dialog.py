@@ -25,6 +25,7 @@ from pos_uniformes.database.connection import get_session
 from pos_uniformes.services.inventory_count_service import (
     InventoryCountRow,
     InventoryCountVariantView,
+    accumulate_inventory_count_scan,
     build_inventory_count_payload,
     build_inventory_count_row,
     load_inventory_count_variant_by_sku,
@@ -63,6 +64,7 @@ class InventoryCountDialog(QDialog):
         self._selected_variant: InventoryCountVariantView | None = None
         self._rows: list[InventoryCountRow] = list(initial_rows or [])
         self._initial_context_label = str(initial_context_label or "").strip()
+        self._scan_accumulation_enabled = not bool(initial_rows)
         self._result: dict[str, object] | None = None
         self.setWindowTitle("Conteo fisico")
         self.setModal(True)
@@ -76,7 +78,7 @@ class InventoryCountDialog(QDialog):
         layout.setSpacing(12)
 
         helper = QLabel(
-            "Modo rapido por SKU. Tambien puedes abrir un lote base desde Inventario y ajustar el contado por fila antes de aplicarlo."
+            "Conteo rapido por SKU. Sin lote previo, cada escaneo suma 1 al contado; con lote base desde Inventario, puedes revisar y corregir fila por fila."
         )
         helper.setWordWrap(True)
         helper.setObjectName("subtleLine")
@@ -97,7 +99,7 @@ class InventoryCountDialog(QDialog):
         self.sku_input.setPlaceholderText("Escanea o captura SKU")
         self.sku_input.setClearButtonEnabled(True)
         self.sku_input.returnPressed.connect(self._handle_lookup_sku)
-        self.lookup_button = QPushButton("Buscar")
+        self.lookup_button = QPushButton("Escanear")
         self.lookup_button.setObjectName("toolbarSecondaryButton")
         self.lookup_button.clicked.connect(self._handle_lookup_sku)
 
@@ -131,9 +133,9 @@ class InventoryCountDialog(QDialog):
         self.counted_spin = QSpinBox()
         self.counted_spin.setRange(0, 100000)
         self.counted_spin.setEnabled(False)
-        counted_form.addRow("Contado", self.counted_spin)
+        counted_form.addRow("Contado manual", self.counted_spin)
         counted_layout.addLayout(counted_form)
-        self.add_button = QPushButton("Agregar al lote")
+        self.add_button = QPushButton("Aplicar contado manual")
         self.add_button.setObjectName("toolbarPrimaryButton")
         self.add_button.setEnabled(False)
         self.add_button.clicked.connect(self._handle_add_to_batch)
@@ -220,6 +222,31 @@ class InventoryCountDialog(QDialog):
             self._selected_variant = None
             self._refresh_selected_variant_card()
             self.sku_input.selectAll()
+            self.sku_input.setFocus()
+            return
+
+        if self._scan_accumulation_enabled:
+            self._selected_variant = variant
+            self._rows = accumulate_inventory_count_scan(
+                self._rows,
+                variant=variant,
+                step=1,
+            )
+            current_row = next(
+                (row for row in self._rows if int(row.variante_id) == int(variant.variante_id)),
+                None,
+            )
+            self._refresh_selected_variant_card()
+            if current_row is not None:
+                self.counted_spin.setValue(int(current_row.stock_contado))
+            self.counted_spin.setEnabled(True)
+            self.add_button.setEnabled(True)
+            self._refresh_batch_table()
+            if current_row is not None:
+                self.batch_status_label.setText(
+                    f"Escaneo acumulado: {variant.sku} | contado {current_row.stock_contado} | sistema {current_row.stock_sistema} | delta {current_row.delta:+d}"
+                )
+            self.sku_input.clear()
             self.sku_input.setFocus()
             return
 
@@ -323,6 +350,10 @@ class InventoryCountDialog(QDialog):
         if self._initial_context_label:
             self.initial_context_label.setText(
                 f"Lote base: {self._initial_context_label}. Puedes ajustar el contado por fila o seguir agregando SKU."
+            )
+        elif self._scan_accumulation_enabled:
+            self.initial_context_label.setText(
+                "Modo escaneo acumulado: cada SKU suma 1 al contado. Usa el campo manual solo si necesitas corregir una fila."
             )
         else:
             self.initial_context_label.setText("Escanea SKU para construir o complementar el lote.")
