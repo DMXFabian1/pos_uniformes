@@ -132,6 +132,18 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertEqual(window.sale_credit_mode, ModoOrigenVenta.UNASSIGNED)
         self.assertEqual(window.sale_origin_value_label.text(), "Sin asignar")
 
+    def test_sale_origin_buttons_stay_available_without_open_cash_session(self) -> None:
+        window = MainWindow(user_id=1)
+        window.current_role = RolUsuario.ADMIN
+        window.active_cash_session_id = None
+        window.cash_session_requires_cut = False
+
+        window._refresh_permissions()
+
+        self.assertTrue(window.sale_origin_identify_button.isEnabled())
+        self.assertTrue(window.sale_origin_direct_button.isEnabled())
+        self.assertFalse(window.sale_origin_release_button.isEnabled())
+
     def test_admin_role_keeps_manual_discount_controls_visible(self) -> None:
         window = MainWindow(user_id=1)
         window.current_role = RolUsuario.ADMIN
