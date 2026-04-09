@@ -148,6 +148,45 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         self.assertFalse(window.sale_origin_identify_button.isVisible())
 
+    def test_sale_origin_identify_assigns_employee_from_emp_qr(self) -> None:
+        window = MainWindow(user_id=1)
+        fake_employee = SimpleNamespace(codigo="VEND-1", nombre_completo="Guadalupe Gomez Ruiz", activo=True)
+
+        with patch("pos_uniformes.ui.main_window.get_session") as get_session_mock, patch(
+            "pos_uniformes.ui.main_window.EmployeeIdentityService.resolve_employee_by_qr_code",
+            return_value=fake_employee,
+        ):
+            session = Mock()
+            context = Mock()
+            context.__enter__ = Mock(return_value=session)
+            context.__exit__ = Mock(return_value=False)
+            get_session_mock.return_value = context
+
+            window._handle_sale_origin_identify(scanned_code="EMP:VEND-1")
+
+        self.assertEqual(window.sale_credit_mode, ModoOrigenVenta.EMPLOYEE)
+        self.assertEqual(window.sale_seller_employee_code, "VEND-1")
+        self.assertEqual(window.sale_origin_value_label.text(), "Guadalupe Ruiz")
+
+    def test_sale_origin_identify_keeps_state_when_employee_qr_is_invalid(self) -> None:
+        window = MainWindow(user_id=1)
+        window._handle_sale_origin_direct()
+
+        with patch("pos_uniformes.ui.main_window.get_session") as get_session_mock, patch(
+            "pos_uniformes.ui.main_window.EmployeeIdentityService.resolve_employee_by_qr_code",
+            return_value=None,
+        ):
+            session = Mock()
+            context = Mock()
+            context.__enter__ = Mock(return_value=session)
+            context.__exit__ = Mock(return_value=False)
+            get_session_mock.return_value = context
+
+            window._handle_sale_origin_identify(scanned_code="EMP:VEND-404")
+
+        self.assertEqual(window.sale_credit_mode, ModoOrigenVenta.OPERATOR_DIRECT)
+        self.assertEqual(window.sale_origin_value_label.text(), "Directa")
+
     def test_admin_role_keeps_manual_discount_controls_visible(self) -> None:
         window = MainWindow(user_id=1)
         window.current_role = RolUsuario.ADMIN

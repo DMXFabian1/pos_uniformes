@@ -67,6 +67,7 @@ from pos_uniformes.database.models import (
     Categoria,
     Cliente,
     Compra,
+    Empleada,
     Escuela,
     EstadoApartado,
     EstadoPresupuesto,
@@ -129,6 +130,7 @@ from pos_uniformes.services.cash_session_action_service import (
 from pos_uniformes.services.cash_session_history_service import build_cash_session_history_amounts
 from pos_uniformes.services.caja_service import CajaService
 from pos_uniformes.services.client_service import ClientService
+from pos_uniformes.services.employee_identity_service import EmployeeIdentityService
 from pos_uniformes.services.catalog_service import CatalogService
 from pos_uniformes.services.catalog_snapshot_service import load_catalog_snapshot_rows
 from pos_uniformes.services.catalog_mutation_service import (
@@ -258,6 +260,12 @@ from pos_uniformes.services.settings_user_action_service import (
     toggle_settings_user,
     update_settings_user,
 )
+from pos_uniformes.services.settings_employee_action_service import (
+    create_settings_employee,
+    load_settings_employee_prompt_snapshot,
+    toggle_settings_employee,
+    update_settings_employee,
+)
 from pos_uniformes.services.supplier_service import SupplierService
 from pos_uniformes.services.user_service import UserService
 from pos_uniformes.services.venta_service import VentaService
@@ -267,6 +275,7 @@ from pos_uniformes.ui.dialogs.settings_dialogs import (
     build_business_settings_dialog,
     build_cash_history_settings_dialog,
     build_clients_settings_dialog,
+    build_employees_settings_dialog,
     build_marketing_settings_dialog,
     build_suppliers_settings_dialog,
     build_whatsapp_settings_dialog,
@@ -274,6 +283,7 @@ from pos_uniformes.ui.dialogs.settings_dialogs import (
 )
 from pos_uniformes.ui.dialogs.settings_prompt_dialogs import (
     prompt_client_data,
+    prompt_employee_data,
     prompt_client_whatsapp_data,
     prompt_create_user_data,
     prompt_edit_user_data,
@@ -507,6 +517,8 @@ from pos_uniformes.ui.helpers.settings_backup_selection_helper import (
 from pos_uniformes.ui.helpers.settings_crm_feedback_helper import (
     build_settings_client_guard_feedback,
     build_settings_client_result_feedback,
+    build_settings_employee_guard_feedback,
+    build_settings_employee_result_feedback,
     build_settings_marketing_guard_feedback,
     build_settings_marketing_result_feedback,
     build_settings_supplier_guard_feedback,
@@ -514,6 +526,7 @@ from pos_uniformes.ui.helpers.settings_crm_feedback_helper import (
 )
 from pos_uniformes.ui.helpers.settings_crm_selection_helper import (
     resolve_selected_settings_client_id,
+    resolve_selected_settings_employee_id,
     resolve_selected_settings_supplier_id,
 )
 from pos_uniformes.ui.helpers.settings_cash_history_helper import (
@@ -531,6 +544,10 @@ from pos_uniformes.ui.helpers.settings_cash_history_summary_helper import (
 from pos_uniformes.ui.helpers.settings_clients_helper import (
     build_settings_clients_error_view,
     build_settings_clients_view,
+)
+from pos_uniformes.ui.helpers.settings_employees_helper import (
+    build_settings_employees_error_view,
+    build_settings_employees_view,
 )
 from pos_uniformes.ui.helpers.settings_marketing_helper import (
     build_settings_marketing_summary_label,
@@ -1454,6 +1471,7 @@ class MainWindow(QMainWindow):
         self.settings_users_button = QPushButton("Usuarios y acceso")
         self.settings_suppliers_button = QPushButton("Proveedores")
         self.settings_clients_button = QPushButton("Clientes")
+        self.settings_employees_button = QPushButton("Empleadas")
         self.settings_marketing_button = QPushButton("Marketing y promociones")
         self.settings_whatsapp_button = QPushButton("WhatsApp y mensajes")
         self.settings_backup_button = QPushButton("Respaldo y restauracion")
@@ -1483,6 +1501,13 @@ class MainWindow(QMainWindow):
         self.settings_generate_client_qr_button = QPushButton("Generar QR")
         self.settings_client_whatsapp_button = QPushButton("WhatsApp")
         self.settings_clients_dialog: QDialog | None = None
+        self.settings_employees_table = QTableWidget()
+        self.settings_employees_status_label = QLabel("Sin empleadas cargadas.")
+        self.settings_employees_search_input = QLineEdit()
+        self.settings_create_employee_button = QPushButton("Crear empleada")
+        self.settings_update_employee_button = QPushButton("Editar empleada")
+        self.settings_toggle_employee_button = QPushButton("Activar / desactivar")
+        self.settings_employees_dialog: QDialog | None = None
         self.settings_backup_dialog: QDialog | None = None
         self.settings_cash_history_dialog: QDialog | None = None
         self.settings_business_dialog: QDialog | None = None
@@ -2145,6 +2170,15 @@ class MainWindow(QMainWindow):
         self.settings_clients_dialog.show()
         self.settings_clients_dialog.raise_()
         self.settings_clients_dialog.activateWindow()
+
+    def _open_employees_settings_dialog(self) -> None:
+        if self.settings_employees_dialog is None:
+            self.settings_employees_dialog = build_employees_settings_dialog(self)
+
+        self._refresh_settings_employees()
+        self.settings_employees_dialog.show()
+        self.settings_employees_dialog.raise_()
+        self.settings_employees_dialog.activateWindow()
 
     def _open_business_settings_dialog(self) -> None:
         if self.settings_business_dialog is None:
@@ -2912,6 +2946,42 @@ class MainWindow(QMainWindow):
         self.settings_clients_table.resizeColumnsToContents()
         self.settings_clients_status_label.setText(clients_view.status_label)
 
+    def _refresh_settings_employees(self) -> None:
+        search_text = self.settings_employees_search_input.text().strip()
+        try:
+            with get_session() as session:
+                employees = EmployeeIdentityService.list_employees(session, search_text)
+        except Exception as exc:  # noqa: BLE001
+            employees_view = build_settings_employees_error_view(str(exc))
+            self.settings_employees_status_label.setText(employees_view.status_label)
+            self.settings_employees_table.setRowCount(len(employees_view.rows))
+            return
+        employees_view = build_settings_employees_view(
+            [
+                {
+                    "id": int(employee.id),
+                    "code": employee.codigo,
+                    "name": employee.nombre_completo,
+                    "display_name": EmployeeIdentityService.build_visible_employee_name(employee.nombre_completo),
+                    "active": bool(employee.activo),
+                    "active_label": "ACTIVA" if employee.activo else "INACTIVA",
+                    "updated_label": format_display_datetime(employee.updated_at),
+                }
+                for employee in employees
+            ]
+        )
+        self.settings_employees_table.setRowCount(len(employees_view.rows))
+        for row_index, employee_row in enumerate(employees_view.rows):
+            for column_index, value in enumerate(employee_row.values):
+                item = _table_item(value)
+                if column_index == 0:
+                    item.setData(Qt.ItemDataRole.UserRole, employee_row.employee_id)
+                if column_index == 3:
+                    _set_table_badge_style(item, employee_row.status_tone)
+                self.settings_employees_table.setItem(row_index, column_index, item)
+        self.settings_employees_table.resizeColumnsToContents()
+        self.settings_employees_status_label.setText(employees_view.status_label)
+
     def _selected_settings_user_id(self) -> int | None:
         selected_row = self.settings_users_table.currentRow()
         item = self.settings_users_table.item(selected_row, 0)
@@ -2937,6 +3007,15 @@ class MainWindow(QMainWindow):
         return resolve_selected_settings_client_id(
             current_row=selected_row,
             raw_client_id=raw_client_id,
+        )
+
+    def _selected_settings_employee_id(self) -> int | None:
+        selected_row = self.settings_employees_table.currentRow()
+        item = self.settings_employees_table.item(selected_row, 0)
+        raw_employee_id = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+        return resolve_selected_settings_employee_id(
+            current_row=selected_row,
+            raw_employee_id=raw_employee_id,
         )
 
     def _handle_create_user(self) -> None:
@@ -3439,6 +3518,122 @@ class MainWindow(QMainWindow):
                 f"La credencial del cliente ya esta lista para adjuntarla:\n{asset_path}"
             ),
         )
+
+    def _handle_create_employee(self) -> None:
+        feedback = build_settings_employee_guard_feedback(
+            "create_employee",
+            is_admin=self.current_role == RolUsuario.ADMIN,
+            has_selection=False,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
+            return
+        data = prompt_employee_data(
+            self,
+            title="Crear empleada",
+            helper_text="Captura el codigo base EMP y el nombre completo del equipo comercial.",
+        )
+        if data is None:
+            return
+        try:
+            with get_session() as session:
+                result = create_settings_employee(
+                    session,
+                    admin_user_id=self.user_id,
+                    payload=data,
+                )
+                session.commit()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "No se pudo crear", str(exc))
+            return
+
+        self.refresh_all()
+        result_feedback = build_settings_employee_result_feedback(
+            "create_employee",
+            employee_name=result.employee_name,
+            employee_code=result.employee_code,
+        )
+        QMessageBox.information(self, result_feedback.title, result_feedback.message)
+
+    def _handle_update_employee(self) -> None:
+        employee_id = self._selected_settings_employee_id()
+        feedback = build_settings_employee_guard_feedback(
+            "update_employee",
+            is_admin=self.current_role == RolUsuario.ADMIN,
+            has_selection=employee_id is not None,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
+            return
+        try:
+            with get_session() as session:
+                prompt_snapshot = load_settings_employee_prompt_snapshot(session, employee_id=employee_id)
+                data = prompt_employee_data(
+                    self,
+                    title="Editar empleada",
+                    helper_text="Actualiza codigo o nombre visible del equipo comercial.",
+                    current_values={
+                        "codigo": prompt_snapshot.code,
+                        "nombre_completo": prompt_snapshot.full_name,
+                    },
+                )
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "No se pudo abrir", str(exc))
+            return
+        if data is None:
+            return
+
+        try:
+            with get_session() as session:
+                result = update_settings_employee(
+                    session,
+                    admin_user_id=self.user_id,
+                    employee_id=employee_id,
+                    payload=data,
+                )
+                session.commit()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "No se pudo actualizar", str(exc))
+            return
+
+        self.refresh_all()
+        result_feedback = build_settings_employee_result_feedback(
+            "update_employee",
+            employee_name=result.employee_name,
+            employee_code=result.employee_code,
+        )
+        QMessageBox.information(self, result_feedback.title, result_feedback.message)
+
+    def _handle_toggle_employee(self) -> None:
+        employee_id = self._selected_settings_employee_id()
+        feedback = build_settings_employee_guard_feedback(
+            "toggle_employee",
+            is_admin=self.current_role == RolUsuario.ADMIN,
+            has_selection=employee_id is not None,
+        )
+        if feedback is not None:
+            QMessageBox.warning(self, feedback.title, feedback.message)
+            return
+        try:
+            with get_session() as session:
+                result = toggle_settings_employee(
+                    session,
+                    admin_user_id=self.user_id,
+                    employee_id=employee_id,
+                )
+                session.commit()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Operacion fallida", str(exc))
+            return
+
+        self.refresh_all()
+        result_feedback = build_settings_employee_result_feedback(
+            "toggle_employee",
+            employee_name=result.employee_name,
+            employee_code=result.employee_code,
+            status_text=result.status_text,
+        )
+        QMessageBox.information(self, result_feedback.title, result_feedback.message)
 
     def _prepare_client_qr_delivery(self, client: Cliente) -> tuple[str, Path, str]:
         if not (client.telefono or "").strip():
@@ -3956,6 +4151,7 @@ class MainWindow(QMainWindow):
             self.settings_users_dialog,
             self.settings_suppliers_dialog,
             self.settings_clients_dialog,
+            self.settings_employees_dialog,
             self.settings_backup_dialog,
             self.settings_cash_history_dialog,
             self.settings_business_dialog,
@@ -5993,14 +6189,38 @@ class MainWindow(QMainWindow):
         self.sale_origin_direct_button.setEnabled(self.sale_credit_mode != ModoOrigenVenta.OPERATOR_DIRECT)
 
     def _handle_sale_origin_identify(self, scanned_code: str | None = None) -> None:
-        code_hint = f" ({scanned_code})" if scanned_code else ""
-        QMessageBox.information(
-            self,
-            "Identificar responsable",
-            (
-                "La identificacion por QR del equipo comercial"
-                f"{code_hint} se habilitara en el siguiente corte de Origen."
-            ),
+        if not scanned_code:
+            self._set_sale_feedback("Escanea un QR EMP valido para asignar responsable.", "warning", auto_clear_ms=1800)
+            self.sale_sku_input.setFocus()
+            self.sale_sku_input.selectAll()
+            return
+        try:
+            with get_session() as session:
+                employee = EmployeeIdentityService.resolve_employee_by_qr_code(session, scanned_code)
+        except Exception as exc:  # noqa: BLE001
+            self._set_sale_feedback(str(exc), "warning", auto_clear_ms=2200)
+            self.sale_sku_input.setFocus()
+            self.sale_sku_input.selectAll()
+            return
+        if employee is None:
+            self._set_sale_feedback(
+                f"No se encontro una empleada activa para {scanned_code}.",
+                "warning",
+                auto_clear_ms=2200,
+            )
+            self.sale_sku_input.setFocus()
+            self.sale_sku_input.selectAll()
+            return
+        self.sale_credit_mode = ModoOrigenVenta.EMPLOYEE
+        self.sale_seller_employee_code = str(employee.codigo)
+        self.sale_seller_employee_display_name = EmployeeIdentityService.build_visible_employee_name(
+            str(employee.nombre_completo)
+        )
+        self._refresh_sale_origin_ui()
+        self._set_sale_feedback(
+            f"Responsable: {self.sale_seller_employee_display_name}.",
+            "neutral",
+            auto_clear_ms=1600,
         )
         self.sale_sku_input.setFocus()
         self.sale_sku_input.selectAll()
@@ -6405,6 +6625,11 @@ class MainWindow(QMainWindow):
         self.sale_status_label.update()
 
     def _handle_add_sale_item(self) -> None:
+        sku = self.sale_sku_input.text().strip().upper()
+        if sku.startswith("EMP:"):
+            self._handle_sale_origin_identify(scanned_code=sku)
+            self.sale_sku_input.clear()
+            return
         if self.current_role not in {RolUsuario.ADMIN, RolUsuario.CAJERO}:
             QMessageBox.warning(self, "Sin permisos", "Tu usuario no puede registrar ventas.")
             return
@@ -6415,12 +6640,8 @@ class MainWindow(QMainWindow):
         if not self._ensure_cash_session_current_day_for_operation("registrar ventas"):
             return
 
-        sku = self.sale_sku_input.text().strip().upper()
         if not sku:
             QMessageBox.warning(self, "Datos incompletos", "Captura un SKU antes de agregar al carrito.")
-            return
-        if sku.startswith("EMP:"):
-            self._handle_sale_origin_identify(scanned_code=sku)
             return
 
         quantity = self.sale_qty_spin.value()
@@ -7426,6 +7647,7 @@ class MainWindow(QMainWindow):
         self._refresh_settings_users()
         self._refresh_settings_suppliers()
         self._refresh_settings_clients()
+        self._refresh_settings_employees()
         self.status_label.setText("Estado: datos sincronizados con PostgreSQL.")
 
     def _refresh_current_user(self, session) -> None:

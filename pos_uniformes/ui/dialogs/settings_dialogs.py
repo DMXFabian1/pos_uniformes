@@ -195,6 +195,51 @@ def build_clients_settings_dialog(window: "MainWindow") -> QDialog:
     return dialog
 
 
+def build_employees_settings_dialog(window: "MainWindow") -> QDialog:
+    dialog, layout = _create_settings_dialog(
+        window,
+        "Empleadas",
+        "Administra codigos EMP y nombres visibles del equipo comercial para resolver responsable por escaneo en Caja.",
+        width=920,
+    )
+    window.settings_employees_status_label.setObjectName("analyticsLine")
+    actions = QHBoxLayout()
+    window.settings_employees_search_input.setPlaceholderText("Buscar por codigo o nombre")
+    window.settings_create_employee_button.setObjectName("toolbarPrimaryButton")
+    window.settings_update_employee_button.setObjectName("toolbarSecondaryButton")
+    window.settings_toggle_employee_button.setObjectName("toolbarGhostButton")
+    window.settings_employees_search_input.textChanged.connect(window._refresh_settings_employees)
+    window.settings_create_employee_button.clicked.connect(window._handle_create_employee)
+    window.settings_update_employee_button.clicked.connect(window._handle_update_employee)
+    window.settings_toggle_employee_button.clicked.connect(window._handle_toggle_employee)
+    actions.addWidget(QLabel("Buscar"))
+    actions.addWidget(window.settings_employees_search_input, 1)
+    actions.addWidget(window.settings_create_employee_button)
+    actions.addWidget(window.settings_update_employee_button)
+    actions.addWidget(window.settings_toggle_employee_button)
+
+    window.settings_employees_table.setColumnCount(5)
+    window.settings_employees_table.setHorizontalHeaderLabels(
+        ["Codigo", "Nombre completo", "Visible", "Estado", "Actualizado"]
+    )
+    window.settings_employees_table.setObjectName("dataTable")
+    window.settings_employees_table.verticalHeader().setVisible(False)
+    window.settings_employees_table.setSelectionBehavior(window.settings_employees_table.SelectionBehavior.SelectRows)
+    window.settings_employees_table.setAlternatingRowColors(True)
+    window.settings_employees_table.setMinimumHeight(320)
+    window.settings_employees_table.horizontalHeader().setStretchLastSection(True)
+    window.settings_employees_table.itemDoubleClicked.connect(window._handle_update_employee)
+
+    close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+    close_buttons.rejected.connect(dialog.reject)
+    close_buttons.accepted.connect(dialog.accept)
+    layout.addWidget(window.settings_employees_status_label)
+    layout.addLayout(actions)
+    layout.addWidget(window.settings_employees_table)
+    layout.addWidget(close_buttons)
+    return dialog
+
+
 def build_whatsapp_settings_dialog(window: "MainWindow") -> QDialog:
     dialog, layout = _create_settings_dialog(
         window,

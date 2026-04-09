@@ -1,4 +1,4 @@
-"""Mensajes y guardas operativas para proveedores, clientes y marketing."""
+"""Mensajes y guardas operativas para proveedores, clientes, empleadas y marketing."""
 
 from __future__ import annotations
 
@@ -97,6 +97,46 @@ def build_settings_client_result_feedback(
         return SettingsCrmFeedbackView(
             "QR generado",
             f"QR del cliente '{client_code}' guardado en:\n{asset_path}",
+        )
+    raise ValueError(f"Accion no soportada: {action_key}")
+
+
+def build_settings_employee_guard_feedback(
+    action_key: str,
+    *,
+    is_admin: bool,
+    has_selection: bool,
+) -> SettingsCrmFeedbackView | None:
+    if action_key == "create_employee":
+        if is_admin:
+            return None
+        return SettingsCrmFeedbackView("Sin permisos", "Solo ADMIN puede crear empleadas.")
+    if has_selection:
+        return None
+    return SettingsCrmFeedbackView("Sin seleccion", "Selecciona una empleada en la tabla.")
+
+
+def build_settings_employee_result_feedback(
+    action_key: str,
+    *,
+    employee_name: str,
+    employee_code: str,
+    status_text: str | None = None,
+) -> SettingsCrmFeedbackView:
+    if action_key == "create_employee":
+        return SettingsCrmFeedbackView(
+            "Empleada creada",
+            f"Empleada '{employee_name}' creada con codigo {employee_code}.",
+        )
+    if action_key == "update_employee":
+        return SettingsCrmFeedbackView(
+            "Empleada actualizada",
+            f"Empleada '{employee_name}' actualizada.",
+        )
+    if action_key == "toggle_employee":
+        return SettingsCrmFeedbackView(
+            "Empleada actualizada",
+            f"Empleada '{employee_name}' {status_text} correctamente.",
         )
     raise ValueError(f"Accion no soportada: {action_key}")
 

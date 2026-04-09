@@ -520,6 +520,8 @@
   - Caja ahora expone `Corte administrativo` como retiro formal solo para `ADMIN`, protegido con PIN y registrado como movimiento real de caja para que el esperado del cierre siga siendo consistente.
 - `database/models.py`, `services/venta_service.py`, `services/sale_checkout_action_service.py`, `ui/views/cashier_view.py`, `ui/main_window.py`
   - Primer corte real de `Origen en Caja`: la venta ya persiste `credit_mode` y campos base de responsable, `Caja` muestra el bloque `Responsable` y permite marcar `Directa` o volver a `Sin asignar`; `Identificar` queda visible como siguiente corte para enlazar QR de equipo sin mezclarlo aun con una tabla de empleadas.
+- `database/models.py`, `services/employee_identity_service.py`, `services/settings_employee_action_service.py`, `ui/views/settings_view.py`, `ui/dialogs/settings_dialogs.py`, `ui/main_window.py`
+  - Segundo corte de `Origen en Caja`: ya existe la base minima de `Empleadas` en `Configuracion`, `Caja` resuelve escaneos `EMP:{codigo}` contra esa tabla y el bloque `Responsable` cambia a nombre humano corto; tambien se quito el boton visible `Identificar` para dejar el QR como camino principal.
 
 ## Riesgo residual conocido
 

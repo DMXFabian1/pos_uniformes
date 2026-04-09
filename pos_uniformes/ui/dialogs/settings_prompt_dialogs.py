@@ -256,6 +256,34 @@ def prompt_client_data(
     }
 
 
+def prompt_employee_data(
+    parent: QWidget,
+    *,
+    title: str,
+    helper_text: str,
+    current_values: dict[str, str] | None = None,
+) -> dict[str, str] | None:
+    dialog, layout = _create_settings_prompt_dialog(parent, title, helper_text, width=520)
+    form = QFormLayout()
+    code_input = QLineEdit()
+    name_input = QLineEdit()
+    code_input.setPlaceholderText("VEND-1 o EMP:VEND-1")
+    name_input.setPlaceholderText("Nombre completo visible en Caja")
+    if current_values:
+        code_input.setText(current_values.get("codigo", ""))
+        name_input.setText(current_values.get("nombre_completo", ""))
+    form.addRow("Codigo", code_input)
+    form.addRow("Nombre", name_input)
+    layout.addLayout(form)
+    layout.addWidget(_build_prompt_buttons(dialog))
+    if dialog.exec() != int(QDialog.DialogCode.Accepted):
+        return None
+    return {
+        "codigo": code_input.text().strip(),
+        "nombre_completo": name_input.text().strip(),
+    }
+
+
 def prompt_client_whatsapp_data(parent: QWidget, client_name: str) -> tuple[str, str] | None:
     dialog, layout = _create_settings_prompt_dialog(
         parent,
