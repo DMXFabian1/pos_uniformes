@@ -9026,7 +9026,10 @@ class MainWindow(QMainWindow):
             for variante in variantes_inventario
         ]
         self._populate_combo(self.purchase_variant_combo, purchase_variant_items)
+        current_inventory_variant_id = self.inventory_variant_combo.currentData()
         self._populate_combo(self.inventory_variant_combo, inventory_variant_items)
+        if current_inventory_variant_id is None:
+            self.inventory_variant_combo.setCurrentIndex(-1)
         self._refresh_catalog_section_controls()
         self._refresh_selected_qr_preview()
 

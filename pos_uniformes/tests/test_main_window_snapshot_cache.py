@@ -1049,6 +1049,14 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         self.assertFalse(window.catalog_selection_label.isVisible())
 
+    def test_inventory_starts_without_selected_variant(self) -> None:
+        window = MainWindow(user_id=1)
+
+        self.assertEqual(window.inventory_variant_combo.currentIndex(), -1)
+        self.assertEqual(window.inventory_table.currentRow(), -1)
+        self.assertEqual(window.inventory_overview_label.text(), "Selecciona una presentacion")
+        self.assertEqual(window.qr_preview_label.text(), "QR pendiente")
+
     def test_inventory_print_label_uses_batch_dialog_for_multiple_selected_rows(self) -> None:
         window = MainWindow(user_id=1)
         window._selected_inventory_variant_ids = Mock(return_value=[7, 8])
