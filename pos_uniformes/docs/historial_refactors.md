@@ -532,6 +532,8 @@
   - `Empleadas` gana un panel lateral pensado para `ADMIN`: muestra detalle de la seleccion y un resumen de los ultimos 7 dias con `Piezas`, `Tickets`, `Monto` y `Ultima venta`, sin saturar la tabla principal.
 - `ui/dialogs/settings_dialogs.py`, `ui/main_window.py`
   - El panel lateral de `Empleadas` ahora protege montos por defecto: arranca oculto y el toggle `Mostrar monto` pide la contrasena del usuario actual antes de revelar la columna `Monto` y el importe del resumen `Hoy`.
+- `services/employee_sales_history_service.py`, `ui/dialogs/settings_dialogs.py`, `ui/main_window.py`
+  - El historial de 7 dias en `Empleadas` ya permite doble clic por dia para abrir un dialogo con los tickets confirmados de esa fecha; dentro solo muestra lista operativa y accion `Ver ticket`.
 
 ## Riesgo residual conocido
 

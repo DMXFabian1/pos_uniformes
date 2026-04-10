@@ -121,6 +121,7 @@ from pos_uniformes.services.employee_activity_service import (
     build_employee_activity_empty_snapshot,
     load_employee_activity_snapshot,
 )
+from pos_uniformes.services.employee_sales_history_service import list_employee_day_sale_rows
 from pos_uniformes.services.cash_session_action_service import (
     close_cash_session_action,
     correct_cash_opening_action,
@@ -1535,6 +1536,10 @@ class MainWindow(QMainWindow):
         self.settings_employee_activity_table.setColumnCount(4)
         self.settings_employee_activity_table.setHorizontalHeaderLabels(["Dia", "Piezas", "Tickets", "Monto"])
         self.settings_employee_amounts_visible = False
+        self.settings_employee_day_sales_table = QTableWidget()
+        self.settings_employee_day_sales_status_label = QLabel("Sin tickets cargados.")
+        self.settings_employee_view_ticket_button = QPushButton("Ver ticket")
+        self.settings_employee_day_sales_dialog: QDialog | None = None
         self.settings_employees_dialog: QDialog | None = None
         self.settings_backup_dialog: QDialog | None = None
         self.settings_cash_history_dialog: QDialog | None = None
@@ -3102,7 +3107,10 @@ class MainWindow(QMainWindow):
                     f"${day_row.amount:,.2f}",
                 )
                 for column_index, value in enumerate(values):
-                    self.settings_employee_activity_table.setItem(row_index, column_index, _table_item(value))
+                    item = _table_item(value)
+                    if column_index == 0:
+                        item.setData(Qt.ItemDataRole.UserRole, day_row.day)
+                    self.settings_employee_activity_table.setItem(row_index, column_index, item)
             self.settings_employee_activity_table.resizeColumnsToContents()
         self._refresh_settings_employee_amount_visibility()
 
@@ -3120,6 +3128,90 @@ class MainWindow(QMainWindow):
             "Ocultar monto" if self.settings_employee_amounts_visible else "Mostrar monto"
         )
         self.settings_employee_activity_table.setColumnHidden(3, not self.settings_employee_amounts_visible)
+
+    def _selected_settings_employee_activity_day(self) -> date | None:
+        selected_row = self.settings_employee_activity_table.currentRow()
+        item = self.settings_employee_activity_table.item(selected_row, 0)
+        raw_day = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+        if not isinstance(raw_day, date):
+            return None
+        return raw_day
+
+    def _selected_settings_employee_day_sale_id(self) -> int | None:
+        selected_row = self.settings_employee_day_sales_table.currentRow()
+        item = self.settings_employee_day_sales_table.item(selected_row, 0)
+        raw_sale_id = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+        if raw_sale_id is None:
+            return None
+        return int(raw_sale_id)
+
+    def _open_settings_employee_day_sales_dialog(self) -> None:
+        employee_id = self._selected_settings_employee_id()
+        target_day = self._selected_settings_employee_activity_day()
+        if employee_id is None or target_day is None:
+            QMessageBox.warning(self, "Sin seleccion", "Selecciona un dia del historial para ver sus tickets.")
+            return
+        try:
+            with get_session() as session:
+                employee = session.get(Empleada, employee_id)
+                if employee is None:
+                    raise ValueError("No se encontro la empleada seleccionada.")
+                rows = list_employee_day_sale_rows(session, employee_code=str(employee.codigo), target_day=target_day)
+                visible_name = EmployeeIdentityService.build_visible_employee_name(str(employee.nombre_completo))
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "No se pudieron cargar tickets", str(exc))
+            return
+
+        if self.settings_employee_day_sales_dialog is None:
+            from pos_uniformes.ui.dialogs.settings_dialogs import build_employee_day_sales_dialog
+
+            self.settings_employee_day_sales_dialog = build_employee_day_sales_dialog(self)
+
+        self.settings_employee_day_sales_dialog.setWindowTitle(
+            f"{visible_name or 'Empleada'} · {format_display_date(target_day)}"
+        )
+        self.settings_employee_day_sales_status_label.setText(
+            f"Tickets confirmados del dia: {len(rows)}"
+            if rows
+            else "No hubo tickets confirmados acreditados en ese dia."
+        )
+        self.settings_employee_day_sales_table.setRowCount(len(rows))
+        for row_index, row_view in enumerate(rows):
+            for column_index, value in enumerate(row_view.values):
+                display_value = f"${Decimal(value):,.2f}" if column_index == 4 else value
+                item = _table_item(display_value)
+                if column_index == 0:
+                    item.setData(Qt.ItemDataRole.UserRole, row_view.sale_id)
+                self.settings_employee_day_sales_table.setItem(row_index, column_index, item)
+        if rows:
+            self.settings_employee_day_sales_table.setCurrentCell(0, 0)
+        else:
+            self.settings_employee_day_sales_table.clearSelection()
+            self.settings_employee_day_sales_table.setCurrentItem(None)
+        self.settings_employee_day_sales_table.resizeColumnsToContents()
+        self._refresh_settings_employee_day_sale_actions()
+        self.settings_employee_day_sales_dialog.show()
+        self.settings_employee_day_sales_dialog.raise_()
+        self.settings_employee_day_sales_dialog.activateWindow()
+
+    def _refresh_settings_employee_day_sale_actions(self) -> None:
+        self.settings_employee_view_ticket_button.setEnabled(self._selected_settings_employee_day_sale_id() is not None)
+
+    def _handle_view_settings_employee_day_sale_ticket(self) -> None:
+        sale_id = self._selected_settings_employee_day_sale_id()
+        if sale_id is None:
+            QMessageBox.warning(self, "Sin seleccion", "Selecciona un ticket del listado para abrirlo.")
+            return
+        try:
+            open_printable_document_flow(
+                parent=self,
+                session_factory=get_session,
+                build_document_view=lambda session: build_sale_ticket_document_view(session, sale_id=sale_id),
+                open_dialog=open_printable_text_dialog,
+            )
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Ticket no disponible", str(exc))
+            return
 
     def _prompt_settings_employee_amount_access(self) -> bool:
         password, accepted = QInputDialog.getText(

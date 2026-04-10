@@ -274,6 +274,7 @@ def build_employees_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_employee_activity_table.setAlternatingRowColors(True)
     window.settings_employee_activity_table.setMinimumHeight(240)
     window.settings_employee_activity_table.horizontalHeader().setStretchLastSection(True)
+    window.settings_employee_activity_table.itemDoubleClicked.connect(window._open_settings_employee_day_sales_dialog)
     activity_header = QHBoxLayout()
     activity_header.setSpacing(8)
     activity_header.addWidget(window.settings_employee_activity_status_label, 1)
@@ -298,6 +299,47 @@ def build_employees_settings_dialog(window: "MainWindow") -> QDialog:
     layout.addWidget(window.settings_employees_status_label)
     layout.addLayout(actions)
     layout.addLayout(content_layout)
+    layout.addWidget(close_buttons)
+    return dialog
+
+
+def build_employee_day_sales_dialog(window: "MainWindow") -> QDialog:
+    dialog, layout = _create_settings_dialog(
+        window,
+        "Tickets del dia",
+        "Consulta los tickets confirmados acreditados a la empleada en la fecha seleccionada.",
+        width=860,
+    )
+    window.settings_employee_day_sales_status_label.setObjectName("subtleLine")
+    window.settings_employee_view_ticket_button.setObjectName("toolbarSecondaryButton")
+    window.settings_employee_view_ticket_button.clicked.connect(window._handle_view_settings_employee_day_sale_ticket)
+    window.settings_employee_day_sales_table.setColumnCount(5)
+    window.settings_employee_day_sales_table.setHorizontalHeaderLabels(
+        ["Hora", "Folio", "Cliente", "Piezas", "Total"]
+    )
+    window.settings_employee_day_sales_table.setObjectName("dataTable")
+    window.settings_employee_day_sales_table.verticalHeader().setVisible(False)
+    window.settings_employee_day_sales_table.setSelectionBehavior(
+        window.settings_employee_day_sales_table.SelectionBehavior.SelectRows
+    )
+    window.settings_employee_day_sales_table.setAlternatingRowColors(True)
+    window.settings_employee_day_sales_table.setEditTriggers(
+        window.settings_employee_day_sales_table.EditTrigger.NoEditTriggers
+    )
+    window.settings_employee_day_sales_table.horizontalHeader().setStretchLastSection(True)
+    window.settings_employee_day_sales_table.itemSelectionChanged.connect(
+        window._refresh_settings_employee_day_sale_actions
+    )
+
+    actions = QHBoxLayout()
+    actions.addWidget(window.settings_employee_day_sales_status_label, 1)
+    actions.addWidget(window.settings_employee_view_ticket_button)
+
+    close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+    close_buttons.rejected.connect(dialog.reject)
+    close_buttons.accepted.connect(dialog.accept)
+    layout.addLayout(actions)
+    layout.addWidget(window.settings_employee_day_sales_table, 1)
     layout.addWidget(close_buttons)
     return dialog
 

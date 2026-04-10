@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from types import SimpleNamespace
 import unittest
@@ -209,7 +209,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             today_amount=Decimal("1250.00"),
             last_sale_at=datetime(2026, 4, 9, 18, 45),
             day_rows=(
-                SimpleNamespace(day_label="09/04/2026", pieces=8, tickets=3, amount=Decimal("1250.00")),
+                SimpleNamespace(day=date(2026, 4, 9), day_label="09/04/2026", pieces=8, tickets=3, amount=Decimal("1250.00")),
             ),
         )
 
@@ -255,7 +255,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             today_amount=Decimal("1250.00"),
             last_sale_at=datetime(2026, 4, 9, 18, 45),
             day_rows=(
-                SimpleNamespace(day_label="09/04/2026", pieces=8, tickets=3, amount=Decimal("1250.00")),
+                SimpleNamespace(day=date(2026, 4, 9), day_label="09/04/2026", pieces=8, tickets=3, amount=Decimal("1250.00")),
             ),
         )
 
@@ -301,7 +301,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             today_amount=Decimal("1250.00"),
             last_sale_at=datetime(2026, 4, 9, 18, 45),
             day_rows=(
-                SimpleNamespace(day_label="09/04/2026", pieces=8, tickets=3, amount=Decimal("1250.00")),
+                SimpleNamespace(day=date(2026, 4, 9), day_label="09/04/2026", pieces=8, tickets=3, amount=Decimal("1250.00")),
             ),
         )
 
@@ -322,6 +322,45 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertTrue(window.settings_employee_activity_table.isColumnHidden(3))
         self.assertNotIn("$1,250.00", window.settings_employee_detail_today_label.text())
         self.assertEqual(window.settings_employee_toggle_amounts_button.text(), "Mostrar monto")
+
+    def test_open_settings_employee_day_sales_dialog_loads_rows_for_selected_day(self) -> None:
+        window = MainWindow(user_id=1)
+        window.settings_employees_table.setColumnCount(1)
+        window.settings_employees_table.setRowCount(1)
+        employee_item = QTableWidgetItem("VEND-1")
+        employee_item.setData(Qt.ItemDataRole.UserRole, 4)
+        window.settings_employees_table.setItem(0, 0, employee_item)
+        window.settings_employees_table.setCurrentCell(0, 0)
+        window.settings_employee_activity_table.setColumnCount(4)
+        window.settings_employee_activity_table.setRowCount(1)
+        day_item = QTableWidgetItem("09/04/2026")
+        day_item.setData(Qt.ItemDataRole.UserRole, date(2026, 4, 9))
+        window.settings_employee_activity_table.setItem(0, 0, day_item)
+        window.settings_employee_activity_table.setCurrentCell(0, 0)
+
+        employee = SimpleNamespace(codigo="VEND-1", nombre_completo="Guadalupe Gomez Ruiz")
+        rows = (
+            SimpleNamespace(sale_id=10, values=("10:30", "VTA-010", "Maria", 2, Decimal("199.00"))),
+        )
+
+        with patch("pos_uniformes.ui.main_window.get_session") as get_session_mock, patch(
+            "pos_uniformes.ui.main_window.list_employee_day_sale_rows",
+            return_value=rows,
+        ):
+            session = Mock()
+            session.get.return_value = employee
+            context = Mock()
+            context.__enter__ = Mock(return_value=session)
+            context.__exit__ = Mock(return_value=False)
+            get_session_mock.return_value = context
+
+            window._open_settings_employee_day_sales_dialog()
+
+        self.assertIsNotNone(window.settings_employee_day_sales_dialog)
+        self.assertEqual(window.settings_employee_day_sales_table.rowCount(), 1)
+        self.assertEqual(window.settings_employee_day_sales_status_label.text(), "Tickets confirmados del dia: 1")
+        self.assertEqual(window.settings_employee_day_sales_table.item(0, 1).text(), "VTA-010")
+        self.assertTrue(window.settings_employee_view_ticket_button.isEnabled())
 
     def test_admin_role_keeps_manual_discount_controls_visible(self) -> None:
         window = MainWindow(user_id=1)
