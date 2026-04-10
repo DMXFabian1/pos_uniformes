@@ -190,6 +190,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
     def test_settings_employee_detail_panel_formats_recent_activity(self) -> None:
         window = MainWindow(user_id=1)
+        window.settings_employee_period_combo.addItems(["Hoy", "7 dias", "30 dias"])
         window.settings_employees_table.setColumnCount(1)
         window.settings_employees_table.setRowCount(1)
         item = QTableWidgetItem("VEND-1")
@@ -204,6 +205,11 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             pin_label="Listo",
             qr_label="Listo",
             card_label="Lista",
+            period_days=1,
+            period_label="Hoy",
+            period_pieces=8,
+            period_tickets=3,
+            period_amount=Decimal("1250.00"),
             today_pieces=8,
             today_tickets=3,
             today_amount=Decimal("1250.00"),
@@ -236,6 +242,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
     def test_settings_employee_detail_can_show_amounts_after_password(self) -> None:
         window = MainWindow(user_id=1)
+        window.settings_employee_period_combo.addItems(["Hoy", "7 dias", "30 dias"])
         window.settings_employees_table.setColumnCount(1)
         window.settings_employees_table.setRowCount(1)
         item = QTableWidgetItem("VEND-1")
@@ -250,6 +257,11 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             pin_label="Listo",
             qr_label="Listo",
             card_label="Lista",
+            period_days=1,
+            period_label="Hoy",
+            period_pieces=8,
+            period_tickets=3,
+            period_amount=Decimal("1250.00"),
             today_pieces=8,
             today_tickets=3,
             today_amount=Decimal("1250.00"),
@@ -282,6 +294,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
     def test_settings_employee_detail_keeps_amounts_hidden_when_password_fails(self) -> None:
         window = MainWindow(user_id=1)
+        window.settings_employee_period_combo.addItems(["Hoy", "7 dias", "30 dias"])
         window.settings_employees_table.setColumnCount(1)
         window.settings_employees_table.setRowCount(1)
         item = QTableWidgetItem("VEND-1")
@@ -296,6 +309,11 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             pin_label="Listo",
             qr_label="Listo",
             card_label="Lista",
+            period_days=1,
+            period_label="Hoy",
+            period_pieces=8,
+            period_tickets=3,
+            period_amount=Decimal("1250.00"),
             today_pieces=8,
             today_tickets=3,
             today_amount=Decimal("1250.00"),
@@ -318,6 +336,52 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
             with patch.object(window, "_prompt_settings_employee_amount_access", return_value=False):
                 window._handle_toggle_settings_employee_amounts()
+
+    def test_settings_employee_detail_updates_summary_when_period_changes(self) -> None:
+        window = MainWindow(user_id=1)
+        window.settings_employee_period_combo.addItems(["Hoy", "7 dias", "30 dias"])
+        window.settings_employee_period_combo.setCurrentText("7 dias")
+        window.settings_employees_table.setColumnCount(1)
+        window.settings_employees_table.setRowCount(1)
+        item = QTableWidgetItem("VEND-1")
+        item.setData(Qt.ItemDataRole.UserRole, 4)
+        window.settings_employees_table.setItem(0, 0, item)
+        window.settings_employees_table.setCurrentCell(0, 0)
+        snapshot = SimpleNamespace(
+            visible_name="Lupita Gomez",
+            full_name="Guadalupe Gomez Ruiz",
+            employee_code="VEND-1",
+            active_label="ACTIVA",
+            pin_label="Listo",
+            qr_label="Listo",
+            card_label="Lista",
+            period_days=7,
+            period_label="7 dias",
+            period_pieces=12,
+            period_tickets=4,
+            period_amount=Decimal("1800.00"),
+            today_pieces=8,
+            today_tickets=3,
+            today_amount=Decimal("1250.00"),
+            last_sale_at=datetime(2026, 4, 9, 18, 45),
+            day_rows=(
+                SimpleNamespace(day=date(2026, 4, 9), day_label="09/04/2026", pieces=8, tickets=3, amount=Decimal("1250.00")),
+            ),
+        )
+
+        with patch("pos_uniformes.ui.main_window.get_session") as get_session_mock, patch(
+            "pos_uniformes.ui.main_window.load_employee_activity_snapshot",
+            return_value=snapshot,
+        ):
+            session = Mock()
+            context = Mock()
+            context.__enter__ = Mock(return_value=session)
+            context.__exit__ = Mock(return_value=False)
+            get_session_mock.return_value = context
+
+            window._refresh_settings_employee_detail()
+
+        self.assertIn("7 dias: 12 piezas | 4 tickets", window.settings_employee_detail_today_label.text())
 
     def test_refresh_settings_employees_shows_recent_activity_badge(self) -> None:
         window = MainWindow(user_id=1)

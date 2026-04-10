@@ -1538,6 +1538,7 @@ class MainWindow(QMainWindow):
             "Selecciona una empleada para revisar su actividad reciente."
         )
         self.settings_employee_toggle_amounts_button = QPushButton("Ocultar monto")
+        self.settings_employee_period_combo = QComboBox()
         self.settings_employee_activity_table = QTableWidget()
         self.settings_employee_activity_table.setColumnCount(4)
         self.settings_employee_activity_table.setHorizontalHeaderLabels(["Dia", "Piezas", "Tickets", "Monto"])
@@ -3085,24 +3086,33 @@ class MainWindow(QMainWindow):
 
     def _refresh_settings_employee_detail(self) -> None:
         employee_id = self._selected_settings_employee_id()
+        summary_days = self._selected_settings_employee_summary_days()
         if employee_id is None:
             snapshot = build_employee_activity_empty_snapshot()
             self._apply_settings_employee_detail_snapshot(snapshot, has_selection=False)
             return
         try:
             with get_session() as session:
-                snapshot = load_employee_activity_snapshot(session, employee_id=employee_id)
+                snapshot = load_employee_activity_snapshot(session, employee_id=employee_id, summary_days=summary_days)
         except Exception as exc:  # noqa: BLE001
             self.settings_employee_detail_name_label.setText("Detalle no disponible.")
             self.settings_employee_detail_meta_label.setText(str(exc))
             self.settings_employee_detail_assets_label.setText("No se pudo cargar el resumen de la empleada.")
-            self.settings_employee_detail_today_label.setText("Hoy: -")
+            self.settings_employee_detail_today_label.setText(f"{self.settings_employee_period_combo.currentText() or 'Hoy'}: -")
             self.settings_employee_detail_last_sale_label.setText("Ultima venta: -")
             self.settings_employee_activity_status_label.setText("Actividad no disponible.")
             self.settings_employee_activity_table.setRowCount(0)
             self._refresh_settings_employee_amount_visibility()
             return
         self._apply_settings_employee_detail_snapshot(snapshot, has_selection=True)
+
+    def _selected_settings_employee_summary_days(self) -> int:
+        raw_value = self.settings_employee_period_combo.currentText().strip().lower()
+        if raw_value == "7 dias":
+            return 7
+        if raw_value == "30 dias":
+            return 30
+        return 1
 
     def _apply_settings_employee_detail_snapshot(self, snapshot, *, has_selection: bool) -> None:
         if not has_selection:
@@ -3111,7 +3121,7 @@ class MainWindow(QMainWindow):
                 "Aqui veras el nombre visible, codigo y estado de la seleccion."
             )
             self.settings_employee_detail_assets_label.setText("PIN, QR y credencial apareceran aqui.")
-            self.settings_employee_detail_today_label.setText("Hoy: -")
+            self.settings_employee_detail_today_label.setText(f"{self.settings_employee_period_combo.currentText() or 'Hoy'}: -")
             self.settings_employee_detail_last_sale_label.setText("Ultima venta: -")
             self.settings_employee_activity_status_label.setText(
                 "Selecciona una empleada para revisar sus ultimos 7 dias."
@@ -3124,9 +3134,9 @@ class MainWindow(QMainWindow):
             self.settings_employee_detail_assets_label.setText(
                 f"PIN: {snapshot.pin_label} | QR: {snapshot.qr_label} | Credencial: {snapshot.card_label}"
             )
-            today_text = f"Hoy: {snapshot.today_pieces} piezas | {snapshot.today_tickets} tickets"
+            today_text = f"{snapshot.period_label}: {snapshot.period_pieces} piezas | {snapshot.period_tickets} tickets"
             if self.settings_employee_amounts_visible:
-                today_text = f"{today_text} | ${snapshot.today_amount:,.2f}"
+                today_text = f"{today_text} | ${snapshot.period_amount:,.2f}"
             self.settings_employee_detail_today_label.setText(today_text)
             if snapshot.last_sale_at is None:
                 self.settings_employee_detail_last_sale_label.setText("Ultima venta: Sin ventas confirmadas.")

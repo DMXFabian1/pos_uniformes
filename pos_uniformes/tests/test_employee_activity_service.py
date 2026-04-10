@@ -184,6 +184,46 @@ class EmployeeActivityServiceTests(unittest.TestCase):
         self.assertEqual(ordered[1].visible_name, "Andrea Lopez")
         self.assertEqual(ordered[2].visible_name, "Berenice Cruz")
 
+    def test_build_snapshot_supports_period_totals_longer_than_history_table(self) -> None:
+        employee = SimpleNamespace(
+            id=4,
+            codigo="VEND-1",
+            nombre_completo="Guadalupe Gomez Ruiz",
+            activo=True,
+        )
+        sales = [
+            SimpleNamespace(
+                confirmada_at=datetime(2026, 4, 9, 11, 20),
+                total=Decimal("250.00"),
+                detalles=[SimpleNamespace(cantidad=2)],
+            ),
+            SimpleNamespace(
+                confirmada_at=datetime(2026, 3, 20, 10, 5),
+                total=Decimal("99.00"),
+                detalles=[SimpleNamespace(cantidad=1)],
+            ),
+        ]
+
+        snapshot = build_employee_activity_snapshot(
+            employee,
+            pin_ready=True,
+            qr_ready=False,
+            card_ready=True,
+            sales=sales,
+            reference_date=date(2026, 4, 9),
+            history_days=7,
+            summary_days=30,
+            visible_name_builder=lambda full_name: "Guadalupe Ruiz",
+        )
+
+        self.assertEqual(len(snapshot.day_rows), 7)
+        self.assertEqual(snapshot.period_days, 30)
+        self.assertEqual(snapshot.period_label, "30 dias")
+        self.assertEqual(snapshot.period_pieces, 3)
+        self.assertEqual(snapshot.period_tickets, 2)
+        self.assertEqual(snapshot.period_amount, Decimal("349.00"))
+        self.assertEqual(snapshot.day_rows[0].pieces, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

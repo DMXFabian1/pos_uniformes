@@ -32,6 +32,11 @@ class EmployeeActivitySnapshot:
     pin_label: str
     qr_label: str
     card_label: str
+    period_days: int
+    period_label: str
+    period_pieces: int
+    period_tickets: int
+    period_amount: Decimal
     today_pieces: int
     today_tickets: int
     today_amount: Decimal
@@ -53,17 +58,25 @@ def build_employee_activity_snapshot(
     card_ready: bool,
     sales: list[object] | tuple[object, ...],
     reference_date: date | None = None,
+    history_days: int = 7,
+    summary_days: int = 1,
     visible_name_builder=None,
 ) -> EmployeeActivitySnapshot:
     if reference_date is None:
         reference_date = date.today()
+    history_days = max(int(history_days or 7), 1)
+    summary_days = max(int(summary_days or 1), 1)
     if visible_name_builder is None:
         from pos_uniformes.services.employee_identity_service import EmployeeIdentityService
 
         visible_name_builder = EmployeeIdentityService.build_visible_employee_name
 
     day_rows: dict[date, EmployeeActivityDayRow] = {}
-    target_days = [reference_date - timedelta(days=offset) for offset in range(7)]
+    target_days = [reference_date - timedelta(days=offset) for offset in range(history_days)]
+    summary_start = reference_date - timedelta(days=summary_days - 1)
+    period_pieces = 0
+    period_tickets = 0
+    period_amount = Decimal("0.00")
     for current_day in target_days:
         day_rows[current_day] = EmployeeActivityDayRow(
             day=current_day,
@@ -79,11 +92,15 @@ def build_employee_activity_snapshot(
         if sale_datetime is None:
             continue
         sale_day = sale_datetime.date()
+        pieces = sum(int(getattr(detail, "cantidad", 0) or 0) for detail in getattr(sale, "detalles", ()))
+        amount = Decimal(str(getattr(sale, "total", Decimal("0.00")) or Decimal("0.00"))).quantize(Decimal("0.01"))
+        if sale_day >= summary_start:
+            period_pieces += pieces
+            period_tickets += 1
+            period_amount = (period_amount + amount).quantize(Decimal("0.01"))
         if sale_day not in day_rows:
             continue
         current = day_rows[sale_day]
-        pieces = sum(int(getattr(detail, "cantidad", 0) or 0) for detail in getattr(sale, "detalles", ()))
-        amount = Decimal(str(getattr(sale, "total", Decimal("0.00")) or Decimal("0.00"))).quantize(Decimal("0.01"))
         day_rows[sale_day] = EmployeeActivityDayRow(
             day=current.day,
             day_label=current.day_label,
@@ -105,6 +122,11 @@ def build_employee_activity_snapshot(
         pin_label="Listo" if pin_ready else "Pendiente",
         qr_label="Listo" if qr_ready else "Pendiente",
         card_label="Lista" if card_ready else "Pendiente",
+        period_days=summary_days,
+        period_label="Hoy" if summary_days == 1 else f"{summary_days} dias",
+        period_pieces=period_pieces,
+        period_tickets=period_tickets,
+        period_amount=period_amount,
         today_pieces=today_row.pieces,
         today_tickets=today_row.tickets,
         today_amount=today_row.amount,
@@ -147,7 +169,14 @@ def build_employee_activity_sort_key(snapshot: EmployeeActivitySnapshot) -> tupl
     )
 
 
-def load_employee_activity_snapshot(session, *, employee_id: int, reference_date: date | None = None) -> EmployeeActivitySnapshot:
+def load_employee_activity_snapshot(
+    session,
+    *,
+    employee_id: int,
+    reference_date: date | None = None,
+    history_days: int = 7,
+    summary_days: int = 1,
+) -> EmployeeActivitySnapshot:
     from pos_uniformes.services.employee_card_service import EmployeeCardService
     from pos_uniformes.services.employee_identity_service import EmployeeIdentityService
     from pos_uniformes.utils.qr_generator import QrGenerator
@@ -158,7 +187,10 @@ def load_employee_activity_snapshot(session, *, employee_id: int, reference_date
 
     if reference_date is None:
         reference_date = date.today()
-    window_start = datetime.combine(reference_date - timedelta(days=6), datetime.min.time())
+    history_days = max(int(history_days or 7), 1)
+    summary_days = max(int(summary_days or 1), 1)
+    lookback_days = max(history_days, summary_days)
+    window_start = datetime.combine(reference_date - timedelta(days=lookback_days - 1), datetime.min.time())
     sales = (
         session.scalars(
             select(Venta)
@@ -179,6 +211,8 @@ def load_employee_activity_snapshot(session, *, employee_id: int, reference_date
         card_ready=EmployeeCardService.exists_for_employee(employee),
         sales=sales,
         reference_date=reference_date,
+        history_days=history_days,
+        summary_days=summary_days,
         visible_name_builder=EmployeeIdentityService.build_visible_employee_name,
     )
 

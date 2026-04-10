@@ -259,6 +259,10 @@ def build_employees_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_employee_detail_last_sale_label.setObjectName("inventoryMetaCardAlt")
     window.settings_employee_activity_status_label.setObjectName("subtleLine")
     window.settings_employee_toggle_amounts_button.setObjectName("toolbarGhostButton")
+    window.settings_employee_period_combo.clear()
+    window.settings_employee_period_combo.addItems(["Hoy", "7 dias", "30 dias"])
+    window.settings_employee_period_combo.setObjectName("toolbarSecondaryButton")
+    window.settings_employee_period_combo.currentTextChanged.connect(window._refresh_settings_employee_detail)
     window.settings_employee_toggle_amounts_button.clicked.connect(window._handle_toggle_settings_employee_amounts)
     for label in (
         window.settings_employee_detail_name_label,
@@ -286,6 +290,8 @@ def build_employees_settings_dialog(window: "MainWindow") -> QDialog:
     activity_header = QHBoxLayout()
     activity_header.setSpacing(8)
     activity_header.addWidget(window.settings_employee_activity_status_label, 1)
+    activity_header.addWidget(QLabel("Periodo"))
+    activity_header.addWidget(window.settings_employee_period_combo)
     activity_header.addWidget(window.settings_employee_toggle_amounts_button)
     detail_layout.addWidget(window.settings_employee_detail_name_label)
     detail_layout.addWidget(window.settings_employee_detail_meta_label)
