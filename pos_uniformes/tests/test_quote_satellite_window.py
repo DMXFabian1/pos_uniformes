@@ -356,6 +356,55 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         self.assertEqual(first_button.minimumHeight(), 42)
         self.assertEqual(window.guided_variant_groups_layout.count(), 2)
 
+    def test_guided_reset_steps_returns_to_school_start(self) -> None:
+        window = QuoteSatelliteWindow(user_id=1)
+        window.guided_mode = "basics"
+        window.guided_selected_level = "Primaria"
+        window.guided_selected_school = "Colegio Mexico"
+        window.guided_selected_gender = "OFICIAL"
+        window.guided_selected_profile = "NINA"
+        window.guided_selected_bucket = "EXTRAS"
+        window.guided_selected_piece = "Bata"
+        window.guided_selected_product_key = "Bata||Bata Infantil Blanca"
+        window.guided_selected_sku = "SKU000001"
+        window.guided_qty_spin.setValue(4)
+
+        with patch.object(window, "_refresh_guided_browser") as refresh_guided_browser:
+            window._handle_guided_reset_steps()
+
+        self.assertEqual(window.guided_mode, "school")
+        self.assertEqual(window.guided_selected_level, "")
+        self.assertEqual(window.guided_selected_school, "")
+        self.assertEqual(window.guided_selected_gender, "TODOS")
+        self.assertEqual(window.guided_selected_profile, "TODOS")
+        self.assertEqual(window.guided_selected_bucket, "TODOS")
+        self.assertEqual(window.guided_selected_piece, "")
+        self.assertEqual(window.guided_selected_product_key, "")
+        self.assertEqual(window.guided_selected_sku, "")
+        self.assertEqual(window.guided_qty_spin.value(), 1)
+        refresh_guided_browser.assert_called_once()
+
+    def test_guided_basics_button_moves_to_clean_basics_route(self) -> None:
+        window = QuoteSatelliteWindow(user_id=1)
+        window.guided_mode = "school"
+        window.guided_selected_level = "Primaria"
+        window.guided_selected_school = "Colegio Mexico"
+        window.guided_selected_piece = "Camisa"
+        window.guided_selected_sku = "SKU000002"
+        window.guided_qty_spin.setValue(3)
+
+        with patch.object(window, "_refresh_guided_browser") as refresh_guided_browser:
+            window._handle_guided_go_to_basics()
+
+        self.assertEqual(window.guided_mode, "basics")
+        self.assertEqual(window.guided_selected_level, "")
+        self.assertEqual(window.guided_selected_school, "")
+        self.assertEqual(window.guided_selected_bucket, "BASICO")
+        self.assertEqual(window.guided_selected_piece, "")
+        self.assertEqual(window.guided_selected_sku, "")
+        self.assertEqual(window.guided_qty_spin.value(), 1)
+        refresh_guided_browser.assert_called_once()
+
     def test_reveal_saved_quote_switches_filter_and_search_page(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
         fake_session = Mock()

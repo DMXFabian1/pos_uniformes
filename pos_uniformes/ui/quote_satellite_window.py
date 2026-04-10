@@ -200,6 +200,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_empty_label = QLabel("Selecciona una ruta para comenzar.")
         self.guided_qty_spin = QSpinBox()
         self.guided_add_button = QPushButton("Agregar al presupuesto")
+        self.guided_reset_button = QPushButton("Limpiar pasos")
+        self.guided_basics_button = QPushButton("Piezas generales")
         self.guided_visual_icon_label = QLabel()
         self.guided_detail_title_label = QLabel("Sin seleccion.")
         self.guided_detail_meta_label = QLabel("")
@@ -1110,6 +1112,14 @@ class QuoteSatelliteWindow(QMainWindow):
         products_section_layout.addWidget(self.guided_product_scroll, 1)
         self.guided_products_section.setLayout(products_section_layout)
         steps_layout.addWidget(self.guided_products_section, 1)
+        guided_footer_actions = QHBoxLayout()
+        guided_footer_actions.setSpacing(8)
+        guided_footer_actions.addStretch()
+        self.guided_reset_button.setObjectName("ghostButton")
+        self.guided_basics_button.setObjectName("secondaryButton")
+        guided_footer_actions.addWidget(self.guided_reset_button)
+        guided_footer_actions.addWidget(self.guided_basics_button)
+        steps_layout.addLayout(guided_footer_actions)
         steps_box.setLayout(steps_layout)
 
         detail_box = QGroupBox("Producto seleccionado")
@@ -1564,6 +1574,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self.catalog_previous_page_button.clicked.connect(self._handle_catalog_browser_previous_page)
         self.catalog_next_page_button.clicked.connect(self._handle_catalog_browser_next_page)
         self.guided_add_button.clicked.connect(self._handle_add_guided_selection_to_quote)
+        self.guided_reset_button.clicked.connect(self._handle_guided_reset_steps)
+        self.guided_basics_button.clicked.connect(self._handle_guided_go_to_basics)
         self.quote_remove_button.clicked.connect(self._handle_remove_quote_item)
         self.quote_qty_down_button.clicked.connect(self._handle_decrease_quote_item_quantity)
         self.quote_qty_up_button.clicked.connect(self._handle_increase_quote_item_quantity)
@@ -1869,6 +1881,9 @@ class QuoteSatelliteWindow(QMainWindow):
         self._add_quote_item_by_sku(sku, 1)
 
     def _handle_guided_mode_change(self, mode_key: str) -> None:
+        self._reset_guided_route(mode_key=mode_key)
+
+    def _reset_guided_route(self, *, mode_key: str) -> None:
         self.guided_mode = "basics" if mode_key == "basics" else "school"
         self.guided_selected_level = ""
         self.guided_selected_school = ""
@@ -1878,7 +1893,14 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_selected_piece = ""
         self.guided_selected_product_key = ""
         self.guided_selected_sku = ""
+        self.guided_qty_spin.setValue(1)
         self._refresh_guided_browser()
+
+    def _handle_guided_reset_steps(self) -> None:
+        self._reset_guided_route(mode_key="school")
+
+    def _handle_guided_go_to_basics(self) -> None:
+        self._reset_guided_route(mode_key="basics")
 
     def _handle_guided_level_selected(self, level_name: str) -> None:
         self.guided_selected_level = level_name
