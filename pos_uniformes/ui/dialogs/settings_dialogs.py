@@ -227,9 +227,9 @@ def build_employees_settings_dialog(window: "MainWindow") -> QDialog:
     actions.addWidget(window.settings_generate_employee_qr_button)
     actions.addWidget(window.settings_generate_employee_card_button)
 
-    window.settings_employees_table.setColumnCount(8)
+    window.settings_employees_table.setColumnCount(9)
     window.settings_employees_table.setHorizontalHeaderLabels(
-        ["Codigo", "Nombre completo", "Visible", "PIN", "QR", "Credencial", "Estado", "Actualizado"]
+        ["Codigo", "Nombre completo", "Visible", "Actividad", "PIN", "QR", "Credencial", "Estado", "Actualizado"]
     )
     window.settings_employees_table.setObjectName("dataTable")
     window.settings_employees_table.verticalHeader().setVisible(False)

@@ -9,6 +9,7 @@ from dataclasses import dataclass
 class SettingsEmployeeRowView:
     employee_id: int
     values: tuple[object, ...]
+    activity_tone: str
     pin_tone: str
     qr_tone: str
     card_tone: str
@@ -31,12 +32,14 @@ def build_settings_employees_view(employees: list[dict[str, object]]) -> Setting
                     employee["code"],
                     employee["name"],
                     employee["display_name"],
+                    employee["activity_label"],
                     employee["pin_label"],
                     employee["qr_label"],
                     employee["card_label"],
                     employee["active_label"],
                     employee["updated_label"],
                 ),
+                activity_tone=str(employee["activity_tone"]),
                 pin_tone="positive" if str(employee["pin_label"]) == "Listo" else "warning",
                 qr_tone="positive" if str(employee["qr_label"]) == "Listo" else "warning",
                 card_tone="positive" if str(employee["card_label"]) == "Lista" else "muted",

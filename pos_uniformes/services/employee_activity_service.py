@@ -39,6 +39,12 @@ class EmployeeActivitySnapshot:
     day_rows: tuple[EmployeeActivityDayRow, ...]
 
 
+@dataclass(frozen=True)
+class EmployeeActivityState:
+    label: str
+    tone: str
+
+
 def build_employee_activity_snapshot(
     employee,
     *,
@@ -105,6 +111,14 @@ def build_employee_activity_snapshot(
         last_sale_at=last_sale_at,
         day_rows=ordered_rows,
     )
+
+
+def build_employee_activity_state(snapshot: EmployeeActivitySnapshot) -> EmployeeActivityState:
+    if snapshot.today_pieces > 0 or snapshot.today_tickets > 0:
+        return EmployeeActivityState(label="Activa hoy", tone="positive")
+    if any(day_row.pieces > 0 or day_row.tickets > 0 for day_row in snapshot.day_rows[1:]):
+        return EmployeeActivityState(label="Activa 7d", tone="warning")
+    return EmployeeActivityState(label="Sin actividad", tone="muted")
 
 
 def load_employee_activity_snapshot(session, *, employee_id: int, reference_date: date | None = None) -> EmployeeActivitySnapshot:

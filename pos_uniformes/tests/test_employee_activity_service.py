@@ -5,7 +5,10 @@ from decimal import Decimal
 from types import SimpleNamespace
 import unittest
 
-from pos_uniformes.services.employee_activity_service import build_employee_activity_snapshot
+from pos_uniformes.services.employee_activity_service import (
+    build_employee_activity_snapshot,
+    build_employee_activity_state,
+)
 
 
 class EmployeeActivityServiceTests(unittest.TestCase):
@@ -92,6 +95,52 @@ class EmployeeActivityServiceTests(unittest.TestCase):
         self.assertEqual(snapshot.today_amount, Decimal("0.00"))
         self.assertIsNone(snapshot.last_sale_at)
         self.assertTrue(all(row.pieces == 0 and row.tickets == 0 for row in snapshot.day_rows))
+
+    def test_build_activity_state_marks_today_activity_first(self) -> None:
+        snapshot = SimpleNamespace(
+            today_pieces=3,
+            today_tickets=1,
+            day_rows=(
+                SimpleNamespace(pieces=3, tickets=1),
+                SimpleNamespace(pieces=2, tickets=1),
+            ),
+        )
+
+        state = build_employee_activity_state(snapshot)
+
+        self.assertEqual(state.label, "Activa hoy")
+        self.assertEqual(state.tone, "positive")
+
+    def test_build_activity_state_marks_recent_activity_without_today_sales(self) -> None:
+        snapshot = SimpleNamespace(
+            today_pieces=0,
+            today_tickets=0,
+            day_rows=(
+                SimpleNamespace(pieces=0, tickets=0),
+                SimpleNamespace(pieces=2, tickets=1),
+                SimpleNamespace(pieces=0, tickets=0),
+            ),
+        )
+
+        state = build_employee_activity_state(snapshot)
+
+        self.assertEqual(state.label, "Activa 7d")
+        self.assertEqual(state.tone, "warning")
+
+    def test_build_activity_state_marks_inactive_when_week_has_no_sales(self) -> None:
+        snapshot = SimpleNamespace(
+            today_pieces=0,
+            today_tickets=0,
+            day_rows=(
+                SimpleNamespace(pieces=0, tickets=0),
+                SimpleNamespace(pieces=0, tickets=0),
+            ),
+        )
+
+        state = build_employee_activity_state(snapshot)
+
+        self.assertEqual(state.label, "Sin actividad")
+        self.assertEqual(state.tone, "muted")
 
 
 if __name__ == "__main__":

@@ -119,6 +119,7 @@ from pos_uniformes.services.settings_business_action_service import (
 )
 from pos_uniformes.services.employee_activity_service import (
     build_employee_activity_empty_snapshot,
+    build_employee_activity_state,
     load_employee_activity_snapshot,
 )
 from pos_uniformes.services.employee_sales_history_service import list_employee_day_sale_rows
@@ -2986,6 +2987,14 @@ class MainWindow(QMainWindow):
         try:
             with get_session() as session:
                 employees = EmployeeIdentityService.list_employees(session, search_text)
+                employee_activity_states: dict[int, tuple[str, str]] = {}
+                for employee in employees:
+                    try:
+                        activity_snapshot = load_employee_activity_snapshot(session, employee_id=int(employee.id))
+                        activity_state = build_employee_activity_state(activity_snapshot)
+                    except Exception:  # noqa: BLE001
+                        activity_state = build_employee_activity_state(build_employee_activity_empty_snapshot())
+                    employee_activity_states[int(employee.id)] = (activity_state.label, activity_state.tone)
         except Exception as exc:  # noqa: BLE001
             employees_view = build_settings_employees_error_view(str(exc))
             self.settings_employees_status_label.setText(employees_view.status_label)
@@ -2999,6 +3008,8 @@ class MainWindow(QMainWindow):
                     "code": employee.codigo,
                     "name": employee.nombre_completo,
                     "display_name": EmployeeIdentityService.build_visible_employee_name(employee.nombre_completo),
+                    "activity_label": employee_activity_states[int(employee.id)][0],
+                    "activity_tone": employee_activity_states[int(employee.id)][1],
                     "pin_label": "Listo" if EmployeeIdentityService.has_pin(employee) else "Pendiente",
                     "qr_label": "Listo" if QrGenerator.exists_for_employee(employee) else "Pendiente",
                     "card_label": "Lista" if EmployeeCardService.exists_for_employee(employee) else "Pendiente",
@@ -3017,12 +3028,14 @@ class MainWindow(QMainWindow):
                 if column_index == 0:
                     item.setData(Qt.ItemDataRole.UserRole, employee_row.employee_id)
                 if column_index == 3:
-                    _set_table_badge_style(item, employee_row.pin_tone)
+                    _set_table_badge_style(item, employee_row.activity_tone)
                 if column_index == 4:
-                    _set_table_badge_style(item, employee_row.qr_tone)
+                    _set_table_badge_style(item, employee_row.pin_tone)
                 if column_index == 5:
-                    _set_table_badge_style(item, employee_row.card_tone)
+                    _set_table_badge_style(item, employee_row.qr_tone)
                 if column_index == 6:
+                    _set_table_badge_style(item, employee_row.card_tone)
+                if column_index == 7:
                     _set_table_badge_style(item, employee_row.status_tone)
                 self.settings_employees_table.setItem(row_index, column_index, item)
         self.settings_employees_table.resizeColumnsToContents()
