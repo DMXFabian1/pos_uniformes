@@ -35,6 +35,8 @@ class InventoryCountSummary:
     increases: int
     decreases: int
     zero_rows: int
+    counted_pieces: int
+    system_pieces: int
 
 
 def load_inventory_count_variant_by_sku(session, sku: str) -> InventoryCountVariantView | None:
@@ -172,11 +174,15 @@ def build_inventory_count_summary(rows: list[InventoryCountRow]) -> InventoryCou
     increases = sum(1 for row in rows if int(row.delta) > 0)
     decreases = sum(1 for row in rows if int(row.delta) < 0)
     zero_rows = sum(1 for row in rows if int(row.delta) == 0)
+    counted_pieces = sum(int(row.stock_contado) for row in rows)
+    system_pieces = sum(int(row.stock_sistema) for row in rows)
     return InventoryCountSummary(
         changed_rows=changed_rows,
         increases=increases,
         decreases=decreases,
         zero_rows=zero_rows,
+        counted_pieces=counted_pieces,
+        system_pieces=system_pieces,
     )
 
 

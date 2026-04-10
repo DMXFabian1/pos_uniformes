@@ -41,11 +41,13 @@ def build_inventory_count_batch_view(rows: list[InventoryCountRow]) -> Inventory
         return InventoryCountBatchView(
             rows=(),
             summary_label="Lote vacio.",
-            status_label="Escanea un SKU y agrega el conteo al lote.",
+            status_label="Escanea pieza por pieza para empezar a contar.",
             confirmation_lines=(),
         )
 
     summary_label = (
+        f"Piezas contadas: {summary.counted_pieces} | "
+        f"Sistema base: {summary.system_pieces} | "
         f"Filas con diferencia: {summary.changed_rows} | "
         f"Suben: {summary.increases} | "
         f"Bajan: {summary.decreases}"

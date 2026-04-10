@@ -1,4 +1,4 @@
-"""Dialogo V1 para conteo fisico rapido por SKU."""
+"""Dialogo V1/V2 para conteo fisico con escaneo uno a uno."""
 
 from __future__ import annotations
 
@@ -82,7 +82,7 @@ class InventoryCountDialog(QDialog):
         layout.setSpacing(12)
 
         helper = QLabel(
-            "Conteo rapido por SKU. Sin lote previo, cada escaneo suma 1 al contado; con lote base desde Inventario, puedes revisar y corregir fila por fila."
+            "Conteo uno a uno por SKU. Sin lote previo, cada escaneo suma 1 pieza al contado; con lote base desde Inventario, puedes revisar y corregir fila por fila."
         )
         helper.setWordWrap(True)
         helper.setObjectName("analyticsLine")
@@ -107,10 +107,14 @@ class InventoryCountDialog(QDialog):
         control_layout.setVerticalSpacing(10)
 
         self.sku_input = QLineEdit()
-        self.sku_input.setPlaceholderText("Escanea o captura SKU")
+        self.sku_input.setPlaceholderText(
+            "Escanea pieza por pieza"
+            if self._scan_accumulation_enabled
+            else "Escanea o captura SKU"
+        )
         self.sku_input.setClearButtonEnabled(True)
         self.sku_input.returnPressed.connect(self._handle_lookup_sku)
-        self.lookup_button = QPushButton("Escanear")
+        self.lookup_button = QPushButton("Sumar 1" if self._scan_accumulation_enabled else "Escanear")
         self.lookup_button.setObjectName("toolbarSecondaryButton")
         self.lookup_button.clicked.connect(self._handle_lookup_sku)
 
@@ -149,7 +153,7 @@ class InventoryCountDialog(QDialog):
         manual_layout = QVBoxLayout()
         manual_layout.setContentsMargins(0, 0, 0, 0)
         manual_layout.setSpacing(8)
-        manual_label = QLabel("Correccion manual")
+        manual_label = QLabel("Ajuste puntual")
         manual_label.setObjectName("inventoryFilterLabel")
         self.counted_spin = QSpinBox()
         self.counted_spin.setRange(0, 100000)
@@ -230,9 +234,13 @@ class InventoryCountDialog(QDialog):
 
         actions_column = QVBoxLayout()
         actions_column.setSpacing(8)
+        self.decrement_button = QPushButton("Restar 1")
+        self.decrement_button.setObjectName("toolbarGhostButton")
+        self.decrement_button.clicked.connect(self._handle_decrement_selected_row_count)
         self.remove_button = QPushButton("Quitar fila")
         self.remove_button.setObjectName("toolbarGhostButton")
         self.remove_button.clicked.connect(self._handle_remove_selected_row)
+        actions_column.addWidget(self.decrement_button)
         actions_column.addWidget(self.remove_button)
         actions_column.addStretch()
 
@@ -253,6 +261,7 @@ class InventoryCountDialog(QDialog):
         layout.addWidget(footer_card)
 
         self.setLayout(layout)
+        self.batch_table.itemSelectionChanged.connect(self._refresh_batch_action_state)
         self.sku_input.setFocus()
 
     def _handle_lookup_sku(self) -> None:
@@ -297,7 +306,7 @@ class InventoryCountDialog(QDialog):
             self._clear_batch_selection()
             if current_row is not None:
                 self.batch_status_label.setText(
-                    f"Escaneo acumulado: {variant.sku} | contado {current_row.stock_contado} | sistema {current_row.stock_sistema} | delta {current_row.delta:+d}"
+                    f"Conteo uno a uno: {variant.sku} | contado {current_row.stock_contado} | sistema {current_row.stock_sistema} | delta {current_row.delta:+d}"
                 )
             self.sku_input.clear()
             self.sku_input.setFocus()
@@ -359,7 +368,11 @@ class InventoryCountDialog(QDialog):
     def _refresh_selected_variant_card(self) -> None:
         if self._selected_variant is None:
             self.variant_title_label.setText("Sin SKU cargado.")
-            self.variant_meta_label.setText("Escanea una presentacion para cargar su stock actual.")
+            self.variant_meta_label.setText(
+                "Escanea una pieza para cargar su stock actual."
+                if self._scan_accumulation_enabled
+                else "Escanea una presentacion para cargar su stock actual."
+            )
             self.variant_stock_label.setText("Sistema: -")
             return
 
@@ -412,11 +425,36 @@ class InventoryCountDialog(QDialog):
             )
         elif self._scan_accumulation_enabled:
             self.initial_context_label.setText(
-                "Modo escaneo acumulado: cada SKU suma 1 al contado. Usa el campo manual solo si necesitas corregir una fila."
+                "Modo uno a uno: cada lectura suma 1 pieza al contado. Usa Restar 1 o el ajuste puntual si necesitas corregir."
             )
         else:
             self.initial_context_label.setText("Escanea SKU para construir o complementar el lote.")
-        self.remove_button.setEnabled(bool(batch_view.rows))
+        self._refresh_batch_action_state()
+
+    def _refresh_batch_action_state(self) -> None:
+        has_rows = bool(self._rows)
+        has_selection = self.batch_table.currentRow() >= 0
+        self.remove_button.setEnabled(has_rows and has_selection)
+        self.decrement_button.setEnabled(has_rows and has_selection)
+
+    def _handle_decrement_selected_row_count(self) -> None:
+        current_row = self.batch_table.currentRow()
+        if current_row < 0 or current_row >= len(self._rows):
+            QMessageBox.information(self, "Sin fila", "Selecciona una fila del lote para restar una pieza.")
+            return
+        selected = self._rows[current_row]
+        new_counted_stock = max(0, int(selected.stock_contado) - 1)
+        self._rows = update_inventory_count_row_counted_stock(
+            self._rows,
+            variante_id=int(selected.variante_id),
+            counted_stock=new_counted_stock,
+        )
+        self._refresh_batch_table()
+        if 0 <= current_row < self.batch_table.rowCount():
+            self.batch_table.selectRow(current_row)
+        self.batch_status_label.setText(
+            f"Correccion rapida: {selected.sku} quedo en contado {new_counted_stock} | sistema {selected.stock_sistema} | delta {new_counted_stock - int(selected.stock_sistema):+d}"
+        )
 
     def _handle_batch_count_changed(self, *, variante_id: int, counted_stock: int) -> None:
         self._rows = update_inventory_count_row_counted_stock(
@@ -450,6 +488,7 @@ class InventoryCountDialog(QDialog):
         self.batch_table.clearSelection()
         self.batch_table.setCurrentCell(-1, -1)
         self.batch_table.clearFocus()
+        self._refresh_batch_action_state()
         self.sku_input.setFocus(Qt.FocusReason.ShortcutFocusReason)
         QTimer.singleShot(0, lambda: self.sku_input.setFocus(Qt.FocusReason.ShortcutFocusReason))
 

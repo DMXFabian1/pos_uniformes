@@ -53,6 +53,7 @@ class InventoryCountDialogTests(unittest.TestCase):
         self.assertEqual(dialog._rows[0].stock_contado, 2)
         self.assertEqual(dialog.batch_table.rowCount(), 1)
         self.assertFalse(dialog.initial_context_label.isVisible())
+        self.assertEqual(dialog.lookup_button.text(), "Sumar 1")
 
     def test_reference_is_generated_and_read_only(self) -> None:
         dialog = InventoryCountDialog()
@@ -129,6 +130,27 @@ class InventoryCountDialogTests(unittest.TestCase):
         self.assertFalse(dialog.batch_table.selectionModel().hasSelection())
         self.assertEqual(dialog.batch_table.currentRow(), -1)
         self.assertTrue(dialog.sku_input.hasFocus())
+
+    def test_decrement_selected_row_count_subtracts_one_piece(self) -> None:
+        dialog = InventoryCountDialog(
+            initial_rows=[
+                InventoryCountRow(
+                    variante_id=11,
+                    sku="SKU000011",
+                    producto_nombre="Bata",
+                    stock_sistema=9,
+                    stock_contado=12,
+                    delta=3,
+                )
+            ],
+            initial_context_label="Filas seleccionadas (1)",
+        )
+
+        dialog.batch_table.selectRow(0)
+        dialog._handle_decrement_selected_row_count()
+
+        self.assertEqual(dialog._rows[0].stock_contado, 11)
+        self.assertEqual(dialog._rows[0].delta, 2)
 
 
 if __name__ == "__main__":
