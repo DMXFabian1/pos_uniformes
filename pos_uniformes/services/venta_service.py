@@ -23,6 +23,7 @@ from pos_uniformes.database.models import (
 from pos_uniformes.services.inventario_service import InventarioService
 from pos_uniformes.services.loyalty_service import LoyaltyService
 from pos_uniformes.services.sale_stock_policy import sale_stock_guard_enabled
+from pos_uniformes.utils.product_name import sanitize_product_display_name
 
 
 @dataclass(frozen=True)
@@ -32,6 +33,8 @@ class VentaItemInput:
     precio_unitario: Decimal | None = None
     precio_base: Decimal | None = None
     pricing_rule_label: str = ""
+    descripcion_snapshot: str | None = None
+    is_manual: bool = False
 
 
 class VentaService:
@@ -92,6 +95,8 @@ class VentaService:
         cumulative_quantities: dict[str, int] = {}
         variants_by_sku: dict[str, Variante] = {}
         for item in items:
+            if item.is_manual:
+                continue
             variante = cls.obtener_variante_por_sku(session, item.sku)
             if variante is None:
                 raise ValueError(f"No existe una variante activa para el SKU '{item.sku}'.")
@@ -102,19 +107,35 @@ class VentaService:
             cls.validar_stock_disponible(variants_by_sku[sku], quantity)
 
         for item in items:
-            variante = variants_by_sku[item.sku]
-            unit_price = (
-                Decimal(str(item.precio_unitario)).quantize(Decimal("0.01"))
-                if item.precio_unitario is not None
-                else Decimal(variante.precio_venta).quantize(Decimal("0.01"))
-            )
-            subtotal_linea = (Decimal(item.cantidad) * unit_price).quantize(Decimal("0.01"))
-            detalle = VentaDetalle(
-                variante=variante,
-                cantidad=item.cantidad,
-                precio_unitario=unit_price,
-                subtotal_linea=subtotal_linea,
-            )
+            if item.is_manual:
+                unit_price = Decimal(str(item.precio_unitario or Decimal("0.00"))).quantize(Decimal("0.01"))
+                sku_snapshot = str(item.sku or "SIN-CODIGO").strip().upper() or "SIN-CODIGO"
+                descripcion_snapshot = str(item.descripcion_snapshot or "Venta manual").strip() or "Venta manual"
+                subtotal_linea = (Decimal(item.cantidad) * unit_price).quantize(Decimal("0.01"))
+                detalle = VentaDetalle(
+                    variante=None,
+                    sku_snapshot=sku_snapshot,
+                    descripcion_snapshot=descripcion_snapshot,
+                    cantidad=item.cantidad,
+                    precio_unitario=unit_price,
+                    subtotal_linea=subtotal_linea,
+                )
+            else:
+                variante = variants_by_sku[item.sku]
+                unit_price = (
+                    Decimal(str(item.precio_unitario)).quantize(Decimal("0.01"))
+                    if item.precio_unitario is not None
+                    else Decimal(variante.precio_venta).quantize(Decimal("0.01"))
+                )
+                subtotal_linea = (Decimal(item.cantidad) * unit_price).quantize(Decimal("0.01"))
+                detalle = VentaDetalle(
+                    variante=variante,
+                    sku_snapshot=variante.sku,
+                    descripcion_snapshot=sanitize_product_display_name(getattr(variante.producto, "nombre", "")),
+                    cantidad=item.cantidad,
+                    precio_unitario=unit_price,
+                    subtotal_linea=subtotal_linea,
+                )
             venta.detalles.append(detalle)
             total += subtotal_linea
 
@@ -137,6 +158,8 @@ class VentaService:
             raise ValueError("No se puede confirmar una venta sin detalles.")
 
         for detalle in venta.detalles:
+            if detalle.variante is None:
+                continue
             InventarioService.registrar_salida_venta(
                 session=session,
                 variante=detalle.variante,
@@ -185,6 +208,8 @@ class VentaService:
         for detalle_apartado in apartado.detalles:
             detalle = VentaDetalle(
                 variante=detalle_apartado.variante,
+                sku_snapshot=getattr(detalle_apartado.variante, "sku", None),
+                descripcion_snapshot=sanitize_product_display_name(getattr(detalle_apartado.variante.producto, "nombre", "")),
                 cantidad=detalle_apartado.cantidad,
                 precio_unitario=detalle_apartado.precio_unitario,
                 subtotal_linea=detalle_apartado.subtotal_linea,
@@ -229,6 +254,8 @@ class VentaService:
             raise ValueError("Solo se pueden cancelar ventas confirmadas.")
 
         for detalle in venta.detalles:
+            if detalle.variante is None:
+                continue
             InventarioService.registrar_cancelacion_venta(
                 session=session,
                 variante=detalle.variante,

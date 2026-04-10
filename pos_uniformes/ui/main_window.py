@@ -217,7 +217,11 @@ from pos_uniformes.services.sale_document_view_service import (
     build_layaway_sale_ticket_document_view,
     build_sale_ticket_document_view,
 )
-from pos_uniformes.services.sale_cart_update_service import add_sale_cart_variants, update_sale_cart_item_quantity
+from pos_uniformes.services.sale_cart_update_service import (
+    add_sale_cart_manual_line,
+    add_sale_cart_variants,
+    update_sale_cart_item_quantity,
+)
 from pos_uniformes.services.sale_selected_client_service import (
     find_active_sale_client_by_code,
     load_sale_selected_client_discount_percent,
@@ -1808,7 +1812,7 @@ class MainWindow(QMainWindow):
             self.quote_whatsapp_button: "Abre WhatsApp con un mensaje prellenado para el cliente del presupuesto seleccionado.",
             self.quote_cancel_button: "Marca como cancelado el presupuesto seleccionado sin tocar inventario.",
             self.quote_refresh_button: "Vuelve a leer los presupuestos recientes con los filtros actuales.",
-            self.sale_add_button: "Agrega el SKU capturado al carrito de venta.",
+            self.sale_add_button: "Agrega una linea manual de cobro rapido sin afectar inventario.",
             self.sale_button: "Confirma la venta de todos los productos del carrito.",
             self.sale_recent_button: "Abre las ventas recientes en una ventana separada para consultar o cancelar.",
             self.sale_ticket_button: "Abre una vista de ticket para la venta seleccionada.",
@@ -7105,7 +7109,7 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Datos incompletos", "Captura un SKU antes de agregar al carrito.")
             return
 
-        quantity = self.sale_qty_spin.value()
+        quantity = 1
         now = monotonic()
         if (
             quantity == 1
@@ -7203,6 +7207,78 @@ class MainWindow(QMainWindow):
         self._refresh_sale_cart_table()
         self.sale_sku_input.setFocus()
 
+    def _prompt_sale_manual_line(self) -> dict[str, object] | None:
+        dialog, layout = self._create_modal_dialog(
+            "Agregar sin codigo",
+            "Registra un cobro rapido sin SKU. Esta linea entra a la venta y al ticket, pero no afecta inventario.",
+            width=420,
+        )
+        form = QFormLayout()
+        price_input = QDoubleSpinBox()
+        price_input.setDecimals(2)
+        price_input.setRange(0.01, 999999.99)
+        price_input.setSingleStep(10.00)
+        price_input.setPrefix("$")
+        price_input.setValue(1.00)
+        quick_name_input = QLineEdit()
+        quick_name_input.setPlaceholderText("Venta manual")
+        form.addRow("Precio", price_input)
+        form.addRow("Nombre rapido", quick_name_input)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        ok_button = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        cancel_button = buttons.button(QDialogButtonBox.StandardButton.Cancel)
+        if ok_button is not None:
+            ok_button.setText("Agregar")
+        if cancel_button is not None:
+            cancel_button.setText("Cancelar")
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addLayout(form)
+        layout.addWidget(buttons)
+        price_input.setFocus()
+        price_input.selectAll()
+        if dialog.exec() != int(QDialog.DialogCode.Accepted):
+            return None
+        return {
+            "descripcion": quick_name_input.text().strip() or "Venta manual",
+            "precio_unitario": Decimal(str(price_input.value())).quantize(Decimal("0.01")),
+        }
+
+    def _handle_add_sale_manual_line(self) -> None:
+        if self.current_role not in {RolUsuario.ADMIN, RolUsuario.CAJERO}:
+            QMessageBox.warning(self, "Sin permisos", "Tu usuario no puede registrar ventas.")
+            return
+        if self.active_cash_session_id is None:
+            QMessageBox.information(self, "Caja cerrada", "Abre caja antes de registrar ventas.")
+            self._handle_cash_cut()
+            return
+        if not self._ensure_cash_session_current_day_for_operation("registrar ventas"):
+            return
+
+        payload = self._prompt_sale_manual_line()
+        if payload is None:
+            self.sale_sku_input.setFocus()
+            return
+
+        try:
+            add_sale_cart_manual_line(
+                self.sale_cart,
+                description=str(payload["descripcion"]),
+                unit_price=payload["precio_unitario"],
+            )
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "No se pudo agregar", str(exc))
+            self.sale_sku_input.setFocus()
+            return
+
+        self._set_sale_feedback(
+            f"{payload['descripcion']} agregado como linea manual.",
+            "positive",
+            auto_clear_ms=1600,
+        )
+        self._refresh_sale_cart_table()
+        self.sale_sku_input.setFocus()
+
     def _handle_remove_sale_item(self) -> None:
         selected_row = self.sale_cart_table.currentRow()
         if selected_row < 0 or selected_row >= len(self.sale_cart):
@@ -7274,11 +7350,16 @@ class MainWindow(QMainWindow):
 
         selected_item = self.sale_cart[selected_row]
         sku = str(selected_item.get("sku") or "").strip().upper()
+        line_label = (
+            str(selected_item.get("producto_nombre") or "").strip()
+            if str(selected_item.get("line_type") or "").upper() == "MANUAL"
+            else sku
+        )
         current_quantity = int(selected_item.get("cantidad") or 1)
         new_quantity, accepted = QInputDialog.getInt(
             self,
             "Actualizar cantidad",
-            f"Cantidad para {sku}:",
+            f"Cantidad para {line_label}:",
             current_quantity,
             1,
             1000,
@@ -7304,7 +7385,7 @@ class MainWindow(QMainWindow):
             self.sale_cart_table.setCurrentCell(selected_row, 2)
             self.sale_cart_table.selectRow(selected_row)
         self._set_sale_feedback(
-            f"{sku} actualizado a {new_quantity} pieza(s).",
+            f"{line_label} actualizado a {new_quantity} pieza(s).",
             "positive",
             auto_clear_ms=1600,
         )
@@ -9476,11 +9557,11 @@ class MainWindow(QMainWindow):
                                 "venta_id": sale.id,
                                 "folio": sale.folio,
                                 "cliente": sale.cliente.nombre if sale.cliente is not None else "Mostrador",
-                                "sku": detalle.variante.sku if detalle.variante else None,
+                                "sku": detalle.variante.sku if detalle.variante else (detalle.sku_snapshot or None),
                                 "producto": (
                                     sanitize_product_display_name(detalle.variante.producto.nombre)
                                     if detalle.variante is not None and detalle.variante.producto is not None
-                                    else None
+                                    else (detalle.descripcion_snapshot or None)
                                 ),
                                 "cantidad": detalle.cantidad,
                                 "precio_unitario": detalle.precio_unitario,

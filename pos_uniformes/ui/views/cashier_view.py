@@ -79,7 +79,7 @@ def build_cashier_tab(window: "MainWindow") -> QWidget:
     sale_form.setColumnStretch(1, 3)
     sale_form.setColumnStretch(6, 1)
     sale_form.setColumnStretch(8, 2)
-    window.sale_add_button.clicked.connect(window._handle_add_sale_item)
+    window.sale_add_button.clicked.connect(window._handle_add_sale_manual_line)
     window.sale_sku_input.returnPressed.connect(window._handle_add_sale_item)
     window.sale_button.clicked.connect(window._handle_sale)
     window.sale_origin_direct_button.clicked.connect(window._handle_sale_origin_direct)

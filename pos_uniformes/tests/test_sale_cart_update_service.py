@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import unittest
 
 from pos_uniformes.services.sale_cart_update_service import (
+    add_sale_cart_manual_line,
     add_sale_cart_variant,
     add_sale_cart_variants,
     update_sale_cart_item_quantity,
@@ -12,6 +13,22 @@ from pos_uniformes.services.sale_cart_update_service import (
 
 
 class SaleCartUpdateServiceTests(unittest.TestCase):
+    def test_adds_manual_line_with_default_description(self) -> None:
+        sale_cart: list[dict[str, object]] = []
+
+        line_item = add_sale_cart_manual_line(
+            sale_cart,
+            description="",
+            unit_price=Decimal("85.00"),
+        )
+
+        self.assertEqual(line_item["line_type"], "MANUAL")
+        self.assertEqual(line_item["sku"], "SIN-CODIGO")
+        self.assertEqual(line_item["producto_nombre"], "Venta manual")
+        self.assertEqual(line_item["cantidad"], 1)
+        self.assertEqual(line_item["precio_unitario"], Decimal("85.00"))
+        self.assertEqual(len(sale_cart), 1)
+
     def test_adds_new_variant_line(self) -> None:
         sale_cart: list[dict[str, object]] = []
         variant = SimpleNamespace(
@@ -139,6 +156,21 @@ class SaleCartUpdateServiceTests(unittest.TestCase):
 
         self.assertEqual(updated["cantidad"], 3)
         self.assertEqual(sale_cart[0]["cantidad"], 3)
+
+    def test_updates_manual_line_quantity_without_loading_variant(self) -> None:
+        sale_cart = [{"sku": "SIN-CODIGO", "cantidad": 1, "line_type": "MANUAL", "producto_nombre": "Venta manual"}]
+
+        updated = update_sale_cart_item_quantity(
+            SimpleNamespace(),
+            sale_cart=sale_cart,
+            row_index=0,
+            new_quantity=4,
+            variant_loader=lambda session, sku: None,
+            stock_validator=lambda variante, cantidad: None,
+        )
+
+        self.assertEqual(updated["cantidad"], 4)
+        self.assertEqual(sale_cart[0]["cantidad"], 4)
 
     def test_rejects_invalid_row(self) -> None:
         with self.assertRaisesRegex(ValueError, "linea valida"):

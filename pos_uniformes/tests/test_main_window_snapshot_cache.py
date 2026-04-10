@@ -267,6 +267,23 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertFalse(window.sale_add_button.isHidden())
         self.assertEqual(window.sale_add_button.text(), "Agregar sin codigo")
 
+    def test_handle_add_sale_manual_line_appends_manual_cart_line(self) -> None:
+        window = MainWindow(user_id=1)
+        window.current_role = RolUsuario.ADMIN
+        window.active_cash_session_id = 10
+
+        with patch.object(window, "_ensure_cash_session_current_day_for_operation", return_value=True), patch.object(
+            window,
+            "_prompt_sale_manual_line",
+            return_value={"descripcion": "Venta manual", "precio_unitario": Decimal("75.00")},
+        ), patch.object(window, "_refresh_sale_cart_table"), patch.object(window, "_set_sale_feedback"):
+            window._handle_add_sale_manual_line()
+
+        self.assertEqual(len(window.sale_cart), 1)
+        self.assertEqual(window.sale_cart[0]["line_type"], "MANUAL")
+        self.assertEqual(window.sale_cart[0]["producto_nombre"], "Venta manual")
+        self.assertEqual(window.sale_cart[0]["precio_unitario"], Decimal("75.00"))
+
     def test_sale_origin_defaults_to_unassigned_after_reset(self) -> None:
         window = MainWindow(user_id=1)
 

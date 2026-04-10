@@ -91,8 +91,8 @@ def build_employee_sale_detail_snapshot(sale) -> EmployeeSaleDetailSnapshot:
     for detail in getattr(sale, "detalles", ()) or ():
         variante = getattr(detail, "variante", None)
         producto = getattr(variante, "producto", None) if variante is not None else None
-        sku = getattr(variante, "sku", None) or "SIN SKU"
-        product_name = getattr(producto, "nombre", None) or "Producto"
+        sku = getattr(variante, "sku", None) or getattr(detail, "sku_snapshot", None) or "SIN SKU"
+        product_name = getattr(producto, "nombre", None) or getattr(detail, "descripcion_snapshot", None) or "Producto"
         cantidad = int(getattr(detail, "cantidad", 0) or 0)
         pieces += cantidad
         unit_price = Decimal(str(getattr(detail, "precio_unitario", Decimal("0.00")) or Decimal("0.00"))).quantize(

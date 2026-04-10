@@ -24,6 +24,37 @@ def add_sale_cart_variant(
     return updated_lines[0]
 
 
+def add_sale_cart_manual_line(
+    sale_cart: list[dict[str, object]],
+    *,
+    description: str,
+    unit_price: Decimal | str | int | float,
+    quantity: int = 1,
+) -> dict[str, object]:
+    normalized_quantity = int(quantity)
+    if normalized_quantity <= 0:
+        raise ValueError("La cantidad debe ser mayor a cero.")
+    normalized_description = str(description or "").strip() or "Venta manual"
+    normalized_unit_price = Decimal(str(unit_price)).quantize(Decimal("0.01"))
+    if normalized_unit_price <= Decimal("0.00"):
+        raise ValueError("El precio debe ser mayor a cero.")
+
+    line_item = {
+        "line_type": "MANUAL",
+        "sku": "SIN-CODIGO",
+        "variante_id": None,
+        "producto_nombre": normalized_description,
+        "descripcion_snapshot": normalized_description,
+        "cantidad": normalized_quantity,
+        "precio_unitario": normalized_unit_price,
+        "precio_base": normalized_unit_price,
+        "pricing_rule_key": "",
+        "pricing_rule_label": "",
+    }
+    sale_cart.append(line_item)
+    return line_item
+
+
 def add_sale_cart_variants(
     sale_cart: list[dict[str, object]],
     *,
@@ -90,6 +121,10 @@ def update_sale_cart_item_quantity(
         raise ValueError("La cantidad debe ser mayor a cero.")
 
     line_item = sale_cart[row_index]
+    if str(line_item.get("line_type") or "").upper() == "MANUAL":
+        line_item["cantidad"] = int(new_quantity)
+        return line_item
+
     sku = str(line_item.get("sku") or "").strip().upper()
     if not sku:
         raise ValueError("La linea seleccionada no tiene un SKU valido.")

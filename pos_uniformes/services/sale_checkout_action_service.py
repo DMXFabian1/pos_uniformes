@@ -64,11 +64,13 @@ def complete_sale_checkout(
         folio=folio,
         items=[
             venta_item_input(
-                sku=str(item["sku"]),
+                sku=str(item.get("sku") or ""),
                 cantidad=int(item["cantidad"]),
                 precio_unitario=item.get("precio_unitario"),
                 precio_base=item.get("precio_base"),
                 pricing_rule_label=str(item.get("pricing_rule_label") or ""),
+                descripcion_snapshot=str(item.get("descripcion_snapshot") or item.get("producto_nombre") or ""),
+                is_manual=str(item.get("line_type") or "").upper() == "MANUAL",
             )
             for item in sale_cart
         ],

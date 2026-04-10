@@ -109,9 +109,13 @@ def build_sale_ticket_text(
         producto = (
             sanitize_product_display_name(getattr(getattr(variante, "producto", None), "nombre", ""))
             if variante
-            else ""
+            else str(getattr(detalle, "descripcion_snapshot", "") or "").strip()
         )
-        sku = getattr(variante, "sku", "") if variante else ""
+        sku = (
+            getattr(variante, "sku", "")
+            if variante
+            else str(getattr(detalle, "sku_snapshot", "") or "").strip()
+        )
         lines.append(producto)
         lines.append(
             f"{sku} | {getattr(detalle, 'cantidad', '')} x "

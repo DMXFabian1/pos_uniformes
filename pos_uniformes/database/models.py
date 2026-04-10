@@ -1234,17 +1234,18 @@ class VentaDetalle(Base):
         nullable=False,
         index=True,
     )
-    variante_id: Mapped[int] = mapped_column(
+    variante_id: Mapped[int | None] = mapped_column(
         ForeignKey("variante.id", ondelete="RESTRICT"),
-        nullable=False,
         index=True,
     )
+    sku_snapshot: Mapped[str | None] = mapped_column(String(64), index=True)
+    descripcion_snapshot: Mapped[str | None] = mapped_column(String(220))
     cantidad: Mapped[int] = mapped_column(Integer, nullable=False)
     precio_unitario: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     subtotal_linea: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
 
     venta: Mapped["Venta"] = relationship(back_populates="detalles")
-    variante: Mapped["Variante"] = relationship(back_populates="ventas_detalle")
+    variante: Mapped["Variante | None"] = relationship(back_populates="ventas_detalle")
 
 
 class Apartado(Base):
