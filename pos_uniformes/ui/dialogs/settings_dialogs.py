@@ -335,6 +335,9 @@ def build_employee_day_sales_dialog(window: "MainWindow") -> QDialog:
         window.settings_employee_day_sales_table.EditTrigger.NoEditTriggers
     )
     window.settings_employee_day_sales_table.horizontalHeader().setStretchLastSection(True)
+    window.settings_employee_day_sales_table.itemDoubleClicked.connect(
+        window._handle_view_settings_employee_day_sale_ticket
+    )
     window.settings_employee_day_sales_table.itemSelectionChanged.connect(
         window._refresh_settings_employee_day_sale_actions
     )
@@ -348,6 +351,38 @@ def build_employee_day_sales_dialog(window: "MainWindow") -> QDialog:
     close_buttons.accepted.connect(dialog.accept)
     layout.addLayout(actions)
     layout.addWidget(window.settings_employee_day_sales_table, 1)
+    layout.addWidget(close_buttons)
+    return dialog
+
+
+def build_employee_sale_detail_dialog(window: "MainWindow") -> QDialog:
+    dialog, layout = _create_settings_dialog(
+        window,
+        "Detalle de ticket",
+        "Consulta los productos incluidos en el ticket seleccionado.",
+        width=980,
+    )
+    window.settings_employee_sale_detail_status_label.setObjectName("subtleLine")
+    window.settings_employee_sale_detail_table.setColumnCount(5)
+    window.settings_employee_sale_detail_table.setHorizontalHeaderLabels(
+        ["SKU", "Producto", "Cantidad", "Precio", "Subtotal"]
+    )
+    window.settings_employee_sale_detail_table.setObjectName("dataTable")
+    window.settings_employee_sale_detail_table.verticalHeader().setVisible(False)
+    window.settings_employee_sale_detail_table.setSelectionBehavior(
+        window.settings_employee_sale_detail_table.SelectionBehavior.SelectRows
+    )
+    window.settings_employee_sale_detail_table.setAlternatingRowColors(True)
+    window.settings_employee_sale_detail_table.setEditTriggers(
+        window.settings_employee_sale_detail_table.EditTrigger.NoEditTriggers
+    )
+    window.settings_employee_sale_detail_table.horizontalHeader().setStretchLastSection(True)
+
+    close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+    close_buttons.rejected.connect(dialog.reject)
+    close_buttons.accepted.connect(dialog.accept)
+    layout.addWidget(window.settings_employee_sale_detail_status_label)
+    layout.addWidget(window.settings_employee_sale_detail_table, 1)
     layout.addWidget(close_buttons)
     return dialog
 

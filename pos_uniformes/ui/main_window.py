@@ -123,7 +123,10 @@ from pos_uniformes.services.employee_activity_service import (
     build_employee_activity_sort_key,
     load_employee_activity_snapshot,
 )
-from pos_uniformes.services.employee_sales_history_service import list_employee_day_sale_rows
+from pos_uniformes.services.employee_sales_history_service import (
+    list_employee_day_sale_rows,
+    load_employee_sale_detail_snapshot,
+)
 from pos_uniformes.services.cash_session_action_service import (
     close_cash_session_action,
     correct_cash_opening_action,
@@ -1543,6 +1546,9 @@ class MainWindow(QMainWindow):
         self.settings_employee_day_sales_status_label = QLabel("Sin tickets cargados.")
         self.settings_employee_view_ticket_button = QPushButton("Ver ticket")
         self.settings_employee_day_sales_dialog: QDialog | None = None
+        self.settings_employee_sale_detail_status_label = QLabel("Sin ticket seleccionado.")
+        self.settings_employee_sale_detail_table = QTableWidget()
+        self.settings_employee_sale_detail_dialog: QDialog | None = None
         self.settings_employees_dialog: QDialog | None = None
         self.settings_backup_dialog: QDialog | None = None
         self.settings_cash_history_dialog: QDialog | None = None
@@ -3238,15 +3244,33 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Sin seleccion", "Selecciona un ticket del listado para abrirlo.")
             return
         try:
-            open_printable_document_flow(
-                parent=self,
-                session_factory=get_session,
-                build_document_view=lambda session: build_sale_ticket_document_view(session, sale_id=sale_id),
-                open_dialog=open_printable_text_dialog,
-            )
+            with get_session() as session:
+                snapshot = load_employee_sale_detail_snapshot(session, sale_id=sale_id)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Ticket no disponible", str(exc))
             return
+
+        if self.settings_employee_sale_detail_dialog is None:
+            from pos_uniformes.ui.dialogs.settings_dialogs import build_employee_sale_detail_dialog
+
+            self.settings_employee_sale_detail_dialog = build_employee_sale_detail_dialog(self)
+
+        self.settings_employee_sale_detail_dialog.setWindowTitle(
+            f"{snapshot.folio or 'Ticket'} · {snapshot.time_label}"
+        )
+        self.settings_employee_sale_detail_status_label.setText(
+            f"Cliente: {snapshot.client_name} | Piezas: {snapshot.pieces} | Total: ${snapshot.total:,.2f}"
+        )
+        self.settings_employee_sale_detail_table.setRowCount(len(snapshot.rows))
+        for row_index, row_view in enumerate(snapshot.rows):
+            for column_index, value in enumerate(row_view.values):
+                display_value = f"${Decimal(value):,.2f}" if column_index in {3, 4} else value
+                item = _table_item(display_value)
+                self.settings_employee_sale_detail_table.setItem(row_index, column_index, item)
+        self.settings_employee_sale_detail_table.resizeColumnsToContents()
+        self.settings_employee_sale_detail_dialog.show()
+        self.settings_employee_sale_detail_dialog.raise_()
+        self.settings_employee_sale_detail_dialog.activateWindow()
 
     def _prompt_settings_employee_amount_access(self) -> bool:
         password, accepted = QInputDialog.getText(

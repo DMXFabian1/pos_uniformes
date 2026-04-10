@@ -575,6 +575,46 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertEqual(window.settings_employee_day_sales_table.item(0, 1).text(), "VTA-010")
         self.assertTrue(window.settings_employee_view_ticket_button.isEnabled())
 
+    def test_view_settings_employee_day_sale_ticket_opens_detail_with_products(self) -> None:
+        window = MainWindow(user_id=1)
+        window.settings_employee_day_sales_table.setColumnCount(5)
+        window.settings_employee_day_sales_table.setRowCount(1)
+        item = QTableWidgetItem("10:30")
+        item.setData(Qt.ItemDataRole.UserRole, 10)
+        window.settings_employee_day_sales_table.setItem(0, 0, item)
+        window.settings_employee_day_sales_table.setCurrentCell(0, 0)
+        snapshot = SimpleNamespace(
+            folio="VTA-010",
+            time_label="10:30",
+            client_name="Maria",
+            pieces=2,
+            total=Decimal("199.00"),
+            rows=(
+                SimpleNamespace(values=("SKU-001", "Playera Polo", 2, Decimal("99.50"), Decimal("199.00"))),
+            ),
+        )
+
+        with patch("pos_uniformes.ui.main_window.get_session") as get_session_mock, patch(
+            "pos_uniformes.ui.main_window.load_employee_sale_detail_snapshot",
+            return_value=snapshot,
+        ):
+            session = Mock()
+            context = Mock()
+            context.__enter__ = Mock(return_value=session)
+            context.__exit__ = Mock(return_value=False)
+            get_session_mock.return_value = context
+
+            window._handle_view_settings_employee_day_sale_ticket()
+
+        self.assertIsNotNone(window.settings_employee_sale_detail_dialog)
+        self.assertEqual(
+            window.settings_employee_sale_detail_status_label.text(),
+            "Cliente: Maria | Piezas: 2 | Total: $199.00",
+        )
+        self.assertEqual(window.settings_employee_sale_detail_table.rowCount(), 1)
+        self.assertEqual(window.settings_employee_sale_detail_table.item(0, 0).text(), "SKU-001")
+        self.assertEqual(window.settings_employee_sale_detail_table.item(0, 1).text(), "Playera Polo")
+
     def test_admin_role_keeps_manual_discount_controls_visible(self) -> None:
         window = MainWindow(user_id=1)
         window.current_role = RolUsuario.ADMIN
