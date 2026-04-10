@@ -205,6 +205,11 @@ def build_employees_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_employees_status_label.setObjectName("analyticsLine")
     actions = QHBoxLayout()
     window.settings_employees_search_input.setPlaceholderText("Buscar por codigo o nombre")
+    window.settings_employees_activity_filter_combo.clear()
+    window.settings_employees_activity_filter_combo.addItems(
+        ["Todas", "Activa hoy", "Activa 7d", "Sin actividad"]
+    )
+    window.settings_employees_activity_filter_combo.setObjectName("toolbarSecondaryButton")
     window.settings_create_employee_button.setObjectName("toolbarPrimaryButton")
     window.settings_update_employee_button.setObjectName("toolbarSecondaryButton")
     window.settings_toggle_employee_button.setObjectName("toolbarGhostButton")
@@ -212,6 +217,7 @@ def build_employees_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_generate_employee_qr_button.setObjectName("toolbarSecondaryButton")
     window.settings_generate_employee_card_button.setObjectName("toolbarGhostButton")
     window.settings_employees_search_input.textChanged.connect(window._refresh_settings_employees)
+    window.settings_employees_activity_filter_combo.currentTextChanged.connect(window._refresh_settings_employees)
     window.settings_create_employee_button.clicked.connect(window._handle_create_employee)
     window.settings_update_employee_button.clicked.connect(window._handle_update_employee)
     window.settings_toggle_employee_button.clicked.connect(window._handle_toggle_employee)
@@ -220,6 +226,8 @@ def build_employees_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_generate_employee_card_button.clicked.connect(window._handle_generate_employee_card)
     actions.addWidget(QLabel("Buscar"))
     actions.addWidget(window.settings_employees_search_input, 1)
+    actions.addWidget(QLabel("Actividad"))
+    actions.addWidget(window.settings_employees_activity_filter_combo)
     actions.addWidget(window.settings_create_employee_button)
     actions.addWidget(window.settings_update_employee_button)
     actions.addWidget(window.settings_toggle_employee_button)

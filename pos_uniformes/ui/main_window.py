@@ -1516,6 +1516,7 @@ class MainWindow(QMainWindow):
         self.settings_employees_table = QTableWidget()
         self.settings_employees_status_label = QLabel("Sin empleadas cargadas.")
         self.settings_employees_search_input = QLineEdit()
+        self.settings_employees_activity_filter_combo = QComboBox()
         self.settings_create_employee_button = QPushButton("Crear empleada")
         self.settings_update_employee_button = QPushButton("Editar empleada")
         self.settings_toggle_employee_button = QPushButton("Activar / desactivar")
@@ -2983,6 +2984,7 @@ class MainWindow(QMainWindow):
 
     def _refresh_settings_employees(self) -> None:
         search_text = self.settings_employees_search_input.text().strip()
+        activity_filter = self.settings_employees_activity_filter_combo.currentText().strip()
         selected_employee_id = self._selected_settings_employee_id()
         try:
             with get_session() as session:
@@ -3001,6 +3003,13 @@ class MainWindow(QMainWindow):
             self.settings_employees_table.setRowCount(len(employees_view.rows))
             self._refresh_settings_employee_detail()
             return
+        filtered_employees = [
+            employee
+            for employee in employees
+            if not activity_filter
+            or activity_filter == "Todas"
+            or employee_activity_states[int(employee.id)][0] == activity_filter
+        ]
         employees_view = build_settings_employees_view(
             [
                 {
@@ -3017,7 +3026,7 @@ class MainWindow(QMainWindow):
                     "active_label": "ACTIVA" if employee.activo else "INACTIVA",
                     "updated_label": format_display_datetime(employee.updated_at),
                 }
-                for employee in employees
+                for employee in filtered_employees
             ]
         )
         self.settings_employees_table.blockSignals(True)
@@ -3052,7 +3061,12 @@ class MainWindow(QMainWindow):
             self.settings_employees_table.clearSelection()
             self.settings_employees_table.setCurrentItem(None)
         self.settings_employees_table.blockSignals(False)
-        self.settings_employees_status_label.setText(employees_view.status_label)
+        if activity_filter and activity_filter != "Todas":
+            self.settings_employees_status_label.setText(
+                f"{employees_view.status_label} | filtro: {activity_filter}"
+            )
+        else:
+            self.settings_employees_status_label.setText(employees_view.status_label)
         self._refresh_settings_employee_detail()
 
     def _refresh_settings_employee_detail(self) -> None:

@@ -322,6 +322,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
     def test_refresh_settings_employees_shows_recent_activity_badge(self) -> None:
         window = MainWindow(user_id=1)
         window.settings_employees_table.setColumnCount(9)
+        window.settings_employees_activity_filter_combo.addItems(["Todas", "Activa hoy", "Activa 7d", "Sin actividad"])
         employee_today = SimpleNamespace(
             id=4,
             codigo="VEND-1",
@@ -379,6 +380,70 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         self.assertEqual(window.settings_employees_table.item(0, 3).text(), "Activa hoy")
         self.assertEqual(window.settings_employees_table.item(1, 3).text(), "Activa 7d")
+
+    def test_refresh_settings_employees_filters_by_activity_label(self) -> None:
+        window = MainWindow(user_id=1)
+        window.settings_employees_table.setColumnCount(9)
+        window.settings_employees_activity_filter_combo.addItems(["Todas", "Activa hoy", "Activa 7d", "Sin actividad"])
+        window.settings_employees_activity_filter_combo.setCurrentText("Sin actividad")
+        employee_today = SimpleNamespace(
+            id=4,
+            codigo="VEND-1",
+            nombre_completo="Guadalupe Gomez Ruiz",
+            activo=True,
+            updated_at=datetime(2026, 4, 9, 9, 0),
+        )
+        employee_inactive = SimpleNamespace(
+            id=5,
+            codigo="VEND-2",
+            nombre_completo="Andrea Lopez",
+            activo=True,
+            updated_at=datetime(2026, 4, 8, 17, 30),
+        )
+        today_snapshot = SimpleNamespace(
+            today_pieces=3,
+            today_tickets=1,
+            day_rows=(
+                SimpleNamespace(pieces=3, tickets=1),
+                SimpleNamespace(pieces=0, tickets=0),
+            ),
+        )
+        inactive_snapshot = SimpleNamespace(
+            today_pieces=0,
+            today_tickets=0,
+            day_rows=(
+                SimpleNamespace(pieces=0, tickets=0),
+                SimpleNamespace(pieces=0, tickets=0),
+            ),
+        )
+
+        with patch("pos_uniformes.ui.main_window.get_session") as get_session_mock, patch(
+            "pos_uniformes.ui.main_window.EmployeeIdentityService.list_employees",
+            return_value=[employee_today, employee_inactive],
+        ), patch(
+            "pos_uniformes.ui.main_window.load_employee_activity_snapshot",
+            side_effect=[today_snapshot, inactive_snapshot],
+        ), patch(
+            "pos_uniformes.ui.main_window.EmployeeIdentityService.has_pin",
+            side_effect=[True, False],
+        ), patch(
+            "pos_uniformes.ui.main_window.QrGenerator.exists_for_employee",
+            return_value=False,
+        ), patch(
+            "pos_uniformes.ui.main_window.EmployeeCardService.exists_for_employee",
+            return_value=False,
+        ):
+            session = Mock()
+            context = Mock()
+            context.__enter__ = Mock(return_value=session)
+            context.__exit__ = Mock(return_value=False)
+            get_session_mock.return_value = context
+
+            window._refresh_settings_employees()
+
+        self.assertEqual(window.settings_employees_table.rowCount(), 1)
+        self.assertEqual(window.settings_employees_table.item(0, 0).text(), "VEND-2")
+        self.assertIn("filtro: Sin actividad", window.settings_employees_status_label.text())
 
         self.assertTrue(window.settings_employee_activity_table.isColumnHidden(3))
         self.assertNotIn("$1,250.00", window.settings_employee_detail_today_label.text())
