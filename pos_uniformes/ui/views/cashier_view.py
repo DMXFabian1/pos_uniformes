@@ -102,7 +102,7 @@ def build_cashier_tab(window: "MainWindow") -> QWidget:
     sale_footer.addWidget(window.sale_button)
     sale_layout.addLayout(sale_footer)
     window.sale_context_label.setObjectName("subtleLine")
-    sale_layout.addWidget(window.sale_context_label)
+    window.sale_context_label.setVisible(False)
     sale_box.setLayout(sale_layout)
 
     window.recent_sales_table.setColumnCount(7)

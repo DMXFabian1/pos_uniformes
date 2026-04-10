@@ -114,6 +114,11 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertTrue(window.sale_discount_field_label.isHidden())
         self.assertTrue(window.sale_discount_combo.isHidden())
 
+    def test_cashier_view_hides_sale_context_band(self) -> None:
+        window = MainWindow(user_id=1)
+
+        self.assertFalse(window.sale_context_label.isVisible())
+
     def test_sale_origin_defaults_to_unassigned_after_reset(self) -> None:
         window = MainWindow(user_id=1)
 
