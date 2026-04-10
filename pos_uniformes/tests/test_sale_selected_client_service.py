@@ -11,6 +11,7 @@ from pos_uniformes.services.sale_selected_client_service import (
     find_active_sale_client_by_code,
     load_sale_selected_client_benefit,
     load_sale_selected_client_discount_percent,
+    normalize_scanned_client_code,
     resolve_sale_selected_client_sync_state,
 )
 
@@ -22,6 +23,9 @@ class SaleSelectedClientServiceTests(unittest.TestCase):
         result = find_active_sale_client_by_code(session, "   ")
 
         self.assertIsNone(result)
+
+    def test_normalize_scanned_client_code_accepts_common_scanner_layout_substitutions(self) -> None:
+        self.assertEqual(normalize_scanned_client_code("CLI´001"), "CLI-001")
 
     def test_returns_none_when_no_client_is_selected(self) -> None:
         session = SimpleNamespace(get=lambda _model, _id: None)

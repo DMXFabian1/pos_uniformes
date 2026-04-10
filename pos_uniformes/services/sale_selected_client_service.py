@@ -10,8 +10,24 @@ from pos_uniformes.services.sale_client_benefit_service import SaleClientBenefit
 from pos_uniformes.services.sale_client_sync_service import SaleClientSyncState, resolve_sale_client_sync_state
 
 
+_CLIENT_SCAN_TRANSLATION = str.maketrans(
+    {
+        "´": "-",
+        "`": "-",
+        "'": "-",
+        "_": "-",
+        "–": "-",
+        "—": "-",
+    }
+)
+
+
+def normalize_scanned_client_code(client_code: str) -> str:
+    return client_code.strip().upper().translate(_CLIENT_SCAN_TRANSLATION)
+
+
 def find_active_sale_client_by_code(session, client_code: str) -> Cliente | None:
-    normalized_code = client_code.strip().upper()
+    normalized_code = normalize_scanned_client_code(client_code)
     if not normalized_code:
         return None
     return session.scalar(
