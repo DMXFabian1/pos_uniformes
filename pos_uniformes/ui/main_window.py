@@ -7222,8 +7222,35 @@ class MainWindow(QMainWindow):
         price_input.setValue(1.00)
         quick_name_input = QLineEdit()
         quick_name_input.setPlaceholderText("Venta manual")
+        quick_name_hint = QLabel("Nombre rapido")
+        quick_name_hint.setObjectName("inventoryFilterLabel")
+        quick_name_chips = QHBoxLayout()
+        quick_name_chips.setSpacing(6)
+        quick_name_presets = (
+            "Accesorio",
+            "Bordado",
+            "Parche",
+            "Ajuste",
+            "Playera",
+            "Otro",
+        )
+        for preset in quick_name_presets:
+            preset_button = QPushButton(preset)
+            preset_button.setObjectName("toolbarGhostButton")
+            preset_button.setMinimumWidth(0)
+            if preset == "Otro":
+                preset_button.clicked.connect(lambda _checked=False: quick_name_input.clear())
+            else:
+                preset_button.clicked.connect(
+                    lambda _checked=False, value=preset: quick_name_input.setText(value)
+                )
+            quick_name_chips.addWidget(preset_button)
+        quick_name_chips.addStretch()
         form.addRow("Precio", price_input)
         form.addRow("Nombre rapido", quick_name_input)
+        layout.addLayout(form)
+        layout.addWidget(quick_name_hint)
+        layout.addLayout(quick_name_chips)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         ok_button = buttons.button(QDialogButtonBox.StandardButton.Ok)
         cancel_button = buttons.button(QDialogButtonBox.StandardButton.Cancel)
@@ -7233,7 +7260,6 @@ class MainWindow(QMainWindow):
             cancel_button.setText("Cancelar")
         buttons.accepted.connect(dialog.accept)
         buttons.rejected.connect(dialog.reject)
-        layout.addLayout(form)
         layout.addWidget(buttons)
         price_input.setFocus()
         price_input.selectAll()
