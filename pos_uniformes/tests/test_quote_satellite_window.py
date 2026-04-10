@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from decimal import Decimal
 import os
 from types import SimpleNamespace
 import unittest
@@ -7,6 +8,7 @@ from unittest.mock import MagicMock, Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtTest import QTest
 from PyQt6.QtWidgets import QApplication
 
@@ -85,6 +87,15 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         window = QuoteSatelliteWindow(user_id=1)
 
         self.assertFalse(window.catalog_table.horizontalHeader().isHidden())
+
+    def test_catalog_add_button_requires_real_selection(self) -> None:
+        window = QuoteSatelliteWindow(user_id=1)
+
+        window.catalog_table.clearSelection()
+        window.catalog_table.setCurrentCell(-1, -1)
+        window._apply_action_state()
+
+        self.assertFalse(window.catalog_add_button.isEnabled())
 
     def test_catalog_active_filter_chips_show_text_and_route(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
@@ -180,6 +191,55 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         self.assertEqual(window.quote_cart_table.objectName(), "cashierCartTable")
         self.assertEqual(window.quote_cart_table.horizontalHeaderItem(0).text(), "Cantidad")
         self.assertEqual(window.quote_cart_table.horizontalHeaderItem(1).text(), "Producto")
+
+    def test_quote_line_buttons_require_selected_row(self) -> None:
+        window = QuoteSatelliteWindow(user_id=1)
+        window.quote_cart = [
+            {
+                "sku": "SKU000001",
+                "producto_nombre": "Bata Infantil Blanca",
+                "escuela_nombre": "General",
+                "nivel_educativo_nombre": "Sin nivel",
+                "cantidad": 1,
+                "precio_unitario": Decimal("65.00"),
+            }
+        ]
+
+        window._refresh_quote_cart_table()
+        window.quote_cart_table.clearSelection()
+        window.quote_cart_table.setCurrentCell(-1, -1)
+        window._apply_action_state()
+        self.assertFalse(window.quote_qty_down_button.isEnabled())
+        self.assertFalse(window.quote_qty_up_button.isEnabled())
+        self.assertFalse(window.quote_remove_button.isEnabled())
+
+        window.quote_cart_table.selectRow(0)
+        window._apply_action_state()
+        self.assertTrue(window.quote_qty_down_button.isEnabled())
+        self.assertTrue(window.quote_qty_up_button.isEnabled())
+        self.assertTrue(window.quote_remove_button.isEnabled())
+
+    def test_share_button_requires_active_quote_state(self) -> None:
+        window = QuoteSatelliteWindow(user_id=1)
+        window.quote_table.setRowCount(1)
+        window.quote_table.setColumnCount(1)
+        item = window.quote_table.item(0, 0)
+        if item is None:
+            from PyQt6.QtWidgets import QTableWidgetItem
+
+            item = QTableWidgetItem("PRE-TEST")
+            window.quote_table.setItem(0, 0, item)
+        item.setData(Qt.ItemDataRole.UserRole, 10)
+        window.quote_table.selectRow(0)
+
+        window.selected_quote_state = "CANCELADO"
+        window.selected_quote_phone = ""
+        window._apply_action_state()
+        self.assertFalse(window.quote_open_share_button.isEnabled())
+
+        window.selected_quote_state = "EMITIDO"
+        window._apply_action_state()
+        self.assertTrue(window.quote_open_share_button.isEnabled())
 
     def test_window_title_and_version_show_kiosk_build_identity(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)

@@ -1574,6 +1574,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.quote_search_input.textChanged.connect(self._handle_quote_filters_changed)
         self.quote_state_combo.currentIndexChanged.connect(self._handle_quote_filters_changed)
         self.quote_table.itemSelectionChanged.connect(self._handle_quote_selection)
+        self.quote_cart_table.itemSelectionChanged.connect(self._apply_action_state)
         self.quote_resume_button.clicked.connect(self._handle_resume_quote)
         self.quote_emit_selected_button.clicked.connect(self._handle_emit_selected_quote)
         self.quote_open_share_button.clicked.connect(self._handle_open_share_page)
@@ -2775,6 +2776,7 @@ class QuoteSatelliteWindow(QMainWindow):
             for column_index, value in enumerate(values):
                 self.share_detail_table.setItem(row_index, column_index, _table_item(value))
     def _apply_action_state(self) -> None:
+        selected_quote_line = 0 <= self.quote_cart_table.currentRow() < len(self.quote_cart)
         action_state = build_quote_satellite_action_state(
             can_operate=self._can_operate(),
             has_selection=self._selected_quote_id() is not None,
@@ -2784,16 +2786,16 @@ class QuoteSatelliteWindow(QMainWindow):
         self.quote_resume_button.setEnabled(action_state.resume_enabled)
         self.quote_emit_selected_button.setEnabled(action_state.emit_enabled)
         self.quote_cancel_button.setEnabled(action_state.cancel_enabled)
-        self.quote_open_share_button.setEnabled(self._selected_quote_id() is not None)
+        self.quote_open_share_button.setEnabled(action_state.share_enabled)
         self.quote_whatsapp_button.setEnabled(action_state.whatsapp_enabled)
         self.quote_print_button.setEnabled(action_state.print_enabled)
         self.share_refresh_button.setEnabled(self._selected_quote_id() is not None)
         self.kiosk_add_button.setEnabled(self.lookup_snapshot is not None and self._can_operate())
-        self.catalog_add_button.setEnabled(self._selected_catalog_sku() is not None and self._can_operate())
+        self.catalog_add_button.setEnabled(bool(self._selected_catalog_sku()) and self._can_operate())
         self.guided_add_button.setEnabled(bool(self.guided_selected_sku) and self._can_operate())
-        self.quote_qty_down_button.setEnabled(bool(self.quote_cart))
-        self.quote_qty_up_button.setEnabled(bool(self.quote_cart))
-        self.quote_remove_button.setEnabled(bool(self.quote_cart))
+        self.quote_qty_down_button.setEnabled(selected_quote_line)
+        self.quote_qty_up_button.setEnabled(selected_quote_line)
+        self.quote_remove_button.setEnabled(selected_quote_line)
         self.quote_clear_button.setEnabled(bool(self.quote_cart))
 
     def _handle_resume_quote(self) -> None:
