@@ -3,7 +3,7 @@ from __future__ import annotations
 import os
 from types import SimpleNamespace
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
@@ -295,6 +295,26 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         self.assertTrue(first_button.property("compactChoice"))
         self.assertEqual(first_button.minimumHeight(), 42)
         self.assertEqual(window.guided_variant_groups_layout.count(), 2)
+
+    def test_reveal_saved_quote_switches_filter_and_search_page(self) -> None:
+        window = QuoteSatelliteWindow(user_id=1)
+        fake_session = Mock()
+        session_cm = MagicMock()
+        session_cm.__enter__.return_value = fake_session
+        session_cm.__exit__.return_value = False
+
+        window._set_page("quote")
+        window.quote_state_combo.setCurrentIndex(0)
+
+        with (
+            patch("pos_uniformes.ui.quote_satellite_window.get_session", return_value=session_cm),
+            patch.object(window, "_refresh_quotes") as refresh_quotes,
+        ):
+            window._reveal_saved_quote(quote_id=77, state_filter="EMITIDO")
+
+        self.assertEqual(window.quote_state_combo.currentData(), "EMITIDO")
+        refresh_quotes.assert_called_once_with(fake_session, preferred_quote_id=77)
+        self.assertEqual(window.current_page_key, "search")
 
 
 if __name__ == "__main__":

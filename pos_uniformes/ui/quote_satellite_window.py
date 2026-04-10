@@ -2524,7 +2524,10 @@ class QuoteSatelliteWindow(QMainWindow):
             self.quote_cart.clear()
             self._refresh_quote_cart_table()
             self._reset_quote_form()
-            self.refresh_all()
+            self._reveal_saved_quote(
+                quote_id=result.quote_id,
+                state_filter=_state_value(target_state),
+            )
             title, message = _quote_result_message(result.action_key, result.folio)
             QMessageBox.information(self, title, message)
         except Exception as exc:  # noqa: BLE001
@@ -2612,8 +2615,8 @@ class QuoteSatelliteWindow(QMainWindow):
         except SQLAlchemyError as exc:
             QMessageBox.critical(self, "No se pudo filtrar", str(exc))
 
-    def _refresh_quotes(self, session) -> None:
-        selected_quote_id = self._selected_quote_id()
+    def _refresh_quotes(self, session, preferred_quote_id: int | None = None) -> None:
+        selected_quote_id = preferred_quote_id if preferred_quote_id is not None else self._selected_quote_id()
         quote_snapshots = build_quote_history_input_rows(load_quote_snapshot_rows(session, limit=300))
         rows = build_quote_satellite_rows(
             quote_snapshots=quote_snapshots,
@@ -2656,6 +2659,26 @@ class QuoteSatelliteWindow(QMainWindow):
 
         self._refresh_quote_detail(self._selected_quote_id())
         self._apply_action_state()
+
+    def _reveal_saved_quote(self, *, quote_id: int, state_filter: str) -> None:
+        self._set_quote_state_filter(state_filter)
+        with get_session() as session:
+            self._refresh_quotes(session, preferred_quote_id=quote_id)
+        self._set_page("search")
+
+    def _set_quote_state_filter(self, state_filter: str) -> None:
+        normalized_filter = str(state_filter or "").strip().upper()
+        self.quote_state_combo.blockSignals(True)
+        try:
+            target_index = 0
+            for index in range(self.quote_state_combo.count()):
+                item_value = str(self.quote_state_combo.itemData(index) or "").strip().upper()
+                if item_value == normalized_filter:
+                    target_index = index
+                    break
+            self.quote_state_combo.setCurrentIndex(target_index)
+        finally:
+            self.quote_state_combo.blockSignals(False)
 
     def _handle_quote_selection(self) -> None:
         self._refresh_quote_detail(self._selected_quote_id())
