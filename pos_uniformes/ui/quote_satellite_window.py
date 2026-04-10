@@ -164,6 +164,10 @@ class QuoteSatelliteWindow(QMainWindow):
         self.nav_share_button = QPushButton("Compartir")
         self.sidebar_total_label = QLabel("$0.00")
         self.sidebar_summary_label = QLabel("Sin piezas en el presupuesto actual.")
+        self.sidebar_items_count_label = QLabel("0 lineas | 0 pzas")
+        self.sidebar_items_scroll = QScrollArea()
+        self.sidebar_items_content = QWidget()
+        self.sidebar_items_layout = QVBoxLayout()
         self.kiosk_open_quote_button = QPushButton("Ver presupuesto")
         self.kiosk_open_search_button = QPushButton("Abrir catalogo")
         self.kiosk_budget_total_label = QLabel("$0.00")
@@ -349,6 +353,12 @@ class QuoteSatelliteWindow(QMainWindow):
                     hover_color="#2c2a27",
                     hover_border="#d6ccbe",
                 ),
+                build_button_hover_styles(
+                    selector="QPushButton#sidebarItemRemoveButton",
+                    hover_background="#ead8c9",
+                    hover_color="#73341c",
+                    hover_border="#d3bca8",
+                ),
             )
         )
         self.setStyleSheet(
@@ -389,6 +399,11 @@ class QuoteSatelliteWindow(QMainWindow):
                 background: #fbf8f2;
                 border: 1px solid #dce5eb;
                 border-radius: 22px;
+            }
+            QFrame#satSidebarItemCard {
+                background: #f8f2e9;
+                border: 1px solid #e3d8ca;
+                border-radius: 16px;
             }
             QLabel#satTitle {
                 font-size: 20px;
@@ -451,6 +466,39 @@ class QuoteSatelliteWindow(QMainWindow):
                 border: 1px solid #dce5eb;
                 border-radius: 12px;
                 padding: 10px 12px;
+            }
+            QLabel#satSidebarSectionMeta {
+                color: #7a6d60;
+                font-size: 12px;
+                font-weight: 700;
+            }
+            QLabel#satSidebarItemQty {
+                background: #e6dccd;
+                color: #654e3d;
+                border-radius: 10px;
+                padding: 4px 8px;
+                font-size: 11px;
+                font-weight: 900;
+            }
+            QLabel#satSidebarItemName {
+                color: #2f2a24;
+                font-size: 13px;
+                font-weight: 800;
+            }
+            QLabel#satSidebarItemMeta {
+                color: #6f665d;
+                font-size: 12px;
+            }
+            QLabel#satSidebarItemEmpty {
+                color: #6f665d;
+                background: #f3ece3;
+                border: 1px dashed #dacdbf;
+                border-radius: 14px;
+                padding: 12px;
+            }
+            QScrollArea#satSidebarItemsScroll, QWidget#satSidebarItemsViewport, QWidget#satSidebarItemsContent {
+                background: transparent;
+                border: none;
             }
             QLabel#satKioskSku {
                 font-size: 26px;
@@ -611,6 +659,15 @@ class QuoteSatelliteWindow(QMainWindow):
                 padding: 14px 16px;
                 font-size: 15px;
             }
+            QPushButton#sidebarItemRemoveButton {
+                background: #efe4d5;
+                color: #6c4d3a;
+                border: 1px solid #dbcbb8;
+                border-radius: 10px;
+                padding: 5px 10px;
+                font-size: 12px;
+                font-weight: 800;
+            }
             QPushButton#navButton:checked {
                 background: #87492c;
                 color: #f9f4ea;
@@ -737,7 +794,7 @@ class QuoteSatelliteWindow(QMainWindow):
     def _build_sidebar(self) -> QWidget:
         card = QFrame()
         card.setObjectName("satSidebarCard")
-        card.setFixedWidth(232)
+        card.setFixedWidth(278)
         layout = QVBoxLayout()
         layout.setContentsMargins(16, 18, 16, 18)
         layout.setSpacing(8)
@@ -771,7 +828,32 @@ class QuoteSatelliteWindow(QMainWindow):
         budget_layout.addWidget(self.sidebar_summary_label)
         budget_card.setLayout(budget_layout)
 
+        items_card = QFrame()
+        items_card.setObjectName("satTotalsCard")
+        items_layout = QVBoxLayout()
+        items_layout.setContentsMargins(14, 14, 14, 14)
+        items_layout.setSpacing(8)
+        items_title = QLabel("Piezas agregadas")
+        items_title.setObjectName("satSidebarTitle")
+        self.sidebar_items_count_label.setObjectName("satSidebarSectionMeta")
+        self.sidebar_items_scroll.setObjectName("satSidebarItemsScroll")
+        self.sidebar_items_scroll.setWidgetResizable(True)
+        self.sidebar_items_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.sidebar_items_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.sidebar_items_scroll.viewport().setObjectName("satSidebarItemsViewport")
+        self.sidebar_items_content.setObjectName("satSidebarItemsContent")
+        self.sidebar_items_layout.setContentsMargins(0, 0, 0, 0)
+        self.sidebar_items_layout.setSpacing(8)
+        self.sidebar_items_content.setLayout(self.sidebar_items_layout)
+        self.sidebar_items_scroll.setWidget(self.sidebar_items_content)
+        self.sidebar_items_scroll.setMinimumHeight(320)
+        items_layout.addWidget(items_title)
+        items_layout.addWidget(self.sidebar_items_count_label)
+        items_layout.addWidget(self.sidebar_items_scroll, 1)
+        items_card.setLayout(items_layout)
+
         layout.addWidget(budget_card)
+        layout.addWidget(items_card, 1)
         layout.addStretch()
         card.setLayout(layout)
         return card
@@ -2462,13 +2544,20 @@ class QuoteSatelliteWindow(QMainWindow):
         if feedback is not None:
             QMessageBox.warning(self, feedback.title, feedback.message)
             return
-        removed_line_item = dict(self.quote_cart[selected_row])
-        self.quote_cart.pop(selected_row)
+        self._remove_quote_item_at_index(selected_row)
+
+    def _remove_quote_item_at_index(self, row_index: int) -> None:
+        if row_index < 0 or row_index >= len(self.quote_cart):
+            return
+        removed_line_item = dict(self.quote_cart[row_index])
+        self.quote_cart.pop(row_index)
         restore_message = restore_sports_uniform_playera_price_if_needed(
             self.quote_cart,
             removed_line_item=removed_line_item,
         )
         self._refresh_quote_cart_table()
+        if self.quote_cart:
+            self.quote_cart_table.selectRow(min(row_index, len(self.quote_cart) - 1))
         if restore_message:
             self._set_status(restore_message)
 
@@ -2970,11 +3059,90 @@ class QuoteSatelliteWindow(QMainWindow):
         self.sidebar_summary_label.setText(
             f"{overall_cart_view.summary.summary_label}\n{overall_cart_view.summary.school_summary_label}"
         )
+        self._refresh_sidebar_quote_items()
         self.kiosk_budget_total_label.setText(overall_cart_view.summary.total_label)
         self.kiosk_budget_summary_label.setText(
             f"{overall_cart_view.summary.summary_label}\n{overall_cart_view.summary.school_summary_label}"
         )
         self._apply_action_state()
+
+    def _refresh_sidebar_quote_items(self) -> None:
+        _clear_layout(self.sidebar_items_layout)
+        line_count = len(self.quote_cart)
+        piece_count = sum(max(int(item.get("cantidad") or 0), 0) for item in self.quote_cart)
+        line_label = "linea" if line_count == 1 else "lineas"
+        piece_label = "pza" if piece_count == 1 else "pzas"
+        self.sidebar_items_count_label.setText(f"{line_count} {line_label} | {piece_count} {piece_label}")
+        if not self.quote_cart:
+            empty_label = QLabel("Aun no agregas piezas.\nAqui veras el armado listo para revisar.")
+            empty_label.setObjectName("satSidebarItemEmpty")
+            empty_label.setWordWrap(True)
+            self.sidebar_items_layout.addWidget(empty_label)
+            self.sidebar_items_layout.addStretch()
+            return
+        for row_index, line_item in enumerate(self.quote_cart):
+            self.sidebar_items_layout.addWidget(self._build_sidebar_quote_item_card(row_index, line_item))
+        self.sidebar_items_layout.addStretch()
+
+    def _build_sidebar_quote_item_card(self, row_index: int, line_item: dict[str, object]) -> QFrame:
+        card = QFrame()
+        card.setObjectName("satSidebarItemCard")
+        layout = QVBoxLayout()
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(6)
+
+        quantity = max(int(line_item.get("cantidad") or 0), 0)
+        quantity_label = QLabel(f"{quantity} pza" if quantity == 1 else f"{quantity} pzas")
+        quantity_label.setObjectName("satSidebarItemQty")
+
+        remove_button = QPushButton("Quitar")
+        remove_button.setObjectName("sidebarItemRemoveButton")
+        remove_button.clicked.connect(lambda checked=False, index=row_index: self._remove_quote_item_at_index(index))
+
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.setSpacing(6)
+        header.addWidget(quantity_label, 0, Qt.AlignmentFlag.AlignLeft)
+        header.addStretch()
+        header.addWidget(remove_button, 0, Qt.AlignmentFlag.AlignRight)
+
+        product_name = str(
+            line_item.get("producto_nombre")
+            or line_item.get("descripcion")
+            or line_item.get("sku")
+            or "Producto"
+        )
+        name_label = QLabel(product_name)
+        name_label.setObjectName("satSidebarItemName")
+        name_label.setWordWrap(True)
+
+        school_name = str(line_item.get("escuela_nombre") or "General")
+        level_name = str(line_item.get("nivel_educativo_nombre") or "Sin nivel")
+        sku = str(line_item.get("sku") or "").strip()
+        unit_price = Decimal(str(line_item.get("precio_unitario") or "0")).quantize(Decimal("0.01"))
+        subtotal = (unit_price * Decimal(quantity)).quantize(Decimal("0.01"))
+        scope_parts = [school_name]
+        if level_name and level_name != "Sin nivel":
+            scope_parts.append(level_name)
+        meta_label = QLabel(" | ".join(scope_parts))
+        meta_label.setObjectName("satSidebarItemMeta")
+        meta_label.setWordWrap(True)
+
+        price_parts = [f"${subtotal}"]
+        if sku:
+            price_parts.append(sku)
+        if quantity > 1:
+            price_parts.append(f"${unit_price} c/u")
+        footer_label = QLabel(" | ".join(price_parts))
+        footer_label.setObjectName("satSidebarItemMeta")
+        footer_label.setWordWrap(True)
+
+        layout.addLayout(header)
+        layout.addWidget(name_label)
+        layout.addWidget(meta_label)
+        layout.addWidget(footer_label)
+        card.setLayout(layout)
+        return card
 
     def _apply_lookup_view(self, lookup_view) -> None:
         lookup_row = None

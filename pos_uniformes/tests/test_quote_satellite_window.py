@@ -10,7 +10,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtTest import QTest
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QFrame, QPushButton
 
 from pos_uniformes.services.active_filter_service import ActiveFilterToken
 from pos_uniformes.ui.helpers.flow_layout import FlowLayout
@@ -191,6 +191,61 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         self.assertEqual(window.quote_cart_table.objectName(), "cashierCartTable")
         self.assertEqual(window.quote_cart_table.horizontalHeaderItem(0).text(), "Cantidad")
         self.assertEqual(window.quote_cart_table.horizontalHeaderItem(1).text(), "Producto")
+
+    def test_sidebar_shows_empty_state_without_quote_items(self) -> None:
+        window = QuoteSatelliteWindow(user_id=1)
+        window.quote_cart = []
+
+        window._refresh_quote_cart_table()
+
+        self.assertEqual(window.sidebar_items_count_label.text(), "0 lineas | 0 pzas")
+        empty_labels = [label.text() for label in window.sidebar_items_content.findChildren(type(window.sidebar_total_label))]
+        self.assertTrue(any("Aun no agregas piezas." in text for text in empty_labels))
+
+    def test_sidebar_builds_compact_cards_for_quote_items(self) -> None:
+        window = QuoteSatelliteWindow(user_id=1)
+        window.quote_cart = [
+            {
+                "sku": "SKU000001",
+                "producto_nombre": "Bata Infantil Blanca",
+                "escuela_nombre": "General",
+                "nivel_educativo_nombre": "Sin nivel",
+                "cantidad": 2,
+                "precio_unitario": Decimal("65.00"),
+            }
+        ]
+
+        window._refresh_quote_cart_table()
+
+        cards = window.sidebar_items_content.findChildren(QFrame, "satSidebarItemCard")
+        self.assertEqual(len(cards), 1)
+        self.assertEqual(window.sidebar_items_count_label.text(), "1 linea | 2 pzas")
+        texts = [label.text() for label in cards[0].findChildren(type(window.sidebar_total_label))]
+        self.assertTrue(any("Bata Infantil Blanca" in text for text in texts))
+        self.assertTrue(any("$130.00" in text for text in texts))
+
+    def test_sidebar_remove_button_removes_quote_line(self) -> None:
+        window = QuoteSatelliteWindow(user_id=1)
+        window.quote_cart = [
+            {
+                "sku": "SKU000001",
+                "producto_nombre": "Bata Infantil Blanca",
+                "escuela_nombre": "General",
+                "nivel_educativo_nombre": "Sin nivel",
+                "cantidad": 1,
+                "precio_unitario": Decimal("65.00"),
+            }
+        ]
+        window._refresh_quote_cart_table()
+
+        card = window.sidebar_items_content.findChildren(QFrame, "satSidebarItemCard")[0]
+        remove_button = card.findChild(QPushButton, "sidebarItemRemoveButton")
+        self.assertIsNotNone(remove_button)
+
+        QTest.mouseClick(remove_button, Qt.MouseButton.LeftButton)
+
+        self.assertEqual(window.quote_cart, [])
+        self.assertEqual(window.sidebar_items_count_label.text(), "0 lineas | 0 pzas")
 
     def test_quote_line_buttons_require_selected_row(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
