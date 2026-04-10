@@ -1001,6 +1001,9 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         window.inventory_overview_label.setText("SKU-101")
         window.inventory_product_label.setText("Pants Deportivo")
         window.catalog_selection_label.setText("SKU-101 | contexto")
+        window.qr_preview_label.setText("SKU-101")
+        window.qr_preview_info_label.setText("SKU-101 | Pants Deportivo")
+        window.qr_status_label.setText("QR disponible: SKU-101.png")
 
         window._clear_inventory_table_selection()
 
@@ -1008,6 +1011,9 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertEqual(window.inventory_variant_combo.currentIndex(), -1)
         self.assertEqual(window.inventory_overview_label.text(), "Selecciona una presentacion")
         self.assertEqual(window.catalog_selection_label.text(), "Selecciona una presentacion en inventario para gestionar cambios.")
+        self.assertEqual(window.qr_preview_label.text(), "QR pendiente")
+        self.assertEqual(window.qr_preview_info_label.text(), "")
+        self.assertEqual(window.qr_status_label.text(), "Sin seleccion")
 
     def test_clear_inventory_filters_also_clears_table_selection(self) -> None:
         window = MainWindow(user_id=1)
@@ -1021,6 +1027,9 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         window.inventory_search_input.setText("pants")
         window.inventory_overview_label.setText("SKU-101")
         window.catalog_selection_label.setText("SKU-101 | contexto")
+        window.qr_preview_label.setText("SKU-101")
+        window.qr_preview_info_label.setText("SKU-101 | Pants Deportivo")
+        window.qr_status_label.setText("QR disponible: SKU-101.png")
 
         with patch.object(window, "_handle_inventory_filters_changed") as refresh_filters:
             window._handle_clear_inventory_filters()
@@ -1029,6 +1038,9 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertEqual(window.inventory_variant_combo.currentIndex(), -1)
         self.assertEqual(window.inventory_overview_label.text(), "Selecciona una presentacion")
         self.assertEqual(window.catalog_selection_label.text(), "Selecciona una presentacion en inventario para gestionar cambios.")
+        self.assertEqual(window.qr_preview_label.text(), "QR pendiente")
+        self.assertEqual(window.qr_preview_info_label.text(), "")
+        self.assertEqual(window.qr_status_label.text(), "Sin seleccion")
         self.assertEqual(window.inventory_search_input.text(), "")
         refresh_filters.assert_called_once_with()
 

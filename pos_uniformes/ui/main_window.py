@@ -10933,7 +10933,7 @@ class MainWindow(QMainWindow):
             self.inventory_variant_combo.setCurrentIndex(-1)
         finally:
             self.inventory_variant_combo.blockSignals(False)
-        self._apply_inventory_overview_view(build_empty_inventory_overview_view())
+        self._refresh_selected_qr_preview()
 
     def _selected_inventory_variant_ids(self) -> list[int]:
         return collect_selected_inventory_variant_ids(
