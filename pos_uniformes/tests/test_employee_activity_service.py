@@ -8,6 +8,7 @@ import unittest
 from pos_uniformes.services.employee_activity_service import (
     build_employee_activity_snapshot,
     build_employee_activity_state,
+    build_employee_activity_sort_key,
 )
 
 
@@ -141,6 +142,47 @@ class EmployeeActivityServiceTests(unittest.TestCase):
 
         self.assertEqual(state.label, "Sin actividad")
         self.assertEqual(state.tone, "muted")
+
+    def test_build_activity_sort_key_prioritizes_today_then_recent_then_inactive(self) -> None:
+        active_today = SimpleNamespace(
+            visible_name="Lupita Gomez",
+            full_name="Guadalupe Gomez Ruiz",
+            today_pieces=5,
+            last_sale_at=datetime(2026, 4, 9, 16, 10),
+            day_rows=(
+                SimpleNamespace(pieces=5, tickets=2),
+                SimpleNamespace(pieces=0, tickets=0),
+            ),
+        )
+        active_7d = SimpleNamespace(
+            visible_name="Andrea Lopez",
+            full_name="Andrea Lopez",
+            today_pieces=0,
+            last_sale_at=datetime(2026, 4, 8, 10, 0),
+            day_rows=(
+                SimpleNamespace(pieces=0, tickets=0),
+                SimpleNamespace(pieces=1, tickets=1),
+            ),
+        )
+        inactive = SimpleNamespace(
+            visible_name="Berenice Cruz",
+            full_name="Berenice Cruz",
+            today_pieces=0,
+            last_sale_at=None,
+            day_rows=(
+                SimpleNamespace(pieces=0, tickets=0),
+                SimpleNamespace(pieces=0, tickets=0),
+            ),
+        )
+
+        ordered = sorted(
+            [inactive, active_7d, active_today],
+            key=build_employee_activity_sort_key,
+        )
+
+        self.assertEqual(ordered[0].visible_name, "Lupita Gomez")
+        self.assertEqual(ordered[1].visible_name, "Andrea Lopez")
+        self.assertEqual(ordered[2].visible_name, "Berenice Cruz")
 
 
 if __name__ == "__main__":

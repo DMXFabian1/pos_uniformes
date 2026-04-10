@@ -114,11 +114,37 @@ def build_employee_activity_snapshot(
 
 
 def build_employee_activity_state(snapshot: EmployeeActivitySnapshot) -> EmployeeActivityState:
-    if snapshot.today_pieces > 0 or snapshot.today_tickets > 0:
+    today_pieces = int(getattr(snapshot, "today_pieces", 0) or 0)
+    today_tickets = int(getattr(snapshot, "today_tickets", 0) or 0)
+    day_rows = tuple(getattr(snapshot, "day_rows", ()) or ())
+    if today_pieces > 0 or today_tickets > 0:
         return EmployeeActivityState(label="Activa hoy", tone="positive")
-    if any(day_row.pieces > 0 or day_row.tickets > 0 for day_row in snapshot.day_rows[1:]):
+    if any(
+        int(getattr(day_row, "pieces", 0) or 0) > 0 or int(getattr(day_row, "tickets", 0) or 0) > 0
+        for day_row in day_rows[1:]
+    ):
         return EmployeeActivityState(label="Activa 7d", tone="warning")
     return EmployeeActivityState(label="Sin actividad", tone="muted")
+
+
+def build_employee_activity_sort_key(snapshot: EmployeeActivitySnapshot) -> tuple[int, int, float, str]:
+    state = build_employee_activity_state(snapshot)
+    state_priority = {
+        "Activa hoy": 0,
+        "Activa 7d": 1,
+        "Sin actividad": 2,
+    }.get(state.label, 3)
+    last_sale_at = getattr(snapshot, "last_sale_at", None)
+    last_sale_timestamp = last_sale_at.timestamp() if last_sale_at is not None else 0.0
+    display_name = (
+        str(getattr(snapshot, "visible_name", "") or getattr(snapshot, "full_name", "") or "").strip().lower()
+    )
+    return (
+        state_priority,
+        -int(getattr(snapshot, "today_pieces", 0) or 0),
+        -last_sale_timestamp,
+        display_name,
+    )
 
 
 def load_employee_activity_snapshot(session, *, employee_id: int, reference_date: date | None = None) -> EmployeeActivitySnapshot:

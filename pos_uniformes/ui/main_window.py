@@ -120,6 +120,7 @@ from pos_uniformes.services.settings_business_action_service import (
 from pos_uniformes.services.employee_activity_service import (
     build_employee_activity_empty_snapshot,
     build_employee_activity_state,
+    build_employee_activity_sort_key,
     load_employee_activity_snapshot,
 )
 from pos_uniformes.services.employee_sales_history_service import list_employee_day_sale_rows
@@ -2990,12 +2991,15 @@ class MainWindow(QMainWindow):
             with get_session() as session:
                 employees = EmployeeIdentityService.list_employees(session, search_text)
                 employee_activity_states: dict[int, tuple[str, str]] = {}
+                employee_activity_snapshots: dict[int, object] = {}
                 for employee in employees:
                     try:
                         activity_snapshot = load_employee_activity_snapshot(session, employee_id=int(employee.id))
                         activity_state = build_employee_activity_state(activity_snapshot)
                     except Exception:  # noqa: BLE001
-                        activity_state = build_employee_activity_state(build_employee_activity_empty_snapshot())
+                        activity_snapshot = build_employee_activity_empty_snapshot()
+                        activity_state = build_employee_activity_state(activity_snapshot)
+                    employee_activity_snapshots[int(employee.id)] = activity_snapshot
                     employee_activity_states[int(employee.id)] = (activity_state.label, activity_state.tone)
         except Exception as exc:  # noqa: BLE001
             employees_view = build_settings_employees_error_view(str(exc))
@@ -3003,9 +3007,13 @@ class MainWindow(QMainWindow):
             self.settings_employees_table.setRowCount(len(employees_view.rows))
             self._refresh_settings_employee_detail()
             return
+        sorted_employees = sorted(
+            employees,
+            key=lambda employee: build_employee_activity_sort_key(employee_activity_snapshots[int(employee.id)]),
+        )
         filtered_employees = [
             employee
-            for employee in employees
+            for employee in sorted_employees
             if not activity_filter
             or activity_filter == "Todas"
             or employee_activity_states[int(employee.id)][0] == activity_filter

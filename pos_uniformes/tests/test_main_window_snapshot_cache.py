@@ -445,6 +445,93 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertEqual(window.settings_employees_table.item(0, 0).text(), "VEND-2")
         self.assertIn("filtro: Sin actividad", window.settings_employees_status_label.text())
 
+    def test_refresh_settings_employees_orders_by_activity_priority_and_today_pieces(self) -> None:
+        window = MainWindow(user_id=1)
+        window.settings_employees_table.setColumnCount(9)
+        window.settings_employees_activity_filter_combo.addItems(["Todas", "Activa hoy", "Activa 7d", "Sin actividad"])
+        employee_inactive = SimpleNamespace(
+            id=6,
+            codigo="VEND-3",
+            nombre_completo="Berenice Cruz",
+            activo=True,
+            updated_at=datetime(2026, 4, 7, 17, 30),
+        )
+        employee_recent = SimpleNamespace(
+            id=5,
+            codigo="VEND-2",
+            nombre_completo="Andrea Lopez",
+            activo=True,
+            updated_at=datetime(2026, 4, 8, 17, 30),
+        )
+        employee_today = SimpleNamespace(
+            id=4,
+            codigo="VEND-1",
+            nombre_completo="Guadalupe Gomez Ruiz",
+            activo=True,
+            updated_at=datetime(2026, 4, 9, 9, 0),
+        )
+        inactive_snapshot = SimpleNamespace(
+            visible_name="Berenice Cruz",
+            full_name="Berenice Cruz",
+            today_pieces=0,
+            today_tickets=0,
+            last_sale_at=None,
+            day_rows=(
+                SimpleNamespace(pieces=0, tickets=0),
+                SimpleNamespace(pieces=0, tickets=0),
+            ),
+        )
+        recent_snapshot = SimpleNamespace(
+            visible_name="Andrea Lopez",
+            full_name="Andrea Lopez",
+            today_pieces=0,
+            today_tickets=0,
+            last_sale_at=datetime(2026, 4, 8, 10, 0),
+            day_rows=(
+                SimpleNamespace(pieces=0, tickets=0),
+                SimpleNamespace(pieces=2, tickets=1),
+            ),
+        )
+        today_snapshot = SimpleNamespace(
+            visible_name="Guadalupe Ruiz",
+            full_name="Guadalupe Gomez Ruiz",
+            today_pieces=3,
+            today_tickets=1,
+            last_sale_at=datetime(2026, 4, 9, 11, 0),
+            day_rows=(
+                SimpleNamespace(pieces=3, tickets=1),
+                SimpleNamespace(pieces=0, tickets=0),
+            ),
+        )
+
+        with patch("pos_uniformes.ui.main_window.get_session") as get_session_mock, patch(
+            "pos_uniformes.ui.main_window.EmployeeIdentityService.list_employees",
+            return_value=[employee_inactive, employee_recent, employee_today],
+        ), patch(
+            "pos_uniformes.ui.main_window.load_employee_activity_snapshot",
+            side_effect=[inactive_snapshot, recent_snapshot, today_snapshot],
+        ), patch(
+            "pos_uniformes.ui.main_window.EmployeeIdentityService.has_pin",
+            return_value=False,
+        ), patch(
+            "pos_uniformes.ui.main_window.QrGenerator.exists_for_employee",
+            return_value=False,
+        ), patch(
+            "pos_uniformes.ui.main_window.EmployeeCardService.exists_for_employee",
+            return_value=False,
+        ):
+            session = Mock()
+            context = Mock()
+            context.__enter__ = Mock(return_value=session)
+            context.__exit__ = Mock(return_value=False)
+            get_session_mock.return_value = context
+
+            window._refresh_settings_employees()
+
+        self.assertEqual(window.settings_employees_table.item(0, 0).text(), "VEND-1")
+        self.assertEqual(window.settings_employees_table.item(1, 0).text(), "VEND-2")
+        self.assertEqual(window.settings_employees_table.item(2, 0).text(), "VEND-3")
+
         self.assertTrue(window.settings_employee_activity_table.isColumnHidden(3))
         self.assertNotIn("$1,250.00", window.settings_employee_detail_today_label.text())
         self.assertEqual(window.settings_employee_toggle_amounts_button.text(), "Mostrar monto")
