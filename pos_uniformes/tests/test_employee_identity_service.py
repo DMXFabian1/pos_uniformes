@@ -41,6 +41,15 @@ class EmployeeIdentityServiceTests(unittest.TestCase):
 
         self.assertIsNone(resolved)
 
+    def test_normalize_employee_code_accepts_common_scanner_layout_substitutions(self) -> None:
+        normalized = EmployeeIdentityService.normalize_employee_code("EMPÑVEND´1")
+
+        self.assertEqual(normalized, "VEND-1")
+
+    def test_looks_like_employee_qr_accepts_scanner_layout_substitutions(self) -> None:
+        self.assertTrue(EmployeeIdentityService.looks_like_employee_qr("EMPÑVEND´1"))
+        self.assertTrue(EmployeeIdentityService.looks_like_employee_qr("EMP:VEND-1"))
+
     def test_normalize_pin_requires_digits_and_length(self) -> None:
         self.assertEqual(EmployeeIdentityService.normalize_pin(" 634700 "), "634700")
         with self.assertRaisesRegex(ValueError, "solo numeros"):

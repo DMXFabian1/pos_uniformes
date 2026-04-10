@@ -7085,9 +7085,10 @@ class MainWindow(QMainWindow):
         self.sale_status_label.update()
 
     def _handle_add_sale_item(self) -> None:
-        sku = self.sale_sku_input.text().strip().upper()
-        if sku.startswith("EMP:"):
-            self._handle_sale_origin_identify(scanned_code=sku)
+        raw_input = self.sale_sku_input.text().strip()
+        sku = raw_input.upper()
+        if EmployeeIdentityService.looks_like_employee_qr(raw_input):
+            self._handle_sale_origin_identify(scanned_code=raw_input)
             self.sale_sku_input.clear()
             return
         if self.current_role not in {RolUsuario.ADMIN, RolUsuario.CAJERO}:

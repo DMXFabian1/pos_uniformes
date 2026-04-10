@@ -335,6 +335,16 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertEqual(window.sale_credit_mode, ModoOrigenVenta.OPERATOR_DIRECT)
         self.assertEqual(window.sale_origin_value_label.text(), "Directa")
 
+    def test_handle_add_sale_item_routes_scanner_layout_variant_to_employee_origin(self) -> None:
+        window = MainWindow(user_id=1)
+        window.sale_sku_input.setText("EMPÑVEND´1")
+
+        with patch.object(window, "_handle_sale_origin_identify") as identify_mock:
+            window._handle_add_sale_item()
+
+        identify_mock.assert_called_once_with(scanned_code="EMPÑVEND´1")
+        self.assertEqual(window.sale_sku_input.text(), "")
+
     def test_settings_employee_detail_panel_formats_recent_activity(self) -> None:
         window = MainWindow(user_id=1)
         window.settings_employee_period_combo.addItems(["Hoy", "7 dias", "30 dias"])

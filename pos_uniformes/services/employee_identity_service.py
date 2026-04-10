@@ -14,6 +14,18 @@ class EmployeeIdentityService:
 
     QR_PREFIX = "EMP:"
     CODE_PREFIX = "VEND-"
+    _SCAN_TRANSLATION = str.maketrans(
+        {
+            "Ñ": ":",
+            ";": ":",
+            "´": "-",
+            "`": "-",
+            "'": "-",
+            "_": "-",
+            "–": "-",
+            "—": "-",
+        }
+    )
 
     @staticmethod
     def _validar_admin(admin_user: Usuario) -> None:
@@ -23,8 +35,17 @@ class EmployeeIdentityService:
             raise PermissionError("Solo ADMIN puede gestionar empleadas.")
 
     @classmethod
+    def normalize_scanned_employee_qr(cls, raw_code: str) -> str:
+        return raw_code.strip().upper().translate(cls._SCAN_TRANSLATION)
+
+    @classmethod
+    def looks_like_employee_qr(cls, raw_code: str) -> bool:
+        normalized_scan = cls.normalize_scanned_employee_qr(raw_code)
+        return normalized_scan.startswith(cls.QR_PREFIX) or normalized_scan.startswith("EMP")
+
+    @classmethod
     def normalize_employee_code(cls, raw_code: str) -> str:
-        normalized = raw_code.strip().upper()
+        normalized = cls.normalize_scanned_employee_qr(raw_code)
         if normalized.startswith(cls.QR_PREFIX):
             normalized = normalized[len(cls.QR_PREFIX) :].strip()
         if not normalized:
