@@ -595,3 +595,6 @@ Registrar mejoras propuestas por operacion o producto y ubicarlas dentro del pla
   - confirmar que `EMP:{codigo}` siga resolviendo normal al `Responsable`
 - Si esa validacion sale bien, el siguiente corte natural en ese frente es:
   - reflejar `Responsable` tambien en ticket, `Presupuestos` y `Apartados`
+- Anotacion separada de `Caja`:
+  - evaluar quitar la banda de contexto `Cliente | Pago | Descuento` para desaturar la parte superior
+  - pensar un flujo limpio para vender productos sin codigo, sin romper el escaneo normal por SKU
