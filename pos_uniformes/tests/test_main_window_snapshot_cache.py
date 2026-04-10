@@ -261,6 +261,12 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         self.assertFalse(window.sale_context_label.isVisible())
 
+    def test_cashier_view_places_manual_line_button_in_header(self) -> None:
+        window = MainWindow(user_id=1)
+
+        self.assertFalse(window.sale_add_button.isHidden())
+        self.assertEqual(window.sale_add_button.text(), "Agregar sin codigo")
+
     def test_sale_origin_defaults_to_unassigned_after_reset(self) -> None:
         window = MainWindow(user_id=1)
 
