@@ -5,7 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass
 from html import escape
 from pathlib import Path
-import shutil
 import subprocess
 import tempfile
 
@@ -13,6 +12,7 @@ from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
 from pos_uniformes.database.models import Empleada
 from pos_uniformes.services.employee_identity_service import EmployeeIdentityService
+from pos_uniformes.utils.headless_browser_helper import resolve_headless_browser_executable
 from pos_uniformes.utils.qr_generator import QrGenerator
 
 CARD_OUTPUT_DIR = Path(__file__).resolve().parents[1] / "generated" / "employee_cards"
@@ -96,7 +96,7 @@ class EmployeeCardService:
         template_html = TEMPLATE_HTML_PATH.read_text(encoding="utf-8")
         template_css = TEMPLATE_CSS_PATH.read_text(encoding="utf-8")
         html_document = cls._build_html_document(payload, template_html, template_css)
-        browser_path = cls._resolve_browser_executable()
+        browser_path = resolve_headless_browser_executable()
         if browser_path is None:
             raise FileNotFoundError("No se encontro un browser compatible para render headless.")
 
@@ -158,24 +158,6 @@ class EmployeeCardService:
         if len(normalized) >= 15 or len(normalized.split()) >= 3:
             return "medium"
         return "default"
-
-    @staticmethod
-    def _resolve_browser_executable() -> str | None:
-        candidates = [
-            Path("/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"),
-            Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
-            Path("/Applications/Chromium.app/Contents/MacOS/Chromium"),
-            Path("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"),
-            Path("/Applications/Arc.app/Contents/MacOS/Arc"),
-        ]
-        for candidate in candidates:
-            if candidate.exists():
-                return str(candidate)
-        for executable in ("brave-browser", "brave", "google-chrome", "chromium", "chromium-browser", "microsoft-edge"):
-            resolved = shutil.which(executable)
-            if resolved:
-                return resolved
-        return None
 
     @classmethod
     def _render_card_with_pil(cls, payload: EmployeeCardRenderInput, target: Path) -> Path:
