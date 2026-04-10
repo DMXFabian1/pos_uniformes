@@ -4580,6 +4580,7 @@ class MainWindow(QMainWindow):
         def _switch_user(authenticated_user_id: int) -> None:
             nonlocal switch_completed
             try:
+                dialog.hide()
                 self.user_id = authenticated_user_id
                 self.show()
                 self.raise_()
@@ -4590,6 +4591,7 @@ class MainWindow(QMainWindow):
                     self.refresh_all()
                     self.hide()
                     dialog.clear_loading_state()
+                    dialog.show()
                     dialog.raise_()
                     dialog.activateWindow()
                     return
@@ -4606,6 +4608,7 @@ class MainWindow(QMainWindow):
                 self.refresh_all()
                 self.hide()
                 dialog.clear_loading_state()
+                dialog.show()
                 QMessageBox.critical(dialog, "No se pudo iniciar la sesion", str(exc))
                 dialog.raise_()
                 dialog.activateWindow()

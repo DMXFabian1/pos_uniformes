@@ -67,9 +67,11 @@ def main() -> int:
     def _launch_main_window(user_id: int) -> None:
         nonlocal startup_window
         try:
+            login_dialog.hide()
             startup_window = MainWindow(user_id=user_id)
             if not startup_window.ensure_cash_session():
                 login_dialog.clear_loading_state()
+                login_dialog.show()
                 login_dialog.raise_()
                 login_dialog.activateWindow()
                 return
@@ -80,6 +82,7 @@ def main() -> int:
                 startup_window.close()
                 startup_window = None
             login_dialog.clear_loading_state()
+            login_dialog.show()
             QMessageBox.critical(login_dialog, "No se pudo iniciar la aplicacion", str(exc))
             login_dialog.raise_()
             login_dialog.activateWindow()

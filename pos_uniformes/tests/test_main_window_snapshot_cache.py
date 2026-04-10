@@ -139,6 +139,12 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             def accept(self) -> None:
                 return None
 
+            def hide(self) -> None:
+                order.append("dialog-hide")
+
+            def show(self) -> None:
+                order.append("dialog-show")
+
             def exec(self) -> int:
                 assert self.authenticated._callback is not None
                 self.authenticated._callback(2)
@@ -171,8 +177,10 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         ), patch.object(window, "refresh_all"), patch.object(window, "_set_sale_feedback"):
             window._handle_logout()
 
+        self.assertIn("dialog-hide", order)
         self.assertIn("show", order)
         self.assertIn("ensure", order)
+        self.assertLess(order.index("dialog-hide"), order.index("ensure"))
         self.assertLess(order.index("show"), order.index("ensure"))
 
     def test_logout_closes_and_resets_cached_dialogs(self) -> None:
@@ -213,6 +221,12 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
                 return None
 
             def accept(self) -> None:
+                return None
+
+            def hide(self) -> None:
+                return None
+
+            def show(self) -> None:
                 return None
 
             def exec(self) -> int:
