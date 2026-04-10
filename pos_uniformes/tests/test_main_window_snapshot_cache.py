@@ -119,15 +119,36 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         window.current_role = RolUsuario.ADMIN
         order: list[str] = []
 
+        class FakeSignal:
+            def __init__(self) -> None:
+                self._callback = None
+
+            def connect(self, callback) -> None:
+                self._callback = callback
+
         class FakeLoginDialog:
             class DialogCode:
                 Accepted = 1
 
             def __init__(self) -> None:
-                self.user_id = 2
+                self.authenticated = FakeSignal()
+
+            def clear_loading_state(self) -> None:
+                return None
+
+            def accept(self) -> None:
+                return None
 
             def exec(self) -> int:
+                assert self.authenticated._callback is not None
+                self.authenticated._callback(2)
                 return self.DialogCode.Accepted
+
+            def raise_(self) -> None:
+                return None
+
+            def activateWindow(self) -> None:
+                return None
 
         with patch(
             "pos_uniformes.ui.main_window.QMessageBox.question",
@@ -174,15 +195,36 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         for attr_name in dialog_attr_names:
             setattr(window, attr_name, Mock())
 
+        class FakeSignal:
+            def __init__(self) -> None:
+                self._callback = None
+
+            def connect(self, callback) -> None:
+                self._callback = callback
+
         class FakeLoginDialog:
             class DialogCode:
                 Accepted = 1
 
             def __init__(self) -> None:
-                self.user_id = 2
+                self.authenticated = FakeSignal()
+
+            def clear_loading_state(self) -> None:
+                return None
+
+            def accept(self) -> None:
+                return None
 
             def exec(self) -> int:
+                assert self.authenticated._callback is not None
+                self.authenticated._callback(2)
                 return self.DialogCode.Accepted
+
+            def raise_(self) -> None:
+                return None
+
+            def activateWindow(self) -> None:
+                return None
 
         with patch(
             "pos_uniformes.ui.main_window.QMessageBox.question",

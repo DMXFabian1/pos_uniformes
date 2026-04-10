@@ -4569,36 +4569,58 @@ class MainWindow(QMainWindow):
                 if not self._run_quick_backup_flow(allow_continue_on_error=True):
                     return
 
+        previous_user_id = self.user_id
+        previous_cart = list(self.sale_cart)
         self._close_cached_logout_dialogs()
 
         self.hide()
         dialog = LoginDialog()
-        if dialog.exec() != LoginDialog.DialogCode.Accepted or dialog.user_id is None:
+        switch_completed = False
+
+        def _switch_user(authenticated_user_id: int) -> None:
+            nonlocal switch_completed
+            try:
+                self.user_id = authenticated_user_id
+                self.show()
+                self.raise_()
+                self.activateWindow()
+                if not self.ensure_cash_session():
+                    self.user_id = previous_user_id
+                    self.sale_cart = previous_cart
+                    self.refresh_all()
+                    self.hide()
+                    dialog.clear_loading_state()
+                    dialog.raise_()
+                    dialog.activateWindow()
+                    return
+
+                self.sale_cart.clear()
+                self._reset_sale_form()
+                self.sales_dialog = None
+                self.refresh_all()
+                self._apply_role_navigation()
+                self._focus_default_tab_for_role()
+            except Exception as exc:  # noqa: BLE001
+                self.user_id = previous_user_id
+                self.sale_cart = previous_cart
+                self.refresh_all()
+                self.hide()
+                dialog.clear_loading_state()
+                QMessageBox.critical(dialog, "No se pudo iniciar la sesion", str(exc))
+                dialog.raise_()
+                dialog.activateWindow()
+                return
+
+            switch_completed = True
+            dialog.clear_loading_state()
+            dialog.accept()
+
+        dialog.authenticated.connect(_switch_user)
+        if dialog.exec() != LoginDialog.DialogCode.Accepted or not switch_completed:
             self._force_close = True
             self.close()
             return
 
-        previous_user_id = self.user_id
-        previous_cart = list(self.sale_cart)
-        self.user_id = dialog.user_id
-        self.show()
-        self.raise_()
-        self.activateWindow()
-        if not self.ensure_cash_session():
-            self.user_id = previous_user_id
-            self.sale_cart = previous_cart
-            self.refresh_all()
-            self.show()
-            self.raise_()
-            self.activateWindow()
-            return
-
-        self.sale_cart.clear()
-        self._reset_sale_form()
-        self.sales_dialog = None
-        self.refresh_all()
-        self._apply_role_navigation()
-        self._focus_default_tab_for_role()
         self.show()
         self.raise_()
         self.activateWindow()
