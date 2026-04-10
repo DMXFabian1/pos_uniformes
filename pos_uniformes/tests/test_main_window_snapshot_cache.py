@@ -20,6 +20,7 @@ from pos_uniformes.ui.main_window import (
     CATALOG_PAGE_SIZE,
     INVENTORY_PAGE_SIZE,
     MainWindow,
+    MultiSelectPickerButton,
     _TableSpinTabNavigator,
     _catalog_toggle_feedback_action,
 )
@@ -75,6 +76,19 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
             self.assertEqual(reloaded_rows, first_rows)
             self.assertEqual(loader.call_count, 2)
+
+    def test_multi_select_picker_button_opens_without_missing_group_attr(self) -> None:
+        button = MultiSelectPickerButton(
+            "Tallas: ninguna",
+            title="Seleccionar tallas",
+            helper_text="Selecciona varias tallas.",
+        )
+        button.set_items([("12", "12"), ("14", "14")])
+
+        with patch("pos_uniformes.ui.main_window.QDialog.exec", return_value=0):
+            button._open_picker()
+
+        self.assertEqual(button.selected_labels(), [])
 
     def test_cash_session_label_hides_expected_amount_from_hero(self) -> None:
         window = MainWindow(user_id=1)

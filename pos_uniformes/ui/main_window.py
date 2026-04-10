@@ -812,6 +812,7 @@ class MultiSelectPickerButton(QPushButton):
         title: str,
         helper_text: str,
         columns: int = 4,
+        group_values_by_format: bool = False,
         presets: list[tuple[str, list[str] | Callable[[list[str]], list[str]]]] | None = None,
     ) -> None:
         super().__init__(default_label)
@@ -820,6 +821,7 @@ class MultiSelectPickerButton(QPushButton):
         self._title = title
         self._helper_text = helper_text
         self._columns = max(1, columns)
+        self._group_values_by_format = group_values_by_format
         self._items: list[tuple[str, str]] = []
         self._selected_values: set[str] = set()
         self._presets = presets or []
