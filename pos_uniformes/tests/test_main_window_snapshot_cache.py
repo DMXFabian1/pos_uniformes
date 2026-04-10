@@ -12,7 +12,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtTest import QTest
-from PyQt6.QtWidgets import QApplication, QDoubleSpinBox, QPushButton, QSpinBox, QTableWidgetItem
+from PyQt6.QtWidgets import QApplication, QDoubleSpinBox, QMessageBox, QPushButton, QSpinBox, QTableWidgetItem
 
 from pos_uniformes.services.active_filter_service import ActiveFilterToken
 from pos_uniformes.database.models import ModoOrigenVenta, RolUsuario, TipoMovimientoCaja
@@ -113,6 +113,92 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         self.assertTrue(window.sale_discount_field_label.isHidden())
         self.assertTrue(window.sale_discount_combo.isHidden())
+
+    def test_logout_shows_window_before_ensuring_cash_session_for_new_user(self) -> None:
+        window = MainWindow(user_id=1)
+        window.current_role = RolUsuario.ADMIN
+        order: list[str] = []
+
+        class FakeLoginDialog:
+            class DialogCode:
+                Accepted = 1
+
+            def __init__(self) -> None:
+                self.user_id = 2
+
+            def exec(self) -> int:
+                return self.DialogCode.Accepted
+
+        with patch(
+            "pos_uniformes.ui.main_window.QMessageBox.question",
+            side_effect=[
+                QMessageBox.StandardButton.Yes,
+                QMessageBox.StandardButton.No,
+            ],
+        ), patch("pos_uniformes.ui.main_window.LoginDialog", FakeLoginDialog), patch.object(
+            window,
+            "show",
+            side_effect=lambda: order.append("show"),
+        ), patch.object(window, "raise_", side_effect=lambda: order.append("raise")), patch.object(
+            window,
+            "activateWindow",
+            side_effect=lambda: order.append("activate"),
+        ), patch.object(
+            window,
+            "ensure_cash_session",
+            side_effect=lambda: order.append("ensure") or False,
+        ), patch.object(window, "refresh_all"), patch.object(window, "_set_sale_feedback"):
+            window._handle_logout()
+
+        self.assertIn("show", order)
+        self.assertIn("ensure", order)
+        self.assertLess(order.index("show"), order.index("ensure"))
+
+    def test_logout_closes_and_resets_cached_dialogs(self) -> None:
+        window = MainWindow(user_id=1)
+        window.current_role = RolUsuario.CAJERO
+        dialog_attr_names = (
+            "sales_dialog",
+            "settings_users_dialog",
+            "settings_suppliers_dialog",
+            "settings_clients_dialog",
+            "settings_employees_dialog",
+            "settings_employee_day_sales_dialog",
+            "settings_employee_sale_detail_dialog",
+            "settings_backup_dialog",
+            "settings_cash_history_dialog",
+            "settings_business_dialog",
+            "settings_marketing_dialog",
+            "settings_whatsapp_dialog",
+        )
+        for attr_name in dialog_attr_names:
+            setattr(window, attr_name, Mock())
+
+        class FakeLoginDialog:
+            class DialogCode:
+                Accepted = 1
+
+            def __init__(self) -> None:
+                self.user_id = 2
+
+            def exec(self) -> int:
+                return self.DialogCode.Accepted
+
+        with patch(
+            "pos_uniformes.ui.main_window.QMessageBox.question",
+            return_value=QMessageBox.StandardButton.Yes,
+        ), patch("pos_uniformes.ui.main_window.LoginDialog", FakeLoginDialog), patch.object(
+            window,
+            "ensure_cash_session",
+            return_value=True,
+        ), patch.object(window, "refresh_all"), patch.object(window, "_set_sale_feedback"), patch.object(
+            window,
+            "show",
+        ), patch.object(window, "raise_"), patch.object(window, "activateWindow"):
+            window._handle_logout()
+
+        for attr_name in dialog_attr_names:
+            self.assertIsNone(getattr(window, attr_name))
 
     def test_cashier_view_hides_sale_context_band(self) -> None:
         window = MainWindow(user_id=1)

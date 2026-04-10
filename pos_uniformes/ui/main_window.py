@@ -4569,19 +4569,7 @@ class MainWindow(QMainWindow):
                 if not self._run_quick_backup_flow(allow_continue_on_error=True):
                     return
 
-        for dialog in (
-            self.sales_dialog,
-            self.settings_users_dialog,
-            self.settings_suppliers_dialog,
-            self.settings_clients_dialog,
-            self.settings_employees_dialog,
-            self.settings_backup_dialog,
-            self.settings_cash_history_dialog,
-            self.settings_business_dialog,
-            self.settings_whatsapp_dialog,
-        ):
-            if dialog is not None:
-                dialog.close()
+        self._close_cached_logout_dialogs()
 
         self.hide()
         dialog = LoginDialog()
@@ -4593,6 +4581,9 @@ class MainWindow(QMainWindow):
         previous_user_id = self.user_id
         previous_cart = list(self.sale_cart)
         self.user_id = dialog.user_id
+        self.show()
+        self.raise_()
+        self.activateWindow()
         if not self.ensure_cash_session():
             self.user_id = previous_user_id
             self.sale_cart = previous_cart
@@ -4612,6 +4603,27 @@ class MainWindow(QMainWindow):
         self.raise_()
         self.activateWindow()
         self._set_sale_feedback("Sesion actualizada correctamente.", "positive", auto_clear_ms=1800)
+
+    def _close_cached_logout_dialogs(self) -> None:
+        dialog_attr_names = (
+            "sales_dialog",
+            "settings_users_dialog",
+            "settings_suppliers_dialog",
+            "settings_clients_dialog",
+            "settings_employees_dialog",
+            "settings_employee_day_sales_dialog",
+            "settings_employee_sale_detail_dialog",
+            "settings_backup_dialog",
+            "settings_cash_history_dialog",
+            "settings_business_dialog",
+            "settings_marketing_dialog",
+            "settings_whatsapp_dialog",
+        )
+        for attr_name in dialog_attr_names:
+            dialog = getattr(self, attr_name, None)
+            if dialog is not None:
+                dialog.close()
+            setattr(self, attr_name, None)
 
     def _prompt_product_data(self, initial: dict[str, object] | None = None) -> dict[str, object] | None:
         return build_catalog_product_dialog(
