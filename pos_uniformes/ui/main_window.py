@@ -9313,6 +9313,7 @@ class MainWindow(QMainWindow):
             widget.blockSignals(True)
             widget.clear_selection()
             widget.blockSignals(False)
+        self._clear_inventory_table_selection()
         self._handle_inventory_filters_changed()
 
     def _handle_inventory_previous_page(self) -> None:

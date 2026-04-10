@@ -1009,6 +1009,29 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertEqual(window.inventory_overview_label.text(), "Selecciona una presentacion")
         self.assertEqual(window.catalog_selection_label.text(), "Selecciona una presentacion en inventario para gestionar cambios.")
 
+    def test_clear_inventory_filters_also_clears_table_selection(self) -> None:
+        window = MainWindow(user_id=1)
+        window.inventory_table.setRowCount(1)
+        window.inventory_table.setColumnCount(1)
+        first_item = QTableWidgetItem("SKU-101")
+        first_item.setData(0x0100, 101)
+        window.inventory_table.setItem(0, 0, first_item)
+        window.inventory_table.setCurrentCell(0, 0)
+        window.inventory_table.selectRow(0)
+        window.inventory_search_input.setText("pants")
+        window.inventory_overview_label.setText("SKU-101")
+        window.catalog_selection_label.setText("SKU-101 | contexto")
+
+        with patch.object(window, "_handle_inventory_filters_changed") as refresh_filters:
+            window._handle_clear_inventory_filters()
+
+        self.assertEqual(window.inventory_table.currentRow(), -1)
+        self.assertEqual(window.inventory_variant_combo.currentIndex(), -1)
+        self.assertEqual(window.inventory_overview_label.text(), "Selecciona una presentacion")
+        self.assertEqual(window.catalog_selection_label.text(), "Selecciona una presentacion en inventario para gestionar cambios.")
+        self.assertEqual(window.inventory_search_input.text(), "")
+        refresh_filters.assert_called_once_with()
+
     def test_inventory_hides_catalog_selection_summary_line(self) -> None:
         window = MainWindow(user_id=1)
 
