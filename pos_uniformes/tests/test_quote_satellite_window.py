@@ -184,13 +184,14 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         self.assertIn("background: #f2ece3;", window.styleSheet())
         self.assertIn("background: #efe4d5;", window.styleSheet())
 
-    def test_quote_cart_uses_six_columns_and_cashier_style(self) -> None:
+    def test_quote_cart_uses_size_column_and_cashier_style(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
 
-        self.assertEqual(window.quote_cart_table.columnCount(), 6)
+        self.assertEqual(window.quote_cart_table.columnCount(), 7)
         self.assertEqual(window.quote_cart_table.objectName(), "cashierCartTable")
         self.assertEqual(window.quote_cart_table.horizontalHeaderItem(0).text(), "Cantidad")
         self.assertEqual(window.quote_cart_table.horizontalHeaderItem(1).text(), "Producto")
+        self.assertEqual(window.quote_cart_table.horizontalHeaderItem(2).text(), "Talla")
 
     def test_sidebar_shows_empty_state_without_quote_items(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
@@ -208,6 +209,7 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
             {
                 "sku": "SKU000001",
                 "producto_nombre": "Bata Infantil Blanca",
+                "talla": "CH",
                 "escuela_nombre": "General",
                 "nivel_educativo_nombre": "Sin nivel",
                 "cantidad": 2,
@@ -217,6 +219,7 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
 
         window._refresh_quote_cart_table()
 
+        self.assertEqual(window.quote_cart_table.item(0, 2).text(), "CH")
         cards = window.sidebar_items_content.findChildren(QFrame, "satSidebarItemCard")
         self.assertEqual(len(cards), 1)
         self.assertEqual(window.sidebar_items_count_label.text(), "1 linea | 2 pzas")

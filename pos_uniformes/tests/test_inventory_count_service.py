@@ -145,6 +145,27 @@ class InventoryCountServiceTests(unittest.TestCase):
         self.assertEqual(rows[0].stock_contado, 9)
         self.assertEqual(rows[0].delta, 0)
 
+    def test_build_inventory_count_rows_from_snapshot_rows_can_start_counted_at_zero(self) -> None:
+        rows = build_inventory_count_rows_from_snapshot_rows(
+            [
+                {
+                    "variante_id": 11,
+                    "sku": "SKU000011",
+                    "producto_nombre_base": "Bata",
+                    "talla": "12",
+                    "color": "Blanca",
+                    "escuela_nombre": "General",
+                    "stock_actual": 9,
+                }
+            ],
+            use_system_count_as_counted=False,
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].stock_sistema, 9)
+        self.assertEqual(rows[0].stock_contado, 0)
+        self.assertEqual(rows[0].delta, -9)
+
     def test_update_inventory_count_row_counted_stock_recalculates_delta(self) -> None:
         rows = [
             InventoryCountRow(

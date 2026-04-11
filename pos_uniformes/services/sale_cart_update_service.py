@@ -181,6 +181,7 @@ def _apply_sale_cart_variant(
             "sku": sku,
             "variante_id": getattr(variante, "id", None),
             "producto_nombre": sanitize_product_display_name(getattr(getattr(variante, "producto", None), "nombre", "")),
+            "talla": str(getattr(variante, "talla", "") or "-"),
             "cantidad": int(quantity),
             "precio_unitario": unit_price,
             "precio_base": base_price,

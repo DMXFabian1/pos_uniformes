@@ -41,12 +41,13 @@ def build_inventory_count_batch_view(rows: list[InventoryCountRow]) -> Inventory
         return InventoryCountBatchView(
             rows=(),
             summary_label="Lote vacio.",
-            status_label="Escanea pieza por pieza para empezar a contar.",
+            status_label="Escanea sin detenerte. La tabla ira guardando solo los SKU que captures.",
             confirmation_lines=(),
         )
 
     summary_label = (
-        f"Piezas contadas: {summary.counted_pieces} | "
+        f"Lecturas: {summary.counted_pieces} | "
+        f"SKU distintos: {len(rows)} | "
         f"Sistema base: {summary.system_pieces} | "
         f"Filas con diferencia: {summary.changed_rows} | "
         f"Suben: {summary.increases} | "
@@ -67,7 +68,7 @@ def build_inventory_count_batch_view(rows: list[InventoryCountRow]) -> Inventory
     return InventoryCountBatchView(
         rows=table_rows,
         summary_label=summary_label,
-        status_label="Revisa el lote antes de aplicar. Solo se guardaran filas con diferencia.",
+        status_label="Piscina de datos lista. Sigue escaneando o revisa al final; solo se guardaran filas con diferencia.",
         confirmation_lines=confirmation_lines,
     )
 

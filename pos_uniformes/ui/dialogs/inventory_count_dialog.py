@@ -66,7 +66,7 @@ class InventoryCountDialog(QDialog):
         self._selected_variant: InventoryCountVariantView | None = None
         self._rows: list[InventoryCountRow] = list(initial_rows or [])
         self._initial_context_label = str(initial_context_label or "").strip()
-        self._scan_accumulation_enabled = not bool(initial_rows)
+        self._scan_accumulation_enabled = True
         self._result: dict[str, object] | None = None
         self._reference_value = f"CONTEO-{uuid4().hex[:8].upper()}"
         self.setWindowTitle("Conteo fisico")
@@ -82,12 +82,11 @@ class InventoryCountDialog(QDialog):
         layout.setSpacing(12)
 
         helper = QLabel(
-            "Conteo uno a uno por SKU. Sin lote previo, cada escaneo suma 1 pieza al contado; con lote base desde Inventario, puedes revisar y corregir fila por fila."
+            "Conteo libre por SKU. Escanea sin detenerte: la tabla ira armando una piscina de datos con solo los productos capturados."
         )
         helper.setWordWrap(True)
         helper.setObjectName("analyticsLine")
         helper.setStyleSheet("padding: 2px 0; color: #5f6d78;")
-        helper.setVisible(False)
         layout.addWidget(helper)
 
         self.initial_context_label = QLabel("")
@@ -96,7 +95,7 @@ class InventoryCountDialog(QDialog):
         self.initial_context_label.setStyleSheet(
             "padding: 6px 10px; border-radius: 12px; background: #eef5fb; color: #4a6072; border: 1px solid #d1e1ee;"
         )
-        self.initial_context_label.setVisible(False)
+        self.initial_context_label.setVisible(True)
         layout.addWidget(self.initial_context_label)
 
         control_card = QFrame()
@@ -107,14 +106,10 @@ class InventoryCountDialog(QDialog):
         control_layout.setVerticalSpacing(10)
 
         self.sku_input = QLineEdit()
-        self.sku_input.setPlaceholderText(
-            "Escanea pieza por pieza"
-            if self._scan_accumulation_enabled
-            else "Escanea o captura SKU"
-        )
+        self.sku_input.setPlaceholderText("Escanea pieza por pieza")
         self.sku_input.setClearButtonEnabled(True)
         self.sku_input.returnPressed.connect(self._handle_lookup_sku)
-        self.lookup_button = QPushButton("Sumar 1" if self._scan_accumulation_enabled else "Escanear")
+        self.lookup_button = QPushButton("Sumar 1")
         self.lookup_button.setObjectName("toolbarSecondaryButton")
         self.lookup_button.clicked.connect(self._handle_lookup_sku)
 
@@ -153,7 +148,7 @@ class InventoryCountDialog(QDialog):
         manual_layout = QVBoxLayout()
         manual_layout.setContentsMargins(0, 0, 0, 0)
         manual_layout.setSpacing(8)
-        manual_label = QLabel("Ajuste puntual")
+        manual_label = QLabel("Correccion puntual")
         manual_label.setObjectName("inventoryFilterLabel")
         self.counted_spin = QSpinBox()
         self.counted_spin.setRange(0, 100000)
@@ -268,7 +263,7 @@ class InventoryCountDialog(QDialog):
         sku = self.sku_input.text().strip()
         if not sku:
             self.variant_title_label.setText("Sin SKU cargado.")
-            self.variant_meta_label.setText("Captura un SKU para buscar la presentacion.")
+            self.variant_meta_label.setText("Escanea una pieza para empezar a llenar la tabla.")
             self.variant_stock_label.setText("Sistema: -")
             self.counted_spin.setEnabled(False)
             self.add_button.setEnabled(False)
@@ -286,39 +281,29 @@ class InventoryCountDialog(QDialog):
             self.sku_input.setFocus()
             return
 
-        if self._scan_accumulation_enabled:
-            self._selected_variant = variant
-            self._rows = accumulate_inventory_count_scan(
-                self._rows,
-                variant=variant,
-                step=1,
-            )
-            current_row = next(
-                (row for row in self._rows if int(row.variante_id) == int(variant.variante_id)),
-                None,
-            )
-            self._refresh_selected_variant_card()
-            if current_row is not None:
-                self.counted_spin.setValue(int(current_row.stock_contado))
-            self.counted_spin.setEnabled(True)
-            self.add_button.setEnabled(True)
-            self._refresh_batch_table()
-            self._clear_batch_selection()
-            if current_row is not None:
-                self.batch_status_label.setText(
-                    f"Conteo uno a uno: {variant.sku} | contado {current_row.stock_contado} | sistema {current_row.stock_sistema} | delta {current_row.delta:+d}"
-                )
-            self.sku_input.clear()
-            self.sku_input.setFocus()
-            return
-
         self._selected_variant = variant
+        self._rows = accumulate_inventory_count_scan(
+            self._rows,
+            variant=variant,
+            step=1,
+        )
+        current_row = next(
+            (row for row in self._rows if int(row.variante_id) == int(variant.variante_id)),
+            None,
+        )
         self._refresh_selected_variant_card()
-        self.counted_spin.setValue(int(variant.stock_actual))
+        if current_row is not None:
+            self.counted_spin.setValue(int(current_row.stock_contado))
         self.counted_spin.setEnabled(True)
         self.add_button.setEnabled(True)
-        self.counted_spin.setFocus()
-        self.counted_spin.selectAll()
+        self._refresh_batch_table()
+        self._clear_batch_selection()
+        if current_row is not None:
+            self.batch_status_label.setText(
+                f"Conteo uno a uno: {variant.sku} | contado {current_row.stock_contado} | sistema {current_row.stock_sistema} | delta {current_row.delta:+d}"
+            )
+        self.sku_input.clear()
+        self.sku_input.setFocus()
 
     def _handle_add_to_batch(self) -> None:
         if self._selected_variant is None:
@@ -332,15 +317,11 @@ class InventoryCountDialog(QDialog):
         self._rows = upsert_inventory_count_row(self._rows, new_row)
         self._refresh_batch_table()
         self._clear_batch_selection()
-        QMessageBox.information(
-            self,
-            "Lote actualizado",
+        self.batch_status_label.setText(
             (
-                f"SKU {new_row.sku} {'actualizado' if existed_before else 'agregado'} al lote.\n"
-                f"Sistema: {new_row.stock_sistema}\n"
-                f"Contado: {new_row.stock_contado}\n"
-                f"Diferencia: {new_row.delta:+d}"
-            ),
+                f"Ajuste puntual: {new_row.sku} {'actualizado' if existed_before else 'agregado'} al lote | "
+                f"contado {new_row.stock_contado} | sistema {new_row.stock_sistema} | delta {new_row.delta:+d}"
+            )
         )
         self.sku_input.clear()
         self._selected_variant = None
@@ -368,16 +349,12 @@ class InventoryCountDialog(QDialog):
     def _refresh_selected_variant_card(self) -> None:
         if self._selected_variant is None:
             self.variant_title_label.setText("Sin SKU cargado.")
-            self.variant_meta_label.setText(
-                "Escanea una pieza para cargar su stock actual."
-                if self._scan_accumulation_enabled
-                else "Escanea una presentacion para cargar su stock actual."
-            )
+            self.variant_meta_label.setText("Escanea una pieza para cargar su stock actual.")
             self.variant_stock_label.setText("Sistema: -")
             return
 
         variant = self._selected_variant
-        self.variant_title_label.setText(f"{variant.sku} | {variant.producto_nombre}")
+        self.variant_title_label.setText(f"Ultima lectura: {variant.sku} | {variant.producto_nombre}")
         self.variant_meta_label.setText(
             f"Escuela {variant.escuela_nombre} | Talla {variant.talla} | Color {variant.color}"
         )
@@ -419,16 +396,10 @@ class InventoryCountDialog(QDialog):
     def _refresh_batch_meta(self, batch_view) -> None:
         self.batch_summary_label.setText(batch_view.summary_label)
         self.batch_status_label.setText(batch_view.status_label)
-        if self._initial_context_label:
-            self.initial_context_label.setText(
-                f"Lote base: {self._initial_context_label}. Puedes ajustar el contado por fila o seguir agregando SKU."
-            )
-        elif self._scan_accumulation_enabled:
-            self.initial_context_label.setText(
-                "Modo uno a uno: cada lectura suma 1 pieza al contado. Usa Restar 1 o el ajuste puntual si necesitas corregir."
-            )
-        else:
-            self.initial_context_label.setText("Escanea SKU para construir o complementar el lote.")
+        self.initial_context_label.setText(
+            "Modo libre: la tabla solo muestra SKU escaneados. Revisa diferencias hasta el final."
+        )
+        self.initial_context_label.setVisible(bool(self.initial_context_label.text().strip()))
         self._refresh_batch_action_state()
 
     def _refresh_batch_action_state(self) -> None:
@@ -515,6 +486,9 @@ class InventoryCountDialog(QDialog):
             rows=self._rows,
         )
         changed_rows = list(payload["rows"])
+        if not self._rows:
+            QMessageBox.information(self, "Sin lecturas", "Aun no has escaneado piezas para este conteo.")
+            return
         if not changed_rows:
             QMessageBox.information(self, "Sin diferencias", "No hay diferencias reales para aplicar.")
             return

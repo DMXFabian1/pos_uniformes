@@ -12,6 +12,7 @@ from pos_uniformes.utils.date_format import format_display_date
 class QuoteDetailLineSnapshot:
     sku: str
     description: str
+    size_label: str
     quantity: int
     unit_price: object
     subtotal: object
@@ -50,6 +51,7 @@ def load_quote_detail_snapshot(session, *, quote_id: int) -> QuoteDetailSnapshot
             QuoteDetailLineSnapshot(
                 sku=str(detail.sku_snapshot),
                 description=str(detail.descripcion_snapshot),
+                size_label=str(detail.talla_snapshot or "-"),
                 quantity=int(detail.cantidad),
                 unit_price=detail.precio_unitario,
                 subtotal=detail.subtotal_linea,

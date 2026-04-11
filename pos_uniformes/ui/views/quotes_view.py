@@ -95,9 +95,9 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
     quote_actions.addWidget(window.quote_remove_button)
     quote_actions.addWidget(window.quote_clear_button)
 
-    window.quote_cart_table.setColumnCount(6)
+    window.quote_cart_table.setColumnCount(7)
     window.quote_cart_table.setHorizontalHeaderLabels(
-        ["Cantidad", "Producto", "Nivel", "Escuela", "Precio", "Subtotal"]
+        ["Cantidad", "Producto", "Talla", "Nivel", "Escuela", "Precio", "Subtotal"]
     )
     window.quote_cart_table.setObjectName("cashierCartTable")
     window.quote_cart_table.verticalHeader().setVisible(False)
@@ -137,6 +137,7 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
     quote_cart_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
     quote_cart_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
     quote_cart_header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+    quote_cart_header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
     quote_cart_header.setStretchLastSection(False)
 
     history_box = QGroupBox("Presupuestos recientes")
@@ -194,8 +195,8 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
     window.quote_meta_label.setObjectName("quoteDetailMetaText")
     window.quote_notes_label.setWordWrap(True)
     window.quote_notes_label.setObjectName("quoteDetailNotesText")
-    window.quote_detail_table.setColumnCount(5)
-    window.quote_detail_table.setHorizontalHeaderLabels(["SKU", "Producto", "Cantidad", "Precio", "Subtotal"])
+    window.quote_detail_table.setColumnCount(6)
+    window.quote_detail_table.setHorizontalHeaderLabels(["SKU", "Producto", "Talla", "Cantidad", "Precio", "Subtotal"])
     window.quote_detail_table.setObjectName("dataTable")
     window.quote_detail_table.verticalHeader().setVisible(False)
     window.quote_detail_table.setSelectionBehavior(window.quote_detail_table.SelectionBehavior.SelectRows)
@@ -207,6 +208,7 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
     quote_detail_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
     quote_detail_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
     quote_detail_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+    quote_detail_header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
     quote_detail_header.setStretchLastSection(False)
 
     detail_meta_card = QFrame()

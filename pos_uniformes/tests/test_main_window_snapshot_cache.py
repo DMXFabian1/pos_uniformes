@@ -936,9 +936,50 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
     def test_quote_cart_table_keeps_cashier_breathing_in_main_window(self) -> None:
         window = MainWindow(user_id=1)
 
+        self.assertEqual(window.quote_cart_table.columnCount(), 7)
+        self.assertEqual(window.quote_cart_table.horizontalHeaderItem(2).text(), "Talla")
         self.assertEqual(window.quote_cart_table.objectName(), "cashierCartTable")
         self.assertEqual(window.quote_cart_table.verticalHeader().defaultSectionSize(), 48)
         self.assertEqual(window.quote_cart_table.minimumHeight(), 260)
+
+    def test_create_quote_client_avoids_generating_assets_and_shows_promotion(self) -> None:
+        window = MainWindow(user_id=1)
+        window.current_role = RolUsuario.ADMIN
+        window._prompt_quick_quote_client_data = Mock(return_value={"nombre": "Ana", "telefono": "5551234567"})
+        window._render_client_card_safe = Mock(side_effect=AssertionError("No debe generar credencial aqui"))
+        window._prepare_client_qr_delivery = Mock(side_effect=AssertionError("No debe generar QR aqui"))
+        window._prepare_client_card_delivery = Mock(side_effect=AssertionError("No debe preparar envio aqui"))
+
+        fake_user = SimpleNamespace(id=1)
+        fake_client = SimpleNamespace(id=12, nombre="Ana", codigo_cliente="CLI-012", telefono="5551234567")
+        fake_session = Mock()
+        fake_session.get.return_value = fake_user
+
+        def _fake_refresh() -> None:
+            window.quote_client_combo.clear()
+            window.quote_client_combo.addItem("Sin cliente asignado", None)
+            window.quote_client_combo.addItem(
+                "CLI-012 · Ana",
+                {"id": 12, "nombre": "Ana", "telefono": "5551234567"},
+            )
+
+        window.refresh_all = Mock(side_effect=_fake_refresh)
+
+        with patch("pos_uniformes.ui.main_window.get_session") as get_session, patch(
+            "pos_uniformes.ui.main_window.ClientService.create_client_quick",
+            return_value=fake_client,
+        ), patch(
+            "pos_uniformes.ui.main_window.build_quote_client_created_feedback",
+            return_value="Promo lista",
+        ), patch(
+            "pos_uniformes.ui.main_window.QMessageBox.information",
+        ) as info:
+            get_session.return_value.__enter__.return_value = fake_session
+
+            window._handle_create_quote_client()
+
+        self.assertEqual(window.quote_client_combo.currentText(), "CLI-012 · Ana")
+        self.assertEqual(info.call_args.args[2], "Promo lista")
 
     def test_cashier_role_hides_dashboard_tab(self) -> None:
         window = MainWindow(user_id=1)
@@ -1109,11 +1150,7 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         self.assertIsNone(result)
         prompt_mock.assert_called_once()
-        self.assertEqual(prompt_mock.call_args.kwargs["initial_context_label"], "Filas seleccionadas (1)")
-        initial_rows = prompt_mock.call_args.kwargs["initial_rows"]
-        self.assertEqual(len(initial_rows), 1)
-        self.assertEqual(initial_rows[0].variante_id, 12)
-        self.assertEqual(initial_rows[0].stock_contado, 4)
+        self.assertEqual(prompt_mock.call_args.kwargs, {})
 
     def test_table_spin_tab_navigator_moves_between_bulk_adjust_inputs(self) -> None:
         host = MainWindow(user_id=1)

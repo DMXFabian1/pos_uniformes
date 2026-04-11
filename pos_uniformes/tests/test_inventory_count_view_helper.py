@@ -40,7 +40,10 @@ class InventoryCountViewHelperTests(unittest.TestCase):
             view.rows[0].values,
             ("SKU000001", "Bata", 2, 4, "+2"),
         )
-        self.assertEqual(view.summary_label, "Filas con diferencia: 2 | Suben: 1 | Bajan: 1")
+        self.assertEqual(
+            view.summary_label,
+            "Lecturas: 7 | SKU distintos: 2 | Sistema base: 7 | Filas con diferencia: 2 | Suben: 1 | Bajan: 1",
+        )
         self.assertEqual(view.confirmation_lines[0], "Filas capturadas: 2")
 
 

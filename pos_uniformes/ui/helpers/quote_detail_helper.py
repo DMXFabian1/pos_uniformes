@@ -10,15 +10,18 @@ from decimal import Decimal
 class QuoteDetailLineView:
     sku: str
     description: str
+    size_label: str
     quantity: int
     unit_price: Decimal | str | int | float
     subtotal: Decimal | str | int | float
 
     @property
-    def table_values(self) -> tuple[object, object, object, object]:
+    def table_values(self) -> tuple[object, object, object, object, object, object]:
         return (
-            self.quantity,
+            self.sku,
             self.description,
+            self.size_label,
+            self.quantity,
             self.unit_price,
             self.subtotal,
         )
@@ -79,6 +82,7 @@ def build_quote_detail_view(
             QuoteDetailLineView(
                 sku=str(row["sku"]),
                 description=str(row["description"]),
+                size_label=str(row.get("size_label") or "-"),
                 quantity=int(row["quantity"]),
                 unit_price=row["unit_price"],
                 subtotal=row["subtotal"],

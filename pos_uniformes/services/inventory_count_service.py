@@ -103,13 +103,18 @@ def build_inventory_count_row(
 
 def build_inventory_count_rows_from_snapshot_rows(
     rows: list[Mapping[str, object]],
+    *,
+    use_system_count_as_counted: bool = True,
 ) -> list[InventoryCountRow]:
     batch_rows: list[InventoryCountRow] = []
     for row in rows:
         variant = build_inventory_count_variant_view_from_snapshot_row(row)
         batch_rows = upsert_inventory_count_row(
             batch_rows,
-            build_inventory_count_row(variant, counted_stock=int(variant.stock_actual)),
+            build_inventory_count_row(
+                variant,
+                counted_stock=int(variant.stock_actual) if use_system_count_as_counted else 0,
+            ),
         )
     return batch_rows
 

@@ -24,6 +24,7 @@ class QuoteEditorServiceTests(unittest.TestCase):
                 SimpleNamespace(
                     sku_snapshot="SKU-001",
                     descripcion_snapshot="Playera",
+                    talla_snapshot="CH",
                     cantidad=2,
                     precio_unitario="199.00",
                 )
@@ -47,6 +48,7 @@ class QuoteEditorServiceTests(unittest.TestCase):
         self.assertEqual(len(snapshot.detail_rows), 1)
         self.assertEqual(snapshot.detail_rows[0].sku, "SKU-001")
         self.assertEqual(snapshot.detail_rows[0].description, "Playera")
+        self.assertEqual(snapshot.detail_rows[0].size_label, "CH")
 
     def test_save_quote_from_editor_creates_draft(self) -> None:
         user = object()

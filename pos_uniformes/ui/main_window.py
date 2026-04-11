@@ -170,7 +170,6 @@ from pos_uniformes.services.inventory_label_service import (
     render_inventory_label,
 )
 from pos_uniformes.services.inventory_overview_service import load_inventory_overview_snapshot
-from pos_uniformes.services.inventory_count_service import build_inventory_count_rows_from_snapshot_rows
 from pos_uniformes.services.inventory_snapshot_service import (
     invalidate_inventory_qr_exists_cache,
     load_inventory_snapshot_rows,
@@ -516,6 +515,7 @@ from pos_uniformes.services.sports_uniform_pricing_service import (
     THREE_PIECE_PLAYERA_PRICE,
     build_three_piece_playera_price_override,
 )
+from pos_uniformes.services.quote_client_creation_feedback_service import build_quote_client_created_feedback
 from pos_uniformes.ui.helpers.size_option_sort_helper import group_size_options, sort_size_options
 from pos_uniformes.ui.helpers.snapshot_cache_helper import SnapshotCache
 from pos_uniformes.ui.helpers.settings_backup_helper import (
@@ -4955,19 +4955,8 @@ class MainWindow(QMainWindow):
         }
 
     def _prompt_inventory_count_data(self) -> dict[str, object] | None:
-        selected_ids = self._selected_inventory_variant_ids()
-        filtered_rows = list(self.inventory_filtered_rows)
-        initial_rows = None
-        initial_context_label = None
-        if selected_ids:
-            selected_rows = [row for row in filtered_rows if int(row["variante_id"]) in set(selected_ids)]
-            if selected_rows:
-                initial_rows = build_inventory_count_rows_from_snapshot_rows(selected_rows)
-                initial_context_label = f"Filas seleccionadas ({len(selected_rows)})"
         payload = prompt_inventory_count_data(
             self,
-            initial_rows=initial_rows,
-            initial_context_label=initial_context_label,
         )
         if payload is None:
             return None
@@ -7467,10 +7456,12 @@ class MainWindow(QMainWindow):
                 )
                 session.flush()
                 client_id = int(client.id)
-                card_path, card_error = self._render_client_card_safe(client)
+                client_message = build_quote_client_created_feedback(
+                    session,
+                    client_name=str(client.nombre),
+                    client_code=str(client.codigo_cliente),
+                )
                 session.commit()
-                normalized_phone, qr_path, _qr_note = self._prepare_client_qr_delivery(client)
-                _phone_for_card, _asset_path, card_note = self._prepare_client_card_delivery(client)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "No se pudo crear", str(exc))
             return
@@ -7484,13 +7475,7 @@ class MainWindow(QMainWindow):
         QMessageBox.information(
             self,
             "Cliente creado",
-            (
-                f"Cliente '{data['nombre']}' registrado y seleccionado en el presupuesto.\n"
-                f"Telefono guardado: {normalized_phone}\n"
-                f"QR listo para envio futuro por WhatsApp:\n{qr_path}\n\n"
-                f"{'Credencial lista para enviar por WhatsApp: ' + str(card_path) if card_path is not None else 'Credencial pendiente: ' + str(card_error or 'sin detalle')}\n\n"
-                f"Mensaje base preparado:\n{card_note}"
-            ),
+            client_message,
         )
 
     def _handle_add_quote_item(self) -> None:
@@ -9123,6 +9108,7 @@ class MainWindow(QMainWindow):
                         {
                             "sku": detail.sku,
                             "description": detail.description,
+                            "size_label": detail.size_label,
                             "quantity": detail.quantity,
                             "unit_price": detail.unit_price,
                             "subtotal": detail.subtotal,
@@ -9147,9 +9133,9 @@ class MainWindow(QMainWindow):
             values = list(detalle.table_values)
             for column_index, value in enumerate(values):
                 item = _table_item(value)
-                if column_index == 0:
+                if column_index == 3:
                     item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                elif column_index in {2, 3}:
+                elif column_index in {4, 5}:
                     item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 self.quote_detail_table.setItem(row_index, column_index, item)
         self.quote_detail_table.resizeColumnsToContents()
@@ -10896,7 +10882,7 @@ class MainWindow(QMainWindow):
                 item = _table_item(value)
                 if column_index == 0:
                     item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                elif column_index in {4, 5}:
+                elif column_index in {5, 6}:
                     item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 self.quote_cart_table.setItem(row_index, column_index, item)
         self.quote_cart_table.resizeColumnsToContents()

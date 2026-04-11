@@ -41,6 +41,7 @@ class QuoteDetailHelperTests(unittest.TestCase):
                 {
                     "sku": "SKU-001",
                     "description": "Playera deportiva CH azul",
+                    "size_label": "CH",
                     "quantity": 2,
                     "unit_price": Decimal("149.50"),
                     "subtotal": Decimal("299.00"),
@@ -48,6 +49,7 @@ class QuoteDetailHelperTests(unittest.TestCase):
                 {
                     "sku": "SKU-002",
                     "description": "Pants deportivo CH azul",
+                    "size_label": "CH",
                     "quantity": 1,
                     "unit_price": Decimal("150.50"),
                     "subtotal": Decimal("150.50"),
@@ -64,12 +66,13 @@ class QuoteDetailHelperTests(unittest.TestCase):
         self.assertEqual(len(view.detail_rows), 2)
         self.assertEqual(view.detail_rows[0].sku, "SKU-001")
         self.assertEqual(view.detail_rows[0].description, "Playera deportiva CH azul")
+        self.assertEqual(view.detail_rows[0].size_label, "CH")
         self.assertEqual(view.detail_rows[0].quantity, 2)
         self.assertEqual(view.detail_rows[0].unit_price, Decimal("149.50"))
         self.assertEqual(view.detail_rows[0].subtotal, Decimal("299.00"))
         self.assertEqual(
             view.detail_rows[0].table_values,
-            (2, "Playera deportiva CH azul", Decimal("149.50"), Decimal("299.00")),
+            ("SKU-001", "Playera deportiva CH azul", "CH", 2, Decimal("149.50"), Decimal("299.00")),
         )
 
 

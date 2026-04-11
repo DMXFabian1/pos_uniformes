@@ -53,6 +53,7 @@ from pos_uniformes.services.active_filter_service import build_active_filter_tok
 from pos_uniformes.services.catalog_snapshot_service import load_catalog_snapshot_rows
 from pos_uniformes.services.client_service import ClientService
 from pos_uniformes.services.presupuesto_service import PresupuestoService
+from pos_uniformes.services.quote_client_creation_feedback_service import build_quote_client_created_feedback
 from pos_uniformes.services.quote_action_service import cancel_quote, emit_quote
 from pos_uniformes.services.quote_detail_service import load_quote_detail_snapshot
 from pos_uniformes.services.quote_document_view_service import build_quote_document_view
@@ -1290,15 +1291,15 @@ class QuoteSatelliteWindow(QMainWindow):
         self.share_meta_label.setWordWrap(True)
         self.share_notes_label.setObjectName("satDetailNotes")
         self.share_notes_label.setWordWrap(True)
-        self.share_detail_table.setColumnCount(5)
-        self.share_detail_table.setHorizontalHeaderLabels(["SKU", "Producto", "Cantidad", "Precio", "Subtotal"])
+        self.share_detail_table.setColumnCount(6)
+        self.share_detail_table.setHorizontalHeaderLabels(["SKU", "Producto", "Talla", "Cantidad", "Precio", "Subtotal"])
         self.share_detail_table.verticalHeader().setVisible(False)
         self.share_detail_table.setAlternatingRowColors(True)
         self.share_detail_table.setSelectionBehavior(self.share_detail_table.SelectionBehavior.SelectRows)
         _configure_satellite_table(
             self.share_detail_table,
             stretch_columns=(1,),
-            resize_columns=(0, 2, 3, 4),
+            resize_columns=(0, 2, 3, 4, 5),
         )
         detail_layout.addWidget(self.share_customer_label)
         detail_layout.addWidget(self.share_meta_label)
@@ -1501,9 +1502,9 @@ class QuoteSatelliteWindow(QMainWindow):
         cart_box = QGroupBox("Carrito")
         cart_layout = QVBoxLayout()
         cart_layout.setSpacing(10)
-        self.quote_cart_table.setColumnCount(6)
+        self.quote_cart_table.setColumnCount(7)
         self.quote_cart_table.setHorizontalHeaderLabels(
-            ["Cantidad", "Producto", "Nivel", "Escuela", "Precio", "Subtotal"]
+            ["Cantidad", "Producto", "Talla", "Nivel", "Escuela", "Precio", "Subtotal"]
         )
         self.quote_cart_table.setObjectName("cashierCartTable")
         self.quote_cart_table.verticalHeader().setVisible(False)
@@ -1514,7 +1515,7 @@ class QuoteSatelliteWindow(QMainWindow):
         _configure_satellite_table(
             self.quote_cart_table,
             stretch_columns=(1,),
-            resize_columns=(0, 2, 3, 4, 5),
+            resize_columns=(0, 2, 3, 4, 5, 6),
         )
 
         totals_card = QFrame()
@@ -1607,15 +1608,15 @@ class QuoteSatelliteWindow(QMainWindow):
         self.quote_meta_label.setWordWrap(True)
         self.quote_notes_label.setObjectName("satDetailNotes")
         self.quote_notes_label.setWordWrap(True)
-        self.quote_detail_table.setColumnCount(5)
-        self.quote_detail_table.setHorizontalHeaderLabels(["SKU", "Producto", "Cantidad", "Precio", "Subtotal"])
+        self.quote_detail_table.setColumnCount(6)
+        self.quote_detail_table.setHorizontalHeaderLabels(["SKU", "Producto", "Talla", "Cantidad", "Precio", "Subtotal"])
         self.quote_detail_table.verticalHeader().setVisible(False)
         self.quote_detail_table.setAlternatingRowColors(True)
         self.quote_detail_table.setSelectionBehavior(self.quote_detail_table.SelectionBehavior.SelectRows)
         _configure_satellite_table(
             self.quote_detail_table,
             stretch_columns=(1,),
-            resize_columns=(0, 2, 3, 4),
+            resize_columns=(0, 2, 3, 4, 5),
         )
         detail_layout.addWidget(self.quote_customer_label)
         detail_layout.addWidget(self.quote_meta_label)
@@ -2684,10 +2685,16 @@ class QuoteSatelliteWindow(QMainWindow):
                 )
                 session.flush()
                 client_id = int(client.id)
+                client_message = build_quote_client_created_feedback(
+                    session,
+                    client_name=str(client.nombre),
+                    client_code=str(client.codigo_cliente),
+                )
                 session.commit()
             self.refresh_all()
             self._select_client_id(client_id)
-            self._set_status(f"Cliente {payload['nombre']} creado.")
+            QMessageBox.information(self, "Cliente creado", client_message)
+            self._set_status(f"Cliente {payload['nombre']} creado y asignado.")
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "No se pudo crear", str(exc))
 
@@ -2837,6 +2844,7 @@ class QuoteSatelliteWindow(QMainWindow):
                     {
                         "sku": detail.sku,
                         "description": detail.description,
+                        "size_label": detail.size_label,
                         "quantity": detail.quantity,
                         "unit_price": detail.unit_price,
                         "subtotal": detail.subtotal,
@@ -2865,6 +2873,7 @@ class QuoteSatelliteWindow(QMainWindow):
             values = [
                 detail.sku,
                 detail.description,
+                detail.size_label,
                 detail.quantity,
                 detail.unit_price,
                 detail.subtotal,
@@ -2880,6 +2889,7 @@ class QuoteSatelliteWindow(QMainWindow):
             values = [
                 detail.sku,
                 detail.description,
+                detail.size_label,
                 detail.quantity,
                 detail.unit_price,
                 detail.subtotal,
@@ -2948,6 +2958,7 @@ class QuoteSatelliteWindow(QMainWindow):
             {
                 "sku": line.sku,
                 "producto_nombre": line.description,
+                "talla": line.size_label,
                 "escuela_nombre": line.school_name,
                 "nivel_educativo_nombre": line.education_level_name,
                 "cantidad": line.quantity,

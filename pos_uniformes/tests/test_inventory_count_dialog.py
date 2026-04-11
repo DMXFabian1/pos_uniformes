@@ -52,8 +52,46 @@ class InventoryCountDialogTests(unittest.TestCase):
         self.assertEqual(len(dialog._rows), 1)
         self.assertEqual(dialog._rows[0].stock_contado, 2)
         self.assertEqual(dialog.batch_table.rowCount(), 1)
-        self.assertFalse(dialog.initial_context_label.isVisible())
+        self.assertFalse(dialog.initial_context_label.isHidden())
         self.assertEqual(dialog.lookup_button.text(), "Sumar 1")
+
+    def test_lookup_sku_accumulates_over_selected_base_rows(self) -> None:
+        variant = InventoryCountVariantView(
+            variante_id=11,
+            sku="SKU000011",
+            producto_nombre="Bata",
+            talla="12",
+            color="Blanca",
+            escuela_nombre="General",
+            stock_actual=9,
+        )
+        dialog = InventoryCountDialog(
+            initial_rows=[
+                InventoryCountRow(
+                    variante_id=11,
+                    sku="SKU000011",
+                    producto_nombre="Bata",
+                    stock_sistema=9,
+                    stock_contado=0,
+                    delta=-9,
+                )
+            ],
+            initial_context_label="Filas seleccionadas (1)",
+        )
+
+        with (
+            patch("pos_uniformes.ui.dialogs.inventory_count_dialog.get_session", _fake_session_context),
+            patch(
+                "pos_uniformes.ui.dialogs.inventory_count_dialog.load_inventory_count_variant_by_sku",
+                return_value=variant,
+            ),
+        ):
+            dialog.sku_input.setText("SKU000011")
+            dialog._handle_lookup_sku()
+
+        self.assertEqual(dialog._rows[0].stock_contado, 1)
+        self.assertEqual(dialog._rows[0].delta, -8)
+        self.assertFalse(dialog.initial_context_label.isHidden())
 
     def test_reference_is_generated_and_read_only(self) -> None:
         dialog = InventoryCountDialog()
