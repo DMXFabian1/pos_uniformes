@@ -108,9 +108,11 @@ class InventoryCountDialog(QDialog):
         self.sku_input = QLineEdit()
         self.sku_input.setPlaceholderText("Escanea pieza por pieza")
         self.sku_input.setClearButtonEnabled(True)
-        self.sku_input.returnPressed.connect(self._handle_lookup_sku)
+        self.sku_input.installEventFilter(self)
         self.lookup_button = QPushButton("Sumar 1")
         self.lookup_button.setObjectName("toolbarSecondaryButton")
+        self.lookup_button.setAutoDefault(False)
+        self.lookup_button.setDefault(False)
         self.lookup_button.clicked.connect(self._handle_lookup_sku)
 
         search_row = QHBoxLayout()
@@ -156,6 +158,8 @@ class InventoryCountDialog(QDialog):
         self.counted_spin.setMinimumWidth(140)
         self.add_button = QPushButton("Aplicar contado manual")
         self.add_button.setObjectName("toolbarPrimaryButton")
+        self.add_button.setAutoDefault(False)
+        self.add_button.setDefault(False)
         self.add_button.setEnabled(False)
         self.add_button.clicked.connect(self._handle_add_to_batch)
         manual_hint = QLabel("Usa este ajuste si necesitas corregir una fila sin volver a escanear.")
@@ -246,9 +250,13 @@ class InventoryCountDialog(QDialog):
         cancel_button = buttons.button(QDialogButtonBox.StandardButton.Cancel)
         if ok_button is not None:
             ok_button.setText("Aplicar lote")
+            ok_button.setAutoDefault(False)
+            ok_button.setDefault(False)
             ok_button.clicked.connect(self._handle_confirm)
         if cancel_button is not None:
             cancel_button.setText("Cancelar")
+            cancel_button.setAutoDefault(False)
+            cancel_button.setDefault(False)
             cancel_button.clicked.connect(self.reject)
         actions_column.addWidget(buttons)
         footer_layout.addLayout(actions_column)
@@ -473,6 +481,18 @@ class InventoryCountDialog(QDialog):
         return False
 
     def eventFilter(self, watched, event):  # type: ignore[override]
+        if watched is self.sku_input and event.type() == QEvent.Type.KeyPress and event.key() in (
+            Qt.Key.Key_Return,
+            Qt.Key.Key_Enter,
+        ):
+            self._handle_lookup_sku()
+            return True
+        if watched is self.sku_input and event.type() == QEvent.Type.ShortcutOverride and event.key() in (
+            Qt.Key.Key_Return,
+            Qt.Key.Key_Enter,
+        ):
+            event.accept()
+            return True
         if event.type() in (QEvent.Type.ShortcutOverride, QEvent.Type.KeyPress) and event.key() == Qt.Key.Key_Escape:
             if self._is_batch_table_widget(watched):
                 self._clear_batch_selection()

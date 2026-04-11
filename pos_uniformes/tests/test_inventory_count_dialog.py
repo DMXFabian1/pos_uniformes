@@ -55,6 +55,37 @@ class InventoryCountDialogTests(unittest.TestCase):
         self.assertFalse(dialog.initial_context_label.isHidden())
         self.assertEqual(dialog.lookup_button.text(), "Sumar 1")
 
+    def test_enter_on_scan_input_adds_reading_without_closing_dialog(self) -> None:
+        variant = InventoryCountVariantView(
+            variante_id=11,
+            sku="SKU000011",
+            producto_nombre="Bata",
+            talla="12",
+            color="Blanca",
+            escuela_nombre="General",
+            stock_actual=9,
+        )
+        dialog = InventoryCountDialog()
+        dialog.show()
+
+        with (
+            patch("pos_uniformes.ui.dialogs.inventory_count_dialog.get_session", _fake_session_context),
+            patch(
+                "pos_uniformes.ui.dialogs.inventory_count_dialog.load_inventory_count_variant_by_sku",
+                return_value=variant,
+            ),
+        ):
+            dialog.sku_input.setFocus()
+            dialog.sku_input.setText("SKU000011")
+            QTest.keyClick(dialog.sku_input, Qt.Key.Key_Return)
+            QTest.qWait(20)
+
+        self.assertEqual(dialog.result(), 0)
+        self.assertTrue(dialog.isVisible())
+        self.assertEqual(len(dialog._rows), 1)
+        self.assertEqual(dialog._rows[0].stock_contado, 1)
+        self.assertEqual(dialog.batch_table.rowCount(), 1)
+
     def test_lookup_sku_accumulates_over_selected_base_rows(self) -> None:
         variant = InventoryCountVariantView(
             variante_id=11,
