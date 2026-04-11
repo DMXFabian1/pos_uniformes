@@ -48,6 +48,10 @@ def collect_selected_inventory_variant_ids(raw_variant_ids: Iterable[object]) ->
     return ids
 
 
+def collect_inventory_row_variant_ids(rows: Iterable[dict[str, object]]) -> list[int]:
+    return collect_selected_inventory_variant_ids(row.get("variante_id") for row in rows)
+
+
 def find_inventory_row_index_by_variant_id(
     row_variant_ids: Sequence[object],
     variant_id: object,

@@ -437,6 +437,7 @@ from pos_uniformes.ui.helpers.inventory_qr_preview_helper import (
     build_inventory_qr_preview_selection,
 )
 from pos_uniformes.ui.helpers.inventory_selection_helper import (
+    collect_inventory_row_variant_ids,
     collect_selected_inventory_variant_ids,
     find_catalog_row_by_variant_id,
     find_inventory_row_index_by_variant_id,
@@ -1434,6 +1435,7 @@ class MainWindow(QMainWindow):
         self.inventory_new_button = QToolButton()
         self.inventory_edit_button = QToolButton()
         self.inventory_stock_button = QToolButton()
+        self.inventory_labels_button = QToolButton()
         self.inventory_more_button = QToolButton()
         self.inventory_table = QTableWidget()
 
@@ -4957,6 +4959,7 @@ class MainWindow(QMainWindow):
     def _prompt_inventory_count_data(self) -> dict[str, object] | None:
         payload = prompt_inventory_count_data(
             self,
+            print_labels_callback=self._handle_inventory_count_print_labels,
         )
         if payload is None:
             return None
@@ -8257,6 +8260,7 @@ class MainWindow(QMainWindow):
         self.inventory_new_button.setEnabled(is_admin)
         self.inventory_edit_button.setEnabled(is_admin)
         self.inventory_stock_button.setEnabled(is_admin)
+        self.inventory_labels_button.setEnabled(is_admin)
         self.inventory_bulk_adjust_button.setEnabled(is_admin)
         self.inventory_bulk_price_button.setEnabled(is_admin)
         self.inventory_more_button.setEnabled(is_admin)
@@ -10727,6 +10731,37 @@ class MainWindow(QMainWindow):
             )
             return
 
+        self._open_inventory_label_dialog_for_variant(int(variante_id))
+
+    def _handle_inventory_print_visible_labels(self) -> None:
+        visible_variant_ids = collect_inventory_row_variant_ids(self.inventory_filtered_rows)
+        if not visible_variant_ids:
+            QMessageBox.warning(
+                self,
+                "Sin resultados",
+                "No hay presentaciones visibles en Inventario para preparar etiquetas.",
+            )
+            return
+        if len(visible_variant_ids) == 1:
+            self._open_inventory_label_dialog_for_variant(int(visible_variant_ids[0]))
+            return
+        self._handle_inventory_print_label_batch(visible_variant_ids)
+
+    def _handle_inventory_count_print_labels(self, variant_ids: list[int]) -> None:
+        ordered_variant_ids = [int(variant_id) for variant_id in variant_ids if int(variant_id)]
+        if not ordered_variant_ids:
+            QMessageBox.information(
+                self,
+                "Sin lecturas",
+                "Aun no hay piezas capturadas para preparar etiquetas desde el conteo.",
+            )
+            return
+        if len(ordered_variant_ids) == 1:
+            self._open_inventory_label_dialog_for_variant(int(ordered_variant_ids[0]))
+            return
+        self._handle_inventory_print_label_batch(ordered_variant_ids)
+
+    def _open_inventory_label_dialog_for_variant(self, variante_id: int) -> None:
         variant_ids = [
             int(item_data)
             for index in range(self.inventory_variant_combo.count())

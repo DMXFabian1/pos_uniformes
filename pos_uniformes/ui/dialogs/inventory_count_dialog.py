@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from uuid import uuid4
 
 from PyQt6.QtCore import QEvent, QTimer, Qt
@@ -43,11 +44,13 @@ def prompt_inventory_count_data(
     *,
     initial_rows: list[InventoryCountRow] | None = None,
     initial_context_label: str | None = None,
+    print_labels_callback: Callable[[list[int]], None] | None = None,
 ) -> dict[str, object] | None:
     dialog = InventoryCountDialog(
         parent=parent,
         initial_rows=initial_rows,
         initial_context_label=initial_context_label,
+        print_labels_callback=print_labels_callback,
     )
     if dialog.exec() != int(QDialog.DialogCode.Accepted):
         return None
@@ -61,6 +64,7 @@ class InventoryCountDialog(QDialog):
         *,
         initial_rows: list[InventoryCountRow] | None = None,
         initial_context_label: str | None = None,
+        print_labels_callback: Callable[[list[int]], None] | None = None,
     ) -> None:
         super().__init__(parent)
         self._selected_variant: InventoryCountVariantView | None = None
@@ -69,6 +73,11 @@ class InventoryCountDialog(QDialog):
         self._scan_accumulation_enabled = True
         self._result: dict[str, object] | None = None
         self._reference_value = f"CONTEO-{uuid4().hex[:8].upper()}"
+        self._print_labels_callback = print_labels_callback
+        self._scan_feedback_reset_timer = QTimer(self)
+        self._scan_feedback_reset_timer.setSingleShot(True)
+        self._scan_feedback_reset_timer.setInterval(1200)
+        self._scan_feedback_reset_timer.timeout.connect(self._reset_scan_feedback)
         self.setWindowTitle("Conteo fisico")
         self.setModal(True)
         self.resize(960, 720)
@@ -89,6 +98,59 @@ class InventoryCountDialog(QDialog):
         helper.setStyleSheet("padding: 2px 0; color: #5f6d78;")
         layout.addWidget(helper)
 
+        scan_header_card = QFrame()
+        scan_header_card.setObjectName("infoSubcard")
+        scan_header_card.setStyleSheet(
+            "QFrame#infoSubcard { border: 1px solid #d9e5ef; }"
+            "QLineEdit#inventoryCountScanInput {"
+            "  min-height: 58px;"
+            "  padding: 0 18px;"
+            "  border-radius: 18px;"
+            "  border: 2px solid #d7e4ee;"
+            "  background: #fcfdfd;"
+            "  font-size: 22px;"
+            "  font-weight: 600;"
+            "  color: #294f69;"
+            "}"
+            "QLineEdit#inventoryCountScanInput:focus {"
+            "  border: 2px solid #c45425;"
+            "  background: #fffdf9;"
+            "}"
+        )
+        scan_header_layout = QVBoxLayout()
+        scan_header_layout.setContentsMargins(16, 14, 16, 14)
+        scan_header_layout.setSpacing(10)
+
+        scan_header_row = QHBoxLayout()
+        scan_header_row.setSpacing(10)
+        self.scan_title_label = QLabel("Escaneando...")
+        self.scan_title_label.setObjectName("inventoryTitle")
+        self.scan_title_label.setStyleSheet("font-size: 30px; font-weight: 800; color: #224863;")
+        self.scan_state_badge = QLabel()
+        self.scan_state_badge.setObjectName("analyticsLine")
+        self.scan_state_badge.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        scan_header_row.addWidget(self.scan_title_label)
+        scan_header_row.addStretch(1)
+        scan_header_row.addWidget(self.scan_state_badge, 0, Qt.AlignmentFlag.AlignVCenter)
+
+        self.scan_hint_label = QLabel("Cada lectura suma una pieza y mantiene el foco en este campo.")
+        self.scan_hint_label.setObjectName("analyticsLine")
+        self.scan_hint_label.setWordWrap(True)
+        self.scan_hint_label.setStyleSheet("color: #5f6d78; padding: 0 2px;")
+
+        self.sku_input = QLineEdit()
+        self.sku_input.setObjectName("inventoryCountScanInput")
+        self.sku_input.setPlaceholderText("Escanea pieza por pieza")
+        self.sku_input.setClearButtonEnabled(True)
+        self.sku_input.setMinimumHeight(58)
+        self.sku_input.installEventFilter(self)
+
+        scan_header_layout.addLayout(scan_header_row)
+        scan_header_layout.addWidget(self.scan_hint_label)
+        scan_header_layout.addWidget(self.sku_input)
+        scan_header_card.setLayout(scan_header_layout)
+        layout.addWidget(scan_header_card)
+
         self.initial_context_label = QLabel("")
         self.initial_context_label.setObjectName("analyticsLine")
         self.initial_context_label.setWordWrap(True)
@@ -105,10 +167,6 @@ class InventoryCountDialog(QDialog):
         control_layout.setHorizontalSpacing(12)
         control_layout.setVerticalSpacing(10)
 
-        self.sku_input = QLineEdit()
-        self.sku_input.setPlaceholderText("Escanea pieza por pieza")
-        self.sku_input.setClearButtonEnabled(True)
-        self.sku_input.installEventFilter(self)
         self.lookup_button = QPushButton("Sumar 1")
         self.lookup_button.setObjectName("toolbarSecondaryButton")
         self.lookup_button.setAutoDefault(False)
@@ -233,12 +291,16 @@ class InventoryCountDialog(QDialog):
 
         actions_column = QVBoxLayout()
         actions_column.setSpacing(8)
+        self.print_labels_button = QPushButton("Imprimir etiquetas")
+        self.print_labels_button.setObjectName("toolbarSecondaryButton")
+        self.print_labels_button.clicked.connect(self._handle_print_labels)
         self.decrement_button = QPushButton("Restar 1")
         self.decrement_button.setObjectName("toolbarGhostButton")
         self.decrement_button.clicked.connect(self._handle_decrement_selected_row_count)
         self.remove_button = QPushButton("Quitar fila")
         self.remove_button.setObjectName("toolbarGhostButton")
         self.remove_button.clicked.connect(self._handle_remove_selected_row)
+        actions_column.addWidget(self.print_labels_button)
         actions_column.addWidget(self.decrement_button)
         actions_column.addWidget(self.remove_button)
         actions_column.addStretch()
@@ -265,6 +327,7 @@ class InventoryCountDialog(QDialog):
 
         self.setLayout(layout)
         self.batch_table.itemSelectionChanged.connect(self._refresh_batch_action_state)
+        self._reset_scan_feedback()
         self.sku_input.setFocus()
 
     def _handle_lookup_sku(self) -> None:
@@ -275,6 +338,7 @@ class InventoryCountDialog(QDialog):
             self.variant_stock_label.setText("Sistema: -")
             self.counted_spin.setEnabled(False)
             self.add_button.setEnabled(False)
+            self._set_scan_feedback("Esperando lectura", tone="idle")
             self.sku_input.setFocus()
             return
 
@@ -282,6 +346,7 @@ class InventoryCountDialog(QDialog):
             variant = load_inventory_count_variant_by_sku(session, sku)
 
         if variant is None:
+            self._set_scan_feedback("SKU no encontrado", tone="warning", sticky=True)
             QMessageBox.information(self, "SKU no encontrado", f"No se encontro una presentacion para '{sku}'.")
             self._selected_variant = None
             self._refresh_selected_variant_card()
@@ -310,6 +375,7 @@ class InventoryCountDialog(QDialog):
             self.batch_status_label.setText(
                 f"Conteo uno a uno: {variant.sku} | contado {current_row.stock_contado} | sistema {current_row.stock_sistema} | delta {current_row.delta:+d}"
             )
+            self._set_scan_feedback(f"{variant.sku} sumado", tone="success")
         self.sku_input.clear()
         self.sku_input.setFocus()
 
@@ -413,8 +479,45 @@ class InventoryCountDialog(QDialog):
     def _refresh_batch_action_state(self) -> None:
         has_rows = bool(self._rows)
         has_selection = self.batch_table.currentRow() >= 0
+        self.print_labels_button.setEnabled(has_rows and self._print_labels_callback is not None)
         self.remove_button.setEnabled(has_rows and has_selection)
         self.decrement_button.setEnabled(has_rows and has_selection)
+
+    def _selected_batch_variant_ids(self) -> list[int]:
+        selection_model = self.batch_table.selectionModel()
+        if selection_model is None:
+            return []
+        variant_ids: list[int] = []
+        seen: set[int] = set()
+        for model_index in selection_model.selectedRows():
+            item = self.batch_table.item(model_index.row(), 0)
+            if item is None:
+                continue
+            raw_variant_id = item.data(Qt.ItemDataRole.UserRole)
+            try:
+                variant_id = int(raw_variant_id)
+            except (TypeError, ValueError):
+                continue
+            if variant_id in seen:
+                continue
+            seen.add(variant_id)
+            variant_ids.append(variant_id)
+        return variant_ids
+
+    def _handle_print_labels(self) -> None:
+        if self._print_labels_callback is None:
+            return
+        selected_variant_ids = self._selected_batch_variant_ids()
+        variant_ids = selected_variant_ids or [int(row.variante_id) for row in self._rows]
+        if not variant_ids:
+            QMessageBox.information(
+                self,
+                "Sin lecturas",
+                "Escanea al menos una pieza antes de abrir la impresion de etiquetas.",
+            )
+            return
+        self._print_labels_callback(variant_ids)
+        self.sku_input.setFocus()
 
     def _handle_decrement_selected_row_count(self) -> None:
         current_row = self.batch_table.currentRow()
@@ -470,6 +573,25 @@ class InventoryCountDialog(QDialog):
         self._refresh_batch_action_state()
         self.sku_input.setFocus(Qt.FocusReason.ShortcutFocusReason)
         QTimer.singleShot(0, lambda: self.sku_input.setFocus(Qt.FocusReason.ShortcutFocusReason))
+
+    def _reset_scan_feedback(self) -> None:
+        self._set_scan_feedback("Listo para leer", tone="idle", sticky=True)
+
+    def _set_scan_feedback(self, text: str, *, tone: str, sticky: bool = False) -> None:
+        tone_styles = {
+            "idle": "background: #eef5fb; color: #456176; border: 1px solid #d1e1ee;",
+            "success": "background: #e6f6ec; color: #1f6a3b; border: 1px solid #b7e0c4;",
+            "warning": "background: #fff4df; color: #8a5a0a; border: 1px solid #efd4a0;",
+        }
+        self.scan_state_badge.setText(text.strip() or "Listo para leer")
+        self.scan_state_badge.setStyleSheet(
+            "padding: 6px 12px; border-radius: 12px; font-weight: 700; "
+            + tone_styles.get(tone, tone_styles["idle"])
+        )
+        if sticky:
+            self._scan_feedback_reset_timer.stop()
+            return
+        self._scan_feedback_reset_timer.start()
 
     def _is_batch_table_widget(self, watched) -> bool:
         current = watched

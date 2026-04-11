@@ -25,6 +25,13 @@ class InventoryCountDialogTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
 
+    def test_scan_header_starts_ready_for_reading(self) -> None:
+        dialog = InventoryCountDialog()
+
+        self.assertEqual(dialog.scan_title_label.text(), "Escaneando...")
+        self.assertEqual(dialog.scan_state_badge.text(), "Listo para leer")
+        self.assertGreaterEqual(dialog.sku_input.minimumHeight(), 58)
+
     def test_lookup_sku_accumulates_count_when_dialog_starts_without_initial_rows(self) -> None:
         variant = InventoryCountVariantView(
             variante_id=11,
@@ -54,6 +61,7 @@ class InventoryCountDialogTests(unittest.TestCase):
         self.assertEqual(dialog.batch_table.rowCount(), 1)
         self.assertFalse(dialog.initial_context_label.isHidden())
         self.assertEqual(dialog.lookup_button.text(), "Sumar 1")
+        self.assertEqual(dialog.scan_state_badge.text(), "SKU000011 sumado")
 
     def test_enter_on_scan_input_adds_reading_without_closing_dialog(self) -> None:
         variant = InventoryCountVariantView(
@@ -220,6 +228,64 @@ class InventoryCountDialogTests(unittest.TestCase):
 
         self.assertEqual(dialog._rows[0].stock_contado, 11)
         self.assertEqual(dialog._rows[0].delta, 2)
+
+    def test_print_labels_button_uses_selected_row_when_available(self) -> None:
+        printed_ids: list[list[int]] = []
+        dialog = InventoryCountDialog(
+            initial_rows=[
+                InventoryCountRow(
+                    variante_id=11,
+                    sku="SKU000011",
+                    producto_nombre="Bata Blanca",
+                    stock_sistema=9,
+                    stock_contado=10,
+                    delta=1,
+                ),
+                InventoryCountRow(
+                    variante_id=12,
+                    sku="SKU000012",
+                    producto_nombre="Bata Azul",
+                    stock_sistema=4,
+                    stock_contado=6,
+                    delta=2,
+                ),
+            ],
+            print_labels_callback=lambda variant_ids: printed_ids.append(list(variant_ids)),
+        )
+
+        dialog.batch_table.selectRow(1)
+        dialog.print_labels_button.click()
+
+        self.assertEqual(printed_ids, [[12]])
+
+    def test_print_labels_button_uses_all_rows_when_nothing_is_selected(self) -> None:
+        printed_ids: list[list[int]] = []
+        dialog = InventoryCountDialog(
+            initial_rows=[
+                InventoryCountRow(
+                    variante_id=11,
+                    sku="SKU000011",
+                    producto_nombre="Bata Blanca",
+                    stock_sistema=9,
+                    stock_contado=10,
+                    delta=1,
+                ),
+                InventoryCountRow(
+                    variante_id=12,
+                    sku="SKU000012",
+                    producto_nombre="Bata Azul",
+                    stock_sistema=4,
+                    stock_contado=6,
+                    delta=2,
+                ),
+            ],
+            print_labels_callback=lambda variant_ids: printed_ids.append(list(variant_ids)),
+        )
+
+        dialog._clear_batch_selection()
+        dialog.print_labels_button.click()
+
+        self.assertEqual(printed_ids, [[11, 12]])
 
 
 if __name__ == "__main__":

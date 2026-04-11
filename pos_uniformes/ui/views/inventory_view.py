@@ -48,6 +48,7 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_new_button.setText("Nuevo")
     window.inventory_edit_button.setText("Editar")
     window.inventory_stock_button.setText("Stock")
+    window.inventory_labels_button.setText("Etiquetas")
     window.inventory_more_button.setText("Mas")
     window.toggle_product_button.setText("Prod.")
     window.toggle_variant_button.setText("Pres.")
@@ -64,6 +65,7 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
         window.inventory_new_button: QStyle.StandardPixmap.SP_FileDialogNewFolder,
         window.inventory_edit_button: QStyle.StandardPixmap.SP_FileDialogDetailedView,
         window.inventory_stock_button: QStyle.StandardPixmap.SP_ArrowUp,
+        window.inventory_labels_button: QStyle.StandardPixmap.SP_FileDialogContentsView,
         window.inventory_more_button: QStyle.StandardPixmap.SP_TitleBarUnshadeButton,
     }
     for button, icon in grouped_buttons.items():
@@ -120,6 +122,18 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     bulk_adjust_action.triggered.connect(window._handle_inventory_bulk_adjustment)
     window.inventory_stock_button.setMenu(stock_menu)
 
+    labels_menu = QMenu(window)
+    print_selected_action = labels_menu.addAction("Etiquetas de seleccion")
+    print_selected_action.triggered.connect(window._handle_inventory_print_label)
+    print_visible_action = labels_menu.addAction("Etiquetas de visibles")
+    print_visible_action.triggered.connect(window._handle_inventory_print_visible_labels)
+    window.inventory_labels_button.setMenu(labels_menu)
+    window.inventory_labels_button.clicked.connect(window._handle_inventory_print_label)
+    window.inventory_labels_button.setPopupMode(window.inventory_labels_button.ToolButtonPopupMode.MenuButtonPopup)
+    window.inventory_labels_button.setToolTip(
+        "Click: imprime la seleccion actual. Menu: abre etiquetas para los resultados visibles filtrados."
+    )
+
     more_menu = QMenu(window)
     delete_product_action = more_menu.addAction("Eliminar producto")
     delete_product_action.triggered.connect(window._handle_delete_product)
@@ -135,6 +149,7 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     toolbar.addWidget(window.inventory_new_button)
     toolbar.addWidget(window.inventory_edit_button)
     toolbar.addWidget(window.inventory_stock_button)
+    toolbar.addWidget(window.inventory_labels_button)
     toolbar.addWidget(window.inventory_bulk_adjust_button)
     toolbar.addWidget(window.inventory_bulk_price_button)
     toolbar.addWidget(window.inventory_more_button)
