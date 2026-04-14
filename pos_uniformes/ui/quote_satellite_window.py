@@ -276,6 +276,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_empty_label = QLabel("Selecciona una ruta para comenzar.")
         self.guided_qty_spin = QSpinBox()
         self.guided_add_button = QPushButton("Agregar al presupuesto")
+        self.guided_print_label_button = QPushButton("Imprimir etiqueta")
         self.guided_reset_button = QPushButton("Limpiar pasos")
         self.guided_basics_button = QPushButton("Piezas generales")
         self.guided_visual_icon_label = QLabel()
@@ -1360,7 +1361,9 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_qty_spin.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
         self.guided_qty_spin.setValue(1)
         self.guided_add_button.setObjectName("primaryButton")
+        self.guided_print_label_button.setObjectName("ghostButton")
         detail_actions.addStretch()
+        detail_actions.addWidget(self.guided_print_label_button)
         detail_actions.addWidget(QLabel("Cantidad"))
         detail_actions.addWidget(self.guided_qty_spin)
         detail_actions.addWidget(self.guided_add_button)
@@ -1783,6 +1786,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.catalog_previous_page_button.clicked.connect(self._handle_catalog_browser_previous_page)
         self.catalog_next_page_button.clicked.connect(self._handle_catalog_browser_next_page)
         self.guided_add_button.clicked.connect(self._handle_add_guided_selection_to_quote)
+        self.guided_print_label_button.clicked.connect(self._print_label_for_guided_selection)
         self.guided_reset_button.clicked.connect(self._handle_guided_reset_steps)
         self.guided_basics_button.clicked.connect(self._handle_guided_go_to_basics)
         self.quote_remove_button.clicked.connect(self._handle_remove_quote_item)
@@ -3094,6 +3098,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.catalog_add_button.setEnabled(bool(self._selected_catalog_sku()) and self._can_operate())
         self.catalog_print_label_button.setEnabled(bool(self._selected_catalog_sku()))
         self.guided_add_button.setEnabled(bool(self.guided_selected_sku) and self._can_operate())
+        self.guided_print_label_button.setEnabled(bool(self.guided_selected_sku))
         self.quote_qty_down_button.setEnabled(selected_quote_line)
         self.quote_qty_up_button.setEnabled(selected_quote_line)
         self.quote_remove_button.setEnabled(selected_quote_line)
@@ -3587,8 +3592,14 @@ class QuoteSatelliteWindow(QMainWindow):
         print_dialog.setWindowTitle(title)
         return print_dialog.exec() == QDialog.DialogCode.Accepted
 
+    def _print_label_for_guided_selection(self) -> None:
+        self._print_label_for_sku(self.guided_selected_sku)
+
     def _print_label_for_selected_catalog_row(self) -> None:
-        sku = self._selected_catalog_sku()
+        self._print_label_for_sku(self._selected_catalog_sku())
+
+    def _print_label_for_sku(self, sku: str) -> None:
+        sku = (sku or "").strip()
         if not sku:
             return
         selected_row = next(
@@ -3596,7 +3607,9 @@ class QuoteSatelliteWindow(QMainWindow):
         )
         if selected_row is None:
             return
+        self._open_label_dialog_for_row(selected_row)
 
+    def _open_label_dialog_for_row(self, selected_row: dict) -> None:
         if not self._show_pin_dialog():
             return
 
