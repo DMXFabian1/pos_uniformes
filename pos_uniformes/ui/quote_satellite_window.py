@@ -115,6 +115,13 @@ SATELLITE_SEARCH_DEBOUNCE_MS = 300
 SATELLITE_CATALOG_PAGE_SIZE = 25
 SATELLITE_QUOTE_VALIDITY_DAYS = 7
 
+try:
+    from PyQt6.QtWidgets import QScroller as _QScroller
+    _SCROLLER_GESTURE = _QScroller.ScrollerGestureType.LeftMouseButtonGesture
+    _TOUCH_SCROLL_AVAILABLE = True
+except Exception:
+    _TOUCH_SCROLL_AVAILABLE = False
+
 
 class QuoteSatelliteWindow(QMainWindow):
     def __init__(
@@ -870,6 +877,27 @@ class QuoteSatelliteWindow(QMainWindow):
         root.setLayout(root_layout)
         self.setCentralWidget(root)
         self._set_page("kiosk")
+        self._apply_touch_scrolling()
+
+    def _apply_touch_scrolling(self) -> None:
+        """Activa scroll por arrastre en todas las tablas y areas scrollables."""
+        if not _TOUCH_SCROLL_AVAILABLE:
+            return
+        for widget in (
+            self.catalog_table,
+            self.kiosk_recent_table,
+            self.quote_table,
+            self.share_detail_table,
+            self.quote_cart_table,
+        ):
+            _QScroller.grabGesture(widget.viewport(), _SCROLLER_GESTURE)
+        for scroll_area in (
+            self.sidebar_items_scroll,
+            self.guided_product_scroll,
+            self.guided_page_scroll,
+            self.guided_school_scroll,
+        ):
+            _QScroller.grabGesture(scroll_area.viewport(), _SCROLLER_GESTURE)
 
     def _build_sidebar(self) -> QWidget:
         card = QFrame()
@@ -1085,6 +1113,7 @@ class QuoteSatelliteWindow(QMainWindow):
         page_layout.setSpacing(0)
 
         scroll = QScrollArea()
+        self.guided_page_scroll = scroll
         scroll.setObjectName("guidedPageScrollArea")
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -1155,6 +1184,7 @@ class QuoteSatelliteWindow(QMainWindow):
         school_hint.setObjectName("guidedStepHint")
         school_hint.setWordWrap(True)
         school_scroll = QScrollArea()
+        self.guided_school_scroll = school_scroll
         school_scroll.setWidgetResizable(True)
         school_scroll.setFrameShape(QFrame.Shape.NoFrame)
         school_scroll.setMinimumHeight(160)
@@ -1808,6 +1838,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self.page_stack.setCurrentIndex(page_index_map[page_key])
         button_map[page_key].setChecked(True)
         self._set_status(page_title_map[page_key])
+        if page_key == "kiosk":
+            QTimer.singleShot(0, self.kiosk_scan_input.setFocus)
 
     def refresh_all(self) -> None:
         try:
