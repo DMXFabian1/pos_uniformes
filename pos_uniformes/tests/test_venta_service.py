@@ -51,7 +51,7 @@ class VentaServiceLayawayTests(unittest.TestCase):
     def test_crear_confirmada_desde_apartado_preserves_rounded_total(self) -> None:
         session = _SessionStub()
         usuario = SimpleNamespace(activo=True, rol="CAJERO", username="caja")
-        variante = SimpleNamespace()
+        variante = SimpleNamespace(producto=SimpleNamespace(nombre="Playera"))
         detalle = SimpleNamespace(
             variante=variante,
             cantidad=1,
@@ -87,7 +87,7 @@ class VentaServiceLayawayTests(unittest.TestCase):
     def test_crear_confirmada_desde_apartado_keeps_observation_without_adjustment(self) -> None:
         session = _SessionStub()
         usuario = SimpleNamespace(activo=True, rol="CAJERO", username="caja")
-        variante = SimpleNamespace()
+        variante = SimpleNamespace(producto=SimpleNamespace(nombre="Pantalon"))
         detalle = SimpleNamespace(
             variante=variante,
             cantidad=1,
@@ -121,7 +121,7 @@ class VentaServiceLayawayTests(unittest.TestCase):
     def test_crear_borrador_preserves_custom_unit_price_for_same_sku(self) -> None:
         session = _SessionStub()
         usuario = SimpleNamespace(activo=True, rol="CAJERO")
-        variant = SimpleNamespace(sku="PLY-001", precio_venta=Decimal("189.00"))
+        variant = SimpleNamespace(sku="PLY-001", precio_venta=Decimal("189.00"), producto=SimpleNamespace(nombre="Playera"))
 
         with patch("pos_uniformes.services.venta_service.Venta", _FakeVenta), patch(
             "pos_uniformes.services.venta_service.VentaDetalle", _FakeVentaDetalle
@@ -153,7 +153,7 @@ class VentaServiceLayawayTests(unittest.TestCase):
     def test_crear_borrador_persists_sale_origin_fields(self) -> None:
         session = _SessionStub()
         usuario = SimpleNamespace(activo=True, rol="CAJERO")
-        variant = SimpleNamespace(sku="SKU-001", precio_venta=Decimal("65.00"))
+        variant = SimpleNamespace(sku="SKU-001", precio_venta=Decimal("65.00"), producto=SimpleNamespace(nombre="Camisa"))
 
         with patch("pos_uniformes.services.venta_service.Venta", _FakeVenta), patch(
             "pos_uniformes.services.venta_service.VentaDetalle", _FakeVentaDetalle
