@@ -28,3 +28,4 @@ packaging/windows/drivers/*
 backups/database/*.sql
 backups/database/*.dump
 backups/database/.automatic_backup_status.json
+data/catalog_cache.json

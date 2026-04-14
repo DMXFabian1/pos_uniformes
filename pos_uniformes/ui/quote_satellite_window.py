@@ -50,6 +50,11 @@ if __package__ in {None, ""}:
 from pos_uniformes.database.connection import get_session
 from pos_uniformes.database.models import Cliente, EstadoPresupuesto, RolUsuario, Usuario
 from pos_uniformes.services.active_filter_service import build_active_filter_tokens
+from pos_uniformes.services.catalog_local_cache_service import (
+    catalog_cache_saved_at,
+    format_cache_age_label,
+    save_catalog_cache,
+)
 from pos_uniformes.services.catalog_snapshot_service import load_catalog_snapshot_rows
 from pos_uniformes.services.client_service import ClientService
 from pos_uniformes.services.presupuesto_service import PresupuestoService
@@ -112,9 +117,15 @@ SATELLITE_QUOTE_VALIDITY_DAYS = 7
 
 
 class QuoteSatelliteWindow(QMainWindow):
-    def __init__(self, user_id: int) -> None:
+    def __init__(
+        self,
+        user_id: int | None,
+        offline_mode: bool = False,
+        offline_catalog_cache: list[dict] | None = None,
+    ) -> None:
         super().__init__()
         self.user_id = user_id
+        self.offline_mode = offline_mode
         self.current_username = ""
         self.current_full_name = ""
         self.current_role = RolUsuario.CAJERO
@@ -139,19 +150,62 @@ class QuoteSatelliteWindow(QMainWindow):
         self._apply_styles()
         self._build_ui()
         self._bind_events()
-        self._load_operator_context()
+
+        if self.offline_mode:
+            self._init_offline(offline_catalog_cache or [])
+        else:
+            self._load_operator_context()
+            self._reset_quote_form()
+            self._apply_lookup_view(build_empty_quote_kiosk_lookup_view())
+            self._apply_catalog_detail(None)
+            self._apply_guided_detail(None)
+            self._refresh_recent_lookup_table()
+            self.refresh_all()
+
+        QTimer.singleShot(0, self.kiosk_scan_input.setFocus)
+
+    def _init_offline(self, cache_rows: list[dict]) -> None:
+        """Inicializa la ventana en modo local sin tocar la base de datos."""
+        self.catalog_snapshot_rows = cache_rows
+        self.operator_label.setText("Modo local")
+
+        # Mostrar banner con antiguedad del cache
+        saved_at = catalog_cache_saved_at()
+        age_text = format_cache_age_label(saved_at) if saved_at else "cache local disponible"
+        self.offline_banner.setText(
+            f"Modo local \u2014 Catalogo {age_text}. "
+            "Enciende la PC principal para datos en vivo."
+        )
+        self.offline_banner.setVisible(True)
+
+        # Deshabilitar pestanas que requieren base de datos
+        self.nav_quote_button.setEnabled(False)
+        self.nav_quote_button.setToolTip("No disponible en modo local")
+        self.nav_share_button.setEnabled(False)
+        self.nav_share_button.setToolTip("No disponible en modo local")
+        self.refresh_button.setEnabled(False)
+        self.refresh_button.setToolTip("Sin conexion con la PC principal")
+
         self._reset_quote_form()
         self._apply_lookup_view(build_empty_quote_kiosk_lookup_view())
         self._apply_catalog_detail(None)
         self._apply_guided_detail(None)
         self._refresh_recent_lookup_table()
-        self.refresh_all()
-        QTimer.singleShot(0, self.kiosk_scan_input.setFocus)
+
+        # Refrescar vistas que no necesitan DB
+        self._refresh_catalog_snapshot_from_cache()
+        self._refresh_catalog_browser()
+        self._refresh_guided_browser()
+        self._set_status("Modo local — catalogo guardado disponible.")
 
     def _build_widgets(self) -> None:
         self.operator_label = QLabel("Sin operador")
         self.version_label = QLabel(satellite_build_label())
         self.status_label = QLabel("Listo.")
+        self.offline_banner = QLabel("")
+        self.offline_banner.setObjectName("offlineBanner")
+        self.offline_banner.setWordWrap(True)
+        self.offline_banner.setVisible(False)
         self.quick_scan_input = QLineEdit()
         self.quick_scan_button = QPushButton("Escanear")
         self.refresh_button = QPushButton("Refrescar")
@@ -371,6 +425,14 @@ class QuoteSatelliteWindow(QMainWindow):
                 color: #1f1c19;
                 font-family: "Avenir Next", "Helvetica Neue", sans-serif;
                 font-size: 14px;
+            }
+            QLabel#offlineBanner {
+                background: #f5c842;
+                color: #3d2600;
+                font-size: 13px;
+                font-weight: 600;
+                padding: 8px 14px;
+                border-radius: 8px;
             }
             QGroupBox {
                 border: 1px solid #dce5eb;
@@ -787,6 +849,7 @@ class QuoteSatelliteWindow(QMainWindow):
         root_layout.setContentsMargins(18, 18, 18, 18)
         root_layout.setSpacing(14)
         root_layout.addWidget(header_card)
+        root_layout.addWidget(self.offline_banner)
         root_layout.addWidget(content, 1)
         root.setLayout(root_layout)
         self.setCentralWidget(root)
@@ -1745,7 +1808,36 @@ class QuoteSatelliteWindow(QMainWindow):
 
     def _refresh_catalog_snapshot(self, session) -> None:
         self.catalog_snapshot_rows = load_catalog_snapshot_rows(session)
+        # Guardar cache local para que el proximo arranque sin conexion pueda usarla.
+        try:
+            save_catalog_cache(self.catalog_snapshot_rows)
+        except Exception:  # noqa: BLE001
+            pass  # Un fallo al guardar cache no debe interrumpir el flujo normal.
         selected_level = str(self.catalog_level_combo.currentData() or "")
+
+    def _refresh_catalog_snapshot_from_cache(self) -> None:
+        """Sincroniza el combo de niveles desde el cache local (sin DB)."""
+        selected_level = str(self.catalog_level_combo.currentData() or "")
+        level_options = sorted(
+            {
+                str(row["nivel_educativo_nombre"]).strip()
+                for row in self.catalog_snapshot_rows
+                if str(row.get("nivel_educativo_nombre", "")).strip()
+                and str(row["nivel_educativo_nombre"]).strip() != "Sin nivel"
+            }
+        )
+        self.catalog_level_combo.blockSignals(True)
+        self.catalog_level_combo.clear()
+        self.catalog_level_combo.addItem("Todos los niveles", "")
+        for level_name in level_options:
+            self.catalog_level_combo.addItem(_level_icon(level_name), level_name, level_name)
+        if selected_level:
+            for index in range(self.catalog_level_combo.count()):
+                if str(self.catalog_level_combo.itemData(index) or "") == selected_level:
+                    self.catalog_level_combo.setCurrentIndex(index)
+                    break
+        self.catalog_level_combo.blockSignals(False)
+        self._refresh_catalog_school_options(selected_level=selected_level)
         level_options = sorted(
             {
                 str(row["nivel_educativo_nombre"]).strip()
@@ -3261,6 +3353,8 @@ class QuoteSatelliteWindow(QMainWindow):
         return item.text().strip() if item is not None else ""
 
     def _can_operate(self) -> bool:
+        if self.offline_mode:
+            return False
         return self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
 
     def _set_status(self, text: str) -> None:
