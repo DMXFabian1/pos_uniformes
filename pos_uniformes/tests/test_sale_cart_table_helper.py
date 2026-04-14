@@ -35,11 +35,11 @@ class SaleCartTableServiceTests(unittest.TestCase):
         self.assertEqual(len(view.rows), 2)
         self.assertEqual(
             view.rows[0].values,
-            ("SKU-001", "Playera", 2, Decimal("199.00"), Decimal("398.00")),
+            (2, "Playera", Decimal("199.00"), Decimal("398.00")),
         )
         self.assertEqual(
             view.rows[1].values,
-            ("SKU-002", "Pantalon", 1, Decimal("350.00"), Decimal("350.00")),
+            (1, "Pantalon", Decimal("350.00"), Decimal("350.00")),
         )
 
 

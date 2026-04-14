@@ -17,6 +17,26 @@ class InventoryQrPreviewView:
     preview_available: bool
 
 
+@dataclass(frozen=True)
+class InventoryQrPreviewSelection:
+    sku: str
+    product_name: str
+    talla: str
+    color: str
+
+
+def build_inventory_qr_preview_selection(variante) -> InventoryQrPreviewSelection:
+    """Captura los datos visibles de una variante mientras la sesion sigue abierta."""
+    producto = getattr(variante, "producto", None)
+    product_name = str(getattr(producto, "nombre", "") or "")
+    return InventoryQrPreviewSelection(
+        sku=str(getattr(variante, "sku", "") or ""),
+        product_name=product_name,
+        talla=str(getattr(variante, "talla", "") or ""),
+        color=str(getattr(variante, "color", "") or ""),
+    )
+
+
 def build_empty_inventory_qr_preview_view() -> InventoryQrPreviewView:
     return InventoryQrPreviewView(
         button_label="Generar QR",

@@ -78,7 +78,7 @@ class LayawayDetailHelperTests(unittest.TestCase):
         self.assertEqual(view.due_badge.text, "Vence 2026-03-28")
         self.assertEqual(view.due_badge.tone, "warning")
         self.assertEqual(view.notes_label, "Cliente pasa el sabado.")
-        self.assertEqual(view.detail_rows[0].values, ("SKU-001", "Playera deportiva", 2, Decimal("149.50"), Decimal("299.00")))
+        self.assertEqual(view.detail_rows[0].values, (2, "Playera deportiva", Decimal("149.50"), Decimal("299.00")))
         self.assertEqual(view.payment_rows[0].values, ("2026-03-18 10:30", Decimal("300.00"), "REF-01", "admin"))
         self.assertFalse(view.sale_ticket_enabled)
         self.assertTrue(view.whatsapp_enabled)
@@ -115,7 +115,7 @@ class LayawayDetailHelperTests(unittest.TestCase):
         )
         self.assertEqual(
             view.detail_rows[-1].values,
-            ("", "Ajuste redondeo", "", "", Decimal("0.30")),
+            ("", "Ajuste redondeo", "", Decimal("0.30")),
         )
         self.assertEqual(view.detail_rows[-1].tone, "warning")
 

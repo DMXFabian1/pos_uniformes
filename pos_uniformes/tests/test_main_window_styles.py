@@ -20,6 +20,8 @@ class MainWindowStylesTests(unittest.TestCase):
 
         self.assertIn("QMainWindow, QWidget", stylesheet)
         self.assertIn("#cashierFeedbackLabel[tone=\"warning\"]", stylesheet)
+        self.assertIn("#quoteFormLabel", stylesheet)
+        self.assertIn("color: #7a4f39;", stylesheet)
         self.assertIn("QPushButton#toolbarAccentButton", stylesheet)
         self.assertIn("#qrPreview", stylesheet)
         self.assertIn("#kpiCard[tone=\"warning\"]", stylesheet)
@@ -30,6 +32,9 @@ class MainWindowStylesTests(unittest.TestCase):
         self.assertIn("QPushButton#inventoryActionButton", stylesheet)
         self.assertIn("QLineEdit, QComboBox, QSpinBox, QTextEdit", stylesheet)
         self.assertIn("#dataTable", stylesheet)
+        self.assertIn("QComboBox QAbstractItemView::item:hover", stylesheet)
+        self.assertIn("QMenu::item:selected", stylesheet)
+        self.assertIn("QToolButton#secondaryButton", stylesheet)
 
     def test_builds_hero_cashier_style_section(self) -> None:
         stylesheet = build_main_window_hero_cashier_styles()
@@ -37,6 +42,7 @@ class MainWindowStylesTests(unittest.TestCase):
         self.assertIn("#heroPanel", stylesheet)
         self.assertIn("#cashierFeedbackLabel[tone=\"danger\"]", stylesheet)
         self.assertIn("#cashierTotalValue", stylesheet)
+        self.assertIn("#cashierCartTable", stylesheet)
 
     def test_builds_inventory_analytics_style_section(self) -> None:
         stylesheet = build_main_window_inventory_analytics_styles()

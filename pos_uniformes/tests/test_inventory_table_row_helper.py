@@ -31,7 +31,7 @@ class InventoryTableRowHelperTests(unittest.TestCase):
         )
         self.assertEqual(view.row_tone, "muted")
         self.assertEqual(view.stock_tone, "warning")
-        self.assertEqual(view.committed_tone, "warning")
+        self.assertEqual(view.committed_tone, "reserved")
         self.assertEqual(view.status_tone, "muted")
         self.assertEqual(view.qr_tone, "warning")
 
@@ -68,7 +68,7 @@ class InventoryTableRowHelperTests(unittest.TestCase):
         self.assertEqual(views[0].row_tone, "danger")
         self.assertEqual(views[0].stock_tone, "danger")
         self.assertEqual(views[1].values[4], "6 OK")
-        self.assertEqual(views[1].row_tone, "neutral")
+        self.assertIsNone(views[1].row_tone)
         self.assertEqual(views[1].stock_tone, "positive")
 
 

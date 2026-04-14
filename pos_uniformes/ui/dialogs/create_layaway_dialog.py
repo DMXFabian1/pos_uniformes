@@ -35,7 +35,14 @@ from pos_uniformes.services.layaway_pricing_service import (
     resolve_layaway_min_deposit,
     resolve_layaway_unit_price,
 )
+from pos_uniformes.services.sale_cart_update_service import add_sale_cart_variants
+from pos_uniformes.services.sports_uniform_pricing_service import build_three_piece_playera_price_override
 from pos_uniformes.ui.helpers.date_field_helper import configure_friendly_date_edit
+from pos_uniformes.ui.helpers.quote_sports_uniform_helper import build_three_piece_quote_description
+from pos_uniformes.ui.helpers.sale_sports_uniform_helper import (
+    resolve_sale_scan_variants,
+    restore_sports_uniform_playera_price_if_needed,
+)
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 
 if TYPE_CHECKING:
@@ -108,9 +115,28 @@ def build_create_layaway_dialog(
             "cantidad": int(item["cantidad"]),
             "precio_unitario": Decimal(item["precio_unitario"]),
             "precio_base": Decimal(item.get("precio_base", item["precio_unitario"])),
+            "pricing_rule_key": str(item.get("pricing_rule_key", "") or ""),
+            "pricing_rule_label": str(item.get("pricing_rule_label", "") or ""),
+            "internal_trace_note": str(item.get("internal_trace_note", "") or ""),
+            "internal_trace_scope": str(item.get("internal_trace_scope", "") or ""),
+            "sports_uniform_base_sku": str(item.get("sports_uniform_base_sku", "") or ""),
+            "sports_uniform_playera_sku": str(item.get("sports_uniform_playera_sku", "") or ""),
+            "sports_uniform_role": str(item.get("sports_uniform_role", "") or ""),
         }
         for item in (initial_items or [])
     ]
+    for item in items:
+        if str(item.get("pricing_rule_label", "") or "").strip() and "conjunto deportivo 3pz" not in str(
+            item.get("producto_nombre", "")
+        ).casefold():
+            school_name = ""
+            trace_note = str(item.get("internal_trace_note", "") or "")
+            if "misma escuela" not in trace_note.casefold():
+                school_name = ""
+            item["producto_nombre"] = build_three_piece_quote_description(
+                str(item.get("producto_nombre", "") or ""),
+                school_name=school_name,
+            )
     sku_input = QLineEdit()
     sku_input.setPlaceholderText("SKU")
     if selected_catalog_row is not None:
@@ -158,6 +184,8 @@ def build_create_layaway_dialog(
     def reprice_items_for_selected_client() -> Decimal:
         discount_percent = current_client_discount_percent()
         for item in items:
+            if str(item.get("pricing_rule_key", "") or "").strip():
+                continue
             item["precio_unitario"] = resolve_layaway_unit_price(
                 Decimal(item["precio_base"]),
                 discount_percent=discount_percent,
@@ -205,47 +233,64 @@ def build_create_layaway_dialog(
                 variante = ApartadoService.obtener_variante_por_sku(session, sku)
                 if variante is None:
                     raise ValueError(f"El SKU '{sku}' no existe o esta inactivo.")
-                InventarioService.validar_stock_disponible(variante, cantidad)
-                producto_nombre = sanitize_product_display_name(variante.producto.nombre)
-                base_price = Decimal(variante.precio_venta)
-                discount_percent = current_client_discount_percent()
-                precio_unitario = resolve_layaway_unit_price(
-                    base_price,
-                    discount_percent=discount_percent,
+                resolution = resolve_sale_scan_variants(
+                    dialog,
+                    session,
+                    variante,
+                    variant_loader=ApartadoService.obtener_variante_por_sku,
                 )
+                if resolution is None:
+                    return
+                base_price_by_sku = {
+                    str(getattr(variant, "sku", "") or "").strip().upper(): Decimal(str(getattr(variant, "precio_venta", 0)))
+                    for variant in resolution.variants
+                }
+                updated_lines = add_sale_cart_variants(
+                    items,
+                    variants=list(resolution.variants),
+                    quantity=cantidad,
+                    stock_validator=InventarioService.validar_stock_disponible,
+                    line_overrides_by_sku=(
+                        {
+                            str(getattr(resolution.variants[1], "sku", "") or "").strip().upper(): (
+                                build_three_piece_playera_price_override(resolution.variants[1])
+                            )
+                        }
+                        if resolution.composed_as_three_pieces and len(resolution.variants) >= 2
+                        else None
+                    ),
+                )
+                for line_item in updated_lines:
+                    current_sku = str(line_item.get("sku") or "").strip().upper()
+                    current_variant = next(
+                        (variant for variant in resolution.variants if str(getattr(variant, "sku", "") or "").strip().upper() == current_sku),
+                        None,
+                    )
+                    if current_variant is None:
+                        continue
+                    product = getattr(current_variant, "producto", None)
+                    school_name = str(getattr(getattr(product, "escuela", None), "nombre", "") or "General")
+                    base_name = sanitize_product_display_name(getattr(product, "nombre", ""))
+                    line_item["precio_base"] = base_price_by_sku[current_sku]
+                    line_item["producto_nombre"] = (
+                        build_three_piece_quote_description(base_name, school_name=school_name)
+                        if str(line_item.get("pricing_rule_label") or "").strip()
+                        else base_name
+                    )
+                    if resolution.composed_as_three_pieces and len(resolution.variants) >= 2:
+                        base_variant, playera_variant = resolution.variants[0], resolution.variants[1]
+                        base_sku = str(getattr(base_variant, "sku", "") or "").strip().upper()
+                        playera_sku = str(getattr(playera_variant, "sku", "") or "").strip().upper()
+                        line_item["internal_trace_scope"] = "SPORTS_UNIFORM_PROTOTYPE"
+                        line_item["sports_uniform_base_sku"] = base_sku
+                        line_item["sports_uniform_playera_sku"] = playera_sku
+                        line_item["sports_uniform_role"] = "base" if current_sku == base_sku else "playera"
         except Exception as exc:  # noqa: BLE001
             message = str(exc)
             if "Stock insuficiente" in message:
                 message = f"No hay stock suficiente para reservar {cantidad} pieza(s) de '{sku}'."
             QMessageBox.warning(dialog, "No se pudo agregar", message)
             return
-
-        existing = next((item for item in items if str(item["sku"]) == sku), None)
-        if existing is not None:
-            nueva_cantidad = int(existing["cantidad"]) + cantidad
-            try:
-                with get_session() as session:
-                    variante = ApartadoService.obtener_variante_por_sku(session, sku)
-                    if variante is None:
-                        raise ValueError(f"El SKU '{sku}' no existe o esta inactivo.")
-                    InventarioService.validar_stock_disponible(variante, nueva_cantidad)
-            except Exception as exc:  # noqa: BLE001
-                message = str(exc)
-                if "Stock insuficiente" in message:
-                    message = f"No hay stock suficiente para dejar {nueva_cantidad} pieza(s) de '{sku}' en el apartado."
-                QMessageBox.warning(dialog, "Stock insuficiente", message)
-                return
-            existing["cantidad"] = nueva_cantidad
-        else:
-            items.append(
-                {
-                    "sku": sku,
-                    "producto_nombre": producto_nombre,
-                    "cantidad": cantidad,
-                    "precio_base": base_price,
-                    "precio_unitario": precio_unitario,
-                }
-            )
 
         sku_input.clear()
         qty_spin.setValue(1)
@@ -255,7 +300,23 @@ def build_create_layaway_dialog(
         row_index = items_table.currentRow()
         if row_index < 0 or row_index >= len(items):
             return
+        removed_line_item = dict(items[row_index])
         items.pop(row_index)
+        restore_message = restore_sports_uniform_playera_price_if_needed(
+            items,
+            removed_line_item=removed_line_item,
+        )
+        if restore_message:
+            with get_session() as session:
+                playera_sku = str(removed_line_item.get("sports_uniform_playera_sku") or "").strip().upper()
+                for item in items:
+                    if str(item.get("sku") or "").strip().upper() != playera_sku:
+                        continue
+                    variante = ApartadoService.obtener_variante_por_sku(session, playera_sku)
+                    if variante is None:
+                        continue
+                    item["producto_nombre"] = sanitize_product_display_name(variante.producto.nombre)
+            QMessageBox.information(dialog, "Precio restaurado", restore_message)
         refresh_items_table()
 
     def handle_selected_client_changed() -> None:
@@ -340,6 +401,9 @@ def build_create_layaway_dialog(
             ApartadoItemInput(
                 sku=str(item["sku"]),
                 cantidad=int(item["cantidad"]),
+                precio_unitario=Decimal(item["precio_unitario"]),
+                pricing_rule_key=str(item.get("pricing_rule_key", "") or ""),
+                pricing_rule_label=str(item.get("pricing_rule_label", "") or ""),
             )
             for item in items
         ],

@@ -46,7 +46,7 @@ def build_catalog_table_row_view(row: dict[str, object]) -> CatalogTableRowView:
             is_active=is_active,
         ),
         stock_tone=stock_tone,
-        layaway_tone="warning" if committed_value > 0 else None,
+        layaway_tone="reserved" if committed_value > 0 else None,
         status_tone="positive" if is_active else "muted",
     )
 
@@ -56,8 +56,4 @@ def _build_catalog_row_tone(*, stock_value: int, committed_value: int, is_active
         return "muted"
     if stock_value == 0:
         return "danger"
-    if stock_value <= 3:
-        return "warning"
-    if committed_value > 0:
-        return "reserved"
     return None

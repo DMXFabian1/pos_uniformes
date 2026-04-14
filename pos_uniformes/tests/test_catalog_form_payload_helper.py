@@ -157,6 +157,70 @@ class CatalogFormPayloadHelperTests(unittest.TestCase):
             "Ropa normal no puede guardarse dentro de una categoria de uniforme.",
         )
 
+    def test_validate_catalog_product_submission_rejects_uniform_garment_for_regular_mode(self) -> None:
+        payload = build_catalog_product_dialog_payload(
+            mode_key="regular",
+            category_id=3,
+            category_name="Ropa casual",
+            brand_id=4,
+            base_name="Playera casual",
+            school="",
+            garment_type="Deportivo",
+            piece_type="Playera",
+            attribute="Ligera",
+            education_level="",
+            gender="Unisex",
+            shield="",
+            location="Piso de venta",
+            description="",
+            sizes=[],
+            colors=[],
+            variant_price="",
+            price_mode="single",
+            prices_by_size={},
+            price_summary="",
+            variant_cost="",
+            initial_stock=0,
+        )
+
+        self.assertEqual(
+            validate_catalog_product_submission(payload),
+            "Ropa normal no puede usar un tipo de uniforme escolar.",
+        )
+
+    def test_validate_catalog_product_submission_rejects_school_context_for_regular_mode(self) -> None:
+        payload = build_catalog_product_dialog_payload(
+            mode_key="regular",
+            category_id=3,
+            category_name="Ropa casual",
+            brand_id=4,
+            base_name="Sudadera",
+            school="General",
+            garment_type="Casual",
+            piece_type="Sudadera",
+            attribute="Ligera",
+            education_level="Primaria",
+            gender="Unisex",
+            shield="Escudo demo",
+            location="Piso de venta",
+            description="",
+            sizes=[],
+            colors=[],
+            variant_price="",
+            price_mode="single",
+            prices_by_size={},
+            price_summary="",
+            variant_cost="",
+            initial_stock=0,
+        )
+        payload["escuela"] = "Colegio Mexico"
+        payload["nivel_educativo"] = "Primaria"
+
+        self.assertEqual(
+            validate_catalog_product_submission(payload),
+            "Ropa normal no debe conservar escuela, nivel ni escudo.",
+        )
+
     def test_build_and_validate_catalog_variant_payload(self) -> None:
         payload = build_catalog_variant_dialog_payload(
             product_id=10,

@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -19,6 +20,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+from pos_uniformes.ui.helpers.flow_layout import FlowLayout
 
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
@@ -41,10 +43,12 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     actions_layout = QVBoxLayout()
     actions_layout.setSpacing(6)
     window.catalog_selection_label.setObjectName("analyticsLine")
-    window.inventory_permission_label.setStyleSheet("color: #a85b00;")
+    window.catalog_selection_label.setVisible(False)
+    window.inventory_permission_label.setObjectName("catalogSectionHint")
     window.inventory_new_button.setText("Nuevo")
     window.inventory_edit_button.setText("Editar")
     window.inventory_stock_button.setText("Stock")
+    window.inventory_labels_button.setText("Etiquetas")
     window.inventory_more_button.setText("Mas")
     window.toggle_product_button.setText("Prod.")
     window.toggle_variant_button.setText("Pres.")
@@ -61,6 +65,7 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
         window.inventory_new_button: QStyle.StandardPixmap.SP_FileDialogNewFolder,
         window.inventory_edit_button: QStyle.StandardPixmap.SP_FileDialogDetailedView,
         window.inventory_stock_button: QStyle.StandardPixmap.SP_ArrowUp,
+        window.inventory_labels_button: QStyle.StandardPixmap.SP_FileDialogContentsView,
         window.inventory_more_button: QStyle.StandardPixmap.SP_TitleBarUnshadeButton,
     }
     for button, icon in grouped_buttons.items():
@@ -82,8 +87,6 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_bulk_price_button.setObjectName("inventorySecondaryButton")
     for button in (window.delete_product_button, window.delete_variant_button):
         button.setObjectName("inventoryDangerButton")
-
-    actions_layout.addWidget(window.catalog_selection_label)
 
     new_menu = QMenu(window)
     new_category_action = new_menu.addAction("Categoria")
@@ -119,6 +122,18 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     bulk_adjust_action.triggered.connect(window._handle_inventory_bulk_adjustment)
     window.inventory_stock_button.setMenu(stock_menu)
 
+    labels_menu = QMenu(window)
+    print_selected_action = labels_menu.addAction("Etiquetas de seleccion")
+    print_selected_action.triggered.connect(window._handle_inventory_print_label)
+    print_visible_action = labels_menu.addAction("Etiquetas de visibles")
+    print_visible_action.triggered.connect(window._handle_inventory_print_visible_labels)
+    window.inventory_labels_button.setMenu(labels_menu)
+    window.inventory_labels_button.clicked.connect(window._handle_inventory_print_label)
+    window.inventory_labels_button.setPopupMode(window.inventory_labels_button.ToolButtonPopupMode.MenuButtonPopup)
+    window.inventory_labels_button.setToolTip(
+        "Click: imprime la seleccion actual. Menu: abre etiquetas para los resultados visibles filtrados."
+    )
+
     more_menu = QMenu(window)
     delete_product_action = more_menu.addAction("Eliminar producto")
     delete_product_action.triggered.connect(window._handle_delete_product)
@@ -134,6 +149,7 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     toolbar.addWidget(window.inventory_new_button)
     toolbar.addWidget(window.inventory_edit_button)
     toolbar.addWidget(window.inventory_stock_button)
+    toolbar.addWidget(window.inventory_labels_button)
     toolbar.addWidget(window.inventory_bulk_adjust_button)
     toolbar.addWidget(window.inventory_bulk_price_button)
     toolbar.addWidget(window.inventory_more_button)
@@ -172,7 +188,7 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.qr_preview_info_label.setObjectName("inventoryQrCaption")
     window.qr_status_label.setObjectName("inventoryQrStatus")
     window.inventory_generate_qr_button.setText("Generar QR")
-    window.inventory_print_label_button.setText("Imprimir etiqueta")
+    window.inventory_print_label_button.setText("Imprimir etiqueta(s)")
     header_row = QHBoxLayout()
     header_row.setSpacing(8)
     header_text = QVBoxLayout()
@@ -198,6 +214,9 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     side_layout.addWidget(window.qr_status_label)
     window.inventory_generate_qr_button.clicked.connect(window._handle_generate_selected_qr)
     window.inventory_print_label_button.clicked.connect(window._handle_inventory_print_label)
+    window.inventory_print_label_button.setToolTip(
+        "Con una fila seleccionada abre la impresion individual. Con varias filas abre el lote experimental."
+    )
     window.inventory_generate_all_qr_button.clicked.connect(window._handle_generate_all_qr)
     window.inventory_variant_combo.currentIndexChanged.connect(window._refresh_selected_qr_preview)
     side_box.setLayout(side_layout)
@@ -228,6 +247,9 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_table.itemDoubleClicked.connect(window._handle_inventory_table_double_click)
     window.inventory_table.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
     window.inventory_table.customContextMenuRequested.connect(window._show_inventory_context_menu)
+    clear_selection_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Escape), window.inventory_table)
+    clear_selection_shortcut.setContext(Qt.ShortcutContext.WidgetShortcut)
+    clear_selection_shortcut.activated.connect(window._clear_inventory_table_selection)
 
     table_box = QGroupBox("Presentaciones disponibles")
     table_box.setObjectName("infoCard")
@@ -244,18 +266,24 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_search_input.setClearButtonEnabled(True)
     window.inventory_search_input.setObjectName("inventoryFilterInput")
     window.inventory_category_filter_combo.setObjectName("secondaryButton")
+    window.inventory_category_filter_combo.hide()
     window.inventory_brand_filter_combo.setObjectName("secondaryButton")
     window.inventory_school_filter_combo.setObjectName("secondaryButton")
     window.inventory_type_filter_combo.setObjectName("secondaryButton")
     window.inventory_piece_filter_combo.setObjectName("secondaryButton")
     window.inventory_size_filter_combo.setObjectName("secondaryButton")
     window.inventory_color_filter_combo.setObjectName("secondaryButton")
+    window.inventory_use_filter_combo.setObjectName("inventoryFilterCombo")
     window.inventory_status_filter_combo.setObjectName("inventoryFilterCombo")
     window.inventory_stock_filter_combo.setObjectName("inventoryFilterCombo")
     window.inventory_qr_filter_combo.setObjectName("inventoryFilterCombo")
     window.inventory_origin_filter_combo.setObjectName("inventoryFilterCombo")
     window.inventory_duplicate_filter_combo.setObjectName("inventoryFilterCombo")
     window.inventory_clear_filters_button.setObjectName("secondaryButton")
+    window.inventory_use_filter_combo.clear()
+    window.inventory_use_filter_combo.addItem("Uso: todos", "")
+    window.inventory_use_filter_combo.addItem("Uniforme escolar", "school_only")
+    window.inventory_use_filter_combo.addItem("Ropa normal", "general_only")
     window.inventory_status_filter_combo.clear()
     window.inventory_status_filter_combo.addItem("Estado: todos", "")
     window.inventory_status_filter_combo.addItem("Activas", "active")
@@ -282,24 +310,33 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     filters_row.setVerticalSpacing(4)
     filters_row.addWidget(window.inventory_search_input, 0, 0, 1, 5)
     filters_row.addWidget(window.inventory_clear_filters_button, 0, 5)
-    filters_row.addWidget(window.inventory_category_filter_combo, 1, 0)
+    filters_row.addWidget(window.inventory_use_filter_combo, 1, 0)
     filters_row.addWidget(window.inventory_brand_filter_combo, 1, 1)
     filters_row.addWidget(window.inventory_school_filter_combo, 1, 2)
     filters_row.addWidget(window.inventory_type_filter_combo, 1, 3)
     filters_row.addWidget(window.inventory_piece_filter_combo, 1, 4)
     filters_row.addWidget(window.inventory_size_filter_combo, 1, 5)
-    filters_row.addWidget(window.inventory_color_filter_combo, 2, 0)
-    filters_row.addWidget(window.inventory_status_filter_combo, 2, 1)
-    filters_row.addWidget(window.inventory_stock_filter_combo, 2, 2)
-    filters_row.addWidget(window.inventory_qr_filter_combo, 2, 3)
-    filters_row.addWidget(window.inventory_origin_filter_combo, 2, 4)
-    filters_row.addWidget(window.inventory_duplicate_filter_combo, 2, 5)
+    filters_row.addWidget(window.inventory_color_filter_combo, 1, 6)
+    filters_row.addWidget(window.inventory_status_filter_combo, 2, 0)
+    filters_row.addWidget(window.inventory_stock_filter_combo, 2, 1)
+    filters_row.addWidget(window.inventory_qr_filter_combo, 2, 2)
+    filters_row.addWidget(window.inventory_origin_filter_combo, 2, 3)
+    filters_row.addWidget(window.inventory_duplicate_filter_combo, 2, 4, 1, 3)
     filters_row.setColumnStretch(0, 1)
     filters_row.setColumnStretch(1, 1)
     filters_row.setColumnStretch(2, 1)
     filters_row.setColumnStretch(3, 1)
     filters_row.setColumnStretch(4, 1)
     filters_row.setColumnStretch(5, 1)
+    filters_row.setColumnStretch(6, 1)
+    window.inventory_active_filters_wrap.setVisible(False)
+    window.inventory_active_filters_flow_layout = FlowLayout(
+        window.inventory_active_filters_wrap,
+        margin=0,
+        h_spacing=6,
+        v_spacing=6,
+    )
+    window.inventory_active_filters_wrap.setLayout(window.inventory_active_filters_flow_layout)
     counters_row = QHBoxLayout()
     counters_row.setSpacing(6)
     for counter in (
@@ -313,17 +350,21 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     counters_row.addStretch()
     summary_row = QHBoxLayout()
     summary_row.setSpacing(8)
-    summary_row.addWidget(window.inventory_results_label, 1)
+    summary_row.addStretch(1)
     summary_row.addWidget(window.inventory_pagination_label)
     summary_row.addWidget(window.inventory_previous_page_button)
     summary_row.addWidget(window.inventory_next_page_button)
     table_layout.addLayout(filters_row)
+    table_layout.addWidget(window.inventory_active_filters_wrap)
     table_layout.addLayout(summary_row)
     table_layout.addLayout(counters_row)
-    inventory_hint_label = QLabel("Doble clic para editar la presentacion seleccionada.")
+    inventory_hint_label = QLabel(
+        "Ctrl/Cmd + clic para seleccion salteada, Shift para rango, Esc para limpiar y doble clic para editar."
+    )
     inventory_hint_label.setObjectName("subtleLine")
     table_layout.addWidget(inventory_hint_label)
     table_layout.addWidget(window.inventory_table)
+    table_layout.addWidget(window.inventory_results_label)
     table_box.setLayout(table_layout)
     window.inventory_search_input.textChanged.connect(lambda _: window._schedule_inventory_filter_refresh_reset_page())
     window.inventory_search_input.returnPressed.connect(window._handle_inventory_filters_changed_reset_page)
@@ -334,6 +375,9 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_piece_filter_combo.selectionChanged.connect(window._handle_inventory_filters_changed_reset_page)
     window.inventory_size_filter_combo.selectionChanged.connect(window._handle_inventory_filters_changed_reset_page)
     window.inventory_color_filter_combo.selectionChanged.connect(window._handle_inventory_filters_changed_reset_page)
+    window.inventory_use_filter_combo.currentIndexChanged.connect(
+        lambda _: window._handle_inventory_filters_changed_reset_page()
+    )
     window.inventory_status_filter_combo.currentIndexChanged.connect(
         lambda _: window._handle_inventory_filters_changed_reset_page()
     )

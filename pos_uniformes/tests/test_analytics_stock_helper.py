@@ -36,7 +36,7 @@ class AnalyticsStockHelperTests(unittest.TestCase):
                 AnalyticsStockRowView(
                     values=("SKU-1", "Playera Deportiva | Patria | Deportivo | Playera", 0, 2, "INACTIVA"),
                     stock_tone="danger",
-                    reserved_tone="warning",
+                    reserved_tone="reserved",
                     state_tone="muted",
                     row_tone="danger",
                 ),

@@ -8,6 +8,7 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QGridLayout,
     QGroupBox,
+    QHeaderView,
     QHBoxLayout,
     QLabel,
     QSplitter,
@@ -111,16 +112,21 @@ def build_layaway_tab(window: "MainWindow") -> QWidget:
     window.layaway_due_status_label.setObjectName("inventoryMetaCardAlt")
     window.layaway_notes_label.setObjectName("inventoryMetaCardAlt")
     window.layaway_notes_label.setWordWrap(True)
-    window.layaway_detail_table.setColumnCount(5)
+    window.layaway_detail_table.setColumnCount(4)
     window.layaway_detail_table.setHorizontalHeaderLabels(
-        ["SKU", "Producto", "Cantidad", "Precio", "Subtotal"]
+        ["Cantidad", "Producto", "Precio", "Subtotal"]
     )
-    window.layaway_detail_table.setObjectName("dataTable")
+    window.layaway_detail_table.setObjectName("cashierCartTable")
     window.layaway_detail_table.verticalHeader().setVisible(False)
     window.layaway_detail_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
     window.layaway_detail_table.setAlternatingRowColors(True)
     window.layaway_detail_table.setMinimumHeight(160)
-    window.layaway_detail_table.horizontalHeader().setStretchLastSection(True)
+    layaway_detail_header = window.layaway_detail_table.horizontalHeader()
+    layaway_detail_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+    layaway_detail_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+    layaway_detail_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+    layaway_detail_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+    layaway_detail_header.setStretchLastSection(False)
     window.layaway_payments_table.setColumnCount(4)
     window.layaway_payments_table.setHorizontalHeaderLabels(["Fecha", "Monto", "Referencia", "Usuario"])
     window.layaway_payments_table.setObjectName("dataTable")

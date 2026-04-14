@@ -39,6 +39,41 @@ class CashCutSummaryView:
     expected_amount: Decimal
 
 
+def build_cash_cut_summary_lines(summary_view: CashCutSummaryView) -> list[str]:
+    lines = [
+        f"Apertura: {summary_view.opened_at_label}",
+        f"Reactivo inicial: ${summary_view.opening_amount}",
+    ]
+    has_extra_cash_movements = any(
+        (
+            summary_view.reactivo_count,
+            summary_view.ingresos_count,
+            summary_view.retiros_count,
+            summary_view.cash_sales_count,
+            summary_view.cash_payments_count,
+            summary_view.reactivo_total,
+            summary_view.ingresos_total,
+            summary_view.retiros_total,
+            summary_view.cash_sales_total,
+            summary_view.cash_payments_total,
+        )
+    )
+    if has_extra_cash_movements:
+        lines.extend(
+            [
+                f"Reactivos extra: {summary_view.reactivo_count} | ${summary_view.reactivo_total}",
+                f"Ingresos manuales: {summary_view.ingresos_count} | ${summary_view.ingresos_total}",
+                f"Retiros manuales: {summary_view.retiros_count} | ${summary_view.retiros_total}",
+                f"Ventas con efectivo: {summary_view.cash_sales_count}",
+                f"Efectivo por ventas: ${summary_view.cash_sales_total}",
+                f"Abonos con efectivo: {summary_view.cash_payments_count}",
+                f"Efectivo por abonos: ${summary_view.cash_payments_total}",
+            ]
+        )
+    lines.append(f"Esperado en caja: ${summary_view.expected_amount}")
+    return lines
+
+
 def _create_cash_prompt_dialog(
     parent: QWidget,
     title: str,
@@ -184,6 +219,53 @@ def prompt_cash_movement_data(
     }
 
 
+def prompt_admin_cash_cut_data(parent: QWidget) -> dict[str, object] | None:
+    dialog, layout = _create_cash_prompt_dialog(
+        parent,
+        "Corte administrativo",
+        "Registra una salida administrativa real de efectivo. Este movimiento impacta el esperado del cierre como cualquier retiro.",
+        width=430,
+    )
+    amount_spin = QDoubleSpinBox()
+    amount_spin.setRange(0.00, 999999.99)
+    amount_spin.setDecimals(2)
+    amount_spin.setPrefix("$")
+    amount_spin.setSingleStep(50.0)
+    note_input = QTextEdit()
+    note_input.setPlaceholderText("Nota opcional para identificar el corte administrativo")
+    note_input.setMaximumHeight(90)
+    concept_label = QLabel("Concepto fijo: Corte administrativo")
+    concept_label.setObjectName("subtleLine")
+    concept_label.setWordWrap(True)
+    form = QFormLayout()
+    form.addRow("Monto", amount_spin)
+    form.addRow("Nota", note_input)
+    buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+    ok_button = buttons.button(QDialogButtonBox.StandardButton.Ok)
+    if ok_button is not None:
+        ok_button.setText("Registrar corte")
+    buttons.accepted.connect(dialog.accept)
+    buttons.rejected.connect(dialog.reject)
+    layout.addWidget(concept_label)
+    layout.addLayout(form)
+    layout.addWidget(buttons)
+    if dialog.exec() != int(QDialog.DialogCode.Accepted):
+        return None
+    amount = Decimal(str(amount_spin.value())).quantize(Decimal("0.01"))
+    if amount <= Decimal("0.00"):
+        QMessageBox.information(dialog, "Monto invalido", "Captura un monto mayor a cero para registrar el corte.")
+        return None
+    note = note_input.toPlainText().strip()
+    concept = "Corte administrativo"
+    if note:
+        concept = f"{concept} | {note}"
+    return {
+        "monto": amount,
+        "concepto": concept,
+        "nota": note,
+    }
+
+
 def prompt_cash_opening_correction(
     parent: QWidget,
     *,
@@ -254,20 +336,7 @@ def prompt_cash_cut_data(
         width=520,
     )
     info = QLabel(
-        "\n".join(
-            [
-                f"Apertura: {summary_view.opened_at_label}",
-                f"Reactivo inicial: ${summary_view.opening_amount}",
-                f"Reactivos extra: {summary_view.reactivo_count} | ${summary_view.reactivo_total}",
-                f"Ingresos manuales: {summary_view.ingresos_count} | ${summary_view.ingresos_total}",
-                f"Retiros manuales: {summary_view.retiros_count} | ${summary_view.retiros_total}",
-                f"Ventas con efectivo: {summary_view.cash_sales_count}",
-                f"Efectivo por ventas: ${summary_view.cash_sales_total}",
-                f"Abonos con efectivo: {summary_view.cash_payments_count}",
-                f"Efectivo por abonos: ${summary_view.cash_payments_total}",
-                f"Esperado en caja: ${summary_view.expected_amount}",
-            ]
-        )
+        "\n".join(build_cash_cut_summary_lines(summary_view))
     )
     info.setWordWrap(True)
     info.setObjectName("inventoryMetaCard")

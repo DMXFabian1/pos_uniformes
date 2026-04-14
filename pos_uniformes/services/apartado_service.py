@@ -32,6 +32,9 @@ from pos_uniformes.services.layaway_pricing_service import (
 class ApartadoItemInput:
     sku: str
     cantidad: int
+    precio_unitario: Decimal | None = None
+    pricing_rule_key: str = ""
+    pricing_rule_label: str = ""
 
 
 class ApartadoService:
@@ -124,9 +127,13 @@ class ApartadoService:
                 raise ValueError(f"No existe una presentacion activa para el SKU '{sku}'.")
 
             InventarioService.validar_stock_disponible(variante, item.cantidad)
-            precio_unitario = resolve_layaway_unit_price(
-                variante.precio_venta,
-                discount_percent=client_discount_percent,
+            precio_unitario = (
+                Decimal(item.precio_unitario).quantize(Decimal("0.01"))
+                if item.precio_unitario is not None
+                else resolve_layaway_unit_price(
+                    variante.precio_venta,
+                    discount_percent=client_discount_percent,
+                )
             )
             subtotal_linea = Decimal(item.cantidad) * precio_unitario
             detalle = ApartadoDetalle(

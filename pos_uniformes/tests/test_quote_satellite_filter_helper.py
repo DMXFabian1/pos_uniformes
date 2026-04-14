@@ -46,6 +46,7 @@ class QuoteSatelliteFilterHelperTests(unittest.TestCase):
                 resume_enabled=True,
                 emit_enabled=True,
                 cancel_enabled=True,
+                share_enabled=True,
                 whatsapp_enabled=True,
                 print_enabled=True,
             ),

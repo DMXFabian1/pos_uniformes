@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 
 from PyQt6.QtWidgets import QFrame, QGridLayout, QGroupBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget, QHeaderView
 
+from pos_uniformes.ui.helpers.flow_layout import FlowLayout
+
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
 
@@ -77,6 +79,7 @@ def build_products_tab(window: "MainWindow") -> QWidget:
     window.catalog_search_input.setClearButtonEnabled(True)
     window.catalog_search_input.setObjectName("inventoryFilterInput")
     window.catalog_category_filter_combo.setObjectName("secondaryButton")
+    window.catalog_category_filter_combo.hide()
     window.catalog_brand_filter_combo.setObjectName("secondaryButton")
     window.catalog_school_filter_combo.setObjectName("secondaryButton")
     window.catalog_type_filter_combo.setObjectName("secondaryButton")
@@ -85,6 +88,7 @@ def build_products_tab(window: "MainWindow") -> QWidget:
     window.catalog_color_filter_combo.setObjectName("secondaryButton")
     window.catalog_school_scope_filter_combo.setObjectName("inventoryFilterCombo")
     window.catalog_status_filter_combo.setObjectName("inventoryFilterCombo")
+    window.catalog_status_filter_combo.hide()
     window.catalog_stock_filter_combo.setObjectName("inventoryFilterCombo")
     window.catalog_layaway_filter_combo.setObjectName("inventoryFilterCombo")
     window.catalog_origin_filter_combo.setObjectName("inventoryFilterCombo")
@@ -164,18 +168,16 @@ def build_products_tab(window: "MainWindow") -> QWidget:
     filters_grid = QGridLayout()
     filters_grid.setHorizontalSpacing(6)
     filters_grid.setVerticalSpacing(6)
-    filters_grid.addWidget(window.catalog_category_filter_combo, 0, 0)
-    filters_grid.addWidget(window.catalog_brand_filter_combo, 0, 1)
-    filters_grid.addWidget(window.catalog_school_filter_combo, 0, 2)
-    filters_grid.addWidget(window.catalog_type_filter_combo, 0, 3)
-    filters_grid.addWidget(window.catalog_piece_filter_combo, 1, 0)
-    filters_grid.addWidget(window.catalog_size_filter_combo, 1, 1)
-    filters_grid.addWidget(window.catalog_color_filter_combo, 1, 2)
-    filters_grid.addWidget(window.catalog_status_filter_combo, 1, 3)
-    filters_grid.addWidget(window.catalog_stock_filter_combo, 2, 0)
-    filters_grid.addWidget(window.catalog_layaway_filter_combo, 2, 1)
-    filters_grid.addWidget(window.catalog_origin_filter_combo, 2, 2)
-    filters_grid.addWidget(window.catalog_duplicate_filter_combo, 2, 3)
+    filters_grid.addWidget(window.catalog_brand_filter_combo, 0, 0)
+    filters_grid.addWidget(window.catalog_school_filter_combo, 0, 1)
+    filters_grid.addWidget(window.catalog_type_filter_combo, 0, 2)
+    filters_grid.addWidget(window.catalog_piece_filter_combo, 0, 3)
+    filters_grid.addWidget(window.catalog_size_filter_combo, 1, 0)
+    filters_grid.addWidget(window.catalog_color_filter_combo, 1, 1)
+    filters_grid.addWidget(window.catalog_stock_filter_combo, 1, 2)
+    filters_grid.addWidget(window.catalog_layaway_filter_combo, 2, 0)
+    filters_grid.addWidget(window.catalog_origin_filter_combo, 2, 1)
+    filters_grid.addWidget(window.catalog_duplicate_filter_combo, 2, 2, 1, 2)
     for column in range(4):
         filters_grid.setColumnStretch(column, 1)
     filters_layout.addLayout(filters_grid)
@@ -185,14 +187,23 @@ def build_products_tab(window: "MainWindow") -> QWidget:
     status_card.setObjectName("catalogStatusStrip")
     status_layout = QVBoxLayout()
     status_layout.setSpacing(6)
+    window.catalog_active_filters_wrap.setVisible(False)
+    window.catalog_active_filters_flow_layout = FlowLayout(
+        window.catalog_active_filters_wrap,
+        margin=0,
+        h_spacing=6,
+        v_spacing=6,
+    )
+    window.catalog_active_filters_wrap.setLayout(window.catalog_active_filters_flow_layout)
 
     status_header = QHBoxLayout()
     status_header.setSpacing(8)
-    status_header.addWidget(window.catalog_results_label, 1)
+    status_header.addStretch(1)
     status_header.addWidget(window.catalog_pagination_label)
     status_header.addWidget(window.catalog_previous_page_button)
     status_header.addWidget(window.catalog_next_page_button)
     status_layout.addLayout(status_header)
+    status_layout.addWidget(window.catalog_active_filters_wrap)
     status_card.setLayout(status_layout)
 
     filters_grid.setContentsMargins(0, 0, 0, 0)
@@ -232,5 +243,6 @@ def build_products_tab(window: "MainWindow") -> QWidget:
 
     layout.addWidget(summary_box)
     layout.addWidget(window.catalog_table, 1)
+    layout.addWidget(window.catalog_results_label)
     widget.setLayout(layout)
     return widget

@@ -6,6 +6,7 @@ from pos_uniformes.ui.helpers.settings_crm_feedback_helper import (
     SettingsCrmFeedbackView,
     build_settings_client_guard_feedback,
     build_settings_client_result_feedback,
+    build_settings_employee_result_feedback,
     build_settings_marketing_guard_feedback,
     build_settings_marketing_result_feedback,
     build_settings_supplier_guard_feedback,
@@ -39,6 +40,43 @@ class SettingsCrmFeedbackHelperTests(unittest.TestCase):
             SettingsCrmFeedbackView(
                 "QR generado",
                 "QR del cliente 'CLI-001' guardado en:\n/tmp/qr.png",
+            ),
+        )
+
+    def test_employee_feedback(self) -> None:
+        self.assertEqual(
+            build_settings_employee_result_feedback(
+                "generate_employee_qr",
+                employee_name="Lupita Gomez",
+                employee_code="VEND-1",
+                asset_path="/tmp/employee_qr.png",
+            ),
+            SettingsCrmFeedbackView(
+                "QR generado",
+                "QR de la empleada 'VEND-1' guardado en:\n/tmp/employee_qr.png",
+            ),
+        )
+        self.assertEqual(
+            build_settings_employee_result_feedback(
+                "generate_employee_card",
+                employee_name="Lupita Gomez",
+                employee_code="VEND-1",
+                asset_path="/tmp/employee_card.png",
+            ),
+            SettingsCrmFeedbackView(
+                "Credencial generada",
+                "Credencial de staff 'VEND-1' guardada en:\n/tmp/employee_card.png",
+            ),
+        )
+        self.assertEqual(
+            build_settings_employee_result_feedback(
+                "set_employee_pin",
+                employee_name="Lupita Gomez",
+                employee_code="VEND-1",
+            ),
+            SettingsCrmFeedbackView(
+                "PIN actualizado",
+                "PIN de la empleada 'Lupita Gomez' configurado correctamente.",
             ),
         )
 

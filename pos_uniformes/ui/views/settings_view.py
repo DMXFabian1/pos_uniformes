@@ -43,6 +43,12 @@ def build_settings_tab(window: "MainWindow") -> QWidget:
             window._open_clients_settings_dialog,
         ),
         (
+            window.settings_employees_button,
+            "Administra codigos EMP y nombres visibles del equipo comercial.",
+            QStyle.StandardPixmap.SP_DirHomeIcon,
+            window._open_employees_settings_dialog,
+        ),
+        (
             window.settings_marketing_button,
             "Define reglas de lealtad, descuentos por nivel y promociones configurables.",
             QStyle.StandardPixmap.SP_DialogApplyButton,

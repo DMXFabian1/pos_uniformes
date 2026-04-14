@@ -57,7 +57,7 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
 
     def form_label(text: str) -> QLabel:
         label = QLabel(text)
-        label.setObjectName("cashierMetaLabel")
+        label.setObjectName("quoteFormLabel")
         return label
 
     scan_stack = QVBoxLayout()
@@ -95,13 +95,16 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
     quote_actions.addWidget(window.quote_remove_button)
     quote_actions.addWidget(window.quote_clear_button)
 
-    window.quote_cart_table.setColumnCount(5)
-    window.quote_cart_table.setHorizontalHeaderLabels(["SKU", "Producto", "Cantidad", "Precio", "Subtotal"])
-    window.quote_cart_table.setObjectName("dataTable")
+    window.quote_cart_table.setColumnCount(7)
+    window.quote_cart_table.setHorizontalHeaderLabels(
+        ["Cantidad", "Producto", "Talla", "Nivel", "Escuela", "Precio", "Subtotal"]
+    )
+    window.quote_cart_table.setObjectName("cashierCartTable")
     window.quote_cart_table.verticalHeader().setVisible(False)
+    window.quote_cart_table.verticalHeader().setDefaultSectionSize(48)
     window.quote_cart_table.setSelectionBehavior(window.quote_cart_table.SelectionBehavior.SelectRows)
     window.quote_cart_table.setAlternatingRowColors(True)
-    window.quote_cart_table.setMinimumHeight(180)
+    window.quote_cart_table.setMinimumHeight(260)
 
     totals_box = QFrame()
     totals_box.setObjectName("cashierTotalsCard")
@@ -133,6 +136,8 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
     quote_cart_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
     quote_cart_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
     quote_cart_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+    quote_cart_header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+    quote_cart_header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
     quote_cart_header.setStretchLastSection(False)
 
     history_box = QGroupBox("Presupuestos recientes")
@@ -190,8 +195,8 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
     window.quote_meta_label.setObjectName("quoteDetailMetaText")
     window.quote_notes_label.setWordWrap(True)
     window.quote_notes_label.setObjectName("quoteDetailNotesText")
-    window.quote_detail_table.setColumnCount(5)
-    window.quote_detail_table.setHorizontalHeaderLabels(["SKU", "Producto", "Cantidad", "Precio", "Subtotal"])
+    window.quote_detail_table.setColumnCount(6)
+    window.quote_detail_table.setHorizontalHeaderLabels(["SKU", "Producto", "Talla", "Cantidad", "Precio", "Subtotal"])
     window.quote_detail_table.setObjectName("dataTable")
     window.quote_detail_table.verticalHeader().setVisible(False)
     window.quote_detail_table.setSelectionBehavior(window.quote_detail_table.SelectionBehavior.SelectRows)
@@ -203,6 +208,7 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
     quote_detail_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
     quote_detail_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
     quote_detail_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+    quote_detail_header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
     quote_detail_header.setStretchLastSection(False)
 
     detail_meta_card = QFrame()
@@ -237,8 +243,8 @@ def build_quotes_tab(window: "MainWindow") -> QWidget:
     history_layout.addLayout(history_content)
     history_box.setLayout(history_layout)
 
-    layout.addWidget(quote_box)
-    layout.addWidget(history_box, 1)
+    layout.addWidget(quote_box, 3)
+    layout.addWidget(history_box, 2)
 
     window.quote_add_button.clicked.connect(window._handle_add_quote_item)
     window.quote_sku_input.returnPressed.connect(window._handle_add_quote_item)

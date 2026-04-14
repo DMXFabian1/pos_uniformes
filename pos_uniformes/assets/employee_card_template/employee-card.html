@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=1080, initial-scale=1.0" />
+    <title>Credencial Staff</title>
+    <link rel="stylesheet" href="./employee-card.css" />
+  </head>
+  <body>
+    <main class="card-shell">
+      <article
+        class="employee-card"
+        data-name-size="{{ name_size }}"
+        style="
+          --primary-color: {{ primary_color }};
+          --secondary-color: {{ secondary_color }};
+        "
+      >
+        <div class="pattern-layer" aria-hidden="true">
+          <span class="pattern-mark pattern-mark-one"></span>
+          <span class="pattern-mark pattern-mark-two"></span>
+          <span class="pattern-mark pattern-mark-three"></span>
+        </div>
+
+        <header class="card-header">
+          <p class="brand-caption">Staff</p>
+        </header>
+
+        <section class="identity-block" aria-labelledby="employee-name">
+          <p class="section-kicker">Credencial interna</p>
+          <h1 id="employee-name" class="employee-name">{{ visible_name }}</h1>
+        </section>
+
+        <aside class="code-seal" aria-label="Codigo interno">
+          <p class="code-meta">Codigo</p>
+          <strong class="code-label">{{ employee_code }}</strong>
+        </aside>
+
+        <section class="qr-section" aria-label="Codigo QR del staff">
+          <div class="qr-frame">
+            <img src="{{ qr_path }}" alt="QR del staff" class="qr-image" />
+          </div>
+        </section>
+      </article>
+    </main>
+  </body>
+</html>

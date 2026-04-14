@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from decimal import Decimal
+from types import SimpleNamespace
 
 from pos_uniformes.database.models import Variante
 from pos_uniformes.utils.label_generator import LabelGenerator, LabelRenderResult
@@ -31,6 +33,49 @@ def load_inventory_label_context(session, variant_id: int) -> InventoryLabelCont
         ),
         talla=str(variante.talla),
         color=str(variante.color),
+    )
+
+
+def _build_fake_variante_from_cache_row(row: dict) -> SimpleNamespace:
+    """Construye un objeto que imita Variante a partir de una fila del cache local."""
+    escuela_nombre = str(row.get("escuela_nombre") or "")
+    if escuela_nombre == "General":
+        escuela_nombre = ""
+    nivel_nombre = str(row.get("nivel_educativo_nombre") or "")
+    if nivel_nombre == "Sin nivel":
+        nivel_nombre = ""
+
+    producto = SimpleNamespace(
+        nombre=str(row.get("producto_nombre") or ""),
+        nombre_base=row.get("producto_nombre_base"),
+        escuela_id=row.get("escuela_id"),
+        nivel_educativo_id=None if not nivel_nombre else "set",
+        escuela=SimpleNamespace(nombre=escuela_nombre) if escuela_nombre else None,
+        nivel_educativo=SimpleNamespace(nombre=nivel_nombre) if nivel_nombre else None,
+        categoria=SimpleNamespace(nombre=str(row.get("categoria_nombre") or "")),
+        tipo_prenda=SimpleNamespace(nombre=str(row.get("tipo_prenda_nombre") or "")),
+        escudo=None,
+    )
+    return SimpleNamespace(
+        sku=str(row["sku"]),
+        talla=str(row.get("talla") or ""),
+        precio_venta=Decimal(str(row.get("precio_venta") or "0")),
+        producto=producto,
+    )
+
+
+def render_inventory_label_from_cache_row(
+    row: dict,
+    *,
+    mode: str,
+    requested_copies: int,
+) -> LabelRenderResult:
+    """Renderiza una etiqueta directamente desde una fila del cache local (sin DB)."""
+    fake_variante = _build_fake_variante_from_cache_row(row)
+    return LabelGenerator.render_for_variant(
+        fake_variante,
+        mode=mode,
+        requested_copies=requested_copies,
     )
 
 

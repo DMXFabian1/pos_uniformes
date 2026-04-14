@@ -64,6 +64,47 @@ class CatalogRefreshHelperTests(unittest.TestCase):
         self.assertIn("pants deportivo", row[SEARCH_GENERAL_BLOB_KEY])
         self.assertIn("pants legacy", row[SEARCH_ALIAS_BLOBS_KEY]["legacy"])
 
+    def test_build_catalog_snapshot_rows_accepts_legacy_tuple_shape(self) -> None:
+        snapshot_rows = build_catalog_snapshot_rows(
+            [
+                (
+                    8,
+                    2,
+                    3,
+                    4,
+                    None,
+                    "SKU-008",
+                    "Uniforme",
+                    "Marca Norte",
+                    None,
+                    "Deportivo",
+                    None,
+                    "Pants Deportivo | Morelos | Pants #4",
+                    "Pants Deportivo",
+                    "Descripcion",
+                    "Pants legacy",
+                    True,
+                    "16",
+                    "Azul Marino",
+                    Decimal("219.00"),
+                    Decimal("140.00"),
+                    6,
+                    2,
+                    True,
+                    False,
+                    True,
+                )
+            ]
+        )
+
+        row = snapshot_rows[0]
+        self.assertEqual(row["sku"], "SKU-008")
+        self.assertEqual(row["escuela_nombre"], "General")
+        self.assertEqual(row["nivel_educativo_nombre"], "Sin nivel")
+        self.assertEqual(row["producto_genero"], "")
+        self.assertEqual(row["producto_nombre"], "Pants Deportivo | Morelos | Pants")
+        self.assertEqual(row["fallback_text"], "fallback")
+
     def test_build_catalog_table_values_returns_visible_columns_in_order(self) -> None:
         table_values = build_catalog_table_values(
             [

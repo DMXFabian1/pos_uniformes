@@ -33,9 +33,9 @@ def _build_main_window_shell_styles() -> str:
                 font-size: 14px;
             }
             QTabWidget::pane {
-                border: 1px solid #d7d0c4;
+                border: 1px solid #d8e0e7;
                 border-radius: 18px;
-                background: #fbf8f2;
+                background: #faf9f5;
                 top: -1px;
                 padding: 10px;
             }
@@ -52,31 +52,31 @@ def _build_main_window_shell_styles() -> str:
                 color: #f7f1e8;
             }
             QTabBar::tab:hover:!selected {
-                background: #e7ded0;
-                color: #2d2b27;
+                background: #e6edf3;
+                color: #2f3f4c;
             }
             #statusLine, #subtleLine, #analyticsLine {
-                background: #fffaf2;
-                border: 1px solid #e1d8cb;
+                background: #f5f8fa;
+                border: 1px solid #d9e3ea;
                 border-radius: 12px;
                 padding: 6px 10px;
             }
             #catalogSpotlightCard, #catalogFiltersCard, #catalogStatusStrip {
-                background: #fffaf4;
-                border: 1px solid #e4d7c8;
+                background: #f8fafb;
+                border: 1px solid #dce5eb;
                 border-radius: 16px;
                 padding: 10px 12px;
             }
             #catalogSpotlightCard {
                 background: qlineargradient(
                     x1: 0, y1: 0, x2: 1, y2: 1,
-                    stop: 0 #fff7ef,
-                    stop: 1 #f8ecdf
+                    stop: 0 #fbfcfd,
+                    stop: 1 #edf3f7
                 );
-                border: 1px solid #e7cdb8;
+                border: 1px solid #d9e3ea;
             }
             #catalogStatusStrip {
-                background: #fffaf2;
+                background: #f5f8fa;
             }
             #catalogSectionTitle {
                 background: transparent;
@@ -105,33 +105,33 @@ def _build_main_window_shell_styles() -> str:
                 letter-spacing: 0.08em;
             }
             #catalogSelectionLine {
-                background: rgba(255, 250, 242, 0.72);
-                border: 1px solid #ead7c6;
+                background: rgba(245, 248, 250, 0.9);
+                border: 1px solid #dce5eb;
                 border-radius: 14px;
                 padding: 6px 10px;
-                color: #4a4038;
+                color: #43515e;
                 font-weight: 700;
             }
             #catalogSummaryLine {
-                background: #fff7ee;
-                border: 1px solid #ebd3c1;
+                background: #eef4f8;
+                border: 1px solid #d8e2ea;
                 border-radius: 14px;
                 padding: 6px 10px;
-                color: #4a352b;
+                color: #304d60;
                 font-weight: 800;
             }
             #catalogPagerLine, #catalogSupportLine {
-                background: #fffaf2;
-                border: 1px solid #e6ddcf;
+                background: #f5f8fa;
+                border: 1px solid #dce5eb;
                 border-radius: 12px;
                 padding: 5px 9px;
             }
             #catalogPagerLine {
-                color: #6c6055;
+                color: #5f6870;
                 font-weight: 700;
             }
             #catalogSupportLine {
-                color: #6e665e;
+                color: #66717b;
             }
             #templatePreviewLabel {
                 background: transparent;
@@ -169,18 +169,18 @@ def _build_main_window_shell_styles() -> str:
                 font-weight: 600;
             }
             #chipButton {
-                background: #efe7d9;
-                color: #6b4b3a;
-                border: 1px solid #ddcbb8;
+                background: #eef3f7;
+                color: #465866;
+                border: 1px solid #d7e1e8;
                 border-radius: 999px;
                 padding: 6px 10px;
                 font-size: 12px;
                 font-weight: 700;
             }
             #chipButton:hover {
-                background: #f8dfcf;
-                border-color: #dfb496;
-                color: #8f4527;
+                background: #dfeaf2;
+                border-color: #c5d7e4;
+                color: #314c60;
             }
             #chipButton[active="true"] {
                 background: #a84f2d;
@@ -188,9 +188,9 @@ def _build_main_window_shell_styles() -> str:
                 border-color: #8a4326;
             }
             #stepButton {
-                background: #efe7d9;
-                color: #6e675f;
-                border: 1px solid #ddd3c6;
+                background: #eef3f7;
+                color: #60707d;
+                border: 1px solid #d8e2ea;
                 border-radius: 999px;
                 padding: 7px 12px;
                 font-size: 12px;
@@ -202,25 +202,33 @@ def _build_main_window_shell_styles() -> str:
                 border-color: #8a4326;
             }
             #stepButton:hover {
-                background: #f8dfcf;
-                color: #8f4527;
-                border-color: #dfb496;
+                background: #dfeaf2;
+                color: #314c60;
+                border-color: #c5d7e4;
             }
             #analyticsLine {
-                background: #efe7d9;
-                color: #4a433d;
+                background: #eef3f7;
+                color: #485762;
             }
             #readOnlyField {
-                background: #f2eee6;
-                color: #564d45;
-                border: 1px solid #ddd3c6;
+                background: #eff4f7;
+                color: #566471;
+                border: 1px solid #d8e2ea;
                 border-radius: 12px;
                 padding: 9px 12px;
                 font-weight: 700;
             }
+            #quoteFormLabel {
+                background: transparent;
+                border: none;
+                color: #7a4f39;
+                padding: 0;
+                font-size: 12px;
+                font-weight: 800;
+            }
             #quoteDetailCard {
-                background: #fff9f1;
-                border: 1px solid #eadccc;
+                background: #f8fafb;
+                border: 1px solid #dce5eb;
                 border-radius: 14px;
             }
             #quoteDetailTitle {
@@ -250,8 +258,8 @@ def _build_main_window_shell_styles() -> str:
                 padding: 0;
             }
             #settingsLaunchCard {
-                background: #fffaf2;
-                border: 1px solid #ddd3c6;
+                background: #f8fafb;
+                border: 1px solid #dce5eb;
                 border-radius: 18px;
             }
             QPushButton#settingsLaunchButton {
@@ -268,8 +276,8 @@ def _build_main_window_shell_styles() -> str:
                 background: #bb613c;
             }
             QGroupBox, #infoCard {
-                background: #fffaf2;
-                border: 1px solid #ddd3c6;
+                background: #f8fafb;
+                border: 1px solid #dce5eb;
                 border-radius: 18px;
                 margin-top: 12px;
                 padding-top: 12px;
@@ -282,13 +290,13 @@ def _build_main_window_shell_styles() -> str:
                 color: #51483f;
             }
             #kpiCard {
-                background: #fffaf2;
-                border: 1px solid #ddd3c6;
+                background: #f8fafb;
+                border: 1px solid #dce5eb;
                 border-radius: 20px;
             }
             #kpiCard[tone="positive"] {
-                background: #fff8f0;
-                border: 1px solid #e1c5b2;
+                background: #eef8f2;
+                border: 1px solid #c9dfd2;
             }
             #kpiCard[tone="warning"] {
                 background: #fff9ec;
@@ -299,27 +307,27 @@ def _build_main_window_shell_styles() -> str:
                 border: 1px solid #e3c0b8;
             }
             #kpiCard[tone="neutral"], #kpiCard[tone="muted"] {
-                background: #fffaf2;
-                border: 1px solid #ddd3c6;
+                background: #f8fafb;
+                border: 1px solid #dce5eb;
             }
             #kpiTitle {
-                color: #6b625a;
+                color: #66707a;
                 font-size: 12px;
                 text-transform: uppercase;
                 letter-spacing: 0.06em;
                 font-weight: 700;
             }
             #kpiValue {
-                color: #7a351d;
+                color: #355167;
                 font-size: 30px;
                 font-weight: 800;
             }
             #kpiSubtitle {
-                color: #857b70;
+                color: #78818a;
                 font-size: 12px;
             }
             #kpiSubtitle[tone="positive"] {
-                color: #8f4527;
+                color: #245241;
             }
             #kpiSubtitle[tone="warning"] {
                 color: #8a5a00;

@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from decimal import Decimal
 from typing import Callable
 
+from pos_uniformes.database.models import ModoOrigenVenta
+
 
 @dataclass(frozen=True)
 class SaleCheckoutResult:
@@ -29,6 +31,10 @@ def complete_sale_checkout(
     breakdown: dict[str, object],
     payment_method: str,
     note_parts: list[str],
+    internal_note_parts: list[str],
+    credit_mode: ModoOrigenVenta,
+    seller_employee_code: str | None,
+    seller_employee_display_name: str | None,
     build_notice: Callable[[str, str, str, Decimal], str],
 ) -> SaleCheckoutResult:
     (
@@ -48,22 +54,37 @@ def complete_sale_checkout(
         selected_client_id=selected_client_id,
     )
     cliente = client_snapshot.client
+    sale_observation_parts = list(note_parts)
+    sale_observation_parts.extend(f"Interno: {part}" for part in internal_note_parts if str(part).strip())
+    movement_note = " | ".join(str(part).strip() for part in internal_note_parts if str(part).strip()) or None
+
     venta = venta_service.crear_borrador(
         session=session,
         usuario=usuario,
         folio=folio,
         items=[
-            venta_item_input(sku=str(item["sku"]), cantidad=int(item["cantidad"]))
+            venta_item_input(
+                sku=str(item.get("sku") or ""),
+                cantidad=int(item["cantidad"]),
+                precio_unitario=item.get("precio_unitario"),
+                precio_base=item.get("precio_base"),
+                pricing_rule_label=str(item.get("pricing_rule_label") or ""),
+                descripcion_snapshot=str(item.get("descripcion_snapshot") or item.get("producto_nombre") or ""),
+                is_manual=str(item.get("line_type") or "").upper() == "MANUAL",
+            )
             for item in sale_cart
         ],
-        observacion=" | ".join(note_parts),
+        observacion=" | ".join(sale_observation_parts),
         cliente=cliente,
+        credit_mode=credit_mode,
+        seller_employee_code=seller_employee_code,
+        seller_employee_display_name=seller_employee_display_name,
     )
     venta.subtotal = subtotal
     venta.descuento_porcentaje = discount_percent
     venta.descuento_monto = applied_discount
     venta.total = total
-    venta_service.confirmar_venta(session, venta)
+    venta_service.confirmar_venta(session, venta, movement_observacion=movement_note)
 
     loyalty_discount = Decimal(str(breakdown["loyalty_discount"] or Decimal("0.00"))).quantize(Decimal("0.01"))
     promo_discount = Decimal(str(breakdown["promo_discount"] or Decimal("0.00"))).quantize(Decimal("0.01"))

@@ -43,7 +43,9 @@ if (Test-Path $zipPath) {
     tests.test_quote_selection_helper `
     tests.test_quote_snapshot_service `
     tests.test_quote_text_service `
-    tests.test_quote_whatsapp_service
+    tests.test_quote_whatsapp_service `
+    tests.test_catalog_local_cache_service `
+    tests.test_satellite_startup_service
 if ($WithPrecheck) {
     & $venvPython (Join-Path $projectRoot "scripts\check_startup_health.py")
 }

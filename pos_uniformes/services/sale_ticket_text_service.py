@@ -50,6 +50,8 @@ def _extract_ticket_notes(observacion: str) -> list[str]:
         if part.startswith("Beneficio aplicado:"):
             cleaned_parts.append(part.replace("Beneficio aplicado:", "Beneficio:", 1).strip())
             continue
+        if part.startswith("Interno:"):
+            continue
         if part in {"Referencia: Sin referencia", "Referencia transferencia: Sin referencia"}:
             continue
         cleaned_parts.append(part)
@@ -107,9 +109,13 @@ def build_sale_ticket_text(
         producto = (
             sanitize_product_display_name(getattr(getattr(variante, "producto", None), "nombre", ""))
             if variante
-            else ""
+            else str(getattr(detalle, "descripcion_snapshot", "") or "").strip()
         )
-        sku = getattr(variante, "sku", "") if variante else ""
+        sku = (
+            getattr(variante, "sku", "")
+            if variante
+            else str(getattr(detalle, "sku_snapshot", "") or "").strip()
+        )
         lines.append(producto)
         lines.append(
             f"{sku} | {getattr(detalle, 'cantidad', '')} x "

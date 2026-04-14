@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import unittest
 
-from pos_uniformes.ui.helpers.size_option_sort_helper import sort_size_options
+from pos_uniformes.ui.helpers.size_option_sort_helper import group_size_options, sort_size_options
 
 
 class SizeOptionSortHelperTests(unittest.TestCase):
@@ -22,6 +22,25 @@ class SizeOptionSortHelperTests(unittest.TestCase):
         self.assertEqual(
             sort_size_options(["MD", "4", "EXG", "CH", "10", "GD-EXG", "Unitalla"]),
             ["4", "10", "CH", "MD", "GD-EXG", "EXG", "Unitalla"],
+        )
+
+    def test_groups_sizes_by_format(self) -> None:
+        self.assertEqual(
+            group_size_options(["MD", "4", "EXG", "CH", "10", "GD-EXG", "Unitalla", "0-2"]),
+            [
+                ("Numericas", ["0-2", "4", "10"]),
+                ("Letras", ["CH", "MD", "GD-EXG", "EXG"]),
+                ("Especiales", ["Unitalla"]),
+            ],
+        )
+
+    def test_groups_numeric_ranges_with_numeric_sizes(self) -> None:
+        self.assertEqual(
+            group_size_options(["12", "3-5", "8", "0-2", "CH"]),
+            [
+                ("Numericas", ["0-2", "3-5", "8", "12"]),
+                ("Letras", ["CH"]),
+            ],
         )
 
 

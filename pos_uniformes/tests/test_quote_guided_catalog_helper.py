@@ -23,6 +23,48 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
         self.assertEqual([option.label for option in view.school_options], ["Colegio Mexico", "Instituto Hidalgo"])
         self.assertEqual(view.empty_label, "Selecciona una escuela para ver productos sugeridos.")
 
+    def test_school_mode_excludes_non_uniform_school_rows(self) -> None:
+        view = build_guided_catalog_view(
+            snapshot_rows=[
+                _row("SKU-1", "Primaria", "Colegio Mexico", "Niño", "Oficial", producto="Camisa Escolar", pieza="Camisa"),
+                _row("SKU-2", "Primaria", "Colegio Mexico", "Unisex", "Casual", producto="Short Mezclilla", pieza="Short"),
+                _row("SKU-3", "Primaria", "Instituto Hidalgo", "Niña", "Deportivo", producto="Playera Deportiva", pieza="Playera"),
+            ],
+            mode_key="school",
+            level_filter="Primaria",
+            school_filter="",
+            gender_filter="TODOS",
+        )
+
+        self.assertEqual([option.label for option in view.school_options], ["Colegio Mexico", "Instituto Hidalgo"])
+
+    def test_basics_mode_groups_piece_options_by_mental_category(self) -> None:
+        view = build_guided_catalog_view(
+            snapshot_rows=[
+                _row("SKU-1", "", "General", "", "Oficial", pieza="Camisa"),
+                _row("SKU-2", "", "General", "", "Oficial", pieza="Playera"),
+                _row("SKU-3", "", "General", "", "Oficial", pieza="Chaleco"),
+                _row("SKU-4", "", "General", "", "Oficial", pieza="Calceta"),
+                _row("SKU-5", "", "General", "", "Oficial", pieza="Bata"),
+            ],
+            mode_key="basics",
+            level_filter="",
+            school_filter="",
+            gender_filter="Todos",
+            bucket_filter="Todos",
+        )
+
+        self.assertEqual(
+            [(option.label, option.group_label) for option in view.piece_options],
+            [
+                ("Camisa", "Prendas principales"),
+                ("Playera", "Prendas principales"),
+                ("Chaleco", "Complementos"),
+                ("Calceta", "Accesorios"),
+                ("Bata", "Especial"),
+            ],
+        )
+
     def test_oficial_nina_keeps_official_unisex(self) -> None:
         view = build_guided_catalog_view(
             snapshot_rows=[
@@ -133,29 +175,278 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
     def test_basics_mode_only_uses_general_products(self) -> None:
         view = build_guided_catalog_view(
             snapshot_rows=[
-                _row("SKU-1", "Primaria", "General", "Unisex"),
+                _row("SKU-1", "Primaria", "General", "Unisex", pieza="Uniforme"),
                 _row("SKU-2", "Primaria", "Colegio Mexico", "Unisex"),
             ],
             mode_key="basics",
             level_filter="",
             school_filter="",
             gender_filter="Todos",
+            piece_filter="Uniforme",
         )
 
         self.assertEqual([card.sku for card in view.product_cards], ["SKU-1"])
-        self.assertEqual(view.path_label, "Basicos > Todos")
+        self.assertEqual(view.path_label, "Basicos > Todos > Uniforme")
+
+    def test_basics_mode_excludes_regular_categories_even_if_school_is_general(self) -> None:
+        view = build_guided_catalog_view(
+            snapshot_rows=[
+                _row(
+                    "SKU-1",
+                    "Sin nivel",
+                    "General",
+                    "Unisex",
+                    "Básico",
+                    producto="Pants Escolar",
+                    pieza="Pants 2pz",
+                    categoria="Básico",
+                ),
+                _row(
+                    "SKU-2",
+                    "Sin nivel",
+                    "General",
+                    "Unisex",
+                    "Deportivo casual",
+                    producto="Short Deportivo",
+                    pieza="Short",
+                    categoria="Deportivo casual",
+                ),
+            ],
+            mode_key="basics",
+            level_filter="",
+            school_filter="",
+            gender_filter="Todos",
+            bucket_filter="Todos",
+            piece_filter="Pants 2pz",
+        )
+
+        self.assertEqual([card.sku for card in view.product_cards], ["SKU-1"])
+
+    def test_basics_mode_can_filter_basicos_vs_extras(self) -> None:
+        snapshot_rows = [
+            _row("SKU-1", "Sin nivel", "General", "Unisex", "Básico", producto="Pantalón Escolar", pieza="Pantalón"),
+            _row("SKU-2", "Sin nivel", "General", "Unisex", "Accesorio", producto="Calceta Escolar", pieza="Calceta"),
+            _row("SKU-3", "Sin nivel", "General", "Unisex", "Accesorio", producto="Playera Polo Blanca", pieza="Playera"),
+        ]
+
+        basics_view = build_guided_catalog_view(
+            snapshot_rows=snapshot_rows,
+            mode_key="basics",
+            level_filter="",
+            school_filter="",
+            gender_filter="Todos",
+            bucket_filter="Basicos",
+            piece_filter="Pantalón",
+        )
+        extras_view = build_guided_catalog_view(
+            snapshot_rows=snapshot_rows,
+            mode_key="basics",
+            level_filter="",
+            school_filter="",
+            gender_filter="Todos",
+            bucket_filter="Extras",
+            piece_filter="Calceta",
+        )
+
+        self.assertEqual([card.sku for card in basics_view.product_cards], ["SKU-1"])
+        self.assertEqual([card.sku for card in extras_view.product_cards], ["SKU-2"])
+        self.assertEqual([option.label for option in basics_view.bucket_options], ["Basicos", "Extras", "Todos"])
+        self.assertEqual([option.label for option in basics_view.piece_options], ["Pantalón", "Playera"])
+        self.assertEqual(basics_view.path_label, "Basicos > Todos > Basicos > Pantalón")
+
+    def test_basics_mode_requires_piece_and_groups_models_before_variants(self) -> None:
+        snapshot_rows = [
+            _row("SKU-1", "Sin nivel", "General", "Unisex", "Accesorio", producto="Bata Manga Corta Blanca", pieza="Bata", talla="40"),
+            _row("SKU-2", "Sin nivel", "General", "Unisex", "Accesorio", producto="Bata Manga Corta Blanca", pieza="Bata", talla="42"),
+            _row("SKU-3", "Sin nivel", "General", "Unisex", "Accesorio", producto="Bata Manga Larga Blanca", pieza="Bata", talla="12"),
+        ]
+
+        without_piece = build_guided_catalog_view(
+            snapshot_rows=snapshot_rows,
+            mode_key="basics",
+            level_filter="",
+            school_filter="",
+            gender_filter="Todos",
+            bucket_filter="Extras",
+        )
+        with_piece = build_guided_catalog_view(
+            snapshot_rows=snapshot_rows,
+            mode_key="basics",
+            level_filter="",
+            school_filter="",
+            gender_filter="Todos",
+            bucket_filter="Extras",
+            piece_filter="Bata",
+        )
+
+        self.assertEqual(without_piece.empty_label, "Selecciona un tipo de pieza para ver modelos.")
+        self.assertEqual([option.label for option in without_piece.piece_options], ["Bata"])
+        self.assertEqual(len(with_piece.product_cards), 2)
+        self.assertEqual(with_piece.product_cards[0].title, "Bata Manga Corta Blanca")
+        self.assertEqual(with_piece.selected_product_key, with_piece.product_cards[0].key)
+        self.assertEqual(
+            [option.label for option in with_piece.variant_options],
+            ["Talla 40 · $199.00", "Talla 42 · $199.00"],
+        )
+
+    def test_school_mode_groups_models_before_variants(self) -> None:
+        snapshot_rows = [
+            _row("SKU-1", "Primaria", "Colegio Mexico", "Niña", "Oficial", producto="Falda Escolar Tabla", pieza="Falda", talla="10"),
+            _row("SKU-2", "Primaria", "Colegio Mexico", "Niña", "Oficial", producto="Falda Escolar Tabla", pieza="Falda", talla="12"),
+            _row("SKU-3", "Primaria", "Colegio Mexico", "Niña", "Oficial", producto="Blusa Escolar Blanca", pieza="Camisa", talla="8"),
+        ]
+
+        view = build_guided_catalog_view(
+            snapshot_rows=snapshot_rows,
+            mode_key="school",
+            level_filter="Primaria",
+            school_filter="Colegio Mexico",
+            gender_filter="Oficial Niña",
+        )
+
+        self.assertEqual([card.title for card in view.product_cards], ["Blusa Escolar Blanca", "Falda Escolar Tabla"])
+        self.assertEqual(view.product_cards[0].subtitle, "Tallas: 8")
+        self.assertEqual(view.selected_product_key, view.product_cards[0].key)
+        self.assertEqual(
+            [option.label for option in view.variant_options],
+            ["Talla 8 · $199.00"],
+        )
+
+    def test_school_mode_exposes_line_and_profile_options_for_official(self) -> None:
+        snapshot_rows = [
+            _row("SKU-1", "Primaria", "Colegio Mexico", "Niña", "Oficial", producto="Suéter Escolar", pieza="Suéter"),
+            _row("SKU-2", "Primaria", "Colegio Mexico", "Niño", "Oficial", producto="Suéter Escolar", pieza="Suéter"),
+            _row("SKU-3", "Primaria", "Colegio Mexico", "Unisex", "Deportivo", producto="Playera Deportiva", pieza="Playera"),
+        ]
+
+        view = build_guided_catalog_view(
+            snapshot_rows=snapshot_rows,
+            mode_key="school",
+            level_filter="Primaria",
+            school_filter="Colegio Mexico",
+            gender_filter="Oficial",
+        )
+
+        self.assertEqual([option.label for option in view.gender_options], ["Deportivo", "Oficial", "Todos"])
+        self.assertEqual([option.label for option in view.profile_options], ["Niña", "Niño", "Compartido", "Todos"])
+
+    def test_school_official_profile_ignores_shared_pants(self) -> None:
+        snapshot_rows = [
+            _row("SKU-1", "Primaria", "Colegio Mexico", "Niña", "Oficial", producto="Suéter Escolar", pieza="Suéter"),
+            _row("SKU-2", "Primaria", "Colegio Mexico", "Niño", "Oficial", producto="Suéter Escolar", pieza="Suéter"),
+            _row("SKU-3", "Primaria", "Colegio Mexico", "Unisex", "Oficial", producto="Pants Escolar", pieza="Pants Suelto"),
+        ]
+
+        nina_view = build_guided_catalog_view(
+            snapshot_rows=snapshot_rows,
+            mode_key="school",
+            level_filter="Primaria",
+            school_filter="Colegio Mexico",
+            gender_filter="Oficial",
+            profile_filter="Niña",
+        )
+        shared_view = build_guided_catalog_view(
+            snapshot_rows=snapshot_rows,
+            mode_key="school",
+            level_filter="Primaria",
+            school_filter="Colegio Mexico",
+            gender_filter="Oficial",
+            profile_filter="Compartido",
+        )
+
+        self.assertEqual([card.title for card in nina_view.product_cards], ["Suéter Escolar"])
+        self.assertEqual([card.title for card in shared_view.product_cards], ["Pants Escolar"])
+
+    def test_variant_options_sort_sizes_from_small_to_large(self) -> None:
+        snapshot_rows = [
+            _row("SKU-1", "Sin nivel", "General", "Unisex", "Oficial", producto="Chaleco Claudia", pieza="Chaleco", talla="32"),
+            _row("SKU-2", "Sin nivel", "General", "Unisex", "Oficial", producto="Chaleco Claudia", pieza="Chaleco", talla="10"),
+            _row("SKU-3", "Sin nivel", "General", "Unisex", "Oficial", producto="Chaleco Claudia", pieza="Chaleco", talla="14"),
+            _row("SKU-4", "Sin nivel", "General", "Unisex", "Oficial", producto="Chaleco Claudia", pieza="Chaleco", talla="28"),
+        ]
+
+        view = build_guided_catalog_view(
+            snapshot_rows=snapshot_rows,
+            mode_key="basics",
+            level_filter="",
+            school_filter="",
+            gender_filter="Todos",
+            bucket_filter="Basicos",
+            piece_filter="Chaleco",
+        )
+
+        self.assertEqual(
+            [option.label for option in view.variant_options],
+            ["Talla 10 · $199.00", "Talla 14 · $199.00", "Talla 28 · $199.00", "Talla 32 · $199.00"],
+        )
+
+    def test_product_cards_only_keep_name_talla_color_and_price(self) -> None:
+        view = build_guided_catalog_view(
+            snapshot_rows=[
+                _row(
+                    "SKU-1",
+                    "Secundaria",
+                    "ESTV 663",
+                    "Unisex",
+                    "Deportivo",
+                    producto="Pants 2pz Lobito Liso ESTV 663",
+                    pieza="Pants",
+                ),
+            ],
+            mode_key="school",
+            level_filter="Secundaria",
+            school_filter="ESTV 663",
+            gender_filter="Deportivo",
+        )
+
+        self.assertEqual(view.product_cards[0].title, "Pants 2pz Lobito Liso ESTV 663")
+        self.assertEqual(view.product_cards[0].subtitle, "Tallas: 12")
+        self.assertEqual(view.product_cards[0].meta_label, "")
+        self.assertEqual(view.product_cards[0].price_label, "$199.00")
+
+    def test_product_cards_hide_ad_hoc_color(self) -> None:
+        view = build_guided_catalog_view(
+            snapshot_rows=[
+                _row(
+                    "SKU-1",
+                    "Secundaria",
+                    "ESTV 663",
+                    "Unisex",
+                    "Deportivo",
+                    producto="Playera Deportiva Blanca",
+                    pieza="Playera",
+                )
+            ],
+            mode_key="school",
+            level_filter="Secundaria",
+            school_filter="ESTV 663",
+            gender_filter="Deportivo",
+        )
+
+        row = dict(_row("SKU-1", "Secundaria", "ESTV 663", "Unisex", "Deportivo", producto="Playera Deportiva Blanca", pieza="Playera"))
+        row["color"] = "Ad hoc"
+        view = build_guided_catalog_view(
+            snapshot_rows=[row],
+            mode_key="school",
+            level_filter="Secundaria",
+            school_filter="ESTV 663",
+            gender_filter="Deportivo",
+        )
+
+        self.assertEqual(view.product_cards[0].subtitle, "Tallas: 12")
 
     def test_oficial_filter_on_basics_keeps_only_official_general(self) -> None:
         view = build_guided_catalog_view(
             snapshot_rows=[
-                _row("SKU-1", "Primaria", "General", "Unisex", "Oficial"),
+                _row("SKU-1", "Primaria", "General", "Unisex", "Oficial", pieza="Uniforme"),
                 _row("SKU-2", "Primaria", "General", "", "Deportivo"),
-                _row("SKU-3", "Primaria", "General", "Niña", "Oficial"),
+                _row("SKU-3", "Primaria", "General", "Niña", "Oficial", pieza="Uniforme"),
             ],
             mode_key="basics",
             level_filter="",
             school_filter="",
             gender_filter="Oficial Niña",
+            piece_filter="Uniforme",
         )
 
         self.assertEqual([card.sku for card in view.product_cards], ["SKU-1", "SKU-3"])
@@ -169,17 +460,20 @@ def _row(
     tipo_prenda: str = "Oficial",
     producto: str | None = None,
     pieza: str = "Uniforme",
+    talla: str = "12",
+    categoria: str = "Uniformes",
 ) -> dict[str, object]:
     return {
         "sku": sku,
         "nivel_educativo_nombre": nivel,
         "escuela_nombre": escuela,
+        "categoria_nombre": categoria,
         "producto_genero": genero,
         "producto_nombre": producto or f"Producto {sku}",
         "producto_nombre_base": producto or f"Producto {sku}",
         "tipo_prenda_nombre": tipo_prenda,
         "tipo_pieza_nombre": pieza,
-        "talla": "12",
+        "talla": talla,
         "color": "Azul",
         "precio_venta": Decimal("199.00"),
         "stock_actual": 5,

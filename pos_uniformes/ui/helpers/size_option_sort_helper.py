@@ -26,6 +26,18 @@ def sort_size_options(values: list[object]) -> list[str]:
     return sorted(normalized_values, key=_size_sort_key)
 
 
+def group_size_options(values: list[object]) -> list[tuple[str, list[str]]]:
+    grouped: dict[str, list[str]] = {
+        "Numericas": [],
+        "Letras": [],
+        "Especiales": [],
+    }
+    for raw_value in sort_size_options(values):
+        group_name = _size_group_name(raw_value)
+        grouped[group_name].append(raw_value)
+    return [(group_name, items) for group_name, items in grouped.items() if items]
+
+
 def _size_sort_key(raw_value: str) -> tuple[object, ...]:
     normalized = raw_value.strip().upper()
 
@@ -44,3 +56,14 @@ def _size_sort_key(raw_value: str) -> tuple[object, ...]:
         return (1, _ALPHA_SIZE_ORDER[normalized], normalized)
 
     return (2, normalized)
+
+
+def _size_group_name(raw_value: str) -> str:
+    normalized = raw_value.strip().upper()
+    if _SIZE_NUMBER_RE.match(normalized) or _SIZE_RANGE_RE.match(normalized):
+        return "Numericas"
+    if normalized in {"UNI", "UNITALLA", "DAMA", "ESP"}:
+        return "Especiales"
+    if normalized in _ALPHA_SIZE_ORDER:
+        return "Letras"
+    return "Especiales"

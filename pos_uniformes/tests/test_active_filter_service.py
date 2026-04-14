@@ -6,6 +6,7 @@ from pos_uniformes.services.active_filter_service import (
     build_active_filter_labels,
     build_active_filters_summary,
     build_filters_label,
+    build_active_filter_tokens,
 )
 
 
@@ -50,4 +51,27 @@ class ActiveFilterServiceTests(unittest.TestCase):
         self.assertEqual(
             build_filters_label(['texto="azul"', "color=Azul"]),
             'texto="azul", color=Azul',
+        )
+
+    def test_build_active_filter_tokens_expands_individual_filters(self) -> None:
+        tokens = build_active_filter_tokens(
+            search_text="  azul  ",
+            multi_filters=(
+                ("categoria", ["Uniformes", "Básico"]),
+                ("marca", []),
+            ),
+            combo_filters=(
+                ("uso", "school_only", "Uniforme escolar"),
+                ("estado", "", "Estado: todos"),
+            ),
+        )
+
+        self.assertEqual(
+            [(token.key, token.display_text, token.value) for token in tokens],
+            [
+                ("texto", 'Texto: "azul"', "azul"),
+                ("categoria", "Categoria: Uniformes", "Uniformes"),
+                ("categoria", "Categoria: Básico", "Básico"),
+                ("uso", "Uso: Uniforme escolar", "Uniforme escolar"),
+            ],
         )

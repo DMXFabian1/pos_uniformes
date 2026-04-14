@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable
 
+from pos_uniformes.ui.helpers.catalog_product_form_mode_helper import UNIFORM_CATEGORIES
 from pos_uniformes.ui.helpers.listing_visibility_helper import (
     matches_active_state,
     matches_fallback_duplicate,
@@ -16,6 +17,7 @@ from pos_uniformes.ui.helpers.listing_visibility_helper import (
 @dataclass(frozen=True)
 class InventoryVisibleFilterState:
     search_text: str
+    use_filter: str
     category_filters: tuple[str, ...]
     brand_filters: tuple[str, ...]
     school_filters: tuple[str, ...]
@@ -54,7 +56,8 @@ def inventory_row_matches_visible_filters(
     search_matcher: Callable[[dict[str, object], str], bool],
 ) -> bool:
     return (
-        matches_selected_values(row["categoria_nombre"], filters.category_filters)
+        _matches_inventory_use_filter(str(row["categoria_nombre"]), filters.use_filter)
+        and matches_selected_values(row["categoria_nombre"], filters.category_filters)
         and matches_selected_values(row["marca_nombre"], filters.brand_filters)
         and matches_selected_values(row["escuela_nombre"], filters.school_filters)
         and matches_selected_values(row["tipo_prenda_nombre"], filters.type_filters)
@@ -67,6 +70,16 @@ def inventory_row_matches_visible_filters(
         and matches_origin_legacy(bool(row["origen_legacy"]), filters.origin_filter)
         and matches_fallback_duplicate(bool(row["fallback_importacion"]), filters.duplicate_filter)
         and search_matcher(row, filters.search_text)
+    )
+
+
+def _matches_inventory_use_filter(category_name: str, use_filter: str) -> bool:
+    normalized_category = _normalize_text(category_name)
+    is_uniform_category = normalized_category in UNIFORM_CATEGORIES
+    return (
+        not use_filter
+        or (use_filter == "school_only" and is_uniform_category)
+        or (use_filter == "general_only" and normalized_category and not is_uniform_category)
     )
 
 
@@ -85,3 +98,9 @@ def _matches_inventory_qr_filter(qr_exists: bool, qr_filter: str) -> bool:
         or (qr_filter == "ready" and qr_exists)
         or (qr_filter == "missing" and not qr_exists)
     )
+
+
+def _normalize_text(raw_value: object) -> str:
+    if raw_value is None:
+        return ""
+    return str(raw_value).strip().lower()

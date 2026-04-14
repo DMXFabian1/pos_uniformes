@@ -3,6 +3,7 @@ from __future__ import annotations
 import unittest
 
 from pos_uniformes.ui.helpers.inventory_selection_helper import (
+    collect_inventory_row_variant_ids,
     collect_selected_inventory_variant_ids,
     find_catalog_row_by_variant_id,
     find_inventory_row_index_by_variant_id,
@@ -52,6 +53,19 @@ class InventorySelectionHelperTests(unittest.TestCase):
         selected_ids = collect_selected_inventory_variant_ids([7, "7", None, "x", 8, "8", 9])
 
         self.assertEqual(selected_ids, [7, 8, 9])
+
+    def test_collect_inventory_row_variant_ids_reads_variant_ids_from_rows(self) -> None:
+        row_ids = collect_inventory_row_variant_ids(
+            [
+                {"variante_id": 7, "sku": "SKU-007"},
+                {"variante_id": "7", "sku": "SKU-007-DUP"},
+                {"variante_id": None, "sku": "SKU-NULL"},
+                {"variante_id": "abc", "sku": "SKU-BAD"},
+                {"variante_id": 8, "sku": "SKU-008"},
+            ]
+        )
+
+        self.assertEqual(row_ids, [7, 8])
 
     def test_find_inventory_row_index_by_variant_id_supports_string_and_int_values(self) -> None:
         row_index = find_inventory_row_index_by_variant_id([None, "7", 8, "9"], 8)

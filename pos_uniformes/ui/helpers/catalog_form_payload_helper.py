@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from pos_uniformes.ui.helpers.catalog_product_form_mode_helper import UNIFORM_CATEGORIES
+from pos_uniformes.ui.helpers.catalog_product_form_mode_helper import (
+    UNIFORM_CATEGORIES,
+    UNIFORM_GARMENT_TYPES,
+)
 
 
 def validate_catalog_product_base_step(
@@ -51,6 +54,14 @@ def validate_catalog_product_submission(payload: dict[str, object]) -> str | Non
         normalized_category_name = category_name.strip().lower()
         if normalized_category_name in UNIFORM_CATEGORIES:
             return "Ropa normal no puede guardarse dentro de una categoria de uniforme."
+        normalized_garment_type = str(payload.get("tipo_prenda") or "").strip().lower()
+        if normalized_garment_type in UNIFORM_GARMENT_TYPES:
+            return "Ropa normal no puede usar un tipo de uniforme escolar."
+        if any(
+            str(payload.get(field_name) or "").strip()
+            for field_name in ("escuela", "nivel_educativo", "escudo")
+        ):
+            return "Ropa normal no debe conservar escuela, nivel ni escudo."
     return None
 
 

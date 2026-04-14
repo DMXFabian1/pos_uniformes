@@ -11,6 +11,7 @@ class QuoteSatelliteActionState:
     resume_enabled: bool
     emit_enabled: bool
     cancel_enabled: bool
+    share_enabled: bool
     whatsapp_enabled: bool
     print_enabled: bool
 
@@ -62,6 +63,7 @@ def build_quote_satellite_action_state(
         resume_enabled=can_operate and has_selection and is_draft,
         emit_enabled=can_operate and has_selection and is_draft,
         cancel_enabled=can_operate and has_selection and is_active,
+        share_enabled=has_selection and is_active,
         whatsapp_enabled=has_selection and is_active and has_phone,
         print_enabled=has_selection and is_active,
     )

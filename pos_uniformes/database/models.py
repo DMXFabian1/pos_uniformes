@@ -53,6 +53,12 @@ class EstadoVenta(str, Enum):
     CANCELADA = "CANCELADA"
 
 
+class ModoOrigenVenta(str, Enum):
+    UNASSIGNED = "UNASSIGNED"
+    EMPLOYEE = "EMPLOYEE"
+    OPERATOR_DIRECT = "OPERATOR_DIRECT"
+
+
 class EstadoApartado(str, Enum):
     ACTIVO = "ACTIVO"
     LIQUIDADO = "LIQUIDADO"
@@ -336,6 +342,27 @@ class Cliente(Base):
         order_by="desc(AutorizacionPromocionManual.created_at)",
     )
     presupuestos: Mapped[list["Presupuesto"]] = relationship(back_populates="cliente")
+
+
+class Empleada(Base):
+    __tablename__ = "empleada"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    codigo: Mapped[str] = mapped_column(String(40), unique=True, nullable=False, index=True)
+    nombre_completo: Mapped[str] = mapped_column(String(150), nullable=False, index=True)
+    pin_hash: Mapped[str | None] = mapped_column(String(255))
+    activo: Mapped[bool] = mapped_column(default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
 
 
 class Categoria(Base):
@@ -1060,6 +1087,14 @@ class Venta(Base):
         ForeignKey("cliente.id", ondelete="SET NULL"),
         index=True,
     )
+    credit_mode: Mapped[ModoOrigenVenta] = mapped_column(
+        SqlEnum(ModoOrigenVenta, name="credit_mode_venta"),
+        default=ModoOrigenVenta.UNASSIGNED,
+        nullable=False,
+        index=True,
+    )
+    seller_employee_code: Mapped[str | None] = mapped_column(String(40), index=True)
+    seller_employee_display_name: Mapped[str | None] = mapped_column(String(120))
     folio: Mapped[str] = mapped_column(String(40), unique=True, nullable=False, index=True)
     estado: Mapped[EstadoVenta] = mapped_column(
         SqlEnum(EstadoVenta, name="estado_venta"),
@@ -1199,17 +1234,18 @@ class VentaDetalle(Base):
         nullable=False,
         index=True,
     )
-    variante_id: Mapped[int] = mapped_column(
+    variante_id: Mapped[int | None] = mapped_column(
         ForeignKey("variante.id", ondelete="RESTRICT"),
-        nullable=False,
         index=True,
     )
+    sku_snapshot: Mapped[str | None] = mapped_column(String(64), index=True)
+    descripcion_snapshot: Mapped[str | None] = mapped_column(String(220))
     cantidad: Mapped[int] = mapped_column(Integer, nullable=False)
     precio_unitario: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     subtotal_linea: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
 
     venta: Mapped["Venta"] = relationship(back_populates="detalles")
-    variante: Mapped["Variante"] = relationship(back_populates="ventas_detalle")
+    variante: Mapped["Variante | None"] = relationship(back_populates="ventas_detalle")
 
 
 class Apartado(Base):

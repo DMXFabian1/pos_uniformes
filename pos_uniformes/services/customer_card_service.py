@@ -6,7 +6,6 @@ from dataclasses import dataclass
 from datetime import datetime
 from html import escape
 from pathlib import Path
-import shutil
 import subprocess
 import tempfile
 from urllib.parse import quote
@@ -17,6 +16,7 @@ from pos_uniformes.database.connection import get_session
 from pos_uniformes.database.models import Cliente
 from pos_uniformes.services.business_settings_service import BusinessSettingsService
 from pos_uniformes.services.loyalty_service import LoyaltyService
+from pos_uniformes.utils.headless_browser_helper import resolve_headless_browser_executable
 from pos_uniformes.utils.qr_generator import QrGenerator
 
 CARD_OUTPUT_DIR = Path(__file__).resolve().parents[1] / "generated" / "client_cards"
@@ -212,7 +212,7 @@ class CustomerCardService:
         template_html = TEMPLATE_HTML_PATH.read_text(encoding="utf-8")
         template_css = TEMPLATE_CSS_PATH.read_text(encoding="utf-8")
         html_document = cls._build_html_document(payload, template_html, template_css)
-        browser_path = cls._resolve_browser_executable()
+        browser_path = resolve_headless_browser_executable()
         if browser_path is None:
             raise FileNotFoundError("No se encontro un browser compatible para render headless.")
 
@@ -296,24 +296,6 @@ class CustomerCardService:
         </svg>
         """.strip()
         return f"data:image/svg+xml;charset=utf-8,{quote(svg)}"
-
-    @staticmethod
-    def _resolve_browser_executable() -> str | None:
-        candidates = [
-            Path("/Applications/Brave Browser.app/Contents/MacOS/Brave Browser"),
-            Path("/Applications/Google Chrome.app/Contents/MacOS/Google Chrome"),
-            Path("/Applications/Chromium.app/Contents/MacOS/Chromium"),
-            Path("/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge"),
-            Path("/Applications/Arc.app/Contents/MacOS/Arc"),
-        ]
-        for candidate in candidates:
-            if candidate.exists():
-                return str(candidate)
-        for executable in ("brave-browser", "brave", "google-chrome", "chromium", "chromium-browser", "microsoft-edge"):
-            resolved = shutil.which(executable)
-            if resolved:
-                return resolved
-        return None
 
     @classmethod
     def _render_card_with_pil(cls, payload: CustomerCardRenderInput, target: Path) -> Path:

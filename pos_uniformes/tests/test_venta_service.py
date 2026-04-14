@@ -5,7 +5,8 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from pos_uniformes.services.venta_service import VentaService
+from pos_uniformes.database.models import ModoOrigenVenta
+from pos_uniformes.services.venta_service import VentaItemInput, VentaService
 
 
 class _SessionStub:
@@ -34,10 +35,23 @@ class _FakeVentaDetalle:
 
 
 class VentaServiceLayawayTests(unittest.TestCase):
+    def test_validar_stock_disponible_allows_sale_when_guard_is_disabled(self) -> None:
+        variante = SimpleNamespace(stock_actual=0)
+
+        with patch("pos_uniformes.services.venta_service.sale_stock_guard_enabled", return_value=False):
+            VentaService.validar_stock_disponible(variante, 3)
+
+    def test_validar_stock_disponible_blocks_when_guard_is_enabled(self) -> None:
+        variante = SimpleNamespace(stock_actual=0)
+
+        with patch("pos_uniformes.services.venta_service.sale_stock_guard_enabled", return_value=True):
+            with self.assertRaisesRegex(ValueError, "Stock insuficiente"):
+                VentaService.validar_stock_disponible(variante, 3)
+
     def test_crear_confirmada_desde_apartado_preserves_rounded_total(self) -> None:
         session = _SessionStub()
         usuario = SimpleNamespace(activo=True, rol="CAJERO", username="caja")
-        variante = SimpleNamespace()
+        variante = SimpleNamespace(producto=SimpleNamespace(nombre="Playera"))
         detalle = SimpleNamespace(
             variante=variante,
             cantidad=1,
@@ -73,7 +87,7 @@ class VentaServiceLayawayTests(unittest.TestCase):
     def test_crear_confirmada_desde_apartado_keeps_observation_without_adjustment(self) -> None:
         session = _SessionStub()
         usuario = SimpleNamespace(activo=True, rol="CAJERO", username="caja")
-        variante = SimpleNamespace()
+        variante = SimpleNamespace(producto=SimpleNamespace(nombre="Pantalon"))
         detalle = SimpleNamespace(
             variante=variante,
             cantidad=1,
@@ -103,6 +117,68 @@ class VentaServiceLayawayTests(unittest.TestCase):
         self.assertEqual(venta.subtotal, Decimal("439.50"))
         self.assertEqual(venta.total, Decimal("439.50"))
         self.assertEqual(venta.observacion, "Entrega limpia")
+
+    def test_crear_borrador_preserves_custom_unit_price_for_same_sku(self) -> None:
+        session = _SessionStub()
+        usuario = SimpleNamespace(activo=True, rol="CAJERO")
+        variant = SimpleNamespace(sku="PLY-001", precio_venta=Decimal("189.00"), producto=SimpleNamespace(nombre="Playera"))
+
+        with patch("pos_uniformes.services.venta_service.Venta", _FakeVenta), patch(
+            "pos_uniformes.services.venta_service.VentaDetalle", _FakeVentaDetalle
+        ), patch.object(
+            VentaService,
+            "obtener_variante_por_sku",
+            side_effect=lambda session, sku: variant if sku == "PLY-001" else None,
+        ), patch.object(
+            VentaService,
+            "validar_stock_disponible",
+            return_value=None,
+        ):
+            venta = VentaService.crear_borrador(
+                session=session,
+                usuario=usuario,
+                folio="V-3PZ-001",
+                items=[
+                    VentaItemInput(sku="PLY-001", cantidad=1, precio_unitario=Decimal("100.00")),
+                    VentaItemInput(sku="PLY-001", cantidad=1, precio_unitario=Decimal("189.00")),
+                ],
+                observacion="Prueba deportivo",
+            )
+
+        self.assertEqual(len(venta.detalles), 2)
+        self.assertEqual(venta.detalles[0].precio_unitario, Decimal("100.00"))
+        self.assertEqual(venta.detalles[1].precio_unitario, Decimal("189.00"))
+        self.assertEqual(venta.subtotal, Decimal("289.00"))
+
+    def test_crear_borrador_persists_sale_origin_fields(self) -> None:
+        session = _SessionStub()
+        usuario = SimpleNamespace(activo=True, rol="CAJERO")
+        variant = SimpleNamespace(sku="SKU-001", precio_venta=Decimal("65.00"), producto=SimpleNamespace(nombre="Camisa"))
+
+        with patch("pos_uniformes.services.venta_service.Venta", _FakeVenta), patch(
+            "pos_uniformes.services.venta_service.VentaDetalle", _FakeVentaDetalle
+        ), patch.object(
+            VentaService,
+            "obtener_variante_por_sku",
+            return_value=variant,
+        ), patch.object(
+            VentaService,
+            "validar_stock_disponible",
+            return_value=None,
+        ):
+            venta = VentaService.crear_borrador(
+                session=session,
+                usuario=usuario,
+                folio="VTA-ORIGEN-001",
+                items=[VentaItemInput(sku="SKU-001", cantidad=1)],
+                credit_mode=ModoOrigenVenta.OPERATOR_DIRECT,
+                seller_employee_code="",
+                seller_employee_display_name="",
+            )
+
+        self.assertEqual(venta.credit_mode, ModoOrigenVenta.OPERATOR_DIRECT)
+        self.assertIsNone(venta.seller_employee_code)
+        self.assertIsNone(venta.seller_employee_display_name)
 
 
 if __name__ == "__main__":

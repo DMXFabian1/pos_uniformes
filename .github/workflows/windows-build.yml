@@ -1,0 +1,104 @@
+name: Windows Build
+
+on:
+  push:
+    branches:
+      - main
+      - codex/etiquetas-windows
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-build-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests-and-bundle:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: pwsh
+        working-directory: pos_uniformes
+    env:
+      PYTHONUTF8: "1"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: |
+            pos_uniformes/requirements.txt
+            pos_uniformes/requirements-build.txt
+
+      - name: Resolve build metadata
+        id: meta
+        run: |
+          $version = (Get-Content VERSION -Raw).Trim()
+          $shortSha = "${{ github.sha }}".Substring(0, 7)
+          $safeRef = "${{ github.ref_name }}" -replace '[^A-Za-z0-9._-]', '-'
+          $appName = "POSUniformes-$version"
+          $bundleZip = "dist\$appName-windows.zip"
+          $artifactZip = "dist\$appName-$safeRef-$shortSha-windows.zip"
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "short_sha=$shortSha" >> $env:GITHUB_OUTPUT
+          "safe_ref=$safeRef" >> $env:GITHUB_OUTPUT
+          "app_name=$appName" >> $env:GITHUB_OUTPUT
+          "bundle_zip=$bundleZip" >> $env:GITHUB_OUTPUT
+          "artifact_zip=$artifactZip" >> $env:GITHUB_OUTPUT
+          "artifact_name=windows-$safeRef-$version-$shortSha" >> $env:GITHUB_OUTPUT
+
+      - name: Create virtual environment
+        run: py -3.12 -m venv .venv
+
+      - name: Install dependencies
+        run: |
+          .\.venv\Scripts\python -m pip install --upgrade pip
+          .\.venv\Scripts\python -m pip install -r requirements.txt -r requirements-build.txt
+
+      - name: Startup health check
+        run: .\.venv\Scripts\python scripts\check_startup_health.py
+
+      - name: Run full test suite
+        run: .\.venv\Scripts\python -m unittest discover -s tests -p "test_*.py" -t .
+
+      - name: Build Windows bundle
+        run: .\scripts\build_windows_bundle.ps1
+
+      - name: Prepare unique artifact zip
+        run: |
+          if (-not (Test-Path "${{ steps.meta.outputs.bundle_zip }}")) {
+            throw "No se encontro el zip esperado: ${{ steps.meta.outputs.bundle_zip }}"
+          }
+          Copy-Item "${{ steps.meta.outputs.bundle_zip }}" "${{ steps.meta.outputs.artifact_zip }}" -Force
+
+      - name: Upload Windows bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.meta.outputs.artifact_name }}
+          path: pos_uniformes/${{ steps.meta.outputs.artifact_zip }}
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Publish workflow summary
+        run: |
+          @"
+          ## Windows build listo
+
+          - Version del producto: `${{ steps.meta.outputs.version }}`
+          - Rama: `${{ github.ref_name }}`
+          - Commit corto: `${{ steps.meta.outputs.short_sha }}`
+          - App generada: `${{ steps.meta.outputs.app_name }}.exe`
+          - Zip portable subido: `${{ steps.meta.outputs.artifact_zip }}`
+
+          Nota:
+          - La version visible del programa sale del archivo `VERSION`.
+          - El artifact agrega `rama + commit` para distinguir builds de prueba sin cambiar la version del producto.
+          "@ | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Encoding utf8 -Append

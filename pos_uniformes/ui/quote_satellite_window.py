@@ -11,7 +11,7 @@ from uuid import uuid4
 import webbrowser
 
 from PyQt6.QtCore import QDate, QSize, QTimer, Qt
-from PyQt6.QtGui import QBrush, QColor, QIcon, QPixmap
+from PyQt6.QtGui import QBrush, QColor, QIcon, QImage, QKeySequence, QPixmap, QShortcut
 from PyQt6.QtWidgets import (
     QButtonGroup,
     QDateEdit,
@@ -33,6 +33,7 @@ from PyQt6.QtWidgets import (
     QSplitter,
     QStackedWidget,
     QStyle,
+    QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
@@ -48,9 +49,16 @@ if __package__ in {None, ""}:
 
 from pos_uniformes.database.connection import get_session
 from pos_uniformes.database.models import Cliente, EstadoPresupuesto, RolUsuario, Usuario
+from pos_uniformes.services.active_filter_service import build_active_filter_tokens
+from pos_uniformes.services.catalog_local_cache_service import (
+    catalog_cache_saved_at,
+    format_cache_age_label,
+    save_catalog_cache,
+)
 from pos_uniformes.services.catalog_snapshot_service import load_catalog_snapshot_rows
 from pos_uniformes.services.client_service import ClientService
-from pos_uniformes.services.presupuesto_service import PresupuestoItemInput, PresupuestoService
+from pos_uniformes.services.presupuesto_service import PresupuestoService
+from pos_uniformes.services.quote_client_creation_feedback_service import build_quote_client_created_feedback
 from pos_uniformes.services.quote_action_service import cancel_quote, emit_quote
 from pos_uniformes.services.quote_detail_service import load_quote_detail_snapshot
 from pos_uniformes.services.quote_document_view_service import build_quote_document_view
@@ -62,6 +70,8 @@ from pos_uniformes.services.sale_selected_client_service import find_active_sale
 from pos_uniformes.services.sale_cart_update_service import update_sale_cart_item_quantity
 from pos_uniformes.ui.dialogs.printable_text_dialog import open_printable_text_dialog
 from pos_uniformes.ui.helpers.date_field_helper import configure_friendly_date_edit
+from pos_uniformes.ui.helpers.flow_layout import FlowLayout
+from pos_uniformes.ui.helpers.active_filter_chip_helper import rebuild_active_filter_chips
 from pos_uniformes.ui.helpers.printable_document_flow_helper import open_printable_document_flow
 from pos_uniformes.ui.helpers.catalog_pagination_helper import build_catalog_pagination_view
 from pos_uniformes.ui.helpers.quote_cart_view_helper import build_quote_cart_view
@@ -76,6 +86,10 @@ from pos_uniformes.ui.helpers.quote_catalog_browser_helper import (
     build_quote_catalog_school_options,
 )
 from pos_uniformes.ui.helpers.quote_scanned_client_helper import build_quote_scanned_client_ui_state
+from pos_uniformes.ui.helpers.quote_sports_uniform_helper import (
+    add_quote_scan_variants,
+    build_quote_presupuesto_inputs,
+)
 from pos_uniformes.ui.helpers.quote_guided_catalog_helper import build_guided_catalog_view
 from pos_uniformes.ui.helpers.quote_kiosk_lookup_helper import (
     build_empty_quote_kiosk_lookup_view,
@@ -90,16 +104,43 @@ from pos_uniformes.ui.helpers.quote_satellite_filter_helper import (
 )
 from pos_uniformes.ui.helpers.quote_summary_helper import build_quote_summary_view
 from pos_uniformes.ui.helpers.quote_table_row_helper import build_quote_table_row_views
+from pos_uniformes.ui.styles.interactive_hover_styles import (
+    build_button_hover_styles,
+    build_combo_popup_hover_styles,
+)
+from pos_uniformes.ui.helpers.sale_sports_uniform_helper import restore_sports_uniform_playera_price_if_needed
+from pos_uniformes.utils.app_metadata import satellite_build_label, satellite_display_name, satellite_windows_icon_path
+from pos_uniformes.ui.dialogs.inventory_label_dialog import build_inventory_label_dialog
+from pos_uniformes.services.inventory_label_service import (
+    InventoryLabelContext,
+    load_inventory_label_context,
+    render_inventory_label,
+    render_inventory_label_from_cache_row,
+)
 
 SATELLITE_SEARCH_DEBOUNCE_MS = 300
+_LABEL_PRINT_PINS = {"634700", "12345"}
 SATELLITE_CATALOG_PAGE_SIZE = 25
 SATELLITE_QUOTE_VALIDITY_DAYS = 7
 
+try:
+    from PyQt6.QtWidgets import QScroller as _QScroller
+    _SCROLLER_GESTURE = _QScroller.ScrollerGestureType.LeftMouseButtonGesture
+    _TOUCH_SCROLL_AVAILABLE = True
+except Exception:
+    _TOUCH_SCROLL_AVAILABLE = False
+
 
 class QuoteSatelliteWindow(QMainWindow):
-    def __init__(self, user_id: int) -> None:
+    def __init__(
+        self,
+        user_id: int | None,
+        offline_mode: bool = False,
+        offline_catalog_cache: list[dict] | None = None,
+    ) -> None:
         super().__init__()
         self.user_id = user_id
+        self.offline_mode = offline_mode
         self.current_username = ""
         self.current_full_name = ""
         self.current_role = RolUsuario.CAJERO
@@ -111,7 +152,9 @@ class QuoteSatelliteWindow(QMainWindow):
         self.lookup_snapshot: QuoteKioskLookupSnapshot | None = None
         self.lookup_history: list[QuoteKioskLookupSnapshot] = []
         self.catalog_snapshot_rows: list[dict[str, object]] = []
+        self.catalog_browser_visible_skus: tuple[str, ...] = ()
         self.catalog_browser_page_index = 0
+        self.current_page_key = "kiosk"
         self.catalog_browser_debounce_timer = QTimer(self)
         self.catalog_browser_debounce_timer.setSingleShot(True)
         self.catalog_browser_debounce_timer.setInterval(SATELLITE_SEARCH_DEBOUNCE_MS)
@@ -122,21 +165,66 @@ class QuoteSatelliteWindow(QMainWindow):
         self._apply_styles()
         self._build_ui()
         self._bind_events()
-        self._load_operator_context()
+
+        if self.offline_mode:
+            self._init_offline(offline_catalog_cache or [])
+        else:
+            self._load_operator_context()
+            self._reset_quote_form()
+            self._apply_lookup_view(build_empty_quote_kiosk_lookup_view())
+            self._apply_catalog_detail(None)
+            self._apply_guided_detail(None)
+            self._refresh_recent_lookup_table()
+            self.refresh_all()
+
+        QTimer.singleShot(0, self.kiosk_scan_input.setFocus)
+
+    def _init_offline(self, cache_rows: list[dict]) -> None:
+        """Inicializa la ventana en modo local sin tocar la base de datos."""
+        self.catalog_snapshot_rows = cache_rows
+        self.operator_label.setText("Modo local")
+
+        # Mostrar banner con antiguedad del cache
+        saved_at = catalog_cache_saved_at()
+        age_text = format_cache_age_label(saved_at) if saved_at else "cache local disponible"
+        self.offline_banner.setText(
+            f"Modo local \u2014 Catalogo {age_text}. "
+            "Enciende la PC principal para datos en vivo."
+        )
+        self.offline_banner.setVisible(True)
+
+        # Deshabilitar pestanas que requieren base de datos
+        self.nav_quote_button.setEnabled(False)
+        self.nav_quote_button.setToolTip("No disponible en modo local")
+        self.nav_share_button.setEnabled(False)
+        self.nav_share_button.setToolTip("No disponible en modo local")
+        self.refresh_button.setEnabled(False)
+        self.refresh_button.setToolTip("Sin conexion con la PC principal")
+
         self._reset_quote_form()
         self._apply_lookup_view(build_empty_quote_kiosk_lookup_view())
         self._apply_catalog_detail(None)
         self._apply_guided_detail(None)
         self._refresh_recent_lookup_table()
-        self.refresh_all()
-        QTimer.singleShot(0, self.kiosk_scan_input.setFocus)
+
+        # Refrescar vistas que no necesitan DB
+        self._refresh_catalog_snapshot_from_cache()
+        self._refresh_catalog_browser()
+        self._refresh_guided_browser()
+        self._set_status("Modo local — catalogo guardado disponible.")
 
     def _build_widgets(self) -> None:
         self.operator_label = QLabel("Sin operador")
+        self.version_label = QLabel(satellite_build_label())
         self.status_label = QLabel("Listo.")
+        self.offline_banner = QLabel("")
+        self.offline_banner.setObjectName("offlineBanner")
+        self.offline_banner.setWordWrap(True)
+        self.offline_banner.setVisible(False)
         self.quick_scan_input = QLineEdit()
         self.quick_scan_button = QPushButton("Escanear")
         self.refresh_button = QPushButton("Refrescar")
+        self.exit_button = QPushButton("Salir")
         self.page_stack = QStackedWidget()
         self.nav_button_group = QButtonGroup(self)
         self.nav_kiosk_button = QPushButton("Kiosko")
@@ -147,6 +235,10 @@ class QuoteSatelliteWindow(QMainWindow):
         self.nav_share_button = QPushButton("Compartir")
         self.sidebar_total_label = QLabel("$0.00")
         self.sidebar_summary_label = QLabel("Sin piezas en el presupuesto actual.")
+        self.sidebar_items_count_label = QLabel("0 lineas | 0 pzas")
+        self.sidebar_items_scroll = QScrollArea()
+        self.sidebar_items_content = QWidget()
+        self.sidebar_items_layout = QVBoxLayout()
         self.kiosk_open_quote_button = QPushButton("Ver presupuesto")
         self.kiosk_open_search_button = QPushButton("Abrir catalogo")
         self.kiosk_budget_total_label = QLabel("$0.00")
@@ -157,7 +249,10 @@ class QuoteSatelliteWindow(QMainWindow):
         self.catalog_qty_spin = QSpinBox()
         self.catalog_refresh_button = QPushButton("Refrescar")
         self.catalog_add_button = QPushButton("Agregar al presupuesto")
+        self.catalog_print_label_button = QPushButton("Imprimir etiqueta")
         self.catalog_status_label = QLabel("Sin catalogo cargado.")
+        self.catalog_active_filters_wrap = QWidget()
+        self.catalog_active_filters_flow_layout = None
         self.catalog_pagination_label = QLabel("0 de 0 | p. 1/1")
         self.catalog_previous_page_button = QPushButton("Anterior")
         self.catalog_next_page_button = QPushButton("Siguiente")
@@ -171,12 +266,19 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_selected_level = ""
         self.guided_selected_school = ""
         self.guided_selected_gender = "TODOS"
+        self.guided_selected_profile = "TODOS"
+        self.guided_selected_bucket = "TODOS"
+        self.guided_selected_piece = ""
+        self.guided_selected_product_key = ""
         self.guided_selected_sku = ""
         self.guided_status_label = QLabel("Empieza eligiendo una ruta.")
         self.guided_path_label = QLabel("Uniformes > sin nivel > sin escuela > Todos")
         self.guided_empty_label = QLabel("Selecciona una ruta para comenzar.")
         self.guided_qty_spin = QSpinBox()
         self.guided_add_button = QPushButton("Agregar al presupuesto")
+        self.guided_print_label_button = QPushButton("Imprimir etiqueta")
+        self.guided_reset_button = QPushButton("Limpiar pasos")
+        self.guided_basics_button = QPushButton("Piezas generales")
         self.guided_visual_icon_label = QLabel()
         self.guided_detail_title_label = QLabel("Sin seleccion.")
         self.guided_detail_meta_label = QLabel("")
@@ -185,6 +287,10 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_level_buttons: dict[str, QPushButton] = {}
         self.guided_school_buttons: dict[str, QPushButton] = {}
         self.guided_gender_buttons: dict[str, QPushButton] = {}
+        self.guided_profile_buttons: dict[str, QPushButton] = {}
+        self.guided_bucket_buttons: dict[str, QPushButton] = {}
+        self.guided_piece_buttons: dict[str, QPushButton] = {}
+        self.guided_variant_buttons: dict[str, QPushButton] = {}
         self.guided_product_buttons: dict[str, QPushButton] = {}
 
         self.kiosk_scan_input = QLineEdit()
@@ -266,16 +372,101 @@ class QuoteSatelliteWindow(QMainWindow):
         self.quote_open_share_button.setIconSize(QSize(18, 18))
 
     def _apply_styles(self) -> None:
+        combo_popup_styles = build_combo_popup_hover_styles(
+            popup_background="#fffdf8",
+            popup_color="#1f1f1b",
+            popup_border="#d8cfc3",
+            selected_background="#f4d4bb",
+            selected_color="#73341c",
+            hover_background="#a9c1d6",
+            hover_color="#0f2940",
+            selected_hover_background="#98b4cd",
+            selected_hover_color="#0b2237",
+        )
+        button_hover_styles = "\n".join(
+            (
+                build_button_hover_styles(
+                    selector="QPushButton#primaryButton",
+                    hover_background="#bb613c",
+                    hover_color="#f9f4ea",
+                ),
+                build_button_hover_styles(
+                    selector="QPushButton#secondaryButton",
+                    hover_background="#e6dccd",
+                    hover_color="#2c2a27",
+                    hover_border="#d6ccbe",
+                ),
+                build_button_hover_styles(
+                    selector="QPushButton#ghostButton",
+                    hover_background="#e6dccd",
+                    hover_color="#2c2a27",
+                    hover_border="#d6ccbe",
+                ),
+                build_button_hover_styles(
+                    selector="QPushButton#dangerButton",
+                    hover_background="#ecd1ca",
+                    hover_color="#7e2f1f",
+                    hover_border="#d9b4ab",
+                ),
+                build_button_hover_styles(
+                    selector="QPushButton#navButton",
+                    hover_background="#e6dccd",
+                    hover_color="#2c2a27",
+                    hover_border="#d6ccbe",
+                ),
+                build_button_hover_styles(
+                    selector="QPushButton#guidedChoiceButton",
+                    hover_background="#e6dccd",
+                    hover_color="#2c2a27",
+                    hover_border="#d6ccbe",
+                ),
+                build_button_hover_styles(
+                    selector="QPushButton#guidedProductButton",
+                    hover_background="#e6dccd",
+                    hover_color="#2c2a27",
+                    hover_border="#d6ccbe",
+                ),
+                build_button_hover_styles(
+                    selector="QPushButton#sidebarItemRemoveButton",
+                    hover_background="#ead8c9",
+                    hover_color="#73341c",
+                    hover_border="#d3bca8",
+                ),
+            )
+        )
         self.setStyleSheet(
-            """
+            "\n".join(
+                [
+                    """
             QMainWindow {
-                background: #f4efe7;
+                background: #f3efe8;
                 color: #1f1c19;
                 font-family: "Avenir Next", "Helvetica Neue", sans-serif;
                 font-size: 14px;
             }
+            QPushButton#exitButton {
+                background: transparent;
+                color: rgba(255, 255, 255, 0.55);
+                border: 1px solid rgba(255, 255, 255, 0.25);
+                border-radius: 8px;
+                padding: 6px 14px;
+                font-size: 12px;
+            }
+            QPushButton#exitButton:hover {
+                background: rgba(255, 255, 255, 0.12);
+                color: rgba(255, 255, 255, 0.85);
+                border-color: rgba(255, 255, 255, 0.45);
+            }
+            QLabel#offlineBanner {
+                background: #f5c842;
+                color: #3d2600;
+                font-size: 13px;
+                font-weight: 600;
+                padding: 8px 14px;
+                border-radius: 8px;
+            }
             QGroupBox {
-                border: 1px solid #d7cbbb;
+                border: 1px solid #dce5eb;
                 border-radius: 16px;
                 margin-top: 12px;
                 padding-top: 12px;
@@ -287,23 +478,34 @@ class QuoteSatelliteWindow(QMainWindow):
                 padding: 0 6px;
                 color: #87492c;
             }
-            QFrame#satHeaderCard, QFrame#satTotalsCard {
+            QFrame#satHeaderCard {
+                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+                    stop:0 #6f331d, stop:0.55 #a84f2d, stop:1 #c96a35);
+                border: 1px solid rgba(255, 255, 255, 0.08);
+                border-radius: 18px;
+            }
+            QFrame#satTotalsCard {
                 background: #fbf8f2;
-                border: 1px solid #d7cbbb;
+                border: 1px solid #dce5eb;
                 border-radius: 18px;
             }
             QFrame#satSidebarCard {
                 background: #fbf8f2;
-                border: 1px solid #d7cbbb;
+                border: 1px solid #dce5eb;
                 border-radius: 22px;
+            }
+            QFrame#satSidebarItemCard {
+                background: #f8f2e9;
+                border: 1px solid #e3d8ca;
+                border-radius: 16px;
             }
             QLabel#satTitle {
                 font-size: 20px;
                 font-weight: 800;
-                color: #87492c;
+                color: #f9f4ea;
             }
             QLabel#satMeta {
-                color: #675f56;
+                color: #f6ddca;
                 font-size: 12px;
             }
             QLabel#satFieldLabel {
@@ -314,12 +516,20 @@ class QuoteSatelliteWindow(QMainWindow):
                 text-transform: uppercase;
             }
             QLabel#satPager {
-                color: #675f56;
+                background: #f5f8fa;
+                border: 1px solid #dce5eb;
+                border-radius: 12px;
+                padding: 5px 9px;
+                color: #5f6870;
                 font-size: 13px;
                 font-weight: 800;
             }
             QLabel#satStatus {
-                color: #675f56;
+                background: rgba(249, 244, 234, 0.09);
+                border: 1px solid rgba(249, 244, 234, 0.14);
+                border-radius: 14px;
+                padding: 8px 12px;
+                color: #f9f4ea;
                 font-weight: 700;
             }
             QLabel#satTotal {
@@ -328,8 +538,9 @@ class QuoteSatelliteWindow(QMainWindow):
                 color: #87492c;
             }
             QLabel#satSummary {
-                color: #4f4a44;
+                color: #304d60;
                 background: #f2ece3;
+                border: 1px solid #d8e2ea;
                 border-radius: 12px;
                 padding: 10px 12px;
             }
@@ -344,10 +555,44 @@ class QuoteSatelliteWindow(QMainWindow):
                 color: #87492c;
             }
             QLabel#satSidebarSummary {
-                color: #5e574f;
+                color: #66717b;
                 background: #f1ebe2;
+                border: 1px solid #dce5eb;
                 border-radius: 12px;
                 padding: 10px 12px;
+            }
+            QLabel#satSidebarSectionMeta {
+                color: #7a6d60;
+                font-size: 12px;
+                font-weight: 700;
+            }
+            QLabel#satSidebarItemQty {
+                background: #e6dccd;
+                color: #654e3d;
+                border-radius: 10px;
+                padding: 4px 8px;
+                font-size: 11px;
+                font-weight: 900;
+            }
+            QLabel#satSidebarItemName {
+                color: #2f2a24;
+                font-size: 13px;
+                font-weight: 800;
+            }
+            QLabel#satSidebarItemMeta {
+                color: #6f665d;
+                font-size: 12px;
+            }
+            QLabel#satSidebarItemEmpty {
+                color: #6f665d;
+                background: #f3ece3;
+                border: 1px dashed #dacdbf;
+                border-radius: 14px;
+                padding: 12px;
+            }
+            QScrollArea#satSidebarItemsScroll, QWidget#satSidebarItemsViewport, QWidget#satSidebarItemsContent {
+                background: transparent;
+                border: none;
             }
             QLabel#satKioskSku {
                 font-size: 26px;
@@ -372,8 +617,9 @@ class QuoteSatelliteWindow(QMainWindow):
                 font-weight: 800;
             }
             QLabel#satKioskBody {
-                color: #5e574f;
+                color: #66717b;
                 background: #f1ebe2;
+                border: 1px solid #dce5eb;
                 border-radius: 12px;
                 padding: 10px 12px;
             }
@@ -389,8 +635,9 @@ class QuoteSatelliteWindow(QMainWindow):
                 padding: 6px 0;
             }
             QLabel#satDetailMeta {
-                color: #5e574f;
+                color: #66717b;
                 background: #f1ebe2;
+                border: 1px solid #dce5eb;
                 border-radius: 12px;
                 padding: 10px 12px;
             }
@@ -409,9 +656,16 @@ class QuoteSatelliteWindow(QMainWindow):
                 color: #675f56;
                 font-size: 13px;
             }
+            QLabel#guidedGroupLabel {
+                color: #87492c;
+                font-size: 12px;
+                font-weight: 900;
+                padding-top: 2px;
+            }
             QLabel#guidedPath {
-                color: #5e574f;
+                color: #66717b;
                 background: #f1ebe2;
+                border: 1px solid #dce5eb;
                 border-radius: 12px;
                 padding: 10px 12px;
                 font-weight: 700;
@@ -423,21 +677,29 @@ class QuoteSatelliteWindow(QMainWindow):
                 padding: 8px 10px;
                 color: #1f1c19;
             }
+            QLineEdit:hover, QTextEdit:hover, QDateEdit:hover, QComboBox:hover, QSpinBox:hover {
+                background: #f9efe7;
+                border: 1px solid #dfb496;
+            }
+            QComboBox#satFilterCombo {
+                font-weight: 700;
+                color: #2f2a24;
+                padding-left: 14px;
+            }
+            QComboBox#satFilterCombo:hover {
+                background: #e2cfbd;
+                color: #1f1b17;
+                border: 1px solid #c69367;
+            }
             QLineEdit:focus, QTextEdit:focus, QDateEdit:focus, QComboBox:focus, QSpinBox:focus {
                 border: 2px solid #c76b39;
             }
             QComboBox QAbstractItemView {
-                background: #fffaf2;
-                color: #2f2a24;
-                border: 1px solid #d5c9b9;
-                selection-background-color: #dfb48f;
-                selection-color: #1f1c19;
-                outline: 0;
+                border-radius: 10px;
             }
-            QComboBox QAbstractItemView::item {
-                min-height: 26px;
-                padding: 6px 10px;
-            }
+            """,
+                    combo_popup_styles,
+                    """
             QLineEdit#satScanInput {
                 font-size: 15px;
                 font-weight: 700;
@@ -448,6 +710,25 @@ class QuoteSatelliteWindow(QMainWindow):
                 border-radius: 12px;
                 padding: 9px 14px;
                 font-weight: 800;
+            }
+            QPushButton#chipButton {
+                background: #eef3f7;
+                color: #465866;
+                border: 1px solid #d7e1e8;
+                border-radius: 999px;
+                padding: 6px 10px;
+                font-size: 12px;
+                font-weight: 700;
+            }
+            QPushButton#chipButton:hover {
+                background: #dfeaf2;
+                border-color: #c5d7e4;
+                color: #314c60;
+            }
+            QPushButton#chipButton[active="true"] {
+                background: #a84f2d;
+                color: #f9f4ea;
+                border-color: #8a4326;
             }
             QPushButton#primaryButton {
                 background: #87492c;
@@ -472,6 +753,15 @@ class QuoteSatelliteWindow(QMainWindow):
                 padding: 14px 16px;
                 font-size: 15px;
             }
+            QPushButton#sidebarItemRemoveButton {
+                background: #efe4d5;
+                color: #6c4d3a;
+                border: 1px solid #dbcbb8;
+                border-radius: 10px;
+                padding: 5px 10px;
+                font-size: 12px;
+                font-weight: 800;
+            }
             QPushButton#navButton:checked {
                 background: #87492c;
                 color: #f9f4ea;
@@ -482,6 +772,12 @@ class QuoteSatelliteWindow(QMainWindow):
                 border: 1px solid #d5c9b9;
                 text-align: left;
                 padding: 10px 12px;
+            }
+            QPushButton#guidedChoiceButton[compactChoice="true"] {
+                padding: 6px 10px;
+            }
+            QPushButton#guidedProductButton[compactCard="true"] {
+                padding: 6px 10px;
             }
             QPushButton#guidedChoiceButton:checked, QPushButton#guidedProductButton:checked {
                 background: #87492c;
@@ -495,9 +791,9 @@ class QuoteSatelliteWindow(QMainWindow):
             QTableWidget {
                 background: #fffaf2;
                 alternate-background-color: #f5eee5;
-                border: 1px solid #d5c9b9;
+                border: 1px solid #dce5eb;
                 border-radius: 12px;
-                gridline-color: #e7dccf;
+                gridline-color: #dce5eb;
                 color: #2f2a24;
                 selection-background-color: #dfb48f;
                 selection-color: #1f1c19;
@@ -510,9 +806,9 @@ class QuoteSatelliteWindow(QMainWindow):
             }
             QHeaderView::section {
                 background: #efe4d5;
-                color: #5d4c3f;
+                color: #304d60;
                 border: none;
-                border-bottom: 1px solid #d5c9b9;
+                border-bottom: 1px solid #d8e2ea;
                 padding: 8px;
                 font-weight: 800;
             }
@@ -522,8 +818,8 @@ class QuoteSatelliteWindow(QMainWindow):
             QTableCornerButton::section {
                 background: #efe4d5;
                 border: none;
-                border-bottom: 1px solid #d5c9b9;
-                border-right: 1px solid #d5c9b9;
+                border-bottom: 1px solid #d8e2ea;
+                border-right: 1px solid #d8e2ea;
             }
             QScrollArea#guidedScrollArea, QWidget#guidedScrollViewport {
                 background: #fbf8f2;
@@ -537,12 +833,18 @@ class QuoteSatelliteWindow(QMainWindow):
                 background: #f4efe7;
                 border: none;
             }
-            """
+            """,
+                    button_hover_styles,
+                ]
+            )
         )
 
     def _build_ui(self) -> None:
-        self.setWindowTitle("Kiosko de Presupuestos")
+        self.setWindowTitle(f"{satellite_display_name()} | {satellite_build_label()}")
         self.resize(1560, 980)
+        icon_path = satellite_windows_icon_path()
+        if icon_path is not None:
+            self.setWindowIcon(QIcon(str(icon_path)))
 
         header_card = QFrame()
         header_card.setObjectName("satHeaderCard")
@@ -551,16 +853,20 @@ class QuoteSatelliteWindow(QMainWindow):
         header_layout.setSpacing(10)
         title_layout = QVBoxLayout()
         title_layout.setSpacing(2)
-        title = QLabel("Kiosko")
+        title = QLabel(satellite_display_name())
         title.setObjectName("satTitle")
         self.operator_label.setObjectName("satMeta")
+        self.version_label.setObjectName("satMeta")
         self.status_label.setObjectName("satStatus")
         title_layout.addWidget(title)
+        title_layout.addWidget(self.version_label)
         title_layout.addWidget(self.operator_label)
         header_layout.addLayout(title_layout, 1)
         header_layout.addWidget(self.status_label, 1, Qt.AlignmentFlag.AlignRight)
         self.refresh_button.setObjectName("secondaryButton")
+        self.exit_button.setObjectName("exitButton")
         header_layout.addWidget(self.refresh_button)
+        header_layout.addWidget(self.exit_button)
         header_card.setLayout(header_layout)
 
         content = QWidget()
@@ -576,15 +882,37 @@ class QuoteSatelliteWindow(QMainWindow):
         root_layout.setContentsMargins(18, 18, 18, 18)
         root_layout.setSpacing(14)
         root_layout.addWidget(header_card)
+        root_layout.addWidget(self.offline_banner)
         root_layout.addWidget(content, 1)
         root.setLayout(root_layout)
         self.setCentralWidget(root)
         self._set_page("kiosk")
+        self._apply_touch_scrolling()
+
+    def _apply_touch_scrolling(self) -> None:
+        """Activa scroll por arrastre en todas las tablas y areas scrollables."""
+        if not _TOUCH_SCROLL_AVAILABLE:
+            return
+        for widget in (
+            self.catalog_table,
+            self.kiosk_recent_table,
+            self.quote_table,
+            self.share_detail_table,
+            self.quote_cart_table,
+        ):
+            _QScroller.grabGesture(widget.viewport(), _SCROLLER_GESTURE)
+        for scroll_area in (
+            self.sidebar_items_scroll,
+            self.guided_product_scroll,
+            self.guided_page_scroll,
+            self.guided_school_scroll,
+        ):
+            _QScroller.grabGesture(scroll_area.viewport(), _SCROLLER_GESTURE)
 
     def _build_sidebar(self) -> QWidget:
         card = QFrame()
         card.setObjectName("satSidebarCard")
-        card.setFixedWidth(232)
+        card.setFixedWidth(278)
         layout = QVBoxLayout()
         layout.setContentsMargins(16, 18, 16, 18)
         layout.setSpacing(8)
@@ -618,7 +946,32 @@ class QuoteSatelliteWindow(QMainWindow):
         budget_layout.addWidget(self.sidebar_summary_label)
         budget_card.setLayout(budget_layout)
 
+        items_card = QFrame()
+        items_card.setObjectName("satTotalsCard")
+        items_layout = QVBoxLayout()
+        items_layout.setContentsMargins(14, 14, 14, 14)
+        items_layout.setSpacing(8)
+        items_title = QLabel("Piezas agregadas")
+        items_title.setObjectName("satSidebarTitle")
+        self.sidebar_items_count_label.setObjectName("satSidebarSectionMeta")
+        self.sidebar_items_scroll.setObjectName("satSidebarItemsScroll")
+        self.sidebar_items_scroll.setWidgetResizable(True)
+        self.sidebar_items_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.sidebar_items_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.sidebar_items_scroll.viewport().setObjectName("satSidebarItemsViewport")
+        self.sidebar_items_content.setObjectName("satSidebarItemsContent")
+        self.sidebar_items_layout.setContentsMargins(0, 0, 0, 0)
+        self.sidebar_items_layout.setSpacing(8)
+        self.sidebar_items_content.setLayout(self.sidebar_items_layout)
+        self.sidebar_items_scroll.setWidget(self.sidebar_items_content)
+        self.sidebar_items_scroll.setMinimumHeight(320)
+        items_layout.addWidget(items_title)
+        items_layout.addWidget(self.sidebar_items_count_label)
+        items_layout.addWidget(self.sidebar_items_scroll, 1)
+        items_card.setLayout(items_layout)
+
         layout.addWidget(budget_card)
+        layout.addWidget(items_card, 1)
         layout.addStretch()
         card.setLayout(layout)
         return card
@@ -665,14 +1018,28 @@ class QuoteSatelliteWindow(QMainWindow):
         self.catalog_search_input.setClearButtonEnabled(True)
         self.catalog_search_input.setMinimumWidth(520)
         self.catalog_refresh_button.setObjectName("ghostButton")
-        self.catalog_add_button.setObjectName("secondaryButton")
+        self.catalog_add_button.setObjectName("primaryButton")
+        self.catalog_add_button.setMinimumHeight(38)
         self.catalog_previous_page_button.setObjectName("ghostButton")
         self.catalog_next_page_button.setObjectName("ghostButton")
+        self.catalog_level_combo.setObjectName("satFilterCombo")
+        self.catalog_school_combo.setObjectName("satFilterCombo")
+        self.catalog_include_general_combo.setObjectName("satFilterCombo")
         self.catalog_level_combo.addItem("Todos los niveles", "")
         self.catalog_include_general_combo.addItem("Escuela + extras generales", "include_general")
         self.catalog_include_general_combo.addItem("Solo escuela", "school_only")
         self.catalog_include_general_combo.addItem("Solo generales", "general_only")
+        self.catalog_include_general_combo.setCurrentIndex(1)
         self.catalog_school_combo.addItem("Todas las escuelas", "")
+        self.catalog_status_label.setVisible(False)
+        self.catalog_active_filters_wrap.setVisible(False)
+        self.catalog_active_filters_flow_layout = FlowLayout(
+            self.catalog_active_filters_wrap,
+            margin=0,
+            h_spacing=6,
+            v_spacing=6,
+        )
+        self.catalog_active_filters_wrap.setLayout(self.catalog_active_filters_flow_layout)
 
         filters = QHBoxLayout()
         filters.setSpacing(8)
@@ -680,10 +1047,13 @@ class QuoteSatelliteWindow(QMainWindow):
         filters.addWidget(self.catalog_school_combo, 3)
         filters.addWidget(self.catalog_include_general_combo, 3)
 
+        self.catalog_print_label_button.setObjectName("ghostButton")
+
         search_row = QHBoxLayout()
         search_row.setSpacing(8)
         search_row.addWidget(self.catalog_search_input, 2)
         search_row.addStretch(1)
+        search_row.addWidget(self.catalog_print_label_button)
         search_row.addWidget(self.catalog_add_button)
         search_row.addWidget(self.catalog_refresh_button)
 
@@ -701,9 +1071,9 @@ class QuoteSatelliteWindow(QMainWindow):
             resize_columns=(0, 1, 2, 4, 5, 6, 7),
         )
 
-        browser_layout.addWidget(self.catalog_status_label)
         browser_layout.addLayout(filters)
         browser_layout.addLayout(search_row)
+        browser_layout.addWidget(self.catalog_active_filters_wrap)
         pager_row = QHBoxLayout()
         pager_row.setSpacing(8)
         pager_row.addWidget(self.catalog_pagination_label)
@@ -711,7 +1081,7 @@ class QuoteSatelliteWindow(QMainWindow):
         pager_row.addWidget(self.catalog_previous_page_button)
         pager_row.addWidget(self.catalog_next_page_button)
         browser_layout.addLayout(pager_row)
-        browser_layout.addWidget(self.catalog_table)
+        browser_layout.addWidget(self.catalog_table, 1)
         browser_box.setLayout(browser_layout)
 
         detail_box = QGroupBox("Detalle del catalogo")
@@ -757,6 +1127,7 @@ class QuoteSatelliteWindow(QMainWindow):
         page_layout.setSpacing(0)
 
         scroll = QScrollArea()
+        self.guided_page_scroll = scroll
         scroll.setObjectName("guidedPageScrollArea")
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -827,6 +1198,7 @@ class QuoteSatelliteWindow(QMainWindow):
         school_hint.setObjectName("guidedStepHint")
         school_hint.setWordWrap(True)
         school_scroll = QScrollArea()
+        self.guided_school_scroll = school_scroll
         school_scroll.setWidgetResizable(True)
         school_scroll.setFrameShape(QFrame.Shape.NoFrame)
         school_scroll.setMinimumHeight(160)
@@ -852,50 +1224,108 @@ class QuoteSatelliteWindow(QMainWindow):
         gender_section_layout = QVBoxLayout()
         gender_section_layout.setContentsMargins(0, 0, 0, 0)
         gender_section_layout.setSpacing(8)
-        gender_title = QLabel("4. Elige tipo de uniforme")
-        gender_title.setObjectName("guidedStepTitle")
-        gender_hint = QLabel("Elige la linea mas cercana a lo que buscan.")
-        gender_hint.setObjectName("guidedStepHint")
-        gender_hint.setWordWrap(True)
+        self.guided_gender_title_label = QLabel("4. Elige tipo de uniforme")
+        self.guided_gender_title_label.setObjectName("guidedStepTitle")
+        self.guided_gender_hint_label = QLabel("Elige la linea mas cercana a lo que buscan.")
+        self.guided_gender_hint_label.setObjectName("guidedStepHint")
+        self.guided_gender_hint_label.setWordWrap(True)
         self.guided_gender_row = QHBoxLayout()
         self.guided_gender_row.setSpacing(8)
-        gender_section_layout.addWidget(gender_title)
-        gender_section_layout.addWidget(gender_hint)
+        gender_section_layout.addWidget(self.guided_gender_title_label)
+        gender_section_layout.addWidget(self.guided_gender_hint_label)
         gender_section_layout.addLayout(self.guided_gender_row)
         self.guided_gender_section.setLayout(gender_section_layout)
         steps_layout.addWidget(self.guided_gender_section)
+
+        self.guided_profile_section = QWidget()
+        profile_section_layout = QVBoxLayout()
+        profile_section_layout.setContentsMargins(0, 0, 0, 0)
+        profile_section_layout.setSpacing(8)
+        self.guided_profile_title_label = QLabel("5. Elige perfil oficial")
+        self.guided_profile_title_label.setObjectName("guidedStepTitle")
+        self.guided_profile_hint_label = QLabel("Usa este paso solo para separar niña, niño o compartido.")
+        self.guided_profile_hint_label.setObjectName("guidedStepHint")
+        self.guided_profile_hint_label.setWordWrap(True)
+        self.guided_profile_row = QHBoxLayout()
+        self.guided_profile_row.setSpacing(8)
+        profile_section_layout.addWidget(self.guided_profile_title_label)
+        profile_section_layout.addWidget(self.guided_profile_hint_label)
+        profile_section_layout.addLayout(self.guided_profile_row)
+        self.guided_profile_section.setLayout(profile_section_layout)
+        steps_layout.addWidget(self.guided_profile_section)
+
+        self.guided_bucket_section = QWidget()
+        bucket_section_layout = QVBoxLayout()
+        bucket_section_layout.setContentsMargins(0, 0, 0, 0)
+        bucket_section_layout.setSpacing(8)
+        self.guided_bucket_title_label = QLabel("5. Elige grupo")
+        self.guided_bucket_title_label.setObjectName("guidedStepTitle")
+        self.guided_bucket_hint_label = QLabel("Separa basicos y extras para reducir la lista.")
+        self.guided_bucket_hint_label.setObjectName("guidedStepHint")
+        self.guided_bucket_hint_label.setWordWrap(True)
+        self.guided_bucket_row = QHBoxLayout()
+        self.guided_bucket_row.setSpacing(8)
+        bucket_section_layout.addWidget(self.guided_bucket_title_label)
+        bucket_section_layout.addWidget(self.guided_bucket_hint_label)
+        bucket_section_layout.addLayout(self.guided_bucket_row)
+        self.guided_bucket_section.setLayout(bucket_section_layout)
+        steps_layout.addWidget(self.guided_bucket_section)
+
+        self.guided_piece_section = QWidget()
+        piece_section_layout = QVBoxLayout()
+        piece_section_layout.setContentsMargins(0, 0, 0, 0)
+        piece_section_layout.setSpacing(8)
+        self.guided_piece_title_label = QLabel("6. Elige tipo de pieza")
+        self.guided_piece_title_label.setObjectName("guidedStepTitle")
+        self.guided_piece_hint_label = QLabel("Primero elige la familia de prenda que buscan.")
+        self.guided_piece_hint_label.setObjectName("guidedStepHint")
+        self.guided_piece_hint_label.setWordWrap(True)
+        self.guided_piece_groups_layout = QVBoxLayout()
+        self.guided_piece_groups_layout.setContentsMargins(0, 0, 0, 0)
+        self.guided_piece_groups_layout.setSpacing(6)
+        piece_section_layout.addWidget(self.guided_piece_title_label)
+        piece_section_layout.addWidget(self.guided_piece_hint_label)
+        piece_section_layout.addLayout(self.guided_piece_groups_layout)
+        self.guided_piece_section.setLayout(piece_section_layout)
+        steps_layout.addWidget(self.guided_piece_section)
 
         self.guided_products_section = QWidget()
         products_section_layout = QVBoxLayout()
         products_section_layout.setContentsMargins(0, 0, 0, 0)
         products_section_layout.setSpacing(8)
-        products_title = QLabel("5. Productos sugeridos")
-        products_title.setObjectName("guidedStepTitle")
-        products_hint = QLabel("Toca una tarjeta para agregarla.")
-        products_hint.setObjectName("guidedStepHint")
-        products_hint.setWordWrap(True)
+        self.guided_products_title_label = QLabel("7. Modelos sugeridos")
+        self.guided_products_title_label.setObjectName("guidedStepTitle")
+        self.guided_products_hint_label = QLabel("Toca una tarjeta para elegir el modelo.")
+        self.guided_products_hint_label.setObjectName("guidedStepHint")
+        self.guided_products_hint_label.setWordWrap(True)
         self.guided_empty_label.setObjectName("guidedPath")
         self.guided_product_scroll = QScrollArea()
         self.guided_product_scroll.setWidgetResizable(True)
         self.guided_product_scroll.setFrameShape(QFrame.Shape.NoFrame)
         self.guided_product_scroll.setMinimumHeight(220)
+        self.guided_product_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.guided_product_scroll.setObjectName("guidedScrollArea")
         self.guided_product_scroll.viewport().setObjectName("guidedScrollViewport")
         self.guided_product_container = QWidget()
         self.guided_product_container.setObjectName("guidedGridSurface")
         self.guided_product_container.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.guided_product_grid = QGridLayout()
-        self.guided_product_grid.setContentsMargins(0, 0, 0, 0)
-        self.guided_product_grid.setHorizontalSpacing(12)
-        self.guided_product_grid.setVerticalSpacing(12)
-        self.guided_product_container.setLayout(self.guided_product_grid)
+        self.guided_product_flow_layout = FlowLayout(margin=0, h_spacing=4, v_spacing=8)
+        self.guided_product_container.setLayout(self.guided_product_flow_layout)
         self.guided_product_scroll.setWidget(self.guided_product_container)
-        products_section_layout.addWidget(products_title)
-        products_section_layout.addWidget(products_hint)
+        products_section_layout.addWidget(self.guided_products_title_label)
+        products_section_layout.addWidget(self.guided_products_hint_label)
         products_section_layout.addWidget(self.guided_empty_label)
         products_section_layout.addWidget(self.guided_product_scroll, 1)
         self.guided_products_section.setLayout(products_section_layout)
         steps_layout.addWidget(self.guided_products_section, 1)
+        guided_footer_actions = QHBoxLayout()
+        guided_footer_actions.setSpacing(8)
+        guided_footer_actions.addStretch()
+        self.guided_reset_button.setObjectName("ghostButton")
+        self.guided_basics_button.setObjectName("secondaryButton")
+        guided_footer_actions.addWidget(self.guided_reset_button)
+        guided_footer_actions.addWidget(self.guided_basics_button)
+        steps_layout.addLayout(guided_footer_actions)
         steps_box.setLayout(steps_layout)
 
         detail_box = QGroupBox("Producto seleccionado")
@@ -914,18 +1344,34 @@ class QuoteSatelliteWindow(QMainWindow):
         detail_text_layout.addWidget(self.guided_detail_title_label)
         detail_text_layout.addWidget(self.guided_detail_meta_label)
         detail_header.addLayout(detail_text_layout, 1)
+        self.guided_variant_section = QWidget()
+        variant_section_layout = QVBoxLayout()
+        variant_section_layout.setContentsMargins(0, 0, 0, 0)
+        variant_section_layout.setSpacing(6)
+        self.guided_variant_title_label = QLabel("Variantes disponibles")
+        self.guided_variant_title_label.setObjectName("guidedStepHint")
+        self.guided_variant_groups_layout = QVBoxLayout()
+        self.guided_variant_groups_layout.setContentsMargins(0, 0, 0, 0)
+        self.guided_variant_groups_layout.setSpacing(6)
+        variant_section_layout.addWidget(self.guided_variant_title_label)
+        variant_section_layout.addLayout(self.guided_variant_groups_layout)
+        self.guided_variant_section.setLayout(variant_section_layout)
         detail_actions = QHBoxLayout()
         detail_actions.setSpacing(8)
         self.guided_qty_spin.setRange(1, 100)
         self.guided_qty_spin.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
         self.guided_qty_spin.setValue(1)
         self.guided_add_button.setObjectName("primaryButton")
+        self.guided_add_button.setMinimumHeight(38)
+        self.guided_print_label_button.setObjectName("ghostButton")
         detail_actions.addStretch()
+        detail_actions.addWidget(self.guided_print_label_button)
         detail_actions.addWidget(QLabel("Cantidad"))
         detail_actions.addWidget(self.guided_qty_spin)
         detail_actions.addWidget(self.guided_add_button)
         detail_layout.addLayout(detail_header)
         detail_layout.addWidget(self.guided_detail_notes_label)
+        detail_layout.addWidget(self.guided_variant_section)
         detail_layout.addLayout(detail_actions)
         detail_box.setLayout(detail_layout)
 
@@ -971,15 +1417,15 @@ class QuoteSatelliteWindow(QMainWindow):
         self.share_meta_label.setWordWrap(True)
         self.share_notes_label.setObjectName("satDetailNotes")
         self.share_notes_label.setWordWrap(True)
-        self.share_detail_table.setColumnCount(5)
-        self.share_detail_table.setHorizontalHeaderLabels(["SKU", "Producto", "Cantidad", "Precio", "Subtotal"])
+        self.share_detail_table.setColumnCount(6)
+        self.share_detail_table.setHorizontalHeaderLabels(["SKU", "Producto", "Talla", "Cantidad", "Precio", "Subtotal"])
         self.share_detail_table.verticalHeader().setVisible(False)
         self.share_detail_table.setAlternatingRowColors(True)
         self.share_detail_table.setSelectionBehavior(self.share_detail_table.SelectionBehavior.SelectRows)
         _configure_satellite_table(
             self.share_detail_table,
             stretch_columns=(1,),
-            resize_columns=(0, 2, 3, 4),
+            resize_columns=(0, 2, 3, 4, 5),
         )
         detail_layout.addWidget(self.share_customer_label)
         detail_layout.addWidget(self.share_meta_label)
@@ -1006,7 +1452,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self.kiosk_scan_input.setObjectName("satScanInput")
         self.kiosk_scan_input.setMinimumWidth(0)
         self.kiosk_lookup_button.setObjectName("primaryButton")
-        self.kiosk_add_button.setObjectName("secondaryButton")
+        self.kiosk_add_button.setObjectName("primaryButton")
+        self.kiosk_add_button.setMinimumHeight(38)
         self.kiosk_open_quote_button.setObjectName("secondaryButton")
         self.kiosk_open_search_button.setObjectName("ghostButton")
 
@@ -1184,16 +1631,18 @@ class QuoteSatelliteWindow(QMainWindow):
         cart_layout.setSpacing(10)
         self.quote_cart_table.setColumnCount(7)
         self.quote_cart_table.setHorizontalHeaderLabels(
-            ["SKU", "Nivel", "Escuela", "Producto", "Cantidad", "Precio", "Subtotal"]
+            ["Cantidad", "Producto", "Talla", "Nivel", "Escuela", "Precio", "Subtotal"]
         )
+        self.quote_cart_table.setObjectName("cashierCartTable")
         self.quote_cart_table.verticalHeader().setVisible(False)
+        self.quote_cart_table.verticalHeader().setDefaultSectionSize(46)
         self.quote_cart_table.setAlternatingRowColors(True)
         self.quote_cart_table.setSelectionBehavior(self.quote_cart_table.SelectionBehavior.SelectRows)
-        self.quote_cart_table.setMinimumHeight(260)
+        self.quote_cart_table.setMinimumHeight(320)
         _configure_satellite_table(
             self.quote_cart_table,
-            stretch_columns=(3,),
-            resize_columns=(0, 1, 2, 4, 5, 6),
+            stretch_columns=(1,),
+            resize_columns=(0, 2, 3, 4, 5, 6),
         )
 
         totals_card = QFrame()
@@ -1286,15 +1735,15 @@ class QuoteSatelliteWindow(QMainWindow):
         self.quote_meta_label.setWordWrap(True)
         self.quote_notes_label.setObjectName("satDetailNotes")
         self.quote_notes_label.setWordWrap(True)
-        self.quote_detail_table.setColumnCount(5)
-        self.quote_detail_table.setHorizontalHeaderLabels(["SKU", "Producto", "Cantidad", "Precio", "Subtotal"])
+        self.quote_detail_table.setColumnCount(6)
+        self.quote_detail_table.setHorizontalHeaderLabels(["SKU", "Producto", "Talla", "Cantidad", "Precio", "Subtotal"])
         self.quote_detail_table.verticalHeader().setVisible(False)
         self.quote_detail_table.setAlternatingRowColors(True)
         self.quote_detail_table.setSelectionBehavior(self.quote_detail_table.SelectionBehavior.SelectRows)
         _configure_satellite_table(
             self.quote_detail_table,
             stretch_columns=(1,),
-            resize_columns=(0, 2, 3, 4),
+            resize_columns=(0, 2, 3, 4, 5),
         )
         detail_layout.addWidget(self.quote_customer_label)
         detail_layout.addWidget(self.quote_meta_label)
@@ -1309,6 +1758,7 @@ class QuoteSatelliteWindow(QMainWindow):
 
     def _bind_events(self) -> None:
         self.refresh_button.clicked.connect(self.refresh_all)
+        self.exit_button.clicked.connect(self.close)
         self.nav_kiosk_button.clicked.connect(lambda: self._set_page("kiosk"))
         self.nav_catalog_button.clicked.connect(lambda: self._set_page("catalog"))
         self.nav_guided_button.clicked.connect(lambda: self._set_page("guided"))
@@ -1332,9 +1782,16 @@ class QuoteSatelliteWindow(QMainWindow):
         self.catalog_include_general_combo.currentIndexChanged.connect(self._handle_catalog_browser_filters_changed_reset_page)
         self.catalog_table.itemSelectionChanged.connect(self._handle_catalog_selection)
         self.catalog_add_button.clicked.connect(self._handle_add_catalog_selection_to_quote)
+        self.catalog_print_label_button.clicked.connect(self._print_label_for_selected_catalog_row)
+        QShortcut(QKeySequence("Ctrl+P"), self.catalog_table).activated.connect(
+            self._print_label_for_selected_catalog_row
+        )
         self.catalog_previous_page_button.clicked.connect(self._handle_catalog_browser_previous_page)
         self.catalog_next_page_button.clicked.connect(self._handle_catalog_browser_next_page)
         self.guided_add_button.clicked.connect(self._handle_add_guided_selection_to_quote)
+        self.guided_print_label_button.clicked.connect(self._print_label_for_guided_selection)
+        self.guided_reset_button.clicked.connect(self._handle_guided_reset_steps)
+        self.guided_basics_button.clicked.connect(self._handle_guided_go_to_basics)
         self.quote_remove_button.clicked.connect(self._handle_remove_quote_item)
         self.quote_qty_down_button.clicked.connect(self._handle_decrease_quote_item_quantity)
         self.quote_qty_up_button.clicked.connect(self._handle_increase_quote_item_quantity)
@@ -1345,6 +1802,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.quote_search_input.textChanged.connect(self._handle_quote_filters_changed)
         self.quote_state_combo.currentIndexChanged.connect(self._handle_quote_filters_changed)
         self.quote_table.itemSelectionChanged.connect(self._handle_quote_selection)
+        self.quote_cart_table.itemSelectionChanged.connect(self._apply_action_state)
         self.quote_resume_button.clicked.connect(self._handle_resume_quote)
         self.quote_emit_selected_button.clicked.connect(self._handle_emit_selected_quote)
         self.quote_open_share_button.clicked.connect(self._handle_open_share_page)
@@ -1399,9 +1857,12 @@ class QuoteSatelliteWindow(QMainWindow):
             "search": "Busqueda y seguimiento de presupuestos.",
             "share": "Compartir por WhatsApp o imprimir.",
         }
+        self.current_page_key = page_key
         self.page_stack.setCurrentIndex(page_index_map[page_key])
         button_map[page_key].setChecked(True)
         self._set_status(page_title_map[page_key])
+        if page_key == "kiosk":
+            QTimer.singleShot(0, self.kiosk_scan_input.setFocus)
 
     def refresh_all(self) -> None:
         try:
@@ -1419,6 +1880,19 @@ class QuoteSatelliteWindow(QMainWindow):
 
     def _refresh_catalog_snapshot(self, session) -> None:
         self.catalog_snapshot_rows = load_catalog_snapshot_rows(session)
+        # Guardar cache local para que el proximo arranque sin conexion pueda usarla.
+        try:
+            save_catalog_cache(self.catalog_snapshot_rows)
+        except Exception:  # noqa: BLE001
+            pass  # Un fallo al guardar cache no debe interrumpir el flujo normal.
+        self._rebuild_catalog_level_combo()
+
+    def _refresh_catalog_snapshot_from_cache(self) -> None:
+        """Sincroniza el combo de niveles desde el cache local (sin DB)."""
+        self._rebuild_catalog_level_combo()
+
+    def _rebuild_catalog_level_combo(self) -> None:
+        """Reconstruye el combo de niveles a partir de catalog_snapshot_rows."""
         selected_level = str(self.catalog_level_combo.currentData() or "")
         level_options = sorted(
             {
@@ -1521,12 +1995,14 @@ class QuoteSatelliteWindow(QMainWindow):
             page_size=SATELLITE_CATALOG_PAGE_SIZE,
         )
         self.catalog_browser_page_index = pagination_view.current_page_index
+        self.catalog_browser_visible_skus = tuple(str(row.sku) for row in pagination_view.page_rows)
         _reload_satellite_table_widget(
             self.catalog_table,
             row_count=len(pagination_view.page_rows),
             populate_rows=lambda: self._populate_catalog_browser_rows(tuple(pagination_view.page_rows)),
         )
         self.catalog_status_label.setText(summary.status_label)
+        self._refresh_catalog_active_filter_chips()
         self.catalog_pagination_label.setText(
             (
                 f"Mostrando {pagination_view.start_row_number}-{pagination_view.end_row_number} de "
@@ -1543,6 +2019,47 @@ class QuoteSatelliteWindow(QMainWindow):
         elif self.catalog_table.rowCount() == 0:
             self._apply_catalog_detail(None)
         self._apply_action_state()
+
+    def _catalog_active_filter_tokens(self):
+        route_value = self.catalog_include_general_combo.currentData()
+        return build_active_filter_tokens(
+            search_text=self.catalog_search_input.text(),
+            multi_filters=(),
+            combo_filters=(
+                ("nivel", self.catalog_level_combo.currentData(), self.catalog_level_combo.currentText()),
+                ("escuela", self.catalog_school_combo.currentData(), self.catalog_school_combo.currentText()),
+                (
+                    "ruta",
+                    "" if route_value == "include_general" else route_value,
+                    self.catalog_include_general_combo.currentText(),
+                ),
+            ),
+        )
+
+    def _refresh_catalog_active_filter_chips(self) -> None:
+        rebuild_active_filter_chips(
+            container=self.catalog_active_filters_wrap,
+            layout=self.catalog_active_filters_flow_layout,
+            tokens=self._catalog_active_filter_tokens(),
+            on_remove=self._handle_remove_catalog_filter_token,
+        )
+
+    def _handle_remove_catalog_filter_token(self, token) -> None:
+        if token.key == "texto":
+            self.catalog_search_input.blockSignals(True)
+            self.catalog_search_input.clear()
+            self.catalog_search_input.blockSignals(False)
+            self._handle_catalog_browser_filters_changed_reset_page()
+            return
+        combo_filters = {
+            "nivel": self.catalog_level_combo,
+            "escuela": self.catalog_school_combo,
+            "ruta": self.catalog_include_general_combo,
+        }
+        combo = combo_filters.get(token.key)
+        if combo is None:
+            return
+        combo.setCurrentIndex(0)
 
     def _populate_catalog_browser_rows(self, rows: tuple[QuoteCatalogBrowserRow, ...]) -> None:
         for row_index, row_view in enumerate(rows):
@@ -1570,12 +2087,20 @@ class QuoteSatelliteWindow(QMainWindow):
             self.catalog_detail_notes_label.setText("")
             return
         self.catalog_visual_icon_label.setPixmap(_catalog_row_icon(row))
+        product_name = str(row.get("producto_nombre_base") or row.get("producto_nombre") or "Producto")
+        school_name = str(row.get("escuela_nombre") or "General")
+        level_name = str(row.get("nivel_educativo_nombre") or "Sin nivel")
+        garment_name = str(row.get("tipo_prenda_nombre") or "-")
+        piece_name = str(row.get("tipo_pieza_nombre") or "-")
+        size_label = str(row.get("talla") or "-")
+        color_label = str(row.get("color") or "-")
+        price_value = Decimal(str(row.get("precio_venta") or "0")).quantize(Decimal("0.01"))
         self.catalog_detail_title_label.setText(
-            f"{row['sku']} | {row['producto_nombre_base']}"
+            f"{row.get('sku', '')} | {product_name}"
         )
         self.catalog_detail_meta_label.setText(
-            f"Nivel {row['nivel_educativo_nombre']} | Escuela {row['escuela_nombre']} | {row['tipo_prenda_nombre']} | {row['tipo_pieza_nombre']} | "
-            f"Talla {row['talla']} | Color {row['color']} | Precio ${Decimal(str(row['precio_venta'])).quantize(Decimal('0.01'))}"
+            f"Nivel {level_name} | Escuela {school_name} | {garment_name} | {piece_name} | "
+            f"Talla {size_label} | Color {color_label} | Precio ${price_value}"
         )
         self.catalog_detail_notes_label.setText(str(row.get("producto_descripcion") or "Sin descripcion adicional."))
 
@@ -1587,33 +2112,80 @@ class QuoteSatelliteWindow(QMainWindow):
         self._add_quote_item_by_sku(sku, 1)
 
     def _handle_guided_mode_change(self, mode_key: str) -> None:
+        self._reset_guided_route(mode_key=mode_key)
+
+    def _reset_guided_route(self, *, mode_key: str) -> None:
         self.guided_mode = "basics" if mode_key == "basics" else "school"
         self.guided_selected_level = ""
         self.guided_selected_school = ""
+        self.guided_selected_gender = "TODOS"
+        self.guided_selected_profile = "TODOS"
+        self.guided_selected_bucket = "BASICO" if self.guided_mode == "basics" else "TODOS"
+        self.guided_selected_piece = ""
+        self.guided_selected_product_key = ""
         self.guided_selected_sku = ""
+        self.guided_qty_spin.setValue(1)
         self._refresh_guided_browser()
+
+    def _handle_guided_reset_steps(self) -> None:
+        self._reset_guided_route(mode_key="school")
+
+    def _handle_guided_go_to_basics(self) -> None:
+        self._reset_guided_route(mode_key="basics")
 
     def _handle_guided_level_selected(self, level_name: str) -> None:
         self.guided_selected_level = level_name
         self.guided_selected_school = ""
+        self.guided_selected_profile = "TODOS"
+        self.guided_selected_product_key = ""
         self.guided_selected_sku = ""
         self._refresh_guided_browser()
 
     def _handle_guided_school_selected(self, school_name: str) -> None:
         self.guided_selected_school = school_name
+        self.guided_selected_profile = "TODOS"
+        self.guided_selected_product_key = ""
         self.guided_selected_sku = ""
         self._refresh_guided_browser()
 
     def _handle_guided_gender_selected(self, gender_key: str) -> None:
         self.guided_selected_gender = gender_key
+        self.guided_selected_profile = "TODOS"
+        self.guided_selected_piece = ""
+        self.guided_selected_product_key = ""
         self.guided_selected_sku = ""
         self._refresh_guided_browser()
 
-    def _handle_guided_product_selected(self, sku: str) -> None:
+    def _handle_guided_profile_selected(self, profile_key: str) -> None:
+        self.guided_selected_profile = profile_key
+        self.guided_selected_product_key = ""
+        self.guided_selected_sku = ""
+        self._refresh_guided_browser()
+
+    def _handle_guided_bucket_selected(self, bucket_key: str) -> None:
+        self.guided_selected_bucket = bucket_key
+        self.guided_selected_piece = ""
+        self.guided_selected_product_key = ""
+        self.guided_selected_sku = ""
+        self._refresh_guided_browser()
+
+    def _handle_guided_piece_selected(self, piece_key: str) -> None:
+        self.guided_selected_piece = piece_key
+        self.guided_selected_product_key = ""
+        self.guided_selected_sku = ""
+        self._refresh_guided_browser()
+
+    def _handle_guided_product_selected(self, product_key: str) -> None:
+        self.guided_selected_product_key = product_key
+        self.guided_selected_sku = ""
+        self._refresh_guided_browser()
+
+    def _handle_guided_variant_selected(self, sku: str) -> None:
         self.guided_selected_sku = sku
         row = next((item for item in self.catalog_snapshot_rows if str(item.get("sku")) == sku), None)
         self._apply_guided_detail(row)
         self._refresh_guided_product_checks()
+        self._refresh_guided_variant_checks()
         self._apply_action_state()
 
     def _refresh_guided_browser(self) -> None:
@@ -1623,6 +2195,11 @@ class QuoteSatelliteWindow(QMainWindow):
             level_filter=self.guided_selected_level,
             school_filter=self.guided_selected_school,
             gender_filter=self.guided_selected_gender,
+            profile_filter=self.guided_selected_profile,
+            bucket_filter=self.guided_selected_bucket,
+            piece_filter=self.guided_selected_piece,
+            selected_product_key=self.guided_selected_product_key,
+            selected_sku=self.guided_selected_sku,
         )
         available_levels = {option.key for option in view.level_options}
         if self.guided_mode == "school" and self.guided_selected_level and self.guided_selected_level not in available_levels:
@@ -1634,30 +2211,82 @@ class QuoteSatelliteWindow(QMainWindow):
         available_schools = {option.key for option in view.school_options}
         if self.guided_mode == "school" and self.guided_selected_school and self.guided_selected_school not in available_schools:
             self.guided_selected_school = ""
+            self.guided_selected_profile = "TODOS"
             self.guided_selected_sku = ""
             self._refresh_guided_browser()
             return
+        available_profiles = {option.key for option in view.profile_options}
+        if self.guided_mode == "school" and self.guided_selected_gender == "OFICIAL" and self.guided_selected_profile not in {"", "TODOS"} and self.guided_selected_profile not in available_profiles:
+            self.guided_selected_profile = "TODOS"
+            self.guided_selected_product_key = ""
+            self.guided_selected_sku = ""
+            self._refresh_guided_browser()
+            return
+        available_buckets = {option.key for option in view.bucket_options}
+        if self.guided_mode == "basics" and self.guided_selected_bucket and self.guided_selected_bucket not in available_buckets:
+            self.guided_selected_bucket = "BASICO" if "BASICO" in available_buckets else "TODOS"
+            self.guided_selected_piece = ""
+            self.guided_selected_product_key = ""
+            self.guided_selected_sku = ""
+            self._refresh_guided_browser()
+            return
+        available_pieces = {option.key for option in view.piece_options}
+        if self.guided_mode == "basics" and self.guided_selected_piece and self.guided_selected_piece not in available_pieces:
+            self.guided_selected_piece = ""
+            self.guided_selected_product_key = ""
+            self.guided_selected_sku = ""
+            self._refresh_guided_browser()
+            return
+        self.guided_selected_product_key = view.selected_product_key
+        self.guided_selected_sku = view.selected_sku
         self.guided_status_label.setText(view.status_label)
         self.guided_path_label.setText(view.path_label)
         self.guided_empty_label.setText(view.empty_label or "Toca un producto para ver detalle.")
         show_level = self.guided_mode == "school"
         show_school = self.guided_mode == "school" and bool(self.guided_selected_level)
         show_gender = self.guided_mode == "basics" or bool(self.guided_selected_school)
-        show_products = self.guided_mode == "basics" or bool(self.guided_selected_school)
+        show_profile = self.guided_mode == "school" and self.guided_selected_gender == "OFICIAL" and bool(view.profile_options)
+        show_bucket = self.guided_mode == "basics" and bool(view.bucket_options)
+        show_piece = self.guided_mode == "basics" and bool(view.piece_options)
+        show_products = (self.guided_mode == "basics" and bool(self.guided_selected_piece)) or (
+            self.guided_mode == "school" and bool(self.guided_selected_school)
+        )
         self.guided_level_section.setVisible(show_level)
         self.guided_school_section.setVisible(show_school)
+
+        if self.guided_mode == "school":
+            self.guided_gender_title_label.setText("4. Elige linea")
+            self.guided_gender_hint_label.setText("Primero separa deportivo de oficial.")
+        else:
+            self.guided_gender_title_label.setText("4. Elige tipo de uniforme")
+            self.guided_gender_hint_label.setText("Elige la linea mas cercana a lo que buscan.")
 
         self._rebuild_guided_mode_buttons()
         self._rebuild_guided_level_buttons(view.level_options)
         self._rebuild_guided_school_buttons(view.school_options)
         self._rebuild_guided_gender_buttons(view.gender_options)
+        self._rebuild_guided_profile_buttons(view.profile_options)
+        self._rebuild_guided_bucket_buttons(view.bucket_options)
+        self._rebuild_guided_piece_buttons(view.piece_options)
         self._rebuild_guided_product_buttons(view.product_cards)
+        self._rebuild_guided_variant_buttons(view.variant_options)
         self.guided_gender_section.setVisible(show_gender)
+        self.guided_profile_section.setVisible(show_profile)
+        self.guided_bucket_section.setVisible(show_bucket)
+        self.guided_piece_section.setVisible(show_piece)
         self.guided_products_section.setVisible(show_products)
-
-        visible_skus = {card.sku for card in view.product_cards}
-        if self.guided_selected_sku not in visible_skus:
-            self.guided_selected_sku = view.product_cards[0].sku if view.product_cards else ""
+        if show_piece:
+            self.guided_products_title_label.setText("7. Modelos sugeridos")
+            self.guided_products_hint_label.setText("Primero elige el tipo de pieza; luego toca un modelo.")
+        elif show_bucket:
+            self.guided_products_title_label.setText("6. Modelos sugeridos")
+            self.guided_products_hint_label.setText("Elige Basicos, Extras o Todos; luego toca un modelo.")
+        elif show_profile:
+            self.guided_products_title_label.setText("6. Modelos sugeridos")
+            self.guided_products_hint_label.setText("Primero elige el perfil oficial; luego toca un modelo.")
+        else:
+            self.guided_products_title_label.setText("5. Modelos sugeridos")
+            self.guided_products_hint_label.setText("Primero toca un modelo; luego elige la variante que quieren.")
         if self.guided_selected_sku:
             row = next(
                 (item for item in self.catalog_snapshot_rows if str(item.get("sku")) == self.guided_selected_sku),
@@ -1667,6 +2296,7 @@ class QuoteSatelliteWindow(QMainWindow):
         else:
             self._apply_guided_detail(None)
         self._refresh_guided_product_checks()
+        self._refresh_guided_variant_checks()
         self._apply_action_state()
 
     def _rebuild_guided_mode_buttons(self) -> None:
@@ -1712,15 +2342,110 @@ class QuoteSatelliteWindow(QMainWindow):
             self.guided_gender_buttons[option.key] = button
         self.guided_gender_row.addStretch()
 
+    def _rebuild_guided_profile_buttons(self, options) -> None:
+        _clear_layout(self.guided_profile_row)
+        self.guided_profile_buttons = {}
+        for option in options:
+            button = self._build_guided_choice_button(option.label)
+            button.setEnabled(option.enabled)
+            button.setChecked(self.guided_selected_profile == option.key)
+            button.clicked.connect(lambda checked=False, selected=option.key: self._handle_guided_profile_selected(selected))
+            self.guided_profile_row.addWidget(button)
+            self.guided_profile_buttons[option.key] = button
+        self.guided_profile_row.addStretch()
+
+    def _rebuild_guided_bucket_buttons(self, options) -> None:
+        _clear_layout(self.guided_bucket_row)
+        self.guided_bucket_buttons = {}
+        for option in options:
+            button = self._build_guided_choice_button(option.label)
+            button.setEnabled(option.enabled)
+            button.setChecked(self.guided_selected_bucket == option.key)
+            button.clicked.connect(lambda checked=False, selected=option.key: self._handle_guided_bucket_selected(selected))
+            self.guided_bucket_row.addWidget(button)
+            self.guided_bucket_buttons[option.key] = button
+        self.guided_bucket_row.addStretch()
+
+    def _rebuild_guided_piece_buttons(self, options) -> None:
+        _clear_layout(self.guided_piece_groups_layout)
+        self.guided_piece_buttons = {}
+        buttons_per_row = 3
+        grouped_options: dict[str, list[object]] = {}
+        for option in options:
+            group_label = getattr(option, "group_label", "") or "Piezas"
+            grouped_options.setdefault(group_label, []).append(option)
+
+        for group_label, group_options in grouped_options.items():
+            label = QLabel(group_label)
+            label.setObjectName("guidedGroupLabel")
+            self.guided_piece_groups_layout.addWidget(label)
+
+            row_layout = QHBoxLayout()
+            row_layout.setContentsMargins(0, 0, 0, 0)
+            row_layout.setSpacing(0)
+
+            grid = QGridLayout()
+            grid.setContentsMargins(0, 0, 0, 0)
+            grid.setHorizontalSpacing(4)
+            grid.setVerticalSpacing(6)
+
+            for index, option in enumerate(group_options):
+                button = self._build_guided_choice_button(option.label)
+                button.setProperty("compactChoice", True)
+                button.setEnabled(option.enabled)
+                button.setChecked(self.guided_selected_piece == option.key)
+                button.setMinimumHeight(42)
+                button.setMinimumWidth(170)
+                button.setMaximumWidth(170)
+                button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+                button.style().unpolish(button)
+                button.style().polish(button)
+                button.clicked.connect(lambda checked=False, selected=option.key: self._handle_guided_piece_selected(selected))
+                grid.addWidget(
+                    button,
+                    index // buttons_per_row,
+                    index % buttons_per_row,
+                    alignment=Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop,
+                )
+                self.guided_piece_buttons[option.key] = button
+
+            row_layout.addLayout(grid)
+            row_layout.addStretch()
+            self.guided_piece_groups_layout.addLayout(row_layout)
+
     def _rebuild_guided_product_buttons(self, product_cards) -> None:
-        _clear_layout(self.guided_product_grid)
+        _clear_layout(self.guided_product_flow_layout)
         self.guided_product_buttons = {}
-        for index, card in enumerate(product_cards):
+        for card in product_cards:
             button = self._build_guided_product_button(card)
-            button.setChecked(self.guided_selected_sku == card.sku)
-            button.clicked.connect(lambda checked=False, selected=card.sku: self._handle_guided_product_selected(selected))
-            self.guided_product_grid.addWidget(button, index // 3, index % 3)
-            self.guided_product_buttons[card.sku] = button
+            button.setChecked(self.guided_selected_product_key == card.key)
+            button.clicked.connect(lambda checked=False, selected=card.key: self._handle_guided_product_selected(selected))
+            self.guided_product_flow_layout.addWidget(button)
+            self.guided_product_buttons[card.key] = button
+
+    def _rebuild_guided_variant_buttons(self, variant_options) -> None:
+        _clear_layout(self.guided_variant_groups_layout)
+        self.guided_variant_buttons = {}
+        if not variant_options:
+            self.guided_variant_section.setVisible(False)
+            return
+        self.guided_variant_section.setVisible(True)
+        current_price = None
+        current_flow = None
+        for option in variant_options:
+            price_label = getattr(option, "price_label", "") or str(option.label).split("·")[-1].strip()
+            if price_label != current_price or current_flow is None:
+                current_price = price_label
+                current_flow = FlowLayout(margin=0, h_spacing=6, v_spacing=8)
+                self.guided_variant_groups_layout.addLayout(current_flow)
+            button = self._build_guided_choice_button(option.label)
+            button.setProperty("compactChoice", True)
+            button.setMinimumHeight(42)
+            button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+            button.setChecked(self.guided_selected_sku == option.sku)
+            button.clicked.connect(lambda checked=False, selected=option.sku: self._handle_guided_variant_selected(selected))
+            current_flow.addWidget(button)
+            self.guided_variant_buttons[option.sku] = button
 
     def _rebuild_guided_option_grid(self, *, layout: QGridLayout, options, selected_key: str, click_handler, icon_builder=None):
         _clear_layout(layout)
@@ -1747,21 +2472,37 @@ class QuoteSatelliteWindow(QMainWindow):
         return button
 
     def _build_guided_product_button(self, card) -> QPushButton:
-        button = QPushButton(
-            f"{card.title}\n{card.subtitle}\n{card.meta_label}\n{card.price_label}"
-        )
+        button_lines = [card.title]
+        if card.subtitle:
+            button_lines.append(card.subtitle)
+        button = QPushButton("\n".join(button_lines))
         button.setObjectName("guidedProductButton")
         button.setCheckable(True)
-        button.setMinimumHeight(94)
-        button.setMinimumWidth(250)
+        compact_card = (self.guided_mode == "basics" and bool(self.guided_selected_piece)) or (
+            self.guided_mode == "school" and bool(self.guided_selected_school)
+        )
+        button.setProperty("compactCard", compact_card)
+        if compact_card:
+            button.setMinimumHeight(68)
+            button.setFixedWidth(252)
+            button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+        else:
+            button.setMinimumHeight(94)
+            button.setMinimumWidth(250)
         row = next((item for item in self.catalog_snapshot_rows if str(item.get("sku")) == card.sku), None)
         if row is not None:
             button.setIcon(QIcon(_catalog_row_icon(row)))
-            button.setIconSize(QSize(34, 34))
+            button.setIconSize(QSize(24, 24) if compact_card else QSize(34, 34))
+        button.style().unpolish(button)
+        button.style().polish(button)
         return button
 
     def _refresh_guided_product_checks(self) -> None:
-        for sku, button in self.guided_product_buttons.items():
+        for key, button in self.guided_product_buttons.items():
+            button.setChecked(key == self.guided_selected_product_key)
+
+    def _refresh_guided_variant_checks(self) -> None:
+        for sku, button in self.guided_variant_buttons.items():
             button.setChecked(sku == self.guided_selected_sku)
 
     def _apply_guided_detail(self, row: dict[str, object] | None) -> None:
@@ -1770,16 +2511,29 @@ class QuoteSatelliteWindow(QMainWindow):
             self.guided_detail_title_label.setText("Sin seleccion.")
             self.guided_detail_meta_label.setText("Completa la ruta guiada y toca un producto para verlo aqui.")
             self.guided_detail_notes_label.setText("")
+            self.guided_variant_section.setVisible(False)
             return
         self.guided_visual_icon_label.setPixmap(_catalog_row_icon(row))
         segmento = _guided_segment_label(row)
-        self.guided_detail_title_label.setText(f"{row['sku']} | {row['producto_nombre_base']}")
-        self.guided_detail_meta_label.setText(
-            f"Nivel {row['nivel_educativo_nombre']} | Escuela {row['escuela_nombre']} | Linea {segmento} | "
-            f"{row['tipo_prenda_nombre']} | {row['tipo_pieza_nombre']} | Talla {row['talla']} | Color {row['color']} | "
-            f"Precio ${Decimal(str(row['precio_venta'])).quantize(Decimal('0.01'))}"
-        )
+        color_label = _guided_display_color_label(row.get("color"))
+        detail_parts = [
+            f"Nivel {row['nivel_educativo_nombre']}",
+            f"Escuela {row['escuela_nombre']}",
+            f"Linea {segmento}",
+            f"{row['tipo_prenda_nombre']}",
+            f"{row['tipo_pieza_nombre']}",
+            f"Talla {row['talla']}",
+        ]
+        if color_label:
+            detail_parts.append(f"Color {color_label}")
+        detail_parts.append(f"Precio ${Decimal(str(row['precio_venta'])).quantize(Decimal('0.01'))}")
+        title = str(row["producto_nombre_base"])
+        if self.guided_mode != "basics":
+            title = f"{row['sku']} | {title}"
+        self.guided_detail_title_label.setText(title)
+        self.guided_detail_meta_label.setText(" | ".join(detail_parts))
         self.guided_detail_notes_label.setText(str(row.get("producto_descripcion") or "Sin descripcion adicional."))
+        self.guided_variant_section.setVisible(bool(self.guided_variant_buttons))
 
     def _handle_add_guided_selection_to_quote(self) -> None:
         if not self.guided_selected_sku:
@@ -1861,20 +2615,58 @@ class QuoteSatelliteWindow(QMainWindow):
             QMessageBox.warning(self, "SKU faltante", "Escanea o captura un SKU para consultarlo.")
             return
         try:
-            with get_session() as session:
-                snapshot = load_quote_kiosk_lookup_snapshot(session, sku=sku)
+            if self.offline_mode:
+                snapshot = self._kiosk_lookup_from_cache(sku)
+            else:
+                with get_session() as session:
+                    snapshot = load_quote_kiosk_lookup_snapshot(session, sku=sku)
             self.lookup_snapshot = snapshot
             self.lookup_history = push_quote_kiosk_recent_scan(self.lookup_history, snapshot)
             self._apply_lookup_view(build_quote_kiosk_lookup_view(snapshot))
             self._refresh_recent_lookup_table()
             self.kiosk_scan_input.clear()
-            self._set_status(f"{snapshot.sku} listo para presupuesto.")
+            self._set_status(f"{snapshot.sku} — precio del catalogo guardado.")
         except Exception as exc:  # noqa: BLE001
             self.lookup_snapshot = None
             self._apply_lookup_view(build_error_quote_kiosk_lookup_view(str(exc)))
             QMessageBox.warning(self, "Consulta no disponible", str(exc))
         self._apply_action_state()
         self.kiosk_scan_input.setFocus()
+
+    def _kiosk_lookup_from_cache(self, sku: str) -> "QuoteKioskLookupSnapshot":
+        """Construye el snapshot del kiosko buscando en catalog_snapshot_rows (sin DB)."""
+        from decimal import Decimal as _Decimal
+
+        normalized = sku.strip().upper()
+        row = next(
+            (
+                r for r in self.catalog_snapshot_rows
+                if str(r.get("sku", "")).strip().upper() == normalized
+            ),
+            None,
+        )
+        if row is None:
+            raise ValueError(f"No existe una presentacion activa para el SKU '{normalized}' en el catalogo guardado.")
+        if not row.get("producto_activo") or not row.get("variante_activo"):
+            raise ValueError(f"El SKU '{normalized}' esta inactivo en el catalogo guardado.")
+
+        school = str(row.get("escuela_nombre") or "General")
+        if school == "General":
+            school = "General"
+        return QuoteKioskLookupSnapshot(
+            sku=normalized,
+            product_name=str(row.get("producto_nombre_base") or row.get("producto_nombre") or ""),
+            school_name=school,
+            garment_type_name=str(row.get("tipo_prenda_nombre") or "Sin tipo de prenda"),
+            piece_type_name=str(row.get("tipo_pieza_nombre") or "Sin tipo de pieza"),
+            size_label=str(row.get("talla") or ""),
+            color_label=str(row.get("color") or ""),
+            price=_Decimal(str(row.get("precio_venta") or "0")).quantize(_Decimal("0.01")),
+            stock_actual=int(row.get("stock_actual") or 0),
+            location_label="",
+            description_text=str(row.get("producto_descripcion") or ""),
+            origin_label="Legacy" if row.get("origen_legacy") else "Catalogo actual",
+        )
 
     def _handle_add_lookup_to_quote(self) -> None:
         if self.lookup_snapshot is None:
@@ -1902,31 +2694,24 @@ class QuoteSatelliteWindow(QMainWindow):
                 variant = PresupuestoService.obtener_variante_por_sku(session, normalized_sku)
                 if variant is None:
                     raise ValueError(f"El SKU '{normalized_sku}' no existe o esta inactivo.")
-                existing = next((item for item in self.quote_cart if item["sku"] == normalized_sku), None)
-                if existing is None:
-                    self.quote_cart.append(
-                        {
-                            "sku": normalized_sku,
-                            "producto_nombre": str(variant.producto.nombre_base),
-                            "escuela_nombre": str(variant.producto.escuela.nombre if variant.producto.escuela else "General"),
-                            "nivel_educativo_nombre": str(
-                                variant.producto.nivel_educativo.nombre
-                                if variant.producto.nivel_educativo
-                                else "Sin nivel"
-                            ),
-                            "cantidad": quantity,
-                            "precio_unitario": Decimal(variant.precio_venta),
-                        }
-                    )
-                else:
-                    existing["cantidad"] = int(existing["cantidad"]) + quantity
+                result = add_quote_scan_variants(
+                    self,
+                    session,
+                    quote_cart=self.quote_cart,
+                    scanned_variant=variant,
+                    quantity=quantity,
+                    variant_loader=PresupuestoService.obtener_variante_por_sku,
+                )
+                if result is None:
+                    self.kiosk_scan_input.setFocus()
+                    return
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "No se pudo agregar", str(exc))
             return
 
         self._refresh_quote_cart_table()
         self.kiosk_scan_input.setFocus()
-        self._set_status(f"{normalized_sku} agregado al presupuesto.")
+        self._set_status(result.feedback_message)
 
     def _handle_recent_scan_selection(self) -> None:
         selected_row = self.kiosk_recent_table.currentRow()
@@ -1946,8 +2731,22 @@ class QuoteSatelliteWindow(QMainWindow):
         if feedback is not None:
             QMessageBox.warning(self, feedback.title, feedback.message)
             return
-        self.quote_cart.pop(selected_row)
+        self._remove_quote_item_at_index(selected_row)
+
+    def _remove_quote_item_at_index(self, row_index: int) -> None:
+        if row_index < 0 or row_index >= len(self.quote_cart):
+            return
+        removed_line_item = dict(self.quote_cart[row_index])
+        self.quote_cart.pop(row_index)
+        restore_message = restore_sports_uniform_playera_price_if_needed(
+            self.quote_cart,
+            removed_line_item=removed_line_item,
+        )
         self._refresh_quote_cart_table()
+        if self.quote_cart:
+            self.quote_cart_table.selectRow(min(row_index, len(self.quote_cart) - 1))
+        if restore_message:
+            self._set_status(restore_message)
 
     def _change_selected_quote_item_quantity(self, delta: int) -> None:
         selected_row = self.quote_cart_table.currentRow()
@@ -2024,7 +2823,10 @@ class QuoteSatelliteWindow(QMainWindow):
             self.quote_cart.clear()
             self._refresh_quote_cart_table()
             self._reset_quote_form()
-            self.refresh_all()
+            self._reveal_saved_quote(
+                quote_id=result.quote_id,
+                state_filter=_state_value(target_state),
+            )
             title, message = _quote_result_message(result.action_key, result.folio)
             QMessageBox.information(self, title, message)
         except Exception as exc:  # noqa: BLE001
@@ -2041,10 +2843,7 @@ class QuoteSatelliteWindow(QMainWindow):
                 datetime.min.time(),
             ),
             notes_text=self.quote_note_input.toPlainText().strip(),
-            items=tuple(
-                PresupuestoItemInput(sku=str(item["sku"]), cantidad=int(item["cantidad"]))
-                for item in self.quote_cart
-            ),
+            items=tuple(build_quote_presupuesto_inputs(self.quote_cart)),
             target_state=target_state,
         )
 
@@ -2072,10 +2871,16 @@ class QuoteSatelliteWindow(QMainWindow):
                 )
                 session.flush()
                 client_id = int(client.id)
+                client_message = build_quote_client_created_feedback(
+                    session,
+                    client_name=str(client.nombre),
+                    client_code=str(client.codigo_cliente),
+                )
                 session.commit()
             self.refresh_all()
             self._select_client_id(client_id)
-            self._set_status(f"Cliente {payload['nombre']} creado.")
+            QMessageBox.information(self, "Cliente creado", client_message)
+            self._set_status(f"Cliente {payload['nombre']} creado y asignado.")
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "No se pudo crear", str(exc))
 
@@ -2115,8 +2920,8 @@ class QuoteSatelliteWindow(QMainWindow):
         except SQLAlchemyError as exc:
             QMessageBox.critical(self, "No se pudo filtrar", str(exc))
 
-    def _refresh_quotes(self, session) -> None:
-        selected_quote_id = self._selected_quote_id()
+    def _refresh_quotes(self, session, preferred_quote_id: int | None = None) -> None:
+        selected_quote_id = preferred_quote_id if preferred_quote_id is not None else self._selected_quote_id()
         quote_snapshots = build_quote_history_input_rows(load_quote_snapshot_rows(session, limit=300))
         rows = build_quote_satellite_rows(
             quote_snapshots=quote_snapshots,
@@ -2159,6 +2964,26 @@ class QuoteSatelliteWindow(QMainWindow):
 
         self._refresh_quote_detail(self._selected_quote_id())
         self._apply_action_state()
+
+    def _reveal_saved_quote(self, *, quote_id: int, state_filter: str) -> None:
+        self._set_quote_state_filter(state_filter)
+        with get_session() as session:
+            self._refresh_quotes(session, preferred_quote_id=quote_id)
+        self._set_page("search")
+
+    def _set_quote_state_filter(self, state_filter: str) -> None:
+        normalized_filter = str(state_filter or "").strip().upper()
+        self.quote_state_combo.blockSignals(True)
+        try:
+            target_index = 0
+            for index in range(self.quote_state_combo.count()):
+                item_value = str(self.quote_state_combo.itemData(index) or "").strip().upper()
+                if item_value == normalized_filter:
+                    target_index = index
+                    break
+            self.quote_state_combo.setCurrentIndex(target_index)
+        finally:
+            self.quote_state_combo.blockSignals(False)
 
     def _handle_quote_selection(self) -> None:
         self._refresh_quote_detail(self._selected_quote_id())
@@ -2205,6 +3030,7 @@ class QuoteSatelliteWindow(QMainWindow):
                     {
                         "sku": detail.sku,
                         "description": detail.description,
+                        "size_label": detail.size_label,
                         "quantity": detail.quantity,
                         "unit_price": detail.unit_price,
                         "subtotal": detail.subtotal,
@@ -2233,6 +3059,7 @@ class QuoteSatelliteWindow(QMainWindow):
             values = [
                 detail.sku,
                 detail.description,
+                detail.size_label,
                 detail.quantity,
                 detail.unit_price,
                 detail.subtotal,
@@ -2248,6 +3075,7 @@ class QuoteSatelliteWindow(QMainWindow):
             values = [
                 detail.sku,
                 detail.description,
+                detail.size_label,
                 detail.quantity,
                 detail.unit_price,
                 detail.subtotal,
@@ -2255,6 +3083,7 @@ class QuoteSatelliteWindow(QMainWindow):
             for column_index, value in enumerate(values):
                 self.share_detail_table.setItem(row_index, column_index, _table_item(value))
     def _apply_action_state(self) -> None:
+        selected_quote_line = 0 <= self.quote_cart_table.currentRow() < len(self.quote_cart)
         action_state = build_quote_satellite_action_state(
             can_operate=self._can_operate(),
             has_selection=self._selected_quote_id() is not None,
@@ -2264,16 +3093,18 @@ class QuoteSatelliteWindow(QMainWindow):
         self.quote_resume_button.setEnabled(action_state.resume_enabled)
         self.quote_emit_selected_button.setEnabled(action_state.emit_enabled)
         self.quote_cancel_button.setEnabled(action_state.cancel_enabled)
-        self.quote_open_share_button.setEnabled(self._selected_quote_id() is not None)
+        self.quote_open_share_button.setEnabled(action_state.share_enabled)
         self.quote_whatsapp_button.setEnabled(action_state.whatsapp_enabled)
         self.quote_print_button.setEnabled(action_state.print_enabled)
         self.share_refresh_button.setEnabled(self._selected_quote_id() is not None)
         self.kiosk_add_button.setEnabled(self.lookup_snapshot is not None and self._can_operate())
-        self.catalog_add_button.setEnabled(self._selected_catalog_sku() is not None and self._can_operate())
+        self.catalog_add_button.setEnabled(bool(self._selected_catalog_sku()) and self._can_operate())
+        self.catalog_print_label_button.setEnabled(bool(self._selected_catalog_sku()))
         self.guided_add_button.setEnabled(bool(self.guided_selected_sku) and self._can_operate())
-        self.quote_qty_down_button.setEnabled(bool(self.quote_cart))
-        self.quote_qty_up_button.setEnabled(bool(self.quote_cart))
-        self.quote_remove_button.setEnabled(bool(self.quote_cart))
+        self.guided_print_label_button.setEnabled(bool(self.guided_selected_sku))
+        self.quote_qty_down_button.setEnabled(selected_quote_line)
+        self.quote_qty_up_button.setEnabled(selected_quote_line)
+        self.quote_remove_button.setEnabled(selected_quote_line)
         self.quote_clear_button.setEnabled(bool(self.quote_cart))
 
     def _handle_resume_quote(self) -> None:
@@ -2315,6 +3146,7 @@ class QuoteSatelliteWindow(QMainWindow):
             {
                 "sku": line.sku,
                 "producto_nombre": line.description,
+                "talla": line.size_label,
                 "escuela_nombre": line.school_name,
                 "nivel_educativo_nombre": line.education_level_name,
                 "cantidad": line.quantity,
@@ -2426,11 +3258,90 @@ class QuoteSatelliteWindow(QMainWindow):
         self.sidebar_summary_label.setText(
             f"{overall_cart_view.summary.summary_label}\n{overall_cart_view.summary.school_summary_label}"
         )
+        self._refresh_sidebar_quote_items()
         self.kiosk_budget_total_label.setText(overall_cart_view.summary.total_label)
         self.kiosk_budget_summary_label.setText(
             f"{overall_cart_view.summary.summary_label}\n{overall_cart_view.summary.school_summary_label}"
         )
         self._apply_action_state()
+
+    def _refresh_sidebar_quote_items(self) -> None:
+        _clear_layout(self.sidebar_items_layout)
+        line_count = len(self.quote_cart)
+        piece_count = sum(max(int(item.get("cantidad") or 0), 0) for item in self.quote_cart)
+        line_label = "linea" if line_count == 1 else "lineas"
+        piece_label = "pza" if piece_count == 1 else "pzas"
+        self.sidebar_items_count_label.setText(f"{line_count} {line_label} | {piece_count} {piece_label}")
+        if not self.quote_cart:
+            empty_label = QLabel("Aun no agregas piezas.\nAqui veras el armado listo para revisar.")
+            empty_label.setObjectName("satSidebarItemEmpty")
+            empty_label.setWordWrap(True)
+            self.sidebar_items_layout.addWidget(empty_label)
+            self.sidebar_items_layout.addStretch()
+            return
+        for row_index, line_item in enumerate(self.quote_cart):
+            self.sidebar_items_layout.addWidget(self._build_sidebar_quote_item_card(row_index, line_item))
+        self.sidebar_items_layout.addStretch()
+
+    def _build_sidebar_quote_item_card(self, row_index: int, line_item: dict[str, object]) -> QFrame:
+        card = QFrame()
+        card.setObjectName("satSidebarItemCard")
+        layout = QVBoxLayout()
+        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setSpacing(6)
+
+        quantity = max(int(line_item.get("cantidad") or 0), 0)
+        quantity_label = QLabel(f"{quantity} pza" if quantity == 1 else f"{quantity} pzas")
+        quantity_label.setObjectName("satSidebarItemQty")
+
+        remove_button = QPushButton("Quitar")
+        remove_button.setObjectName("sidebarItemRemoveButton")
+        remove_button.clicked.connect(lambda checked=False, index=row_index: self._remove_quote_item_at_index(index))
+
+        header = QHBoxLayout()
+        header.setContentsMargins(0, 0, 0, 0)
+        header.setSpacing(6)
+        header.addWidget(quantity_label, 0, Qt.AlignmentFlag.AlignLeft)
+        header.addStretch()
+        header.addWidget(remove_button, 0, Qt.AlignmentFlag.AlignRight)
+
+        product_name = str(
+            line_item.get("producto_nombre")
+            or line_item.get("descripcion")
+            or line_item.get("sku")
+            or "Producto"
+        )
+        name_label = QLabel(product_name)
+        name_label.setObjectName("satSidebarItemName")
+        name_label.setWordWrap(True)
+
+        school_name = str(line_item.get("escuela_nombre") or "General")
+        level_name = str(line_item.get("nivel_educativo_nombre") or "Sin nivel")
+        sku = str(line_item.get("sku") or "").strip()
+        unit_price = Decimal(str(line_item.get("precio_unitario") or "0")).quantize(Decimal("0.01"))
+        subtotal = (unit_price * Decimal(quantity)).quantize(Decimal("0.01"))
+        scope_parts = [school_name]
+        if level_name and level_name != "Sin nivel":
+            scope_parts.append(level_name)
+        meta_label = QLabel(" | ".join(scope_parts))
+        meta_label.setObjectName("satSidebarItemMeta")
+        meta_label.setWordWrap(True)
+
+        price_parts = [f"${subtotal}"]
+        if sku:
+            price_parts.append(sku)
+        if quantity > 1:
+            price_parts.append(f"${unit_price} c/u")
+        footer_label = QLabel(" | ".join(price_parts))
+        footer_label.setObjectName("satSidebarItemMeta")
+        footer_label.setWordWrap(True)
+
+        layout.addLayout(header)
+        layout.addWidget(name_label)
+        layout.addWidget(meta_label)
+        layout.addWidget(footer_label)
+        card.setLayout(layout)
+        return card
 
     def _apply_lookup_view(self, lookup_view) -> None:
         lookup_row = None
@@ -2518,8 +3429,15 @@ class QuoteSatelliteWindow(QMainWindow):
         selected_row = self.catalog_table.currentRow()
         if selected_row < 0:
             return ""
+        current_row_count = self.catalog_table.rowCount()
+        if current_row_count == len(self.catalog_snapshot_rows) and selected_row < len(self.catalog_snapshot_rows):
+            return str(self.catalog_snapshot_rows[selected_row].get("sku") or "").strip()
+        if current_row_count == len(self.catalog_browser_visible_skus) and selected_row < len(self.catalog_browser_visible_skus):
+            return self.catalog_browser_visible_skus[selected_row].strip()
         item = self.catalog_table.item(selected_row, 0)
         if item is None:
+            if selected_row < len(self.catalog_snapshot_rows):
+                return str(self.catalog_snapshot_rows[selected_row].get("sku") or "").strip()
             return ""
         return str(item.data(Qt.ItemDataRole.UserRole) or item.text()).strip()
 
@@ -2531,10 +3449,245 @@ class QuoteSatelliteWindow(QMainWindow):
         return item.text().strip() if item is not None else ""
 
     def _can_operate(self) -> bool:
+        if self.offline_mode:
+            return False
         return self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
 
     def _set_status(self, text: str) -> None:
         self.status_label.setText(text)
+
+    # ------------------------------------------------------------------
+    # Impresion de etiquetas desde catalogo
+    # ------------------------------------------------------------------
+
+    def _create_modal_dialog(
+        self,
+        title: str,
+        helper_text: str | None = None,
+        width: int = 460,
+        *,
+        expand_to_screen: bool = False,
+    ) -> tuple[QDialog, object]:
+        from PyQt6.QtWidgets import QApplication
+        dialog = QDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.setModal(True)
+        if expand_to_screen:
+            screen = self.screen() or QApplication.primaryScreen()
+            if screen is not None:
+                available = screen.availableGeometry()
+                dialog.resize(
+                    max(width, int(available.width() * 0.94)),
+                    int(available.height() * 0.9),
+                )
+                dialog.setMinimumSize(
+                    min(max(width, int(available.width() * 0.82)), available.width()),
+                    min(int(available.height() * 0.72), available.height()),
+                )
+            else:
+                dialog.setMinimumWidth(width)
+        else:
+            dialog.setMinimumWidth(width)
+        layout = QVBoxLayout()
+        layout.setSpacing(12)
+        if helper_text:
+            helper = QLabel(helper_text)
+            helper.setWordWrap(True)
+            helper.setObjectName("subtleLine")
+            layout.addWidget(helper)
+        dialog.setLayout(layout)
+        return dialog, layout
+
+    def _show_pin_dialog(self) -> bool:
+        """Pide un PIN antes de abrir el diálogo de etiquetas. Retorna True si es válido."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("PIN requerido")
+        dialog.setModal(True)
+        dialog.setMinimumWidth(320)
+        layout = QVBoxLayout()
+        layout.setSpacing(12)
+        hint = QLabel("Ingresa el PIN para imprimir etiquetas.")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+        pin_input = QLineEdit()
+        pin_input.setEchoMode(QLineEdit.EchoMode.Password)
+        pin_input.setPlaceholderText("PIN")
+        pin_input.setMaxLength(10)
+        layout.addWidget(pin_input)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        dialog.setLayout(layout)
+        pin_input.returnPressed.connect(dialog.accept)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return False
+        entered = pin_input.text().strip()
+        if entered not in _LABEL_PRINT_PINS:
+            QMessageBox.warning(self, "PIN incorrecto", "El PIN ingresado no es válido.")
+            return False
+        return True
+
+    def _print_satellite_label(
+        self,
+        image_path: "Path",
+        *,
+        title: str,
+        copies: int,
+        parent: "QDialog | None" = None,
+    ) -> bool:
+        image = QImage(str(image_path))
+        if image.isNull():
+            raise ValueError(f"No se pudo abrir la imagen de etiqueta:\n{image_path}")
+        if sys.platform.startswith("win"):
+            from pos_uniformes.ui.helpers.inventory_label_windows_print_helper import (
+                print_inventory_label_via_windows,
+            )
+            try:
+                with get_session() as session:
+                    from pos_uniformes.services.business_print_settings_service import load_business_print_settings_snapshot
+                    preferred_printer = load_business_print_settings_snapshot(session).preferred_printer
+            except Exception:
+                preferred_printer = ""
+            resolution = print_inventory_label_via_windows(
+                image_path,
+                sku=title.replace("Etiqueta ", "", 1),
+                copies=copies,
+                preferred_printer_name=preferred_printer,
+            )
+            if resolution.fallback_used:
+                QMessageBox.information(
+                    parent or self,
+                    "Impresora ajustada",
+                    (
+                        f'Se envió la etiqueta a "{resolution.printer_name}" '
+                        "porque la impresora preferida no estaba disponible en esta PC."
+                    ),
+                )
+            return True
+        # Fallback para macOS / Linux (entorno de desarrollo)
+        from PyQt6.QtPrintSupport import QPrintDialog, QPrinter
+        from PyQt6.QtCore import QMarginsF, QSizeF
+        from PyQt6.QtGui import QPageLayout, QPageSize
+        from pos_uniformes.ui.helpers.inventory_label_print_helper import build_inventory_label_print_layout
+        from pos_uniformes.ui.helpers.qt_image_scale_helper import normalize_printable_image
+        image = normalize_printable_image(image)
+        print_layout = build_inventory_label_print_layout(image.width(), image.height())
+        printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+        printer.setFullPage(True)
+        printer.setResolution(300)
+        printer.setPageOrientation(
+            QPageLayout.Orientation.Landscape
+            if print_layout.orientation == "landscape"
+            else QPageLayout.Orientation.Portrait
+        )
+        printer.setPageMargins(QMarginsF(0.0, 0.0, 0.0, 0.0), QPageLayout.Unit.Millimeter)
+        printer.setPageSize(
+            QPageSize(
+                QSizeF(print_layout.width_mm, print_layout.height_mm),
+                QPageSize.Unit.Millimeter,
+                "inventory-label",
+            )
+        )
+        print_dialog = QPrintDialog(printer, parent or self)
+        print_dialog.setWindowTitle(title)
+        return print_dialog.exec() == QDialog.DialogCode.Accepted
+
+    def _print_label_for_guided_selection(self) -> None:
+        self._print_label_for_sku(self.guided_selected_sku)
+
+    def _print_label_for_selected_catalog_row(self) -> None:
+        self._print_label_for_sku(self._selected_catalog_sku())
+
+    def _print_label_for_sku(self, sku: str) -> None:
+        sku = (sku or "").strip()
+        if not sku:
+            return
+        selected_row = next(
+            (row for row in self.catalog_snapshot_rows if str(row.get("sku")) == sku), None
+        )
+        if selected_row is None:
+            return
+        self._open_label_dialog_for_row(selected_row)
+
+    def _open_label_dialog_for_row(self, selected_row: dict) -> None:
+        if not self._show_pin_dialog():
+            return
+
+        if self.offline_mode:
+            # Modo offline: renderizar desde cache, sin DB
+            label_context = InventoryLabelContext(
+                variant_id=0,
+                sku=str(selected_row["sku"]),
+                product_name=str(selected_row.get("producto_nombre_base") or selected_row.get("producto_nombre") or ""),
+                talla=str(selected_row.get("talla") or ""),
+                color=str(selected_row.get("color") or ""),
+            )
+            cache_row = selected_row
+
+            def _render_label_offline(mode: str, requested_copies: int) -> "object":
+                return render_inventory_label_from_cache_row(
+                    cache_row, mode=mode, requested_copies=requested_copies
+                )
+
+            build_inventory_label_dialog(
+                self,
+                initial_context=label_context,
+                variant_ids=[0],
+                current_index=0,
+                load_context=lambda _vid: label_context,
+                render_label=_render_label_offline,
+                print_label=lambda image_path, copies, sku_val, parent: self._print_satellite_label(
+                    image_path,
+                    title=f"Etiqueta {sku_val}",
+                    copies=copies,
+                    parent=parent,
+                ),
+            )
+            return
+
+        # Modo online: cargar desde DB
+        variant_id = int(selected_row["variante_id"])
+        try:
+            with get_session() as session:
+                label_context = load_inventory_label_context(session, variant_id)
+        except Exception as exc:
+            QMessageBox.critical(self, "Error al cargar etiqueta", str(exc))
+            return
+
+        render_state = {"variant_id": variant_id}
+
+        def _render_label(mode: str, requested_copies: int) -> "object":
+            with get_session() as session:
+                return render_inventory_label(
+                    session,
+                    render_state["variant_id"],
+                    mode=mode,
+                    requested_copies=requested_copies,
+                )
+
+        def _load_context(vid: int) -> "InventoryLabelContext":
+            with get_session() as session:
+                ctx = load_inventory_label_context(session, vid)
+            render_state["variant_id"] = ctx.variant_id
+            return ctx
+
+        build_inventory_label_dialog(
+            self,
+            initial_context=label_context,
+            variant_ids=[variant_id],
+            current_index=0,
+            load_context=_load_context,
+            render_label=_render_label,
+            print_label=lambda image_path, copies, sku_val, parent: self._print_satellite_label(
+                image_path,
+                title=f"Etiqueta {sku_val}",
+                copies=copies,
+                parent=parent,
+            ),
+        )
 
     @staticmethod
     def _generate_quote_folio() -> str:
@@ -2721,6 +3874,14 @@ def _guided_segment_label(row: dict[str, object]) -> str:
     if "niño" in gender or "nino" in gender or "mascul" in gender or "caballero" in gender:
         return "Oficial Niño"
     return "Oficial"
+
+
+def _guided_display_color_label(raw_value: object) -> str:
+    color_label = str(raw_value or "").strip()
+    normalized = color_label.lower().replace(" ", "").replace("-", "")
+    if not color_label or normalized in {"sincolor", "adhoc"}:
+        return ""
+    return color_label
 
 
 def _clear_layout(layout) -> None:

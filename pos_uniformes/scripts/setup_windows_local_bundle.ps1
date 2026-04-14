@@ -6,7 +6,8 @@ param(
     [string]$DbPassword = "postgres",
     [string]$AdminUser = "",
     [string]$AdminPassword = "",
-    [switch]$AllowEmptySchema
+    [switch]$AllowEmptySchema,
+    [switch]$InstallBrotherDriver
 )
 
 $ErrorActionPreference = "Stop"
@@ -86,11 +87,43 @@ function Write-EnvFile {
     Set-Content -Path $OutputPath -Value $content -Encoding UTF8
 }
 
+function Get-BundledBrotherDriverInstaller {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$BundleDir
+    )
+
+    $driverDir = Join-Path $BundleDir "drivers"
+    if (-not (Test-Path $driverDir)) {
+        return $null
+    }
+
+    return Get-ChildItem -Path $driverDir -File |
+        Where-Object { $_.Extension -in @(".exe", ".msi", ".zip") } |
+        Sort-Object Name |
+        Select-Object -First 1
+}
+
+function Install-BundledBrotherDriver {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.IO.FileInfo]$Installer
+    )
+
+    if ($Installer.Extension -eq ".zip") {
+        throw "El driver Brother incluido esta comprimido (.zip). Extraelo y ejecuta manualmente el instalador oficial."
+    }
+
+    Write-Host "Lanzando instalador de driver Brother: $($Installer.FullName)"
+    Start-Process -FilePath $Installer.FullName -Wait
+}
+
 $bundleDir = $PSScriptRoot
 $seedBackup = Join-Path $bundleDir "seed\initial.dump"
 $envTemplatePath = Join-Path $bundleDir "pos_uniformes.env.example"
 $envOutputPath = Join-Path $bundleDir "pos_uniformes.env"
 $exePath = Get-ChildItem -Path $bundleDir -Filter "POSUniformes-*.exe" | Select-Object -First 1
+$bundledBrotherDriver = Get-BundledBrotherDriverInstaller -BundleDir $bundleDir
 
 if (-not $AdminUser) {
     $AdminUser = $DbUser
@@ -160,6 +193,13 @@ elseif (-not $AllowEmptySchema) {
 
 Write-EnvFile -TemplatePath $envTemplatePath -OutputPath $envOutputPath
 
+if ($InstallBrotherDriver) {
+    if (-not $bundledBrotherDriver) {
+        throw "Este bundle no incluye instalador de driver Brother en la carpeta 'drivers'."
+    }
+    Install-BundledBrotherDriver -Installer $bundledBrotherDriver
+}
+
 Write-Host ""
 Write-Host "Setup local completado:"
 Write-Host "  Host:   $DbHost"
@@ -176,5 +216,16 @@ elseif ($AllowEmptySchema) {
 if ($exePath) {
     Write-Host "  EXE:    $($exePath.FullName)"
 }
+if ($bundledBrotherDriver) {
+    Write-Host "  Driver: $($bundledBrotherDriver.FullName)"
+}
+else {
+    Write-Host "  Driver: no incluido en este bundle"
+}
 Write-Host ""
-Write-Host "Siguiente paso: abre el ejecutable desde esta misma carpeta."
+if ($bundledBrotherDriver -and -not $InstallBrotherDriver) {
+    Write-Host "Siguiente paso: si necesitas etiquetas Brother, corre de nuevo este script con -InstallBrotherDriver o ejecuta el driver desde la carpeta 'drivers'."
+}
+else {
+    Write-Host "Siguiente paso: abre el ejecutable desde esta misma carpeta."
+}

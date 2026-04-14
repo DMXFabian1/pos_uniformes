@@ -5,9 +5,10 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
-from PyQt6.QtCore import QEvent, QSettings, Qt, QTimer
-from PyQt6.QtGui import QColor, QGuiApplication, QPalette
+from PyQt6.QtCore import QEvent, QSettings, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import QColor, QGuiApplication, QPalette, QPixmap
 from PyQt6.QtWidgets import (
+    QApplication,
     QComboBox,
     QDialog,
     QFrame,
@@ -27,15 +28,20 @@ from pos_uniformes.database.connection import get_session
 from pos_uniformes.services.auth_service import AuthService
 from pos_uniformes.services.user_service import UserService
 from pos_uniformes.ui.helpers.login_user_list_helper import build_login_user_options
+from pos_uniformes.ui.styles.interactive_hover_styles import build_combo_popup_hover_styles
+from pos_uniformes.utils.app_metadata import APP_DISPLAY_NAME, app_build_label, app_icon_path
 
 
 class LoginDialog(QDialog):
+    authenticated = pyqtSignal(int)
+
     def __init__(self) -> None:
         super().__init__()
         self.user_id: int | None = None
         self._settings = QSettings("POSUniformes", "LoginDialog")
         self._loading_user_options = False
-        self.setWindowTitle("Iniciar sesion")
+        self._is_launching = False
+        self.setWindowTitle(f"{APP_DISPLAY_NAME} | Iniciar sesion")
         self.setModal(True)
         self.resize(520, 420)
         self._apply_styles()
@@ -46,8 +52,21 @@ class LoginDialog(QDialog):
         self._caps_timer.start()
 
     def _apply_styles(self) -> None:
+        combo_popup_styles = build_combo_popup_hover_styles(
+            popup_background="#fffaf2",
+            popup_color="#2d2b27",
+            popup_border="#d2c7b8",
+            selected_background="#8f4527",
+            selected_color="#f9f4ea",
+            hover_background="#f1e7da",
+            hover_color="#5a3224",
+            selected_hover_background="#a25531",
+            selected_hover_color="#fff7ef",
+        )
         self.setStyleSheet(
-            """
+            "\n".join(
+                [
+                    """
             QDialog {
                 background: #f3efe8;
                 color: #1f1f1b;
@@ -60,13 +79,33 @@ class LoginDialog(QDialog):
                 border-radius: 18px;
             }
             QLabel#loginTitle {
+                color: #1f1f1b;
+                font-size: 24px;
+                font-weight: 900;
+            }
+            QLabel#loginSectionTitle {
                 color: #8f4527;
-                font-size: 22px;
+                font-size: 16px;
                 font-weight: 800;
             }
             QLabel#loginHint {
                 color: #6d665e;
                 font-size: 13px;
+            }
+            QLabel#loginBuildBadge {
+                background: #efe7d9;
+                color: #5d483d;
+                border: 1px solid #d8c7b4;
+                border-radius: 10px;
+                padding: 4px 10px;
+                font-size: 12px;
+                font-weight: 800;
+            }
+            QLabel#loginLogo {
+                background: #fffaf2;
+                border: 1px solid #dfd3c5;
+                border-radius: 16px;
+                padding: 8px;
             }
             QLabel#loginStatus {
                 border-radius: 10px;
@@ -120,14 +159,12 @@ class LoginDialog(QDialog):
                 border: 2px solid #c85a4b;
             }
             QComboBox QAbstractItemView {
-                background: #fffaf2;
-                color: #2d2b27;
-                border: 1px solid #d2c7b8;
                 border-radius: 10px;
                 padding: 4px;
-                selection-background-color: #8f4527;
-                color: #f9f4ea;
             }
+            """,
+                    combo_popup_styles,
+                    """
             QPushButton {
                 border-radius: 12px;
                 padding: 8px 14px;
@@ -155,12 +192,18 @@ class LoginDialog(QDialog):
             QPushButton#loginTinyButton:hover {
                 background: #f8dfcf;
             }
-            """
+            """,
+                ]
+            )
         )
 
     def _build_ui(self) -> None:
-        title = QLabel("Iniciar sesion")
+        title = QLabel(APP_DISPLAY_NAME)
         title.setObjectName("loginTitle")
+        section_title = QLabel("Inicio de sesion")
+        section_title.setObjectName("loginSectionTitle")
+        build_badge = QLabel(app_build_label())
+        build_badge.setObjectName("loginBuildBadge")
         hint = QLabel("Selecciona tu usuario y captura tu contrasena para continuar.")
         hint.setObjectName("loginHint")
         self.status_label = QLabel("")
@@ -209,18 +252,45 @@ class LoginDialog(QDialog):
         cancel_button = QPushButton("Salir")
         cancel_button.setObjectName("loginGhostButton")
         cancel_button.clicked.connect(self.reject)
+        self.cancel_button = cancel_button
 
         actions = QHBoxLayout()
         actions.addStretch()
         actions.addWidget(cancel_button)
         actions.addWidget(login_button)
 
+        header_layout = QHBoxLayout()
+        header_layout.setSpacing(14)
+        logo_label = QLabel()
+        logo_label.setObjectName("loginLogo")
+        logo_label.setFixedSize(84, 84)
+        logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        logo_path = app_icon_path()
+        if logo_path is not None:
+            pixmap = QPixmap(str(logo_path))
+            if not pixmap.isNull():
+                logo_label.setPixmap(
+                    pixmap.scaled(
+                        62,
+                        62,
+                        Qt.AspectRatioMode.KeepAspectRatio,
+                        Qt.TransformationMode.SmoothTransformation,
+                    )
+                )
+        title_stack = QVBoxLayout()
+        title_stack.setSpacing(4)
+        title_stack.addWidget(title)
+        title_stack.addWidget(section_title)
+        title_stack.addWidget(build_badge, 0, Qt.AlignmentFlag.AlignLeft)
+        header_layout.addWidget(logo_label, 0, Qt.AlignmentFlag.AlignTop)
+        header_layout.addLayout(title_stack, 1)
+
         card = QFrame()
         card.setObjectName("loginCard")
         card_layout = QVBoxLayout()
         card_layout.setContentsMargins(22, 22, 22, 22)
         card_layout.setSpacing(12)
-        card_layout.addWidget(title)
+        card_layout.addLayout(header_layout)
         card_layout.addWidget(hint)
         card_layout.addWidget(self.status_label)
         card_layout.addWidget(self.caps_lock_label)
@@ -290,6 +360,8 @@ class LoginDialog(QDialog):
             field.update()
 
     def _clear_login_error_state(self) -> None:
+        if self._is_launching:
+            return
         self._set_field_error_state(False, False)
         if self.status_label.isVisible():
             self.status_label.hide()
@@ -335,6 +407,8 @@ class LoginDialog(QDialog):
         self._loading_user_options = False
 
     def _toggle_password_visibility(self, checked: bool) -> None:
+        if self._is_launching:
+            return
         self.password_input.setEchoMode(
             QLineEdit.EchoMode.Normal if checked else QLineEdit.EchoMode.Password
         )
@@ -351,7 +425,44 @@ class LoginDialog(QDialog):
             self._update_caps_lock_warning()
         return super().eventFilter(watched, event)
 
+    def set_loading_state(self, message: str = "Cargando aplicacion...") -> None:
+        self._is_launching = True
+        self.user_combo.setEnabled(False)
+        self.password_input.setEnabled(False)
+        self.password_toggle_button.setEnabled(False)
+        self.login_button.setEnabled(False)
+        self.cancel_button.setEnabled(False)
+        self._set_field_error_state(False, False)
+        self._set_status(message, "neutral")
+        self.setWindowTitle(f"{APP_DISPLAY_NAME} | Cargando")
+        self.setCursor(Qt.CursorShape.WaitCursor)
+        if QApplication.overrideCursor() is None:
+            QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        self.repaint()
+        QApplication.processEvents()
+
+    def clear_loading_state(self) -> None:
+        self._is_launching = False
+        self.user_combo.setEnabled(True)
+        self.password_input.setEnabled(True)
+        self.password_toggle_button.setEnabled(True)
+        self.cancel_button.setEnabled(True)
+        self.login_button.setEnabled(self.user_combo.count() > 0)
+        self.setWindowTitle(f"{APP_DISPLAY_NAME} | Iniciar sesion")
+        self.unsetCursor()
+        if QApplication.overrideCursor() is not None:
+            QApplication.restoreOverrideCursor()
+        self._update_caps_lock_warning()
+        self.status_label.hide()
+
+    def reject(self) -> None:  # type: ignore[override]
+        if self._is_launching:
+            return
+        super().reject()
+
     def _handle_login(self) -> None:
+        if self._is_launching:
+            return
         username = str(self.user_combo.currentData() or "").strip()
         password = self.password_input.text()
 
@@ -380,4 +491,5 @@ class LoginDialog(QDialog):
             QMessageBox.critical(self, "Error de autenticacion", str(exc))
             return
 
-        self.accept()
+        self.set_loading_state("Autenticacion correcta. Cargando aplicacion...")
+        self.authenticated.emit(self.user_id)

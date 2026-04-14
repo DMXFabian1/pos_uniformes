@@ -1,20 +1,30 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 from pathlib import Path
+import sys
 
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_submodules
 
 
 PROJECT_ROOT = Path(SPEC).resolve().parents[2]
+sys.path.insert(0, str(PROJECT_ROOT.parent))
+
+from pos_uniformes.utils.app_metadata import app_windows_icon_path
+from pos_uniformes.utils.pyinstaller_data_helper import collect_tree_datas
+
 VERSION = (PROJECT_ROOT / "VERSION").read_text(encoding="utf-8").strip()
 APP_NAME = f"POSUniformes-{VERSION}"
+WINDOWS_ICON = app_windows_icon_path()
 
-datas = collect_data_files(
-    "pos_uniformes",
-    includes=[
-        "assets/**/*",
-        "migrations/**/*",
-    ],
+datas = []
+datas += collect_tree_datas(
+    PROJECT_ROOT / "assets",
+    "pos_uniformes/assets",
+)
+datas += collect_tree_datas(
+    PROJECT_ROOT / "migrations",
+    "pos_uniformes/migrations",
+    include_python_files=True,
 )
 datas += [
     (str(PROJECT_ROOT / "alembic.ini"), "pos_uniformes"),
@@ -27,6 +37,12 @@ datas += [
 seed_backup = PROJECT_ROOT / "packaging" / "windows" / "seed" / "initial.dump"
 if seed_backup.exists():
     datas.append((str(seed_backup), "seed"))
+
+driver_dir = PROJECT_ROOT / "packaging" / "windows" / "drivers"
+if driver_dir.exists():
+    for installer in driver_dir.iterdir():
+        if installer.is_file():
+            datas.append((str(installer), "drivers"))
 
 hiddenimports = []
 hiddenimports += collect_submodules("psycopg")
@@ -59,6 +75,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=False,
+    icon=str(WINDOWS_ICON) if WINDOWS_ICON is not None else None,
 )
 
 coll = COLLECT(

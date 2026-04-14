@@ -10,6 +10,7 @@ from datetime import datetime
 class QuoteEditorLineSnapshot:
     sku: str
     description: str
+    size_label: str
     quantity: int
     unit_price: object
     school_name: str
@@ -69,6 +70,7 @@ def load_quote_editor_snapshot(session, *, quote_id: int) -> QuoteEditorSnapshot
             QuoteEditorLineSnapshot(
                 sku=str(detail.sku_snapshot),
                 description=str(detail.descripcion_snapshot),
+                size_label=str(detail.talla_snapshot or "-"),
                 quantity=int(detail.cantidad),
                 unit_price=detail.precio_unitario,
                 school_name=_detail_school_name(detail),

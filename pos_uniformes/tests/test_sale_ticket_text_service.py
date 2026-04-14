@@ -188,6 +188,57 @@ class SaleTicketTextServiceTests(unittest.TestCase):
         self.assertIn("Ajuste: -0.15", ticket)
         self.assertIn("Total a pagar: 169.00", ticket)
 
+    def test_omits_internal_operational_notes_from_customer_ticket(self) -> None:
+        sale = _build_sale(
+            with_client=False,
+            stored_discount_percent="0.00",
+            stored_discount_amount="0.00",
+            total="199.00",
+            observacion=(
+                "Metodo de pago: Efectivo | Cambio: 1.00 | "
+                "Interno: Maqueta prueba deportivo 3pz: P2-001 + PLY-001"
+            ),
+        )
+
+        ticket = build_sale_ticket_text(
+            sale=sale,
+            business_name="POS Uniformes",
+        )
+
+        self.assertIn("Notas:\n- Cambio: 1.00", ticket)
+        self.assertNotIn("Interno:", ticket)
+
+    def test_uses_snapshots_for_manual_sale_lines_without_variant(self) -> None:
+        sale = SimpleNamespace(
+            folio="VTA-009",
+            created_at=datetime(2026, 4, 10, 14, 20),
+            usuario=SimpleNamespace(username="admin"),
+            estado=SimpleNamespace(value="CONFIRMADA"),
+            cliente=None,
+            detalles=[
+                SimpleNamespace(
+                    variante=None,
+                    sku_snapshot="SIN-CODIGO",
+                    descripcion_snapshot="Venta manual",
+                    cantidad=1,
+                    precio_unitario=Decimal("75.00"),
+                    subtotal_linea=Decimal("75.00"),
+                )
+            ],
+            subtotal=Decimal("75.00"),
+            descuento_porcentaje=Decimal("0.00"),
+            descuento_monto=Decimal("0.00"),
+            total=Decimal("75.00"),
+            observacion="Metodo de pago: Efectivo",
+        )
+
+        ticket = build_sale_ticket_text(
+            sale=sale,
+            business_name="POS Uniformes",
+        )
+
+        self.assertIn("Venta manual\nSIN-CODIGO | 1 x $75.00 = $75.00", ticket)
+
 
 if __name__ == "__main__":
     unittest.main()

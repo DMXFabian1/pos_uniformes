@@ -18,7 +18,8 @@ from pos_uniformes.database.models import (
 )
 from pos_uniformes.services.auth_service import AuthService
 
-DEFAULT_PROMO_AUTHORIZATION_CODE = "PROMO2026"
+DEFAULT_PROMO_AUTHORIZATION_CODE = "634700"
+LEGACY_DEFAULT_PROMO_AUTHORIZATION_CODES = ("PROMO2026",)
 
 
 @dataclass(frozen=True)
@@ -37,6 +38,16 @@ class ManualPromoService:
     @classmethod
     def _ensure_code_hash(cls, config: ConfiguracionNegocio) -> str:
         if config.promo_authorization_code_hash:
+            stored_hash = config.promo_authorization_code_hash
+            if (
+                not AuthService.verify_password(DEFAULT_PROMO_AUTHORIZATION_CODE, stored_hash)
+                and any(
+                    AuthService.verify_password(legacy_code, stored_hash)
+                    for legacy_code in LEGACY_DEFAULT_PROMO_AUTHORIZATION_CODES
+                )
+            ):
+                config.promo_authorization_code_hash = AuthService.hash_password(DEFAULT_PROMO_AUTHORIZATION_CODE)
+                return config.promo_authorization_code_hash
             return config.promo_authorization_code_hash
         config.promo_authorization_code_hash = AuthService.hash_password(DEFAULT_PROMO_AUTHORIZATION_CODE)
         return config.promo_authorization_code_hash

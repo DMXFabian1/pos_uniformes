@@ -1,4 +1,4 @@
-"""Generacion de codigos QR para presentaciones y clientes."""
+"""Generacion de codigos QR para presentaciones, clientes y empleadas."""
 
 from __future__ import annotations
 
@@ -10,10 +10,11 @@ from PIL import Image, ImageDraw
 import qrcode
 from qrcode.constants import ERROR_CORRECT_H
 
-from pos_uniformes.database.models import Cliente, Variante
+from pos_uniformes.database.models import Cliente, Empleada, Variante
 
 QR_OUTPUT_DIR = Path(__file__).resolve().parents[1] / "generated" / "qrs"
 CLIENT_QR_OUTPUT_DIR = Path(__file__).resolve().parents[1] / "generated" / "client_qrs"
+EMPLOYEE_QR_OUTPUT_DIR = Path(__file__).resolve().parents[1] / "generated" / "employee_qrs"
 QR_ICON_DIR = Path(__file__).resolve().parents[1] / "assets" / "qr_icons"
 
 
@@ -30,6 +31,11 @@ class QrGenerator:
         CLIENT_QR_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         return CLIENT_QR_OUTPUT_DIR
 
+    @staticmethod
+    def employee_output_dir() -> Path:
+        EMPLOYEE_QR_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        return EMPLOYEE_QR_OUTPUT_DIR
+
     @classmethod
     def path_for_variant(cls, variante: Variante) -> Path:
         return cls.output_dir() / f"{variante.sku}.png"
@@ -42,9 +48,7 @@ class QrGenerator:
     def generate_for_variant(cls, variante: Variante) -> Path:
         output_path = cls.path_for_variant(variante)
         qr_image = cls._build_qr_image(str(variante.sku))
-        icon_path = cls.icon_path_for_variant(variante)
-        if icon_path is not None:
-            qr_image = cls._embed_center_icon(qr_image, icon_path)
+        qr_image = cls._build_variant_qr_image(variante, qr_image=qr_image)
         qr_image.save(output_path)
         return output_path
 
@@ -74,6 +78,47 @@ class QrGenerator:
         qr_image = cls._build_qr_image(str(cliente.codigo_cliente))
         qr_image.save(output_path)
         return output_path
+
+    @classmethod
+    def path_for_employee(cls, employee: Empleada) -> Path:
+        return cls.employee_output_dir() / f"{employee.codigo}.png"
+
+    @classmethod
+    def exists_for_employee(cls, employee: Empleada) -> bool:
+        return cls.path_for_employee(employee).exists()
+
+    @classmethod
+    def generate_for_employee(cls, employee: Empleada) -> Path:
+        output_path = cls.path_for_employee(employee)
+        qr_image = cls._build_qr_image(f"EMP:{employee.codigo}")
+        qr_image = cls._build_employee_qr_image(qr_image)
+        qr_image.save(output_path)
+        return output_path
+
+    @classmethod
+    def _build_employee_qr_image(cls, qr_image: Image.Image) -> Image.Image:
+        try:
+            employee_icon_path = QR_ICON_DIR / "default.png"
+            if employee_icon_path.exists():
+                return cls._embed_center_icon(qr_image, employee_icon_path)
+            icon_image = cls._build_employee_monogram_icon()
+            return cls._embed_center_badge_image(qr_image, icon_image)
+        except Exception:
+            return qr_image
+
+    @classmethod
+    def _build_variant_qr_image(cls, variante: Variante, *, qr_image: Image.Image | None = None) -> Image.Image:
+        """Genera la imagen QR final de variante sin reventar si falla el icono central."""
+        if qr_image is None:
+            qr_image = cls._build_qr_image(str(variante.sku))
+
+        try:
+            icon_path = cls.icon_path_for_variant(variante)
+            if icon_path is not None:
+                return cls._embed_center_icon(qr_image, icon_path)
+        except Exception:
+            return qr_image
+        return qr_image
 
     @staticmethod
     def _build_qr_image(payload: str) -> Image.Image:
@@ -147,6 +192,11 @@ class QrGenerator:
     def _embed_center_icon(qr_image: Image.Image, icon_path: Path) -> Image.Image:
         qr_canvas = qr_image.convert("RGBA")
         icon_image = Image.open(icon_path).convert("RGBA")
+        return QrGenerator._embed_center_badge_image(qr_canvas, icon_image)
+
+    @staticmethod
+    def _embed_center_badge_image(qr_image: Image.Image, icon_image: Image.Image) -> Image.Image:
+        qr_canvas = qr_image.convert("RGBA")
         qr_side = min(qr_canvas.size)
         icon_side = max(56, int(qr_side * 0.18))
         badge_side = int(icon_side * 1.42)
@@ -169,3 +219,51 @@ class QrGenerator:
         center_y = (qr_canvas.height - badge_side) // 2
         qr_canvas.alpha_composite(badge, (center_x, center_y))
         return qr_canvas
+
+    @staticmethod
+    def _build_employee_monogram_icon() -> Image.Image:
+        icon_side = 160
+        icon = Image.new("RGBA", (icon_side, icon_side), (0, 0, 0, 0))
+        draw = ImageDraw.Draw(icon)
+        accent = (17, 17, 17, 255)
+        soft = (238, 232, 224, 255)
+
+        draw.rounded_rectangle(
+            (8, 8, icon_side - 8, icon_side - 8),
+            radius=34,
+            fill=soft,
+            outline=(222, 210, 196, 255),
+            width=4,
+        )
+        draw.rounded_rectangle(
+            (18, 18, icon_side - 18, icon_side - 18),
+            radius=26,
+            outline=(17, 17, 17, 46),
+            width=2,
+        )
+
+        font = QrGenerator._load_employee_monogram_font(94)
+        draw.text(
+            (icon_side // 2, icon_side // 2 + 2),
+            "M",
+            anchor="mm",
+            font=font,
+            fill=accent,
+        )
+        return icon
+
+    @staticmethod
+    def _load_employee_monogram_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+        candidates = [
+            "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+            "/System/Library/Fonts/Supplemental/Helvetica.ttc",
+            "/Library/Fonts/Arial Bold.ttf",
+        ]
+        for candidate in candidates:
+            path = Path(candidate)
+            if path.exists():
+                try:
+                    return ImageFont.truetype(str(path), size=size)
+                except Exception:
+                    continue
+        return ImageFont.load_default()

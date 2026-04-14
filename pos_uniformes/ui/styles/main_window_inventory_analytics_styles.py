@@ -6,7 +6,7 @@ from __future__ import annotations
 def build_main_window_inventory_analytics_styles() -> str:
     return """
             #inventoryTitle {
-                color: #7e3a22;
+                color: #375063;
                 font-size: 20px;
                 font-weight: 800;
                 background: transparent;
@@ -22,18 +22,18 @@ def build_main_window_inventory_analytics_styles() -> str:
                 padding: 0;
             }
             #inventoryStatusBadge {
-                background: #f6decd;
-                color: #7e3a22;
-                border: 1px solid #e1b89d;
+                background: #e7eef4;
+                color: #365164;
+                border: 1px solid #d3dfe8;
                 border-radius: 999px;
                 padding: 4px 10px;
                 font-size: 11px;
                 font-weight: 800;
             }
             #inventoryStatusBadge[tone="positive"] {
-                background: #f8dfcf;
-                color: #8f4527;
-                border: 1px solid #dfb496;
+                background: #e5f2eb;
+                color: #245241;
+                border: 1px solid #bfdccd;
             }
             #inventoryStatusBadge[tone="warning"] {
                 background: #fbf0cf;
@@ -53,18 +53,18 @@ def build_main_window_inventory_analytics_styles() -> str:
             #inventoryMetaCard, #inventoryMetaCardAlt {
                 border-radius: 14px;
                 padding: 10px 12px;
-                border: 1px solid #e4dacd;
+                border: 1px solid #d6e2ea;
                 font-weight: 600;
             }
             #inventoryMetaCard {
-                background: #faeadf;
-                color: #8a4326;
-                border: 1px solid #efccb8;
+                background: #ecf3f7;
+                color: #29485d;
+                border: 1px solid #d6e2ea;
             }
             #inventoryMetaCardAlt {
-                background: #fbf3ec;
-                color: #8c6656;
-                border: 1px solid #ecd5c5;
+                background: #f5f8fa;
+                color: #5f6c78;
+                border: 1px solid #dde6ec;
             }
             #inventoryQrCaption {
                 color: #6f665f;
@@ -74,18 +74,18 @@ def build_main_window_inventory_analytics_styles() -> str:
                 padding: 0 4px 2px 4px;
             }
             #inventoryCounterChip {
-                background: #fae9dc;
-                color: #92492a;
-                border: 1px solid #ecc7ac;
+                background: #ecf3f7;
+                color: #365164;
+                border: 1px solid #d6e2ea;
                 border-radius: 999px;
                 padding: 5px 10px;
                 font-size: 12px;
                 font-weight: 700;
             }
             #inventoryCounterChip[tone="positive"], #inventoryQrStatus[tone="positive"] {
-                background: #f8dfcf;
-                color: #8f4527;
-                border: 1px solid #dfb496;
+                background: #e5f2eb;
+                color: #245241;
+                border: 1px solid #bfdccd;
             }
             #inventoryCounterChip[tone="warning"], #inventoryQrStatus[tone="warning"] {
                 background: #fbf0cf;
@@ -112,16 +112,16 @@ def build_main_window_inventory_analytics_styles() -> str:
             #analyticsFlagCard {
                 border-radius: 14px;
                 padding: 10px 12px;
-                border: 1px solid #ecd5c5;
-                background: #fbf3ec;
-                color: #8c6656;
+                border: 1px solid #d6e2ea;
+                background: #f1f5f8;
+                color: #5a6774;
                 font-size: 13px;
                 font-weight: 800;
             }
             #analyticsFlagCard[tone="positive"] {
-                background: #f8dfcf;
-                color: #8f4527;
-                border: 1px solid #dfb496;
+                background: #e5f2eb;
+                color: #245241;
+                border: 1px solid #bfdccd;
             }
             #analyticsFlagCard[tone="warning"] {
                 background: #fbf0cf;
@@ -134,8 +134,8 @@ def build_main_window_inventory_analytics_styles() -> str:
                 border: 1px solid #dfb3aa;
             }
             #analyticsFlagCard[tone="neutral"], #analyticsFlagCard[tone="muted"] {
-                background: #fbf3ec;
-                color: #8c6656;
-                border: 1px solid #ecd5c5;
+                background: #f1f5f8;
+                color: #5a6774;
+                border: 1px solid #d6e2ea;
             }
             """

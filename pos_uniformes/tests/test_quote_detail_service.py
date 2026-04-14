@@ -29,6 +29,7 @@ class QuoteDetailServiceTests(unittest.TestCase):
                 SimpleNamespace(
                     sku_snapshot="SKU-1",
                     descripcion_snapshot="Playera",
+                    talla_snapshot="M",
                     cantidad=2,
                     precio_unitario=Decimal("175.00"),
                     subtotal_linea=Decimal("350.00"),
@@ -58,6 +59,7 @@ class QuoteDetailServiceTests(unittest.TestCase):
                     QuoteDetailLineSnapshot(
                         sku="SKU-1",
                         description="Playera",
+                        size_label="M",
                         quantity=2,
                         unit_price=Decimal("175.00"),
                         subtotal=Decimal("350.00"),

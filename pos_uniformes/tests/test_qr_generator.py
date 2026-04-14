@@ -90,6 +90,87 @@ class QrGeneratorTests(unittest.TestCase):
             self.assertNotEqual(center_pixel[:3], (255, 255, 255))
             self.assertNotEqual(center_pixel[:3], (0, 0, 0))
 
+    def test_generate_for_variant_falls_back_when_center_icon_fails(self) -> None:
+        variant = SimpleNamespace(
+            sku="SKU-777",
+            producto=SimpleNamespace(
+                tipo_prenda=SimpleNamespace(nombre="Camisa"),
+                categoria=None,
+                tipo_pieza=None,
+                atributo=None,
+                nombre_base="Camisa Escolar",
+                nombre="Camisa Escolar Blanca",
+            ),
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            output_path = temp_path / "SKU-777.png"
+            icon_path = temp_path / "camisa.png"
+            Image.new("RGBA", (120, 120), (210, 40, 40, 255)).save(icon_path)
+
+            with (
+                patch.object(QrGenerator, "path_for_variant", return_value=output_path),
+                patch.object(QrGenerator, "icon_path_for_variant", return_value=icon_path),
+                patch.object(QrGenerator, "_embed_center_icon", side_effect=OSError("asset missing")),
+            ):
+                generated = QrGenerator.generate_for_variant(variant)
+
+            self.assertEqual(generated, output_path)
+            self.assertTrue(output_path.exists())
+            image = Image.open(output_path).convert("RGBA")
+            self.assertGreater(image.width, 0)
+            self.assertGreater(image.height, 0)
+
+    def test_generate_for_employee_uses_emp_payload(self) -> None:
+        employee = SimpleNamespace(codigo="VEND-1")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "VEND-1.png"
+            fake_image = Image.new("RGBA", (20, 20), (255, 255, 255, 255))
+            with (
+                patch.object(QrGenerator, "path_for_employee", return_value=output_path),
+                patch.object(QrGenerator, "_build_qr_image", return_value=fake_image) as build_mock,
+            ):
+                generated = QrGenerator.generate_for_employee(employee)
+
+            self.assertEqual(generated, output_path)
+            build_mock.assert_called_once_with("EMP:VEND-1")
+            self.assertTrue(output_path.exists())
+
+    def test_generate_for_employee_embeds_monogram_badge(self) -> None:
+        employee = SimpleNamespace(codigo="VEND-1")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            output_path = Path(temp_dir) / "VEND-1.png"
+            with patch.object(QrGenerator, "path_for_employee", return_value=output_path):
+                generated = QrGenerator.generate_for_employee(employee)
+
+            self.assertEqual(generated, output_path)
+            self.assertTrue(output_path.exists())
+            with Image.open(output_path).convert("RGBA") as image:
+                center_pixel = image.getpixel((image.width // 2, image.height // 2))
+                self.assertNotEqual(center_pixel[:3], (255, 255, 255))
+                self.assertNotEqual(center_pixel[:3], (0, 0, 0))
+
+    def test_generate_for_employee_prefers_default_icon_asset(self) -> None:
+        employee = SimpleNamespace(codigo="VEND-1")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            output_path = temp_path / "VEND-1.png"
+            icon_dir = temp_path / "icons"
+            icon_dir.mkdir()
+            Image.new("RGBA", (128, 128), (0, 0, 0, 255)).save(icon_dir / "default.png")
+
+            with (
+                patch("pos_uniformes.utils.qr_generator.QR_ICON_DIR", icon_dir),
+                patch.object(QrGenerator, "path_for_employee", return_value=output_path),
+                patch.object(QrGenerator, "_embed_center_icon", wraps=QrGenerator._embed_center_icon) as embed_mock,
+            ):
+                generated = QrGenerator.generate_for_employee(employee)
+
+            self.assertEqual(generated, output_path)
+            self.assertTrue(output_path.exists())
+            self.assertEqual(embed_mock.call_count, 1)
+            self.assertEqual(embed_mock.call_args[0][1], icon_dir / "default.png")
+
 
 if __name__ == "__main__":
     unittest.main()

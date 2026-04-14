@@ -32,7 +32,7 @@ class CatalogTableRowHelperTests(unittest.TestCase):
         self.assertEqual(view.variant_id, 8)
         self.assertEqual(view.row_tone, "muted")
         self.assertEqual(view.stock_tone, "warning")
-        self.assertEqual(view.layaway_tone, "warning")
+        self.assertEqual(view.layaway_tone, "reserved")
         self.assertEqual(view.status_tone, "muted")
 
     def test_build_catalog_table_row_views_for_multiple_rows(self) -> None:
@@ -76,8 +76,8 @@ class CatalogTableRowHelperTests(unittest.TestCase):
         self.assertEqual(len(views), 2)
         self.assertEqual(views[0].row_tone, "danger")
         self.assertEqual(views[0].stock_tone, "danger")
-        self.assertEqual(views[1].row_tone, "reserved")
-        self.assertEqual(views[1].layaway_tone, "warning")
+        self.assertIsNone(views[1].row_tone)
+        self.assertEqual(views[1].layaway_tone, "reserved")
 
 
 if __name__ == "__main__":

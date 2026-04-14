@@ -5,10 +5,13 @@ import unittest
 from pos_uniformes.services.inventory_count_service import (
     InventoryCountRow,
     InventoryCountVariantView,
+    accumulate_inventory_count_scan,
     build_inventory_count_payload,
     build_inventory_count_row,
+    build_inventory_count_rows_from_snapshot_rows,
     build_inventory_count_summary,
     remove_inventory_count_row,
+    update_inventory_count_row_counted_stock,
     upsert_inventory_count_row,
 )
 
@@ -121,6 +124,94 @@ class InventoryCountServiceTests(unittest.TestCase):
 
         self.assertEqual(len(updated_rows), 1)
         self.assertEqual(updated_rows[0].variante_id, 2)
+
+    def test_build_inventory_count_rows_from_snapshot_rows_prefills_counted_with_system_stock(self) -> None:
+        rows = build_inventory_count_rows_from_snapshot_rows(
+            [
+                {
+                    "variante_id": 11,
+                    "sku": "SKU000011",
+                    "producto_nombre_base": "Bata",
+                    "talla": "12",
+                    "color": "Blanca",
+                    "escuela_nombre": "General",
+                    "stock_actual": 9,
+                }
+            ]
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].stock_sistema, 9)
+        self.assertEqual(rows[0].stock_contado, 9)
+        self.assertEqual(rows[0].delta, 0)
+
+    def test_build_inventory_count_rows_from_snapshot_rows_can_start_counted_at_zero(self) -> None:
+        rows = build_inventory_count_rows_from_snapshot_rows(
+            [
+                {
+                    "variante_id": 11,
+                    "sku": "SKU000011",
+                    "producto_nombre_base": "Bata",
+                    "talla": "12",
+                    "color": "Blanca",
+                    "escuela_nombre": "General",
+                    "stock_actual": 9,
+                }
+            ],
+            use_system_count_as_counted=False,
+        )
+
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].stock_sistema, 9)
+        self.assertEqual(rows[0].stock_contado, 0)
+        self.assertEqual(rows[0].delta, -9)
+
+    def test_update_inventory_count_row_counted_stock_recalculates_delta(self) -> None:
+        rows = [
+            InventoryCountRow(
+                variante_id=11,
+                sku="SKU000011",
+                producto_nombre="Bata",
+                stock_sistema=9,
+                stock_contado=9,
+                delta=0,
+            )
+        ]
+
+        updated_rows = update_inventory_count_row_counted_stock(
+            rows,
+            variante_id=11,
+            counted_stock=6,
+        )
+
+        self.assertEqual(updated_rows[0].stock_contado, 6)
+        self.assertEqual(updated_rows[0].delta, -3)
+
+    def test_accumulate_inventory_count_scan_increments_existing_variant(self) -> None:
+        variant = InventoryCountVariantView(
+            variante_id=11,
+            sku="SKU000011",
+            producto_nombre="Bata",
+            talla="12",
+            color="Blanca",
+            escuela_nombre="General",
+            stock_actual=9,
+        )
+        rows = [
+            InventoryCountRow(
+                variante_id=11,
+                sku="SKU000011",
+                producto_nombre="Bata",
+                stock_sistema=9,
+                stock_contado=1,
+                delta=-8,
+            )
+        ]
+
+        updated_rows = accumulate_inventory_count_scan(rows, variant=variant)
+
+        self.assertEqual(updated_rows[0].stock_contado, 2)
+        self.assertEqual(updated_rows[0].delta, -7)
 
 
 if __name__ == "__main__":

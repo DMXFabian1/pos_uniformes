@@ -195,6 +195,204 @@ def build_clients_settings_dialog(window: "MainWindow") -> QDialog:
     return dialog
 
 
+def build_employees_settings_dialog(window: "MainWindow") -> QDialog:
+    dialog, layout = _create_settings_dialog(
+        window,
+        "Empleadas",
+        "Administra codigos EMP y nombres visibles del equipo comercial para resolver responsable por escaneo en Caja.",
+        width=1240,
+    )
+    window.settings_employees_status_label.setObjectName("analyticsLine")
+    actions = QHBoxLayout()
+    window.settings_employees_search_input.setPlaceholderText("Buscar por codigo o nombre")
+    window.settings_employees_activity_filter_combo.clear()
+    window.settings_employees_activity_filter_combo.addItems(
+        ["Todas", "Activa hoy", "Activa 7d", "Sin actividad"]
+    )
+    window.settings_employees_activity_filter_combo.setObjectName("toolbarSecondaryButton")
+    window.settings_create_employee_button.setObjectName("toolbarPrimaryButton")
+    window.settings_update_employee_button.setObjectName("toolbarSecondaryButton")
+    window.settings_toggle_employee_button.setObjectName("toolbarGhostButton")
+    window.settings_set_employee_pin_button.setObjectName("toolbarSecondaryButton")
+    window.settings_generate_employee_qr_button.setObjectName("toolbarSecondaryButton")
+    window.settings_generate_employee_card_button.setObjectName("toolbarGhostButton")
+    window.settings_employees_search_input.textChanged.connect(window._refresh_settings_employees)
+    window.settings_employees_activity_filter_combo.currentTextChanged.connect(window._refresh_settings_employees)
+    window.settings_create_employee_button.clicked.connect(window._handle_create_employee)
+    window.settings_update_employee_button.clicked.connect(window._handle_update_employee)
+    window.settings_toggle_employee_button.clicked.connect(window._handle_toggle_employee)
+    window.settings_set_employee_pin_button.clicked.connect(window._handle_set_employee_pin)
+    window.settings_generate_employee_qr_button.clicked.connect(window._handle_generate_employee_qr)
+    window.settings_generate_employee_card_button.clicked.connect(window._handle_generate_employee_card)
+    actions.addWidget(QLabel("Buscar"))
+    actions.addWidget(window.settings_employees_search_input, 1)
+    actions.addWidget(QLabel("Actividad"))
+    actions.addWidget(window.settings_employees_activity_filter_combo)
+    actions.addWidget(window.settings_create_employee_button)
+    actions.addWidget(window.settings_update_employee_button)
+    actions.addWidget(window.settings_toggle_employee_button)
+    actions.addWidget(window.settings_set_employee_pin_button)
+    actions.addWidget(window.settings_generate_employee_qr_button)
+    actions.addWidget(window.settings_generate_employee_card_button)
+
+    window.settings_employees_table.setColumnCount(9)
+    window.settings_employees_table.setHorizontalHeaderLabels(
+        ["Codigo", "Nombre completo", "Visible", "Actividad", "PIN", "QR", "Credencial", "Estado", "Actualizado"]
+    )
+    window.settings_employees_table.setObjectName("dataTable")
+    window.settings_employees_table.verticalHeader().setVisible(False)
+    window.settings_employees_table.setSelectionBehavior(window.settings_employees_table.SelectionBehavior.SelectRows)
+    window.settings_employees_table.setAlternatingRowColors(True)
+    window.settings_employees_table.setMinimumHeight(320)
+    window.settings_employees_table.horizontalHeader().setStretchLastSection(True)
+    window.settings_employees_table.itemDoubleClicked.connect(window._handle_update_employee)
+    window.settings_employees_table.itemSelectionChanged.connect(window._refresh_settings_employee_detail)
+
+    detail_box = QGroupBox("Detalle de empleada")
+    detail_box.setObjectName("infoCard")
+    detail_layout = QVBoxLayout()
+    detail_layout.setSpacing(8)
+    window.settings_employee_detail_name_label.setObjectName("dashboardSummaryTitle")
+    window.settings_employee_detail_meta_label.setObjectName("inventoryMetaCard")
+    window.settings_employee_detail_assets_label.setObjectName("inventoryMetaCardAlt")
+    window.settings_employee_detail_today_label.setObjectName("inventoryMetaCard")
+    window.settings_employee_detail_last_sale_label.setObjectName("inventoryMetaCardAlt")
+    window.settings_employee_activity_status_label.setObjectName("subtleLine")
+    window.settings_employee_toggle_amounts_button.setObjectName("toolbarGhostButton")
+    window.settings_employee_period_combo.clear()
+    window.settings_employee_period_combo.addItems(["Hoy", "7 dias", "30 dias"])
+    window.settings_employee_period_combo.setObjectName("toolbarSecondaryButton")
+    window.settings_employee_period_combo.currentTextChanged.connect(window._refresh_settings_employee_detail)
+    window.settings_employee_toggle_amounts_button.clicked.connect(window._handle_toggle_settings_employee_amounts)
+    for label in (
+        window.settings_employee_detail_name_label,
+        window.settings_employee_detail_meta_label,
+        window.settings_employee_detail_assets_label,
+        window.settings_employee_detail_today_label,
+        window.settings_employee_detail_last_sale_label,
+        window.settings_employee_activity_status_label,
+    ):
+        label.setWordWrap(True)
+    window.settings_employee_activity_table.setColumnCount(4)
+    window.settings_employee_activity_table.setHorizontalHeaderLabels(["Dia", "Piezas", "Tickets", "Monto"])
+    window.settings_employee_activity_table.setObjectName("dataTable")
+    window.settings_employee_activity_table.verticalHeader().setVisible(False)
+    window.settings_employee_activity_table.setSelectionBehavior(
+        window.settings_employee_activity_table.SelectionBehavior.SelectRows
+    )
+    window.settings_employee_activity_table.setEditTriggers(
+        window.settings_employee_activity_table.EditTrigger.NoEditTriggers
+    )
+    window.settings_employee_activity_table.setAlternatingRowColors(True)
+    window.settings_employee_activity_table.setMinimumHeight(240)
+    window.settings_employee_activity_table.horizontalHeader().setStretchLastSection(True)
+    window.settings_employee_activity_table.itemDoubleClicked.connect(window._open_settings_employee_day_sales_dialog)
+    activity_header = QHBoxLayout()
+    activity_header.setSpacing(8)
+    activity_header.addWidget(window.settings_employee_activity_status_label, 1)
+    activity_header.addWidget(QLabel("Periodo"))
+    activity_header.addWidget(window.settings_employee_period_combo)
+    activity_header.addWidget(window.settings_employee_toggle_amounts_button)
+    detail_layout.addWidget(window.settings_employee_detail_name_label)
+    detail_layout.addWidget(window.settings_employee_detail_meta_label)
+    detail_layout.addWidget(window.settings_employee_detail_assets_label)
+    detail_layout.addWidget(window.settings_employee_detail_today_label)
+    detail_layout.addWidget(window.settings_employee_detail_last_sale_label)
+    detail_layout.addLayout(activity_header)
+    detail_layout.addWidget(window.settings_employee_activity_table, 1)
+    detail_box.setLayout(detail_layout)
+
+    content_layout = QHBoxLayout()
+    content_layout.setSpacing(12)
+    content_layout.addWidget(window.settings_employees_table, 3)
+    content_layout.addWidget(detail_box, 2)
+
+    close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+    close_buttons.rejected.connect(dialog.reject)
+    close_buttons.accepted.connect(dialog.accept)
+    layout.addWidget(window.settings_employees_status_label)
+    layout.addLayout(actions)
+    layout.addLayout(content_layout)
+    layout.addWidget(close_buttons)
+    return dialog
+
+
+def build_employee_day_sales_dialog(window: "MainWindow") -> QDialog:
+    dialog, layout = _create_settings_dialog(
+        window,
+        "Tickets del dia",
+        "Consulta los tickets confirmados acreditados a la empleada en la fecha seleccionada.",
+        width=860,
+    )
+    window.settings_employee_day_sales_status_label.setObjectName("subtleLine")
+    window.settings_employee_view_ticket_button.setObjectName("toolbarSecondaryButton")
+    window.settings_employee_view_ticket_button.clicked.connect(window._handle_view_settings_employee_day_sale_ticket)
+    window.settings_employee_day_sales_table.setColumnCount(5)
+    window.settings_employee_day_sales_table.setHorizontalHeaderLabels(
+        ["Hora", "Folio", "Cliente", "Piezas", "Total"]
+    )
+    window.settings_employee_day_sales_table.setObjectName("dataTable")
+    window.settings_employee_day_sales_table.verticalHeader().setVisible(False)
+    window.settings_employee_day_sales_table.setSelectionBehavior(
+        window.settings_employee_day_sales_table.SelectionBehavior.SelectRows
+    )
+    window.settings_employee_day_sales_table.setAlternatingRowColors(True)
+    window.settings_employee_day_sales_table.setEditTriggers(
+        window.settings_employee_day_sales_table.EditTrigger.NoEditTriggers
+    )
+    window.settings_employee_day_sales_table.horizontalHeader().setStretchLastSection(True)
+    window.settings_employee_day_sales_table.itemDoubleClicked.connect(
+        window._handle_view_settings_employee_day_sale_ticket
+    )
+    window.settings_employee_day_sales_table.itemSelectionChanged.connect(
+        window._refresh_settings_employee_day_sale_actions
+    )
+
+    actions = QHBoxLayout()
+    actions.addWidget(window.settings_employee_day_sales_status_label, 1)
+    actions.addWidget(window.settings_employee_view_ticket_button)
+
+    close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+    close_buttons.rejected.connect(dialog.reject)
+    close_buttons.accepted.connect(dialog.accept)
+    layout.addLayout(actions)
+    layout.addWidget(window.settings_employee_day_sales_table, 1)
+    layout.addWidget(close_buttons)
+    return dialog
+
+
+def build_employee_sale_detail_dialog(window: "MainWindow") -> QDialog:
+    dialog, layout = _create_settings_dialog(
+        window,
+        "Detalle de ticket",
+        "Consulta los productos incluidos en el ticket seleccionado.",
+        width=980,
+    )
+    window.settings_employee_sale_detail_status_label.setObjectName("subtleLine")
+    window.settings_employee_sale_detail_table.setColumnCount(5)
+    window.settings_employee_sale_detail_table.setHorizontalHeaderLabels(
+        ["SKU", "Producto", "Cantidad", "Precio", "Subtotal"]
+    )
+    window.settings_employee_sale_detail_table.setObjectName("dataTable")
+    window.settings_employee_sale_detail_table.verticalHeader().setVisible(False)
+    window.settings_employee_sale_detail_table.setSelectionBehavior(
+        window.settings_employee_sale_detail_table.SelectionBehavior.SelectRows
+    )
+    window.settings_employee_sale_detail_table.setAlternatingRowColors(True)
+    window.settings_employee_sale_detail_table.setEditTriggers(
+        window.settings_employee_sale_detail_table.EditTrigger.NoEditTriggers
+    )
+    window.settings_employee_sale_detail_table.horizontalHeader().setStretchLastSection(True)
+
+    close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+    close_buttons.rejected.connect(dialog.reject)
+    close_buttons.accepted.connect(dialog.accept)
+    layout.addWidget(window.settings_employee_sale_detail_status_label)
+    layout.addWidget(window.settings_employee_sale_detail_table, 1)
+    layout.addWidget(close_buttons)
+    return dialog
+
+
 def build_whatsapp_settings_dialog(window: "MainWindow") -> QDialog:
     dialog, layout = _create_settings_dialog(
         window,

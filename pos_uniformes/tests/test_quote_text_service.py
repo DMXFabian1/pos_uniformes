@@ -84,6 +84,40 @@ class QuoteTextServiceTests(unittest.TestCase):
         self.assertNotIn("Gracias por tu compra.", text)
         self.assertNotIn("Gracias por tu preferencia.", text)
 
+    def test_build_quote_text_keeps_three_piece_description_visible(self) -> None:
+        quote = SimpleNamespace(
+            folio="PRE-002",
+            estado=SimpleNamespace(value="EMITIDO"),
+            cliente_nombre="Mostrador",
+            cliente_telefono="",
+            cliente=None,
+            created_at=None,
+            vigencia_hasta=None,
+            total=Decimal("450.00"),
+            observacion="",
+            detalles=[
+                SimpleNamespace(
+                    descripcion_snapshot="Playera deportiva azul (Conjunto deportivo 3pz - Patria)",
+                    sku_snapshot="PLY-001",
+                    cantidad=1,
+                    precio_unitario=Decimal("100.00"),
+                    subtotal_linea=Decimal("100.00"),
+                ),
+                SimpleNamespace(
+                    descripcion_snapshot="Pants deportivo azul 2pz",
+                    sku_snapshot="P2-001",
+                    cantidad=1,
+                    precio_unitario=Decimal("350.00"),
+                    subtotal_linea=Decimal("350.00"),
+                ),
+            ],
+        )
+
+        text = build_quote_text(quote=quote)
+
+        self.assertIn("Playera deportiva azul (Conjunto deportivo 3pz - Patria)", text)
+        self.assertIn("PLY-001 | 1 x 100.00 = 100.00", text)
+
 
 if __name__ == "__main__":
     unittest.main()
