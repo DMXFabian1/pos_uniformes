@@ -115,6 +115,7 @@ from pos_uniformes.services.inventory_label_service import (
     InventoryLabelContext,
     load_inventory_label_context,
     render_inventory_label,
+    render_inventory_label_from_cache_row,
 )
 
 SATELLITE_SEARCH_DEBOUNCE_MS = 300
@@ -3091,7 +3092,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.share_refresh_button.setEnabled(self._selected_quote_id() is not None)
         self.kiosk_add_button.setEnabled(self.lookup_snapshot is not None and self._can_operate())
         self.catalog_add_button.setEnabled(bool(self._selected_catalog_sku()) and self._can_operate())
-        self.catalog_print_label_button.setEnabled(bool(self._selected_catalog_sku()) and not self.offline_mode)
+        self.catalog_print_label_button.setEnabled(bool(self._selected_catalog_sku()))
         self.guided_add_button.setEnabled(bool(self.guided_selected_sku) and self._can_operate())
         self.quote_qty_down_button.setEnabled(selected_quote_line)
         self.quote_qty_up_button.setEnabled(selected_quote_line)
@@ -3590,21 +3591,49 @@ class QuoteSatelliteWindow(QMainWindow):
         sku = self._selected_catalog_sku()
         if not sku:
             return
-        if self.offline_mode:
-            QMessageBox.information(
-                self,
-                "Sin conexión",
-                "La impresión de etiquetas no está disponible en modo sin conexión.",
-            )
-            return
         selected_row = next(
             (row for row in self.catalog_snapshot_rows if str(row.get("sku")) == sku), None
         )
         if selected_row is None:
             return
-        variant_id = int(selected_row["variante_id"])
+
         if not self._show_pin_dialog():
             return
+
+        if self.offline_mode:
+            # Modo offline: renderizar desde cache, sin DB
+            label_context = InventoryLabelContext(
+                variant_id=0,
+                sku=str(selected_row["sku"]),
+                product_name=str(selected_row.get("producto_nombre_base") or selected_row.get("producto_nombre") or ""),
+                talla=str(selected_row.get("talla") or ""),
+                color=str(selected_row.get("color") or ""),
+            )
+            cache_row = selected_row
+
+            def _render_label_offline(mode: str, requested_copies: int) -> "object":
+                return render_inventory_label_from_cache_row(
+                    cache_row, mode=mode, requested_copies=requested_copies
+                )
+
+            build_inventory_label_dialog(
+                self,
+                initial_context=label_context,
+                variant_ids=[0],
+                current_index=0,
+                load_context=lambda _vid: label_context,
+                render_label=_render_label_offline,
+                print_label=lambda image_path, copies, sku_val, parent: self._print_satellite_label(
+                    image_path,
+                    title=f"Etiqueta {sku_val}",
+                    copies=copies,
+                    parent=parent,
+                ),
+            )
+            return
+
+        # Modo online: cargar desde DB
+        variant_id = int(selected_row["variante_id"])
         try:
             with get_session() as session:
                 label_context = load_inventory_label_context(session, variant_id)
