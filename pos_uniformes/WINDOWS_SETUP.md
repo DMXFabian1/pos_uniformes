@@ -421,6 +421,97 @@ Por defecto:
 
 Si `pg_dump` no esta en `PATH`, instala PostgreSQL con herramientas cliente o agrega su carpeta `bin`.
 
+## 9.1. Respaldo automatico con Programador de tareas (Task Scheduler)
+
+Para que la base se respalde sola cada dia sin que nadie tenga que acordarse:
+
+### Que hace el runner automatico
+
+El script `scripts/run_scheduled_backup.py`:
+
+- genera un `.dump` con `pg_dump`
+- aplica rotacion automatica (elimina respaldos mas viejos de N dias)
+- actualiza un archivo de estado que el POS puede leer en `Configuracion > Respaldo`
+- opcionalmente copia el respaldo a una ubicacion externa (OneDrive, disco externo, etc.)
+
+### Crear la tarea en Task Scheduler
+
+Abre PowerShell como administrador y ejecuta:
+
+```powershell
+$python   = "C:\ruta\al\proyecto\pos_uniformes\.venv\Scripts\python.exe"
+$script   = "C:\ruta\al\proyecto\pos_uniformes\scripts\run_scheduled_backup.py"
+$args     = "--format custom --retention-days 14"
+
+$action   = New-ScheduledTaskAction -Execute $python -Argument "$script $args" `
+              -WorkingDirectory "C:\ruta\al\proyecto\pos_uniformes"
+
+$trigger  = New-ScheduledTaskTrigger -Daily -At "02:00"
+
+$settings = New-ScheduledTaskSettingsSet `
+              -ExecutionTimeLimit (New-TimeSpan -Hours 1) `
+              -StartWhenAvailable
+
+Register-ScheduledTask `
+  -TaskName   "POSUniformes - Respaldo automatico" `
+  -Action     $action `
+  -Trigger    $trigger `
+  -Settings   $settings `
+  -RunLevel   Highest `
+  -Force
+```
+
+Ajusta `C:\ruta\al\proyecto\pos_uniformes` a la ruta real del proyecto en esa PC.
+
+### Agregar un respaldo extra al mediodia (opcional)
+
+Si la operacion lo justifica, registra una segunda tarea con un trigger adicional:
+
+```powershell
+$trigger2 = New-ScheduledTaskTrigger -Daily -At "14:00"
+
+$action2  = New-ScheduledTaskAction -Execute $python -Argument "$script $args" `
+              -WorkingDirectory "C:\ruta\al\proyecto\pos_uniformes"
+
+Register-ScheduledTask `
+  -TaskName   "POSUniformes - Respaldo automatico mediodia" `
+  -Action     $action2 `
+  -Trigger    $trigger2 `
+  -Settings   $settings `
+  -RunLevel   Highest `
+  -Force
+```
+
+### Copiar respaldo a ubicacion externa (recomendado)
+
+Si ya tienes OneDrive, Google Drive, un NAS o un disco externo montado, agrega `--external-dir`:
+
+```powershell
+$args = "--format custom --retention-days 14 --external-dir `"C:\Users\usuario\OneDrive\RespaldosPOS`""
+```
+
+O define la variable de entorno en el sistema para no repetirla en cada tarea:
+
+```
+POS_UNIFORMES_BACKUP_EXTERNAL_DIR=C:\Users\usuario\OneDrive\RespaldosPOS
+```
+
+Regla importante: el respaldo no debe vivir solo en la misma maquina que corre PostgreSQL.
+
+### Verificar que la tarea funciona
+
+1. Abre `Programador de tareas` en Windows
+2. Busca `POSUniformes - Respaldo automatico`
+3. Haz clic derecho y elige `Ejecutar`
+4. Revisa que aparezca un `.dump` nuevo en `backups\database\`
+5. Abre el POS, ve a `Configuracion > Respaldo` y confirma que muestra el ultimo respaldo automatico
+
+### Eliminar la tarea si hace falta
+
+```powershell
+Unregister-ScheduledTask -TaskName "POSUniformes - Respaldo automatico" -Confirm:$false
+```
+
 ## 10. Sobre lector QR o pistola
 
 La app funciona si el lector emula teclado HID.
