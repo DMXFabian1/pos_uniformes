@@ -1813,31 +1813,15 @@ class QuoteSatelliteWindow(QMainWindow):
             save_catalog_cache(self.catalog_snapshot_rows)
         except Exception:  # noqa: BLE001
             pass  # Un fallo al guardar cache no debe interrumpir el flujo normal.
-        selected_level = str(self.catalog_level_combo.currentData() or "")
+        self._rebuild_catalog_level_combo()
 
     def _refresh_catalog_snapshot_from_cache(self) -> None:
         """Sincroniza el combo de niveles desde el cache local (sin DB)."""
+        self._rebuild_catalog_level_combo()
+
+    def _rebuild_catalog_level_combo(self) -> None:
+        """Reconstruye el combo de niveles a partir de catalog_snapshot_rows."""
         selected_level = str(self.catalog_level_combo.currentData() or "")
-        level_options = sorted(
-            {
-                str(row["nivel_educativo_nombre"]).strip()
-                for row in self.catalog_snapshot_rows
-                if str(row.get("nivel_educativo_nombre", "")).strip()
-                and str(row["nivel_educativo_nombre"]).strip() != "Sin nivel"
-            }
-        )
-        self.catalog_level_combo.blockSignals(True)
-        self.catalog_level_combo.clear()
-        self.catalog_level_combo.addItem("Todos los niveles", "")
-        for level_name in level_options:
-            self.catalog_level_combo.addItem(_level_icon(level_name), level_name, level_name)
-        if selected_level:
-            for index in range(self.catalog_level_combo.count()):
-                if str(self.catalog_level_combo.itemData(index) or "") == selected_level:
-                    self.catalog_level_combo.setCurrentIndex(index)
-                    break
-        self.catalog_level_combo.blockSignals(False)
-        self._refresh_catalog_school_options(selected_level=selected_level)
         level_options = sorted(
             {
                 str(row["nivel_educativo_nombre"]).strip()
@@ -2559,20 +2543,58 @@ class QuoteSatelliteWindow(QMainWindow):
             QMessageBox.warning(self, "SKU faltante", "Escanea o captura un SKU para consultarlo.")
             return
         try:
-            with get_session() as session:
-                snapshot = load_quote_kiosk_lookup_snapshot(session, sku=sku)
+            if self.offline_mode:
+                snapshot = self._kiosk_lookup_from_cache(sku)
+            else:
+                with get_session() as session:
+                    snapshot = load_quote_kiosk_lookup_snapshot(session, sku=sku)
             self.lookup_snapshot = snapshot
             self.lookup_history = push_quote_kiosk_recent_scan(self.lookup_history, snapshot)
             self._apply_lookup_view(build_quote_kiosk_lookup_view(snapshot))
             self._refresh_recent_lookup_table()
             self.kiosk_scan_input.clear()
-            self._set_status(f"{snapshot.sku} listo para presupuesto.")
+            self._set_status(f"{snapshot.sku} — precio del catalogo guardado.")
         except Exception as exc:  # noqa: BLE001
             self.lookup_snapshot = None
             self._apply_lookup_view(build_error_quote_kiosk_lookup_view(str(exc)))
             QMessageBox.warning(self, "Consulta no disponible", str(exc))
         self._apply_action_state()
         self.kiosk_scan_input.setFocus()
+
+    def _kiosk_lookup_from_cache(self, sku: str) -> "QuoteKioskLookupSnapshot":
+        """Construye el snapshot del kiosko buscando en catalog_snapshot_rows (sin DB)."""
+        from decimal import Decimal as _Decimal
+
+        normalized = sku.strip().upper()
+        row = next(
+            (
+                r for r in self.catalog_snapshot_rows
+                if str(r.get("sku", "")).strip().upper() == normalized
+            ),
+            None,
+        )
+        if row is None:
+            raise ValueError(f"No existe una presentacion activa para el SKU '{normalized}' en el catalogo guardado.")
+        if not row.get("producto_activo") or not row.get("variante_activo"):
+            raise ValueError(f"El SKU '{normalized}' esta inactivo en el catalogo guardado.")
+
+        school = str(row.get("escuela_nombre") or "General")
+        if school == "General":
+            school = "General"
+        return QuoteKioskLookupSnapshot(
+            sku=normalized,
+            product_name=str(row.get("producto_nombre_base") or row.get("producto_nombre") or ""),
+            school_name=school,
+            garment_type_name=str(row.get("tipo_prenda_nombre") or "Sin tipo de prenda"),
+            piece_type_name=str(row.get("tipo_pieza_nombre") or "Sin tipo de pieza"),
+            size_label=str(row.get("talla") or ""),
+            color_label=str(row.get("color") or ""),
+            price=_Decimal(str(row.get("precio_venta") or "0")).quantize(_Decimal("0.01")),
+            stock_actual=int(row.get("stock_actual") or 0),
+            location_label="",
+            description_text=str(row.get("producto_descripcion") or ""),
+            origin_label="Legacy" if row.get("origen_legacy") else "Catalogo actual",
+        )
 
     def _handle_add_lookup_to_quote(self) -> None:
         if self.lookup_snapshot is None:
