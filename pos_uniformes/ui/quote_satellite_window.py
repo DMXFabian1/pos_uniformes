@@ -11,7 +11,7 @@ from uuid import uuid4
 import webbrowser
 
 from PyQt6.QtCore import QDate, QSize, QTimer, Qt
-from PyQt6.QtGui import QBrush, QColor, QIcon, QPixmap
+from PyQt6.QtGui import QBrush, QColor, QIcon, QImage, QKeySequence, QPixmap, QShortcut
 from PyQt6.QtWidgets import (
     QButtonGroup,
     QDateEdit,
@@ -110,8 +110,15 @@ from pos_uniformes.ui.styles.interactive_hover_styles import (
 )
 from pos_uniformes.ui.helpers.sale_sports_uniform_helper import restore_sports_uniform_playera_price_if_needed
 from pos_uniformes.utils.app_metadata import satellite_build_label, satellite_display_name, satellite_windows_icon_path
+from pos_uniformes.ui.dialogs.inventory_label_dialog import build_inventory_label_dialog
+from pos_uniformes.services.inventory_label_service import (
+    InventoryLabelContext,
+    load_inventory_label_context,
+    render_inventory_label,
+)
 
 SATELLITE_SEARCH_DEBOUNCE_MS = 300
+_LABEL_PRINT_PINS = {"634700", "12345"}
 SATELLITE_CATALOG_PAGE_SIZE = 25
 SATELLITE_QUOTE_VALIDITY_DAYS = 7
 
@@ -241,6 +248,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.catalog_qty_spin = QSpinBox()
         self.catalog_refresh_button = QPushButton("Refrescar")
         self.catalog_add_button = QPushButton("Agregar al presupuesto")
+        self.catalog_print_label_button = QPushButton("Imprimir etiqueta")
         self.catalog_status_label = QLabel("Sin catalogo cargado.")
         self.catalog_active_filters_wrap = QWidget()
         self.catalog_active_filters_flow_layout = None
@@ -1036,10 +1044,13 @@ class QuoteSatelliteWindow(QMainWindow):
         filters.addWidget(self.catalog_school_combo, 3)
         filters.addWidget(self.catalog_include_general_combo, 3)
 
+        self.catalog_print_label_button.setObjectName("ghostButton")
+
         search_row = QHBoxLayout()
         search_row.setSpacing(8)
         search_row.addWidget(self.catalog_search_input, 2)
         search_row.addStretch(1)
+        search_row.addWidget(self.catalog_print_label_button)
         search_row.addWidget(self.catalog_add_button)
         search_row.addWidget(self.catalog_refresh_button)
 
@@ -1764,6 +1775,10 @@ class QuoteSatelliteWindow(QMainWindow):
         self.catalog_include_general_combo.currentIndexChanged.connect(self._handle_catalog_browser_filters_changed_reset_page)
         self.catalog_table.itemSelectionChanged.connect(self._handle_catalog_selection)
         self.catalog_add_button.clicked.connect(self._handle_add_catalog_selection_to_quote)
+        self.catalog_print_label_button.clicked.connect(self._print_label_for_selected_catalog_row)
+        QShortcut(QKeySequence("Ctrl+P"), self.catalog_table).activated.connect(
+            self._print_label_for_selected_catalog_row
+        )
         self.catalog_previous_page_button.clicked.connect(self._handle_catalog_browser_previous_page)
         self.catalog_next_page_button.clicked.connect(self._handle_catalog_browser_next_page)
         self.guided_add_button.clicked.connect(self._handle_add_guided_selection_to_quote)
@@ -3076,6 +3091,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.share_refresh_button.setEnabled(self._selected_quote_id() is not None)
         self.kiosk_add_button.setEnabled(self.lookup_snapshot is not None and self._can_operate())
         self.catalog_add_button.setEnabled(bool(self._selected_catalog_sku()) and self._can_operate())
+        self.catalog_print_label_button.setEnabled(bool(self._selected_catalog_sku()) and not self.offline_mode)
         self.guided_add_button.setEnabled(bool(self.guided_selected_sku) and self._can_operate())
         self.quote_qty_down_button.setEnabled(selected_quote_line)
         self.quote_qty_up_button.setEnabled(selected_quote_line)
@@ -3430,6 +3446,203 @@ class QuoteSatelliteWindow(QMainWindow):
 
     def _set_status(self, text: str) -> None:
         self.status_label.setText(text)
+
+    # ------------------------------------------------------------------
+    # Impresion de etiquetas desde catalogo
+    # ------------------------------------------------------------------
+
+    def _create_modal_dialog(
+        self,
+        title: str,
+        helper_text: str | None = None,
+        width: int = 460,
+        *,
+        expand_to_screen: bool = False,
+    ) -> tuple[QDialog, object]:
+        from PyQt6.QtWidgets import QApplication
+        dialog = QDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.setModal(True)
+        if expand_to_screen:
+            screen = self.screen() or QApplication.primaryScreen()
+            if screen is not None:
+                available = screen.availableGeometry()
+                dialog.resize(
+                    max(width, int(available.width() * 0.94)),
+                    int(available.height() * 0.9),
+                )
+                dialog.setMinimumSize(
+                    min(max(width, int(available.width() * 0.82)), available.width()),
+                    min(int(available.height() * 0.72), available.height()),
+                )
+            else:
+                dialog.setMinimumWidth(width)
+        else:
+            dialog.setMinimumWidth(width)
+        layout = QVBoxLayout()
+        layout.setSpacing(12)
+        if helper_text:
+            helper = QLabel(helper_text)
+            helper.setWordWrap(True)
+            helper.setObjectName("subtleLine")
+            layout.addWidget(helper)
+        dialog.setLayout(layout)
+        return dialog, layout
+
+    def _show_pin_dialog(self) -> bool:
+        """Pide un PIN antes de abrir el diálogo de etiquetas. Retorna True si es válido."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("PIN requerido")
+        dialog.setModal(True)
+        dialog.setMinimumWidth(320)
+        layout = QVBoxLayout()
+        layout.setSpacing(12)
+        hint = QLabel("Ingresa el PIN para imprimir etiquetas.")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+        pin_input = QLineEdit()
+        pin_input.setEchoMode(QLineEdit.EchoMode.Password)
+        pin_input.setPlaceholderText("PIN")
+        pin_input.setMaxLength(10)
+        layout.addWidget(pin_input)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+        dialog.setLayout(layout)
+        pin_input.returnPressed.connect(dialog.accept)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return False
+        entered = pin_input.text().strip()
+        if entered not in _LABEL_PRINT_PINS:
+            QMessageBox.warning(self, "PIN incorrecto", "El PIN ingresado no es válido.")
+            return False
+        return True
+
+    def _print_satellite_label(
+        self,
+        image_path: "Path",
+        *,
+        title: str,
+        copies: int,
+        parent: "QDialog | None" = None,
+    ) -> bool:
+        image = QImage(str(image_path))
+        if image.isNull():
+            raise ValueError(f"No se pudo abrir la imagen de etiqueta:\n{image_path}")
+        if sys.platform.startswith("win"):
+            from pos_uniformes.ui.helpers.inventory_label_windows_print_helper import (
+                print_inventory_label_via_windows,
+            )
+            try:
+                with get_session() as session:
+                    from pos_uniformes.services.business_print_settings_service import load_business_print_settings_snapshot
+                    preferred_printer = load_business_print_settings_snapshot(session).preferred_printer
+            except Exception:
+                preferred_printer = ""
+            resolution = print_inventory_label_via_windows(
+                image_path,
+                sku=title.replace("Etiqueta ", "", 1),
+                copies=copies,
+                preferred_printer_name=preferred_printer,
+            )
+            if resolution.fallback_used:
+                QMessageBox.information(
+                    parent or self,
+                    "Impresora ajustada",
+                    (
+                        f'Se envió la etiqueta a "{resolution.printer_name}" '
+                        "porque la impresora preferida no estaba disponible en esta PC."
+                    ),
+                )
+            return True
+        # Fallback para macOS / Linux (entorno de desarrollo)
+        from PyQt6.QtPrintSupport import QPrintDialog, QPrinter
+        from PyQt6.QtCore import QMarginsF, QSizeF
+        from PyQt6.QtGui import QPageLayout, QPageSize
+        from pos_uniformes.ui.helpers.inventory_label_print_helper import build_inventory_label_print_layout
+        from pos_uniformes.ui.helpers.qt_image_scale_helper import normalize_printable_image
+        image = normalize_printable_image(image)
+        print_layout = build_inventory_label_print_layout(image.width(), image.height())
+        printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+        printer.setFullPage(True)
+        printer.setResolution(300)
+        printer.setPageOrientation(
+            QPageLayout.Orientation.Landscape
+            if print_layout.orientation == "landscape"
+            else QPageLayout.Orientation.Portrait
+        )
+        printer.setPageMargins(QMarginsF(0.0, 0.0, 0.0, 0.0), QPageLayout.Unit.Millimeter)
+        printer.setPageSize(
+            QPageSize(
+                QSizeF(print_layout.width_mm, print_layout.height_mm),
+                QPageSize.Unit.Millimeter,
+                "inventory-label",
+            )
+        )
+        print_dialog = QPrintDialog(printer, parent or self)
+        print_dialog.setWindowTitle(title)
+        return print_dialog.exec() == QDialog.DialogCode.Accepted
+
+    def _print_label_for_selected_catalog_row(self) -> None:
+        sku = self._selected_catalog_sku()
+        if not sku:
+            return
+        if self.offline_mode:
+            QMessageBox.information(
+                self,
+                "Sin conexión",
+                "La impresión de etiquetas no está disponible en modo sin conexión.",
+            )
+            return
+        selected_row = next(
+            (row for row in self.catalog_snapshot_rows if str(row.get("sku")) == sku), None
+        )
+        if selected_row is None:
+            return
+        variant_id = int(selected_row["variante_id"])
+        if not self._show_pin_dialog():
+            return
+        try:
+            with get_session() as session:
+                label_context = load_inventory_label_context(session, variant_id)
+        except Exception as exc:
+            QMessageBox.critical(self, "Error al cargar etiqueta", str(exc))
+            return
+
+        render_state = {"variant_id": variant_id}
+
+        def _render_label(mode: str, requested_copies: int) -> "object":
+            with get_session() as session:
+                return render_inventory_label(
+                    session,
+                    render_state["variant_id"],
+                    mode=mode,
+                    requested_copies=requested_copies,
+                )
+
+        def _load_context(vid: int) -> "InventoryLabelContext":
+            with get_session() as session:
+                ctx = load_inventory_label_context(session, vid)
+            render_state["variant_id"] = ctx.variant_id
+            return ctx
+
+        build_inventory_label_dialog(
+            self,
+            initial_context=label_context,
+            variant_ids=[variant_id],
+            current_index=0,
+            load_context=_load_context,
+            render_label=_render_label,
+            print_label=lambda image_path, copies, sku_val, parent: self._print_satellite_label(
+                image_path,
+                title=f"Etiqueta {sku_val}",
+                copies=copies,
+                parent=parent,
+            ),
+        )
 
     @staticmethod
     def _generate_quote_folio() -> str:
