@@ -12,6 +12,21 @@ Registrar mejoras propuestas por operacion o producto y ubicarlas dentro del pla
 
 ## Solicitudes abiertas
 
+### 2026-04-11
+
+#### 10. Satelite operativo de consulta con cache local futuro
+
+- Idea:
+  Consolidar la app satelite de `Presupuestos` como terminal operativa de consulta de precios y armado de presupuestos, conectada a la base real del negocio que vive en la PC principal. Despues, evaluar una capa de cache local minima para continuidad de lectura si la principal no esta disponible.
+- Estado:
+  - `2026-04-11`: validado el enfoque de producto actual: el satelite no cobra ni descuenta inventario; por ahora solo consulta catalogo/precios y arma presupuestos
+  - `2026-04-11`: decision tecnica actual: mantener a la PC principal como fuente de verdad PostgreSQL y a la satelite como cliente de red local
+  - `2026-04-11`: documentado que la siguiente mejora razonable no es una replica completa ni una sincronizacion general, sino una cache local de lectura para catalogo/precios y, en una fase posterior, borradores offline si el uso real lo justifica
+  - `2026-04-11`: documento base creado en `docs/satelite_consulta_y_cache_local.md`
+  - `2026-04-11`: anotacion de UX real en pruebas de piso: el boton `Agregar al presupuesto` necesita mas protagonismo visual o una redistribucion de la pestaña para que no quede tapado/alejado en ciertas resoluciones del satelite
+  - `2026-04-12`: nueva anotacion aceptada para la satelite: al arrancar debe intentar validar/reconstruir su configuracion de conexion automaticamente; si la principal no responde, no debe romper de inmediato, sino intentar operar con la ultima configuracion valida y entrar a `modo cache` con el ultimo snapshot local disponible de catalogo/precios
+  - `2026-04-12`: nueva anotacion de UX para kiosko/satelite: evaluar soporte tactil mas natural para scroll por arrastre en tablas/listados y superficies con inercia o gesto simple, evitando depender solo de scrollbars finos o rueda de mouse en pantallas tactiles
+
 ### 2026-04-07
 
 #### 9. Checkpoint operativo Windows y regla deportivo 3pz
@@ -39,6 +54,7 @@ Registrar mejoras propuestas por operacion o producto y ubicarlas dentro del pla
   Revisar y mejorar la experiencia de `Conteo fisico` en `Inventario`.
 - Estado:
   `2026-03-27`: `V1` construida con flujo rapido por `SKU`, lote y confirmacion final; queda pendiente validacion manual de UI y, despues, una segunda iteracion para `conteo por lote filtrado`
+  - `2026-04-11`: nueva anotacion de producto/operacion aceptada para fase futura: guardar `ultimo conteo` por `SKU` y usarlo despues para filtros y recordatorios discretos de reconteo. Decision tomada: el seguimiento debe ser `por SKU`, no por zona, y la UX no debe depender de popups invasivos. Documento base: `docs/conteo_por_sku_y_recordatorios.md`
 
 ### 2026-03-27
 
