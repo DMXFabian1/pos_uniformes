@@ -3,29 +3,28 @@
     Deja la PC satelite lista de una sola vez.
 
 .DESCRIPTION
-    Este script hace tres cosas:
+    Este script hace hasta cuatro cosas:
       1. Escribe pos_uniformes.env con la conexion a la PC principal.
       2. Prueba la conexion (avisa si no hay, no bloquea).
       3. Crea un acceso directo en el escritorio.
+      4. Opcional (-AutoStart): registra la app para que abra sola al encender la PC.
 
-    Despues de correr este script las empleadas solo necesitan hacer doble
-    clic en el acceso directo del escritorio.
-
-.EXAMPLE
-    # Instalacion tipica:
-    .\setup_satelite.ps1 `
-        -TargetDir "C:\PresupuestosSatelite\PresupuestosSatelite-2026.04.14" `
-        -DbHost    "192.168.1.10" `
-        -DbPassword "tu_password"
+    Despues de correr este script las empleadas solo necesitan encender la PC.
 
 .EXAMPLE
-    # Si el usuario de postgres no es el default:
+    # Instalacion tipica con arranque automatico:
     .\setup_satelite.ps1 `
         -TargetDir  "C:\PresupuestosSatelite\PresupuestosSatelite-2026.04.14" `
         -DbHost     "192.168.1.10" `
-        -DbUser     "pos_app" `
         -DbPassword "tu_password" `
-        -DbName     "pos_uniformes"
+        -AutoStart
+
+.EXAMPLE
+    # Sin arranque automatico:
+    .\setup_satelite.ps1 `
+        -TargetDir  "C:\PresupuestosSatelite\PresupuestosSatelite-2026.04.14" `
+        -DbHost     "192.168.1.10" `
+        -DbPassword "tu_password"
 
 .EXAMPLE
     # Solo ver que haria sin ejecutar nada:
@@ -33,7 +32,16 @@
         -TargetDir  "C:\PresupuestosSatelite\PresupuestosSatelite-2026.04.14" `
         -DbHost     "192.168.1.10" `
         -DbPassword "tu_password" `
+        -AutoStart `
         -DryRun
+
+.EXAMPLE
+    # Quitar el arranque automatico:
+    .\setup_satelite.ps1 `
+        -TargetDir  "C:\PresupuestosSatelite\PresupuestosSatelite-2026.04.14" `
+        -DbHost     "192.168.1.10" `
+        -DbPassword "tu_password" `
+        -RemoveAutoStart
 #>
 
 param(
@@ -43,14 +51,22 @@ param(
     [Parameter(Mandatory = $true)]
     [string]$DbHost,
 
-    [string]$DbPort     = "5432",
-    [string]$DbName     = "pos_uniformes",
-    [string]$DbUser     = "postgres",
+    [string]$DbPort      = "5432",
+    [string]$DbName      = "pos_uniformes",
+    [string]$DbUser      = "postgres",
 
     [Parameter(Mandatory = $true)]
     [string]$DbPassword,
 
     [string]$ShortcutName = "Presupuestos Satelite",
+
+    # Registra la app para que abra automaticamente al iniciar sesion en Windows.
+    # Usa la carpeta Startup del usuario — no requiere permisos de administrador.
+    # Se agrega un retraso de 15 segundos para que la red este lista primero.
+    [switch]$AutoStart,
+
+    # Quita el arranque automatico si ya estaba configurado.
+    [switch]$RemoveAutoStart,
 
     [switch]$DryRun
 )
@@ -77,6 +93,9 @@ function Write-Warn([string]$msg) {
 function Write-Dry([string]$msg) {
     Write-Host "  [dry-run]  $msg" -ForegroundColor DarkGray
 }
+
+$startupFolder = [Environment]::GetFolderPath("Startup")
+$startupShortcut = Join-Path $startupFolder "$ShortcutName.lnk"
 
 # ---------------------------------------------------------------------------
 # Validacion inicial
@@ -148,7 +167,7 @@ if ($DryRun) {
 
 Write-Step "Paso 3 — Crear acceso directo en el escritorio"
 
-$desktopPath = [Environment]::GetFolderPath("Desktop")
+$desktopPath  = [Environment]::GetFolderPath("Desktop")
 $shortcutPath = Join-Path $desktopPath "$ShortcutName.lnk"
 
 if ($DryRun) {
@@ -165,6 +184,57 @@ if ($DryRun) {
 }
 
 # ---------------------------------------------------------------------------
+# Paso 4 — Arranque automatico (opcional)
+# ---------------------------------------------------------------------------
+
+if ($RemoveAutoStart) {
+    Write-Step "Paso 4 — Quitar arranque automatico"
+    if ($DryRun) {
+        Write-Dry "Eliminaria $startupShortcut si existe"
+    } elseif (Test-Path $startupShortcut) {
+        Remove-Item $startupShortcut -Force
+        Write-Ok "Arranque automatico eliminado: $startupShortcut"
+    } else {
+        Write-Ok "No habia arranque automatico configurado."
+    }
+} elseif ($AutoStart) {
+    Write-Step "Paso 4 — Configurar arranque automatico al iniciar sesion"
+    Write-Host "  Metodo: carpeta Startup del usuario (no requiere administrador)" -ForegroundColor DarkGray
+    Write-Host "  Retraso: 15 segundos para que la red este lista primero" -ForegroundColor DarkGray
+
+    if ($DryRun) {
+        Write-Dry "Crearia acceso directo en Startup: $startupShortcut"
+        Write-Dry "Con retraso de 15s via wrapper VBScript"
+    } else {
+        # Crear un VBScript que espera 15s y luego lanza el exe.
+        # El retraso es importante: si la app arranca antes de que
+        # Windows conecte a la red, el probe TCP falla y abre en modo
+        # offline aunque la PC principal este encendida.
+        $wrapperPath = Join-Path $TargetDir "iniciar_satelite.vbs"
+        $wrapperContent = @"
+WScript.Sleep 15000
+Set oShell = CreateObject("WScript.Shell")
+oShell.Run """$($exe.FullName)""", 1, False
+"@
+        Set-Content -Path $wrapperPath -Value $wrapperContent -Encoding ascii
+
+        $shell2   = New-Object -ComObject WScript.Shell
+        $shortcut2 = $shell2.CreateShortcut($startupShortcut)
+        $shortcut2.TargetPath       = "wscript.exe"
+        $shortcut2.Arguments        = """$wrapperPath"""
+        $shortcut2.WorkingDirectory = $TargetDir
+        $shortcut2.Description      = "Presupuestos Satelite — arranque automatico"
+        $shortcut2.Save()
+
+        Write-Ok "Arranque automatico configurado: $startupShortcut"
+        Write-Ok "Wrapper creado: $wrapperPath"
+    }
+} else {
+    Write-Step "Paso 4 — Arranque automatico"
+    Write-Host "  Omitido. Usa -AutoStart para configurarlo." -ForegroundColor DarkGray
+}
+
+# ---------------------------------------------------------------------------
 # Resumen
 # ---------------------------------------------------------------------------
 
@@ -175,8 +245,12 @@ if ($DryRun) {
 } else {
     Write-Host "  Satelite listo." -ForegroundColor Green
     Write-Host ""
-    Write-Host "  La empleada solo necesita hacer doble clic en:" -ForegroundColor White
-    Write-Host "    $shortcutPath" -ForegroundColor White
+    if ($AutoStart) {
+        Write-Host "  La app abrira sola 15 segundos despues de que la empleada inicie sesion." -ForegroundColor White
+    } else {
+        Write-Host "  La empleada solo necesita hacer doble clic en:" -ForegroundColor White
+        Write-Host "    $shortcutPath" -ForegroundColor White
+    }
     Write-Host ""
     Write-Host "  Si la PC principal esta encendida: abre normal." -ForegroundColor DarkGray
     Write-Host "  Si la PC principal esta apagada:   abre con catalogo guardado." -ForegroundColor DarkGray
