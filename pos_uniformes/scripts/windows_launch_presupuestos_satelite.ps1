@@ -56,16 +56,12 @@ Write-Host "ENV listo: $envFile" -ForegroundColor Green
 Write-Step "2. Probando conexion con la PC principal"
 $connection = Test-NetConnection $DbHost -Port ([int]$DbPort) -WarningAction SilentlyContinue
 if (-not $connection.TcpTestSucceeded) {
-    Write-Host "No fue posible conectar con $DbHost`:$DbPort" -ForegroundColor Red
-    Write-Host "Revisa estos puntos antes de abrir la app:" -ForegroundColor Yellow
-    Write-Host "- La PC principal debe estar encendida."
-    Write-Host "- Ambas PCs deben estar en la misma red."
-    Write-Host "- PostgreSQL debe seguir aceptando conexiones remotas."
-    Write-Host "- SourceAddress actual: $($connection.SourceAddress)"
-    exit 1
+    Write-Host "Aviso: no se pudo conectar con $DbHost`:$DbPort" -ForegroundColor Yellow
+    Write-Host "La app abrira en modo local si hay un catalogo guardado." -ForegroundColor Yellow
+    Write-Host "Si es la primera vez que usas esta PC satelite, enciende la PC principal primero." -ForegroundColor Yellow
+} else {
+    Write-Host "Conexion OK hacia $DbHost`:$DbPort" -ForegroundColor Green
 }
-
-Write-Host "Conexion OK hacia $DbHost`:$DbPort" -ForegroundColor Green
 
 Write-Step "3. Abriendo la app satelite"
 Start-Process -FilePath $exe.FullName
