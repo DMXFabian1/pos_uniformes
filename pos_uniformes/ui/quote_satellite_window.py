@@ -209,6 +209,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.quick_scan_input = QLineEdit()
         self.quick_scan_button = QPushButton("Escanear")
         self.refresh_button = QPushButton("Refrescar")
+        self.exit_button = QPushButton("Salir")
         self.page_stack = QStackedWidget()
         self.nav_button_group = QButtonGroup(self)
         self.nav_kiosk_button = QPushButton("Kiosko")
@@ -425,6 +426,19 @@ class QuoteSatelliteWindow(QMainWindow):
                 color: #1f1c19;
                 font-family: "Avenir Next", "Helvetica Neue", sans-serif;
                 font-size: 14px;
+            }
+            QPushButton#exitButton {
+                background: transparent;
+                color: rgba(255, 255, 255, 0.55);
+                border: 1px solid rgba(255, 255, 255, 0.25);
+                border-radius: 8px;
+                padding: 6px 14px;
+                font-size: 12px;
+            }
+            QPushButton#exitButton:hover {
+                background: rgba(255, 255, 255, 0.12);
+                color: rgba(255, 255, 255, 0.85);
+                border-color: rgba(255, 255, 255, 0.45);
             }
             QLabel#offlineBanner {
                 background: #f5c842;
@@ -833,7 +847,9 @@ class QuoteSatelliteWindow(QMainWindow):
         header_layout.addLayout(title_layout, 1)
         header_layout.addWidget(self.status_label, 1, Qt.AlignmentFlag.AlignRight)
         self.refresh_button.setObjectName("secondaryButton")
+        self.exit_button.setObjectName("exitButton")
         header_layout.addWidget(self.refresh_button)
+        header_layout.addWidget(self.exit_button)
         header_card.setLayout(header_layout)
 
         content = QWidget()
@@ -1694,6 +1710,7 @@ class QuoteSatelliteWindow(QMainWindow):
 
     def _bind_events(self) -> None:
         self.refresh_button.clicked.connect(self.refresh_all)
+        self.exit_button.clicked.connect(self.close)
         self.nav_kiosk_button.clicked.connect(lambda: self._set_page("kiosk"))
         self.nav_catalog_button.clicked.connect(lambda: self._set_page("catalog"))
         self.nav_guided_button.clicked.connect(lambda: self._set_page("guided"))

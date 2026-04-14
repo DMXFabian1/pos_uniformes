@@ -99,7 +99,7 @@ def main() -> int:
             offline_catalog_cache=local_cache,
         )
 
-    window.showMaximized()
+    window.showFullScreen()
     return app.exec()
 
 
