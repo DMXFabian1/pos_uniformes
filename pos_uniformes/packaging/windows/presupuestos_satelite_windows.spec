@@ -30,6 +30,7 @@ datas += [
     (str(PROJECT_ROOT / "alembic.ini"), "pos_uniformes"),
     (str(PROJECT_ROOT / "pos_uniformes.env.example"), "."),
     (str(PROJECT_ROOT / "VERSION"), "."),
+    (str(PROJECT_ROOT / "scripts" / "setup_satelite.ps1"), "."),
 ]
 
 hiddenimports = []
