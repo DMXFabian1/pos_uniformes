@@ -174,6 +174,16 @@ def _matches_mode(*, row: dict[str, object], mode_key: str) -> bool:
     return school_name != "General" and _classify_line_type(row) in {"DEPORTIVO", "OFICIAL"}
 
 
+_LEVEL_ORDER = ["Preescolar", "Primaria", "Secundaria", "Bachillerato"]
+
+
+def _level_sort_key(name: str) -> tuple[int, str]:
+    try:
+        return (_LEVEL_ORDER.index(name), name)
+    except ValueError:
+        return (len(_LEVEL_ORDER), name)
+
+
 def _build_level_options(rows: list[dict[str, object]]) -> tuple[GuidedCatalogOption, ...]:
     counts: dict[str, int] = {}
     for row in rows:
@@ -183,7 +193,7 @@ def _build_level_options(rows: list[dict[str, object]]) -> tuple[GuidedCatalogOp
         counts[level_name] = counts.get(level_name, 0) + 1
     return tuple(
         GuidedCatalogOption(key=level_name, label=level_name, count=counts[level_name], enabled=counts[level_name] > 0)
-        for level_name in sorted(counts)
+        for level_name in sorted(counts, key=_level_sort_key)
     )
 
 
