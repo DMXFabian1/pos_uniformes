@@ -105,10 +105,7 @@ from pos_uniformes.ui.helpers.quote_satellite_filter_helper import (
 )
 from pos_uniformes.ui.helpers.quote_summary_helper import build_quote_summary_view
 from pos_uniformes.ui.helpers.quote_table_row_helper import build_quote_table_row_views
-from pos_uniformes.ui.styles.interactive_hover_styles import (
-    build_button_hover_styles,
-    build_combo_popup_hover_styles,
-)
+from pos_uniformes.ui.styles.satellite_styles import build_satellite_stylesheet
 from pos_uniformes.ui.helpers.sale_sports_uniform_helper import restore_sports_uniform_playera_price_if_needed
 from pos_uniformes.utils.app_metadata import satellite_build_label, satellite_display_name, satellite_windows_icon_path
 from pos_uniformes.ui.dialogs.inventory_label_dialog import build_inventory_label_dialog
@@ -391,498 +388,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.quote_open_share_button.setIconSize(QSize(18, 18))
 
     def _apply_styles(self) -> None:
-        combo_popup_styles = build_combo_popup_hover_styles(
-            popup_background="#fffdf8",
-            popup_color="#1f1f1b",
-            popup_border="#d8cfc3",
-            selected_background="#f4d4bb",
-            selected_color="#73341c",
-            hover_background="#a9c1d6",
-            hover_color="#0f2940",
-            selected_hover_background="#98b4cd",
-            selected_hover_color="#0b2237",
-        )
-        button_hover_styles = "\n".join(
-            (
-                build_button_hover_styles(
-                    selector="QPushButton#primaryButton",
-                    hover_background="#bb613c",
-                    hover_color="#f9f4ea",
-                ),
-                build_button_hover_styles(
-                    selector="QPushButton#secondaryButton",
-                    hover_background="#e6dccd",
-                    hover_color="#2c2a27",
-                    hover_border="#d6ccbe",
-                ),
-                build_button_hover_styles(
-                    selector="QPushButton#ghostButton",
-                    hover_background="#e6dccd",
-                    hover_color="#2c2a27",
-                    hover_border="#d6ccbe",
-                ),
-                build_button_hover_styles(
-                    selector="QPushButton#dangerButton",
-                    hover_background="#ecd1ca",
-                    hover_color="#7e2f1f",
-                    hover_border="#d9b4ab",
-                ),
-                build_button_hover_styles(
-                    selector="QPushButton#navButton",
-                    hover_background="#e6dccd",
-                    hover_color="#2c2a27",
-                    hover_border="#d6ccbe",
-                ),
-                build_button_hover_styles(
-                    selector="QPushButton#guidedChoiceButton",
-                    hover_background="#e6dccd",
-                    hover_color="#2c2a27",
-                    hover_border="#d6ccbe",
-                ),
-                build_button_hover_styles(
-                    selector="QPushButton#guidedProductButton",
-                    hover_background="#e6dccd",
-                    hover_color="#2c2a27",
-                    hover_border="#d6ccbe",
-                ),
-                build_button_hover_styles(
-                    selector="QPushButton#sidebarItemRemoveButton",
-                    hover_background="#ead8c9",
-                    hover_color="#73341c",
-                    hover_border="#d3bca8",
-                ),
-            )
-        )
-        self.setStyleSheet(
-            "\n".join(
-                [
-                    """
-            QMainWindow {
-                background: #f3efe8;
-                color: #1f1c19;
-                font-family: "Avenir Next", "Helvetica Neue", sans-serif;
-                font-size: 14px;
-            }
-            QPushButton#exitButton {
-                background: transparent;
-                color: rgba(255, 255, 255, 0.55);
-                border: 1px solid rgba(255, 255, 255, 0.25);
-                border-radius: 8px;
-                padding: 6px 14px;
-                font-size: 12px;
-            }
-            QPushButton#exitButton:hover {
-                background: rgba(255, 255, 255, 0.12);
-                color: rgba(255, 255, 255, 0.85);
-                border-color: rgba(255, 255, 255, 0.45);
-            }
-            QLabel#offlineBanner {
-                background: #f5c842;
-                color: #3d2600;
-                font-size: 13px;
-                font-weight: 600;
-                padding: 8px 14px;
-                border-radius: 8px;
-            }
-            QGroupBox {
-                border: 1px solid #dce5eb;
-                border-radius: 16px;
-                margin-top: 10px;
-                padding-top: 6px;
-                background: #fbf8f2;
-                font-weight: 700;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                left: 12px;
-                padding: 0 6px;
-                color: #87492c;
-            }
-            QFrame#guidedStepsCard {
-                border: 1px solid #dce5eb;
-                border-radius: 16px;
-                background: #fbf8f2;
-            }
-            QFrame#satHeaderCard {
-                background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #6f331d, stop:0.55 #a84f2d, stop:1 #c96a35);
-                border: 1px solid rgba(255, 255, 255, 0.08);
-                border-radius: 18px;
-            }
-            QFrame#satTotalsCard {
-                background: #fbf8f2;
-                border: 1px solid #dce5eb;
-                border-radius: 18px;
-            }
-            QFrame#satSidebarCard {
-                background: #fbf8f2;
-                border: 1px solid #dce5eb;
-                border-radius: 22px;
-            }
-            QFrame#satSidebarItemCard {
-                background: #f8f2e9;
-                border: 1px solid #e3d8ca;
-                border-radius: 16px;
-            }
-            QLabel#satTitle {
-                font-size: 20px;
-                font-weight: 800;
-                color: #f9f4ea;
-            }
-            QLabel#satMeta {
-                color: #f6ddca;
-                font-size: 12px;
-            }
-            QLabel#satFieldLabel {
-                color: #7a6d60;
-                font-size: 12px;
-                font-weight: 800;
-                letter-spacing: 0.4px;
-                text-transform: uppercase;
-            }
-            QLabel#satPager {
-                background: #f5f8fa;
-                border: 1px solid #dce5eb;
-                border-radius: 12px;
-                padding: 5px 9px;
-                color: #5f6870;
-                font-size: 13px;
-                font-weight: 800;
-            }
-            QLabel#satStatus {
-                background: rgba(249, 244, 234, 0.09);
-                border: 1px solid rgba(249, 244, 234, 0.14);
-                border-radius: 14px;
-                padding: 8px 12px;
-                color: #f9f4ea;
-                font-weight: 700;
-            }
-            QLabel#satTotal {
-                font-size: 28px;
-                font-weight: 900;
-                color: #87492c;
-            }
-            QLabel#satSummary {
-                color: #304d60;
-                background: #f2ece3;
-                border: 1px solid #d8e2ea;
-                border-radius: 12px;
-                padding: 10px 12px;
-            }
-            QLabel#satSidebarTitle {
-                font-size: 15px;
-                font-weight: 900;
-                color: #87492c;
-            }
-            QLabel#satSidebarTotal {
-                font-size: 28px;
-                font-weight: 900;
-                color: #87492c;
-            }
-            QLabel#satSidebarSummary {
-                color: #66717b;
-                background: #f1ebe2;
-                border: 1px solid #dce5eb;
-                border-radius: 12px;
-                padding: 10px 12px;
-            }
-            QLabel#satSidebarSectionMeta {
-                color: #7a6d60;
-                font-size: 12px;
-                font-weight: 700;
-            }
-            QLabel#satSidebarItemQty {
-                background: #e6dccd;
-                color: #654e3d;
-                border-radius: 10px;
-                padding: 4px 8px;
-                font-size: 11px;
-                font-weight: 900;
-            }
-            QLabel#satSidebarItemName {
-                color: #2f2a24;
-                font-size: 13px;
-                font-weight: 800;
-            }
-            QLabel#satSidebarItemMeta {
-                color: #6f665d;
-                font-size: 12px;
-            }
-            QLabel#satSidebarItemEmpty {
-                color: #6f665d;
-                background: #f3ece3;
-                border: 1px dashed #dacdbf;
-                border-radius: 14px;
-                padding: 12px;
-            }
-            QScrollArea#satSidebarItemsScroll, QWidget#satSidebarItemsViewport, QWidget#satSidebarItemsContent {
-                background: transparent;
-                border: none;
-            }
-            QLabel#satKioskSku {
-                font-size: 26px;
-                font-weight: 900;
-                color: #2f2a24;
-            }
-            QLabel#satKioskProduct {
-                font-size: 22px;
-                font-weight: 800;
-                color: #87492c;
-            }
-            QLabel#satKioskPrice {
-                font-size: 48px;
-                font-weight: 900;
-                color: #87492c;
-            }
-            QLabel#satKioskBadge {
-                color: #2f2a24;
-                background: #e8dfd3;
-                border-radius: 12px;
-                padding: 8px 12px;
-                font-weight: 800;
-            }
-            QLabel#satKioskBody {
-                color: #66717b;
-                background: #f1ebe2;
-                border: 1px solid #dce5eb;
-                border-radius: 12px;
-                padding: 10px 12px;
-            }
-            QLabel#satDetailTitle {
-                font-size: 16px;
-                font-weight: 800;
-                color: #2f2a24;
-            }
-            QLabel#satFieldValue {
-                color: #5e574f;
-                font-size: 15px;
-                font-weight: 700;
-                padding: 6px 0;
-            }
-            QLabel#satDetailMeta {
-                color: #66717b;
-                background: #f1ebe2;
-                border: 1px solid #dce5eb;
-                border-radius: 12px;
-                padding: 10px 12px;
-            }
-            QLabel#satDetailNotes {
-                color: #5e574f;
-                background: #efe5d8;
-                border-radius: 12px;
-                padding: 10px 12px;
-            }
-            QLabel#guidedStepTitle {
-                font-size: 15px;
-                font-weight: 900;
-                color: #3d5c7a;
-                padding: 0px;
-                margin: 0px;
-            }
-            QLabel#guidedStepTitle[step="1"] { color: #2d6a8a; }
-            QLabel#guidedStepTitle[step="2"] { color: #3d7a52; }
-            QLabel#guidedStepTitle[step="3"] { color: #6a5c2d; }
-            QLabel#guidedStepTitle[step="4"] { color: #5c2d7a; }
-            QLabel#guidedStepTitle[step="5"] { color: #2d6b6b; }
-            QLabel#guidedStepTitle[step="6"] { color: #7a3d5c; }
-            QLabel#guidedStepTitle[step="7"] { color: #3d6a3d; }
-            QLabel#guidedStepHint {
-                color: #675f56;
-                font-size: 13px;
-                padding: 0px;
-                margin: 0px;
-            }
-            QLabel#guidedGroupLabel {
-                color: #5c5048;
-                font-size: 12px;
-                font-weight: 900;
-                padding: 0px;
-                margin: 0px;
-            }
-            QLabel#guidedPath {
-                color: #66717b;
-                background: transparent;
-                border: none;
-                padding: 0px;
-                margin: 0px;
-                font-weight: 700;
-                font-size: 12px;
-            }
-            QLabel#guidedGroupBoxTitle {
-                color: #87492c;
-                font-weight: 700;
-                font-size: 13px;
-                padding: 0px;
-                margin: 0px;
-            }
-            QLineEdit, QTextEdit, QDateEdit, QComboBox, QSpinBox {
-                background: #fffaf2;
-                border: 1px solid #d5c9b9;
-                border-radius: 12px;
-                padding: 8px 10px;
-                color: #1f1c19;
-            }
-            QLineEdit:hover, QTextEdit:hover, QDateEdit:hover, QComboBox:hover, QSpinBox:hover {
-                background: #f9efe7;
-                border: 1px solid #dfb496;
-            }
-            QComboBox#satFilterCombo {
-                font-weight: 700;
-                color: #2f2a24;
-                padding-left: 14px;
-            }
-            QComboBox#satFilterCombo:hover {
-                background: #e2cfbd;
-                color: #1f1b17;
-                border: 1px solid #c69367;
-            }
-            QLineEdit:focus, QTextEdit:focus, QDateEdit:focus, QComboBox:focus, QSpinBox:focus {
-                border: 2px solid #c76b39;
-            }
-            QComboBox QAbstractItemView {
-                border-radius: 10px;
-            }
-            """,
-                    combo_popup_styles,
-                    """
-            QLineEdit#satScanInput {
-                font-size: 15px;
-                font-weight: 700;
-                padding: 8px 10px;
-                min-height: 0px;
-            }
-            QPushButton {
-                border-radius: 12px;
-                padding: 9px 14px;
-                font-weight: 800;
-            }
-            QPushButton#chipButton {
-                background: #eef3f7;
-                color: #465866;
-                border: 1px solid #d7e1e8;
-                border-radius: 999px;
-                padding: 6px 10px;
-                font-size: 12px;
-                font-weight: 700;
-            }
-            QPushButton#chipButton:hover {
-                background: #dfeaf2;
-                border-color: #c5d7e4;
-                color: #314c60;
-            }
-            QPushButton#chipButton[active="true"] {
-                background: #a84f2d;
-                color: #f9f4ea;
-                border-color: #8a4326;
-            }
-            QPushButton#primaryButton {
-                background: #87492c;
-                color: #f9f4ea;
-            }
-            QPushButton#secondaryButton {
-                background: #efe4d5;
-                color: #2f2a24;
-            }
-            QPushButton#ghostButton {
-                background: #f8f1e7;
-                color: #6d6155;
-            }
-            QPushButton#dangerButton {
-                background: #b65246;
-                color: #fbf8f2;
-            }
-            QPushButton#navButton {
-                background: #f8f1e7;
-                color: #6d6155;
-                text-align: left;
-                padding: 14px 16px;
-                font-size: 15px;
-            }
-            QPushButton#sidebarItemRemoveButton {
-                background: #efe4d5;
-                color: #6c4d3a;
-                border: 1px solid #dbcbb8;
-                border-radius: 10px;
-                padding: 5px 10px;
-                font-size: 12px;
-                font-weight: 800;
-            }
-            QPushButton#navButton:checked {
-                background: #87492c;
-                color: #f9f4ea;
-            }
-            QPushButton#guidedChoiceButton, QPushButton#guidedProductButton {
-                background: #fffaf2;
-                color: #2f2a24;
-                border: 1px solid #d5c9b9;
-                text-align: left;
-                padding: 10px 12px;
-            }
-            QPushButton#guidedChoiceButton[compactChoice="true"] {
-                padding: 6px 10px;
-            }
-            QPushButton#guidedProductButton[compactCard="true"] {
-                padding: 6px 10px;
-            }
-            QPushButton#guidedChoiceButton:checked, QPushButton#guidedProductButton:checked {
-                background: #87492c;
-                color: #fbf8f2;
-                border: 1px solid #87492c;
-            }
-            QPushButton:disabled {
-                background: #e8dfd3;
-                color: #a39a90;
-            }
-            QTableWidget {
-                background: #fffaf2;
-                alternate-background-color: #f5eee5;
-                border: 1px solid #dce5eb;
-                border-radius: 12px;
-                gridline-color: #dce5eb;
-                color: #2f2a24;
-                selection-background-color: #dfb48f;
-                selection-color: #1f1c19;
-            }
-            QTableWidget::item {
-                color: #2f2a24;
-            }
-            QTableWidget::item:selected {
-                color: #1f1c19;
-            }
-            QHeaderView::section {
-                background: #efe4d5;
-                color: #304d60;
-                border: none;
-                border-bottom: 1px solid #d8e2ea;
-                padding: 8px;
-                font-weight: 800;
-            }
-            QHeaderView {
-                background: #efe4d5;
-            }
-            QTableCornerButton::section {
-                background: #efe4d5;
-                border: none;
-                border-bottom: 1px solid #d8e2ea;
-                border-right: 1px solid #d8e2ea;
-            }
-            QScrollArea#guidedScrollArea, QWidget#guidedScrollViewport {
-                background: #fbf8f2;
-                border: none;
-                border-radius: 16px;
-            }
-            QWidget#guidedGridSurface {
-                background: #fbf8f2;
-            }
-            QScrollArea#guidedPageScrollArea, QWidget#guidedPageViewport, QWidget#guidedPageSurface, QWidget#guidedPageRoot {
-                background: #f4efe7;
-                border: none;
-            }
-            """,
-                    button_hover_styles,
-                ]
-            )
-        )
+        self.setStyleSheet(build_satellite_stylesheet())
 
     def _build_ui(self) -> None:
         self.setWindowTitle(f"{satellite_display_name()} | {satellite_build_label()}")
@@ -2250,65 +1756,70 @@ class QuoteSatelliteWindow(QMainWindow):
             selected_product_key=self._gfs.product_key,
             selected_sku=self._gfs.sku,
         )
-        available_levels = {option.key for option in view.level_options}
+        if self._correct_guided_state(view):
+            return
+        self._apply_guided_view(view)
+
+    def _correct_guided_state(self, view) -> bool:
+        """Corrige selecciones obsoletas contra las opciones disponibles.
+
+        Retorna True si hizo una corrección y ya re-invocó _refresh_guided_browser.
+        """
+        available_levels = {opt.key for opt in view.level_options}
         if self._gfs.mode == "school" and self._gfs.level and self._gfs.level not in available_levels:
             self._gfs.level = ""
             self._gfs.school = ""
             self._gfs.sku = ""
             self._refresh_guided_browser()
-            return
-        available_schools = {option.key for option in view.school_options}
+            return True
+
+        available_schools = {opt.key for opt in view.school_options}
         if self._gfs.mode == "school" and self._gfs.school and self._gfs.school not in available_schools:
             self._gfs.school = ""
             self._gfs.profile = "TODOS"
             self._gfs.sku = ""
             self._refresh_guided_browser()
-            return
-        available_profiles = {option.key for option in view.profile_options}
-        if self._gfs.mode == "school" and self._gfs.gender == "OFICIAL" and self._gfs.profile not in {"", "TODOS"} and self._gfs.profile not in available_profiles:
+            return True
+
+        available_profiles = {opt.key for opt in view.profile_options}
+        if (
+            self._gfs.mode == "school"
+            and self._gfs.gender == "OFICIAL"
+            and self._gfs.profile not in {"", "TODOS"}
+            and self._gfs.profile not in available_profiles
+        ):
             self._gfs.profile = "TODOS"
             self._gfs.product_key = ""
             self._gfs.sku = ""
             self._refresh_guided_browser()
-            return
-        available_buckets = {option.key for option in view.bucket_options}
+            return True
+
+        available_buckets = {opt.key for opt in view.bucket_options}
         if self._gfs.mode == "basics" and self._gfs.bucket and self._gfs.bucket not in available_buckets:
             self._gfs.bucket = "BASICO" if "BASICO" in available_buckets else "TODOS"
             self._gfs.piece = ""
             self._gfs.product_key = ""
             self._gfs.sku = ""
             self._refresh_guided_browser()
-            return
-        available_pieces = {option.key for option in view.piece_options}
+            return True
+
+        available_pieces = {opt.key for opt in view.piece_options}
         if self._gfs.mode == "basics" and self._gfs.piece and self._gfs.piece not in available_pieces:
             self._gfs.piece = ""
             self._gfs.product_key = ""
             self._gfs.sku = ""
             self._refresh_guided_browser()
-            return
+            return True
+
+        return False
+
+    def _apply_guided_view(self, view) -> None:
+        """Aplica el view calculado a todos los widgets de la página guiada."""
         self._gfs.product_key = view.selected_product_key
         self._gfs.sku = view.selected_sku
         self.guided_status_label.setText(view.status_label)
         self.guided_path_label.setText(view.path_label)
         self.guided_empty_label.setText(view.empty_label or "Toca un producto para ver detalle.")
-        show_level = self._gfs.mode == "school"
-        show_school = self._gfs.mode == "school" and bool(self._gfs.level)
-        show_gender = self._gfs.mode == "basics" or bool(self._gfs.school)
-        show_profile = self._gfs.mode == "school" and self._gfs.gender == "OFICIAL" and bool(view.profile_options)
-        show_bucket = self._gfs.mode == "basics" and bool(view.bucket_options)
-        show_piece = self._gfs.mode == "basics" and bool(view.piece_options)
-        show_products = (self._gfs.mode == "basics" and bool(self._gfs.piece)) or (
-            self._gfs.mode == "school" and bool(self._gfs.school)
-        )
-        self.guided_level_section.setVisible(show_level)
-        self.guided_school_section.setVisible(show_school)
-
-        if self._gfs.mode == "school":
-            self.guided_gender_title_label.setText("4. Elige linea")
-            self.guided_gender_hint_label.setText("Primero separa deportivo de oficial.")
-        else:
-            self.guided_gender_title_label.setText("4. Elige tipo de uniforme")
-            self.guided_gender_hint_label.setText("Elige la linea mas cercana a lo que buscan.")
 
         self._rebuild_guided_mode_buttons()
         self._rebuild_guided_level_buttons(view.level_options)
@@ -2319,11 +1830,54 @@ class QuoteSatelliteWindow(QMainWindow):
         self._rebuild_guided_piece_buttons(view.piece_options)
         self._rebuild_guided_product_buttons(view.product_cards)
         self._rebuild_guided_variant_buttons(view.variant_options)
+
+        self._apply_guided_section_visibility(view)
+        self._apply_guided_product_section_labels(view)
+
+        if self._gfs.sku:
+            row = next(
+                (item for item in self.catalog_snapshot_rows if str(item.get("sku")) == self._gfs.sku),
+                None,
+            )
+            self._apply_guided_detail(row)
+        else:
+            self._apply_guided_detail(None)
+        self._refresh_guided_product_checks()
+        self._refresh_guided_variant_checks()
+        self._apply_action_state()
+
+    def _apply_guided_section_visibility(self, view) -> None:
+        """Muestra u oculta cada sección de pasos según el estado actual."""
+        mode = self._gfs.mode
+        show_level = mode == "school"
+        show_school = mode == "school" and bool(self._gfs.level)
+        show_gender = mode == "basics" or bool(self._gfs.school)
+        show_profile = mode == "school" and self._gfs.gender == "OFICIAL" and bool(view.profile_options)
+        show_bucket = mode == "basics" and bool(view.bucket_options)
+        show_piece = mode == "basics" and bool(view.piece_options)
+        show_products = (mode == "basics" and bool(self._gfs.piece)) or (mode == "school" and bool(self._gfs.school))
+
+        self.guided_level_section.setVisible(show_level)
+        self.guided_school_section.setVisible(show_school)
         self.guided_gender_section.setVisible(show_gender)
         self.guided_profile_section.setVisible(show_profile)
         self.guided_bucket_section.setVisible(show_bucket)
         self.guided_piece_section.setVisible(show_piece)
         self.guided_products_section.setVisible(show_products)
+
+        if mode == "school":
+            self.guided_gender_title_label.setText("4. Elige linea")
+            self.guided_gender_hint_label.setText("Primero separa deportivo de oficial.")
+        else:
+            self.guided_gender_title_label.setText("4. Elige tipo de uniforme")
+            self.guided_gender_hint_label.setText("Elige la linea mas cercana a lo que buscan.")
+
+    def _apply_guided_product_section_labels(self, view) -> None:
+        """Actualiza el título y hint de la sección de modelos según el paso activo."""
+        mode = self._gfs.mode
+        show_profile = mode == "school" and self._gfs.gender == "OFICIAL" and bool(view.profile_options)
+        show_bucket = mode == "basics" and bool(view.bucket_options)
+        show_piece = mode == "basics" and bool(view.piece_options)
         if show_piece:
             self.guided_products_title_label.setText("7. Modelos sugeridos")
             self.guided_products_hint_label.setText("Primero elige el tipo de pieza; luego toca un modelo.")
@@ -2336,17 +1890,6 @@ class QuoteSatelliteWindow(QMainWindow):
         else:
             self.guided_products_title_label.setText("5. Modelos sugeridos")
             self.guided_products_hint_label.setText("Primero toca un modelo; luego elige la variante que quieren.")
-        if self._gfs.sku:
-            row = next(
-                (item for item in self.catalog_snapshot_rows if str(item.get("sku")) == self._gfs.sku),
-                None,
-            )
-            self._apply_guided_detail(row)
-        else:
-            self._apply_guided_detail(None)
-        self._refresh_guided_product_checks()
-        self._refresh_guided_variant_checks()
-        self._apply_action_state()
 
     def _rebuild_guided_mode_buttons(self) -> None:
         definitions = (
