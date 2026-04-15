@@ -2489,7 +2489,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self._reset_quote_form()
             self._reveal_saved_quote(
                 quote_id=result.quote_id,
-                state_filter=_state_value(target_state),
+                state_filter=str(getattr(target_state, "value", target_state)).strip().upper(),
             )
             title, message = _quote_result_message(result.action_key, result.folio)
             QMessageBox.information(self, title, message)
