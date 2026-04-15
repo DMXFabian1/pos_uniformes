@@ -2636,9 +2636,11 @@ class QuoteSatelliteWindow(QMainWindow):
             QMessageBox.critical(self, "No se pudo crear", str(exc))
 
     def _prompt_quick_client_data(self) -> dict[str, str] | None:
+        from PyQt6.QtGui import QRegularExpressionValidator
+        from PyQt6.QtCore import QRegularExpression
         dialog = QDialog(self)
         dialog.setWindowTitle("Nuevo cliente rapido")
-        dialog.resize(420, 210)
+        dialog.resize(420, 230)
         layout = QVBoxLayout()
         intro = QLabel("Registra nombre y telefono para seguir con el presupuesto.")
         intro.setWordWrap(True)
@@ -2646,12 +2648,29 @@ class QuoteSatelliteWindow(QMainWindow):
         name_input = QLineEdit()
         phone_input = QLineEdit()
         name_input.setPlaceholderText("Nombre del cliente")
-        phone_input.setPlaceholderText("Telefono")
+        phone_input.setPlaceholderText("10 digitos")
+        phone_input.setMaxLength(10)
+        phone_input.setValidator(QRegularExpressionValidator(QRegularExpression(r"\d{0,10}")))
+        error_label = QLabel("")
+        error_label.setStyleSheet("color: #c0392b; font-size: 12px;")
+        error_label.setVisible(False)
         form.addRow("Nombre", name_input)
         form.addRow("Telefono", phone_input)
+        form.addRow("", error_label)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(dialog.accept)
         buttons.rejected.connect(dialog.reject)
+
+        def _try_accept() -> None:
+            digits = phone_input.text().strip()
+            if len(digits) != 10:
+                error_label.setText("El telefono debe tener exactamente 10 digitos.")
+                error_label.setVisible(True)
+                phone_input.setFocus()
+                return
+            error_label.setVisible(False)
+            dialog.accept()
+
+        buttons.accepted.connect(_try_accept)
         layout.addWidget(intro)
         layout.addLayout(form)
         layout.addWidget(buttons)
