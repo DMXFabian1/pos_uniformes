@@ -242,6 +242,8 @@ class QuoteSatelliteWindow(QMainWindow):
         # Deshabilitar pestanas que requieren base de datos
         self.nav_quote_button.setEnabled(False)
         self.nav_quote_button.setToolTip("No disponible en modo local")
+        self.nav_search_button.setEnabled(False)
+        self.nav_search_button.setToolTip("No disponible en modo local")
         self.nav_share_button.setEnabled(False)
         self.nav_share_button.setToolTip("No disponible en modo local")
         self.refresh_button.setEnabled(False)
@@ -2776,7 +2778,7 @@ class QuoteSatelliteWindow(QMainWindow):
         if quote_id is None:
             QMessageBox.warning(self, "Sin seleccion", "Selecciona un borrador para reanudarlo.")
             return
-        if self.selected_quote_state != "BORRADOR":
+        if self.selected_quote_state.strip().upper() != "BORRADOR":
             QMessageBox.warning(self, "Solo borradores", "Solo se pueden reanudar presupuestos en borrador.")
             return
         if self.quote_cart and QMessageBox.question(
@@ -2827,7 +2829,7 @@ class QuoteSatelliteWindow(QMainWindow):
         if quote_id is None:
             QMessageBox.warning(self, "Sin seleccion", "Selecciona un borrador para emitirlo.")
             return
-        if self.selected_quote_state != "BORRADOR":
+        if self.selected_quote_state.strip().upper() != "BORRADOR":
             QMessageBox.warning(self, "Solo borradores", "Solo se pueden emitir presupuestos en borrador.")
             return
         try:
