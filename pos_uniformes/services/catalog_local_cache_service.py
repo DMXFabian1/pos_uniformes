@@ -12,14 +12,14 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
 
-from pos_uniformes.utils.config import runtime_base_dir
+from pos_uniformes.utils.config import satellite_data_dir
 
 _CACHE_FILENAME = "catalog_cache.json"
 _DATA_SUBDIR = "data"
 
 
 def _cache_path() -> Path:
-    return runtime_base_dir() / _DATA_SUBDIR / _CACHE_FILENAME
+    return satellite_data_dir() / _DATA_SUBDIR / _CACHE_FILENAME
 
 
 def save_catalog_cache(rows: list[dict]) -> None:

@@ -30,6 +30,18 @@ def _appdata_config_dir() -> Path | None:
     return Path(appdata) / "PresupuestosSatelite"
 
 
+def satellite_data_dir() -> Path:
+    """Carpeta de datos del satélite (cache, etc.).
+
+    Bundle  → %APPDATA%\\PresupuestosSatelite\\  (todo contenido en AppData)
+    Dev/Mac → junto al código fuente (comportamiento anterior)
+    """
+    appdata_dir = _appdata_config_dir()
+    if appdata_dir is not None:
+        return appdata_dir
+    return runtime_base_dir()
+
+
 def _parse_env_file(path: Path, overrides: dict[str, str]) -> None:
     """Lee un archivo .env y agrega sus valores a overrides (sin sobreescribir)."""
     for raw_line in path.read_text(encoding="utf-8").splitlines():

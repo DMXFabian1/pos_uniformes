@@ -18,7 +18,7 @@ class SaveLoadRoundTripTests(unittest.TestCase):
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
-            with patch("pos_uniformes.services.catalog_local_cache_service.runtime_base_dir", return_value=tmp_path):
+            with patch("pos_uniformes.services.catalog_local_cache_service.satellite_data_dir", return_value=tmp_path):
                 from pos_uniformes.services.catalog_local_cache_service import save_catalog_cache, load_catalog_cache
                 rows = [{"sku": "ABC-001", "precio_venta": "150.00", "producto_activo": True}]
                 save_catalog_cache(rows)
@@ -29,7 +29,7 @@ class SaveLoadRoundTripTests(unittest.TestCase):
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
-            with patch("pos_uniformes.services.catalog_local_cache_service.runtime_base_dir", return_value=tmp_path):
+            with patch("pos_uniformes.services.catalog_local_cache_service.satellite_data_dir", return_value=tmp_path):
                 from pos_uniformes.services.catalog_local_cache_service import save_catalog_cache, load_catalog_cache
                 rows = [{"precio_venta": Decimal("99.99")}]
                 save_catalog_cache(rows)
@@ -40,7 +40,7 @@ class SaveLoadRoundTripTests(unittest.TestCase):
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
-            with patch("pos_uniformes.services.catalog_local_cache_service.runtime_base_dir", return_value=tmp_path):
+            with patch("pos_uniformes.services.catalog_local_cache_service.satellite_data_dir", return_value=tmp_path):
                 from pos_uniformes.services.catalog_local_cache_service import load_catalog_cache
                 result = load_catalog_cache()
         self.assertIsNone(result)
@@ -52,7 +52,7 @@ class SaveLoadRoundTripTests(unittest.TestCase):
             cache_file = tmp_path / "data" / "catalog_cache.json"
             cache_file.parent.mkdir(parents=True)
             cache_file.write_text("esto no es json valido", encoding="utf-8")
-            with patch("pos_uniformes.services.catalog_local_cache_service.runtime_base_dir", return_value=tmp_path):
+            with patch("pos_uniformes.services.catalog_local_cache_service.satellite_data_dir", return_value=tmp_path):
                 from pos_uniformes.services.catalog_local_cache_service import load_catalog_cache
                 result = load_catalog_cache()
         self.assertIsNone(result)
@@ -64,7 +64,7 @@ class SaveLoadRoundTripTests(unittest.TestCase):
             cache_file = tmp_path / "data" / "catalog_cache.json"
             cache_file.parent.mkdir(parents=True)
             cache_file.write_text(json.dumps({"saved_at": "2026-04-14T00:00:00+00:00"}), encoding="utf-8")
-            with patch("pos_uniformes.services.catalog_local_cache_service.runtime_base_dir", return_value=tmp_path):
+            with patch("pos_uniformes.services.catalog_local_cache_service.satellite_data_dir", return_value=tmp_path):
                 from pos_uniformes.services.catalog_local_cache_service import load_catalog_cache
                 result = load_catalog_cache()
         self.assertIsNone(result)
@@ -73,7 +73,7 @@ class SaveLoadRoundTripTests(unittest.TestCase):
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
-            with patch("pos_uniformes.services.catalog_local_cache_service.runtime_base_dir", return_value=tmp_path):
+            with patch("pos_uniformes.services.catalog_local_cache_service.satellite_data_dir", return_value=tmp_path):
                 from pos_uniformes.services.catalog_local_cache_service import save_catalog_cache, catalog_cache_saved_at
                 save_catalog_cache([{"sku": "X"}])
                 saved = catalog_cache_saved_at()
@@ -84,7 +84,7 @@ class SaveLoadRoundTripTests(unittest.TestCase):
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
-            with patch("pos_uniformes.services.catalog_local_cache_service.runtime_base_dir", return_value=tmp_path):
+            with patch("pos_uniformes.services.catalog_local_cache_service.satellite_data_dir", return_value=tmp_path):
                 from pos_uniformes.services.catalog_local_cache_service import catalog_cache_saved_at
                 result = catalog_cache_saved_at()
         self.assertIsNone(result)
@@ -93,7 +93,7 @@ class SaveLoadRoundTripTests(unittest.TestCase):
         import tempfile
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
-            with patch("pos_uniformes.services.catalog_local_cache_service.runtime_base_dir", return_value=tmp_path):
+            with patch("pos_uniformes.services.catalog_local_cache_service.satellite_data_dir", return_value=tmp_path):
                 from pos_uniformes.services.catalog_local_cache_service import save_catalog_cache
                 save_catalog_cache([])
             self.assertTrue((tmp_path / "data" / "catalog_cache.json").exists())
