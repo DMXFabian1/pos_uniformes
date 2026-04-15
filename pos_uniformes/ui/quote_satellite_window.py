@@ -1812,25 +1812,26 @@ class QuoteSatelliteWindow(QMainWindow):
         self._apply_guided_view(view)
 
     def _correct_guided_state(self, view) -> bool:
-        """Corrige selecciones obsoletas contra las opciones disponibles.
+        """Corrige selecciones obsoletas contra las opciones disponibles en un solo pase.
 
-        Retorna True si hizo una corrección y ya re-invocó _refresh_guided_browser.
+        Retorna True si corrigió algo y se debe re-invocar _refresh_guided_browser.
+        No recursea — resetea todo el estado inválido de una vez.
         """
+        corrected = False
+
         available_levels = {opt.key for opt in view.level_options}
         if self._gfs.mode == "school" and self._gfs.level and self._gfs.level not in available_levels:
             self._gfs.level = ""
             self._gfs.school = ""
             self._gfs.sku = ""
-            self._refresh_guided_browser()
-            return True
+            corrected = True
 
         available_schools = {opt.key for opt in view.school_options}
         if self._gfs.mode == "school" and self._gfs.school and self._gfs.school not in available_schools:
             self._gfs.school = ""
             self._gfs.profile = "TODOS"
             self._gfs.sku = ""
-            self._refresh_guided_browser()
-            return True
+            corrected = True
 
         available_profiles = {opt.key for opt in view.profile_options}
         if (
@@ -1842,8 +1843,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self._gfs.profile = "TODOS"
             self._gfs.product_key = ""
             self._gfs.sku = ""
-            self._refresh_guided_browser()
-            return True
+            corrected = True
 
         available_buckets = {opt.key for opt in view.bucket_options}
         if self._gfs.mode == "basics" and self._gfs.bucket and self._gfs.bucket not in available_buckets:
@@ -1851,18 +1851,18 @@ class QuoteSatelliteWindow(QMainWindow):
             self._gfs.piece = ""
             self._gfs.product_key = ""
             self._gfs.sku = ""
-            self._refresh_guided_browser()
-            return True
+            corrected = True
 
         available_pieces = {opt.key for opt in view.piece_options}
         if self._gfs.mode == "basics" and self._gfs.piece and self._gfs.piece not in available_pieces:
             self._gfs.piece = ""
             self._gfs.product_key = ""
             self._gfs.sku = ""
-            self._refresh_guided_browser()
-            return True
+            corrected = True
 
-        return False
+        if corrected:
+            self._refresh_guided_browser()
+        return corrected
 
     def _apply_guided_view(self, view) -> None:
         """Aplica el view calculado a todos los widgets de la página guiada."""
