@@ -14,6 +14,7 @@ import webbrowser
 from PyQt6.QtCore import QDate, QSize, QTimer, Qt
 from PyQt6.QtGui import QBrush, QColor, QIcon, QImage, QKeySequence, QPixmap, QShortcut
 from PyQt6.QtWidgets import (
+    QApplication,
     QButtonGroup,
     QDateEdit,
     QDialog,
@@ -240,14 +241,14 @@ class QuoteSatelliteWindow(QMainWindow):
         self.offline_banner.setVisible(True)
 
         # Deshabilitar pestanas que requieren base de datos
-        self.nav_quote_button.setEnabled(False)
-        self.nav_quote_button.setToolTip("No disponible en modo local")
         self.nav_search_button.setEnabled(False)
         self.nav_search_button.setToolTip("No disponible en modo local")
         self.nav_share_button.setEnabled(False)
         self.nav_share_button.setToolTip("No disponible en modo local")
         self.refresh_button.setEnabled(False)
         self.refresh_button.setToolTip("Sin conexion con la PC principal")
+        # Presupuesto: tab habilitado pero guardado a DB desactivado — emit local disponible
+        self.nav_quote_button.setToolTip("Modo local — solo emision por WhatsApp")
 
         self._reset_quote_form()
         self._apply_lookup_view(build_empty_quote_kiosk_lookup_view())
@@ -2459,10 +2460,94 @@ class QuoteSatelliteWindow(QMainWindow):
         self._set_status("Armado limpiado.")
 
     def _handle_save_quote_draft(self) -> None:
+        if self.offline_mode:
+            QMessageBox.information(
+                self,
+                "Sin conexión",
+                "El borrador requiere conexión con la PC principal.\n"
+                "Usa 'Emitir' para compartir el presupuesto por WhatsApp.",
+            )
+            return
         self._persist_quote(EstadoPresupuesto.BORRADOR)
 
     def _handle_emit_quote(self) -> None:
+        if self.offline_mode:
+            self._handle_offline_emit()
+            return
         self._persist_quote(EstadoPresupuesto.EMITIDO)
+
+    def _handle_offline_emit(self) -> None:
+        """Emite el presupuesto en modo local: genera folio y abre WhatsApp sin guardar en DB."""
+        if not self.quote_cart:
+            QMessageBox.warning(self, "Presupuesto vacio", "Agrega al menos un producto al presupuesto.")
+            return
+        client_info = self._prompt_offline_client_info()
+        if client_info is None:
+            return
+        folio = self._generate_quote_folio()
+        client_name = client_info["nombre"] or "cliente"
+        phone = client_info["telefono"]
+        cart_view = build_quote_cart_view(self.quote_cart)
+        message = _build_offline_whatsapp_message(
+            folio=folio,
+            client_name=client_name,
+            cart=self.quote_cart,
+            total=cart_view.total,
+            validity_date=self.quote_validity_input.date().toPyDate(),
+            notes=self.quote_note_input.toPlainText().strip(),
+        )
+        if phone:
+            normalized = _normalize_whatsapp_phone(phone)
+            if normalized:
+                from urllib.parse import quote as _url_quote
+                whatsapp_url = f"https://wa.me/{normalized}?text={_url_quote(message)}"
+                if webbrowser.open(whatsapp_url):
+                    self._set_status(f"Presupuesto {folio} enviado por WhatsApp (modo local).")
+                    return
+        # Fallback: show dialog with copyable message
+        dialog = QDialog(self)
+        dialog.setWindowTitle(f"Presupuesto {folio} — modo local")
+        dialog.setMinimumWidth(480)
+        layout = QVBoxLayout()
+        hint = QLabel("Copia el mensaje y envialo manualmente por WhatsApp.")
+        hint.setWordWrap(True)
+        text_area = QTextEdit()
+        text_area.setPlainText(message)
+        text_area.setReadOnly(True)
+        text_area.setMinimumHeight(220)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        copy_btn = QPushButton("Copiar mensaje")
+        copy_btn.clicked.connect(lambda: QApplication.clipboard().setText(message))
+        buttons.addButton(copy_btn, QDialogButtonBox.ButtonRole.ActionRole)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(hint)
+        layout.addWidget(text_area)
+        layout.addWidget(buttons)
+        dialog.setLayout(layout)
+        dialog.exec()
+        self._set_status(f"Presupuesto {folio} generado en modo local.")
+
+    def _prompt_offline_client_info(self) -> dict | None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Datos del cliente")
+        layout = QVBoxLayout()
+        intro = QLabel("Datos del cliente para el mensaje de WhatsApp (opcionales).")
+        intro.setWordWrap(True)
+        name_input = QLineEdit()
+        name_input.setPlaceholderText("Nombre del cliente")
+        phone_input = QLineEdit()
+        phone_input.setPlaceholderText("Telefono (ej: 521234567890)")
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(intro)
+        layout.addWidget(name_input)
+        layout.addWidget(phone_input)
+        layout.addWidget(buttons)
+        dialog.setLayout(layout)
+        if dialog.exec() != int(QDialog.DialogCode.Accepted):
+            return None
+        return {"nombre": name_input.text().strip(), "telefono": phone_input.text().strip()}
 
     def _persist_quote(self, target_state: EstadoPresupuesto) -> None:
         action_key = "save_quote" if target_state == EstadoPresupuesto.EMITIDO else "save_quote"
@@ -2764,9 +2849,9 @@ class QuoteSatelliteWindow(QMainWindow):
         self.quote_print_button.setEnabled(action_state.print_enabled)
         self.share_refresh_button.setEnabled(self._selected_quote_id() is not None)
         self.kiosk_add_button.setEnabled(self.lookup_snapshot is not None and self._can_operate())
-        self.catalog_add_button.setEnabled(bool(self._selected_catalog_sku()) and self._can_operate())
+        self.catalog_add_button.setEnabled(bool(self._selected_catalog_sku()) and self._can_build_cart())
         self.catalog_print_label_button.setEnabled(bool(self._selected_catalog_sku()))
-        self.guided_add_button.setEnabled(bool(self._gfs.sku) and self._can_operate())
+        self.guided_add_button.setEnabled(bool(self._gfs.sku) and self._can_build_cart())
         self.guided_print_label_button.setEnabled(bool(self._gfs.sku))
         self.quote_qty_down_button.setEnabled(selected_quote_line)
         self.quote_qty_up_button.setEnabled(selected_quote_line)
@@ -3212,6 +3297,12 @@ class QuoteSatelliteWindow(QMainWindow):
             return False
         return self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
 
+    def _can_build_cart(self) -> bool:
+        """Permite agregar piezas al armado incluso en modo local (sin DB)."""
+        if self.offline_mode:
+            return True
+        return self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
+
     def _set_status(self, text: str) -> None:
         self.status_label.setText(text)
 
@@ -3598,6 +3689,39 @@ def _catalog_row_icon(row: dict[str, object]) -> QPixmap:
             if token in candidate:
                 return _scaled_asset_pixmap(asset_name, 72)
     return _scaled_asset_pixmap("qr_icons/default.png", 72)
+
+
+def _build_offline_whatsapp_message(
+    *,
+    folio: str,
+    client_name: str,
+    cart: list[dict],
+    total: object,
+    validity_date: object,
+    notes: str,
+) -> str:
+    lines = [
+        f"Hola {client_name}, te compartimos tu presupuesto {folio}.",
+        "POS Uniformes",
+        f"Total estimado: ${Decimal(str(total)).quantize(Decimal('0.01'))}",
+    ]
+    if validity_date is not None:
+        try:
+            lines.append(f"Vigencia: {validity_date.strftime('%d/%m/%Y')}")
+        except Exception:  # noqa: BLE001
+            pass
+    lines.append("Piezas:")
+    for item in cart:
+        qty = int(item["cantidad"])
+        unit_price = Decimal(str(item["precio_unitario"])).quantize(Decimal("0.01"))
+        subtotal = (unit_price * qty).quantize(Decimal("0.01"))
+        description = str(item.get("producto_nombre") or item.get("sku", ""))
+        lines.append(f"- {description}")
+        lines.append(f"  SKU {item['sku']} | {qty} x {unit_price} = {subtotal}")
+    if notes:
+        lines.append(f"Observaciones: {notes}")
+    lines.append(f"Para confirmar, menciona el folio {folio}.")
+    return "\n".join(lines)
 
 
 def _normalize_whatsapp_phone(phone: str) -> str:
