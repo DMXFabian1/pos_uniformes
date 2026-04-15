@@ -118,12 +118,13 @@ Write-Ok "Carpeta: $TargetDir"
 Write-Ok "Ejecutable: $($exe.Name)"
 
 # ---------------------------------------------------------------------------
-# Paso 1 — Escribir pos_uniformes.env
+# Paso 1 — Escribir pos_uniformes.env en AppData (persiste entre updates)
 # ---------------------------------------------------------------------------
 
 Write-Step "Paso 1 — Configurar pos_uniformes.env"
 
-$envFile = Join-Path $TargetDir "pos_uniformes.env"
+$appDataDir = Join-Path $env:APPDATA "PresupuestosSatelite"
+$envFile    = Join-Path $appDataDir "pos_uniformes.env"
 $envContent = @"
 POS_UNIFORMES_DB_HOST=$DbHost
 POS_UNIFORMES_DB_PORT=$DbPort
@@ -136,10 +137,15 @@ POS_UNIFORMES_BACKUP_EXTERNAL_DIR=
 "@
 
 if ($DryRun) {
+    Write-Dry "Crearia carpeta: $appDataDir"
     Write-Dry "Escribiria $envFile con DbHost=$DbHost, DbUser=$DbUser, DbName=$DbName"
 } else {
+    if (-not (Test-Path $appDataDir)) {
+        New-Item -ItemType Directory -Path $appDataDir -Force | Out-Null
+    }
     Set-Content -Path $envFile -Value $envContent -Encoding ascii
     Write-Ok "ENV escrito: $envFile"
+    Write-Host "  (La configuracion persiste automaticamente entre updates del bundle)" -ForegroundColor DarkGray
 }
 
 # ---------------------------------------------------------------------------

@@ -20,23 +20,44 @@ def runtime_base_dir() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
-def load_runtime_env_overrides(base_dir: Path | None = None) -> dict[str, str]:
-    root = (base_dir or runtime_base_dir()).resolve()
-    overrides: dict[str, str] = {}
-    for candidate_name in ("pos_uniformes.env", ".env"):
-        candidate = root / candidate_name
-        if not candidate.exists():
+def _appdata_config_dir() -> Path | None:
+    """Carpeta de config persistente en AppData (solo cuando corre como bundle)."""
+    if not getattr(sys, "frozen", False):
+        return None
+    appdata = os.environ.get("APPDATA")
+    if not appdata:
+        return None
+    return Path(appdata) / "PresupuestosSatelite"
+
+
+def _parse_env_file(path: Path, overrides: dict[str, str]) -> None:
+    """Lee un archivo .env y agrega sus valores a overrides (sin sobreescribir)."""
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
             continue
-        for raw_line in candidate.read_text(encoding="utf-8").splitlines():
-            line = raw_line.strip()
-            if not line or line.startswith("#") or "=" not in line:
-                continue
-            key, value = line.split("=", 1)
-            normalized_key = key.strip()
-            if not normalized_key:
-                continue
-            normalized_value = value.strip().strip('"').strip("'")
-            overrides.setdefault(normalized_key, normalized_value)
+        key, value = line.split("=", 1)
+        normalized_key = key.strip()
+        if not normalized_key:
+            continue
+        overrides.setdefault(normalized_key, value.strip().strip('"').strip("'"))
+
+
+def load_runtime_env_overrides(base_dir: Path | None = None) -> dict[str, str]:
+    # Orden de búsqueda: AppData primero (persiste entre updates), luego carpeta del exe
+    search_dirs: list[Path] = []
+    appdata_dir = _appdata_config_dir()
+    if appdata_dir is not None:
+        search_dirs.append(appdata_dir)
+    search_dirs.append((base_dir or runtime_base_dir()).resolve())
+
+    overrides: dict[str, str] = {}
+    for search_dir in search_dirs:
+        for candidate_name in ("pos_uniformes.env", ".env"):
+            candidate = search_dir / candidate_name
+            if candidate.exists():
+                _parse_env_file(candidate, overrides)
+                break  # primer archivo encontrado en este directorio gana
     return overrides
 
 
