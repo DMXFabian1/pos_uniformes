@@ -468,15 +468,21 @@ class QuoteSatelliteWindow(QMainWindow):
             QGroupBox {
                 border: 1px solid #dce5eb;
                 border-radius: 16px;
-                margin-top: 12px;
-                padding-top: 12px;
+                margin-top: 10px;
+                padding-top: 6px;
                 background: #fbf8f2;
                 font-weight: 700;
             }
             QGroupBox::title {
+                subcontrol-origin: margin;
                 left: 12px;
                 padding: 0 6px;
                 color: #87492c;
+            }
+            QFrame#guidedStepsCard {
+                border: 1px solid #dce5eb;
+                border-radius: 16px;
+                background: #fbf8f2;
             }
             QFrame#satHeaderCard {
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
@@ -648,27 +654,47 @@ class QuoteSatelliteWindow(QMainWindow):
                 padding: 10px 12px;
             }
             QLabel#guidedStepTitle {
-                font-size: 16px;
+                font-size: 15px;
                 font-weight: 900;
-                color: #87492c;
+                color: #3d5c7a;
+                padding: 0px;
+                margin: 0px;
             }
+            QLabel#guidedStepTitle[step="1"] { color: #2d6a8a; }
+            QLabel#guidedStepTitle[step="2"] { color: #3d7a52; }
+            QLabel#guidedStepTitle[step="3"] { color: #6a5c2d; }
+            QLabel#guidedStepTitle[step="4"] { color: #5c2d7a; }
+            QLabel#guidedStepTitle[step="5"] { color: #2d6b6b; }
+            QLabel#guidedStepTitle[step="6"] { color: #7a3d5c; }
+            QLabel#guidedStepTitle[step="7"] { color: #3d6a3d; }
             QLabel#guidedStepHint {
                 color: #675f56;
                 font-size: 13px;
+                padding: 0px;
+                margin: 0px;
             }
             QLabel#guidedGroupLabel {
-                color: #87492c;
+                color: #5c5048;
                 font-size: 12px;
                 font-weight: 900;
-                padding-top: 2px;
+                padding: 0px;
+                margin: 0px;
             }
             QLabel#guidedPath {
                 color: #66717b;
-                background: #f1ebe2;
-                border: 1px solid #dce5eb;
-                border-radius: 12px;
-                padding: 10px 12px;
+                background: transparent;
+                border: none;
+                padding: 0px;
+                margin: 0px;
                 font-weight: 700;
+                font-size: 12px;
+            }
+            QLabel#guidedGroupBoxTitle {
+                color: #87492c;
+                font-weight: 700;
+                font-size: 13px;
+                padding: 0px;
+                margin: 0px;
             }
             QLineEdit, QTextEdit, QDateEdit, QComboBox, QSpinBox {
                 background: #fffaf2;
@@ -964,7 +990,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.sidebar_items_layout.setSpacing(8)
         self.sidebar_items_content.setLayout(self.sidebar_items_layout)
         self.sidebar_items_scroll.setWidget(self.sidebar_items_content)
-        self.sidebar_items_scroll.setMinimumHeight(320)
+        self.sidebar_items_scroll.setMinimumHeight(180)
         items_layout.addWidget(items_title)
         items_layout.addWidget(self.sidebar_items_count_label)
         items_layout.addWidget(self.sidebar_items_scroll, 1)
@@ -972,7 +998,6 @@ class QuoteSatelliteWindow(QMainWindow):
 
         layout.addWidget(budget_card)
         layout.addWidget(items_card, 1)
-        layout.addStretch()
         card.setLayout(layout)
         return card
 
@@ -1140,28 +1165,23 @@ class QuoteSatelliteWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(14)
 
-        intro_box = QGroupBox("Presupuesto guiado")
-        intro_layout = QVBoxLayout()
-        intro_layout.setSpacing(6)
-        intro_title = QLabel("Cotiza por pasos")
-        intro_title.setObjectName("guidedStepTitle")
-        intro_hint = QLabel("Elige nivel, escuela y tipo de uniforme.")
-        intro_hint.setObjectName("guidedStepHint")
-        intro_hint.setWordWrap(True)
-        self.guided_status_label.setObjectName("satStatus")
+        self.guided_status_label.setObjectName("guidedStepHint")
         self.guided_path_label.setObjectName("guidedPath")
-        intro_layout.addWidget(intro_title)
-        intro_layout.addWidget(intro_hint)
-        intro_layout.addWidget(self.guided_status_label)
-        intro_layout.addWidget(self.guided_path_label)
-        intro_box.setLayout(intro_layout)
 
-        steps_box = QGroupBox("Ruta")
+        steps_box = QFrame()
+        steps_box.setObjectName("guidedStepsCard")
+        steps_box.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         steps_layout = QVBoxLayout()
-        steps_layout.setSpacing(10)
+        steps_layout.setContentsMargins(12, 10, 12, 8)
+        steps_layout.setSpacing(4)
+        _steps_title = QLabel("Cotiza por pasos")
+        _steps_title.setObjectName("guidedGroupBoxTitle")
+        steps_layout.addWidget(_steps_title)
+        steps_layout.addWidget(self.guided_path_label)
 
         mode_title = QLabel("1. Elige una ruta")
         mode_title.setObjectName("guidedStepTitle")
+        mode_title.setProperty("step", "1")
         mode_hint = QLabel("Uniformes por escuela o piezas generales.")
         mode_hint.setObjectName("guidedStepHint")
         mode_hint.setWordWrap(True)
@@ -1177,6 +1197,7 @@ class QuoteSatelliteWindow(QMainWindow):
         level_layout.setSpacing(8)
         level_title = QLabel("2. Elige nivel")
         level_title.setObjectName("guidedStepTitle")
+        level_title.setProperty("step", "2")
         level_hint = QLabel("Solo niveles disponibles.")
         level_hint.setObjectName("guidedStepHint")
         self.guided_level_grid = QGridLayout()
@@ -1194,6 +1215,7 @@ class QuoteSatelliteWindow(QMainWindow):
         school_layout.setSpacing(8)
         school_title = QLabel("3. Elige escuela")
         school_title.setObjectName("guidedStepTitle")
+        school_title.setProperty("step", "3")
         school_hint = QLabel("Escuelas del nivel elegido.")
         school_hint.setObjectName("guidedStepHint")
         school_hint.setWordWrap(True)
@@ -1201,8 +1223,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_school_scroll = school_scroll
         school_scroll.setWidgetResizable(True)
         school_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        school_scroll.setMinimumHeight(160)
-        school_scroll.setMaximumHeight(220)
+        school_scroll.setMinimumHeight(120)
         school_scroll.setObjectName("guidedScrollArea")
         school_scroll.viewport().setObjectName("guidedScrollViewport")
         self.guided_school_container = QWidget()
@@ -1226,6 +1247,7 @@ class QuoteSatelliteWindow(QMainWindow):
         gender_section_layout.setSpacing(8)
         self.guided_gender_title_label = QLabel("4. Elige tipo de uniforme")
         self.guided_gender_title_label.setObjectName("guidedStepTitle")
+        self.guided_gender_title_label.setProperty("step", "4")
         self.guided_gender_hint_label = QLabel("Elige la linea mas cercana a lo que buscan.")
         self.guided_gender_hint_label.setObjectName("guidedStepHint")
         self.guided_gender_hint_label.setWordWrap(True)
@@ -1243,6 +1265,7 @@ class QuoteSatelliteWindow(QMainWindow):
         profile_section_layout.setSpacing(8)
         self.guided_profile_title_label = QLabel("5. Elige perfil oficial")
         self.guided_profile_title_label.setObjectName("guidedStepTitle")
+        self.guided_profile_title_label.setProperty("step", "5")
         self.guided_profile_hint_label = QLabel("Usa este paso solo para separar niña, niño o compartido.")
         self.guided_profile_hint_label.setObjectName("guidedStepHint")
         self.guided_profile_hint_label.setWordWrap(True)
@@ -1260,6 +1283,7 @@ class QuoteSatelliteWindow(QMainWindow):
         bucket_section_layout.setSpacing(8)
         self.guided_bucket_title_label = QLabel("5. Elige grupo")
         self.guided_bucket_title_label.setObjectName("guidedStepTitle")
+        self.guided_bucket_title_label.setProperty("step", "5")
         self.guided_bucket_hint_label = QLabel("Separa basicos y extras para reducir la lista.")
         self.guided_bucket_hint_label.setObjectName("guidedStepHint")
         self.guided_bucket_hint_label.setWordWrap(True)
@@ -1277,6 +1301,7 @@ class QuoteSatelliteWindow(QMainWindow):
         piece_section_layout.setSpacing(8)
         self.guided_piece_title_label = QLabel("6. Elige tipo de pieza")
         self.guided_piece_title_label.setObjectName("guidedStepTitle")
+        self.guided_piece_title_label.setProperty("step", "6")
         self.guided_piece_hint_label = QLabel("Primero elige la familia de prenda que buscan.")
         self.guided_piece_hint_label.setObjectName("guidedStepHint")
         self.guided_piece_hint_label.setWordWrap(True)
@@ -1295,6 +1320,7 @@ class QuoteSatelliteWindow(QMainWindow):
         products_section_layout.setSpacing(8)
         self.guided_products_title_label = QLabel("7. Modelos sugeridos")
         self.guided_products_title_label.setObjectName("guidedStepTitle")
+        self.guided_products_title_label.setProperty("step", "7")
         self.guided_products_hint_label = QLabel("Toca una tarjeta para elegir el modelo.")
         self.guided_products_hint_label.setObjectName("guidedStepHint")
         self.guided_products_hint_label.setWordWrap(True)
@@ -1302,7 +1328,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_product_scroll = QScrollArea()
         self.guided_product_scroll.setWidgetResizable(True)
         self.guided_product_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self.guided_product_scroll.setMinimumHeight(220)
+        self.guided_product_scroll.setMinimumHeight(160)
         self.guided_product_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self.guided_product_scroll.setObjectName("guidedScrollArea")
         self.guided_product_scroll.viewport().setObjectName("guidedScrollViewport")
@@ -1328,12 +1354,18 @@ class QuoteSatelliteWindow(QMainWindow):
         steps_layout.addLayout(guided_footer_actions)
         steps_box.setLayout(steps_layout)
 
-        detail_box = QGroupBox("Producto seleccionado")
+        detail_box = QFrame()
+        detail_box.setObjectName("guidedStepsCard")
+        detail_box.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         detail_layout = QVBoxLayout()
+        detail_layout.setContentsMargins(12, 10, 12, 8)
         detail_layout.setSpacing(8)
+        _detail_title = QLabel("Producto seleccionado")
+        _detail_title.setObjectName("guidedGroupBoxTitle")
+        detail_layout.addWidget(_detail_title)
         detail_header = QHBoxLayout()
         detail_header.setSpacing(10)
-        self.guided_visual_icon_label.setFixedSize(84, 84)
+        self.guided_visual_icon_label.setFixedSize(72, 72)
         detail_header.addWidget(self.guided_visual_icon_label, 0, Qt.AlignmentFlag.AlignTop)
         detail_text_layout = QVBoxLayout()
         self.guided_detail_title_label.setObjectName("satDetailTitle")
@@ -1356,6 +1388,8 @@ class QuoteSatelliteWindow(QMainWindow):
         variant_section_layout.addWidget(self.guided_variant_title_label)
         variant_section_layout.addLayout(self.guided_variant_groups_layout)
         self.guided_variant_section.setLayout(variant_section_layout)
+        self.guided_detail_scroll = self.guided_variant_section  # alias para compatibilidad
+
         detail_actions = QHBoxLayout()
         detail_actions.setSpacing(8)
         self.guided_qty_spin.setRange(1, 100)
@@ -1375,12 +1409,13 @@ class QuoteSatelliteWindow(QMainWindow):
         detail_layout.addLayout(detail_actions)
         detail_box.setLayout(detail_layout)
 
-        layout.addWidget(intro_box)
-        layout.addWidget(steps_box, 1)
+        layout.addWidget(steps_box)
         layout.addWidget(detail_box)
+        layout.addSpacing(160)
         content.setLayout(layout)
         scroll.setWidget(content)
-        page_layout.addWidget(scroll)
+
+        page_layout.addWidget(scroll, 1)
         page.setLayout(page_layout)
         return page
 
@@ -1786,6 +1821,9 @@ class QuoteSatelliteWindow(QMainWindow):
         QShortcut(QKeySequence("Ctrl+P"), self.catalog_table).activated.connect(
             self._print_label_for_selected_catalog_row
         )
+        _guided_ctrl_p = QShortcut(QKeySequence("Ctrl+P"), self.guided_page_scroll)
+        _guided_ctrl_p.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        _guided_ctrl_p.activated.connect(self._print_label_for_guided_selection)
         self.catalog_previous_page_button.clicked.connect(self._handle_catalog_browser_previous_page)
         self.catalog_next_page_button.clicked.connect(self._handle_catalog_browser_next_page)
         self.guided_add_button.clicked.connect(self._handle_add_guided_selection_to_quote)
@@ -2427,9 +2465,9 @@ class QuoteSatelliteWindow(QMainWindow):
         _clear_layout(self.guided_variant_groups_layout)
         self.guided_variant_buttons = {}
         if not variant_options:
-            self.guided_variant_section.setVisible(False)
+            self.guided_detail_scroll.setVisible(False)
             return
-        self.guided_variant_section.setVisible(True)
+        self.guided_detail_scroll.setVisible(True)
         current_price = None
         current_flow = None
         for option in variant_options:
@@ -2444,6 +2482,15 @@ class QuoteSatelliteWindow(QMainWindow):
             button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
             button.setChecked(self.guided_selected_sku == option.sku)
             button.clicked.connect(lambda checked=False, selected=option.sku: self._handle_guided_variant_selected(selected))
+
+            def _make_dblclick(sku, btn):
+                def _dblclick(event):
+                    self._handle_guided_variant_selected(sku)
+                    self._handle_add_guided_selection_to_quote()
+                    QPushButton.mouseDoubleClickEvent(btn, event)
+                return _dblclick
+
+            button.mouseDoubleClickEvent = _make_dblclick(option.sku, button)
             current_flow.addWidget(button)
             self.guided_variant_buttons[option.sku] = button
 
@@ -2507,13 +2554,18 @@ class QuoteSatelliteWindow(QMainWindow):
 
     def _apply_guided_detail(self, row: dict[str, object] | None) -> None:
         if row is None:
-            self.guided_visual_icon_label.setPixmap(_scaled_asset_pixmap("qr_icons/default.png", 72))
-            self.guided_detail_title_label.setText("Sin seleccion.")
-            self.guided_detail_meta_label.setText("Completa la ruta guiada y toca un producto para verlo aqui.")
-            self.guided_detail_notes_label.setText("")
-            self.guided_variant_section.setVisible(False)
+            self.guided_visual_icon_label.setPixmap(_scaled_asset_pixmap("qr_icons/default.png", 48))
+            self.guided_visual_icon_label.setFixedSize(48, 48)
+            self.guided_detail_title_label.setText("Sin seleccion — toca un modelo para verlo aqui.")
+            self.guided_detail_meta_label.setVisible(False)
+            self.guided_detail_notes_label.setVisible(False)
+            self.guided_detail_scroll.setVisible(False)
             return
+        self.guided_visual_icon_label.setFixedSize(72, 72)
         self.guided_visual_icon_label.setPixmap(_catalog_row_icon(row))
+        self.guided_detail_meta_label.setVisible(True)
+        self.guided_detail_notes_label.setVisible(False)
+        self.guided_detail_scroll.setVisible(True)
         segmento = _guided_segment_label(row)
         color_label = _guided_display_color_label(row.get("color"))
         detail_parts = [
@@ -2533,7 +2585,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_detail_title_label.setText(title)
         self.guided_detail_meta_label.setText(" | ".join(detail_parts))
         self.guided_detail_notes_label.setText(str(row.get("producto_descripcion") or "Sin descripcion adicional."))
-        self.guided_variant_section.setVisible(bool(self.guided_variant_buttons))
+        self.guided_detail_scroll.setVisible(bool(self.guided_variant_buttons))
 
     def _handle_add_guided_selection_to_quote(self) -> None:
         if not self.guided_selected_sku:
@@ -2732,6 +2784,26 @@ class QuoteSatelliteWindow(QMainWindow):
             QMessageBox.warning(self, feedback.title, feedback.message)
             return
         self._remove_quote_item_at_index(selected_row)
+
+    def _change_sidebar_item_quantity(self, row_index: int, delta: int) -> None:
+        if row_index < 0 or row_index >= len(self.quote_cart):
+            return
+        item = self.quote_cart[row_index]
+        new_qty = max(1, int(item.get("cantidad") or 1) + delta)
+        try:
+            with get_session() as session:
+                update_sale_cart_item_quantity(
+                    session,
+                    sale_cart=self.quote_cart,
+                    row_index=row_index,
+                    new_quantity=new_qty,
+                    variant_loader=PresupuestoService.obtener_variante_por_sku,
+                    stock_validator=lambda _v, _c: None,
+                )
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Cantidad no actualizada", str(exc))
+            return
+        self._refresh_quote_cart_table()
 
     def _remove_quote_item_at_index(self, row_index: int) -> None:
         if row_index < 0 or row_index >= len(self.quote_cart):
@@ -3287,23 +3359,12 @@ class QuoteSatelliteWindow(QMainWindow):
         card = QFrame()
         card.setObjectName("satSidebarItemCard")
         layout = QVBoxLayout()
-        layout.setContentsMargins(10, 10, 10, 10)
-        layout.setSpacing(6)
+        layout.setContentsMargins(10, 8, 10, 8)
+        layout.setSpacing(4)
 
         quantity = max(int(line_item.get("cantidad") or 0), 0)
-        quantity_label = QLabel(f"{quantity} pza" if quantity == 1 else f"{quantity} pzas")
-        quantity_label.setObjectName("satSidebarItemQty")
-
-        remove_button = QPushButton("Quitar")
-        remove_button.setObjectName("sidebarItemRemoveButton")
-        remove_button.clicked.connect(lambda checked=False, index=row_index: self._remove_quote_item_at_index(index))
-
-        header = QHBoxLayout()
-        header.setContentsMargins(0, 0, 0, 0)
-        header.setSpacing(6)
-        header.addWidget(quantity_label, 0, Qt.AlignmentFlag.AlignLeft)
-        header.addStretch()
-        header.addWidget(remove_button, 0, Qt.AlignmentFlag.AlignRight)
+        unit_price = Decimal(str(line_item.get("precio_unitario") or "0")).quantize(Decimal("0.01"))
+        subtotal = (unit_price * Decimal(quantity)).quantize(Decimal("0.01"))
 
         product_name = str(
             line_item.get("producto_nombre")
@@ -3311,37 +3372,145 @@ class QuoteSatelliteWindow(QMainWindow):
             or line_item.get("sku")
             or "Producto"
         )
+        talla = str(line_item.get("talla") or "").strip()
+        sku = str(line_item.get("sku") or "").strip()
+
+        # Fila superior: nombre + quitar
         name_label = QLabel(product_name)
         name_label.setObjectName("satSidebarItemName")
         name_label.setWordWrap(True)
+        remove_button = QPushButton("✕")
+        remove_button.setObjectName("sidebarItemRemoveButton")
+        remove_button.setFixedSize(26, 26)
+        remove_button.clicked.connect(lambda checked=False, index=row_index: self._remove_quote_item_at_index(index))
+        name_row = QHBoxLayout()
+        name_row.setContentsMargins(0, 0, 0, 0)
+        name_row.setSpacing(4)
+        name_row.addWidget(name_label, 1)
+        name_row.addWidget(remove_button, 0, Qt.AlignmentFlag.AlignTop)
 
-        school_name = str(line_item.get("escuela_nombre") or "General")
-        level_name = str(line_item.get("nivel_educativo_nombre") or "Sin nivel")
-        sku = str(line_item.get("sku") or "").strip()
-        unit_price = Decimal(str(line_item.get("precio_unitario") or "0")).quantize(Decimal("0.01"))
-        subtotal = (unit_price * Decimal(quantity)).quantize(Decimal("0.01"))
-        scope_parts = [school_name]
-        if level_name and level_name != "Sin nivel":
-            scope_parts.append(level_name)
-        meta_label = QLabel(" | ".join(scope_parts))
-        meta_label.setObjectName("satSidebarItemMeta")
-        meta_label.setWordWrap(True)
-
-        price_parts = [f"${subtotal}"]
+        # Fila meta: talla + sku
+        meta_parts = []
+        if talla and talla != "-":
+            meta_parts.append(f"Talla {talla}")
         if sku:
-            price_parts.append(sku)
-        if quantity > 1:
-            price_parts.append(f"${unit_price} c/u")
-        footer_label = QLabel(" | ".join(price_parts))
-        footer_label.setObjectName("satSidebarItemMeta")
-        footer_label.setWordWrap(True)
+            meta_parts.append(sku)
+        if meta_parts:
+            meta_label = QLabel(" · ".join(meta_parts))
+            meta_label.setObjectName("satSidebarItemMeta")
 
-        layout.addLayout(header)
-        layout.addWidget(name_label)
-        layout.addWidget(meta_label)
-        layout.addWidget(footer_label)
+        # Fila inferior: precio + ±cantidad
+        price_label = QLabel(f"${subtotal}" + (f"  (${unit_price} c/u)" if quantity > 1 else ""))
+        price_label.setObjectName("satSidebarItemQty")
+
+        minus_btn = QPushButton("−")
+        minus_btn.setObjectName("sidebarItemRemoveButton")
+        minus_btn.setFixedSize(26, 26)
+        minus_btn.clicked.connect(lambda checked=False, index=row_index: self._change_sidebar_item_quantity(index, -1))
+
+        qty_label = QLabel(str(quantity))
+        qty_label.setObjectName("satSidebarItemQty")
+        qty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        qty_label.setFixedWidth(22)
+
+        plus_btn = QPushButton("+")
+        plus_btn.setObjectName("sidebarItemRemoveButton")
+        plus_btn.setFixedSize(26, 26)
+        plus_btn.clicked.connect(lambda checked=False, index=row_index: self._change_sidebar_item_quantity(index, 1))
+
+        footer_row = QHBoxLayout()
+        footer_row.setContentsMargins(0, 0, 0, 0)
+        footer_row.setSpacing(4)
+        footer_row.addWidget(price_label, 1)
+        footer_row.addWidget(minus_btn)
+        footer_row.addWidget(qty_label)
+        footer_row.addWidget(plus_btn)
+
+        layout.addLayout(name_row)
+        if meta_parts:
+            layout.addWidget(meta_label)
+        layout.addLayout(footer_row)
         card.setLayout(layout)
+
+        def _dblclick(event, _card=card):
+            self._show_cart_popup()
+            QFrame.mouseDoubleClickEvent(_card, event)
+
+        card.mouseDoubleClickEvent = _dblclick
         return card
+
+    def _show_cart_popup(self) -> None:
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Piezas agregadas")
+        dlg.setMinimumWidth(640)
+        dlg.setMinimumHeight(420)
+        dlg_layout = QVBoxLayout()
+        dlg_layout.setContentsMargins(16, 16, 16, 16)
+        dlg_layout.setSpacing(10)
+
+        columns = ["Producto", "Talla", "SKU", "Cant.", "Precio unit.", "Subtotal", ""]
+        table = QTableWidget(0, len(columns))
+        table.setHorizontalHeaderLabels(columns)
+        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        table.setAlternatingRowColors(True)
+        table.verticalHeader().setVisible(False)
+        table.horizontalHeader().setStretchLastSection(False)
+        table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        table.setShowGrid(False)
+
+        total_label = QLabel()
+        total_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+
+        def _refresh_table():
+            table.setRowCount(0)
+            total = Decimal("0")
+            for row_idx, item in enumerate(self.quote_cart):
+                qty = max(int(item.get("cantidad") or 0), 0)
+                unit_price = Decimal(str(item.get("precio_unitario") or "0")).quantize(Decimal("0.01"))
+                subtotal = (unit_price * Decimal(qty)).quantize(Decimal("0.01"))
+                total += subtotal
+                product_name = str(
+                    item.get("producto_nombre") or item.get("descripcion") or item.get("sku") or "Producto"
+                )
+                talla = str(item.get("talla") or "—").strip()
+                sku = str(item.get("sku") or "—").strip()
+                table.insertRow(row_idx)
+                for col_idx, value in enumerate([
+                    product_name, talla, sku, str(qty), f"${unit_price}", f"${subtotal}",
+                ]):
+                    cell = QTableWidgetItem(value)
+                    cell.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | (
+                        Qt.AlignmentFlag.AlignRight if col_idx >= 3 else Qt.AlignmentFlag.AlignLeft
+                    ))
+                    table.setItem(row_idx, col_idx, cell)
+                remove_btn = QPushButton("✕")
+                remove_btn.setObjectName("sidebarItemRemoveButton")
+                remove_btn.setFixedSize(26, 26)
+                remove_btn.clicked.connect(lambda checked=False, index=row_idx: (
+                    self._remove_quote_item_at_index(index),
+                    _refresh_table(),
+                ))
+                table.setCellWidget(row_idx, 6, remove_btn)
+            table.resizeColumnToContents(1)
+            table.resizeColumnToContents(2)
+            table.resizeColumnToContents(3)
+            table.resizeColumnToContents(4)
+            table.resizeColumnToContents(5)
+            table.setColumnWidth(6, 36)
+            total_label.setText(f"Total: <b>${total.quantize(Decimal('0.01'))}</b>")
+
+        _refresh_table()
+
+        close_btn = QPushButton("Cerrar")
+        close_btn.setObjectName("primaryButton")
+        close_btn.clicked.connect(dlg.accept)
+
+        dlg_layout.addWidget(table, 1)
+        dlg_layout.addWidget(total_label)
+        dlg_layout.addWidget(close_btn, 0, Qt.AlignmentFlag.AlignRight)
+        dlg.setLayout(dlg_layout)
+        dlg.exec()
 
     def _apply_lookup_view(self, lookup_view) -> None:
         lookup_row = None
