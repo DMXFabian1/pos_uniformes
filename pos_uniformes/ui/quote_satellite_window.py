@@ -129,6 +129,28 @@ except Exception:
     _TOUCH_SCROLL_AVAILABLE = False
 
 
+class _DoubleClickButton(QPushButton):
+    """QPushButton que emite una señal dedicada al hacer doble clic."""
+
+    from PyQt6.QtCore import pyqtSignal as _pyqtSignal
+    double_clicked = _pyqtSignal()
+
+    def mouseDoubleClickEvent(self, event):  # noqa: N802
+        self.double_clicked.emit()
+        super().mouseDoubleClickEvent(event)
+
+
+class _DoubleClickFrame(QFrame):
+    """QFrame que emite una señal dedicada al hacer doble clic."""
+
+    from PyQt6.QtCore import pyqtSignal as _pyqtSignal
+    double_clicked = _pyqtSignal()
+
+    def mouseDoubleClickEvent(self, event):  # noqa: N802
+        self.double_clicked.emit()
+        super().mouseDoubleClickEvent(event)
+
+
 @dataclass
 class GuidedFlowState:
     """Estado de navegación de la página de presupuesto guiado."""
@@ -683,16 +705,27 @@ class QuoteSatelliteWindow(QMainWindow):
         scroll.setFrameShape(QFrame.Shape.NoFrame)
         scroll.viewport().setObjectName("guidedPageViewport")
 
+        self.guided_status_label.setObjectName("guidedStepHint")
+        self.guided_path_label.setObjectName("guidedPath")
+
         content = QWidget()
         content.setObjectName("guidedPageSurface")
         content.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(14)
+        layout.addWidget(self._build_guided_steps_card())
+        layout.addWidget(self._build_guided_detail_card())
+        layout.addSpacing(160)
+        content.setLayout(layout)
+        scroll.setWidget(content)
 
-        self.guided_status_label.setObjectName("guidedStepHint")
-        self.guided_path_label.setObjectName("guidedPath")
+        page_layout.addWidget(scroll, 1)
+        page.setLayout(page_layout)
+        return page
 
+    def _build_guided_steps_card(self) -> QFrame:
+        """Construye el card de navegación por pasos (pasos 1–7 + footer)."""
         steps_box = QFrame()
         steps_box.setObjectName("guidedStepsCard")
         steps_box.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -704,6 +737,7 @@ class QuoteSatelliteWindow(QMainWindow):
         steps_layout.addWidget(_steps_title)
         steps_layout.addWidget(self.guided_path_label)
 
+        # Paso 1 — Ruta
         mode_title = QLabel("1. Elige una ruta")
         mode_title.setObjectName("guidedStepTitle")
         mode_title.setProperty("step", "1")
@@ -716,6 +750,7 @@ class QuoteSatelliteWindow(QMainWindow):
         steps_layout.addWidget(mode_hint)
         steps_layout.addLayout(self.guided_mode_row)
 
+        # Paso 2 — Nivel
         self.guided_level_section = QWidget()
         level_layout = QVBoxLayout()
         level_layout.setContentsMargins(0, 0, 0, 0)
@@ -734,6 +769,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_level_section.setLayout(level_layout)
         steps_layout.addWidget(self.guided_level_section)
 
+        # Paso 3 — Escuela
         self.guided_school_section = QWidget()
         school_layout = QVBoxLayout()
         school_layout.setContentsMargins(0, 0, 0, 0)
@@ -766,6 +802,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_school_section.setLayout(school_layout)
         steps_layout.addWidget(self.guided_school_section, 1)
 
+        # Paso 4 — Tipo de uniforme
         self.guided_gender_section = QWidget()
         gender_section_layout = QVBoxLayout()
         gender_section_layout.setContentsMargins(0, 0, 0, 0)
@@ -784,6 +821,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_gender_section.setLayout(gender_section_layout)
         steps_layout.addWidget(self.guided_gender_section)
 
+        # Paso 5a — Perfil oficial
         self.guided_profile_section = QWidget()
         profile_section_layout = QVBoxLayout()
         profile_section_layout.setContentsMargins(0, 0, 0, 0)
@@ -802,6 +840,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_profile_section.setLayout(profile_section_layout)
         steps_layout.addWidget(self.guided_profile_section)
 
+        # Paso 5b — Grupo (básicos/extras)
         self.guided_bucket_section = QWidget()
         bucket_section_layout = QVBoxLayout()
         bucket_section_layout.setContentsMargins(0, 0, 0, 0)
@@ -820,6 +859,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_bucket_section.setLayout(bucket_section_layout)
         steps_layout.addWidget(self.guided_bucket_section)
 
+        # Paso 6 — Tipo de pieza
         self.guided_piece_section = QWidget()
         piece_section_layout = QVBoxLayout()
         piece_section_layout.setContentsMargins(0, 0, 0, 0)
@@ -839,6 +879,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_piece_section.setLayout(piece_section_layout)
         steps_layout.addWidget(self.guided_piece_section)
 
+        # Paso 7 — Modelos sugeridos
         self.guided_products_section = QWidget()
         products_section_layout = QVBoxLayout()
         products_section_layout.setContentsMargins(0, 0, 0, 0)
@@ -869,6 +910,8 @@ class QuoteSatelliteWindow(QMainWindow):
         products_section_layout.addWidget(self.guided_product_scroll, 1)
         self.guided_products_section.setLayout(products_section_layout)
         steps_layout.addWidget(self.guided_products_section, 1)
+
+        # Footer
         guided_footer_actions = QHBoxLayout()
         guided_footer_actions.setSpacing(8)
         guided_footer_actions.addStretch()
@@ -877,8 +920,12 @@ class QuoteSatelliteWindow(QMainWindow):
         guided_footer_actions.addWidget(self.guided_reset_button)
         guided_footer_actions.addWidget(self.guided_basics_button)
         steps_layout.addLayout(guided_footer_actions)
-        steps_box.setLayout(steps_layout)
 
+        steps_box.setLayout(steps_layout)
+        return steps_box
+
+    def _build_guided_detail_card(self) -> QFrame:
+        """Construye el card de producto seleccionado (ícono + variantes + acciones)."""
         detail_box = QFrame()
         detail_box.setObjectName("guidedStepsCard")
         detail_box.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
@@ -888,6 +935,8 @@ class QuoteSatelliteWindow(QMainWindow):
         _detail_title = QLabel("Producto seleccionado")
         _detail_title.setObjectName("guidedGroupBoxTitle")
         detail_layout.addWidget(_detail_title)
+
+        # Header: ícono + texto
         detail_header = QHBoxLayout()
         detail_header.setSpacing(10)
         self.guided_visual_icon_label.setFixedSize(72, 72)
@@ -901,6 +950,8 @@ class QuoteSatelliteWindow(QMainWindow):
         detail_text_layout.addWidget(self.guided_detail_title_label)
         detail_text_layout.addWidget(self.guided_detail_meta_label)
         detail_header.addLayout(detail_text_layout, 1)
+
+        # Variantes
         self.guided_variant_section = QWidget()
         variant_section_layout = QVBoxLayout()
         variant_section_layout.setContentsMargins(0, 0, 0, 0)
@@ -915,6 +966,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_variant_section.setLayout(variant_section_layout)
         self.guided_detail_scroll = self.guided_variant_section  # alias para compatibilidad
 
+        # Acciones
         detail_actions = QHBoxLayout()
         detail_actions.setSpacing(8)
         self.guided_qty_spin.setRange(1, 100)
@@ -928,21 +980,13 @@ class QuoteSatelliteWindow(QMainWindow):
         detail_actions.addWidget(QLabel("Cantidad"))
         detail_actions.addWidget(self.guided_qty_spin)
         detail_actions.addWidget(self.guided_add_button)
+
         detail_layout.addLayout(detail_header)
         detail_layout.addWidget(self.guided_detail_notes_label)
         detail_layout.addWidget(self.guided_variant_section)
         detail_layout.addLayout(detail_actions)
         detail_box.setLayout(detail_layout)
-
-        layout.addWidget(steps_box)
-        layout.addWidget(detail_box)
-        layout.addSpacing(160)
-        content.setLayout(layout)
-        scroll.setWidget(content)
-
-        page_layout.addWidget(scroll, 1)
-        page.setLayout(page_layout)
-        return page
+        return detail_box
 
     def _build_share_page(self) -> QWidget:
         page = QWidget()
@@ -1104,14 +1148,27 @@ class QuoteSatelliteWindow(QMainWindow):
         panel.setLayout(layout)
         return panel
 
+    def _make_form_label(self, text: str) -> QLabel:
+        """Etiqueta de campo de formulario con estilo satFieldLabel."""
+        label = QLabel(text)
+        label.setObjectName("satFieldLabel")
+        return label
+
     def _build_editor_panel(self) -> QWidget:
         panel = QWidget()
         layout = QVBoxLayout()
         layout.setSpacing(12)
+        layout.addWidget(self._build_editor_form_panel())
+        layout.addWidget(self._build_editor_cart_panel(), 1)
+        panel.setLayout(layout)
+        return panel
 
+    def _build_editor_form_panel(self) -> QGroupBox:
+        """Construye el panel de datos del presupuesto: escaneo, form y acciones."""
         editor_box = QGroupBox("Presupuesto actual")
         editor_layout = QVBoxLayout()
         editor_layout.setSpacing(10)
+
         configure_friendly_date_edit(
             self.quote_validity_input,
             minimum_date=QDate.currentDate(),
@@ -1119,7 +1176,6 @@ class QuoteSatelliteWindow(QMainWindow):
         )
         self.quote_note_input.setMaximumHeight(90)
         self.quote_note_input.setPlaceholderText("Observaciones adicionales")
-
         self.quote_draft_button.setObjectName("ghostButton")
         self.quote_emit_button.setObjectName("primaryButton")
         self.quote_qty_down_button.setObjectName("ghostButton")
@@ -1140,15 +1196,9 @@ class QuoteSatelliteWindow(QMainWindow):
             "El cliente se asigna al crear uno nuevo o al reanudar un borrador existente."
         )
 
-        def form_label(text: str) -> QLabel:
-            label = QLabel(text)
-            label.setObjectName("satFieldLabel")
-            return label
-
         scan_stack = QVBoxLayout()
         scan_stack.setSpacing(4)
-        scan_stack.addWidget(form_label("Escaneo"))
-
+        scan_stack.addWidget(self._make_form_label("Escaneo"))
         scan_row = QHBoxLayout()
         scan_row.setSpacing(6)
         scan_row.addWidget(self.quick_scan_input, 1)
@@ -1159,14 +1209,14 @@ class QuoteSatelliteWindow(QMainWindow):
         form = QGridLayout()
         form.setHorizontalSpacing(8)
         form.setVerticalSpacing(8)
-        form.addWidget(form_label("Folio"), 0, 0)
+        form.addWidget(self._make_form_label("Folio"), 0, 0)
         form.addWidget(self.quote_folio_input, 0, 1, 1, 2)
-        form.addWidget(form_label("Cliente asignado"), 0, 3)
+        form.addWidget(self._make_form_label("Cliente asignado"), 0, 3)
         form.addWidget(self.quote_client_combo, 0, 4, 1, 2)
         form.addWidget(self.quote_create_client_button, 0, 6)
-        form.addWidget(form_label("Vigencia"), 1, 0)
+        form.addWidget(self._make_form_label("Vigencia"), 1, 0)
         form.addWidget(self.quote_validity_input, 1, 1, 1, 2)
-        form.addWidget(form_label("Observacion"), 2, 0)
+        form.addWidget(self._make_form_label("Observacion"), 2, 0)
         form.addWidget(self.quote_note_input, 2, 1, 1, 6)
         form.setColumnStretch(1, 1)
         form.setColumnStretch(4, 1)
@@ -1185,10 +1235,14 @@ class QuoteSatelliteWindow(QMainWindow):
         editor_layout.addLayout(form)
         editor_layout.addLayout(actions)
         editor_box.setLayout(editor_layout)
+        return editor_box
 
+    def _build_editor_cart_panel(self) -> QGroupBox:
+        """Construye el panel del carrito: tabla de líneas, totales y resumen."""
         cart_box = QGroupBox("Carrito")
         cart_layout = QVBoxLayout()
         cart_layout.setSpacing(10)
+
         self.quote_cart_table.setColumnCount(7)
         self.quote_cart_table.setHorizontalHeaderLabels(
             ["Cantidad", "Producto", "Talla", "Nivel", "Escuela", "Precio", "Subtotal"]
@@ -1216,6 +1270,7 @@ class QuoteSatelliteWindow(QMainWindow):
         totals_layout.addWidget(totals_title)
         totals_layout.addWidget(self.quote_total_label)
         totals_card.setLayout(totals_layout)
+
         self.quote_summary_label.setObjectName("satSummary")
         self.quote_school_summary_label.setObjectName("satDetailMeta")
         self.quote_school_summary_label.setWordWrap(True)
@@ -1225,11 +1280,7 @@ class QuoteSatelliteWindow(QMainWindow):
         cart_layout.addWidget(self.quote_summary_label)
         cart_layout.addWidget(self.quote_school_summary_label)
         cart_box.setLayout(cart_layout)
-
-        layout.addWidget(editor_box)
-        layout.addWidget(cart_box, 1)
-        panel.setLayout(layout)
-        return panel
+        return cart_box
 
     def _build_history_panel(self) -> QWidget:
         panel = QWidget()
@@ -2019,21 +2070,19 @@ class QuoteSatelliteWindow(QMainWindow):
                 current_price = price_label
                 current_flow = FlowLayout(margin=0, h_spacing=6, v_spacing=8)
                 self.guided_variant_groups_layout.addLayout(current_flow)
-            button = self._build_guided_choice_button(option.label)
+            button = _DoubleClickButton(option.label)
+            button.setObjectName("guidedChoiceButton")
+            button.setCheckable(True)
+            button.setMinimumHeight(60)
             button.setProperty("compactChoice", True)
             button.setMinimumHeight(42)
             button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
             button.setChecked(self._gfs.sku == option.sku)
             button.clicked.connect(lambda checked=False, selected=option.sku: self._handle_guided_variant_selected(selected))
-
-            def _make_dblclick(sku, btn):
-                def _dblclick(event):
-                    self._handle_guided_variant_selected(sku)
-                    self._handle_add_guided_selection_to_quote()
-                    QPushButton.mouseDoubleClickEvent(btn, event)
-                return _dblclick
-
-            button.mouseDoubleClickEvent = _make_dblclick(option.sku, button)
+            def _on_variant_double_click(sku=option.sku):
+                self._handle_guided_variant_selected(sku)
+                self._handle_add_guided_selection_to_quote()
+            button.double_clicked.connect(_on_variant_double_click)
             current_flow.addWidget(button)
             self.guided_variant_buttons[option.sku] = button
 
@@ -2899,7 +2948,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.sidebar_items_layout.addStretch()
 
     def _build_sidebar_quote_item_card(self, row_index: int, line_item: dict[str, object]) -> QFrame:
-        card = QFrame()
+        card = _DoubleClickFrame()
         card.setObjectName("satSidebarItemCard")
         layout = QVBoxLayout()
         layout.setContentsMargins(10, 8, 10, 8)
@@ -2975,11 +3024,7 @@ class QuoteSatelliteWindow(QMainWindow):
         layout.addLayout(footer_row)
         card.setLayout(layout)
 
-        def _dblclick(event, _card=card):
-            self._show_cart_popup()
-            QFrame.mouseDoubleClickEvent(_card, event)
-
-        card.mouseDoubleClickEvent = _dblclick
+        card.double_clicked.connect(self._show_cart_popup)
         return card
 
     def _show_cart_popup(self) -> None:
@@ -3030,10 +3075,10 @@ class QuoteSatelliteWindow(QMainWindow):
                 remove_btn = QPushButton("✕")
                 remove_btn.setObjectName("sidebarItemRemoveButton")
                 remove_btn.setFixedSize(26, 26)
-                remove_btn.clicked.connect(lambda checked=False, index=row_idx: (
-                    self._remove_quote_item_at_index(index),
-                    _refresh_table(),
-                ))
+                def _on_remove(index=row_idx):
+                    self._remove_quote_item_at_index(index)
+                    _refresh_table()
+                remove_btn.clicked.connect(_on_remove)
                 table.setCellWidget(row_idx, 6, remove_btn)
             table.resizeColumnToContents(1)
             table.resizeColumnToContents(2)
