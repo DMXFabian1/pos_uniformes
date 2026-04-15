@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 import sys
@@ -129,6 +130,32 @@ try:
     _TOUCH_SCROLL_AVAILABLE = True
 except Exception:
     _TOUCH_SCROLL_AVAILABLE = False
+
+
+@dataclass
+class GuidedFlowState:
+    """Estado de navegación de la página de presupuesto guiado."""
+
+    mode: str = "school"
+    level: str = ""
+    school: str = ""
+    gender: str = "TODOS"
+    profile: str = "TODOS"
+    bucket: str = "TODOS"
+    piece: str = ""
+    product_key: str = ""
+    sku: str = ""
+
+    def reset(self, mode_key: str) -> None:
+        self.mode = "basics" if mode_key == "basics" else "school"
+        self.level = ""
+        self.school = ""
+        self.gender = "TODOS"
+        self.profile = "TODOS"
+        self.bucket = "BASICO" if self.mode == "basics" else "TODOS"
+        self.piece = ""
+        self.product_key = ""
+        self.sku = ""
 
 
 class QuoteSatelliteWindow(QMainWindow):
@@ -262,15 +289,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.catalog_detail_meta_label = QLabel("")
         self.catalog_detail_notes_label = QLabel("")
         self.catalog_level_combo = QComboBox()
-        self.guided_mode = "school"
-        self.guided_selected_level = ""
-        self.guided_selected_school = ""
-        self.guided_selected_gender = "TODOS"
-        self.guided_selected_profile = "TODOS"
-        self.guided_selected_bucket = "TODOS"
-        self.guided_selected_piece = ""
-        self.guided_selected_product_key = ""
-        self.guided_selected_sku = ""
+        self._gfs = GuidedFlowState()
         self.guided_status_label = QLabel("Empieza eligiendo una ruta.")
         self.guided_path_label = QLabel("Uniformes > sin nivel > sin escuela > Todos")
         self.guided_empty_label = QLabel("Selecciona una ruta para comenzar.")
@@ -2153,15 +2172,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self._reset_guided_route(mode_key=mode_key)
 
     def _reset_guided_route(self, *, mode_key: str) -> None:
-        self.guided_mode = "basics" if mode_key == "basics" else "school"
-        self.guided_selected_level = ""
-        self.guided_selected_school = ""
-        self.guided_selected_gender = "TODOS"
-        self.guided_selected_profile = "TODOS"
-        self.guided_selected_bucket = "BASICO" if self.guided_mode == "basics" else "TODOS"
-        self.guided_selected_piece = ""
-        self.guided_selected_product_key = ""
-        self.guided_selected_sku = ""
+        self._gfs.reset(mode_key)
         self.guided_qty_spin.setValue(1)
         self._refresh_guided_browser()
 
@@ -2172,54 +2183,54 @@ class QuoteSatelliteWindow(QMainWindow):
         self._reset_guided_route(mode_key="basics")
 
     def _handle_guided_level_selected(self, level_name: str) -> None:
-        self.guided_selected_level = level_name
-        self.guided_selected_school = ""
-        self.guided_selected_profile = "TODOS"
-        self.guided_selected_product_key = ""
-        self.guided_selected_sku = ""
+        self._gfs.level = level_name
+        self._gfs.school = ""
+        self._gfs.profile = "TODOS"
+        self._gfs.product_key = ""
+        self._gfs.sku = ""
         self._refresh_guided_browser()
 
     def _handle_guided_school_selected(self, school_name: str) -> None:
-        self.guided_selected_school = school_name
-        self.guided_selected_profile = "TODOS"
-        self.guided_selected_product_key = ""
-        self.guided_selected_sku = ""
+        self._gfs.school = school_name
+        self._gfs.profile = "TODOS"
+        self._gfs.product_key = ""
+        self._gfs.sku = ""
         self._refresh_guided_browser()
 
     def _handle_guided_gender_selected(self, gender_key: str) -> None:
-        self.guided_selected_gender = gender_key
-        self.guided_selected_profile = "TODOS"
-        self.guided_selected_piece = ""
-        self.guided_selected_product_key = ""
-        self.guided_selected_sku = ""
+        self._gfs.gender = gender_key
+        self._gfs.profile = "TODOS"
+        self._gfs.piece = ""
+        self._gfs.product_key = ""
+        self._gfs.sku = ""
         self._refresh_guided_browser()
 
     def _handle_guided_profile_selected(self, profile_key: str) -> None:
-        self.guided_selected_profile = profile_key
-        self.guided_selected_product_key = ""
-        self.guided_selected_sku = ""
+        self._gfs.profile = profile_key
+        self._gfs.product_key = ""
+        self._gfs.sku = ""
         self._refresh_guided_browser()
 
     def _handle_guided_bucket_selected(self, bucket_key: str) -> None:
-        self.guided_selected_bucket = bucket_key
-        self.guided_selected_piece = ""
-        self.guided_selected_product_key = ""
-        self.guided_selected_sku = ""
+        self._gfs.bucket = bucket_key
+        self._gfs.piece = ""
+        self._gfs.product_key = ""
+        self._gfs.sku = ""
         self._refresh_guided_browser()
 
     def _handle_guided_piece_selected(self, piece_key: str) -> None:
-        self.guided_selected_piece = piece_key
-        self.guided_selected_product_key = ""
-        self.guided_selected_sku = ""
+        self._gfs.piece = piece_key
+        self._gfs.product_key = ""
+        self._gfs.sku = ""
         self._refresh_guided_browser()
 
     def _handle_guided_product_selected(self, product_key: str) -> None:
-        self.guided_selected_product_key = product_key
-        self.guided_selected_sku = ""
+        self._gfs.product_key = product_key
+        self._gfs.sku = ""
         self._refresh_guided_browser()
 
     def _handle_guided_variant_selected(self, sku: str) -> None:
-        self.guided_selected_sku = sku
+        self._gfs.sku = sku
         row = next((item for item in self.catalog_snapshot_rows if str(item.get("sku")) == sku), None)
         self._apply_guided_detail(row)
         self._refresh_guided_product_checks()
@@ -2229,70 +2240,70 @@ class QuoteSatelliteWindow(QMainWindow):
     def _refresh_guided_browser(self) -> None:
         view = build_guided_catalog_view(
             snapshot_rows=self.catalog_snapshot_rows,
-            mode_key=self.guided_mode,
-            level_filter=self.guided_selected_level,
-            school_filter=self.guided_selected_school,
-            gender_filter=self.guided_selected_gender,
-            profile_filter=self.guided_selected_profile,
-            bucket_filter=self.guided_selected_bucket,
-            piece_filter=self.guided_selected_piece,
-            selected_product_key=self.guided_selected_product_key,
-            selected_sku=self.guided_selected_sku,
+            mode_key=self._gfs.mode,
+            level_filter=self._gfs.level,
+            school_filter=self._gfs.school,
+            gender_filter=self._gfs.gender,
+            profile_filter=self._gfs.profile,
+            bucket_filter=self._gfs.bucket,
+            piece_filter=self._gfs.piece,
+            selected_product_key=self._gfs.product_key,
+            selected_sku=self._gfs.sku,
         )
         available_levels = {option.key for option in view.level_options}
-        if self.guided_mode == "school" and self.guided_selected_level and self.guided_selected_level not in available_levels:
-            self.guided_selected_level = ""
-            self.guided_selected_school = ""
-            self.guided_selected_sku = ""
+        if self._gfs.mode == "school" and self._gfs.level and self._gfs.level not in available_levels:
+            self._gfs.level = ""
+            self._gfs.school = ""
+            self._gfs.sku = ""
             self._refresh_guided_browser()
             return
         available_schools = {option.key for option in view.school_options}
-        if self.guided_mode == "school" and self.guided_selected_school and self.guided_selected_school not in available_schools:
-            self.guided_selected_school = ""
-            self.guided_selected_profile = "TODOS"
-            self.guided_selected_sku = ""
+        if self._gfs.mode == "school" and self._gfs.school and self._gfs.school not in available_schools:
+            self._gfs.school = ""
+            self._gfs.profile = "TODOS"
+            self._gfs.sku = ""
             self._refresh_guided_browser()
             return
         available_profiles = {option.key for option in view.profile_options}
-        if self.guided_mode == "school" and self.guided_selected_gender == "OFICIAL" and self.guided_selected_profile not in {"", "TODOS"} and self.guided_selected_profile not in available_profiles:
-            self.guided_selected_profile = "TODOS"
-            self.guided_selected_product_key = ""
-            self.guided_selected_sku = ""
+        if self._gfs.mode == "school" and self._gfs.gender == "OFICIAL" and self._gfs.profile not in {"", "TODOS"} and self._gfs.profile not in available_profiles:
+            self._gfs.profile = "TODOS"
+            self._gfs.product_key = ""
+            self._gfs.sku = ""
             self._refresh_guided_browser()
             return
         available_buckets = {option.key for option in view.bucket_options}
-        if self.guided_mode == "basics" and self.guided_selected_bucket and self.guided_selected_bucket not in available_buckets:
-            self.guided_selected_bucket = "BASICO" if "BASICO" in available_buckets else "TODOS"
-            self.guided_selected_piece = ""
-            self.guided_selected_product_key = ""
-            self.guided_selected_sku = ""
+        if self._gfs.mode == "basics" and self._gfs.bucket and self._gfs.bucket not in available_buckets:
+            self._gfs.bucket = "BASICO" if "BASICO" in available_buckets else "TODOS"
+            self._gfs.piece = ""
+            self._gfs.product_key = ""
+            self._gfs.sku = ""
             self._refresh_guided_browser()
             return
         available_pieces = {option.key for option in view.piece_options}
-        if self.guided_mode == "basics" and self.guided_selected_piece and self.guided_selected_piece not in available_pieces:
-            self.guided_selected_piece = ""
-            self.guided_selected_product_key = ""
-            self.guided_selected_sku = ""
+        if self._gfs.mode == "basics" and self._gfs.piece and self._gfs.piece not in available_pieces:
+            self._gfs.piece = ""
+            self._gfs.product_key = ""
+            self._gfs.sku = ""
             self._refresh_guided_browser()
             return
-        self.guided_selected_product_key = view.selected_product_key
-        self.guided_selected_sku = view.selected_sku
+        self._gfs.product_key = view.selected_product_key
+        self._gfs.sku = view.selected_sku
         self.guided_status_label.setText(view.status_label)
         self.guided_path_label.setText(view.path_label)
         self.guided_empty_label.setText(view.empty_label or "Toca un producto para ver detalle.")
-        show_level = self.guided_mode == "school"
-        show_school = self.guided_mode == "school" and bool(self.guided_selected_level)
-        show_gender = self.guided_mode == "basics" or bool(self.guided_selected_school)
-        show_profile = self.guided_mode == "school" and self.guided_selected_gender == "OFICIAL" and bool(view.profile_options)
-        show_bucket = self.guided_mode == "basics" and bool(view.bucket_options)
-        show_piece = self.guided_mode == "basics" and bool(view.piece_options)
-        show_products = (self.guided_mode == "basics" and bool(self.guided_selected_piece)) or (
-            self.guided_mode == "school" and bool(self.guided_selected_school)
+        show_level = self._gfs.mode == "school"
+        show_school = self._gfs.mode == "school" and bool(self._gfs.level)
+        show_gender = self._gfs.mode == "basics" or bool(self._gfs.school)
+        show_profile = self._gfs.mode == "school" and self._gfs.gender == "OFICIAL" and bool(view.profile_options)
+        show_bucket = self._gfs.mode == "basics" and bool(view.bucket_options)
+        show_piece = self._gfs.mode == "basics" and bool(view.piece_options)
+        show_products = (self._gfs.mode == "basics" and bool(self._gfs.piece)) or (
+            self._gfs.mode == "school" and bool(self._gfs.school)
         )
         self.guided_level_section.setVisible(show_level)
         self.guided_school_section.setVisible(show_school)
 
-        if self.guided_mode == "school":
+        if self._gfs.mode == "school":
             self.guided_gender_title_label.setText("4. Elige linea")
             self.guided_gender_hint_label.setText("Primero separa deportivo de oficial.")
         else:
@@ -2325,9 +2336,9 @@ class QuoteSatelliteWindow(QMainWindow):
         else:
             self.guided_products_title_label.setText("5. Modelos sugeridos")
             self.guided_products_hint_label.setText("Primero toca un modelo; luego elige la variante que quieren.")
-        if self.guided_selected_sku:
+        if self._gfs.sku:
             row = next(
-                (item for item in self.catalog_snapshot_rows if str(item.get("sku")) == self.guided_selected_sku),
+                (item for item in self.catalog_snapshot_rows if str(item.get("sku")) == self._gfs.sku),
                 None,
             )
             self._apply_guided_detail(row)
@@ -2349,13 +2360,13 @@ class QuoteSatelliteWindow(QMainWindow):
                 self.guided_mode_row.addWidget(button)
                 self.guided_mode_buttons[key] = button
         for key, button in self.guided_mode_buttons.items():
-            button.setChecked(self.guided_mode == key)
+            button.setChecked(self._gfs.mode == key)
 
     def _rebuild_guided_level_buttons(self, options) -> None:
         self.guided_level_buttons = self._rebuild_guided_option_grid(
             layout=self.guided_level_grid,
             options=options,
-            selected_key=self.guided_selected_level,
+            selected_key=self._gfs.level,
             click_handler=self._handle_guided_level_selected,
             icon_builder=lambda option: _level_icon(option.label),
         )
@@ -2364,45 +2375,34 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_school_buttons = self._rebuild_guided_option_grid(
             layout=self.guided_school_grid,
             options=options,
-            selected_key=self.guided_selected_school,
+            selected_key=self._gfs.school,
             click_handler=self._handle_guided_school_selected,
         )
 
-    def _rebuild_guided_gender_buttons(self, options) -> None:
-        _clear_layout(self.guided_gender_row)
-        self.guided_gender_buttons = {}
+    def _rebuild_guided_hrow(self, layout: QHBoxLayout, options, selected_key: str, click_handler) -> dict:
+        _clear_layout(layout)
+        buttons: dict[str, QPushButton] = {}
         for option in options:
             button = self._build_guided_choice_button(option.label)
             button.setEnabled(option.enabled)
-            button.setChecked(self.guided_selected_gender == option.key)
-            button.clicked.connect(lambda checked=False, selected=option.key: self._handle_guided_gender_selected(selected))
-            self.guided_gender_row.addWidget(button)
-            self.guided_gender_buttons[option.key] = button
-        self.guided_gender_row.addStretch()
+            button.setChecked(selected_key == option.key)
+            button.clicked.connect(lambda checked=False, selected=option.key: click_handler(selected))
+            layout.addWidget(button)
+            buttons[option.key] = button
+        layout.addStretch()
+        return buttons
+
+    def _rebuild_guided_gender_buttons(self, options) -> None:
+        self.guided_gender_buttons = self._rebuild_guided_hrow(
+            self.guided_gender_row, options, self._gfs.gender, self._handle_guided_gender_selected)
 
     def _rebuild_guided_profile_buttons(self, options) -> None:
-        _clear_layout(self.guided_profile_row)
-        self.guided_profile_buttons = {}
-        for option in options:
-            button = self._build_guided_choice_button(option.label)
-            button.setEnabled(option.enabled)
-            button.setChecked(self.guided_selected_profile == option.key)
-            button.clicked.connect(lambda checked=False, selected=option.key: self._handle_guided_profile_selected(selected))
-            self.guided_profile_row.addWidget(button)
-            self.guided_profile_buttons[option.key] = button
-        self.guided_profile_row.addStretch()
+        self.guided_profile_buttons = self._rebuild_guided_hrow(
+            self.guided_profile_row, options, self._gfs.profile, self._handle_guided_profile_selected)
 
     def _rebuild_guided_bucket_buttons(self, options) -> None:
-        _clear_layout(self.guided_bucket_row)
-        self.guided_bucket_buttons = {}
-        for option in options:
-            button = self._build_guided_choice_button(option.label)
-            button.setEnabled(option.enabled)
-            button.setChecked(self.guided_selected_bucket == option.key)
-            button.clicked.connect(lambda checked=False, selected=option.key: self._handle_guided_bucket_selected(selected))
-            self.guided_bucket_row.addWidget(button)
-            self.guided_bucket_buttons[option.key] = button
-        self.guided_bucket_row.addStretch()
+        self.guided_bucket_buttons = self._rebuild_guided_hrow(
+            self.guided_bucket_row, options, self._gfs.bucket, self._handle_guided_bucket_selected)
 
     def _rebuild_guided_piece_buttons(self, options) -> None:
         _clear_layout(self.guided_piece_groups_layout)
@@ -2431,7 +2431,7 @@ class QuoteSatelliteWindow(QMainWindow):
                 button = self._build_guided_choice_button(option.label)
                 button.setProperty("compactChoice", True)
                 button.setEnabled(option.enabled)
-                button.setChecked(self.guided_selected_piece == option.key)
+                button.setChecked(self._gfs.piece == option.key)
                 button.setMinimumHeight(42)
                 button.setMinimumWidth(170)
                 button.setMaximumWidth(170)
@@ -2456,7 +2456,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_product_buttons = {}
         for card in product_cards:
             button = self._build_guided_product_button(card)
-            button.setChecked(self.guided_selected_product_key == card.key)
+            button.setChecked(self._gfs.product_key == card.key)
             button.clicked.connect(lambda checked=False, selected=card.key: self._handle_guided_product_selected(selected))
             self.guided_product_flow_layout.addWidget(button)
             self.guided_product_buttons[card.key] = button
@@ -2480,7 +2480,7 @@ class QuoteSatelliteWindow(QMainWindow):
             button.setProperty("compactChoice", True)
             button.setMinimumHeight(42)
             button.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-            button.setChecked(self.guided_selected_sku == option.sku)
+            button.setChecked(self._gfs.sku == option.sku)
             button.clicked.connect(lambda checked=False, selected=option.sku: self._handle_guided_variant_selected(selected))
 
             def _make_dblclick(sku, btn):
@@ -2525,8 +2525,8 @@ class QuoteSatelliteWindow(QMainWindow):
         button = QPushButton("\n".join(button_lines))
         button.setObjectName("guidedProductButton")
         button.setCheckable(True)
-        compact_card = (self.guided_mode == "basics" and bool(self.guided_selected_piece)) or (
-            self.guided_mode == "school" and bool(self.guided_selected_school)
+        compact_card = (self._gfs.mode == "basics" and bool(self._gfs.piece)) or (
+            self._gfs.mode == "school" and bool(self._gfs.school)
         )
         button.setProperty("compactCard", compact_card)
         if compact_card:
@@ -2546,11 +2546,11 @@ class QuoteSatelliteWindow(QMainWindow):
 
     def _refresh_guided_product_checks(self) -> None:
         for key, button in self.guided_product_buttons.items():
-            button.setChecked(key == self.guided_selected_product_key)
+            button.setChecked(key == self._gfs.product_key)
 
     def _refresh_guided_variant_checks(self) -> None:
         for sku, button in self.guided_variant_buttons.items():
-            button.setChecked(sku == self.guided_selected_sku)
+            button.setChecked(sku == self._gfs.sku)
 
     def _apply_guided_detail(self, row: dict[str, object] | None) -> None:
         if row is None:
@@ -2580,7 +2580,7 @@ class QuoteSatelliteWindow(QMainWindow):
             detail_parts.append(f"Color {color_label}")
         detail_parts.append(f"Precio ${Decimal(str(row['precio_venta'])).quantize(Decimal('0.01'))}")
         title = str(row["producto_nombre_base"])
-        if self.guided_mode != "basics":
+        if self._gfs.mode != "basics":
             title = f"{row['sku']} | {title}"
         self.guided_detail_title_label.setText(title)
         self.guided_detail_meta_label.setText(" | ".join(detail_parts))
@@ -2588,10 +2588,10 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_detail_scroll.setVisible(bool(self.guided_variant_buttons))
 
     def _handle_add_guided_selection_to_quote(self) -> None:
-        if not self.guided_selected_sku:
+        if not self._gfs.sku:
             QMessageBox.warning(self, "Sin seleccion", "Elige un producto guiado antes de agregarlo.")
             return
-        self._add_quote_item_by_sku(self.guided_selected_sku, self.guided_qty_spin.value())
+        self._add_quote_item_by_sku(self._gfs.sku, self.guided_qty_spin.value())
         self.guided_qty_spin.setValue(1)
 
     def _refresh_client_combo(self, session) -> None:
@@ -3172,8 +3172,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self.kiosk_add_button.setEnabled(self.lookup_snapshot is not None and self._can_operate())
         self.catalog_add_button.setEnabled(bool(self._selected_catalog_sku()) and self._can_operate())
         self.catalog_print_label_button.setEnabled(bool(self._selected_catalog_sku()))
-        self.guided_add_button.setEnabled(bool(self.guided_selected_sku) and self._can_operate())
-        self.guided_print_label_button.setEnabled(bool(self.guided_selected_sku))
+        self.guided_add_button.setEnabled(bool(self._gfs.sku) and self._can_operate())
+        self.guided_print_label_button.setEnabled(bool(self._gfs.sku))
         self.quote_qty_down_button.setEnabled(selected_quote_line)
         self.quote_qty_up_button.setEnabled(selected_quote_line)
         self.quote_remove_button.setEnabled(selected_quote_line)
@@ -3765,7 +3765,7 @@ class QuoteSatelliteWindow(QMainWindow):
         return print_dialog.exec() == QDialog.DialogCode.Accepted
 
     def _print_label_for_guided_selection(self) -> None:
-        self._print_label_for_sku(self.guided_selected_sku)
+        self._print_label_for_sku(self._gfs.sku)
 
     def _print_label_for_selected_catalog_row(self) -> None:
         self._print_label_for_sku(self._selected_catalog_sku())
