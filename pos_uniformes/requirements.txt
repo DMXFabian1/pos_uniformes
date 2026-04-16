@@ -4,3 +4,8 @@ PyQt6>=6.7
 alembic>=1.13
 qrcode[pil]>=7.4
 pywin32>=311; platform_system == "Windows"
+
+# API movil
+fastapi>=0.111
+uvicorn[standard]>=0.29
+PyJWT>=2.8

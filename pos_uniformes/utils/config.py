@@ -50,6 +50,11 @@ class Settings:
     db_echo: bool
     auto_create_schema: bool
     backup_external_dir: str | None
+    # API movil
+    api_secret_key: str
+    api_host: str
+    api_port: int
+    api_token_expire_hours: int
 
     @property
     def database_url(self) -> str:
@@ -87,6 +92,10 @@ class Settings:
                 default=False,
             ),
             backup_external_dir=optional_env_value("POS_UNIFORMES_BACKUP_EXTERNAL_DIR"),
+            api_secret_key=env_value("POS_API_SECRET_KEY", "cambiar-esta-clave-en-produccion"),
+            api_host=env_value("POS_API_HOST", "0.0.0.0"),
+            api_port=int(env_value("POS_API_PORT", "8000")),
+            api_token_expire_hours=int(env_value("POS_API_TOKEN_EXPIRE_HOURS", "8")),
         )
 
 

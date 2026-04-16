@@ -10,8 +10,10 @@
 - Regla vigente:
   - `ui/main_window.py` se acepta como coordinador principal, pero las mejoras nuevas deben nacer fuera de ahi y solo integrarse desde la ventana
 - Siguiente iniciativa grande despues de `Fase 5`:
-  - `Empleadas, atribucion comercial y comisiones`
-  - pensada desde el inicio para `POS`, `kiosko` y `app movil`
+  - `API, app movil y modulo de empleadas` como frente unificado
+  - convergen tres iniciativas: llevar la funcion del satelite a moviles, abrir el modulo de empleadas, e introducir una capa de API REST en la PC principal
+  - documento base: `docs/arquitectura_api_movil_y_empleadas.md`
+  - complementa `docs/empleadas_y_comisiones.md` y `docs/satelite_consulta_y_cache_local.md`
 
 ## Entrada
 
@@ -212,4 +214,6 @@
   - polish visual y consistencia de UX
   - mejoras localizadas de estabilidad
 - Despues:
-  - abrir modulo de `Empleadas / atribucion / comisiones`
+  - abrir frente unificado `API, app movil y modulo de empleadas`
+  - orden propuesto: contrato de modelo -> empleadas backend -> API lectura + auth -> API presupuestos -> PWA movil -> hardening concurrencia -> atribucion cross-canal -> analitica y comisiones
+  - documento base: `docs/arquitectura_api_movil_y_empleadas.md`
