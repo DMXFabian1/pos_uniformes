@@ -249,19 +249,24 @@ QWidget#satSidebarItemsContent {
     border: none;
 }
 QLabel#satKioskSku {
-    font-size: 26px;
+    font-size: 30px;
     font-weight: 900;
     color: #2f2a24;
 }
 QLabel#satKioskProduct {
-    font-size: 22px;
+    font-size: 28px;
     font-weight: 800;
-    color: #87492c;
+    color: #2f2a24;
+}
+QLabel#satKioskTalla {
+    font-size: 20px;
+    font-weight: 600;
+    color: #7a6f64;
 }
 QLabel#satKioskPrice {
-    font-size: 48px;
+    font-size: 56px;
     font-weight: 900;
-    color: #87492c;
+    color: #c0392b;
 }
 QLabel#satKioskBadge {
     color: #2f2a24;

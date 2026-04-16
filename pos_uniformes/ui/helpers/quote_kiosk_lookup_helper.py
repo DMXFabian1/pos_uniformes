@@ -19,6 +19,7 @@ class QuoteKioskBadgeState:
 class QuoteKioskLookupView:
     sku_label: str
     product_label: str
+    talla_label: str
     price_label: str
     status_badge: QuoteKioskBadgeState
     detail_label: str
@@ -36,6 +37,7 @@ def build_empty_quote_kiosk_lookup_view() -> QuoteKioskLookupView:
     return QuoteKioskLookupView(
         sku_label="Escanea un SKU",
         product_label="El producto aparecera aqui.",
+        talla_label="",
         price_label="$0.00",
         status_badge=QuoteKioskBadgeState(text="Sin consulta", tone="neutral"),
         detail_label="Talla, color y tipo apareceran despues del escaneo.",
@@ -48,6 +50,7 @@ def build_error_quote_kiosk_lookup_view(error_message: str) -> QuoteKioskLookupV
     return QuoteKioskLookupView(
         sku_label="No encontrado",
         product_label=error_message,
+        talla_label="",
         price_label="$0.00",
         status_badge=QuoteKioskBadgeState(text="Revisar SKU", tone="danger"),
         detail_label="Verifica el codigo y vuelve a escanear.",
@@ -58,9 +61,15 @@ def build_error_quote_kiosk_lookup_view(error_message: str) -> QuoteKioskLookupV
 
 def build_quote_kiosk_lookup_view(snapshot: QuoteKioskLookupSnapshot) -> QuoteKioskLookupView:
     product_label = sanitize_product_display_name(snapshot.product_name)
+    talla_parts = []
+    if snapshot.size_label:
+        talla_parts.append(f"Talla {snapshot.size_label}")
+    if snapshot.color_label:
+        talla_parts.append(snapshot.color_label)
     return QuoteKioskLookupView(
         sku_label=snapshot.sku,
         product_label=product_label,
+        talla_label=" · ".join(talla_parts),
         price_label=f"${Decimal(snapshot.price).quantize(Decimal('0.01'))}",
         status_badge=QuoteKioskBadgeState(text="Listo para cotizar", tone="positive"),
         detail_label=(

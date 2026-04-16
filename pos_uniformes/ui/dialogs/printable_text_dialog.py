@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from PyQt6.QtCore import QMarginsF
 from PyQt6.QtGui import QPageLayout
 from PyQt6.QtPrintSupport import QPrintDialog, QPrinter
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QTextEdit, QVBoxLayout, QWidget
@@ -48,10 +49,12 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
         printer.setCopyCount(copies)
         printer.setFullPage(False)
         printer.setPageMargins(
-            TICKET_HORIZONTAL_MARGIN_MM,
-            TICKET_HORIZONTAL_MARGIN_MM,
-            TICKET_HORIZONTAL_MARGIN_MM,
-            TICKET_HORIZONTAL_MARGIN_MM,
+            QMarginsF(
+                TICKET_HORIZONTAL_MARGIN_MM,
+                TICKET_HORIZONTAL_MARGIN_MM,
+                TICKET_HORIZONTAL_MARGIN_MM,
+                TICKET_HORIZONTAL_MARGIN_MM,
+            ),
             QPageLayout.Unit.Millimeter,
         )
         print_dialog = QPrintDialog(printer, dialog)

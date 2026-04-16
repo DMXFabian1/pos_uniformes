@@ -345,6 +345,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.kiosk_add_button = QPushButton("Agregar al presupuesto")
         self.kiosk_lookup_sku_label = QLabel("")
         self.kiosk_lookup_product_label = QLabel("")
+        self.kiosk_lookup_talla_label = QLabel("")
         self.kiosk_lookup_price_label = QLabel("$0.00")
         self.kiosk_lookup_status_label = QLabel("")
         self.kiosk_lookup_detail_label = QLabel("")
@@ -1098,6 +1099,8 @@ class QuoteSatelliteWindow(QMainWindow):
 
         self.kiosk_lookup_sku_label.setObjectName("satKioskSku")
         self.kiosk_lookup_product_label.setObjectName("satKioskProduct")
+        self.kiosk_lookup_talla_label.setObjectName("satKioskTalla")
+        self.kiosk_lookup_talla_label.setWordWrap(True)
         self.kiosk_lookup_price_label.setObjectName("satKioskPrice")
         self.kiosk_lookup_status_label.setObjectName("satKioskBadge")
         self.kiosk_lookup_detail_label.setObjectName("satKioskBody")
@@ -1116,6 +1119,7 @@ class QuoteSatelliteWindow(QMainWindow):
         hero_text.setSpacing(8)
         hero_text.addWidget(self.kiosk_lookup_sku_label)
         hero_text.addWidget(self.kiosk_lookup_product_label)
+        hero_text.addWidget(self.kiosk_lookup_talla_label)
         hero_text.addWidget(self.kiosk_lookup_price_label)
         hero_text.addWidget(self.kiosk_lookup_status_label, 0, Qt.AlignmentFlag.AlignLeft)
         hero_row.addLayout(hero_text, 1)
@@ -2089,15 +2093,15 @@ class QuoteSatelliteWindow(QMainWindow):
             self.guided_product_flow_layout.addWidget(container)
             self.guided_product_buttons[card.key] = product_btn
 
-    def _confirm_favorite_removal(self) -> bool:
-        """Pide contraseña antes de quitar un favorito. Retorna True si es correcta."""
+    def _confirm_favorites_password(self, action: str) -> bool:
+        """Pide contraseña para agregar o quitar un favorito. Retorna True si es correcta."""
         dialog = QDialog(self)
-        dialog.setWindowTitle("Quitar favorito")
+        dialog.setWindowTitle("Favoritos")
         dialog.setModal(True)
         dialog.setMinimumWidth(300)
         layout = QVBoxLayout()
         layout.setSpacing(12)
-        lbl = QLabel("Ingresa la contraseña para quitar este favorito.")
+        lbl = QLabel(f"Ingresa la contraseña para {action}.")
         lbl.setWordWrap(True)
         layout.addWidget(lbl)
         pwd_input = QLineEdit()
@@ -2121,9 +2125,14 @@ class QuoteSatelliteWindow(QMainWindow):
 
     def _handle_toggle_favorite(self, product_key: str) -> None:
         self._favorites = set(load_favorites())
-        if product_key in self._favorites and not self._confirm_favorite_removal():
-            self._refresh_guided_browser()
-            return
+        if product_key in self._favorites:
+            if not self._confirm_favorites_password("quitar este favorito"):
+                self._refresh_guided_browser()
+                return
+        else:
+            if not self._confirm_favorites_password("agregar este favorito"):
+                self._refresh_guided_browser()
+                return
         toggle_favorite(product_key)
         self._favorites = set(load_favorites())
         self._refresh_guided_browser()
@@ -3696,6 +3705,8 @@ QLabel#favDialogPriceLabel {
         )
         self.kiosk_lookup_sku_label.setText(lookup_view.sku_label)
         self.kiosk_lookup_product_label.setText(lookup_view.product_label)
+        self.kiosk_lookup_talla_label.setText(lookup_view.talla_label)
+        self.kiosk_lookup_talla_label.setVisible(bool(lookup_view.talla_label))
         self.kiosk_lookup_price_label.setText(lookup_view.price_label)
         self.kiosk_lookup_status_label.setText(lookup_view.status_badge.text)
         _style_badge_label(self.kiosk_lookup_status_label, lookup_view.status_badge.tone)
