@@ -17,6 +17,12 @@ APP_NAME = f"PresupuestosSatelite-{VERSION}"
 WINDOWS_ICON = satellite_windows_icon_path()
 
 datas = []
+
+# Incluir favoritos como seed para el primer arranque en Windows
+_favorites_seed = PROJECT_ROOT / "data" / "favorites.json"
+if _favorites_seed.exists():
+    datas += [(str(_favorites_seed), "data")]
+
 datas += collect_tree_datas(
     PROJECT_ROOT / "assets",
     "pos_uniformes/assets",

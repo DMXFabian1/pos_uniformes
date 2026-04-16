@@ -54,6 +54,39 @@ class GuidedCatalogView:
     empty_label: str
 
 
+def build_favorites_catalog_view(
+    snapshot_rows: list[dict[str, object]],
+    favorite_keys: set[str],
+    selected_product_key: str = "",
+) -> GuidedCatalogView:
+    """Devuelve una vista con únicamente los productos marcados como favoritos.
+
+    No filtra por modo ni jerarquía — incluye piezas de escuela y generales.
+    """
+    active_rows = [row for row in snapshot_rows if _is_active_row(row)]
+    all_cards = _build_product_cards(active_rows, mode_key="basics")
+    favorite_cards = tuple(card for card in all_cards if card.key in favorite_keys)
+    resolved = _resolve_selected_product_key(favorite_cards, selected_product_key)
+    variants = _build_variant_options(rows=active_rows, mode_key="basics", selected_product_key=resolved)
+    resolved_sku = _resolve_selected_sku(variants, "")
+    count = len(favorite_cards)
+    return GuidedCatalogView(
+        level_options=(),
+        school_options=(),
+        gender_options=(),
+        profile_options=(),
+        bucket_options=(),
+        piece_options=(),
+        product_cards=favorite_cards,
+        variant_options=variants,
+        selected_product_key=resolved,
+        selected_sku=resolved_sku,
+        status_label=f"{count} favorito(s) guardado(s)",
+        path_label="Mis Favoritos",
+        empty_label="No hay favoritos. Toca ♥ en las piezas del flujo guiado.",
+    )
+
+
 def build_guided_catalog_view(
     *,
     snapshot_rows: list[dict[str, object]],

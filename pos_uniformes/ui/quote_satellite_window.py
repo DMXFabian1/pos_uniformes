@@ -57,7 +57,7 @@ from pos_uniformes.services.catalog_local_cache_service import (
     format_cache_age_label,
     save_catalog_cache,
 )
-from pos_uniformes.services.satellite_favorites_service import load_favorites, toggle_favorite
+from pos_uniformes.services.satellite_favorites_service import load_favorites, seed_favorites_from_bundle, toggle_favorite
 from pos_uniformes.services.catalog_snapshot_service import load_catalog_snapshot_rows
 from pos_uniformes.services.client_service import ClientService
 from pos_uniformes.services.presupuesto_service import PresupuestoService
@@ -93,7 +93,7 @@ from pos_uniformes.ui.helpers.quote_sports_uniform_helper import (
     add_quote_scan_variants,
     build_quote_presupuesto_inputs,
 )
-from pos_uniformes.ui.helpers.quote_guided_catalog_helper import build_guided_catalog_view
+from pos_uniformes.ui.helpers.quote_guided_catalog_helper import build_favorites_catalog_view, build_guided_catalog_view
 from pos_uniformes.ui.helpers.quote_kiosk_lookup_helper import (
     build_empty_quote_kiosk_lookup_view,
     build_error_quote_kiosk_lookup_view,
@@ -207,6 +207,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.catalog_browser_debounce_timer.setSingleShot(True)
         self.catalog_browser_debounce_timer.setInterval(SATELLITE_SEARCH_DEBOUNCE_MS)
         self.catalog_browser_debounce_timer.timeout.connect(self._run_catalog_browser_refresh)
+        seed_favorites_from_bundle()
         self._favorites: set[str] = load_favorites()
 
         self._build_widgets()
@@ -320,6 +321,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_qty_spin = QSpinBox()
         self.guided_add_button = QPushButton("Agregar al presupuesto")
         self.guided_print_label_button = QPushButton("Imprimir etiqueta")
+        self.guided_favorites_button = QPushButton("★ Favoritos")
         self.guided_reset_button = QPushButton("Limpiar pasos")
         self.guided_basics_button = QPushButton("Piezas generales")
         self.guided_visual_icon_label = QLabel()
@@ -737,9 +739,16 @@ class QuoteSatelliteWindow(QMainWindow):
         steps_layout = QVBoxLayout()
         steps_layout.setContentsMargins(12, 10, 12, 8)
         steps_layout.setSpacing(4)
+        _steps_header = QHBoxLayout()
+        _steps_header.setSpacing(8)
         _steps_title = QLabel("Cotiza por pasos")
         _steps_title.setObjectName("guidedGroupBoxTitle")
-        steps_layout.addWidget(_steps_title)
+        self.guided_favorites_button.setObjectName("chipButton")
+        self.guided_favorites_button.setFixedHeight(32)
+        _steps_header.addWidget(_steps_title)
+        _steps_header.addStretch()
+        _steps_header.addWidget(self.guided_favorites_button)
+        steps_layout.addLayout(_steps_header)
         steps_layout.addWidget(self.guided_path_label)
 
         # Paso 1 — Ruta
@@ -1409,6 +1418,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.catalog_next_page_button.clicked.connect(self._handle_catalog_browser_next_page)
         self.guided_add_button.clicked.connect(self._handle_add_guided_selection_to_quote)
         self.guided_print_label_button.clicked.connect(self._print_label_for_guided_selection)
+        self.guided_favorites_button.clicked.connect(self._open_favorites_dialog)
         self.guided_reset_button.clicked.connect(self._handle_guided_reset_steps)
         self.guided_basics_button.clicked.connect(self._handle_guided_go_to_basics)
         self.quote_remove_button.clicked.connect(self._handle_remove_quote_item)
@@ -2079,6 +2089,196 @@ class QuoteSatelliteWindow(QMainWindow):
         self._favorites = set(load_favorites())
         toggle_favorite(product_key)
         self._favorites = set(load_favorites())
+        self._refresh_guided_browser()
+
+    def _open_favorites_dialog(self) -> None:
+        """Abre un dialog con todas las piezas favoritas para agregar rápidamente al carrito."""
+        self._favorites = set(load_favorites())
+        if not self._favorites:
+            QMessageBox.information(
+                self,
+                "Sin favoritos",
+                "No hay favoritos guardados.\nToca ♥ en las piezas del flujo guiado para marcarlas.",
+            )
+            return
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Mis Favoritos")
+        dialog.setModal(True)
+        dialog.setMinimumWidth(540)
+        dialog.setMinimumHeight(500)
+        dialog.setStyleSheet(build_satellite_stylesheet())
+
+        outer = QVBoxLayout()
+        outer.setContentsMargins(16, 16, 16, 12)
+        outer.setSpacing(10)
+
+        # Título
+        title_row = QHBoxLayout()
+        title_row.setSpacing(8)
+        title_lbl = QLabel("★ Mis Favoritos")
+        title_lbl.setObjectName("satSidebarTitle")
+        title_row.addWidget(title_lbl)
+        title_row.addStretch()
+        outer.addLayout(title_row)
+
+        # Área de tarjetas de producto
+        products_scroll = QScrollArea()
+        products_scroll.setWidgetResizable(True)
+        products_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        products_scroll.setMinimumHeight(180)
+        products_scroll.setObjectName("guidedScrollArea")
+        products_scroll.viewport().setObjectName("guidedScrollViewport")
+        products_container = QWidget()
+        products_container.setObjectName("guidedGridSurface")
+        products_container.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        products_flow = FlowLayout(margin=0, h_spacing=4, v_spacing=8)
+        products_container.setLayout(products_flow)
+        products_scroll.setWidget(products_container)
+        outer.addWidget(products_scroll)
+
+        # Detalle y variantes
+        detail_lbl = QLabel("Selecciona una pieza para ver sus tallas.")
+        detail_lbl.setObjectName("guidedStepHint")
+        detail_lbl.setWordWrap(True)
+        outer.addWidget(detail_lbl)
+
+        variants_header = QLabel("Tallas:")
+        variants_header.setObjectName("satFieldLabel")
+        variants_header.setVisible(False)
+        outer.addWidget(variants_header)
+
+        variants_container = QWidget()
+        variants_flow = FlowLayout(margin=0, h_spacing=6, v_spacing=6)
+        variants_container.setLayout(variants_flow)
+        variants_container.setVisible(False)
+        outer.addWidget(variants_container)
+
+        # Footer
+        footer = QHBoxLayout()
+        footer.setSpacing(8)
+        qty_lbl = QLabel("Cantidad:")
+        qty_lbl.setObjectName("satFieldLabel")
+        qty_spin = QSpinBox()
+        qty_spin.setMinimum(1)
+        qty_spin.setMaximum(99)
+        qty_spin.setValue(1)
+        qty_spin.setFixedWidth(72)
+        add_btn = QPushButton("Agregar al presupuesto")
+        add_btn.setObjectName("primaryButton")
+        add_btn.setEnabled(False)
+        close_btn = QPushButton("Cerrar")
+        close_btn.setObjectName("ghostButton")
+        footer.addWidget(qty_lbl)
+        footer.addWidget(qty_spin)
+        footer.addStretch()
+        footer.addWidget(close_btn)
+        footer.addWidget(add_btn)
+        outer.addLayout(footer)
+
+        dialog.setLayout(outer)
+
+        # Estado interno del dialog
+        _state: dict[str, str] = {"product_key": "", "sku": ""}
+        _variant_buttons: dict[str, QPushButton] = {}
+        _product_buttons: dict[str, QPushButton] = {}
+
+        def _rebuild_variants(product_key: str) -> None:
+            _clear_layout(variants_flow)
+            _variant_buttons.clear()
+            view = build_favorites_catalog_view(
+                self.catalog_snapshot_rows, self._favorites, selected_product_key=product_key
+            )
+            if not view.variant_options:
+                variants_header.setVisible(False)
+                variants_container.setVisible(False)
+                return
+            variants_header.setVisible(True)
+            variants_container.setVisible(True)
+            for opt in view.variant_options:
+                vbtn = QPushButton(opt.label)
+                vbtn.setObjectName("guidedChoiceButton")
+                vbtn.setCheckable(True)
+                vbtn.setProperty("compactChoice", True)
+                vbtn.setMinimumHeight(42)
+                vbtn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
+                vbtn.clicked.connect(lambda checked=False, s=opt.sku: _select_sku(s))
+                variants_flow.addWidget(vbtn)
+                _variant_buttons[opt.sku] = vbtn
+
+        def _rebuild_products() -> None:
+            _clear_layout(products_flow)
+            _product_buttons.clear()
+            view = build_favorites_catalog_view(self.catalog_snapshot_rows, self._favorites)
+            for card in view.product_cards:
+                pbtn = self._build_guided_product_button(card)
+                pbtn.setChecked(card.key == _state["product_key"])
+                pbtn.clicked.connect(lambda checked=False, k=card.key: _select_product(k))
+                heart_btn = QPushButton("♥")
+                heart_btn.setObjectName("favoriteButton")
+                heart_btn.setFixedHeight(28)
+                heart_btn.setChecked(True)
+                heart_btn.setToolTip("Quitar de favoritos")
+                heart_btn.clicked.connect(lambda checked=False, k=card.key: _remove_favorite(k))
+                container = QWidget()
+                cl = QVBoxLayout(container)
+                cl.setContentsMargins(0, 0, 0, 0)
+                cl.setSpacing(2)
+                cl.addWidget(pbtn)
+                cl.addWidget(heart_btn)
+                products_flow.addWidget(container)
+                _product_buttons[card.key] = pbtn
+
+        def _select_product(key: str) -> None:
+            _state["product_key"] = key
+            _state["sku"] = ""
+            add_btn.setEnabled(False)
+            for k, b in _product_buttons.items():
+                b.setChecked(k == key)
+            view = build_favorites_catalog_view(
+                self.catalog_snapshot_rows, self._favorites, selected_product_key=key
+            )
+            card_names = {c.key: c.title for c in view.product_cards}
+            detail_lbl.setText(f"Modelo: {card_names.get(key, key)}")
+            _rebuild_variants(key)
+
+        def _select_sku(sku: str) -> None:
+            _state["sku"] = sku
+            add_btn.setEnabled(bool(sku))
+            for s, b in _variant_buttons.items():
+                b.setChecked(s == sku)
+
+        def _remove_favorite(key: str) -> None:
+            toggle_favorite(key)
+            self._favorites = set(load_favorites())
+            if _state["product_key"] == key:
+                _state["product_key"] = ""
+                _state["sku"] = ""
+                detail_lbl.setText("Selecciona una pieza para ver sus tallas.")
+                _clear_layout(variants_flow)
+                variants_header.setVisible(False)
+                variants_container.setVisible(False)
+                add_btn.setEnabled(False)
+            _rebuild_products()
+            if not self._favorites:
+                dialog.accept()
+
+        def _add_to_cart() -> None:
+            if not _state["sku"]:
+                return
+            self._add_quote_item_by_sku(_state["sku"], qty_spin.value())
+            qty_spin.setValue(1)
+            _state["sku"] = ""
+            add_btn.setEnabled(False)
+            for b in _variant_buttons.values():
+                b.setChecked(False)
+            detail_lbl.setText("✓ Agregado. Elige otra talla o pieza, o cierra.")
+
+        add_btn.clicked.connect(_add_to_cart)
+        close_btn.clicked.connect(dialog.accept)
+
+        _rebuild_products()
+        dialog.exec()
         self._refresh_guided_browser()
 
     def _rebuild_guided_variant_buttons(self, variant_options) -> None:
