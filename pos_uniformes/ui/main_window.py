@@ -2873,10 +2873,13 @@ class MainWindow(QMainWindow):
             changes=changes,
         )
 
-    def _refresh_settings_users(self) -> None:
+    def _refresh_settings_users(self, session=None) -> None:
         try:
-            with get_session() as session:
+            if session is not None:
                 users = UserService.list_users(session)
+            else:
+                with get_session() as s:
+                    users = UserService.list_users(s)
         except Exception as exc:  # noqa: BLE001
             users_view = build_settings_users_error_view(str(exc))
             self.settings_users_status_label.setText(users_view.status_label)
@@ -2906,11 +2909,14 @@ class MainWindow(QMainWindow):
         self.settings_users_table.resizeColumnsToContents()
         self.settings_users_status_label.setText(users_view.status_label)
 
-    def _refresh_settings_suppliers(self) -> None:
+    def _refresh_settings_suppliers(self, session=None) -> None:
         search_text = self.settings_suppliers_search_input.text().strip()
         try:
-            with get_session() as session:
+            if session is not None:
                 suppliers = SupplierService.list_suppliers(session, search_text)
+            else:
+                with get_session() as s:
+                    suppliers = SupplierService.list_suppliers(s, search_text)
         except Exception as exc:  # noqa: BLE001
             suppliers_view = build_settings_suppliers_error_view(str(exc))
             self.settings_suppliers_status_label.setText(suppliers_view.status_label)
@@ -2943,11 +2949,14 @@ class MainWindow(QMainWindow):
         self.settings_suppliers_table.resizeColumnsToContents()
         self.settings_suppliers_status_label.setText(suppliers_view.status_label)
 
-    def _refresh_settings_clients(self) -> None:
+    def _refresh_settings_clients(self, session=None) -> None:
         search_text = self.settings_clients_search_input.text().strip()
         try:
-            with get_session() as session:
+            if session is not None:
                 clients = ClientService.list_clients(session, search_text)
+            else:
+                with get_session() as s:
+                    clients = ClientService.list_clients(s, search_text)
         except Exception as exc:  # noqa: BLE001
             clients_view = build_settings_clients_error_view(str(exc))
             self.settings_clients_status_label.setText(clients_view.status_label)
@@ -3016,6 +3025,7 @@ class MainWindow(QMainWindow):
                         activity_state = build_employee_activity_state(activity_snapshot)
                     employee_activity_snapshots[int(employee.id)] = activity_snapshot
                     employee_activity_states[int(employee.id)] = (activity_state.label, activity_state.tone)
+            self._employee_activity_snapshots_cache = employee_activity_snapshots
         except Exception as exc:  # noqa: BLE001
             employees_view = build_settings_employees_error_view(str(exc))
             self.settings_employees_status_label.setText(employees_view.status_label)
@@ -3098,6 +3108,10 @@ class MainWindow(QMainWindow):
         if employee_id is None:
             snapshot = build_employee_activity_empty_snapshot()
             self._apply_settings_employee_detail_snapshot(snapshot, has_selection=False)
+            return
+        cache = getattr(self, "_employee_activity_snapshots_cache", {})
+        if summary_days == 1 and employee_id in cache:
+            self._apply_settings_employee_detail_snapshot(cache[employee_id], has_selection=True)
             return
         try:
             with get_session() as session:
@@ -8202,9 +8216,10 @@ class MainWindow(QMainWindow):
             return
 
         self._refresh_settings_backups()
-        self._refresh_settings_users()
-        self._refresh_settings_suppliers()
-        self._refresh_settings_clients()
+        with get_session() as settings_session:
+            self._refresh_settings_users(settings_session)
+            self._refresh_settings_suppliers(settings_session)
+            self._refresh_settings_clients(settings_session)
         self._refresh_settings_employees()
         self.status_label.setText("Estado: datos sincronizados con PostgreSQL.")
 
