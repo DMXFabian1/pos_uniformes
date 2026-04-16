@@ -5,26 +5,31 @@
 import { useEffect, useRef } from 'react'
 import { Html5Qrcode } from 'html5-qrcode'
 
-let scannerInstance = null
-
 export default function Scanner({ onScan, active = true }) {
   const containerId = 'qr-scanner-container'
-  const started = useRef(false)
+  const scannerRef = useRef(null)
+  const stoppingRef = useRef(false)
 
   useEffect(() => {
     if (!active) return
 
+    let cancelled = false
+
     async function start() {
-      if (started.current) return
+      // Esperar si hay una parada en curso
+      while (stoppingRef.current) {
+        await new Promise(r => setTimeout(r, 50))
+      }
+      if (cancelled) return
+
       try {
         const scanner = new Html5Qrcode(containerId)
-        scannerInstance = scanner
+        scannerRef.current = scanner
         await scanner.start(
           { facingMode: 'environment' },
           { fps: 10, qrbox: { width: 260, height: 180 } },
-          (decoded) => { onScan(decoded) }
+          (decoded) => { if (!cancelled) onScan(decoded) }
         )
-        started.current = true
       } catch (e) {
         console.warn('Scanner no disponible:', e)
       }
@@ -33,13 +38,16 @@ export default function Scanner({ onScan, active = true }) {
     start()
 
     return () => {
-      if (scannerInstance && started.current) {
-        scannerInstance.stop().catch(() => {})
-        scannerInstance = null
-        started.current = false
-      }
+      cancelled = true
+      const scanner = scannerRef.current
+      if (!scanner) return
+      scannerRef.current = null
+      stoppingRef.current = true
+      scanner.stop()
+        .catch(() => {})
+        .finally(() => { stoppingRef.current = false })
     }
-  }, [active, onScan])
+  }, [active]) // onScan intencionalmente excluido para evitar reinicios
 
   return (
     <div className="relative w-full overflow-hidden rounded-2xl bg-black">
