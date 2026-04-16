@@ -586,30 +586,4 @@ QWidget#guidedPageRoot {
     background: #f4efe7;
     border: none;
 }
-/* ── Guided redesign ────────────────────────────────────────── */
-QScrollArea#guidedStepsScroll,
-QWidget#guidedStepsViewport,
-QWidget#guidedStepsContent {
-    background: transparent;
-    border: none;
-}
-QFrame#guidedStepSection {
-    background: #fffdf8;
-    border: 1px solid #e6dace;
-    border-radius: 14px;
-}
-QFrame#guidedDetailCard {
-    background: #fdfaf4;
-    border-top: 4px solid #a84f2d;
-    border-left: 1px solid #dfcbb5;
-    border-right: 1px solid #dfcbb5;
-    border-bottom: 1px solid #dfcbb5;
-    border-radius: 20px;
-}
-QFrame#guidedDetailDivider {
-    background: #e8ddd0;
-    border: none;
-    max-height: 1px;
-    min-height: 1px;
-}
 """
