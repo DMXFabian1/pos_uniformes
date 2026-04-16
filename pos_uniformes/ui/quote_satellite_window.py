@@ -57,6 +57,7 @@ from pos_uniformes.services.catalog_local_cache_service import (
     format_cache_age_label,
     save_catalog_cache,
 )
+from pos_uniformes.services.satellite_favorites_service import load_favorites, toggle_favorite
 from pos_uniformes.services.catalog_snapshot_service import load_catalog_snapshot_rows
 from pos_uniformes.services.client_service import ClientService
 from pos_uniformes.services.presupuesto_service import PresupuestoService
@@ -206,6 +207,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.catalog_browser_debounce_timer.setSingleShot(True)
         self.catalog_browser_debounce_timer.setInterval(SATELLITE_SEARCH_DEBOUNCE_MS)
         self.catalog_browser_debounce_timer.timeout.connect(self._run_catalog_browser_refresh)
+        self._favorites: set[str] = load_favorites()
 
         self._build_widgets()
         self._apply_icons()
@@ -2051,12 +2053,33 @@ class QuoteSatelliteWindow(QMainWindow):
     def _rebuild_guided_product_buttons(self, product_cards) -> None:
         _clear_layout(self.guided_product_flow_layout)
         self.guided_product_buttons = {}
-        for card in product_cards:
-            button = self._build_guided_product_button(card)
-            button.setChecked(self._gfs.product_key == card.key)
-            button.clicked.connect(lambda checked=False, selected=card.key: self._handle_guided_product_selected(selected))
-            self.guided_product_flow_layout.addWidget(button)
-            self.guided_product_buttons[card.key] = button
+        sorted_cards = sorted(product_cards, key=lambda c: (c.key not in self._favorites, 0))
+        for card in sorted_cards:
+            product_btn = self._build_guided_product_button(card)
+            product_btn.setChecked(self._gfs.product_key == card.key)
+            product_btn.clicked.connect(lambda checked=False, selected=card.key: self._handle_guided_product_selected(selected))
+            is_fav = card.key in self._favorites
+            heart_btn = QPushButton("♥" if is_fav else "♡")
+            heart_btn.setObjectName("favoriteButton")
+            heart_btn.setFixedHeight(28)
+            heart_btn.setCheckable(True)
+            heart_btn.setChecked(is_fav)
+            heart_btn.setToolTip("Quitar de favoritos" if is_fav else "Agregar a favoritos")
+            heart_btn.clicked.connect(lambda checked=False, key=card.key: self._handle_toggle_favorite(key))
+            container = QWidget()
+            container_layout = QVBoxLayout(container)
+            container_layout.setContentsMargins(0, 0, 0, 0)
+            container_layout.setSpacing(2)
+            container_layout.addWidget(product_btn)
+            container_layout.addWidget(heart_btn)
+            self.guided_product_flow_layout.addWidget(container)
+            self.guided_product_buttons[card.key] = product_btn
+
+    def _handle_toggle_favorite(self, product_key: str) -> None:
+        self._favorites = set(load_favorites())
+        toggle_favorite(product_key)
+        self._favorites = set(load_favorites())
+        self._refresh_guided_browser()
 
     def _rebuild_guided_variant_buttons(self, variant_options) -> None:
         _clear_layout(self.guided_variant_groups_layout)

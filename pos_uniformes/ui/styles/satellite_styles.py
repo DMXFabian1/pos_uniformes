@@ -428,6 +428,22 @@ QPushButton#guidedProductButton:checked {
     color: #fbf8f2;
     border: 1px solid #87492c;
 }
+QPushButton#favoriteButton {
+    background: transparent;
+    color: #c0a090;
+    border: none;
+    border-radius: 8px;
+    padding: 2px 4px;
+    font-size: 16px;
+    font-weight: 400;
+}
+QPushButton#favoriteButton:checked {
+    color: #c0392b;
+}
+QPushButton#favoriteButton:hover {
+    background: #f5e8e0;
+    color: #a84f2d;
+}
 QPushButton:disabled {
     background: #e8dfd3;
     color: #a39a90;
