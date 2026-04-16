@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 import sys
+import unicodedata
 from pathlib import Path
 from urllib.parse import quote
 from uuid import uuid4
@@ -4204,23 +4205,30 @@ def _guided_display_color_label(raw_value: object) -> str:
 
 
 _FAV_PIECE_ORDER = [
-    "pantalon",
-    "falda",
-    "sueter",
-    "camisa",
-    "playera",
-    "calcet",   # cubre calceta / calcetín / calcetines
-    "malla",
+    "pantalon",   # Pantalón
+    "falda",      # Falda
+    "sueter",     # Suéter
+    "camisa",     # Camisa
+    "playera",    # Playera
+    "calceta",    # Calceta
+    "malla",      # Malla
 ]
 
 
 def _fav_piece_sort_key(label: str) -> tuple[int, str]:
-    """Orden personalizado para grupos de piezas en el dialog de favoritos."""
-    normalized = label.lower()
+    """Orden personalizado para grupos de piezas en el dialog de favoritos.
+
+    Quita acentos antes de comparar para que 'Pantalón' → 'pantalon' y
+    'Suéter' → 'sueter' coincidan con las keywords sin acento.
+    """
+    stripped = "".join(
+        c for c in unicodedata.normalize("NFD", label.lower())
+        if unicodedata.category(c) != "Mn"
+    )
     for i, kw in enumerate(_FAV_PIECE_ORDER):
-        if kw in normalized:
-            return (i, normalized)
-    return (len(_FAV_PIECE_ORDER), normalized)
+        if kw in stripped:
+            return (i, stripped)
+    return (len(_FAV_PIECE_ORDER), stripped)
 
 
 def _clear_layout(layout) -> None:
