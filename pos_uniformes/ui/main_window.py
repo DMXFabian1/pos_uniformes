@@ -10922,7 +10922,9 @@ class MainWindow(QMainWindow):
         self.sale_qty_up_button.setEnabled(panel_view.quick_adjust_enabled)
         self.sale_remove_button.setEnabled(panel_view.remove_enabled)
         self.sale_clear_button.setEnabled(panel_view.clear_enabled)
-        self._refresh_permissions()
+        can_manage_layaways = self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
+        can_operate_open_cash = self.active_cash_session_id is not None and not self.cash_session_requires_cut
+        self.sale_layaway_button.setEnabled(can_manage_layaways and can_operate_open_cash and bool(self.sale_cart))
 
     def _refresh_quote_cart_table(self) -> None:
         quote_cart_view = build_quote_cart_view(self.quote_cart)
@@ -10938,7 +10940,11 @@ class MainWindow(QMainWindow):
         self.quote_cart_table.resizeColumnsToContents()
         self.quote_total_label.setText(quote_cart_view.summary.total_label)
         self.quote_summary_label.setText(quote_cart_view.summary.summary_label)
-        self._refresh_permissions()
+        can_sell = self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
+        self.quote_qty_down_button.setEnabled(can_sell and bool(self.quote_cart))
+        self.quote_qty_up_button.setEnabled(can_sell and bool(self.quote_cart))
+        self.quote_remove_button.setEnabled(can_sell and bool(self.quote_cart))
+        self.quote_clear_button.setEnabled(can_sell and bool(self.quote_cart))
 
     def _selected_catalog_row(self) -> dict[str, object] | None:
         inventory_variant_id = self._inventory_table_variant_id_at_row(self.inventory_table.currentRow())
