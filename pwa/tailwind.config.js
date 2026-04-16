@@ -16,6 +16,20 @@ export default {
       },
       fontFamily: {
         sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif']
+      },
+      animation: {
+        scan: 'scan 2s ease-in-out infinite',
+        'slide-up': 'slideUp 0.25s ease-out',
+      },
+      keyframes: {
+        scan: {
+          '0%, 100%': { transform: 'translateY(0px)', opacity: '0.9' },
+          '50%':       { transform: 'translateY(160px)', opacity: '0.6' },
+        },
+        slideUp: {
+          '0%':   { transform: 'translateY(100%)', opacity: '0' },
+          '100%': { transform: 'translateY(0)',    opacity: '1' },
+        }
       }
     }
   },
