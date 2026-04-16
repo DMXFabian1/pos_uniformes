@@ -287,11 +287,11 @@ QFrame#satRecentCard {
 QPushButton#addToCartButton {
     background: #a84f2d;
     color: #f9f4ea;
-    font-size: 15px;
+    font-size: 13px;
     font-weight: 900;
-    padding: 13px 20px;
-    border-radius: 14px;
-    min-height: 48px;
+    padding: 8px 16px;
+    border-radius: 12px;
+    min-height: 36px;
 }
 QPushButton#addToCartButton:disabled {
     background: #d8c9b8;
