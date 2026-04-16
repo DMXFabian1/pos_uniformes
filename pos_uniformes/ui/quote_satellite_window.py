@@ -2144,12 +2144,18 @@ QFrame#favDialogSep {
     max-height: 1px;
     border: none;
 }
+QLabel#favDialogPriceLabel {
+    color: #87492c;
+    font-size: 12px;
+    font-weight: 800;
+    padding: 4px 0 2px 0;
+}
 """
         dialog = QDialog(self)
-        dialog.setWindowTitle("Mis Favoritos")
+        dialog.setWindowTitle("Los favoritos de Maximoda")
         dialog.setModal(True)
-        dialog.setMinimumWidth(820)
-        dialog.setMinimumHeight(580)
+        dialog.setMinimumWidth(960)
+        dialog.setMinimumHeight(660)
         dialog.setStyleSheet(build_satellite_stylesheet() + _extra_css)
 
         root = QVBoxLayout()
@@ -2163,7 +2169,7 @@ QFrame#favDialogSep {
         h_row = QHBoxLayout()
         h_row.setContentsMargins(20, 14, 16, 14)
         h_row.setSpacing(12)
-        title_lbl = QLabel("♥ Mis Favoritos")
+        title_lbl = QLabel("♥  Los favoritos de Maximoda")
         title_lbl.setObjectName("favDialogTitle")
         count_lbl = QLabel("")
         count_lbl.setObjectName("favDialogCount")
@@ -2250,8 +2256,10 @@ QFrame#favDialogSep {
         right_vbox.addSpacing(6)
 
         variants_container = QWidget()
-        variants_flow = FlowLayout(margin=0, h_spacing=6, v_spacing=8)
-        variants_container.setLayout(variants_flow)
+        variants_vbox = QVBoxLayout()
+        variants_vbox.setContentsMargins(0, 0, 0, 0)
+        variants_vbox.setSpacing(4)
+        variants_container.setLayout(variants_vbox)
         variants_container.setVisible(False)
         right_vbox.addWidget(variants_container)
 
@@ -2338,7 +2346,7 @@ QFrame#favDialogSep {
                 piece = card.key.split("||")[0].strip() if "||" in card.key else "Piezas"
                 groups.setdefault(piece, []).append(card)
 
-            for piece_label in sorted(groups):
+            for piece_label in sorted(groups, key=_fav_piece_sort_key):
                 grp_lbl = QLabel(piece_label.upper())
                 grp_lbl.setObjectName("favDialogGroupLabel")
                 new_vbox.addWidget(grp_lbl)
@@ -2359,7 +2367,7 @@ QFrame#favDialogSep {
             products_scroll.setWidget(new_container)
 
         def _rebuild_variants(product_key: str) -> None:
-            _clear_layout(variants_flow)
+            _clear_layout(variants_vbox)
             _variant_buttons.clear()
             view = build_favorites_catalog_view(
                 self.catalog_snapshot_rows, self._favorites, selected_product_key=product_key
@@ -2370,15 +2378,28 @@ QFrame#favDialogSep {
                 return
             variants_title_lbl.setVisible(True)
             variants_container.setVisible(True)
+            current_price: str | None = None
+            current_flow: FlowLayout | None = None
             for opt in view.variant_options:
-                vbtn = QPushButton(opt.label)
+                price = opt.price_label
+                if price != current_price or current_flow is None:
+                    current_price = price
+                    price_grp_lbl = QLabel(price)
+                    price_grp_lbl.setObjectName("favDialogPriceLabel")
+                    variants_vbox.addWidget(price_grp_lbl)
+                    grp_widget = QWidget()
+                    current_flow = FlowLayout(margin=0, h_spacing=6, v_spacing=6)
+                    grp_widget.setLayout(current_flow)
+                    variants_vbox.addWidget(grp_widget)
+                size_text = opt.label.split(" · ")[0].strip() if " · " in opt.label else opt.label
+                vbtn = QPushButton(size_text)
                 vbtn.setObjectName("guidedChoiceButton")
                 vbtn.setCheckable(True)
                 vbtn.setProperty("compactChoice", True)
                 vbtn.setMinimumHeight(44)
                 vbtn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
                 vbtn.clicked.connect(lambda checked=False, s=opt.sku: _select_sku(s))
-                variants_flow.addWidget(vbtn)
+                current_flow.addWidget(vbtn)
                 _variant_buttons[opt.sku] = vbtn
 
         def _select_product(key: str) -> None:
@@ -2426,7 +2447,7 @@ QFrame#favDialogSep {
             detail_name_lbl.setText("Selecciona una pieza")
             detail_subtitle_lbl.setText("Toca una tarjeta de la izquierda.")
             detail_icon_lbl.setPixmap(_scaled_asset_pixmap("qr_icons/default.png", 40))
-            _clear_layout(variants_flow)
+            _clear_layout(variants_vbox)
             variants_title_lbl.setVisible(False)
             variants_container.setVisible(False)
             add_btn.setEnabled(False)
@@ -4180,6 +4201,26 @@ def _guided_display_color_label(raw_value: object) -> str:
     if not color_label or normalized in {"sincolor", "adhoc"}:
         return ""
     return color_label
+
+
+_FAV_PIECE_ORDER = [
+    "pantalon",
+    "falda",
+    "sueter",
+    "camisa",
+    "playera",
+    "calcet",   # cubre calceta / calcetín / calcetines
+    "malla",
+]
+
+
+def _fav_piece_sort_key(label: str) -> tuple[int, str]:
+    """Orden personalizado para grupos de piezas en el dialog de favoritos."""
+    normalized = label.lower()
+    for i, kw in enumerate(_FAV_PIECE_ORDER):
+        if kw in normalized:
+            return (i, normalized)
+    return (len(_FAV_PIECE_ORDER), normalized)
 
 
 def _clear_layout(layout) -> None:
