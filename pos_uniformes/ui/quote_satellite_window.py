@@ -1060,48 +1060,49 @@ class QuoteSatelliteWindow(QMainWindow):
         return page
 
     def _build_kiosk_panel(self) -> QWidget:
-        panel = QGroupBox("Escaneo rapido")
+        root = QWidget()
         layout = QHBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(16)
 
-        # ---- LEFT ----
+        # ======== COLUMNA IZQUIERDA ========
         left = QWidget()
         left_layout = QVBoxLayout()
-        left_layout.setSpacing(14)
         left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setSpacing(14)
 
-        self.kiosk_scan_input.setPlaceholderText("Escanea o captura el SKU")
+        # --- Tarjeta de escaneo ---
+        self.kiosk_scan_input.setPlaceholderText("Escanea o captura el SKU aquí")
         self.kiosk_scan_input.setClearButtonEnabled(True)
         self.kiosk_scan_input.setObjectName("satScanInput")
+        self.kiosk_scan_input.setMinimumHeight(46)
         self.kiosk_scan_input.setMinimumWidth(0)
         self.kiosk_lookup_button.setObjectName("secondaryButton")
         self.kiosk_add_button.setObjectName("addToCartButton")
-        self.kiosk_open_quote_button.setObjectName("secondaryButton")
-        self.kiosk_open_search_button.setObjectName("ghostButton")
 
-        scan_label = QLabel("SKU")
-        scan_label.setObjectName("satFieldLabel")
+        scan_field_label = QLabel("CÓDIGO DE PRODUCTO")
+        scan_field_label.setObjectName("satKioskScanLabel")
 
-        top_scan_row = QHBoxLayout()
-        top_scan_row.setSpacing(10)
-        top_scan_row.addWidget(self.kiosk_scan_input, 1)
+        scan_input_row = QHBoxLayout()
+        scan_input_row.setSpacing(10)
+        scan_input_row.addWidget(self.kiosk_scan_input, 1)
 
-        action_row = QHBoxLayout()
-        action_row.setSpacing(10)
-        action_row.addWidget(self.kiosk_lookup_button)
-        action_row.addWidget(self.kiosk_add_button, 1)
+        scan_action_row = QHBoxLayout()
+        scan_action_row.setSpacing(10)
+        scan_action_row.addWidget(self.kiosk_lookup_button)
+        scan_action_row.addWidget(self.kiosk_add_button, 1)
 
         scan_card = QFrame()
         scan_card.setObjectName("satScanCard")
         scan_card_layout = QVBoxLayout()
-        scan_card_layout.setContentsMargins(16, 14, 16, 14)
-        scan_card_layout.setSpacing(10)
-        scan_card_layout.addWidget(scan_label)
-        scan_card_layout.addLayout(top_scan_row)
-        scan_card_layout.addLayout(action_row)
+        scan_card_layout.setContentsMargins(20, 16, 20, 16)
+        scan_card_layout.setSpacing(12)
+        scan_card_layout.addWidget(scan_field_label)
+        scan_card_layout.addLayout(scan_input_row)
+        scan_card_layout.addLayout(scan_action_row)
         scan_card.setLayout(scan_card_layout)
 
-        # Product hero card
+        # --- Tarjeta hero del producto ---
         self.kiosk_lookup_sku_label.setObjectName("satKioskSku")
         self.kiosk_lookup_product_label.setObjectName("satKioskProduct")
         self.kiosk_lookup_talla_label.setObjectName("satKioskTalla")
@@ -1111,59 +1112,70 @@ class QuoteSatelliteWindow(QMainWindow):
         self.kiosk_lookup_detail_label.setObjectName("satKioskBody")
         self.kiosk_lookup_context_label.setObjectName("satKioskBody")
         self.kiosk_lookup_notes_label.setObjectName("satKioskBody")
-        self.kiosk_visual_icon_label.setFixedSize(132, 132)
+        self.kiosk_visual_icon_label.setFixedSize(148, 148)
         self.kiosk_lookup_product_label.setWordWrap(True)
         self.kiosk_lookup_detail_label.setWordWrap(True)
         self.kiosk_lookup_context_label.setWordWrap(True)
         self.kiosk_lookup_notes_label.setWordWrap(True)
 
-        hero_row = QHBoxLayout()
-        hero_row.setSpacing(16)
-        hero_row.addWidget(self.kiosk_visual_icon_label, 0, Qt.AlignmentFlag.AlignTop)
+        hero_icon_text = QHBoxLayout()
+        hero_icon_text.setSpacing(20)
+        hero_icon_text.addWidget(self.kiosk_visual_icon_label, 0, Qt.AlignmentFlag.AlignTop)
+
         hero_text = QVBoxLayout()
-        hero_text.setSpacing(6)
+        hero_text.setSpacing(4)
         hero_text.addWidget(self.kiosk_lookup_sku_label)
         hero_text.addWidget(self.kiosk_lookup_product_label)
         hero_text.addWidget(self.kiosk_lookup_talla_label)
+        hero_text.addSpacing(6)
         hero_text.addWidget(self.kiosk_lookup_price_label)
         hero_text.addWidget(self.kiosk_lookup_status_label, 0, Qt.AlignmentFlag.AlignLeft)
-        hero_row.addLayout(hero_text, 1)
+        hero_icon_text.addLayout(hero_text, 1)
+
+        hero_divider = QFrame()
+        hero_divider.setObjectName("satHeroDivider")
+        hero_divider.setFrameShape(QFrame.Shape.HLine)
 
         hero_card = QFrame()
         hero_card.setObjectName("satProductHeroCard")
         hero_card_layout = QVBoxLayout()
-        hero_card_layout.setContentsMargins(20, 18, 20, 18)
-        hero_card_layout.setSpacing(10)
-        hero_card_layout.addLayout(hero_row)
+        hero_card_layout.setContentsMargins(22, 20, 22, 20)
+        hero_card_layout.setSpacing(12)
+        hero_card_layout.addLayout(hero_icon_text)
+        hero_card_layout.addWidget(hero_divider)
         hero_card_layout.addWidget(self.kiosk_lookup_detail_label)
         hero_card_layout.addWidget(self.kiosk_lookup_context_label)
         hero_card_layout.addWidget(self.kiosk_lookup_notes_label)
+        hero_card_layout.addStretch()
         hero_card.setLayout(hero_card_layout)
-
-        quick_actions = QHBoxLayout()
-        quick_actions.setSpacing(8)
-        quick_actions.addWidget(self.kiosk_open_quote_button)
-        quick_actions.addWidget(self.kiosk_open_search_button)
-        quick_actions.addStretch()
 
         left_layout.addWidget(scan_card)
         left_layout.addWidget(hero_card, 1)
-        left_layout.addLayout(quick_actions)
         left.setLayout(left_layout)
 
-        # ---- RIGHT ----
-        right = QWidget()
-        right_layout = QVBoxLayout()
-        right_layout.setSpacing(8)
+        # ======== COLUMNA DERECHA ========
+        self.kiosk_open_quote_button.setObjectName("secondaryButton")
+        self.kiosk_open_search_button.setObjectName("ghostButton")
+
+        quick_nav_row = QHBoxLayout()
+        quick_nav_row.setSpacing(8)
+        quick_nav_row.addWidget(self.kiosk_open_quote_button, 1)
+        quick_nav_row.addWidget(self.kiosk_open_search_button, 1)
+
         recent_title = QLabel("Escaneos recientes")
         recent_title.setObjectName("satDetailTitle")
         recent_hint = QLabel("Toca una fila para volver a cargarla.")
         recent_hint.setObjectName("satMeta")
+
         self.kiosk_recent_table.setColumnCount(5)
-        self.kiosk_recent_table.setHorizontalHeaderLabels(["SKU", "Producto", "Precio", "Escuela", "Detalle"])
+        self.kiosk_recent_table.setHorizontalHeaderLabels(
+            ["SKU", "Producto", "Precio", "Escuela", "Detalle"]
+        )
         self.kiosk_recent_table.verticalHeader().setVisible(False)
         self.kiosk_recent_table.setAlternatingRowColors(True)
-        self.kiosk_recent_table.setSelectionBehavior(self.kiosk_recent_table.SelectionBehavior.SelectRows)
+        self.kiosk_recent_table.setSelectionBehavior(
+            self.kiosk_recent_table.SelectionBehavior.SelectRows
+        )
         self.kiosk_recent_table.setMinimumWidth(480)
         self.kiosk_recent_table.setMinimumHeight(520)
         _configure_satellite_table(
@@ -1171,15 +1183,29 @@ class QuoteSatelliteWindow(QMainWindow):
             stretch_columns=(1, 4),
             resize_columns=(0, 2, 3),
         )
-        right_layout.addWidget(recent_title)
-        right_layout.addWidget(recent_hint)
-        right_layout.addWidget(self.kiosk_recent_table, 1)
+
+        recent_card = QFrame()
+        recent_card.setObjectName("satRecentCard")
+        recent_card_layout = QVBoxLayout()
+        recent_card_layout.setContentsMargins(16, 16, 16, 16)
+        recent_card_layout.setSpacing(10)
+        recent_card_layout.addWidget(recent_title)
+        recent_card_layout.addWidget(recent_hint)
+        recent_card_layout.addWidget(self.kiosk_recent_table, 1)
+        recent_card.setLayout(recent_card_layout)
+
+        right = QWidget()
+        right_layout = QVBoxLayout()
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(12)
+        right_layout.addLayout(quick_nav_row)
+        right_layout.addWidget(recent_card, 1)
         right.setLayout(right_layout)
 
-        layout.addWidget(left, 4)
+        layout.addWidget(left, 5)
         layout.addWidget(right, 3)
-        panel.setLayout(layout)
-        return panel
+        root.setLayout(layout)
+        return root
 
     def _make_form_label(self, text: str) -> QLabel:
         """Etiqueta de campo de formulario con estilo satFieldLabel."""

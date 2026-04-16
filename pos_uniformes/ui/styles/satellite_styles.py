@@ -253,15 +253,35 @@ QWidget#satSidebarItemsContent {
     background: transparent;
     border: none;
 }
+/* ── Kiosko ─────────────────────────────────────────────────── */
 QFrame#satScanCard {
-    background: #fffaf2;
+    background: #fffdf8;
     border: 1px solid #d5c9b9;
-    border-radius: 16px;
+    border-radius: 18px;
+}
+QLabel#satKioskScanLabel {
+    color: #9a8478;
+    font-size: 11px;
+    font-weight: 800;
+    letter-spacing: 1px;
 }
 QFrame#satProductHeroCard {
-    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
-        stop:0 #fdf8f0, stop:1 #f4ece0);
-    border: 1px solid #dfcbb5;
+    background: #fdfaf4;
+    border-top: 4px solid #a84f2d;
+    border-left: 1px solid #dfcbb5;
+    border-right: 1px solid #dfcbb5;
+    border-bottom: 1px solid #dfcbb5;
+    border-radius: 20px;
+}
+QFrame#satHeroDivider {
+    background: #e8ddd0;
+    border: none;
+    max-height: 1px;
+    min-height: 1px;
+}
+QFrame#satRecentCard {
+    background: #fbf8f2;
+    border: 1px solid #dce5eb;
     border-radius: 18px;
 }
 QPushButton#addToCartButton {
@@ -269,47 +289,50 @@ QPushButton#addToCartButton {
     color: #f9f4ea;
     font-size: 15px;
     font-weight: 900;
-    padding: 12px 18px;
+    padding: 13px 20px;
     border-radius: 14px;
-    min-height: 44px;
+    min-height: 48px;
 }
 QPushButton#addToCartButton:disabled {
     background: #d8c9b8;
     color: #9e8e7e;
 }
 QLabel#satKioskSku {
+    font-size: 12px;
+    font-weight: 700;
+    color: #9a8478;
+    letter-spacing: 0.5px;
+}
+QLabel#satKioskProduct {
     font-size: 30px;
     font-weight: 900;
     color: #2f2a24;
 }
-QLabel#satKioskProduct {
-    font-size: 28px;
-    font-weight: 800;
-    color: #2f2a24;
-}
 QLabel#satKioskTalla {
-    font-size: 20px;
+    font-size: 18px;
     font-weight: 600;
     color: #7a6f64;
 }
 QLabel#satKioskPrice {
-    font-size: 56px;
+    font-size: 64px;
     font-weight: 900;
-    color: #c0392b;
+    color: #a84f2d;
 }
 QLabel#satKioskBadge {
     color: #2f2a24;
     background: #e8dfd3;
     border-radius: 12px;
-    padding: 8px 12px;
+    padding: 8px 14px;
     font-weight: 800;
+    font-size: 13px;
 }
 QLabel#satKioskBody {
-    color: #66717b;
-    background: rgba(255, 255, 255, 0.60);
+    color: #5e574f;
+    background: rgba(255, 255, 255, 0.55);
     border: 1px solid #ddd0be;
-    border-radius: 12px;
-    padding: 10px 12px;
+    border-radius: 10px;
+    padding: 9px 12px;
+    font-size: 13px;
 }
 QLabel#satDetailTitle {
     font-size: 16px;
