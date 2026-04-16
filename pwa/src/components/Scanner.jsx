@@ -7,28 +7,30 @@ import { Html5Qrcode } from 'html5-qrcode'
 
 export default function Scanner({ onScan, active = true }) {
   const containerId = 'qr-scanner-container'
-  const scannerRef = useRef(null)
-  const stoppingRef = useRef(false)
+  const onScanRef = useRef(onScan)
+  onScanRef.current = onScan  // siempre fresco sin re-montar el scanner
 
   useEffect(() => {
     if (!active) return
 
-    let cancelled = false
+    let alive = true
+    let scanner = null
 
     async function start() {
-      // Esperar si hay una parada en curso
-      while (stoppingRef.current) {
-        await new Promise(r => setTimeout(r, 50))
-      }
-      if (cancelled) return
+      // Pequeña pausa para que cualquier stop previo (StrictMode) termine
+      await new Promise(r => setTimeout(r, 120))
+      if (!alive) return
+
+      // Limpiar el contenedor por si quedaron restos de una instancia anterior
+      const container = document.getElementById(containerId)
+      if (container) container.innerHTML = ''
 
       try {
-        const scanner = new Html5Qrcode(containerId)
-        scannerRef.current = scanner
+        scanner = new Html5Qrcode(containerId)
         await scanner.start(
           { facingMode: 'environment' },
           { fps: 10, qrbox: { width: 260, height: 180 } },
-          (decoded) => { if (!cancelled) onScan(decoded) }
+          (decoded) => { if (alive) onScanRef.current(decoded) }
         )
       } catch (e) {
         console.warn('Scanner no disponible:', e)
@@ -38,16 +40,13 @@ export default function Scanner({ onScan, active = true }) {
     start()
 
     return () => {
-      cancelled = true
-      const scanner = scannerRef.current
-      if (!scanner) return
-      scannerRef.current = null
-      stoppingRef.current = true
-      scanner.stop()
-        .catch(() => {})
-        .finally(() => { stoppingRef.current = false })
+      alive = false
+      if (scanner) {
+        scanner.stop().catch(() => {})
+        scanner = null
+      }
     }
-  }, [active]) // onScan intencionalmente excluido para evitar reinicios
+  }, [active])
 
   return (
     <div className="relative w-full overflow-hidden rounded-2xl bg-black">
