@@ -171,6 +171,11 @@ QLabel#satPager {
     font-size: 13px;
     font-weight: 800;
 }
+QLabel#quoteActionHint {
+    color: #7a6f64;
+    font-size: 12px;
+    padding: 2px 0px;
+}
 QLabel#satStatus {
     background: rgba(249, 244, 234, 0.09);
     border: 1px solid rgba(249, 244, 234, 0.14);

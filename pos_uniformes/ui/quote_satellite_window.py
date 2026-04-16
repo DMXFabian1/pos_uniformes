@@ -375,6 +375,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.quote_refresh_button = QPushButton("Refrescar")
         self.quote_resume_button = QPushButton("Reanudar")
         self.quote_emit_selected_button = QPushButton("Emitir seleccionado")
+        self.quote_action_hint_label = QLabel("")
         self.quote_open_share_button = QPushButton("Compartir")
         self.quote_whatsapp_button = QPushButton("Compartir por WhatsApp")
         self.quote_print_button = QPushButton("Imprimir")
@@ -1347,9 +1348,11 @@ class QuoteSatelliteWindow(QMainWindow):
             resize_columns=(0, 2, 3, 4, 5, 6),
         )
 
+        self.quote_action_hint_label.setObjectName("quoteActionHint")
         history_layout.addWidget(self.quote_status_label)
         history_layout.addLayout(filters)
         history_layout.addLayout(actions)
+        history_layout.addWidget(self.quote_action_hint_label)
         history_layout.addWidget(self.quote_table)
         history_box.setLayout(history_layout)
 
@@ -2086,8 +2089,41 @@ class QuoteSatelliteWindow(QMainWindow):
             self.guided_product_flow_layout.addWidget(container)
             self.guided_product_buttons[card.key] = product_btn
 
+    def _confirm_favorite_removal(self) -> bool:
+        """Pide contraseña antes de quitar un favorito. Retorna True si es correcta."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Quitar favorito")
+        dialog.setModal(True)
+        dialog.setMinimumWidth(300)
+        layout = QVBoxLayout()
+        layout.setSpacing(12)
+        lbl = QLabel("Ingresa la contraseña para quitar este favorito.")
+        lbl.setWordWrap(True)
+        layout.addWidget(lbl)
+        pwd_input = QLineEdit()
+        pwd_input.setEchoMode(QLineEdit.EchoMode.Password)
+        pwd_input.setPlaceholderText("Contraseña")
+        layout.addWidget(pwd_input)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        pwd_input.returnPressed.connect(dialog.accept)
+        layout.addWidget(buttons)
+        dialog.setLayout(layout)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return False
+        if pwd_input.text().strip() != "12345":
+            QMessageBox.warning(self, "Contraseña incorrecta", "La contraseña ingresada no es válida.")
+            return False
+        return True
+
     def _handle_toggle_favorite(self, product_key: str) -> None:
         self._favorites = set(load_favorites())
+        if product_key in self._favorites and not self._confirm_favorite_removal():
+            self._refresh_guided_browser()
+            return
         toggle_favorite(product_key)
         self._favorites = set(load_favorites())
         self._refresh_guided_browser()
@@ -2272,27 +2308,6 @@ QLabel#favDialogPriceLabel {
         right_vbox.addWidget(footer_sep)
         right_vbox.addSpacing(12)
 
-        qty_row = QHBoxLayout()
-        qty_row.setSpacing(8)
-        qty_row_lbl = QLabel("Cantidad:")
-        qty_row_lbl.setObjectName("satFieldLabel")
-        qty_spin = QSpinBox()
-        qty_spin.setMinimum(1)
-        qty_spin.setMaximum(99)
-        qty_spin.setValue(1)
-        qty_spin.setFixedWidth(72)
-        qty_row.addWidget(qty_row_lbl)
-        qty_row.addWidget(qty_spin)
-        qty_row.addStretch()
-        right_vbox.addLayout(qty_row)
-        right_vbox.addSpacing(8)
-
-        remove_btn = QPushButton("♥  Quitar de favoritos")
-        remove_btn.setObjectName("dangerButton")
-        remove_btn.setEnabled(False)
-        right_vbox.addWidget(remove_btn)
-        right_vbox.addSpacing(6)
-
         add_btn = QPushButton("Agregar al presupuesto")
         add_btn.setObjectName("primaryButton")
         add_btn.setEnabled(False)
@@ -2368,21 +2383,61 @@ QLabel#favDialogPriceLabel {
             products_scroll.setWidget(new_container)
 
         def _rebuild_variants(product_key: str) -> None:
+            from decimal import Decimal as _D
             _clear_layout(variants_vbox)
             _variant_buttons.clear()
-            view = build_favorites_catalog_view(
-                self.catalog_snapshot_rows, self._favorites, selected_product_key=product_key
-            )
-            if not view.variant_options:
+
+            # Filtrar directamente de snapshot para tener escuela_nombre disponible
+            family_rows = [
+                r for r in self.catalog_snapshot_rows
+                if (
+                    str(r.get("tipo_pieza_nombre") or "").strip()
+                    + "||"
+                    + str(r.get("producto_nombre_base") or r.get("producto_nombre") or "").strip()
+                ) == product_key
+                and r.get("activo", True)
+            ]
+            def _talla_sort_key(talla_str: str):
+                try:
+                    return (0, float(talla_str))
+                except (ValueError, TypeError):
+                    return (1, talla_str)
+
+            family_rows.sort(key=lambda r: (
+                str(r.get("escuela_nombre") or "General") != "General",  # General primero (False < True)
+                str(r.get("escuela_nombre") or ""),
+                _D(str(r.get("precio_venta") or "0")),
+                _talla_sort_key(str(r.get("talla") or "")),
+            ))
+
+            if not family_rows:
                 variants_title_lbl.setVisible(False)
                 variants_container.setVisible(False)
                 return
             variants_title_lbl.setVisible(True)
             variants_container.setVisible(True)
+
+            # Agrupar por escuela → precio
+            escuelas_distintas = {str(rr.get("escuela_nombre") or "General") for rr in family_rows}
+            multi_escuela = len(escuelas_distintas) > 1
+            current_school: str | None = None
             current_price: str | None = None
             current_flow: FlowLayout | None = None
-            for opt in view.variant_options:
-                price = opt.price_label
+            for r in family_rows:
+                school = str(r.get("escuela_nombre") or "General").strip()
+                price = f"${_D(str(r.get('precio_venta') or '0')).quantize(_D('0.01'))}"
+                talla = str(r.get("talla") or "").strip()
+                sku = str(r.get("sku") or "")
+
+                if multi_escuela and school != current_school:
+                    current_school = school
+                    current_price = None  # forzar nuevo encabezado de precio
+                    school_lbl = QLabel(
+                        "Precio general" if school == "General" else f"Precio {school}"
+                    )
+                    school_lbl.setObjectName("favDialogGroupLabel")
+                    variants_vbox.addWidget(school_lbl)
+
                 if price != current_price or current_flow is None:
                     current_price = price
                     price_grp_lbl = QLabel(price)
@@ -2392,22 +2447,22 @@ QLabel#favDialogPriceLabel {
                     current_flow = FlowLayout(margin=0, h_spacing=6, v_spacing=6)
                     grp_widget.setLayout(current_flow)
                     variants_vbox.addWidget(grp_widget)
-                size_text = opt.label.split(" · ")[0].strip() if " · " in opt.label else opt.label
+
+                size_text = f"Talla {talla}" if talla else sku
                 vbtn = QPushButton(size_text)
                 vbtn.setObjectName("guidedChoiceButton")
                 vbtn.setCheckable(True)
                 vbtn.setProperty("compactChoice", True)
                 vbtn.setMinimumHeight(44)
                 vbtn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-                vbtn.clicked.connect(lambda checked=False, s=opt.sku: _select_sku(s))
+                vbtn.clicked.connect(lambda checked=False, s=sku: _select_sku(s))
                 current_flow.addWidget(vbtn)
-                _variant_buttons[opt.sku] = vbtn
+                _variant_buttons[sku] = vbtn
 
         def _select_product(key: str) -> None:
             _state["product_key"] = key
             _state["sku"] = ""
             add_btn.setEnabled(False)
-            remove_btn.setEnabled(True)
             for k, b in _product_buttons.items():
                 b.setChecked(k == key)
             view = build_favorites_catalog_view(
@@ -2437,39 +2492,29 @@ QLabel#favDialogPriceLabel {
             for s, b in _variant_buttons.items():
                 b.setChecked(s == sku)
 
-        def _do_remove_favorite() -> None:
-            key = _state["product_key"]
-            if not key:
-                return
-            toggle_favorite(key)
-            self._favorites = set(load_favorites())
-            _state["product_key"] = ""
-            _state["sku"] = ""
-            detail_name_lbl.setText("Selecciona una pieza")
-            detail_subtitle_lbl.setText("Toca una tarjeta de la izquierda.")
-            detail_icon_lbl.setPixmap(_scaled_asset_pixmap("qr_icons/default.png", 40))
-            _clear_layout(variants_vbox)
-            variants_title_lbl.setVisible(False)
-            variants_container.setVisible(False)
-            add_btn.setEnabled(False)
-            remove_btn.setEnabled(False)
-            _rebuild_products()
-            if not self._favorites:
-                dialog.accept()
-
         def _add_to_cart() -> None:
             if not _state["sku"]:
                 return
-            self._add_quote_item_by_sku(_state["sku"], qty_spin.value())
-            qty_spin.setValue(1)
+            self._add_quote_item_by_sku(_state["sku"], 1)
             _state["sku"] = ""
             add_btn.setEnabled(False)
             for b in _variant_buttons.values():
                 b.setChecked(False)
             detail_subtitle_lbl.setText("✓ Agregado — elige otra talla o pieza.")
 
-        remove_btn.clicked.connect(_do_remove_favorite)
+        def _do_print_label() -> None:
+            sku = _state["sku"]
+            if not sku:
+                return
+            selected_row = next(
+                (r for r in self.catalog_snapshot_rows if str(r.get("sku")) == sku), None
+            )
+            if selected_row is None:
+                return
+            self._open_label_dialog_for_row(selected_row)
+
         add_btn.clicked.connect(_add_to_cart)
+        QShortcut(QKeySequence("Ctrl+P"), dialog).activated.connect(_do_print_label)
         close_btn.clicked.connect(dialog.accept)
 
         _rebuild_products()
@@ -3280,6 +3325,21 @@ QLabel#favDialogPriceLabel {
         )
         self.quote_resume_button.setEnabled(action_state.resume_enabled)
         self.quote_emit_selected_button.setEnabled(action_state.emit_enabled)
+        _state = self.selected_quote_state.strip().upper()
+        if self._selected_quote_id() is None:
+            _hint = "Selecciona un presupuesto para ver las acciones disponibles."
+        elif _state == "BORRADOR":
+            _hint = "Borrador — puedes retomarlo o emitirlo directamente."
+        elif _state == "EMITIDO":
+            _hint = "Ya emitido — solo puedes cancelarlo o compartirlo."
+        elif _state == "CANCELADO":
+            _hint = "Cancelado — sin acciones disponibles."
+        elif _state == "CONVERTIDO":
+            _hint = "Convertido a venta — sin acciones disponibles."
+        else:
+            _hint = ""
+        self.quote_action_hint_label.setText(_hint)
+        self.quote_action_hint_label.setVisible(bool(_hint))
         self.quote_cancel_button.setEnabled(action_state.cancel_enabled)
         self.quote_open_share_button.setEnabled(action_state.share_enabled)
         self.quote_whatsapp_button.setEnabled(action_state.whatsapp_enabled)
@@ -3900,31 +3960,48 @@ QLabel#favDialogPriceLabel {
         self._open_label_dialog_for_row(selected_row)
 
     def _open_label_dialog_for_row(self, selected_row: dict) -> None:
-        if not self._show_pin_dialog():
-            return
-
         if self.offline_mode:
             # Modo offline: renderizar desde cache, sin DB
-            label_context = InventoryLabelContext(
-                variant_id=0,
-                sku=str(selected_row["sku"]),
-                product_name=str(selected_row.get("producto_nombre_base") or selected_row.get("producto_nombre") or ""),
-                talla=str(selected_row.get("talla") or ""),
-                color=str(selected_row.get("color") or ""),
-            )
-            cache_row = selected_row
+            # Recopilar siblings del mismo producto para Anterior/Siguiente
+            _product_name_off = str(selected_row.get("producto_nombre_base") or selected_row.get("producto_nombre") or "")
+            _escuela_off = str(selected_row.get("escuela_nombre") or "")
+            _nivel_off = str(selected_row.get("nivel_educativo_nombre") or "")
+            offline_siblings = [
+                r for r in self.catalog_snapshot_rows
+                if str(r.get("producto_nombre_base") or r.get("producto_nombre") or "") == _product_name_off
+                and str(r.get("escuela_nombre") or "") == _escuela_off
+                and str(r.get("nivel_educativo_nombre") or "") == _nivel_off
+            ] or [selected_row]
+            _current_sku = str(selected_row["sku"])
+            _off_index = next((i for i, r in enumerate(offline_siblings) if str(r["sku"]) == _current_sku), 0)
+
+            def _make_offline_context(row: dict) -> "InventoryLabelContext":
+                return InventoryLabelContext(
+                    variant_id=0,
+                    sku=str(row["sku"]),
+                    product_name=str(row.get("producto_nombre_base") or row.get("producto_nombre") or ""),
+                    talla=str(row.get("talla") or ""),
+                    color=str(row.get("color") or ""),
+                )
+
+            offline_render_state: dict[str, object] = {"row": selected_row}
 
             def _render_label_offline(mode: str, requested_copies: int) -> "object":
                 return render_inventory_label_from_cache_row(
-                    cache_row, mode=mode, requested_copies=requested_copies
+                    offline_render_state["row"], mode=mode, requested_copies=requested_copies
                 )
+
+            def _load_context_offline(idx: int) -> "InventoryLabelContext":
+                row = offline_siblings[idx] if 0 <= idx < len(offline_siblings) else selected_row
+                offline_render_state["row"] = row
+                return _make_offline_context(row)
 
             build_inventory_label_dialog(
                 self,
-                initial_context=label_context,
-                variant_ids=[0],
-                current_index=0,
-                load_context=lambda _vid: label_context,
+                initial_context=_make_offline_context(selected_row),
+                variant_ids=list(range(len(offline_siblings))),
+                current_index=_off_index,
+                load_context=_load_context_offline,
                 render_label=_render_label_offline,
                 print_label=lambda image_path, copies, sku_val, parent: self._print_satellite_label(
                     image_path,
@@ -3937,6 +4014,23 @@ QLabel#favDialogPriceLabel {
 
         # Modo online: cargar desde DB
         variant_id = int(selected_row["variante_id"])
+
+        # Recopilar todas las variantes del mismo producto para habilitar Anterior/Siguiente
+        product_name = str(selected_row.get("producto_nombre_base") or selected_row.get("producto_nombre") or "")
+        escuela_nombre = str(selected_row.get("escuela_nombre") or "")
+        nivel_nombre = str(selected_row.get("nivel_educativo_nombre") or "")
+        sibling_rows = [
+            r for r in self.catalog_snapshot_rows
+            if str(r.get("producto_nombre_base") or r.get("producto_nombre") or "") == product_name
+            and str(r.get("escuela_nombre") or "") == escuela_nombre
+            and str(r.get("nivel_educativo_nombre") or "") == nivel_nombre
+            and r.get("variante_id") is not None
+        ]
+        sibling_variant_ids = [int(r["variante_id"]) for r in sibling_rows]
+        if variant_id not in sibling_variant_ids:
+            sibling_variant_ids = [variant_id]
+        current_index = sibling_variant_ids.index(variant_id)
+
         try:
             with get_session() as session:
                 label_context = load_inventory_label_context(session, variant_id)
@@ -3964,8 +4058,8 @@ QLabel#favDialogPriceLabel {
         build_inventory_label_dialog(
             self,
             initial_context=label_context,
-            variant_ids=[variant_id],
-            current_index=0,
+            variant_ids=sibling_variant_ids,
+            current_index=current_index,
             load_context=_load_context,
             render_label=_render_label,
             print_label=lambda image_path, copies, sku_val, parent: self._print_satellite_label(
