@@ -68,6 +68,11 @@ def build_satellite_stylesheet() -> str:
             hover_color="#73341c",
             hover_border="#d3bca8",
         ),
+        build_button_hover_styles(
+            selector="QPushButton#addToCartButton",
+            hover_background="#c96a35",
+            hover_color="#fff8f0",
+        ),
     ))
 
     return "\n".join([
@@ -248,6 +253,30 @@ QWidget#satSidebarItemsContent {
     background: transparent;
     border: none;
 }
+QFrame#satScanCard {
+    background: #fffaf2;
+    border: 1px solid #d5c9b9;
+    border-radius: 16px;
+}
+QFrame#satProductHeroCard {
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #fdf8f0, stop:1 #f4ece0);
+    border: 1px solid #dfcbb5;
+    border-radius: 18px;
+}
+QPushButton#addToCartButton {
+    background: #a84f2d;
+    color: #f9f4ea;
+    font-size: 15px;
+    font-weight: 900;
+    padding: 12px 18px;
+    border-radius: 14px;
+    min-height: 44px;
+}
+QPushButton#addToCartButton:disabled {
+    background: #d8c9b8;
+    color: #9e8e7e;
+}
 QLabel#satKioskSku {
     font-size: 30px;
     font-weight: 900;
@@ -277,8 +306,8 @@ QLabel#satKioskBadge {
 }
 QLabel#satKioskBody {
     color: #66717b;
-    background: #f1ebe2;
-    border: 1px solid #dce5eb;
+    background: rgba(255, 255, 255, 0.60);
+    border: 1px solid #ddd0be;
     border-radius: 12px;
     padding: 10px 12px;
 }
