@@ -1,15 +1,15 @@
 /**
  * Componente de camara para escaneo de QR y codigos de barras.
  * - fps 20, formatos limitados = deteccion rapida
- * - Flash verde + haptic al detectar
+ * - Flash verde + haptic + beep al detectar
  * - Linea de escaneo animada
  * - Boton de linterna (torch)
+ * - Slider de zoom
  * - Manejo de permiso denegado con instrucciones claras
  */
 import { useEffect, useRef, useState } from 'react'
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 
-// Beep corto con Web Audio API — sin archivos de sonido
 function beep() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)()
@@ -37,7 +37,6 @@ const FORMATS = [
   Html5QrcodeSupportedFormats.UPC_E,
 ]
 
-// Detectar si el error es de permiso denegado
 function isPermissionError(e) {
   const msg = (e?.message ?? e?.toString() ?? '').toLowerCase()
   return (
@@ -50,34 +49,47 @@ function isPermissionError(e) {
 }
 
 export default function Scanner({ onScan, active = true }) {
-  const containerId  = 'qr-scanner-container'
-  const onScanRef    = useRef(onScan)
-  const trackRef     = useRef(null)
+  const containerId = 'qr-scanner-container'
+  const onScanRef   = useRef(onScan)
+  const trackRef    = useRef(null)
   const [flash,     setFlash]     = useState(false)
   const [torch,     setTorch]     = useState(false)
   const [hasTorch,  setHasTorch]  = useState(false)
-  const [camError,  setCamError]  = useState(null) // null | 'denied' | 'unavailable'
-  const [retryKey,  setRetryKey]  = useState(0)   // incrementar = reintentar
+  const [camError,  setCamError]  = useState(null)
+  const [retryKey,  setRetryKey]  = useState(0)
+  const [zoom,      setZoom]      = useState(1)
+  const [zoomRange, setZoomRange] = useState(null) // { min, max, step }
   onScanRef.current = onScan
 
+  // Sincronizar torch
   useEffect(() => {
     const track = trackRef.current
     if (!track?.applyConstraints) return
     track.applyConstraints({ advanced: [{ torch }] }).catch(() => {})
   }, [torch])
 
+  // Sincronizar zoom
+  useEffect(() => {
+    const track = trackRef.current
+    if (!track?.applyConstraints || !zoomRange) return
+    track.applyConstraints({ advanced: [{ zoom }] }).catch(() => {})
+  }, [zoom, zoomRange])
+
+  // Reset al desactivar
   useEffect(() => {
     if (!active) {
       setTorch(false)
       setHasTorch(false)
       setCamError(null)
+      setZoom(1)
+      setZoomRange(null)
       trackRef.current = null
     }
   }, [active])
 
   useEffect(() => {
     if (!active) return
-    setCamError(null) // limpiar error al reintentar
+    setCamError(null)
 
     let alive   = true
     let scanner = null
@@ -90,10 +102,7 @@ export default function Scanner({ onScan, active = true }) {
       if (container) container.innerHTML = ''
 
       try {
-        scanner = new Html5Qrcode(containerId, {
-          formatsToSupport: FORMATS,
-          verbose: false,
-        })
+        scanner = new Html5Qrcode(containerId, { formatsToSupport: FORMATS, verbose: false })
 
         const boxW = Math.min(Math.round(window.innerWidth * 0.72), 290)
         const boxH = Math.round(boxW * 0.58)
@@ -119,12 +128,16 @@ export default function Scanner({ onScan, active = true }) {
             await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {})
             const caps = track.getCapabilities?.()
             if (caps?.torch) setHasTorch(true)
+            // Detectar rango de zoom soportado
+            if (caps?.zoom) {
+              setZoomRange({ min: caps.zoom.min, max: caps.zoom.max, step: caps.zoom.step ?? 0.1 })
+              setZoom(caps.zoom.min)
+            }
           }
         } catch (_) {}
 
       } catch (e) {
         if (!alive) return
-        console.warn('Scanner error:', e)
         setCamError(isPermissionError(e) ? 'denied' : 'unavailable')
       }
     }
@@ -134,15 +147,14 @@ export default function Scanner({ onScan, active = true }) {
     return () => {
       alive = false
       setTorch(false)
+      setZoom(1)
+      setZoomRange(null)
       trackRef.current = null
-      if (scanner) {
-        scanner.stop().catch(() => {})
-        scanner = null
-      }
+      if (scanner) { scanner.stop().catch(() => {}); scanner = null }
     }
   }, [active, retryKey])
 
-  // ── Pantalla de error ──────────────────────────────
+  // ── Error ──
   if (camError) {
     const isDenied = camError === 'denied'
     return (
@@ -150,7 +162,6 @@ export default function Scanner({ onScan, active = true }) {
         <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center text-4xl">
           {isDenied ? '🚫' : '📷'}
         </div>
-
         <div>
           <p className="text-white font-semibold text-lg mb-1">
             {isDenied ? 'Cámara bloqueada' : 'Cámara no disponible'}
@@ -161,12 +172,9 @@ export default function Scanner({ onScan, active = true }) {
               : 'No se pudo acceder a la cámara. Verifica que ninguna otra app la esté usando.'}
           </p>
         </div>
-
         {isDenied && (
           <div className="bg-white/5 rounded-2xl px-5 py-4 text-left w-full">
-            <p className="text-white/70 text-xs font-semibold uppercase tracking-wide mb-2">
-              Cómo activarla en iPhone
-            </p>
+            <p className="text-white/70 text-xs font-semibold uppercase tracking-wide mb-2">Cómo activarla en iPhone</p>
             <ol className="text-white/50 text-sm space-y-1 list-decimal list-inside">
               <li>Abre <span className="text-white/70">Ajustes</span></li>
               <li>Baja hasta <span className="text-white/70">Safari</span></li>
@@ -175,25 +183,23 @@ export default function Scanner({ onScan, active = true }) {
             </ol>
           </div>
         )}
-
-        <button
-          onClick={() => setRetryKey(k => k + 1)}
-          className="bg-brand-700 text-white font-semibold px-8 py-3 rounded-xl active:bg-brand-800"
-        >
+        <button onClick={() => setRetryKey(k => k + 1)} className="bg-brand-700 text-white font-semibold px-8 py-3 rounded-xl active:bg-brand-800">
           Intentar de nuevo
         </button>
       </div>
     )
   }
 
-  // ── Vista normal ───────────────────────────────────
+  // ── Vista normal ──
   return (
     <div className="relative w-full h-full overflow-hidden bg-black">
       <div id={containerId} className="w-full h-full" />
 
+      {/* Flash verde */}
       <div className={`absolute inset-0 pointer-events-none transition-opacity duration-150
         bg-green-400/35 ${flash ? 'opacity-100' : 'opacity-0'}`} />
 
+      {/* Marco guia */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div className="relative w-72 h-44">
           <span className="absolute top-0 left-0   w-7 h-7 border-t-[3px] border-l-[3px] border-white rounded-tl-md" />
@@ -205,6 +211,7 @@ export default function Scanner({ onScan, active = true }) {
         </div>
       </div>
 
+      {/* Linterna */}
       {hasTorch && (
         <button
           onClick={() => setTorch(t => !t)}
@@ -214,6 +221,23 @@ export default function Scanner({ onScan, active = true }) {
         >
           🔦
         </button>
+      )}
+
+      {/* Slider de zoom — solo si el dispositivo lo soporta */}
+      {zoomRange && (
+        <div className="absolute bottom-4 left-6 right-6 flex items-center gap-3">
+          <span className="text-white/50 text-xs">🔍</span>
+          <input
+            type="range"
+            min={zoomRange.min}
+            max={zoomRange.max}
+            step={zoomRange.step}
+            value={zoom}
+            onChange={e => setZoom(Number(e.target.value))}
+            className="flex-1 h-1 accent-white cursor-pointer"
+          />
+          <span className="text-white/50 text-xs w-8 text-right">{zoom.toFixed(1)}×</span>
+        </div>
       )}
     </div>
   )
