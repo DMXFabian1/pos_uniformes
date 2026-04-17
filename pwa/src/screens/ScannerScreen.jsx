@@ -190,24 +190,26 @@ export default function ScannerScreen() {
         )}
       </div>
 
-      {/* ── Bottom sheets ── */}
+      {/* ── Bottom sheets ── max-h + scroll interno para pantallas pequeñas */}
       {mode === 'client' && result && (
-        <div className="animate-slide-up bg-white rounded-t-3xl px-5 pt-5 pb-8 shadow-2xl">
-          <div className="flex items-center gap-4 mb-4">
-            <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center shrink-0 text-2xl">👤</div>
-            <div className="flex-1 min-w-0">
-              <p className="text-xs text-gray-400 uppercase tracking-wide">Cliente identificado</p>
-              <p className="font-bold text-gray-900 truncate">{result.data.nombre}</p>
-              <p className="text-xs text-gray-500">{result.data.tipo_cliente} · {result.data.nivel_lealtad}</p>
+        <div className="animate-slide-up bg-white rounded-t-3xl shadow-2xl flex flex-col max-h-[60vh]">
+          <div className="flex-1 overflow-y-auto overscroll-contain px-5 pt-5 pb-2">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center shrink-0 text-2xl">👤</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-400 uppercase tracking-wide">Cliente identificado</p>
+                <p className="font-bold text-gray-900 truncate">{result.data.nombre}</p>
+                <p className="text-xs text-gray-500">{result.data.tipo_cliente} · {result.data.nivel_lealtad}</p>
+              </div>
+              {result.data.descuento_preferente > 0 && (
+                <span className="shrink-0 bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full">
+                  -{result.data.descuento_preferente}%
+                </span>
+              )}
             </div>
-            {result.data.descuento_preferente > 0 && (
-              <span className="shrink-0 bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-full">
-                -{result.data.descuento_preferente}%
-              </span>
-            )}
+            <p className="text-center text-xs text-gray-400">Navegando al catálogo en 2 s…</p>
           </div>
-          <p className="text-center text-xs text-gray-400 mb-3">Navegando al catálogo en 2 s…</p>
-          <div className="flex gap-2">
+          <div className="px-5 py-4 border-t border-gray-100 flex gap-2">
             <button onClick={reset} className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium active:bg-gray-50">
               Cancelar
             </button>
@@ -219,67 +221,58 @@ export default function ScannerScreen() {
       )}
 
       {mode === 'product' && result && (
-        <div className="animate-slide-up bg-white rounded-t-3xl px-5 pt-5 pb-8 shadow-2xl">
-          {/* Nombre y precio */}
-          <div className="flex items-start justify-between mb-3">
-            <div className="flex-1 min-w-0 pr-3">
-              <p className="font-bold text-gray-900 leading-tight">
-                {result.data.nombre ?? result.data.sku}
-              </p>
-              {result.data.categoria && (
-                <p className="text-xs text-gray-400 mt-0.5">
-                  {result.data.categoria}{result.data.marca ? ` · ${result.data.marca}` : ''}
+        <div className="animate-slide-up bg-white rounded-t-3xl shadow-2xl flex flex-col max-h-[65vh]">
+          {/* Contenido scrollable */}
+          <div className="flex-1 overflow-y-auto overscroll-contain px-5 pt-5 pb-2">
+            {/* Nombre y precio */}
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex-1 min-w-0 pr-3">
+                <p className="font-bold text-gray-900 leading-tight">
+                  {result.data.nombre ?? result.data.sku}
                 </p>
-              )}
+                {result.data.categoria && (
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {result.data.categoria}{result.data.marca ? ` · ${result.data.marca}` : ''}
+                  </p>
+                )}
+              </div>
+              <p className="text-3xl font-extrabold text-brand-700 shrink-0">
+                ${fmt(result.data.precio_venta)}
+              </p>
             </div>
-            <p className="text-3xl font-extrabold text-brand-700 shrink-0">
-              ${fmt(result.data.precio_venta)}
-            </p>
-          </div>
 
-          {/* Chips de variante */}
-          <div className="flex gap-2 flex-wrap mb-4">
-            <span className="bg-gray-100 text-gray-600 text-xs font-medium px-3 py-1 rounded-full">
-              SKU: {result.data.sku}
-            </span>
-            <span className="bg-gray-100 text-gray-600 text-xs font-medium px-3 py-1 rounded-full">
-              Talla {result.data.talla}
-            </span>
-            <span className="bg-gray-100 text-gray-600 text-xs font-medium px-3 py-1 rounded-full">
-              {result.data.color}
-            </span>
-          </div>
-
-          {/* Descripcion si existe */}
-          {result.data.descripcion && (
-            <p className="text-xs text-gray-400 mb-4 leading-relaxed">{result.data.descripcion}</p>
-          )}
-
-          {/* Selector de cantidad */}
-          <div className="flex items-center justify-between bg-gray-50 rounded-2xl px-4 py-3 mb-4">
-            <span className="text-sm text-gray-500 font-medium">Cantidad</span>
-            <div className="flex items-center gap-4">
-              <button
-                onClick={() => setQty(q => Math.max(1, q - 1))}
-                className="w-9 h-9 rounded-full bg-white border border-gray-200 text-gray-700
-                  text-lg font-bold flex items-center justify-center active:bg-gray-100 shadow-sm"
-              >−</button>
-              <span className="text-xl font-bold text-gray-900 w-6 text-center">{qty}</span>
-              <button
-                onClick={() => setQty(q => q + 1)}
-                className="w-9 h-9 rounded-full bg-brand-700 text-white
-                  text-lg font-bold flex items-center justify-center active:bg-brand-800 shadow-sm"
-              >+</button>
+            {/* Chips */}
+            <div className="flex gap-2 flex-wrap mb-4">
+              <span className="bg-gray-100 text-gray-600 text-xs font-medium px-3 py-1 rounded-full">SKU: {result.data.sku}</span>
+              <span className="bg-gray-100 text-gray-600 text-xs font-medium px-3 py-1 rounded-full">Talla {result.data.talla}</span>
+              <span className="bg-gray-100 text-gray-600 text-xs font-medium px-3 py-1 rounded-full">{result.data.color}</span>
             </div>
+
+            {result.data.descripcion && (
+              <p className="text-xs text-gray-400 mb-4 leading-relaxed">{result.data.descripcion}</p>
+            )}
+
+            {/* Selector de cantidad */}
+            <div className="flex items-center justify-between bg-gray-50 rounded-2xl px-4 py-3">
+              <span className="text-sm text-gray-500 font-medium">Cantidad</span>
+              <div className="flex items-center gap-4">
+                <button onClick={() => setQty(q => Math.max(1, q - 1))}
+                  className="w-9 h-9 rounded-full bg-white border border-gray-200 text-gray-700 text-lg font-bold flex items-center justify-center active:bg-gray-100 shadow-sm">−</button>
+                <span className="text-xl font-bold text-gray-900 w-6 text-center">{qty}</span>
+                <button onClick={() => setQty(q => q + 1)}
+                  className="w-9 h-9 rounded-full bg-brand-700 text-white text-lg font-bold flex items-center justify-center active:bg-brand-800 shadow-sm">+</button>
+              </div>
+            </div>
+
+            {qty > 1 && (
+              <p className="text-right text-xs text-gray-400 mt-2">
+                Subtotal: <span className="font-semibold text-gray-700">${fmt(result.data.precio_venta * qty)}</span>
+              </p>
+            )}
           </div>
 
-          {qty > 1 && (
-            <p className="text-right text-xs text-gray-400 mb-3">
-              Subtotal: <span className="font-semibold text-gray-700">${fmt(result.data.precio_venta * qty)}</span>
-            </p>
-          )}
-
-          <div className="flex gap-2">
+          {/* Botones siempre visibles */}
+          <div className="px-5 py-4 border-t border-gray-100 flex gap-2">
             <button onClick={reset} className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium active:bg-gray-50">
               Escanear otro
             </button>
@@ -291,17 +284,21 @@ export default function ScannerScreen() {
       )}
 
       {mode === 'error' && result && (
-        <div className="animate-slide-up bg-white rounded-t-3xl px-5 pt-5 pb-8 shadow-2xl">
-          <div className="flex items-center gap-3 mb-4">
-            <span className="text-3xl">🤷</span>
-            <div>
-              <p className="font-semibold text-gray-800">Código no reconocido</p>
-              <p className="text-xs text-gray-400 break-all mt-0.5">{result.raw}</p>
+        <div className="animate-slide-up bg-white rounded-t-3xl shadow-2xl flex flex-col max-h-[40vh]">
+          <div className="flex-1 overflow-y-auto overscroll-contain px-5 pt-5 pb-2">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">🤷</span>
+              <div>
+                <p className="font-semibold text-gray-800">Código no reconocido</p>
+                <p className="text-xs text-gray-400 break-all mt-0.5">{result.raw}</p>
+              </div>
             </div>
           </div>
-          <button onClick={reset} className="w-full py-3 rounded-xl bg-gray-800 text-white font-semibold active:bg-gray-900">
-            Intentar de nuevo
-          </button>
+          <div className="px-5 py-4 border-t border-gray-100">
+            <button onClick={reset} className="w-full py-3 rounded-xl bg-gray-800 text-white font-semibold active:bg-gray-900">
+              Intentar de nuevo
+            </button>
+          </div>
         </div>
       )}
 
