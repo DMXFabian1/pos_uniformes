@@ -20,6 +20,7 @@ export default {
       animation: {
         scan: 'scan 2s ease-in-out infinite',
         'slide-up': 'slideUp 0.25s ease-out',
+        'ready-pulse': 'readyPulse 0.6s ease-out',
       },
       keyframes: {
         scan: {
@@ -29,6 +30,11 @@ export default {
         loading: {
           '0%':   { transform: 'translateX(-100%)' },
           '100%': { transform: 'translateX(400%)' },
+        },
+        readyPulse: {
+          '0%':   { opacity: '0', transform: 'scale(0.92)' },
+          '50%':  { opacity: '1', transform: 'scale(1.06)' },
+          '100%': { opacity: '0', transform: 'scale(1)'    },
         },
         slideUp: {
           '0%':   { transform: 'translateY(100%)', opacity: '0' },

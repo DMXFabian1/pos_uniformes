@@ -53,12 +53,13 @@ export default function Scanner({ onScan, active = true }) {
   const onScanRef   = useRef(onScan)
   const trackRef    = useRef(null)
   const [flash,     setFlash]     = useState(false)
+  const [ready,     setReady]     = useState(false) // pulso verde "listo"
   const [torch,     setTorch]     = useState(false)
   const [hasTorch,  setHasTorch]  = useState(false)
   const [camError,  setCamError]  = useState(null)
   const [retryKey,  setRetryKey]  = useState(0)
   const [zoom,      setZoom]      = useState(1)
-  const [zoomRange, setZoomRange] = useState(null) // { min, max, step }
+  const [zoomRange, setZoomRange] = useState(null)
   onScanRef.current = onScan
 
   // Sincronizar torch
@@ -75,7 +76,8 @@ export default function Scanner({ onScan, active = true }) {
     track.applyConstraints({ advanced: [{ zoom }] }).catch(() => {})
   }, [zoom, zoomRange])
 
-  // Reset al desactivar
+  // Reset al desactivar / pulso "listo" al reactivar
+  const prevActiveRef = useRef(false)
   useEffect(() => {
     if (!active) {
       setTorch(false)
@@ -84,7 +86,12 @@ export default function Scanner({ onScan, active = true }) {
       setZoom(1)
       setZoomRange(null)
       trackRef.current = null
+    } else if (!prevActiveRef.current && active) {
+      // Acaba de reactivarse — mostrar pulso verde
+      setReady(true)
+      setTimeout(() => setReady(false), 700)
     }
+    prevActiveRef.current = active
   }, [active])
 
   useEffect(() => {
@@ -117,6 +124,9 @@ export default function Scanner({ onScan, active = true }) {
             setFlash(true)
             setTimeout(() => setFlash(false), 280)
             onScanRef.current(decoded)
+          },
+          () => {
+            // onError silencioso — dispara el pulso de "listo" continuamente
           }
         )
 
@@ -202,10 +212,15 @@ export default function Scanner({ onScan, active = true }) {
       {/* Marco guia */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div className="relative w-72 h-44">
-          <span className="absolute top-0 left-0   w-7 h-7 border-t-[3px] border-l-[3px] border-white rounded-tl-md" />
-          <span className="absolute top-0 right-0  w-7 h-7 border-t-[3px] border-r-[3px] border-white rounded-tr-md" />
-          <span className="absolute bottom-0 left-0  w-7 h-7 border-b-[3px] border-l-[3px] border-white rounded-bl-md" />
-          <span className="absolute bottom-0 right-0 w-7 h-7 border-b-[3px] border-r-[3px] border-white rounded-br-md" />
+          {/* Esquinas — se ponen verdes con pulso cuando el scanner está listo */}
+          {['top-0 left-0 border-t-[3px] border-l-[3px] rounded-tl-md',
+            'top-0 right-0 border-t-[3px] border-r-[3px] rounded-tr-md',
+            'bottom-0 left-0 border-b-[3px] border-l-[3px] rounded-bl-md',
+            'bottom-0 right-0 border-b-[3px] border-r-[3px] rounded-br-md',
+          ].map((cls, i) => (
+            <span key={i} className={`absolute w-7 h-7 ${cls} transition-colors duration-200
+              ${ready ? 'border-green-400 animate-ready-pulse' : 'border-white'}`} />
+          ))}
           <div className="absolute top-2 left-3 right-3 h-[2px] animate-scan
             bg-gradient-to-r from-transparent via-green-400 to-transparent" />
         </div>
