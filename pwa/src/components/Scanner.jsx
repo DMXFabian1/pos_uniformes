@@ -122,9 +122,19 @@ export default function Scanner({ onScan, active = true }) {
         const boxH = Math.round(boxW * 0.62)
 
         await scanner.start(
-          // 640×480 arranca mucho más rápido que la resolución por defecto (1080p+)
-          { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
-          { fps: 25, qrbox: { width: boxW, height: boxH }, aspectRatio: 1.5, disableFlip: false },
+          { facingMode: 'environment' },
+          {
+            fps: 25,
+            qrbox: { width: boxW, height: boxH },
+            aspectRatio: 1.5,
+            disableFlip: false,
+            // Resolución baja = arranca más rápido y procesa más rápido
+            videoConstraints: {
+              facingMode: { ideal: 'environment' },
+              width:  { ideal: 640 },
+              height: { ideal: 480 },
+            },
+          },
           (decoded) => {
             if (!alive) return
             beep()
