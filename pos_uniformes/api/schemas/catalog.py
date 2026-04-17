@@ -7,6 +7,57 @@ from decimal import Decimal
 from pydantic import BaseModel
 
 
+# ── Guided catalog ────────────────────────────────────────────────────────────
+
+class FiltroItem(BaseModel):
+    id: int
+    nombre: str
+
+
+class EscuelaItem(BaseModel):
+    id: int
+    nombre: str
+
+
+class NivelItem(BaseModel):
+    id: int
+    nombre: str
+    escuelas: list[EscuelaItem]
+
+
+class GuidedOptionsOut(BaseModel):
+    niveles: list[NivelItem]
+    tipo_pieza_school: list[FiltroItem]
+    tipo_pieza_basics: list[FiltroItem]
+
+
+class VarianteFamilyOut(BaseModel):
+    id: int
+    sku: str
+    talla: str
+    color: str
+    precio_venta: Decimal
+    stock_actual: int
+
+
+class ProductFamilyOut(BaseModel):
+    key: str
+    nombre_base: str
+    tipo_pieza: str | None
+    tipo_pieza_id: int | None
+    precio_desde: Decimal
+    variantes: list[VarianteFamilyOut]
+
+
+class GuidedProductsOut(BaseModel):
+    genero_options: list[str]
+    tipo_prenda_options: list[str]
+    tipo_pieza_options: list[FiltroItem]
+    families: list[ProductFamilyOut]
+
+
+# ── Base schemas ──────────────────────────────────────────────────────────────
+
 class VarianteOut(BaseModel):
     id: int
     sku: str
