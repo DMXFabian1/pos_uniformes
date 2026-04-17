@@ -117,9 +117,9 @@ export default function ScannerScreen() {
   const hasSheet = mode !== 'idle'
 
   return (
-    <div className="flex flex-col h-full bg-black">
-      {/* Camara */}
-      <div className="flex-1 relative min-h-0">
+    <div className="relative h-full bg-black">
+      {/* Camara — siempre ocupa toda la pantalla */}
+      <div className="absolute inset-0">
         <Scanner onScan={handleScan} active={scanActive} />
 
         {/* Boton historial — solo cuando hay items y no hay sheet */}
@@ -190,9 +190,9 @@ export default function ScannerScreen() {
         )}
       </div>
 
-      {/* ── Bottom sheets ── max-h + scroll interno para pantallas pequeñas */}
+      {/* ── Bottom sheets — absolute sobre la camara ── */}
       {mode === 'client' && result && (
-        <div className="animate-slide-up bg-white rounded-t-3xl shadow-2xl flex flex-col max-h-[60vh]">
+        <div className="absolute inset-x-0 bottom-0 z-20 animate-slide-up bg-white rounded-t-3xl shadow-2xl flex flex-col max-h-[60vh]">
           <div className="flex-1 overflow-y-auto overscroll-contain px-5 pt-5 pb-2">
             <div className="flex items-center gap-4 mb-4">
               <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center shrink-0 text-2xl">👤</div>
@@ -221,7 +221,7 @@ export default function ScannerScreen() {
       )}
 
       {mode === 'product' && result && (
-        <div className="animate-slide-up bg-white rounded-t-3xl shadow-2xl flex flex-col max-h-[65vh]">
+        <div className="absolute inset-x-0 bottom-0 z-20 animate-slide-up bg-white rounded-t-3xl shadow-2xl flex flex-col max-h-[65vh]">
           {/* Contenido scrollable */}
           <div className="flex-1 overflow-y-auto overscroll-contain px-5 pt-5 pb-2">
             {/* Nombre y precio */}
@@ -284,7 +284,7 @@ export default function ScannerScreen() {
       )}
 
       {mode === 'error' && result && (
-        <div className="animate-slide-up bg-white rounded-t-3xl shadow-2xl flex flex-col max-h-[40vh]">
+        <div className="absolute inset-x-0 bottom-0 z-20 animate-slide-up bg-white rounded-t-3xl shadow-2xl flex flex-col max-h-[40vh]">
           <div className="flex-1 overflow-y-auto overscroll-contain px-5 pt-5 pb-2">
             <div className="flex items-center gap-3">
               <span className="text-3xl">🤷</span>
@@ -302,9 +302,9 @@ export default function ScannerScreen() {
         </div>
       )}
 
-      {/* Barra inferior idle */}
+      {/* Barra inferior idle — absolute sobre la camara */}
       {mode === 'idle' && (
-        <div className="bg-gray-950 px-5 py-3 pb-5">
+        <div className="absolute inset-x-0 bottom-0 z-20 bg-gray-950 px-5 py-3 pb-5">
           {showManual ? (
             <form onSubmit={submitManual} className="flex gap-2">
               <input
