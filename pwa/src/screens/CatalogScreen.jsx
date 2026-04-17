@@ -712,8 +712,17 @@ function FavoritesTab({ favKeys, isFav, toggleFav, onAdd, addedSku }) {
       // Deduplicar (misma key puede aparecer en básicos y en alguna escuela)
       const seen = new Set()
       const unique = favs.filter(f => { if (seen.has(f.key)) return false; seen.add(f.key); return true })
-      // Mismo orden que el satélite: alfabético por nombre_base (card.title.lower())
-      unique.sort((a, b) => a.nombre_base.localeCompare(b.nombre_base, 'es', { sensitivity: 'base' }))
+      // Orden personalizado por tipo_pieza, resto alfabético al final
+      const PIEZA_ORDER = ['Pantalón', 'Falda', 'Suéter', 'Camisa', 'Playera', 'Calceta', 'Malla']
+      const piezaRank = (f) => {
+        const i = PIEZA_ORDER.indexOf(f.tipo_pieza ?? '')
+        return i === -1 ? PIEZA_ORDER.length : i
+      }
+      unique.sort((a, b) => {
+        const dr = piezaRank(a) - piezaRank(b)
+        if (dr !== 0) return dr
+        return a.nombre_base.localeCompare(b.nombre_base, 'es', { sensitivity: 'base' })
+      })
       setFamilies(unique)
     }).finally(() => setLoading(false))
   }, [favKeys])
