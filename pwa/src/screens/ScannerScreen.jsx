@@ -7,7 +7,6 @@
 import { useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Scanner from '../components/Scanner'
-import Spinner from '../components/Spinner'
 import { clientsApi } from '../api/clients'
 import { catalogApi } from '../api/catalog'
 import { useCart } from '../context/CartContext'
@@ -173,12 +172,19 @@ export default function ScannerScreen() {
           </div>
         )}
 
-        {/* Spinner */}
+        {/* Indicador de procesando — barra superior sin tapar la camara */}
         {mode === 'loading' && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/50">
-            <div className="bg-white rounded-2xl px-8 py-6 flex flex-col items-center gap-3">
-              <Spinner />
-              <p className="text-gray-600 text-sm font-medium">Identificando…</p>
+          <div className="absolute top-0 left-0 right-0">
+            {/* Barra de progreso indeterminada */}
+            <div className="h-1 bg-white/10 overflow-hidden">
+              <div className="h-full bg-green-400 animate-[loading_1s_ease-in-out_infinite]
+                w-1/3 rounded-full" style={{ animation: 'loading 1s ease-in-out infinite' }} />
+            </div>
+            <div className="flex items-center justify-center mt-2">
+              <span className="bg-black/60 backdrop-blur-sm text-white/80 text-xs
+                px-3 py-1.5 rounded-full font-medium">
+                Identificando…
+              </span>
             </div>
           </div>
         )}

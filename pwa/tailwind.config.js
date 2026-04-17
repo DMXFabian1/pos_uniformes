@@ -26,6 +26,10 @@ export default {
           '0%, 100%': { transform: 'translateY(0px)', opacity: '0.9' },
           '50%':       { transform: 'translateY(160px)', opacity: '0.6' },
         },
+        loading: {
+          '0%':   { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(400%)' },
+        },
         slideUp: {
           '0%':   { transform: 'translateY(100%)', opacity: '0' },
           '100%': { transform: 'translateY(0)',    opacity: '1' },
