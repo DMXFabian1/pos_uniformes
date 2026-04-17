@@ -102,7 +102,7 @@ export default function Scanner({ onScan, active = true }) {
     let scanner = null
 
     async function start() {
-      await new Promise(r => setTimeout(r, 120))
+      await new Promise(r => setTimeout(r, 60))
       if (!alive) return
 
       const container = document.getElementById(containerId)
@@ -117,12 +117,14 @@ export default function Scanner({ onScan, active = true }) {
           },
         })
 
-        const boxW = Math.min(Math.round(window.innerWidth * 0.72), 290)
-        const boxH = Math.round(boxW * 0.58)
+        // Caja pequeña = menos píxeles por frame = detección más rápida
+        const boxW = Math.min(Math.round(window.innerWidth * 0.52), 210)
+        const boxH = Math.round(boxW * 0.62)
 
         await scanner.start(
-          { facingMode: 'environment' },
-          { fps: 20, qrbox: { width: boxW, height: boxH }, aspectRatio: 1.6, disableFlip: false },
+          // 640×480 arranca mucho más rápido que la resolución por defecto (1080p+)
+          { facingMode: 'environment', width: { ideal: 640 }, height: { ideal: 480 } },
+          { fps: 25, qrbox: { width: boxW, height: boxH }, aspectRatio: 1.5, disableFlip: false },
           (decoded) => {
             if (!alive) return
             beep()
@@ -215,16 +217,15 @@ export default function Scanner({ onScan, active = true }) {
       <div className={`absolute inset-0 pointer-events-none transition-opacity duration-150
         bg-green-400/35 ${flash ? 'opacity-100' : 'opacity-0'}`} />
 
-      {/* Marco guia */}
+      {/* Marco guia — tamaño reducido para coincidir con el qrbox */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="relative w-72 h-44">
-          {/* Esquinas — se ponen verdes con pulso cuando el scanner está listo */}
+        <div className="relative w-52 h-32">
           {['top-0 left-0 border-t-[3px] border-l-[3px] rounded-tl-md',
             'top-0 right-0 border-t-[3px] border-r-[3px] rounded-tr-md',
             'bottom-0 left-0 border-b-[3px] border-l-[3px] rounded-bl-md',
             'bottom-0 right-0 border-b-[3px] border-r-[3px] rounded-br-md',
           ].map((cls, i) => (
-            <span key={i} className={`absolute w-7 h-7 ${cls} transition-colors duration-200
+            <span key={i} className={`absolute w-6 h-6 ${cls} transition-colors duration-200
               ${ready ? 'border-green-400 animate-ready-pulse' : 'border-white'}`} />
           ))}
           <div className="absolute top-2 left-3 right-3 h-[2px] animate-scan
