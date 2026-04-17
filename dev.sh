@@ -29,8 +29,16 @@ trap cleanup INT TERM
 
 # ── API (FastAPI + uvicorn) ──────────────────
 echo -e "${CYAN}▶ Levantando API en :8000${RESET}"
+# Buscar venv: primero en el worktree, luego en el proyecto original
+if   [ -f "$API_DIR/.venv/bin/python3" ]; then
+  VENV="$API_DIR/.venv/bin/python3"
+elif [ -f "/Users/danielfabian/Documents/Playground 2/pos_uniformes/.venv/bin/python3" ]; then
+  VENV="/Users/danielfabian/Documents/Playground 2/pos_uniformes/.venv/bin/python3"
+else
+  VENV="$(which python3)"
+fi
 cd "$API_DIR"
-PYTHONPATH="$ROOT" python api_server.py 2>&1 | sed "s/^/${RED}[API]${RESET} /" &
+PYTHONPATH="$ROOT" "$VENV" api_server.py 2>&1 | sed "s/^/$(printf '\033[0;31m')[API]$(printf '\033[0m') /" &
 API_PID=$!
 
 # ── PWA (Vite HTTPS) ─────────────────────────
