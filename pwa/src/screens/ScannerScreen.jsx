@@ -7,6 +7,7 @@
 import { useState, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Scanner from '../components/Scanner'
+import BottomSheet from '../components/BottomSheet'
 import { clientsApi } from '../api/clients'
 import { catalogApi } from '../api/catalog'
 import { useCart } from '../context/CartContext'
@@ -190,10 +191,10 @@ export default function ScannerScreen() {
         )}
       </div>
 
-      {/* ── Bottom sheets — absolute sobre la camara ── */}
+      {/* ── Bottom sheets — draggables ── */}
       {mode === 'client' && result && (
-        <div className="absolute inset-x-0 bottom-0 z-20 animate-slide-up bg-white rounded-t-3xl shadow-2xl flex flex-col max-h-[60vh]">
-          <div className="flex-1 overflow-y-auto overscroll-contain px-5 pt-5 pb-2">
+        <BottomSheet onClose={reset} maxHeight="55vh">
+          <div className="flex-1 overflow-y-auto overscroll-contain px-5 pt-3 pb-2">
             <div className="flex items-center gap-4 mb-4">
               <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center shrink-0 text-2xl">👤</div>
               <div className="flex-1 min-w-0">
@@ -209,39 +210,26 @@ export default function ScannerScreen() {
             </div>
             <p className="text-center text-xs text-gray-400">Navegando al catálogo en 2 s…</p>
           </div>
-          <div className="px-5 py-4 border-t border-gray-100 flex gap-2">
-            <button onClick={reset} className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium active:bg-gray-50">
-              Cancelar
-            </button>
-            <button onClick={confirmClient} className="flex-[2] py-3 rounded-xl bg-brand-700 text-white font-semibold active:bg-brand-800">
-              Ver catálogo →
-            </button>
+          <div className="px-5 py-4 border-t border-gray-100 flex gap-2 shrink-0">
+            <button onClick={reset} className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium active:bg-gray-50">Cancelar</button>
+            <button onClick={confirmClient} className="flex-[2] py-3 rounded-xl bg-brand-700 text-white font-semibold active:bg-brand-800">Ver catálogo →</button>
           </div>
-        </div>
+        </BottomSheet>
       )}
 
       {mode === 'product' && result && (
-        <div className="absolute inset-x-0 bottom-0 z-20 animate-slide-up bg-white rounded-t-3xl shadow-2xl flex flex-col max-h-[65vh]">
-          {/* Contenido scrollable */}
-          <div className="flex-1 overflow-y-auto overscroll-contain px-5 pt-5 pb-2">
-            {/* Nombre y precio */}
+        <BottomSheet onClose={reset} maxHeight="60vh">
+          <div className="flex-1 overflow-y-auto overscroll-contain px-5 pt-3 pb-2">
             <div className="flex items-start justify-between mb-3">
               <div className="flex-1 min-w-0 pr-3">
-                <p className="font-bold text-gray-900 leading-tight">
-                  {result.data.nombre ?? result.data.sku}
-                </p>
+                <p className="font-bold text-gray-900 leading-tight">{result.data.nombre ?? result.data.sku}</p>
                 {result.data.categoria && (
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {result.data.categoria}{result.data.marca ? ` · ${result.data.marca}` : ''}
-                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">{result.data.categoria}{result.data.marca ? ` · ${result.data.marca}` : ''}</p>
                 )}
               </div>
-              <p className="text-3xl font-extrabold text-brand-700 shrink-0">
-                ${fmt(result.data.precio_venta)}
-              </p>
+              <p className="text-3xl font-extrabold text-brand-700 shrink-0">${fmt(result.data.precio_venta)}</p>
             </div>
 
-            {/* Chips */}
             <div className="flex gap-2 flex-wrap mb-4">
               <span className="bg-gray-100 text-gray-600 text-xs font-medium px-3 py-1 rounded-full">SKU: {result.data.sku}</span>
               <span className="bg-gray-100 text-gray-600 text-xs font-medium px-3 py-1 rounded-full">Talla {result.data.talla}</span>
@@ -252,7 +240,6 @@ export default function ScannerScreen() {
               <p className="text-xs text-gray-400 mb-4 leading-relaxed">{result.data.descripcion}</p>
             )}
 
-            {/* Selector de cantidad */}
             <div className="flex items-center justify-between bg-gray-50 rounded-2xl px-4 py-3">
               <span className="text-sm text-gray-500 font-medium">Cantidad</span>
               <div className="flex items-center gap-4">
@@ -263,29 +250,24 @@ export default function ScannerScreen() {
                   className="w-9 h-9 rounded-full bg-brand-700 text-white text-lg font-bold flex items-center justify-center active:bg-brand-800 shadow-sm">+</button>
               </div>
             </div>
-
             {qty > 1 && (
               <p className="text-right text-xs text-gray-400 mt-2">
                 Subtotal: <span className="font-semibold text-gray-700">${fmt(result.data.precio_venta * qty)}</span>
               </p>
             )}
           </div>
-
-          {/* Botones siempre visibles */}
-          <div className="px-5 py-4 border-t border-gray-100 flex gap-2">
-            <button onClick={reset} className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium active:bg-gray-50">
-              Escanear otro
-            </button>
+          <div className="px-5 py-4 border-t border-gray-100 flex gap-2 shrink-0">
+            <button onClick={reset} className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium active:bg-gray-50">Escanear otro</button>
             <button onClick={addToCartAndReset} className="flex-[2] py-3 rounded-xl bg-brand-700 text-white font-semibold active:bg-brand-800">
               + Añadir {qty > 1 ? `(${qty})` : ''} al presupuesto
             </button>
           </div>
-        </div>
+        </BottomSheet>
       )}
 
       {mode === 'error' && result && (
-        <div className="absolute inset-x-0 bottom-0 z-20 animate-slide-up bg-white rounded-t-3xl shadow-2xl flex flex-col max-h-[40vh]">
-          <div className="flex-1 overflow-y-auto overscroll-contain px-5 pt-5 pb-2">
+        <BottomSheet onClose={reset} maxHeight="40vh">
+          <div className="flex-1 overflow-y-auto overscroll-contain px-5 pt-3 pb-2">
             <div className="flex items-center gap-3">
               <span className="text-3xl">🤷</span>
               <div>
@@ -294,12 +276,10 @@ export default function ScannerScreen() {
               </div>
             </div>
           </div>
-          <div className="px-5 py-4 border-t border-gray-100">
-            <button onClick={reset} className="w-full py-3 rounded-xl bg-gray-800 text-white font-semibold active:bg-gray-900">
-              Intentar de nuevo
-            </button>
+          <div className="px-5 py-4 border-t border-gray-100 shrink-0">
+            <button onClick={reset} className="w-full py-3 rounded-xl bg-gray-800 text-white font-semibold active:bg-gray-900">Intentar de nuevo</button>
           </div>
-        </div>
+        </BottomSheet>
       )}
 
       {/* Barra inferior idle — absolute sobre la camara */}
