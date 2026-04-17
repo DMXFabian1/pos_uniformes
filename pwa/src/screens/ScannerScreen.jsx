@@ -18,12 +18,6 @@ function fmt(n) {
   return Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2 })
 }
 
-function StockBadge({ stock }) {
-  if (stock === null || stock === undefined) return null
-  if (stock === 0)  return <span className="text-xs font-semibold text-red-500">Sin stock</span>
-  if (stock <= 3)   return <span className="text-xs font-semibold text-orange-500">{stock} piezas</span>
-  return <span className="text-xs font-semibold text-green-600">{stock} en stock</span>
-}
 
 export default function ScannerScreen() {
   const [mode, setMode]           = useState('idle')
@@ -223,13 +217,18 @@ export default function ScannerScreen() {
           {/* Nombre y precio */}
           <div className="flex items-start justify-between mb-3">
             <div className="flex-1 min-w-0 pr-3">
-              <p className="font-bold text-gray-900 leading-tight">{result.data.nombre}</p>
-              <p className="text-xs text-gray-400 mt-0.5">{result.data.categoria} · {result.data.marca}</p>
+              <p className="font-bold text-gray-900 leading-tight">
+                {result.data.nombre ?? result.data.sku}
+              </p>
+              {result.data.categoria && (
+                <p className="text-xs text-gray-400 mt-0.5">
+                  {result.data.categoria}{result.data.marca ? ` · ${result.data.marca}` : ''}
+                </p>
+              )}
             </div>
-            <div className="text-right shrink-0">
-              <p className="text-3xl font-extrabold text-brand-700">${fmt(result.data.precio_venta)}</p>
-              <StockBadge stock={result.data.stock_actual} />
-            </div>
+            <p className="text-3xl font-extrabold text-brand-700 shrink-0">
+              ${fmt(result.data.precio_venta)}
+            </p>
           </div>
 
           {/* Chips de variante */}
