@@ -3,11 +3,11 @@
  * - fps 20, formatos limitados = deteccion rapida
  * - Flash verde + haptic al detectar
  * - Linea de escaneo animada
+ * - Boton de linterna (torch)
  */
 import { useEffect, useRef, useState } from 'react'
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 
-// Solo los formatos que usamos — ignorar el resto acelera mucho el decode
 const FORMATS = [
   Html5QrcodeSupportedFormats.QR_CODE,
   Html5QrcodeSupportedFormats.EAN_13,
@@ -19,10 +19,29 @@ const FORMATS = [
 ]
 
 export default function Scanner({ onScan, active = true }) {
-  const containerId = 'qr-scanner-container'
-  const onScanRef   = useRef(onScan)
-  const [flash, setFlash] = useState(false)
+  const containerId  = 'qr-scanner-container'
+  const onScanRef    = useRef(onScan)
+  const trackRef     = useRef(null)       // pista de video activa
+  const [flash,  setFlash]  = useState(false)
+  const [torch,  setTorch]  = useState(false)
+  const [hasTorch, setHasTorch] = useState(false)
   onScanRef.current = onScan
+
+  // Sincronizar torch con el hardware cuando cambia
+  useEffect(() => {
+    const track = trackRef.current
+    if (!track?.applyConstraints) return
+    track.applyConstraints({ advanced: [{ torch }] }).catch(() => {})
+  }, [torch])
+
+  // Apagar linterna al desmontar / desactivar
+  useEffect(() => {
+    if (!active) {
+      setTorch(false)
+      setHasTorch(false)
+      trackRef.current = null
+    }
+  }, [active])
 
   useEffect(() => {
     if (!active) return
@@ -43,7 +62,6 @@ export default function Scanner({ onScan, active = true }) {
           verbose: false,
         })
 
-        // qrbox responsivo al ancho de pantalla
         const boxW = Math.min(Math.round(window.innerWidth * 0.72), 290)
         const boxH = Math.round(boxW * 0.58)
 
@@ -64,14 +82,19 @@ export default function Scanner({ onScan, active = true }) {
           }
         )
 
-        // Aplicar foco continuo sobre la pista de video activa
+        // Obtener pista de video para foco y linterna
         try {
           const video = document.getElementById(containerId)?.querySelector('video')
           const track = video?.srcObject?.getVideoTracks?.()[0]
           if (track?.applyConstraints) {
-            await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] })
+            trackRef.current = track
+            // Foco continuo
+            await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {})
+            // Detectar si tiene linterna
+            const caps = track.getCapabilities?.()
+            if (caps?.torch) setHasTorch(true)
           }
-        } catch (_) { /* no soportado en este dispositivo, ignorar */ }
+        } catch (_) {}
 
       } catch (e) {
         console.warn('Scanner no disponible:', e)
@@ -82,6 +105,8 @@ export default function Scanner({ onScan, active = true }) {
 
     return () => {
       alive = false
+      setTorch(false)
+      trackRef.current = null
       if (scanner) {
         scanner.stop().catch(() => {})
         scanner = null
@@ -91,29 +116,39 @@ export default function Scanner({ onScan, active = true }) {
 
   return (
     <div className="relative w-full h-full overflow-hidden bg-black">
-      {/* Video del scanner */}
+      {/* Video */}
       <div id={containerId} className="w-full h-full" />
 
       {/* Flash verde en deteccion */}
-      <div
-        className={`absolute inset-0 pointer-events-none transition-opacity duration-150
-          bg-green-400/35 ${flash ? 'opacity-100' : 'opacity-0'}`}
-      />
+      <div className={`absolute inset-0 pointer-events-none transition-opacity duration-150
+        bg-green-400/35 ${flash ? 'opacity-100' : 'opacity-0'}`} />
 
-      {/* Marco guia con esquinas y linea animada */}
+      {/* Marco guia */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
         <div className="relative w-72 h-44">
-          {/* Esquinas */}
           <span className="absolute top-0 left-0   w-7 h-7 border-t-[3px] border-l-[3px] border-white rounded-tl-md" />
           <span className="absolute top-0 right-0  w-7 h-7 border-t-[3px] border-r-[3px] border-white rounded-tr-md" />
           <span className="absolute bottom-0 left-0  w-7 h-7 border-b-[3px] border-l-[3px] border-white rounded-bl-md" />
           <span className="absolute bottom-0 right-0 w-7 h-7 border-b-[3px] border-r-[3px] border-white rounded-br-md" />
-
-          {/* Linea de escaneo */}
           <div className="absolute top-2 left-3 right-3 h-[2px] animate-scan
             bg-gradient-to-r from-transparent via-green-400 to-transparent" />
         </div>
       </div>
+
+      {/* Boton linterna — solo si el dispositivo lo soporta */}
+      {hasTorch && (
+        <button
+          onClick={() => setTorch(t => !t)}
+          className={`absolute top-4 right-4 w-11 h-11 rounded-full flex items-center justify-center
+            text-xl transition-all active:scale-90 shadow-lg
+            ${torch
+              ? 'bg-yellow-400 text-gray-900'
+              : 'bg-black/40 text-white/70 border border-white/20'
+            }`}
+        >
+          {torch ? '🔦' : '🔦'}
+        </button>
+      )}
     </div>
   )
 }
