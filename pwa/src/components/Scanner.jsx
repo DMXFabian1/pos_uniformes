@@ -47,8 +47,17 @@ export default function Scanner({ onScan, active = true }) {
         const boxW = Math.min(Math.round(window.innerWidth * 0.72), 290)
         const boxH = Math.round(boxW * 0.58)
 
+        // Constraints de camara: foco continuo + resolucion optima
+        const cameraConstraints = {
+          facingMode: 'environment',
+          advanced: [
+            { focusMode: 'continuous' },   // foco permanente (iOS 15+ / Android)
+            { focusMode: 'continuousVideo' }, // alias en algunos Android
+          ],
+        }
+
         await scanner.start(
-          { facingMode: 'environment' },
+          cameraConstraints,
           {
             fps: 20,
             qrbox: { width: boxW, height: boxH },
