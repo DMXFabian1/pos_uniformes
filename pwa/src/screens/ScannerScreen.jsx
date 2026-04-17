@@ -22,6 +22,7 @@ export default function ScannerScreen() {
   const [scanActive, setScan] = useState(true)
   const [manualInput, setManual] = useState('')
   const [showManual, setShowManual] = useState(false)
+  const [qty, setQty] = useState(1)
   const { setClient, addLine } = useCart()
   const navigate   = useNavigate()
   const processing = useRef(false)
@@ -51,6 +52,7 @@ export default function ScannerScreen() {
       const variante = await catalogApi.bySku(raw).catch(() => null)
       if (variante) {
         setResult({ type: 'product', data: variante })
+        setQty(1)
         setMode('product')
         return
       }
@@ -81,10 +83,12 @@ export default function ScannerScreen() {
 
   function addToCartAndReset() {
     const v = result.data
-    addLine(
-      { sku: v.sku, talla: v.talla, color: v.color, precio_venta: Number(v.precio_venta) },
-      { nombre: v.descripcion_snapshot ?? v.sku }
-    )
+    for (let i = 0; i < qty; i++) {
+      addLine(
+        { sku: v.sku, talla: v.talla, color: v.color, precio_venta: Number(v.precio_venta) },
+        { nombre: v.descripcion_snapshot ?? v.sku }
+      )
+    }
     reset()
   }
 
@@ -162,19 +166,48 @@ export default function ScannerScreen() {
 
       {mode === 'product' && result && (
         <div className="animate-slide-up bg-white rounded-t-3xl px-5 pt-5 pb-8 shadow-2xl">
-          <div className="flex items-start justify-between mb-1">
+          {/* Info del producto */}
+          <div className="flex items-start justify-between mb-4">
             <div className="flex-1 min-w-0 pr-3">
               <p className="text-xs text-gray-400 uppercase tracking-wide">Precio rápido</p>
-              <p className="text-sm font-medium text-gray-700 truncate mt-0.5">
-                {result.data.sku}
-              </p>
+              <p className="text-sm font-medium text-gray-700 truncate mt-0.5">{result.data.sku}</p>
               <p className="text-xs text-gray-400">{result.data.talla} · {result.data.color}</p>
             </div>
             <p className="text-3xl font-extrabold text-brand-700 shrink-0">
               ${fmt(result.data.precio_venta)}
             </p>
           </div>
-          <div className="flex gap-2 mt-4">
+
+          {/* Selector de cantidad */}
+          <div className="flex items-center justify-between bg-gray-50 rounded-2xl px-4 py-3 mb-4">
+            <span className="text-sm text-gray-500 font-medium">Cantidad</span>
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setQty(q => Math.max(1, q - 1))}
+                className="w-9 h-9 rounded-full bg-white border border-gray-200 text-gray-700
+                  text-lg font-bold flex items-center justify-center active:bg-gray-100 shadow-sm"
+              >
+                −
+              </button>
+              <span className="text-xl font-bold text-gray-900 w-6 text-center">{qty}</span>
+              <button
+                onClick={() => setQty(q => q + 1)}
+                className="w-9 h-9 rounded-full bg-brand-700 text-white
+                  text-lg font-bold flex items-center justify-center active:bg-brand-800 shadow-sm"
+              >
+                +
+              </button>
+            </div>
+          </div>
+
+          {/* Subtotal */}
+          {qty > 1 && (
+            <p className="text-right text-xs text-gray-400 mb-3">
+              Subtotal: <span className="font-semibold text-gray-700">${fmt(result.data.precio_venta * qty)}</span>
+            </p>
+          )}
+
+          <div className="flex gap-2">
             <button
               onClick={reset}
               className="flex-1 py-3 rounded-xl border border-gray-200 text-gray-600 text-sm font-medium active:bg-gray-50"
@@ -185,7 +218,7 @@ export default function ScannerScreen() {
               onClick={addToCartAndReset}
               className="flex-[2] py-3 rounded-xl bg-brand-700 text-white font-semibold active:bg-brand-800"
             >
-              + Añadir al presupuesto
+              + Añadir {qty > 1 ? `(${qty})` : ''} al presupuesto
             </button>
           </div>
         </div>
