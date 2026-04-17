@@ -25,9 +25,14 @@ from pos_uniformes.utils.venv_bootstrap import ensure_local_venv_site_packages
 
 ensure_local_venv_site_packages(Path(__file__))
 
+import os
+
 import uvicorn
 
 from pos_uniformes.utils.config import settings
+
+# En desarrollo recarga automaticamente al detectar cambios en el codigo
+DEV_MODE = os.getenv("POS_ENV", "development") != "production"
 
 
 def main() -> None:
@@ -38,6 +43,8 @@ def main() -> None:
         workers=1,
         log_level="info",
         access_log=True,
+        reload=DEV_MODE,
+        reload_dirs=["pos_uniformes"] if DEV_MODE else None,
     )
 
 
