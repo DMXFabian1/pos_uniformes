@@ -47,17 +47,8 @@ export default function Scanner({ onScan, active = true }) {
         const boxW = Math.min(Math.round(window.innerWidth * 0.72), 290)
         const boxH = Math.round(boxW * 0.58)
 
-        // Constraints de camara: foco continuo + resolucion optima
-        const cameraConstraints = {
-          facingMode: 'environment',
-          advanced: [
-            { focusMode: 'continuous' },   // foco permanente (iOS 15+ / Android)
-            { focusMode: 'continuousVideo' }, // alias en algunos Android
-          ],
-        }
-
         await scanner.start(
-          cameraConstraints,
+          { facingMode: 'environment' },
           {
             fps: 20,
             qrbox: { width: boxW, height: boxH },
@@ -72,6 +63,16 @@ export default function Scanner({ onScan, active = true }) {
             onScanRef.current(decoded)
           }
         )
+
+        // Aplicar foco continuo sobre la pista de video activa
+        try {
+          const video = document.getElementById(containerId)?.querySelector('video')
+          const track = video?.srcObject?.getVideoTracks?.()[0]
+          if (track?.applyConstraints) {
+            await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] })
+          }
+        } catch (_) { /* no soportado en este dispositivo, ignorar */ }
+
       } catch (e) {
         console.warn('Scanner no disponible:', e)
       }
