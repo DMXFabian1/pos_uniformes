@@ -48,7 +48,14 @@ cd "$PWA_DIR"
 npm run dev 2>&1 | sed "s/^/${GREEN}[PWA]${RESET} /" &
 PWA_PID=$!
 
-echo -e "\n${BOLD}Servidores corriendo. Ctrl+C para detener ambos.${RESET}\n"
+# Detectar IP local
+LAN_IP=$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo "desconocida")
+
+echo -e "\n${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+echo -e "  ${CYAN}API${RESET}  →  http://${LAN_IP}:8000"
+echo -e "  ${GREEN}PWA${RESET}  →  ${BOLD}https://${LAN_IP}:5173${RESET}  ← abre esto en el iPhone"
+echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
+echo -e "  Ctrl+C para detener ambos\n"
 
 # Esperar a que alguno termine inesperadamente
 wait "$API_PID" "$PWA_PID"
