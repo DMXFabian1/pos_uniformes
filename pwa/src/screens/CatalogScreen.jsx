@@ -712,6 +712,8 @@ function FavoritesTab({ favKeys, isFav, toggleFav, onAdd, addedSku }) {
       // Deduplicar (misma key puede aparecer en básicos y en alguna escuela)
       const seen = new Set()
       const unique = favs.filter(f => { if (seen.has(f.key)) return false; seen.add(f.key); return true })
+      // Mismo orden que el satélite: alfabético por nombre_base (card.title.lower())
+      unique.sort((a, b) => a.nombre_base.localeCompare(b.nombre_base, 'es', { sensitivity: 'base' }))
       setFamilies(unique)
     }).finally(() => setLoading(false))
   }, [favKeys])
