@@ -39,6 +39,7 @@ export default function Scanner({ onScan, active = true }) {
   const [torch,     setTorch]     = useState(false)
   const [hasTorch,  setHasTorch]  = useState(false)
   const [camError,  setCamError]  = useState(null) // null | 'denied' | 'unavailable'
+  const [retryKey,  setRetryKey]  = useState(0)   // incrementar = reintentar
   onScanRef.current = onScan
 
   useEffect(() => {
@@ -58,6 +59,7 @@ export default function Scanner({ onScan, active = true }) {
 
   useEffect(() => {
     if (!active) return
+    setCamError(null) // limpiar error al reintentar
 
     let alive   = true
     let scanner = null
@@ -119,7 +121,7 @@ export default function Scanner({ onScan, active = true }) {
         scanner = null
       }
     }
-  }, [active])
+  }, [active, retryKey])
 
   // ── Pantalla de error ──────────────────────────────
   if (camError) {
@@ -156,7 +158,7 @@ export default function Scanner({ onScan, active = true }) {
         )}
 
         <button
-          onClick={() => setCamError(null)}
+          onClick={() => setRetryKey(k => k + 1)}
           className="bg-brand-700 text-white font-semibold px-8 py-3 rounded-xl active:bg-brand-800"
         >
           Intentar de nuevo
