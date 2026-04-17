@@ -9,6 +9,24 @@
 import { useEffect, useRef, useState } from 'react'
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 
+// Beep corto con Web Audio API — sin archivos de sonido
+function beep() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)()
+    const osc = ctx.createOscillator()
+    const gain = ctx.createGain()
+    osc.connect(gain)
+    gain.connect(ctx.destination)
+    osc.type = 'sine'
+    osc.frequency.setValueAtTime(1850, ctx.currentTime)
+    gain.gain.setValueAtTime(0.3, ctx.currentTime)
+    gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12)
+    osc.start(ctx.currentTime)
+    osc.stop(ctx.currentTime + 0.12)
+    osc.onended = () => ctx.close()
+  } catch (_) {}
+}
+
 const FORMATS = [
   Html5QrcodeSupportedFormats.QR_CODE,
   Html5QrcodeSupportedFormats.EAN_13,
@@ -85,6 +103,7 @@ export default function Scanner({ onScan, active = true }) {
           { fps: 20, qrbox: { width: boxW, height: boxH }, aspectRatio: 1.6, disableFlip: false },
           (decoded) => {
             if (!alive) return
+            beep()
             if (navigator.vibrate) navigator.vibrate(55)
             setFlash(true)
             setTimeout(() => setFlash(false), 280)
