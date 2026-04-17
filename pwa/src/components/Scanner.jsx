@@ -109,7 +109,13 @@ export default function Scanner({ onScan, active = true }) {
       if (container) container.innerHTML = ''
 
       try {
-        scanner = new Html5Qrcode(containerId, { formatsToSupport: FORMATS, verbose: false })
+        scanner = new Html5Qrcode(containerId, {
+          formatsToSupport: FORMATS,
+          verbose: false,
+          experimentalFeatures: {
+            useBarCodeDetector: true, // BarcodeDetector nativo en Android Chrome (3-5x mas rapido)
+          },
+        })
 
         const boxW = Math.min(Math.round(window.innerWidth * 0.72), 290)
         const boxH = Math.round(boxW * 0.58)
