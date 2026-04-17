@@ -118,9 +118,9 @@ export default function ScannerScreen() {
   const hasSheet = mode !== 'idle'
 
   return (
-    <div className="relative h-full bg-black">
-      {/* Camara — siempre ocupa toda la pantalla */}
-      <div className="absolute inset-0">
+    <div className="relative flex flex-col h-full bg-black">
+      {/* Camara — flex-1 da dimensiones correctas a html5-qrcode */}
+      <div className="flex-1 relative min-h-0">
         <Scanner onScan={handleScan} active={scanActive} />
 
         {/* Boton historial — solo cuando hay items y no hay sheet */}
@@ -176,14 +176,12 @@ export default function ScannerScreen() {
         {/* Indicador de procesando — barra superior sin tapar la camara */}
         {mode === 'loading' && (
           <div className="absolute top-0 left-0 right-0">
-            {/* Barra de progreso indeterminada */}
             <div className="h-1 bg-white/10 overflow-hidden">
-              <div className="h-full bg-green-400 animate-[loading_1s_ease-in-out_infinite]
-                w-1/3 rounded-full" style={{ animation: 'loading 1s ease-in-out infinite' }} />
+              <div className="h-full bg-green-400 w-1/3 rounded-full"
+                style={{ animation: 'loading 1s ease-in-out infinite' }} />
             </div>
             <div className="flex items-center justify-center mt-2">
-              <span className="bg-black/60 backdrop-blur-sm text-white/80 text-xs
-                px-3 py-1.5 rounded-full font-medium">
+              <span className="bg-black/60 backdrop-blur-sm text-white/80 text-xs px-3 py-1.5 rounded-full font-medium">
                 Identificando…
               </span>
             </div>
@@ -191,7 +189,32 @@ export default function ScannerScreen() {
         )}
       </div>
 
-      {/* ── Bottom sheets — draggables ── */}
+      {/* Barra idle — flujo normal, da altura fija al pie */}
+      {mode === 'idle' && (
+        <div className="shrink-0 bg-gray-950 px-5 py-3 pb-5">
+          {showManual ? (
+            <form onSubmit={submitManual} className="flex gap-2">
+              <input
+                autoFocus
+                type="text"
+                value={manualInput}
+                onChange={e => setManual(e.target.value)}
+                placeholder="Escribe SKU o código…"
+                className="flex-1 bg-white/10 text-white placeholder-white/30 rounded-xl px-4 py-2.5 text-sm outline-none"
+              />
+              <button type="submit" className="bg-brand-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold active:bg-brand-800">Buscar</button>
+              <button type="button" onClick={() => setShowManual(false)} className="text-white/40 px-2 text-sm">✕</button>
+            </form>
+          ) : (
+            <div className="flex gap-2">
+              <button onClick={() => setShowManual(true)} className="flex-1 bg-white/10 text-white/70 py-2.5 rounded-xl text-sm active:bg-white/20">✏️ Ingresar código</button>
+              <button onClick={() => { setClient(null); navigate('/catalog') }} className="flex-1 bg-white/10 text-white/70 py-2.5 rounded-xl text-sm active:bg-white/20">📦 Ir al catálogo</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Bottom sheets — absolute sobre todo, z-20 ── */}
       {mode === 'client' && result && (
         <BottomSheet onClose={reset} maxHeight="55vh">
           <div className="flex-1 overflow-y-auto overscroll-contain px-5 pt-3 pb-2">
@@ -282,36 +305,6 @@ export default function ScannerScreen() {
         </BottomSheet>
       )}
 
-      {/* Barra inferior idle — absolute sobre la camara */}
-      {mode === 'idle' && (
-        <div className="absolute inset-x-0 bottom-0 z-20 bg-gray-950 px-5 py-3 pb-5">
-          {showManual ? (
-            <form onSubmit={submitManual} className="flex gap-2">
-              <input
-                autoFocus
-                type="text"
-                value={manualInput}
-                onChange={e => setManual(e.target.value)}
-                placeholder="Escribe SKU o código…"
-                className="flex-1 bg-white/10 text-white placeholder-white/30 rounded-xl px-4 py-2.5 text-sm outline-none"
-              />
-              <button type="submit" className="bg-brand-700 text-white px-4 py-2.5 rounded-xl text-sm font-semibold active:bg-brand-800">
-                Buscar
-              </button>
-              <button type="button" onClick={() => setShowManual(false)} className="text-white/40 px-2 text-sm">✕</button>
-            </form>
-          ) : (
-            <div className="flex gap-2">
-              <button onClick={() => setShowManual(true)} className="flex-1 bg-white/10 text-white/70 py-2.5 rounded-xl text-sm active:bg-white/20">
-                ✏️ Ingresar código
-              </button>
-              <button onClick={() => { setClient(null); navigate('/catalog') }} className="flex-1 bg-white/10 text-white/70 py-2.5 rounded-xl text-sm active:bg-white/20">
-                📦 Ir al catálogo
-              </button>
-            </div>
-          )}
-        </div>
-      )}
     </div>
   )
 }
