@@ -4,6 +4,7 @@
  * Flujo school:  Modo → Nivel → Escuela → [DEPORTIVO|OFICIAL] → [Niña|Niño] → Pieza → Productos
  * Flujo basics:  Modo → Pieza → Productos
  * Tab Buscar:    búsqueda libre de texto (fallback)
+ * Favoritos:     escuelas y familias de producto guardadas en localStorage
  */
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
@@ -20,10 +21,67 @@ function fmt(n) {
 const GENERO_LABEL = { NINA: '👧 Niña', NINO: '👦 Niño', COMPARTIDO: '👫 Compartido', TODOS: '👫 Todos' }
 const PRENDA_LABEL = { DEPORTIVO: '⚽ Deportivo', OFICIAL: '🎓 Oficial' }
 
+// ── useFavorites hook ─────────────────────────────────────────────────────────
+
+const FAV_KEY = 'pwa_catalog_favorites_v1'
+
+function useFavorites() {
+  const [favorites, setFavorites] = useState(() => {
+    try {
+      const stored = localStorage.getItem(FAV_KEY)
+      return stored ? JSON.parse(stored) : { escuelas: [], families: [] }
+    } catch {
+      return { escuelas: [], families: [] }
+    }
+  })
+
+  function save(next) {
+    setFavorites(next)
+    try { localStorage.setItem(FAV_KEY, JSON.stringify(next)) } catch {}
+  }
+
+  function toggleEscuela(escuela, nivelNombre) {
+    const exists = favorites.escuelas.some(e => e.id === escuela.id)
+    save({
+      ...favorites,
+      escuelas: exists
+        ? favorites.escuelas.filter(e => e.id !== escuela.id)
+        : [{ id: escuela.id, nombre: escuela.nombre, nivel: nivelNombre }, ...favorites.escuelas],
+    })
+  }
+
+  function toggleFamily(family, ctx) {
+    // ctx: { escuela_id, escuela_nombre, tipo_prenda, genero }
+    const favKey = `${family.key}||${ctx.escuela_id ?? 'basics'}`
+    const exists = favorites.families.some(f => f.fav_key === favKey)
+    save({
+      ...favorites,
+      families: exists
+        ? favorites.families.filter(f => f.fav_key !== favKey)
+        : [{
+            fav_key:       favKey,
+            key:           family.key,
+            nombre_base:   family.nombre_base,
+            tipo_pieza:    family.tipo_pieza,
+            tipo_pieza_id: family.tipo_pieza_id,
+            precio_desde:  family.precio_desde,
+            ...ctx,
+          }, ...favorites.families],
+    })
+  }
+
+  function isFavEscuela(id)           { return favorites.escuelas.some(e => e.id === id) }
+  function isFavFamily(key, escuelaId) {
+    const favKey = `${key}||${escuelaId ?? 'basics'}`
+    return favorites.families.some(f => f.fav_key === favKey)
+  }
+
+  return { favorites, toggleEscuela, toggleFamily, isFavEscuela, isFavFamily }
+}
+
 // ── FamilyCard ────────────────────────────────────────────────────────────────
 
-function FamilyCard({ family, onAdd, addedSku }) {
-  // Agrupar variantes por color
+function FamilyCard({ family, onAdd, addedSku, isFav, onToggleFav }) {
   const byColor = useMemo(() => {
     const map = {}
     for (const v of family.variantes) {
@@ -37,9 +95,9 @@ function FamilyCard({ family, onAdd, addedSku }) {
 
   return (
     <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-      {/* Encabezado de familia */}
+      {/* Encabezado */}
       <div className="flex items-start justify-between mb-3">
-        <div className="flex-1 min-w-0 pr-3">
+        <div className="flex-1 min-w-0 pr-2">
           <p className="font-bold text-gray-900 leading-tight">{family.nombre_base}</p>
           {family.tipo_pieza && (
             <span className="inline-block mt-1 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full">
@@ -47,23 +105,33 @@ function FamilyCard({ family, onAdd, addedSku }) {
             </span>
           )}
         </div>
-        <div className="text-right shrink-0">
-          <p className="font-extrabold text-brand-700 text-lg">${fmt(family.precio_desde)}</p>
-          {family.variantes.length > 1 && (
-            <p className="text-[10px] text-gray-400">desde</p>
+        <div className="flex items-start gap-2 shrink-0">
+          {/* Precio */}
+          <div className="text-right">
+            <p className="font-extrabold text-brand-700 text-lg">${fmt(family.precio_desde)}</p>
+            {family.variantes.length > 1 && (
+              <p className="text-[10px] text-gray-400">desde</p>
+            )}
+          </div>
+          {/* Estrella favorito */}
+          {onToggleFav && (
+            <button
+              onClick={onToggleFav}
+              className="text-xl leading-none p-0.5 transition-transform active:scale-90"
+            >
+              {isFav ? '⭐' : '☆'}
+            </button>
           )}
         </div>
       </div>
 
-      {/* Variantes agrupadas por color */}
+      {/* Variantes por color */}
       <div className="space-y-2">
         {colorKeys.map(color => (
           <div key={color} className="flex items-center gap-2 flex-wrap">
-            {/* Etiqueta de color */}
             <span className="text-xs text-gray-500 font-medium shrink-0 w-20 truncate" title={color}>
               {color}
             </span>
-            {/* Chips de talla */}
             <div className="flex gap-1.5 flex-wrap">
               {byColor[color].map(v => {
                 const isAdded = addedSku === v.sku
@@ -84,12 +152,10 @@ function FamilyCard({ family, onAdd, addedSku }) {
             </div>
           </div>
         ))}
+        {colorKeys.length === 0 && (
+          <p className="text-xs text-gray-400 text-center py-2">Sin variantes disponibles</p>
+        )}
       </div>
-
-      {/* Precio total si hay variante seleccionada */}
-      {colorKeys.length === 0 && (
-        <p className="text-xs text-gray-400 text-center py-2">Sin variantes disponibles</p>
-      )}
     </div>
   )
 }
@@ -103,13 +169,13 @@ function FilterChips({ options, selected, onSelect, labelFn }) {
       {options.map(opt => {
         const key   = typeof opt === 'object' ? opt.id   : opt
         const label = typeof opt === 'object' ? opt.nombre : (labelFn?.(opt) ?? opt)
-        const isSelected = selected === key
+        const active = selected === key
         return (
           <button
             key={key}
-            onClick={() => onSelect(isSelected ? null : key)}
+            onClick={() => onSelect(active ? null : key)}
             className={`shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-all
-              ${isSelected
+              ${active
                 ? 'bg-brand-700 text-white shadow-md shadow-brand-700/30'
                 : 'bg-gray-100 text-gray-700 active:bg-gray-200'
               }`}
@@ -122,9 +188,9 @@ function FilterChips({ options, selected, onSelect, labelFn }) {
   )
 }
 
-// ── StepList — lista de opciones tipo "nivel" o "escuela" ─────────────────────
+// ── StepList ──────────────────────────────────────────────────────────────────
 
-function StepList({ items, onSelect, filterKey = 'nombre', badgeFn }) {
+function StepList({ items, onSelect, filterKey = 'nombre', badgeFn, onStar, isStar }) {
   const [q, setQ] = useState('')
   const filtered = items.filter(it =>
     it[filterKey].toLowerCase().includes(q.toLowerCase())
@@ -144,19 +210,30 @@ function StepList({ items, onSelect, filterKey = 'nombre', badgeFn }) {
       )}
       <div className="flex-1 overflow-y-auto overscroll-contain space-y-1.5 px-4">
         {filtered.map(it => (
-          <button
-            key={it.id}
-            onClick={() => onSelect(it)}
-            className="w-full flex items-center justify-between bg-white rounded-2xl px-4 py-3.5
-              shadow-sm border border-gray-100 active:bg-brand-50 active:border-brand-200 text-left"
-          >
-            <span className="font-medium text-gray-900 text-sm">{it[filterKey]}</span>
-            {badgeFn && (
-              <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full shrink-0">
-                {badgeFn(it)}
-              </span>
+          <div key={it.id} className="flex items-center gap-2">
+            <button
+              onClick={() => onSelect(it)}
+              className="flex-1 flex items-center justify-between bg-white rounded-2xl px-4 py-3.5
+                shadow-sm border border-gray-100 active:bg-brand-50 active:border-brand-200 text-left"
+            >
+              <span className="font-medium text-gray-900 text-sm">{it[filterKey]}</span>
+              {badgeFn && (
+                <span className="text-xs text-gray-400 bg-gray-100 px-2 py-0.5 rounded-full shrink-0 ml-2">
+                  {badgeFn(it)}
+                </span>
+              )}
+            </button>
+            {/* Estrella de favorito */}
+            {onStar && (
+              <button
+                onClick={() => onStar(it)}
+                className="w-11 h-11 rounded-2xl bg-white shadow-sm border border-gray-100
+                  flex items-center justify-center text-xl shrink-0 active:scale-90 transition-transform"
+              >
+                {isStar?.(it) ? '⭐' : '☆'}
+              </button>
             )}
-          </button>
+          </div>
         ))}
         {filtered.length === 0 && (
           <p className="text-center text-gray-400 text-sm py-8">Sin resultados</p>
@@ -169,12 +246,12 @@ function StepList({ items, onSelect, filterKey = 'nombre', badgeFn }) {
 // ── Main Component ────────────────────────────────────────────────────────────
 
 export default function CatalogScreen() {
-  // ── Filtros ──
-  const [mode,        setMode]        = useState(null)    // 'school' | 'basics'
+  // ── Filtros guiados ──
+  const [mode,        setMode]        = useState(null)
   const [nivelId,     setNivelId]     = useState(null)
   const [escuelaId,   setEscuelaId]   = useState(null)
-  const [tipoPrenda,  setTipoPrenda]  = useState(null)    // 'DEPORTIVO' | 'OFICIAL'
-  const [genero,      setGenero]      = useState(null)    // 'NINA' | 'NINO' | 'COMPARTIDO'
+  const [tipoPrenda,  setTipoPrenda]  = useState(null)
+  const [genero,      setGenero]      = useState(null)
   const [tipoPiezaId, setTipoPiezaId] = useState(null)
 
   // ── Datos ──
@@ -184,21 +261,30 @@ export default function CatalogScreen() {
   const [loadingProd, setLoadingProd] = useState(false)
 
   // ── Search tab ──
-  const [tab,         setTab]         = useState('guided') // 'guided' | 'search'
-  const [q,           setQ]           = useState('')
-  const [searchData,  setSearchData]  = useState(null)
-  const [searchPage,  setSearchPage]  = useState(1)
-  const [searchLoad,  setSearchLoad]  = useState(false)
+  const [tab,        setTab]       = useState('guided')
+  const [q,          setQ]         = useState('')
+  const [searchData, setSearchData] = useState(null)
+  const [searchPage, setSearchPage] = useState(1)
+  const [searchLoad, setSearchLoad] = useState(false)
   const searchDebounce = useRef(null)
+
+  // ── Favoritos ──
+  const { favorites, toggleEscuela, toggleFamily, isFavEscuela, isFavFamily } = useFavorites()
 
   // ── Cart & nav ──
   const { client, lines, addLine } = useCart()
   const navigate = useNavigate()
-
-  // Flash al agregar
   const [addedSku, setAddedSku] = useState(null)
 
-  // ── Cargar opciones una sola vez ──────────────────────────────────────────
+  // ── Detail modal (search) ──
+  const [detail, setDetail] = useState(null)
+
+  async function openDetail(id) {
+    const prod = await catalogApi.get(id).catch(() => null)
+    if (prod) setDetail(prod)
+  }
+
+  // ── Cargar opciones ───────────────────────────────────────────────────────
   useEffect(() => {
     setLoadingOpts(true)
     catalogApi.guidedOptions()
@@ -207,7 +293,7 @@ export default function CatalogScreen() {
       .finally(() => setLoadingOpts(false))
   }, [])
 
-  // ── Cargar productos cuando hay filtros suficientes ───────────────────────
+  // ── Cargar productos ──────────────────────────────────────────────────────
   useEffect(() => {
     if (!mode) { setProducts(null); return }
     if (mode === 'school' && !escuelaId) { setProducts(null); return }
@@ -239,13 +325,6 @@ export default function CatalogScreen() {
     if (tab === 'search' && !searchData) runSearch('', 1)
   }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Detail modal (search tab) ─────────────────────────────────────────────
-  const [detail, setDetail] = useState(null)
-  async function openDetail(id) {
-    const prod = await catalogApi.get(id).catch(() => null)
-    if (prod) setDetail(prod)
-  }
-
   // ── Agregar al carrito ────────────────────────────────────────────────────
   function handleAdd(variante, nombre) {
     addLine(
@@ -257,17 +336,36 @@ export default function CatalogScreen() {
     setTimeout(() => setAddedSku(null), 900)
   }
 
-  // ── Datos derivados ───────────────────────────────────────────────────────
-  const nivel = useMemo(
-    () => options?.niveles.find(n => n.id === nivelId),
-    [options, nivelId]
-  )
-  const escuela = useMemo(
-    () => nivel?.escuelas.find(e => e.id === escuelaId),
-    [nivel, escuelaId]
-  )
+  // ── Saltar a escuela favorita ─────────────────────────────────────────────
+  function jumpToEscuela(fav) {
+    const nivel = options?.niveles.find(n => n.escuelas.some(e => e.id === fav.id))
+    setMode('school')
+    if (nivel) setNivelId(nivel.id)
+    setEscuelaId(fav.id)
+    setTipoPrenda(null)
+    setGenero(null)
+    setTipoPiezaId(null)
+  }
 
-  // Breadcrumb
+  // ── Saltar a familia favorita ─────────────────────────────────────────────
+  function jumpToFavFamily(fav) {
+    if (fav.escuela_id) {
+      const nivel = options?.niveles.find(n => n.escuelas.some(e => e.id === fav.escuela_id))
+      setMode('school')
+      if (nivel) setNivelId(nivel.id)
+      setEscuelaId(fav.escuela_id)
+      setTipoPrenda(fav.tipo_prenda ?? null)
+      setGenero(fav.genero ?? null)
+    } else {
+      setMode('basics')
+    }
+    setTipoPiezaId(fav.tipo_pieza_id ?? null)
+  }
+
+  // ── Datos derivados ───────────────────────────────────────────────────────
+  const nivel   = useMemo(() => options?.niveles.find(n => n.id === nivelId), [options, nivelId])
+  const escuela = useMemo(() => nivel?.escuelas.find(e => e.id === escuelaId), [nivel, escuelaId])
+
   const crumbs = useMemo(() => {
     const items = []
     if (!mode) return items
@@ -290,16 +388,16 @@ export default function CatalogScreen() {
     return items
   }, [mode, nivelId, nivel, escuelaId, escuela])
 
-  // Paso actual
   const step = useMemo(() => {
-    if (!mode) return 'mode'
-    if (mode === 'school' && !nivelId) return 'nivel'
-    if (mode === 'school' && !escuelaId) return 'escuela'
+    if (!mode)                              return 'mode'
+    if (mode === 'school' && !nivelId)      return 'nivel'
+    if (mode === 'school' && !escuelaId)    return 'escuela'
     return 'products'
   }, [mode, nivelId, escuelaId])
 
-  // Carrito
   const cartTotal = lines.reduce((acc, l) => acc + Number(l.subtotal), 0)
+
+  const favCtx = { escuela_id: escuelaId, escuela_nombre: escuela?.nombre, tipo_prenda: tipoPrenda, genero }
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
@@ -307,15 +405,12 @@ export default function CatalogScreen() {
 
       {/* ── Header ── */}
       <div className="bg-white px-4 pt-4 pb-3 border-b border-gray-100 space-y-2 shrink-0">
-        {/* Cliente activo */}
         {client && (
           <div className="flex items-center gap-2 bg-brand-50 rounded-xl px-3 py-2">
             <span className="text-brand-600 text-sm">👤</span>
             <span className="text-brand-800 text-sm font-medium flex-1 truncate">{client.nombre}</span>
           </div>
         )}
-
-        {/* Tabs */}
         <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
           <button
             onClick={() => setTab('guided')}
@@ -389,7 +484,6 @@ export default function CatalogScreen() {
             )}
           </div>
 
-          {/* Modal detalle (search) */}
           {detail && (
             <div className="fixed inset-0 z-50 flex items-end bg-black/50" onClick={() => setDetail(null)}>
               <div className="w-full bg-white rounded-t-3xl p-5 max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
@@ -427,7 +521,7 @@ export default function CatalogScreen() {
       {/* ══ TAB: GUIADO ════════════════════════════════════════════════════════ */}
       {tab === 'guided' && (
         <>
-          {/* Breadcrumb de navegación */}
+          {/* Breadcrumb */}
           {crumbs.length > 0 && (
             <div className="bg-white px-4 py-2 border-b border-gray-100 shrink-0">
               <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
@@ -455,41 +549,99 @@ export default function CatalogScreen() {
 
           {loadingOpts && step === 'mode' && <Spinner className="flex-1" />}
 
-          {/* ── Paso 0: elegir modo ── */}
+          {/* ── Paso 0: elegir modo (con favoritos) ── */}
           {step === 'mode' && !loadingOpts && (
-            <div className="flex-1 flex flex-col items-center justify-center px-6 gap-4">
-              <p className="text-gray-500 text-sm mb-2">¿Qué tipo de productos?</p>
-              <div className="w-full grid grid-cols-2 gap-4">
-                <button
-                  onClick={() => setMode('school')}
-                  className="flex flex-col items-center gap-3 bg-white rounded-3xl p-6 shadow-sm
-                    border-2 border-transparent active:border-brand-400 active:bg-brand-50 transition-all"
-                >
-                  <span className="text-5xl">🏫</span>
-                  <span className="font-bold text-gray-800 text-center text-sm leading-tight">
-                    Uniformes Escolares
-                  </span>
-                  {options && (
-                    <span className="text-xs text-gray-400">
-                      {options.niveles.length} niveles
-                    </span>
+            <div className="flex-1 overflow-y-auto overscroll-contain px-5 py-5 flex flex-col gap-5">
+
+              {/* Favoritos — sección rápida */}
+              {(favorites.escuelas.length > 0 || favorites.families.length > 0) && (
+                <div>
+                  <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-3">
+                    ⭐ Favoritos
+                  </p>
+
+                  {/* Escuelas favoritas */}
+                  {favorites.escuelas.length > 0 && (
+                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none mb-3">
+                      {favorites.escuelas.map(fav => (
+                        <button
+                          key={fav.id}
+                          onClick={() => jumpToEscuela(fav)}
+                          className="shrink-0 bg-yellow-50 border border-yellow-200 rounded-2xl
+                            px-4 py-3 text-left active:bg-yellow-100 transition-colors"
+                        >
+                          <p className="text-sm font-semibold text-gray-800 max-w-[130px] truncate">
+                            {fav.nombre}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-0.5">{fav.nivel}</p>
+                        </button>
+                      ))}
+                    </div>
                   )}
-                </button>
-                <button
-                  onClick={() => setMode('basics')}
-                  className="flex flex-col items-center gap-3 bg-white rounded-3xl p-6 shadow-sm
-                    border-2 border-transparent active:border-brand-400 active:bg-brand-50 transition-all"
-                >
-                  <span className="text-5xl">📦</span>
-                  <span className="font-bold text-gray-800 text-center text-sm leading-tight">
-                    Básicos
-                  </span>
-                  {options && (
-                    <span className="text-xs text-gray-400">
-                      {options.tipo_pieza_basics.length} tipos
-                    </span>
+
+                  {/* Familias de producto favoritas */}
+                  {favorites.families.length > 0 && (
+                    <div className="space-y-2">
+                      {favorites.families.map(fav => (
+                        <button
+                          key={fav.fav_key}
+                          onClick={() => jumpToFavFamily(fav)}
+                          className="w-full flex items-center gap-3 bg-white rounded-2xl px-4 py-3
+                            shadow-sm border border-gray-100 active:bg-brand-50 text-left"
+                        >
+                          <span className="text-xl shrink-0">👕</span>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-semibold text-gray-900 text-sm truncate">{fav.nombre_base}</p>
+                            <p className="text-xs text-gray-400 truncate">
+                              {[fav.escuela_nombre, fav.tipo_prenda && PRENDA_LABEL[fav.tipo_prenda], fav.tipo_pieza]
+                                .filter(Boolean).join(' · ')}
+                            </p>
+                          </div>
+                          <p className="text-sm font-bold text-brand-700 shrink-0">${fmt(fav.precio_desde)}</p>
+                        </button>
+                      ))}
+                    </div>
                   )}
-                </button>
+                </div>
+              )}
+
+              {/* Cards de modo */}
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold mb-3">
+                  Nuevo presupuesto
+                </p>
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    onClick={() => setMode('school')}
+                    className="flex flex-col items-center gap-3 bg-white rounded-3xl p-6 shadow-sm
+                      border-2 border-transparent active:border-brand-400 active:bg-brand-50 transition-all"
+                  >
+                    <span className="text-5xl">🏫</span>
+                    <span className="font-bold text-gray-800 text-center text-sm leading-tight">
+                      Uniformes Escolares
+                    </span>
+                    {options && (
+                      <span className="text-xs text-gray-400">
+                        {options.niveles.length} niveles
+                      </span>
+                    )}
+                  </button>
+                  <button
+                    onClick={() => setMode('basics')}
+                    className="flex flex-col items-center gap-3 bg-white rounded-3xl p-6 shadow-sm
+                      border-2 border-transparent active:border-brand-400 active:bg-brand-50 transition-all"
+                  >
+                    <span className="text-5xl">📦</span>
+                    <span className="font-bold text-gray-800 text-center text-sm leading-tight">
+                      Básicos
+                    </span>
+                    {options && (
+                      <span className="text-xs text-gray-400">
+                        {options.tipo_pieza_basics.length} tipos
+                      </span>
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -517,6 +669,8 @@ export default function CatalogScreen() {
               <StepList
                 items={nivel.escuelas}
                 onSelect={e => setEscuelaId(e.id)}
+                onStar={e => toggleEscuela(e, nivel.nombre)}
+                isStar={e => isFavEscuela(e.id)}
               />
             </div>
           )}
@@ -525,14 +679,13 @@ export default function CatalogScreen() {
           {step === 'products' && (
             <div className="flex-1 min-h-0 flex flex-col">
 
-              {/* Filtros inline: tipo_prenda, genero, tipo_pieza */}
+              {/* Filtros */}
               {(products?.tipo_prenda_options?.length > 0
-                || products?.genero_options?.length > 0
+                || products?.genero_options?.length > 1
                 || products?.tipo_pieza_options?.length > 0
                 || options?.tipo_pieza_basics?.length > 0
               ) && (
                 <div className="bg-white border-b border-gray-100 px-4 py-3 shrink-0 space-y-2.5">
-                  {/* Tipo de prenda (Deportivo / Oficial) — solo mode=school */}
                   {mode === 'school' && products?.tipo_prenda_options?.length > 0 && (
                     <FilterChips
                       options={products.tipo_prenda_options}
@@ -541,8 +694,6 @@ export default function CatalogScreen() {
                       labelFn={v => PRENDA_LABEL[v] ?? v}
                     />
                   )}
-
-                  {/* Género — solo si hay más de una opción */}
                   {mode === 'school' && tipoPrenda && products?.genero_options?.length > 1 && (
                     <FilterChips
                       options={products.genero_options}
@@ -551,8 +702,6 @@ export default function CatalogScreen() {
                       labelFn={v => GENERO_LABEL[v] ?? v}
                     />
                   )}
-
-                  {/* Tipo de pieza */}
                   {(() => {
                     const piezaOpts = mode === 'school'
                       ? products?.tipo_pieza_options
@@ -595,9 +744,7 @@ export default function CatalogScreen() {
                     <span className="text-4xl">🔍</span>
                     <p className="text-gray-500 text-sm text-center">
                       Sin productos para esta selección.
-                      {mode === 'school' && !tipoPrenda && (
-                        <> Selecciona un tipo de uniforme.</>
-                      )}
+                      {mode === 'school' && !tipoPrenda && ' Selecciona un tipo de uniforme.'}
                     </p>
                   </div>
                 )}
@@ -608,15 +755,10 @@ export default function CatalogScreen() {
                     family={family}
                     onAdd={handleAdd}
                     addedSku={addedSku}
+                    isFav={isFavFamily(family.key, escuelaId)}
+                    onToggleFav={() => toggleFamily(family, favCtx)}
                   />
                 ))}
-
-                {/* Basics: mostrar productos aunque no haya filtros aplicados aún */}
-                {!loadingProd && mode === 'basics' && !products && !loadingProd && (
-                  <div className="flex flex-col items-center justify-center py-16 gap-3">
-                    <Spinner />
-                  </div>
-                )}
               </div>
             </div>
           )}
@@ -625,7 +767,7 @@ export default function CatalogScreen() {
 
       {/* ── Carrito flotante ── */}
       {lines.length > 0 && (
-        <div className="px-4 pb-2 shrink-0 bg-transparent">
+        <div className="px-4 pb-2 shrink-0">
           <button
             onClick={() => navigate('/quotes/current')}
             className="w-full bg-brand-700 text-white rounded-2xl px-4 py-4
