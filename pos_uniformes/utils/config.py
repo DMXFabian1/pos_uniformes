@@ -20,6 +20,28 @@ def runtime_base_dir() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
+def _appdata_config_dir() -> Path | None:
+    """Carpeta de config persistente en AppData (solo cuando corre como bundle)."""
+    if not getattr(sys, "frozen", False):
+        return None
+    appdata = os.environ.get("APPDATA")
+    if not appdata:
+        return None
+    return Path(appdata) / "PresupuestosSatelite"
+
+
+def satellite_data_dir() -> Path:
+    """Carpeta de datos del satélite donde vive favorites.json.
+
+    Bundle  → %APPDATA%\\PresupuestosSatelite\\
+    Dev/Mac → junto al código fuente
+    """
+    appdata_dir = _appdata_config_dir()
+    if appdata_dir is not None:
+        return appdata_dir
+    return runtime_base_dir()
+
+
 def load_runtime_env_overrides(base_dir: Path | None = None) -> dict[str, str]:
     root = (base_dir or runtime_base_dir()).resolve()
     overrides: dict[str, str] = {}

@@ -345,7 +345,9 @@ def guided_products(
         if not variantes_activas:
             continue
 
-        fam_key = f"{p.nombre_base}||{p.tipo_pieza_id or 0}"
+        # Mismo formato de clave que el satélite desktop:  "TipoPieza||NombreBase"
+        tipo_pieza_nombre = p.tipo_pieza.nombre if p.tipo_pieza else "Sin pieza"
+        fam_key = f"{tipo_pieza_nombre}||{p.nombre_base}"
         if fam_key not in families_map:
             precio_desde = min(v.precio_venta for v in variantes_activas)
             families_map[fam_key] = {
