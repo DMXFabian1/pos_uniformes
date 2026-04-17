@@ -18,15 +18,23 @@ function fmt(n) {
   return Number(n).toLocaleString('es-MX', { minimumFractionDigits: 2 })
 }
 
+function StockBadge({ stock }) {
+  if (stock === null || stock === undefined) return null
+  if (stock === 0)  return <span className="text-xs font-semibold text-red-500">Sin stock</span>
+  if (stock <= 3)   return <span className="text-xs font-semibold text-orange-500">{stock} piezas</span>
+  return <span className="text-xs font-semibold text-green-600">{stock} en stock</span>
+}
+
 export default function ScannerScreen() {
-  const [mode, setMode]         = useState('idle')
-  const [result, setResult]     = useState(null)
-  const [scanActive, setScan]   = useState(true)
-  const [manualInput, setManual]   = useState('')
+  const [mode, setMode]           = useState('idle')
+  const [result, setResult]       = useState(null)
+  const [scanActive, setScan]     = useState(true)
+  const [manualInput, setManual]  = useState('')
   const [showManual, setShowManual] = useState(false)
-  const [qty, setQty]           = useState(1)
-  const [history, setHistory]   = useState([])   // [{type,label,subLabel,price,raw}]
-  const { setClient, addLine }  = useCart()
+  const [qty, setQty]             = useState(1)
+  const [history, setHistory]     = useState([])
+  const [showHistory, setShowHistory] = useState(false)
+  const { setClient, addLine }    = useCart()
   const navigate   = useNavigate()
   const processing = useRef(false)
   const autoTimer  = useRef(null)
@@ -38,6 +46,7 @@ export default function ScannerScreen() {
   const processCode = useCallback(async (raw) => {
     if (processing.current) return
     processing.current = true
+    setShowHistory(false)
     setScan(false)
     setMode('loading')
 
@@ -61,7 +70,7 @@ export default function ScannerScreen() {
         setMode('product')
         pushHistory({
           type: 'product',
-          label: variante.sku,
+          label: variante.nombre,
           subLabel: `${variante.talla} · ${variante.color}`,
           price: variante.precio_venta,
           raw,
@@ -98,7 +107,7 @@ export default function ScannerScreen() {
     for (let i = 0; i < qty; i++) {
       addLine(
         { sku: v.sku, talla: v.talla, color: v.color, precio_venta: Number(v.precio_venta) },
-        { nombre: v.descripcion_snapshot ?? v.sku }
+        { nombre: v.nombre ?? v.sku }
       )
     }
     reset()
@@ -112,11 +121,6 @@ export default function ScannerScreen() {
     processCode(val)
   }
 
-  // Re-escanear desde historial
-  function reScan(entry) {
-    processCode(entry.raw)
-  }
-
   const hasSheet = mode !== 'idle'
 
   return (
@@ -125,36 +129,48 @@ export default function ScannerScreen() {
       <div className="flex-1 relative min-h-0">
         <Scanner onScan={handleScan} active={scanActive} />
 
-        {/* Historial flotante cuando idle */}
+        {/* Boton historial — solo cuando hay items y no hay sheet */}
         {!hasSheet && history.length > 0 && (
-          <div className="absolute top-3 left-3 right-3 pointer-events-auto">
-            <div className="bg-black/60 backdrop-blur-sm rounded-2xl overflow-hidden">
-              {history.map((h, i) => (
-                <button
-                  key={i}
-                  onClick={() => reScan(h)}
-                  className="w-full flex items-center gap-3 px-4 py-2.5 active:bg-white/10
-                    border-b border-white/5 last:border-0 text-left"
-                >
-                  <span className="text-base shrink-0">
-                    {h.type === 'client' ? '👤' : '📦'}
-                  </span>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-white text-xs font-medium truncate">{h.label}</p>
-                    <p className="text-white/40 text-xs truncate">{h.subLabel}</p>
-                  </div>
-                  {h.price && (
-                    <p className="text-white/70 text-xs font-semibold shrink-0">
-                      ${fmt(h.price)}
-                    </p>
-                  )}
-                </button>
-              ))}
-            </div>
+          <div className="absolute top-3 right-3">
+            <button
+              onClick={() => setShowHistory(h => !h)}
+              className="flex items-center gap-1.5 bg-black/60 backdrop-blur-sm
+                text-white/80 text-xs font-medium px-3 py-2 rounded-full border border-white/10"
+            >
+              🕐 Recientes
+              <span className="bg-white/20 text-white text-xs rounded-full w-4 h-4
+                flex items-center justify-center font-bold">
+                {history.length}
+              </span>
+            </button>
+
+            {/* Panel desplegable */}
+            {showHistory && (
+              <div className="absolute top-10 right-0 w-64 bg-black/80 backdrop-blur-sm
+                rounded-2xl overflow-hidden shadow-2xl border border-white/10 mt-1">
+                {history.map((h, i) => (
+                  <button
+                    key={i}
+                    onClick={() => { setShowHistory(false); processCode(h.raw) }}
+                    className="w-full flex items-center gap-3 px-4 py-2.5 active:bg-white/10
+                      border-b border-white/5 last:border-0 text-left"
+                  >
+                    <span className="text-base shrink-0">{h.type === 'client' ? '👤' : '📦'}</span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-white text-xs font-medium truncate">{h.label}</p>
+                      <p className="text-white/40 text-xs truncate">{h.subLabel}</p>
+                    </div>
+                    {h.price && (
+                      <p className="text-white/70 text-xs font-semibold shrink-0">${fmt(h.price)}</p>
+                    )}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
-        {/* Hint cuando idle sin historial */}
+        {/* Hint cuando no hay historial */}
         {!hasSheet && history.length === 0 && (
           <div className="absolute bottom-4 left-0 right-0 flex flex-col items-center pointer-events-none">
             <p className="text-white/50 text-xs tracking-wide">
@@ -163,7 +179,7 @@ export default function ScannerScreen() {
           </div>
         )}
 
-        {/* Spinner loading */}
+        {/* Spinner */}
         {mode === 'loading' && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/50">
             <div className="bg-white rounded-2xl px-8 py-6 flex flex-col items-center gap-3">
@@ -204,26 +220,50 @@ export default function ScannerScreen() {
 
       {mode === 'product' && result && (
         <div className="animate-slide-up bg-white rounded-t-3xl px-5 pt-5 pb-8 shadow-2xl">
-          <div className="flex items-start justify-between mb-4">
+          {/* Nombre y precio */}
+          <div className="flex items-start justify-between mb-3">
             <div className="flex-1 min-w-0 pr-3">
-              <p className="text-xs text-gray-400 uppercase tracking-wide">Precio rápido</p>
-              <p className="text-sm font-medium text-gray-700 truncate mt-0.5">{result.data.sku}</p>
-              <p className="text-xs text-gray-400">{result.data.talla} · {result.data.color}</p>
+              <p className="font-bold text-gray-900 leading-tight">{result.data.nombre}</p>
+              <p className="text-xs text-gray-400 mt-0.5">{result.data.categoria} · {result.data.marca}</p>
             </div>
-            <p className="text-3xl font-extrabold text-brand-700 shrink-0">${fmt(result.data.precio_venta)}</p>
+            <div className="text-right shrink-0">
+              <p className="text-3xl font-extrabold text-brand-700">${fmt(result.data.precio_venta)}</p>
+              <StockBadge stock={result.data.stock_actual} />
+            </div>
           </div>
 
+          {/* Chips de variante */}
+          <div className="flex gap-2 flex-wrap mb-4">
+            <span className="bg-gray-100 text-gray-600 text-xs font-medium px-3 py-1 rounded-full">
+              SKU: {result.data.sku}
+            </span>
+            <span className="bg-gray-100 text-gray-600 text-xs font-medium px-3 py-1 rounded-full">
+              Talla {result.data.talla}
+            </span>
+            <span className="bg-gray-100 text-gray-600 text-xs font-medium px-3 py-1 rounded-full">
+              {result.data.color}
+            </span>
+          </div>
+
+          {/* Descripcion si existe */}
+          {result.data.descripcion && (
+            <p className="text-xs text-gray-400 mb-4 leading-relaxed">{result.data.descripcion}</p>
+          )}
+
+          {/* Selector de cantidad */}
           <div className="flex items-center justify-between bg-gray-50 rounded-2xl px-4 py-3 mb-4">
             <span className="text-sm text-gray-500 font-medium">Cantidad</span>
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setQty(q => Math.max(1, q - 1))}
-                className="w-9 h-9 rounded-full bg-white border border-gray-200 text-gray-700 text-lg font-bold flex items-center justify-center active:bg-gray-100 shadow-sm"
+                className="w-9 h-9 rounded-full bg-white border border-gray-200 text-gray-700
+                  text-lg font-bold flex items-center justify-center active:bg-gray-100 shadow-sm"
               >−</button>
               <span className="text-xl font-bold text-gray-900 w-6 text-center">{qty}</span>
               <button
                 onClick={() => setQty(q => q + 1)}
-                className="w-9 h-9 rounded-full bg-brand-700 text-white text-lg font-bold flex items-center justify-center active:bg-brand-800 shadow-sm"
+                className="w-9 h-9 rounded-full bg-brand-700 text-white
+                  text-lg font-bold flex items-center justify-center active:bg-brand-800 shadow-sm"
               >+</button>
             </div>
           </div>

@@ -18,6 +18,23 @@ class VarianteOut(BaseModel):
     model_config = {"from_attributes": True}
 
 
+class VarianteScanOut(BaseModel):
+    """Respuesta enriquecida del scanner — incluye datos del producto padre."""
+    id: int
+    sku: str
+    talla: str
+    color: str
+    precio_venta: Decimal
+    stock_actual: int
+    # Datos del producto padre
+    nombre: str
+    categoria: str
+    marca: str
+    descripcion: str | None = None
+
+    model_config = {"from_attributes": True}
+
+
 class ProductoOut(BaseModel):
     id: int
     nombre: str

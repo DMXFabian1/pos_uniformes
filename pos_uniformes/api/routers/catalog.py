@@ -9,7 +9,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from pos_uniformes.api.dependencies import get_current_employee, get_db
-from pos_uniformes.api.schemas.catalog import CatalogPage, ProductoListItem, ProductoOut, VarianteOut
+from pos_uniformes.api.schemas.catalog import CatalogPage, ProductoListItem, ProductoOut, VarianteOut, VarianteScanOut
 from pos_uniformes.database.models import Categoria, Marca, Producto, Variante
 
 router = APIRouter(prefix="/api/v1/catalog", tags=["catalog"])
@@ -123,20 +123,26 @@ def get_product(
     )
 
 
-@router.get("/sku/{sku}", response_model=VarianteOut)
+@router.get("/sku/{sku}", response_model=VarianteScanOut)
 def get_by_sku(
     sku: str,
     db: Session = Depends(get_db),
     _auth=Depends(get_current_employee),
-) -> VarianteOut:
+) -> VarianteScanOut:
     """
     Consulta rapida de precio por SKU o codigo de barras escaneado.
     Endpoint principal del scanner de producto en la PWA.
+    Devuelve variante + datos del producto padre (nombre, categoria, marca).
     """
     variante = db.scalar(
-        select(Variante).where(
+        select(Variante)
+        .where(
             func.upper(Variante.sku) == sku.strip().upper(),
             Variante.activo.is_(True),
+        )
+        .options(
+            selectinload(Variante.producto).selectinload(Producto.categoria),
+            selectinload(Variante.producto).selectinload(Producto.marca),
         )
     )
     if variante is None:
@@ -144,11 +150,16 @@ def get_by_sku(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"error": {"code": "sku_no_encontrado", "message": f"No se encontro producto con SKU '{sku}'."}},
         )
-    return VarianteOut(
+    p = variante.producto
+    return VarianteScanOut(
         id=variante.id,
         sku=variante.sku,
         talla=variante.talla,
         color=variante.color,
         precio_venta=variante.precio_venta,
         stock_actual=variante.stock_actual,
+        nombre=p.nombre,
+        categoria=p.categoria.nombre,
+        marca=p.marca.nombre,
+        descripcion=p.descripcion,
     )
