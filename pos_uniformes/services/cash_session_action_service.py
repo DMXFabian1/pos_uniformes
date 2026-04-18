@@ -36,6 +36,7 @@ class CashCutPromptSnapshot:
     cash_payments_count: int
     cash_payments_total: Decimal
     expected_amount: Decimal
+    suggested_next_reactivo: Decimal
 
 
 @dataclass(frozen=True)
@@ -49,6 +50,12 @@ class CashCloseResult:
     expected_amount: Decimal
     counted_amount: Decimal
     difference: Decimal
+
+
+@dataclass(frozen=True)
+class CashCloseAndReopenResult:
+    close_result: CashCloseResult
+    new_session_id: int
 
 
 def load_cash_session_gate_snapshot(session, *, user_id: int, is_stale_session) -> CashSessionGateSnapshot:
@@ -206,6 +213,7 @@ def load_cash_cut_prompt_snapshot(session, *, active_cash_session_id: int) -> Ca
         cash_payments_count=int(resumen.abonos_efectivo_count),
         cash_payments_total=Decimal(resumen.efectivo_abonos).quantize(Decimal("0.01")),
         expected_amount=Decimal(resumen.esperado_en_caja).quantize(Decimal("0.01")),
+        suggested_next_reactivo=Decimal(cash_session.monto_apertura).quantize(Decimal("0.01")),
     )
 
 
@@ -234,6 +242,45 @@ def close_cash_session_action(
         expected_amount=Decimal(closed_session.monto_esperado_cierre).quantize(Decimal("0.01")),
         counted_amount=Decimal(closed_session.monto_cierre_declarado).quantize(Decimal("0.01")),
         difference=Decimal(closed_session.diferencia_cierre).quantize(Decimal("0.01")),
+    )
+
+
+def close_and_reopen_cash_session_action(
+    session,
+    *,
+    active_cash_session_id: int,
+    user_id: int,
+    counted_amount: Decimal,
+    closing_note: object,
+    next_reactivo: Decimal,
+) -> CashCloseAndReopenResult:
+    caja_service, usuario_model, sesion_caja_model, _ = _resolve_cash_session_action_dependencies()
+    cash_session = session.get(sesion_caja_model, active_cash_session_id)
+    user = session.get(usuario_model, user_id)
+    if cash_session is None or user is None:
+        raise ValueError("No se pudo cargar la caja o el usuario.")
+    closed_session = caja_service.cerrar_sesion(
+        session=session,
+        cash_session=cash_session,
+        usuario=user,
+        monto_contado=counted_amount,
+        observacion=_normalize_optional_text(closing_note),
+    )
+    close_result = CashCloseResult(
+        expected_amount=Decimal(closed_session.monto_esperado_cierre).quantize(Decimal("0.01")),
+        counted_amount=Decimal(closed_session.monto_cierre_declarado).quantize(Decimal("0.01")),
+        difference=Decimal(closed_session.diferencia_cierre).quantize(Decimal("0.01")),
+    )
+    new_session = caja_service.abrir_sesion(
+        session=session,
+        usuario=user,
+        monto_apertura=next_reactivo,
+        observacion=None,
+    )
+    session.commit()
+    return CashCloseAndReopenResult(
+        close_result=close_result,
+        new_session_id=int(new_session.id),
     )
 
 

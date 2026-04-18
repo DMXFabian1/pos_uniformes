@@ -128,6 +128,7 @@ from pos_uniformes.services.employee_sales_history_service import (
     load_employee_sale_detail_snapshot,
 )
 from pos_uniformes.services.cash_session_action_service import (
+    close_and_reopen_cash_session_action,
     close_cash_session_action,
     correct_cash_opening_action,
     load_cash_cut_prompt_snapshot,
@@ -2469,6 +2470,8 @@ class MainWindow(QMainWindow):
                     "ingresos_total": resumen.ingresos_total,
                     "retiros_count": resumen.retiros_count,
                     "retiros_total": resumen.retiros_total,
+                    "discounts_total": resumen.total_descuentos,
+                    "rounding_total": resumen.total_ajuste_redondeo,
                     "movements": movement_rows,
                 }
         except Exception as exc:
@@ -2494,6 +2497,8 @@ class MainWindow(QMainWindow):
             cash_sales_total=detail["cash_sales_total"],
             cash_payments_count=int(detail["cash_payments_count"]),
             cash_payments_total=detail["cash_payments_total"],
+            discounts_total=detail["discounts_total"],
+            rounding_total=detail["rounding_total"],
             movement_rows=list(detail["movements"]),
             closed_at=str(detail["closed_at"]),
             closed_by=str(detail["closed_by"]),
@@ -4538,6 +4543,7 @@ class MainWindow(QMainWindow):
                 cash_payments_count=prompt_snapshot.cash_payments_count,
                 cash_payments_total=prompt_snapshot.cash_payments_total,
                 expected_amount=prompt_snapshot.expected_amount,
+                suggested_next_reactivo=prompt_snapshot.suggested_next_reactivo,
             ),
         )
         if payload is None:
@@ -4545,19 +4551,21 @@ class MainWindow(QMainWindow):
 
         try:
             with get_session() as session:
-                result = close_cash_session_action(
+                reopen_result = close_and_reopen_cash_session_action(
                     session,
                     active_cash_session_id=int(self.active_cash_session_id),
                     user_id=self.user_id,
                     counted_amount=Decimal(payload["monto_contado"]),
                     closing_note=str(payload["observacion"]),
+                    next_reactivo=Decimal(payload["next_reactivo"]),
                 )
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "No se pudo cerrar caja", str(exc))
             return
 
-        self.active_cash_session_id = None
+        self.active_cash_session_id = reopen_result.new_session_id
         self.refresh_all()
+        result = reopen_result.close_result
         feedback = build_cash_close_success_feedback(
             expected_amount=result.expected_amount,
             counted_amount=result.counted_amount,
