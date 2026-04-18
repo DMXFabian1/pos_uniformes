@@ -165,8 +165,7 @@ def build_catalog_variant_dialog(
     form.addRow("Talla", talla_combo)
     form.addRow("Color", color_combo)
     stock_minimo_spin = QSpinBox()
-    stock_minimo_spin.setRange(0, 10000)
-    stock_minimo_spin.setSpecialValueText("Sin mínimo")
+    stock_minimo_spin.setRange(1, 10000)
     stock_minimo_enabled = QCheckBox("Definir mínimo")
     if initial:
         existing_min = initial.get("stock_minimo")
@@ -175,12 +174,16 @@ def build_catalog_variant_dialog(
             stock_minimo_spin.setValue(int(existing_min))
         else:
             stock_minimo_enabled.setChecked(False)
-            stock_minimo_spin.setValue(0)
+            stock_minimo_spin.setValue(1)
     else:
         stock_minimo_enabled.setChecked(False)
-        stock_minimo_spin.setValue(0)
+        stock_minimo_spin.setValue(1)
     stock_minimo_spin.setEnabled(stock_minimo_enabled.isChecked())
-    stock_minimo_enabled.toggled.connect(stock_minimo_spin.setEnabled)
+
+    def _on_minimo_toggled(checked: bool) -> None:
+        stock_minimo_spin.setEnabled(checked)
+
+    stock_minimo_enabled.toggled.connect(_on_minimo_toggled)
 
     form.addRow("Precio venta", precio_input)
     form.addRow("Costo referencia", costo_input)
