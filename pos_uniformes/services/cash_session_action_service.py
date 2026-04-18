@@ -266,6 +266,7 @@ def close_and_reopen_cash_session_action(
         monto_contado=counted_amount,
         observacion=_normalize_optional_text(closing_note),
     )
+    session.flush()  # hace visible el cerrada_at antes de que abrir_sesion consulte la sesion activa
     close_result = CashCloseResult(
         expected_amount=Decimal(closed_session.monto_esperado_cierre).quantize(Decimal("0.01")),
         counted_amount=Decimal(closed_session.monto_cierre_declarado).quantize(Decimal("0.01")),
