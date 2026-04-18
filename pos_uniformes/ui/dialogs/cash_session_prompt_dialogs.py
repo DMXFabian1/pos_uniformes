@@ -37,6 +37,7 @@ class CashCutSummaryView:
     cash_payments_count: int
     cash_payments_total: Decimal
     expected_amount: Decimal
+    suggested_next_reactivo: Decimal
 
 
 def build_cash_cut_summary_lines(summary_view: CashCutSummaryView) -> list[str]:
@@ -348,6 +349,12 @@ def prompt_cash_cut_data(
     counted_spin.setValue(float(summary_view.expected_amount))
     difference_label = QLabel("$0.00")
     difference_label.setObjectName("cashierChangeValue")
+    next_reactivo_spin = QDoubleSpinBox()
+    next_reactivo_spin.setRange(0.0, 999999.99)
+    next_reactivo_spin.setDecimals(2)
+    next_reactivo_spin.setPrefix("$")
+    next_reactivo_spin.setSingleStep(50.0)
+    next_reactivo_spin.setValue(float(summary_view.suggested_next_reactivo))
     note_input = QTextEdit()
     note_input.setPlaceholderText("Observaciones del corte")
     note_input.setMaximumHeight(90)
@@ -361,9 +368,10 @@ def prompt_cash_cut_data(
     form = QFormLayout()
     form.addRow("Monto contado", counted_spin)
     form.addRow("Diferencia", difference_label)
+    form.addRow("Reactivo nueva sesion", next_reactivo_spin)
     form.addRow("Observacion", note_input)
     buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-    buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Cerrar caja")
+    buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Cerrar y reabrir caja")
     buttons.accepted.connect(dialog.accept)
     buttons.rejected.connect(dialog.reject)
     layout.addWidget(info)
@@ -374,5 +382,6 @@ def prompt_cash_cut_data(
         return None
     return {
         "monto_contado": Decimal(str(counted_spin.value())).quantize(Decimal("0.01")),
+        "next_reactivo": Decimal(str(next_reactivo_spin.value())).quantize(Decimal("0.01")),
         "observacion": note_input.toPlainText().strip(),
     }

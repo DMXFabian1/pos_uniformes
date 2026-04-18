@@ -54,6 +54,7 @@ class CajaServiceTests(unittest.TestCase):
         sale = SimpleNamespace(
             observacion="Metodo de pago: Efectivo",
             total=Decimal("200.00"),
+            descuento_monto=Decimal("0.00"),
         )
         active_payment = SimpleNamespace(
             monto=Decimal("100.00"),

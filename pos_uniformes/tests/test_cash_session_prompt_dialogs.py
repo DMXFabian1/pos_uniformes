@@ -67,6 +67,7 @@ class CashSessionPromptDialogsTests(unittest.TestCase):
                         cash_payments_count=1,
                         cash_payments_total=Decimal("80.00"),
                         expected_amount=Decimal("930.00"),
+                        suggested_next_reactivo=Decimal("300.00"),
                     ),
                 )
             )
@@ -87,6 +88,7 @@ class CashSessionPromptDialogsTests(unittest.TestCase):
                 cash_payments_count=0,
                 cash_payments_total=Decimal("0.00"),
                 expected_amount=Decimal("1000.00"),
+                suggested_next_reactivo=Decimal("1000.00"),
             )
         )
 
@@ -115,6 +117,7 @@ class CashSessionPromptDialogsTests(unittest.TestCase):
                 cash_payments_count=1,
                 cash_payments_total=Decimal("80.00"),
                 expected_amount=Decimal("1830.00"),
+                suggested_next_reactivo=Decimal("1000.00"),
             )
         )
 
