@@ -1,20 +1,30 @@
 # Backlog de Caja
 
-## Solicitudes abiertas de operacion
+## Solicitudes cerradas
 
 ### 2026-03-13
 
-#### 1. Calculadora usable con teclado fisico
+#### 1. Calculadora usable con teclado fisico ✅ cerrado 2026-04-18
 
-- Contexto:
-  La calculadora o captura de cobro debe responder tambien a las teclas del teclado, no solo a botones en pantalla.
-- Objetivo:
-  Permitir captura rapida sin depender del mouse.
-- Criterio esperado:
-  - numeros del teclado escriben monto
-  - `Backspace` corrige
-  - `Enter` confirma cuando corresponda
-  - `Esc` cancela si el flujo lo permite
+- Verificado que `install_keypad_shortcuts` implementado desde `fc5f0bb` (2026-03-12) cubre todos los criterios:
+  - digitos 0-9 escriben monto ✓
+  - `Backspace` corrige ✓
+  - `Enter` confirma ✓
+  - `Esc` cancela ✓
+- No se requirieron cambios adicionales.
+
+#### 3. Redondeo de cobro para evitar centavos ✅ cerrado 2026-04-18
+
+- `sale_rounding_service.py` implementa la regla `.00/.50/siguiente .00`
+- Integrado en `sale_discount_service.py`, visible en panel de caja y ticket
+- `ResumenCaja` ahora incluye `total_ajuste_redondeo` separado del descuento
+- El detalle del corte en Configuracion muestra "Ajuste por redondeo" y "Descuentos aplicados"
+
+---
+
+## Solicitudes abiertas de operacion
+
+### 2026-03-13
 
 #### 2. Quitar el nombre del cliente del total visible en Caja
 
@@ -47,15 +57,12 @@
 - Documento base:
   `docs/politica_redondeo_efectivo.md`
 
-#### 4. Cliente en caja solo por escaneo de QR
+#### 4. Cliente en caja solo por escaneo de QR ✅ cerrado 2026-04-18
 
-- Contexto:
-  En Caja no se quiere seleccion manual del cliente. La venta debe quedarse como mostrador salvo que el cliente se agregue escaneando su QR o codigo de cliente.
-- Objetivo:
-  Reducir errores operativos y forzar un flujo de identificacion mas consistente para beneficios de cliente.
-- Criterio esperado:
-  - el selector manual de cliente deja de ser editable o desaparece de Caja
-  - el cliente solo se enlaza cuando se escanea su QR o codigo
-  - si no se escanea cliente, la venta permanece como mostrador
-  - el flujo de reemplazo de cliente escaneado con carrito sigue pidiendo confirmacion cuando corresponda
-  - descuento, lealtad y resumen visual siguen sincronizados con el cliente escaneado
+- Verificado que el flujo ya estaba implementado:
+  - `sale_client_combo` es `setVisible(False)` + `setEnabled(False)` siempre
+  - el cliente solo se enlaza via `_apply_scanned_client_to_sale` al escanear QR o codigo
+  - sin escaneo la venta queda en "Mostrador / sin cliente" (index 0 del combo)
+  - `confirm_replace` pide confirmacion si hay carrito con otro cliente
+  - "Vaciar carrito" y fin de venta resetean cliente a Mostrador
+  - descuento, lealtad y display label se sincronizan via `_handle_sale_client_changed`

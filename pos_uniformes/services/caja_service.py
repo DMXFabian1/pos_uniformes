@@ -37,6 +37,8 @@ class ResumenCaja:
     retiros_count: int
     retiros_total: Decimal
     esperado_en_caja: Decimal
+    total_descuentos: Decimal
+    total_ajuste_redondeo: Decimal
 
 
 class CajaService:
@@ -250,11 +252,16 @@ class CajaService:
         ).all()
         efectivo_total = Decimal("0.00")
         ventas_count = 0
+        total_descuentos = Decimal("0.00")
+        total_ajuste_redondeo = Decimal("0.00")
         for sale in sales:
             cash_amount = cls._cash_amount_for_sale(sale)
             if cash_amount > Decimal("0.00"):
                 ventas_count += 1
                 efectivo_total += cash_amount
+            total_descuentos += Decimal(sale.descuento_monto or 0).quantize(Decimal("0.01"))
+            adj = cls._extract_note_value(sale.observacion or "", "Ajuste redondeo:")
+            total_ajuste_redondeo += adj if adj is not None else Decimal("0.00")
         payments = session.scalars(
             select(ApartadoAbono)
             .join(ApartadoAbono.apartado)
@@ -324,6 +331,8 @@ class CajaService:
             retiros_count=retiros_count,
             retiros_total=retiros_total.quantize(Decimal("0.01")),
             esperado_en_caja=esperado.quantize(Decimal("0.01")),
+            total_descuentos=total_descuentos.quantize(Decimal("0.01")),
+            total_ajuste_redondeo=total_ajuste_redondeo.quantize(Decimal("0.01")),
         )
 
     @classmethod
