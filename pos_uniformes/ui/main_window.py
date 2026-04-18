@@ -3,7 +3,7 @@
 import csv
 import json
 from collections.abc import Callable
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 import os
 from pathlib import Path
@@ -1424,6 +1424,7 @@ class MainWindow(QMainWindow):
         self.inventory_status_filter_combo = QComboBox()
         self.inventory_stock_filter_combo = QComboBox()
         self.inventory_qr_filter_combo = QComboBox()
+        self.inventory_conteo_filter_combo = QComboBox()
         self.inventory_origin_filter_combo = QComboBox()
         self.inventory_duplicate_filter_combo = QComboBox()
         self.inventory_clear_filters_button = QPushButton("Limpiar filtros")
@@ -4997,6 +4998,7 @@ class MainWindow(QMainWindow):
                 }
                 for row in list(payload.get("rows", []))
             ],
+            "todos_variante_ids": [int(v) for v in payload.get("all_variante_ids", [])],
         }
 
     @staticmethod
@@ -5909,6 +5911,8 @@ class MainWindow(QMainWindow):
                     variante = session.get(Variante, int(initial["variante_id"]))
                     if variante is None:
                         raise ValueError("Presentacion no encontrada.")
+                    stock_minimo_raw = data.get("stock_minimo")
+                    stock_minimo = int(stock_minimo_raw) if stock_minimo_raw is not None else None
                     presentacion = CatalogService.actualizar_variante(
                         session=session,
                         usuario=user,
@@ -5919,6 +5923,7 @@ class MainWindow(QMainWindow):
                         color=color,
                         precio_venta=precio,
                         costo_referencia=costo,
+                        stock_minimo=stock_minimo,
                     )
                 session.commit()
                 return str(presentacion.sku), int(presentacion.id)
@@ -8042,12 +8047,15 @@ class MainWindow(QMainWindow):
 
         reference = str(data["referencia"]).strip() or f"CONTEO-{uuid4().hex[:8].upper()}"
         note = str(data["observacion"]).strip() or "Conteo fisico desde interfaz POS."
+        todos_variante_ids: list[int] = [int(v) for v in data.get("todos_variante_ids", [])]
 
         try:
             with get_session() as session:
                 user = session.get(Usuario, self.user_id)
                 if user is None:
                     raise ValueError("Usuario no encontrado.")
+                now = datetime.now(tz=timezone.utc)
+                applied_ids: set[int] = set()
                 for row in conteos:
                     variante = session.get(Variante, int(row["variante_id"]))
                     if variante is None:
@@ -8062,6 +8070,13 @@ class MainWindow(QMainWindow):
                             f"{note} Stock sistema {row['stock_sistema']} -> contado {row['stock_contado']}."
                         ),
                     )
+                    variante.ultimo_conteo_at = now
+                    applied_ids.add(int(row["variante_id"]))
+                for variante_id in todos_variante_ids:
+                    if variante_id not in applied_ids:
+                        v = session.get(Variante, variante_id)
+                        if v is not None:
+                            v.ultimo_conteo_at = now
                 session.commit()
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Conteo fallido", str(exc))
@@ -8866,6 +8881,7 @@ class MainWindow(QMainWindow):
                 ("qr", self.inventory_qr_filter_combo.currentData(), self.inventory_qr_filter_combo.currentText()),
                 ("origen", self.inventory_origin_filter_combo.currentData(), self.inventory_origin_filter_combo.currentText()),
                 ("incidencias", self.inventory_duplicate_filter_combo.currentData(), self.inventory_duplicate_filter_combo.currentText()),
+                ("conteo", self.inventory_conteo_filter_combo.currentData(), self.inventory_conteo_filter_combo.currentText()),
             ),
         )
 
@@ -8887,6 +8903,7 @@ class MainWindow(QMainWindow):
                 ("qr", self.inventory_qr_filter_combo.currentData(), self.inventory_qr_filter_combo.currentText()),
                 ("origen", self.inventory_origin_filter_combo.currentData(), self.inventory_origin_filter_combo.currentText()),
                 ("incidencias", self.inventory_duplicate_filter_combo.currentData(), self.inventory_duplicate_filter_combo.currentText()),
+                ("conteo", self.inventory_conteo_filter_combo.currentData(), self.inventory_conteo_filter_combo.currentText()),
             ),
         )
 
@@ -9190,6 +9207,7 @@ class MainWindow(QMainWindow):
         qr_filter = str(self.inventory_qr_filter_combo.currentData() or "")
         origin_filter = str(self.inventory_origin_filter_combo.currentData() or "")
         duplicate_filter = str(self.inventory_duplicate_filter_combo.currentData() or "")
+        conteo_filter = str(self.inventory_conteo_filter_combo.currentData() or "")
 
         self.inventory_filtered_rows = filter_visible_inventory_rows(
             inventory_snapshot_rows,
@@ -9208,6 +9226,7 @@ class MainWindow(QMainWindow):
                 qr_filter=qr_filter,
                 origin_filter=origin_filter,
                 duplicate_filter=duplicate_filter,
+                conteo_filter=conteo_filter,
             ),
             search_matcher=lambda row, _search_text: row_matches_search(
                 row,
@@ -9315,6 +9334,7 @@ class MainWindow(QMainWindow):
             self.inventory_qr_filter_combo,
             self.inventory_origin_filter_combo,
             self.inventory_duplicate_filter_combo,
+            self.inventory_conteo_filter_combo,
         ):
             combo.blockSignals(True)
             combo.setCurrentIndex(0)

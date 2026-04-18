@@ -45,6 +45,8 @@ def _build_inventory_snapshot_row(row: tuple[object, ...]) -> dict[str, object]:
             "apartado_cantidad": int(row[16]),
             "variante_activa": bool(row[17]),
             "fallback_importacion": bool(row[18]),
+            "ultimo_conteo_at": row[19],
+            "stock_minimo": int(row[20]) if row[20] is not None else None,
             "qr_exists": qr_exists,
             "origen_etiqueta": "LEGACY" if row[10] else "NUEVO",
             "variante_estado": "ACTIVA" if row[17] else "INACTIVA",
@@ -123,6 +125,8 @@ def _execute_inventory_snapshot_query(session) -> list[tuple[object, ...]]:
             func.coalesce(layaway_reserved_subquery.c.apartado_cantidad, 0),
             Variante.activo,
             func.coalesce(ImportacionCatalogoFila.producto_fallback, False),
+            Variante.ultimo_conteo_at,
+            Variante.stock_minimo,
         )
         .join(Variante.producto)
         .join(Producto.categoria)

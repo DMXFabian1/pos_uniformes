@@ -25,6 +25,8 @@ class InventoryFilterHelperTests(unittest.TestCase):
             "qr_exists": True,
             "origen_legacy": False,
             "fallback_importacion": False,
+            "ultimo_conteo_at": None,
+            "stock_minimo": None,
         }
 
         matches = inventory_row_matches_visible_filters(
@@ -44,6 +46,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
                 qr_filter="ready",
                 origin_filter="native",
                 duplicate_filter="fallback_exclude",
+                conteo_filter="",
             ),
             search_matcher=lambda _row, search_text: search_text == "sku",
         )
@@ -64,6 +67,8 @@ class InventoryFilterHelperTests(unittest.TestCase):
             "qr_exists": False,
             "origen_legacy": False,
             "fallback_importacion": False,
+            "ultimo_conteo_at": None,
+            "stock_minimo": None,
         }
 
         matches = inventory_row_matches_visible_filters(
@@ -83,6 +88,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
                 qr_filter="ready",
                 origin_filter="",
                 duplicate_filter="",
+                conteo_filter="",
             ),
             search_matcher=lambda *_args: True,
         )
@@ -105,6 +111,8 @@ class InventoryFilterHelperTests(unittest.TestCase):
                 "qr_exists": True,
                 "origen_legacy": False,
                 "fallback_importacion": False,
+                "ultimo_conteo_at": None,
+                "stock_minimo": None,
             },
             {
                 "sku": "SKU-002",
@@ -120,6 +128,8 @@ class InventoryFilterHelperTests(unittest.TestCase):
                 "qr_exists": False,
                 "origen_legacy": True,
                 "fallback_importacion": True,
+                "ultimo_conteo_at": None,
+                "stock_minimo": None,
             },
         ]
 
@@ -140,6 +150,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
                 qr_filter="ready",
                 origin_filter="native",
                 duplicate_filter="fallback_exclude",
+                conteo_filter="",
             ),
             search_matcher=lambda row, search_text: str(row["sku"]).lower() == search_text,
         )
@@ -160,6 +171,8 @@ class InventoryFilterHelperTests(unittest.TestCase):
             "qr_exists": True,
             "origen_legacy": False,
             "fallback_importacion": False,
+            "ultimo_conteo_at": None,
+            "stock_minimo": None,
         }
         search_matcher = Mock(return_value=True)
 
@@ -180,6 +193,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
                 qr_filter="",
                 origin_filter="",
                 duplicate_filter="",
+                conteo_filter="",
             ),
             search_matcher=search_matcher,
         )
@@ -201,6 +215,8 @@ class InventoryFilterHelperTests(unittest.TestCase):
             "qr_exists": True,
             "origen_legacy": False,
             "fallback_importacion": False,
+            "ultimo_conteo_at": None,
+            "stock_minimo": None,
         }
         regular_row = {
             **uniform_row,
@@ -226,6 +242,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
                     qr_filter="",
                     origin_filter="",
                     duplicate_filter="",
+                    conteo_filter="",
                 ),
                 search_matcher=lambda *_args: True,
             )
@@ -248,6 +265,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
                     qr_filter="",
                     origin_filter="",
                     duplicate_filter="",
+                    conteo_filter="",
                 ),
                 search_matcher=lambda *_args: True,
             )
@@ -270,6 +288,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
                     qr_filter="",
                     origin_filter="",
                     duplicate_filter="",
+                    conteo_filter="",
                 ),
                 search_matcher=lambda *_args: True,
             )
