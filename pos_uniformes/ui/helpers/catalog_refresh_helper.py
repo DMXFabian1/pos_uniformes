@@ -45,6 +45,7 @@ def build_catalog_snapshot_rows(rows: list[tuple[object, ...]]) -> list[dict[str
                 "origen_etiqueta": "LEGACY" if normalized_row["origen_legacy"] else "NUEVO",
                 "fallback_importacion": bool(normalized_row["fallback_importacion"]),
                 "fallback_text": "fallback" if bool(normalized_row["fallback_importacion"]) else "",
+                "stock_minimo": normalized_row.get("stock_minimo"),
             },
             alias_map=CATALOG_SEARCH_ALIAS_MAP,
             general_fields=CATALOG_SEARCH_GENERAL_FIELDS,
@@ -54,6 +55,37 @@ def build_catalog_snapshot_rows(rows: list[tuple[object, ...]]) -> list[dict[str
 
 
 def _normalize_catalog_snapshot_row(row: tuple[object, ...]) -> dict[str, object]:
+    if len(row) == 28:
+        return {
+            "variante_id": row[0],
+            "producto_id": row[1],
+            "categoria_id": row[2],
+            "marca_id": row[3],
+            "escuela_id": row[4],
+            "sku": row[5],
+            "categoria_nombre": row[6],
+            "marca_nombre": row[7],
+            "escuela_nombre": row[8],
+            "nivel_educativo_nombre": row[9],
+            "producto_genero": row[10],
+            "tipo_prenda_nombre": row[11],
+            "tipo_pieza_nombre": row[12],
+            "producto_nombre": row[13],
+            "producto_nombre_base": row[14],
+            "producto_descripcion": row[15],
+            "nombre_legacy": row[16],
+            "origen_legacy": row[17],
+            "talla": row[18],
+            "color": row[19],
+            "precio_venta": row[20],
+            "costo_referencia": row[21],
+            "stock_actual": row[22],
+            "apartado_cantidad": row[23],
+            "producto_activo": row[24],
+            "variante_activo": row[25],
+            "fallback_importacion": row[26],
+            "stock_minimo": int(row[27]) if row[27] is not None else None,
+        }
     if len(row) == 27:
         return {
             "variante_id": row[0],
@@ -83,6 +115,7 @@ def _normalize_catalog_snapshot_row(row: tuple[object, ...]) -> dict[str, object
             "producto_activo": row[24],
             "variante_activo": row[25],
             "fallback_importacion": row[26],
+            "stock_minimo": None,
         }
     if len(row) == 25:
         return {
@@ -113,6 +146,7 @@ def _normalize_catalog_snapshot_row(row: tuple[object, ...]) -> dict[str, object
             "producto_activo": row[22],
             "variante_activo": row[23],
             "fallback_importacion": row[24],
+            "stock_minimo": None,
         }
     raise ValueError(f"Formato de snapshot de catalogo no soportado: {len(row)} columnas")
 
