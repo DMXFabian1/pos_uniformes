@@ -3,7 +3,7 @@
 import csv
 import json
 from collections.abc import Callable
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from decimal import Decimal, InvalidOperation
 import os
 from pathlib import Path
@@ -1424,6 +1424,7 @@ class MainWindow(QMainWindow):
         self.inventory_status_filter_combo = QComboBox()
         self.inventory_stock_filter_combo = QComboBox()
         self.inventory_qr_filter_combo = QComboBox()
+        self.inventory_conteo_filter_combo = QComboBox()
         self.inventory_origin_filter_combo = QComboBox()
         self.inventory_duplicate_filter_combo = QComboBox()
         self.inventory_clear_filters_button = QPushButton("Limpiar filtros")
@@ -2878,10 +2879,13 @@ class MainWindow(QMainWindow):
             changes=changes,
         )
 
-    def _refresh_settings_users(self) -> None:
+    def _refresh_settings_users(self, session=None) -> None:
         try:
-            with get_session() as session:
+            if session is not None:
                 users = UserService.list_users(session)
+            else:
+                with get_session() as s:
+                    users = UserService.list_users(s)
         except Exception as exc:  # noqa: BLE001
             users_view = build_settings_users_error_view(str(exc))
             self.settings_users_status_label.setText(users_view.status_label)
@@ -2911,11 +2915,14 @@ class MainWindow(QMainWindow):
         self.settings_users_table.resizeColumnsToContents()
         self.settings_users_status_label.setText(users_view.status_label)
 
-    def _refresh_settings_suppliers(self) -> None:
+    def _refresh_settings_suppliers(self, session=None) -> None:
         search_text = self.settings_suppliers_search_input.text().strip()
         try:
-            with get_session() as session:
+            if session is not None:
                 suppliers = SupplierService.list_suppliers(session, search_text)
+            else:
+                with get_session() as s:
+                    suppliers = SupplierService.list_suppliers(s, search_text)
         except Exception as exc:  # noqa: BLE001
             suppliers_view = build_settings_suppliers_error_view(str(exc))
             self.settings_suppliers_status_label.setText(suppliers_view.status_label)
@@ -2948,11 +2955,14 @@ class MainWindow(QMainWindow):
         self.settings_suppliers_table.resizeColumnsToContents()
         self.settings_suppliers_status_label.setText(suppliers_view.status_label)
 
-    def _refresh_settings_clients(self) -> None:
+    def _refresh_settings_clients(self, session=None) -> None:
         search_text = self.settings_clients_search_input.text().strip()
         try:
-            with get_session() as session:
+            if session is not None:
                 clients = ClientService.list_clients(session, search_text)
+            else:
+                with get_session() as s:
+                    clients = ClientService.list_clients(s, search_text)
         except Exception as exc:  # noqa: BLE001
             clients_view = build_settings_clients_error_view(str(exc))
             self.settings_clients_status_label.setText(clients_view.status_label)
@@ -3021,6 +3031,7 @@ class MainWindow(QMainWindow):
                         activity_state = build_employee_activity_state(activity_snapshot)
                     employee_activity_snapshots[int(employee.id)] = activity_snapshot
                     employee_activity_states[int(employee.id)] = (activity_state.label, activity_state.tone)
+            self._employee_activity_snapshots_cache = employee_activity_snapshots
         except Exception as exc:  # noqa: BLE001
             employees_view = build_settings_employees_error_view(str(exc))
             self.settings_employees_status_label.setText(employees_view.status_label)
@@ -3103,6 +3114,10 @@ class MainWindow(QMainWindow):
         if employee_id is None:
             snapshot = build_employee_activity_empty_snapshot()
             self._apply_settings_employee_detail_snapshot(snapshot, has_selection=False)
+            return
+        cache = getattr(self, "_employee_activity_snapshots_cache", {})
+        if summary_days == 1 and employee_id in cache:
+            self._apply_settings_employee_detail_snapshot(cache[employee_id], has_selection=True)
             return
         try:
             with get_session() as session:
@@ -4983,6 +4998,7 @@ class MainWindow(QMainWindow):
                 }
                 for row in list(payload.get("rows", []))
             ],
+            "todos_variante_ids": [int(v) for v in payload.get("all_variante_ids", [])],
         }
 
     @staticmethod
@@ -5895,6 +5911,8 @@ class MainWindow(QMainWindow):
                     variante = session.get(Variante, int(initial["variante_id"]))
                     if variante is None:
                         raise ValueError("Presentacion no encontrada.")
+                    stock_minimo_raw = data.get("stock_minimo")
+                    stock_minimo = int(stock_minimo_raw) if stock_minimo_raw is not None else None
                     presentacion = CatalogService.actualizar_variante(
                         session=session,
                         usuario=user,
@@ -5905,6 +5923,7 @@ class MainWindow(QMainWindow):
                         color=color,
                         precio_venta=precio,
                         costo_referencia=costo,
+                        stock_minimo=stock_minimo,
                     )
                 session.commit()
                 return str(presentacion.sku), int(presentacion.id)
@@ -8028,12 +8047,15 @@ class MainWindow(QMainWindow):
 
         reference = str(data["referencia"]).strip() or f"CONTEO-{uuid4().hex[:8].upper()}"
         note = str(data["observacion"]).strip() or "Conteo fisico desde interfaz POS."
+        todos_variante_ids: list[int] = [int(v) for v in data.get("todos_variante_ids", [])]
 
         try:
             with get_session() as session:
                 user = session.get(Usuario, self.user_id)
                 if user is None:
                     raise ValueError("Usuario no encontrado.")
+                now = datetime.now(tz=timezone.utc)
+                applied_ids: set[int] = set()
                 for row in conteos:
                     variante = session.get(Variante, int(row["variante_id"]))
                     if variante is None:
@@ -8048,6 +8070,13 @@ class MainWindow(QMainWindow):
                             f"{note} Stock sistema {row['stock_sistema']} -> contado {row['stock_contado']}."
                         ),
                     )
+                    variante.ultimo_conteo_at = now
+                    applied_ids.add(int(row["variante_id"]))
+                for variante_id in todos_variante_ids:
+                    if variante_id not in applied_ids:
+                        v = session.get(Variante, variante_id)
+                        if v is not None:
+                            v.ultimo_conteo_at = now
                 session.commit()
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Conteo fallido", str(exc))
@@ -8210,9 +8239,10 @@ class MainWindow(QMainWindow):
             return
 
         self._refresh_settings_backups()
-        self._refresh_settings_users()
-        self._refresh_settings_suppliers()
-        self._refresh_settings_clients()
+        with get_session() as settings_session:
+            self._refresh_settings_users(settings_session)
+            self._refresh_settings_suppliers(settings_session)
+            self._refresh_settings_clients(settings_session)
         self._refresh_settings_employees()
         self.status_label.setText("Estado: datos sincronizados con PostgreSQL.")
 
@@ -8851,6 +8881,7 @@ class MainWindow(QMainWindow):
                 ("qr", self.inventory_qr_filter_combo.currentData(), self.inventory_qr_filter_combo.currentText()),
                 ("origen", self.inventory_origin_filter_combo.currentData(), self.inventory_origin_filter_combo.currentText()),
                 ("incidencias", self.inventory_duplicate_filter_combo.currentData(), self.inventory_duplicate_filter_combo.currentText()),
+                ("conteo", self.inventory_conteo_filter_combo.currentData(), self.inventory_conteo_filter_combo.currentText()),
             ),
         )
 
@@ -8872,6 +8903,7 @@ class MainWindow(QMainWindow):
                 ("qr", self.inventory_qr_filter_combo.currentData(), self.inventory_qr_filter_combo.currentText()),
                 ("origen", self.inventory_origin_filter_combo.currentData(), self.inventory_origin_filter_combo.currentText()),
                 ("incidencias", self.inventory_duplicate_filter_combo.currentData(), self.inventory_duplicate_filter_combo.currentText()),
+                ("conteo", self.inventory_conteo_filter_combo.currentData(), self.inventory_conteo_filter_combo.currentText()),
             ),
         )
 
@@ -9175,6 +9207,7 @@ class MainWindow(QMainWindow):
         qr_filter = str(self.inventory_qr_filter_combo.currentData() or "")
         origin_filter = str(self.inventory_origin_filter_combo.currentData() or "")
         duplicate_filter = str(self.inventory_duplicate_filter_combo.currentData() or "")
+        conteo_filter = str(self.inventory_conteo_filter_combo.currentData() or "")
 
         self.inventory_filtered_rows = filter_visible_inventory_rows(
             inventory_snapshot_rows,
@@ -9193,6 +9226,7 @@ class MainWindow(QMainWindow):
                 qr_filter=qr_filter,
                 origin_filter=origin_filter,
                 duplicate_filter=duplicate_filter,
+                conteo_filter=conteo_filter,
             ),
             search_matcher=lambda row, _search_text: row_matches_search(
                 row,
@@ -9300,6 +9334,7 @@ class MainWindow(QMainWindow):
             self.inventory_qr_filter_combo,
             self.inventory_origin_filter_combo,
             self.inventory_duplicate_filter_combo,
+            self.inventory_conteo_filter_combo,
         ):
             combo.blockSignals(True)
             combo.setCurrentIndex(0)
@@ -10915,7 +10950,9 @@ class MainWindow(QMainWindow):
         self.sale_qty_up_button.setEnabled(panel_view.quick_adjust_enabled)
         self.sale_remove_button.setEnabled(panel_view.remove_enabled)
         self.sale_clear_button.setEnabled(panel_view.clear_enabled)
-        self._refresh_permissions()
+        can_manage_layaways = self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
+        can_operate_open_cash = self.active_cash_session_id is not None and not self.cash_session_requires_cut
+        self.sale_layaway_button.setEnabled(can_manage_layaways and can_operate_open_cash and bool(self.sale_cart))
 
     def _refresh_quote_cart_table(self) -> None:
         quote_cart_view = build_quote_cart_view(self.quote_cart)
@@ -10931,7 +10968,11 @@ class MainWindow(QMainWindow):
         self.quote_cart_table.resizeColumnsToContents()
         self.quote_total_label.setText(quote_cart_view.summary.total_label)
         self.quote_summary_label.setText(quote_cart_view.summary.summary_label)
-        self._refresh_permissions()
+        can_sell = self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO}
+        self.quote_qty_down_button.setEnabled(can_sell and bool(self.quote_cart))
+        self.quote_qty_up_button.setEnabled(can_sell and bool(self.quote_cart))
+        self.quote_remove_button.setEnabled(can_sell and bool(self.quote_cart))
+        self.quote_clear_button.setEnabled(can_sell and bool(self.quote_cart))
 
     def _selected_catalog_row(self) -> dict[str, object] | None:
         inventory_variant_id = self._inventory_table_variant_id_at_row(self.inventory_table.currentRow())

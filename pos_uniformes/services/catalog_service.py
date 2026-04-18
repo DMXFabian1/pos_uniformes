@@ -580,6 +580,7 @@ class CatalogService:
         color: str,
         precio_venta: Decimal,
         costo_referencia: Decimal | None = None,
+        stock_minimo: int | None = None,
     ) -> Variante:
         cls._validar_admin(usuario)
         talla = talla.strip()
@@ -631,6 +632,7 @@ class CatalogService:
         variante.color = color
         variante.precio_venta = precio_venta
         variante.costo_referencia = costo_referencia
+        variante.stock_minimo = stock_minimo
         session.add(variante)
         cls._registrar_cambios(
             session=session,

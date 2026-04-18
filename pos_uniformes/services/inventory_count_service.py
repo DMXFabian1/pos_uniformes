@@ -215,4 +215,5 @@ def build_inventory_count_payload(
             }
             for row in changed_rows
         ],
+        "all_variante_ids": [int(row.variante_id) for row in rows],
     }

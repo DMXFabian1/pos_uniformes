@@ -41,6 +41,8 @@ class InventorySnapshotServiceTests(unittest.TestCase):
                 2,
                 False,
                 True,
+                None,
+                None,
             )
         ]
         session = SimpleNamespace()
@@ -88,6 +90,8 @@ class InventorySnapshotServiceTests(unittest.TestCase):
                 2,
                 False,
                 True,
+                None,
+                None,
             )
         ]
         session = SimpleNamespace()

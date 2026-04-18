@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QLineEdit,
     QSpinBox,
+    QCheckBox,
 )
 from sqlalchemy import select
 
@@ -163,10 +164,31 @@ def build_catalog_variant_dialog(
     form.addRow("", sku_hint)
     form.addRow("Talla", talla_combo)
     form.addRow("Color", color_combo)
+    stock_minimo_spin = QSpinBox()
+    stock_minimo_spin.setRange(0, 10000)
+    stock_minimo_spin.setSpecialValueText("Sin mínimo")
+    stock_minimo_enabled = QCheckBox("Definir mínimo")
+    if initial:
+        existing_min = initial.get("stock_minimo")
+        if existing_min is not None:
+            stock_minimo_enabled.setChecked(True)
+            stock_minimo_spin.setValue(int(existing_min))
+        else:
+            stock_minimo_enabled.setChecked(False)
+            stock_minimo_spin.setValue(0)
+    else:
+        stock_minimo_enabled.setChecked(False)
+        stock_minimo_spin.setValue(0)
+    stock_minimo_spin.setEnabled(stock_minimo_enabled.isChecked())
+    stock_minimo_enabled.toggled.connect(stock_minimo_spin.setEnabled)
+
     form.addRow("Precio venta", precio_input)
     form.addRow("Costo referencia", costo_input)
     if include_stock:
         form.addRow("Stock inicial", stock_spin)
+    if not include_stock:
+        form.addRow("Stock mínimo", stock_minimo_enabled)
+        form.addRow("", stock_minimo_spin)
 
     producto_combo.currentIndexChanged.connect(lambda _: refresh_sku_suggestion())
     talla_combo.currentTextChanged.connect(lambda _: refresh_sku_suggestion())
@@ -195,6 +217,8 @@ def build_catalog_variant_dialog(
     validation = validate_catalog_variant_submission(payload, require_stock=include_stock)
     if validation is not None:
         raise ValueError(validation)
+    if not include_stock:
+        payload["stock_minimo"] = stock_minimo_spin.value() if stock_minimo_enabled.isChecked() else None
     return payload
 
 

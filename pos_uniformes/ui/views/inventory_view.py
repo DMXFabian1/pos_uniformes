@@ -221,9 +221,9 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_variant_combo.currentIndexChanged.connect(window._refresh_selected_qr_preview)
     side_box.setLayout(side_layout)
 
-    window.inventory_table.setColumnCount(8)
+    window.inventory_table.setColumnCount(9)
     window.inventory_table.setHorizontalHeaderLabels(
-        ["SKU", "Producto", "Talla", "Color", "Stock", "Apartado", "Estado", "QR"]
+        ["SKU", "Producto", "Talla", "Color", "Stock", "Apartado", "Estado", "QR", "Ult. conteo"]
     )
     window.inventory_table.setObjectName("dataTable")
     window.inventory_table.verticalHeader().setVisible(False)
@@ -241,6 +241,7 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     inventory_header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
     inventory_header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
     inventory_header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)
+    inventory_header.setSectionResizeMode(8, QHeaderView.ResizeMode.ResizeToContents)
     inventory_header.setStretchLastSection(False)
     window.inventory_table.itemSelectionChanged.connect(window._handle_inventory_table_selection)
     window.inventory_table.currentCellChanged.connect(lambda *_: window._handle_inventory_table_selection())
@@ -277,6 +278,7 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_status_filter_combo.setObjectName("inventoryFilterCombo")
     window.inventory_stock_filter_combo.setObjectName("inventoryFilterCombo")
     window.inventory_qr_filter_combo.setObjectName("inventoryFilterCombo")
+    window.inventory_conteo_filter_combo.setObjectName("inventoryFilterCombo")
     window.inventory_origin_filter_combo.setObjectName("inventoryFilterCombo")
     window.inventory_duplicate_filter_combo.setObjectName("inventoryFilterCombo")
     window.inventory_clear_filters_button.setObjectName("secondaryButton")
@@ -293,6 +295,12 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_stock_filter_combo.addItem("Agotado", "zero")
     window.inventory_stock_filter_combo.addItem("Bajo", "low")
     window.inventory_stock_filter_combo.addItem("Disponible", "available")
+    window.inventory_stock_filter_combo.addItem("Bajo mínimo", "below_min")
+    window.inventory_conteo_filter_combo.clear()
+    window.inventory_conteo_filter_combo.addItem("Conteo: todos", "")
+    window.inventory_conteo_filter_combo.addItem("Sin conteo", "never")
+    window.inventory_conteo_filter_combo.addItem("Reciente (0-3d)", "recent")
+    window.inventory_conteo_filter_combo.addItem("Vencido (8+d)", "stale")
     window.inventory_qr_filter_combo.clear()
     window.inventory_qr_filter_combo.addItem("QR: todos", "")
     window.inventory_qr_filter_combo.addItem("Con QR", "ready")
@@ -321,7 +329,8 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     filters_row.addWidget(window.inventory_stock_filter_combo, 2, 1)
     filters_row.addWidget(window.inventory_qr_filter_combo, 2, 2)
     filters_row.addWidget(window.inventory_origin_filter_combo, 2, 3)
-    filters_row.addWidget(window.inventory_duplicate_filter_combo, 2, 4, 1, 3)
+    filters_row.addWidget(window.inventory_duplicate_filter_combo, 2, 4, 1, 2)
+    filters_row.addWidget(window.inventory_conteo_filter_combo, 2, 6)
     filters_row.setColumnStretch(0, 1)
     filters_row.setColumnStretch(1, 1)
     filters_row.setColumnStretch(2, 1)
@@ -391,6 +400,9 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
         lambda _: window._handle_inventory_filters_changed_reset_page()
     )
     window.inventory_duplicate_filter_combo.currentIndexChanged.connect(
+        lambda _: window._handle_inventory_filters_changed_reset_page()
+    )
+    window.inventory_conteo_filter_combo.currentIndexChanged.connect(
         lambda _: window._handle_inventory_filters_changed_reset_page()
     )
     window.inventory_clear_filters_button.clicked.connect(window._handle_clear_inventory_filters)

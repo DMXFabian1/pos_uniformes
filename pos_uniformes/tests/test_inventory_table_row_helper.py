@@ -21,13 +21,15 @@ class InventoryTableRowHelperTests(unittest.TestCase):
                 "apartado_cantidad": 1,
                 "variante_activa": False,
                 "qr_exists": False,
+                "ultimo_conteo_at": None,
+                "stock_minimo": None,
             }
         )
 
         self.assertEqual(view.variant_id, 8)
         self.assertEqual(
             view.values,
-            ("SKU-008", "Pants Deportivo", "16", "Azul Marino", "2 Bajo", 1, "INACTIVA", "Pendiente"),
+            ("SKU-008", "Pants Deportivo", "16", "Azul Marino", "2 Bajo", 1, "INACTIVA", "Pendiente", "Nunca"),
         )
         self.assertEqual(view.row_tone, "muted")
         self.assertEqual(view.stock_tone, "warning")
@@ -48,6 +50,8 @@ class InventoryTableRowHelperTests(unittest.TestCase):
                     "apartado_cantidad": 0,
                     "variante_activa": True,
                     "qr_exists": True,
+                    "ultimo_conteo_at": None,
+                    "stock_minimo": None,
                 },
                 {
                     "variante_id": 2,
@@ -59,6 +63,8 @@ class InventoryTableRowHelperTests(unittest.TestCase):
                     "apartado_cantidad": 0,
                     "variante_activa": True,
                     "qr_exists": False,
+                    "ultimo_conteo_at": None,
+                    "stock_minimo": None,
                 },
             ]
         )
