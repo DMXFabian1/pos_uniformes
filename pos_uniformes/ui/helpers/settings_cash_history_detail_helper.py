@@ -53,6 +53,8 @@ def build_settings_cash_history_detail_view(
     cash_sales_total: Decimal | str | int | float,
     cash_payments_count: int,
     cash_payments_total: Decimal | str | int | float,
+    discounts_total: Decimal | str | int | float,
+    rounding_total: Decimal | str | int | float,
     movement_rows: list[dict[str, object]],
     closed_at: str,
     closed_by: str,
@@ -90,6 +92,8 @@ def build_settings_cash_history_detail_view(
             ("Efectivo por ventas", f"${cash_sales_total}"),
             ("Abonos con efectivo", f"{cash_payments_count}"),
             ("Efectivo por abonos", f"${cash_payments_total}"),
+            ("Descuentos aplicados", f"${Decimal(discounts_total).quantize(Decimal('0.01'))}"),
+            ("Ajuste por redondeo", f"${Decimal(rounding_total).quantize(Decimal('0.01'))}"),
         ),
         movement_rows=tuple(
             SettingsCashHistoryDetailMovementRowView(

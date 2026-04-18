@@ -28,6 +28,8 @@ class SettingsCashHistoryDetailHelperTests(unittest.TestCase):
             cash_sales_total=Decimal("450.00"),
             cash_payments_count=1,
             cash_payments_total=Decimal("100.00"),
+            discounts_total=Decimal("0.00"),
+            rounding_total=Decimal("0.00"),
             movement_rows=[],
             closed_at="-",
             closed_by="-",
@@ -62,6 +64,8 @@ class SettingsCashHistoryDetailHelperTests(unittest.TestCase):
             cash_sales_total=Decimal("800.00"),
             cash_payments_count=2,
             cash_payments_total=Decimal("200.00"),
+            discounts_total=Decimal("45.00"),
+            rounding_total=Decimal("1.50"),
             movement_rows=[
                 {
                     "fecha": "2026-03-17 10:00",
