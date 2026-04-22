@@ -6199,7 +6199,11 @@ class MainWindow(QMainWindow):
         if selected is None:
             QMessageBox.warning(self, "Sin seleccion", "Selecciona una presentacion para duplicar.")
             return
-        result = self._create_or_edit_presentation(prefill=selected, include_stock=True)
+        result = self._create_or_edit_presentation(
+            prefill=selected,
+            default_product_id=int(selected["producto_id"]),
+            include_stock=True,
+        )
         if result is None:
             return
         sku, variant_id = result

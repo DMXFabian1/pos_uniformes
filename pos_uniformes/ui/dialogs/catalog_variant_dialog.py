@@ -156,6 +156,7 @@ def build_catalog_variant_dialog(
         sku_hint.setText(f"SKU actual: {initial['sku']}")
     elif prefill:
         window._set_combo_value(producto_combo, prefill["producto_id"])
+        producto_combo.setEnabled(False)
         color_text = str(prefill["color"])
         color_index = color_combo.findText(color_text)
         if color_index >= 0:
