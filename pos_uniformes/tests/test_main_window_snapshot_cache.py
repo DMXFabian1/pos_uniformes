@@ -1151,7 +1151,8 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         self.assertIsNone(result)
         prompt_mock.assert_called_once()
-        self.assertEqual(prompt_mock.call_args.kwargs, {})
+        self.assertIn("print_labels_callback", prompt_mock.call_args.kwargs)
+        self.assertTrue(callable(prompt_mock.call_args.kwargs["print_labels_callback"]))
 
     def test_table_spin_tab_navigator_moves_between_bulk_adjust_inputs(self) -> None:
         host = MainWindow(user_id=1)
