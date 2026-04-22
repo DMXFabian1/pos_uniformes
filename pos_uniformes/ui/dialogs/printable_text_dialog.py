@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from PyQt6.QtCore import QSizeF
 from PyQt6.QtGui import QPageSize
-from PyQt6.QtPrintSupport import QPrintDialog, QPrinter
+from PyQt6.QtPrintSupport import QPrinter
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QTextEdit, QVBoxLayout, QWidget
 
 from pos_uniformes.database.connection import get_session
@@ -48,13 +48,9 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
         if preferred_printer:
             printer.setPrinterName(preferred_printer)
         printer.setCopyCount(copies)
-        print_dialog = QPrintDialog(printer, dialog)
-        if print_dialog.exec() == QDialog.DialogCode.Accepted:
-            # Aplicar DESPUES del dialogo: el dialogo puede sobrescribir el
-            # tamaño de pagina, causando margenes incorrectos al imprimir.
-            printer.setPageSize(QPageSize(QSizeF(TICKET_PAPER_WIDTH_MM, 600.0), QPageSize.Unit.Millimeter))
-            printer.setFullPage(True)
-            build_ticket_document(content, text_width_mm=TICKET_TEXT_WIDTH_MM).print(printer)
+        printer.setPageSize(QPageSize(QSizeF(TICKET_PAPER_WIDTH_MM, 600.0), QPageSize.Unit.Millimeter))
+        printer.setFullPage(True)
+        build_ticket_document(content, text_width_mm=TICKET_TEXT_WIDTH_MM).print(printer)
 
     print_button.clicked.connect(handle_print)
     buttons.rejected.connect(dialog.reject)
