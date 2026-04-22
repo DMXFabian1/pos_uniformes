@@ -4792,12 +4792,14 @@ class MainWindow(QMainWindow):
     def _prompt_variant_data(
         self,
         initial: dict[str, object] | None = None,
+        prefill: dict[str, object] | None = None,
         include_stock: bool = False,
         default_product_id: int | None = None,
     ) -> dict[str, object] | None:
         return build_catalog_variant_dialog(
             self,
             initial=initial,
+            prefill=prefill,
             include_stock=include_stock,
             default_product_id=default_product_id,
             common_sizes=COMMON_SIZES,
@@ -5854,12 +5856,14 @@ class MainWindow(QMainWindow):
         self,
         *,
         initial: dict[str, object] | None = None,
+        prefill: dict[str, object] | None = None,
         default_product_id: int | None = None,
         include_stock: bool,
     ) -> tuple[str, int] | None:
         try:
             data = self._prompt_variant_data(
                 initial=initial,
+                prefill=prefill,
                 include_stock=include_stock,
                 default_product_id=default_product_id,
             )
@@ -6184,6 +6188,26 @@ class MainWindow(QMainWindow):
         self._offer_generate_qr_for_variants(
             [variant_id],
             title="Presentacion creada",
+            summary_message=f"Presentacion '{sku.upper()}' creada correctamente.\n\nQR: pendiente.",
+        )
+
+    def _handle_duplicate_variant(self) -> None:
+        if self.current_role != RolUsuario.ADMIN:
+            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede crear presentaciones.")
+            return
+        selected = self._selected_catalog_row()
+        if selected is None:
+            QMessageBox.warning(self, "Sin seleccion", "Selecciona una presentacion para duplicar.")
+            return
+        result = self._create_or_edit_presentation(prefill=selected, include_stock=True)
+        if result is None:
+            return
+        sku, variant_id = result
+        self.refresh_all()
+        self._set_combo_value(self.inventory_variant_combo, variant_id)
+        self._offer_generate_qr_for_variants(
+            [variant_id],
+            title="Presentacion duplicada",
             summary_message=f"Presentacion '{sku.upper()}' creada correctamente.\n\nQR: pendiente.",
         )
 

@@ -34,6 +34,7 @@ def build_catalog_variant_dialog(
     window: "MainWindow",
     *,
     initial: dict[str, object] | None = None,
+    prefill: dict[str, object] | None = None,
     include_stock: bool = False,
     default_product_id: int | None = None,
     common_sizes: list[str],
@@ -122,7 +123,7 @@ def build_catalog_variant_dialog(
                 producto=fake_producto,  # type: ignore[arg-type]
                 talla=talla,
                 color=color,
-                excluding_variant_id=int(initial["variante_id"]) if initial else None,
+                excluding_variant_id=int(initial["variante_id"]) if (initial and initial.get("variante_id")) else None,
             )
         previous_auto = last_auto_sku["value"]
         last_auto_sku["value"] = suggested
@@ -153,6 +154,17 @@ def build_catalog_variant_dialog(
         precio_input.setText(str(initial["precio_venta"]))
         costo_input.setText("" if initial["costo_referencia"] is None else str(initial["costo_referencia"]))
         sku_hint.setText(f"SKU actual: {initial['sku']}")
+    elif prefill:
+        window._set_combo_value(producto_combo, prefill["producto_id"])
+        color_text = str(prefill["color"])
+        color_index = color_combo.findText(color_text)
+        if color_index >= 0:
+            color_combo.setCurrentIndex(color_index)
+        else:
+            color_combo.setEditText(color_text)
+        precio_input.setText(str(prefill["precio_venta"]))
+        costo_input.setText("" if prefill.get("costo_referencia") is None else str(prefill["costo_referencia"]))
+        sku_hint.setText("Elige la nueva talla para generar el SKU.")
     elif default_product_id is not None:
         window._set_combo_value(producto_combo, default_product_id)
         sku_hint.setText("Completa talla y color para sugerir un SKU.")
@@ -165,8 +177,7 @@ def build_catalog_variant_dialog(
     form.addRow("Talla", talla_combo)
     form.addRow("Color", color_combo)
     stock_minimo_spin = QSpinBox()
-    stock_minimo_spin.setRange(0, 10000)
-    stock_minimo_spin.setSpecialValueText("Sin mínimo")
+    stock_minimo_spin.setRange(1, 10000)
     stock_minimo_enabled = QCheckBox("Definir mínimo")
     if initial:
         existing_min = initial.get("stock_minimo")
@@ -175,12 +186,16 @@ def build_catalog_variant_dialog(
             stock_minimo_spin.setValue(int(existing_min))
         else:
             stock_minimo_enabled.setChecked(False)
-            stock_minimo_spin.setValue(0)
+            stock_minimo_spin.setValue(1)
     else:
         stock_minimo_enabled.setChecked(False)
-        stock_minimo_spin.setValue(0)
+        stock_minimo_spin.setValue(1)
     stock_minimo_spin.setEnabled(stock_minimo_enabled.isChecked())
-    stock_minimo_enabled.toggled.connect(stock_minimo_spin.setEnabled)
+
+    def _on_minimo_toggled(checked: bool) -> None:
+        stock_minimo_spin.setEnabled(checked)
+
+    stock_minimo_enabled.toggled.connect(_on_minimo_toggled)
 
     form.addRow("Precio venta", precio_input)
     form.addRow("Costo referencia", costo_input)

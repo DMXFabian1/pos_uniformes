@@ -98,6 +98,8 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     new_product_action.triggered.connect(window._handle_create_product)
     new_variant_action = new_menu.addAction("Presentacion")
     new_variant_action.triggered.connect(window._handle_create_variant)
+    duplicate_variant_action = new_menu.addAction("Duplicar presentacion")
+    duplicate_variant_action.triggered.connect(window._handle_duplicate_variant)
     window.inventory_new_button.setMenu(new_menu)
 
     edit_menu = QMenu(window)
