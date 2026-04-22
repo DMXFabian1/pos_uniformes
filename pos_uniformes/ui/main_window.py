@@ -1427,6 +1427,7 @@ class MainWindow(QMainWindow):
         self.inventory_conteo_filter_combo = QComboBox()
         self.inventory_origin_filter_combo = QComboBox()
         self.inventory_duplicate_filter_combo = QComboBox()
+        self.inventory_precio_filter_combo = QComboBox()
         self.inventory_clear_filters_button = QPushButton("Limpiar filtros")
         self.inventory_previous_page_button = QPushButton("Anterior")
         self.inventory_next_page_button = QPushButton("Siguiente")
@@ -8882,6 +8883,7 @@ class MainWindow(QMainWindow):
                 ("origen", self.inventory_origin_filter_combo.currentData(), self.inventory_origin_filter_combo.currentText()),
                 ("incidencias", self.inventory_duplicate_filter_combo.currentData(), self.inventory_duplicate_filter_combo.currentText()),
                 ("conteo", self.inventory_conteo_filter_combo.currentData(), self.inventory_conteo_filter_combo.currentText()),
+                ("precio", self.inventory_precio_filter_combo.currentData(), self.inventory_precio_filter_combo.currentText()),
             ),
         )
 
@@ -8904,6 +8906,7 @@ class MainWindow(QMainWindow):
                 ("origen", self.inventory_origin_filter_combo.currentData(), self.inventory_origin_filter_combo.currentText()),
                 ("incidencias", self.inventory_duplicate_filter_combo.currentData(), self.inventory_duplicate_filter_combo.currentText()),
                 ("conteo", self.inventory_conteo_filter_combo.currentData(), self.inventory_conteo_filter_combo.currentText()),
+                ("precio", self.inventory_precio_filter_combo.currentData(), self.inventory_precio_filter_combo.currentText()),
             ),
         )
 
@@ -9208,6 +9211,7 @@ class MainWindow(QMainWindow):
         origin_filter = str(self.inventory_origin_filter_combo.currentData() or "")
         duplicate_filter = str(self.inventory_duplicate_filter_combo.currentData() or "")
         conteo_filter = str(self.inventory_conteo_filter_combo.currentData() or "")
+        precio_filter = str(self.inventory_precio_filter_combo.currentData() or "")
 
         self.inventory_filtered_rows = filter_visible_inventory_rows(
             inventory_snapshot_rows,
@@ -9227,6 +9231,7 @@ class MainWindow(QMainWindow):
                 origin_filter=origin_filter,
                 duplicate_filter=duplicate_filter,
                 conteo_filter=conteo_filter,
+                precio_filter=precio_filter,
             ),
             search_matcher=lambda row, _search_text: row_matches_search(
                 row,
@@ -9335,6 +9340,7 @@ class MainWindow(QMainWindow):
             self.inventory_origin_filter_combo,
             self.inventory_duplicate_filter_combo,
             self.inventory_conteo_filter_combo,
+            self.inventory_precio_filter_combo,
         ):
             combo.blockSignals(True)
             combo.setCurrentIndex(0)

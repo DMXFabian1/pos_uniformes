@@ -27,6 +27,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
             "fallback_importacion": False,
             "ultimo_conteo_at": None,
             "stock_minimo": None,
+            "precio_venta": "150.00",
         }
 
         matches = inventory_row_matches_visible_filters(
@@ -47,6 +48,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
                 origin_filter="native",
                 duplicate_filter="fallback_exclude",
                 conteo_filter="",
+                precio_filter="",
             ),
             search_matcher=lambda _row, search_text: search_text == "sku",
         )
@@ -69,6 +71,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
             "fallback_importacion": False,
             "ultimo_conteo_at": None,
             "stock_minimo": None,
+            "precio_venta": "150.00",
         }
 
         matches = inventory_row_matches_visible_filters(
@@ -89,6 +92,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
                 origin_filter="",
                 duplicate_filter="",
                 conteo_filter="",
+                precio_filter="",
             ),
             search_matcher=lambda *_args: True,
         )
@@ -151,6 +155,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
                 origin_filter="native",
                 duplicate_filter="fallback_exclude",
                 conteo_filter="",
+                precio_filter="",
             ),
             search_matcher=lambda row, search_text: str(row["sku"]).lower() == search_text,
         )
@@ -173,6 +178,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
             "fallback_importacion": False,
             "ultimo_conteo_at": None,
             "stock_minimo": None,
+            "precio_venta": "150.00",
         }
         search_matcher = Mock(return_value=True)
 
@@ -194,6 +200,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
                 origin_filter="",
                 duplicate_filter="",
                 conteo_filter="",
+                precio_filter="",
             ),
             search_matcher=search_matcher,
         )
@@ -217,6 +224,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
             "fallback_importacion": False,
             "ultimo_conteo_at": None,
             "stock_minimo": None,
+            "precio_venta": "150.00",
         }
         regular_row = {
             **uniform_row,
@@ -243,6 +251,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
                     origin_filter="",
                     duplicate_filter="",
                     conteo_filter="",
+                    precio_filter="",
                 ),
                 search_matcher=lambda *_args: True,
             )
@@ -266,6 +275,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
                     origin_filter="",
                     duplicate_filter="",
                     conteo_filter="",
+                    precio_filter="",
                 ),
                 search_matcher=lambda *_args: True,
             )
@@ -289,6 +299,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
                     origin_filter="",
                     duplicate_filter="",
                     conteo_filter="",
+                    precio_filter="",
                 ),
                 search_matcher=lambda *_args: True,
             )

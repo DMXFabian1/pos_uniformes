@@ -31,6 +31,7 @@ class InventoryVisibleFilterState:
     origin_filter: str
     duplicate_filter: str
     conteo_filter: str
+    precio_filter: str
 
 
 def filter_visible_inventory_rows(
@@ -71,6 +72,7 @@ def inventory_row_matches_visible_filters(
         and matches_origin_legacy(bool(row["origen_legacy"]), filters.origin_filter)
         and matches_fallback_duplicate(bool(row["fallback_importacion"]), filters.duplicate_filter)
         and _matches_inventory_conteo_filter(row.get("ultimo_conteo_at"), filters.conteo_filter)
+        and _matches_inventory_precio_filter(row.get("precio_venta"), filters.precio_filter)
         and search_matcher(row, filters.search_text)
     )
 
@@ -116,6 +118,24 @@ def _matches_inventory_conteo_filter(ultimo_conteo_at: object, conteo_filter: st
         return days_ago <= 3
     if conteo_filter == "stale":
         return days_ago >= 8
+    return True
+
+
+def _matches_inventory_precio_filter(precio_venta: object, precio_filter: str) -> bool:
+    if not precio_filter:
+        return True
+    try:
+        precio = float(precio_venta)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        return True
+    if precio_filter == "under_100":
+        return precio < 100
+    if precio_filter == "100_199":
+        return 100 <= precio <= 199
+    if precio_filter == "200_499":
+        return 200 <= precio <= 499
+    if precio_filter == "500_plus":
+        return precio >= 500
     return True
 
 
