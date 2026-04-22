@@ -48,14 +48,12 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
         if preferred_printer:
             printer.setPrinterName(preferred_printer)
         printer.setCopyCount(copies)
-        # Forzar tamaño 80mm: el driver de impresoras termicas suele reportar
-        # un ancho incorrecto a Qt, lo que hace que paintRect() devuelva ~29mm
-        # en lugar de ~76mm. Con setFullPage(True) usamos coordenadas del papel
-        # completo y hardcodeamos el ancho conocido del ticket.
-        printer.setPageSize(QPageSize(QSizeF(TICKET_PAPER_WIDTH_MM, 600.0), QPageSize.Unit.Millimeter))
-        printer.setFullPage(True)
         print_dialog = QPrintDialog(printer, dialog)
         if print_dialog.exec() == QDialog.DialogCode.Accepted:
+            # Aplicar DESPUES del dialogo: el dialogo puede sobrescribir el
+            # tamaño de pagina, causando margenes incorrectos al imprimir.
+            printer.setPageSize(QPageSize(QSizeF(TICKET_PAPER_WIDTH_MM, 600.0), QPageSize.Unit.Millimeter))
+            printer.setFullPage(True)
             build_ticket_document(content, text_width_mm=TICKET_TEXT_WIDTH_MM).print(printer)
 
     print_button.clicked.connect(handle_print)
