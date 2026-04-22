@@ -9313,6 +9313,14 @@ class MainWindow(QMainWindow):
             summary_view.inactive_counter.tone,
         )
 
+        if current_variant_id is not None:
+            selected_filtered_index = find_catalog_row_index_by_variant_id(
+                self.inventory_filtered_rows,
+                current_variant_id,
+            )
+            if selected_filtered_index is not None:
+                self.inventory_page_index = selected_filtered_index // INVENTORY_PAGE_SIZE
+
         pagination_view = build_catalog_pagination_view(
             self.inventory_filtered_rows,
             current_page_index=self.inventory_page_index,

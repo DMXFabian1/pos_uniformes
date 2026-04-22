@@ -1768,6 +1768,91 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         self.assertEqual(combo.currentIndex(), 1)
 
+    def test_refresh_inventory_jumps_to_page_of_selected_variant(self) -> None:
+        window = MainWindow(user_id=1)
+        filtered_rows = [{"variante_id": i, "sku": f"SKU-{i:03d}"} for i in range(30)]
+        variant_on_page1 = 27
+        window.inventory_variant_combo.addItem("SKU-027", variant_on_page1)
+        window.inventory_variant_combo.setCurrentIndex(
+            window.inventory_variant_combo.findData(variant_on_page1)
+        )
+        window.inventory_page_index = 0
+
+        table_row_view = SimpleNamespace(
+            values=["SKU-027", "P", "M", "Rojo", "3", "0", "Activa", "OK"],
+            row_tone=None,
+            variant_id=variant_on_page1,
+            stock_tone="positive",
+            committed_tone=None,
+            status_tone="positive",
+            qr_tone="positive",
+        )
+        summary_view = SimpleNamespace(
+            out_counter=SimpleNamespace(text="0", tone="positive"),
+            low_counter=SimpleNamespace(text="0", tone="positive"),
+            qr_pending_counter=SimpleNamespace(text="0", tone="positive"),
+            inactive_counter=SimpleNamespace(text="0", tone="positive"),
+            results_summary="30 resultados",
+        )
+
+        with patch.object(window, "_load_inventory_snapshot_rows", return_value=filtered_rows), patch(
+            "pos_uniformes.ui.main_window.filter_visible_inventory_rows",
+            return_value=filtered_rows,
+        ), patch(
+            "pos_uniformes.ui.main_window.build_inventory_table_row_views",
+            return_value=[table_row_view] * INVENTORY_PAGE_SIZE,
+        ), patch(
+            "pos_uniformes.ui.main_window.build_inventory_summary_view",
+            return_value=summary_view,
+        ), patch.object(window, "_build_inventory_active_filters_summary", return_value="Sin filtros"), patch.object(
+            window, "_sync_inventory_table_selection"
+        ), patch.object(window, "_refresh_inventory_overview"):
+            window._refresh_inventory_table()
+
+        self.assertEqual(window.inventory_page_index, 1)
+
+    def test_refresh_inventory_stays_on_page_when_selected_variant_not_in_filtered_rows(self) -> None:
+        window = MainWindow(user_id=1)
+        filtered_rows = [{"variante_id": i, "sku": f"SKU-{i:03d}"} for i in range(30)]
+        window.inventory_variant_combo.addItem("SKU-999", 999)
+        window.inventory_variant_combo.setCurrentIndex(
+            window.inventory_variant_combo.findData(999)
+        )
+        window.inventory_page_index = 0
+
+        table_row_view = SimpleNamespace(
+            values=["SKU-000", "P", "M", "Rojo", "3", "0", "Activa", "OK"],
+            row_tone=None,
+            variant_id=0,
+            stock_tone="positive",
+            committed_tone=None,
+            status_tone="positive",
+            qr_tone="positive",
+        )
+        summary_view = SimpleNamespace(
+            out_counter=SimpleNamespace(text="0", tone="positive"),
+            low_counter=SimpleNamespace(text="0", tone="positive"),
+            qr_pending_counter=SimpleNamespace(text="0", tone="positive"),
+            inactive_counter=SimpleNamespace(text="0", tone="positive"),
+            results_summary="30 resultados",
+        )
+
+        with patch.object(window, "_load_inventory_snapshot_rows", return_value=filtered_rows), patch(
+            "pos_uniformes.ui.main_window.filter_visible_inventory_rows",
+            return_value=filtered_rows,
+        ), patch(
+            "pos_uniformes.ui.main_window.build_inventory_table_row_views",
+            return_value=[table_row_view] * INVENTORY_PAGE_SIZE,
+        ), patch(
+            "pos_uniformes.ui.main_window.build_inventory_summary_view",
+            return_value=summary_view,
+        ), patch.object(window, "_build_inventory_active_filters_summary", return_value="Sin filtros"), patch.object(
+            window, "_sync_inventory_table_selection"
+        ), patch.object(window, "_refresh_inventory_overview"):
+            window._refresh_inventory_table()
+
+        self.assertEqual(window.inventory_page_index, 0)
+
 
 if __name__ == "__main__":
     unittest.main()
