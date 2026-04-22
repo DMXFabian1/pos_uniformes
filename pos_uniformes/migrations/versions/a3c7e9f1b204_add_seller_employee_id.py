@@ -40,6 +40,7 @@ def upgrade() -> None:
         "ix_venta_seller_employee_id",
         "venta",
         ["seller_employee_id"],
+        if_not_exists=True,
     )
 
     op.add_column(
@@ -56,6 +57,7 @@ def upgrade() -> None:
         "ix_presupuesto_seller_employee_id",
         "presupuesto",
         ["seller_employee_id"],
+        if_not_exists=True,
     )
 
     op.add_column(
@@ -72,6 +74,7 @@ def upgrade() -> None:
         "ix_apartado_seller_employee_id",
         "apartado",
         ["seller_employee_id"],
+        if_not_exists=True,
     )
 
 
