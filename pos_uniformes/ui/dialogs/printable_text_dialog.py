@@ -61,7 +61,8 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
         )
         print_dialog = QPrintDialog(printer, dialog)
         if print_dialog.exec() == QDialog.DialogCode.Accepted:
-            build_ticket_document(content).print(printer)
+            paint_rect = printer.pageLayout().paintRect(QPageLayout.Unit.Millimeter)
+            build_ticket_document(content, text_width_mm=paint_rect.width()).print(printer)
 
     print_button.clicked.connect(handle_print)
     buttons.rejected.connect(dialog.reject)
