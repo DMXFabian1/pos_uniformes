@@ -11,9 +11,10 @@ def resolve_selected_catalog_row(
     catalog_table_row: int,
     catalog_rows: list[dict[str, object]],
 ) -> dict[str, object] | None:
-    selected_from_inventory = find_catalog_row_by_variant_id(catalog_rows, inventory_variant_id)
-    if selected_from_inventory is not None:
-        return selected_from_inventory
+    if normalize_inventory_variant_id(inventory_variant_id) is not None:
+        # Hay selección en la tabla de inventario: buscar solo por ID, sin fallback.
+        # Si no se encuentra, devolver None en lugar de caer a catalog_table_row.
+        return find_catalog_row_by_variant_id(catalog_rows, inventory_variant_id)
     if catalog_table_row < 0 or catalog_table_row >= len(catalog_rows):
         return None
     return catalog_rows[catalog_table_row]

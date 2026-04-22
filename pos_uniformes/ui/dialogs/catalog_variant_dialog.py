@@ -34,6 +34,7 @@ def build_catalog_variant_dialog(
     window: "MainWindow",
     *,
     initial: dict[str, object] | None = None,
+    prefill: dict[str, object] | None = None,
     include_stock: bool = False,
     default_product_id: int | None = None,
     common_sizes: list[str],
@@ -122,7 +123,7 @@ def build_catalog_variant_dialog(
                 producto=fake_producto,  # type: ignore[arg-type]
                 talla=talla,
                 color=color,
-                excluding_variant_id=int(initial["variante_id"]) if initial else None,
+                excluding_variant_id=int(initial["variante_id"]) if (initial and initial.get("variante_id")) else None,
             )
         previous_auto = last_auto_sku["value"]
         last_auto_sku["value"] = suggested
@@ -153,6 +154,19 @@ def build_catalog_variant_dialog(
         precio_input.setText(str(initial["precio_venta"]))
         costo_input.setText("" if initial["costo_referencia"] is None else str(initial["costo_referencia"]))
         sku_hint.setText(f"SKU actual: {initial['sku']}")
+    elif prefill:
+        window._set_combo_value(producto_combo, prefill["producto_id"])
+        producto_combo.setEnabled(False)
+        color_text = str(prefill["color"])
+        color_index = color_combo.findText(color_text)
+        if color_index >= 0:
+            color_combo.setCurrentIndex(color_index)
+        else:
+            color_combo.setEditText(color_text)
+        precio_input.setText(str(prefill["precio_venta"]))
+        costo_input.setText("" if prefill.get("costo_referencia") is None else str(prefill["costo_referencia"]))
+        sku_input.setReadOnly(True)
+        sku_hint.setText("Elige la nueva talla para generar el SKU.")
     elif default_product_id is not None:
         window._set_combo_value(producto_combo, default_product_id)
         sku_hint.setText("Completa talla y color para sugerir un SKU.")

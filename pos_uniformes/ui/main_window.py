@@ -343,6 +343,8 @@ from pos_uniformes.ui.helpers.catalog_action_feedback_helper import (
     build_catalog_delete_confirmation,
     build_catalog_error_title,
     build_catalog_success_result,
+    build_product_delete_label,
+    build_variant_delete_label,
 )
 from pos_uniformes.ui.helpers.catalog_filter_helper import (
     CatalogVisibleFilterState,
@@ -1139,6 +1141,14 @@ PRODUCT_TEMPLATES = [
 UNIFORM_MACRO_TYPES = ["Deportivo", "Oficial", "Basico", "Escolta", "Accesorio"]
 
 
+def _build_bulk_selection_label(selected_ids: list[int], matched_rows: list[dict[str, object]]) -> str:
+    matched = len(matched_rows)
+    total = len(selected_ids)
+    if total > matched:
+        return f"Filas seleccionadas ({matched} de {total} — {total - matched} no coinciden con el filtro actual)"
+    return f"Filas seleccionadas ({matched})"
+
+
 class MainWindow(QMainWindow):
     def __init__(self, user_id: int) -> None:
         super().__init__()
@@ -1427,6 +1437,8 @@ class MainWindow(QMainWindow):
         self.inventory_conteo_filter_combo = QComboBox()
         self.inventory_origin_filter_combo = QComboBox()
         self.inventory_duplicate_filter_combo = QComboBox()
+        self.inventory_precio_filter_combo = QComboBox()
+        self.inventory_precio_text_input = QLineEdit()
         self.inventory_clear_filters_button = QPushButton("Limpiar filtros")
         self.inventory_previous_page_button = QPushButton("Anterior")
         self.inventory_next_page_button = QPushButton("Siguiente")
@@ -4790,12 +4802,14 @@ class MainWindow(QMainWindow):
     def _prompt_variant_data(
         self,
         initial: dict[str, object] | None = None,
+        prefill: dict[str, object] | None = None,
         include_stock: bool = False,
         default_product_id: int | None = None,
     ) -> dict[str, object] | None:
         return build_catalog_variant_dialog(
             self,
             initial=initial,
+            prefill=prefill,
             include_stock=include_stock,
             default_product_id=default_product_id,
             common_sizes=COMMON_SIZES,
@@ -4854,7 +4868,7 @@ class MainWindow(QMainWindow):
                 f"{sku} | {producto_nombre} | stock {stock_actual}",
                 variante_id,
             )
-        self._set_combo_value(presentacion_combo, self.inventory_variant_combo.currentData())
+        self._set_combo_value(presentacion_combo, self._dialog_prefill_variant_id())
         cantidad_spin = QSpinBox()
         cantidad_spin.setRange(1, 1000)
         costo_input = QLineEdit()
@@ -4913,7 +4927,7 @@ class MainWindow(QMainWindow):
                 f"{sku} | {producto_nombre} | stock {stock_actual}",
                 variante_id,
             )
-        self._set_combo_value(presentacion_combo, self.inventory_variant_combo.currentData())
+        self._set_combo_value(presentacion_combo, self._dialog_prefill_variant_id())
         stock_actual_label = QLabel()
         stock_actual_label.setObjectName("analyticsLine")
         stock_final_spin = QSpinBox()
@@ -5016,7 +5030,7 @@ class MainWindow(QMainWindow):
         if selected_ids:
             selected_rows = [row for row in filtered_rows if int(row["variante_id"]) in set(selected_ids)]
             source_options.append(
-                (f"Filas seleccionadas ({len(selected_rows)})", "SELECCION", selected_rows)
+                (_build_bulk_selection_label(selected_ids, selected_rows), "SELECCION", selected_rows)
             )
         if filtered_rows:
             source_options.append(
@@ -5852,12 +5866,16 @@ class MainWindow(QMainWindow):
         self,
         *,
         initial: dict[str, object] | None = None,
+        prefill: dict[str, object] | None = None,
         default_product_id: int | None = None,
         include_stock: bool,
     ) -> tuple[str, int] | None:
+        if initial is not None and prefill is not None:
+            raise ValueError("No se puede usar initial (editar) y prefill (duplicar) al mismo tiempo.")
         try:
             data = self._prompt_variant_data(
                 initial=initial,
+                prefill=prefill,
                 include_stock=include_stock,
                 default_product_id=default_product_id,
             )
@@ -6185,6 +6203,38 @@ class MainWindow(QMainWindow):
             summary_message=f"Presentacion '{sku.upper()}' creada correctamente.\n\nQR: pendiente.",
         )
 
+    def _handle_duplicate_variant(self) -> None:
+        if self.current_role != RolUsuario.ADMIN:
+            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede crear presentaciones.")
+            return
+        inventory_variant_id = self._inventory_table_variant_id_at_row(self.inventory_table.currentRow())
+        if inventory_variant_id is None:
+            QMessageBox.warning(
+                self,
+                "Sin seleccion",
+                "Selecciona una presentacion en la tabla de inventario para duplicar.",
+            )
+            return
+        selected = self._selected_catalog_row()
+        if selected is None:
+            QMessageBox.warning(self, "Presentacion no encontrada", "No se pudo cargar la presentacion seleccionada.")
+            return
+        result = self._create_or_edit_presentation(
+            prefill=selected,
+            default_product_id=int(selected["producto_id"]),
+            include_stock=True,
+        )
+        if result is None:
+            return
+        sku, variant_id = result
+        self.refresh_all()
+        self._set_combo_value(self.inventory_variant_combo, variant_id)
+        self._offer_generate_qr_for_variants(
+            [variant_id],
+            title="Presentacion duplicada",
+            summary_message=f"Presentacion '{sku.upper()}' creada correctamente.\n\nQR: pendiente.",
+        )
+
     def _handle_catalog_selection(self) -> None:
         row = resolve_catalog_row(self.catalog_rows, self.catalog_table.currentRow())
         if row is None:
@@ -6397,7 +6447,7 @@ class MainWindow(QMainWindow):
         product_name = str(selected["producto_nombre"])
         confirmation_view = build_catalog_delete_confirmation(
             action_key="delete_product",
-            item_label=product_name,
+            item_label=build_product_delete_label(selected),
         )
         confirmation = QMessageBox.question(self, confirmation_view.title, confirmation_view.message)
         if confirmation != QMessageBox.StandardButton.Yes:
@@ -6437,7 +6487,7 @@ class MainWindow(QMainWindow):
         sku = str(selected["sku"])
         confirmation_view = build_catalog_delete_confirmation(
             action_key="delete_variant",
-            item_label=sku,
+            item_label=build_variant_delete_label(selected),
         )
         confirmation = QMessageBox.question(self, confirmation_view.title, confirmation_view.message)
         if confirmation != QMessageBox.StandardButton.Yes:
@@ -8882,6 +8932,8 @@ class MainWindow(QMainWindow):
                 ("origen", self.inventory_origin_filter_combo.currentData(), self.inventory_origin_filter_combo.currentText()),
                 ("incidencias", self.inventory_duplicate_filter_combo.currentData(), self.inventory_duplicate_filter_combo.currentText()),
                 ("conteo", self.inventory_conteo_filter_combo.currentData(), self.inventory_conteo_filter_combo.currentText()),
+                ("precio", self.inventory_precio_filter_combo.currentData(), self.inventory_precio_filter_combo.currentText()),
+                ("precio_exacto", self.inventory_precio_text_input.text().strip() or None, f"${self.inventory_precio_text_input.text().strip()}" if self.inventory_precio_text_input.text().strip() else ""),
             ),
         )
 
@@ -8904,6 +8956,8 @@ class MainWindow(QMainWindow):
                 ("origen", self.inventory_origin_filter_combo.currentData(), self.inventory_origin_filter_combo.currentText()),
                 ("incidencias", self.inventory_duplicate_filter_combo.currentData(), self.inventory_duplicate_filter_combo.currentText()),
                 ("conteo", self.inventory_conteo_filter_combo.currentData(), self.inventory_conteo_filter_combo.currentText()),
+                ("precio", self.inventory_precio_filter_combo.currentData(), self.inventory_precio_filter_combo.currentText()),
+                ("precio_exacto", self.inventory_precio_text_input.text().strip() or None, f"${self.inventory_precio_text_input.text().strip()}" if self.inventory_precio_text_input.text().strip() else ""),
             ),
         )
 
@@ -9208,6 +9262,8 @@ class MainWindow(QMainWindow):
         origin_filter = str(self.inventory_origin_filter_combo.currentData() or "")
         duplicate_filter = str(self.inventory_duplicate_filter_combo.currentData() or "")
         conteo_filter = str(self.inventory_conteo_filter_combo.currentData() or "")
+        precio_filter = str(self.inventory_precio_filter_combo.currentData() or "")
+        precio_text_filter = self.inventory_precio_text_input.text().strip()
 
         self.inventory_filtered_rows = filter_visible_inventory_rows(
             inventory_snapshot_rows,
@@ -9227,6 +9283,8 @@ class MainWindow(QMainWindow):
                 origin_filter=origin_filter,
                 duplicate_filter=duplicate_filter,
                 conteo_filter=conteo_filter,
+                precio_filter=precio_filter,
+                precio_text_filter=precio_text_filter,
             ),
             search_matcher=lambda row, _search_text: row_matches_search(
                 row,
@@ -9254,6 +9312,14 @@ class MainWindow(QMainWindow):
             summary_view.inactive_counter.text,
             summary_view.inactive_counter.tone,
         )
+
+        if current_variant_id is not None:
+            selected_filtered_index = find_catalog_row_index_by_variant_id(
+                self.inventory_filtered_rows,
+                current_variant_id,
+            )
+            if selected_filtered_index is not None:
+                self.inventory_page_index = selected_filtered_index // INVENTORY_PAGE_SIZE
 
         pagination_view = build_catalog_pagination_view(
             self.inventory_filtered_rows,
@@ -9327,6 +9393,9 @@ class MainWindow(QMainWindow):
         self.inventory_search_input.blockSignals(True)
         self.inventory_search_input.clear()
         self.inventory_search_input.blockSignals(False)
+        self.inventory_precio_text_input.blockSignals(True)
+        self.inventory_precio_text_input.clear()
+        self.inventory_precio_text_input.blockSignals(False)
         for combo in (
             self.inventory_use_filter_combo,
             self.inventory_status_filter_combo,
@@ -9335,6 +9404,7 @@ class MainWindow(QMainWindow):
             self.inventory_origin_filter_combo,
             self.inventory_duplicate_filter_combo,
             self.inventory_conteo_filter_combo,
+            self.inventory_precio_filter_combo,
         ):
             combo.blockSignals(True)
             combo.setCurrentIndex(0)
@@ -10976,19 +11046,19 @@ class MainWindow(QMainWindow):
 
     def _selected_catalog_row(self) -> dict[str, object] | None:
         inventory_variant_id = self._inventory_table_variant_id_at_row(self.inventory_table.currentRow())
+        if inventory_variant_id is None:
+            # Sin selección en inventario → usar la tabla de catálogo (pestaña Catálogo).
+            return resolve_catalog_row(self.catalog_rows, self.catalog_table.currentRow())
         selected_from_inventory = find_catalog_row_by_variant_id(
             self.catalog_filtered_rows,
             inventory_variant_id,
         )
         if selected_from_inventory is not None:
             return selected_from_inventory
-        selected_from_snapshot = find_catalog_row_by_variant_id(
+        return find_catalog_row_by_variant_id(
             self._load_catalog_snapshot_rows(),
             inventory_variant_id,
         )
-        if selected_from_snapshot is not None:
-            return selected_from_snapshot
-        return resolve_catalog_row(self.catalog_rows, self.catalog_table.currentRow())
 
     def _handle_inventory_table_selection(self) -> None:
         variant_id = self._inventory_table_variant_id_at_row(self.inventory_table.currentRow())
@@ -11009,6 +11079,10 @@ class MainWindow(QMainWindow):
         finally:
             self.inventory_variant_combo.blockSignals(False)
         self._refresh_selected_qr_preview()
+
+    def _dialog_prefill_variant_id(self) -> int | None:
+        """Variante a pre-seleccionar en dialogs de stock/compra: siempre desde inventory_table."""
+        return self._inventory_table_variant_id_at_row(self.inventory_table.currentRow())
 
     def _selected_inventory_variant_ids(self) -> list[int]:
         return collect_selected_inventory_variant_ids(
@@ -11033,6 +11107,9 @@ class MainWindow(QMainWindow):
             return
         self.inventory_table.setCurrentCell(row_index, 0)
         self.inventory_table.selectRow(row_index)
+        variant_id = self._inventory_table_variant_id_at_row(row_index)
+        if variant_id is not None:
+            self._set_combo_value(self.inventory_variant_combo, variant_id)
 
         selected = self._selected_catalog_row()
         if selected is None:
@@ -11065,7 +11142,11 @@ class MainWindow(QMainWindow):
 
     def _sync_inventory_table_selection(self, variant_id: object) -> None:
         if variant_id is None:
-            self.inventory_table.clearSelection()
+            self.inventory_table.blockSignals(True)
+            try:
+                self.inventory_table.clearSelection()
+            finally:
+                self.inventory_table.blockSignals(False)
             return
         row_variant_ids = [
             self._inventory_table_variant_id_at_row(row_index)
@@ -11183,9 +11264,13 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _set_combo_value(combo: QComboBox, value: object) -> None:
+        if value is None:
+            return
         index = combo.findData(value)
         if index >= 0:
             combo.setCurrentIndex(index)
+        else:
+            combo.setCurrentIndex(-1)
 
     @staticmethod
     def _populate_combo(combo: QComboBox, items: list[tuple[str, int]]) -> None:

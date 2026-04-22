@@ -22,6 +22,7 @@ from pos_uniformes.ui.main_window import (
     MainWindow,
     MultiSelectPickerButton,
     _TableSpinTabNavigator,
+    _build_bulk_selection_label,
     _catalog_toggle_feedback_action,
 )
 
@@ -1633,6 +1634,246 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         window._schedule_catalog_filter_refresh_reset_page()
         self.assertEqual(window.catalog_page_index, 0)
         schedule_callback.assert_called_once()
+
+
+    def test_dialog_prefill_variant_id_reads_from_inventory_table_not_combo(self) -> None:
+        window = MainWindow(user_id=1)
+        window.inventory_table.setRowCount(1)
+        window.inventory_table.setColumnCount(1)
+        item = QTableWidgetItem("SKU-007")
+        item.setData(Qt.ItemDataRole.UserRole, 7)
+        window.inventory_table.setItem(0, 0, item)
+        window.inventory_table.blockSignals(True)
+        window.inventory_table.setCurrentCell(0, 0)
+        window.inventory_table.blockSignals(False)
+
+        result = window._dialog_prefill_variant_id()
+
+        self.assertEqual(result, 7)
+
+    def test_dialog_prefill_variant_id_returns_none_when_no_row_selected(self) -> None:
+        window = MainWindow(user_id=1)
+
+        result = window._dialog_prefill_variant_id()
+
+        self.assertIsNone(result)
+
+    def test_create_or_edit_presentation_raises_when_initial_and_prefill_both_set(self) -> None:
+        window = MainWindow(user_id=1)
+        window.current_role = RolUsuario.ADMIN
+        dummy = {"variante_id": 1, "producto_id": 1}
+
+        with self.assertRaises(ValueError):
+            window._create_or_edit_presentation(
+                initial=dummy,
+                prefill=dummy,
+                include_stock=True,
+            )
+
+    def test_context_menu_syncs_combo_to_right_clicked_row(self) -> None:
+        from PyQt6.QtCore import QPoint
+        window = MainWindow(user_id=1)
+        window.inventory_table.setRowCount(2)
+        window.inventory_table.setColumnCount(1)
+        for row_idx, variant_id in [(0, 11), (1, 22)]:
+            item = QTableWidgetItem(f"SKU-{variant_id:03d}")
+            item.setData(Qt.ItemDataRole.UserRole, variant_id)
+            window.inventory_table.setItem(row_idx, 0, item)
+        window.inventory_variant_combo.addItem("SKU-011", 11)
+        window.inventory_variant_combo.addItem("SKU-022", 22)
+        window.inventory_variant_combo.setCurrentIndex(0)
+
+        with patch("pos_uniformes.ui.main_window.prompt_inventory_context_action", return_value=None):
+            pos = QPoint(0, window.inventory_table.rowViewportPosition(1))
+            window._show_inventory_context_menu(pos)
+
+        self.assertEqual(window.inventory_variant_combo.currentData(), 22)
+
+    def test_build_bulk_selection_label_shows_count_when_all_match(self) -> None:
+        rows = [{"variante_id": 1}, {"variante_id": 2}]
+        label = _build_bulk_selection_label([1, 2], rows)
+        self.assertEqual(label, "Filas seleccionadas (2)")
+
+    def test_build_bulk_selection_label_warns_when_some_filtered_out(self) -> None:
+        rows = [{"variante_id": 1}]
+        label = _build_bulk_selection_label([1, 2, 3], rows)
+        self.assertIn("1 de 3", label)
+        self.assertIn("2 no coinciden", label)
+
+    def test_build_bulk_selection_label_single_match_no_warning(self) -> None:
+        rows = [{"variante_id": 5}]
+        label = _build_bulk_selection_label([5], rows)
+        self.assertEqual(label, "Filas seleccionadas (1)")
+
+    def test_duplicate_variant_warns_when_inventory_table_has_no_selection(self) -> None:
+        window = MainWindow(user_id=1)
+        window.current_role = RolUsuario.ADMIN
+
+        with patch("pos_uniformes.ui.main_window.QMessageBox.warning") as warn_mock, \
+             patch.object(window, "_create_or_edit_presentation") as create_mock:
+            window._handle_duplicate_variant()
+
+        warn_mock.assert_called_once()
+        self.assertIn("inventario", warn_mock.call_args[0][2].lower())
+        create_mock.assert_not_called()
+
+    def test_duplicate_variant_warns_when_only_catalog_table_has_selection(self) -> None:
+        window = MainWindow(user_id=1)
+        window.current_role = RolUsuario.ADMIN
+        window.catalog_rows = [{"variante_id": 7, "sku": "SKU-007", "producto_id": 1}]
+        window.catalog_table.setRowCount(1)
+        window.catalog_table.setColumnCount(1)
+        window.catalog_table.blockSignals(True)
+        window.catalog_table.setCurrentCell(0, 0)
+        window.catalog_table.blockSignals(False)
+
+        with patch("pos_uniformes.ui.main_window.QMessageBox.warning") as warn_mock, \
+             patch.object(window, "_create_or_edit_presentation") as create_mock:
+            window._handle_duplicate_variant()
+
+        warn_mock.assert_called_once()
+        create_mock.assert_not_called()
+
+    def test_set_combo_value_selects_matching_item(self) -> None:
+        from PyQt6.QtWidgets import QComboBox
+        combo = QComboBox()
+        combo.addItem("Alfa", 1)
+        combo.addItem("Beta", 2)
+        combo.addItem("Gamma", 3)
+        combo.setCurrentIndex(0)
+
+        MainWindow._set_combo_value(combo, 2)
+
+        self.assertEqual(combo.currentData(), 2)
+
+    def test_set_combo_value_clears_when_value_not_found(self) -> None:
+        from PyQt6.QtWidgets import QComboBox
+        combo = QComboBox()
+        combo.addItem("Alfa", 1)
+        combo.addItem("Beta", 2)
+        combo.setCurrentIndex(0)
+
+        MainWindow._set_combo_value(combo, 99)
+
+        self.assertEqual(combo.currentIndex(), -1)
+
+    def test_set_combo_value_leaves_combo_unchanged_when_value_is_none(self) -> None:
+        from PyQt6.QtWidgets import QComboBox
+        combo = QComboBox()
+        combo.addItem("Alfa", 1)
+        combo.addItem("Beta", 2)
+        combo.setCurrentIndex(1)
+
+        MainWindow._set_combo_value(combo, None)
+
+        self.assertEqual(combo.currentIndex(), 1)
+
+    def test_refresh_inventory_jumps_to_page_of_selected_variant(self) -> None:
+        window = MainWindow(user_id=1)
+        filtered_rows = [{"variante_id": i, "sku": f"SKU-{i:03d}"} for i in range(30)]
+        variant_on_page1 = 27
+        window.inventory_variant_combo.addItem("SKU-027", variant_on_page1)
+        window.inventory_variant_combo.setCurrentIndex(
+            window.inventory_variant_combo.findData(variant_on_page1)
+        )
+        window.inventory_page_index = 0
+
+        table_row_view = SimpleNamespace(
+            values=["SKU-027", "P", "M", "Rojo", "3", "0", "Activa", "OK"],
+            row_tone=None,
+            variant_id=variant_on_page1,
+            stock_tone="positive",
+            committed_tone=None,
+            status_tone="positive",
+            qr_tone="positive",
+        )
+        summary_view = SimpleNamespace(
+            out_counter=SimpleNamespace(text="0", tone="positive"),
+            low_counter=SimpleNamespace(text="0", tone="positive"),
+            qr_pending_counter=SimpleNamespace(text="0", tone="positive"),
+            inactive_counter=SimpleNamespace(text="0", tone="positive"),
+            results_summary="30 resultados",
+        )
+
+        with patch.object(window, "_load_inventory_snapshot_rows", return_value=filtered_rows), patch(
+            "pos_uniformes.ui.main_window.filter_visible_inventory_rows",
+            return_value=filtered_rows,
+        ), patch(
+            "pos_uniformes.ui.main_window.build_inventory_table_row_views",
+            return_value=[table_row_view] * INVENTORY_PAGE_SIZE,
+        ), patch(
+            "pos_uniformes.ui.main_window.build_inventory_summary_view",
+            return_value=summary_view,
+        ), patch.object(window, "_build_inventory_active_filters_summary", return_value="Sin filtros"), patch.object(
+            window, "_sync_inventory_table_selection"
+        ), patch.object(window, "_refresh_inventory_overview"):
+            window._refresh_inventory_table()
+
+        self.assertEqual(window.inventory_page_index, 1)
+
+    def test_refresh_inventory_stays_on_page_when_selected_variant_not_in_filtered_rows(self) -> None:
+        window = MainWindow(user_id=1)
+        filtered_rows = [{"variante_id": i, "sku": f"SKU-{i:03d}"} for i in range(30)]
+        window.inventory_variant_combo.addItem("SKU-999", 999)
+        window.inventory_variant_combo.setCurrentIndex(
+            window.inventory_variant_combo.findData(999)
+        )
+        window.inventory_page_index = 0
+
+        table_row_view = SimpleNamespace(
+            values=["SKU-000", "P", "M", "Rojo", "3", "0", "Activa", "OK"],
+            row_tone=None,
+            variant_id=0,
+            stock_tone="positive",
+            committed_tone=None,
+            status_tone="positive",
+            qr_tone="positive",
+        )
+        summary_view = SimpleNamespace(
+            out_counter=SimpleNamespace(text="0", tone="positive"),
+            low_counter=SimpleNamespace(text="0", tone="positive"),
+            qr_pending_counter=SimpleNamespace(text="0", tone="positive"),
+            inactive_counter=SimpleNamespace(text="0", tone="positive"),
+            results_summary="30 resultados",
+        )
+
+        with patch.object(window, "_load_inventory_snapshot_rows", return_value=filtered_rows), patch(
+            "pos_uniformes.ui.main_window.filter_visible_inventory_rows",
+            return_value=filtered_rows,
+        ), patch(
+            "pos_uniformes.ui.main_window.build_inventory_table_row_views",
+            return_value=[table_row_view] * INVENTORY_PAGE_SIZE,
+        ), patch(
+            "pos_uniformes.ui.main_window.build_inventory_summary_view",
+            return_value=summary_view,
+        ), patch.object(window, "_build_inventory_active_filters_summary", return_value="Sin filtros"), patch.object(
+            window, "_sync_inventory_table_selection"
+        ), patch.object(window, "_refresh_inventory_overview"):
+            window._refresh_inventory_table()
+
+        self.assertEqual(window.inventory_page_index, 0)
+
+    def test_sync_inventory_table_selection_none_does_not_fire_selection_handler(self) -> None:
+        window = MainWindow(user_id=1)
+        window.inventory_table.setRowCount(3)
+        window.inventory_table.setColumnCount(1)
+        for row in range(3):
+            item = QTableWidgetItem(f"SKU-{row:03d}")
+            item.setData(Qt.ItemDataRole.UserRole, row + 1)
+            window.inventory_table.setItem(row, 0, item)
+        window.inventory_variant_combo.addItem("SKU-001", 1)
+        window.inventory_variant_combo.addItem("SKU-002", 2)
+        window.inventory_variant_combo.addItem("SKU-003", 3)
+        window.inventory_variant_combo.setCurrentIndex(-1)
+
+        handler_calls: list[object] = []
+        original = window._handle_inventory_table_selection
+        window._handle_inventory_table_selection = lambda: handler_calls.append(True) or original()  # type: ignore[method-assign]
+
+        window._sync_inventory_table_selection(None)
+
+        self.assertEqual(handler_calls, [], "_handle_inventory_table_selection no debe dispararse")
+        self.assertEqual(window.inventory_variant_combo.currentIndex(), -1)
 
 
 if __name__ == "__main__":

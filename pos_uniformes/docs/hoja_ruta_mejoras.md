@@ -12,6 +12,25 @@ Registrar mejoras propuestas por operacion o producto y ubicarlas dentro del pla
 
 ## Solicitudes abiertas
 
+### 2026-04-15
+
+#### 11. API, app movil y modulo de empleadas como frente unificado
+
+- Idea:
+  Llevar la funcion actual del satelite (consulta de catalogo, precios y armado de presupuestos) a dispositivos moviles dentro de la tienda, abriendo al mismo tiempo el modulo de empleadas y una capa de API REST en la PC principal. Las tres iniciativas convergen: la API que necesita el movil es la superficie natural donde debe vivir la identidad `empleada`, y hacerlas por separado duplicaria trabajo.
+- Estado:
+  - `2026-04-15`: decision de producto tomada: el cliente movil replica el alcance actual del satelite (consulta y presupuestos), sin cobro ni inventario ni corte de caja
+  - `2026-04-15`: decision de red tomada: operacion exclusiva en Wi-Fi del local, sin exposicion a internet publico; se espera mas de 5 dispositivos moviles simultaneos
+  - `2026-04-15`: decision de arquitectura tomada: introducir FastAPI en la PC principal como unica via a PostgreSQL; los moviles no hablan directo a la base
+  - `2026-04-15`: decision de identidad tomada: `usuario` y `empleada` se mantienen separados; el login movil se hace con `QR + PIN` de empleada, no con usuario del POS
+  - `2026-04-15`: decision de cliente movil: `PWA` responsiva instalable como primera opcion, descartando nativo y React Native/Flutter en esta etapa
+  - `2026-04-15`: documento base creado en `docs/arquitectura_api_movil_y_empleadas.md` con fases ordenadas y riesgos
+  - `2026-04-15`: prerrequisito explicito: cerrar la etapa actual de estabilizacion operativa del satelite conectado antes de abrir este frente
+  - `2026-04-15`: se respeta el orden de `docs/empleadas_y_comisiones.md`: ficha y atribucion primero, analitica despues, comisiones al final
+  - `2026-04-15`: cerradas 8 decisiones de arquitectura en el documento base: alta de empleadas desde POS, borrador ligado a empleada creadora, consulta de cliente por QR sin alta desde movil, deployment Windows con `NSSM` y endpoint `/health`, gestion de dispositivos con autoregistro y revocacion desde POS, versionado `/api/v1/` con contrato de errores uniforme, reportes actuales se extienden sin modificarse, satelite desktop y POS no migran a la API en v1
+  - `2026-04-15`: ajuste de UX de login movil: listbox de empleadas activas + PIN en lugar de escaneo obligatorio de QR; el QR queda como alternativa futura opcional
+  - `2026-04-15`: descubrimiento al revisar el POS: el modelo `Empleada` y `services/employee_identity_service.py` ya estan implementados con alta/edicion/PIN/QR restringidos a ADMIN; la Etapa 1 queda reducida a agregar `seller_employee_id` en `venta` y `presupuesto` y su migracion Alembic
+
 ### 2026-04-11
 
 #### 10. Satelite operativo de consulta con cache local futuro

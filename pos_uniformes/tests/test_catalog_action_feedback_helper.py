@@ -8,6 +8,8 @@ from pos_uniformes.ui.helpers.catalog_action_feedback_helper import (
     build_catalog_delete_confirmation,
     build_catalog_error_title,
     build_catalog_success_result,
+    build_product_delete_label,
+    build_variant_delete_label,
 )
 
 
@@ -54,6 +56,40 @@ class CatalogActionFeedbackHelperTests(unittest.TestCase):
                 action_key="otra",
                 item_label="X",
             )
+
+
+    def test_build_variant_delete_label_includes_product_talla_color_stock_precio(self) -> None:
+        row = {
+            "sku": "SKU-007",
+            "producto_nombre": "Pants Deportivo",
+            "talla": "14",
+            "color": "Azul",
+            "stock_actual": 5,
+            "precio_venta": "150.00",
+        }
+        label = build_variant_delete_label(row)
+        self.assertIn("SKU-007", label)
+        self.assertIn("Pants Deportivo", label)
+        self.assertIn("14", label)
+        self.assertIn("Azul", label)
+        self.assertIn("Stock: 5", label)
+        self.assertIn("150.00", label)
+
+    def test_build_variant_delete_label_handles_missing_optional_fields(self) -> None:
+        row = {"sku": "SKU-001"}
+        label = build_variant_delete_label(row)
+        self.assertIn("SKU-001", label)
+
+    def test_build_product_delete_label_includes_brand(self) -> None:
+        row = {"producto_nombre": "Playera Oficial", "marca_nombre": "Marca Norte"}
+        label = build_product_delete_label(row)
+        self.assertIn("Playera Oficial", label)
+        self.assertIn("Marca Norte", label)
+
+    def test_build_product_delete_label_without_brand(self) -> None:
+        row = {"producto_nombre": "Playera Oficial", "marca_nombre": ""}
+        label = build_product_delete_label(row)
+        self.assertEqual(label, "Playera Oficial")
 
 
 if __name__ == "__main__":
