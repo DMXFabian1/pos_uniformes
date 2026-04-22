@@ -49,6 +49,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
                 duplicate_filter="fallback_exclude",
                 conteo_filter="",
                 precio_filter="",
+                precio_text_filter="",
             ),
             search_matcher=lambda _row, search_text: search_text == "sku",
         )
@@ -93,6 +94,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
                 duplicate_filter="",
                 conteo_filter="",
                 precio_filter="",
+                precio_text_filter="",
             ),
             search_matcher=lambda *_args: True,
         )
@@ -156,6 +158,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
                 duplicate_filter="fallback_exclude",
                 conteo_filter="",
                 precio_filter="",
+                precio_text_filter="",
             ),
             search_matcher=lambda row, search_text: str(row["sku"]).lower() == search_text,
         )
@@ -201,6 +204,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
                 duplicate_filter="",
                 conteo_filter="",
                 precio_filter="",
+                precio_text_filter="",
             ),
             search_matcher=search_matcher,
         )
@@ -252,6 +256,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
                     duplicate_filter="",
                     conteo_filter="",
                     precio_filter="",
+                    precio_text_filter="",
                 ),
                 search_matcher=lambda *_args: True,
             )
@@ -276,6 +281,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
                     duplicate_filter="",
                     conteo_filter="",
                     precio_filter="",
+                    precio_text_filter="",
                 ),
                 search_matcher=lambda *_args: True,
             )
@@ -300,6 +306,7 @@ class InventoryFilterHelperTests(unittest.TestCase):
                     duplicate_filter="",
                     conteo_filter="",
                     precio_filter="",
+                    precio_text_filter="",
                 ),
                 search_matcher=lambda *_args: True,
             )

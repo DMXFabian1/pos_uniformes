@@ -282,6 +282,8 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_origin_filter_combo.setObjectName("inventoryFilterCombo")
     window.inventory_duplicate_filter_combo.setObjectName("inventoryFilterCombo")
     window.inventory_precio_filter_combo.setObjectName("inventoryFilterCombo")
+    window.inventory_precio_text_input.setObjectName("inventoryFilterCombo")
+    window.inventory_precio_text_input.setPlaceholderText("Precio exacto...")
     window.inventory_clear_filters_button.setObjectName("secondaryButton")
     window.inventory_use_filter_combo.clear()
     window.inventory_use_filter_combo.addItem("Uso: todos", "")
@@ -339,6 +341,7 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     filters_row.addWidget(window.inventory_duplicate_filter_combo, 2, 4)
     filters_row.addWidget(window.inventory_precio_filter_combo, 2, 5)
     filters_row.addWidget(window.inventory_conteo_filter_combo, 2, 6)
+    filters_row.addWidget(window.inventory_precio_text_input, 3, 5)
     filters_row.setColumnStretch(0, 1)
     filters_row.setColumnStretch(1, 1)
     filters_row.setColumnStretch(2, 1)
@@ -415,6 +418,9 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     )
     window.inventory_precio_filter_combo.currentIndexChanged.connect(
         lambda _: window._handle_inventory_filters_changed_reset_page()
+    )
+    window.inventory_precio_text_input.textChanged.connect(
+        lambda _: window._schedule_inventory_filter_refresh_reset_page()
     )
     window.inventory_clear_filters_button.clicked.connect(window._handle_clear_inventory_filters)
     window.inventory_previous_page_button.clicked.connect(window._handle_inventory_previous_page)
