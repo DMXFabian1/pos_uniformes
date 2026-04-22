@@ -11252,9 +11252,13 @@ class MainWindow(QMainWindow):
 
     @staticmethod
     def _set_combo_value(combo: QComboBox, value: object) -> None:
+        if value is None:
+            return
         index = combo.findData(value)
         if index >= 0:
             combo.setCurrentIndex(index)
+        else:
+            combo.setCurrentIndex(-1)
 
     @staticmethod
     def _populate_combo(combo: QComboBox, items: list[tuple[str, int]]) -> None:

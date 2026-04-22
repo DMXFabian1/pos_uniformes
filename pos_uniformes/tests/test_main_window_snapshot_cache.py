@@ -1734,6 +1734,40 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         warn_mock.assert_called_once()
         create_mock.assert_not_called()
 
+    def test_set_combo_value_selects_matching_item(self) -> None:
+        from PyQt6.QtWidgets import QComboBox
+        combo = QComboBox()
+        combo.addItem("Alfa", 1)
+        combo.addItem("Beta", 2)
+        combo.addItem("Gamma", 3)
+        combo.setCurrentIndex(0)
+
+        MainWindow._set_combo_value(combo, 2)
+
+        self.assertEqual(combo.currentData(), 2)
+
+    def test_set_combo_value_clears_when_value_not_found(self) -> None:
+        from PyQt6.QtWidgets import QComboBox
+        combo = QComboBox()
+        combo.addItem("Alfa", 1)
+        combo.addItem("Beta", 2)
+        combo.setCurrentIndex(0)
+
+        MainWindow._set_combo_value(combo, 99)
+
+        self.assertEqual(combo.currentIndex(), -1)
+
+    def test_set_combo_value_leaves_combo_unchanged_when_value_is_none(self) -> None:
+        from PyQt6.QtWidgets import QComboBox
+        combo = QComboBox()
+        combo.addItem("Alfa", 1)
+        combo.addItem("Beta", 2)
+        combo.setCurrentIndex(1)
+
+        MainWindow._set_combo_value(combo, None)
+
+        self.assertEqual(combo.currentIndex(), 1)
+
 
 if __name__ == "__main__":
     unittest.main()
