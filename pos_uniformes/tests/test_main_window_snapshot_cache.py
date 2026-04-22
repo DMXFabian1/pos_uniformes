@@ -1670,6 +1670,25 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
                 include_stock=True,
             )
 
+    def test_context_menu_syncs_combo_to_right_clicked_row(self) -> None:
+        from PyQt6.QtCore import QPoint
+        window = MainWindow(user_id=1)
+        window.inventory_table.setRowCount(2)
+        window.inventory_table.setColumnCount(1)
+        for row_idx, variant_id in [(0, 11), (1, 22)]:
+            item = QTableWidgetItem(f"SKU-{variant_id:03d}")
+            item.setData(Qt.ItemDataRole.UserRole, variant_id)
+            window.inventory_table.setItem(row_idx, 0, item)
+        window.inventory_variant_combo.addItem("SKU-011", 11)
+        window.inventory_variant_combo.addItem("SKU-022", 22)
+        window.inventory_variant_combo.setCurrentIndex(0)
+
+        with patch("pos_uniformes.ui.main_window.prompt_inventory_context_action", return_value=None):
+            pos = QPoint(0, window.inventory_table.rowViewportPosition(1))
+            window._show_inventory_context_menu(pos)
+
+        self.assertEqual(window.inventory_variant_combo.currentData(), 22)
+
     def test_build_bulk_selection_label_shows_count_when_all_match(self) -> None:
         rows = [{"variante_id": 1}, {"variante_id": 2}]
         label = _build_bulk_selection_label([1, 2], rows)

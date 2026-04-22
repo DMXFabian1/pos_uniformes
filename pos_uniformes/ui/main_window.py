@@ -11099,6 +11099,9 @@ class MainWindow(QMainWindow):
             return
         self.inventory_table.setCurrentCell(row_index, 0)
         self.inventory_table.selectRow(row_index)
+        variant_id = self._inventory_table_variant_id_at_row(row_index)
+        if variant_id is not None:
+            self._set_combo_value(self.inventory_variant_combo, variant_id)
 
         selected = self._selected_catalog_row()
         if selected is None:
