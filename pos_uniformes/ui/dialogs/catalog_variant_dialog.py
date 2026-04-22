@@ -164,6 +164,7 @@ def build_catalog_variant_dialog(
             color_combo.setEditText(color_text)
         precio_input.setText(str(prefill["precio_venta"]))
         costo_input.setText("" if prefill.get("costo_referencia") is None else str(prefill["costo_referencia"]))
+        sku_input.setReadOnly(True)
         sku_hint.setText("Elige la nueva talla para generar el SKU.")
     elif default_product_id is not None:
         window._set_combo_value(producto_combo, default_product_id)
