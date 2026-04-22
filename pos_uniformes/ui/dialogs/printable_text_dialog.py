@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QMarginsF
-from PyQt6.QtGui import QPageLayout
+from PyQt6.QtCore import QMarginsF, QSizeF
+from PyQt6.QtGui import QPageLayout, QPageSize
 from PyQt6.QtPrintSupport import QPrintDialog, QPrinter
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QTextEdit, QVBoxLayout, QWidget
 
@@ -11,6 +11,7 @@ from pos_uniformes.database.connection import get_session
 from pos_uniformes.services.business_settings_service import BusinessSettingsService
 from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
     TICKET_HORIZONTAL_MARGIN_MM,
+    TICKET_PAPER_WIDTH_MM,
     build_ticket_document,
 )
 
@@ -47,6 +48,7 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
         if preferred_printer:
             printer.setPrinterName(preferred_printer)
         printer.setCopyCount(copies)
+        printer.setPageSize(QPageSize(QSizeF(TICKET_PAPER_WIDTH_MM, 3000.0), QPageSize.Unit.Millimeter))
         printer.setFullPage(False)
         printer.setPageMargins(
             QMarginsF(
