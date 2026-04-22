@@ -4866,7 +4866,7 @@ class MainWindow(QMainWindow):
                 f"{sku} | {producto_nombre} | stock {stock_actual}",
                 variante_id,
             )
-        self._set_combo_value(presentacion_combo, self.inventory_variant_combo.currentData())
+        self._set_combo_value(presentacion_combo, self._dialog_prefill_variant_id())
         cantidad_spin = QSpinBox()
         cantidad_spin.setRange(1, 1000)
         costo_input = QLineEdit()
@@ -4925,7 +4925,7 @@ class MainWindow(QMainWindow):
                 f"{sku} | {producto_nombre} | stock {stock_actual}",
                 variante_id,
             )
-        self._set_combo_value(presentacion_combo, self.inventory_variant_combo.currentData())
+        self._set_combo_value(presentacion_combo, self._dialog_prefill_variant_id())
         stock_actual_label = QLabel()
         stock_actual_label.setObjectName("analyticsLine")
         stock_final_spin = QSpinBox()
@@ -5868,6 +5868,8 @@ class MainWindow(QMainWindow):
         default_product_id: int | None = None,
         include_stock: bool,
     ) -> tuple[str, int] | None:
+        if initial is not None and prefill is not None:
+            raise ValueError("No se puede usar initial (editar) y prefill (duplicar) al mismo tiempo.")
         try:
             data = self._prompt_variant_data(
                 initial=initial,
@@ -11067,6 +11069,10 @@ class MainWindow(QMainWindow):
         finally:
             self.inventory_variant_combo.blockSignals(False)
         self._refresh_selected_qr_preview()
+
+    def _dialog_prefill_variant_id(self) -> int | None:
+        """Variante a pre-seleccionar en dialogs de stock/compra: siempre desde inventory_table."""
+        return self._inventory_table_variant_id_at_row(self.inventory_table.currentRow())
 
     def _selected_inventory_variant_ids(self) -> list[int]:
         return collect_selected_inventory_variant_ids(

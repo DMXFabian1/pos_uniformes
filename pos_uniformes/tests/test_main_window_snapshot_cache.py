@@ -1636,6 +1636,40 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         schedule_callback.assert_called_once()
 
 
+    def test_dialog_prefill_variant_id_reads_from_inventory_table_not_combo(self) -> None:
+        window = MainWindow(user_id=1)
+        window.inventory_table.setRowCount(1)
+        window.inventory_table.setColumnCount(1)
+        item = QTableWidgetItem("SKU-007")
+        item.setData(Qt.ItemDataRole.UserRole, 7)
+        window.inventory_table.setItem(0, 0, item)
+        window.inventory_table.blockSignals(True)
+        window.inventory_table.setCurrentCell(0, 0)
+        window.inventory_table.blockSignals(False)
+
+        result = window._dialog_prefill_variant_id()
+
+        self.assertEqual(result, 7)
+
+    def test_dialog_prefill_variant_id_returns_none_when_no_row_selected(self) -> None:
+        window = MainWindow(user_id=1)
+
+        result = window._dialog_prefill_variant_id()
+
+        self.assertIsNone(result)
+
+    def test_create_or_edit_presentation_raises_when_initial_and_prefill_both_set(self) -> None:
+        window = MainWindow(user_id=1)
+        window.current_role = RolUsuario.ADMIN
+        dummy = {"variante_id": 1, "producto_id": 1}
+
+        with self.assertRaises(ValueError):
+            window._create_or_edit_presentation(
+                initial=dummy,
+                prefill=dummy,
+                include_stock=True,
+            )
+
     def test_build_bulk_selection_label_shows_count_when_all_match(self) -> None:
         rows = [{"variante_id": 1}, {"variante_id": 2}]
         label = _build_bulk_selection_label([1, 2], rows)
