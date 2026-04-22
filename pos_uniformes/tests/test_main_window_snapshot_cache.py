@@ -1853,6 +1853,28 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
 
         self.assertEqual(window.inventory_page_index, 0)
 
+    def test_sync_inventory_table_selection_none_does_not_fire_selection_handler(self) -> None:
+        window = MainWindow(user_id=1)
+        window.inventory_table.setRowCount(3)
+        window.inventory_table.setColumnCount(1)
+        for row in range(3):
+            item = QTableWidgetItem(f"SKU-{row:03d}")
+            item.setData(Qt.ItemDataRole.UserRole, row + 1)
+            window.inventory_table.setItem(row, 0, item)
+        window.inventory_variant_combo.addItem("SKU-001", 1)
+        window.inventory_variant_combo.addItem("SKU-002", 2)
+        window.inventory_variant_combo.addItem("SKU-003", 3)
+        window.inventory_variant_combo.setCurrentIndex(-1)
+
+        handler_calls: list[object] = []
+        original = window._handle_inventory_table_selection
+        window._handle_inventory_table_selection = lambda: handler_calls.append(True) or original()  # type: ignore[method-assign]
+
+        window._sync_inventory_table_selection(None)
+
+        self.assertEqual(handler_calls, [], "_handle_inventory_table_selection no debe dispararse")
+        self.assertEqual(window.inventory_variant_combo.currentIndex(), -1)
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -11142,7 +11142,11 @@ class MainWindow(QMainWindow):
 
     def _sync_inventory_table_selection(self, variant_id: object) -> None:
         if variant_id is None:
-            self.inventory_table.clearSelection()
+            self.inventory_table.blockSignals(True)
+            try:
+                self.inventory_table.clearSelection()
+            finally:
+                self.inventory_table.blockSignals(False)
             return
         row_variant_ids = [
             self._inventory_table_variant_id_at_row(row_index)
