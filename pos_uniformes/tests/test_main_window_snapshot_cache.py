@@ -22,6 +22,7 @@ from pos_uniformes.ui.main_window import (
     MainWindow,
     MultiSelectPickerButton,
     _TableSpinTabNavigator,
+    _build_bulk_selection_label,
     _catalog_toggle_feedback_action,
 )
 
@@ -1634,6 +1635,22 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertEqual(window.catalog_page_index, 0)
         schedule_callback.assert_called_once()
 
+
+    def test_build_bulk_selection_label_shows_count_when_all_match(self) -> None:
+        rows = [{"variante_id": 1}, {"variante_id": 2}]
+        label = _build_bulk_selection_label([1, 2], rows)
+        self.assertEqual(label, "Filas seleccionadas (2)")
+
+    def test_build_bulk_selection_label_warns_when_some_filtered_out(self) -> None:
+        rows = [{"variante_id": 1}]
+        label = _build_bulk_selection_label([1, 2, 3], rows)
+        self.assertIn("1 de 3", label)
+        self.assertIn("2 no coinciden", label)
+
+    def test_build_bulk_selection_label_single_match_no_warning(self) -> None:
+        rows = [{"variante_id": 5}]
+        label = _build_bulk_selection_label([5], rows)
+        self.assertEqual(label, "Filas seleccionadas (1)")
 
     def test_duplicate_variant_warns_when_inventory_table_has_no_selection(self) -> None:
         window = MainWindow(user_id=1)

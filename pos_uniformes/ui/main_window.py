@@ -1139,6 +1139,14 @@ PRODUCT_TEMPLATES = [
 UNIFORM_MACRO_TYPES = ["Deportivo", "Oficial", "Basico", "Escolta", "Accesorio"]
 
 
+def _build_bulk_selection_label(selected_ids: list[int], matched_rows: list[dict[str, object]]) -> str:
+    matched = len(matched_rows)
+    total = len(selected_ids)
+    if total > matched:
+        return f"Filas seleccionadas ({matched} de {total} — {total - matched} no coinciden con el filtro actual)"
+    return f"Filas seleccionadas ({matched})"
+
+
 class MainWindow(QMainWindow):
     def __init__(self, user_id: int) -> None:
         super().__init__()
@@ -5020,7 +5028,7 @@ class MainWindow(QMainWindow):
         if selected_ids:
             selected_rows = [row for row in filtered_rows if int(row["variante_id"]) in set(selected_ids)]
             source_options.append(
-                (f"Filas seleccionadas ({len(selected_rows)})", "SELECCION", selected_rows)
+                (_build_bulk_selection_label(selected_ids, selected_rows), "SELECCION", selected_rows)
             )
         if filtered_rows:
             source_options.append(
