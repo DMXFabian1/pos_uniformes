@@ -11018,19 +11018,19 @@ class MainWindow(QMainWindow):
 
     def _selected_catalog_row(self) -> dict[str, object] | None:
         inventory_variant_id = self._inventory_table_variant_id_at_row(self.inventory_table.currentRow())
+        if inventory_variant_id is None:
+            # Sin selección en inventario → usar la tabla de catálogo (pestaña Catálogo).
+            return resolve_catalog_row(self.catalog_rows, self.catalog_table.currentRow())
         selected_from_inventory = find_catalog_row_by_variant_id(
             self.catalog_filtered_rows,
             inventory_variant_id,
         )
         if selected_from_inventory is not None:
             return selected_from_inventory
-        selected_from_snapshot = find_catalog_row_by_variant_id(
+        return find_catalog_row_by_variant_id(
             self._load_catalog_snapshot_rows(),
             inventory_variant_id,
         )
-        if selected_from_snapshot is not None:
-            return selected_from_snapshot
-        return resolve_catalog_row(self.catalog_rows, self.catalog_table.currentRow())
 
     def _handle_inventory_table_selection(self) -> None:
         variant_id = self._inventory_table_variant_id_at_row(self.inventory_table.currentRow())

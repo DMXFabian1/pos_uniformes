@@ -41,6 +41,33 @@ class InventorySelectionHelperTests(unittest.TestCase):
 
         self.assertEqual(selected, {"variante_id": 8, "sku": "SKU-008"})
 
+    def test_resolve_selected_catalog_row_returns_none_when_inventory_variant_not_found(self) -> None:
+        catalog_rows = [
+            {"variante_id": 7, "sku": "SKU-007"},
+            {"variante_id": 8, "sku": "SKU-008"},
+        ]
+
+        selected = resolve_selected_catalog_row(
+            inventory_variant_id=99,
+            catalog_table_row=0,
+            catalog_rows=catalog_rows,
+        )
+
+        self.assertIsNone(selected)
+
+    def test_resolve_selected_catalog_row_does_not_fall_back_when_inventory_id_present(self) -> None:
+        catalog_rows = [
+            {"variante_id": 7, "sku": "SKU-007"},
+        ]
+
+        selected = resolve_selected_catalog_row(
+            inventory_variant_id=99,
+            catalog_table_row=0,
+            catalog_rows=catalog_rows,
+        )
+
+        self.assertIsNone(selected, "Con inventory_variant_id no None no debe usarse catalog_table_row")
+
     def test_find_catalog_row_by_variant_id_returns_none_for_unknown_variant(self) -> None:
         selected = find_catalog_row_by_variant_id(
             [{"variante_id": 7, "sku": "SKU-007"}],
