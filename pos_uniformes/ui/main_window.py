@@ -343,6 +343,8 @@ from pos_uniformes.ui.helpers.catalog_action_feedback_helper import (
     build_catalog_delete_confirmation,
     build_catalog_error_title,
     build_catalog_success_result,
+    build_product_delete_label,
+    build_variant_delete_label,
 )
 from pos_uniformes.ui.helpers.catalog_filter_helper import (
     CatalogVisibleFilterState,
@@ -6445,7 +6447,7 @@ class MainWindow(QMainWindow):
         product_name = str(selected["producto_nombre"])
         confirmation_view = build_catalog_delete_confirmation(
             action_key="delete_product",
-            item_label=product_name,
+            item_label=build_product_delete_label(selected),
         )
         confirmation = QMessageBox.question(self, confirmation_view.title, confirmation_view.message)
         if confirmation != QMessageBox.StandardButton.Yes:
@@ -6485,7 +6487,7 @@ class MainWindow(QMainWindow):
         sku = str(selected["sku"])
         confirmation_view = build_catalog_delete_confirmation(
             action_key="delete_variant",
-            item_label=sku,
+            item_label=build_variant_delete_label(selected),
         )
         confirmation = QMessageBox.question(self, confirmation_view.title, confirmation_view.message)
         if confirmation != QMessageBox.StandardButton.Yes:

@@ -17,6 +17,28 @@ class CatalogResultView:
     message: str
 
 
+def build_variant_delete_label(row: dict[str, object]) -> str:
+    sku = str(row.get("sku") or "")
+    producto = str(row.get("producto_nombre") or "")
+    talla = str(row.get("talla") or "")
+    color = str(row.get("color") or "")
+    stock = row.get("stock_actual")
+    precio = row.get("precio_venta")
+    parts = [p for p in (producto, talla, color) if p]
+    label = f"{sku} — {' | '.join(parts)}" if parts else sku
+    if stock is not None:
+        label += f" — Stock: {stock}"
+    if precio is not None:
+        label += f" — ${precio}"
+    return label
+
+
+def build_product_delete_label(row: dict[str, object]) -> str:
+    nombre = str(row.get("producto_nombre") or "")
+    marca = str(row.get("marca_nombre") or "")
+    return f"{nombre} ({marca})" if marca else nombre
+
+
 def build_catalog_delete_confirmation(
     *,
     action_key: str,
