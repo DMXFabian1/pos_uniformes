@@ -6195,9 +6195,17 @@ class MainWindow(QMainWindow):
         if self.current_role != RolUsuario.ADMIN:
             QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede crear presentaciones.")
             return
+        inventory_variant_id = self._inventory_table_variant_id_at_row(self.inventory_table.currentRow())
+        if inventory_variant_id is None:
+            QMessageBox.warning(
+                self,
+                "Sin seleccion",
+                "Selecciona una presentacion en la tabla de inventario para duplicar.",
+            )
+            return
         selected = self._selected_catalog_row()
         if selected is None:
-            QMessageBox.warning(self, "Sin seleccion", "Selecciona una presentacion para duplicar.")
+            QMessageBox.warning(self, "Presentacion no encontrada", "No se pudo cargar la presentacion seleccionada.")
             return
         result = self._create_or_edit_presentation(
             prefill=selected,

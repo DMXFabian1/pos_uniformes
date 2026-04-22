@@ -1635,5 +1635,35 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         schedule_callback.assert_called_once()
 
 
+    def test_duplicate_variant_warns_when_inventory_table_has_no_selection(self) -> None:
+        window = MainWindow(user_id=1)
+        window.current_role = RolUsuario.ADMIN
+
+        with patch("pos_uniformes.ui.main_window.QMessageBox.warning") as warn_mock, \
+             patch.object(window, "_create_or_edit_presentation") as create_mock:
+            window._handle_duplicate_variant()
+
+        warn_mock.assert_called_once()
+        self.assertIn("inventario", warn_mock.call_args[0][2].lower())
+        create_mock.assert_not_called()
+
+    def test_duplicate_variant_warns_when_only_catalog_table_has_selection(self) -> None:
+        window = MainWindow(user_id=1)
+        window.current_role = RolUsuario.ADMIN
+        window.catalog_rows = [{"variante_id": 7, "sku": "SKU-007", "producto_id": 1}]
+        window.catalog_table.setRowCount(1)
+        window.catalog_table.setColumnCount(1)
+        window.catalog_table.blockSignals(True)
+        window.catalog_table.setCurrentCell(0, 0)
+        window.catalog_table.blockSignals(False)
+
+        with patch("pos_uniformes.ui.main_window.QMessageBox.warning") as warn_mock, \
+             patch.object(window, "_create_or_edit_presentation") as create_mock:
+            window._handle_duplicate_variant()
+
+        warn_mock.assert_called_once()
+        create_mock.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
