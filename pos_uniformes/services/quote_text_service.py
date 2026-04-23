@@ -7,7 +7,7 @@ from textwrap import wrap
 
 from pos_uniformes.utils.date_format import format_display_date, format_display_datetime
 
-QUOTE_TERMS_WRAP_WIDTH = 38
+QUOTE_TERMS_WRAP_WIDTH = 42
 
 DEFAULT_QUOTE_TERMS_LINES = (
     "1. Validez del Presupuesto",
@@ -36,7 +36,7 @@ def build_quote_text(
     lines = [
         business_name or "POS Uniformes",
         "Presupuesto",
-        "=" * 40,
+        "=" * 42,
         f"Folio: {quote.folio}",
         f"Estado: {quote.estado.value}",
         f"Cliente: {quote.cliente_nombre or (quote.cliente.nombre if quote.cliente else 'Mostrador / sin cliente')}",
@@ -54,7 +54,7 @@ def build_quote_text(
     if business_address:
         lines.append(f"Direccion: {business_address}")
 
-    lines.append("-" * 40)
+    lines.append("-" * 42)
     lines.append("Piezas")
     for detail in quote.detalles:
         subtotal = Decimal(detail.subtotal_linea).quantize(Decimal("0.01"))
@@ -68,7 +68,7 @@ def build_quote_text(
     if lines and lines[-1] == "":
         lines.pop()
 
-    lines.append("-" * 40)
+    lines.append("-" * 42)
     lines.append(f"Total estimado: {Decimal(quote.total).quantize(Decimal('0.01'))}")
     if quote.observacion:
         lines.append("Observaciones:")
