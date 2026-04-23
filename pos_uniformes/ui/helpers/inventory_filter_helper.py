@@ -12,6 +12,7 @@ from pos_uniformes.ui.helpers.listing_visibility_helper import (
     matches_origin_legacy,
     matches_selected_values,
 )
+from pos_uniformes.utils.text_normalization import normalize_text as _normalize_text
 
 
 @dataclass(frozen=True)
@@ -160,7 +161,3 @@ def _matches_inventory_qr_filter(qr_exists: bool, qr_filter: str) -> bool:
     )
 
 
-def _normalize_text(raw_value: object) -> str:
-    if raw_value is None:
-        return ""
-    return str(raw_value).strip().lower()

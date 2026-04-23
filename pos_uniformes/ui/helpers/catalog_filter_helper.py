@@ -12,6 +12,7 @@ from pos_uniformes.ui.helpers.listing_visibility_helper import (
     matches_origin_legacy,
     matches_selected_values,
 )
+from pos_uniformes.utils.text_normalization import normalize_text as _normalize_text
 
 
 @dataclass(frozen=True)
@@ -112,8 +113,3 @@ def _matches_catalog_school_scope(categoria_nombre: str, school_scope_filter: st
         or (school_scope_filter == "general_only" and normalized_category and not is_uniform_category)
     )
 
-
-def _normalize_text(raw_value: object) -> str:
-    if raw_value is None:
-        return ""
-    return str(raw_value).strip().lower()

@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
-import unicodedata
 
 from pos_uniformes.ui.helpers.catalog_product_form_mode_helper import REGULAR_CATEGORY_EXCLUSION_SET
+from pos_uniformes.utils.text_normalization import normalize_text_unicode as _normalize_text
 
 
 @dataclass(frozen=True)
@@ -863,9 +863,6 @@ def _segment_row_label(segment_key: str, gender_key: str) -> str:
     return _segment_label(segment_key)
 
 
-def _normalize_text(value: object) -> str:
-    normalized = unicodedata.normalize("NFKD", str(value or "").strip().lower())
-    return "".join(character for character in normalized if not unicodedata.combining(character))
 
 
 def _classify_line_type(row: dict[str, object]) -> str:

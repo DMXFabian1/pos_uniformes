@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pos_uniformes.utils.text_normalization import normalize_text as _normalize_text
+
 
 UNIFORM_CATEGORIES = {
     "uniformes",
@@ -222,7 +224,3 @@ def build_catalog_product_form_mode_view(mode_key: str) -> CatalogProductFormMod
     )
 
 
-def _normalize_text(raw_value: object) -> str:
-    if raw_value is None:
-        return ""
-    return str(raw_value).strip().lower()

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Callable
-import unicodedata
 
 from PyQt6.QtWidgets import QInputDialog, QMessageBox, QWidget
 from sqlalchemy import select
@@ -17,6 +16,7 @@ from pos_uniformes.services.sports_uniform_size_service import (
     build_sports_uniform_size_hint,
 )
 from pos_uniformes.services.venta_service import VentaService
+from pos_uniformes.utils.text_normalization import normalize_text_unicode as _normalize_text
 
 _TWO_PIECE_PATTERNS = ("2pz", "2 pz", "2 piezas", "dos piezas", "conjunto 2", "set 2")
 _SPORT_PATTERNS = ("deportivo", "deporte")
@@ -316,11 +316,6 @@ def _variant_searchable_text(variante) -> str:
             _normalize_text(getattr(getattr(product, "tipo_pieza", None), "nombre", "")),
         ]
     )
-
-
-def _normalize_text(value: object) -> str:
-    normalized = unicodedata.normalize("NFKD", str(value or "").strip().lower())
-    return "".join(character for character in normalized if not unicodedata.combining(character))
 
 
 def _contains_any(text: str, patterns: tuple[str, ...]) -> bool:
