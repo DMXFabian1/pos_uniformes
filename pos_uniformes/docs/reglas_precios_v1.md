@@ -84,7 +84,8 @@ Aplicar por `tipo_pieza='Suéter'`, `tipo_prenda='Oficial'`, `nivel_educativo` y
 | Preescolar | `4, 6, 8, 10` | 290 |
 | Primaria | `4, 6, 8, 10` | 290 |
 | Primaria | `12, 14, 16` | 315 |
-| Primaria | `30, 32, 34, 36, 38, 40, 42` | 325 |
+| Primaria | `30, 32, 34, 36, 38` | 325 |
+| Primaria | `40, 42` | 335 |
 | Secundaria | `12, 14, 16` | 325 |
 | Secundaria | `30, 32, 34, 36, 38, 40, 42, 44` | 345 |
 | Bachillerato | `14, 16` | 325 |
@@ -206,11 +207,7 @@ Aplicar por `tipo_pieza='Chaleco'`, `tipo_prenda='Oficial'`, `nivel_educativo` y
 
 Nota:
 
-- Si aparece `Huizache` sin `nivel_educativo`, normalizarlo como `Chaleco Oficial Primaria`:
-- `6, 8` -> 240
-- `10, 12` -> 245
-- `14, 16` -> 250
-- `34, 36` -> 270
+- `Huizache` se maneja como escuela con precios propios (no es excepción): `6, 8` → 240; `10, 12` → 245; `14, 16` → 250; `34, 36` → 270.
 - Excepciones activas detectadas en `Primaria`: `Albino García Ramos`, `Francisco Villa`, `Justo Sierra`, `Miguel Campuzano` y `Miguel Hidalgo`.
 
 ## 6. Faldas

@@ -24,7 +24,8 @@
 |---|---:|
 | `4, 6, 8, 10` | 290 |
 | `12, 14, 16` | 315 |
-| `30, 32, 34, 36, 38, 40, 42` | 325 |
+| `30, 32, 34, 36, 38` | 325 |
+| `40, 42` | 335 |
 
 ### Oficial Secundaria
 
@@ -44,22 +45,6 @@
 
 ## Excepciones activas
 
-### Preescolar
-
-| Escuela | Tallas | Precio |
-|---|---|---:|
-| `Margarita Paz Paredes` | `4, 6, 8, 10` | 315 |
-
-### Primaria
-
-| Escuela | Tallas | Precio |
-|---|---|---:|
-| `Benito Juárez` | `40, 42` | 335 |
-| `Colegio Motolinea` | `40` | 335 |
-| `Francisco Villa` | `40` | 335 |
-| `Ignacio Allende` | `40` | 335 |
-| `Miguel Hidalgo` | `40, 42` | 335 |
-
 ### Bachillerato
 
 | Escuela | Tallas | Precio |
@@ -69,5 +54,5 @@
 ## Nota
 
 - `Suéter Oferta Ad hoc Talla Uni` se maneja aparte en 199.
-- Si una escuela aparece en excepciones, respetar ese precio.
+- Oficial Primaria 40-42 aplica a toda escuela salvo excepción registrada.
 - Si una prenda ya tiene precio mayor marcado, se respeta.

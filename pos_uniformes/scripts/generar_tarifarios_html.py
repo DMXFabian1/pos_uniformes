@@ -325,21 +325,17 @@ def build_sueteres():
         block("Oficial Preescolar", ["Tallas", "Precio"],
               [["4, 6, 8, 10","$290"]]),
         block("Oficial Primaria", ["Tallas", "Precio"],
-              [["4, 6, 8, 10","$290"],["12, 14, 16","$315"],["30 – 42","$325"]]),
+              [["4, 6, 8, 10","$290"],["12, 14, 16","$315"],["30 – 38","$325"],["40, 42","$335"]]),
         block("Oficial Secundaria", ["Tallas", "Precio"],
               [["12, 14, 16","$325"],["30 – 44","$345"]]),
         block("Oficial Bachillerato", ["Tallas", "Precio"],
               [["14, 16","$325"],["32, 34","$335"],["36, 38","$345"],["40, 42, 44","$355"]]),
-    ) + divider("Excepciones activas") + grid(2,
-        block("Primaria", ["Escuela", "Tallas", "Precio"],
-              [["Benito Juárez","40, 42","$335"],["Colegio Motolinea","40","$335"],
-               ["Francisco Villa","40","$335"],["Ignacio Allende","40","$335"],
-               ["Miguel Hidalgo","40, 42","$335"]], exc=True),
+    ) + divider("Excepciones activas") + grid(1,
         block("Bachillerato", ["Escuela", "Tallas", "Precio"],
               [["UVEG","14, 16, 32–42","$355"]], exc=True),
     ) + notes(
         "Suéter Oferta Ad hoc Talla Uni se maneja aparte a $199.",
-        "Si una escuela aparece en excepciones, respetar ese precio.",
+        "Oficial Primaria 40-42 aplica a toda escuela salvo excepción registrada.",
     )
     return page("Suéteres", "Suéteres", RULE, body)
 
@@ -374,13 +370,12 @@ def build_chalecos():
               [["12, 14, 16","$245"],["30, 32, 34","$265"],["36 – 44","$275"]]),
         block("SABES (Bachillerato)", ["Tallas", "Precio"],
               [["14, 16","$285"],["32 – 42","$285"],["44","$295"]]),
-    ) + divider("Notas por escuela") + grid(2,
+    ) + divider("Precios por escuela") + grid(2,
         block("Colegio Motolinea", ["Tallas", "Precio"],
               [["4, 6, 8","$240"],["10, 12","$250"],["14, 16","$260"],
                ["CH, MD, GD, EXG","$270"]]),
-        block("Excepciones activas", ["Escuela", "Tallas", "Precio"],
-              [["Huizache","6, 8","$240"],["Huizache","10, 12","$245"],
-               ["Huizache","14, 16","$250"],["Huizache","34, 36","$270"]], exc=True),
+        block("Huizache", ["Tallas", "Precio"],
+              [["6, 8","$240"],["10, 12","$245"],["14, 16","$250"],["34, 36","$270"]]),
     )
     return page("Chalecos", "Chalecos", RULE, body)
 
