@@ -111,11 +111,11 @@ class Settings:
             db_name=env_value("POS_UNIFORMES_DB_NAME", "pos_uniformes"),
             db_user=env_value("POS_UNIFORMES_DB_USER", "postgres"),
             db_password=env_value("POS_UNIFORMES_DB_PASSWORD", "postgres"),
-            db_echo=_to_bool(os.getenv("POS_UNIFORMES_DB_ECHO", file_overrides.get("POS_UNIFORMES_DB_ECHO")), default=False),
+            db_echo=_to_bool(os.getenv("POS_UNIFORMES_DB_ECHO", str(file_overrides.get("POS_UNIFORMES_DB_ECHO") or "")), default=False),
             auto_create_schema=_to_bool(
                 os.getenv(
                     "POS_UNIFORMES_AUTO_CREATE_SCHEMA",
-                    file_overrides.get("POS_UNIFORMES_AUTO_CREATE_SCHEMA"),
+                    str(file_overrides.get("POS_UNIFORMES_AUTO_CREATE_SCHEMA") or ""),
                 ),
                 default=False,
             ),

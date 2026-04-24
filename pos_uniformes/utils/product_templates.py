@@ -392,7 +392,7 @@ def build_product_template_preview(template_entry: dict[str, object]) -> str:
         omitted = [
             label
             for key, label in _OMIT_LABELS.items()
-            if bool((template_entry.get("omitir") or {}).get(key))
+            if bool((_omitir := template_entry.get("omitir")) and isinstance(_omitir, dict) and _omitir.get(key))
         ]
         title = f"Legacy | {str(template_entry.get('name') or '').strip() or '-'}"
         primary_parts = [

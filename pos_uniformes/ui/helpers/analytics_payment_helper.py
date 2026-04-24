@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from decimal import Decimal
+from typing import Any
 
 
 @dataclass(frozen=True)
@@ -14,7 +15,7 @@ class AnalyticsPaymentRowView:
     row_tone: str | None
 
 
-def build_analytics_payment_rows(sales: list[object]) -> tuple[AnalyticsPaymentRowView, ...]:
+def build_analytics_payment_rows(sales: list[Any]) -> tuple[AnalyticsPaymentRowView, ...]:
     payment_buckets: dict[str, dict[str, Decimal | int]] = {
         "Efectivo": {"count": 0, "amount": Decimal("0.00")},
         "Tarjeta": {"count": 0, "amount": Decimal("0.00")},

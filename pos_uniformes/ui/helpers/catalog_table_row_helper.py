@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
+from pos_uniformes.utils.stock_tone_helper import resolve_stock_tone
+
 
 @dataclass(frozen=True)
 class CatalogTableRowView:
@@ -23,7 +25,7 @@ def build_catalog_table_row_view(row: dict[str, object]) -> CatalogTableRowView:
     stock_value = int(row["stock_actual"])
     committed_value = int(row["apartado_cantidad"])
     is_active = bool(row["variante_activo"])
-    stock_tone = "danger" if stock_value == 0 else "warning" if stock_value <= 3 else "positive"
+    stock_tone = resolve_stock_tone(stock_value)
     return CatalogTableRowView(
         variant_id=int(row["variante_id"]),
         values=(

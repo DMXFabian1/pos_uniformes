@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from pos_uniformes.utils.product_name import sanitize_product_display_name
+from pos_uniformes.utils.stock_tone_helper import resolve_row_tone_from_stock, resolve_stock_tone
 
 
 @dataclass(frozen=True)
@@ -31,10 +32,10 @@ def build_analytics_stock_row_views(rows: list[object] | tuple[object, ...]) -> 
                     reserved_value,
                     "ACTIVA" if is_active else "INACTIVA",
                 ),
-                stock_tone="danger" if stock_value == 0 else "warning" if stock_value <= 3 else "positive",
+                stock_tone=resolve_stock_tone(stock_value),
                 reserved_tone="reserved" if reserved_value > 0 else "muted",
                 state_tone="positive" if is_active else "muted",
-                row_tone="danger" if stock_value == 0 else "warning" if stock_value <= 3 else None,
+                row_tone=resolve_row_tone_from_stock(stock_value),
             )
         )
     return tuple(row_views)

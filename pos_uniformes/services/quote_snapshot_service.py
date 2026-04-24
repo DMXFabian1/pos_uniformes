@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from decimal import Decimal
 
 from pos_uniformes.utils.date_format import format_display_date, format_display_datetime
@@ -17,6 +18,7 @@ class QuoteSnapshotRow:
     total: Decimal
     username: str
     validity_label: str
+    vigencia_hasta_raw: datetime | None
     created_at_label: str
     searchable: str
 
@@ -36,6 +38,7 @@ def load_quote_snapshot_rows(session, *, limit: int = 200) -> tuple[QuoteSnapsho
             total=Decimal(quote.total),
             username=str(quote.usuario.username if quote.usuario else ""),
             validity_label=format_display_date(quote.vigencia_hasta, empty="Sin vigencia"),
+            vigencia_hasta_raw=quote.vigencia_hasta,
             created_at_label=format_display_datetime(quote.created_at),
             searchable=" ".join(
                 [
@@ -60,6 +63,7 @@ def build_quote_history_input_rows(rows: list[QuoteSnapshotRow] | tuple[QuoteSna
             "total": row.total,
             "usuario": row.username,
             "vigencia": row.validity_label,
+            "vigencia_raw": row.vigencia_hasta_raw,
             "fecha": row.created_at_label,
             "searchable": row.searchable,
         }

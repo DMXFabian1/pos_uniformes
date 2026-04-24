@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from decimal import Decimal
 
 from pos_uniformes.utils.product_name import sanitize_product_display_name
+from pos_uniformes.utils.stock_tone_helper import resolve_stock_tone
 
 
 @dataclass(frozen=True)
@@ -79,7 +80,7 @@ def build_inventory_overview_view(
 ) -> InventoryOverviewView:
     clean_product_name = sanitize_product_display_name(product_name)
     stock_status = "agotado" if stock_actual == 0 else "bajo" if stock_actual <= 3 else "saludable"
-    stock_tone = "danger" if stock_actual == 0 else "warning" if stock_actual <= 3 else "positive"
+    stock_tone = resolve_stock_tone(stock_actual)
     if movement_type is None or movement_quantity is None:
         last_movement_label = "Sin movimientos registrados."
     else:

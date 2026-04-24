@@ -1251,9 +1251,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self.quick_scan_input.setToolTip("Escanea codigo de cliente o SKU de producto. Empleada se integrara despues.")
         self.quick_scan_button.setObjectName("ghostButton")
         self.quick_scan_button.setText("OK")
-        self.quote_client_combo.setToolTip(
-            "El cliente se asigna al crear uno nuevo o al reanudar un borrador existente."
-        )
+        self.quote_client_combo.setEnabled(False)
+        self.quote_client_combo.setToolTip("Cliente asignado por escaneo QR. No se puede cambiar manualmente.")
 
         scan_stack = QVBoxLayout()
         scan_stack.setSpacing(4)
@@ -1270,7 +1269,7 @@ class QuoteSatelliteWindow(QMainWindow):
         form.setVerticalSpacing(8)
         form.addWidget(self._make_form_label("Folio"), 0, 0)
         form.addWidget(self.quote_folio_input, 0, 1, 1, 2)
-        form.addWidget(self._make_form_label("Cliente asignado"), 0, 3)
+        form.addWidget(self._make_form_label("Cliente (QR)"), 0, 3)
         form.addWidget(self.quote_client_combo, 0, 4, 1, 2)
         form.addWidget(self.quote_create_client_button, 0, 6)
         form.addWidget(self._make_form_label("Vigencia"), 1, 0)
@@ -1353,6 +1352,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.quote_search_input.setClearButtonEnabled(True)
         self.quote_state_combo.addItem("Estado: todos", "")
         self.quote_state_combo.addItem("Emitidos", "EMITIDO")
+        self.quote_state_combo.addItem("Vencidos", "VENCIDO")
         self.quote_state_combo.addItem("Borradores", "BORRADOR")
         self.quote_state_combo.addItem("Cancelados", "CANCELADO")
         self.quote_state_combo.addItem("Convertidos", "CONVERTIDO")

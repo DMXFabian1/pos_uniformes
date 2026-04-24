@@ -55,6 +55,7 @@ def build_dashboard_status_view(
     ventas: int,
     is_admin: bool,
 ) -> DashboardStatusView:
+    metrics_parts: tuple[str, ...]
     if is_admin:
         metrics_parts = (
             f"Usuarios: {usuarios}",

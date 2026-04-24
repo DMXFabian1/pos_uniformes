@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
+from pos_uniformes.utils.stock_tone_helper import resolve_stock_tone
+
 
 @dataclass(frozen=True)
 class InventoryTableRowView:
@@ -27,7 +29,7 @@ def build_inventory_table_row_view(row: dict[str, object]) -> InventoryTableRowV
     stock_minimo = row.get("stock_minimo")
     stock_minimo_int = int(stock_minimo) if stock_minimo is not None else None
     below_min = stock_minimo_int is not None and stock_value < stock_minimo_int
-    stock_tone = "danger" if stock_value == 0 else "warning" if (stock_value <= 3 or below_min) else "positive"
+    stock_tone = resolve_stock_tone(stock_value, stock_minimo=stock_minimo_int)
     row_tone = _build_inventory_row_tone(
         stock_value=stock_value,
         committed_value=committed_value,
@@ -39,7 +41,8 @@ def build_inventory_table_row_view(row: dict[str, object]) -> InventoryTableRowV
     status_tone = "positive" if row["variante_activa"] else "muted"
     qr_text = "Listo" if row["qr_exists"] else "Pendiente"
     qr_tone = "positive" if row["qr_exists"] else "warning"
-    conteo_text = _format_ultimo_conteo(row.get("ultimo_conteo_at"))
+    conteo_raw = row.get("ultimo_conteo_at")
+    conteo_text = _format_ultimo_conteo(conteo_raw if isinstance(conteo_raw, datetime) else None)
     return InventoryTableRowView(
         variant_id=int(row["variante_id"]),
         values=(
@@ -71,14 +74,14 @@ def _build_stock_table_text(stock_value: int, *, stock_minimo: int | None = None
     return f"{stock_value} OK"
 
 
-def _format_ultimo_conteo(ultimo_conteo_at: object) -> str:
+def _format_ultimo_conteo(ultimo_conteo_at: datetime | None) -> str:
     if ultimo_conteo_at is None:
         return "Nunca"
     try:
-        dt = ultimo_conteo_at  # type: ignore[assignment]
-        if dt.tzinfo is None:  # type: ignore[union-attr]
-            dt = dt.replace(tzinfo=timezone.utc)  # type: ignore[union-attr]
-        days = (datetime.now(tz=timezone.utc) - dt).days  # type: ignore[operator]
+        dt = ultimo_conteo_at
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=timezone.utc)
+        days = (datetime.now(tz=timezone.utc) - dt).days
         if days == 0:
             return "Hoy"
         if days == 1:

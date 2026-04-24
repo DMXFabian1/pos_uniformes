@@ -25,7 +25,7 @@ def decide_scanned_client_action(
     scanned_client_id: int | str,
     has_sale_cart: bool,
 ) -> ScannedClientDecision:
-    normalized_current = None if current_client_id in {None, ""} else int(current_client_id)
+    normalized_current = None if current_client_id in {None, ""} else int(str(current_client_id))
     normalized_scanned = int(scanned_client_id)
 
     if normalized_current == normalized_scanned:
