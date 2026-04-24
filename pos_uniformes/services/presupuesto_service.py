@@ -133,6 +133,8 @@ class PresupuestoService:
         )
         presupuesto.vigencia_hasta = vigencia_hasta
         presupuesto.observacion = (observacion or "").strip() or None
+        if estado == EstadoPresupuesto.EMITIDO and vigencia_hasta is not None and vigencia_hasta < datetime.now():
+            raise ValueError("La vigencia del presupuesto ya venció. Actualiza la fecha antes de emitir.")
         presupuesto.estado = estado
         if estado == EstadoPresupuesto.EMITIDO and presupuesto.emitido_at is None:
             presupuesto.emitido_at = datetime.now()
