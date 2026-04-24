@@ -79,10 +79,9 @@
 | `Francisco Villa` | `Camisa Oficial Primaria` | 215 / 225 / 245 |
 | `Bicentenario` | `Camisa Oficial Secundaria` | 265 |
 | `CBTIS 148` | `Camisa Oficial Bachillerato` | 265 |
-| `Conalep` | `Camisa Oficial Escolar` | 265 |
+| `Conalep` | `Camisa Oficial Bachillerato` | 265 |
 
 ## Nota
 
-- Si aparece `Camisa Manga Larga Blanca` en `265` sin `nivel_educativo`, conservar en `265`.
 - Las camisas oficiales por escuela se manejan como excepcion.
 - Si una camisa ya tiene precio mayor marcado, se respeta.
