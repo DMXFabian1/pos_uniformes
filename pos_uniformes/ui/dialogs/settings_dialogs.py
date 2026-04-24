@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
     QLabel,
     QLineEdit,
     QPushButton,
+    QTableWidget,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -963,5 +964,69 @@ def build_cash_history_settings_dialog(window: "MainWindow") -> QDialog:
     layout.addLayout(actions)
     layout.addWidget(window.settings_cash_history_table)
     layout.addWidget(movements_box)
+    layout.addWidget(close_buttons)
+    return dialog
+
+
+def build_catalog_sync_settings_dialog(window: "MainWindow") -> QDialog:
+    dialog, layout = _create_settings_dialog(
+        window,
+        "Consistencia de catálogo",
+        "Compara el catálogo SQLite (Windows) contra PostgreSQL y detecta productos nuevos, "
+        "exclusivos de Postgres y precios distintos.",
+        width=1060,
+    )
+
+    window.settings_catalog_sync_status_label.setObjectName("analyticsLine")
+
+    window.settings_catalog_sync_filter_combo.clear()
+    window.settings_catalog_sync_filter_combo.addItem("Todos", "todos")
+    window.settings_catalog_sync_filter_combo.addItem("Solo en catálogo (SQLite)", "solo_sqlite")
+    window.settings_catalog_sync_filter_combo.addItem("Solo en Postgres", "solo_postgres")
+    window.settings_catalog_sync_filter_combo.addItem("Precio distinto", "precio_distinto")
+
+    window.settings_catalog_sync_verify_button.setObjectName("toolbarPrimaryButton")
+    window.settings_catalog_sync_path_button.setObjectName("toolbarGhostButton")
+    window.settings_catalog_sync_verify_button.clicked.connect(window._handle_catalog_sync_verify)
+    window.settings_catalog_sync_path_button.clicked.connect(window._handle_catalog_sync_change_path)
+    window.settings_catalog_sync_filter_combo.currentIndexChanged.connect(
+        window._apply_catalog_sync_filter
+    )
+
+    path_row = QHBoxLayout()
+    path_row.addWidget(QLabel("Catálogo SQLite:"))
+    path_row.addWidget(window.settings_catalog_sync_path_label, stretch=1)
+    path_row.addWidget(window.settings_catalog_sync_path_button)
+
+    actions_row = QHBoxLayout()
+    actions_row.addWidget(window.settings_catalog_sync_verify_button)
+    actions_row.addWidget(QLabel("Filtrar:"))
+    actions_row.addWidget(window.settings_catalog_sync_filter_combo)
+    actions_row.addStretch()
+
+    window.settings_catalog_sync_table.setColumnCount(5)
+    window.settings_catalog_sync_table.setHorizontalHeaderLabels(
+        ["Tipo", "SKU", "Nombre", "$ Catálogo", "$ Postgres"]
+    )
+    window.settings_catalog_sync_table.setObjectName("dataTable")
+    window.settings_catalog_sync_table.verticalHeader().setVisible(False)
+    window.settings_catalog_sync_table.setSelectionBehavior(
+        window.settings_catalog_sync_table.SelectionBehavior.SelectRows
+    )
+    window.settings_catalog_sync_table.setAlternatingRowColors(True)
+    window.settings_catalog_sync_table.setMinimumHeight(340)
+    window.settings_catalog_sync_table.horizontalHeader().setStretchLastSection(True)
+    window.settings_catalog_sync_table.setEditTriggers(
+        window.settings_catalog_sync_table.EditTrigger.NoEditTriggers
+    )
+
+    close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+    close_buttons.rejected.connect(dialog.reject)
+    close_buttons.accepted.connect(dialog.accept)
+
+    layout.addLayout(path_row)
+    layout.addLayout(actions_row)
+    layout.addWidget(window.settings_catalog_sync_status_label)
+    layout.addWidget(window.settings_catalog_sync_table)
     layout.addWidget(close_buttons)
     return dialog

@@ -78,6 +78,12 @@ def build_settings_tab(window: "MainWindow") -> QWidget:
             QStyle.StandardPixmap.SP_FileDialogInfoView,
             window._open_business_settings_dialog,
         ),
+        (
+            window.settings_catalog_sync_button,
+            "Detecta inconsistencias entre el catalogo SQLite (Windows) y Postgres.",
+            QStyle.StandardPixmap.SP_FileDialogDetailedView,
+            window._open_catalog_sync_settings_dialog,
+        ),
     ]
     for index, (button, description, icon_name, handler) in enumerate(settings_buttons):
         row, column = divmod(index, 3)

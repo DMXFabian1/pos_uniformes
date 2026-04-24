@@ -293,6 +293,7 @@ from pos_uniformes.ui.dialogs.settings_dialogs import (
     build_backup_settings_dialog,
     build_business_settings_dialog,
     build_cash_history_settings_dialog,
+    build_catalog_sync_settings_dialog,
     build_clients_settings_dialog,
     build_employees_settings_dialog,
     build_marketing_settings_dialog,
@@ -1516,6 +1517,7 @@ class MainWindow(QMainWindow):
         self.settings_backup_button = QPushButton("Respaldo y restauracion")
         self.settings_cash_history_button = QPushButton("Historial de cortes")
         self.settings_business_button = QPushButton("Negocio e impresion")
+        self.settings_catalog_sync_button = QPushButton("Consistencia de catalogo")
         self.settings_users_table = QTableWidget()
         self.settings_users_status_label = QLabel("Sin usuarios cargados.")
         self.settings_create_user_button = QPushButton("Crear usuario")
@@ -1579,6 +1581,15 @@ class MainWindow(QMainWindow):
         self.settings_business_dialog: QDialog | None = None
         self.settings_marketing_dialog: QDialog | None = None
         self.settings_whatsapp_dialog: QDialog | None = None
+        self.settings_catalog_sync_dialog: QDialog | None = None
+        self.settings_catalog_sync_table = QTableWidget()
+        self.settings_catalog_sync_status_label = QLabel("Sin verificar.")
+        self.settings_catalog_sync_path_label = QLabel("")
+        self.settings_catalog_sync_filter_combo = QComboBox()
+        self.settings_catalog_sync_verify_button = QPushButton("Verificar ahora")
+        self.settings_catalog_sync_path_button = QPushButton("Cambiar ruta")
+        self.settings_catalog_sync_rows: list = []
+        self.settings_catalog_sync_sqlite_path: str = ""
         self.settings_cash_history_table = QTableWidget()
         self.settings_cash_history_movements_table = QTableWidget()
         self.settings_cash_history_status_label = QLabel("Sin cortes cargados.")
@@ -2295,6 +2306,104 @@ class MainWindow(QMainWindow):
         self.settings_backup_dialog.show()
         self.settings_backup_dialog.raise_()
         self.settings_backup_dialog.activateWindow()
+
+    def _open_catalog_sync_settings_dialog(self) -> None:
+        if self.settings_catalog_sync_dialog is None:
+            self.settings_catalog_sync_dialog = build_catalog_sync_settings_dialog(self)
+            from pos_uniformes.utils.legacy_paths import detect_legacy_sqlite_path
+            detected = detect_legacy_sqlite_path()
+            self.settings_catalog_sync_sqlite_path = str(detected)
+            self.settings_catalog_sync_path_label.setText(
+                str(detected) if detected.exists() else f"{detected}  ⚠ no encontrada"
+            )
+        self.settings_catalog_sync_dialog.show()
+        self.settings_catalog_sync_dialog.raise_()
+        self.settings_catalog_sync_dialog.activateWindow()
+
+    def _handle_catalog_sync_verify(self) -> None:
+        from pathlib import Path
+        from pos_uniformes.services.catalog_sync_service import verificar_consistencia
+        from PyQt6.QtWidgets import QTableWidgetItem
+
+        sqlite_path = Path(self.settings_catalog_sync_sqlite_path)
+        if not sqlite_path.exists():
+            self.settings_catalog_sync_status_label.setText(
+                f"No se encontró el catálogo SQLite: {sqlite_path}"
+            )
+            return
+
+        self.settings_catalog_sync_status_label.setText("Verificando…")
+        try:
+            with get_session() as session:
+                inconsistencias = verificar_consistencia(session, sqlite_path)
+        except Exception as exc:
+            self.settings_catalog_sync_status_label.setText(f"Error: {exc}")
+            return
+
+        etiquetas = {
+            "solo_sqlite": "Solo en catálogo",
+            "solo_postgres": "Solo en Postgres",
+            "precio_distinto": "Precio distinto",
+        }
+        self.settings_catalog_sync_rows = [
+            (
+                etiquetas.get(i.tipo, i.tipo),
+                i.sku,
+                i.nombre,
+                f"${i.precio_sqlite:.0f}" if i.precio_sqlite is not None else "—",
+                f"${i.precio_postgres:.0f}" if i.precio_postgres is not None else "—",
+            )
+            for i in inconsistencias
+        ]
+
+        n_sq = sum(1 for i in inconsistencias if i.tipo == "solo_sqlite")
+        n_pg = sum(1 for i in inconsistencias if i.tipo == "solo_postgres")
+        n_px = sum(1 for i in inconsistencias if i.tipo == "precio_distinto")
+        self.settings_catalog_sync_status_label.setText(
+            f"Total: {len(inconsistencias)}  —  "
+            f"Solo catálogo: {n_sq}  |  Solo Postgres: {n_pg}  |  Precio distinto: {n_px}"
+        )
+        self._apply_catalog_sync_filter()
+
+    def _apply_catalog_sync_filter(self) -> None:
+        from PyQt6.QtWidgets import QTableWidgetItem
+
+        filtro = self.settings_catalog_sync_filter_combo.currentData() or "todos"
+        etiqueta_filtro = {
+            "solo_sqlite": "Solo en catálogo",
+            "solo_postgres": "Solo en Postgres",
+            "precio_distinto": "Precio distinto",
+        }.get(filtro)
+
+        filas = (
+            self.settings_catalog_sync_rows
+            if etiqueta_filtro is None
+            else [r for r in self.settings_catalog_sync_rows if r[0] == etiqueta_filtro]
+        )
+        tabla = self.settings_catalog_sync_table
+        tabla.setRowCount(len(filas))
+        for row_idx, (tipo, sku, nombre, sq, pg) in enumerate(filas):
+            for col_idx, valor in enumerate((tipo, sku, nombre, sq, pg)):
+                item = QTableWidgetItem(valor)
+                item.setFlags(item.flags() & ~item.flags().__class__.ItemIsEditable)
+                tabla.setItem(row_idx, col_idx, item)
+        tabla.resizeColumnsToContents()
+
+    def _handle_catalog_sync_change_path(self) -> None:
+        from PyQt6.QtWidgets import QFileDialog
+
+        path, _ = QFileDialog.getOpenFileName(
+            self.settings_catalog_sync_dialog,
+            "Seleccionar catálogo SQLite",
+            self.settings_catalog_sync_sqlite_path,
+            "SQLite (*.db *.sqlite)",
+        )
+        if path:
+            self.settings_catalog_sync_sqlite_path = path
+            self.settings_catalog_sync_path_label.setText(path)
+            self.settings_catalog_sync_status_label.setText("Sin verificar.")
+            self.settings_catalog_sync_table.setRowCount(0)
+            self.settings_catalog_sync_rows = []
 
     def _refresh_settings_cash_history(self) -> None:
         estado = self.settings_cash_history_state_combo.currentData() or "todas"
@@ -4688,6 +4797,7 @@ class MainWindow(QMainWindow):
             "settings_business_dialog",
             "settings_marketing_dialog",
             "settings_whatsapp_dialog",
+            "settings_catalog_sync_dialog",
         )
         for attr_name in dialog_attr_names:
             dialog = getattr(self, attr_name, None)
@@ -8469,6 +8579,7 @@ class MainWindow(QMainWindow):
         self.settings_backup_button.setEnabled(is_admin)
         self.settings_cash_history_button.setEnabled(is_admin)
         self.settings_business_button.setEnabled(is_admin)
+        self.settings_catalog_sync_button.setEnabled(is_admin)
         self.settings_create_user_button.setEnabled(is_admin)
         self.settings_edit_user_button.setEnabled(is_admin)
         self.settings_toggle_user_button.setEnabled(is_admin)
