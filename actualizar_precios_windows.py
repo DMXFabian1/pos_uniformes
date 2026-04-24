@@ -3,8 +3,25 @@ import os
 import sys
 import shutil
 from datetime import datetime
+from pathlib import Path
 
-DB_PATH = r"C:/Users/Daniel/Downloads/Gestor_de_Inventarios/data/productos.db"
+
+def _resolve_db_path() -> str:
+    project_root = Path(__file__).resolve().parent
+    candidates = [
+        project_root / "Gestor_de_Inventarios" / "data" / "productos.db",
+        Path.cwd() / "productos.db",
+        project_root / "data" / "productos.db",
+        Path.home() / "Downloads" / "Gestor_de_Inventarios" / "data" / "productos.db",
+        Path(r"C:/Users/Daniel/Downloads/Gestor_de_Inventarios/data/productos.db"),
+    ]
+    for c in candidates:
+        if c.exists():
+            return str(c)
+    return str(candidates[0])
+
+
+DB_PATH = _resolve_db_path()
 
 
 def log(msg):
