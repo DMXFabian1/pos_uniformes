@@ -182,7 +182,7 @@ from pos_uniformes.services.quote_snapshot_service import (
     load_quote_snapshot_rows,
 )
 from pos_uniformes.services.quote_detail_service import load_quote_detail_snapshot
-from pos_uniformes.services.quote_action_service import cancel_quote
+from pos_uniformes.services.quote_action_service import cancel_quote, convert_quote_to_cart
 from pos_uniformes.services.quote_whatsapp_service import build_quote_whatsapp_view
 from pos_uniformes.services.layaway_alerts_service import load_layaway_alerts_snapshot
 from pos_uniformes.services.layaway_closure_service import (
@@ -1373,6 +1373,7 @@ class MainWindow(QMainWindow):
         self.quote_remove_button = QPushButton("Quitar linea")
         self.quote_clear_button = QPushButton("Vaciar presupuesto")
         self.quote_cancel_button = QPushButton("Cancelar presupuesto")
+        self.quote_convert_button = QPushButton("Cobrar presupuesto")
         self.quote_whatsapp_button = QPushButton("WhatsApp")
         self.quote_refresh_button = QPushButton("Refrescar")
         self.quote_status_label = QLabel("Sin presupuestos cargados.")
@@ -1829,6 +1830,7 @@ class MainWindow(QMainWindow):
             self.quote_clear_button: "Vacía por completo el presupuesto actual.",
             self.quote_whatsapp_button: "Abre WhatsApp con un mensaje prellenado para el cliente del presupuesto seleccionado.",
             self.quote_cancel_button: "Marca como cancelado el presupuesto seleccionado sin tocar inventario.",
+            self.quote_convert_button: "Carga los items del presupuesto emitido al carrito de venta y lo marca como convertido.",
             self.quote_refresh_button: "Vuelve a leer los presupuestos recientes con los filtros actuales.",
             self.sale_add_button: "Agrega una linea manual de cobro rapido sin afectar inventario.",
             self.sale_button: "Confirma la venta de todos los productos del carrito.",
@@ -7732,6 +7734,7 @@ class MainWindow(QMainWindow):
         )
         self.quote_cancel_button.setEnabled(action_state.cancel_enabled)
         self.quote_whatsapp_button.setEnabled(action_state.whatsapp_enabled)
+        self.quote_convert_button.setEnabled(action_state.convert_enabled)
 
     def _handle_quote_filters_changed(self) -> None:
         try:
@@ -7763,6 +7766,36 @@ class MainWindow(QMainWindow):
         self.refresh_all()
         result_view = build_quote_result_feedback("cancel_quote")
         QMessageBox.information(self, result_view.title, result_view.message)
+
+    def _handle_convert_quote_to_sale(self) -> None:
+        quote_id = self._selected_quote_id()
+        if quote_id is None:
+            QMessageBox.warning(self, "Sin seleccion", "Selecciona un presupuesto emitido.")
+            return
+        if self.sale_cart:
+            if QMessageBox.question(
+                self,
+                "Carrito con items",
+                "El carrito de venta ya tiene items. ¿Reemplazar con los items del presupuesto?",
+            ) != QMessageBox.StandardButton.Yes:
+                return
+        try:
+            with get_session() as session:
+                cart_items = convert_quote_to_cart(session, quote_id=quote_id, user_id=self.user_id)
+                session.commit()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "No se pudo convertir", str(exc))
+            return
+        self.sale_cart.clear()
+        self.sale_cart.extend(cart_items)
+        self._refresh_sale_cart_table()
+        self.refresh_all()
+        self.tabs.setCurrentIndex(1)  # Caja
+        QMessageBox.information(
+            self,
+            "Presupuesto cargado",
+            "Los items del presupuesto se cargaron al carrito de venta. Ya puedes cobrar.",
+        )
 
     def _handle_open_quote_whatsapp(self) -> None:
         quote_id = self._selected_quote_id()

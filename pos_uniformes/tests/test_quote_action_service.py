@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch, MagicMock
 
-from pos_uniformes.services.quote_action_service import cancel_quote, emit_quote
+from pos_uniformes.services.quote_action_service import cancel_quote, convert_quote_to_cart, emit_quote
 
 
 def _make_session(quote, user, *, user_id=7):
@@ -163,6 +163,56 @@ class CancelQuoteTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 cancel_quote(session, quote_id=1, user_id=99)
         self.assertEqual(called, [])
+
+
+class ConvertQuoteToCartTests(unittest.TestCase):
+    def _patch(self, fake_svc):
+        return patch(
+            "pos_uniformes.services.quote_action_service._resolve_quote_action_dependencies",
+            return_value=(fake_svc, object()),
+        )
+
+    def test_returns_cart_items_from_detalles(self) -> None:
+        from decimal import Decimal
+        from types import SimpleNamespace
+
+        detalle = SimpleNamespace(
+            sku_snapshot="PLY-001",
+            variante_id=5,
+            descripcion_snapshot="Playera deportiva",
+            talla_snapshot="M",
+            cantidad=2,
+            precio_unitario=Decimal("189.00"),
+        )
+        quote = SimpleNamespace(
+            estado=None,
+            convertido_at=None,
+            detalles=[detalle],
+        )
+        convert_spy = []
+        svc = SimpleNamespace(
+            obtener_presupuesto=lambda _s, _id: quote,
+            convertir_presupuesto=lambda **kw: convert_spy.append(kw) or quote,
+        )
+        session = SimpleNamespace(get=lambda model, uid: object(), add=lambda x: None)
+        with self._patch(svc):
+            items = convert_quote_to_cart(session, quote_id=1, user_id=7)
+
+        self.assertEqual(len(items), 1)
+        self.assertEqual(items[0]["sku"], "PLY-001")
+        self.assertEqual(items[0]["cantidad"], 2)
+        self.assertEqual(items[0]["precio_unitario"], Decimal("189.00"))
+        self.assertTrue(convert_spy)
+
+    def test_raises_when_quote_not_found(self) -> None:
+        svc = SimpleNamespace(
+            obtener_presupuesto=lambda _s, _id: None,
+            convertir_presupuesto=lambda **kw: None,
+        )
+        session = SimpleNamespace(get=lambda model, uid: object())
+        with self._patch(svc):
+            with self.assertRaises(ValueError):
+                convert_quote_to_cart(session, quote_id=99, user_id=1)
 
 
 if __name__ == "__main__":

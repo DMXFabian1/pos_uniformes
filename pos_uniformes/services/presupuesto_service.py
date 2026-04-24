@@ -286,3 +286,18 @@ class PresupuestoService:
             presupuesto.observacion = observacion.strip()
         session.add(presupuesto)
         return presupuesto
+
+    @classmethod
+    def convertir_presupuesto(
+        cls,
+        session: Session,
+        presupuesto: Presupuesto,
+        usuario: Usuario,
+    ) -> Presupuesto:
+        cls._validar_operador(usuario)
+        if presupuesto.estado != EstadoPresupuesto.EMITIDO:
+            raise ValueError("Solo se pueden convertir a venta presupuestos emitidos.")
+        presupuesto.estado = EstadoPresupuesto.CONVERTIDO
+        presupuesto.convertido_at = datetime.now()
+        session.add(presupuesto)
+        return presupuesto

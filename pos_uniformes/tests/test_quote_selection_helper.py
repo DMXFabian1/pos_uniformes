@@ -44,7 +44,7 @@ class QuoteSelectionHelperTests(unittest.TestCase):
                 selected_state="EMITIDO",
                 has_phone=True,
             ),
-            QuoteActionState(cancel_enabled=True, whatsapp_enabled=True),
+            QuoteActionState(cancel_enabled=True, whatsapp_enabled=True, convert_enabled=True),
         )
         self.assertEqual(
             build_quote_action_state(
@@ -53,8 +53,15 @@ class QuoteSelectionHelperTests(unittest.TestCase):
                 selected_state="CANCELADO",
                 has_phone=False,
             ),
-            QuoteActionState(cancel_enabled=False, whatsapp_enabled=False),
+            QuoteActionState(cancel_enabled=False, whatsapp_enabled=False, convert_enabled=False),
         )
+
+    def test_convert_enabled_only_for_emitido(self) -> None:
+        for state, expected in [("EMITIDO", True), ("BORRADOR", False), ("CANCELADO", False), ("CONVERTIDO", False)]:
+            state_obj = build_quote_action_state(
+                can_sell=True, has_selection=True, selected_state=state, has_phone=True
+            )
+            self.assertEqual(state_obj.convert_enabled, expected, msg=f"state={state}")
 
 
 if __name__ == "__main__":

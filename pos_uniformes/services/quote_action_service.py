@@ -31,6 +31,31 @@ def cancel_quote(session, *, quote_id: int, user_id: int) -> None:
     )
 
 
+def convert_quote_to_cart(session, *, quote_id: int, user_id: int) -> list[dict[str, object]]:
+    from decimal import Decimal
+
+    presupuesto_service, usuario_model = _resolve_quote_action_dependencies()
+    presupuesto = presupuesto_service.obtener_presupuesto(session, quote_id)
+    usuario = session.get(usuario_model, user_id)
+    if presupuesto is None or usuario is None:
+        raise ValueError("No se pudo cargar el presupuesto seleccionado.")
+    presupuesto_service.convertir_presupuesto(session=session, presupuesto=presupuesto, usuario=usuario)
+    return [
+        {
+            "sku": str(detalle.sku_snapshot),
+            "variante_id": detalle.variante_id,
+            "producto_nombre": str(detalle.descripcion_snapshot),
+            "talla": str(detalle.talla_snapshot or "-"),
+            "cantidad": int(detalle.cantidad),
+            "precio_unitario": Decimal(str(detalle.precio_unitario)),
+            "precio_base": Decimal(str(detalle.precio_unitario)),
+            "pricing_rule_key": "",
+            "pricing_rule_label": "",
+        }
+        for detalle in presupuesto.detalles
+    ]
+
+
 def _resolve_quote_action_dependencies():
     from pos_uniformes.database.models import Usuario
     from pos_uniformes.services.presupuesto_service import PresupuestoService

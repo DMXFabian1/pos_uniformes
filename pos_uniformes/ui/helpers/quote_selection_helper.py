@@ -9,6 +9,7 @@ from dataclasses import dataclass
 class QuoteActionState:
     cancel_enabled: bool
     whatsapp_enabled: bool
+    convert_enabled: bool
 
 
 # Qt.ItemDataRole.UserRole sin depender de PyQt6 en pruebas puras.
@@ -38,4 +39,5 @@ def build_quote_action_state(
     return QuoteActionState(
         cancel_enabled=can_sell and has_selection and is_active,
         whatsapp_enabled=has_selection and is_active and has_phone,
+        convert_enabled=can_sell and has_selection and normalized_state == "EMITIDO",
     )
