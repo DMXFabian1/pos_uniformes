@@ -285,6 +285,10 @@ Aplicar por `tipo_pieza='Falda'`, `tipo_prenda='Oficial'` y familia/nivel.
 | `Sin nivel Pgallo cafe` | `28, 30, 32, 34` | 245 |
 | `Sin nivel Pgallo cafe` | `36, 38, 40, 42` | 255 |
 
+Excepcion activa:
+
+- `Margarita Paz Paredes` maneja `Falda Oficial Preescolar` tallas `4, 6, 8` a `239`.
+
 ## 7. Pantalon Basico
 
 Aplicar por `tipo_pieza='Pantalón'`, `tipo_prenda='Básico'` y familia detectada desde `nombre`.
@@ -556,6 +560,21 @@ Aplicar por `tipo_pieza='Playera'`, `atributo='Polo'`, `escuela_id IS NULL`.
 | `40, 42` | 180 |
 | `CH, MD` | 185 |
 | `GD, EXG` | 195 |
+
+## 13. Bata
+
+Aplicar por `tipo_pieza='Bata'`.
+
+| Tipo | Tallas | Precio objetivo |
+|---|---|---:|
+| Infantil | Uni | 65 |
+| Manga Corta | `12 – 46` | 395 |
+| Manga Larga | `12 – 46` | 439 |
+
+Notas:
+
+- La Bata Infantil es talla única; no aplicar escalera adicional.
+- No heredar precios de Bata a otras prendas.
 
 ## Excepciones y conservaciones explicitas
 

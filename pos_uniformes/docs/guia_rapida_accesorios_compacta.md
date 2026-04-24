@@ -7,7 +7,7 @@
 | Calceta Escolar | 49 |
 | Guante Escolta | 49 |
 | Corbata | 70 |
-| Corbatin | 70 |
+| Corbatín | 70 |
 | Moño | 70 |
 | Boina Escolta | 80 |
 
