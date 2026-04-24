@@ -2,6 +2,9 @@
 
 ## Checkpoint actual
 
+- `2026-04-23`: Bug — vigencia validation en `_apply_quote_payload` cubre todos los caminos de emisión (crear_presupuesto + actualizar_presupuesto vía editor del satélite). Checkpoint `validated-tests`.
+- `2026-04-23`: feat — flujo completo CONVERTIDO para presupuestos: `convertir_presupuesto()` en service, `convert_quote_to_cart()` en action service, botón "Cobrar presupuesto" en panel (activo solo en EMITIDO), carga items al carrito de Caja y navega al tab. 4 tests nuevos. Checkpoint `validated-tests`.
+- `2026-04-23`: fix — rechazar emitir presupuesto con vigencia vencida en `emitir_presupuesto()`. 4 tests: sin vigencia, vigencia futura, vigencia vencida, mensaje incluye "vigencia". Checkpoint `validated-tests`.
 - `2026-04-23`: consolidaciones de utilidades compartidas — (1) `_normalize_text` extraido a `utils/text_normalization.py` con variantes `normalize_text` y `normalize_text_unicode`; (2) 3 funciones idénticas de resolución de ID colapsadas a `resolve_selected_settings_row_id` genérico; (3) lógica de semáforo de stock centralizada en `utils/stock_tone_helper.py` con umbral `_LOW_STOCK_THRESHOLD = 3`. Checkpoint `validated-tests`.
 - `2026-04-23`: 6 errores estructurales de mypy corregidos en `dashboard_summary_helper`, `product_templates`, `analytics_payment_helper`, `inventory_table_row_helper`, `scanned_client_flow_service` y `config.py`. Resto (~681) son ruido de convención `dict[str, object]`. Checkpoint `validated-tests`.
 - `2026-04-23`: presupuestos vencidos — `quote_history_helper` detecta EMITIDO con vigencia pasada y muestra "VENCIDO" (tono danger). `QuoteSnapshotRow` lleva `vigencia_hasta_raw`. Filtro "Vencidos" agregado en POS principal y satélite. Checkpoint `validated-tests`.
