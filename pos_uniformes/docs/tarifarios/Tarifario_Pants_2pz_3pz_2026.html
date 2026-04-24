@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tarifario Pants 2pz 3pz 2026</title>
+  <style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --navy:       #1B3557;
+  --navy-mid:   #2C4E80;
+  --blue-light: #EBF2FF;
+  --accent:     #C96030;
+  --accent-lt:  #FEF3EC;
+  --red:        #C92020;
+  --red-lt:     #FEF0F0;
+  --border:     #DDE4EF;
+  --row-alt:    #F5F8FF;
+  --text:       #16202E;
+  --muted:      #64748B;
+  --surface:    #FFFFFF;
+  --bg:         #F3F5FA;
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ── Página ───────────────────────────────────────────────────────────────── */
+.page {
+  width: 11in;
+  min-height: 8.5in;
+  background: var(--surface);
+  margin: 0 auto 32px;
+  padding: 0.42in 0.52in 0.38in;
+  box-shadow: 0 2px 20px rgba(27,53,87,0.10);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+@page { size: letter landscape; margin: 0; }
+
+@media print {
+  body { background: white; }
+  .page {
+    margin: 0;
+    box-shadow: none;
+    page-break-after: always;
+  }
+  .page:last-child { page-break-after: avoid; }
+}
+
+/* ── Header ───────────────────────────────────────────────────────────────── */
+.page-header {
+  background: linear-gradient(120deg, var(--navy) 0%, var(--navy-mid) 100%);
+  border-radius: 10px;
+  padding: 13px 22px;
+  margin-bottom: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+}
+
+.page-header::before {
+  content: '';
+  position: absolute;
+  width: 180px; height: 180px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.04);
+  top: -60px; right: -40px;
+}
+
+.page-header::after {
+  content: '';
+  position: absolute;
+  width: 90px; height: 90px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.06);
+  bottom: -30px; right: 120px;
+}
+
+.header-left { z-index: 1; }
+
+.header-category {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: rgba(255,255,255,0.55);
+  margin-bottom: 3px;
+}
+
+.header-title {
+  font-size: 26px;
+  font-weight: 800;
+  color: white;
+  letter-spacing: -0.5px;
+}
+
+.header-right {
+  z-index: 1;
+  text-align: right;
+}
+
+.header-date {
+  font-size: 10px;
+  color: rgba(255,255,255,0.45);
+}
+
+/* ── Grids ────────────────────────────────────────────────────────────────── */
+.grid { display: grid; gap: 10px; margin-bottom: 10px; }
+.cols-2 { grid-template-columns: repeat(2, 1fr); }
+.cols-3 { grid-template-columns: repeat(3, 1fr); }
+.cols-4 { grid-template-columns: repeat(4, 1fr); }
+.cols-1 { grid-template-columns: 1fr; }
+
+/* ── Table block ──────────────────────────────────────────────────────────── */
+.block { break-inside: avoid; }
+
+.block-title {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  color: var(--navy);
+  text-transform: uppercase;
+  padding: 5px 10px 5px 11px;
+  background: var(--blue-light);
+  border-left: 3px solid var(--navy-mid);
+  border-radius: 0 5px 0 0;
+  margin-bottom: 0;
+}
+
+.block-title.exc {
+  color: var(--red);
+  background: var(--red-lt);
+  border-left-color: var(--red);
+}
+
+/* ── Tables ───────────────────────────────────────────────────────────────── */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  border: 1px solid var(--border);
+  border-top: none;
+}
+
+thead th {
+  background: #F0F4FB;
+  color: #334155;
+  font-weight: 600;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  padding: 4px 9px;
+  border-bottom: 1.5px solid var(--border);
+  text-align: left;
+  white-space: nowrap;
+}
+
+thead th:not(:first-child) { text-align: right; }
+
+tbody td {
+  padding: 4px 9px;
+  border-bottom: 1px solid #EDF2F8;
+  color: var(--text);
+}
+
+tbody td:not(:first-child) {
+  text-align: right;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--navy);
+}
+
+tbody tr:nth-child(even) td { background: var(--row-alt); }
+tbody tr:last-child td { border-bottom: none; }
+
+/* Exception tables */
+.exc-table thead th {
+  background: #FEF0F0;
+  color: #7F1D1D;
+  border-bottom-color: #FECACA;
+}
+.exc-table tbody td:not(:first-child) { color: var(--red); }
+.exc-table tbody tr:nth-child(even) td { background: #FFF7F7; }
+.exc-table { border-color: #FECACA; }
+
+/* ── Section divider ──────────────────────────────────────────────────────── */
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 11px 0 8px;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: #94A3B8;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: #E2E8F0;
+}
+
+/* ── Notes ────────────────────────────────────────────────────────────────── */
+.notes {
+  margin-top: auto;
+  padding-top: 10px;
+  border-top: 1px solid #EDF2F8;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.notes p {
+  font-size: 10px;
+  color: var(--muted);
+  font-style: italic;
+  display: flex;
+  gap: 5px;
+}
+
+.notes p::before {
+  content: '–';
+  color: #CBD5E1;
+  flex-shrink: 0;
+}
+</style>
+</head>
+<body>
+
+<div class="page">
+  <div class="page-header">
+    <div class="header-left">
+      <div class="header-category">Tarifario Rápido · Pants</div>
+      <div class="header-title">Pants 2 y 3 Piezas</div>
+    </div>
+    <div class="header-right">
+      <div class="header-date">Actualizado: Abril 2026</div>
+    </div>
+  </div>
+  <div class="divider">Liso · Punto · Algodón (genérico)</div><div class="grid cols-3">
+<div class="block">
+  <div class="block-title ">Liso · todos los colores</div>
+  <table class="">
+    <thead><tr><th>Tallas</th><th>Precio</th></tr></thead>
+    <tbody><tr><td>2, 4, 6, 8</td><td>$250</td></tr><tr><td>10, 12, 14, 16</td><td>$265</td></tr><tr><td>28, CH</td><td>$315</td></tr><tr><td>MD</td><td>$325</td></tr><tr><td>GD</td><td>$335</td></tr><tr><td>EXG</td><td>$345</td></tr></tbody>
+  </table>
+</div>
+
+<div class="block">
+  <div class="block-title ">Punto · todos los colores</div>
+  <table class="">
+    <thead><tr><th>Tallas</th><th>Precio</th></tr></thead>
+    <tbody><tr><td>2, 4, 6, 8</td><td>$475</td></tr><tr><td>10, 12, 14, 16</td><td>$495</td></tr><tr><td>28, CH</td><td>$525</td></tr><tr><td>MD</td><td>$535</td></tr><tr><td>GD</td><td>$545</td></tr><tr><td>EXG</td><td>$555</td></tr></tbody>
+  </table>
+</div>
+
+<div class="block">
+  <div class="block-title ">Algodón Azul Marino</div>
+  <table class="">
+    <thead><tr><th>Tallas</th><th>Precio</th></tr></thead>
+    <tbody><tr><td>4, 6, 8</td><td>$260</td></tr><tr><td>10, 12</td><td>$265</td></tr><tr><td>14, 16</td><td>$275</td></tr></tbody>
+  </table>
+</div></div><div class="divider">Deportivo por nivel</div><div class="grid cols-4">
+<div class="block">
+  <div class="block-title ">Preescolar</div>
+  <table class="">
+    <thead><tr><th>Tallas</th><th>2 pzas</th><th>3 pzas</th></tr></thead>
+    <tbody><tr><td>2, 4, 6, 8, 10</td><td>$445</td><td>$545</td></tr></tbody>
+  </table>
+</div>
+
+<div class="block">
+  <div class="block-title ">Primaria</div>
+  <table class="">
+    <thead><tr><th>Tallas</th><th>2 pzas</th><th>3 pzas</th></tr></thead>
+    <tbody><tr><td>4, 6, 8, 10, 12</td><td>$485</td><td>$585</td></tr><tr><td>14, 16</td><td>$495</td><td>$595</td></tr><tr><td>CH, MD, GD</td><td>$585</td><td>$685</td></tr></tbody>
+  </table>
+</div>
+
+<div class="block">
+  <div class="block-title ">Secundaria</div>
+  <table class="">
+    <thead><tr><th>Tallas</th><th>2 pzas</th><th>3 pzas</th></tr></thead>
+    <tbody><tr><td>10, 12</td><td>$595</td><td>$695</td></tr><tr><td>14, 16</td><td>$605</td><td>$705</td></tr><tr><td>CH, MD, GD, EXG</td><td>$615</td><td>$715</td></tr></tbody>
+  </table>
+</div>
+
+<div class="block">
+  <div class="block-title ">Bachillerato</div>
+  <table class="">
+    <thead><tr><th>Tallas</th><th>2 pzas</th><th>3 pzas</th></tr></thead>
+    <tbody><tr><td>16</td><td>$615</td><td>$715</td></tr><tr><td>CH, MD, GD, EXG</td><td>$615</td><td>$715</td></tr></tbody>
+  </table>
+</div></div><div class="divider">Excepciones activas</div><div class="grid cols-3">
+<div class="block">
+  <div class="block-title exc">Preescolar</div>
+  <table class="exc-table">
+    <thead><tr><th>Escuela</th><th>2 pzas</th><th>3 pzas</th></tr></thead>
+    <tbody><tr><td>Sor Juana Inés de la Cruz</td><td>$515</td><td>—</td></tr></tbody>
+  </table>
+</div>
+
+<div class="block">
+  <div class="block-title exc">Primaria</div>
+  <table class="exc-table">
+    <thead><tr><th>Escuela</th><th>2 pzas</th><th>3 pzas</th></tr></thead>
+    <tbody><tr><td>Adolfo Lopez Mateo</td><td>575/585/595</td><td>—</td></tr><tr><td>Colegio Motolinea</td><td>595/630/640/650</td><td>695/730/740/750</td></tr></tbody>
+  </table>
+</div>
+
+<div class="block">
+  <div class="block-title exc">Secundaria · Bachillerato</div>
+  <table class="exc-table">
+    <thead><tr><th>Escuela</th><th>2 pzas</th><th>3 pzas</th></tr></thead>
+    <tbody><tr><td>Telesecundaria 454</td><td>$650</td><td>$750</td></tr><tr><td>Telesecundaria 512</td><td>$650</td><td>$750</td></tr><tr><td>CECYTE</td><td>$650</td><td>$750</td></tr><tr><td>Conalep</td><td>$650</td><td>$750</td></tr><tr><td>UVEG</td><td>$650</td><td>$750</td></tr></tbody>
+  </table>
+</div></div>
+</div>
+</body>
+</html>
