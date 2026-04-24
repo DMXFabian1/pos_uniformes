@@ -277,6 +277,8 @@ class PresupuestoService:
             raise ValueError("No se puede emitir un presupuesto ya convertido.")
         if presupuesto.estado != EstadoPresupuesto.BORRADOR:
             raise ValueError("Solo se pueden emitir presupuestos en borrador.")
+        if presupuesto.vigencia_hasta is not None and presupuesto.vigencia_hasta < datetime.now():
+            raise ValueError("La vigencia del presupuesto ya venció. Actualiza la fecha antes de emitir.")
 
         presupuesto.estado = EstadoPresupuesto.EMITIDO
         presupuesto.emitido_at = datetime.now()

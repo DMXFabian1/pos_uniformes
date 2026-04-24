@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta
 from decimal import Decimal
 from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
+from pos_uniformes.database.models import EstadoPresupuesto
 from pos_uniformes.services.presupuesto_service import PresupuestoItemInput, PresupuestoService
 
 
@@ -74,6 +76,47 @@ class PresupuestoServiceTests(unittest.TestCase):
 
         self.assertEqual(len(detail_rows), 2)
         self.assertEqual(total, Decimal("289.00"))
+
+
+def _make_borrador(*, vigencia_hasta: datetime | None = None) -> SimpleNamespace:
+    return SimpleNamespace(
+        estado=EstadoPresupuesto.BORRADOR,
+        vigencia_hasta=vigencia_hasta,
+        emitido_at=None,
+        observacion=None,
+    )
+
+
+def _make_usuario() -> SimpleNamespace:
+    return SimpleNamespace(rol="ADMIN", activo=True)
+
+
+class EmitirPresupuestoTests(unittest.TestCase):
+    def _call(self, presupuesto: SimpleNamespace) -> SimpleNamespace:
+        session = SimpleNamespace(add=lambda x: None)
+        with patch.object(PresupuestoService, "_validar_operador", return_value=None):
+            return PresupuestoService.emitir_presupuesto(session, presupuesto, _make_usuario())
+
+    def test_emite_sin_vigencia(self) -> None:
+        p = _make_borrador()
+        result = self._call(p)
+        self.assertEqual(result.estado, EstadoPresupuesto.EMITIDO)
+
+    def test_emite_con_vigencia_futura(self) -> None:
+        p = _make_borrador(vigencia_hasta=datetime.now() + timedelta(days=1))
+        result = self._call(p)
+        self.assertEqual(result.estado, EstadoPresupuesto.EMITIDO)
+
+    def test_rechaza_vigencia_vencida(self) -> None:
+        p = _make_borrador(vigencia_hasta=datetime.now() - timedelta(days=1))
+        with self.assertRaises(ValueError, msg="vigencia vencida debe rechazar"):
+            self._call(p)
+
+    def test_mensaje_incluye_vigencia(self) -> None:
+        p = _make_borrador(vigencia_hasta=datetime.now() - timedelta(hours=1))
+        with self.assertRaises(ValueError) as ctx:
+            self._call(p)
+        self.assertIn("vigencia", str(ctx.exception).lower())
 
 
 if __name__ == "__main__":
