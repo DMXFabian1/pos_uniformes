@@ -2,15 +2,14 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QSizeF, Qt
-from PyQt6.QtGui import QFontDatabase, QPainter, QPageSize
+from PyQt6.QtCore import QSizeF
+from PyQt6.QtGui import QPageSize
 from PyQt6.QtPrintSupport import QPrinter
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QMessageBox, QTextEdit, QVBoxLayout, QWidget
 
 from pos_uniformes.database.connection import get_session
 from pos_uniformes.services.business_settings_service import BusinessSettingsService
 from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
-    TICKET_FONT_POINT_SIZE,
     TICKET_PAPER_WIDTH_MM,
     build_ticket_document,
 )
@@ -36,7 +35,6 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
     layout = QVBoxLayout()
     editor = QTextEdit()
     editor.setReadOnly(True)
-    editor.setPlainText(content)
     editor.setDocument(build_ticket_document(content))
 
     buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
@@ -52,25 +50,9 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
             printer.setPageSize(QPageSize(QSizeF(TICKET_PAPER_WIDTH_MM, 600.0), QPageSize.Unit.Millimeter))
             printer.setFullPage(True)
 
-            painter = QPainter(printer)
-            if not painter.isActive():
-                QMessageBox.warning(dialog, "Error de impresión", "No se pudo iniciar el trabajo de impresión.\nVerifica que la impresora esté conectada y disponible.")
-                return
-
-            font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
-            font.setPointSize(TICKET_FONT_POINT_SIZE)
-            painter.setFont(font)
-
-            # painter.viewport() da el rect imprimible en coordenadas nativas de la
-            # impresora. drawText con TextWordWrap ajusta el texto a ese ancho real,
-            # evitando el desfase de unidades que ocurre con QTextDocument.setTextWidth.
-            rect = painter.viewport()
-            painter.drawText(
-                rect,
-                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap,
-                content,
-            )
-            painter.end()
+            page_rect = printer.pageRect(QPrinter.Unit.Millimeter)
+            doc = build_ticket_document(content, text_width_mm=page_rect.width())
+            doc.print_(printer)
         except Exception as exc:
             QMessageBox.warning(dialog, "Error de impresión", f"No se pudo imprimir el ticket:\n{exc}")
 

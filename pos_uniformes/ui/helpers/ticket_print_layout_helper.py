@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PyQt6.QtGui import QFont, QFontDatabase, QTextDocument
+from PyQt6.QtGui import QFont, QTextDocument
 
 TICKET_PAPER_WIDTH_MM = 80.0
 TICKET_HORIZONTAL_MARGIN_MM = 2.0
@@ -16,19 +16,19 @@ def millimeters_to_points(value_mm: float) -> float:
 
 
 def build_ticket_document(content: str, *, text_width_mm: float | None = None) -> QTextDocument:
-    """Prepara un documento de texto optimizado para ticket termico de 80 mm.
+    """Prepara un documento HTML optimizado para ticket termico de 80 mm.
 
     text_width_mm: ancho de texto en mm. Si se omite usa TICKET_TEXT_WIDTH_MM (fallback para preview).
     Al imprimir, pasar el ancho real del area imprimible del driver para ocupar todo el papel.
     """
     effective_width = text_width_mm if text_width_mm is not None else TICKET_TEXT_WIDTH_MM
     document = QTextDocument()
-    document.setPlainText(content)
+    document.setHtml(content)
     document.setDocumentMargin(millimeters_to_points(TICKET_HORIZONTAL_MARGIN_MM))
     document.setTextWidth(millimeters_to_points(effective_width))
 
-    font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
-    font.setStyleHint(QFont.StyleHint.TypeWriter)
+    font = QFont("Arial")
+    font.setStyleHint(QFont.StyleHint.SansSerif)
     font.setPointSize(TICKET_FONT_POINT_SIZE)
     document.setDefaultFont(font)
     return document

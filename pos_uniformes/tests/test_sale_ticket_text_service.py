@@ -68,20 +68,24 @@ class SaleTicketTextServiceTests(unittest.TestCase):
         )
 
         self.assertIn("POS Uniformes", ticket)
-        self.assertIn("Fecha: 12/03/2026 18:35", ticket)
-        self.assertIn("Forma de pago: Efectivo", ticket)
-        self.assertIn("Cliente: Maria Fernanda", ticket)
-        self.assertIn("Codigo cliente: CLI-001", ticket)
-        self.assertNotIn("Telefono cliente:", ticket)
+        self.assertIn("12/03/2026 18:35", ticket)
+        self.assertIn("Efectivo", ticket)
+        self.assertIn("Maria Fernanda", ticket)
+        self.assertIn("CLI-001", ticket)
+        self.assertNotIn("Telefono", ticket)
         self.assertNotIn("Usuario:", ticket)
         self.assertNotIn("Estado:", ticket)
-        self.assertIn("Articulos", ticket)
-        self.assertIn("Playera deportiva\nSKU0001 | 1 x $199.00 = $199.00", ticket)
-        self.assertIn("Subtotal: 199.00", ticket)
-        self.assertIn("Descuento aplicado: 10.00% (-19.90)", ticket)
-        self.assertIn("Total a pagar: 179.10", ticket)
-        self.assertIn("Notas:\n- Promo autorizada", ticket)
-        self.assertNotIn("Notas: Metodo de pago:", ticket)
+        self.assertIn("ARTÍCULOS", ticket)
+        self.assertIn("Playera deportiva", ticket)
+        self.assertIn("SKU0001", ticket)
+        self.assertIn("$199.00", ticket)
+        self.assertIn("Subtotal", ticket)
+        self.assertIn("Descuento 10.00%", ticket)
+        self.assertIn("-$19.90", ticket)
+        self.assertIn("TOTAL A PAGAR", ticket)
+        self.assertIn("$179.10", ticket)
+        self.assertIn("Promo autorizada", ticket)
+        self.assertNotIn("Metodo de pago:", ticket)
         self.assertNotIn("Copias configuradas:", ticket)
         self.assertNotIn("Impresora preferida:", ticket)
 
@@ -98,12 +102,13 @@ class SaleTicketTextServiceTests(unittest.TestCase):
             business_name="POS Uniformes",
         )
 
-        self.assertNotIn("Cliente:", ticket)
-        self.assertNotIn("Codigo cliente:", ticket)
-        self.assertNotIn("Forma de pago:", ticket)
-        self.assertIn("Subtotal: 199.00", ticket)
-        self.assertIn("Descuento aplicado: 15.00% (-29.85)", ticket)
-        self.assertIn("Total a pagar: 169.15", ticket)
+        self.assertNotIn("Maria Fernanda", ticket)
+        self.assertNotIn("CLI-001", ticket)
+        self.assertIn("Subtotal", ticket)
+        self.assertIn("$199.00", ticket)
+        self.assertIn("Descuento 15.00%", ticket)
+        self.assertIn("-$29.85", ticket)
+        self.assertIn("$169.15", ticket)
         self.assertNotIn("Impresora preferida:", ticket)
 
     def test_keeps_simple_output_for_sale_without_discount_or_notes(self) -> None:
@@ -120,11 +125,12 @@ class SaleTicketTextServiceTests(unittest.TestCase):
             ticket_footer="Gracias por tu compra.",
         )
 
-        self.assertIn("Subtotal: 199.00", ticket)
-        self.assertIn("Descuento aplicado: 0.00% (-0.00)", ticket)
-        self.assertIn("Total a pagar: 199.00", ticket)
-        self.assertNotIn("Notas:", ticket)
-        self.assertNotIn("Cliente:", ticket)
+        self.assertIn("Subtotal", ticket)
+        self.assertIn("$199.00", ticket)
+        self.assertIn("TOTAL A PAGAR", ticket)
+        self.assertNotIn("Descuento", ticket)
+        self.assertNotIn("Notas", ticket)
+        self.assertNotIn("Maria Fernanda", ticket)
 
     def test_simplifies_operational_notes_for_customer_ticket(self) -> None:
         sale = _build_sale(
@@ -144,11 +150,13 @@ class SaleTicketTextServiceTests(unittest.TestCase):
             business_name="POS Uniformes",
         )
 
-        self.assertIn("Forma de pago: Efectivo", ticket)
-        self.assertIn("Notas:\n- Beneficio: Lealtad Profesor 15%\n- Recibido: 200.00\n- Cambio: 30.85", ticket)
+        self.assertIn("Efectivo", ticket)
+        self.assertIn("Beneficio: Lealtad Profesor 15%", ticket)
+        self.assertIn("Recibido: 200.00", ticket)
+        self.assertIn("Cambio: 30.85", ticket)
         self.assertNotIn("Lealtad Profesor: 15%", ticket)
         self.assertNotIn("Descuento aplicado: 29.85", ticket)
-        self.assertNotIn("Referencia: Sin referencia", ticket)
+        self.assertNotIn("Sin referencia", ticket)
 
     def test_shows_rounding_adjustment_as_separate_line_when_present(self) -> None:
         sale = _build_sale(
@@ -164,10 +172,12 @@ class SaleTicketTextServiceTests(unittest.TestCase):
             business_name="POS Uniformes",
         )
 
-        self.assertIn("Descuento aplicado: 15.00% (-29.85)", ticket)
-        self.assertIn("Ajuste: -0.15", ticket)
-        self.assertIn("Total a pagar: 169.00", ticket)
-        self.assertIn("Notas:\n- Cambio: 31.00", ticket)
+        self.assertIn("Descuento 15.00%", ticket)
+        self.assertIn("-$29.85", ticket)
+        self.assertIn("Ajuste", ticket)
+        self.assertIn("-0.15", ticket)
+        self.assertIn("$169.00", ticket)
+        self.assertIn("Cambio: 31.00", ticket)
         self.assertNotIn("Ajuste redondeo:", ticket)
 
     def test_reconstructs_discount_correctly_when_rounding_adjustment_is_present(self) -> None:
@@ -184,9 +194,11 @@ class SaleTicketTextServiceTests(unittest.TestCase):
             business_name="POS Uniformes",
         )
 
-        self.assertIn("Descuento aplicado: 15.00% (-29.85)", ticket)
-        self.assertIn("Ajuste: -0.15", ticket)
-        self.assertIn("Total a pagar: 169.00", ticket)
+        self.assertIn("Descuento 15.00%", ticket)
+        self.assertIn("-$29.85", ticket)
+        self.assertIn("Ajuste", ticket)
+        self.assertIn("-0.15", ticket)
+        self.assertIn("$169.00", ticket)
 
     def test_omits_internal_operational_notes_from_customer_ticket(self) -> None:
         sale = _build_sale(
@@ -205,7 +217,7 @@ class SaleTicketTextServiceTests(unittest.TestCase):
             business_name="POS Uniformes",
         )
 
-        self.assertIn("Notas:\n- Cambio: 1.00", ticket)
+        self.assertIn("Cambio: 1.00", ticket)
         self.assertNotIn("Interno:", ticket)
 
     def test_uses_snapshots_for_manual_sale_lines_without_variant(self) -> None:
@@ -237,7 +249,9 @@ class SaleTicketTextServiceTests(unittest.TestCase):
             business_name="POS Uniformes",
         )
 
-        self.assertIn("Venta manual\nSIN-CODIGO | 1 x $75.00 = $75.00", ticket)
+        self.assertIn("Venta manual", ticket)
+        self.assertIn("SIN-CODIGO", ticket)
+        self.assertIn("$75.00", ticket)
 
 
 if __name__ == "__main__":
