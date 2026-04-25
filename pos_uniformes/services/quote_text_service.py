@@ -1,13 +1,11 @@
-"""Render textual reutilizable para presupuestos."""
+"""Render HTML reutilizable para presupuestos."""
 
 from __future__ import annotations
 
 from decimal import Decimal
-from textwrap import wrap
+from html import escape as _esc
 
 from pos_uniformes.utils.date_format import format_display_date, format_display_datetime
-
-QUOTE_TERMS_WRAP_WIDTH = 42
 
 DEFAULT_QUOTE_TERMS_LINES = (
     "1. Validez del Presupuesto",
@@ -33,61 +31,99 @@ def build_quote_text(
     business_address: str = "",
     ticket_footer: str = "",
 ) -> str:
-    lines = [
-        business_name or "POS Uniformes",
-        "Presupuesto",
-        "=" * 42,
-        f"Folio: {quote.folio}",
-        f"Estado: {quote.estado.value}",
-        f"Cliente: {quote.cliente_nombre or (quote.cliente.nombre if quote.cliente else 'Mostrador / sin cliente')}",
-    ]
+    p: list[str] = []
 
-    phone_text = quote.cliente_telefono or (quote.cliente.telefono if quote.cliente else "")
-    if phone_text:
-        lines.append(f"Telefono: {phone_text}")
-    if getattr(quote, "created_at", None) is not None:
-        lines.append(f"Fecha: {format_display_datetime(quote.created_at)}")
-    if quote.vigencia_hasta is not None:
-        lines.append(f"Vigencia: {format_display_date(quote.vigencia_hasta)}")
-    if business_phone:
-        lines.append(f"Negocio tel: {business_phone}")
+    # — Encabezado —
+    p.append(
+        f'<p style="text-align:center; margin:2px 0;">'
+        f'<b style="font-size:12pt;">{_esc(business_name or "POS Uniformes")}</b></p>'
+    )
     if business_address:
-        lines.append(f"Direccion: {business_address}")
+        p.append(f'<p style="text-align:center; margin:1px 0; font-size:7pt;">{_esc(business_address)}</p>')
+    if business_phone:
+        p.append(f'<p style="text-align:center; margin:1px 0; font-size:7pt;">Tel: {_esc(business_phone)}</p>')
+    p.append('<p style="text-align:center; margin:2px 0; font-size:7pt; color:#555555;">Presupuesto</p>')
+    p.append('<hr/>')
 
-    lines.append("-" * 42)
-    lines.append("Piezas")
+    # — Datos del presupuesto —
+    cliente_nombre = (
+        quote.cliente_nombre
+        or (quote.cliente.nombre if quote.cliente else "Mostrador / sin cliente")
+    )
+    phone_text = quote.cliente_telefono or (quote.cliente.telefono if quote.cliente else "")
+
+    p.append('<table width="100%" cellspacing="0" cellpadding="1">')
+    p.append(f'<tr><td><b>Folio</b></td><td align="right">{_esc(str(quote.folio))}</td></tr>')
+    p.append(f'<tr><td><b>Estado</b></td><td align="right">{_esc(str(quote.estado.value))}</td></tr>')
+    p.append(f'<tr><td><b>Cliente</b></td><td align="right">{_esc(str(cliente_nombre))}</td></tr>')
+    if phone_text:
+        p.append(f'<tr><td><b>Teléfono</b></td><td align="right">{_esc(str(phone_text))}</td></tr>')
+    if getattr(quote, "created_at", None) is not None:
+        p.append(f'<tr><td><b>Fecha</b></td><td align="right">{_esc(format_display_datetime(quote.created_at))}</td></tr>')
+    if quote.vigencia_hasta is not None:
+        p.append(f'<tr><td><b>Vigencia</b></td><td align="right">{_esc(format_display_date(quote.vigencia_hasta))}</td></tr>')
+    p.append('</table>')
+
+    # — Piezas —
+    p.append('<hr/>')
+    p.append('<p style="margin:3px 0;"><b>PIEZAS</b></p>')
+    p.append('<table width="100%" cellspacing="0" cellpadding="2">')
     for detail in quote.detalles:
         subtotal = Decimal(detail.subtotal_linea).quantize(Decimal("0.01"))
         unit_price = Decimal(detail.precio_unitario).quantize(Decimal("0.01"))
-        lines.append(str(detail.descripcion_snapshot))
-        lines.append(
-            f"{detail.sku_snapshot} | {detail.cantidad} x {unit_price} = {subtotal}"
+        descripcion = str(detail.descripcion_snapshot)
+        sku = str(detail.sku_snapshot)
+        cantidad = detail.cantidad
+        p.append(
+            f'<tr>'
+            f'<td style="padding-bottom:0;">{_esc(descripcion)}</td>'
+            f'<td align="right" style="padding-bottom:0; white-space:nowrap;"><b>${_esc(str(subtotal))}</b></td>'
+            f'</tr>'
         )
-        lines.append("")
+        p.append(
+            f'<tr>'
+            f'<td colspan="2" style="font-size:7pt; color:#666666; padding-top:0;">'
+            f'{_esc(sku)} &nbsp;·&nbsp; {_esc(str(cantidad))} × ${_esc(str(unit_price))}'
+            f'</td>'
+            f'</tr>'
+        )
+    p.append('</table>')
 
-    if lines and lines[-1] == "":
-        lines.pop()
+    # — Total —
+    p.append('<hr/>')
+    p.append('<table width="100%" cellspacing="0" cellpadding="3">')
+    total_str = str(Decimal(quote.total).quantize(Decimal("0.01")))
+    p.append(
+        f'<tr>'
+        f'<td><b style="font-size:10pt;">TOTAL ESTIMADO</b></td>'
+        f'<td align="right"><b style="font-size:10pt;">${_esc(total_str)}</b></td>'
+        f'</tr>'
+    )
+    p.append('</table>')
 
-    lines.append("-" * 42)
-    lines.append(f"Total estimado: {Decimal(quote.total).quantize(Decimal('0.01'))}")
+    # — Observaciones —
     if quote.observacion:
-        lines.append("Observaciones:")
-        lines.append(str(quote.observacion))
-    lines.append("")
-    lines.append("Terminos y condiciones")
-    lines.extend(_build_wrapped_quote_terms_lines())
+        p.append('<hr/>')
+        p.append('<p style="margin:2px 0;"><b>Observaciones</b></p>')
+        p.append(f'<p style="margin:1px 0; font-size:7pt;">{_esc(str(quote.observacion))}</p>')
+
+    # — Términos y condiciones —
+    p.append('<hr/>')
+    p.append('<p style="margin:2px 0;"><b>Términos y condiciones</b></p>')
+    for line in DEFAULT_QUOTE_TERMS_LINES:
+        if not line:
+            p.append('<p style="margin:1px 0;"></p>')
+        else:
+            p.append(f'<p style="margin:1px 0; font-size:7pt;">{_esc(line)}</p>')
+
+    # — Pie —
     if ticket_footer:
-        lines.append("")
-        lines.append(ticket_footer)
+        p.append('<hr/>')
+        p.append(f'<p style="text-align:center; margin:3px 0; font-size:7pt;">{_esc(ticket_footer)}</p>')
 
-    return "\n".join(lines).strip()
-
-
-def _build_wrapped_quote_terms_lines() -> list[str]:
-    wrapped_lines: list[str] = []
-    for raw_line in DEFAULT_QUOTE_TERMS_LINES:
-        if not raw_line:
-            wrapped_lines.append("")
-            continue
-        wrapped_lines.extend(wrap(raw_line, width=QUOTE_TERMS_WRAP_WIDTH, break_long_words=False))
-    return wrapped_lines
+    body = "\n".join(p)
+    return (
+        '<html><body style="font-family: Arial, sans-serif; font-size: 8pt; margin: 4px; padding: 0;">'
+        f'{body}'
+        '</body></html>'
+    )
