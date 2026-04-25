@@ -18,10 +18,12 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
+    QWidget,
 )
 
 from pos_uniformes.database.connection import get_session
@@ -325,7 +327,20 @@ class InventoryCountDialog(QDialog):
         footer_card.setLayout(footer_layout)
         layout.addWidget(footer_card)
 
-        self.setLayout(layout)
+        content_widget = QWidget()
+        content_widget.setLayout(layout)
+
+        scroll = QScrollArea()
+        scroll.setWidget(content_widget)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        outer = QVBoxLayout()
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.addWidget(scroll)
+        self.setLayout(outer)
+
         self.batch_table.itemSelectionChanged.connect(self._refresh_batch_action_state)
         self._reset_scan_feedback()
         self.sku_input.setFocus()
