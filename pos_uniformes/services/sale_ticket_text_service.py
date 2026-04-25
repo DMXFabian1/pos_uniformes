@@ -139,6 +139,15 @@ def build_sale_ticket_text(
         cantidad = getattr(detalle, "cantidad", "")
         precio_unitario = getattr(detalle, "precio_unitario", "")
         subtotal_linea = getattr(detalle, "subtotal_linea", "")
+        talla = str(getattr(variante, "talla", "") or "").strip() if variante else ""
+        color = str(getattr(variante, "color", "") or "").strip() if variante else ""
+        meta_parts = [str(sku)]
+        if talla:
+            meta_parts.append(f"Talla {talla}")
+        if color:
+            meta_parts.append(color)
+        meta_parts.append(f"{cantidad} × ${_fmt(precio_unitario)}")
+        meta_str = " &nbsp;·&nbsp; ".join(_esc(part) for part in meta_parts)
         p.append(
             f'<tr>'
             f'<td style="padding-bottom:0;">{_esc(str(producto))}</td>'
@@ -147,9 +156,7 @@ def build_sale_ticket_text(
         )
         p.append(
             f'<tr>'
-            f'<td colspan="2" style="font-size:7pt; color:#666666; padding-top:0;">'
-            f'{_esc(str(sku))} &nbsp;·&nbsp; {_esc(str(cantidad))} × ${_esc(_fmt(precio_unitario))}'
-            f'</td>'
+            f'<td colspan="2" style="font-size:7pt; color:#666666; padding-top:0;">{meta_str}</td>'
             f'</tr>'
         )
     p.append('</table>')
