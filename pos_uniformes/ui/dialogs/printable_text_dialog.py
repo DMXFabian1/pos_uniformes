@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QSizeF
-from PyQt6.QtGui import QPageSize
+from PyQt6.QtGui import QPainter, QPageSize
 from PyQt6.QtPrintSupport import QPrinter
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QMessageBox, QTextEdit, QVBoxLayout, QWidget
 
@@ -52,7 +52,12 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
 
             page_rect = printer.pageRect(QPrinter.Unit.Millimeter)
             doc = build_ticket_document(content, text_width_mm=page_rect.width())
-            doc.print_(printer)
+            painter = QPainter(printer)
+            if not painter.isActive():
+                QMessageBox.warning(dialog, "Error de impresión", "No se pudo iniciar el trabajo de impresión.\nVerifica que la impresora esté conectada.")
+                return
+            doc.drawContents(painter)
+            painter.end()
         except Exception as exc:
             QMessageBox.warning(dialog, "Error de impresión", f"No se pudo imprimir el ticket:\n{exc}")
 
