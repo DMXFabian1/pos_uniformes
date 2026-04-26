@@ -124,6 +124,7 @@ def build_sale_ticket_text(
     # — Artículos —
     lines.append(_sep())
     lines.append("ARTICULOS")
+    lines.append(_sep())
     for detalle in detalles:
         variante = getattr(detalle, "variante", None)
         producto = (
