@@ -128,22 +128,60 @@ def resolve_windows_inventory_label_printer(preferred_printer_name: str) -> Wind
     )
 
 
-_CONTINUOUS_ASSUMED_DPI = 300
-
-
-def _build_continuous_devmode(win32print, printer_name: str, hprinter, label_width_px: int, label_height_px: int):
-    """Devuelve un DEVMODE con el largo de pagina ajustado, o None si falla."""
+def _query_printer_dpi(win32ui, printer_name: str) -> tuple[int, int]:
+    """Devuelve (dpi_x, dpi_y) reales del driver. Fallback 203 (QL-800 estandar)."""
     try:
+        hdc = win32ui.CreateDC()
+        hdc.CreatePrinterDC(printer_name)
+        dpi_x = hdc.GetDeviceCaps(88) or 0  # LOGPIXELSX
+        dpi_y = hdc.GetDeviceCaps(90) or 0  # LOGPIXELSY
+        hdc.DeleteDC()
+        return (dpi_x or 203, dpi_y or 203)
+    except Exception:
+        return (203, 203)
+
+
+def _find_continuous_roll_paper_id(win32print, printer_name: str, target_width_mm10: int) -> int | None:
+    """Busca el ID de rollo continuo (257-264) cuyo ancho coincide con el ancho del rollo actual."""
+    try:
+        paper_ids = win32print.DeviceCapabilities(printer_name, None, win32print.DC_PAPERS)
+        paper_sizes = win32print.DeviceCapabilities(printer_name, None, win32print.DC_PAPERSIZE)
+        if not paper_ids or not paper_sizes:
+            return None
+        candidates = [
+            (pid, w, h) for pid, (w, h) in zip(paper_ids, paper_sizes)
+            if 257 <= pid <= 264
+        ]
+        if not candidates:
+            return None
+        return min(candidates, key=lambda x: abs(x[1] - target_width_mm10))[0]
+    except Exception:
+        return None
+
+
+def _build_continuous_devmode(win32print, win32ui, printer_name: str, hprinter, label_width_px: int, label_height_px: int):
+    """Devuelve un DEVMODE configurado para rollo continuo con el largo exacto de la imagen."""
+    try:
+        dpi_x, dpi_y = _query_printer_dpi(win32ui, printer_name)
+        height_mm10 = max(1, int(round((label_height_px / dpi_y) * 254)))
+        width_mm10 = max(1, int(round((label_width_px / dpi_x) * 254)))
+
         props = win32print.GetPrinter(hprinter, 2)
         devmode = props.get("pDevMode")
         if devmode is None:
             return None
-        height_tenths_mm = max(1, int(round((label_height_px / _CONTINUOUS_ASSUMED_DPI) * 254)))
-        width_tenths_mm = max(1, int(round((label_width_px / _CONTINUOUS_ASSUMED_DPI) * 254)))
-        devmode.PaperSize = 256  # DMPAPER_USER
-        devmode.PaperLength = height_tenths_mm
-        devmode.PaperWidth = width_tenths_mm
-        devmode.Fields = (getattr(devmode, "Fields", 0) or 0) | 0x2 | 0x4 | 0x8
+
+        continuous_id = _find_continuous_roll_paper_id(win32print, printer_name, width_mm10)
+        if continuous_id is not None:
+            devmode.PaperSize = continuous_id
+            devmode.PaperLength = height_mm10
+            devmode.Fields = (getattr(devmode, "Fields", 0) or 0) | 0x2 | 0x4  # PAPERSIZE | PAPERLENGTH
+        else:
+            devmode.PaperSize = 256  # DMPAPER_USER
+            devmode.PaperLength = height_mm10
+            devmode.PaperWidth = width_mm10
+            devmode.Fields = (getattr(devmode, "Fields", 0) or 0) | 0x2 | 0x4 | 0x8
+
         win32print.DocumentProperties(
             0, hprinter, printer_name, devmode, devmode,
             win32print.DM_IN_BUFFER | win32print.DM_OUT_BUFFER,
@@ -183,7 +221,7 @@ def _send_single_label_job(
     try:
         hprinter = win32print.OpenPrinter(printer_name)
         devmode = (
-            _build_continuous_devmode(win32print, printer_name, hprinter, label_width, label_height)
+            _build_continuous_devmode(win32print, win32ui, printer_name, hprinter, label_width, label_height)
             if configure_paper
             else None
         )
