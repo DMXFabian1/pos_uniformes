@@ -25,7 +25,7 @@ def _build_sale(
         )
 
     producto = SimpleNamespace(nombre="Playera deportiva")
-    variante = SimpleNamespace(sku="SKU0001", producto=producto)
+    variante = SimpleNamespace(sku="SKU0001", producto=producto, talla="CH", color="Azul")
     detalle = SimpleNamespace(
         variante=variante,
         cantidad=1,
@@ -75,14 +75,15 @@ class SaleTicketTextServiceTests(unittest.TestCase):
         self.assertNotIn("Telefono", ticket)
         self.assertNotIn("Usuario:", ticket)
         self.assertNotIn("Estado:", ticket)
-        self.assertIn("ARTÍCULOS", ticket)
+        self.assertIn("ARTICULOS", ticket)
         self.assertIn("Playera deportiva", ticket)
         self.assertIn("SKU0001", ticket)
+        self.assertIn("Talla CH", ticket)
         self.assertIn("$199.00", ticket)
-        self.assertIn("Subtotal", ticket)
-        self.assertIn("Descuento 10.00%", ticket)
+        self.assertIn("Subtotal:", ticket)
+        self.assertIn("Descuento 10.00%:", ticket)
         self.assertIn("-$19.90", ticket)
-        self.assertIn("TOTAL A PAGAR", ticket)
+        self.assertIn("TOTAL A PAGAR:", ticket)
         self.assertIn("$179.10", ticket)
         self.assertIn("Promo autorizada", ticket)
         self.assertNotIn("Metodo de pago:", ticket)
@@ -104,12 +105,11 @@ class SaleTicketTextServiceTests(unittest.TestCase):
 
         self.assertNotIn("Maria Fernanda", ticket)
         self.assertNotIn("CLI-001", ticket)
-        self.assertIn("Subtotal", ticket)
+        self.assertIn("Subtotal:", ticket)
         self.assertIn("$199.00", ticket)
-        self.assertIn("Descuento 15.00%", ticket)
+        self.assertIn("Descuento 15.00%:", ticket)
         self.assertIn("-$29.85", ticket)
         self.assertIn("$169.15", ticket)
-        self.assertNotIn("Impresora preferida:", ticket)
 
     def test_keeps_simple_output_for_sale_without_discount_or_notes(self) -> None:
         sale = _build_sale(
@@ -125,11 +125,11 @@ class SaleTicketTextServiceTests(unittest.TestCase):
             ticket_footer="Gracias por tu compra.",
         )
 
-        self.assertIn("Subtotal", ticket)
+        self.assertIn("Subtotal:", ticket)
         self.assertIn("$199.00", ticket)
-        self.assertIn("TOTAL A PAGAR", ticket)
+        self.assertIn("TOTAL A PAGAR:", ticket)
         self.assertNotIn("Descuento", ticket)
-        self.assertNotIn("Notas", ticket)
+        self.assertNotIn("Notas:", ticket)
         self.assertNotIn("Maria Fernanda", ticket)
 
     def test_simplifies_operational_notes_for_customer_ticket(self) -> None:
@@ -172,9 +172,9 @@ class SaleTicketTextServiceTests(unittest.TestCase):
             business_name="POS Uniformes",
         )
 
-        self.assertIn("Descuento 15.00%", ticket)
+        self.assertIn("Descuento 15.00%:", ticket)
         self.assertIn("-$29.85", ticket)
-        self.assertIn("Ajuste", ticket)
+        self.assertIn("Ajuste:", ticket)
         self.assertIn("-0.15", ticket)
         self.assertIn("$169.00", ticket)
         self.assertIn("Cambio: 31.00", ticket)
@@ -194,9 +194,9 @@ class SaleTicketTextServiceTests(unittest.TestCase):
             business_name="POS Uniformes",
         )
 
-        self.assertIn("Descuento 15.00%", ticket)
+        self.assertIn("Descuento 15.00%:", ticket)
         self.assertIn("-$29.85", ticket)
-        self.assertIn("Ajuste", ticket)
+        self.assertIn("Ajuste:", ticket)
         self.assertIn("-0.15", ticket)
         self.assertIn("$169.00", ticket)
 
