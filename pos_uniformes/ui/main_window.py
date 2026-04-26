@@ -11064,11 +11064,12 @@ class MainWindow(QMainWindow):
             current_index=current_index,
             load_context=load_context_for_dialog,
             render_label=render_label,
-            print_label=lambda image_path, copies, sku, parent: self._print_image_path(
+            print_label=lambda image_path, copies, sku, parent, mode: self._print_image_path(
                 image_path,
                 title=f"Etiqueta {sku}",
                 copies=copies,
                 parent=parent,
+                cut_between_copies=(mode == "continuous"),
             ),
         )
 

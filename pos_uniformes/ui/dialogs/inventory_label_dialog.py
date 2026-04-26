@@ -90,7 +90,7 @@ def build_inventory_label_dialog(
     current_index: int,
     load_context: Callable[[int], "InventoryLabelContext"],
     render_label: Callable[[str, int], "LabelRenderResult"],
-    print_label: Callable[[Path, int, str, QDialog | None], bool],
+    print_label: Callable[[Path, int, str, QDialog | None, str], bool],
 ) -> None:
     dialog, layout = window._create_modal_dialog(
         "Imprimir etiqueta",
@@ -133,6 +133,7 @@ def build_inventory_label_dialog(
     mode_combo = QComboBox()
     mode_combo.addItem("Normal", "standard")
     mode_combo.addItem("Split", "split")
+    mode_combo.addItem("Continua", "continuous")
     copies_spin = QSpinBox()
     copies_spin.setRange(1, 500)
     copies_spin.setValue(1)
@@ -269,6 +270,7 @@ def build_inventory_label_dialog(
                 int(result.effective_copies),
                 str(context.sku),
                 dialog,
+                result.mode,
             )
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(dialog, "Impresion fallida", str(exc))
