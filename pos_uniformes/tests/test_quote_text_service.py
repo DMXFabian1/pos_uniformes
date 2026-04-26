@@ -61,7 +61,7 @@ class QuoteTextServiceTests(unittest.TestCase):
         self.assertIn("$449.50", text)
         self.assertIn("Observaciones", text)
         self.assertIn("Entregar impreso.", text)
-        self.assertIn("Términos y condiciones", text)
+        self.assertIn("Terminos y condiciones", text)
         self.assertIn("1. Validez del Presupuesto", text)
         self.assertIn("Los precios son vigentes al momento de emision", text)
         self.assertIn("2. Condiciones de Pago", text)
