@@ -21,6 +21,7 @@ LABELS_OUTPUT_DIR = Path(__file__).resolve().parents[1] / "generated" / "labels"
 STANDARD_SIZE = (992, 271)
 SPLIT_SIZE = (976, 342)
 SPLIT_SECTION_WIDTH = 244
+CONTINUOUS_SIZE = (244, 342)
 QR_SIZE_STANDARD = 231
 QR_SIZE_SPLIT = 231
 
@@ -89,6 +90,9 @@ class LabelGenerator:
         if normalized_mode == "split":
             cls._render_split(variante, qr_path, output_path)
             effective_copies = max(1, math.ceil(max(1, requested_copies) / 4))
+        elif normalized_mode == "continuous":
+            cls._render_continuous(variante, qr_path, output_path)
+            effective_copies = max(1, requested_copies)
         else:
             cls._render_standard(variante, qr_path, output_path)
             effective_copies = max(1, requested_copies)
@@ -154,6 +158,38 @@ class LabelGenerator:
                 draw.text((text_x, text_y), line.text, font=font, fill=0)
                 text_y += cls._line_height(font) + line.gap_after
 
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        label_image.save(output_path, "PNG")
+
+    @classmethod
+    def _render_continuous(cls, variante: Variante, qr_path: Path, output_path: Path) -> None:
+        label_image = Image.new("1", CONTINUOUS_SIZE, 1)
+        draw = ImageDraw.Draw(label_image)
+        qr_image = Image.open(qr_path).convert("1").resize((QR_SIZE_SPLIT, QR_SIZE_SPLIT))
+        qr_x = (CONTINUOUS_SIZE[0] - QR_SIZE_SPLIT) // 2
+        qr_y = 10
+        label_image.paste(qr_image, (qr_x, qr_y))
+        text_area_x = 10
+        text_area_width = CONTINUOUS_SIZE[0] - 20
+        text_area_y = qr_y + QR_SIZE_SPLIT + 8
+        text_area_height = CONTINUOUS_SIZE[1] - text_area_y - 10
+        label_lines = cls._split_label_lines(variante)
+        text_y = text_area_y + max(
+            (text_area_height - cls._measure_split_lines(draw, label_lines, text_area_width)) // 2,
+            0,
+        )
+        for line in label_lines:
+            font = cls._fit_font(
+                draw,
+                line.text,
+                text_area_width,
+                base_size=line.base_size,
+                min_size=line.min_size,
+            )
+            text_width = cls._text_width(draw, line.text, font)
+            text_x = text_area_x + (text_area_width - text_width) // 2
+            draw.text((text_x, text_y), line.text, font=font, fill=0)
+            text_y += cls._line_height(font) + line.gap_after
         output_path.parent.mkdir(parents=True, exist_ok=True)
         label_image.save(output_path, "PNG")
 
