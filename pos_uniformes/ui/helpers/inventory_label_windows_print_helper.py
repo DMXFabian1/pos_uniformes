@@ -176,13 +176,9 @@ def _send_single_label_job(
             _try_set_paper_length(win32print, printer_name, hprinter, label_width, label_height)
         hdc = win32ui.CreateDC()
         hdc.CreatePrinterDC(printer_name)
-        page_w = hdc.GetDeviceCaps(110)  # HORZRES
-        page_h = hdc.GetDeviceCaps(111)  # VERTRES
-        dest_w = page_w if page_w > 0 else label_width
-        dest_h = page_h if page_h > 0 else label_height
         hdc.StartDoc(job_name)
         hdc.StartPage()
-        dib.draw(hdc.GetHandleOutput(), (0, 0, dest_w, dest_h))
+        dib.draw(hdc.GetHandleOutput(), (0, 0, label_width, label_height))
         hdc.EndPage()
         hdc.EndDoc()
     finally:
