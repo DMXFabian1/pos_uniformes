@@ -21,9 +21,10 @@ LABELS_OUTPUT_DIR = Path(__file__).resolve().parents[1] / "generated" / "labels"
 STANDARD_SIZE = (992, 271)
 SPLIT_SIZE = (976, 342)
 SPLIT_SECTION_WIDTH = 244
-CONTINUOUS_SIZE = (244, 342)
+CONTINUOUS_SIZE = (244, 260)
 QR_SIZE_STANDARD = 231
 QR_SIZE_SPLIT = 231
+QR_SIZE_CONTINUOUS = 200
 
 _CONTINUOUS_MODES = {"continuous"}
 _SPLIT_MODES = {"split"}
@@ -163,21 +164,24 @@ class LabelGenerator:
 
     @classmethod
     def _render_continuous(cls, variante: Variante, qr_path: Path, output_path: Path) -> None:
-        label_image = Image.new("1", CONTINUOUS_SIZE, 1)
-        draw = ImageDraw.Draw(label_image)
-        qr_image = Image.open(qr_path).convert("1").resize((QR_SIZE_SPLIT, QR_SIZE_SPLIT))
-        qr_x = (CONTINUOUS_SIZE[0] - QR_SIZE_SPLIT) // 2
-        qr_y = 10
-        label_image.paste(qr_image, (qr_x, qr_y))
-        text_area_x = 10
-        text_area_width = CONTINUOUS_SIZE[0] - 20
-        text_area_y = qr_y + QR_SIZE_SPLIT + 8
-        text_area_height = CONTINUOUS_SIZE[1] - text_area_y - 10
+        draw_temp = ImageDraw.Draw(Image.new("1", (1, 1), 1))
         label_lines = cls._split_label_lines(variante)
-        text_y = text_area_y + max(
-            (text_area_height - cls._measure_split_lines(draw, label_lines, text_area_width)) // 2,
-            0,
-        )
+        text_area_width = CONTINUOUS_SIZE[0] - 20
+        text_block_height = cls._measure_split_lines(draw_temp, label_lines, text_area_width)
+        margin = 5
+        gap = 6
+        label_height = margin + QR_SIZE_CONTINUOUS + gap + text_block_height + margin
+        size = (CONTINUOUS_SIZE[0], label_height)
+
+        label_image = Image.new("1", size, 1)
+        draw = ImageDraw.Draw(label_image)
+        qr_image = Image.open(qr_path).convert("1").resize((QR_SIZE_CONTINUOUS, QR_SIZE_CONTINUOUS))
+        qr_x = (size[0] - QR_SIZE_CONTINUOUS) // 2
+        qr_y = margin
+        label_image.paste(qr_image, (qr_x, qr_y))
+
+        text_x_base = 10
+        text_y = qr_y + QR_SIZE_CONTINUOUS + gap
         for line in label_lines:
             font = cls._fit_font(
                 draw,
@@ -187,9 +191,10 @@ class LabelGenerator:
                 min_size=line.min_size,
             )
             text_width = cls._text_width(draw, line.text, font)
-            text_x = text_area_x + (text_area_width - text_width) // 2
+            text_x = text_x_base + (text_area_width - text_width) // 2
             draw.text((text_x, text_y), line.text, font=font, fill=0)
             text_y += cls._line_height(font) + line.gap_after
+
         output_path.parent.mkdir(parents=True, exist_ok=True)
         label_image.save(output_path, "PNG")
 
