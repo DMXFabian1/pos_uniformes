@@ -128,6 +128,36 @@ def resolve_windows_inventory_label_printer(preferred_printer_name: str) -> Wind
     )
 
 
+_CONTINUOUS_ASSUMED_DPI = 300
+
+
+def _try_set_paper_length(
+    win32print,
+    printer_name: str,
+    hprinter: object,
+    label_width_px: int,
+    label_height_px: int,
+) -> None:
+    """Ajusta el largo de pagina en el driver para rollo continuo via DEVMODE."""
+    try:
+        props = win32print.GetPrinter(hprinter, 2)
+        devmode = props.get("pDevMode")
+        if devmode is None:
+            return
+        height_tenths_mm = max(1, int(round((label_height_px / _CONTINUOUS_ASSUMED_DPI) * 254)))
+        width_tenths_mm = max(1, int(round((label_width_px / _CONTINUOUS_ASSUMED_DPI) * 254)))
+        devmode.PaperSize = 256  # DMPAPER_USER
+        devmode.PaperLength = height_tenths_mm
+        devmode.PaperWidth = width_tenths_mm
+        devmode.Fields = (getattr(devmode, "Fields", 0) or 0) | 0x2 | 0x4 | 0x8
+        win32print.DocumentProperties(
+            0, hprinter, printer_name, devmode, devmode,
+            win32print.DM_IN_BUFFER | win32print.DM_OUT_BUFFER,
+        )
+    except Exception:
+        pass
+
+
 def _send_single_label_job(
     win32print,
     win32ui,
@@ -136,20 +166,34 @@ def _send_single_label_job(
     label_width: int,
     label_height: int,
     job_name: str,
+    configure_paper: bool = False,
 ) -> None:
+    hprinter = None
     hdc = None
     try:
+        hprinter = win32print.OpenPrinter(printer_name)
+        if configure_paper:
+            _try_set_paper_length(win32print, printer_name, hprinter, label_width, label_height)
         hdc = win32ui.CreateDC()
         hdc.CreatePrinterDC(printer_name)
+        page_w = hdc.GetDeviceCaps(110)  # HORZRES
+        page_h = hdc.GetDeviceCaps(111)  # VERTRES
+        dest_w = page_w if page_w > 0 else label_width
+        dest_h = page_h if page_h > 0 else label_height
         hdc.StartDoc(job_name)
         hdc.StartPage()
-        dib.draw(hdc.GetHandleOutput(), (0, 0, label_width, label_height))
+        dib.draw(hdc.GetHandleOutput(), (0, 0, dest_w, dest_h))
         hdc.EndPage()
         hdc.EndDoc()
     finally:
         if hdc is not None:
             try:
                 hdc.DeleteDC()
+            except Exception:
+                pass
+        if hprinter is not None:
+            try:
+                win32print.ClosePrinter(hprinter)
             except Exception:
                 pass
 
@@ -186,6 +230,7 @@ def print_inventory_label_via_windows(
                 label_width,
                 label_height,
                 job_name,
+                configure_paper=True,
             )
         return resolution
 
