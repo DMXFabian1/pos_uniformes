@@ -10896,6 +10896,7 @@ class MainWindow(QMainWindow):
         title: str,
         copies: int,
         parent: QDialog | None = None,
+        cut_between_copies: bool = False,
     ) -> bool:
         image = QImage(str(image_path))
         if image.isNull():
@@ -10912,6 +10913,7 @@ class MainWindow(QMainWindow):
                 sku=title.replace("Etiqueta ", "", 1),
                 copies=copies,
                 preferred_printer_name=preferred_printer,
+                cut_between_copies=cut_between_copies,
             )
             if resolution.fallback_used:
                 QMessageBox.information(
@@ -11102,11 +11104,12 @@ class MainWindow(QMainWindow):
             self,
             contexts=contexts,
             render_label=render_label,
-            print_label=lambda image_path, copies, sku, parent: self._print_image_path(
+            print_label=lambda image_path, copies, sku, parent, mode: self._print_image_path(
                 image_path,
                 title=f"Etiqueta {sku}",
                 copies=copies,
                 parent=parent,
+                cut_between_copies=(mode == "continuous"),
             ),
         )
 

@@ -24,6 +24,9 @@ SPLIT_SECTION_WIDTH = 244
 QR_SIZE_STANDARD = 231
 QR_SIZE_SPLIT = 231
 
+_CONTINUOUS_MODES = {"continuous"}
+_SPLIT_MODES = {"split"}
+
 
 @dataclass(frozen=True)
 class LabelRenderResult:
@@ -45,14 +48,24 @@ class LabelGenerator:
     """Renderiza etiquetas basicas con los dos formatos heredados del sistema legacy."""
 
     @classmethod
+    def _normalize_mode(cls, mode: str) -> str:
+        raw = str(mode).strip().lower()
+        if raw in _SPLIT_MODES:
+            return "split"
+        if raw in _CONTINUOUS_MODES:
+            return "continuous"
+        return "standard"
+
+    @classmethod
     def output_dir(cls, mode: str) -> Path:
-        directory = LABELS_OUTPUT_DIR / ("split" if mode == "split" else "standard")
+        folder = "split" if mode == "split" else ("continuous" if mode == "continuous" else "standard")
+        directory = LABELS_OUTPUT_DIR / folder
         directory.mkdir(parents=True, exist_ok=True)
         return directory
 
     @classmethod
     def path_for_variant(cls, variante: Variante, mode: str) -> Path:
-        suffix = "split" if mode == "split" else "standard"
+        suffix = mode if mode in {"split", "continuous"} else "standard"
         return cls.output_dir(mode) / f"{variante.sku}_{suffix}.png"
 
     @classmethod
@@ -70,7 +83,7 @@ class LabelGenerator:
         mode: str = "standard",
         requested_copies: int = 1,
     ) -> LabelRenderResult:
-        normalized_mode = "split" if str(mode).strip().lower() == "split" else "standard"
+        normalized_mode = cls._normalize_mode(mode)
         qr_path = cls.ensure_qr(variante)
         output_path = cls.path_for_variant(variante, normalized_mode)
         if normalized_mode == "split":

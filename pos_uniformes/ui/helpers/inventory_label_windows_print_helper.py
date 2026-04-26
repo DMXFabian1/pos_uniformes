@@ -128,30 +128,75 @@ def resolve_windows_inventory_label_printer(preferred_printer_name: str) -> Wind
     )
 
 
+def _send_single_label_job(
+    win32print,
+    win32ui,
+    printer_name: str,
+    dib: "ImageWin.Dib",
+    label_width: int,
+    label_height: int,
+    job_name: str,
+) -> None:
+    hdc = None
+    try:
+        hdc = win32ui.CreateDC()
+        hdc.CreatePrinterDC(printer_name)
+        hdc.StartDoc(job_name)
+        hdc.StartPage()
+        dib.draw(hdc.GetHandleOutput(), (0, 0, label_width, label_height))
+        hdc.EndPage()
+        hdc.EndDoc()
+    finally:
+        if hdc is not None:
+            try:
+                hdc.DeleteDC()
+            except Exception:
+                pass
+
+
 def print_inventory_label_via_windows(
     image_path: Path,
     *,
     sku: str,
     copies: int,
     preferred_printer_name: str,
+    cut_between_copies: bool = False,
 ) -> WindowsInventoryLabelPrinterResolution:
-    """Imprime la etiqueta como bitmap monocromatico usando el spooler de Windows."""
+    """Imprime la etiqueta como bitmap monocromatico usando el spooler de Windows.
+
+    Cuando cut_between_copies=True, cada copia se envia como trabajo independiente
+    para garantizar el corte automatico en impresoras de rollo continuo.
+    """
     win32print, win32ui = _load_win32_modules()
     resolution = resolve_windows_inventory_label_printer(preferred_printer_name)
 
-    hprinter = None
-    hdc = None
     image = Image.open(image_path).convert("L").point(lambda value: 0 if value < 128 else 255, "1")
     label_width, label_height = image.size
     dib = ImageWin.Dib(image)
     job_name = f"Etiqueta {str(sku or '').strip() or 'inventario'}"
+    total_copies = max(1, int(copies))
 
+    if cut_between_copies:
+        for _copy_index in range(total_copies):
+            _send_single_label_job(
+                win32print,
+                win32ui,
+                resolution.printer_name,
+                dib,
+                label_width,
+                label_height,
+                job_name,
+            )
+        return resolution
+
+    hprinter = None
+    hdc = None
     try:
         hprinter = win32print.OpenPrinter(resolution.printer_name)
         hdc = win32ui.CreateDC()
         hdc.CreatePrinterDC(resolution.printer_name)
         hdc.StartDoc(job_name)
-        for _copy_index in range(max(1, int(copies))):
+        for _copy_index in range(total_copies):
             hdc.StartPage()
             dib.draw(hdc.GetHandleOutput(), (0, 0, label_width, label_height))
             hdc.EndPage()

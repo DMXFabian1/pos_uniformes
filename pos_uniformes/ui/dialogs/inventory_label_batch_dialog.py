@@ -107,7 +107,7 @@ def build_inventory_label_batch_dialog(
     *,
     contexts: list["InventoryLabelContext"],
     render_label: Callable[[int, str, int], "LabelRenderResult"],
-    print_label: Callable[[Path, int, str, QDialog | None], bool],
+    print_label: Callable[[Path, int, str, QDialog | None, str], bool],
 ) -> None:
     dialog, layout = window._create_modal_dialog(
         "Imprimir etiquetas por lote",
@@ -123,6 +123,7 @@ def build_inventory_label_batch_dialog(
     mode_combo = QComboBox()
     mode_combo.addItem("Normal", "standard")
     mode_combo.addItem("Split", "split")
+    mode_combo.addItem("Continua", "continuous")
     mode_hint = QLabel(build_inventory_label_mode_hint("standard"))
     mode_hint.setWordWrap(True)
     mode_hint.setObjectName("subtleLine")
@@ -214,6 +215,7 @@ def build_inventory_label_batch_dialog(
                     int(result.effective_copies),
                     str(context.sku),
                     dialog,
+                    result.mode,
                 )
             except Exception as exc:  # noqa: BLE001
                 failed_lines.append(f"{context.sku}: {exc}")
