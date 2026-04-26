@@ -131,19 +131,13 @@ def resolve_windows_inventory_label_printer(preferred_printer_name: str) -> Wind
 _CONTINUOUS_ASSUMED_DPI = 300
 
 
-def _try_set_paper_length(
-    win32print,
-    printer_name: str,
-    hprinter: object,
-    label_width_px: int,
-    label_height_px: int,
-) -> None:
-    """Ajusta el largo de pagina en el driver para rollo continuo via DEVMODE."""
+def _build_continuous_devmode(win32print, printer_name: str, hprinter, label_width_px: int, label_height_px: int):
+    """Devuelve un DEVMODE con el largo de pagina ajustado, o None si falla."""
     try:
         props = win32print.GetPrinter(hprinter, 2)
         devmode = props.get("pDevMode")
         if devmode is None:
-            return
+            return None
         height_tenths_mm = max(1, int(round((label_height_px / _CONTINUOUS_ASSUMED_DPI) * 254)))
         width_tenths_mm = max(1, int(round((label_width_px / _CONTINUOUS_ASSUMED_DPI) * 254)))
         devmode.PaperSize = 256  # DMPAPER_USER
@@ -154,8 +148,24 @@ def _try_set_paper_length(
             0, hprinter, printer_name, devmode, devmode,
             win32print.DM_IN_BUFFER | win32print.DM_OUT_BUFFER,
         )
+        return devmode
     except Exception:
-        pass
+        return None
+
+
+def _create_printer_hdc(win32ui, printer_name: str, devmode=None):
+    """Crea un HDC de impresora. Si se pasa devmode lo usa via win32gui.CreateDC."""
+    if devmode is not None:
+        try:
+            import win32gui
+            raw_hdc = win32gui.CreateDC("WINSPOOL", printer_name, None, devmode)
+            if raw_hdc:
+                return win32ui.CreateDCFromHandle(raw_hdc)
+        except Exception:
+            pass
+    hdc = win32ui.CreateDC()
+    hdc.CreatePrinterDC(printer_name)
+    return hdc
 
 
 def _send_single_label_job(
@@ -172,10 +182,12 @@ def _send_single_label_job(
     hdc = None
     try:
         hprinter = win32print.OpenPrinter(printer_name)
-        if configure_paper:
-            _try_set_paper_length(win32print, printer_name, hprinter, label_width, label_height)
-        hdc = win32ui.CreateDC()
-        hdc.CreatePrinterDC(printer_name)
+        devmode = (
+            _build_continuous_devmode(win32print, printer_name, hprinter, label_width, label_height)
+            if configure_paper
+            else None
+        )
+        hdc = _create_printer_hdc(win32ui, printer_name, devmode)
         hdc.StartDoc(job_name)
         hdc.StartPage()
         dib.draw(hdc.GetHandleOutput(), (0, 0, label_width, label_height))
