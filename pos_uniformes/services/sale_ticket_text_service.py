@@ -9,7 +9,7 @@ from pos_uniformes.services.sale_ticket_totals_service import resolve_sale_ticke
 from pos_uniformes.utils.date_format import format_display_datetime
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 
-_W = 42  # ancho en caracteres para papel de 80 mm a 8 pt
+_W = 38  # ancho en caracteres para papel de 80 mm a 8 pt bold
 
 
 def _sep(char: str = "─") -> str:
