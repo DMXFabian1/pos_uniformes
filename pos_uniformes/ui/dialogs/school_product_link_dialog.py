@@ -320,6 +320,7 @@ class SchoolProductLinkDialog(QDialog):
         try:
             with get_session() as session:
                 add_school_product_link(session, escuela_id=escuela_id, producto_id=producto_id)
+                session.commit()
         except ValueError as exc:
             self._set_status(str(exc), tone="warning")
             return
@@ -336,6 +337,7 @@ class SchoolProductLinkDialog(QDialog):
         try:
             with get_session() as session:
                 remove_school_product_link(session, link_id=link_id)
+                session.commit()
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Error", str(exc))
             return

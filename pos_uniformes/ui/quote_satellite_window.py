@@ -2273,8 +2273,8 @@ QLabel#favDialogPriceLabel {
         dialog = QDialog(self)
         dialog.setWindowTitle("Los favoritos de Maximoda")
         dialog.setModal(True)
-        dialog.setMinimumWidth(960)
-        dialog.setMinimumHeight(660)
+        dialog.setMinimumWidth(1104)
+        dialog.setMinimumHeight(759)
         dialog.setStyleSheet(build_satellite_stylesheet() + _extra_css)
 
         root = QVBoxLayout()

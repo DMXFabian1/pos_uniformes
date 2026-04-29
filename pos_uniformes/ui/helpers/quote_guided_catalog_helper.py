@@ -967,10 +967,10 @@ def _inject_linked_products(
         return school_mode_rows
 
     school_to_nivel: dict[str, str] = {}
-    for row in school_mode_rows:
+    for row in all_active_rows:
         school = str(row.get("escuela_nombre") or "").strip()
         nivel = str(row.get("nivel_educativo_nombre") or "").strip()
-        if school and school != "General":
+        if school and school != "General" and nivel:
             school_to_nivel.setdefault(school, nivel)
 
     already_in_school: dict[str, set[str]] = {}

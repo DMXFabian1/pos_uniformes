@@ -483,5 +483,84 @@ def _row(
     }
 
 
+    def test_school_links_inject_general_product_into_school(self) -> None:
+        school_links = [
+            {
+                "escuela_nombre": "Colegio Mexico",
+                "producto_nombre_base": "Pantalón Azul",
+            }
+        ]
+        snapshot_rows = [
+            _row("SKU-OFICIAL", "Primaria", "Colegio Mexico", "Niño", "Oficial", producto="Camisa Escolar", pieza="Camisa"),
+            _row("SKU-GENERAL", "Sin nivel", "General", "Unisex", "Oficial", producto="Pantalón Azul", pieza="Pantalón"),
+        ]
+
+        view = build_guided_catalog_view(
+            snapshot_rows=snapshot_rows,
+            mode_key="school",
+            level_filter="Primaria",
+            school_filter="Colegio Mexico",
+            gender_filter="TODOS",
+            school_links=school_links,
+        )
+
+        titles = [card.title for card in view.product_cards]
+        self.assertIn("Pantalón Azul", titles)
+        self.assertIn("Camisa Escolar", titles)
+
+    def test_school_links_nivel_derived_from_all_rows_not_just_official(self) -> None:
+        """School with only OTRO-type own products still gets correct nivel for injected products."""
+        school_links = [
+            {
+                "escuela_nombre": "Colegio Mexico",
+                "producto_nombre_base": "Pantalón General",
+            }
+        ]
+        snapshot_rows = [
+            # School has a product but it's OTRO type (not OFICIAL/DEPORTIVO) — won't appear in school_mode_rows
+            _row("SKU-OTRO", "Primaria", "Colegio Mexico", "Unisex", "Casual", producto="Bolso Escolar", pieza="Accesorio"),
+            # General product to inject
+            _row("SKU-GENERAL", "Sin nivel", "General", "Unisex", "Oficial", producto="Pantalón General", pieza="Pantalón"),
+        ]
+
+        view = build_guided_catalog_view(
+            snapshot_rows=snapshot_rows,
+            mode_key="school",
+            level_filter="Primaria",
+            school_filter="Colegio Mexico",
+            gender_filter="TODOS",
+            school_links=school_links,
+        )
+
+        self.assertIn("Primaria", [opt.key for opt in view.level_options])
+        self.assertIn("Colegio Mexico", [opt.key for opt in view.school_options])
+        titles = [card.title for card in view.product_cards]
+        self.assertIn("Pantalón General", titles)
+
+    def test_school_links_no_duplicate_if_school_already_has_product(self) -> None:
+        school_links = [
+            {
+                "escuela_nombre": "Colegio Mexico",
+                "producto_nombre_base": "Camisa Escolar",
+            }
+        ]
+        snapshot_rows = [
+            _row("SKU-OWN", "Primaria", "Colegio Mexico", "Niño", "Oficial", producto="Camisa Escolar", pieza="Camisa"),
+            _row("SKU-GEN", "Sin nivel", "General", "Unisex", "Oficial", producto="Camisa Escolar", pieza="Camisa"),
+        ]
+
+        view = build_guided_catalog_view(
+            snapshot_rows=snapshot_rows,
+            mode_key="school",
+            level_filter="Primaria",
+            school_filter="Colegio Mexico",
+            gender_filter="TODOS",
+            school_links=school_links,
+        )
+
+        titles = [card.title for card in view.product_cards]
+        self.assertEqual(titles.count("Camisa Escolar"), 1)
+
+
 if __name__ == "__main__":
     unittest.main()
