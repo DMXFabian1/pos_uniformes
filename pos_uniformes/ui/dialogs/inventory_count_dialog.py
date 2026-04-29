@@ -449,8 +449,9 @@ class InventoryCountDialog(QDialog):
         self._refresh_batch_table()
         self._clear_batch_selection()
         if current_row is not None:
+            mode_label = "Ingreso de mercancia" if self._add_to_system_mode else "Conteo uno a uno"
             self.batch_status_label.setText(
-                f"Conteo uno a uno: {variant.sku} | contado {current_row.stock_contado} | sistema {current_row.stock_sistema} | delta {current_row.delta:+d}"
+                f"{mode_label}: {variant.sku} | contado {current_row.stock_contado} | sistema {current_row.stock_sistema} | delta {current_row.delta:+d}"
             )
             self._set_scan_feedback(f"{variant.sku} sumado", tone="success")
         self.sku_input.clear()
@@ -528,7 +529,8 @@ class InventoryCountDialog(QDialog):
         counted_spin = self.batch_table.cellWidget(row_index, 3)
         if not isinstance(counted_spin, QSpinBox):
             counted_spin = QSpinBox()
-            counted_spin.setRange(0, 100000)
+            spin_min = int(row.values[2]) if self._add_to_system_mode else 0
+            counted_spin.setRange(spin_min, 100000)
             counted_spin.installEventFilter(self)
             counted_line_edit = counted_spin.lineEdit()
             if counted_line_edit is not None:
@@ -603,7 +605,8 @@ class InventoryCountDialog(QDialog):
             QMessageBox.information(self, "Sin fila", "Selecciona una fila del lote para restar una pieza.")
             return
         selected = self._rows[current_row]
-        new_counted_stock = max(0, int(selected.stock_contado) - 1)
+        min_stock = int(selected.stock_sistema) if self._add_to_system_mode else 0
+        new_counted_stock = max(min_stock, int(selected.stock_contado) - 1)
         self._rows = update_inventory_count_row_counted_stock(
             self._rows,
             variante_id=int(selected.variante_id),
@@ -721,8 +724,10 @@ class InventoryCountDialog(QDialog):
 
         batch_view = build_inventory_count_batch_view(self._rows)
         reference = str(payload["reference"]).strip() or f"CONTEO-{uuid4().hex[:8].upper()}"
+        mode_label = "Ingreso de mercancia" if self._add_to_system_mode else "Conteo fisico"
         confirmation_text = "\n".join(
             (
+                f"Modo: {mode_label}",
                 f"Referencia: {reference}",
                 *batch_view.confirmation_lines,
                 "",
