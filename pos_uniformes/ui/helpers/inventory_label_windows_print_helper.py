@@ -191,21 +191,6 @@ def _build_continuous_devmode(win32print, win32ui, printer_name: str, hprinter, 
         return None
 
 
-def _create_printer_hdc(win32ui, printer_name: str, devmode=None):
-    """Crea un HDC de impresora. Si se pasa devmode lo usa via win32gui.CreateDC."""
-    if devmode is not None:
-        try:
-            import win32gui
-            raw_hdc = win32gui.CreateDC("WINSPOOL", printer_name, None, devmode)
-            if raw_hdc:
-                return win32ui.CreateDCFromHandle(raw_hdc)
-        except Exception:
-            pass
-    hdc = win32ui.CreateDC()
-    hdc.CreatePrinterDC(printer_name)
-    return hdc
-
-
 def _send_single_label_job(
     win32print,
     win32ui,
@@ -218,14 +203,26 @@ def _send_single_label_job(
 ) -> None:
     hprinter = None
     hdc = None
+    original_devmode = None
     try:
         hprinter = win32print.OpenPrinter(printer_name)
-        devmode = (
-            _build_continuous_devmode(win32print, win32ui, printer_name, hprinter, label_width, label_height)
-            if configure_paper
-            else None
-        )
-        hdc = _create_printer_hdc(win32ui, printer_name, devmode)
+
+        if configure_paper:
+            try:
+                original_devmode = win32print.GetPrinter(hprinter, 8).get("pDevMode")
+            except Exception:
+                pass
+            devmode = _build_continuous_devmode(
+                win32print, win32ui, printer_name, hprinter, label_width, label_height
+            )
+            if devmode is not None:
+                try:
+                    win32print.SetPrinter(hprinter, 8, {"pDevMode": devmode}, 0)
+                except Exception:
+                    pass
+
+        hdc = win32ui.CreateDC()
+        hdc.CreatePrinterDC(printer_name)
         hdc.StartDoc(job_name)
         hdc.StartPage()
         dib.draw(hdc.GetHandleOutput(), (0, 0, label_width, label_height))
@@ -235,6 +232,11 @@ def _send_single_label_job(
         if hdc is not None:
             try:
                 hdc.DeleteDC()
+            except Exception:
+                pass
+        if original_devmode is not None and hprinter is not None:
+            try:
+                win32print.SetPrinter(hprinter, 8, {"pDevMode": original_devmode}, 0)
             except Exception:
                 pass
         if hprinter is not None:
