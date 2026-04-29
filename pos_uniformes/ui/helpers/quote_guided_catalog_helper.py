@@ -99,6 +99,7 @@ def build_guided_catalog_view(
     piece_filter: str = "",
     selected_product_key: str = "",
     selected_sku: str = "",
+    school_links: list[dict] | None = None,
 ) -> GuidedCatalogView:
     active_rows = [row for row in snapshot_rows if _is_active_row(row)]
     normalized_mode = "basics" if mode_key == "basics" else "school"
@@ -112,6 +113,8 @@ def build_guided_catalog_view(
     mode_rows = [
         row for row in active_rows if _matches_mode(row=row, mode_key=normalized_mode)
     ]
+    if normalized_mode == "school" and school_links:
+        mode_rows = _inject_linked_products(mode_rows, active_rows, school_links)
     level_options = _build_level_options(mode_rows) if normalized_mode == "school" else tuple()
     school_options = (
         _build_school_options(mode_rows, level_filter=normalized_level) if normalized_mode == "school" else tuple()
@@ -941,3 +944,61 @@ def _deportivo_priority(row: dict[str, object]) -> int:
 
 def _contains_any(text: str, patterns: tuple[str, ...]) -> bool:
     return any(pattern in text for pattern in patterns)
+
+
+def _inject_linked_products(
+    school_mode_rows: list[dict[str, object]],
+    all_active_rows: list[dict[str, object]],
+    school_links: list[dict],
+) -> list[dict[str, object]]:
+    """Agrega filas sintéticas para productos generales ligados manualmente a escuelas.
+
+    Los productos ligados aparecen junto a los productos propios de la escuela
+    en el flujo guiado, sin modificar el catálogo original.
+    """
+    links_by_school: dict[str, set[str]] = {}
+    for link in school_links:
+        school = str(link.get("escuela_nombre") or "").strip()
+        nombre_base = _normalize_text(link.get("producto_nombre_base") or "")
+        if school and nombre_base:
+            links_by_school.setdefault(school, set()).add(nombre_base)
+
+    if not links_by_school:
+        return school_mode_rows
+
+    school_to_nivel: dict[str, str] = {}
+    for row in school_mode_rows:
+        school = str(row.get("escuela_nombre") or "").strip()
+        nivel = str(row.get("nivel_educativo_nombre") or "").strip()
+        if school and school != "General":
+            school_to_nivel.setdefault(school, nivel)
+
+    already_in_school: dict[str, set[str]] = {}
+    for row in school_mode_rows:
+        school = str(row.get("escuela_nombre") or "").strip()
+        nombre_base = _normalize_text(row.get("producto_nombre_base") or "")
+        if school and school != "General":
+            already_in_school.setdefault(school, set()).add(nombre_base)
+
+    general_rows = [
+        row for row in all_active_rows
+        if str(row.get("escuela_nombre") or "General").strip() == "General"
+    ]
+
+    injected: list[dict[str, object]] = []
+    for school, linked_names in links_by_school.items():
+        nivel = school_to_nivel.get(school, "")
+        existing_for_school = already_in_school.get(school, set())
+        for row in general_rows:
+            nombre_base_normalized = _normalize_text(row.get("producto_nombre_base") or "")
+            if nombre_base_normalized not in linked_names:
+                continue
+            if nombre_base_normalized in existing_for_school:
+                continue
+            synthetic = dict(row)
+            synthetic["escuela_nombre"] = school
+            synthetic["nivel_educativo_nombre"] = nivel
+            synthetic["_linked"] = True
+            injected.append(synthetic)
+
+    return school_mode_rows + injected

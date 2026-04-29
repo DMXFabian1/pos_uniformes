@@ -1352,6 +1352,30 @@ class ApartadoDetalle(Base):
     variante: Mapped["Variante"] = relationship(back_populates="apartados_detalle")
 
 
+class CatalogSchoolProductLink(Base):
+    """Liga manual entre un producto general y una escuela para el catálogo guiado."""
+
+    __tablename__ = "catalog_school_product_link"
+    __table_args__ = (
+        UniqueConstraint("escuela_id", "producto_id", name="uq_school_product_link"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    escuela_id: Mapped[int] = mapped_column(
+        ForeignKey("escuela.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    producto_id: Mapped[int] = mapped_column(
+        ForeignKey("producto.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    activo: Mapped[bool] = mapped_column(default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    escuela: Mapped["Escuela"] = relationship()
+    producto: Mapped["Producto"] = relationship()
+
+
 class ApartadoAbono(Base):
     __tablename__ = "apartado_abono"
     __table_args__ = (

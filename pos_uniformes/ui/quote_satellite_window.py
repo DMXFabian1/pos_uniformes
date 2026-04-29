@@ -58,6 +58,9 @@ from pos_uniformes.services.catalog_local_cache_service import (
     format_cache_age_label,
     save_catalog_cache,
 )
+from pos_uniformes.services.catalog_school_link_service import list_all_active_links
+from pos_uniformes.services.school_links_cache_service import load_school_links_cache, save_school_links_cache
+from pos_uniformes.ui.dialogs.school_product_link_dialog import prompt_school_product_link_admin
 from pos_uniformes.services.satellite_favorites_service import load_favorites, seed_favorites_from_bundle, toggle_favorite
 from pos_uniformes.services.catalog_snapshot_service import load_catalog_snapshot_rows
 from pos_uniformes.services.client_service import ClientService
@@ -210,6 +213,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.catalog_browser_debounce_timer.timeout.connect(self._run_catalog_browser_refresh)
         seed_favorites_from_bundle()
         self._favorites: set[str] = load_favorites()
+        self._school_links: list[dict] = load_school_links_cache()
 
         self._build_widgets()
         self._apply_icons()
@@ -1461,6 +1465,9 @@ class QuoteSatelliteWindow(QMainWindow):
         _guided_ctrl_p = QShortcut(QKeySequence("Ctrl+P"), self.guided_page_scroll)
         _guided_ctrl_p.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         _guided_ctrl_p.activated.connect(self._print_label_for_guided_selection)
+        _guided_ctrl_shift_l = QShortcut(QKeySequence("Ctrl+Shift+L"), self.guided_page_scroll)
+        _guided_ctrl_shift_l.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        _guided_ctrl_shift_l.activated.connect(self._open_school_product_link_admin)
         self.catalog_previous_page_button.clicked.connect(self._handle_catalog_browser_previous_page)
         self.catalog_next_page_button.clicked.connect(self._handle_catalog_browser_next_page)
         self.guided_add_button.clicked.connect(self._handle_add_guided_selection_to_quote)
@@ -1556,11 +1563,15 @@ class QuoteSatelliteWindow(QMainWindow):
 
     def _refresh_catalog_snapshot(self, session) -> None:
         self.catalog_snapshot_rows = load_catalog_snapshot_rows(session)
-        # Guardar cache local para que el proximo arranque sin conexion pueda usarla.
         try:
             save_catalog_cache(self.catalog_snapshot_rows)
         except Exception:  # noqa: BLE001
-            pass  # Un fallo al guardar cache no debe interrumpir el flujo normal.
+            pass
+        try:
+            self._school_links = list_all_active_links(session)
+            save_school_links_cache(self._school_links)
+        except Exception:  # noqa: BLE001
+            pass
         self._rebuild_catalog_level_combo()
 
     def _refresh_catalog_snapshot_from_cache(self) -> None:
@@ -1868,6 +1879,7 @@ class QuoteSatelliteWindow(QMainWindow):
             piece_filter=self._gfs.piece,
             selected_product_key=self._gfs.product_key,
             selected_sku=self._gfs.sku,
+            school_links=self._school_links or None,
         )
         if self._correct_guided_state(view):
             return
@@ -2174,6 +2186,28 @@ class QuoteSatelliteWindow(QMainWindow):
                 return
         toggle_favorite(product_key)
         self._favorites = set(load_favorites())
+        self._refresh_guided_browser()
+
+    def _open_school_product_link_admin(self) -> None:
+        if self.offline_mode:
+            QMessageBox.information(
+                self,
+                "No disponible",
+                "La administración de ligas requiere conexión con la PC principal.",
+            )
+            return
+        prompt_school_product_link_admin(
+            self,
+            on_links_changed=self._reload_school_links,
+        )
+
+    def _reload_school_links(self) -> None:
+        try:
+            with get_session() as session:
+                self._school_links = list_all_active_links(session)
+                save_school_links_cache(self._school_links)
+        except Exception:  # noqa: BLE001
+            pass
         self._refresh_guided_browser()
 
     def _open_favorites_dialog(self) -> None:
