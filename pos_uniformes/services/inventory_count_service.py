@@ -124,13 +124,15 @@ def accumulate_inventory_count_scan(
     *,
     variant: InventoryCountVariantView,
     step: int = 1,
+    add_to_system: bool = False,
 ) -> list[InventoryCountRow]:
     normalized_step = max(1, int(step))
     existing_row = next((row for row in rows if int(row.variante_id) == int(variant.variante_id)), None)
     if existing_row is None:
+        base = int(variant.stock_actual) if add_to_system else 0
         return upsert_inventory_count_row(
             rows,
-            build_inventory_count_row(variant, counted_stock=normalized_step),
+            build_inventory_count_row(variant, counted_stock=base + normalized_step),
         )
     return update_inventory_count_row_counted_stock(
         rows,

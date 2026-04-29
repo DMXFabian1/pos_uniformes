@@ -8,6 +8,7 @@ from uuid import uuid4
 from PyQt6.QtCore import QEvent, QTimer, Qt
 from PyQt6.QtGui import QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
+    QButtonGroup,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -18,6 +19,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QRadioButton,
     QScrollArea,
     QSpinBox,
     QTableWidget,
@@ -80,6 +82,7 @@ class InventoryCountDialog(QDialog):
         self._scan_feedback_reset_timer.setSingleShot(True)
         self._scan_feedback_reset_timer.setInterval(1200)
         self._scan_feedback_reset_timer.timeout.connect(self._reset_scan_feedback)
+        self._add_to_system_mode = False
         self.setWindowTitle("Conteo fisico")
         self.setModal(True)
         self.resize(960, 720)
@@ -99,6 +102,31 @@ class InventoryCountDialog(QDialog):
         helper.setObjectName("analyticsLine")
         helper.setStyleSheet("padding: 2px 0; color: #5f6d78;")
         layout.addWidget(helper)
+
+        mode_card = QFrame()
+        mode_card.setObjectName("infoSubcard")
+        mode_card.setStyleSheet("QFrame#infoSubcard { border: 1px solid #d9e5ef; }")
+        mode_layout = QHBoxLayout()
+        mode_layout.setContentsMargins(14, 10, 14, 10)
+        mode_layout.setSpacing(16)
+        mode_label = QLabel("Modo:")
+        mode_label.setObjectName("inventoryFilterLabel")
+        self._radio_conteo = QRadioButton("Conteo fisico")
+        self._radio_conteo.setChecked(True)
+        self._radio_ingreso = QRadioButton("Agregar mercancia")
+        self._mode_group = QButtonGroup(self)
+        self._mode_group.addButton(self._radio_conteo, 0)
+        self._mode_group.addButton(self._radio_ingreso, 1)
+        self._mode_hint = QLabel("Reemplaza el stock con lo que cuentes fisicamente.")
+        self._mode_hint.setObjectName("analyticsLine")
+        self._mode_hint.setStyleSheet("color: #5f6d78;")
+        mode_layout.addWidget(mode_label)
+        mode_layout.addWidget(self._radio_conteo)
+        mode_layout.addWidget(self._radio_ingreso)
+        mode_layout.addSpacing(8)
+        mode_layout.addWidget(self._mode_hint, 1)
+        mode_card.setLayout(mode_layout)
+        layout.addWidget(mode_card)
 
         scan_header_card = QFrame()
         scan_header_card.setObjectName("infoSubcard")
@@ -342,8 +370,18 @@ class InventoryCountDialog(QDialog):
         self.setLayout(outer)
 
         self.batch_table.itemSelectionChanged.connect(self._refresh_batch_action_state)
+        self._mode_group.idToggled.connect(self._handle_mode_changed)
         self._reset_scan_feedback()
         self.sku_input.setFocus()
+
+    def _handle_mode_changed(self, button_id: int, checked: bool) -> None:
+        if not checked:
+            return
+        self._add_to_system_mode = button_id == 1
+        if self._add_to_system_mode:
+            self._mode_hint.setText("Suma las piezas escaneadas al stock actual del sistema.")
+        else:
+            self._mode_hint.setText("Reemplaza el stock con lo que cuentes fisicamente.")
 
     def _handle_lookup_sku(self) -> None:
         sku = self.sku_input.text().strip()
@@ -374,6 +412,7 @@ class InventoryCountDialog(QDialog):
             self._rows,
             variant=variant,
             step=1,
+            add_to_system=self._add_to_system_mode,
         )
         current_row = next(
             (row for row in self._rows if int(row.variante_id) == int(variant.variante_id)),
