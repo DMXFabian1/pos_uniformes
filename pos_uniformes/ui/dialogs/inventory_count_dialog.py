@@ -378,7 +378,27 @@ class InventoryCountDialog(QDialog):
     def _handle_mode_changed(self, button_id: int, checked: bool) -> None:
         if not checked:
             return
-        self._add_to_system_mode = button_id == 1
+        new_mode_is_add = button_id == 1
+        if new_mode_is_add == self._add_to_system_mode:
+            return
+        if self._rows:
+            answer = QMessageBox.question(
+                self,
+                "Cambiar modo",
+                "Cambiar de modo borrara las filas ya capturadas porque los valores no son compatibles.\n\n¿Deseas continuar?",
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                self._mode_group.blockSignals(True)
+                self._radio_conteo.setChecked(not self._add_to_system_mode)
+                self._radio_ingreso.setChecked(self._add_to_system_mode)
+                self._mode_group.blockSignals(False)
+                return
+            self._rows = []
+            self._refresh_batch_table()
+            self._clear_batch_selection()
+            self._selected_variant = None
+            self._refresh_selected_variant_card()
+        self._add_to_system_mode = new_mode_is_add
         if self._add_to_system_mode:
             self._mode_hint.setText("Suma las piezas escaneadas al stock actual del sistema.")
         else:
