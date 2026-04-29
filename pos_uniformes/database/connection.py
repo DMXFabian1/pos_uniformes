@@ -26,6 +26,7 @@ engine: Engine = create_engine(
     settings.database_url,
     echo=settings.db_echo,
     future=True,
+    connect_args={"connect_timeout": 5},
 )
 
 SessionLocal = sessionmaker(

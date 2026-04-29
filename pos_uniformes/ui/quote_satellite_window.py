@@ -3976,12 +3976,14 @@ QLabel#favDialogPriceLabel {
             from pos_uniformes.ui.helpers.inventory_label_windows_print_helper import (
                 print_inventory_label_via_windows,
             )
-            try:
-                with get_session() as session:
-                    from pos_uniformes.services.business_print_settings_service import load_business_print_settings_snapshot
-                    preferred_printer = load_business_print_settings_snapshot(session).preferred_printer
-            except Exception:
-                preferred_printer = ""
+            preferred_printer = ""
+            if not self.offline_mode:
+                try:
+                    with get_session() as session:
+                        from pos_uniformes.services.business_print_settings_service import load_business_print_settings_snapshot
+                        preferred_printer = load_business_print_settings_snapshot(session).preferred_printer
+                except Exception:
+                    preferred_printer = ""
             resolution = print_inventory_label_via_windows(
                 image_path,
                 sku=title.replace("Etiqueta ", "", 1),
