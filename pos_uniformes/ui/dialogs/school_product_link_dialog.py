@@ -15,7 +15,6 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QScrollArea,
-    QSizePolicy,
     QVBoxLayout,
     QWidget,
 )
@@ -264,11 +263,14 @@ class SchoolProductLinkDialog(QDialog):
     def _rebuild_links_panel(self, links: list[dict]) -> None:
         while self._links_inner_layout.count() > 1:
             item = self._links_inner_layout.takeAt(0)
-            if item and item.widget():
-                item.widget().deleteLater()
+            if item:
+                widget = item.widget()
+                if widget is not None and widget is not self._empty_links_label:
+                    widget.deleteLater()
 
         if not links:
-            self._links_inner_layout.insertWidget(0, self._empty_links_label)
+            if self._links_inner_layout.indexOf(self._empty_links_label) < 0:
+                self._links_inner_layout.insertWidget(0, self._empty_links_label)
             self._empty_links_label.setVisible(True)
             return
 
