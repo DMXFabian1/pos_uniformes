@@ -244,6 +244,7 @@ class InventoryCountDialog(QDialog):
         self.counted_spin.setRange(0, 100000)
         self.counted_spin.setEnabled(False)
         self.counted_spin.setMinimumWidth(140)
+        self.counted_spin.installEventFilter(self)
         self.add_button = QPushButton("Aplicar contado manual")
         self.add_button.setObjectName("toolbarPrimaryButton")
         self.add_button.setAutoDefault(False)
@@ -657,6 +658,12 @@ class InventoryCountDialog(QDialog):
         return False
 
     def eventFilter(self, watched, event):  # type: ignore[override]
+        if event.type() == QEvent.Type.Wheel:
+            target = watched
+            while target is not None:
+                if isinstance(target, QSpinBox):
+                    return True
+                target = target.parent() if callable(getattr(target, "parent", None)) else None
         if watched is self.sku_input and event.type() == QEvent.Type.KeyPress and event.key() in (
             Qt.Key.Key_Return,
             Qt.Key.Key_Enter,
