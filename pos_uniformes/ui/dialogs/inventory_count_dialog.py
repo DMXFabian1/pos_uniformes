@@ -441,6 +441,8 @@ class InventoryCountDialog(QDialog):
         )
         self._refresh_selected_variant_card()
         if current_row is not None:
+            spin_min = int(current_row.stock_sistema) if self._add_to_system_mode else 0
+            self.counted_spin.setMinimum(spin_min)
             self.counted_spin.setValue(int(current_row.stock_contado))
         self.counted_spin.setEnabled(True)
         self.add_button.setEnabled(True)
@@ -475,6 +477,7 @@ class InventoryCountDialog(QDialog):
         self.sku_input.clear()
         self._selected_variant = None
         self._refresh_selected_variant_card()
+        self.counted_spin.setMinimum(0)
         self.counted_spin.setValue(0)
         self.counted_spin.setEnabled(False)
         self.add_button.setEnabled(False)

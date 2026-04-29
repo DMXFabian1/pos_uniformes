@@ -187,6 +187,40 @@ class InventoryCountServiceTests(unittest.TestCase):
         self.assertEqual(updated_rows[0].stock_contado, 6)
         self.assertEqual(updated_rows[0].delta, -3)
 
+    def test_accumulate_inventory_count_scan_add_to_system_starts_from_system_stock(self) -> None:
+        variant = InventoryCountVariantView(
+            variante_id=5,
+            sku="SKU000005",
+            producto_nombre="Playera",
+            talla="CH",
+            color="Azul",
+            escuela_nombre="General",
+            stock_actual=10,
+        )
+
+        rows = accumulate_inventory_count_scan([], variant=variant, add_to_system=True)
+
+        self.assertEqual(rows[0].stock_sistema, 10)
+        self.assertEqual(rows[0].stock_contado, 11)
+        self.assertEqual(rows[0].delta, 1)
+
+    def test_accumulate_inventory_count_scan_add_to_system_continues_accumulating(self) -> None:
+        variant = InventoryCountVariantView(
+            variante_id=5,
+            sku="SKU000005",
+            producto_nombre="Playera",
+            talla="CH",
+            color="Azul",
+            escuela_nombre="General",
+            stock_actual=10,
+        )
+        rows = accumulate_inventory_count_scan([], variant=variant, add_to_system=True)
+
+        rows = accumulate_inventory_count_scan(rows, variant=variant, add_to_system=True)
+
+        self.assertEqual(rows[0].stock_contado, 12)
+        self.assertEqual(rows[0].delta, 2)
+
     def test_accumulate_inventory_count_scan_increments_existing_variant(self) -> None:
         variant = InventoryCountVariantView(
             variante_id=11,
