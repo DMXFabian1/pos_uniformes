@@ -229,8 +229,13 @@ class SchoolProductLinkDialog(QDialog):
             return
 
         self._school_list.clear()
+        name_counts: dict[str, int] = {}
         for school in self._all_schools:
-            item = QListWidgetItem(str(school["escuela_nombre"]))
+            name_counts[str(school["escuela_nombre"])] = name_counts.get(str(school["escuela_nombre"]), 0) + 1
+        for school in self._all_schools:
+            name = str(school["escuela_nombre"])
+            label = f"{name} (id {school['escuela_id']})" if name_counts[name] > 1 else name
+            item = QListWidgetItem(label)
             item.setData(Qt.ItemDataRole.UserRole, school["escuela_id"])
             self._school_list.addItem(item)
 

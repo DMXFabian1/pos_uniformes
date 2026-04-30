@@ -955,30 +955,40 @@ def _inject_linked_products(
 
     Los productos ligados aparecen junto a los productos propios de la escuela
     en el flujo guiado, sin modificar el catálogo original.
+    Usa escuela_id como clave para manejar correctamente escuelas con el mismo nombre.
     """
-    links_by_school: dict[str, set[str]] = {}
+    # Agrupar links por escuela_id para no confundir escuelas con mismo nombre
+    links_by_id: dict[int, tuple[str, set[str]]] = {}
     for link in school_links:
-        school = str(link.get("escuela_nombre") or "").strip()
+        eid = link.get("escuela_id")
+        school_name = str(link.get("escuela_nombre") or "").strip()
         nombre_base = _normalize_text(link.get("producto_nombre_base") or "")
-        if school and nombre_base:
-            links_by_school.setdefault(school, set()).add(nombre_base)
+        if eid is None or not school_name or not nombre_base:
+            continue
+        eid = int(eid)
+        if eid not in links_by_id:
+            links_by_id[eid] = (school_name, set())
+        links_by_id[eid][1].add(nombre_base)
 
-    if not links_by_school:
+    if not links_by_id:
         return school_mode_rows
 
-    school_to_nivel: dict[str, str] = {}
+    # Nivel por escuela_id (primera ocurrencia no vacía)
+    id_to_nivel: dict[int, str] = {}
     for row in all_active_rows:
-        school = str(row.get("escuela_nombre") or "").strip()
+        eid = row.get("escuela_id")
         nivel = str(row.get("nivel_educativo_nombre") or "").strip()
-        if school and school != "General" and nivel:
-            school_to_nivel.setdefault(school, nivel)
+        if eid is not None and nivel and str(row.get("escuela_nombre") or "") not in ("", "General"):
+            id_to_nivel.setdefault(int(eid), nivel)
 
-    already_in_school: dict[str, set[str]] = {}
+    # Productos ya presentes en la escuela (por escuela_id)
+    already_in_school: dict[int, set[str]] = {}
     for row in school_mode_rows:
+        eid = row.get("escuela_id")
         school = str(row.get("escuela_nombre") or "").strip()
         nombre_base = _normalize_text(row.get("producto_nombre_base") or "")
-        if school and school != "General":
-            already_in_school.setdefault(school, set()).add(nombre_base)
+        if eid is not None and school and school != "General":
+            already_in_school.setdefault(int(eid), set()).add(nombre_base)
 
     general_rows = [
         row for row in all_active_rows
@@ -986,17 +996,18 @@ def _inject_linked_products(
     ]
 
     injected: list[dict[str, object]] = []
-    for school, linked_names in links_by_school.items():
-        nivel = school_to_nivel.get(school, "")
-        existing_for_school = already_in_school.get(school, set())
+    for escuela_id, (school_name, linked_names) in links_by_id.items():
+        nivel = id_to_nivel.get(escuela_id, "")
+        existing = already_in_school.get(escuela_id, set())
         for row in general_rows:
             nombre_base_normalized = _normalize_text(row.get("producto_nombre_base") or "")
             if nombre_base_normalized not in linked_names:
                 continue
-            if nombre_base_normalized in existing_for_school:
+            if nombre_base_normalized in existing:
                 continue
             synthetic = dict(row)
-            synthetic["escuela_nombre"] = school
+            synthetic["escuela_id"] = escuela_id
+            synthetic["escuela_nombre"] = school_name
             synthetic["nivel_educativo_nombre"] = nivel
             synthetic["_linked"] = True
             injected.append(synthetic)

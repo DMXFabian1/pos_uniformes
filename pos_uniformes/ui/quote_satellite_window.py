@@ -366,6 +366,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.quote_note_input = QTextEdit()
         self.quote_draft_button = QPushButton("Guardar borrador")
         self.quote_emit_button = QPushButton("Emitir")
+        self.quote_print_cart_button = QPushButton("Imprimir")
         self.quote_qty_down_button = QPushButton("-1")
         self.quote_qty_up_button = QPushButton("+1")
         self.quote_remove_button = QPushButton("Quitar linea")
@@ -1241,6 +1242,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.quote_note_input.setPlaceholderText("Observaciones adicionales")
         self.quote_draft_button.setObjectName("ghostButton")
         self.quote_emit_button.setObjectName("primaryButton")
+        self.quote_print_cart_button.setObjectName("ghostButton")
         self.quote_qty_down_button.setObjectName("ghostButton")
         self.quote_qty_up_button.setObjectName("ghostButton")
         self.quote_remove_button.setObjectName("secondaryButton")
@@ -1287,6 +1289,7 @@ class QuoteSatelliteWindow(QMainWindow):
         actions.setSpacing(8)
         actions.addWidget(self.quote_draft_button)
         actions.addWidget(self.quote_emit_button)
+        actions.addWidget(self.quote_print_cart_button)
         actions.addStretch()
         actions.addWidget(self.quote_qty_down_button)
         actions.addWidget(self.quote_qty_up_button)
@@ -1481,6 +1484,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.quote_clear_button.clicked.connect(self._handle_clear_quote_cart)
         self.quote_draft_button.clicked.connect(self._handle_save_quote_draft)
         self.quote_emit_button.clicked.connect(self._handle_emit_quote)
+        self.quote_print_cart_button.clicked.connect(self._handle_print_cart)
         self.quote_create_client_button.clicked.connect(self._handle_create_quote_client)
         self.quote_search_input.textChanged.connect(self._handle_quote_filters_changed)
         self.quote_state_combo.currentIndexChanged.connect(self._handle_quote_filters_changed)
@@ -3530,6 +3534,25 @@ QLabel#favDialogPriceLabel {
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "No se pudo cancelar", str(exc))
 
+    def _handle_print_cart(self) -> None:
+        if not self.quote_cart:
+            QMessageBox.warning(self, "Presupuesto vacio", "Agrega al menos un producto al presupuesto.")
+            return
+        folio = self._generate_quote_folio()
+        client_name = self.quote_client_combo.currentText().strip() or "Mostrador / sin cliente"
+        notes = self.quote_note_input.toPlainText().strip()
+        validity_date = self.quote_validity_input.date().toPyDate()
+        cart_view = build_quote_cart_view(self.quote_cart)
+        content = _build_cart_ticket_text(
+            folio=folio,
+            client_name=client_name,
+            cart=self.quote_cart,
+            total=cart_view.total,
+            validity_date=validity_date,
+            notes=notes,
+        )
+        open_printable_text_dialog(self, f"Presupuesto {folio}", content)
+
     def _handle_print_quote(self) -> None:
         quote_id = self._selected_quote_id()
         if quote_id is None:
@@ -3968,6 +3991,7 @@ QLabel#favDialogPriceLabel {
         title: str,
         copies: int,
         parent: "QDialog | None" = None,
+        cut_between_copies: bool = False,
     ) -> bool:
         image = QImage(str(image_path))
         if image.isNull():
@@ -3989,6 +4013,7 @@ QLabel#favDialogPriceLabel {
                 sku=title.replace("Etiqueta ", "", 1),
                 copies=copies,
                 preferred_printer_name=preferred_printer,
+                cut_between_copies=cut_between_copies,
             )
             if resolution.fallback_used:
                 QMessageBox.information(
@@ -4089,11 +4114,12 @@ QLabel#favDialogPriceLabel {
                 current_index=_off_index,
                 load_context=_load_context_offline,
                 render_label=_render_label_offline,
-                print_label=lambda image_path, copies, sku_val, parent: self._print_satellite_label(
+                print_label=lambda image_path, copies, sku_val, parent, mode: self._print_satellite_label(
                     image_path,
                     title=f"Etiqueta {sku_val}",
                     copies=copies,
                     parent=parent,
+                    cut_between_copies=(mode == "continuous"),
                 ),
             )
             return
@@ -4148,11 +4174,12 @@ QLabel#favDialogPriceLabel {
             current_index=current_index,
             load_context=_load_context,
             render_label=_render_label,
-            print_label=lambda image_path, copies, sku_val, parent: self._print_satellite_label(
+            print_label=lambda image_path, copies, sku_val, parent, mode: self._print_satellite_label(
                 image_path,
                 title=f"Etiqueta {sku_val}",
                 copies=copies,
                 parent=parent,
+                cut_between_copies=(mode == "continuous"),
             ),
         )
 
@@ -4306,6 +4333,73 @@ def _catalog_row_icon(row: dict[str, object]) -> QPixmap:
             if token in candidate:
                 return _scaled_asset_pixmap(asset_name, 72)
     return _scaled_asset_pixmap("qr_icons/default.png", 72)
+
+
+def _build_cart_ticket_text(
+    *,
+    folio: str,
+    client_name: str,
+    cart: list[dict],
+    total: object,
+    validity_date: object,
+    notes: str,
+) -> str:
+    from pos_uniformes.services.quote_text_service import DEFAULT_QUOTE_TERMS_LINES
+
+    _W = 38
+
+    def _sep() -> str:
+        return "─" * _W
+
+    def _center(text: str) -> str:
+        return text.center(_W)
+
+    def _row(label: str, value: str) -> str:
+        gap = _W - len(label) - len(value)
+        return f"{label}{' ' * max(1, gap)}{value}"
+
+    def _fmt(value: object) -> str:
+        try:
+            return str(Decimal(str(value)).quantize(Decimal("0.01")))
+        except Exception:  # noqa: BLE001
+            return str(value)
+
+    lines: list[str] = []
+    lines.append(_center("POS Uniformes"))
+    lines.append(_center("Presupuesto"))
+    lines.append(_sep())
+    lines.append(_row("Folio:", folio))
+    lines.append(_row("Cliente:", client_name))
+    if validity_date is not None:
+        try:
+            lines.append(_row("Vigencia:", validity_date.strftime("%d/%m/%Y")))
+        except Exception:  # noqa: BLE001
+            pass
+    lines.append(_sep())
+    lines.append("PIEZAS")
+    lines.append(_sep())
+    for item in cart:
+        qty = int(item["cantidad"])
+        unit_price = Decimal(str(item["precio_unitario"])).quantize(Decimal("0.01"))
+        subtotal = (unit_price * qty).quantize(Decimal("0.01"))
+        description = str(item.get("producto_nombre") or item.get("sku", ""))
+        sku = str(item["sku"])
+        lines.append("")
+        lines.append(description)
+        lines.append(_row(f"{sku} | {qty} x ${unit_price}", f"${subtotal}"))
+    lines.append("")
+    lines.append(_sep())
+    lines.append(_row("TOTAL ESTIMADO:", f"${_fmt(total)}"))
+    lines.append(_sep())
+    if notes:
+        lines.append("Observaciones:")
+        lines.append(notes)
+        lines.append("")
+    lines.append("Terminos y condiciones")
+    lines.append(_sep())
+    for term_line in DEFAULT_QUOTE_TERMS_LINES:
+        lines.append(term_line)
+    return "\n".join(lines)
 
 
 def _build_offline_whatsapp_message(

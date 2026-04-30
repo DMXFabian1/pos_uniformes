@@ -1,4 +1,4 @@
-<#
+﻿<#
 .SYNOPSIS
     Deja la PC satelite lista de una sola vez.
 
@@ -61,7 +61,7 @@ param(
     [string]$ShortcutName = "Presupuestos Satelite",
 
     # Registra la app para que abra automaticamente al iniciar sesion en Windows.
-    # Usa la carpeta Startup del usuario — no requiere permisos de administrador.
+    # Usa la carpeta Startup del usuario - no requiere permisos de administrador.
     # Se agrega un retraso de 15 segundos para que la red este lista primero.
     [switch]$AutoStart,
 
@@ -118,10 +118,10 @@ Write-Ok "Carpeta: $TargetDir"
 Write-Ok "Ejecutable: $($exe.Name)"
 
 # ---------------------------------------------------------------------------
-# Paso 1 — Escribir pos_uniformes.env en AppData (persiste entre updates)
+# Paso 1 -Escribir pos_uniformes.env en AppData (persiste entre updates)
 # ---------------------------------------------------------------------------
 
-Write-Step "Paso 1 — Configurar pos_uniformes.env"
+Write-Step "Paso 1 -Configurar pos_uniformes.env"
 
 $appDataDir = Join-Path $env:APPDATA "PresupuestosSatelite"
 $envFile    = Join-Path $appDataDir "pos_uniformes.env"
@@ -149,10 +149,10 @@ if ($DryRun) {
 }
 
 # ---------------------------------------------------------------------------
-# Paso 2 — Probar conexion (no bloquea)
+# Paso 2 -Probar conexion (no bloquea)
 # ---------------------------------------------------------------------------
 
-Write-Step "Paso 2 — Probar conexion con la PC principal ($DbHost`:$DbPort)"
+Write-Step "Paso 2 -Probar conexion con la PC principal ($DbHost`:$DbPort)"
 
 if ($DryRun) {
     Write-Dry "Saltando prueba de conexion en dry-run"
@@ -168,10 +168,10 @@ if ($DryRun) {
 }
 
 # ---------------------------------------------------------------------------
-# Paso 3 — Crear acceso directo en el escritorio
+# Paso 3 -Crear acceso directo en el escritorio
 # ---------------------------------------------------------------------------
 
-Write-Step "Paso 3 — Crear acceso directo en el escritorio"
+Write-Step "Paso 3 -Crear acceso directo en el escritorio"
 
 $desktopPath  = [Environment]::GetFolderPath("Desktop")
 $shortcutPath = Join-Path $desktopPath "$ShortcutName.lnk"
@@ -184,17 +184,17 @@ if ($DryRun) {
     $shortcut.TargetPath       = $exe.FullName
     $shortcut.WorkingDirectory = $TargetDir
     $shortcut.IconLocation     = $exe.FullName
-    $shortcut.Description      = "Presupuestos Satelite — POS Uniformes"
+    $shortcut.Description      = "Presupuestos Satelite -POS Uniformes"
     $shortcut.Save()
     Write-Ok "Acceso directo creado: $shortcutPath"
 }
 
 # ---------------------------------------------------------------------------
-# Paso 4 — Arranque automatico (opcional)
+# Paso 4 -Arranque automatico (opcional)
 # ---------------------------------------------------------------------------
 
 if ($RemoveAutoStart) {
-    Write-Step "Paso 4 — Quitar arranque automatico"
+    Write-Step "Paso 4 -Quitar arranque automatico"
     if ($DryRun) {
         Write-Dry "Eliminaria $startupShortcut si existe"
     } elseif (Test-Path $startupShortcut) {
@@ -204,7 +204,7 @@ if ($RemoveAutoStart) {
         Write-Ok "No habia arranque automatico configurado."
     }
 } elseif ($AutoStart) {
-    Write-Step "Paso 4 — Configurar arranque automatico al iniciar sesion"
+    Write-Step "Paso 4 -Configurar arranque automatico al iniciar sesion"
     Write-Host "  Metodo: carpeta Startup del usuario (no requiere administrador)" -ForegroundColor DarkGray
     Write-Host "  Retraso: 15 segundos para que la red este lista primero" -ForegroundColor DarkGray
 
@@ -229,14 +229,14 @@ oShell.Run """$($exe.FullName)""", 1, False
         $shortcut2.TargetPath       = "wscript.exe"
         $shortcut2.Arguments        = """$wrapperPath"""
         $shortcut2.WorkingDirectory = $TargetDir
-        $shortcut2.Description      = "Presupuestos Satelite — arranque automatico"
+        $shortcut2.Description      = "Presupuestos Satelite -arranque automatico"
         $shortcut2.Save()
 
         Write-Ok "Arranque automatico configurado: $startupShortcut"
         Write-Ok "Wrapper creado: $wrapperPath"
     }
 } else {
-    Write-Step "Paso 4 — Arranque automatico"
+    Write-Step "Paso 4 -Arranque automatico"
     Write-Host "  Omitido. Usa -AutoStart para configurarlo." -ForegroundColor DarkGray
 }
 

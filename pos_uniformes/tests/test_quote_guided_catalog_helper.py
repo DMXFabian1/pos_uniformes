@@ -452,6 +452,9 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
         self.assertEqual([card.sku for card in view.product_cards], ["SKU-1", "SKU-3"])
 
 
+_SCHOOL_ID: dict[str, int] = {"General": 0, "Colegio Mexico": 1, "Escuela Deportiva": 2}
+
+
 def _row(
     sku: str,
     nivel: str,
@@ -467,6 +470,7 @@ def _row(
         "sku": sku,
         "nivel_educativo_nombre": nivel,
         "escuela_nombre": escuela,
+        "escuela_id": _SCHOOL_ID.get(escuela, 99),
         "categoria_nombre": categoria,
         "producto_genero": genero,
         "producto_nombre": producto or f"Producto {sku}",
@@ -486,6 +490,7 @@ def _row(
     def test_school_links_inject_general_product_into_school(self) -> None:
         school_links = [
             {
+                "escuela_id": 1,
                 "escuela_nombre": "Colegio Mexico",
                 "producto_nombre_base": "Pantalón Azul",
             }
@@ -512,6 +517,7 @@ def _row(
         """School with only OTRO-type own products still gets correct nivel for injected products."""
         school_links = [
             {
+                "escuela_id": 1,
                 "escuela_nombre": "Colegio Mexico",
                 "producto_nombre_base": "Pantalón General",
             }
@@ -540,6 +546,7 @@ def _row(
     def test_school_links_no_duplicate_if_school_already_has_product(self) -> None:
         school_links = [
             {
+                "escuela_id": 1,
                 "escuela_nombre": "Colegio Mexico",
                 "producto_nombre_base": "Camisa Escolar",
             }
