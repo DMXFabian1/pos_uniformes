@@ -68,6 +68,10 @@ def build_quote_text(
         lines.append(_center(f"Tel: {business_phone}"))
     lines.append(_center("Presupuesto"))
     lines.append(_sep())
+    lines.append(_center("ESTE NO ES UN COMPROBANTE"))
+    lines.append(_center("FISCAL NI DE COMPRA"))
+    lines.append(_center("Precios solo de referencia"))
+    lines.append(_sep())
 
     # — Datos —
     cliente_nombre = (
