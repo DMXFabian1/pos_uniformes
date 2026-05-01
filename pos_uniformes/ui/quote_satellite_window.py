@@ -66,6 +66,12 @@ from pos_uniformes.services.satellite_favorites_service import load_favorites, s
 from pos_uniformes.services.catalog_snapshot_service import load_catalog_snapshot_rows
 from pos_uniformes.services.client_service import ClientService
 from pos_uniformes.services.presupuesto_service import PresupuestoService
+from pos_uniformes.services.offline_quote_storage_service import (
+    delete_offline_quote,
+    get_offline_quote,
+    list_offline_quotes,
+    save_offline_quote,
+)
 from pos_uniformes.services.quote_client_creation_feedback_service import build_quote_client_created_feedback
 from pos_uniformes.services.quote_action_service import cancel_quote, emit_quote
 from pos_uniformes.services.quote_detail_service import QuoteDetailSnapshot, load_quote_detail_snapshot
@@ -201,6 +207,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self.selected_quote_state = ""
         self.selected_quote_phone = ""
         self._current_share_snapshot: QuoteDetailSnapshot | None = None
+        self.offline_saved_quotes_table: QTableWidget | None = None
+        self.offline_saved_box: QGroupBox | None = None
         self.lookup_snapshot: QuoteKioskLookupSnapshot | None = None
         self.lookup_history: list[QuoteKioskLookupSnapshot] = []
         self.catalog_snapshot_rows: list[dict[str, object]] = []
@@ -267,6 +275,7 @@ class QuoteSatelliteWindow(QMainWindow):
         # Refrescar vistas que no necesitan DB
         self._refresh_catalog_snapshot_from_cache()
         self._refresh_catalog_browser()
+        self._refresh_offline_saved_list()
         self._refresh_guided_browser()
         self._set_status("Modo local — catalogo guardado disponible.")
 
@@ -1224,6 +1233,7 @@ class QuoteSatelliteWindow(QMainWindow):
         layout.setSpacing(12)
         layout.addWidget(self._build_editor_form_panel())
         layout.addWidget(self._build_editor_cart_panel(), 1)
+        layout.addWidget(self._build_offline_saved_panel())
         panel.setLayout(layout)
         return panel
 
@@ -1346,6 +1356,93 @@ class QuoteSatelliteWindow(QMainWindow):
         cart_layout.addWidget(self.quote_school_summary_label)
         cart_box.setLayout(cart_layout)
         return cart_box
+
+    def _build_offline_saved_panel(self) -> QGroupBox:
+        box = QGroupBox("Guardados localmente (sin conexion)")
+        box.setObjectName("infoCard")
+        layout = QVBoxLayout()
+        layout.setSpacing(8)
+
+        table = QTableWidget()
+        table.setColumnCount(4)
+        table.setHorizontalHeaderLabels(["Folio", "Cliente", "Total", "Acciones"])
+        table.verticalHeader().setVisible(False)
+        table.setSelectionBehavior(table.SelectionBehavior.SelectRows)
+        table.setEditTriggers(table.EditTrigger.NoEditTriggers)
+        table.setAlternatingRowColors(True)
+        table.setMinimumHeight(120)
+        table.setMaximumHeight(220)
+        header = table.horizontalHeader()
+        header.setSectionResizeMode(0, header.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, header.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, header.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(3, header.ResizeMode.ResizeToContents)
+
+        self.offline_saved_quotes_table = table
+        self.offline_saved_box = box
+        layout.addWidget(table)
+        box.setLayout(layout)
+        box.setVisible(False)
+        return box
+
+    def _refresh_offline_saved_list(self) -> None:
+        if self.offline_saved_quotes_table is None or self.offline_saved_box is None:
+            return
+        quotes = list_offline_quotes()
+        self.offline_saved_box.setVisible(bool(quotes))
+        table = self.offline_saved_quotes_table
+        table.setRowCount(len(quotes))
+        for row_idx, q in enumerate(quotes):
+            folio = str(q.get("folio", ""))
+            table.setItem(row_idx, 0, _table_item(folio))
+            table.setItem(row_idx, 1, _table_item(str(q.get("client_name", ""))))
+            table.setItem(row_idx, 2, _table_item(f"${q.get('total', '0')}"))
+            btn_widget = QWidget()
+            btn_layout = QHBoxLayout()
+            btn_layout.setContentsMargins(4, 2, 4, 2)
+            btn_layout.setSpacing(4)
+            print_btn = QPushButton("Imprimir")
+            print_btn.setObjectName("ghostButton")
+            del_btn = QPushButton("Eliminar")
+            del_btn.setObjectName("dangerButton")
+            print_btn.clicked.connect(lambda _checked, f=folio: self._handle_print_offline_quote(f))
+            del_btn.clicked.connect(lambda _checked, f=folio: self._handle_delete_offline_quote(f))
+            btn_layout.addWidget(print_btn)
+            btn_layout.addWidget(del_btn)
+            btn_widget.setLayout(btn_layout)
+            table.setCellWidget(row_idx, 3, btn_widget)
+
+    def _handle_print_offline_quote(self, folio: str) -> None:
+        q = get_offline_quote(folio)
+        if q is None:
+            QMessageBox.warning(self, "No encontrado", f"El presupuesto {folio} no existe.")
+            return
+        from datetime import date
+        try:
+            validity_str = q.get("validity_date", "")
+            validity_date = date.fromisoformat(validity_str) if validity_str else None
+        except Exception:
+            validity_date = None
+        cart_view = build_quote_cart_view(q.get("cart", []))
+        content = _build_cart_ticket_text(
+            folio=folio,
+            client_name=str(q.get("client_name", "Sin cliente")),
+            cart=q.get("cart", []),
+            total=cart_view.total,
+            validity_date=validity_date,
+            notes=str(q.get("notes", "")),
+        )
+        open_printable_text_dialog(self, f"Presupuesto {folio}", content)
+
+    def _handle_delete_offline_quote(self, folio: str) -> None:
+        reply = QMessageBox.question(
+            self,
+            "Eliminar presupuesto local",
+            f"¿Eliminar el presupuesto {folio} del almacenamiento local?\nEsta accion no se puede deshacer.",
+        )
+        if reply == QMessageBox.StandardButton.Yes:
+            delete_offline_quote(folio)
+            self._refresh_offline_saved_list()
 
     def _build_history_panel(self) -> QWidget:
         panel = QWidget()
@@ -2874,7 +2971,7 @@ QLabel#favDialogPriceLabel {
     def _add_quote_item_by_sku(self, sku: str, quantity: int) -> None:
         feedback = build_quote_guard_feedback(
             "add_item",
-            can_operate=self._can_operate(),
+            can_operate=self._can_build_cart(),
         )
         if feedback is not None:
             QMessageBox.warning(self, feedback.title, feedback.message)
@@ -2883,6 +2980,10 @@ QLabel#favDialogPriceLabel {
         normalized_sku = sku.strip().upper()
         if not normalized_sku:
             QMessageBox.warning(self, "Datos incompletos", "Captura un SKU antes de agregarlo.")
+            return
+
+        if self.offline_mode:
+            self._add_quote_item_from_cache(normalized_sku, quantity)
             return
 
         try:
@@ -2908,6 +3009,33 @@ QLabel#favDialogPriceLabel {
         self._refresh_quote_cart_table()
         self.kiosk_scan_input.setFocus()
         self._set_status(result.feedback_message)
+
+    def _add_quote_item_from_cache(self, normalized_sku: str, quantity: int) -> None:
+        row = next(
+            (r for r in self.catalog_snapshot_rows if str(r.get("sku", "")).upper() == normalized_sku),
+            None,
+        )
+        if row is None:
+            QMessageBox.warning(self, "SKU no encontrado", f"'{normalized_sku}' no esta en el catalogo local.")
+            return
+        product_name = str(row.get("producto_nombre_base") or row.get("producto_nombre") or normalized_sku)
+        unit_price = Decimal(str(row.get("precio_venta") or "0"))
+        existing = next((i for i in self.quote_cart if str(i.get("sku", "")) == normalized_sku), None)
+        if existing:
+            existing["cantidad"] = int(existing["cantidad"]) + quantity
+        else:
+            self.quote_cart.append({
+                "sku": normalized_sku,
+                "producto_nombre": product_name,
+                "cantidad": quantity,
+                "precio_unitario": unit_price,
+                "talla": str(row.get("talla") or ""),
+                "nivel_educativo_nombre": str(row.get("nivel_educativo_nombre") or ""),
+                "escuela_nombre": str(row.get("escuela_nombre") or ""),
+            })
+        self._refresh_quote_cart_table()
+        self.kiosk_scan_input.setFocus()
+        self._set_status(f"Agregado: {product_name} ({normalized_sku})")
 
     def _handle_recent_scan_selection(self) -> None:
         selected_row = self.kiosk_recent_table.currentRow()
@@ -3010,14 +3138,41 @@ QLabel#favDialogPriceLabel {
 
     def _handle_save_quote_draft(self) -> None:
         if self.offline_mode:
-            QMessageBox.information(
-                self,
-                "Sin conexión",
-                "El borrador requiere conexión con la PC principal.\n"
-                "Usa 'Emitir' para compartir el presupuesto por WhatsApp.",
-            )
+            self._handle_offline_save_draft()
             return
         self._persist_quote(EstadoPresupuesto.BORRADOR)
+
+    def _handle_offline_save_draft(self) -> None:
+        if not self.quote_cart:
+            QMessageBox.warning(self, "Presupuesto vacio", "Agrega al menos un producto al presupuesto.")
+            return
+        folio = self._generate_quote_folio()
+        client_name = self.quote_client_combo.currentText().strip() or "Mostrador / sin cliente"
+        notes = self.quote_note_input.toPlainText().strip()
+        validity_date = self.quote_validity_input.date().toPyDate()
+        cart_view = build_quote_cart_view(self.quote_cart)
+        try:
+            save_offline_quote(
+                folio=folio,
+                client_name=client_name,
+                client_phone="",
+                notes=notes,
+                validity_date=validity_date,
+                cart=self.quote_cart,
+                total=cart_view.total,
+            )
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Error al guardar", f"No se pudo guardar localmente:\n{exc}")
+            return
+        self.quote_cart.clear()
+        self._refresh_quote_cart_table()
+        self._refresh_offline_saved_list()
+        self._set_status(f"Presupuesto {folio} guardado localmente.")
+        QMessageBox.information(
+            self,
+            "Guardado localmente",
+            f"Presupuesto {folio} guardado.\nAparece en la lista inferior. Puedes imprimirlo desde ahi.",
+        )
 
     def _handle_emit_quote(self) -> None:
         if self.offline_mode:

@@ -22,10 +22,21 @@ def _load_print_preferences() -> tuple[str, int]:
             config = BusinessSettingsService.get_or_create(session)
             ticket_printer = config.impresora_tickets or ""
             copies = config.copias_ticket or 1
+        # Guarda en cache local para que el modo offline pueda imprimir sin DB
+        try:
+            from pos_uniformes.services.ticket_print_settings_cache_service import save_ticket_print_settings
+            save_ticket_print_settings(ticket_printer, copies)
+        except Exception:
+            pass
+        return ticket_printer, copies
     except Exception:
-        ticket_printer = ""
-        copies = 1
-    return ticket_printer, copies
+        pass
+    # Fallback: cache guardado en el ultimo arranque online
+    try:
+        from pos_uniformes.services.ticket_print_settings_cache_service import load_ticket_print_settings
+        return load_ticket_print_settings()
+    except Exception:
+        return "", 1
 
 
 def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> None:
