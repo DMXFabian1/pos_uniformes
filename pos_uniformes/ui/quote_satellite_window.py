@@ -67,8 +67,7 @@ from pos_uniformes.services.client_service import ClientService
 from pos_uniformes.services.presupuesto_service import PresupuestoService
 from pos_uniformes.services.quote_client_creation_feedback_service import build_quote_client_created_feedback
 from pos_uniformes.services.quote_action_service import cancel_quote, emit_quote
-from pos_uniformes.services.quote_detail_service import load_quote_detail_snapshot
-from pos_uniformes.services.quote_document_view_service import build_quote_document_view
+from pos_uniformes.services.quote_detail_service import QuoteDetailSnapshot, load_quote_detail_snapshot
 from pos_uniformes.services.quote_editor_service import QuoteSavePayload, load_quote_editor_snapshot, save_quote_from_editor
 from pos_uniformes.services.quote_kiosk_lookup_service import QuoteKioskLookupSnapshot, load_quote_kiosk_lookup_snapshot
 from pos_uniformes.services.quote_snapshot_service import build_quote_history_input_rows, load_quote_snapshot_rows
@@ -79,7 +78,6 @@ from pos_uniformes.ui.dialogs.printable_text_dialog import open_printable_text_d
 from pos_uniformes.ui.helpers.date_field_helper import configure_friendly_date_edit
 from pos_uniformes.ui.helpers.flow_layout import FlowLayout
 from pos_uniformes.ui.helpers.active_filter_chip_helper import rebuild_active_filter_chips
-from pos_uniformes.ui.helpers.printable_document_flow_helper import open_printable_document_flow
 from pos_uniformes.ui.helpers.catalog_pagination_helper import build_catalog_pagination_view
 from pos_uniformes.ui.helpers.quote_cart_view_helper import build_quote_cart_view
 from pos_uniformes.ui.helpers.quote_detail_helper import (
@@ -201,6 +199,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.quote_rows: list[dict[str, object]] = []
         self.selected_quote_state = ""
         self.selected_quote_phone = ""
+        self._current_share_snapshot: QuoteDetailSnapshot | None = None
         self.lookup_snapshot: QuoteKioskLookupSnapshot | None = None
         self.lookup_history: list[QuoteKioskLookupSnapshot] = []
         self.catalog_snapshot_rows: list[dict[str, object]] = []
@@ -3323,6 +3322,7 @@ QLabel#favDialogPriceLabel {
         if quote_id is None:
             self.selected_quote_state = ""
             self.selected_quote_phone = ""
+            self._current_share_snapshot = None
             self._apply_quote_detail_view(build_empty_quote_detail_view())
             self._apply_share_detail_view(build_empty_quote_detail_view())
             self.share_status_label.setText("Selecciona un presupuesto desde Buscar.")
@@ -3330,6 +3330,7 @@ QLabel#favDialogPriceLabel {
         try:
             with get_session() as session:
                 quote_snapshot = load_quote_detail_snapshot(session, quote_id=quote_id)
+            self._current_share_snapshot = quote_snapshot
             self.selected_quote_state = str(quote_snapshot.status_label)
             self.selected_quote_phone = (
                 ""
@@ -3365,6 +3366,7 @@ QLabel#favDialogPriceLabel {
         except Exception as exc:  # noqa: BLE001
             self.selected_quote_state = ""
             self.selected_quote_phone = ""
+            self._current_share_snapshot = None
             self._apply_quote_detail_view(build_error_quote_detail_view(str(exc)))
             self._apply_share_detail_view(build_error_quote_detail_view(str(exc)))
             self.share_status_label.setText("No se pudo cargar el detalle para compartir.")
@@ -3554,19 +3556,12 @@ QLabel#favDialogPriceLabel {
         open_printable_text_dialog(self, f"Presupuesto {folio}", content)
 
     def _handle_print_quote(self) -> None:
-        quote_id = self._selected_quote_id()
-        if quote_id is None:
+        snapshot = self._current_share_snapshot
+        if snapshot is None:
             QMessageBox.warning(self, "Sin seleccion", "Selecciona un presupuesto para imprimirlo.")
             return
-        try:
-            open_printable_document_flow(
-                parent=self,
-                session_factory=get_session,
-                build_document_view=lambda session: build_quote_document_view(session, quote_id=quote_id),
-                open_dialog=open_printable_text_dialog,
-            )
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Impresion no disponible", str(exc))
+        content = _build_snapshot_ticket_text(snapshot)
+        open_printable_text_dialog(self, f"Presupuesto {snapshot.folio}", content)
 
     def _handle_open_quote_whatsapp(self) -> None:
         quote_id = self._selected_quote_id()
@@ -4333,6 +4328,62 @@ def _catalog_row_icon(row: dict[str, object]) -> QPixmap:
             if token in candidate:
                 return _scaled_asset_pixmap(asset_name, 72)
     return _scaled_asset_pixmap("qr_icons/default.png", 72)
+
+
+def _build_snapshot_ticket_text(snapshot: QuoteDetailSnapshot) -> str:
+    from pos_uniformes.services.quote_text_service import DEFAULT_QUOTE_TERMS_LINES
+
+    _W = 38
+
+    def _sep() -> str:
+        return "─" * _W
+
+    def _center(text: str) -> str:
+        return text.center(_W)
+
+    def _row(label: str, value: str) -> str:
+        gap = _W - len(label) - len(value)
+        return f"{label}{' ' * max(1, gap)}{value}"
+
+    def _fmt(value: object) -> str:
+        try:
+            return str(Decimal(str(value)).quantize(Decimal("0.01")))
+        except Exception:  # noqa: BLE001
+            return str(value)
+
+    lines: list[str] = []
+    lines.append(_center("POS Uniformes"))
+    lines.append(_center("Presupuesto"))
+    lines.append(_sep())
+    lines.append(_row("Folio:", snapshot.folio))
+    lines.append(_row("Estado:", snapshot.status_label))
+    lines.append(_row("Cliente:", snapshot.customer_label))
+    if snapshot.phone_text and snapshot.phone_text.lower() != "sin telefono":
+        lines.append(_row("Telefono:", snapshot.phone_text))
+    if snapshot.validity_label and snapshot.validity_label.lower() != "sin vigencia":
+        lines.append(_row("Vigencia:", snapshot.validity_label))
+    lines.append(_sep())
+    lines.append("PIEZAS")
+    lines.append(_sep())
+    for detail in snapshot.detail_rows:
+        unit_price = Decimal(str(detail.unit_price)).quantize(Decimal("0.01"))
+        subtotal = Decimal(str(detail.subtotal)).quantize(Decimal("0.01"))
+        lines.append("")
+        lines.append(str(detail.description))
+        lines.append(_row(f"{detail.sku} | {detail.quantity} x ${unit_price}", f"${subtotal}"))
+    lines.append("")
+    lines.append(_sep())
+    lines.append(_row("TOTAL ESTIMADO:", f"${_fmt(snapshot.total)}"))
+    lines.append(_sep())
+    if snapshot.notes_text and snapshot.notes_text.lower() != "sin observaciones.":
+        lines.append("Observaciones:")
+        lines.append(snapshot.notes_text)
+        lines.append("")
+    lines.append("Terminos y condiciones")
+    lines.append(_sep())
+    for term_line in DEFAULT_QUOTE_TERMS_LINES:
+        lines.append(term_line)
+    return "\n".join(lines)
 
 
 def _build_cart_ticket_text(
