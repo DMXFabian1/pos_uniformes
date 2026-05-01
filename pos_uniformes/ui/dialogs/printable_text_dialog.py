@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QSizeF
-from PyQt6.QtGui import QPainter, QPageSize
+from PyQt6.QtCore import QSizeF, Qt
+from PyQt6.QtGui import QFontDatabase, QPainter, QPageSize
 from PyQt6.QtPrintSupport import QPrinter
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QMessageBox, QTextEdit, QVBoxLayout, QWidget
 
 from pos_uniformes.database.connection import get_session
 from pos_uniformes.services.business_settings_service import BusinessSettingsService
 from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
+    TICKET_FONT_POINT_SIZE,
     TICKET_PAPER_WIDTH_MM,
     build_ticket_document,
 )
@@ -50,8 +51,6 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
             printer.setPageSize(QPageSize(QSizeF(TICKET_PAPER_WIDTH_MM, 600.0), QPageSize.Unit.Millimeter))
             printer.setFullPage(True)
 
-            page_rect = printer.pageRect(QPrinter.Unit.Millimeter)
-            doc = build_ticket_document(content, text_width_mm=page_rect.width())
             painter = QPainter(printer)
             if not painter.isActive():
                 QMessageBox.warning(
@@ -60,11 +59,19 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
                     "No se pudo iniciar el trabajo de impresión.\nVerifica que la impresora esté conectada.",
                 )
                 return
-            # doc trabaja en puntos (72 ppp); el painter del printer trabaja en
-            # píxeles de dispositivo. Sin este scale el texto sale invisible.
-            scale = printer.resolution() / 72.0
-            painter.scale(scale, scale)
-            doc.drawContents(painter)
+            font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+            font.setPointSize(TICKET_FONT_POINT_SIZE)
+            painter.setFont(font)
+
+            # painter.viewport() devuelve el rect imprimible en coordenadas
+            # nativas del driver. drawText con TextWordWrap ajusta el texto a
+            # ese ancho real, evitando el desfase de unidades de QTextDocument.
+            rect = painter.viewport()
+            painter.drawText(
+                rect,
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap,
+                content,
+            )
             painter.end()
         except Exception as exc:
             QMessageBox.warning(dialog, "Error de impresión", f"No se pudo imprimir el ticket:\n{exc}")
