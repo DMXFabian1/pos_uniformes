@@ -19,12 +19,12 @@ def _load_print_preferences() -> tuple[str, int]:
     try:
         with get_session() as session:
             config = BusinessSettingsService.get_or_create(session)
-            preferred_printer = config.impresora_preferida or ""
+            ticket_printer = config.impresora_tickets or ""
             copies = config.copias_ticket or 1
     except Exception:
-        preferred_printer = ""
+        ticket_printer = ""
         copies = 1
-    return preferred_printer, copies
+    return ticket_printer, copies
 
 
 def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> None:
@@ -43,9 +43,9 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
     def handle_print() -> None:
         try:
             printer = QPrinter(QPrinter.PrinterMode.HighResolution)
-            preferred_printer, copies = _load_print_preferences()
-            if preferred_printer:
-                printer.setPrinterName(preferred_printer)
+            ticket_printer, copies = _load_print_preferences()
+            if ticket_printer:
+                printer.setPrinterName(ticket_printer)
             printer.setCopyCount(copies)
             printer.setPageSize(QPageSize(QSizeF(TICKET_PAPER_WIDTH_MM, 600.0), QPageSize.Unit.Millimeter))
             printer.setFullPage(True)

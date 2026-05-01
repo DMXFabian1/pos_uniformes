@@ -16,6 +16,7 @@ class BusinessPrintSettingsServiceTests(unittest.TestCase):
             direccion="Centro 123",
             pie_ticket="Vuelve pronto",
             impresora_preferida="Caja 1",
+            impresora_tickets="JM-58",
             copias_ticket=2,
         )
 
@@ -30,6 +31,7 @@ class BusinessPrintSettingsServiceTests(unittest.TestCase):
         self.assertEqual(snapshot.business_address, "Centro 123")
         self.assertEqual(snapshot.ticket_footer, "Vuelve pronto")
         self.assertEqual(snapshot.preferred_printer, "Caja 1")
+        self.assertEqual(snapshot.ticket_printer, "JM-58")
         self.assertEqual(snapshot.ticket_copies, 2)
 
     def test_applies_defaults_when_config_fields_are_empty(self) -> None:
@@ -39,6 +41,7 @@ class BusinessPrintSettingsServiceTests(unittest.TestCase):
             direccion=None,
             pie_ticket="",
             impresora_preferida=None,
+            impresora_tickets=None,
             copias_ticket=0,
         )
 

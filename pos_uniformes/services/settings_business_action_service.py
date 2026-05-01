@@ -30,6 +30,7 @@ class SettingsBusinessFormSnapshot:
     whatsapp_client_followup: str
     whatsapp_client_greeting: str
     preferred_printer: str
+    ticket_printer: str
     ticket_copies: int
 
 
@@ -64,6 +65,7 @@ def load_settings_business_form_snapshot(session, *, default_templates: dict[str
         whatsapp_client_followup=whatsapp_templates["client_followup"],
         whatsapp_client_greeting=whatsapp_templates["client_greeting"],
         preferred_printer=str(config.impresora_preferida or ""),
+        ticket_printer=str(config.impresora_tickets or ""),
         ticket_copies=int(config.copias_ticket or 1),
     )
 

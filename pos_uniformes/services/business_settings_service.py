@@ -38,6 +38,7 @@ class BusinessSettingsInput:
     whatsapp_cliente_seguimiento: str | None
     whatsapp_cliente_saludo: str | None
     impresora_preferida: str | None
+    impresora_tickets: str | None
     copias_ticket: int
     promo_authorization_code: str | None = None
 
@@ -184,6 +185,7 @@ class BusinessSettingsService:
             payload.whatsapp_cliente_saludo.strip() if payload.whatsapp_cliente_saludo else None
         )
         config.impresora_preferida = payload.impresora_preferida.strip() if payload.impresora_preferida else None
+        config.impresora_tickets = payload.impresora_tickets.strip() if payload.impresora_tickets else None
         config.copias_ticket = payload.copias_ticket
         ManualPromoService.update_authorization_code(session, config, payload.promo_authorization_code)
         MarketingAuditService.log_field_changes(session, actor_user=admin_user, fields=audit_fields)

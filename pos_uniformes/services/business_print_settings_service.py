@@ -14,6 +14,7 @@ class BusinessPrintSettingsSnapshot:
     business_address: str
     ticket_footer: str
     preferred_printer: str
+    ticket_printer: str
     ticket_copies: int
 
 
@@ -30,5 +31,6 @@ def load_business_print_settings_snapshot(
         business_address=config.direccion or "",
         ticket_footer=config.pie_ticket or default_ticket_footer,
         preferred_printer=config.impresora_preferida or "",
+        ticket_printer=config.impresora_tickets or "",
         ticket_copies=config.copias_ticket or 1,
     )

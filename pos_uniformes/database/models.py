@@ -194,6 +194,7 @@ class ConfiguracionNegocio(Base):
     whatsapp_cliente_seguimiento: Mapped[str | None] = mapped_column(Text())
     whatsapp_cliente_saludo: Mapped[str | None] = mapped_column(Text())
     impresora_preferida: Mapped[str | None] = mapped_column(String(200))
+    impresora_tickets: Mapped[str | None] = mapped_column(String(200))
     copias_ticket: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
     promo_authorization_code_hash: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(

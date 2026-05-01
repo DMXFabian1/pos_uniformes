@@ -628,8 +628,11 @@ def build_business_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_business_copies_spin.setRange(1, 5)
     window.settings_business_printer_combo.clear()
     window.settings_business_printer_combo.addItem("Preguntar siempre", "")
+    window.settings_business_ticket_printer_combo.clear()
+    window.settings_business_ticket_printer_combo.addItem("Preguntar siempre", "")
     for printer in QPrinterInfo.availablePrinters():
         window.settings_business_printer_combo.addItem(printer.printerName(), printer.printerName())
+        window.settings_business_ticket_printer_combo.addItem(printer.printerName(), printer.printerName())
     logo_row = QHBoxLayout()
     logo_row.addWidget(window.settings_business_logo_input)
     logo_row.addWidget(window.settings_business_logo_pick_button)
@@ -682,7 +685,8 @@ def build_business_settings_dialog(window: "MainWindow") -> QDialog:
     print_form = QFormLayout()
     print_form.setSpacing(10)
     print_form.addRow("Codigo promo manual", window.settings_business_promo_code_input)
-    print_form.addRow("Impresora", window.settings_business_printer_combo)
+    print_form.addRow("Impresora etiquetas", window.settings_business_printer_combo)
+    print_form.addRow("Impresora tickets", window.settings_business_ticket_printer_combo)
     print_form.addRow("Copias", window.settings_business_copies_spin)
     print_box.setLayout(print_form)
 

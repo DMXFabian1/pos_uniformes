@@ -32,6 +32,7 @@ class SettingsBusinessActionServiceTests(unittest.TestCase):
             transferencia_clabe="123",
             transferencia_instrucciones="Trae comprobante",
             impresora_preferida="Brother",
+            impresora_tickets="JM-58",
             copias_ticket=2,
         )
         fake_business_service = SimpleNamespace(get_or_create=lambda session: config)
@@ -80,6 +81,7 @@ class SettingsBusinessActionServiceTests(unittest.TestCase):
                 whatsapp_client_followup="Seguimiento",
                 whatsapp_client_greeting="Saludo",
                 preferred_printer="Brother",
+                ticket_printer="JM-58",
                 ticket_copies=2,
             ),
         )

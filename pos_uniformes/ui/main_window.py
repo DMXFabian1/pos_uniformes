@@ -1640,6 +1640,7 @@ class MainWindow(QMainWindow):
         self.settings_whatsapp_reset_button = QPushButton("Sugeridas")
         self.settings_whatsapp_preview_output = QTextEdit()
         self.settings_business_printer_combo = QComboBox()
+        self.settings_business_ticket_printer_combo = QComboBox()
         self.settings_business_copies_spin = QSpinBox()
         self.settings_business_status_label = QLabel("Sin configuracion cargada.")
         self.settings_business_save_button = QPushButton("Guardar configuracion")
@@ -2783,6 +2784,8 @@ class MainWindow(QMainWindow):
                 self.settings_whatsapp_client_greeting_input.setPlainText(snapshot.whatsapp_client_greeting)
                 printer_index = self.settings_business_printer_combo.findData(snapshot.preferred_printer)
                 self.settings_business_printer_combo.setCurrentIndex(printer_index if printer_index >= 0 else 0)
+                ticket_printer_index = self.settings_business_ticket_printer_combo.findData(snapshot.ticket_printer)
+                self.settings_business_ticket_printer_combo.setCurrentIndex(ticket_printer_index if ticket_printer_index >= 0 else 0)
                 self.settings_business_copies_spin.setValue(snapshot.ticket_copies)
                 self.settings_business_status_label.setText("Configuracion cargada correctamente.")
                 self.settings_marketing_status_label.setText("Reglas de marketing cargadas correctamente.")
@@ -2823,6 +2826,7 @@ class MainWindow(QMainWindow):
             whatsapp_cliente_seguimiento=self.settings_whatsapp_client_followup_input.toPlainText(),
             whatsapp_cliente_saludo=self.settings_whatsapp_client_greeting_input.toPlainText(),
             impresora_preferida=str(self.settings_business_printer_combo.currentData() or ""),
+            impresora_tickets=str(self.settings_business_ticket_printer_combo.currentData() or ""),
             copias_ticket=self.settings_business_copies_spin.value(),
         )
 
