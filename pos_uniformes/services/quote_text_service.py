@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import textwrap
 from decimal import Decimal
 
 from pos_uniformes.utils.date_format import format_display_date, format_display_datetime
@@ -115,7 +116,10 @@ def build_quote_text(
     lines.append("Terminos y condiciones")
     lines.append(_sep())
     for term_line in DEFAULT_QUOTE_TERMS_LINES:
-        lines.append(term_line)
+        if term_line == "":
+            lines.append("")
+        else:
+            lines.extend(textwrap.wrap(term_line, width=_W) or [""])
 
     # — Pie —
     if ticket_footer:

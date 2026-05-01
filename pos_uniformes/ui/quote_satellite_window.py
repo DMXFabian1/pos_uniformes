@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
 import sys
+import textwrap
 import unicodedata
 from pathlib import Path
 from urllib.parse import quote
@@ -4382,7 +4383,10 @@ def _build_snapshot_ticket_text(snapshot: QuoteDetailSnapshot) -> str:
     lines.append("Terminos y condiciones")
     lines.append(_sep())
     for term_line in DEFAULT_QUOTE_TERMS_LINES:
-        lines.append(term_line)
+        if term_line == "":
+            lines.append("")
+        else:
+            lines.extend(textwrap.wrap(term_line, width=_W) or [""])
     return "\n".join(lines)
 
 
@@ -4449,7 +4453,10 @@ def _build_cart_ticket_text(
     lines.append("Terminos y condiciones")
     lines.append(_sep())
     for term_line in DEFAULT_QUOTE_TERMS_LINES:
-        lines.append(term_line)
+        if term_line == "":
+            lines.append("")
+        else:
+            lines.extend(textwrap.wrap(term_line, width=_W) or [""])
     return "\n".join(lines)
 
 
