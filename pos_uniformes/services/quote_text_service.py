@@ -19,7 +19,7 @@ DEFAULT_QUOTE_TERMS_LINES = (
     "3. Promociones",
     "Por la alta demanda previa al inicio de clases, los padres que compren en julio de 2026 recibiran un descuento al registrarse en Maximoda. Valido solo del 1 al 31 de julio, sujeto a disponibilidad.",
     "",
-    "Contamos con sistema de apartado, con solo un 25% del valor total, asegure sus uniformes, ahorre y obtenga las tallas que necesita sin complicaciones :)",
+    "Contamos con sistema de apartado, con solo un 25% del valor total, asegure sus uniformes, ahorre y obtenga las tallas que necesita sin complicaciones.",
 )
 
 
