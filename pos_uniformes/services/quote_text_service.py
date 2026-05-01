@@ -11,22 +11,13 @@ _W = 38
 
 DEFAULT_QUOTE_TERMS_LINES = (
     "1. Validez del Presupuesto",
-    "Los precios son vigentes al momento de emision",
-    "y pueden cambiar sin previo aviso.",
-    "No garantizan disponibilidad del producto.",
-    "Valido por 7 dias naturales salvo indicacion",
-    "contraria.",
+    "Los precios son vigentes al momento de emision y pueden cambiar sin previo aviso. No garantizan disponibilidad del producto. Valido por 7 dias naturales salvo indicacion contraria.",
     "",
     "2. Condiciones de Pago",
-    "Los precios no aseguran reserva del producto.",
-    "Se requiere confirmacion o anticipo para",
-    "garantizar precio y disponibilidad.",
+    "Los precios no aseguran reserva del producto. Se requiere confirmacion o anticipo para garantizar precio y disponibilidad.",
     "",
     "3. Promociones",
-    "Por la alta demanda previa al inicio de clases,",
-    "los padres que compren en julio de 2026",
-    "recibiran un descuento. Valido solo del 1 al",
-    "31 de julio, sujeto a disponibilidad.",
+    "Por la alta demanda previa al inicio de clases, los padres que compren en julio de 2026 recibiran un descuento. Valido solo del 1 al 31 de julio, sujeto a disponibilidad.",
 )
 
 
