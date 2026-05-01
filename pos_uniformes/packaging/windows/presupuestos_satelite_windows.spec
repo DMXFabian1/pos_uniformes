@@ -42,6 +42,9 @@ datas += [
 hiddenimports = []
 hiddenimports += collect_submodules("psycopg")
 hiddenimports += collect_submodules("alembic")
+hiddenimports += [
+    "pos_uniformes.ui.dialogs.satellite_admin_dialog",
+]
 
 
 a = Analysis(
