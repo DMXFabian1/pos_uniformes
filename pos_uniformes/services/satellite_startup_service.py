@@ -13,7 +13,11 @@ from pos_uniformes.utils.config import settings
 _DEFAULT_PROBE_TIMEOUT_SEC = 3.0
 
 
-def probe_database_host(timeout_sec: float = _DEFAULT_PROBE_TIMEOUT_SEC) -> bool:
+def probe_database_host(
+    timeout_sec: float = _DEFAULT_PROBE_TIMEOUT_SEC,
+    *,
+    override_host: str | None = None,
+) -> bool:
     """Intenta una conexion TCP al host de la base con un timeout corto.
 
     Devuelve True si el host responde en el puerto configurado.
@@ -23,9 +27,10 @@ def probe_database_host(timeout_sec: float = _DEFAULT_PROBE_TIMEOUT_SEC) -> bool
     ni negociacion de protocolo: solo verifica que el host este vivo y
     el puerto abierto.
     """
+    host = override_host or settings.db_host
     try:
         with socket.create_connection(
-            (settings.db_host, settings.db_port),
+            (host, settings.db_port),
             timeout=timeout_sec,
         ):
             return True

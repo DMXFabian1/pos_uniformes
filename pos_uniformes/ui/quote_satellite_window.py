@@ -1568,6 +1568,8 @@ class QuoteSatelliteWindow(QMainWindow):
         _guided_ctrl_shift_l = QShortcut(QKeySequence("Ctrl+Shift+L"), self.guided_page_scroll)
         _guided_ctrl_shift_l.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         _guided_ctrl_shift_l.activated.connect(self._open_school_product_link_admin)
+        _admin_shortcut = QShortcut(QKeySequence("Ctrl+Shift+A"), self)
+        _admin_shortcut.activated.connect(self._open_satellite_admin)
         self.catalog_previous_page_button.clicked.connect(self._handle_catalog_browser_previous_page)
         self.catalog_next_page_button.clicked.connect(self._handle_catalog_browser_next_page)
         self.guided_add_button.clicked.connect(self._handle_add_guided_selection_to_quote)
@@ -2288,6 +2290,10 @@ class QuoteSatelliteWindow(QMainWindow):
         toggle_favorite(product_key)
         self._favorites = set(load_favorites())
         self._refresh_guided_browser()
+
+    def _open_satellite_admin(self) -> None:
+        from pos_uniformes.ui.dialogs.satellite_admin_dialog import open_satellite_admin_dialog
+        open_satellite_admin_dialog(self)
 
     def _open_school_product_link_admin(self) -> None:
         if self.offline_mode:
