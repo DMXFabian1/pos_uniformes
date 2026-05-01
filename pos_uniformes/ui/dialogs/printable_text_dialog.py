@@ -60,6 +60,10 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
                     "No se pudo iniciar el trabajo de impresión.\nVerifica que la impresora esté conectada.",
                 )
                 return
+            # doc trabaja en puntos (72 ppp); el painter del printer trabaja en
+            # píxeles de dispositivo. Sin este scale el texto sale invisible.
+            scale = printer.resolution() / 72.0
+            painter.scale(scale, scale)
             doc.drawContents(painter)
             painter.end()
         except Exception as exc:
