@@ -4715,8 +4715,11 @@ def _build_snapshot_ticket_text(snapshot: QuoteDetailSnapshot) -> str:
     for detail in snapshot.detail_rows:
         unit_price = Decimal(str(detail.unit_price)).quantize(Decimal("0.01"))
         subtotal = Decimal(str(detail.subtotal)).quantize(Decimal("0.01"))
+        talla = str(detail.size_label or "").strip()
         lines.append("")
         lines.append(str(detail.description))
+        if talla and talla != "-":
+            lines.append(f"Talla: {talla}")
         lines.append(_row(f"{detail.sku} | {detail.quantity} x ${unit_price}", f"${subtotal}"))
     lines.append("")
     lines.append(_sep())
@@ -4785,8 +4788,11 @@ def _build_cart_ticket_text(
         subtotal = (unit_price * qty).quantize(Decimal("0.01"))
         description = str(item.get("producto_nombre") or item.get("sku", ""))
         sku = str(item["sku"])
+        talla = str(item.get("talla") or "").strip()
         lines.append("")
         lines.append(description)
+        if talla and talla != "-":
+            lines.append(f"Talla: {talla}")
         lines.append(_row(f"{sku} | {qty} x ${unit_price}", f"${subtotal}"))
     lines.append("")
     lines.append(_sep())
@@ -4831,7 +4837,9 @@ def _build_offline_whatsapp_message(
         unit_price = Decimal(str(item["precio_unitario"])).quantize(Decimal("0.01"))
         subtotal = (unit_price * qty).quantize(Decimal("0.01"))
         description = str(item.get("producto_nombre") or item.get("sku", ""))
-        lines.append(f"- {description}")
+        talla = str(item.get("talla") or "").strip()
+        talla_suffix = f" T:{talla}" if talla and talla != "-" else ""
+        lines.append(f"- {description}{talla_suffix}")
         lines.append(f"  SKU {item['sku']} | {qty} x {unit_price} = {subtotal}")
     if notes:
         lines.append(f"Observaciones: {notes}")
