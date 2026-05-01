@@ -17,24 +17,20 @@ from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
 
 
 def _load_print_preferences() -> tuple[str, int]:
+    # El cache local (menu admin del satelite) siempre tiene prioridad.
+    # La BD solo se usa si nunca se configuro una impresora local.
+    try:
+        from pos_uniformes.services.ticket_print_settings_cache_service import load_ticket_print_settings
+        cached_printer, cached_copies = load_ticket_print_settings()
+        if cached_printer:
+            return cached_printer, cached_copies
+    except Exception:
+        pass
+    # Fallback: BD (primer arranque sin configuracion local)
     try:
         with get_session() as session:
             config = BusinessSettingsService.get_or_create(session)
-            ticket_printer = config.impresora_tickets or ""
-            copies = config.copias_ticket or 1
-        # Guarda en cache local para que el modo offline pueda imprimir sin DB
-        try:
-            from pos_uniformes.services.ticket_print_settings_cache_service import save_ticket_print_settings
-            save_ticket_print_settings(ticket_printer, copies)
-        except Exception:
-            pass
-        return ticket_printer, copies
-    except Exception:
-        pass
-    # Fallback: cache guardado en el ultimo arranque online
-    try:
-        from pos_uniformes.services.ticket_print_settings_cache_service import load_ticket_print_settings
-        return load_ticket_print_settings()
+            return config.impresora_tickets or "", config.copias_ticket or 1
     except Exception:
         return "", 1
 

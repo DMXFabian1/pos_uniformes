@@ -209,6 +209,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self._current_share_snapshot: QuoteDetailSnapshot | None = None
         self.offline_saved_quotes_table: QTableWidget | None = None
         self.offline_saved_box: QGroupBox | None = None
+        self._offline_selected_quote: dict | None = None
         self.lookup_snapshot: QuoteKioskLookupSnapshot | None = None
         self.lookup_history: list[QuoteKioskLookupSnapshot] = []
         self.catalog_snapshot_rows: list[dict[str, object]] = []
@@ -257,10 +258,10 @@ class QuoteSatelliteWindow(QMainWindow):
         self.offline_banner.setVisible(True)
 
         # Deshabilitar pestanas que requieren base de datos
-        self.nav_search_button.setEnabled(False)
-        self.nav_search_button.setToolTip("No disponible en modo local")
-        self.nav_share_button.setEnabled(False)
-        self.nav_share_button.setToolTip("No disponible en modo local")
+        self.nav_search_button.setEnabled(True)
+        self.nav_search_button.setToolTip("Presupuestos guardados localmente")
+        self.nav_share_button.setEnabled(True)
+        self.nav_share_button.setToolTip("Compartir presupuesto guardado localmente")
         self.refresh_button.setEnabled(False)
         self.refresh_button.setToolTip("Sin conexion con la PC principal")
         # Presupuesto: tab habilitado pero guardado a DB desactivado — emit local disponible
@@ -276,6 +277,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self._refresh_catalog_snapshot_from_cache()
         self._refresh_catalog_browser()
         self._refresh_offline_saved_list()
+        self._refresh_offline_quotes()
         self._refresh_guided_browser()
         self._set_status("Modo local — catalogo guardado disponible.")
 
@@ -1444,6 +1446,39 @@ class QuoteSatelliteWindow(QMainWindow):
             delete_offline_quote(folio)
             self._refresh_offline_saved_list()
 
+    def _refresh_offline_quotes(self) -> None:
+        """Popula quote_table con los presupuestos guardados localmente."""
+        from datetime import date as _date
+        quotes = list_offline_quotes()
+        self.quote_table.setRowCount(len(quotes))
+        for row_index, q in enumerate(quotes):
+            folio = str(q.get("folio", ""))
+            client = str(q.get("client_name", ""))
+            total = f"${q.get('total', '0')}"
+            validity_str = str(q.get("validity_date", ""))
+            try:
+                validity_label = _date.fromisoformat(validity_str).strftime("%d/%m/%Y") if validity_str else ""
+            except Exception:
+                validity_label = validity_str
+            created_str = str(q.get("created_at", ""))[:10]
+            values = [folio, client, "LOCAL", total, "", validity_label, created_str]
+            for col, val in enumerate(values):
+                self.quote_table.setItem(row_index, col, _table_item(val))
+            item = self.quote_table.item(row_index, 0)
+            if item is not None:
+                item.setData(Qt.ItemDataRole.UserRole, folio)
+        self.quote_status_label.setText(
+            f"{len(quotes)} presupuesto(s) guardado(s) localmente."
+            if quotes else "Sin presupuestos locales aun."
+        )
+        self._offline_selected_quote = None
+        self.selected_quote_state = ""
+        self.selected_quote_phone = ""
+        self._apply_quote_detail_view(build_empty_quote_detail_view())
+        self._apply_share_detail_view(build_empty_quote_detail_view())
+        self.share_status_label.setText("Selecciona un presupuesto local para compartirlo.")
+        self._apply_action_state()
+
     def _build_history_panel(self) -> QWidget:
         panel = QWidget()
         layout = QVBoxLayout()
@@ -1649,6 +1684,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self._set_status(page_title_map[page_key])
         if page_key == "kiosk":
             QTimer.singleShot(0, self.kiosk_scan_input.setFocus)
+        if page_key == "search" and self.offline_mode:
+            self._refresh_offline_quotes()
 
     def refresh_all(self) -> None:
         try:
@@ -3466,11 +3503,18 @@ QLabel#favDialogPriceLabel {
             self.quote_state_combo.blockSignals(False)
 
     def _handle_quote_selection(self) -> None:
-        self._refresh_quote_detail(self._selected_quote_id())
+        if self.offline_mode:
+            self._refresh_offline_quote_detail(self._selected_offline_folio())
+        else:
+            self._refresh_quote_detail(self._selected_quote_id())
         self._apply_action_state()
 
     def _handle_open_share_page(self) -> None:
-        if self._selected_quote_id() is None:
+        if self.offline_mode:
+            if self._offline_selected_quote is None:
+                QMessageBox.warning(self, "Sin seleccion", "Selecciona un presupuesto antes de abrir Compartir.")
+                return
+        elif self._selected_quote_id() is None:
             QMessageBox.warning(self, "Sin seleccion", "Selecciona un presupuesto antes de abrir Compartir.")
             return
         self._set_page("share")
@@ -3479,6 +3523,62 @@ QLabel#favDialogPriceLabel {
         self._refresh_quote_detail(self._selected_quote_id())
         if self._selected_quote_id() is not None:
             self._set_status("Detalle actualizado para compartir.")
+
+    def _refresh_offline_quote_detail(self, folio: str | None) -> None:
+        from datetime import date as _date
+        from decimal import Decimal as _Decimal
+        if folio is None:
+            self._offline_selected_quote = None
+            self.selected_quote_state = ""
+            self.selected_quote_phone = ""
+            self._apply_quote_detail_view(build_empty_quote_detail_view())
+            self._apply_share_detail_view(build_empty_quote_detail_view())
+            self.share_status_label.setText("Selecciona un presupuesto local para compartirlo.")
+            return
+        q = get_offline_quote(folio)
+        if q is None:
+            self._offline_selected_quote = None
+            self.selected_quote_state = ""
+            self.selected_quote_phone = ""
+            self._apply_quote_detail_view(build_error_quote_detail_view(f"No se encontro el presupuesto {folio}"))
+            self._apply_share_detail_view(build_error_quote_detail_view(f"No se encontro el presupuesto {folio}"))
+            self.share_status_label.setText(f"No se encontro el presupuesto {folio}.")
+            return
+        self._offline_selected_quote = q
+        self.selected_quote_state = "EMITIDO"
+        phone = str(q.get("client_phone", ""))
+        self.selected_quote_phone = phone if phone.strip() else ""
+        validity_str = str(q.get("validity_date", ""))
+        try:
+            validity_label = _date.fromisoformat(validity_str).strftime("%d/%m/%Y") if validity_str else "Sin vigencia"
+        except Exception:
+            validity_label = validity_str or "Sin vigencia"
+        cart = q.get("cart", [])
+        detail_rows = [
+            {
+                "sku": str(item.get("sku", "")),
+                "description": str(item.get("producto_nombre") or item.get("sku", "")),
+                "size_label": str(item.get("talla") or "-"),
+                "quantity": int(item.get("cantidad", 1)),
+                "unit_price": str(_Decimal(str(item.get("precio_unitario", "0"))).quantize(_Decimal("0.01"))),
+                "subtotal": str((_Decimal(str(item.get("precio_unitario", "0"))) * int(item.get("cantidad", 1))).quantize(_Decimal("0.01"))),
+            }
+            for item in cart
+        ]
+        detail_view = build_quote_detail_view(
+            folio=folio,
+            client_name=str(q.get("client_name", "Sin cliente")),
+            status_label="LOCAL",
+            phone_text=phone or "Sin telefono",
+            total=str(q.get("total", "0")),
+            validity_label=validity_label,
+            user_label="local",
+            notes_text=str(q.get("notes", "")),
+            detail_rows=detail_rows,
+        )
+        self._apply_quote_detail_view(detail_view)
+        self._apply_share_detail_view(detail_view)
+        self.share_status_label.setText(f"Presupuesto local {folio} listo para imprimir o compartir.")
 
     def _refresh_quote_detail(self, quote_id: int | None) -> None:
         if quote_id is None:
@@ -3567,34 +3667,48 @@ QLabel#favDialogPriceLabel {
                 self.share_detail_table.setItem(row_index, column_index, _table_item(value))
     def _apply_action_state(self) -> None:
         selected_quote_line = 0 <= self.quote_cart_table.currentRow() < len(self.quote_cart)
-        action_state = build_quote_satellite_action_state(
-            can_operate=self._can_operate(),
-            has_selection=self._selected_quote_id() is not None,
-            selected_state=self.selected_quote_state,
-            has_phone=bool(_normalize_whatsapp_phone(self.selected_quote_phone)),
-        )
-        self.quote_resume_button.setEnabled(action_state.resume_enabled)
-        self.quote_emit_selected_button.setEnabled(action_state.emit_enabled)
-        _state = self.selected_quote_state.strip().upper()
-        if self._selected_quote_id() is None:
-            _hint = "Selecciona un presupuesto para ver las acciones disponibles."
-        elif _state == "BORRADOR":
-            _hint = "Borrador — puedes retomarlo o emitirlo directamente."
-        elif _state == "EMITIDO":
-            _hint = "Ya emitido — solo puedes cancelarlo o compartirlo."
-        elif _state == "CANCELADO":
-            _hint = "Cancelado — sin acciones disponibles."
-        elif _state == "CONVERTIDO":
-            _hint = "Convertido a venta — sin acciones disponibles."
+        if self.offline_mode:
+            has_offline = self._offline_selected_quote is not None
+            has_phone = bool(_normalize_whatsapp_phone(self.selected_quote_phone))
+            self.quote_resume_button.setEnabled(False)
+            self.quote_emit_selected_button.setEnabled(False)
+            _hint = "Presupuesto local — solo puedes imprimirlo o compartirlo." if has_offline else "Selecciona un presupuesto local para ver las acciones disponibles."
+            self.quote_action_hint_label.setText(_hint)
+            self.quote_action_hint_label.setVisible(True)
+            self.quote_cancel_button.setEnabled(False)
+            self.quote_open_share_button.setEnabled(has_offline)
+            self.quote_whatsapp_button.setEnabled(has_offline and has_phone)
+            self.quote_print_button.setEnabled(has_offline)
+            self.share_refresh_button.setEnabled(False)
         else:
-            _hint = ""
-        self.quote_action_hint_label.setText(_hint)
-        self.quote_action_hint_label.setVisible(bool(_hint))
-        self.quote_cancel_button.setEnabled(action_state.cancel_enabled)
-        self.quote_open_share_button.setEnabled(action_state.share_enabled)
-        self.quote_whatsapp_button.setEnabled(action_state.whatsapp_enabled)
-        self.quote_print_button.setEnabled(action_state.print_enabled)
-        self.share_refresh_button.setEnabled(self._selected_quote_id() is not None)
+            action_state = build_quote_satellite_action_state(
+                can_operate=self._can_operate(),
+                has_selection=self._selected_quote_id() is not None,
+                selected_state=self.selected_quote_state,
+                has_phone=bool(_normalize_whatsapp_phone(self.selected_quote_phone)),
+            )
+            self.quote_resume_button.setEnabled(action_state.resume_enabled)
+            self.quote_emit_selected_button.setEnabled(action_state.emit_enabled)
+            _state = self.selected_quote_state.strip().upper()
+            if self._selected_quote_id() is None:
+                _hint = "Selecciona un presupuesto para ver las acciones disponibles."
+            elif _state == "BORRADOR":
+                _hint = "Borrador — puedes retomarlo o emitirlo directamente."
+            elif _state == "EMITIDO":
+                _hint = "Ya emitido — solo puedes cancelarlo o compartirlo."
+            elif _state == "CANCELADO":
+                _hint = "Cancelado — sin acciones disponibles."
+            elif _state == "CONVERTIDO":
+                _hint = "Convertido a venta — sin acciones disponibles."
+            else:
+                _hint = ""
+            self.quote_action_hint_label.setText(_hint)
+            self.quote_action_hint_label.setVisible(bool(_hint))
+            self.quote_cancel_button.setEnabled(action_state.cancel_enabled)
+            self.quote_open_share_button.setEnabled(action_state.share_enabled)
+            self.quote_whatsapp_button.setEnabled(action_state.whatsapp_enabled)
+            self.quote_print_button.setEnabled(action_state.print_enabled)
+            self.share_refresh_button.setEnabled(self._selected_quote_id() is not None)
         self.kiosk_add_button.setEnabled(self.lookup_snapshot is not None and self._can_operate())
         self.catalog_add_button.setEnabled(bool(self._selected_catalog_sku()) and self._can_build_cart())
         self.catalog_print_label_button.setEnabled(bool(self._selected_catalog_sku()))
@@ -3718,6 +3832,28 @@ QLabel#favDialogPriceLabel {
         open_printable_text_dialog(self, f"Presupuesto {folio}", content)
 
     def _handle_print_quote(self) -> None:
+        if self.offline_mode:
+            q = self._offline_selected_quote
+            if q is None:
+                QMessageBox.warning(self, "Sin seleccion", "Selecciona un presupuesto para imprimirlo.")
+                return
+            from datetime import date as _date
+            validity_str = str(q.get("validity_date", ""))
+            try:
+                validity_date = _date.fromisoformat(validity_str) if validity_str else None
+            except Exception:
+                validity_date = None
+            cart_view = build_quote_cart_view(q.get("cart", []))
+            content = _build_cart_ticket_text(
+                folio=str(q.get("folio", "")),
+                client_name=str(q.get("client_name", "Sin cliente")),
+                cart=q.get("cart", []),
+                total=cart_view.total,
+                validity_date=validity_date,
+                notes=str(q.get("notes", "")),
+            )
+            open_printable_text_dialog(self, f"Presupuesto {q.get('folio', '')}", content)
+            return
         snapshot = self._current_share_snapshot
         if snapshot is None:
             QMessageBox.warning(self, "Sin seleccion", "Selecciona un presupuesto para imprimirlo.")
@@ -3726,6 +3862,40 @@ QLabel#favDialogPriceLabel {
         open_printable_text_dialog(self, f"Presupuesto {snapshot.folio}", content)
 
     def _handle_open_quote_whatsapp(self) -> None:
+        if self.offline_mode:
+            q = self._offline_selected_quote
+            if q is None:
+                QMessageBox.warning(self, "Sin seleccion", "Selecciona un presupuesto para compartirlo.")
+                return
+            phone = str(q.get("client_phone", ""))
+            normalized_phone = _normalize_whatsapp_phone(phone)
+            if not normalized_phone:
+                QMessageBox.warning(self, "Telefono faltante", "El presupuesto seleccionado no tiene telefono valido.")
+                return
+            from datetime import date as _date
+            validity_str = str(q.get("validity_date", ""))
+            try:
+                validity_date = _date.fromisoformat(validity_str) if validity_str else None
+            except Exception:
+                validity_date = None
+            message = _build_offline_whatsapp_message(
+                folio=str(q.get("folio", "")),
+                client_name=str(q.get("client_name", "cliente")),
+                cart=q.get("cart", []),
+                total=q.get("total", "0"),
+                validity_date=validity_date,
+                notes=str(q.get("notes", "")),
+            )
+            whatsapp_url = f"https://wa.me/{normalized_phone}?text={quote(message)}"
+            if not webbrowser.open(whatsapp_url):
+                QMessageBox.warning(
+                    self,
+                    "No se pudo abrir WhatsApp",
+                    "No se pudo abrir WhatsApp automaticamente. Verifica que tengas navegador disponible.",
+                )
+                return
+            self._set_status(f"WhatsApp preparado para {q.get('client_name', 'cliente')}.")
+            return
         quote_id = self._selected_quote_id()
         if quote_id is None:
             QMessageBox.warning(self, "Sin seleccion", "Selecciona un presupuesto para compartirlo.")
@@ -4028,7 +4198,22 @@ QLabel#favDialogPriceLabel {
         if item is None:
             return None
         quote_id = item.data(Qt.ItemDataRole.UserRole)
-        return int(quote_id) if quote_id is not None else None
+        if quote_id is None:
+            return None
+        try:
+            return int(quote_id)
+        except (ValueError, TypeError):
+            return None
+
+    def _selected_offline_folio(self) -> str | None:
+        selected_row = self.quote_table.currentRow()
+        if selected_row < 0:
+            return None
+        item = self.quote_table.item(selected_row, 0)
+        if item is None:
+            return None
+        data = item.data(Qt.ItemDataRole.UserRole)
+        return str(data) if data is not None else None
 
     def _selected_catalog_sku(self) -> str:
         selected_row = self.catalog_table.currentRow()
