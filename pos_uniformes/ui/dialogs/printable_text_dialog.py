@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QSizeF, Qt
+from PyQt6.QtCore import QSizeF
 from PyQt6.QtGui import QPainter, QPageSize
 from PyQt6.QtPrintSupport import QPrinter
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QMessageBox, QTextEdit, QVBoxLayout, QWidget
@@ -12,7 +12,6 @@ from pos_uniformes.services.business_settings_service import BusinessSettingsSer
 from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
     TICKET_PAPER_WIDTH_MM,
     build_ticket_document,
-    build_ticket_print_font,
 )
 
 
@@ -48,7 +47,9 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
             if preferred_printer:
                 printer.setPrinterName(preferred_printer)
             printer.setCopyCount(copies)
-            printer.setPageSize(QPageSize(QSizeF(TICKET_PAPER_WIDTH_MM, 600.0), QPageSize.Unit.Millimeter))
+            doc = build_ticket_document(content)
+            height_mm = max(100.0, doc.size().height() * 25.4 / 72.0)
+            printer.setPageSize(QPageSize(QSizeF(TICKET_PAPER_WIDTH_MM, height_mm), QPageSize.Unit.Millimeter))
             printer.setFullPage(True)
 
             painter = QPainter(printer)
@@ -60,13 +61,7 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
                 )
                 return
 
-            painter.setFont(build_ticket_print_font())
-            rect = painter.viewport()
-            painter.drawText(
-                rect,
-                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap,
-                content,
-            )
+            doc.drawContents(painter)
             painter.end()
         except Exception as exc:
             QMessageBox.warning(dialog, "Error de impresión", f"No se pudo imprimir el ticket:\n{exc}")
