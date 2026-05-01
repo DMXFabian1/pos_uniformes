@@ -6,7 +6,9 @@ import os
 import sys
 from pathlib import Path
 
+from PyQt6.QtPrintSupport import QPrinterInfo
 from PyQt6.QtWidgets import (
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -16,11 +18,16 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
 
 from pos_uniformes.services.satellite_startup_service import probe_database_host
+from pos_uniformes.services.ticket_print_settings_cache_service import (
+    load_ticket_print_settings,
+    save_ticket_print_settings,
+)
 from pos_uniformes.utils.config import settings, _appdata_config_dir, runtime_base_dir
 
 _ADMIN_PIN = "634700"
@@ -28,13 +35,12 @@ _ENV_FILENAME = "pos_uniformes.env"
 
 
 def _find_env_path() -> Path:
-    """Devuelve la ruta del .env que el bundle usa (AppData primero, luego carpeta exe)."""
     appdata = _appdata_config_dir()
     if appdata is not None:
         candidate = appdata / _ENV_FILENAME
         if candidate.exists():
             return candidate
-        return candidate  # si no existe, lo creamos ahí
+        return candidate
     return runtime_base_dir() / _ENV_FILENAME
 
 
@@ -85,7 +91,7 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
 
     dialog = QDialog(parent)
     dialog.setWindowTitle("Administracion del satelite")
-    dialog.setMinimumWidth(460)
+    dialog.setMinimumWidth(480)
     layout = QVBoxLayout()
     layout.setSpacing(16)
 
@@ -102,7 +108,7 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     status_form.addRow("Archivo .env:", env_path_label)
     status_box.setLayout(status_form)
 
-    # — Configurar conexion —
+    # — Conexion —
     config_box = QGroupBox("Cambiar conexion")
     config_form = QFormLayout()
     config_form.setSpacing(8)
@@ -111,33 +117,31 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     password_input = QLineEdit(settings.db_password)
     password_input.setEchoMode(QLineEdit.EchoMode.Password)
     password_input.setPlaceholderText("Contrasena de la base de datos")
-    config_form.addRow("Host (IP de la PC principal):", host_input)
+    config_form.addRow("Host (IP PC principal):", host_input)
     config_form.addRow("Contrasena BD:", password_input)
 
     test_result_label = QLabel("")
     test_result_label.setWordWrap(True)
-
     test_btn = QPushButton("Probar conexion")
-    save_btn = QPushButton("Guardar y reiniciar")
-    save_btn.setObjectName("primaryButton")
+    save_conn_btn = QPushButton("Guardar y reiniciar")
+    save_conn_btn.setObjectName("primaryButton")
 
     def handle_test() -> None:
         host = host_input.text().strip()
         if not host:
-            test_result_label.setText("Ingresa una IP o nombre de host.")
+            test_result_label.setText("Ingresa una IP.")
             return
-        test_result_label.setText(f"Probando conexion a {host}...")
+        test_result_label.setText(f"Probando {host}...")
         from PyQt6.QtWidgets import QApplication
         QApplication.processEvents()
-        ok = probe_database_host(override_host=host)
-        if ok:
+        if probe_database_host(override_host=host):
             test_result_label.setText(f"✓ Conexion exitosa a {host}")
             test_result_label.setStyleSheet("color: green;")
         else:
-            test_result_label.setText(f"✗ No se pudo conectar a {host}. Verifica la IP y que la PC principal este encendida.")
+            test_result_label.setText(f"✗ Sin respuesta en {host}. Verifica IP y que la PC principal este encendida.")
             test_result_label.setStyleSheet("color: red;")
 
-    def handle_save() -> None:
+    def handle_save_conn() -> None:
         host = host_input.text().strip()
         password = password_input.text().strip()
         if not host:
@@ -146,34 +150,75 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
         try:
             _write_env(host, password)
         except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(dialog, "Error al guardar", f"No se pudo escribir el archivo .env:\n{exc}")
+            QMessageBox.critical(dialog, "Error al guardar", f"No se pudo escribir .env:\n{exc}")
             return
-        QMessageBox.information(
-            dialog,
-            "Guardado",
-            f"Configuracion guardada. La app se reiniciara ahora apuntando a {host}.",
-        )
+        QMessageBox.information(dialog, "Guardado", f"Configuracion guardada. Reiniciando hacia {host}.")
         dialog.accept()
         _restart_app()
 
     test_btn.clicked.connect(handle_test)
-    save_btn.clicked.connect(handle_save)
-
-    btn_row = QHBoxLayout()
-    btn_row.addWidget(test_btn)
-    btn_row.addWidget(save_btn)
+    save_conn_btn.clicked.connect(handle_save_conn)
+    conn_btn_row = QHBoxLayout()
+    conn_btn_row.addWidget(test_btn)
+    conn_btn_row.addWidget(save_conn_btn)
 
     config_layout = QVBoxLayout()
     config_layout.addLayout(config_form)
     config_layout.addWidget(test_result_label)
-    config_layout.addLayout(btn_row)
+    config_layout.addLayout(conn_btn_row)
     config_box.setLayout(config_layout)
 
+    # — Impresora de tickets —
+    printer_box = QGroupBox("Impresora de tickets")
+    printer_form = QFormLayout()
+    printer_form.setSpacing(8)
+
+    cached_printer, cached_copies = load_ticket_print_settings()
+
+    printer_combo = QComboBox()
+    printer_combo.addItem("Impresora predeterminada del sistema", "")
+    for p in QPrinterInfo.availablePrinters():
+        printer_combo.addItem(p.printerName(), p.printerName())
+
+    # Seleccionar la impresora guardada
+    idx = printer_combo.findData(cached_printer)
+    printer_combo.setCurrentIndex(idx if idx >= 0 else 0)
+
+    copies_spin = QSpinBox()
+    copies_spin.setRange(1, 5)
+    copies_spin.setValue(cached_copies)
+
+    printer_form.addRow("Impresora:", printer_combo)
+    printer_form.addRow("Copias:", copies_spin)
+
+    save_printer_btn = QPushButton("Guardar preferencias de impresion")
+    save_printer_btn.setObjectName("primaryButton")
+
+    def handle_save_printer() -> None:
+        selected = str(printer_combo.currentData() or "")
+        copies = copies_spin.value()
+        try:
+            save_ticket_print_settings(selected, copies)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(dialog, "Error", f"No se pudo guardar:\n{exc}")
+            return
+        name = printer_combo.currentText()
+        QMessageBox.information(dialog, "Guardado", f"Impresora '{name}' guardada para tickets.")
+
+    save_printer_btn.clicked.connect(handle_save_printer)
+
+    printer_layout = QVBoxLayout()
+    printer_layout.addLayout(printer_form)
+    printer_layout.addWidget(save_printer_btn)
+    printer_box.setLayout(printer_layout)
+
+    # — Cerrar —
     close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
     close_buttons.rejected.connect(dialog.reject)
 
     layout.addWidget(status_box)
     layout.addWidget(config_box)
+    layout.addWidget(printer_box)
     layout.addWidget(close_buttons)
     dialog.setLayout(layout)
     dialog.exec()
