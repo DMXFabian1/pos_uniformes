@@ -47,11 +47,11 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
             if preferred_printer:
                 printer.setPrinterName(preferred_printer)
             printer.setCopyCount(copies)
-            doc = build_ticket_document(content)
-            height_mm = max(100.0, doc.size().height() * 25.4 / 72.0)
-            printer.setPageSize(QPageSize(QSizeF(TICKET_PAPER_WIDTH_MM, height_mm), QPageSize.Unit.Millimeter))
+            printer.setPageSize(QPageSize(QSizeF(TICKET_PAPER_WIDTH_MM, 600.0), QPageSize.Unit.Millimeter))
             printer.setFullPage(True)
 
+            page_rect = printer.pageRect(QPrinter.Unit.Millimeter)
+            doc = build_ticket_document(content, text_width_mm=page_rect.width())
             painter = QPainter(printer)
             if not painter.isActive():
                 QMessageBox.warning(
@@ -60,7 +60,6 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
                     "No se pudo iniciar el trabajo de impresión.\nVerifica que la impresora esté conectada.",
                 )
                 return
-
             doc.drawContents(painter)
             painter.end()
         except Exception as exc:
