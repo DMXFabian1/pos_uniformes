@@ -93,8 +93,11 @@ def build_quote_text(
     for detail in quote.detalles:
         subtotal = _fmt(detail.subtotal_linea)
         unit_price = _fmt(detail.precio_unitario)
+        talla = str(detail.talla_snapshot or "").strip()
         lines.append("")
         lines.append(str(detail.descripcion_snapshot))
+        if talla and talla != "-":
+            lines.append(f"Talla: {talla}")
         lines.append(_row(
             f"{detail.sku_snapshot} | {detail.cantidad} x ${unit_price}",
             f"${subtotal}",
