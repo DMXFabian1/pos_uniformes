@@ -23,7 +23,6 @@ class SaleCashierPanelHelperTests(unittest.TestCase):
             collected_total=Decimal("180.00"),
             payment_method="Transferencia",
             winner_label="Promocion manual 10%",
-            selected_client_label="CLI-001 · Maria",
             can_sell=True,
             has_cash_session=True,
             is_processing=False,
@@ -35,8 +34,9 @@ class SaleCashierPanelHelperTests(unittest.TestCase):
         self.assertTrue(panel_view.remove_enabled)
         self.assertTrue(panel_view.clear_enabled)
         self.assertTrue(panel_view.quick_adjust_enabled)
-        self.assertIn("Cliente: CLI-001 · Maria", panel_view.context_label)
+        self.assertNotIn("Cliente:", panel_view.context_label)
         self.assertIn("Pago: Transferencia", panel_view.context_label)
+        self.assertIn("Descuento: Promocion manual 10%", panel_view.context_label)
         self.assertEqual(panel_view.status_label, "Lista para cobrar por transferencia.")
         self.assertEqual(panel_view.status_tone, "positive")
 
@@ -49,7 +49,6 @@ class SaleCashierPanelHelperTests(unittest.TestCase):
             collected_total=Decimal("0.00"),
             payment_method="",
             winner_label="Sin descuento",
-            selected_client_label="",
             can_sell=True,
             has_cash_session=False,
             is_processing=False,
@@ -58,7 +57,8 @@ class SaleCashierPanelHelperTests(unittest.TestCase):
         self.assertFalse(panel_view.remove_enabled)
         self.assertFalse(panel_view.clear_enabled)
         self.assertFalse(panel_view.quick_adjust_enabled)
-        self.assertIn("Mostrador / sin cliente", panel_view.context_label)
+        self.assertNotIn("Cliente:", panel_view.context_label)
+        self.assertIn("Pago: Efectivo", panel_view.context_label)
         self.assertIn("efectivo", panel_view.payment_tooltip)
         self.assertEqual(panel_view.status_label, "Caja cerrada: abre caja antes de cobrar.")
         self.assertEqual(panel_view.status_tone, "danger")

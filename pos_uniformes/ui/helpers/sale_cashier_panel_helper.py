@@ -30,13 +30,11 @@ def build_sale_cashier_panel_view(
     collected_total: Decimal,
     payment_method: str,
     winner_label: str,
-    selected_client_label: str,
     can_sell: bool,
     has_cash_session: bool,
     is_processing: bool,
 ) -> SaleCashierPanelView:
     normalized_payment_method = payment_method.strip() or "Efectivo"
-    normalized_client_label = selected_client_label.strip() or "Mostrador / sin cliente"
     cashier_view = build_sale_cashier_view(
         sale_cart=sale_cart,
         subtotal=subtotal,
@@ -72,7 +70,6 @@ def build_sale_cashier_panel_view(
         cashier_view=cashier_view,
         payment_tooltip=build_sale_payment_tooltip(normalized_payment_method),
         context_label=(
-            f"Cliente: {normalized_client_label} | "
             f"Pago: {normalized_payment_method} | "
             f"Descuento: {winner_label}"
         ),

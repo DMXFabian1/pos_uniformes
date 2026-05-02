@@ -1340,7 +1340,7 @@ class MainWindow(QMainWindow):
         self.sale_remove_button = QPushButton("Quitar linea")
         self.sale_clear_button = QPushButton("Vaciar carrito")
         self.sale_summary_label = QLabel("Carrito vacio.")
-        self.sale_context_label = QLabel("Cliente: Mostrador / sin cliente | Pago: Efectivo | Descuento: Sin descuento")
+        self.sale_context_label = QLabel("Pago: Efectivo | Descuento: Sin descuento")
         self.sale_total_label = QLabel("$0.00")
         self.sale_total_meta_label = QLabel("Total a cobrar")
         self.sale_status_label = QLabel("Escanea un SKU para empezar a vender.")
@@ -7262,7 +7262,6 @@ class MainWindow(QMainWindow):
             collected_total=Decimal("0.00"),
             payment_method=self.sale_payment_combo.currentText(),
             winner_label="",
-            selected_client_label=self.sale_client_combo.currentText(),
             can_sell=self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO},
             has_cash_session=self.active_cash_session_id is not None,
             is_processing=self.sale_processing,
@@ -11143,7 +11142,6 @@ class MainWindow(QMainWindow):
             collected_total=pricing.collected_total,
             payment_method=self.sale_payment_combo.currentText().strip() or "Efectivo",
             winner_label=str(breakdown["winner_label"]),
-            selected_client_label=self.sale_client_combo.currentText(),
             can_sell=self.current_role in {RolUsuario.ADMIN, RolUsuario.CAJERO},
             has_cash_session=self.active_cash_session_id is not None,
             is_processing=self.sale_processing,
