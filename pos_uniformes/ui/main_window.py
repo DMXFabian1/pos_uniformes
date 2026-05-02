@@ -2106,7 +2106,7 @@ class MainWindow(QMainWindow):
                 current_dt = (
                     datetime.now(active_session.abierta_at.tzinfo)
                     if active_session.abierta_at is not None and active_session.abierta_at.tzinfo is not None
-                    else datetime.now()
+                    else datetime.now(timezone.utc)
                 )
                 reminder_key = (active_session.id, current_dt.date())
                 if current_dt.hour >= 17 and self.cash_session_cut_reminder_key != reminder_key:
@@ -8703,7 +8703,7 @@ class MainWindow(QMainWindow):
             stock_critical_count=stock_bajo,
             overdue_layaways=layaway_alerts_snapshot.overdue_count,
             automatic_backup_status=automatic_backup_status,
-            now=datetime.now(),
+            now=datetime.now(timezone.utc),
         )
         dashboard_alerts_view = build_dashboard_operational_alerts_view(operational_alerts)
         self.dashboard_operational_alerts_label.setText(dashboard_alerts_view.text)
@@ -9770,7 +9770,7 @@ class MainWindow(QMainWindow):
             stock_critical_count=len(stock_row_views),
             overdue_layaways=layaway_snapshot.overdue_count,
             automatic_backup_status=automatic_backup_status,
-            now=datetime.now(),
+            now=datetime.now(timezone.utc),
         )
         self.analytics_alerts_label.setText(build_analytics_alerts_text(alerts))
         self.analytics_export_status_label.setText(
