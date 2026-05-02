@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -134,7 +134,7 @@ class LoyaltyService:
             return cls.coerce_level(client.nivel_lealtad)
 
         rules = cls._load_program_rules(session)
-        review_time = reference_time or datetime.now()
+        review_time = reference_time or datetime.now(timezone.utc)
         period_start = review_time - timedelta(days=rules.review_window_days)
         statement = (
             select(

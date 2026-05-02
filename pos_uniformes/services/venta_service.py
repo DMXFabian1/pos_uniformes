@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -170,7 +170,7 @@ class VentaService:
             )
 
         venta.estado = EstadoVenta.CONFIRMADA
-        venta.confirmada_at = datetime.now()
+        venta.confirmada_at = datetime.now(timezone.utc)
         session.add(venta)
         session.flush()
         LoyaltyService.refresh_client_level_from_sales(
@@ -200,7 +200,7 @@ class VentaService:
             folio=folio,
             observacion=observacion,
             estado=EstadoVenta.CONFIRMADA,
-            confirmada_at=datetime.now(),
+            confirmada_at=datetime.now(timezone.utc),
             credit_mode=ModoOrigenVenta.UNASSIGNED,
         )
 
@@ -267,7 +267,7 @@ class VentaService:
 
         venta.estado = EstadoVenta.CANCELADA
         venta.cancelado_por = admin_usuario
-        venta.cancelada_at = datetime.now()
+        venta.cancelada_at = datetime.now(timezone.utc)
         if observacion:
             venta.observacion = observacion
 
@@ -278,6 +278,6 @@ class VentaService:
             venta.cliente,
             actor_user=admin_usuario,
             reason="venta_cancelada",
-            reference_time=datetime.now(),
+            reference_time=datetime.now(timezone.utc),
         )
         return venta

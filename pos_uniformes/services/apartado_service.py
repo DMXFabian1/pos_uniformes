@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import desc, select
@@ -68,7 +68,7 @@ class ApartadoService:
             apartado.saldo_pendiente = Decimal("0.00")
             apartado.estado = EstadoApartado.LIQUIDADO
             if apartado.liquidado_at is None:
-                apartado.liquidado_at = datetime.now()
+                apartado.liquidado_at = datetime.now(timezone.utc)
         else:
             apartado.estado = EstadoApartado.ACTIVO
             apartado.liquidado_at = None
@@ -251,7 +251,7 @@ class ApartadoService:
 
         apartado.estado = EstadoApartado.ENTREGADO
         apartado.entregado_por = usuario
-        apartado.entregado_at = datetime.now()
+        apartado.entregado_at = datetime.now(timezone.utc)
         session.add(apartado)
         return apartado
 
@@ -281,7 +281,7 @@ class ApartadoService:
 
         apartado.estado = EstadoApartado.CANCELADO
         apartado.cancelado_por = usuario
-        apartado.cancelado_at = datetime.now()
+        apartado.cancelado_at = datetime.now(timezone.utc)
         if observacion:
             apartado.observacion = observacion
         session.add(apartado)

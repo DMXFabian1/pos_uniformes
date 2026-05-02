@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy.orm import Session
@@ -117,6 +117,6 @@ class CompraService:
             )
 
         compra.estado = EstadoCompra.CONFIRMADA
-        compra.confirmada_at = datetime.now()
+        compra.confirmada_at = datetime.now(timezone.utc)
         session.add(compra)
         return compra
