@@ -19,8 +19,15 @@ bearer_scheme = HTTPBearer()
 
 def get_db() -> Generator[Session, None, None]:
     """Provee una sesion de base de datos por request."""
-    with get_session() as session:
-        yield session
+    db = get_session()
+    try:
+        yield db
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
 
 
 def get_current_employee(
