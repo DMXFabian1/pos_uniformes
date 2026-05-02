@@ -2,6 +2,8 @@
 
 ## Checkpoint actual
 
+- `2026-05-02`: Bloque 1 refactorización — `sale_cashier_panel_helper.py`: eliminado `selected_client_label` del `context_label` de Caja. El nombre del cliente ya tiene su propio label dedicado (`sale_client_display_label`); mostrarlo en la barra de contexto era redundante. `context_label` ahora muestra solo `Pago: X | Descuento: Y`. Tests actualizados. Commit `45771d6`. Checkpoint `validated-tests`.
+
 - `2026-04-23`: Bug — vigencia validation en `_apply_quote_payload` cubre todos los caminos de emisión (crear_presupuesto + actualizar_presupuesto vía editor del satélite). Checkpoint `validated-tests`.
 - `2026-04-23`: feat — flujo completo CONVERTIDO para presupuestos: `convertir_presupuesto()` en service, `convert_quote_to_cart()` en action service, botón "Cobrar presupuesto" en panel (activo solo en EMITIDO), carga items al carrito de Caja y navega al tab. 4 tests nuevos. Checkpoint `validated-tests`.
 - `2026-04-23`: fix — rechazar emitir presupuesto con vigencia vencida en `emitir_presupuesto()`. 4 tests: sin vigencia, vigencia futura, vigencia vencida, mensaje incluye "vigencia". Checkpoint `validated-tests`.

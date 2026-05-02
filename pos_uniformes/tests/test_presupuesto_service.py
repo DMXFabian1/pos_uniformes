@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace
 import unittest
@@ -103,17 +103,17 @@ class EmitirPresupuestoTests(unittest.TestCase):
         self.assertEqual(result.estado, EstadoPresupuesto.EMITIDO)
 
     def test_emite_con_vigencia_futura(self) -> None:
-        p = _make_borrador(vigencia_hasta=datetime.now() + timedelta(days=1))
+        p = _make_borrador(vigencia_hasta=datetime.now(timezone.utc) + timedelta(days=1))
         result = self._call(p)
         self.assertEqual(result.estado, EstadoPresupuesto.EMITIDO)
 
     def test_rechaza_vigencia_vencida(self) -> None:
-        p = _make_borrador(vigencia_hasta=datetime.now() - timedelta(days=1))
+        p = _make_borrador(vigencia_hasta=datetime.now(timezone.utc) - timedelta(days=1))
         with self.assertRaises(ValueError, msg="vigencia vencida debe rechazar"):
             self._call(p)
 
     def test_mensaje_incluye_vigencia(self) -> None:
-        p = _make_borrador(vigencia_hasta=datetime.now() - timedelta(hours=1))
+        p = _make_borrador(vigencia_hasta=datetime.now(timezone.utc) - timedelta(hours=1))
         with self.assertRaises(ValueError) as ctx:
             self._call(p)
         self.assertIn("vigencia", str(ctx.exception).lower())

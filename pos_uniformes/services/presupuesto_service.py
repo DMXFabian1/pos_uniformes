@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy import desc, select
@@ -133,11 +133,11 @@ class PresupuestoService:
         )
         presupuesto.vigencia_hasta = vigencia_hasta
         presupuesto.observacion = (observacion or "").strip() or None
-        if estado == EstadoPresupuesto.EMITIDO and vigencia_hasta is not None and vigencia_hasta < datetime.now():
+        if estado == EstadoPresupuesto.EMITIDO and vigencia_hasta is not None and vigencia_hasta < datetime.now(timezone.utc):
             raise ValueError("La vigencia del presupuesto ya venció. Actualiza la fecha antes de emitir.")
         presupuesto.estado = estado
         if estado == EstadoPresupuesto.EMITIDO and presupuesto.emitido_at is None:
-            presupuesto.emitido_at = datetime.now()
+            presupuesto.emitido_at = datetime.now(timezone.utc)
         if estado == EstadoPresupuesto.BORRADOR:
             presupuesto.emitido_at = None
 
@@ -256,7 +256,7 @@ class PresupuestoService:
         if presupuesto.estado == EstadoPresupuesto.CONVERTIDO:
             raise ValueError("No se puede cancelar un presupuesto ya convertido.")
         presupuesto.estado = EstadoPresupuesto.CANCELADO
-        presupuesto.cancelado_at = datetime.now()
+        presupuesto.cancelado_at = datetime.now(timezone.utc)
         if observacion:
             presupuesto.observacion = observacion.strip()
         session.add(presupuesto)
@@ -279,11 +279,11 @@ class PresupuestoService:
             raise ValueError("No se puede emitir un presupuesto ya convertido.")
         if presupuesto.estado != EstadoPresupuesto.BORRADOR:
             raise ValueError("Solo se pueden emitir presupuestos en borrador.")
-        if presupuesto.vigencia_hasta is not None and presupuesto.vigencia_hasta < datetime.now():
+        if presupuesto.vigencia_hasta is not None and presupuesto.vigencia_hasta < datetime.now(timezone.utc):
             raise ValueError("La vigencia del presupuesto ya venció. Actualiza la fecha antes de emitir.")
 
         presupuesto.estado = EstadoPresupuesto.EMITIDO
-        presupuesto.emitido_at = datetime.now()
+        presupuesto.emitido_at = datetime.now(timezone.utc)
         if observacion:
             presupuesto.observacion = observacion.strip()
         session.add(presupuesto)
@@ -300,6 +300,6 @@ class PresupuestoService:
         if presupuesto.estado != EstadoPresupuesto.EMITIDO:
             raise ValueError("Solo se pueden convertir a venta presupuestos emitidos.")
         presupuesto.estado = EstadoPresupuesto.CONVERTIDO
-        presupuesto.convertido_at = datetime.now()
+        presupuesto.convertido_at = datetime.now(timezone.utc)
         session.add(presupuesto)
         return presupuesto
