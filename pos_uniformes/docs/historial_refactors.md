@@ -2,6 +2,8 @@
 
 ## Checkpoint actual
 
+- `2026-05-02`: bug — datetime naive/aware en services: `presupuesto_service`, `venta_service`, `compra_service`, `apartado_service` y `loyalty_service` usaban `datetime.now()` (naive) al escribir columnas `DateTime(timezone=True)`. En producción causa `TypeError` al comparar vigencias o al acceder a fechas con tzinfo. Reemplazado por `datetime.now(timezone.utc)` en los 9 puntos afectados. `backup_service` y `customer_card_service` conservan naive (sistema de archivos y presentación). Tests actualizados y pasando. Commits `3132efc` + `b7847a4`. Checkpoint `validated-tests`.
+
 - `2026-05-02`: Bloque 1 refactorización — `sale_cashier_panel_helper.py`: eliminado `selected_client_label` del `context_label` de Caja. El nombre del cliente ya tiene su propio label dedicado (`sale_client_display_label`); mostrarlo en la barra de contexto era redundante. `context_label` ahora muestra solo `Pago: X | Descuento: Y`. Tests actualizados. Commit `45771d6`. Checkpoint `validated-tests`.
 
 - `2026-04-23`: Bug — vigencia validation en `_apply_quote_payload` cubre todos los caminos de emisión (crear_presupuesto + actualizar_presupuesto vía editor del satélite). Checkpoint `validated-tests`.
