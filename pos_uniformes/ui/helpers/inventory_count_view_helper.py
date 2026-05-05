@@ -73,6 +73,23 @@ def build_inventory_count_batch_view(rows: list[InventoryCountRow]) -> Inventory
     )
 
 
+def build_inventory_count_confirm_text(
+    batch_view: InventoryCountBatchView,
+    *,
+    mode_label: str,
+    reference: str,
+) -> str:
+    return "\n".join(
+        (
+            f"Modo: {mode_label}",
+            f"Referencia: {reference}",
+            *batch_view.confirmation_lines,
+            "",
+            "Solo se aplicaran filas con diferencia. ¿Deseas continuar?",
+        )
+    )
+
+
 def _format_delta_label(delta: int) -> str:
     if delta > 0:
         return f"+{delta}"

@@ -35,12 +35,16 @@ from pos_uniformes.services.inventory_count_service import (
     accumulate_inventory_count_scan,
     build_inventory_count_payload,
     build_inventory_count_row,
+    get_inventory_count_apply_error,
     load_inventory_count_variant_by_sku,
     remove_inventory_count_row,
     update_inventory_count_row_counted_stock,
     upsert_inventory_count_row,
 )
-from pos_uniformes.ui.helpers.inventory_count_view_helper import build_inventory_count_batch_view
+from pos_uniformes.ui.helpers.inventory_count_view_helper import (
+    build_inventory_count_batch_view,
+    build_inventory_count_confirm_text,
+)
 
 
 def prompt_inventory_count_data(
@@ -709,36 +713,23 @@ class InventoryCountDialog(QDialog):
         return super().eventFilter(watched, event)
 
     def _handle_confirm(self) -> None:
+        apply_error = get_inventory_count_apply_error(self._rows)
+        if apply_error is not None:
+            QMessageBox.information(self, "No se puede aplicar", apply_error)
+            return
+
         payload = build_inventory_count_payload(
             reference=self.reference_input.text(),
             observation=self.observation_input.text(),
             rows=self._rows,
         )
-        changed_rows = list(payload["rows"])
-        if not self._rows:
-            QMessageBox.information(self, "Sin lecturas", "Aun no has escaneado piezas para este conteo.")
-            return
-        if not changed_rows:
-            QMessageBox.information(self, "Sin diferencias", "No hay diferencias reales para aplicar.")
-            return
-
-        batch_view = build_inventory_count_batch_view(self._rows)
         reference = str(payload["reference"]).strip() or f"CONTEO-{uuid4().hex[:8].upper()}"
         mode_label = "Ingreso de mercancia" if self._add_to_system_mode else "Conteo fisico"
-        confirmation_text = "\n".join(
-            (
-                f"Modo: {mode_label}",
-                f"Referencia: {reference}",
-                *batch_view.confirmation_lines,
-                "",
-                "Solo se aplicaran filas con diferencia. ¿Deseas continuar?",
-            )
+        batch_view = build_inventory_count_batch_view(self._rows)
+        confirmation_text = build_inventory_count_confirm_text(
+            batch_view, mode_label=mode_label, reference=reference
         )
-        answer = QMessageBox.question(
-            self,
-            "Confirmar conteo",
-            confirmation_text,
-        )
+        answer = QMessageBox.question(self, "Confirmar conteo", confirmation_text)
         if answer != QMessageBox.StandardButton.Yes:
             return
 

@@ -10,6 +10,7 @@ from pos_uniformes.services.inventory_count_service import (
     build_inventory_count_row,
     build_inventory_count_rows_from_snapshot_rows,
     build_inventory_count_summary,
+    get_inventory_count_apply_error,
     remove_inventory_count_row,
     update_inventory_count_row_counted_stock,
     upsert_inventory_count_row,
@@ -220,6 +221,41 @@ class InventoryCountServiceTests(unittest.TestCase):
 
         self.assertEqual(rows[0].stock_contado, 12)
         self.assertEqual(rows[0].delta, 2)
+
+    def test_get_inventory_count_apply_error_returns_none_when_valid(self) -> None:
+        rows = [
+            InventoryCountRow(
+                variante_id=1,
+                sku="SKU000001",
+                producto_nombre="Bata",
+                stock_sistema=2,
+                stock_contado=4,
+                delta=2,
+            )
+        ]
+
+        self.assertIsNone(get_inventory_count_apply_error(rows))
+
+    def test_get_inventory_count_apply_error_on_empty_rows(self) -> None:
+        error = get_inventory_count_apply_error([])
+
+        self.assertIsNotNone(error)
+
+    def test_get_inventory_count_apply_error_when_no_changed_rows(self) -> None:
+        rows = [
+            InventoryCountRow(
+                variante_id=1,
+                sku="SKU000001",
+                producto_nombre="Bata",
+                stock_sistema=5,
+                stock_contado=5,
+                delta=0,
+            )
+        ]
+
+        error = get_inventory_count_apply_error(rows)
+
+        self.assertIsNotNone(error)
 
     def test_accumulate_inventory_count_scan_increments_existing_variant(self) -> None:
         variant = InventoryCountVariantView(

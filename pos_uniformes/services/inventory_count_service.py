@@ -197,6 +197,15 @@ def filter_inventory_count_changed_rows(rows: list[InventoryCountRow]) -> list[I
     return [row for row in rows if int(row.delta) != 0]
 
 
+def get_inventory_count_apply_error(rows: list[InventoryCountRow]) -> str | None:
+    """Devuelve un mensaje de error si el conteo no puede aplicarse, o None si es valido."""
+    if not rows:
+        return "Aun no has escaneado piezas para este conteo."
+    if not filter_inventory_count_changed_rows(rows):
+        return "No hay diferencias reales para aplicar."
+    return None
+
+
 def build_inventory_count_payload(
     *,
     reference: str,
