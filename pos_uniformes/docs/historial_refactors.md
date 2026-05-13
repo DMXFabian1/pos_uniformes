@@ -2,6 +2,8 @@
 
 ## Checkpoint actual
 
+- `2026-05-13`: pase general Caja y tickets — dos bugs corregidos. (1) `_handle_sale_cart_item_double_click` filtraba `column() != 2` (Precio) pero el hint de UI dice "Doble clic en Cantidad" (col 0); ahora responde a cualquier columna de la fila. (2) Ajuste de redondeo en ticket se mostraba sin `$` (`Ajuste: 0.31`), inconsistente con todos los demás valores monetarios; corregido a `$0.31`. Tests verde. Commit `c8dc130`. Checkpoint `validated-tests`.
+
 - `2026-05-02`: bug — API `get_db()` nunca commitea: `with get_session() as session: yield session` llama `session.close()` al salir sin commit, así que PostgreSQL descartaba todos los cambios (crear/actualizar/cancelar presupuesto desde la API móvil). Corregido con patrón explícito commit/rollback/close. Commit `99b2fce`. Checkpoint `validated-tests` (la API no tiene suite de tests, pero la lógica es trivial).
 
 - `2026-05-02`: bug — datetime naive/aware en services: `presupuesto_service`, `venta_service`, `compra_service`, `apartado_service` y `loyalty_service` usaban `datetime.now()` (naive) al escribir columnas `DateTime(timezone=True)`. En producción causa `TypeError` al comparar vigencias o al acceder a fechas con tzinfo. Reemplazado por `datetime.now(timezone.utc)` en los 9 puntos afectados. `backup_service` y `customer_card_service` conservan naive (sistema de archivos y presentación). Tests actualizados y pasando. Commits `3132efc` + `b7847a4`. Checkpoint `validated-tests`.
