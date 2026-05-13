@@ -171,7 +171,7 @@ def build_sale_ticket_text(
             f"-${ticket_totals.discount_amount}",
         ))
     if rounding_adjustment != Decimal("0.00"):
-        lines.append(_row("Ajuste:", str(rounding_adjustment)))
+        lines.append(_row("Ajuste:", f"${_fmt(rounding_adjustment)}"))
     lines.append(_sep())
     lines.append(_row("TOTAL A PAGAR:", f"${_fmt(ticket_totals.total)}"))
     lines.append(_sep())

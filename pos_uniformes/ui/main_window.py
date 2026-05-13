@@ -7550,7 +7550,7 @@ class MainWindow(QMainWindow):
         self._set_sale_feedback("Carrito limpiado.", "neutral", auto_clear_ms=1400)
 
     def _handle_sale_cart_item_double_click(self, item) -> None:
-        if item is None or item.column() != 2:
+        if item is None:
             return
         self._handle_update_sale_item_quantity()
 
