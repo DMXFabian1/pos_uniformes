@@ -127,6 +127,11 @@ from pos_uniformes.services.employee_sales_history_service import (
     list_employee_day_sale_rows,
     load_employee_sale_detail_snapshot,
 )
+from pos_uniformes.services.employee_ranking_service import (
+    build_ranking_period_dates,
+    load_employee_ranking,
+)
+from pos_uniformes.ui.helpers.settings_employee_ranking_helper import build_employee_ranking_view
 from pos_uniformes.services.cash_session_action_service import (
     close_and_reopen_cash_session_action,
     close_cash_session_action,
@@ -1575,6 +1580,13 @@ class MainWindow(QMainWindow):
         self.settings_employee_sale_detail_status_label = QLabel("Sin ticket seleccionado.")
         self.settings_employee_sale_detail_table = QTableWidget()
         self.settings_employee_sale_detail_dialog: QDialog | None = None
+        self.settings_open_employee_ranking_button = QPushButton("Ranking")
+        self.settings_employee_ranking_table = QTableWidget()
+        self.settings_employee_ranking_status_label = QLabel("Sin datos.")
+        self.settings_employee_ranking_period_combo = QComboBox()
+        self.settings_employee_ranking_toggle_amounts_button = QPushButton("Ocultar monto")
+        self.settings_employee_ranking_amounts_visible = True
+        self.settings_employee_ranking_dialog: QDialog | None = None
         self.settings_employees_dialog: QDialog | None = None
         self.settings_backup_dialog: QDialog | None = None
         self.settings_cash_history_dialog: QDialog | None = None
@@ -3402,6 +3414,62 @@ class MainWindow(QMainWindow):
 
     def _refresh_settings_employee_day_sale_actions(self) -> None:
         self.settings_employee_view_ticket_button.setEnabled(self._selected_settings_employee_day_sale_id() is not None)
+
+    def _open_employee_ranking_dialog(self) -> None:
+        if self.settings_employee_ranking_dialog is None:
+            from pos_uniformes.ui.dialogs.settings_dialogs import build_employee_ranking_dialog
+
+            self.settings_employee_ranking_dialog = build_employee_ranking_dialog(self)
+        self._refresh_employee_ranking()
+        self.settings_employee_ranking_dialog.show()
+        self.settings_employee_ranking_dialog.raise_()
+        self.settings_employee_ranking_dialog.activateWindow()
+
+    def _refresh_employee_ranking(self) -> None:
+        from datetime import timedelta
+
+        period = self.settings_employee_ranking_period_combo.currentText().strip() or "Hoy"
+        start_date, end_date = build_ranking_period_dates(period)
+        period_label = {
+            "Hoy": "hoy",
+            "7 dias": "ultimos 7 dias",
+            "Este mes": "este mes",
+        }.get(period, period.lower())
+        try:
+            with get_session() as session:
+                ranking_rows = load_employee_ranking(session, start_date=start_date, end_date=end_date)
+        except Exception as exc:  # noqa: BLE001
+            self.settings_employee_ranking_status_label.setText(f"No se pudo cargar el ranking: {exc}")
+            self.settings_employee_ranking_table.setRowCount(0)
+            return
+        view = build_employee_ranking_view(
+            ranking_rows,
+            period_label=period_label,
+            amounts_visible=self.settings_employee_ranking_amounts_visible,
+        )
+        self.settings_employee_ranking_status_label.setText(view.status_label)
+        self.settings_employee_ranking_table.setRowCount(len(view.rows))
+        for row_index, row in enumerate(view.rows):
+            for col_index, value in enumerate(row.values):
+                item = _table_item(value)
+                if col_index in {0, 2, 3}:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                if col_index in {4}:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+                if row.is_top:
+                    item.setForeground(self.palette().highlight())
+                self.settings_employee_ranking_table.setItem(row_index, col_index, item)
+        if view.rows:
+            self.settings_employee_ranking_table.setCurrentCell(0, 0)
+        else:
+            self.settings_employee_ranking_table.clearSelection()
+
+    def _handle_toggle_employee_ranking_amounts(self) -> None:
+        self.settings_employee_ranking_amounts_visible = not self.settings_employee_ranking_amounts_visible
+        self.settings_employee_ranking_toggle_amounts_button.setText(
+            "Ocultar monto" if self.settings_employee_ranking_amounts_visible else "Mostrar monto"
+        )
+        self._refresh_employee_ranking()
 
     def _handle_view_settings_employee_day_sale_ticket(self) -> None:
         sale_id = self._selected_settings_employee_day_sale_id()

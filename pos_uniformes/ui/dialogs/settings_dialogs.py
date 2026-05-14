@@ -225,6 +225,8 @@ def build_employees_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_set_employee_pin_button.clicked.connect(window._handle_set_employee_pin)
     window.settings_generate_employee_qr_button.clicked.connect(window._handle_generate_employee_qr)
     window.settings_generate_employee_card_button.clicked.connect(window._handle_generate_employee_card)
+    window.settings_open_employee_ranking_button.setObjectName("toolbarSecondaryButton")
+    window.settings_open_employee_ranking_button.clicked.connect(window._open_employee_ranking_dialog)
     actions.addWidget(QLabel("Buscar"))
     actions.addWidget(window.settings_employees_search_input, 1)
     actions.addWidget(QLabel("Actividad"))
@@ -235,6 +237,7 @@ def build_employees_settings_dialog(window: "MainWindow") -> QDialog:
     actions.addWidget(window.settings_set_employee_pin_button)
     actions.addWidget(window.settings_generate_employee_qr_button)
     actions.addWidget(window.settings_generate_employee_card_button)
+    actions.addWidget(window.settings_open_employee_ranking_button)
 
     window.settings_employees_table.setColumnCount(9)
     window.settings_employees_table.setHorizontalHeaderLabels(
@@ -1032,5 +1035,60 @@ def build_catalog_sync_settings_dialog(window: "MainWindow") -> QDialog:
     layout.addLayout(actions_row)
     layout.addWidget(window.settings_catalog_sync_status_label)
     layout.addWidget(window.settings_catalog_sync_table)
+    layout.addWidget(close_buttons)
+    return dialog
+
+
+def build_employee_ranking_dialog(window: "MainWindow") -> QDialog:
+    dialog, layout = _create_settings_dialog(
+        window,
+        "Ranking de empleadas",
+        "Ventas confirmadas acreditadas por escaneo QR de empleada. Solo aparecen quienes tienen ventas en el periodo.",
+        width=780,
+    )
+    toolbar = QHBoxLayout()
+    window.settings_employee_ranking_period_combo.clear()
+    window.settings_employee_ranking_period_combo.addItems(["Hoy", "7 dias", "Este mes"])
+    window.settings_employee_ranking_period_combo.setObjectName("toolbarSecondaryButton")
+    window.settings_employee_ranking_period_combo.currentTextChanged.connect(window._refresh_employee_ranking)
+    window.settings_employee_ranking_toggle_amounts_button.setObjectName("toolbarGhostButton")
+    window.settings_employee_ranking_toggle_amounts_button.clicked.connect(
+        window._handle_toggle_employee_ranking_amounts
+    )
+    toolbar.addWidget(QLabel("Periodo"))
+    toolbar.addWidget(window.settings_employee_ranking_period_combo)
+    toolbar.addStretch()
+    toolbar.addWidget(window.settings_employee_ranking_toggle_amounts_button)
+
+    window.settings_employee_ranking_status_label.setObjectName("analyticsLine")
+
+    window.settings_employee_ranking_table.setColumnCount(6)
+    window.settings_employee_ranking_table.setHorizontalHeaderLabels(
+        ["#", "Empleada", "Tickets", "Piezas", "Monto", "Ultima venta"]
+    )
+    window.settings_employee_ranking_table.setObjectName("dataTable")
+    window.settings_employee_ranking_table.verticalHeader().setVisible(False)
+    window.settings_employee_ranking_table.setSelectionBehavior(
+        window.settings_employee_ranking_table.SelectionBehavior.SelectRows
+    )
+    window.settings_employee_ranking_table.setEditTriggers(
+        window.settings_employee_ranking_table.EditTrigger.NoEditTriggers
+    )
+    window.settings_employee_ranking_table.setAlternatingRowColors(True)
+    window.settings_employee_ranking_table.setMinimumHeight(280)
+    header = window.settings_employee_ranking_table.horizontalHeader()
+    from PyQt6.QtWidgets import QHeaderView
+    header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+    header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+    header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+    header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+    header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
+    header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
+
+    close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+    close_buttons.rejected.connect(dialog.reject)
+    layout.addLayout(toolbar)
+    layout.addWidget(window.settings_employee_ranking_status_label)
+    layout.addWidget(window.settings_employee_ranking_table, 1)
     layout.addWidget(close_buttons)
     return dialog
