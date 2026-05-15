@@ -24,6 +24,8 @@ class LayawayPaymentInput:
     cash_amount: Decimal
     reference: str
     notes: str
+    seller_employee_code: str | None = None
+    seller_employee_display_name: str | None = None
 
 
 def normalize_layaway_payment_method(payment_method: str) -> str:
@@ -78,6 +80,8 @@ def build_layaway_payment_input(
     cash_amount: Decimal | str | int | float,
     reference: str = "",
     notes: str = "",
+    seller_employee_code: str | None = None,
+    seller_employee_display_name: str | None = None,
 ) -> LayawayPaymentInput:
     normalized_amount = Decimal(str(amount or 0)).quantize(Decimal("0.01"))
     state = resolve_layaway_payment_state(
@@ -91,4 +95,6 @@ def build_layaway_payment_input(
         cash_amount=state.cash_amount,
         reference=reference.strip(),
         notes=notes.strip(),
+        seller_employee_code=seller_employee_code or None,
+        seller_employee_display_name=seller_employee_display_name or None,
     )

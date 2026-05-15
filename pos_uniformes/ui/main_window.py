@@ -10761,6 +10761,8 @@ class MainWindow(QMainWindow):
                     layaway_id=apartado_id,
                     user_id=self.user_id,
                     payment_input=payload,
+                    seller_employee_code=payload.seller_employee_code,
+                    seller_employee_display_name=payload.seller_employee_display_name,
                 )
                 session.commit()
         except Exception as exc:  # noqa: BLE001
@@ -10829,6 +10831,10 @@ class MainWindow(QMainWindow):
                         layaway_id=apartado_id,
                         user_id=self.user_id,
                         payment_input=payment_payload,
+                        final_abono_employee_code=payment_payload.seller_employee_code,
+                        final_abono_employee_display_name=payment_payload.seller_employee_display_name,
+                        delivery_employee_code=payment_payload.seller_employee_code,
+                        delivery_employee_display_name=payment_payload.seller_employee_display_name,
                     )
                 session.commit()
         except Exception as exc:  # noqa: BLE001

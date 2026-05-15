@@ -20,6 +20,8 @@ def create_layaway_from_payload(
     folio: str,
     payload: dict[str, object],
     default_note: str | None = None,
+    seller_employee_code: str | None = None,
+    seller_employee_display_name: str | None = None,
 ) -> LayawayCreationResult:
     apartado_service, cliente_model, usuario_model = _resolve_layaway_creation_dependencies()
     usuario = session.get(usuario_model, user_id)
@@ -40,6 +42,8 @@ def create_layaway_from_payload(
         due_date = date.fromisoformat(str(payload["fecha_compromiso"]))
         due_value = datetime.combine(due_date, datetime.min.time())
 
+    emp_code = seller_employee_code or str(payload.get("seller_employee_code") or "") or None
+    emp_name = seller_employee_display_name or str(payload.get("seller_employee_display_name") or "") or None
     layaway = apartado_service.crear_apartado(
         session=session,
         usuario=usuario,
@@ -51,6 +55,8 @@ def create_layaway_from_payload(
         fecha_compromiso=due_value,
         observacion=str(payload["observacion"]) or default_note,
         cliente=cliente,
+        seller_employee_code=emp_code,
+        seller_employee_display_name=emp_name,
     )
     return LayawayCreationResult(
         layaway_id=int(layaway.id),

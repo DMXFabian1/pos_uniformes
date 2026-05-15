@@ -367,10 +367,47 @@ def build_create_layaway_dialog(
     deposit_spin.setValue(0.01)
     notes_input = QTextEdit()
     notes_input.setMaximumHeight(90)
+    employee_qr_input = QLineEdit()
+    employee_qr_input.setPlaceholderText("Escanea QR de empleada (opcional)")
+    employee_qr_input.setEchoMode(QLineEdit.EchoMode.Password)
+    employee_name_label = QLabel("—")
+    employee_state: dict[str, str | None] = {"code": None, "display_name": None}
+
+    def resolve_employee_qr() -> None:
+        raw = employee_qr_input.text().strip()
+        if not raw:
+            employee_state["code"] = None
+            employee_state["display_name"] = None
+            employee_name_label.setText("—")
+            return
+        try:
+            from pos_uniformes.services.employee_identity_service import EmployeeIdentityService
+            with get_session() as _session:
+                emp = EmployeeIdentityService.resolve_employee_by_qr_code(_session, raw)
+            if emp is None:
+                employee_state["code"] = None
+                employee_state["display_name"] = None
+                employee_name_label.setText("QR no reconocido")
+            else:
+                employee_state["code"] = str(emp.codigo)
+                display = EmployeeIdentityService.build_visible_employee_name(str(emp.nombre_completo or emp.codigo))
+                employee_state["display_name"] = display
+                employee_name_label.setText(display)
+        except Exception:  # noqa: BLE001
+            employee_state["code"] = None
+            employee_state["display_name"] = None
+            employee_name_label.setText("Error al verificar QR")
+        employee_qr_input.clear()
+
+    employee_qr_input.returnPressed.connect(resolve_employee_qr)
+    emp_row = QHBoxLayout()
+    emp_row.addWidget(employee_qr_input, 1)
+    emp_row.addWidget(employee_name_label)
     form.addRow("Anticipo", deposit_spin)
     form.addRow("Fecha de vencimiento", due_input)
     form.addRow("", due_quick_row)
     form.addRow("Observacion", notes_input)
+    form.addRow("Empleada", emp_row)
     buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
     buttons.accepted.connect(dialog.accept)
     buttons.rejected.connect(dialog.reject)
@@ -410,4 +447,6 @@ def build_create_layaway_dialog(
         "anticipo": Decimal(str(deposit_spin.value())),
         "fecha_compromiso": due_input.date().toPyDate().isoformat(),
         "observacion": notes_input.toPlainText().strip(),
+        "seller_employee_code": employee_state["code"],
+        "seller_employee_display_name": employee_state["display_name"],
     }

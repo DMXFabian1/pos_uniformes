@@ -86,6 +86,8 @@ class ApartadoService:
         fecha_compromiso: datetime | None = None,
         observacion: str | None = None,
         cliente: Cliente | None = None,
+        seller_employee_code: str | None = None,
+        seller_employee_display_name: str | None = None,
     ) -> Apartado:
         cls._validar_operador(usuario)
         if not cliente_nombre.strip():
@@ -104,6 +106,8 @@ class ApartadoService:
             fecha_compromiso=fecha_compromiso,
             observacion=observacion,
             estado=EstadoApartado.ACTIVO,
+            seller_employee_code=seller_employee_code or None,
+            seller_employee_display_name=seller_employee_display_name or None,
         )
 
         total = Decimal("0.00")
@@ -180,6 +184,8 @@ class ApartadoService:
                     monto=anticipo,
                     referencia="ANTICIPO",
                     observacion="Anticipo inicial del apartado.",
+                    seller_employee_code=seller_employee_code or None,
+                    seller_employee_display_name=seller_employee_display_name or None,
                 )
             )
 
@@ -198,6 +204,8 @@ class ApartadoService:
         monto_efectivo: Decimal | None = None,
         referencia: str | None = None,
         observacion: str | None = None,
+        seller_employee_code: str | None = None,
+        seller_employee_display_name: str | None = None,
     ) -> ApartadoAbono:
         cls._validar_operador(usuario)
         if apartado.estado in {EstadoApartado.CANCELADO, EstadoApartado.ENTREGADO}:
@@ -231,6 +239,8 @@ class ApartadoService:
             monto_efectivo=efectivo_real.quantize(Decimal("0.01")),
             referencia=(referencia or "").strip() or None,
             observacion=(observacion or "").strip() or None,
+            seller_employee_code=seller_employee_code or None,
+            seller_employee_display_name=seller_employee_display_name or None,
         )
         apartado.total_abonado = Decimal(apartado.total_abonado) + monto
         apartado.saldo_pendiente = Decimal(apartado.total) - Decimal(apartado.total_abonado)
@@ -240,7 +250,14 @@ class ApartadoService:
         return abono
 
     @classmethod
-    def entregar_apartado(cls, session: Session, apartado: Apartado, usuario: Usuario) -> Apartado:
+    def entregar_apartado(
+        cls,
+        session: Session,
+        apartado: Apartado,
+        usuario: Usuario,
+        delivery_employee_code: str | None = None,
+        delivery_employee_display_name: str | None = None,
+    ) -> Apartado:
         cls._validar_operador(usuario)
         if apartado.estado == EstadoApartado.CANCELADO:
             raise ValueError("No puedes entregar un apartado cancelado.")
@@ -252,6 +269,9 @@ class ApartadoService:
         apartado.estado = EstadoApartado.ENTREGADO
         apartado.entregado_por = usuario
         apartado.entregado_at = datetime.now(timezone.utc)
+        if delivery_employee_code:
+            apartado.delivery_employee_code = delivery_employee_code
+            apartado.delivery_employee_display_name = delivery_employee_display_name or None
         session.add(apartado)
         return apartado
 

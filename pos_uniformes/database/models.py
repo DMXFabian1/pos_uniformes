@@ -1287,6 +1287,10 @@ class Apartado(Base):
     saldo_pendiente: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0.00"), nullable=False)
     fecha_compromiso: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     observacion: Mapped[str | None] = mapped_column(Text())
+    seller_employee_code: Mapped[str | None] = mapped_column(String(40), index=True)
+    seller_employee_display_name: Mapped[str | None] = mapped_column(String(120))
+    delivery_employee_code: Mapped[str | None] = mapped_column(String(40), index=True)
+    delivery_employee_display_name: Mapped[str | None] = mapped_column(String(120))
     liquidado_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     entregado_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     cancelado_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
@@ -1403,6 +1407,8 @@ class ApartadoAbono(Base):
     monto_efectivo: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     referencia: Mapped[str | None] = mapped_column(String(120))
     observacion: Mapped[str | None] = mapped_column(Text())
+    seller_employee_code: Mapped[str | None] = mapped_column(String(40), index=True)
+    seller_employee_display_name: Mapped[str | None] = mapped_column(String(120))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

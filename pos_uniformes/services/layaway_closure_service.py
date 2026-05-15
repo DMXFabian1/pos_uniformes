@@ -52,7 +52,14 @@ def load_layaway_delivery_confirmation(session, *, layaway_id: int) -> LayawayDe
     )
 
 
-def deliver_layaway(session, *, layaway_id: int, user_id: int) -> LayawayDeliveryResult:
+def deliver_layaway(
+    session,
+    *,
+    layaway_id: int,
+    user_id: int,
+    delivery_employee_code: str | None = None,
+    delivery_employee_display_name: str | None = None,
+) -> LayawayDeliveryResult:
     apartado_service, usuario_model, venta_service = _resolve_layaway_closure_dependencies()
     usuario = session.get(usuario_model, user_id)
     apartado = apartado_service.obtener_apartado(session, layaway_id)
@@ -65,10 +72,22 @@ def deliver_layaway(session, *, layaway_id: int, user_id: int) -> LayawayDeliver
         apartado=apartado,
         usuario=usuario,
         payment_registered_amount=Decimal("0.00"),
+        delivery_employee_code=delivery_employee_code,
+        delivery_employee_display_name=delivery_employee_display_name,
     )
 
 
-def settle_and_deliver_layaway(session, *, layaway_id: int, user_id: int, payment_input) -> LayawayDeliveryResult:
+def settle_and_deliver_layaway(
+    session,
+    *,
+    layaway_id: int,
+    user_id: int,
+    payment_input,
+    final_abono_employee_code: str | None = None,
+    final_abono_employee_display_name: str | None = None,
+    delivery_employee_code: str | None = None,
+    delivery_employee_display_name: str | None = None,
+) -> LayawayDeliveryResult:
     apartado_service, usuario_model, venta_service = _resolve_layaway_closure_dependencies()
     usuario = session.get(usuario_model, user_id)
     apartado = apartado_service.obtener_apartado(session, layaway_id)
@@ -83,6 +102,8 @@ def settle_and_deliver_layaway(session, *, layaway_id: int, user_id: int, paymen
         monto_efectivo=payment_input.cash_amount,
         referencia=payment_input.reference or None,
         observacion=payment_input.notes or None,
+        seller_employee_code=final_abono_employee_code or None,
+        seller_employee_display_name=final_abono_employee_display_name or None,
     )
     return _finalize_layaway_delivery(
         session=session,
@@ -91,6 +112,8 @@ def settle_and_deliver_layaway(session, *, layaway_id: int, user_id: int, paymen
         apartado=apartado,
         usuario=usuario,
         payment_registered_amount=Decimal(payment_input.amount).quantize(Decimal("0.01")),
+        delivery_employee_code=delivery_employee_code,
+        delivery_employee_display_name=delivery_employee_display_name,
     )
 
 
@@ -102,6 +125,8 @@ def _finalize_layaway_delivery(
     apartado,
     usuario,
     payment_registered_amount: Decimal,
+    delivery_employee_code: str | None = None,
+    delivery_employee_display_name: str | None = None,
 ) -> LayawayDeliveryResult:
     sale = venta_service.crear_confirmada_desde_apartado(
         session=session,
@@ -110,7 +135,13 @@ def _finalize_layaway_delivery(
         folio=f"ENT-{apartado.folio}",
         observacion=f"Entrega de apartado {apartado.folio}",
     )
-    apartado_service.entregar_apartado(session, apartado, usuario)
+    apartado_service.entregar_apartado(
+        session,
+        apartado,
+        usuario,
+        delivery_employee_code=delivery_employee_code,
+        delivery_employee_display_name=delivery_employee_display_name,
+    )
     customer_label = (
         f"{apartado.cliente.codigo_cliente} · {apartado.cliente_nombre}"
         if getattr(apartado, "cliente", None) is not None

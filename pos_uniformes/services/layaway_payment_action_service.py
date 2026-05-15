@@ -9,6 +9,8 @@ def register_layaway_payment(
     layaway_id: int,
     user_id: int,
     payment_input,
+    seller_employee_code: str | None = None,
+    seller_employee_display_name: str | None = None,
 ) -> None:
     apartado_service, usuario_model = _resolve_layaway_payment_action_dependencies()
     usuario = session.get(usuario_model, user_id)
@@ -24,6 +26,8 @@ def register_layaway_payment(
         monto_efectivo=payment_input.cash_amount,
         referencia=payment_input.reference or None,
         observacion=payment_input.notes or None,
+        seller_employee_code=seller_employee_code or None,
+        seller_employee_display_name=seller_employee_display_name or None,
     )
 
 
