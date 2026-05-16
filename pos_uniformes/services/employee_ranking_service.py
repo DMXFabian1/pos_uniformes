@@ -1,4 +1,4 @@
-"""Ranking de empleadas por ventas confirmadas en un periodo."""
+"""Ranking de empleadas por ventas confirmadas y apartados en un periodo."""
 
 from __future__ import annotations
 
@@ -9,7 +9,16 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
-from pos_uniformes.database.models import Empleada, EstadoVenta, ModoOrigenVenta, Venta
+from pos_uniformes.database.models import (
+    Apartado,
+    ApartadoAbono,
+    ApartadoDetalle,
+    Empleada,
+    EstadoApartado,
+    EstadoVenta,
+    ModoOrigenVenta,
+    Venta,
+)
 
 
 @dataclass(frozen=True)
@@ -47,11 +56,7 @@ def load_employee_ranking(
         )
     ).all()
 
-    aggregates: dict[str, dict] = {}
-    for sale in sales:
-        code = str(sale.seller_employee_code or "").strip().upper()
-        if not code:
-            continue
+    def _ensure_agg(code: str) -> dict:
         if code not in aggregates:
             aggregates[code] = {
                 "tickets": 0,
@@ -59,13 +64,67 @@ def load_employee_ranking(
                 "amount": Decimal("0.00"),
                 "last_sale_at": None,
             }
-        agg = aggregates[code]
+        return aggregates[code]
+
+    def _update_last(agg: dict, ts: datetime | None) -> None:
+        if ts is not None and (agg["last_sale_at"] is None or ts > agg["last_sale_at"]):
+            agg["last_sale_at"] = ts
+
+    aggregates: dict[str, dict] = {}
+
+    # --- Ventas directas con atribucion de empleada ---
+    for sale in sales:
+        code = str(sale.seller_employee_code or "").strip().upper()
+        if not code:
+            continue
+        agg = _ensure_agg(code)
         agg["tickets"] += 1
         agg["pieces"] += sum(int(getattr(d, "cantidad", 0) or 0) for d in sale.detalles)
         agg["amount"] = (agg["amount"] + Decimal(str(sale.total or "0"))).quantize(Decimal("0.01"))
-        sale_at = sale.confirmada_at
-        if sale_at is not None and (agg["last_sale_at"] is None or sale_at > agg["last_sale_at"]):
-            agg["last_sale_at"] = sale_at
+        _update_last(agg, sale.confirmada_at)
+
+    # --- Apartados creados en el periodo con atribucion de empleada ---
+    apartados = session.scalars(
+        select(Apartado)
+        .options(selectinload(Apartado.detalles), selectinload(Apartado.abonos))
+        .where(
+            Apartado.seller_employee_code.isnot(None),
+            Apartado.estado != EstadoApartado.CANCELADO,
+            Apartado.created_at >= window_start,
+            Apartado.created_at <= window_end,
+        )
+    ).all()
+    for apartado in apartados:
+        code = str(apartado.seller_employee_code or "").strip().upper()
+        if not code:
+            continue
+        anticipo = next(
+            (Decimal(str(ab.monto or "0")) for ab in apartado.abonos if str(ab.referencia or "") == "ANTICIPO"),
+            Decimal("0.00"),
+        )
+        agg = _ensure_agg(code)
+        agg["tickets"] += 1
+        agg["pieces"] += sum(int(getattr(d, "cantidad", 0) or 0) for d in apartado.detalles)
+        agg["amount"] = (agg["amount"] + anticipo).quantize(Decimal("0.01"))
+        _update_last(agg, apartado.created_at)
+
+    # --- Abonos adicionales (excluye ANTICIPO, ya contado en la creacion) ---
+    additional_abonos = session.scalars(
+        select(ApartadoAbono)
+        .where(
+            ApartadoAbono.seller_employee_code.isnot(None),
+            ApartadoAbono.referencia != "ANTICIPO",
+            ApartadoAbono.created_at >= window_start,
+            ApartadoAbono.created_at <= window_end,
+        )
+    ).all()
+    for abono in additional_abonos:
+        code = str(abono.seller_employee_code or "").strip().upper()
+        if not code:
+            continue
+        agg = _ensure_agg(code)
+        agg["amount"] = (agg["amount"] + Decimal(str(abono.monto or "0"))).quantize(Decimal("0.01"))
+        _update_last(agg, abono.created_at)
 
     employees = session.scalars(select(Empleada)).all()
     employee_by_code: dict[str, Empleada] = {

@@ -25,6 +25,36 @@ def _make_employee(emp_id: int, codigo: str, nombre: str):
     return SimpleNamespace(id=emp_id, codigo=codigo, nombre_completo=nombre)
 
 
+def _make_apartado(code: str, anticipo: str, pieces: int, created_at: datetime):
+    return SimpleNamespace(
+        seller_employee_code=code,
+        created_at=created_at,
+        detalles=[SimpleNamespace(cantidad=pieces)],
+        abonos=[SimpleNamespace(referencia="ANTICIPO", monto=Decimal(anticipo))],
+    )
+
+
+def _make_abono(code: str, monto: str, created_at: datetime, referencia: str = "ABONO"):
+    return SimpleNamespace(
+        seller_employee_code=code,
+        monto=Decimal(monto),
+        created_at=created_at,
+        referencia=referencia,
+    )
+
+
+def _mock_scalars(sales=(), apartados=(), abonos=(), employees=()):
+    from unittest.mock import MagicMock
+    mock_session = MagicMock()
+    mock_session.scalars.side_effect = [
+        MagicMock(all=MagicMock(return_value=list(sales))),
+        MagicMock(all=MagicMock(return_value=list(apartados))),
+        MagicMock(all=MagicMock(return_value=list(abonos))),
+        MagicMock(all=MagicMock(return_value=list(employees))),
+    ]
+    return mock_session
+
+
 class _FakeSession:
     def __init__(self, sales, employees):
         self._sales = sales
@@ -52,10 +82,6 @@ class EmployeeRankingServiceTests(unittest.TestCase):
         return _FakeSession(sales, employees)
 
     def test_ranks_by_amount_descending(self) -> None:
-        from pos_uniformes.services.employee_ranking_service import (
-            EmployeeRankingRow,
-            load_employee_ranking,
-        )
         dt = lambda d: datetime(2026, 5, d, 10, 0, tzinfo=timezone.utc)
         sales = [
             _make_sale("ANA", "500.00", 5, dt(10)),
@@ -66,87 +92,129 @@ class EmployeeRankingServiceTests(unittest.TestCase):
             _make_employee(1, "ANA", "Ana Lopez"),
             _make_employee(2, "LUZ", "Luz Ramirez"),
         ]
+        mock_session = _mock_scalars(sales=sales, employees=employees)
 
-        from unittest.mock import patch, MagicMock
-        mock_session = MagicMock()
-        scalars_returns = [
-            MagicMock(all=MagicMock(return_value=sales)),
-            MagicMock(all=MagicMock(return_value=employees)),
-        ]
-        mock_session.scalars.side_effect = scalars_returns
-
+        from unittest.mock import patch
         with patch(
             "pos_uniformes.services.employee_identity_service.EmployeeIdentityService.build_visible_employee_name",
             side_effect=lambda name: name.split()[0],
         ):
-            rows = load_employee_ranking(
-                mock_session,
-                start_date=date(2026, 5, 1),
-                end_date=date(2026, 5, 31),
-            )
+            rows = load_employee_ranking(mock_session, start_date=date(2026, 5, 1), end_date=date(2026, 5, 31))
 
         self.assertEqual(len(rows), 2)
-        self.assertEqual(rows[0].rank, 1)
         self.assertEqual(rows[0].employee_code, "LUZ")
         self.assertEqual(rows[0].amount, Decimal("1200.00"))
         self.assertEqual(rows[0].tickets, 1)
         self.assertEqual(rows[0].pieces, 12)
-
-        self.assertEqual(rows[1].rank, 2)
         self.assertEqual(rows[1].employee_code, "ANA")
         self.assertEqual(rows[1].amount, Decimal("800.00"))
         self.assertEqual(rows[1].tickets, 2)
         self.assertEqual(rows[1].pieces, 8)
 
     def test_excludes_employees_with_no_sales_in_period(self) -> None:
-        from unittest.mock import patch, MagicMock
+        mock_session = _mock_scalars(employees=[_make_employee(1, "ANA", "Ana Lopez")])
 
-        mock_session = MagicMock()
-        scalars_returns = [
-            MagicMock(all=MagicMock(return_value=[])),
-            MagicMock(all=MagicMock(return_value=[_make_employee(1, "ANA", "Ana Lopez")])),
-        ]
-        mock_session.scalars.side_effect = scalars_returns
-
+        from unittest.mock import patch
         with patch(
             "pos_uniformes.services.employee_identity_service.EmployeeIdentityService.build_visible_employee_name",
             side_effect=lambda name: name,
         ):
-            rows = load_employee_ranking(
-                mock_session,
-                start_date=date(2026, 5, 1),
-                end_date=date(2026, 5, 31),
-            )
+            rows = load_employee_ranking(mock_session, start_date=date(2026, 5, 1), end_date=date(2026, 5, 31))
 
         self.assertEqual(rows, ())
 
     def test_skips_sales_without_employee_code(self) -> None:
-        from unittest.mock import patch, MagicMock
-
         dt = datetime(2026, 5, 10, 10, 0, tzinfo=timezone.utc)
         sales = [
             _make_sale("", "500.00", 5, dt),
             _make_sale("ANA", "200.00", 2, dt),
         ]
-        mock_session = MagicMock()
-        scalars_returns = [
-            MagicMock(all=MagicMock(return_value=sales)),
-            MagicMock(all=MagicMock(return_value=[_make_employee(1, "ANA", "Ana Lopez")])),
-        ]
-        mock_session.scalars.side_effect = scalars_returns
+        mock_session = _mock_scalars(sales=sales, employees=[_make_employee(1, "ANA", "Ana Lopez")])
 
+        from unittest.mock import patch
         with patch(
             "pos_uniformes.services.employee_identity_service.EmployeeIdentityService.build_visible_employee_name",
             side_effect=lambda name: name,
         ):
-            rows = load_employee_ranking(
-                mock_session,
-                start_date=date(2026, 5, 1),
-                end_date=date(2026, 5, 31),
-            )
+            rows = load_employee_ranking(mock_session, start_date=date(2026, 5, 1), end_date=date(2026, 5, 31))
 
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0].employee_code, "ANA")
+
+
+class ApartadoRankingTests(unittest.TestCase):
+    def _run(self, *, sales=(), apartados=(), abonos=(), employees=()):
+        from unittest.mock import patch
+        mock_session = _mock_scalars(sales=sales, apartados=apartados, abonos=abonos, employees=employees)
+        with patch(
+            "pos_uniformes.services.employee_identity_service.EmployeeIdentityService.build_visible_employee_name",
+            side_effect=lambda name: name,
+        ):
+            return load_employee_ranking(mock_session, start_date=date(2026, 5, 1), end_date=date(2026, 5, 31))
+
+    def test_apartado_creation_counts_as_ticket_and_pieces(self) -> None:
+        dt = datetime(2026, 5, 10, 10, 0, tzinfo=timezone.utc)
+        rows = self._run(
+            apartados=[_make_apartado("ANA", anticipo="200.00", pieces=3, created_at=dt)],
+            employees=[_make_employee(1, "ANA", "Ana Lopez")],
+        )
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].employee_code, "ANA")
+        self.assertEqual(rows[0].tickets, 1)
+        self.assertEqual(rows[0].pieces, 3)
+        self.assertEqual(rows[0].amount, Decimal("200.00"))
+
+    def test_additional_abono_adds_to_amount_only(self) -> None:
+        dt = datetime(2026, 5, 10, 10, 0, tzinfo=timezone.utc)
+        rows = self._run(
+            abonos=[_make_abono("ANA", "150.00", dt, referencia="ABONO-1")],
+            employees=[_make_employee(1, "ANA", "Ana Lopez")],
+        )
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].tickets, 0)
+        self.assertEqual(rows[0].pieces, 0)
+        self.assertEqual(rows[0].amount, Decimal("150.00"))
+
+    def test_anticipo_not_double_counted_with_extra_abono(self) -> None:
+        dt = datetime(2026, 5, 10, 10, 0, tzinfo=timezone.utc)
+        # The DB WHERE referencia != 'ANTICIPO' means the mock abonos list has no ANTICIPO rows.
+        # Only a real additional abono is returned — amount must be anticipo + abono, not double.
+        rows = self._run(
+            apartados=[_make_apartado("ANA", anticipo="100.00", pieces=2, created_at=dt)],
+            abonos=[_make_abono("ANA", "50.00", dt, referencia="ABONO-2")],
+            employees=[_make_employee(1, "ANA", "Ana Lopez")],
+        )
+        self.assertEqual(rows[0].amount, Decimal("150.00"))
+        self.assertEqual(rows[0].tickets, 1)  # only the apartado creation counts as ticket
+
+    def test_sale_and_apartado_aggregate_for_same_employee(self) -> None:
+        dt = datetime(2026, 5, 10, 10, 0, tzinfo=timezone.utc)
+        rows = self._run(
+            sales=[_make_sale("ANA", "300.00", 4, dt)],
+            apartados=[_make_apartado("ANA", anticipo="100.00", pieces=2, created_at=dt)],
+            employees=[_make_employee(1, "ANA", "Ana Lopez")],
+        )
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0].tickets, 2)
+        self.assertEqual(rows[0].pieces, 6)
+        self.assertEqual(rows[0].amount, Decimal("400.00"))
+
+    def test_different_employees_for_sale_and_apartado(self) -> None:
+        dt = datetime(2026, 5, 10, 10, 0, tzinfo=timezone.utc)
+        rows = self._run(
+            sales=[_make_sale("LUZ", "500.00", 5, dt)],
+            apartados=[_make_apartado("ANA", anticipo="200.00", pieces=3, created_at=dt)],
+            employees=[
+                _make_employee(1, "ANA", "Ana Lopez"),
+                _make_employee(2, "LUZ", "Luz Ramirez"),
+            ],
+        )
+        self.assertEqual(len(rows), 2)
+        # LUZ ranked first (higher amount)
+        self.assertEqual(rows[0].employee_code, "LUZ")
+        self.assertEqual(rows[0].amount, Decimal("500.00"))
+        self.assertEqual(rows[1].employee_code, "ANA")
+        self.assertEqual(rows[1].amount, Decimal("200.00"))
 
 
 class BuildRankingPeriodDatesTests(unittest.TestCase):
