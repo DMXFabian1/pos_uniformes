@@ -72,7 +72,7 @@ def load_cash_session_gate_snapshot(session, *, user_id: int, is_stale_session) 
                 else "otro usuario"
             ),
             opened_at_label=(
-                active_session.abierta_at.strftime("%Y-%m-%d %H:%M")
+                active_session.abierta_at.astimezone().strftime("%Y-%m-%d %H:%M")
                 if active_session.abierta_at is not None
                 else "sin fecha"
             ),
@@ -200,7 +200,7 @@ def load_cash_cut_prompt_snapshot(session, *, active_cash_session_id: int) -> Ca
         raise ValueError("No se encontro la caja activa.")
     resumen = caja_service.resumir_sesion(session, cash_session)
     return CashCutPromptSnapshot(
-        opened_at_label=cash_session.abierta_at.strftime("%Y-%m-%d %H:%M") if cash_session.abierta_at else "",
+        opened_at_label=cash_session.abierta_at.astimezone().strftime("%Y-%m-%d %H:%M") if cash_session.abierta_at else "",
         opening_amount=Decimal(cash_session.monto_apertura).quantize(Decimal("0.01")),
         reactivo_count=int(resumen.reactivo_count),
         reactivo_total=Decimal(resumen.reactivo_total).quantize(Decimal("0.01")),
