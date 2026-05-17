@@ -39,6 +39,8 @@ def build_employee_day_sale_rows(sales: list[object] | tuple[object, ...]) -> tu
     rows: list[EmployeeDaySaleRow] = []
     for sale in sales:
         sale_datetime = getattr(sale, "confirmada_at", None) or getattr(sale, "created_at", None)
+        if sale_datetime is not None and sale_datetime.tzinfo is not None:
+            sale_datetime = sale_datetime.astimezone()
         time_label = sale_datetime.strftime("%H:%M") if sale_datetime is not None else "--:--"
         pieces = sum(int(getattr(detail, "cantidad", 0) or 0) for detail in getattr(sale, "detalles", ()))
         client = getattr(sale, "cliente", None)
@@ -83,6 +85,8 @@ def list_employee_day_sale_rows(session, *, employee_code: str, target_day: date
 
 def build_employee_sale_detail_snapshot(sale) -> EmployeeSaleDetailSnapshot:
     sale_datetime = getattr(sale, "confirmada_at", None) or getattr(sale, "created_at", None)
+    if sale_datetime is not None and sale_datetime.tzinfo is not None:
+        sale_datetime = sale_datetime.astimezone()
     time_label = sale_datetime.strftime("%H:%M") if sale_datetime is not None else "--:--"
     client = getattr(sale, "cliente", None)
     client_name = getattr(client, "nombre", None) or "Mostrador"

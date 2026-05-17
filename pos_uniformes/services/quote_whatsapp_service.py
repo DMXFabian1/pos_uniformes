@@ -46,7 +46,9 @@ def _build_quote_whatsapp_message(*, quote, business_name: str) -> str:
         f"Total estimado: ${Decimal(quote.total).quantize(Decimal('0.01'))}",
     ]
     if quote.vigencia_hasta is not None:
-        lines.append(f"Vigencia: {quote.vigencia_hasta.strftime('%d/%m/%Y')}")
+        vh = quote.vigencia_hasta
+        vh_local = vh.astimezone() if vh.tzinfo is not None else vh
+        lines.append(f"Vigencia: {vh_local.strftime('%d/%m/%Y')}")
     lines.append("Piezas:")
     for detail in quote.detalles:
         unit_price = Decimal(detail.precio_unitario).quantize(Decimal("0.01"))
