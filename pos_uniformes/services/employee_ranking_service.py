@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, timezone
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -19,6 +19,7 @@ from pos_uniformes.database.models import (
     ModoOrigenVenta,
     Venta,
 )
+from pos_uniformes.utils.date_format import local_day_window
 
 
 @dataclass(frozen=True)
@@ -42,8 +43,8 @@ def load_employee_ranking(
     """Ranking de empleadas por monto en [start_date, end_date] inclusive."""
     from pos_uniformes.services.employee_identity_service import EmployeeIdentityService
 
-    window_start = datetime.combine(start_date, datetime.min.time()).replace(tzinfo=timezone.utc)
-    window_end = datetime.combine(end_date, datetime.max.time()).replace(tzinfo=timezone.utc)
+    window_start, _ = local_day_window(start_date)
+    _, window_end = local_day_window(end_date)
 
     sales = session.scalars(
         select(Venta)

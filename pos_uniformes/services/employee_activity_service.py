@@ -11,6 +11,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from pos_uniformes.database.models import Empleada, EstadoVenta, ModoOrigenVenta, Venta
+from pos_uniformes.utils.date_format import local_day_window
 
 
 @dataclass(frozen=True)
@@ -91,7 +92,7 @@ def build_employee_activity_snapshot(
         sale_datetime = getattr(sale, "confirmada_at", None) or getattr(sale, "created_at", None)
         if sale_datetime is None:
             continue
-        sale_day = sale_datetime.date()
+        sale_day = (sale_datetime.astimezone() if sale_datetime.tzinfo is not None else sale_datetime).date()
         pieces = sum(int(getattr(detail, "cantidad", 0) or 0) for detail in getattr(sale, "detalles", ()))
         amount = Decimal(str(getattr(sale, "total", Decimal("0.00")) or Decimal("0.00"))).quantize(Decimal("0.01"))
         if sale_day >= summary_start:
@@ -190,7 +191,7 @@ def load_employee_activity_snapshot(
     history_days = max(int(history_days or 7), 1)
     summary_days = max(int(summary_days or 1), 1)
     lookback_days = max(history_days, summary_days)
-    window_start = datetime.combine(reference_date - timedelta(days=lookback_days - 1), datetime.min.time())
+    window_start, _ = local_day_window(reference_date - timedelta(days=lookback_days - 1))
     sales = (
         session.scalars(
             select(Venta)

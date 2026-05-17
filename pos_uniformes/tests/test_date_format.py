@@ -3,7 +3,7 @@ from __future__ import annotations
 import unittest
 from datetime import date, datetime, timezone, timedelta
 
-from pos_uniformes.utils.date_format import format_display_date, format_display_datetime
+from pos_uniformes.utils.date_format import format_display_date, format_display_datetime, local_day_window
 
 CDT = timezone(timedelta(hours=-5))  # Mexico City en verano (mayo)
 
@@ -54,3 +54,30 @@ class FormatDisplayDateTests(unittest.TestCase):
 
     def test_none_returns_empty(self) -> None:
         self.assertEqual(format_display_date(None), "")
+
+
+class LocalDayWindowTests(unittest.TestCase):
+    def test_returns_two_datetimes(self) -> None:
+        start, end = local_day_window(date(2026, 5, 16))
+        self.assertIsInstance(start, datetime)
+        self.assertIsInstance(end, datetime)
+
+    def test_start_and_end_are_timezone_aware(self) -> None:
+        start, end = local_day_window(date(2026, 5, 16))
+        self.assertIsNotNone(start.tzinfo)
+        self.assertIsNotNone(end.tzinfo)
+
+    def test_start_is_before_end(self) -> None:
+        start, end = local_day_window(date(2026, 5, 16))
+        self.assertLess(start, end)
+
+    def test_window_covers_full_local_day(self) -> None:
+        target = date(2026, 5, 16)
+        start, end = local_day_window(target)
+        self.assertEqual(start.astimezone().date(), target)
+        self.assertEqual(end.astimezone().date(), target)
+
+    def test_different_dates_produce_different_windows(self) -> None:
+        s1, e1 = local_day_window(date(2026, 5, 16))
+        s2, e2 = local_day_window(date(2026, 5, 17))
+        self.assertLess(e1, s2)

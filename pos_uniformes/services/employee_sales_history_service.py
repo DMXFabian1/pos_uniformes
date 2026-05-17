@@ -10,6 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import selectinload
 
 from pos_uniformes.database.models import EstadoVenta, ModoOrigenVenta, Variante, Venta, VentaDetalle
+from pos_uniformes.utils.date_format import local_day_window
 
 
 @dataclass(frozen=True)
@@ -59,8 +60,7 @@ def build_employee_day_sale_rows(sales: list[object] | tuple[object, ...]) -> tu
 
 
 def list_employee_day_sale_rows(session, *, employee_code: str, target_day: date) -> tuple[EmployeeDaySaleRow, ...]:
-    day_start = datetime.combine(target_day, datetime.min.time())
-    day_end = day_start + timedelta(days=1)
+    day_start, day_end = local_day_window(target_day)
     sales = (
         session.scalars(
             select(Venta)
