@@ -617,7 +617,7 @@ from pos_uniformes.ui.views.products_view import build_products_tab
 from pos_uniformes.ui.views.quotes_view import build_quotes_tab
 from pos_uniformes.ui.views.settings_view import build_settings_tab
 from pos_uniformes.ui.styles.main_window_styles import build_main_window_stylesheet
-from pos_uniformes.utils.date_format import format_display_date, format_display_datetime
+from pos_uniformes.utils.date_format import format_display_date, format_display_datetime, local_day_window
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 from pos_uniformes.utils.qr_generator import QrGenerator
 
@@ -7878,10 +7878,7 @@ class MainWindow(QMainWindow):
                     cliente=cliente,
                     cliente_nombre=cliente.nombre if cliente is not None else None,
                     cliente_telefono=cliente.telefono if cliente is not None else None,
-                    vigencia_hasta=datetime.combine(
-                        self.quote_validity_input.date().toPyDate(),
-                        datetime.min.time(),
-                    ),
+                    vigencia_hasta=local_day_window(self.quote_validity_input.date().toPyDate())[0],
                     observacion=self.quote_note_input.toPlainText().strip(),
                     estado=EstadoPresupuesto.EMITIDO,
                 )

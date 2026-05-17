@@ -119,6 +119,7 @@ from pos_uniformes.ui.helpers.quote_table_row_helper import build_quote_table_ro
 from pos_uniformes.ui.styles.satellite_styles import build_satellite_stylesheet
 from pos_uniformes.ui.helpers.sale_sports_uniform_helper import restore_sports_uniform_playera_price_if_needed
 from pos_uniformes.utils.app_metadata import satellite_build_label, satellite_display_name, satellite_windows_icon_path
+from pos_uniformes.utils.date_format import local_day_window
 from pos_uniformes.ui.dialogs.inventory_label_dialog import build_inventory_label_dialog
 from pos_uniformes.services.inventory_label_service import (
     InventoryLabelContext,
@@ -3336,10 +3337,7 @@ QLabel#favDialogPriceLabel {
             quote_id=self.quote_editing_id,
             folio=self.quote_folio_input.text().strip() or self._generate_quote_folio(),
             customer_id=self._selected_client_id(),
-            validity_at=datetime.combine(
-                self.quote_validity_input.date().toPyDate(),
-                datetime.min.time(),
-            ),
+            validity_at=local_day_window(self.quote_validity_input.date().toPyDate())[0],
             notes_text=self.quote_note_input.toPlainText().strip(),
             items=tuple(build_quote_presupuesto_inputs(self.quote_cart)),
             target_state=target_state,
