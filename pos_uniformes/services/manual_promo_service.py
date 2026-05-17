@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime, time
+from datetime import date, datetime
 from decimal import Decimal
 
 from sqlalchemy import func, select
@@ -17,6 +17,7 @@ from pos_uniformes.database.models import (
     Venta,
 )
 from pos_uniformes.services.auth_service import AuthService
+from pos_uniformes.utils.date_format import local_day_window
 
 DEFAULT_PROMO_AUTHORIZATION_CODE = "634700"
 LEGACY_DEFAULT_PROMO_AUTHORIZATION_CODES = ("PROMO2026",)
@@ -122,7 +123,7 @@ class ManualPromoService:
 
     @classmethod
     def summarize_today(cls, session: Session, *, limit: int = 4) -> PromoAuthorizationSummary:
-        today_start = datetime.combine(date.today(), time.min)
+        today_start, _ = local_day_window(date.today())
         total_hoy = session.scalar(
             select(func.count(AutorizacionPromocionManual.id)).where(
                 AutorizacionPromocionManual.created_at >= today_start

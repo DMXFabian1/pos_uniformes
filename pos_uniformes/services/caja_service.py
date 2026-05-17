@@ -22,6 +22,7 @@ from pos_uniformes.database.models import (
     Usuario,
     Venta,
 )
+from pos_uniformes.utils.date_format import local_day_window
 
 
 @dataclass(frozen=True)
@@ -80,14 +81,14 @@ class CajaService:
             query = query.where(SesionCaja.cerrada_at.is_not(None))
         if fecha_desde is not None or fecha_hasta is not None:
             start_dt = (
-                datetime.combine(fecha_desde, time.min)
+                local_day_window(fecha_desde)[0]
                 if fecha_desde is not None
-                else datetime.min
+                else datetime.min.replace(tzinfo=timezone.utc)
             )
             end_dt = (
-                datetime.combine(fecha_hasta, time.max)
+                local_day_window(fecha_hasta)[1]
                 if fecha_hasta is not None
-                else datetime.max
+                else datetime.max.replace(tzinfo=timezone.utc)
             )
             query = query.where(
                 or_(

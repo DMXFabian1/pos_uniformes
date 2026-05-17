@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timedelta
+from datetime import date, timedelta
+
+from pos_uniformes.utils.date_format import local_day_window
 
 
 ANALYTICS_QUICK_PERIODS: tuple[tuple[str, str], ...] = (
@@ -44,10 +46,9 @@ def resolve_analytics_period_bounds(
         end_date = manual_to or today
     if end_date < start_date:
         start_date, end_date = end_date, start_date
-    return (
-        datetime.combine(start_date, datetime.min.time()),
-        datetime.combine(end_date + timedelta(days=1), datetime.min.time()),
-    )
+    start, _ = local_day_window(start_date)
+    _, end = local_day_window(end_date)
+    return start, end
 
 
 def build_analytics_export_status_text(*, selected_client_id: object, selected_client_label: str) -> str:

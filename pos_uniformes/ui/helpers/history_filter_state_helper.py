@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Callable
 
-from pos_uniformes.utils.date_format import format_display_date
+from pos_uniformes.utils.date_format import format_display_date, local_day_window
 
 
 @dataclass(frozen=True)
@@ -60,14 +60,13 @@ def build_history_date_range_state(
     start_datetime = None
     start_date_label = ""
     if from_date > minimum_date:
-        start_datetime = datetime.combine(from_date, datetime.min.time())
+        start_datetime, _ = local_day_window(from_date)
         start_date_label = format_display_date(from_date)
 
     end_datetime = None
     end_date_label = ""
     if to_date > minimum_date:
-        exclusive_end = to_date + timedelta(days=1)
-        end_datetime = datetime.combine(exclusive_end, datetime.min.time())
+        _, end_datetime = local_day_window(to_date)
         end_date_label = format_display_date(to_date)
 
     return HistoryDateRangeState(
