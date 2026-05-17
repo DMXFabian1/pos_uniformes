@@ -10202,7 +10202,7 @@ class MainWindow(QMainWindow):
         if estado in {EstadoApartado.ENTREGADO, EstadoApartado.CANCELADO}:
             return (format_display_date(commitment), "muted")
         today = date.today()
-        due_date = commitment.date()
+        due_date = (commitment.astimezone() if commitment.tzinfo else commitment).date()
         if due_date < today:
             return (f"Vencido desde {format_display_date(due_date)}", "danger")
         if due_date == today:

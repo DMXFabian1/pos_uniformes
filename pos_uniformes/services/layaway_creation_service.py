@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime
+
+from pos_uniformes.utils.date_format import local_day_window
 from decimal import Decimal
 
 
@@ -40,7 +42,7 @@ def create_layaway_from_payload(
     due_value = None
     if payload["fecha_compromiso"]:
         due_date = date.fromisoformat(str(payload["fecha_compromiso"]))
-        due_value = datetime.combine(due_date, datetime.min.time())
+        due_value = local_day_window(due_date)[0]
 
     emp_code = seller_employee_code or str(payload.get("seller_employee_code") or "") or None
     emp_name = seller_employee_display_name or str(payload.get("seller_employee_display_name") or "") or None

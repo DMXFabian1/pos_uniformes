@@ -41,7 +41,8 @@ def load_layaway_snapshot_rows(
                 layaway.cliente_telefono or "",
             ]
         ).lower()
-        due_date = layaway.fecha_compromiso.date() if layaway.fecha_compromiso else None
+        fc = layaway.fecha_compromiso
+        due_date = (fc.astimezone() if fc.tzinfo else fc).date() if fc else None
         due_bucket = "none"
         state_value = str(getattr(layaway.estado, "value", layaway.estado))
         closed_states = {
