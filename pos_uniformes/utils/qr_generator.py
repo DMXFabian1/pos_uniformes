@@ -10,7 +10,9 @@ from PIL import Image, ImageDraw
 import qrcode
 from qrcode.constants import ERROR_CORRECT_H
 
-from pos_uniformes.database.models import Cliente, Empleada, Variante
+from pos_uniformes.database.models import BodegaCaja, Cliente, Empleada, Variante
+
+CAJA_QR_OUTPUT_DIR = Path(__file__).resolve().parents[1] / "generated" / "caja_qrs"
 
 QR_OUTPUT_DIR = Path(__file__).resolve().parents[1] / "generated" / "qrs"
 CLIENT_QR_OUTPUT_DIR = Path(__file__).resolve().parents[1] / "generated" / "client_qrs"
@@ -92,6 +94,24 @@ class QrGenerator:
         output_path = cls.path_for_employee(employee)
         qr_image = cls._build_qr_image(f"EMP:{employee.codigo}")
         qr_image = cls._build_employee_qr_image(qr_image)
+        qr_image.save(output_path)
+        return output_path
+
+    # ─── Cajas de bodega ─────────────────────────────────────────────────
+
+    @staticmethod
+    def caja_output_dir() -> Path:
+        CAJA_QR_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+        return CAJA_QR_OUTPUT_DIR
+
+    @classmethod
+    def path_for_caja(cls, caja: BodegaCaja) -> Path:
+        return cls.caja_output_dir() / f"{caja.codigo}.png"
+
+    @classmethod
+    def generate_for_caja(cls, caja: BodegaCaja) -> Path:
+        output_path = cls.path_for_caja(caja)
+        qr_image = cls._build_qr_image(f"BODEGA:CAJA:{caja.codigo}")
         qr_image.save(output_path)
         return output_path
 

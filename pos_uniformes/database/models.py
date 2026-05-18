@@ -23,6 +23,21 @@ class TipoMovimientoInventario(str, Enum):
     APARTADO_LIBERACION = "APARTADO_LIBERACION"
 
 
+class TipoMovimientoBodega(str, Enum):
+    INGRESO = "INGRESO"
+    RETIRO = "RETIRO"
+    TRANSFERENCIA = "TRANSFERENCIA"
+    MOVER_CAJA = "MOVER_CAJA"
+    CREAR_CAJA = "CREAR_CAJA"
+    AJUSTE = "AJUSTE"
+
+
+class EstadoCaja(str, Enum):
+    ACTIVA = "ACTIVA"
+    VACIA = "VACIA"
+    CERRADA = "CERRADA"
+
+
 class RolUsuario(str, Enum):
     ADMIN = "ADMIN"
     CAJERO = "CAJERO"
@@ -1417,3 +1432,144 @@ class ApartadoAbono(Base):
 
     apartado: Mapped["Apartado"] = relationship(back_populates="abonos")
     usuario: Mapped["Usuario"] = relationship(back_populates="apartados_abonos")
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# BODEGA / WAREHOUSE
+# ══════���═══════════════��════════════════════════════════════════════════════════
+
+
+class BodegaUbicacion(Base):
+    __tablename__ = "bodega_ubicacion"
+    __table_args__ = (
+        UniqueConstraint("rack", "nivel", name="bodega_ubicacion_rack_nivel_unico"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    codigo: Mapped[str] = mapped_column(String(30), unique=True, nullable=False, index=True)
+    rack: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    nivel: Mapped[int] = mapped_column(Integer, nullable=False)
+    descripcion: Mapped[str | None] = mapped_column(String(120))
+    activo: Mapped[bool] = mapped_column(default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    cajas: Mapped[list["BodegaCaja"]] = relationship(back_populates="ubicacion")
+
+
+class BodegaCaja(Base):
+    __tablename__ = "bodega_caja"
+    __table_args__ = (
+        CheckConstraint(
+            "estado IN ('ACTIVA', 'VACIA', 'CERRADA')",
+            name="bodega_caja_estado_valido",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    codigo: Mapped[str] = mapped_column(String(30), unique=True, nullable=False, index=True)
+    ubicacion_id: Mapped[int | None] = mapped_column(
+        ForeignKey("bodega_ubicacion.id", ondelete="SET NULL"),
+        index=True,
+    )
+    estado: Mapped[str] = mapped_column(
+        String(20), nullable=False, default=EstadoCaja.ACTIVA.value
+    )
+    qr_data: Mapped[str | None] = mapped_column(Text())
+    notas: Mapped[str | None] = mapped_column(Text())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    ubicacion: Mapped["BodegaUbicacion | None"] = relationship(back_populates="cajas")
+    contenido: Mapped[list["BodegaContenido"]] = relationship(
+        back_populates="caja",
+        cascade="all, delete-orphan",
+    )
+    movimientos: Mapped[list["BodegaMovimiento"]] = relationship(
+        back_populates="caja",
+        foreign_keys="BodegaMovimiento.caja_id",
+        order_by="BodegaMovimiento.created_at.desc()",
+    )
+
+
+class BodegaContenido(Base):
+    __tablename__ = "bodega_contenido"
+    __table_args__ = (
+        UniqueConstraint("caja_id", "variante_id", name="bodega_contenido_caja_variante_unico"),
+        CheckConstraint("cantidad > 0", name="bodega_contenido_cantidad_positiva"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    caja_id: Mapped[int] = mapped_column(
+        ForeignKey("bodega_caja.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    variante_id: Mapped[int] = mapped_column(
+        ForeignKey("variante.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    cantidad: Mapped[int] = mapped_column(Integer, nullable=False)
+
+    caja: Mapped["BodegaCaja"] = relationship(back_populates="contenido")
+    variante: Mapped["Variante"] = relationship()
+
+
+class BodegaMovimiento(Base):
+    __tablename__ = "bodega_movimiento"
+    __table_args__ = (
+        CheckConstraint(
+            "tipo IN ('INGRESO', 'RETIRO', 'TRANSFERENCIA', 'MOVER_CAJA', 'CREAR_CAJA', 'AJUSTE')",
+            name="bodega_movimiento_tipo_valido",
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    caja_id: Mapped[int] = mapped_column(
+        ForeignKey("bodega_caja.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    variante_id: Mapped[int | None] = mapped_column(
+        ForeignKey("variante.id", ondelete="RESTRICT"),
+        index=True,
+    )
+    tipo: Mapped[str] = mapped_column(String(30), nullable=False, index=True)
+    cantidad: Mapped[int | None] = mapped_column(Integer)
+    caja_destino_id: Mapped[int | None] = mapped_column(
+        ForeignKey("bodega_caja.id", ondelete="RESTRICT"),
+    )
+    ubicacion_anterior_id: Mapped[int | None] = mapped_column(
+        ForeignKey("bodega_ubicacion.id", ondelete="SET NULL"),
+    )
+    ubicacion_nueva_id: Mapped[int | None] = mapped_column(
+        ForeignKey("bodega_ubicacion.id", ondelete="SET NULL"),
+    )
+    observacion: Mapped[str | None] = mapped_column(Text())
+    creado_por: Mapped[str] = mapped_column(String(60), default="SYSTEM", nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True,
+    )
+
+    caja: Mapped["BodegaCaja"] = relationship(
+        back_populates="movimientos",
+        foreign_keys=[caja_id],
+    )
+    variante: Mapped["Variante | None"] = relationship()
+    caja_destino: Mapped["BodegaCaja | None"] = relationship(foreign_keys=[caja_destino_id])

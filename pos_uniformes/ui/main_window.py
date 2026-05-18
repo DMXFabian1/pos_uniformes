@@ -615,6 +615,7 @@ from pos_uniformes.ui.views.inventory_view import build_inventory_tab
 from pos_uniformes.ui.views.layaway_view import build_layaway_tab
 from pos_uniformes.ui.views.products_view import build_products_tab
 from pos_uniformes.ui.views.quotes_view import build_quotes_tab
+from pos_uniformes.ui.views.bodega_view import build_bodega_tab
 from pos_uniformes.ui.views.settings_view import build_settings_tab
 from pos_uniformes.ui.styles.main_window_styles import build_main_window_stylesheet
 from pos_uniformes.utils.date_format import format_display_date, format_display_datetime, local_day_window
@@ -1780,6 +1781,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self._wrap_tab_scroll(self._build_layaway_tab()), "Apartados")
         self.tabs.addTab(self._wrap_tab_scroll(self._build_catalog_tab()), "Catalogo")
         self.tabs.addTab(self._wrap_tab_scroll(self._build_inventory_tab()), "Inventario")
+        self.tabs.addTab(self._build_bodega_tab(), "Bodega")
         self.tabs.addTab(self._wrap_tab_scroll(self._build_history_tab()), "Historial inventarios")
         self.tabs.addTab(self._wrap_tab_scroll(self._build_analytics_tab()), "Analitica")
         self.tabs.addTab(self._wrap_tab_scroll(self._build_settings_tab()), "Configuracion")
@@ -2156,6 +2158,9 @@ class MainWindow(QMainWindow):
 
     def _build_inventory_tab(self) -> QWidget:
         return build_inventory_tab(self)
+
+    def _build_bodega_tab(self) -> QWidget:
+        return build_bodega_tab(self)
 
     def _build_analytics_tab(self) -> QWidget:
         return build_analytics_tab(self)
