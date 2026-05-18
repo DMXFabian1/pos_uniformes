@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import os
@@ -248,7 +248,7 @@ def run_automatic_backup(
     target_dir = (output_dir or backup_output_dir()).expanduser().resolve()
     previous_status = read_automatic_backup_status(target_dir)
     resolved_external_dir = (external_dir.expanduser().resolve() if external_dir is not None else configured_external_backup_dir())
-    started_at = datetime.now()
+    started_at = datetime.now(timezone.utc)
     try:
         backup_file, deleted_files = create_backup(
             output_dir=target_dir,

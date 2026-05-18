@@ -83,7 +83,10 @@ def build_analytics_operational_alerts(
     if automatic_backup_status is None or automatic_backup_status.last_success_at is None:
         alerts.append("Respaldo automatico pendiente o sin primer respaldo correcto.")
     else:
-        age_hours = max((now - automatic_backup_status.last_success_at).total_seconds() / 3600, 0)
+        success_at = automatic_backup_status.last_success_at
+        if success_at.tzinfo is None:
+            success_at = success_at.replace(tzinfo=now.tzinfo)
+        age_hours = max((now - success_at).total_seconds() / 3600, 0)
         if automatic_backup_status.last_error:
             alerts.append("Ultimo respaldo automatico fallo; revisa Configuracion.")
         elif age_hours > stale_backup_hours:

@@ -66,7 +66,9 @@ def build_settings_backup_automatic_status_view(
             detail = f"{detail} | Error: {last_error}"
         return summary, detail
 
-    age_hours = max((reference_now - success_dt).total_seconds() / 3600, 0)
+    safe_dt = success_dt if success_dt.tzinfo else success_dt.replace(tzinfo=reference_now.tzinfo)
+    safe_now = reference_now if reference_now.tzinfo else reference_now.replace(tzinfo=safe_dt.tzinfo)
+    age_hours = max((safe_now - safe_dt).total_seconds() / 3600, 0)
     age_label = _humanize_hours(age_hours)
     file_label = f"Archivo: {backup_name}" if isinstance(backup_name, str) and backup_name else "Archivo: sin dato"
 
