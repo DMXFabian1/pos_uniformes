@@ -32,6 +32,21 @@ class TipoMovimientoBodega(str, Enum):
     AJUSTE = "AJUSTE"
 
 
+class CategoriaCaja(str, Enum):
+    A = "A"
+    B = "B"
+    C = "C"
+    D = "D"
+
+
+CATEGORIA_CAJA_LABELS: dict[str, str] = {
+    "A": "Alta rotación",
+    "B": "Excedentes escuelas",
+    "C": "Temporada",
+    "D": "Descatalogado",
+}
+
+
 class EstadoCaja(str, Enum):
     ACTIVA = "ACTIVA"
     VACIA = "VACIA"
@@ -1467,10 +1482,17 @@ class BodegaCaja(Base):
             "estado IN ('ACTIVA', 'VACIA', 'CERRADA')",
             name="bodega_caja_estado_valido",
         ),
+        CheckConstraint(
+            "categoria IN ('A', 'B', 'C', 'D')",
+            name="bodega_caja_categoria_valida",
+        ),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     codigo: Mapped[str] = mapped_column(String(30), unique=True, nullable=False, index=True)
+    categoria: Mapped[str] = mapped_column(
+        String(1), nullable=False, default=CategoriaCaja.A.value, index=True
+    )
     ubicacion_id: Mapped[int | None] = mapped_column(
         ForeignKey("bodega_ubicacion.id", ondelete="SET NULL"),
         index=True,

@@ -2,14 +2,17 @@
 
 from __future__ import annotations
 
+import sqlalchemy as sa
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from pos_uniformes.database.models import (
+    CATEGORIA_CAJA_LABELS,
     BodegaCaja,
     BodegaContenido,
     BodegaMovimiento,
     BodegaUbicacion,
+    CategoriaCaja,
     EstadoCaja,
     Producto,
     TipoMovimientoBodega,
@@ -59,15 +62,28 @@ class BodegaService:
     # ─── Cajas ───────────────────────────────────────────────────────────
 
     @staticmethod
+    def _siguiente_codigo(session: Session, categoria: CategoriaCaja) -> str:
+        prefix = categoria.value
+        max_num = session.scalar(
+            select(func.max(
+                func.cast(func.substr(BodegaCaja.codigo, 3), sa.Integer)
+            )).where(BodegaCaja.codigo.like(f"{prefix}-%"))
+        )
+        return f"{prefix}-{(max_num or 0) + 1:03d}"
+
+    @classmethod
     def crear_caja(
+        cls,
         session: Session,
-        codigo: str,
+        categoria: CategoriaCaja,
         ubicacion_id: int | None = None,
         notas: str | None = None,
         creado_por: str = "SYSTEM",
     ) -> BodegaCaja:
+        codigo = cls._siguiente_codigo(session, categoria)
         caja = BodegaCaja(
-            codigo=codigo.strip().upper(),
+            codigo=codigo,
+            categoria=categoria.value,
             ubicacion_id=ubicacion_id,
             estado=EstadoCaja.ACTIVA.value,
             notas=notas,
@@ -125,17 +141,20 @@ class BodegaService:
         *,
         ubicacion_id: int | None = None,
         estado: EstadoCaja | None = None,
+        categoria: CategoriaCaja | None = None,
         query: str | None = None,
     ) -> list[BodegaCaja]:
         stmt = (
             select(BodegaCaja)
             .options(joinedload(BodegaCaja.ubicacion))
-            .order_by(BodegaCaja.codigo)
+            .order_by(BodegaCaja.categoria, BodegaCaja.codigo)
         )
         if ubicacion_id is not None:
             stmt = stmt.where(BodegaCaja.ubicacion_id == ubicacion_id)
         if estado is not None:
             stmt = stmt.where(BodegaCaja.estado == estado.value)
+        if categoria is not None:
+            stmt = stmt.where(BodegaCaja.categoria == categoria.value)
         if query:
             stmt = stmt.where(BodegaCaja.codigo.ilike(f"%{query}%"))
         return list(session.scalars(stmt).unique().all())
@@ -425,3 +444,148 @@ class BodegaService:
             select(func.count(BodegaCaja.id)).where(BodegaCaja.estado != EstadoCaja.CERRADA.value)
         )
         return int(result)
+
+    @staticmethod
+    def reclasificar_caja(
+        session: Session,
+        caja_id: int,
+        nueva_categoria: CategoriaCaja,
+        creado_por: str = "SYSTEM",
+    ) -> BodegaCaja:
+        caja = session.get(BodegaCaja, caja_id)
+        if not caja:
+            raise ValueError("Caja no encontrada.")
+        anterior = caja.categoria
+        caja.categoria = nueva_categoria.value
+        mov = BodegaMovimiento(
+            caja_id=caja.id,
+            tipo=TipoMovimientoBodega.AJUSTE.value,
+            observacion=f"Reclasificada de {anterior} a {nueva_categoria.value}",
+            creado_por=creado_por,
+        )
+        session.add(mov)
+        session.flush()
+        return caja
+
+    @staticmethod
+    def resumen_por_categoria(session: Session) -> list[dict]:
+        stmt = (
+            select(
+                BodegaCaja.categoria,
+                func.count(BodegaCaja.id).label("cajas"),
+                func.coalesce(func.sum(
+                    select(func.coalesce(func.sum(BodegaContenido.cantidad), 0))
+                    .where(BodegaContenido.caja_id == BodegaCaja.id)
+                    .correlate(BodegaCaja)
+                    .scalar_subquery()
+                ), 0).label("prendas"),
+            )
+            .where(BodegaCaja.estado != EstadoCaja.CERRADA.value)
+            .group_by(BodegaCaja.categoria)
+            .order_by(BodegaCaja.categoria)
+        )
+        return [
+            {
+                "categoria": row.categoria,
+                "label": CATEGORIA_CAJA_LABELS.get(row.categoria, row.categoria),
+                "cajas": row.cajas,
+                "prendas": int(row.prendas),
+            }
+            for row in session.execute(stmt).all()
+        ]
+
+    @staticmethod
+    def desglose_contenido_caja(session: Session, caja_id: int) -> list[dict]:
+        """Contenido agrupado por producto con desglose de tallas."""
+        stmt = (
+            select(BodegaContenido)
+            .options(
+                joinedload(BodegaContenido.variante).joinedload(Variante.producto),
+            )
+            .where(BodegaContenido.caja_id == caja_id)
+        )
+        por_producto: dict[int, dict] = {}
+        for c in session.scalars(stmt).unique().all():
+            prod = c.variante.producto
+            if prod.id not in por_producto:
+                por_producto[prod.id] = {
+                    "producto_id": prod.id,
+                    "producto": prod.nombre,
+                    "tallas": [],
+                    "total": 0,
+                }
+            por_producto[prod.id]["tallas"].append({
+                "talla": c.variante.talla,
+                "color": c.variante.color,
+                "cantidad": c.cantidad,
+                "variante_id": c.variante_id,
+            })
+            por_producto[prod.id]["total"] += c.cantidad
+        for grupo in por_producto.values():
+            grupo["tallas"].sort(key=lambda t: t["talla"])
+        return list(por_producto.values())
+
+    @staticmethod
+    def buscar_por_texto_agrupado(session: Session, query: str) -> list[dict]:
+        """Búsqueda agrupada por producto con tallas y stock en tienda."""
+        pattern = f"%{query}%"
+        stmt = (
+            select(BodegaContenido)
+            .join(BodegaContenido.variante)
+            .join(Variante.producto)
+            .join(BodegaContenido.caja)
+            .outerjoin(BodegaCaja.ubicacion)
+            .options(
+                joinedload(BodegaContenido.variante).joinedload(Variante.producto),
+                joinedload(BodegaContenido.caja).joinedload(BodegaCaja.ubicacion),
+            )
+            .where(
+                or_(
+                    Variante.sku.ilike(pattern),
+                    Producto.nombre.ilike(pattern),
+                    Variante.talla.ilike(pattern),
+                    BodegaCaja.codigo.ilike(pattern),
+                )
+            )
+            .order_by(Producto.nombre, Variante.talla)
+        )
+        por_producto: dict[int, dict] = {}
+        for c in session.scalars(stmt).unique().all():
+            prod = c.variante.producto
+            if prod.id not in por_producto:
+                por_producto[prod.id] = {
+                    "producto_id": prod.id,
+                    "producto": prod.nombre,
+                    "variantes": {},
+                }
+            v_id = c.variante_id
+            if v_id not in por_producto[prod.id]["variantes"]:
+                por_producto[prod.id]["variantes"][v_id] = {
+                    "variante_id": v_id,
+                    "sku": c.variante.sku,
+                    "talla": c.variante.talla,
+                    "color": c.variante.color,
+                    "stock_actual": c.variante.stock_actual,
+                    "en_bodega": 0,
+                    "cajas": [],
+                }
+            entry = por_producto[prod.id]["variantes"][v_id]
+            entry["en_bodega"] += c.cantidad
+            entry["cajas"].append({
+                "caja_codigo": c.caja.codigo,
+                "categoria": c.caja.categoria,
+                "ubicacion": c.caja.ubicacion.codigo if c.caja.ubicacion else None,
+                "cantidad": c.cantidad,
+            })
+
+        result = []
+        for grupo in por_producto.values():
+            variantes = sorted(grupo["variantes"].values(), key=lambda v: v["talla"])
+            for v in variantes:
+                v["en_tienda"] = v["stock_actual"] - v["en_bodega"]
+            result.append({
+                "producto_id": grupo["producto_id"],
+                "producto": grupo["producto"],
+                "variantes": variantes,
+            })
+        return result

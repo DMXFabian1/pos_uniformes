@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -29,11 +30,25 @@ from PyQt6.QtWidgets import (
 from sqlalchemy import select as sa_select
 
 from pos_uniformes.database.connection import get_session
-from pos_uniformes.database.models import BodegaCaja, BodegaUbicacion, EstadoCaja, Variante
+from pos_uniformes.database.models import (
+    CATEGORIA_CAJA_LABELS,
+    BodegaCaja,
+    BodegaUbicacion,
+    CategoriaCaja,
+    EstadoCaja,
+    Variante,
+)
 from pos_uniformes.services.bodega_service import BodegaService
 
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
+
+CATEGORIA_COLORS: dict[str, str] = {
+    "A": "#2e7d32",
+    "B": "#1565c0",
+    "C": "#e65100",
+    "D": "#616161",
+}
 
 
 def build_bodega_tab(window: "MainWindow") -> QWidget:
@@ -45,6 +60,7 @@ class BodegaWidget(QWidget):
         super().__init__()
         self.window = window
         self._selected_caja_id: int | None = None
+        self._categoria_filter: CategoriaCaja | None = None
         self._init_ui()
         self._refresh_cajas()
 
@@ -75,6 +91,36 @@ class BodegaWidget(QWidget):
 
         main_layout.addLayout(top_bar)
 
+        # ─── Category chips ──────────────────────────────────────────────
+        cat_bar = QHBoxLayout()
+        cat_bar.setSpacing(4)
+        self._cat_buttons: dict[str | None, QPushButton] = {}
+        for key, label in [
+            (None, "Todas"),
+            ("A", "A — Alta rotación"),
+            ("B", "B — Excedentes escuelas"),
+            ("C", "C — Temporada"),
+            ("D", "D — Descatalogado"),
+        ]:
+            btn = QPushButton(label)
+            btn.setCheckable(True)
+            btn.setChecked(key is None)
+            color = CATEGORIA_COLORS.get(key, "#333")
+            btn.setStyleSheet(
+                f"QPushButton {{ border: 1px solid {color}; border-radius: 10px; "
+                f"padding: 3px 10px; color: {color}; background: white; font-size: 11px; }}"
+                f"QPushButton:checked {{ background: {color}; color: white; }}"
+            )
+            btn.clicked.connect(lambda checked, k=key: self._on_cat_filter(k))
+            cat_bar.addWidget(btn)
+            self._cat_buttons[key] = btn
+        cat_bar.addStretch()
+
+        self.resumen_label = QLabel("")
+        self.resumen_label.setStyleSheet("font-size: 11px; color: #555;")
+        cat_bar.addWidget(self.resumen_label)
+        main_layout.addLayout(cat_bar)
+
         # ─── Splitter: lista cajas | detalle ─────────────────────────────
         splitter = QSplitter(Qt.Orientation.Horizontal)
 
@@ -101,8 +147,10 @@ class BodegaWidget(QWidget):
 
         # Tabla de cajas
         self.tabla_cajas = QTableWidget()
-        self.tabla_cajas.setColumnCount(5)
-        self.tabla_cajas.setHorizontalHeaderLabels(["Código", "Ubicación", "Estado", "Prendas", "Última actividad"])
+        self.tabla_cajas.setColumnCount(6)
+        self.tabla_cajas.setHorizontalHeaderLabels([
+            "Código", "Categoría", "Ubicación", "Estado", "Contenido", "Última actividad",
+        ])
         self.tabla_cajas.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tabla_cajas.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.tabla_cajas.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -126,6 +174,9 @@ class BodegaWidget(QWidget):
         self.detalle_ubicacion_label = QLabel("")
         right_layout.addWidget(self.detalle_ubicacion_label)
 
+        self.detalle_categoria_label = QLabel("")
+        right_layout.addWidget(self.detalle_categoria_label)
+
         # Acciones de caja
         acciones_caja = QHBoxLayout()
         self.btn_agregar = QPushButton("+ Agregar producto")
@@ -143,6 +194,11 @@ class BodegaWidget(QWidget):
         self.btn_mover.setEnabled(False)
         acciones_caja.addWidget(self.btn_mover)
 
+        self.btn_reclasificar = QPushButton("Reclasificar")
+        self.btn_reclasificar.clicked.connect(self._on_reclasificar)
+        self.btn_reclasificar.setEnabled(False)
+        acciones_caja.addWidget(self.btn_reclasificar)
+
         self.btn_qr = QPushButton("Imprimir QR")
         self.btn_qr.clicked.connect(self._on_imprimir_qr)
         self.btn_qr.setEnabled(False)
@@ -151,9 +207,15 @@ class BodegaWidget(QWidget):
         acciones_caja.addStretch()
         right_layout.addLayout(acciones_caja)
 
-        # Contenido de caja
+        # Contenido de caja — desglose por producto
         contenido_group = QGroupBox("Contenido")
         contenido_layout = QVBoxLayout()
+        self.contenido_text = QLabel("")
+        self.contenido_text.setWordWrap(True)
+        self.contenido_text.setStyleSheet("font-size: 12px; padding: 4px;")
+        self.contenido_text.setTextFormat(Qt.TextFormat.RichText)
+        contenido_layout.addWidget(self.contenido_text)
+
         self.tabla_contenido = QTableWidget()
         self.tabla_contenido.setColumnCount(5)
         self.tabla_contenido.setHorizontalHeaderLabels(["Producto", "Talla", "Color", "Cantidad", "SKU"])
@@ -179,23 +241,30 @@ class BodegaWidget(QWidget):
         right_panel.setLayout(right_layout)
         splitter.addWidget(right_panel)
 
-        splitter.setSizes([350, 650])
+        splitter.setSizes([400, 600])
         main_layout.addWidget(splitter)
 
         # ─── Resultados de búsqueda (oculto inicialmente) ────────────────
         self.search_results_group = QGroupBox("Resultados de búsqueda")
         search_layout = QVBoxLayout()
-        self.tabla_busqueda = QTableWidget()
-        self.tabla_busqueda.setColumnCount(6)
-        self.tabla_busqueda.setHorizontalHeaderLabels(["Producto", "Talla", "Color", "Caja", "Ubicación", "Cantidad"])
-        self.tabla_busqueda.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.tabla_busqueda.horizontalHeader().setStretchLastSection(True)
-        search_layout.addWidget(self.tabla_busqueda)
+        self.search_results_text = QLabel("")
+        self.search_results_text.setWordWrap(True)
+        self.search_results_text.setTextFormat(Qt.TextFormat.RichText)
+        self.search_results_text.setStyleSheet("font-size: 12px; padding: 4px;")
+        search_layout.addWidget(self.search_results_text)
         self.search_results_group.setLayout(search_layout)
         self.search_results_group.setVisible(False)
         main_layout.addWidget(self.search_results_group)
 
         self.setLayout(main_layout)
+
+    # ─── Category filter ─────────────────────────────────────────────────
+
+    def _on_cat_filter(self, cat_key: str | None) -> None:
+        for k, btn in self._cat_buttons.items():
+            btn.setChecked(k == cat_key)
+        self._categoria_filter = CategoriaCaja(cat_key) if cat_key else None
+        self._refresh_cajas()
 
     # ─── Data loading ────────────────────────────────────────────────────
 
@@ -208,29 +277,61 @@ class BodegaWidget(QWidget):
             ubicacion_id = int(ub_data) if ub_data is not None else None
 
             cajas = BodegaService.listar_cajas(
-                session, estado=estado, ubicacion_id=ubicacion_id
+                session,
+                estado=estado,
+                ubicacion_id=ubicacion_id,
+                categoria=self._categoria_filter,
             )
 
             self.tabla_cajas.setRowCount(len(cajas))
             for row, caja in enumerate(cajas):
-                self.tabla_cajas.setItem(row, 0, QTableWidgetItem(caja.codigo))
+                # Código
+                item_codigo = QTableWidgetItem(caja.codigo)
+                item_codigo.setData(Qt.ItemDataRole.UserRole, caja.id)
+                self.tabla_cajas.setItem(row, 0, item_codigo)
+
+                # Categoría (colored badge)
+                cat_label = CATEGORIA_CAJA_LABELS.get(caja.categoria, caja.categoria)
+                item_cat = QTableWidgetItem(f"{caja.categoria} — {cat_label}")
+                color = CATEGORIA_COLORS.get(caja.categoria, "#333")
+                item_cat.setForeground(QColor(color))
+                self.tabla_cajas.setItem(row, 1, item_cat)
+
+                # Ubicación
                 ub_str = caja.ubicacion.codigo if caja.ubicacion else "—"
-                self.tabla_cajas.setItem(row, 1, QTableWidgetItem(ub_str))
-                self.tabla_cajas.setItem(row, 2, QTableWidgetItem(caja.estado))
+                self.tabla_cajas.setItem(row, 2, QTableWidgetItem(ub_str))
 
-                total_prendas = sum(c.cantidad for c in caja.contenido) if caja.contenido else 0
-                item_prendas = QTableWidgetItem(str(total_prendas))
-                item_prendas.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self.tabla_cajas.setItem(row, 3, item_prendas)
+                # Estado
+                self.tabla_cajas.setItem(row, 3, QTableWidgetItem(caja.estado))
 
-                self.tabla_cajas.setItem(row, 4, QTableWidgetItem(
+                # Contenido — desglose de tallas
+                desglose = BodegaService.desglose_contenido_caja(session, caja.id)
+                if desglose:
+                    parts = []
+                    for grupo in desglose:
+                        tallas = " ".join(
+                            f"{t['talla']}({t['cantidad']})" for t in grupo["tallas"]
+                        )
+                        parts.append(f"{grupo['producto']}: {tallas}")
+                    contenido_str = " | ".join(parts)
+                else:
+                    contenido_str = "Vacía"
+                self.tabla_cajas.setItem(row, 4, QTableWidgetItem(contenido_str))
+
+                # Última actividad
+                self.tabla_cajas.setItem(row, 5, QTableWidgetItem(
                     caja.updated_at.strftime("%d/%m %H:%M") if caja.updated_at else "—"
                 ))
 
-                self.tabla_cajas.setItem(row, 0, QTableWidgetItem(caja.codigo))
-                self.tabla_cajas.item(row, 0).setData(Qt.ItemDataRole.UserRole, caja.id)
-
             self._refresh_filtro_ubicaciones(session)
+            self._refresh_resumen(session)
+
+    def _refresh_resumen(self, session) -> None:
+        resumen = BodegaService.resumen_por_categoria(session)
+        parts = []
+        for r in resumen:
+            parts.append(f"{r['categoria']}: {r['cajas']} cajas, {r['prendas']} prendas")
+        self.resumen_label.setText("  ·  ".join(parts) if parts else "Sin cajas")
 
     def _refresh_filtro_ubicaciones(self, session) -> None:
         current = self.filtro_ubicacion.currentData()
@@ -266,6 +367,7 @@ class BodegaWidget(QWidget):
         self.btn_agregar.setEnabled(enabled)
         self.btn_retirar.setEnabled(enabled)
         self.btn_mover.setEnabled(enabled)
+        self.btn_reclasificar.setEnabled(enabled)
         self.btn_qr.setEnabled(enabled)
 
     def _load_caja_detalle(self, caja_id: int) -> None:
@@ -274,11 +376,30 @@ class BodegaWidget(QWidget):
             if not caja:
                 return
 
+            cat_label = CATEGORIA_CAJA_LABELS.get(caja.categoria, caja.categoria)
+            color = CATEGORIA_COLORS.get(caja.categoria, "#333")
             self.detalle_header.setText(f"Caja {caja.codigo}  [{caja.estado}]")
             ub_text = f"Ubicación: {caja.ubicacion.codigo}" if caja.ubicacion else "Sin ubicación asignada"
             self.detalle_ubicacion_label.setText(ub_text)
+            self.detalle_categoria_label.setText(
+                f'<span style="color:{color}; font-weight:bold;">{caja.categoria} — {cat_label}</span>'
+            )
+            self.detalle_categoria_label.setTextFormat(Qt.TextFormat.RichText)
 
-            # Contenido
+            # Desglose por producto
+            desglose = BodegaService.desglose_contenido_caja(session, caja_id)
+            if desglose:
+                html_parts = []
+                for grupo in desglose:
+                    tallas = " &nbsp; ".join(
+                        f"<b>{t['talla']}</b>({t['cantidad']})" for t in grupo["tallas"]
+                    )
+                    html_parts.append(f"<b>{grupo['producto']}</b> ({grupo['total']} pz): {tallas}")
+                self.contenido_text.setText("<br>".join(html_parts))
+            else:
+                self.contenido_text.setText("<i>Sin contenido</i>")
+
+            # Tabla detallada
             contenido = caja.contenido or []
             self.tabla_contenido.setRowCount(len(contenido))
             for row, c in enumerate(contenido):
@@ -315,19 +436,31 @@ class BodegaWidget(QWidget):
             return
 
         with get_session() as session:
-            resultados = BodegaService.buscar_por_texto(session, query)
+            resultados = BodegaService.buscar_por_texto_agrupado(session, query)
 
-        self.tabla_busqueda.setRowCount(len(resultados))
-        for row, r in enumerate(resultados):
-            self.tabla_busqueda.setItem(row, 0, QTableWidgetItem(r["producto"]))
-            self.tabla_busqueda.setItem(row, 1, QTableWidgetItem(r["talla"]))
-            self.tabla_busqueda.setItem(row, 2, QTableWidgetItem(r["color"]))
-            self.tabla_busqueda.setItem(row, 3, QTableWidgetItem(r["caja_codigo"]))
-            self.tabla_busqueda.setItem(row, 4, QTableWidgetItem(r["ubicacion"] or "—"))
-            cant_item = QTableWidgetItem(str(r["cantidad"]))
-            cant_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self.tabla_busqueda.setItem(row, 5, cant_item)
+        if not resultados:
+            self.search_results_text.setText("<i>Sin resultados</i>")
+            self.search_results_group.setVisible(True)
+            return
 
+        html_parts = []
+        for grupo in resultados:
+            html_parts.append(f'<b style="font-size:13px">{grupo["producto"]}</b>')
+            for v in grupo["variantes"]:
+                cajas_str = ", ".join(
+                    f'{c["caja_codigo"]}({c["cantidad"]})'
+                    for c in v["cajas"]
+                )
+                html_parts.append(
+                    f'&nbsp;&nbsp;{v["talla"]} {v["color"]} — '
+                    f'Bodega: <b>{v["en_bodega"]}</b> · '
+                    f'Tienda: <b>{v["en_tienda"]}</b> · '
+                    f'Total: {v["stock_actual"]} · '
+                    f'Cajas: {cajas_str}'
+                )
+            html_parts.append("")
+
+        self.search_results_text.setText("<br>".join(html_parts))
         self.search_results_group.setVisible(True)
 
     # ─── Acciones ────────────────────────────────────────────────────────
@@ -392,6 +525,14 @@ class BodegaWidget(QWidget):
             self._load_caja_detalle(self._selected_caja_id)
             self._refresh_cajas()
 
+    def _on_reclasificar(self) -> None:
+        if not self._selected_caja_id:
+            return
+        dialog = ReclasificarDialog(self, self._selected_caja_id)
+        if dialog.exec() == QDialog.DialogCode.Accepted:
+            self._load_caja_detalle(self._selected_caja_id)
+            self._refresh_cajas()
+
     def _on_imprimir_qr(self) -> None:
         if not self._selected_caja_id:
             return
@@ -425,13 +566,16 @@ class NuevaCajaDialog(QDialog):
     def __init__(self, parent: BodegaWidget):
         super().__init__(parent)
         self.setWindowTitle("Nueva Caja")
-        self.setMinimumWidth(350)
+        self.setMinimumWidth(400)
 
         layout = QFormLayout()
 
-        self.codigo_input = QLineEdit()
-        self.codigo_input.setPlaceholderText("Ej: B-015")
-        layout.addRow("Código:", self.codigo_input)
+        self.categoria_combo = QComboBox()
+        for cat in CategoriaCaja:
+            color = CATEGORIA_COLORS[cat.value]
+            label = f"{cat.value} — {CATEGORIA_CAJA_LABELS[cat.value]}"
+            self.categoria_combo.addItem(label, cat)
+        layout.addRow("Categoría:", self.categoria_combo)
 
         self.ubicacion_combo = QComboBox()
         self.ubicacion_combo.addItem("Sin asignar", None)
@@ -444,6 +588,12 @@ class NuevaCajaDialog(QDialog):
         self.notas_input = QLineEdit()
         layout.addRow("Notas:", self.notas_input)
 
+        self.preview_label = QLabel("")
+        self.preview_label.setStyleSheet("font-size: 11px; color: #555;")
+        layout.addRow("", self.preview_label)
+        self.categoria_combo.currentIndexChanged.connect(self._update_preview)
+        self._update_preview()
+
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self._on_accept)
         buttons.rejected.connect(self.reject)
@@ -451,20 +601,62 @@ class NuevaCajaDialog(QDialog):
 
         self.setLayout(layout)
 
-    def _on_accept(self) -> None:
-        codigo = self.codigo_input.text().strip()
-        if not codigo:
-            QMessageBox.warning(self, "Error", "El código es obligatorio.")
+    def _update_preview(self) -> None:
+        cat: CategoriaCaja = self.categoria_combo.currentData()
+        if not cat:
             return
+        with get_session() as session:
+            codigo = BodegaService._siguiente_codigo(session, cat)
+        self.preview_label.setText(f"Se creará con código: {codigo}")
 
+    def _on_accept(self) -> None:
+        cat: CategoriaCaja = self.categoria_combo.currentData()
         ubicacion_id = self.ubicacion_combo.currentData()
         notas = self.notas_input.text().strip() or None
 
         with get_session() as session:
             try:
-                BodegaService.crear_caja(session, codigo, ubicacion_id, notas)
+                BodegaService.crear_caja(session, cat, ubicacion_id, notas)
                 session.commit()
             except Exception as e:
+                session.rollback()
+                QMessageBox.warning(self, "Error", str(e))
+                return
+        self.accept()
+
+
+class ReclasificarDialog(QDialog):
+    def __init__(self, parent: BodegaWidget, caja_id: int):
+        super().__init__(parent)
+        self._caja_id = caja_id
+        self._parent_widget = parent
+        self.setWindowTitle("Reclasificar Caja")
+        self.setMinimumWidth(350)
+
+        layout = QFormLayout()
+
+        self.categoria_combo = QComboBox()
+        for cat in CategoriaCaja:
+            label = f"{cat.value} — {CATEGORIA_CAJA_LABELS[cat.value]}"
+            self.categoria_combo.addItem(label, cat)
+        layout.addRow("Nueva categoría:", self.categoria_combo)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(self._on_accept)
+        buttons.rejected.connect(self.reject)
+        layout.addRow(buttons)
+        self.setLayout(layout)
+
+    def _on_accept(self) -> None:
+        cat: CategoriaCaja = self.categoria_combo.currentData()
+        with get_session() as session:
+            try:
+                BodegaService.reclasificar_caja(
+                    session, self._caja_id, cat,
+                    creado_por=self._parent_widget._get_usuario_actual(),
+                )
+                session.commit()
+            except ValueError as e:
                 session.rollback()
                 QMessageBox.warning(self, "Error", str(e))
                 return
