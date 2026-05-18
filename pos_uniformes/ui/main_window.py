@@ -9645,10 +9645,12 @@ class MainWindow(QMainWindow):
         if self.inventory_page_index <= 0:
             return
         self.inventory_page_index -= 1
+        self.inventory_variant_combo.setCurrentIndex(-1)
         self._handle_inventory_filters_changed()
 
     def _handle_inventory_next_page(self) -> None:
         self.inventory_page_index += 1
+        self.inventory_variant_combo.setCurrentIndex(-1)
         self._handle_inventory_filters_changed()
 
     def _analytics_period_bounds(self) -> tuple[datetime, datetime]:
