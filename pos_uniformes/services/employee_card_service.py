@@ -7,6 +7,7 @@ from html import escape
 from pathlib import Path
 import subprocess
 import tempfile
+from urllib.parse import quote
 
 from PIL import Image, ImageDraw, ImageFilter, ImageFont
 
@@ -32,6 +33,8 @@ SECONDARY_COLOR = "#E8DDD2"
 
 @dataclass(frozen=True)
 class EmployeeCardRenderInput:
+    business_name: str | None
+    logo_path: str | None
     visible_name: str
     employee_code: str
     qr_path: str
@@ -53,12 +56,53 @@ class EmployeeCardService:
     def exists_for_employee(cls, employee: Empleada) -> bool:
         return cls.path_for_employee(employee).exists()
 
+    @staticmethod
+    def _business_name() -> str:
+        try:
+            from pos_uniformes.database.connection import get_session
+            from pos_uniformes.services.business_settings_service import BusinessSettingsService
+            with get_session() as session:
+                config = BusinessSettingsService.get_or_create(session)
+                if (config.nombre_negocio or "").strip():
+                    return str(config.nombre_negocio).strip()
+        except Exception:
+            return "POS Uniformes"
+        return "POS Uniformes"
+
+    @staticmethod
+    def default_logo_path() -> Path | None:
+        try:
+            from pos_uniformes.database.connection import get_session
+            from pos_uniformes.services.business_settings_service import BusinessSettingsService
+            with get_session() as session:
+                config = BusinessSettingsService.get_or_create(session)
+                if (config.logo_path or "").strip():
+                    candidate = Path(str(config.logo_path)).expanduser()
+                    if candidate.exists():
+                        return candidate
+        except Exception:
+            pass
+        candidates = [
+            Path(__file__).resolve().parents[1] / "assets" / "logo.png",
+            Path(__file__).resolve().parents[1] / "assets" / "logo.jpg",
+            Path(__file__).resolve().parents[1] / "assets" / "logo.jpeg",
+            Path(__file__).resolve().parents[1] / "assets" / "customer_card_template" / "brand" / "store-logo.PNG",
+            Path(__file__).resolve().parents[1] / "assets" / "customer_card_template" / "brand" / "store-logo.png",
+        ]
+        for candidate in candidates:
+            if candidate.exists():
+                return candidate
+        return None
+
     @classmethod
     def build_render_input(cls, employee: Empleada) -> EmployeeCardRenderInput:
         qr_path = QrGenerator.path_for_employee(employee)
         if not qr_path.exists():
             qr_path = QrGenerator.generate_for_employee(employee)
+        logo = cls.default_logo_path()
         return EmployeeCardRenderInput(
+            business_name=cls._business_name(),
+            logo_path=str(logo) if logo else None,
             visible_name=EmployeeIdentityService.build_visible_employee_name(employee.nombre_completo),
             employee_code=str(employee.codigo),
             qr_path=str(qr_path),
@@ -128,6 +172,10 @@ class EmployeeCardService:
             "{{ primary_color }}": ACCENT_COLOR,
             "{{ secondary_color }}": SECONDARY_COLOR,
             "{{ name_size }}": cls._name_size_variant(payload.visible_name),
+            "{{ logo_path }}": cls._asset_src(
+                payload.logo_path,
+                fallback=cls._fallback_logo_data_uri(payload.business_name),
+            ),
             "{{ visible_name }}": escape(payload.visible_name),
             "{{ employee_code }}": escape(payload.employee_code),
             "{{ qr_path }}": cls._asset_src(payload.qr_path),
@@ -141,12 +189,23 @@ class EmployeeCardService:
         return document
 
     @staticmethod
-    def _asset_src(path_value: str | None) -> str:
+    def _asset_src(path_value: str | None, *, fallback: str = "") -> str:
         if path_value:
             path = Path(path_value)
             if path.exists():
                 return path.resolve().as_uri()
-        return ""
+        return fallback
+
+    @staticmethod
+    def _fallback_logo_data_uri(business_name: str | None = None) -> str:
+        resolved = (business_name or "POS Uniformes").strip() or "POS Uniformes"
+        svg = f"""
+        <svg xmlns="http://www.w3.org/2000/svg" width="720" height="220" viewBox="0 0 720 220">
+          <rect width="720" height="220" fill="white" fill-opacity="0"/>
+          <text x="360" y="122" text-anchor="middle" font-family="Baskerville, serif" font-size="58" font-weight="700" fill="{ACCENT_COLOR}">{escape(resolved)}</text>
+        </svg>
+        """.strip()
+        return f"data:image/svg+xml;charset=utf-8,{quote(svg)}"
 
     @staticmethod
     def _name_size_variant(full_name: str) -> str:
@@ -167,10 +226,11 @@ class EmployeeCardService:
         cls._draw_background_pattern(canvas)
         cls._draw_surface_panel(draw)
         cls._draw_top_band(draw)
-        cls._draw_title(draw)
+        cls._draw_logo_block(canvas, payload.logo_path, payload.business_name)
         cls._draw_name_block(draw, payload.visible_name)
         cls._draw_code_badge(draw, payload.employee_code)
         cls._draw_qr_block(canvas, payload.qr_path)
+        cls._draw_footer(draw)
 
         canvas.convert("RGB").save(target, format="PNG", optimize=True)
         return target
@@ -231,64 +291,111 @@ class EmployeeCardService:
         )
 
     @classmethod
-    def _draw_title(cls, draw: ImageDraw.ImageDraw) -> None:
+    def _draw_logo_block(
+        cls,
+        canvas: Image.Image,
+        logo_path: str | None,
+        business_name: str | None = None,
+    ) -> None:
+        if logo_path:
+            path = Path(logo_path)
+            if path.exists():
+                try:
+                    logo = Image.open(path).convert("RGBA")
+                    logo.thumbnail((240, 120))
+                    pos_x = (CARD_SIZE[0] - logo.width) // 2
+                    canvas.alpha_composite(logo, (pos_x, 190))
+                    return
+                except Exception:
+                    pass
+        draw = ImageDraw.Draw(canvas)
         draw.text(
-            (540, 214),
-            "Staff",
+            (CARD_SIZE[0] // 2, 210),
+            (business_name or "POS Uniformes").strip() or "POS Uniformes",
             anchor="mm",
-            font=cls._font(52, bold=True),
-            fill=TEXT_PRIMARY,
+            font=cls._font(42, bold=True),
+            fill=ACCENT_COLOR,
+        )
+        draw.text(
+            (CARD_SIZE[0] // 2, 258),
+            "Credencial de staff",
+            anchor="mm",
+            font=cls._font(24),
+            fill=TEXT_MUTED,
         )
 
     @classmethod
     def _draw_name_block(cls, draw: ImageDraw.ImageDraw, visible_name: str) -> None:
         draw.text(
-            (540, 356),
+            (120, 352),
             visible_name,
-            anchor="mm",
             font=cls._font(cls._title_font_size(visible_name), bold=True),
             fill=TEXT_PRIMARY,
         )
-        draw.line((170, 428, 910, 428), fill=DIVIDER_COLOR, width=2)
+        draw.line((120, 428, 960, 428), fill=DIVIDER_COLOR, width=2)
 
     @classmethod
     def _title_font_size(cls, visible_name: str) -> int:
-        normalized = " ".join((visible_name or "").split())
-        if len(normalized) >= 24:
-            return 64
-        if len(normalized) >= 18:
-            return 72
-        return 80
+        variant = cls._name_size_variant(visible_name)
+        if variant == "dense":
+            return 42
+        if variant == "compact":
+            return 50
+        if variant == "medium":
+            return 58
+        return 64
 
     @classmethod
     def _draw_code_badge(cls, draw: ImageDraw.ImageDraw, employee_code: str) -> None:
         draw.rounded_rectangle(
-            (350, 472, 730, 556),
-            radius=30,
+            (120, 472, 430, 552),
+            radius=26,
             fill=ACCENT_SOFT,
             outline=DIVIDER_COLOR,
             width=2,
         )
         draw.text(
-            (540, 514),
+            (150, 489),
+            "Codigo",
+            font=cls._font(20),
+            fill=TEXT_MUTED,
+        )
+        draw.text(
+            (150, 514),
             employee_code,
-            anchor="mm",
-            font=cls._font(34, bold=True),
+            font=cls._font(30, bold=True),
             fill=ACCENT_COLOR,
         )
 
     @classmethod
     def _draw_qr_block(cls, canvas: Image.Image, qr_path: str) -> None:
         qr_image = Image.open(qr_path).convert("RGBA")
-        qr_image = qr_image.resize((430, 430))
-        qr_panel = Image.new("RGBA", (510, 510), (255, 255, 255, 0))
+        qr_image = qr_image.resize((360, 360))
+        qr_panel = Image.new("RGBA", (420, 420), (255, 255, 255, 0))
         qr_draw = ImageDraw.Draw(qr_panel)
         qr_draw.rounded_rectangle(
-            (0, 0, 510, 510),
+            (0, 0, 420, 420),
             radius=34,
             fill="#FFFFFF",
             outline=DIVIDER_COLOR,
             width=2,
         )
-        qr_panel.alpha_composite(qr_image, (40, 40))
-        canvas.alpha_composite(qr_panel, (285, 650))
+        qr_panel.alpha_composite(qr_image, (30, 30))
+        canvas.alpha_composite(qr_panel, (330, 620))
+
+    @classmethod
+    def _draw_footer(cls, draw: ImageDraw.ImageDraw) -> None:
+        draw.text(
+            (CARD_SIZE[0] // 2, 1100),
+            "Escanea para identificar responsable",
+            anchor="mm",
+            font=cls._font(24),
+            fill=TEXT_MUTED,
+        )
+        draw.text(
+            (CARD_SIZE[0] // 2, 1190),
+            "Credencial interna para registro de ventas y comisiones",
+            anchor="mm",
+            font=cls._font(20),
+            fill=TEXT_MUTED,
+        )

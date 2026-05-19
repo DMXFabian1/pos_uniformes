@@ -23,11 +23,14 @@
         </div>
 
         <header class="card-header">
-          <p class="brand-caption">Staff</p>
+          <figure class="brand-mark">
+            <img src="{{ logo_path }}" alt="Logo de la tienda" class="brand-logo" />
+          </figure>
+          <p class="brand-caption">Credencial de staff</p>
         </header>
 
         <section class="identity-block" aria-labelledby="employee-name">
-          <p class="section-kicker">Credencial interna</p>
+          <p class="section-kicker">Equipo comercial</p>
           <h1 id="employee-name" class="employee-name">{{ visible_name }}</h1>
         </section>
 
@@ -40,7 +43,13 @@
           <div class="qr-frame">
             <img src="{{ qr_path }}" alt="QR del staff" class="qr-image" />
           </div>
+          <p class="qr-caption">Escanea para identificar responsable</p>
         </section>
+
+        <footer class="card-footer">
+          <span class="footer-line"></span>
+          <p class="footer-copy">Credencial interna para registro de ventas y comisiones</p>
+        </footer>
       </article>
     </main>
   </body>
