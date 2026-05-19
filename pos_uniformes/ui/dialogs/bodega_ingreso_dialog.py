@@ -1,20 +1,22 @@
-"""Diálogo de ingreso rápido a caja — matriz de tallas."""
+"""Diálogo de ingreso a caja de bodega — escaneo uno a uno con acumulación."""
 
 from __future__ import annotations
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import QEvent, QTimer, Qt
+from PyQt6.QtGui import QColor, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
-    QCompleter,
     QDialog,
     QDialogButtonBox,
-    QFormLayout,
-    QGroupBox,
+    QFrame,
     QHBoxLayout,
     QLabel,
     QLineEdit,
     QMessageBox,
+    QPushButton,
     QScrollArea,
     QSpinBox,
+    QTableWidget,
+    QTableWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -26,69 +28,223 @@ from pos_uniformes.database.models import Producto, Variante
 from pos_uniformes.services.bodega_service import BodegaService
 
 
+class _IngresoRow:
+    __slots__ = ("variante_id", "sku", "producto", "talla", "color", "stock_actual", "en_bodega", "disponible", "cantidad")
+
+    def __init__(self, v: Variante, en_bodega: int) -> None:
+        self.variante_id: int = v.id
+        self.sku: str = v.sku or ""
+        self.producto: str = v.producto.nombre if v.producto else ""
+        self.talla: str = v.talla or ""
+        self.color: str = v.color or ""
+        self.stock_actual: int = v.stock_actual
+        self.en_bodega: int = en_bodega
+        self.disponible: int = max(0, v.stock_actual - en_bodega)
+        self.cantidad: int = 0
+
+
 class BodegaIngresoDialog(QDialog):
     def __init__(self, parent: QWidget, caja_id: int):
         super().__init__(parent)
         self._caja_id = caja_id
-        self._variantes: list[Variante] = []
-        self._spin_boxes: list[tuple[int, QSpinBox]] = []
+        self._rows: list[_IngresoRow] = []
+        self._feedback_timer = QTimer(self)
+        self._feedback_timer.setSingleShot(True)
+        self._feedback_timer.setInterval(1200)
+        self._feedback_timer.timeout.connect(self._reset_feedback)
         self.setWindowTitle("Agregar producto a caja")
-        self.setMinimumSize(420, 500)
-        self._init_ui()
+        self.setModal(True)
+        self.resize(820, 600)
+        self._build_ui()
 
-    def _init_ui(self) -> None:
+    def _build_ui(self) -> None:
         layout = QVBoxLayout()
+        layout.setSpacing(10)
 
-        # Buscador de producto
-        search_layout = QHBoxLayout()
-        self.search_input = QLineEdit()
-        self.search_input.setPlaceholderText("Buscar producto por nombre o SKU...")
-        self.search_input.returnPressed.connect(self._on_buscar)
-        search_layout.addWidget(self.search_input, 3)
+        # ─── Header ──────────────────────────────────────────────────────
+        with get_session() as session:
+            from pos_uniformes.database.models import BodegaCaja, CATEGORIA_CAJA_LABELS
+            caja = session.get(BodegaCaja, self._caja_id)
+            if caja:
+                cat_label = CATEGORIA_CAJA_LABELS.get(caja.categoria, "")
+                header_text = f"Caja {caja.codigo} — {cat_label}"
+                if caja.ubicacion:
+                    header_text += f" · {caja.ubicacion.codigo}"
+            else:
+                header_text = "Caja"
 
-        self.btn_buscar = self._make_button("Buscar", self._on_buscar)
-        search_layout.addWidget(self.btn_buscar)
-        layout.addLayout(search_layout)
+        header = QLabel(header_text)
+        header.setStyleSheet("font-size: 15px; font-weight: bold; color: #224863; padding: 2px 0;")
+        layout.addWidget(header)
 
-        # Producto seleccionado
-        self.producto_label = QLabel("")
-        self.producto_label.setStyleSheet("font-weight: bold; font-size: 13px;")
-        layout.addWidget(self.producto_label)
+        hint = QLabel(
+            "Escanea piezas una por una — cada lectura suma 1 automáticamente. "
+            "También puedes buscar por nombre y ajustar cantidades en la tabla."
+        )
+        hint.setWordWrap(True)
+        hint.setStyleSheet("color: #5f6d78; font-size: 11px; padding: 0 2px;")
+        layout.addWidget(hint)
 
-        # Scroll area para la matriz de tallas
-        self.scroll = QScrollArea()
-        self.scroll.setWidgetResizable(True)
-        self.matrix_container = QWidget()
-        self.matrix_layout = QVBoxLayout()
-        self.matrix_layout.setSpacing(4)
-        self.matrix_container.setLayout(self.matrix_layout)
-        self.scroll.setWidget(self.matrix_container)
-        layout.addWidget(self.scroll, 1)
+        # ─── Scan input ──────────────────────────────────────────────────
+        scan_card = QFrame()
+        scan_card.setStyleSheet(
+            "QFrame { border: 1px solid #d9e5ef; border-radius: 8px; background: #fcfdfd; }"
+        )
+        scan_layout = QHBoxLayout()
+        scan_layout.setContentsMargins(12, 10, 12, 10)
+        scan_layout.setSpacing(8)
 
-        # Botones
-        self.buttons = QDialogButtonBox(
+        self.sku_input = QLineEdit()
+        self.sku_input.setPlaceholderText("Escanea SKU o busca por nombre...")
+        self.sku_input.setStyleSheet(
+            "min-height: 40px; padding: 0 12px; border-radius: 12px; "
+            "border: 2px solid #d7e4ee; background: white; font-size: 16px; font-weight: 600; color: #294f69;"
+        )
+        self.sku_input.installEventFilter(self)
+        scan_layout.addWidget(self.sku_input, 1)
+
+        self.btn_sumar = QPushButton("Sumar 1")
+        self.btn_sumar.setStyleSheet(
+            "min-height: 40px; padding: 0 16px; border-radius: 12px; "
+            "background: #c45425; color: white; font-weight: bold;"
+        )
+        self.btn_sumar.clicked.connect(self._handle_scan)
+        self.btn_sumar.setAutoDefault(False)
+        self.btn_sumar.setDefault(False)
+        scan_layout.addWidget(self.btn_sumar)
+
+        scan_card.setLayout(scan_layout)
+        layout.addWidget(scan_card)
+
+        # ─── Feedback badge ──────────────────────────────────────────────
+        self.feedback_label = QLabel("Listo para escanear")
+        self.feedback_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.feedback_label.setStyleSheet(
+            "padding: 6px 12px; border-radius: 12px; font-weight: 700; "
+            "background: #eef5fb; color: #456176; border: 1px solid #d1e1ee;"
+        )
+        layout.addWidget(self.feedback_label)
+
+        # ─── Tabla de piezas ─────────────────────────────────────────────
+        self.table = QTableWidget()
+        self.table.setColumnCount(7)
+        self.table.setHorizontalHeaderLabels([
+            "SKU", "Producto", "Talla", "Color", "Disponible", "Cantidad", "Restante",
+        ])
+        self.table.verticalHeader().setVisible(False)
+        self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setAlternatingRowColors(True)
+        self.table.setMinimumHeight(250)
+        self.table.installEventFilter(self)
+        h = self.table.horizontalHeader()
+        h.setSectionResizeMode(0, h.ResizeMode.ResizeToContents)
+        h.setSectionResizeMode(1, h.ResizeMode.Stretch)
+        h.setSectionResizeMode(2, h.ResizeMode.ResizeToContents)
+        h.setSectionResizeMode(3, h.ResizeMode.ResizeToContents)
+        h.setSectionResizeMode(4, h.ResizeMode.ResizeToContents)
+        h.setSectionResizeMode(5, h.ResizeMode.ResizeToContents)
+        h.setSectionResizeMode(6, h.ResizeMode.ResizeToContents)
+
+        self.clear_selection_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Escape), self.table)
+        self.clear_selection_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+        self.clear_selection_shortcut.activated.connect(self._clear_selection)
+        layout.addWidget(self.table)
+
+        # ─── Summary + actions ───────────────────────────────────────────
+        self.summary_label = QLabel("0 piezas de 0 presentaciones")
+        self.summary_label.setStyleSheet(
+            "padding: 8px 10px; border-radius: 12px; background: #eef5fb; "
+            "color: #4f6475; border: 1px solid #d1e1ee; font-weight: 600;"
+        )
+        layout.addWidget(self.summary_label)
+
+        footer = QHBoxLayout()
+        footer.setSpacing(8)
+
+        self.btn_restar = QPushButton("Restar 1")
+        self.btn_restar.setStyleSheet(
+            "padding: 6px 14px; border-radius: 10px; border: 1px solid #ccc; background: white;"
+        )
+        self.btn_restar.clicked.connect(self._handle_restar)
+        self.btn_restar.setAutoDefault(False)
+        self.btn_restar.setEnabled(False)
+        footer.addWidget(self.btn_restar)
+
+        self.btn_quitar = QPushButton("Quitar fila")
+        self.btn_quitar.setStyleSheet(
+            "padding: 6px 14px; border-radius: 10px; border: 1px solid #ccc; background: white;"
+        )
+        self.btn_quitar.clicked.connect(self._handle_quitar_fila)
+        self.btn_quitar.setAutoDefault(False)
+        self.btn_quitar.setEnabled(False)
+        footer.addWidget(self.btn_quitar)
+
+        footer.addStretch()
+
+        buttons = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
-        self.buttons.accepted.connect(self._on_accept)
-        self.buttons.rejected.connect(self.reject)
-        self.buttons.button(QDialogButtonBox.StandardButton.Ok).setEnabled(False)
-        layout.addWidget(self.buttons)
+        ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        if ok_btn:
+            ok_btn.setText("Ingresar a caja")
+            ok_btn.setAutoDefault(False)
+            ok_btn.setDefault(False)
+        buttons.accepted.connect(self._handle_confirm)
+        buttons.rejected.connect(self.reject)
+        footer.addWidget(buttons)
 
-        self.setLayout(layout)
+        layout.addLayout(footer)
 
-    def _make_button(self, text: str, slot) -> QWidget:
-        from PyQt6.QtWidgets import QPushButton
-        btn = QPushButton(text)
-        btn.clicked.connect(slot)
-        return btn
+        content = QWidget()
+        content.setLayout(layout)
+        scroll = QScrollArea()
+        scroll.setWidget(content)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QScrollArea.Shape.NoFrame)
 
-    def _on_buscar(self) -> None:
-        query = self.search_input.text().strip()
-        if not query:
+        outer = QVBoxLayout()
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.addWidget(scroll)
+        self.setLayout(outer)
+
+        self.table.itemSelectionChanged.connect(self._refresh_action_state)
+        self.sku_input.setFocus()
+
+    # ─── Scan / lookup ───────────────────────────────────────────────────
+
+    def _handle_scan(self) -> None:
+        text = self.sku_input.text().strip()
+        if not text:
+            self.sku_input.setFocus()
+            return
+
+        existing = next((r for r in self._rows if r.sku.upper() == text.upper()), None)
+        if existing:
+            if existing.cantidad >= existing.disponible:
+                self._set_feedback(f"{existing.sku}: no hay más disponible ({existing.disponible})", "warning")
+                self.sku_input.clear()
+                self.sku_input.setFocus()
+                return
+            existing.cantidad += 1
+            self._refresh_table()
+            self._set_feedback(f"{existing.sku} → {existing.cantidad} pz", "success")
+            self.sku_input.clear()
+            self.sku_input.setFocus()
             return
 
         with get_session() as session:
-            pattern = f"%{query}%"
+            variante = session.scalar(
+                select(Variante)
+                .options(joinedload(Variante.producto))
+                .where(Variante.sku.ilike(text), Variante.activo.is_(True))
+            )
+            if variante:
+                self._add_variante_from_db(session, variante)
+                self.sku_input.clear()
+                self.sku_input.setFocus()
+                return
+
+            pattern = f"%{text}%"
             productos = list(session.scalars(
                 select(Producto)
                 .where(Producto.nombre.ilike(pattern), Producto.activo.is_(True))
@@ -97,16 +253,9 @@ class BodegaIngresoDialog(QDialog):
             ).all())
 
             if not productos:
-                variante = session.scalar(
-                    select(Variante)
-                    .options(joinedload(Variante.producto))
-                    .where(Variante.sku.ilike(pattern), Variante.activo.is_(True))
-                )
-                if variante:
-                    productos = [variante.producto]
-
-            if not productos:
-                QMessageBox.information(self, "Sin resultados", "No se encontró el producto.")
+                self._set_feedback(f"No encontrado: {text}", "warning")
+                self.sku_input.selectAll()
+                self.sku_input.setFocus()
                 return
 
             producto = productos[0]
@@ -117,72 +266,175 @@ class BodegaIngresoDialog(QDialog):
                     self, "Seleccionar producto", "Producto:", nombres, 0, False
                 )
                 if not ok:
+                    self.sku_input.setFocus()
                     return
                 producto = next(p for p in productos if p.nombre == nombre)
 
             variantes = list(session.scalars(
                 select(Variante)
+                .options(joinedload(Variante.producto))
                 .where(Variante.producto_id == producto.id, Variante.activo.is_(True))
                 .order_by(Variante.talla)
             ).all())
 
-            self._build_matrix(session, producto, variantes)
+            added = 0
+            for v in variantes:
+                if any(r.variante_id == v.id for r in self._rows):
+                    continue
+                en_bodega = BodegaService._total_en_bodega_para_variante(session, v.id)
+                row = _IngresoRow(v, en_bodega)
+                if row.disponible > 0:
+                    self._rows.append(row)
+                    added += 1
 
-    def _build_matrix(self, session, producto: Producto, variantes: list[Variante]) -> None:
-        self._variantes = variantes
-        self._spin_boxes.clear()
-        self.producto_label.setText(producto.nombre)
+            if added:
+                self._refresh_table()
+                self._set_feedback(f"{producto.nombre}: {added} tallas cargadas — ajusta cantidades", "success")
+            else:
+                self._set_feedback(f"{producto.nombre}: todas las tallas ya están en bodega", "warning")
 
-        # Limpiar layout anterior
-        while self.matrix_layout.count():
-            child = self.matrix_layout.takeAt(0)
-            if child.widget():
-                child.widget().deleteLater()
+            self.sku_input.clear()
+            self.sku_input.setFocus()
 
-        if not variantes:
-            self.matrix_layout.addWidget(QLabel("No hay variantes activas."))
-            self.buttons.button(QDialogButtonBox.StandardButton.Ok).setEnabled(False)
+    def _add_variante_from_db(self, session, variante: Variante) -> None:
+        existing = next((r for r in self._rows if r.variante_id == variante.id), None)
+        if existing:
+            if existing.cantidad >= existing.disponible:
+                self._set_feedback(f"{existing.sku}: no hay más disponible", "warning")
+                return
+            existing.cantidad += 1
+            self._refresh_table()
+            self._set_feedback(f"{existing.sku} → {existing.cantidad} pz", "success")
             return
 
-        for v in variantes:
-            en_bodega = BodegaService._total_en_bodega_para_variante(session, v.id)
-            disponible = v.stock_actual - en_bodega
+        en_bodega = BodegaService._total_en_bodega_para_variante(session, variante.id)
+        row = _IngresoRow(variante, en_bodega)
+        if row.disponible <= 0:
+            self._set_feedback(f"{row.sku}: sin stock disponible para bodega", "warning")
+            return
+        row.cantidad = 1
+        self._rows.append(row)
+        self._refresh_table()
+        self._set_feedback(f"{row.sku} · {row.producto} {row.talla} — 1 pz", "success")
 
-            row_widget = QWidget()
-            row_layout = QHBoxLayout()
-            row_layout.setContentsMargins(4, 2, 4, 2)
+    # ─── Table rendering ─────────────────────────────────────────────────
 
-            label = QLabel(f"{v.talla} / {v.color}")
-            label.setMinimumWidth(120)
-            row_layout.addWidget(label)
+    def _refresh_table(self) -> None:
+        self.table.setRowCount(len(self._rows))
+        for i, row in enumerate(self._rows):
+            sku_item = QTableWidgetItem(row.sku)
+            sku_item.setData(Qt.ItemDataRole.UserRole, row.variante_id)
+            self.table.setItem(i, 0, sku_item)
+            self.table.setItem(i, 1, QTableWidgetItem(row.producto))
+            self.table.setItem(i, 2, QTableWidgetItem(row.talla))
+            self.table.setItem(i, 3, QTableWidgetItem(row.color))
 
-            stock_label = QLabel(f"Stock: {v.stock_actual}  En bodega: {en_bodega}  Disp: {disponible}")
-            stock_label.setStyleSheet("color: #666;")
-            row_layout.addWidget(stock_label, 1)
+            disp_item = QTableWidgetItem(str(row.disponible))
+            disp_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.table.setItem(i, 4, disp_item)
 
-            spin = QSpinBox()
-            spin.setMinimum(0)
-            spin.setMaximum(max(0, disponible))
-            spin.setValue(0)
-            spin.setMinimumWidth(70)
-            row_layout.addWidget(spin)
+            spin = self.table.cellWidget(i, 5)
+            if not isinstance(spin, QSpinBox):
+                spin = QSpinBox()
+                spin.setRange(0, row.disponible)
+                spin.installEventFilter(self)
+                line_edit = spin.lineEdit()
+                if line_edit:
+                    line_edit.installEventFilter(self)
+                spin.valueChanged.connect(
+                    lambda val, vid=row.variante_id: self._handle_spin_changed(vid, val)
+                )
+                self.table.setCellWidget(i, 5, spin)
+            spin.blockSignals(True)
+            spin.setMaximum(row.disponible)
+            spin.setValue(row.cantidad)
+            spin.blockSignals(False)
 
-            row_widget.setLayout(row_layout)
-            self.matrix_layout.addWidget(row_widget)
-            self._spin_boxes.append((v.id, spin))
+            restante = row.disponible - row.cantidad
+            rest_item = QTableWidgetItem(str(restante))
+            rest_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            if restante == 0 and row.cantidad > 0:
+                rest_item.setForeground(QColor("#c45425"))
+            self.table.setItem(i, 6, rest_item)
 
-        self.matrix_layout.addStretch()
-        self.buttons.button(QDialogButtonBox.StandardButton.Ok).setEnabled(True)
+        self._refresh_summary()
+        self._refresh_action_state()
 
-    def _on_accept(self) -> None:
-        items = []
-        for variante_id, spin in self._spin_boxes:
-            cantidad = spin.value()
-            if cantidad > 0:
-                items.append({"variante_id": variante_id, "cantidad": cantidad})
+    def _refresh_summary(self) -> None:
+        total_pz = sum(r.cantidad for r in self._rows)
+        n_variantes = sum(1 for r in self._rows if r.cantidad > 0)
+        self.summary_label.setText(f"{total_pz} piezas de {n_variantes} presentaciones a ingresar")
 
+    def _refresh_action_state(self) -> None:
+        has_selection = self.table.currentRow() >= 0
+        self.btn_restar.setEnabled(has_selection)
+        self.btn_quitar.setEnabled(has_selection)
+
+    def _handle_spin_changed(self, variante_id: int, value: int) -> None:
+        row = next((r for r in self._rows if r.variante_id == variante_id), None)
+        if row:
+            row.cantidad = value
+            idx = self._rows.index(row)
+            restante = row.disponible - row.cantidad
+            rest_item = QTableWidgetItem(str(restante))
+            rest_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            if restante == 0 and row.cantidad > 0:
+                rest_item.setForeground(QColor("#c45425"))
+            self.table.setItem(idx, 6, rest_item)
+            self._refresh_summary()
+
+    # ─── Actions ─────────────────────────────────────────────────────────
+
+    def _handle_restar(self) -> None:
+        idx = self.table.currentRow()
+        if idx < 0 or idx >= len(self._rows):
+            return
+        row = self._rows[idx]
+        if row.cantidad > 0:
+            row.cantidad -= 1
+            self._refresh_table()
+            self.table.selectRow(idx)
+            self._set_feedback(f"{row.sku} → {row.cantidad} pz", "success")
+
+    def _handle_quitar_fila(self) -> None:
+        idx = self.table.currentRow()
+        if idx < 0 or idx >= len(self._rows):
+            return
+        removed = self._rows.pop(idx)
+        self._refresh_table()
+        self._set_feedback(f"{removed.sku} quitado", "warning")
+        self.sku_input.setFocus()
+
+    def _clear_selection(self) -> None:
+        sel = self.table.selectionModel()
+        if sel:
+            sel.clearSelection()
+            sel.clearCurrentIndex()
+        self.table.clearSelection()
+        self.table.setCurrentCell(-1, -1)
+        self._refresh_action_state()
+        self.sku_input.setFocus()
+
+    def _handle_confirm(self) -> None:
+        items = [
+            {"variante_id": r.variante_id, "cantidad": r.cantidad}
+            for r in self._rows if r.cantidad > 0
+        ]
         if not items:
             QMessageBox.information(self, "Nada que ingresar", "No se capturó ninguna cantidad.")
+            return
+
+        total = sum(i["cantidad"] for i in items)
+        desglose = "\n".join(
+            f"  {r.sku}  {r.talla} — {r.cantidad} pz"
+            for r in self._rows if r.cantidad > 0
+        )
+        answer = QMessageBox.question(
+            self,
+            "Confirmar ingreso",
+            f"¿Ingresar {total} piezas a la caja?\n\n{desglose}",
+        )
+        if answer != QMessageBox.StandardButton.Yes:
             return
 
         parent_widget = self.parent()
@@ -194,10 +446,55 @@ class BodegaIngresoDialog(QDialog):
             try:
                 total = BodegaService.ingreso_masivo(session, self._caja_id, items, creado_por)
                 session.commit()
-                QMessageBox.information(self, "Listo", f"Se ingresaron {total} prendas a la caja.")
             except ValueError as e:
                 session.rollback()
                 QMessageBox.warning(self, "Error", str(e))
                 return
 
         self.accept()
+
+    # ─── Feedback ────────────────────────────────────────────────────────
+
+    def _set_feedback(self, text: str, tone: str) -> None:
+        styles = {
+            "success": "background: #e6f6ec; color: #1f6a3b; border: 1px solid #b7e0c4;",
+            "warning": "background: #fff4df; color: #8a5a0a; border: 1px solid #efd4a0;",
+            "idle": "background: #eef5fb; color: #456176; border: 1px solid #d1e1ee;",
+        }
+        self.feedback_label.setText(text)
+        self.feedback_label.setStyleSheet(
+            "padding: 6px 12px; border-radius: 12px; font-weight: 700; "
+            + styles.get(tone, styles["idle"])
+        )
+        self._feedback_timer.start()
+
+    def _reset_feedback(self) -> None:
+        self.feedback_label.setText("Listo para escanear")
+        self.feedback_label.setStyleSheet(
+            "padding: 6px 12px; border-radius: 12px; font-weight: 700; "
+            "background: #eef5fb; color: #456176; border: 1px solid #d1e1ee;"
+        )
+
+    # ─── Event filter ────────────────────────────────────────────────────
+
+    def eventFilter(self, watched, event):  # type: ignore[override]
+        if event.type() == QEvent.Type.Wheel:
+            target = watched
+            while target is not None:
+                if isinstance(target, QSpinBox):
+                    return True
+                target = target.parent() if callable(getattr(target, "parent", None)) else None
+
+        if watched is self.sku_input and event.type() == QEvent.Type.KeyPress and event.key() in (
+            Qt.Key.Key_Return, Qt.Key.Key_Enter,
+        ):
+            self._handle_scan()
+            return True
+
+        if watched is self.sku_input and event.type() == QEvent.Type.ShortcutOverride and event.key() in (
+            Qt.Key.Key_Return, Qt.Key.Key_Enter,
+        ):
+            event.accept()
+            return True
+
+        return super().eventFilter(watched, event)
