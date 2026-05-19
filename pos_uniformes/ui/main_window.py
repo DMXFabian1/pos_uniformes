@@ -4781,30 +4781,51 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, feedback.title, feedback.message)
 
     def _handle_logout(self) -> None:
-        confirmation = QMessageBox.question(
-            self,
-            "Cerrar sesion",
-            "Se cerrara la sesion actual y volveras al acceso del sistema.\n\nContinuar?",
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Cerrar sesion")
+        dialog.setModal(True)
+        dialog.setMinimumWidth(420)
+        dlg_layout = QVBoxLayout()
+        dlg_layout.setSpacing(16)
+        dlg_layout.setContentsMargins(24, 24, 24, 20)
+        title = QLabel("Cerrar sesion")
+        title.setStyleSheet("font-size: 18px; font-weight: 700; color: #1a1a1a;")
+        desc = QLabel(
+            "Se cerrara la sesion actual y volveras a la pantalla de acceso.\n"
+            "El carrito y los datos no guardados se perderan."
         )
-        if confirmation != QMessageBox.StandardButton.Yes:
+        desc.setWordWrap(True)
+        desc.setObjectName("subtleLine")
+        dlg_layout.addWidget(title)
+        dlg_layout.addWidget(desc)
+
+        is_admin = self.current_role == RolUsuario.ADMIN
+        backup_check: QCheckBox | None = None
+        if is_admin:
+            backup_check = QCheckBox("Crear respaldo (.dump) antes de salir")
+            backup_check.setChecked(True)
+            backup_check.setToolTip("Genera un checkpoint restaurable antes de cambiar de usuario.")
+            dlg_layout.addWidget(backup_check)
+
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        cancel_btn = QPushButton("Cancelar")
+        cancel_btn.setObjectName("toolbarGhostButton")
+        cancel_btn.clicked.connect(dialog.reject)
+        logout_btn = QPushButton("Cerrar sesion")
+        logout_btn.setObjectName("toolbarPrimaryButton")
+        logout_btn.clicked.connect(dialog.accept)
+        btn_layout.addWidget(cancel_btn)
+        btn_layout.addWidget(logout_btn)
+        dlg_layout.addLayout(btn_layout)
+        dialog.setLayout(dlg_layout)
+
+        if dialog.exec() != int(QDialog.DialogCode.Accepted):
             return
 
-        if self.current_role == RolUsuario.ADMIN:
-            backup_prompt = QMessageBox.question(
-                self,
-                "Respaldo antes de salir",
-                "Quieres crear un respaldo restaurable (.dump) antes de cerrar sesion?\n\n"
-                "Te deja un checkpoint rapido antes de cambiar de usuario o salir del POS.",
-                QMessageBox.StandardButton.Yes
-                | QMessageBox.StandardButton.No
-                | QMessageBox.StandardButton.Cancel,
-                QMessageBox.StandardButton.Yes,
-            )
-            if backup_prompt == QMessageBox.StandardButton.Cancel:
+        if is_admin and backup_check is not None and backup_check.isChecked():
+            if not self._run_quick_backup_flow(allow_continue_on_error=True):
                 return
-            if backup_prompt == QMessageBox.StandardButton.Yes:
-                if not self._run_quick_backup_flow(allow_continue_on_error=True):
-                    return
 
         previous_user_id = self.user_id
         previous_cart = list(self.sale_cart)
