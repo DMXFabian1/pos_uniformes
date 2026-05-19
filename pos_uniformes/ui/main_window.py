@@ -7682,23 +7682,80 @@ class MainWindow(QMainWindow):
         )
 
     def _prompt_quick_quote_client_data(self) -> dict[str, str] | None:
+        from PyQt6.QtCore import QRegularExpression
+        from PyQt6.QtGui import QRegularExpressionValidator
+
         dialog, layout = self._create_modal_dialog(
             "Nuevo cliente rapido",
-            "Registra un cliente basico desde Presupuestos. Por ahora lo esencial es nombre y telefono.",
-            width=420,
+            "Registra un cliente con nombre y telefono para vincularlo al presupuesto.",
+            width=460,
         )
         form = QFormLayout()
+        form.setVerticalSpacing(14)
+        form.setHorizontalSpacing(16)
         name_input = QLineEdit()
+        name_input.setPlaceholderText("Nombre completo del cliente")
+        name_input.setMinimumHeight(36)
         phone_input = QLineEdit()
-        name_input.setPlaceholderText("Nombre del cliente")
-        phone_input.setPlaceholderText("Telefono")
+        phone_input.setPlaceholderText("10 digitos")
+        phone_input.setMinimumHeight(36)
+        phone_input.setMaxLength(10)
+        phone_input.setValidator(QRegularExpressionValidator(QRegularExpression(r"\d{0,10}")))
+        error_label = QLabel("")
+        error_label.setStyleSheet("color: #c0392b; font-size: 12px;")
+        error_label.setVisible(False)
+        preview_label = QLabel("")
+        preview_label.setObjectName("subtleLine")
+        preview_label.setVisible(False)
+
+        def _update_preview() -> None:
+            name = name_input.text().strip()
+            phone = phone_input.text().strip()
+            if name:
+                parts = [f"<b>{name}</b>"]
+                if phone:
+                    parts.append(f" · Tel: {phone}")
+                preview_label.setText("".join(parts))
+                preview_label.setVisible(True)
+            else:
+                preview_label.setVisible(False)
+
+        name_input.textChanged.connect(_update_preview)
+        phone_input.textChanged.connect(_update_preview)
+
         form.addRow("Nombre", name_input)
         form.addRow("Telefono", phone_input)
-        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        buttons.accepted.connect(dialog.accept)
-        buttons.rejected.connect(dialog.reject)
         layout.addLayout(form)
+        layout.addWidget(error_label)
+        layout.addWidget(preview_label)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        ok_btn = buttons.button(QDialogButtonBox.StandardButton.Ok)
+        cancel_btn = buttons.button(QDialogButtonBox.StandardButton.Cancel)
+        if ok_btn is not None:
+            ok_btn.setText("Crear cliente")
+        if cancel_btn is not None:
+            cancel_btn.setText("Cancelar")
+
+        def _try_accept() -> None:
+            name = name_input.text().strip()
+            phone = phone_input.text().strip()
+            if not name:
+                error_label.setText("El nombre es obligatorio.")
+                error_label.setVisible(True)
+                name_input.setFocus()
+                return
+            if phone and len(phone) != 10:
+                error_label.setText("El telefono debe tener exactamente 10 digitos.")
+                error_label.setVisible(True)
+                phone_input.setFocus()
+                return
+            error_label.setVisible(False)
+            dialog.accept()
+
+        buttons.accepted.connect(_try_accept)
+        buttons.rejected.connect(dialog.reject)
         layout.addWidget(buttons)
+        name_input.setFocus()
         if dialog.exec() != int(QDialog.DialogCode.Accepted):
             return None
         return {
