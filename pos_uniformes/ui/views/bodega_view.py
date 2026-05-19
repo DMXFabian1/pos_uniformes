@@ -78,14 +78,17 @@ class BodegaWidget(QWidget):
         top_bar.addWidget(self.search_input, 3)
 
         self.btn_buscar = QPushButton("Buscar")
+        self.btn_buscar.setToolTip("Busca dónde está un producto, talla o SKU dentro de las cajas")
         self.btn_buscar.clicked.connect(self._on_search)
         top_bar.addWidget(self.btn_buscar)
 
         self.btn_nueva_caja = QPushButton("+ Nueva Caja")
+        self.btn_nueva_caja.setToolTip("Crea una caja nueva eligiendo su categoría de rotación (A/B/C/D)")
         self.btn_nueva_caja.clicked.connect(self._on_nueva_caja)
         top_bar.addWidget(self.btn_nueva_caja)
 
         self.btn_ubicaciones = QPushButton("Ubicaciones")
+        self.btn_ubicaciones.setToolTip("Administra los racks y niveles donde se colocan las cajas")
         self.btn_ubicaciones.clicked.connect(self._on_gestionar_ubicaciones)
         top_bar.addWidget(self.btn_ubicaciones)
 
