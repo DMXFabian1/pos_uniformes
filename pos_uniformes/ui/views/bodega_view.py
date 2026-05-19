@@ -199,10 +199,10 @@ class BodegaWidget(QWidget):
         self.btn_reclasificar.setEnabled(False)
         acciones_caja.addWidget(self.btn_reclasificar)
 
-        self.btn_qr = QPushButton("Imprimir QR")
-        self.btn_qr.clicked.connect(self._on_imprimir_qr)
-        self.btn_qr.setEnabled(False)
-        acciones_caja.addWidget(self.btn_qr)
+        self.btn_etiqueta = QPushButton("Imprimir etiqueta")
+        self.btn_etiqueta.clicked.connect(self._on_imprimir_etiqueta)
+        self.btn_etiqueta.setEnabled(False)
+        acciones_caja.addWidget(self.btn_etiqueta)
 
         acciones_caja.addStretch()
         right_layout.addLayout(acciones_caja)
@@ -368,7 +368,7 @@ class BodegaWidget(QWidget):
         self.btn_retirar.setEnabled(enabled)
         self.btn_mover.setEnabled(enabled)
         self.btn_reclasificar.setEnabled(enabled)
-        self.btn_qr.setEnabled(enabled)
+        self.btn_etiqueta.setEnabled(enabled)
 
     def _load_caja_detalle(self, caja_id: int) -> None:
         with get_session() as session:
@@ -533,22 +533,19 @@ class BodegaWidget(QWidget):
             self._load_caja_detalle(self._selected_caja_id)
             self._refresh_cajas()
 
-    def _on_imprimir_qr(self) -> None:
+    def _on_imprimir_etiqueta(self) -> None:
         if not self._selected_caja_id:
             return
-        from pos_uniformes.utils.qr_generator import QrGenerator
+        from pos_uniformes.services.bodega_label_service import print_caja_label
         with get_session() as session:
-            caja = session.get(BodegaCaja, self._selected_caja_id)
-            if not caja:
+            try:
+                path = print_caja_label(session, self._selected_caja_id)
+            except Exception as e:
+                QMessageBox.warning(self, "Error", f"No se pudo generar la etiqueta:\n{e}")
                 return
-            qr_data = BodegaService.generar_qr_data(caja)
-            caja.qr_data = qr_data
-            session.commit()
-            qr_path = QrGenerator.generate_for_caja(caja)
-
         QMessageBox.information(
-            self, "QR generado",
-            f"Caja: {caja.codigo}\nArchivo: {qr_path}",
+            self, "Etiqueta generada",
+            "La etiqueta se abrió en el navegador.\nUsa Ctrl+P para imprimir en tamaño carta horizontal.",
         )
 
     def _get_usuario_actual(self) -> str:
