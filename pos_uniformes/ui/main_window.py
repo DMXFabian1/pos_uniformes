@@ -1698,14 +1698,33 @@ class MainWindow(QMainWindow):
             event.ignore()
             return
 
-        confirm = QMessageBox.question(
-            self,
-            decision.title,
-            decision.message,
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.Cancel,
-            QMessageBox.StandardButton.Cancel,
-        )
-        if confirm == QMessageBox.StandardButton.Yes:
+        dialog = QDialog(self)
+        dialog.setWindowTitle(decision.title)
+        dialog.setModal(True)
+        dialog.setMinimumWidth(420)
+        dlg_layout = QVBoxLayout()
+        dlg_layout.setSpacing(16)
+        dlg_layout.setContentsMargins(24, 24, 24, 20)
+        title_label = QLabel(decision.title)
+        title_label.setStyleSheet("font-size: 18px; font-weight: 700; color: #1a1a1a;")
+        desc_label = QLabel(decision.message)
+        desc_label.setWordWrap(True)
+        desc_label.setObjectName("subtleLine")
+        dlg_layout.addWidget(title_label)
+        dlg_layout.addWidget(desc_label)
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        cancel_btn = QPushButton("Cancelar")
+        cancel_btn.setObjectName("toolbarGhostButton")
+        cancel_btn.clicked.connect(dialog.reject)
+        close_btn = QPushButton("Cerrar aplicacion")
+        close_btn.setObjectName("toolbarPrimaryButton")
+        close_btn.clicked.connect(dialog.accept)
+        btn_layout.addWidget(cancel_btn)
+        btn_layout.addWidget(close_btn)
+        dlg_layout.addLayout(btn_layout)
+        dialog.setLayout(dlg_layout)
+        if dialog.exec() == int(QDialog.DialogCode.Accepted):
             event.accept()
             return
         event.ignore()
