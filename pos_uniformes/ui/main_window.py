@@ -7688,14 +7688,13 @@ class MainWindow(QMainWindow):
         dialog, layout = self._create_modal_dialog(
             "Nuevo cliente rapido",
             "Registra un cliente con nombre y telefono para vincularlo al presupuesto.",
-            width=460,
+            width=500,
         )
-        form = QFormLayout()
-        form.setVerticalSpacing(14)
-        form.setHorizontalSpacing(16)
+        name_label = QLabel("Nombre")
         name_input = QLineEdit()
         name_input.setPlaceholderText("Nombre completo del cliente")
         name_input.setMinimumHeight(36)
+        phone_label = QLabel("Telefono")
         phone_input = QLineEdit()
         phone_input.setPlaceholderText("10 digitos")
         phone_input.setMinimumHeight(36)
@@ -7723,9 +7722,10 @@ class MainWindow(QMainWindow):
         name_input.textChanged.connect(_update_preview)
         phone_input.textChanged.connect(_update_preview)
 
-        form.addRow("Nombre", name_input)
-        form.addRow("Telefono", phone_input)
-        layout.addLayout(form)
+        layout.addWidget(name_label)
+        layout.addWidget(name_input)
+        layout.addWidget(phone_label)
+        layout.addWidget(phone_input)
         layout.addWidget(error_label)
         layout.addWidget(preview_label)
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
