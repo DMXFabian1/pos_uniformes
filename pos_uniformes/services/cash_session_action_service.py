@@ -213,7 +213,7 @@ def load_cash_cut_prompt_snapshot(session, *, active_cash_session_id: int) -> Ca
         cash_payments_count=int(resumen.abonos_efectivo_count),
         cash_payments_total=Decimal(resumen.efectivo_abonos).quantize(Decimal("0.01")),
         expected_amount=Decimal(resumen.esperado_en_caja).quantize(Decimal("0.01")),
-        suggested_next_reactivo=Decimal(cash_session.monto_apertura).quantize(Decimal("0.01")),
+        suggested_next_reactivo=(Decimal(cash_session.monto_apertura) + Decimal(resumen.reactivo_total)).quantize(Decimal("0.01")),
     )
 
 
