@@ -180,26 +180,31 @@ class BodegaWidget(QWidget):
         # Acciones de caja
         acciones_caja = QHBoxLayout()
         self.btn_agregar = QPushButton("+ Agregar producto")
+        self.btn_agregar.setToolTip("Escanea o busca productos para ingresar piezas a esta caja")
         self.btn_agregar.clicked.connect(self._on_agregar_producto)
         self.btn_agregar.setEnabled(False)
         acciones_caja.addWidget(self.btn_agregar)
 
         self.btn_retirar = QPushButton("- Retirar")
+        self.btn_retirar.setToolTip("Saca piezas de esta caja para llevarlas a tienda")
         self.btn_retirar.clicked.connect(self._on_retirar_producto)
         self.btn_retirar.setEnabled(False)
         acciones_caja.addWidget(self.btn_retirar)
 
         self.btn_mover = QPushButton("Mover caja")
+        self.btn_mover.setToolTip("Cambia la ubicación física de esta caja a otro rack o nivel")
         self.btn_mover.clicked.connect(self._on_mover_caja)
         self.btn_mover.setEnabled(False)
         acciones_caja.addWidget(self.btn_mover)
 
         self.btn_reclasificar = QPushButton("Reclasificar")
+        self.btn_reclasificar.setToolTip("Cambia la categoría de rotación (A/B/C/D) de esta caja")
         self.btn_reclasificar.clicked.connect(self._on_reclasificar)
         self.btn_reclasificar.setEnabled(False)
         acciones_caja.addWidget(self.btn_reclasificar)
 
         self.btn_etiqueta = QPushButton("Imprimir etiqueta")
+        self.btn_etiqueta.setToolTip("Genera una hoja tamaño carta con QR, contenido y tallas para pegar a la caja")
         self.btn_etiqueta.clicked.connect(self._on_imprimir_etiqueta)
         self.btn_etiqueta.setEnabled(False)
         acciones_caja.addWidget(self.btn_etiqueta)
