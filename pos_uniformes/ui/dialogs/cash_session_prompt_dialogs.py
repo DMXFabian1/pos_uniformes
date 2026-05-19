@@ -363,6 +363,7 @@ def prompt_cash_cut_data(
         counted = Decimal(str(counted_spin.value())).quantize(Decimal("0.01"))
         difference = (counted - summary_view.expected_amount).quantize(Decimal("0.01"))
         difference_label.setText(f"${difference}")
+        next_reactivo_spin.setValue(float(counted))
 
     counted_spin.valueChanged.connect(update_difference)
     form = QFormLayout()
