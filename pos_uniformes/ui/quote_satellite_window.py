@@ -2074,6 +2074,8 @@ class QuoteSatelliteWindow(QMainWindow):
         if self._guided_search_input_submitted:
             self._guided_search_input_submitted = False
             return
+        if self._guided_search_results_container is None:
+            return
         if text.strip():
             self._suggest_timer.start()
             self._guided_search_timer.start()
@@ -2087,17 +2089,21 @@ class QuoteSatelliteWindow(QMainWindow):
         query = self.guided_search_input.text().strip()
         if not query:
             return
-        from pos_uniformes.services import meilisearch_service
-        hits = meilisearch_service.search(query, limit=20)
-        seen: set[str] = set()
-        suggestions: list[str] = []
-        for hit in hits:
-            name = hit.get("nombre_base", "")
-            if name and name not in seen:
-                seen.add(name)
-                suggestions.append(name)
-        self._search_completer_model.setStringList(suggestions)
-        self._search_completer.complete()
+        try:
+            from pos_uniformes.services import meilisearch_service
+            hits = meilisearch_service.search(query, limit=20)
+            seen: set[str] = set()
+            suggestions: list[str] = []
+            for hit in hits:
+                name = hit.get("nombre_base", "")
+                if name and name not in seen:
+                    seen.add(name)
+                    suggestions.append(name)
+            self._search_completer_model.setStringList(suggestions)
+            if suggestions:
+                self._search_completer.complete()
+        except Exception:  # noqa: BLE001
+            pass
 
     def _on_search_suggestion_selected(self, text: str) -> None:
         self._guided_search_input_submitted = True
@@ -2108,7 +2114,7 @@ class QuoteSatelliteWindow(QMainWindow):
 
     def _run_guided_search(self) -> None:
         query = self.guided_search_input.text().strip()
-        if not query:
+        if not query or self._guided_search_results_container is None:
             return
 
         from pos_uniformes.services import meilisearch_service
