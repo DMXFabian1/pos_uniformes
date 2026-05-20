@@ -14,21 +14,33 @@ def build_catalog_product_display_name_preview(
     if not normalized_base_name:
         return "Nombre final pendiente."
 
+    # context_values = (escuela, tipo_prenda, tipo_pieza)
+    school = str(context_values[0] or "").strip() if len(context_values) > 0 else ""
+    remaining_values = context_values[1:] if len(context_values) > 1 else ()
+
+    # Integrate school into base name (matching what CatalogService does)
     normalized_base = _normalize_lookup_text(normalized_base_name)
+    normalized_school = _normalize_lookup_text(school)
+    if school and normalized_school not in normalized_base:
+        full_base = f"{normalized_base_name} {school}"
+    else:
+        full_base = normalized_base_name
+
+    normalized_full = _normalize_lookup_text(full_base)
     suffix_parts: list[str] = []
     seen_suffixes: set[str] = set()
-    for value in context_values:
+    for value in remaining_values:
         cleaned_value = str(value or "").strip()
         normalized_value = _normalize_lookup_text(cleaned_value)
         if not normalized_value or normalized_value in seen_suffixes:
             continue
-        if normalized_value in normalized_base:
+        if normalized_value in normalized_full:
             continue
         seen_suffixes.add(normalized_value)
         suffix_parts.append(cleaned_value)
     if not suffix_parts:
-        return normalized_base_name
-    return f"{normalized_base_name} | {' | '.join(suffix_parts)}"
+        return full_base
+    return f"{full_base} | {' | '.join(suffix_parts)}"
 
 
 def build_catalog_variant_examples_preview(
