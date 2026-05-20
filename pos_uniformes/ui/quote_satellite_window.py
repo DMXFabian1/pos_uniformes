@@ -2104,40 +2104,59 @@ class QuoteSatelliteWindow(QMainWindow):
         card.setObjectName("guidedStepsCard")
         card.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         card_layout = QVBoxLayout()
-        card_layout.setContentsMargins(12, 10, 12, 8)
-        card_layout.setSpacing(6)
+        card_layout.setContentsMargins(16, 14, 16, 12)
+        card_layout.setSpacing(8)
 
         nombre = family.get("nombre_base", "")
         tipo_pieza = family.get("tipo_pieza", "")
         precio_desde = family.get("precio_desde", 0)
 
-        header = QLabel(f"{nombre}")
+        header_layout = QHBoxLayout()
+        header_layout.setSpacing(8)
+        header = QLabel(nombre)
         header.setObjectName("guidedGroupBoxTitle")
         header.setWordWrap(True)
-        card_layout.addWidget(header)
+        header_layout.addWidget(header, 1)
+        precio_label = QLabel(f"desde ${precio_desde:,.2f}")
+        precio_label.setObjectName("guidedStepHint")
+        precio_label.setStyleSheet("font-weight: 600; font-size: 13px;")
+        header_layout.addWidget(precio_label, 0, Qt.AlignmentFlag.AlignRight)
+        card_layout.addLayout(header_layout)
 
-        meta = QLabel(f"{tipo_pieza}  ·  desde ${precio_desde:,.2f}")
+        meta = QLabel(tipo_pieza)
         meta.setObjectName("guidedStepHint")
         card_layout.addWidget(meta)
 
         variantes = family.get("variantes", [])
-        flow = QHBoxLayout()
-        flow.setSpacing(6)
+        flow = FlowLayout(margin=0, h_spacing=6, v_spacing=6)
         for v in variantes:
             sku = v.get("sku", "")
             talla = v.get("talla", "")
             stock = v.get("stock_actual", 0)
             precio = v.get("precio_venta", 0)
             label = talla or sku
-            btn = QPushButton(f"{label}\n${precio:,.0f} ({stock})")
-            btn.setFixedHeight(48)
-            btn.setMinimumWidth(70)
-            btn.setObjectName("chipButton")
+            btn = QPushButton(f"{label}\n${precio:,.0f}  ·  {stock} pzs")
+            btn.setFixedSize(100, 44)
+            btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.setToolTip(f"SKU: {sku}")
+            if stock > 0:
+                btn.setStyleSheet(
+                    "QPushButton { background: #f5f0e8; border: 1px solid #d4c9b8;"
+                    " border-radius: 8px; font-size: 11px; padding: 2px 4px; }"
+                    "QPushButton:hover { background: #e8dfd2; border-color: #8B5E3C; }"
+                )
+            else:
+                btn.setStyleSheet(
+                    "QPushButton { background: #f0f0f0; border: 1px solid #ddd;"
+                    " border-radius: 8px; font-size: 11px; padding: 2px 4px; color: #999; }"
+                    "QPushButton:hover { background: #e5e5e5; }"
+                )
             btn.clicked.connect(lambda checked, s=sku: self._on_search_variant_clicked(s))
             flow.addWidget(btn)
-        flow.addStretch()
-        card_layout.addLayout(flow)
+
+        flow_container = QWidget()
+        flow_container.setLayout(flow)
+        card_layout.addWidget(flow_container)
         card.setLayout(card_layout)
         return card
 
