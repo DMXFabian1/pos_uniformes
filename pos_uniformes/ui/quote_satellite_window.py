@@ -2135,22 +2135,15 @@ class QuoteSatelliteWindow(QMainWindow):
             stock = v.get("stock_actual", 0)
             precio = v.get("precio_venta", 0)
             label = talla or sku
-            btn = QPushButton(f"{label}\n${precio:,.0f}  ·  {stock} pzs")
-            btn.setFixedSize(100, 44)
+            btn = QPushButton(f"{label}\n${precio:,.0f}")
+            btn.setFixedSize(80, 40)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.setToolTip(f"SKU: {sku}")
-            if stock > 0:
-                btn.setStyleSheet(
-                    "QPushButton { background: #f5f0e8; border: 1px solid #d4c9b8;"
-                    " border-radius: 8px; font-size: 11px; padding: 2px 4px; }"
-                    "QPushButton:hover { background: #e8dfd2; border-color: #8B5E3C; }"
-                )
-            else:
-                btn.setStyleSheet(
-                    "QPushButton { background: #f0f0f0; border: 1px solid #ddd;"
-                    " border-radius: 8px; font-size: 11px; padding: 2px 4px; color: #999; }"
-                    "QPushButton:hover { background: #e5e5e5; }"
-                )
+            btn.setStyleSheet(
+                "QPushButton { background: #f5f0e8; border: 1px solid #d4c9b8;"
+                " border-radius: 8px; font-size: 11px; padding: 2px 4px; }"
+                "QPushButton:hover { background: #e8dfd2; border-color: #8B5E3C; }"
+            )
             btn.clicked.connect(lambda checked, s=sku: self._on_search_variant_clicked(s))
             flow.addWidget(btn)
 
