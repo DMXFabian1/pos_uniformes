@@ -751,7 +751,11 @@ def _classify_basics_bucket(row: dict[str, object]) -> str:
 
 
 def _piece_label(row: dict[str, object]) -> str:
-    return str(row.get("tipo_pieza_nombre") or "Sin pieza").strip() or "Sin pieza"
+    raw = str(row.get("tipo_pieza_nombre") or "").strip()
+    if not raw or raw == "-":
+        # Producto sin tipo de pieza — usar nombre base como etiqueta
+        return str(row.get("producto_nombre_base") or row.get("producto_nombre") or "Sin pieza").strip() or "Sin pieza"
+    return raw
 
 
 def _build_family_key(row: dict[str, object]) -> str:
