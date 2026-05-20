@@ -13,7 +13,7 @@ from urllib.parse import quote
 from uuid import uuid4
 import webbrowser
 
-from PyQt6.QtCore import QDate, QSize, QTimer, Qt
+from PyQt6.QtCore import QDate, QSize, QStringListModel, QTimer, Qt
 from PyQt6.QtGui import QBrush, QColor, QIcon, QImage, QKeySequence, QPixmap, QShortcut
 from PyQt6.QtWidgets import (
     QApplication,
@@ -44,6 +44,7 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
     QComboBox,
+    QCompleter,
 )
 from sqlalchemy import select
 from sqlalchemy.exc import SQLAlchemyError
@@ -364,6 +365,20 @@ class QuoteSatelliteWindow(QMainWindow):
         self._guided_search_timer.setInterval(250)
         self._guided_search_timer.timeout.connect(self._run_guided_search)
         self.guided_search_input.textChanged.connect(self._on_guided_search_text_changed)
+        self.guided_search_input.returnPressed.connect(self._run_guided_search)
+        self._guided_search_input_submitted = False
+        # Completer predictivo
+        self._search_completer_model = QStringListModel()
+        self._search_completer = QCompleter(self._search_completer_model, self)
+        self._search_completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self._search_completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        self._search_completer.setMaxVisibleItems(8)
+        self._search_completer.activated.connect(self._on_search_suggestion_selected)
+        self.guided_search_input.setCompleter(self._search_completer)
+        self._suggest_timer = QTimer()
+        self._suggest_timer.setSingleShot(True)
+        self._suggest_timer.setInterval(150)
+        self._suggest_timer.timeout.connect(self._update_search_suggestions)
         self._guided_search_results_layout = QVBoxLayout()
         self._guided_search_results_layout.setContentsMargins(8, 8, 8, 8)
         self._guided_search_results_layout.setSpacing(8)
@@ -2064,12 +2079,40 @@ class QuoteSatelliteWindow(QMainWindow):
             pass
 
     def _on_guided_search_text_changed(self, text: str) -> None:
+        if self._guided_search_input_submitted:
+            self._guided_search_input_submitted = False
+            return
         if text.strip():
+            self._suggest_timer.start()
             self._guided_search_timer.start()
         else:
+            self._suggest_timer.stop()
             self._guided_search_timer.stop()
             self._guided_search_results_container.setVisible(False)
             self.guided_page_scroll.setVisible(True)
+
+    def _update_search_suggestions(self) -> None:
+        query = self.guided_search_input.text().strip()
+        if not query:
+            return
+        from pos_uniformes.services import meilisearch_service
+        hits = meilisearch_service.search(query, limit=20)
+        seen: set[str] = set()
+        suggestions: list[str] = []
+        for hit in hits:
+            name = hit.get("nombre_base", "")
+            if name and name not in seen:
+                seen.add(name)
+                suggestions.append(name)
+        self._search_completer_model.setStringList(suggestions)
+        self._search_completer.complete()
+
+    def _on_search_suggestion_selected(self, text: str) -> None:
+        self._guided_search_input_submitted = True
+        self.guided_search_input.setText(text)
+        self._suggest_timer.stop()
+        self._guided_search_timer.stop()
+        self._run_guided_search()
 
     def _run_guided_search(self) -> None:
         query = self.guided_search_input.text().strip()
