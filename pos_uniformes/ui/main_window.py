@@ -1524,6 +1524,7 @@ class MainWindow(QMainWindow):
         self.settings_cash_history_button = QPushButton("Historial de cortes")
         self.settings_business_button = QPushButton("Negocio e impresion")
         self.settings_catalog_sync_button = QPushButton("Consistencia de catalogo")
+        self.settings_meilisearch_button = QPushButton("Meilisearch (busqueda)")
         self.settings_users_table = QTableWidget()
         self.settings_users_status_label = QLabel("Sin usuarios cargados.")
         self.settings_create_user_button = QPushButton("Crear usuario")
@@ -2385,6 +2386,26 @@ class MainWindow(QMainWindow):
         self.settings_backup_dialog.show()
         self.settings_backup_dialog.raise_()
         self.settings_backup_dialog.activateWindow()
+
+    def _handle_meilisearch_reindex(self) -> None:
+        self.settings_meilisearch_button.setEnabled(False)
+        self.settings_meilisearch_button.setText("Indexando...")
+        QApplication.processEvents()
+        try:
+            from pos_uniformes.services.meilisearch_service import configure_index, index_from_db, _get_client
+            if _get_client() is None:
+                QMessageBox.warning(self, "Meilisearch", "No se pudo conectar con Meilisearch en 127.0.0.1:7700.\nVerifica que esté corriendo.")
+                return
+            configure_index()
+            from pos_uniformes.database.connection import get_session
+            with get_session() as session:
+                count = index_from_db(session)
+            QMessageBox.information(self, "Meilisearch", f"Indexados: {count} documentos.")
+        except Exception as exc:
+            QMessageBox.warning(self, "Meilisearch", f"Error al re-indexar:\n{exc}")
+        finally:
+            self.settings_meilisearch_button.setText("Meilisearch (busqueda)")
+            self.settings_meilisearch_button.setEnabled(True)
 
     def _open_catalog_sync_settings_dialog(self) -> None:
         if self.settings_catalog_sync_dialog is None:
@@ -8903,6 +8924,7 @@ class MainWindow(QMainWindow):
         self.settings_cash_history_button.setEnabled(is_admin)
         self.settings_business_button.setEnabled(is_admin)
         self.settings_catalog_sync_button.setEnabled(is_admin)
+        self.settings_meilisearch_button.setEnabled(is_admin)
         self.settings_create_user_button.setEnabled(is_admin)
         self.settings_edit_user_button.setEnabled(is_admin)
         self.settings_toggle_user_button.setEnabled(is_admin)

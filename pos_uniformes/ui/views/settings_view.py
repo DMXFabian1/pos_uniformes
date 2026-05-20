@@ -84,6 +84,12 @@ def build_settings_tab(window: "MainWindow") -> QWidget:
             QStyle.StandardPixmap.SP_FileDialogDetailedView,
             window._open_catalog_sync_settings_dialog,
         ),
+        (
+            window.settings_meilisearch_button,
+            "Re-indexa el catalogo en Meilisearch para busqueda rapida.",
+            QStyle.StandardPixmap.SP_BrowserReload,
+            window._handle_meilisearch_reindex,
+        ),
     ]
     for index, (button, description, icon_name, handler) in enumerate(settings_buttons):
         row, column = divmod(index, 3)
