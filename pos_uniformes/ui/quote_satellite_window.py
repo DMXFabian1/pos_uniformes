@@ -13,7 +13,7 @@ from urllib.parse import quote
 from uuid import uuid4
 import webbrowser
 
-from PyQt6.QtCore import QDate, QSize, QStringListModel, QTimer, Qt
+from PyQt6.QtCore import QDate, QEvent, QSize, QStringListModel, QTimer, Qt
 from PyQt6.QtGui import QBrush, QColor, QIcon, QImage, QKeySequence, QPixmap, QShortcut
 from PyQt6.QtWidgets import (
     QApplication,
@@ -2083,6 +2083,8 @@ class QuoteSatelliteWindow(QMainWindow):
             self._suggest_timer.stop()
             self._guided_search_timer.stop()
             self._guided_search_results_container.setVisible(False)
+            if self._guided_steps_widget:
+                self._guided_steps_widget.setVisible(True)
             self.guided_page_scroll.setVisible(True)
 
     def _update_search_suggestions(self) -> None:
@@ -2143,7 +2145,9 @@ class QuoteSatelliteWindow(QMainWindow):
             old.deleteLater()
 
         self._guided_search_results_container.setVisible(True)
-        self.guided_page_scroll.setVisible(False)
+        if self._guided_steps_widget:
+            self._guided_steps_widget.setVisible(False)
+        self.guided_page_scroll.setVisible(True)
 
     def _build_search_family_card(self, family: dict) -> QFrame:
         card = QFrame()
@@ -2201,7 +2205,9 @@ class QuoteSatelliteWindow(QMainWindow):
                     " padding: 4px 12px; }"
                     "QPushButton:hover { background: #e8dfd2; border-color: #8B5E3C; }"
                 )
-                btn.clicked.connect(lambda checked, s=sku: self._on_search_variant_clicked(s))
+                btn.setProperty("search_sku", sku)
+                btn.clicked.connect(lambda checked, s=sku: self._on_search_variant_select(s))
+                btn.installEventFilter(self)
                 flow.addWidget(btn)
             flow_container = QWidget()
             flow_container.setLayout(flow)
@@ -2209,8 +2215,23 @@ class QuoteSatelliteWindow(QMainWindow):
         card.setLayout(card_layout)
         return card
 
-    def _on_search_variant_clicked(self, sku: str) -> None:
-        self._add_quote_item_by_sku(sku, 1)
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Type.MouseButtonDblClick and isinstance(obj, QPushButton):
+            sku = obj.property("search_sku")
+            if sku:
+                self._add_quote_item_by_sku(sku, 1)
+                return True
+        return super().eventFilter(obj, event)
+
+    def _on_search_variant_select(self, sku: str) -> None:
+        """Single click — selecciona variante y muestra detalle."""
+        self._gfs.sku = sku
+        row = next((item for item in self.catalog_snapshot_rows if str(item.get("sku")) == sku), None)
+        self._apply_guided_detail(row)
+        self._apply_action_state()
+        # Scroll al detalle si está visible
+        if self._guided_detail_widget and self._guided_detail_widget.isVisible():
+            self._guided_detail_widget.parent().parent().ensureWidgetVisible(self._guided_detail_widget)
 
     def _refresh_guided_browser(self) -> None:
         view = build_guided_catalog_view(
