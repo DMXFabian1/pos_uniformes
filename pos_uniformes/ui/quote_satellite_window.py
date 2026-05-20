@@ -797,6 +797,12 @@ class QuoteSatelliteWindow(QMainWindow):
         scroll.setWidget(content)
 
         page_layout.addWidget(scroll, 1)
+
+        # Detalle fijo abajo (visible solo durante búsqueda)
+        self._guided_search_detail_wrapper = QWidget()
+        self._guided_search_detail_wrapper.setVisible(False)
+        page_layout.addWidget(self._guided_search_detail_wrapper, 0)
+
         page.setLayout(page_layout)
         return page
 
@@ -2079,8 +2085,12 @@ class QuoteSatelliteWindow(QMainWindow):
             self._suggest_timer.stop()
             self._guided_search_timer.stop()
             self._guided_search_results_container.setVisible(False)
-            if self._guided_steps_widget:
-                self._guided_steps_widget.setVisible(True)
+            self._guided_search_detail_wrapper.setVisible(False)
+            # Regresar detail card al scroll content
+            if self._guided_detail_widget:
+                scroll_content = self.guided_page_scroll.widget()
+                if scroll_content and scroll_content.layout():
+                    scroll_content.layout().insertWidget(1, self._guided_detail_widget)
             self.guided_variant_section.setVisible(True)
             self.guided_detail_notes_label.setVisible(True)
             self.guided_page_scroll.setVisible(True)
@@ -2143,11 +2153,18 @@ class QuoteSatelliteWindow(QMainWindow):
             old.deleteLater()
 
         self._guided_search_results_container.setVisible(True)
-        if self._guided_steps_widget:
-            self._guided_steps_widget.setVisible(False)
-        self.guided_variant_section.setVisible(False)
-        self.guided_detail_notes_label.setVisible(False)
-        self.guided_page_scroll.setVisible(True)
+        self.guided_page_scroll.setVisible(False)
+        # Mover detail card al wrapper fijo abajo
+        if self._guided_detail_widget and self._guided_search_detail_wrapper:
+            self.guided_variant_section.setVisible(False)
+            self.guided_detail_notes_label.setVisible(False)
+            if not self._guided_search_detail_wrapper.layout():
+                wrapper_layout = QVBoxLayout()
+                wrapper_layout.setContentsMargins(0, 0, 0, 0)
+                wrapper_layout.setSpacing(0)
+                self._guided_search_detail_wrapper.setLayout(wrapper_layout)
+            self._guided_search_detail_wrapper.layout().addWidget(self._guided_detail_widget)
+            self._guided_search_detail_wrapper.setVisible(True)
 
     def _build_search_family_card(self, family: dict) -> QFrame:
         card = QFrame()
