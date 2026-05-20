@@ -2085,6 +2085,8 @@ class QuoteSatelliteWindow(QMainWindow):
             self._guided_search_results_container.setVisible(False)
             if self._guided_steps_widget:
                 self._guided_steps_widget.setVisible(True)
+            self.guided_variant_section.setVisible(True)
+            self.guided_detail_notes_label.setVisible(True)
             self.guided_page_scroll.setVisible(True)
 
     def _update_search_suggestions(self) -> None:
@@ -2147,6 +2149,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self._guided_search_results_container.setVisible(True)
         if self._guided_steps_widget:
             self._guided_steps_widget.setVisible(False)
+        self.guided_variant_section.setVisible(False)
+        self.guided_detail_notes_label.setVisible(False)
         self.guided_page_scroll.setVisible(True)
 
     def _build_search_family_card(self, family: dict) -> QFrame:
