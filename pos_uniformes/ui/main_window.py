@@ -9678,6 +9678,21 @@ class MainWindow(QMainWindow):
         inventory_snapshot_rows = self._load_inventory_snapshot_rows(session)
 
         search_text = self.inventory_search_input.text().strip()
+
+        # Meilisearch pre-filtra por relevancia (typo-tolerant), luego filtros locales refinan
+        if search_text:
+            try:
+                from pos_uniformes.services import meilisearch_service
+                if meilisearch_service.is_available():
+                    hits = meilisearch_service.search(search_text, limit=500)
+                    if hits:
+                        hit_skus = {str(h.get("sku", "")) for h in hits}
+                        inventory_snapshot_rows = [
+                            r for r in inventory_snapshot_rows
+                            if str(r.get("sku", "")) in hit_skus
+                        ]
+            except Exception:
+                pass
         search_terms = compile_search_terms(search_text)
         use_filter = str(self.inventory_use_filter_combo.currentData() or "")
         category_filters = (
