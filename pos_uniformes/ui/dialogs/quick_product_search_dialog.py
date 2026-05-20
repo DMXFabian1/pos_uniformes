@@ -199,23 +199,23 @@ class QuickProductSearchDialog(QDialog):
         hits: list[dict] = []
         used_meili = False
 
-        # Intentar Meilisearch primero
+        # Intentar Meilisearch primero (pre-filtra por relevancia)
+        source_rows = self._catalog_rows
         try:
             from pos_uniformes.services import meilisearch_service
             if meilisearch_service.is_available():
-                raw_hits = meilisearch_service.search(query, limit=200)
+                raw_hits = meilisearch_service.search(query, limit=500)
                 if raw_hits:
                     hit_skus = {str(h.get("sku", "")) for h in raw_hits}
-                    hits = [r for r in self._catalog_rows if str(r.get("sku", "")) in hit_skus]
+                    source_rows = [r for r in self._catalog_rows if str(r.get("sku", "")) in hit_skus]
                     used_meili = True
         except Exception:
             pass
 
-        # Fallback: filtro local
-        if not used_meili:
-            q_lower = query.lower()
-            terms = q_lower.split()
-            for row in self._catalog_rows:
+        # Filtro local refina (siempre se aplica)
+        q_lower = query.lower()
+        terms = q_lower.split()
+        for row in source_rows:
                 if not row.get("producto_activo") or not row.get("variante_activo"):
                     continue
                 searchable = " ".join([
