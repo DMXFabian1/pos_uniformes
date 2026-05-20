@@ -76,8 +76,16 @@ def configure_index() -> bool:
             "sortableAttributes": ["nombre_base", "precio_venta"],
             "typoTolerance": {
                 "enabled": True,
-                "minWordSizeForTypos": {"oneTypo": 3, "twoTypos": 6},
+                "minWordSizeForTypos": {"oneTypo": 4, "twoTypos": 12},
             },
+            "rankingRules": [
+                "words",
+                "typo",
+                "proximity",
+                "attribute",
+                "sort",
+                "exactness",
+            ],
         })
         return True
     except Exception as exc:
