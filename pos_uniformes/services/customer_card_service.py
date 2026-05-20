@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from html import escape
 from pathlib import Path
+import shutil
 import subprocess
 import tempfile
 from urllib.parse import quote
