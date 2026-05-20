@@ -2221,8 +2221,12 @@ class QuoteSatelliteWindow(QMainWindow):
 
     def _on_search_variant_select(self, sku: str) -> None:
         """Single click — selecciona variante y muestra detalle."""
+        import logging
+        logging.getLogger(__name__).warning("SEARCH SELECT: sku=%s", sku)
+        print(f"[SEARCH] Selected SKU: {sku}", flush=True)
         self._gfs.sku = sku
         row = next((item for item in self.catalog_snapshot_rows if str(item.get("sku")) == sku), None)
+        print(f"[SEARCH] Found row: {row is not None}", flush=True)
         self._apply_guided_detail(row)
         self._apply_action_state()
 

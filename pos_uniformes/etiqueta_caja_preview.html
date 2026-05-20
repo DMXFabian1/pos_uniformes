@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Etiqueta de Caja — Bodega</title>
+<style>
+  @page {
+    size: letter landscape;
+    margin: 0;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, 'Segoe UI', Arial, sans-serif;
+    color: #1a1a1a;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* ─── Page container ─── */
+  .page {
+    width: 279mm;
+    min-height: 216mm;
+    padding: 10mm 14mm 8mm;
+    page-break-after: always;
+    position: relative;
+  }
+  .page:last-child {
+    page-break-after: auto;
+  }
+
+  /* ─── Header: QR + código + categoría ─── */
+  .header {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding-bottom: 12px;
+    border-bottom: 3px solid #222;
+  }
+  .header-compact {
+    padding-bottom: 8px;
+    border-bottom: 2px solid #222;
+  }
+  .qr-placeholder {
+    width: 100px;
+    height: 100px;
+    border: 2px solid #333;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 11px;
+    color: #888;
+    flex-shrink: 0;
+    background: white;
+  }
+  .qr-small {
+    width: 60px;
+    height: 60px;
+    font-size: 9px;
+  }
+  .header-info {
+    flex: 1;
+  }
+  .codigo {
+    font-size: 48px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    line-height: 1;
+  }
+  .codigo-compact {
+    font-size: 28px;
+  }
+  .categoria-badge {
+    display: inline-block;
+    padding: 4px 16px;
+    border-radius: 20px;
+    font-size: 16px;
+    font-weight: 700;
+    color: white;
+    margin-top: 6px;
+  }
+  .categoria-badge-compact {
+    font-size: 12px;
+    padding: 2px 12px;
+    margin-top: 4px;
+  }
+  .cat-A { background: #2e7d32; }
+  .cat-B { background: #1565c0; }
+  .cat-C { background: #e65100; }
+  .cat-D { background: #616161; }
+
+  .ubicacion {
+    font-size: 18px;
+    color: #444;
+    margin-top: 6px;
+    font-weight: 500;
+  }
+  .ubicacion-compact {
+    font-size: 13px;
+    margin-top: 2px;
+  }
+
+  /* ─── Meta row ─── */
+  .meta-row {
+    display: flex;
+    gap: 24px;
+    padding: 8px 0;
+    border-bottom: 1px solid #ddd;
+    font-size: 13px;
+    color: #555;
+  }
+  .meta-row span { font-weight: 600; color: #222; }
+
+  /* ─── Page indicator ─── */
+  .page-indicator {
+    font-size: 12px;
+    color: #888;
+    text-align: right;
+    padding: 4px 0;
+  }
+
+  /* ─── Contenido table ─── */
+  .contenido-title {
+    font-size: 18px;
+    font-weight: 800;
+    padding: 10px 0 6px;
+    color: #222;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+  }
+  thead th {
+    background: #222;
+    color: white;
+    padding: 7px 10px;
+    text-align: left;
+    font-weight: 700;
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  thead th:last-child,
+  tbody td:last-child {
+    text-align: center;
+  }
+  tbody tr {
+    border-bottom: 1px solid #e0e0e0;
+  }
+  tbody tr:nth-child(even) {
+    background: #f7f7f7;
+  }
+  tbody td {
+    padding: 5px 10px;
+  }
+  .producto-row td {
+    background: #eef5fb;
+    font-weight: 700;
+    font-size: 15px;
+    padding: 8px 10px 5px;
+    border-bottom: 2px solid #c5d9e8;
+  }
+  .talla-row td {
+    padding-left: 28px;
+    color: #333;
+  }
+  .cantidad-cell {
+    font-weight: 800;
+    font-size: 16px;
+    color: #c45425;
+  }
+
+  /* ─── Leyenda de categorías ─── */
+  .leyenda {
+    margin-top: 14px;
+    padding: 8px 14px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    display: flex;
+    gap: 20px;
+    font-size: 12px;
+  }
+  .leyenda-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .leyenda-dot {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* ─── Footer ─── */
+  .footer {
+    padding-top: 8px;
+    border-top: 1px solid #ddd;
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: #888;
+    margin-top: 10px;
+  }
+
+  /* ─── Continuation banner ─── */
+  .continuation {
+    font-size: 12px;
+    color: #888;
+    font-style: italic;
+    padding: 4px 0;
+  }
+
+  /* Print */
+  @media print {
+    .no-print { display: none !important; }
+    .page { padding: 8mm 12mm 6mm; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Preview controls -->
+<div class="no-print" style="background:#ffe; padding:10px 14px; border-bottom:2px solid #ccc; font-size:14px;">
+  <strong>Vista previa</strong> — Ctrl+P para imprimir en tamaño carta horizontal.
+  Ejemplo con muchos productos para demostrar paginación automática.
+</div>
+
+<!-- ═══ PÁGINA 1 ═══ -->
+<div class="page">
+
+  <div class="header">
+    <div class="qr-placeholder">
+      [ QR ]<br>A-003
+    </div>
+    <div class="header-info">
+      <div class="codigo">A-003</div>
+      <div class="categoria-badge cat-A">A — Alta rotación</div>
+      <div class="ubicacion">📍 Rack A1 · Nivel 2</div>
+    </div>
+  </div>
+
+  <div class="meta-row">
+    <div>Estado: <span>ACTIVA</span></div>
+    <div>Prendas totales: <span>89</span></div>
+    <div>Impreso: <span>18/05/2026 18:30</span></div>
+  </div>
+
+  <div class="contenido-title">Contenido de la caja</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Producto</th>
+        <th>Talla</th>
+        <th>Color</th>
+        <th>Cantidad</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="producto-row">
+        <td colspan="3">Pants punto 2pz</td>
+        <td class="cantidad-cell">23</td>
+      </tr>
+      <tr class="talla-row"><td></td><td>T8</td><td>Negro</td><td class="cantidad-cell">4</td></tr>
+      <tr class="talla-row"><td></td><td>T10</td><td>Negro</td><td class="cantidad-cell">6</td></tr>
+      <tr class="talla-row"><td></td><td>T12</td><td>Negro</td><td class="cantidad-cell">8</td></tr>
+      <tr class="talla-row"><td></td><td>T14</td><td>Negro</td><td class="cantidad-cell">3</td></tr>
+      <tr class="talla-row"><td></td><td>T16</td><td>Negro</td><td class="cantidad-cell">2</td></tr>
+
+      <tr class="producto-row">
+        <td colspan="3">Falda tableada Montessori</td>
+        <td class="cantidad-cell">18</td>
+      </tr>
+      <tr class="talla-row"><td></td><td>T4</td><td>Azul marino</td><td class="cantidad-cell">2</td></tr>
+      <tr class="talla-row"><td></td><td>T6</td><td>Azul marino</td><td class="cantidad-cell">5</td></tr>
+      <tr class="talla-row"><td></td><td>T8</td><td>Azul marino</td><td class="cantidad-cell">4</td></tr>
+      <tr class="talla-row"><td></td><td>T10</td><td>Azul marino</td><td class="cantidad-cell">4</td></tr>
+      <tr class="talla-row"><td></td><td>T12</td><td>Azul marino</td><td class="cantidad-cell">3</td></tr>
+
+      <tr class="producto-row">
+        <td colspan="3">Playera polo Colegio Patria</td>
+        <td class="cantidad-cell">15</td>
+      </tr>
+      <tr class="talla-row"><td></td><td>T6</td><td>Blanco</td><td class="cantidad-cell">2</td></tr>
+      <tr class="talla-row"><td></td><td>T8</td><td>Blanco</td><td class="cantidad-cell">3</td></tr>
+      <tr class="talla-row"><td></td><td>T10</td><td>Blanco</td><td class="cantidad-cell">3</td></tr>
+      <tr class="talla-row"><td></td><td>T12</td><td>Blanco</td><td class="cantidad-cell">4</td></tr>
+      <tr class="talla-row"><td></td><td>T14</td><td>Blanco</td><td class="cantidad-cell">3</td></tr>
+
+      <tr class="producto-row">
+        <td colspan="3">Short deportivo Inst. Cumbres</td>
+        <td class="cantidad-cell">12</td>
+      </tr>
+      <tr class="talla-row"><td></td><td>T8</td><td>Azul rey</td><td class="cantidad-cell">3</td></tr>
+      <tr class="talla-row"><td></td><td>T10</td><td>Azul rey</td><td class="cantidad-cell">4</td></tr>
+      <tr class="talla-row"><td></td><td>T12</td><td>Azul rey</td><td class="cantidad-cell">3</td></tr>
+      <tr class="talla-row"><td></td><td>T14</td><td>Azul rey</td><td class="cantidad-cell">2</td></tr>
+    </tbody>
+  </table>
+
+  <div class="leyenda">
+    <div class="leyenda-item"><div class="leyenda-dot" style="background:#2e7d32"></div> A — Alta rotación</div>
+    <div class="leyenda-item"><div class="leyenda-dot" style="background:#1565c0"></div> B — Excedentes escuelas</div>
+    <div class="leyenda-item"><div class="leyenda-dot" style="background:#e65100"></div> C — Temporada</div>
+    <div class="leyenda-item"><div class="leyenda-dot" style="background:#616161"></div> D — Descatalogado</div>
+  </div>
+
+  <div class="footer">
+    <div>POS Uniformes · Bodega</div>
+    <div>Página 1 de 2</div>
+    <div>Generado automáticamente</div>
+  </div>
+</div>
+
+<!-- ═══ PÁGINA 2 (continuación) ═══ -->
+<div class="page">
+
+  <div class="header header-compact">
+    <div class="qr-placeholder qr-small">
+      [ QR ]<br>A-003
+    </div>
+    <div class="header-info">
+      <div class="codigo codigo-compact">A-003 <span style="font-size:16px; font-weight:500; color:#666;">— continuación</span></div>
+      <div class="categoria-badge categoria-badge-compact cat-A">A — Alta rotación</div>
+      <div class="ubicacion ubicacion-compact">📍 Rack A1 · Nivel 2</div>
+    </div>
+  </div>
+
+  <div class="contenido-title">Contenido de la caja (cont.)</div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Producto</th>
+        <th>Talla</th>
+        <th>Color</th>
+        <th>Cantidad</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="producto-row">
+        <td colspan="3">Suéter cerrado Colegio Patria</td>
+        <td class="cantidad-cell">10</td>
+      </tr>
+      <tr class="talla-row"><td></td><td>T8</td><td>Azul marino</td><td class="cantidad-cell">2</td></tr>
+      <tr class="talla-row"><td></td><td>T10</td><td>Azul marino</td><td class="cantidad-cell">3</td></tr>
+      <tr class="talla-row"><td></td><td>T12</td><td>Azul marino</td><td class="cantidad-cell">3</td></tr>
+      <tr class="talla-row"><td></td><td>T14</td><td>Azul marino</td><td class="cantidad-cell">2</td></tr>
+
+      <tr class="producto-row">
+        <td colspan="3">Calceta larga escolar</td>
+        <td class="cantidad-cell">11</td>
+      </tr>
+      <tr class="talla-row"><td></td><td>CH</td><td>Blanco</td><td class="cantidad-cell">4</td></tr>
+      <tr class="talla-row"><td></td><td>M</td><td>Blanco</td><td class="cantidad-cell">4</td></tr>
+      <tr class="talla-row"><td></td><td>G</td><td>Blanco</td><td class="cantidad-cell">3</td></tr>
+    </tbody>
+  </table>
+
+  <div style="margin-top: 20px; padding: 12px 16px; background: #f5f9fc; border-radius: 8px; border: 1px solid #dbe6ef;">
+    <div style="font-size: 14px; font-weight: 700; color: #222; margin-bottom: 6px;">Resumen total: 89 prendas en 6 productos</div>
+    <div style="font-size: 12px; color: #555; line-height: 1.6;">
+      Pants punto 2pz: 23 ·
+      Falda tableada Montessori: 18 ·
+      Playera polo Colegio Patria: 15 ·
+      Short deportivo Inst. Cumbres: 12 ·
+      Suéter cerrado Colegio Patria: 10 ·
+      Calceta larga escolar: 11
+    </div>
+  </div>
+
+  <div class="leyenda">
+    <div class="leyenda-item"><div class="leyenda-dot" style="background:#2e7d32"></div> A — Alta rotación</div>
+    <div class="leyenda-item"><div class="leyenda-dot" style="background:#1565c0"></div> B — Excedentes escuelas</div>
+    <div class="leyenda-item"><div class="leyenda-dot" style="background:#e65100"></div> C — Temporada</div>
+    <div class="leyenda-item"><div class="leyenda-dot" style="background:#616161"></div> D — Descatalogado</div>
+  </div>
+
+  <div class="footer">
+    <div>POS Uniformes · Bodega</div>
+    <div>Página 2 de 2</div>
+    <div>Generado automáticamente</div>
+  </div>
+</div>
+
+</body>
+</html>
