@@ -13,7 +13,7 @@ from urllib.parse import quote
 from uuid import uuid4
 import webbrowser
 
-from PyQt6.QtCore import QDate, QEvent, QSize, QStringListModel, QTimer, Qt
+from PyQt6.QtCore import QDate, QSize, QStringListModel, QTimer, Qt
 from PyQt6.QtGui import QBrush, QColor, QIcon, QImage, QKeySequence, QPixmap, QShortcut
 from PyQt6.QtWidgets import (
     QApplication,
@@ -2221,23 +2221,13 @@ class QuoteSatelliteWindow(QMainWindow):
                     " padding: 4px 12px; }"
                     "QPushButton:hover { background: #e8dfd2; border-color: #8B5E3C; }"
                 )
-                btn.setProperty("search_sku", sku)
                 btn.clicked.connect(lambda checked, s=sku: self._on_search_variant_select(s))
-                btn.installEventFilter(self)
                 flow.addWidget(btn)
             flow_container = QWidget()
             flow_container.setLayout(flow)
             card_layout.addWidget(flow_container)
         card.setLayout(card_layout)
         return card
-
-    def eventFilter(self, obj, event):
-        if event.type() == QEvent.Type.MouseButtonDblClick and isinstance(obj, QPushButton):
-            sku = obj.property("search_sku")
-            if sku:
-                self._add_quote_item_by_sku(sku, 1)
-                return True
-        return super().eventFilter(obj, event)
 
     def _on_search_variant_select(self, sku: str) -> None:
         """Single click — selecciona variante y muestra detalle."""
