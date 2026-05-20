@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from decimal import Decimal
+import time
 from typing import Any
 
 from sqlalchemy.orm import Session, selectinload
@@ -17,18 +17,27 @@ MEILI_KEY = None
 INDEX_NAME = "variantes"
 
 _client = None
+_client_checked_at: float = 0
+_CLIENT_RETRY_INTERVAL = 30
 
 
 def _get_client():
-    global _client
+    global _client, _client_checked_at
+    now = time.monotonic()
     if _client is not None:
         return _client
+    if now - _client_checked_at < _CLIENT_RETRY_INTERVAL:
+        return None
+    _client_checked_at = now
     try:
         import meilisearch
-        _client = meilisearch.Client(MEILI_URL, MEILI_KEY)
-        _client.health()
+        c = meilisearch.Client(MEILI_URL, MEILI_KEY)
+        c.health()
+        _client = c
+        logger.info("Meilisearch conectado en %s", MEILI_URL)
         return _client
-    except Exception:
+    except Exception as exc:
+        logger.debug("Meilisearch no disponible: %s", exc)
         _client = None
         return None
 
@@ -143,11 +152,15 @@ def index_from_db(session: Session) -> int:
             })
 
     if not docs:
+        logger.warning("index_from_db: 0 documentos generados de %d productos", len(productos))
         return 0
 
     try:
-        index.delete_all_documents()
-        index.add_documents(docs)
+        task = index.delete_all_documents()
+        index.wait_for_task(task.task_uid, timeout_in_ms=10_000)
+        task2 = index.add_documents(docs)
+        index.wait_for_task(task2.task_uid, timeout_in_ms=30_000)
+        logger.info("Meilisearch indexado: %d documentos", len(docs))
         return len(docs)
     except Exception as exc:
         logger.warning("Error indexando en Meilisearch: %s", exc)
@@ -223,17 +236,28 @@ def is_available() -> bool:
 
 def notify_catalog_changed() -> None:
     """Re-indexa Meilisearch en un hilo aparte para no bloquear la UI."""
-    if not is_available():
-        return
     import threading
     from pos_uniformes.database.connection import get_session
 
     def _reindex():
         try:
+            global _client, _client_checked_at
+            _client = None
+            _client_checked_at = 0
+
+            if _get_client() is None:
+                logger.debug("notify_catalog_changed: Meilisearch no disponible, saltando")
+                return
+
+            configure_index()
+
             with get_session() as session:
                 count = index_from_db(session)
-                logger.info("Meilisearch re-indexado: %d docs", count)
+                if count > 0:
+                    logger.info("Meilisearch re-indexado OK: %d docs", count)
+                else:
+                    logger.warning("Meilisearch re-indexado pero 0 docs")
         except Exception as exc:
             logger.warning("Error re-indexando Meilisearch: %s", exc)
 
-    threading.Thread(target=_reindex, daemon=True).start()
+    threading.Thread(target=_reindex, daemon=True, name="meili-reindex").start()

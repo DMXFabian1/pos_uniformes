@@ -142,6 +142,12 @@ def main() -> int:
             QMessageBox.critical(None, "Base de datos no lista", str(exc))
             return 1
 
+        try:
+            from pos_uniformes.services.meilisearch_service import notify_catalog_changed
+            notify_catalog_changed()
+        except Exception:
+            pass
+
         _show_splash_message(splash, "Cargando catálogo...", app)
         try:
             operator_id = resolve_satellite_operator_id()

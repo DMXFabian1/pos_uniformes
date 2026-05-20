@@ -61,6 +61,12 @@ def main() -> int:
         )
         return 1
 
+    try:
+        from pos_uniformes.services.meilisearch_service import notify_catalog_changed
+        notify_catalog_changed()
+    except Exception:
+        pass
+
     login_dialog = LoginDialog()
     startup_window: MainWindow | None = None
 
