@@ -792,17 +792,11 @@ class QuoteSatelliteWindow(QMainWindow):
 
         layout.addWidget(steps_card)
         layout.addWidget(detail_card)
-        layout.addSpacing(160)
+        self._guided_bottom_spacer = layout.addSpacing(160)
         content.setLayout(layout)
         scroll.setWidget(content)
 
         page_layout.addWidget(scroll, 1)
-
-        # Detalle fijo abajo (visible solo durante búsqueda)
-        self._guided_search_detail_wrapper = QWidget()
-        self._guided_search_detail_wrapper.setVisible(False)
-        page_layout.addWidget(self._guided_search_detail_wrapper, 0)
-
         page.setLayout(page_layout)
         return page
 
@@ -2081,28 +2075,10 @@ class QuoteSatelliteWindow(QMainWindow):
         if text.strip():
             self._suggest_timer.start()
             self._guided_search_timer.start()
-            # Mover detail card al wrapper fijo
-            if self._guided_detail_widget and self._guided_detail_widget.parent() != self._guided_search_detail_wrapper:
-                self.guided_variant_section.setVisible(False)
-                self.guided_detail_notes_label.setVisible(False)
-                if not self._guided_search_detail_wrapper.layout():
-                    wl = QVBoxLayout()
-                    wl.setContentsMargins(0, 0, 0, 0)
-                    self._guided_search_detail_wrapper.setLayout(wl)
-                self._guided_search_detail_wrapper.layout().addWidget(self._guided_detail_widget)
         else:
             self._suggest_timer.stop()
             self._guided_search_timer.stop()
-            self._guided_search_results_container.setVisible(False)
-            self._guided_search_detail_wrapper.setVisible(False)
-            # Regresar detail card al scroll content
-            if self._guided_detail_widget:
-                scroll_content = self.guided_page_scroll.widget()
-                if scroll_content and scroll_content.layout():
-                    scroll_content.layout().insertWidget(1, self._guided_detail_widget)
-            self.guided_variant_section.setVisible(True)
-            self.guided_detail_notes_label.setVisible(True)
-            self.guided_page_scroll.setVisible(True)
+            self._exit_search_mode()
 
     def _update_search_suggestions(self) -> None:
         query = self.guided_search_input.text().strip()
@@ -2161,9 +2137,7 @@ class QuoteSatelliteWindow(QMainWindow):
         if old is not None:
             old.deleteLater()
 
-        self._guided_search_results_container.setVisible(True)
-        self.guided_page_scroll.setVisible(False)
-        self._guided_search_detail_wrapper.setVisible(True)
+        self._enter_search_mode()
 
     def _build_search_family_card(self, family: dict) -> QFrame:
         card = QFrame()
@@ -2228,6 +2202,22 @@ class QuoteSatelliteWindow(QMainWindow):
             card_layout.addWidget(flow_container)
         card.setLayout(card_layout)
         return card
+
+    def _enter_search_mode(self) -> None:
+        self._guided_search_results_container.setVisible(True)
+        if self._guided_steps_widget:
+            self._guided_steps_widget.setVisible(False)
+        self.guided_variant_section.setVisible(False)
+        self.guided_detail_notes_label.setVisible(False)
+        self.guided_page_scroll.setMaximumHeight(120)
+
+    def _exit_search_mode(self) -> None:
+        self._guided_search_results_container.setVisible(False)
+        if self._guided_steps_widget:
+            self._guided_steps_widget.setVisible(True)
+        self.guided_variant_section.setVisible(True)
+        self.guided_detail_notes_label.setVisible(True)
+        self.guided_page_scroll.setMaximumHeight(16777215)
 
     def _on_search_variant_select(self, sku: str) -> None:
         """Single click — selecciona variante y muestra detalle."""
