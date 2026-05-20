@@ -38,6 +38,14 @@ class CatalogService:
     SKU_PADDING = 6
 
     @staticmethod
+    def _notify_meili() -> None:
+        try:
+            from pos_uniformes.services.meilisearch_service import notify_catalog_changed
+            notify_catalog_changed()
+        except Exception:
+            pass
+
+    @staticmethod
     def _optional_name(value: object | None) -> str | None:
         return getattr(value, "nombre", None) if value is not None else None
 
@@ -397,6 +405,7 @@ class CatalogService:
             cls._descripcion_producto(producto),
             "Producto creado.",
         )
+        cls._notify_meili()
         return producto
 
     @classmethod
@@ -491,6 +500,7 @@ class CatalogService:
                 "ubicacion": producto.ubicacion,
             },
         )
+        cls._notify_meili()
         return producto
 
     @classmethod
@@ -566,6 +576,7 @@ class CatalogService:
                 observacion="Stock inicial al crear variante.",
             )
 
+        cls._notify_meili()
         return variante
 
     @classmethod
@@ -650,6 +661,7 @@ class CatalogService:
                 "costo_referencia": variante.costo_referencia,
             },
         )
+        cls._notify_meili()
         return variante
 
     @classmethod
@@ -688,6 +700,7 @@ class CatalogService:
             valores_nuevos={"activo": producto.activo},
             accion_por_campo={"activo": TipoCambioCatalogo.ESTADO},
         )
+        cls._notify_meili()
         return producto
 
     @classmethod
@@ -712,6 +725,7 @@ class CatalogService:
             valores_nuevos={"activo": variante.activo},
             accion_por_campo={"activo": TipoCambioCatalogo.ESTADO},
         )
+        cls._notify_meili()
         return variante
 
     @classmethod
@@ -777,6 +791,7 @@ class CatalogService:
 
         if resumen["aplicadas"] == 0:
             raise ValueError("El lote no genera cambios efectivos de precio.")
+        cls._notify_meili()
         return resumen
 
     @staticmethod

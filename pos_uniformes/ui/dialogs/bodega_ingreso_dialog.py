@@ -10,6 +10,7 @@ import logging
 from PyQt6.QtCore import QEvent, QStringListModel, QTimer, Qt
 from PyQt6.QtGui import QColor, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QCompleter,
     QDialog,
     QDialogButtonBox,
@@ -98,6 +99,17 @@ class BodegaIngresoDialog(QDialog):
         hint.setWordWrap(True)
         hint.setStyleSheet("color: #5f6d78; font-size: 11px; padding: 0 2px;")
         layout.addWidget(hint)
+
+        self.chk_nueva = QCheckBox("Es mercancía nueva (aumentar stock)")
+        self.chk_nueva.setToolTip(
+            "Activa si las piezas son nuevas (no estaban en inventario). "
+            "Se sumará al stock global además de asignar a la caja."
+        )
+        self.chk_nueva.setStyleSheet(
+            "QCheckBox { font-size: 12px; font-weight: 600; color: #1b5e20; padding: 4px 2px; }"
+        )
+        self.chk_nueva.toggled.connect(self._on_nueva_toggled)
+        layout.addWidget(self.chk_nueva)
 
         # ─── Scan input ──────────────────────────────────────────────────
         scan_card = QFrame()
@@ -240,6 +252,23 @@ class BodegaIngresoDialog(QDialog):
 
         self.sku_input.setFocus()
 
+    # ─── Nueva mercancía toggle ────────────────────────────────────────────
+
+    def _on_nueva_toggled(self, checked: bool) -> None:
+        if checked:
+            for r in self._rows:
+                r.disponible = 9999
+        else:
+            with get_session() as session:
+                for r in self._rows:
+                    en_bodega = BodegaService._total_en_bodega_para_variante(session, r.variante_id)
+                    r.en_bodega = en_bodega
+                    variante = session.get(Variante, r.variante_id)
+                    r.disponible = max(0, (variante.stock_actual if variante else 0) - en_bodega)
+                    if r.cantidad > r.disponible:
+                        r.cantidad = r.disponible
+        self._refresh_table()
+
     # ─── Scan / lookup ───────────────────────────────────────────────────
 
     def _handle_scan(self) -> None:
@@ -250,7 +279,7 @@ class BodegaIngresoDialog(QDialog):
 
         existing = next((r for r in self._rows if r.sku.upper() == text.upper()), None)
         if existing:
-            if existing.cantidad >= existing.disponible:
+            if not self.chk_nueva.isChecked() and existing.cantidad >= existing.disponible:
                 self._set_feedback(f"{existing.sku}: no hay más disponible ({existing.disponible})", "warning")
                 self.sku_input.clear()
                 self.sku_input.setFocus()
@@ -307,11 +336,14 @@ class BodegaIngresoDialog(QDialog):
                 variantes = filtered or variantes  # si filtro vacía todo, usa Meilisearch puro
 
                 added = 0
+                es_nueva = self.chk_nueva.isChecked()
                 for v in variantes:
                     if any(r.variante_id == v.id for r in self._rows):
                         continue
                     en_bodega = BodegaService._total_en_bodega_para_variante(session, v.id)
                     row = _IngresoRow(v, en_bodega)
+                    if es_nueva:
+                        row.disponible = 9999
                     if row.disponible > 0:
                         self._rows.append(row)
                         added += 1
@@ -381,9 +413,10 @@ class BodegaIngresoDialog(QDialog):
             self.sku_input.setFocus()
 
     def _add_variante_from_db(self, session, variante: Variante) -> None:
+        es_nueva = self.chk_nueva.isChecked()
         existing = next((r for r in self._rows if r.variante_id == variante.id), None)
         if existing:
-            if existing.cantidad >= existing.disponible:
+            if not es_nueva and existing.cantidad >= existing.disponible:
                 self._set_feedback(f"{existing.sku}: no hay más disponible", "warning")
                 return
             existing.cantidad += 1
@@ -393,6 +426,8 @@ class BodegaIngresoDialog(QDialog):
 
         en_bodega = BodegaService._total_en_bodega_para_variante(session, variante.id)
         row = _IngresoRow(variante, en_bodega)
+        if es_nueva:
+            row.disponible = 9999
         if row.disponible <= 0:
             self._set_feedback(f"{row.sku}: sin stock disponible para bodega", "warning")
             return
@@ -540,15 +575,17 @@ class BodegaIngresoDialog(QDialog):
             QMessageBox.information(self, "Nada que ingresar", "No se capturó ninguna cantidad.")
             return
 
+        es_nueva = self.chk_nueva.isChecked()
         total = sum(i["cantidad"] for i in items)
         desglose = "\n".join(
             f"  {r.sku}  {r.talla} — {r.cantidad} pz"
             for r in self._rows if r.cantidad > 0
         )
+        modo = "MERCANCÍA NUEVA — se sumará al stock global" if es_nueva else ""
         answer = QMessageBox.question(
             self,
             "Confirmar ingreso",
-            f"¿Ingresar {total} piezas a la caja?\n\n{desglose}",
+            f"¿Ingresar {total} piezas a la caja?\n{modo}\n\n{desglose}".strip(),
         )
         if answer != QMessageBox.StandardButton.Yes:
             return
@@ -560,6 +597,20 @@ class BodegaIngresoDialog(QDialog):
 
         with get_session() as session:
             try:
+                if es_nueva:
+                    from pos_uniformes.services.inventario_service import InventarioService
+                    for item in items:
+                        variante = session.get(Variante, item["variante_id"])
+                        if variante:
+                            InventarioService.registrar_ingreso_compra(
+                                session=session,
+                                variante=variante,
+                                cantidad=item["cantidad"],
+                                referencia=f"BODEGA_CAJA:{self._caja_id}",
+                                observacion="Ingreso mercancía nueva a bodega",
+                                creado_por=creado_por,
+                            )
+
                 total = BodegaService.ingreso_masivo(session, self._caja_id, items, creado_por)
                 session.commit()
             except ValueError as e:

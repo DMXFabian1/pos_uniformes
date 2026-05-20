@@ -218,3 +218,21 @@ def search_as_families(query: str, *, limit: int = 40, mode: str | None = None) 
 
 def is_available() -> bool:
     return _get_client() is not None
+
+
+def notify_catalog_changed() -> None:
+    """Re-indexa Meilisearch en un hilo aparte para no bloquear la UI."""
+    if not is_available():
+        return
+    import threading
+    from pos_uniformes.database.connection import get_session
+
+    def _reindex():
+        try:
+            with get_session() as session:
+                count = index_from_db(session)
+                logger.info("Meilisearch re-indexado: %d docs", count)
+        except Exception as exc:
+            logger.warning("Error re-indexando Meilisearch: %s", exc)
+
+    threading.Thread(target=_reindex, daemon=True).start()
