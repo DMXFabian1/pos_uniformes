@@ -86,15 +86,9 @@ def build_settings_tab(window: "MainWindow") -> QWidget:
         ),
         (
             window.settings_meilisearch_button,
-            "Re-indexa el catalogo en Meilisearch para busqueda rapida.",
+            "Instala, inicia y re-indexa Meilisearch para busqueda rapida.",
             QStyle.StandardPixmap.SP_BrowserReload,
-            window._handle_meilisearch_reindex,
-        ),
-        (
-            window.settings_meilisearch_install_button,
-            "Descarga e inicia Meilisearch si no esta corriendo.",
-            QStyle.StandardPixmap.SP_DialogApplyButton,
-            window._handle_meilisearch_install,
+            window._open_meilisearch_settings_dialog,
         ),
     ]
     for index, (button, description, icon_name, handler) in enumerate(settings_buttons):
