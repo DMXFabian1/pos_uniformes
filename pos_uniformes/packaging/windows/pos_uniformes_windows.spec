@@ -47,6 +47,7 @@ if driver_dir.exists():
 hiddenimports = []
 hiddenimports += collect_submodules("psycopg")
 hiddenimports += collect_submodules("alembic")
+hiddenimports += collect_submodules("meilisearch")
 
 
 a = Analysis(
