@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from PyQt6.QtCore import QSizeF, Qt
-from PyQt6.QtGui import QFontDatabase, QPainter, QPageSize
+from PyQt6.QtGui import QFontDatabase, QPageLayout, QPainter, QPageSize
 from PyQt6.QtPrintSupport import QPrinter
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QMessageBox, QTextEdit, QVBoxLayout, QWidget
 
@@ -50,36 +50,36 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
 
     def handle_print() -> None:
         try:
-            printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+            printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
             ticket_printer, copies = _load_print_preferences()
             if ticket_printer:
                 printer.setPrinterName(ticket_printer)
             printer.setCopyCount(copies)
             printer.setPageSize(QPageSize(QSizeF(TICKET_PAPER_WIDTH_MM, 600.0), QPageSize.Unit.Millimeter))
             printer.setFullPage(True)
+            printer.setPageOrientation(QPageLayout.Orientation.Portrait)
 
-            painter = QPainter(printer)
-            if not painter.isActive():
+            painter = QPainter()
+            if not painter.begin(printer):
                 QMessageBox.warning(
                     dialog,
                     "Error de impresión",
                     "No se pudo iniciar el trabajo de impresión.\nVerifica que la impresora esté conectada.",
                 )
                 return
-            font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
-            font.setPointSize(TICKET_FONT_POINT_SIZE)
-            painter.setFont(font)
+            try:
+                font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+                font.setPointSize(TICKET_FONT_POINT_SIZE)
+                painter.setFont(font)
 
-            # painter.viewport() devuelve el rect imprimible en coordenadas
-            # nativas del driver. drawText con TextWordWrap ajusta el texto a
-            # ese ancho real, evitando el desfase de unidades de QTextDocument.
-            rect = painter.viewport()
-            painter.drawText(
-                rect,
-                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap,
-                content,
-            )
-            painter.end()
+                rect = painter.viewport()
+                painter.drawText(
+                    rect,
+                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap,
+                    content,
+                )
+            finally:
+                painter.end()
         except Exception as exc:
             QMessageBox.warning(dialog, "Error de impresión", f"No se pudo imprimir el ticket:\n{exc}")
 
@@ -89,4 +89,5 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
     layout.addWidget(editor)
     layout.addWidget(buttons)
     dialog.setLayout(layout)
+    dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
     dialog.exec()
