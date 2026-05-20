@@ -98,9 +98,9 @@ def index_from_db(session: Session) -> int:
     if index is None:
         return 0
 
-    productos = session.scalars(
+    productos = (
         session.query(Producto)
-        .where(Producto.activo.is_(True))
+        .filter(Producto.activo.is_(True))
         .options(
             selectinload(Producto.variantes),
             selectinload(Producto.categoria),
@@ -109,7 +109,8 @@ def index_from_db(session: Session) -> int:
             selectinload(Producto.tipo_pieza),
             selectinload(Producto.tipo_prenda),
         )
-    ).all()
+        .all()
+    )
 
     docs: list[dict[str, Any]] = []
     for p in productos:
