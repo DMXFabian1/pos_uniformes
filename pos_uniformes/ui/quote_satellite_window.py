@@ -2229,8 +2229,8 @@ class QuoteSatelliteWindow(QMainWindow):
         # Aplicar highlight naranja al botón clickeado
         if btn is not None:
             btn.setStyleSheet(
-                "QPushButton { background: #C97B3A; border: 1px solid #8B5E3C;"
-                " border-radius: 6px; font-size: 12px; color: #FFFFFF;"
+                "QPushButton { background: #87492c; border: 1px solid #87492c;"
+                " border-radius: 6px; font-size: 12px; color: #fbf8f2;"
                 " padding: 4px 12px; font-weight: bold; }"
             )
             self._selected_search_btn = btn
