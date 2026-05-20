@@ -382,6 +382,12 @@ class QuoteSatelliteWindow(QMainWindow):
         self._guided_search_results_container: QScrollArea | None = None
         self._guided_steps_widget: QFrame | None = None
         self._guided_detail_widget: QFrame | None = None
+        # Detail bar para modo búsqueda
+        self._search_detail_bar: QFrame | None = None
+        self._search_detail_icon = QLabel()
+        self._search_detail_title = QLabel("Toca una talla para ver detalle.")
+        self._search_detail_meta = QLabel("")
+        self._search_detail_sku: str = ""
 
         self.kiosk_scan_input = QLineEdit()
         self.kiosk_qty_spin = QSpinBox()
@@ -797,6 +803,37 @@ class QuoteSatelliteWindow(QMainWindow):
         scroll.setWidget(content)
 
         page_layout.addWidget(scroll, 1)
+
+        # Detail bar fijo abajo (solo visible en modo búsqueda)
+        self._search_detail_bar = QFrame()
+        self._search_detail_bar.setObjectName("guidedStepsCard")
+        self._search_detail_bar.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        bar_layout = QHBoxLayout()
+        bar_layout.setContentsMargins(12, 6, 12, 6)
+        bar_layout.setSpacing(8)
+        self._search_detail_icon.setFixedSize(40, 40)
+        bar_layout.addWidget(self._search_detail_icon, 0, Qt.AlignmentFlag.AlignVCenter)
+        text_col = QVBoxLayout()
+        text_col.setSpacing(0)
+        self._search_detail_title.setObjectName("satDetailTitle")
+        self._search_detail_meta.setObjectName("satDetailMeta")
+        self._search_detail_meta.setWordWrap(True)
+        text_col.addWidget(self._search_detail_title)
+        text_col.addWidget(self._search_detail_meta)
+        bar_layout.addLayout(text_col, 1)
+        search_print_btn = QPushButton("Imprimir etiqueta")
+        search_print_btn.setObjectName("ghostButton")
+        search_print_btn.clicked.connect(self._on_search_print_label)
+        bar_layout.addWidget(search_print_btn)
+        search_add_btn = QPushButton("✓ Agregar al presupuesto")
+        search_add_btn.setObjectName("primaryButton")
+        search_add_btn.setMinimumHeight(34)
+        search_add_btn.clicked.connect(self._on_search_add_to_quote)
+        bar_layout.addWidget(search_add_btn)
+        self._search_detail_bar.setLayout(bar_layout)
+        self._search_detail_bar.setVisible(False)
+        page_layout.addWidget(self._search_detail_bar, 0)
+
         page.setLayout(page_layout)
         return page
 
@@ -2205,32 +2242,41 @@ class QuoteSatelliteWindow(QMainWindow):
 
     def _enter_search_mode(self) -> None:
         self._guided_search_results_container.setVisible(True)
-        if self._guided_steps_widget:
-            self._guided_steps_widget.setVisible(False)
-        self.guided_variant_section.setVisible(False)
-        self.guided_detail_notes_label.setVisible(False)
-        self.guided_page_scroll.setMaximumHeight(120)
+        self.guided_page_scroll.setVisible(False)
+        self._search_detail_bar.setVisible(True)
 
     def _exit_search_mode(self) -> None:
         self._guided_search_results_container.setVisible(False)
-        if self._guided_steps_widget:
-            self._guided_steps_widget.setVisible(True)
-        self.guided_variant_section.setVisible(True)
-        self.guided_detail_notes_label.setVisible(True)
-        self.guided_page_scroll.setMaximumHeight(16777215)
+        self._search_detail_bar.setVisible(False)
+        self.guided_page_scroll.setVisible(True)
 
     def _on_search_variant_select(self, sku: str) -> None:
-        """Single click — selecciona variante y muestra detalle."""
-        self._gfs.sku = sku
+        """Single click — selecciona variante y muestra detalle en el bar."""
+        self._search_detail_sku = sku
         row = next((item for item in self.catalog_snapshot_rows if str(item.get("sku")) == sku), None)
-        self._apply_guided_detail(row)
-        self._apply_action_state()
-        # Re-aplicar modo compacto (apply_guided_detail reactiva variantes/ícono grande)
-        self.guided_variant_section.setVisible(False)
-        self.guided_detail_notes_label.setVisible(False)
-        self.guided_visual_icon_label.setFixedSize(48, 48)
-        # Scroll al detail card
-        self.guided_page_scroll.ensureWidgetVisible(self._guided_detail_widget)
+        if row is None:
+            return
+        self._search_detail_icon.setPixmap(_catalog_row_icon(row).scaled(
+            40, 40, Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation,
+        ))
+        talla = row.get("talla", "")
+        precio = row.get("precio_venta", 0)
+        nombre = row.get("nombre_producto") or row.get("nombre_base", "")
+        self._search_detail_title.setText(f"{sku} | {nombre}")
+        self._search_detail_meta.setText(f"Talla {talla} · ${float(precio):,.2f}")
+
+    def _on_search_add_to_quote(self) -> None:
+        if self._search_detail_sku:
+            self._add_quote_item_by_sku(self._search_detail_sku, 1)
+
+    def _on_search_print_label(self) -> None:
+        if not self._search_detail_sku:
+            return
+        row = next((r for r in self.catalog_snapshot_rows if str(r.get("sku")) == self._search_detail_sku), None)
+        if row:
+            self._gfs.sku = self._search_detail_sku
+            self._apply_guided_detail(row)
+            self._handle_guided_print_label()
 
     def _refresh_guided_browser(self) -> None:
         view = build_guided_catalog_view(
