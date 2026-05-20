@@ -7402,32 +7402,109 @@ class MainWindow(QMainWindow):
 
         catalog_rows = self._load_catalog_snapshot_rows()
         dialog = QuickProductSearchDialog(self, catalog_rows=catalog_rows)
+        added_skus: list[str] = []
 
         def _on_sku_selected(sku: str, qty: int) -> None:
             for _ in range(qty):
                 self.sale_sku_input.setText(sku)
                 self._handle_add_sale_item()
-            # Imprimir etiqueta automáticamente
-            self._auto_print_label_for_sku(sku)
+            added_skus.append(sku)
 
         dialog.sku_selected.connect(_on_sku_selected)
         dialog.exec()
 
-    def _auto_print_label_for_sku(self, sku: str) -> None:
-        """Imprime etiqueta automáticamente al agregar producto desde búsqueda rápida."""
-        try:
-            with get_session() as session:
-                variante = VentaService.obtener_variante_por_sku(session, sku)
-                if variante is None:
-                    return
-                result = render_inventory_label(session, variante.id, mode="continuous", requested_copies=1)
-            self._print_image_path(
-                result.image_path,
-                title=f"Etiqueta {sku}",
-                copies=1,
-            )
-        except Exception:  # noqa: BLE001
-            pass  # Si falla la etiqueta, no interrumpir el flujo de venta
+        # Al cerrar, ofrecer imprimir etiquetas de lo agregado
+        if added_skus:
+            self._show_label_print_confirmation(added_skus, catalog_rows)
+
+    def _show_label_print_confirmation(self, skus: list[str], catalog_rows: list[dict]) -> None:
+        """Muestra confirmación con las etiquetas a imprimir tras búsqueda rápida."""
+        from PyQt6.QtWidgets import QCheckBox
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Imprimir etiquetas")
+        dlg.setMinimumWidth(520)
+        dlg_layout = QVBoxLayout()
+        dlg_layout.setContentsMargins(16, 14, 16, 14)
+        dlg_layout.setSpacing(12)
+
+        title = QLabel(f"Se agregaron {len(skus)} producto(s) desde búsqueda.")
+        title.setStyleSheet("font-size: 14px; font-weight: 600; color: #3a2a1a;")
+        dlg_layout.addWidget(title)
+
+        hint = QLabel("Selecciona las etiquetas que quieres imprimir:")
+        hint.setStyleSheet("font-size: 12px; color: #8a7a6a;")
+        dlg_layout.addWidget(hint)
+
+        # Checkboxes por SKU
+        checks: list[tuple[QCheckBox, str]] = []
+        for sku in skus:
+            row = next((r for r in catalog_rows if str(r.get("sku", "")) == sku), None)
+            nombre = str(row.get("producto_nombre_base", "")) if row else ""
+            talla = str(row.get("talla", "")) if row else ""
+            color = str(row.get("color", "")) if row else ""
+            parts = [sku]
+            if nombre:
+                parts.append(nombre)
+            if talla:
+                parts.append(f"T:{talla}")
+            if color and color.lower() not in ("sin color", "ad hoc"):
+                parts.append(color)
+            cb = QCheckBox(" · ".join(parts))
+            cb.setChecked(True)
+            cb.setStyleSheet("font-size: 13px; padding: 4px 0;")
+            dlg_layout.addWidget(cb)
+            checks.append((cb, sku))
+
+        # Botones select all / none
+        toggle_row = QHBoxLayout()
+        select_all_btn = QPushButton("Todas")
+        select_all_btn.setObjectName("ghostButton")
+        select_all_btn.clicked.connect(lambda: [cb.setChecked(True) for cb, _ in checks])
+        select_none_btn = QPushButton("Ninguna")
+        select_none_btn.setObjectName("ghostButton")
+        select_none_btn.clicked.connect(lambda: [cb.setChecked(False) for cb, _ in checks])
+        toggle_row.addWidget(select_all_btn)
+        toggle_row.addWidget(select_none_btn)
+        toggle_row.addStretch()
+        dlg_layout.addLayout(toggle_row)
+
+        # Acciones
+        actions = QHBoxLayout()
+        actions.setSpacing(10)
+        print_btn = QPushButton("Imprimir seleccionadas")
+        print_btn.setObjectName("primaryButton")
+        print_btn.setMinimumHeight(38)
+        skip_btn = QPushButton("No imprimir")
+        skip_btn.setObjectName("ghostButton")
+        skip_btn.setMinimumHeight(38)
+        skip_btn.clicked.connect(dlg.reject)
+        actions.addStretch()
+        actions.addWidget(skip_btn)
+        actions.addWidget(print_btn)
+        dlg_layout.addLayout(actions)
+
+        def _do_print():
+            selected = [sku for cb, sku in checks if cb.isChecked()]
+            dlg.accept()
+            for sku in selected:
+                try:
+                    with get_session() as session:
+                        variante = VentaService.obtener_variante_por_sku(session, sku)
+                        if variante is None:
+                            continue
+                        result = render_inventory_label(session, variante.id, mode="continuous", requested_copies=1)
+                    self._print_image_path(
+                        result.image_path,
+                        title=f"Etiqueta {sku}",
+                        copies=1,
+                    )
+                except Exception:  # noqa: BLE001
+                    pass
+
+        print_btn.clicked.connect(_do_print)
+        dlg.setLayout(dlg_layout)
+        dlg.exec()
 
     def _handle_add_sale_item(self) -> None:
         raw_input = self.sale_sku_input.text().strip()
