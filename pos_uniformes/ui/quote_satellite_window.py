@@ -355,6 +355,23 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_variant_buttons: dict[str, QPushButton] = {}
         self.guided_product_buttons: dict[str, QPushButton] = {}
 
+        # Búsqueda rápida Meilisearch
+        self.guided_search_input = QLineEdit()
+        self.guided_search_input.setPlaceholderText("Buscar producto rapido…")
+        self.guided_search_input.setClearButtonEnabled(True)
+        self._guided_search_timer = QTimer()
+        self._guided_search_timer.setSingleShot(True)
+        self._guided_search_timer.setInterval(250)
+        self._guided_search_timer.timeout.connect(self._run_guided_search)
+        self.guided_search_input.textChanged.connect(self._on_guided_search_text_changed)
+        self._guided_search_results_layout = QVBoxLayout()
+        self._guided_search_results_layout.setContentsMargins(8, 8, 8, 8)
+        self._guided_search_results_layout.setSpacing(8)
+        self._guided_search_results_container: QScrollArea | None = None
+        self._guided_search_scroll_content: QWidget | None = None
+        self._guided_steps_widget: QFrame | None = None
+        self._guided_detail_widget: QFrame | None = None
+
         self.kiosk_scan_input = QLineEdit()
         self.kiosk_qty_spin = QSpinBox()
         self.kiosk_lookup_button = QPushButton("Consultar")
@@ -725,6 +742,25 @@ class QuoteSatelliteWindow(QMainWindow):
         page_layout.setContentsMargins(0, 0, 0, 0)
         page_layout.setSpacing(0)
 
+        # Barra de búsqueda rápida (Meilisearch)
+        search_bar_layout = QHBoxLayout()
+        search_bar_layout.setContentsMargins(12, 8, 12, 4)
+        self.guided_search_input.setMinimumHeight(36)
+        self.guided_search_input.setObjectName("guidedSearchInput")
+        search_bar_layout.addWidget(self.guided_search_input)
+        page_layout.addLayout(search_bar_layout)
+
+        # Contenedor de resultados de búsqueda (oculto por defecto)
+        search_scroll = QScrollArea()
+        search_scroll.setWidgetResizable(True)
+        search_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self._guided_search_scroll_content = QWidget()
+        self._guided_search_scroll_content.setLayout(self._guided_search_results_layout)
+        search_scroll.setWidget(self._guided_search_scroll_content)
+        self._guided_search_results_container = search_scroll
+        self._guided_search_results_container.setVisible(False)
+        page_layout.addWidget(self._guided_search_results_container, 1)
+
         scroll = QScrollArea()
         self.guided_page_scroll = scroll
         scroll.setObjectName("guidedPageScrollArea")
@@ -741,8 +777,14 @@ class QuoteSatelliteWindow(QMainWindow):
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(14)
-        layout.addWidget(self._build_guided_steps_card())
-        layout.addWidget(self._build_guided_detail_card())
+
+        steps_card = self._build_guided_steps_card()
+        detail_card = self._build_guided_detail_card()
+        self._guided_steps_widget = steps_card
+        self._guided_detail_widget = detail_card
+
+        layout.addWidget(steps_card)
+        layout.addWidget(detail_card)
         layout.addSpacing(160)
         content.setLayout(layout)
         scroll.setWidget(content)
@@ -1714,6 +1756,7 @@ class QuoteSatelliteWindow(QMainWindow):
         except Exception:  # noqa: BLE001
             pass
         self._rebuild_catalog_level_combo()
+        self._try_index_meilisearch(session)
 
     def _refresh_catalog_snapshot_from_cache(self) -> None:
         """Sincroniza el combo de niveles desde el cache local (sin DB)."""
@@ -2007,6 +2050,99 @@ class QuoteSatelliteWindow(QMainWindow):
         self._refresh_guided_product_checks()
         self._refresh_guided_variant_checks()
         self._apply_action_state()
+
+    # ── Búsqueda rápida Meilisearch ─────────────────────────────────────
+
+    def _try_index_meilisearch(self, session) -> None:
+        try:
+            from pos_uniformes.services import meilisearch_service
+            if not meilisearch_service.is_available():
+                return
+            meilisearch_service.configure_index()
+            meilisearch_service.index_from_db(session)
+        except Exception:  # noqa: BLE001
+            pass
+
+    def _on_guided_search_text_changed(self, text: str) -> None:
+        if text.strip():
+            self._guided_search_timer.start()
+        else:
+            self._guided_search_timer.stop()
+            self._guided_search_results_container.setVisible(False)
+            self.guided_page_scroll.setVisible(True)
+
+    def _run_guided_search(self) -> None:
+        query = self.guided_search_input.text().strip()
+        if not query:
+            return
+
+        from pos_uniformes.services import meilisearch_service
+        families = meilisearch_service.search_as_families(query, limit=60)
+
+        # Limpiar resultados anteriores
+        while self._guided_search_results_layout.count():
+            item = self._guided_search_results_layout.takeAt(0)
+            if item.widget():
+                item.widget().deleteLater()
+
+        if not families:
+            no_results = QLabel("Sin resultados.")
+            no_results.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            no_results.setStyleSheet("color: #888; padding: 24px;")
+            self._guided_search_results_layout.addWidget(no_results)
+        else:
+            for fam in families:
+                card = self._build_search_family_card(fam)
+                self._guided_search_results_layout.addWidget(card)
+            self._guided_search_results_layout.addStretch()
+
+        self._guided_search_results_container.setVisible(True)
+        self.guided_page_scroll.setVisible(False)
+
+    def _build_search_family_card(self, family: dict) -> QFrame:
+        card = QFrame()
+        card.setObjectName("guidedStepsCard")
+        card.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        card_layout = QVBoxLayout()
+        card_layout.setContentsMargins(12, 10, 12, 8)
+        card_layout.setSpacing(6)
+
+        nombre = family.get("nombre_base", "")
+        tipo_pieza = family.get("tipo_pieza", "")
+        precio_desde = family.get("precio_desde", 0)
+
+        header = QLabel(f"{nombre}")
+        header.setObjectName("guidedGroupBoxTitle")
+        header.setWordWrap(True)
+        card_layout.addWidget(header)
+
+        meta = QLabel(f"{tipo_pieza}  ·  desde ${precio_desde:,.2f}")
+        meta.setObjectName("guidedStepHint")
+        card_layout.addWidget(meta)
+
+        variantes = family.get("variantes", [])
+        flow = QHBoxLayout()
+        flow.setSpacing(6)
+        for v in variantes:
+            sku = v.get("sku", "")
+            talla = v.get("talla", "")
+            stock = v.get("stock_actual", 0)
+            precio = v.get("precio_venta", 0)
+            label = talla or sku
+            btn = QPushButton(f"{label}\n${precio:,.0f} ({stock})")
+            btn.setFixedHeight(48)
+            btn.setMinimumWidth(70)
+            btn.setObjectName("chipButton")
+            btn.setToolTip(f"SKU: {sku}")
+            btn.clicked.connect(lambda checked, s=sku: self._on_search_variant_clicked(s))
+            flow.addWidget(btn)
+        flow.addStretch()
+        card_layout.addLayout(flow)
+        card.setLayout(card_layout)
+        return card
+
+    def _on_search_variant_clicked(self, sku: str) -> None:
+        self._add_quote_item_by_sku(sku, 1)
 
     def _refresh_guided_browser(self) -> None:
         view = build_guided_catalog_view(
