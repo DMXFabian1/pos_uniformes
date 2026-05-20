@@ -58,6 +58,7 @@ class CatalogService:
         garment_type: TipoPrenda | None = None,
         piece_type: TipoPieza | None = None,
     ) -> str:
+        base_name = cls._title_case(base_name)
         suffix_parts = [
             part
             for part in (
@@ -70,6 +71,18 @@ class CatalogService:
         if not suffix_parts:
             return base_name
         return f"{base_name} | {' | '.join(suffix_parts)}"
+
+    @staticmethod
+    def _title_case(text: str) -> str:
+        _LOWERCASE = {"de", "del", "la", "las", "los", "el", "en", "y", "a", "con", "por", "para"}
+        words = text.split()
+        result = []
+        for i, w in enumerate(words):
+            if i > 0 and w.lower() in _LOWERCASE:
+                result.append(w.lower())
+            else:
+                result.append(w.capitalize())
+        return " ".join(result)
 
     @staticmethod
     def _descripcion_categoria(categoria: Categoria) -> str:
@@ -361,7 +374,7 @@ class CatalogService:
         ubicacion: str | None = None,
     ) -> Producto:
         cls._validar_admin(usuario)
-        nombre_base = nombre.strip()
+        nombre_base = cls._title_case(nombre.strip())
         if not nombre_base:
             raise ValueError("El nombre del producto es obligatorio.")
         display_name = cls._build_product_display_name(
@@ -428,7 +441,7 @@ class CatalogService:
         ubicacion: str | None = None,
     ) -> Producto:
         cls._validar_admin(usuario)
-        nombre_base = nombre.strip()
+        nombre_base = cls._title_case(nombre.strip())
         if not nombre_base:
             raise ValueError("El nombre del producto es obligatorio.")
         display_name = cls._build_product_display_name(
