@@ -7503,6 +7503,8 @@ class MainWindow(QMainWindow):
                     pass
 
         print_btn.clicked.connect(_do_print)
+        print_btn.setDefault(True)
+        QShortcut(QKeySequence("Return"), dlg).activated.connect(_do_print)
         dlg.setLayout(dlg_layout)
         dlg.exec()
 
