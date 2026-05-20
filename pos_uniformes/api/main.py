@@ -9,14 +9,30 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from pos_uniformes.api.routers import health, auth, catalog, clients, favorites, quotes, sales
+from pos_uniformes.api.routers import health, auth, catalog, clients, favorites, quotes, sales, search
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Ciclo de vida de la aplicacion."""
-    # Aqui se puede agregar warmup de pool, precarga de cache, etc.
+    _try_meilisearch_warmup()
     yield
+
+
+def _try_meilisearch_warmup() -> None:
+    try:
+        from pos_uniformes.services import meilisearch_service
+        from pos_uniformes.database.connection import get_session
+        if not meilisearch_service.is_available():
+            return
+        meilisearch_service.configure_index()
+        with get_session() as session:
+            count = meilisearch_service.index_from_db(session)
+            if count:
+                import logging
+                logging.getLogger(__name__).info("Meilisearch: %d variantes indexadas al iniciar.", count)
+    except Exception:
+        pass
 
 
 app = FastAPI(
@@ -62,3 +78,4 @@ app.include_router(clients.router)
 app.include_router(favorites.router)
 app.include_router(quotes.router)
 app.include_router(sales.router)
+app.include_router(search.router)

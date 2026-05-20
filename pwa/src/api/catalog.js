@@ -22,4 +22,12 @@ export const catalogApi = {
     if (tipo_pieza_id != null) params.set('tipo_pieza_id', tipo_pieza_id)
     return api.get(`/api/v1/catalog/guided/products?${params}`)
   },
+
+  // ── Búsqueda rápida (Meilisearch) ─────────────────────────────────────────
+  quickSearch: (q, { mode, limit } = {}) => {
+    const params = new URLSearchParams({ q })
+    if (mode)  params.set('mode', mode)
+    if (limit) params.set('limit', limit)
+    return api.get(`/api/v1/search?${params}`)
+  },
 }

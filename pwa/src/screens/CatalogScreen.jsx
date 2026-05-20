@@ -241,6 +241,12 @@ export default function CatalogScreen() {
   const [detail,     setDetail]     = useState(null)
   const searchDebounce = useRef(null)
 
+  // ── Quick search (Meilisearch) dentro del tab guiado ──
+  const [quickQ,          setQuickQ]          = useState('')
+  const [quickResults,    setQuickResults]    = useState(null)
+  const [quickLoading,    setQuickLoading]    = useState(false)
+  const quickDebounce = useRef(null)
+
   // ── Favoritos (API-backed, mismo archivo que el satélite desktop) ──
   const { keys: favKeys, isFav, toggle: toggleFav } = useFavorites()
 
@@ -289,6 +295,20 @@ export default function CatalogScreen() {
   useEffect(() => {
     if (tab === 'search' && !searchData) runSearch('', 1)
   }, [tab]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Quick search debounce
+  useEffect(() => {
+    if (!quickQ.trim()) { setQuickResults(null); return }
+    clearTimeout(quickDebounce.current)
+    quickDebounce.current = setTimeout(() => {
+      setQuickLoading(true)
+      catalogApi.quickSearch(quickQ.trim())
+        .then(data => setQuickResults(data?.families ?? []))
+        .catch(() => setQuickResults(null))
+        .finally(() => setQuickLoading(false))
+    }, 250)
+    return () => clearTimeout(quickDebounce.current)
+  }, [quickQ])
 
   async function openDetail(id) {
     const prod = await catalogApi.get(id).catch(() => null)
@@ -493,8 +513,55 @@ export default function CatalogScreen() {
       {/* ══ TAB: GUIADO ════════════════════════════════════════════════════════ */}
       {tab === 'guided' && (
         <>
-          {/* Breadcrumb */}
-          {crumbs.length > 0 && (
+          {/* Barra de búsqueda rápida */}
+          <div className="bg-white px-4 py-2 border-b border-gray-100 shrink-0">
+            <div className="relative">
+              <input
+                type="search"
+                value={quickQ}
+                onChange={e => setQuickQ(e.target.value)}
+                placeholder="Buscar producto rapido…"
+                className="w-full bg-gray-100 rounded-xl px-4 py-2.5 text-sm outline-none pl-9"
+              />
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+              {quickQ && (
+                <button
+                  onClick={() => { setQuickQ(''); setQuickResults(null) }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg leading-none"
+                >
+                  ×
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Resultados de búsqueda rápida */}
+          {quickQ.trim() && (
+            <div className="flex-1 overflow-y-auto overscroll-contain px-4 py-3 space-y-3">
+              {quickLoading && <Spinner className="py-12" />}
+              {!quickLoading && quickResults && quickResults.length === 0 && (
+                <div className="flex flex-col items-center justify-center py-16 gap-3">
+                  <span className="text-4xl">🔍</span>
+                  <p className="text-gray-500 text-sm text-center">
+                    Sin resultados para "{quickQ}"
+                  </p>
+                </div>
+              )}
+              {!quickLoading && quickResults && quickResults.map(family => (
+                <FamilyCard
+                  key={family.key}
+                  family={family}
+                  onAdd={handleAdd}
+                  addedSku={addedSku}
+                  isFav={isFav(family.key)}
+                  onToggleFav={() => toggleFav(family.key)}
+                />
+              ))}
+            </div>
+          )}
+
+          {/* Breadcrumb (solo visible si no hay búsqueda activa) */}
+          {!quickQ.trim() && crumbs.length > 0 && (
             <div className="bg-white px-4 py-2 border-b border-gray-100 shrink-0">
               <div className="flex items-center gap-1 overflow-x-auto scrollbar-none">
                 <button
@@ -519,10 +586,10 @@ export default function CatalogScreen() {
             </div>
           )}
 
-          {loadingOpts && step === 'mode' && <Spinner className="flex-1" />}
+          {!quickQ.trim() && loadingOpts && step === 'mode' && <Spinner className="flex-1" />}
 
           {/* ── Paso 0: elegir modo ── */}
-          {step === 'mode' && !loadingOpts && (
+          {!quickQ.trim() && step === 'mode' && !loadingOpts && (
             <div className="flex-1 flex flex-col items-center justify-center px-6 gap-4">
               <p className="text-gray-500 text-sm mb-2">¿Qué tipo de productos?</p>
               <div className="w-full grid grid-cols-2 gap-4">
@@ -557,7 +624,7 @@ export default function CatalogScreen() {
           )}
 
           {/* ── Paso 1 (school): elegir nivel ── */}
-          {step === 'nivel' && options && (
+          {!quickQ.trim() && step === 'nivel' && options && (
             <div className="flex-1 min-h-0 py-3">
               <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold px-4 mb-3">
                 Nivel educativo
@@ -571,7 +638,7 @@ export default function CatalogScreen() {
           )}
 
           {/* ── Paso 2 (school): elegir escuela ── */}
-          {step === 'escuela' && nivel && (
+          {!quickQ.trim() && step === 'escuela' && nivel && (
             <div className="flex-1 min-h-0 py-3">
               <p className="text-xs text-gray-400 uppercase tracking-wide font-semibold px-4 mb-3">
                 Escuela — {nivel.nombre}
@@ -584,7 +651,7 @@ export default function CatalogScreen() {
           )}
 
           {/* ── Paso 3+: productos con filtros inline ── */}
-          {step === 'products' && (
+          {!quickQ.trim() && step === 'products' && (
             <div className="flex-1 min-h-0 flex flex-col">
               {/* Filtros */}
               {(products?.tipo_prenda_options?.length > 0

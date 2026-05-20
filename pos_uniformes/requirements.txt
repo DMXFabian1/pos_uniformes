@@ -9,3 +9,4 @@ pywin32>=311; platform_system == "Windows"
 fastapi>=0.111
 uvicorn[standard]>=0.29
 PyJWT>=2.8
+meilisearch>=0.31
