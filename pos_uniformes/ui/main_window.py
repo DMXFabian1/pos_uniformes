@@ -2062,7 +2062,7 @@ class MainWindow(QMainWindow):
         remove_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Delete), self)
         remove_shortcut.activated.connect(self._handle_remove_sale_item)
         clear_capture_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Escape), self)
-        clear_capture_shortcut.activated.connect(self._clear_sale_capture)
+        clear_capture_shortcut.activated.connect(self._handle_escape)
         quick_backup_shortcut = QShortcut(QKeySequence("Ctrl+Shift+B"), self)
         quick_backup_shortcut.activated.connect(self._handle_quick_backup)
         quick_backup_shortcut_mac = QShortcut(QKeySequence("Meta+Shift+B"), self)
@@ -2076,12 +2076,44 @@ class MainWindow(QMainWindow):
         self.sale_sku_input.setFocus()
         self.sale_sku_input.selectAll()
 
+    def _handle_escape(self) -> None:
+        idx = self.tabs.currentIndex() if self.tabs else -1
+        tab_name = self.tabs.tabText(idx) if self.tabs and idx >= 0 else ""
+        if tab_name == "Caja":
+            self._clear_sale_capture()
+        elif tab_name == "Presupuestos":
+            self._clear_quote_capture()
+        elif tab_name == "Catalogo":
+            self._clear_catalog_capture()
+
     def _clear_sale_capture(self) -> None:
         self.sale_sku_input.clear()
         self.sale_qty_spin.setValue(1)
         self.sale_last_scanned_sku = ""
         self.sale_last_scanned_at = 0.0
+        self.sale_client_combo.setCurrentIndex(0)
+        self._refresh_sale_client_display()
+        self._apply_sale_client_selection_ui_state(
+            build_empty_sale_client_selection_ui_state(
+                normalize_discount_value=self._normalize_discount_value,
+                format_discount_label=self._format_discount_label,
+            )
+        )
+        self._refresh_sale_discount_options(selected_discount=Decimal("0.00"))
+        self.sale_seller_employee_code = ""
+        self.sale_seller_employee_display_name = ""
+        self._refresh_sale_origin_ui()
         self._set_sale_feedback("Captura limpia. Puedes escribir o escanear.", "neutral", auto_clear_ms=1200)
+
+    def _clear_quote_capture(self) -> None:
+        self.quote_sku_input.clear()
+        self.quote_qty_spin.setValue(1)
+        self.quote_client_combo.setCurrentIndex(0)
+
+    def _clear_catalog_capture(self) -> None:
+        if hasattr(self, "catalog_search_input"):
+            self.catalog_search_input.clear()
+            self.catalog_search_input.setFocus()
 
     def _apply_role_navigation(self) -> None:
         if self.tabs is None:
