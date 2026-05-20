@@ -4365,7 +4365,7 @@ QLabel#favDialogPriceLabel {
         summary_frame.setLayout(summary_layout)
 
         # --- Tabla agrupada ---
-        columns = ["Producto", "Talla", "Color", "SKU", "", "Precio unit.", "Subtotal", ""]
+        columns = ["Producto", "Talla", "Color", "SKU", "Cant.", "Precio unit.", "Subtotal", ""]
         table = QTableWidget(0, len(columns))
         table.setHorizontalHeaderLabels(columns)
         table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -4432,17 +4432,24 @@ QLabel#favDialogPriceLabel {
                     qty_widget = QWidget()
                     qty_hl = QHBoxLayout()
                     qty_hl.setContentsMargins(2, 2, 2, 2)
-                    qty_hl.setSpacing(2)
+                    qty_hl.setSpacing(4)
+                    _qty_btn_style = (
+                        "QPushButton { background: #e8dfd2; border: 1px solid #c4b9a8;"
+                        " border-radius: 4px; font-size: 14px; font-weight: 700; color: #3a2a1a; }"
+                        "QPushButton:hover { background: #d4c8b6; border-color: #8B5E3C; }"
+                    )
                     minus_btn = QPushButton("−")
-                    minus_btn.setObjectName("sidebarItemRemoveButton")
-                    minus_btn.setFixedSize(24, 24)
+                    minus_btn.setFixedSize(28, 28)
+                    minus_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+                    minus_btn.setStyleSheet(_qty_btn_style)
                     qty_lbl = QLabel(str(qty))
                     qty_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                    qty_lbl.setFixedWidth(28)
-                    qty_lbl.setStyleSheet("font-weight: 600; font-size: 13px;")
+                    qty_lbl.setFixedWidth(30)
+                    qty_lbl.setStyleSheet("font-weight: 700; font-size: 14px; color: #3a2a1a;")
                     plus_btn = QPushButton("+")
-                    plus_btn.setObjectName("sidebarItemRemoveButton")
-                    plus_btn.setFixedSize(24, 24)
+                    plus_btn.setFixedSize(28, 28)
+                    plus_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+                    plus_btn.setStyleSheet(_qty_btn_style)
 
                     def _on_minus(index=original_idx):
                         self._change_sidebar_item_quantity(index, -1)
