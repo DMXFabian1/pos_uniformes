@@ -383,6 +383,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self._guided_detail_widget: QFrame | None = None
         self._search_results_widget: QWidget | None = None
         self._search_results_layout: QVBoxLayout | None = None
+        self._selected_search_btn: _DoubleClickButton | None = None
 
         self.kiosk_scan_input = QLineEdit()
         self.kiosk_qty_spin = QSpinBox()
@@ -2182,17 +2183,23 @@ class QuoteSatelliteWindow(QMainWindow):
             for v in grupo:
                 sku = v.get("sku", "")
                 talla = v.get("talla", "") or sku
-                btn = QPushButton(f"Talla {talla} · ${precio:,.2f}")
+                btn = _DoubleClickButton(f"Talla {talla} · ${precio:,.2f}")
                 btn.setFixedHeight(32)
                 btn.setCursor(Qt.CursorShape.PointingHandCursor)
                 btn.setToolTip(f"SKU: {sku}")
+                btn.setProperty("searchVariantSku", sku)
                 btn.setStyleSheet(
                     "QPushButton { background: #f5f0e8; border: 1px solid #c4b9a8;"
                     " border-radius: 6px; font-size: 12px; color: #3a2a1a;"
                     " padding: 4px 12px; }"
                     "QPushButton:hover { background: #e8dfd2; border-color: #8B5E3C; }"
                 )
-                btn.clicked.connect(lambda checked, s=sku: self._on_search_variant_select(s))
+                btn.clicked.connect(lambda checked, s=sku, b=btn: self._on_search_variant_select(s, b))
+
+                def _on_dbl(sku=sku):
+                    self._on_search_variant_select(sku)
+                    self._add_quote_item_by_sku(sku, 1)
+                btn.double_clicked.connect(_on_dbl)
                 flow.addWidget(btn)
             flow_container = QWidget()
             flow_container.setLayout(flow)
@@ -2207,9 +2214,27 @@ class QuoteSatelliteWindow(QMainWindow):
     def _exit_search_mode(self) -> None:
         self._search_results_widget.setVisible(False)
         self._guided_steps_widget.setVisible(True)
+        self._selected_search_btn = None
 
-    def _on_search_variant_select(self, sku: str) -> None:
-        """Single click — selecciona variante, muestra en detail card (igual que flujo guiado)."""
+    def _on_search_variant_select(self, sku: str, btn: _DoubleClickButton | None = None) -> None:
+        """Single click — selecciona variante con highlight naranja + detail card."""
+        # Quitar highlight del botón anterior
+        if self._selected_search_btn is not None:
+            self._selected_search_btn.setStyleSheet(
+                "QPushButton { background: #f5f0e8; border: 1px solid #c4b9a8;"
+                " border-radius: 6px; font-size: 12px; color: #3a2a1a;"
+                " padding: 4px 12px; }"
+                "QPushButton:hover { background: #e8dfd2; border-color: #8B5E3C; }"
+            )
+        # Aplicar highlight naranja al botón clickeado
+        if btn is not None:
+            btn.setStyleSheet(
+                "QPushButton { background: #C97B3A; border: 1px solid #8B5E3C;"
+                " border-radius: 6px; font-size: 12px; color: #FFFFFF;"
+                " padding: 4px 12px; font-weight: bold; }"
+            )
+            self._selected_search_btn = btn
+
         self._gfs.sku = sku
         row = next((item for item in self.catalog_snapshot_rows if str(item.get("sku")) == sku), None)
         self._apply_guided_detail(row)
