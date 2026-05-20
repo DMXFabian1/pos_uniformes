@@ -1,10 +1,16 @@
-"""Diálogo de ingreso a caja de bodega — escaneo uno a uno con acumulación."""
+"""Diálogo de ingreso a caja de bodega — escaneo uno a uno con acumulación.
+
+Usa Meilisearch para búsqueda tolerante a typos con fallback a ILIKE.
+"""
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QEvent, QTimer, Qt
+import logging
+
+from PyQt6.QtCore import QEvent, QStringListModel, QTimer, Qt
 from PyQt6.QtGui import QColor, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
+    QCompleter,
     QDialog,
     QDialogButtonBox,
     QFrame,
@@ -26,6 +32,8 @@ from sqlalchemy.orm import joinedload
 from pos_uniformes.database.connection import get_session
 from pos_uniformes.database.models import Producto, Variante
 from pos_uniformes.services.bodega_service import BodegaService
+
+logger = logging.getLogger(__name__)
 
 
 class _IngresoRow:
@@ -52,6 +60,12 @@ class BodegaIngresoDialog(QDialog):
         self._feedback_timer.setSingleShot(True)
         self._feedback_timer.setInterval(1200)
         self._feedback_timer.timeout.connect(self._reset_feedback)
+
+        self._suggest_timer = QTimer(self)
+        self._suggest_timer.setSingleShot(True)
+        self._suggest_timer.setInterval(150)
+        self._suggest_timer.timeout.connect(self._update_suggestions)
+
         self.setWindowTitle("Agregar producto a caja")
         self.setModal(True)
         self.resize(820, 600)
@@ -208,6 +222,17 @@ class BodegaIngresoDialog(QDialog):
         self.setLayout(outer)
 
         self.table.itemSelectionChanged.connect(self._refresh_action_state)
+
+        # ─── Completer Meilisearch ───────────────────────────────────────
+        self._completer_model = QStringListModel()
+        self._completer = QCompleter(self._completer_model, self)
+        self._completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
+        self._completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        self._completer.setMaxVisibleItems(8)
+        self._completer.activated.connect(self._on_completer_activated)
+        self.sku_input.setCompleter(self._completer)
+        self.sku_input.textChanged.connect(self._on_text_changed)
+
         self.sku_input.setFocus()
 
     # ─── Scan / lookup ───────────────────────────────────────────────────
@@ -244,6 +269,60 @@ class BodegaIngresoDialog(QDialog):
                 self.sku_input.setFocus()
                 return
 
+            # ── Meilisearch → variante IDs, fallback a ILIKE ──
+            meili_variante_ids: list[int] | None = None
+            try:
+                from pos_uniformes.services import meilisearch_service
+                if meilisearch_service.is_available():
+                    hits = meilisearch_service.search(text, limit=200)
+                    if hits:
+                        meili_variante_ids = [int(h["id"]) for h in hits if h.get("id")]
+            except Exception:
+                logger.debug("Meilisearch no disponible, fallback a ILIKE")
+
+            if meili_variante_ids:
+                # Cargar variantes encontradas por Meilisearch
+                variantes = list(session.scalars(
+                    select(Variante)
+                    .options(joinedload(Variante.producto))
+                    .where(Variante.id.in_(meili_variante_ids), Variante.activo.is_(True))
+                    .order_by(Variante.talla)
+                ).unique().all())
+
+                # Filtro local para refinar (ej. "gales verde" → solo verde)
+                terms = text.lower().split()
+                filtered: list[Variante] = []
+                for v in variantes:
+                    searchable = " ".join([
+                        v.sku or "", v.producto.nombre if v.producto else "",
+                        v.talla or "", v.color or "",
+                    ]).lower()
+                    if all(t in searchable for t in terms):
+                        filtered.append(v)
+                variantes = filtered or variantes  # si filtro vacía todo, usa Meilisearch puro
+
+                added = 0
+                for v in variantes:
+                    if any(r.variante_id == v.id for r in self._rows):
+                        continue
+                    en_bodega = BodegaService._total_en_bodega_para_variante(session, v.id)
+                    row = _IngresoRow(v, en_bodega)
+                    if row.disponible > 0:
+                        self._rows.append(row)
+                        added += 1
+
+                engine = "Meilisearch"
+                if added:
+                    self._refresh_table()
+                    self._set_feedback(f"{added} variantes cargadas ({engine}) — ajusta cantidades", "success")
+                else:
+                    self._set_feedback(f"Sin stock disponible para bodega ({engine})", "warning")
+
+                self.sku_input.clear()
+                self.sku_input.setFocus()
+                return
+
+            # ── Fallback: ILIKE en nombre de producto ──
             pattern = f"%{text}%"
             productos = list(session.scalars(
                 select(Producto)
@@ -289,7 +368,7 @@ class BodegaIngresoDialog(QDialog):
 
             if added:
                 self._refresh_table()
-                self._set_feedback(f"{producto.nombre}: {added} tallas cargadas — ajusta cantidades", "success")
+                self._set_feedback(f"{producto.nombre}: {added} tallas cargadas (local) — ajusta cantidades", "success")
             else:
                 self._set_feedback(f"{producto.nombre}: todas las tallas ya están en bodega", "warning")
 
@@ -316,6 +395,38 @@ class BodegaIngresoDialog(QDialog):
         self._rows.append(row)
         self._refresh_table()
         self._set_feedback(f"{row.sku} · {row.producto} {row.talla} — 1 pz", "success")
+
+    # ─── Meilisearch suggestions ───────────────────────────────────────────
+
+    def _on_text_changed(self, text: str) -> None:
+        if text.strip() and len(text.strip()) >= 2:
+            self._suggest_timer.start()
+
+    def _update_suggestions(self) -> None:
+        query = self.sku_input.text().strip()
+        if not query or len(query) < 2:
+            return
+        try:
+            from pos_uniformes.services import meilisearch_service
+            if not meilisearch_service.is_available():
+                return
+            hits = meilisearch_service.search(query, limit=20)
+            names: list[str] = []
+            seen: set[str] = set()
+            for h in hits:
+                label = f"{h.get('sku', '')} — {h.get('nombre_base', '')} {h.get('talla', '')} {h.get('color', '')}".strip()
+                if label and label not in seen:
+                    seen.add(label)
+                    names.append(label)
+            self._completer_model.setStringList(names)
+        except Exception:
+            pass
+
+    def _on_completer_activated(self, text: str) -> None:
+        # El completer muestra "SKU — Nombre Talla Color", extraer SKU
+        sku = text.split("—")[0].strip() if "—" in text else text.strip()
+        self.sku_input.setText(sku)
+        self._handle_scan()
 
     # ─── Table rendering ─────────────────────────────────────────────────
 
