@@ -7525,7 +7525,7 @@ class MainWindow(QMainWindow):
                         variante = VentaService.obtener_variante_por_sku(session, sku)
                         if variante is None:
                             continue
-                        result = render_inventory_label(session, variante.id, mode="continuous", requested_copies=1)
+                        result = render_inventory_label(session, variante.id, mode="standard", requested_copies=1)
                     self._print_image_path(
                         result.image_path,
                         title=f"Etiqueta {sku}",
