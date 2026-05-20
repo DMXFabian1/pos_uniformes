@@ -234,6 +234,39 @@ def is_available() -> bool:
     return _get_client() is not None
 
 
+def _ensure_vcruntime(on_progress: Any = None) -> None:
+    """Instala VC++ Redistributable si VCRUNTIME140.dll no existe."""
+    import ctypes.util
+    import os
+    import subprocess
+    import urllib.request
+    from pathlib import Path
+
+    sys_dir = Path(os.environ.get("SYSTEMROOT", r"C:\Windows")) / "System32"
+    if (sys_dir / "vcruntime140.dll").exists():
+        return
+
+    if on_progress:
+        on_progress("Instalando Visual C++ Runtime...")
+
+    vc_url = "https://aka.ms/vs/17/release/vc_redist.x64.exe"
+    tmp_path = Path(os.environ.get("TEMP", r"C:\Temp")) / "vc_redist.x64.exe"
+    try:
+        urllib.request.urlretrieve(vc_url, str(tmp_path))
+        subprocess.run(
+            [str(tmp_path), "/install", "/quiet", "/norestart"],
+            timeout=120,
+            check=False,
+        )
+    except Exception as exc:
+        logger.warning("No se pudo instalar VC++ Runtime: %s", exc)
+    finally:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+
 def ensure_installed(
     *,
     install_dir: str = "C:\\Meilisearch",
@@ -256,29 +289,31 @@ def ensure_installed(
     if is_available():
         return "Meilisearch ya está corriendo."
 
-    # Check if process is running but we couldn't connect (rare)
+    _ensure_vcruntime(on_progress)
+
+    def _start(bin_: Path) -> bool:
+        subprocess.Popen(
+            [str(bin_), "--no-analytics", "--db-path", str(data_dir), "--http-addr", f"127.0.0.1:{port}"],
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        import time
+        time.sleep(3)
+        global _client, _client_checked_at
+        _client = None
+        _client_checked_at = 0
+        return is_available()
+
     if bin_path.exists():
-        # Try starting it
         if on_progress:
             on_progress("Iniciando Meilisearch...")
         try:
-            subprocess.Popen(
-                [str(bin_path), "--no-analytics", "--db-path", str(data_dir), "--http-addr", f"127.0.0.1:{port}"],
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
-            import time
-            time.sleep(3)
-            global _client, _client_checked_at
-            _client = None
-            _client_checked_at = 0
-            if is_available():
+            if _start(bin_path):
                 return "Meilisearch iniciado."
         except Exception as exc:
             logger.warning("No se pudo iniciar Meilisearch: %s", exc)
 
-    # Download
     if on_progress:
         on_progress("Descargando Meilisearch...")
     url = f"https://github.com/meilisearch/meilisearch/releases/download/{version}/meilisearch-windows-amd64.exe"
@@ -291,21 +326,10 @@ def ensure_installed(
     except Exception as exc:
         return f"Error descargando: {exc}"
 
-    # Start
     if on_progress:
         on_progress("Iniciando Meilisearch...")
     try:
-        subprocess.Popen(
-            [str(bin_path), "--no-analytics", "--db-path", str(data_dir), "--http-addr", f"127.0.0.1:{port}"],
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        import time
-        time.sleep(3)
-        _client = None
-        _client_checked_at = 0
-        if is_available():
+        if _start(bin_path):
             return "Meilisearch instalado e iniciado."
         return "Meilisearch instalado pero no responde aún. Reintenta en unos segundos."
     except Exception as exc:
