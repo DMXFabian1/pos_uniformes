@@ -1863,16 +1863,15 @@ class QuoteSatelliteWindow(QMainWindow):
         search_text = self.catalog_search_input.text().strip()
         source_rows = self.catalog_snapshot_rows
 
-        # Búsqueda inteligente con Meilisearch (tolerante a typos)
+        # Búsqueda inteligente con Meilisearch (pre-filtra por relevancia, luego filtro local refina)
         if search_text:
             try:
                 from pos_uniformes.services import meilisearch_service
                 if meilisearch_service.is_available():
-                    hits = meilisearch_service.search(search_text, limit=200)
+                    hits = meilisearch_service.search(search_text, limit=500)
                     if hits:
                         hit_skus = {str(h.get("sku", "")) for h in hits}
                         source_rows = [r for r in self.catalog_snapshot_rows if str(r.get("sku", "")) in hit_skus]
-                        search_text = ""  # ya filtrado por Meilisearch, no filtrar de nuevo
             except Exception:
                 pass  # fallback al filtro local
 
