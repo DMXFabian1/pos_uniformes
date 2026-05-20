@@ -4,15 +4,20 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QFrame,
+    QGroupBox,
+    QHBoxLayout,
     QLabel,
     QLineEdit,
     QSpinBox,
     QCheckBox,
+    QVBoxLayout,
 )
 from sqlalchemy import select
 
@@ -173,11 +178,73 @@ def build_catalog_variant_dialog(
     else:
         sku_hint.setText("Completa producto, talla y color para sugerir un SKU.")
 
-    form.addRow("Producto", producto_combo)
-    form.addRow("SKU", sku_input)
-    form.addRow("", sku_hint)
-    form.addRow("Talla", talla_combo)
-    form.addRow("Color", color_combo)
+    _section_title_style = "font-size: 13px; font-weight: 700; color: #6B4226; padding: 2px 0;"
+    _field_style = (
+        "QLineEdit, QComboBox, QSpinBox { padding: 6px 10px; font-size: 13px;"
+        " border: 1px solid #d5c9b9; border-radius: 6px; background: #fffaf2; }"
+        "QLineEdit:focus, QComboBox:focus, QSpinBox:focus { border-color: #87492c; }"
+    )
+    dialog.setStyleSheet(dialog.styleSheet() + _field_style)
+
+    # ── Sección 1: Producto ──
+    product_box = QGroupBox("Producto")
+    product_box.setStyleSheet("QGroupBox { font-weight: 700; color: #6B4226; }")
+    product_form = QFormLayout()
+    product_form.setSpacing(8)
+    product_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+    product_form.addRow("Producto base", producto_combo)
+    product_box.setLayout(product_form)
+
+    # ── Sección 2: Identificación ──
+    id_box = QGroupBox("Identificacion")
+    id_box.setStyleSheet("QGroupBox { font-weight: 700; color: #6B4226; }")
+    id_form = QFormLayout()
+    id_form.setSpacing(8)
+    id_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+    id_form.addRow("SKU", sku_input)
+    sku_hint.setStyleSheet("font-size: 11px; color: #8a7a6a; padding-left: 4px;")
+    id_form.addRow("", sku_hint)
+
+    # Talla y Color en la misma fila
+    size_color_row = QHBoxLayout()
+    size_color_row.setSpacing(12)
+    talla_label = QLabel("Talla")
+    talla_label.setStyleSheet("font-size: 13px; color: #3a2a1a;")
+    color_label = QLabel("Color")
+    color_label.setStyleSheet("font-size: 13px; color: #3a2a1a;")
+    talla_combo.setMinimumWidth(120)
+    color_combo.setMinimumWidth(140)
+    size_color_row.addWidget(talla_label)
+    size_color_row.addWidget(talla_combo, 1)
+    size_color_row.addSpacing(8)
+    size_color_row.addWidget(color_label)
+    size_color_row.addWidget(color_combo, 1)
+    id_form.addRow(size_color_row)
+    id_box.setLayout(id_form)
+
+    # ── Sección 3: Precios ──
+    price_box = QGroupBox("Precios")
+    price_box.setStyleSheet("QGroupBox { font-weight: 700; color: #6B4226; }")
+    price_form = QFormLayout()
+    price_form.setSpacing(8)
+    price_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
+    precio_input.setPlaceholderText("0.00")
+    costo_input.setPlaceholderText("Opcional")
+    price_row = QHBoxLayout()
+    price_row.setSpacing(12)
+    pv_label = QLabel("Precio venta")
+    pv_label.setStyleSheet("font-size: 13px; color: #3a2a1a;")
+    cr_label = QLabel("Costo ref.")
+    cr_label.setStyleSheet("font-size: 13px; color: #3a2a1a;")
+    price_row.addWidget(pv_label)
+    price_row.addWidget(precio_input, 1)
+    price_row.addSpacing(8)
+    price_row.addWidget(cr_label)
+    price_row.addWidget(costo_input, 1)
+    price_form.addRow(price_row)
+    price_box.setLayout(price_form)
+
+    # ── Sección 4: Stock ──
     stock_minimo_spin = QSpinBox()
     stock_minimo_spin.setRange(1, 10000)
     stock_minimo_enabled = QCheckBox("Definir mínimo")
@@ -199,13 +266,21 @@ def build_catalog_variant_dialog(
 
     stock_minimo_enabled.toggled.connect(_on_minimo_toggled)
 
-    form.addRow("Precio venta", precio_input)
-    form.addRow("Costo referencia", costo_input)
+    stock_box = QGroupBox("Stock")
+    stock_box.setStyleSheet("QGroupBox { font-weight: 700; color: #6B4226; }")
+    stock_form = QFormLayout()
+    stock_form.setSpacing(8)
+    stock_form.setLabelAlignment(Qt.AlignmentFlag.AlignRight)
     if include_stock:
-        form.addRow("Stock inicial", stock_spin)
-    if not include_stock:
-        form.addRow("Stock mínimo", stock_minimo_enabled)
-        form.addRow("", stock_minimo_spin)
+        stock_form.addRow("Stock inicial", stock_spin)
+    else:
+        stock_min_row = QHBoxLayout()
+        stock_min_row.setSpacing(8)
+        stock_min_row.addWidget(stock_minimo_enabled)
+        stock_min_row.addWidget(stock_minimo_spin)
+        stock_min_row.addStretch()
+        stock_form.addRow(stock_min_row)
+    stock_box.setLayout(stock_form)
 
     producto_combo.currentIndexChanged.connect(lambda _: refresh_sku_suggestion())
     talla_combo.currentTextChanged.connect(lambda _: refresh_sku_suggestion())
@@ -217,7 +292,11 @@ def build_catalog_variant_dialog(
     buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
     buttons.accepted.connect(dialog.accept)
     buttons.rejected.connect(dialog.reject)
-    layout.addLayout(form)
+    layout.addWidget(product_box)
+    layout.addWidget(id_box)
+    layout.addWidget(price_box)
+    layout.addWidget(stock_box)
+    layout.addStretch()
     layout.addWidget(buttons)
     if dialog.exec() != int(QDialog.DialogCode.Accepted):
         return None
