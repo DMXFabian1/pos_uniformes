@@ -658,7 +658,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.catalog_include_general_combo.addItem("Escuela + extras generales", "include_general")
         self.catalog_include_general_combo.addItem("Solo escuela", "school_only")
         self.catalog_include_general_combo.addItem("Solo generales", "general_only")
-        self.catalog_include_general_combo.setCurrentIndex(1)
+        self.catalog_include_general_combo.setCurrentIndex(0)
         self.catalog_school_combo.addItem("Todas las escuelas", "")
         self.catalog_status_label.setVisible(False)
         self.catalog_active_filters_wrap.setVisible(False)
