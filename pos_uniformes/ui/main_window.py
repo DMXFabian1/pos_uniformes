@@ -2067,6 +2067,10 @@ class MainWindow(QMainWindow):
         quick_backup_shortcut.activated.connect(self._handle_quick_backup)
         quick_backup_shortcut_mac = QShortcut(QKeySequence("Meta+Shift+B"), self)
         quick_backup_shortcut_mac.activated.connect(self._handle_quick_backup)
+        quick_search_shortcut = QShortcut(QKeySequence("Ctrl+S"), self)
+        quick_search_shortcut.activated.connect(self._open_quick_product_search)
+        quick_search_shortcut_mac = QShortcut(QKeySequence("Meta+S"), self)
+        quick_search_shortcut_mac.activated.connect(self._open_quick_product_search)
 
     def _focus_sale_capture(self) -> None:
         self.sale_sku_input.setFocus()
@@ -7392,6 +7396,20 @@ class MainWindow(QMainWindow):
         self.sale_status_label.style().unpolish(self.sale_status_label)
         self.sale_status_label.style().polish(self.sale_status_label)
         self.sale_status_label.update()
+
+    def _open_quick_product_search(self) -> None:
+        from pos_uniformes.ui.dialogs.quick_product_search_dialog import QuickProductSearchDialog
+
+        catalog_rows = self._load_catalog_snapshot_rows()
+        dialog = QuickProductSearchDialog(self, catalog_rows=catalog_rows)
+
+        def _on_sku_selected(sku: str, qty: int) -> None:
+            for _ in range(qty):
+                self.sale_sku_input.setText(sku)
+                self._handle_add_sale_item()
+
+        dialog.sku_selected.connect(_on_sku_selected)
+        dialog.exec()
 
     def _handle_add_sale_item(self) -> None:
         raw_input = self.sale_sku_input.text().strip()
