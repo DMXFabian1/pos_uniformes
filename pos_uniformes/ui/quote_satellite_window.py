@@ -1860,12 +1860,28 @@ class QuoteSatelliteWindow(QMainWindow):
             effective_school_filter = "General"
             include_general = False
 
+        search_text = self.catalog_search_input.text().strip()
+        source_rows = self.catalog_snapshot_rows
+
+        # Búsqueda inteligente con Meilisearch (tolerante a typos)
+        if search_text:
+            try:
+                from pos_uniformes.services import meilisearch_service
+                if meilisearch_service.is_available():
+                    hits = meilisearch_service.search(search_text, limit=200)
+                    if hits:
+                        hit_skus = {str(h.get("sku", "")) for h in hits}
+                        source_rows = [r for r in self.catalog_snapshot_rows if str(r.get("sku", "")) in hit_skus]
+                        search_text = ""  # ya filtrado por Meilisearch, no filtrar de nuevo
+            except Exception:
+                pass  # fallback al filtro local
+
         rows, summary = build_quote_catalog_browser(
-            snapshot_rows=self.catalog_snapshot_rows,
+            snapshot_rows=source_rows,
             level_filter=str(self.catalog_level_combo.currentData() or ""),
             school_filter=effective_school_filter,
             include_general=include_general,
-            search_text=self.catalog_search_input.text(),
+            search_text=search_text,
         )
         pagination_view = build_catalog_pagination_view(
             list(rows),
