@@ -10,7 +10,6 @@ from PyQt6.QtWidgets import (
     QApplication,
     QComboBox,
     QDialog,
-    QDialogButtonBox,
     QFormLayout,
     QGridLayout,
     QGroupBox,
@@ -90,13 +89,16 @@ def build_users_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_users_table.horizontalHeader().setStretchLastSection(True)
     window.settings_users_table.itemDoubleClicked.connect(window._handle_edit_user)
 
-    close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-    close_buttons.rejected.connect(dialog.reject)
-    close_buttons.accepted.connect(dialog.accept)
     layout.addWidget(window.settings_users_status_label)
     layout.addLayout(actions)
-    layout.addWidget(window.settings_users_table)
-    layout.addWidget(close_buttons)
+    layout.addWidget(window.settings_users_table, 1)
+    footer = QHBoxLayout()
+    footer.addStretch()
+    close_btn = QPushButton("Cerrar")
+    close_btn.setObjectName("toolbarGhostButton")
+    close_btn.clicked.connect(dialog.reject)
+    footer.addWidget(close_btn)
+    layout.addLayout(footer)
     return dialog
 
 
@@ -136,13 +138,16 @@ def build_suppliers_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_suppliers_table.setMinimumHeight(320)
     window.settings_suppliers_table.horizontalHeader().setStretchLastSection(True)
 
-    close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-    close_buttons.rejected.connect(dialog.reject)
-    close_buttons.accepted.connect(dialog.accept)
     layout.addWidget(window.settings_suppliers_status_label)
     layout.addLayout(actions)
     layout.addWidget(window.settings_suppliers_table)
-    layout.addWidget(close_buttons)
+    footer = QHBoxLayout()
+    footer.addStretch()
+    close_btn = QPushButton("Cerrar")
+    close_btn.setObjectName("toolbarGhostButton")
+    close_btn.clicked.connect(dialog.reject)
+    footer.addWidget(close_btn)
+    layout.addLayout(footer)
     return dialog
 
 
@@ -187,13 +192,16 @@ def build_clients_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_clients_table.setMinimumHeight(340)
     window.settings_clients_table.horizontalHeader().setStretchLastSection(True)
 
-    close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-    close_buttons.rejected.connect(dialog.reject)
-    close_buttons.accepted.connect(dialog.accept)
     layout.addWidget(window.settings_clients_status_label)
     layout.addLayout(actions)
     layout.addWidget(window.settings_clients_table)
-    layout.addWidget(close_buttons)
+    footer = QHBoxLayout()
+    footer.addStretch()
+    close_btn = QPushButton("Cerrar")
+    close_btn.setObjectName("toolbarGhostButton")
+    close_btn.clicked.connect(dialog.reject)
+    footer.addWidget(close_btn)
+    layout.addLayout(footer)
     return dialog
 
 
@@ -312,13 +320,16 @@ def build_employees_settings_dialog(window: "MainWindow") -> QDialog:
     content_layout.addWidget(window.settings_employees_table, 3)
     content_layout.addWidget(detail_box, 2)
 
-    close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-    close_buttons.rejected.connect(dialog.reject)
-    close_buttons.accepted.connect(dialog.accept)
     layout.addWidget(window.settings_employees_status_label)
     layout.addLayout(actions)
     layout.addLayout(content_layout)
-    layout.addWidget(close_buttons)
+    footer = QHBoxLayout()
+    footer.addStretch()
+    close_btn = QPushButton("Cerrar")
+    close_btn.setObjectName("toolbarGhostButton")
+    close_btn.clicked.connect(dialog.reject)
+    footer.addWidget(close_btn)
+    layout.addLayout(footer)
     return dialog
 
 
@@ -357,12 +368,15 @@ def build_employee_day_sales_dialog(window: "MainWindow") -> QDialog:
     actions.addWidget(window.settings_employee_day_sales_status_label, 1)
     actions.addWidget(window.settings_employee_view_ticket_button)
 
-    close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-    close_buttons.rejected.connect(dialog.reject)
-    close_buttons.accepted.connect(dialog.accept)
     layout.addLayout(actions)
     layout.addWidget(window.settings_employee_day_sales_table, 1)
-    layout.addWidget(close_buttons)
+    footer = QHBoxLayout()
+    footer.addStretch()
+    close_btn = QPushButton("Cerrar")
+    close_btn.setObjectName("toolbarGhostButton")
+    close_btn.clicked.connect(dialog.reject)
+    footer.addWidget(close_btn)
+    layout.addLayout(footer)
     return dialog
 
 
@@ -389,12 +403,15 @@ def build_employee_sale_detail_dialog(window: "MainWindow") -> QDialog:
     )
     window.settings_employee_sale_detail_table.horizontalHeader().setStretchLastSection(True)
 
-    close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-    close_buttons.rejected.connect(dialog.reject)
-    close_buttons.accepted.connect(dialog.accept)
     layout.addWidget(window.settings_employee_sale_detail_status_label)
     layout.addWidget(window.settings_employee_sale_detail_table, 1)
-    layout.addWidget(close_buttons)
+    footer = QHBoxLayout()
+    footer.addStretch()
+    close_btn = QPushButton("Cerrar")
+    close_btn.setObjectName("toolbarGhostButton")
+    close_btn.clicked.connect(dialog.reject)
+    footer.addWidget(close_btn)
+    layout.addLayout(footer)
     return dialog
 
 
@@ -839,16 +856,19 @@ def build_marketing_settings_dialog(window: "MainWindow") -> QDialog:
     actions.addWidget(window.settings_marketing_save_button)
     actions.addStretch()
 
-    close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-    close_buttons.rejected.connect(dialog.reject)
-    close_buttons.accepted.connect(dialog.accept)
     layout.addWidget(window.settings_marketing_status_label)
     layout.addWidget(rules_box)
     layout.addWidget(discounts_box)
     layout.addWidget(summary_box)
     layout.addWidget(note)
     layout.addLayout(actions)
-    layout.addWidget(close_buttons)
+    footer = QHBoxLayout()
+    footer.addStretch()
+    close_btn = QPushButton("Cerrar")
+    close_btn.setObjectName("toolbarGhostButton")
+    close_btn.clicked.connect(dialog.reject)
+    footer.addWidget(close_btn)
+    layout.addLayout(footer)
     return dialog
 
 
@@ -908,16 +928,19 @@ def build_backup_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_backup_table.setMinimumHeight(280)
     window.settings_backup_table.horizontalHeader().setStretchLastSection(True)
 
-    close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-    close_buttons.rejected.connect(dialog.reject)
-    close_buttons.accepted.connect(dialog.accept)
     layout.addWidget(backup_hint)
     layout.addWidget(automatic_box)
     layout.addWidget(window.settings_backup_status_label)
     layout.addWidget(window.settings_backup_location_label)
     layout.addLayout(backup_actions)
     layout.addWidget(window.settings_backup_table)
-    layout.addWidget(close_buttons)
+    footer = QHBoxLayout()
+    footer.addStretch()
+    close_btn = QPushButton("Cerrar")
+    close_btn.setObjectName("toolbarGhostButton")
+    close_btn.clicked.connect(dialog.reject)
+    footer.addWidget(close_btn)
+    layout.addLayout(footer)
     return dialog
 
 
@@ -1001,14 +1024,17 @@ def build_cash_history_settings_dialog(window: "MainWindow") -> QDialog:
     movements_layout.addWidget(window.settings_cash_history_movements_table)
     movements_box.setLayout(movements_layout)
 
-    close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-    close_buttons.rejected.connect(dialog.reject)
-    close_buttons.accepted.connect(dialog.accept)
     layout.addWidget(window.settings_cash_history_status_label)
     layout.addLayout(actions)
     layout.addWidget(window.settings_cash_history_table)
     layout.addWidget(movements_box)
-    layout.addWidget(close_buttons)
+    footer = QHBoxLayout()
+    footer.addStretch()
+    close_btn = QPushButton("Cerrar")
+    close_btn.setObjectName("toolbarGhostButton")
+    close_btn.clicked.connect(dialog.reject)
+    footer.addWidget(close_btn)
+    layout.addLayout(footer)
     return dialog
 
 
@@ -1064,15 +1090,18 @@ def build_catalog_sync_settings_dialog(window: "MainWindow") -> QDialog:
         window.settings_catalog_sync_table.EditTrigger.NoEditTriggers
     )
 
-    close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-    close_buttons.rejected.connect(dialog.reject)
-    close_buttons.accepted.connect(dialog.accept)
 
     layout.addLayout(path_row)
     layout.addLayout(actions_row)
     layout.addWidget(window.settings_catalog_sync_status_label)
     layout.addWidget(window.settings_catalog_sync_table)
-    layout.addWidget(close_buttons)
+    footer = QHBoxLayout()
+    footer.addStretch()
+    close_btn = QPushButton("Cerrar")
+    close_btn.setObjectName("toolbarGhostButton")
+    close_btn.clicked.connect(dialog.reject)
+    footer.addWidget(close_btn)
+    layout.addLayout(footer)
     return dialog
 
 
@@ -1122,10 +1151,14 @@ def build_employee_ranking_dialog(window: "MainWindow") -> QDialog:
     header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
     header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
 
-    close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-    close_buttons.rejected.connect(dialog.reject)
     layout.addLayout(toolbar)
     layout.addWidget(window.settings_employee_ranking_status_label)
     layout.addWidget(window.settings_employee_ranking_table, 1)
-    layout.addWidget(close_buttons)
+    footer = QHBoxLayout()
+    footer.addStretch()
+    close_btn = QPushButton("Cerrar")
+    close_btn.setObjectName("toolbarGhostButton")
+    close_btn.clicked.connect(dialog.reject)
+    footer.addWidget(close_btn)
+    layout.addLayout(footer)
     return dialog
