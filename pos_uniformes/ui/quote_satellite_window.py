@@ -735,19 +735,7 @@ class QuoteSatelliteWindow(QMainWindow):
 
         layout.addWidget(browser_box, 1)
         layout.addWidget(detail_box)
-
-        content_widget = QWidget()
-        content_widget.setLayout(layout)
-
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setWidget(content_widget)
-
-        page_layout = QVBoxLayout()
-        page_layout.setContentsMargins(0, 0, 0, 0)
-        page_layout.addWidget(scroll)
-        page.setLayout(page_layout)
+        page.setLayout(layout)
         return page
 
     def _build_search_page(self) -> QWidget:
