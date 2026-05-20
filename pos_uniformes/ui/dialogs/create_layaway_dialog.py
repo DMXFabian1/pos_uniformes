@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QDialogButtonBox,
     QDoubleSpinBox,
     QFormLayout,
+    QGroupBox,
     QHBoxLayout,
     QLabel,
     QLineEdit,
@@ -23,6 +24,7 @@ from PyQt6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
+    QVBoxLayout,
 )
 
 from pos_uniformes.database.connection import get_session
@@ -63,17 +65,17 @@ def build_create_layaway_dialog(
 ) -> dict[str, object] | None:
     dialog, layout = window._create_modal_dialog(
         "Nuevo apartado",
-        "Agrega una o varias presentaciones y registra el anticipo inicial del apartado.",
+        "Selecciona un cliente, agrega presentaciones y registra el anticipo.",
         width=760,
     )
-    form = QFormLayout()
+
+    # ── Seccion 1: Cliente ──
+    client_box = QGroupBox("1. Cliente")
+    client_box.setObjectName("infoCard")
+    client_layout = QFormLayout()
+    client_layout.setSpacing(8)
+
     client_selector = QComboBox()
-    client_selector.addItem("Manual / sin cliente", None)
-    customer_input = QLineEdit()
-    customer_input.setPlaceholderText("Nombre del cliente")
-    phone_input = QLineEdit()
-    phone_input.setPlaceholderText("Telefono")
-    last_autofill = {"nombre": "", "telefono": ""}
     try:
         with get_session() as session:
             for client in [item for item in ClientService.list_clients(session) if item.activo]:
@@ -88,25 +90,36 @@ def build_create_layaway_dialog(
     except Exception:
         pass
 
+    if client_selector.count() == 0:
+        client_selector.addItem("Sin clientes registrados", None)
+
+    client_name_label = QLabel("")
+    client_name_label.setObjectName("subtleLine")
+    client_phone_label = QLabel("")
+    client_phone_label.setObjectName("subtleLine")
+
     def sync_selected_client() -> None:
-        nonlocal last_autofill
         selected_client = client_selector.currentData()
         if isinstance(selected_client, dict):
-            nombre = str(selected_client.get("nombre", "")).strip()
-            telefono = str(selected_client.get("telefono", "")).strip()
-            customer_input.setText(nombre)
-            phone_input.setText(telefono)
-            last_autofill = {"nombre": nombre, "telefono": telefono}
-            return
-        if customer_input.text().strip() == last_autofill["nombre"]:
-            customer_input.clear()
-        if phone_input.text().strip() == last_autofill["telefono"]:
-            phone_input.clear()
-        last_autofill = {"nombre": "", "telefono": ""}
+            client_name_label.setText(str(selected_client.get("nombre", "")))
+            client_phone_label.setText(str(selected_client.get("telefono", "") or "Sin telefono"))
+        else:
+            client_name_label.setText("")
+            client_phone_label.setText("")
 
-    form.addRow("Cliente guardado", client_selector)
-    form.addRow("Cliente", customer_input)
-    form.addRow("Telefono", phone_input)
+    client_selector.currentIndexChanged.connect(lambda: sync_selected_client())
+    sync_selected_client()
+
+    client_layout.addRow("Cliente", client_selector)
+    client_layout.addRow("Nombre", client_name_label)
+    client_layout.addRow("Telefono", client_phone_label)
+    client_box.setLayout(client_layout)
+
+    # ── Seccion 2: Productos ──
+    products_box = QGroupBox("2. Presentaciones")
+    products_box.setObjectName("infoCard")
+    products_layout = QVBoxLayout()
+    products_layout.setSpacing(8)
 
     items: list[dict[str, object]] = [
         {
@@ -137,14 +150,25 @@ def build_create_layaway_dialog(
                 str(item.get("producto_nombre", "") or ""),
                 school_name=school_name,
             )
+
     sku_input = QLineEdit()
-    sku_input.setPlaceholderText("SKU")
+    sku_input.setPlaceholderText("Escanea o escribe un SKU")
     if selected_catalog_row is not None:
         sku_input.setText(str(selected_catalog_row["sku"]))
     qty_spin = QSpinBox()
     qty_spin.setRange(1, 100)
-    add_item_button = QPushButton("Agregar presentacion")
+    add_item_button = QPushButton("Agregar")
     remove_item_button = QPushButton("Quitar seleccionada")
+
+    scan_row = QHBoxLayout()
+    scan_row.setSpacing(8)
+    scan_row.addWidget(QLabel("SKU"))
+    scan_row.addWidget(sku_input, 1)
+    scan_row.addWidget(QLabel("Cant."))
+    scan_row.addWidget(qty_spin)
+    scan_row.addWidget(add_item_button)
+    scan_row.addWidget(remove_item_button)
+
     items_table = QTableWidget()
     items_table.setColumnCount(5)
     items_table.setHorizontalHeaderLabels(["SKU", "Producto", "Cantidad", "Precio", "Subtotal"])
@@ -152,13 +176,106 @@ def build_create_layaway_dialog(
     items_table.verticalHeader().setVisible(False)
     items_table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
     items_table.setAlternatingRowColors(True)
-    total_label = QLabel("Total estimado: $0.00")
-    total_label.setObjectName("analyticsLine")
+
     subtotal_label = QLabel("Subtotal estimado: $0.00")
     subtotal_label.setObjectName("analyticsLine")
+    total_label = QLabel("Total estimado: $0.00")
+    total_label.setObjectName("analyticsLine")
     minimum_deposit_label = QLabel("Anticipo minimo (20%): $0.00")
     minimum_deposit_label.setObjectName("analyticsLine")
 
+    products_layout.addLayout(scan_row)
+    products_layout.addWidget(items_table)
+    products_layout.addWidget(subtotal_label)
+    products_layout.addWidget(total_label)
+    products_layout.addWidget(minimum_deposit_label)
+    products_box.setLayout(products_layout)
+
+    # ── Seccion 3: Detalles del apartado ──
+    details_box = QGroupBox("3. Detalles del apartado")
+    details_box.setObjectName("infoCard")
+    details_form = QFormLayout()
+    details_form.setSpacing(8)
+
+    deposit_spin = QDoubleSpinBox()
+    deposit_spin.setRange(0.01, 999999.99)
+    deposit_spin.setDecimals(2)
+    deposit_spin.setPrefix("$")
+    deposit_spin.setValue(0.01)
+
+    due_input = QDateEdit()
+    due_date = date.today() + timedelta(days=15)
+    configure_friendly_date_edit(
+        due_input,
+        initial_date=QDate(due_date.year, due_date.month, due_date.day),
+    )
+
+    due_quick_row = QHBoxLayout()
+    due_quick_row.setSpacing(6)
+    due_plus_15_button = QPushButton("+15 dias")
+    due_plus_30_button = QPushButton("+30 dias")
+    due_plus_60_button = QPushButton("+60 dias")
+    due_quick_row.addWidget(due_plus_15_button)
+    due_quick_row.addWidget(due_plus_30_button)
+    due_quick_row.addWidget(due_plus_60_button)
+    due_quick_row.addStretch()
+
+    def set_due_date_from_offset(days: int) -> None:
+        target_date = date.today() + timedelta(days=days)
+        due_input.setDate(QDate(target_date.year, target_date.month, target_date.day))
+
+    due_plus_15_button.clicked.connect(lambda: set_due_date_from_offset(15))
+    due_plus_30_button.clicked.connect(lambda: set_due_date_from_offset(30))
+    due_plus_60_button.clicked.connect(lambda: set_due_date_from_offset(60))
+
+    notes_input = QTextEdit()
+    notes_input.setMaximumHeight(70)
+
+    employee_qr_input = QLineEdit()
+    employee_qr_input.setPlaceholderText("Escanea QR de empleada (opcional)")
+    employee_qr_input.setEchoMode(QLineEdit.EchoMode.Password)
+    employee_name_label = QLabel("—")
+    employee_state: dict[str, str | None] = {"code": None, "display_name": None}
+
+    def resolve_employee_qr() -> None:
+        raw = employee_qr_input.text().strip()
+        if not raw:
+            employee_state["code"] = None
+            employee_state["display_name"] = None
+            employee_name_label.setText("—")
+            return
+        try:
+            from pos_uniformes.services.employee_identity_service import EmployeeIdentityService
+            with get_session() as _session:
+                emp = EmployeeIdentityService.resolve_employee_by_qr_code(_session, raw)
+            if emp is None:
+                employee_state["code"] = None
+                employee_state["display_name"] = None
+                employee_name_label.setText("QR no reconocido")
+            else:
+                employee_state["code"] = str(emp.codigo)
+                display = EmployeeIdentityService.build_visible_employee_name(str(emp.nombre_completo or emp.codigo))
+                employee_state["display_name"] = display
+                employee_name_label.setText(display)
+        except Exception:  # noqa: BLE001
+            employee_state["code"] = None
+            employee_state["display_name"] = None
+            employee_name_label.setText("Error al verificar QR")
+        employee_qr_input.clear()
+
+    employee_qr_input.returnPressed.connect(resolve_employee_qr)
+    emp_row = QHBoxLayout()
+    emp_row.addWidget(employee_qr_input, 1)
+    emp_row.addWidget(employee_name_label)
+
+    details_form.addRow("Anticipo", deposit_spin)
+    details_form.addRow("Vencimiento", due_input)
+    details_form.addRow("", due_quick_row)
+    details_form.addRow("Observacion", notes_input)
+    details_form.addRow("Empleada", emp_row)
+    details_box.setLayout(details_form)
+
+    # ── Logica ──
     def current_selected_client_id() -> int | None:
         selected_client = client_selector.currentData()
         if not isinstance(selected_client, dict):
@@ -324,116 +441,42 @@ def build_create_layaway_dialog(
         reprice_items_for_selected_client()
         refresh_items_table()
 
-    def set_due_date_from_offset(days: int) -> None:
-        target_date = date.today() + timedelta(days=days)
-        due_input.setDate(QDate(target_date.year, target_date.month, target_date.day))
-
     add_item_button.clicked.connect(handle_add_item)
     remove_item_button.clicked.connect(handle_remove_item)
     sku_input.returnPressed.connect(handle_add_item)
     client_selector.currentIndexChanged.connect(handle_selected_client_changed)
 
-    line_row = QHBoxLayout()
-    line_row.setSpacing(8)
-    line_row.addWidget(QLabel("SKU"))
-    line_row.addWidget(sku_input, 1)
-    line_row.addWidget(QLabel("Cantidad"))
-    line_row.addWidget(qty_spin)
-    line_row.addWidget(add_item_button)
-    line_row.addWidget(remove_item_button)
-
-    due_input = QDateEdit()
-    due_date = date.today() + timedelta(days=15)
-    configure_friendly_date_edit(
-        due_input,
-        initial_date=QDate(due_date.year, due_date.month, due_date.day),
-    )
-    due_quick_row = QHBoxLayout()
-    due_quick_row.setSpacing(6)
-    due_plus_15_button = QPushButton("+15 dias")
-    due_plus_30_button = QPushButton("+30 dias")
-    due_plus_60_button = QPushButton("+60 dias")
-    due_quick_row.addWidget(due_plus_15_button)
-    due_quick_row.addWidget(due_plus_30_button)
-    due_quick_row.addWidget(due_plus_60_button)
-    due_quick_row.addStretch()
-    due_plus_15_button.clicked.connect(lambda: set_due_date_from_offset(15))
-    due_plus_30_button.clicked.connect(lambda: set_due_date_from_offset(30))
-    due_plus_60_button.clicked.connect(lambda: set_due_date_from_offset(60))
-    deposit_spin = QDoubleSpinBox()
-    deposit_spin.setRange(0.01, 999999.99)
-    deposit_spin.setDecimals(2)
-    deposit_spin.setPrefix("$")
-    deposit_spin.setValue(0.01)
-    notes_input = QTextEdit()
-    notes_input.setMaximumHeight(90)
-    employee_qr_input = QLineEdit()
-    employee_qr_input.setPlaceholderText("Escanea QR de empleada (opcional)")
-    employee_qr_input.setEchoMode(QLineEdit.EchoMode.Password)
-    employee_name_label = QLabel("—")
-    employee_state: dict[str, str | None] = {"code": None, "display_name": None}
-
-    def resolve_employee_qr() -> None:
-        raw = employee_qr_input.text().strip()
-        if not raw:
-            employee_state["code"] = None
-            employee_state["display_name"] = None
-            employee_name_label.setText("—")
-            return
-        try:
-            from pos_uniformes.services.employee_identity_service import EmployeeIdentityService
-            with get_session() as _session:
-                emp = EmployeeIdentityService.resolve_employee_by_qr_code(_session, raw)
-            if emp is None:
-                employee_state["code"] = None
-                employee_state["display_name"] = None
-                employee_name_label.setText("QR no reconocido")
-            else:
-                employee_state["code"] = str(emp.codigo)
-                display = EmployeeIdentityService.build_visible_employee_name(str(emp.nombre_completo or emp.codigo))
-                employee_state["display_name"] = display
-                employee_name_label.setText(display)
-        except Exception:  # noqa: BLE001
-            employee_state["code"] = None
-            employee_state["display_name"] = None
-            employee_name_label.setText("Error al verificar QR")
-        employee_qr_input.clear()
-
-    employee_qr_input.returnPressed.connect(resolve_employee_qr)
-    emp_row = QHBoxLayout()
-    emp_row.addWidget(employee_qr_input, 1)
-    emp_row.addWidget(employee_name_label)
-    form.addRow("Anticipo", deposit_spin)
-    form.addRow("Fecha de vencimiento", due_input)
-    form.addRow("", due_quick_row)
-    form.addRow("Observacion", notes_input)
-    form.addRow("Empleada", emp_row)
+    # ── Botones finales ──
     buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
     buttons.accepted.connect(dialog.accept)
     buttons.rejected.connect(dialog.reject)
-    layout.addLayout(form)
-    layout.addLayout(line_row)
-    layout.addWidget(items_table)
-    layout.addWidget(subtotal_label)
-    layout.addWidget(total_label)
-    layout.addWidget(minimum_deposit_label)
+
+    # ── Layout final ──
+    layout.addWidget(client_box)
+    layout.addWidget(products_box)
+    layout.addWidget(details_box)
     layout.addWidget(buttons)
+
     refresh_items_table()
     sku_input.setFocus()
     sku_input.selectAll()
+
     if dialog.exec() != int(QDialog.DialogCode.Accepted):
         return None
+
+    if current_selected_client_id() is None:
+        QMessageBox.warning(window, "Cliente requerido", "Selecciona un cliente guardado antes de crear el apartado.")
+        return None
+
     if not items:
         QMessageBox.warning(window, "Sin presentaciones", "Agrega al menos una presentacion al apartado.")
         return None
+
+    selected_client = client_selector.currentData()
     return {
-        "cliente_id": (
-            int(client_selector.currentData()["id"])
-            if isinstance(client_selector.currentData(), dict)
-            else None
-        ),
-        "cliente_nombre": customer_input.text().strip(),
-        "cliente_telefono": phone_input.text().strip(),
+        "cliente_id": int(selected_client["id"]) if isinstance(selected_client, dict) else None,
+        "cliente_nombre": str(selected_client.get("nombre", "")) if isinstance(selected_client, dict) else "",
+        "cliente_telefono": str(selected_client.get("telefono", "")) if isinstance(selected_client, dict) else "",
         "items": [
             ApartadoItemInput(
                 sku=str(item["sku"]),
