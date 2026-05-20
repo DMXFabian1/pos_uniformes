@@ -231,38 +231,75 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
         meili_status_label.setStyleSheet("color: red;")
 
     reindex_btn = QPushButton("Re-indexar catalogo")
-    reindex_result_label = QLabel("")
-    reindex_result_label.setWordWrap(True)
+    install_btn = QPushButton("Instalar / iniciar Meilisearch")
+    meili_result_label = QLabel("")
+    meili_result_label.setWordWrap(True)
 
     def handle_reindex() -> None:
         reindex_btn.setEnabled(False)
-        reindex_result_label.setText("Indexando...")
+        install_btn.setEnabled(False)
+        meili_result_label.setText("Indexando...")
         from PyQt6.QtWidgets import QApplication
         QApplication.processEvents()
         try:
             from pos_uniformes.services.meilisearch_service import configure_index, index_from_db, _get_client
             if _get_client() is None:
-                reindex_result_label.setText("✗ No se pudo conectar con Meilisearch en 127.0.0.1:7700")
-                reindex_result_label.setStyleSheet("color: red;")
+                meili_result_label.setText("✗ No se pudo conectar con Meilisearch en 127.0.0.1:7700")
+                meili_result_label.setStyleSheet("color: red;")
                 reindex_btn.setEnabled(True)
+                install_btn.setEnabled(True)
                 return
             configure_index()
             from pos_uniformes.database.connection import get_session
             with get_session() as session:
                 count = index_from_db(session)
-            reindex_result_label.setText(f"✓ Indexados: {count} documentos")
-            reindex_result_label.setStyleSheet("color: green;")
+            meili_result_label.setText(f"✓ Indexados: {count} documentos")
+            meili_result_label.setStyleSheet("color: green;")
             meili_status_label.setText("✓ Meilisearch conectado")
             meili_status_label.setStyleSheet("color: green;")
         except Exception as exc:
-            reindex_result_label.setText(f"✗ Error: {exc}")
-            reindex_result_label.setStyleSheet("color: red;")
+            meili_result_label.setText(f"✗ Error: {exc}")
+            meili_result_label.setStyleSheet("color: red;")
+        reindex_btn.setEnabled(True)
+        install_btn.setEnabled(True)
+
+    def handle_install() -> None:
+        install_btn.setEnabled(False)
+        reindex_btn.setEnabled(False)
+        meili_result_label.setText("Verificando...")
+        from PyQt6.QtWidgets import QApplication
+
+        def on_progress(msg: str) -> None:
+            meili_result_label.setText(msg)
+            QApplication.processEvents()
+
+        try:
+            from pos_uniformes.services.meilisearch_service import ensure_installed
+            result = ensure_installed(on_progress=on_progress)
+            meili_result_label.setText(result)
+            from pos_uniformes.services.meilisearch_service import is_available
+            if is_available():
+                meili_result_label.setStyleSheet("color: green;")
+                meili_status_label.setText("✓ Meilisearch conectado")
+                meili_status_label.setStyleSheet("color: green;")
+                handle_reindex()
+                return
+            else:
+                meili_result_label.setStyleSheet("color: orange;")
+        except Exception as exc:
+            meili_result_label.setText(f"✗ Error: {exc}")
+            meili_result_label.setStyleSheet("color: red;")
+        install_btn.setEnabled(True)
         reindex_btn.setEnabled(True)
 
     reindex_btn.clicked.connect(handle_reindex)
+    install_btn.clicked.connect(handle_install)
+    btn_row = QHBoxLayout()
+    btn_row.addWidget(install_btn)
+    btn_row.addWidget(reindex_btn)
     meili_layout.addWidget(meili_status_label)
-    meili_layout.addWidget(reindex_btn)
-    meili_layout.addWidget(reindex_result_label)
+    meili_layout.addLayout(btn_row)
+    meili_layout.addWidget(meili_result_label)
     meili_box.setLayout(meili_layout)
 
     # — Cerrar —

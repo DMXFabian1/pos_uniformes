@@ -1525,6 +1525,7 @@ class MainWindow(QMainWindow):
         self.settings_business_button = QPushButton("Negocio e impresion")
         self.settings_catalog_sync_button = QPushButton("Consistencia de catalogo")
         self.settings_meilisearch_button = QPushButton("Meilisearch (busqueda)")
+        self.settings_meilisearch_install_button = QPushButton("Instalar Meilisearch")
         self.settings_users_table = QTableWidget()
         self.settings_users_status_label = QLabel("Sin usuarios cargados.")
         self.settings_create_user_button = QPushButton("Crear usuario")
@@ -2405,6 +2406,32 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Meilisearch", f"Error al re-indexar:\n{exc}")
         finally:
             self.settings_meilisearch_button.setText("Meilisearch (busqueda)")
+            self.settings_meilisearch_button.setEnabled(True)
+
+    def _handle_meilisearch_install(self) -> None:
+        self.settings_meilisearch_install_button.setEnabled(False)
+        self.settings_meilisearch_button.setEnabled(False)
+        self.settings_meilisearch_install_button.setText("Verificando...")
+        QApplication.processEvents()
+        try:
+            from pos_uniformes.services.meilisearch_service import ensure_installed, is_available
+
+            def on_progress(msg: str) -> None:
+                self.settings_meilisearch_install_button.setText(msg)
+                QApplication.processEvents()
+
+            result = ensure_installed(on_progress=on_progress)
+            if is_available():
+                QMessageBox.information(self, "Meilisearch", result)
+                self._handle_meilisearch_reindex()
+                return
+            else:
+                QMessageBox.warning(self, "Meilisearch", result)
+        except Exception as exc:
+            QMessageBox.warning(self, "Meilisearch", f"Error:\n{exc}")
+        finally:
+            self.settings_meilisearch_install_button.setText("Instalar Meilisearch")
+            self.settings_meilisearch_install_button.setEnabled(True)
             self.settings_meilisearch_button.setEnabled(True)
 
     def _open_catalog_sync_settings_dialog(self) -> None:
@@ -8925,6 +8952,7 @@ class MainWindow(QMainWindow):
         self.settings_business_button.setEnabled(is_admin)
         self.settings_catalog_sync_button.setEnabled(is_admin)
         self.settings_meilisearch_button.setEnabled(is_admin)
+        self.settings_meilisearch_install_button.setEnabled(is_admin)
         self.settings_create_user_button.setEnabled(is_admin)
         self.settings_edit_user_button.setEnabled(is_admin)
         self.settings_toggle_user_button.setEnabled(is_admin)

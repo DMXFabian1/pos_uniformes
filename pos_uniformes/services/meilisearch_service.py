@@ -234,6 +234,84 @@ def is_available() -> bool:
     return _get_client() is not None
 
 
+def ensure_installed(
+    *,
+    install_dir: str = "C:\\Meilisearch",
+    version: str = "v1.14.0",
+    port: int = 7700,
+    on_progress: Any = None,
+) -> str:
+    """Descarga, instala y arranca Meilisearch si no está corriendo.
+
+    Returns status message string.
+    """
+    import os
+    import subprocess
+    import urllib.request
+    from pathlib import Path
+
+    data_dir = Path(install_dir) / "data"
+    bin_path = Path(install_dir) / "meilisearch.exe"
+
+    if is_available():
+        return "Meilisearch ya está corriendo."
+
+    # Check if process is running but we couldn't connect (rare)
+    if bin_path.exists():
+        # Try starting it
+        if on_progress:
+            on_progress("Iniciando Meilisearch...")
+        try:
+            subprocess.Popen(
+                [str(bin_path), "--no-analytics", "--db-path", str(data_dir), "--http-addr", f"127.0.0.1:{port}"],
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+            import time
+            time.sleep(3)
+            global _client, _client_checked_at
+            _client = None
+            _client_checked_at = 0
+            if is_available():
+                return "Meilisearch iniciado."
+        except Exception as exc:
+            logger.warning("No se pudo iniciar Meilisearch: %s", exc)
+
+    # Download
+    if on_progress:
+        on_progress("Descargando Meilisearch...")
+    url = f"https://github.com/meilisearch/meilisearch/releases/download/{version}/meilisearch-windows-amd64.exe"
+
+    os.makedirs(install_dir, exist_ok=True)
+    os.makedirs(str(data_dir), exist_ok=True)
+
+    try:
+        urllib.request.urlretrieve(url, str(bin_path))
+    except Exception as exc:
+        return f"Error descargando: {exc}"
+
+    # Start
+    if on_progress:
+        on_progress("Iniciando Meilisearch...")
+    try:
+        subprocess.Popen(
+            [str(bin_path), "--no-analytics", "--db-path", str(data_dir), "--http-addr", f"127.0.0.1:{port}"],
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        )
+        import time
+        time.sleep(3)
+        _client = None
+        _client_checked_at = 0
+        if is_available():
+            return "Meilisearch instalado e iniciado."
+        return "Meilisearch instalado pero no responde aún. Reintenta en unos segundos."
+    except Exception as exc:
+        return f"Error iniciando: {exc}"
+
+
 def notify_catalog_changed() -> None:
     """Re-indexa Meilisearch en un hilo aparte para no bloquear la UI."""
     import threading

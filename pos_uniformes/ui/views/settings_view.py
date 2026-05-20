@@ -90,6 +90,12 @@ def build_settings_tab(window: "MainWindow") -> QWidget:
             QStyle.StandardPixmap.SP_BrowserReload,
             window._handle_meilisearch_reindex,
         ),
+        (
+            window.settings_meilisearch_install_button,
+            "Descarga e inicia Meilisearch si no esta corriendo.",
+            QStyle.StandardPixmap.SP_DialogApplyButton,
+            window._handle_meilisearch_install,
+        ),
     ]
     for index, (button, description, icon_name, handler) in enumerate(settings_buttons):
         row, column = divmod(index, 3)
