@@ -4335,73 +4335,192 @@ QLabel#favDialogPriceLabel {
     def _show_cart_popup(self) -> None:
         dlg = QDialog(self)
         dlg.setWindowTitle("Piezas agregadas")
-        dlg.setMinimumWidth(640)
-        dlg.setMinimumHeight(420)
+        dlg.setMinimumWidth(720)
+        dlg.setMinimumHeight(500)
+        dlg.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         dlg_layout = QVBoxLayout()
         dlg_layout.setContentsMargins(16, 16, 16, 16)
-        dlg_layout.setSpacing(10)
+        dlg_layout.setSpacing(12)
 
-        columns = ["Producto", "Talla", "SKU", "Cant.", "Precio unit.", "Subtotal", ""]
+        # --- Resumen superior ---
+        summary_frame = QFrame()
+        summary_frame.setObjectName("guidedStepsCard")
+        summary_frame.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        summary_layout = QHBoxLayout()
+        summary_layout.setContentsMargins(14, 10, 14, 10)
+        summary_layout.setSpacing(20)
+        lines_label = QLabel()
+        lines_label.setObjectName("guidedStepHint")
+        pieces_label = QLabel()
+        pieces_label.setObjectName("guidedStepHint")
+        products_label = QLabel()
+        products_label.setObjectName("guidedStepHint")
+        summary_total_label = QLabel()
+        summary_total_label.setStyleSheet("font-size: 16px; font-weight: 700; color: #87492c;")
+        summary_layout.addWidget(lines_label)
+        summary_layout.addWidget(pieces_label)
+        summary_layout.addWidget(products_label)
+        summary_layout.addStretch()
+        summary_layout.addWidget(summary_total_label)
+        summary_frame.setLayout(summary_layout)
+
+        # --- Tabla agrupada ---
+        columns = ["Producto", "Talla", "Color", "SKU", "", "Precio unit.", "Subtotal", ""]
         table = QTableWidget(0, len(columns))
         table.setHorizontalHeaderLabels(columns)
-        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         table.setAlternatingRowColors(True)
         table.verticalHeader().setVisible(False)
         table.horizontalHeader().setStretchLastSection(False)
         table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         table.setShowGrid(False)
-
-        total_label = QLabel()
-        total_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
 
         def _refresh_table():
             table.setRowCount(0)
             total = Decimal("0")
-            for row_idx, item in enumerate(self.quote_cart):
-                qty = max(int(item.get("cantidad") or 0), 0)
-                unit_price = Decimal(str(item.get("precio_unitario") or "0")).quantize(Decimal("0.01"))
-                subtotal = (unit_price * Decimal(qty)).quantize(Decimal("0.01"))
-                total += subtotal
-                product_name = str(
-                    item.get("producto_nombre") or item.get("descripcion") or item.get("sku") or "Producto"
-                )
-                talla = str(item.get("talla") or "—").strip()
-                sku = str(item.get("sku") or "—").strip()
-                table.insertRow(row_idx)
-                for col_idx, value in enumerate([
-                    product_name, talla, sku, str(qty), f"${unit_price}", f"${subtotal}",
-                ]):
-                    cell = QTableWidgetItem(value)
-                    cell.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | (
-                        Qt.AlignmentFlag.AlignRight if col_idx >= 3 else Qt.AlignmentFlag.AlignLeft
-                    ))
-                    table.setItem(row_idx, col_idx, cell)
-                remove_btn = QPushButton("✕")
-                remove_btn.setObjectName("sidebarItemRemoveButton")
-                remove_btn.setFixedSize(26, 26)
-                def _on_remove(index=row_idx):
-                    self._remove_quote_item_at_index(index)
-                    _refresh_table()
-                remove_btn.clicked.connect(_on_remove)
-                table.setCellWidget(row_idx, 6, remove_btn)
-            table.resizeColumnToContents(1)
-            table.resizeColumnToContents(2)
-            table.resizeColumnToContents(3)
-            table.resizeColumnToContents(4)
-            table.resizeColumnToContents(5)
-            table.setColumnWidth(6, 36)
-            total_label.setText(f"Total: <b>${total.quantize(Decimal('0.01'))}</b>")
+            total_pieces = 0
+            product_names: set[str] = set()
+
+            # Agrupar por producto para headers
+            groups: dict[str, list[tuple[int, dict]]] = {}
+            for idx, item in enumerate(self.quote_cart):
+                pname = str(item.get("producto_nombre") or item.get("descripcion") or item.get("sku") or "Producto")
+                groups.setdefault(pname, []).append((idx, item))
+
+            visual_row = 0
+            for product_name, items in groups.items():
+                product_names.add(product_name)
+                # Header de grupo si hay más de un producto distinto
+                if len(groups) > 1:
+                    table.insertRow(visual_row)
+                    header_item = QTableWidgetItem(f"  {product_name}")
+                    header_font = header_item.font()
+                    header_font.setBold(True)
+                    header_item.setFont(header_font)
+                    header_item.setBackground(QBrush(QColor("#f0e6d6")))
+                    header_item.setForeground(QBrush(QColor("#6B4226")))
+                    for c in range(len(columns)):
+                        empty = QTableWidgetItem("")
+                        empty.setBackground(QBrush(QColor("#f0e6d6")))
+                        table.setItem(visual_row, c, empty)
+                    table.setItem(visual_row, 0, header_item)
+                    table.setSpan(visual_row, 0, 1, 3)
+                    visual_row += 1
+
+                for original_idx, item in items:
+                    qty = max(int(item.get("cantidad") or 0), 0)
+                    unit_price = Decimal(str(item.get("precio_unitario") or "0")).quantize(Decimal("0.01"))
+                    subtotal = (unit_price * Decimal(qty)).quantize(Decimal("0.01"))
+                    total += subtotal
+                    total_pieces += qty
+                    talla = str(item.get("talla") or "—").strip()
+                    color = str(item.get("color") or "—").strip()
+                    sku = str(item.get("sku") or "—").strip()
+
+                    table.insertRow(visual_row)
+                    display_name = product_name if len(groups) == 1 else ""
+                    values = [display_name, talla, color, sku, "", f"${unit_price}", f"${subtotal}"]
+                    for col_idx, value in enumerate(values):
+                        cell = QTableWidgetItem(value)
+                        cell.setTextAlignment(Qt.AlignmentFlag.AlignVCenter | (
+                            Qt.AlignmentFlag.AlignRight if col_idx >= 5 else Qt.AlignmentFlag.AlignLeft
+                        ))
+                        table.setItem(visual_row, col_idx, cell)
+
+                    # Columna cantidad editable: − [n] +
+                    qty_widget = QWidget()
+                    qty_hl = QHBoxLayout()
+                    qty_hl.setContentsMargins(2, 2, 2, 2)
+                    qty_hl.setSpacing(2)
+                    minus_btn = QPushButton("−")
+                    minus_btn.setObjectName("sidebarItemRemoveButton")
+                    minus_btn.setFixedSize(24, 24)
+                    qty_lbl = QLabel(str(qty))
+                    qty_lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                    qty_lbl.setFixedWidth(28)
+                    qty_lbl.setStyleSheet("font-weight: 600; font-size: 13px;")
+                    plus_btn = QPushButton("+")
+                    plus_btn.setObjectName("sidebarItemRemoveButton")
+                    plus_btn.setFixedSize(24, 24)
+
+                    def _on_minus(index=original_idx):
+                        self._change_sidebar_item_quantity(index, -1)
+                        _refresh_table()
+                    def _on_plus(index=original_idx):
+                        self._change_sidebar_item_quantity(index, 1)
+                        _refresh_table()
+                    minus_btn.clicked.connect(_on_minus)
+                    plus_btn.clicked.connect(_on_plus)
+                    qty_hl.addWidget(minus_btn)
+                    qty_hl.addWidget(qty_lbl)
+                    qty_hl.addWidget(plus_btn)
+                    qty_widget.setLayout(qty_hl)
+                    table.setCellWidget(visual_row, 4, qty_widget)
+
+                    # Botón eliminar
+                    remove_btn = QPushButton("✕")
+                    remove_btn.setObjectName("sidebarItemRemoveButton")
+                    remove_btn.setFixedSize(26, 26)
+                    def _on_remove(index=original_idx):
+                        self._remove_quote_item_at_index(index)
+                        _refresh_table()
+                    remove_btn.clicked.connect(_on_remove)
+                    table.setCellWidget(visual_row, 7, remove_btn)
+                    visual_row += 1
+
+            for c in [1, 2, 3, 4, 5, 6]:
+                table.resizeColumnToContents(c)
+            table.setColumnWidth(7, 36)
+
+            # Actualizar resumen
+            n_lines = len(self.quote_cart)
+            lines_label.setText(f"{n_lines} linea{'s' if n_lines != 1 else ''}")
+            pieces_label.setText(f"{total_pieces} pieza{'s' if total_pieces != 1 else ''}")
+            products_label.setText(f"{len(product_names)} producto{'s' if len(product_names) != 1 else ''}")
+            summary_total_label.setText(f"Total: ${total.quantize(Decimal('0.01'))}")
+
+            if not self.quote_cart:
+                lines_label.setText("Presupuesto vacio")
+                pieces_label.setText("")
+                products_label.setText("")
+                summary_total_label.setText("$0.00")
 
         _refresh_table()
 
+        # --- Botones de acción ---
+        actions_layout = QHBoxLayout()
+        actions_layout.setSpacing(10)
+
+        print_btn = QPushButton("Imprimir")
+        print_btn.setObjectName("primaryButton")
+        print_btn.setMinimumHeight(36)
+        print_btn.clicked.connect(lambda: (dlg.accept(), self._handle_print_cart()))
+
+        whatsapp_btn = QPushButton("WhatsApp")
+        whatsapp_btn.setObjectName("secondaryButton")
+        whatsapp_btn.setMinimumHeight(36)
+        whatsapp_btn.clicked.connect(lambda: (dlg.accept(), self._handle_open_quote_whatsapp()))
+
+        save_btn = QPushButton("Guardar borrador")
+        save_btn.setObjectName("ghostButton")
+        save_btn.setMinimumHeight(36)
+        save_btn.clicked.connect(lambda: (dlg.accept(), self._handle_save_quote_draft()))
+
         close_btn = QPushButton("Cerrar")
-        close_btn.setObjectName("primaryButton")
+        close_btn.setObjectName("ghostButton")
+        close_btn.setMinimumHeight(36)
         close_btn.clicked.connect(dlg.accept)
 
+        actions_layout.addWidget(print_btn)
+        actions_layout.addWidget(whatsapp_btn)
+        actions_layout.addWidget(save_btn)
+        actions_layout.addStretch()
+        actions_layout.addWidget(close_btn)
+
+        dlg_layout.addWidget(summary_frame)
         dlg_layout.addWidget(table, 1)
-        dlg_layout.addWidget(total_label)
-        dlg_layout.addWidget(close_btn, 0, Qt.AlignmentFlag.AlignRight)
+        dlg_layout.addLayout(actions_layout)
         dlg.setLayout(dlg_layout)
         dlg.exec()
 
