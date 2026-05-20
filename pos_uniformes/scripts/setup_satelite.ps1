@@ -3,11 +3,12 @@
     Deja la PC satelite lista de una sola vez.
 
 .DESCRIPTION
-    Este script hace hasta cuatro cosas:
+    Este script hace hasta cinco cosas:
       1. Escribe pos_uniformes.env con la conexion a la PC principal.
       2. Prueba la conexion (avisa si no hay, no bloquea).
-      3. Crea un acceso directo en el escritorio.
-      4. Opcional (-AutoStart): registra la app para que abra sola al encender la PC.
+      3. Opcional (-InstallMeilisearch): instala Meilisearch para busqueda rapida.
+      4. Crea un acceso directo en el escritorio.
+      5. Opcional (-AutoStart): registra la app para que abra sola al encender la PC.
 
     Despues de correr este script las empleadas solo necesitan encender la PC.
 
@@ -59,6 +60,11 @@ param(
     [string]$DbPassword,
 
     [string]$ShortcutName = "Presupuestos Satelite",
+
+    # Instala Meilisearch para busqueda rapida typo-tolerant en el catalogo.
+    [switch]$InstallMeilisearch,
+
+    [string]$MeilisearchVersion = "v1.14.0",
 
     # Registra la app para que abra automaticamente al iniciar sesion en Windows.
     # Usa la carpeta Startup del usuario - no requiere permisos de administrador.
@@ -168,10 +174,119 @@ if ($DryRun) {
 }
 
 # ---------------------------------------------------------------------------
-# Paso 3 -Crear acceso directo en el escritorio
+# Paso 3 -Instalar Meilisearch (opcional)
 # ---------------------------------------------------------------------------
 
-Write-Step "Paso 3 -Crear acceso directo en el escritorio"
+if ($InstallMeilisearch) {
+    Write-Step "Paso 3 -Instalar Meilisearch para busqueda rapida"
+
+    $meiliDir  = Join-Path $TargetDir "meilisearch"
+    $meiliData = Join-Path $meiliDir "data"
+    $meiliBin  = Join-Path $meiliDir "meilisearch.exe"
+    $meiliPort = 7700
+
+    if ($DryRun) {
+        Write-Dry "Crearia carpeta: $meiliDir"
+        Write-Dry "Descargaria Meilisearch $MeilisearchVersion"
+        Write-Dry "Registraria tarea programada MeilisearchPOS"
+    } else {
+        # Crear directorios
+        if (-not (Test-Path $meiliDir))  { New-Item -ItemType Directory -Path $meiliDir  -Force | Out-Null }
+        if (-not (Test-Path $meiliData)) { New-Item -ItemType Directory -Path $meiliData -Force | Out-Null }
+
+        # Descargar binario si no existe
+        if (-not (Test-Path $meiliBin)) {
+            $meiliUrl = "https://github.com/meilisearch/meilisearch/releases/download/$MeilisearchVersion/meilisearch-windows-amd64.exe"
+            Write-Host "  Descargando Meilisearch $MeilisearchVersion..."
+            Write-Host "  URL: $meiliUrl" -ForegroundColor DarkGray
+            try {
+                [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+                Invoke-WebRequest -Uri $meiliUrl -OutFile $meiliBin -UseBasicParsing
+                Write-Ok "Meilisearch descargado: $meiliBin"
+            } catch {
+                Write-Warn "No se pudo descargar Meilisearch: $_"
+                Write-Warn "La app funcionara sin busqueda rapida."
+                Write-Warn "Descarga manual: $meiliUrl -> $meiliBin"
+                $InstallMeilisearch = $false
+            }
+        } else {
+            Write-Ok "Meilisearch ya existe: $meiliBin"
+        }
+
+        if ($InstallMeilisearch) {
+            # Detener instancia existente
+            $existing = Get-Process -Name "meilisearch" -ErrorAction SilentlyContinue
+            if ($existing) {
+                Write-Host "  Deteniendo Meilisearch existente..."
+                Stop-Process -Name "meilisearch" -Force
+                Start-Sleep -Seconds 2
+            }
+
+            # Registrar tarea programada para auto-start
+            $taskName = "MeilisearchPOS"
+            $existingTask = Get-ScheduledTask -TaskName $taskName -ErrorAction SilentlyContinue
+            if ($existingTask) {
+                Unregister-ScheduledTask -TaskName $taskName -Confirm:$false
+            }
+
+            $taskAction = New-ScheduledTaskAction `
+                -Execute $meiliBin `
+                -Argument "--no-analytics --db-path `"$meiliData`" --http-addr 127.0.0.1:$meiliPort" `
+                -WorkingDirectory $meiliDir
+
+            $taskTrigger  = New-ScheduledTaskTrigger -AtLogon
+            $taskSettings = New-ScheduledTaskSettingsSet `
+                -AllowStartIfOnBatteries `
+                -DontStopIfGoingOnBatteries `
+                -StartWhenAvailable `
+                -RestartCount 3 `
+                -RestartInterval (New-TimeSpan -Minutes 1)
+
+            Register-ScheduledTask `
+                -TaskName $taskName `
+                -Action $taskAction `
+                -Trigger $taskTrigger `
+                -Settings $taskSettings `
+                -Description "Meilisearch para POS Uniformes - busqueda rapida" `
+                -RunLevel Highest | Out-Null
+
+            Write-Ok "Tarea programada '$taskName' registrada (auto-start al iniciar sesion)"
+
+            # Iniciar ahora
+            Write-Host "  Iniciando Meilisearch en puerto $meiliPort..."
+            Start-Process -FilePath $meiliBin `
+                -ArgumentList "--no-analytics", "--db-path", "`"$meiliData`"", "--http-addr", "127.0.0.1:$meiliPort" `
+                -WindowStyle Hidden
+
+            Start-Sleep -Seconds 3
+
+            try {
+                $health = Invoke-RestMethod -Uri "http://127.0.0.1:$meiliPort/health" -Method Get
+                if ($health.status -eq "available") {
+                    Write-Ok "Meilisearch corriendo en puerto $meiliPort"
+                }
+            } catch {
+                Write-Warn "Meilisearch no responde aun. Puede tardar unos segundos."
+            }
+
+            # Escribir variable de entorno en el .env para que la app lo encuentre
+            $envMeiliLine = "POS_UNIFORMES_MEILI_URL=http://127.0.0.1:$meiliPort"
+            if ((Test-Path $envFile) -and -not (Select-String -Path $envFile -Pattern "POS_UNIFORMES_MEILI_URL" -Quiet)) {
+                Add-Content -Path $envFile -Value $envMeiliLine
+                Write-Ok "Agregado MEILI_URL al .env"
+            }
+        }
+    }
+} else {
+    Write-Step "Paso 3 -Meilisearch"
+    Write-Host "  Omitido. Usa -InstallMeilisearch para instalarlo." -ForegroundColor DarkGray
+}
+
+# ---------------------------------------------------------------------------
+# Paso 4 -Crear acceso directo en el escritorio
+# ---------------------------------------------------------------------------
+
+Write-Step "Paso 4 -Crear acceso directo en el escritorio"
 
 $desktopPath  = [Environment]::GetFolderPath("Desktop")
 $shortcutPath = Join-Path $desktopPath "$ShortcutName.lnk"
@@ -190,7 +305,7 @@ if ($DryRun) {
 }
 
 # ---------------------------------------------------------------------------
-# Paso 4 -Arranque automatico (opcional)
+# Paso 5 -Arranque automatico (opcional)
 # ---------------------------------------------------------------------------
 
 if ($RemoveAutoStart) {
@@ -236,7 +351,7 @@ oShell.Run """$($exe.FullName)""", 1, False
         Write-Ok "Wrapper creado: $wrapperPath"
     }
 } else {
-    Write-Step "Paso 4 -Arranque automatico"
+    Write-Step "Paso 5 -Arranque automatico"
     Write-Host "  Omitido. Usa -AutoStart para configurarlo." -ForegroundColor DarkGray
 }
 
