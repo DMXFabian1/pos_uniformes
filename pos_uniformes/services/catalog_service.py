@@ -50,6 +50,20 @@ class CatalogService:
         return getattr(value, "nombre", None) if value is not None else None
 
     @classmethod
+    def _build_nombre_base(
+        cls,
+        *,
+        base_name: str,
+        school: Escuela | None = None,
+    ) -> str:
+        """Construye nombre_base incluyendo la escuela si aplica."""
+        name = cls._title_case(base_name)
+        school_name = cls._optional_name(school)
+        if school_name:
+            return f"{name} {school_name}"
+        return name
+
+    @classmethod
     def _build_product_display_name(
         cls,
         *,
@@ -58,19 +72,18 @@ class CatalogService:
         garment_type: TipoPrenda | None = None,
         piece_type: TipoPieza | None = None,
     ) -> str:
-        base_name = cls._title_case(base_name)
+        nombre_base = cls._build_nombre_base(base_name=base_name, school=school)
         suffix_parts = [
             part
             for part in (
-                cls._optional_name(school),
                 cls._optional_name(garment_type),
                 cls._optional_name(piece_type),
             )
             if part
         ]
         if not suffix_parts:
-            return base_name
-        return f"{base_name} | {' | '.join(suffix_parts)}"
+            return nombre_base
+        return f"{nombre_base} | {' | '.join(suffix_parts)}"
 
     @staticmethod
     def _title_case(text: str) -> str:
@@ -374,11 +387,12 @@ class CatalogService:
         ubicacion: str | None = None,
     ) -> Producto:
         cls._validar_admin(usuario)
-        nombre_base = cls._title_case(nombre.strip())
-        if not nombre_base:
+        raw_name = nombre.strip()
+        if not raw_name:
             raise ValueError("El nombre del producto es obligatorio.")
+        nombre_base = cls._build_nombre_base(base_name=raw_name, school=escuela)
         display_name = cls._build_product_display_name(
-            base_name=nombre_base,
+            base_name=raw_name,
             school=escuela,
             garment_type=tipo_prenda,
             piece_type=tipo_pieza,
@@ -441,11 +455,12 @@ class CatalogService:
         ubicacion: str | None = None,
     ) -> Producto:
         cls._validar_admin(usuario)
-        nombre_base = cls._title_case(nombre.strip())
-        if not nombre_base:
+        raw_name = nombre.strip()
+        if not raw_name:
             raise ValueError("El nombre del producto es obligatorio.")
+        nombre_base = cls._build_nombre_base(base_name=raw_name, school=escuela)
         display_name = cls._build_product_display_name(
-            base_name=nombre_base,
+            base_name=raw_name,
             school=escuela,
             garment_type=tipo_prenda,
             piece_type=tipo_pieza,
