@@ -164,7 +164,10 @@ class _DoubleClickFrame(QFrame):
 
     def mouseDoubleClickEvent(self, event):  # noqa: N802
         self.double_clicked.emit()
-        super().mouseDoubleClickEvent(event)
+        try:
+            super().mouseDoubleClickEvent(event)
+        except RuntimeError:
+            pass
 
 
 @dataclass
