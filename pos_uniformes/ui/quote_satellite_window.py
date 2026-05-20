@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime
 from decimal import Decimal
@@ -128,6 +129,8 @@ from pos_uniformes.services.inventory_label_service import (
     render_inventory_label,
     render_inventory_label_from_cache_row,
 )
+
+logger = logging.getLogger(__name__)
 
 SATELLITE_SEARCH_DEBOUNCE_MS = 300
 _LABEL_PRINT_PINS = {"634700", "12345"}
@@ -2079,11 +2082,13 @@ class QuoteSatelliteWindow(QMainWindow):
         try:
             from pos_uniformes.services import meilisearch_service
             if not meilisearch_service.is_available():
+                logger.info("Meilisearch no disponible — búsqueda usará filtro local")
                 return
             meilisearch_service.configure_index()
-            meilisearch_service.index_from_db(session)
-        except Exception:  # noqa: BLE001
-            pass
+            count = meilisearch_service.index_from_db(session)
+            logger.info("Meilisearch: %d variantes indexadas", count)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Error indexando Meilisearch: %s", exc)
 
     def _on_guided_search_text_changed(self, text: str) -> None:
         if self._guided_search_input_submitted:
