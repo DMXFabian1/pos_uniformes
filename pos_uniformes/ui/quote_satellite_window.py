@@ -4337,7 +4337,6 @@ QLabel#favDialogPriceLabel {
         dlg.setWindowTitle("Piezas agregadas")
         dlg.setMinimumWidth(720)
         dlg.setMinimumHeight(500)
-        dlg.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
         dlg_layout = QVBoxLayout()
         dlg_layout.setContentsMargins(16, 16, 16, 16)
         dlg_layout.setSpacing(12)
@@ -4438,7 +4437,7 @@ QLabel#favDialogPriceLabel {
                         " border-radius: 4px; font-size: 14px; font-weight: 700; color: #3a2a1a; }"
                         "QPushButton:hover { background: #d4c8b6; border-color: #8B5E3C; }"
                     )
-                    minus_btn = QPushButton("−")
+                    minus_btn = QPushButton("-")
                     minus_btn.setFixedSize(28, 28)
                     minus_btn.setCursor(Qt.CursorShape.PointingHandCursor)
                     minus_btn.setStyleSheet(_qty_btn_style)
@@ -4502,17 +4501,24 @@ QLabel#favDialogPriceLabel {
         print_btn = QPushButton("Imprimir")
         print_btn.setObjectName("primaryButton")
         print_btn.setMinimumHeight(36)
-        print_btn.clicked.connect(lambda: (dlg.accept(), self._handle_print_cart()))
+        _post_action = None
+
+        def _close_and_run(action):
+            nonlocal _post_action
+            _post_action = action
+            dlg.accept()
+
+        print_btn.clicked.connect(lambda: _close_and_run(self._handle_print_cart))
 
         whatsapp_btn = QPushButton("WhatsApp")
         whatsapp_btn.setObjectName("secondaryButton")
         whatsapp_btn.setMinimumHeight(36)
-        whatsapp_btn.clicked.connect(lambda: (dlg.accept(), self._handle_open_quote_whatsapp()))
+        whatsapp_btn.clicked.connect(lambda: _close_and_run(self._handle_open_quote_whatsapp))
 
         save_btn = QPushButton("Guardar borrador")
         save_btn.setObjectName("ghostButton")
         save_btn.setMinimumHeight(36)
-        save_btn.clicked.connect(lambda: (dlg.accept(), self._handle_save_quote_draft()))
+        save_btn.clicked.connect(lambda: _close_and_run(self._handle_save_quote_draft))
 
         close_btn = QPushButton("Cerrar")
         close_btn.setObjectName("ghostButton")
@@ -4530,6 +4536,8 @@ QLabel#favDialogPriceLabel {
         dlg_layout.addLayout(actions_layout)
         dlg.setLayout(dlg_layout)
         dlg.exec()
+        if _post_action is not None:
+            _post_action()
 
     def _apply_lookup_view(self, lookup_view) -> None:
         lookup_row = None
