@@ -2229,9 +2229,6 @@ class QuoteSatelliteWindow(QMainWindow):
         row = next((item for item in self.catalog_snapshot_rows if str(item.get("sku")) == sku), None)
         self._apply_guided_detail(row)
         self._apply_action_state()
-        # Scroll al detalle si está visible
-        if self._guided_detail_widget and self._guided_detail_widget.isVisible():
-            self._guided_detail_widget.parent().parent().ensureWidgetVisible(self._guided_detail_widget)
 
     def _refresh_guided_browser(self) -> None:
         view = build_guided_catalog_view(
