@@ -147,6 +147,7 @@ class BodegaIngresoDialog(QDialog):
         ])
         self.table.verticalHeader().setVisible(False)
         self.table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.table.setAlternatingRowColors(True)
         self.table.setMinimumHeight(250)
         self.table.installEventFilter(self)
@@ -162,6 +163,10 @@ class BodegaIngresoDialog(QDialog):
         self.clear_selection_shortcut = QShortcut(QKeySequence(Qt.Key.Key_Escape), self.table)
         self.clear_selection_shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         self.clear_selection_shortcut.activated.connect(self._clear_selection)
+
+        # Ctrl+P / Cmd+P → imprimir etiqueta de la fila seleccionada
+        self._print_shortcut = QShortcut(QKeySequence("Ctrl+P"), self)
+        self._print_shortcut.activated.connect(self._handle_print_label)
         layout.addWidget(self.table)
 
         # ─── Summary + actions ───────────────────────────────────────────
@@ -563,6 +568,26 @@ class BodegaIngresoDialog(QDialog):
                 return
 
         self.accept()
+
+    # ─── Print label ───────────────────────────────────────────────────────
+
+    def _handle_print_label(self) -> None:
+        idx = self.table.currentRow()
+        if idx < 0 or idx >= len(self._rows):
+            self._set_feedback("Selecciona una fila para imprimir etiqueta", "warning")
+            return
+        row = self._rows[idx]
+        variante_id = row.variante_id
+
+        # Buscar el MainWindow padre para delegar la impresión
+        parent_widget = self.parent()
+        while parent_widget is not None:
+            if hasattr(parent_widget, "_open_inventory_label_dialog_for_variant"):
+                parent_widget._open_inventory_label_dialog_for_variant(variante_id)
+                return
+            parent_widget = parent_widget.parent() if callable(getattr(parent_widget, "parent", None)) else None
+
+        self._set_feedback("No se encontró la función de impresión", "warning")
 
     # ─── Feedback ────────────────────────────────────────────────────────
 
