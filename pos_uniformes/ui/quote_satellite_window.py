@@ -379,11 +379,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self._suggest_timer.setSingleShot(True)
         self._suggest_timer.setInterval(150)
         self._suggest_timer.timeout.connect(self._update_search_suggestions)
-        self._guided_search_results_layout = QVBoxLayout()
-        self._guided_search_results_layout.setContentsMargins(8, 8, 8, 8)
-        self._guided_search_results_layout.setSpacing(8)
         self._guided_search_results_container: QScrollArea | None = None
-        self._guided_search_scroll_content: QWidget | None = None
         self._guided_steps_widget: QFrame | None = None
         self._guided_detail_widget: QFrame | None = None
 
@@ -766,13 +762,9 @@ class QuoteSatelliteWindow(QMainWindow):
         page_layout.addLayout(search_bar_layout)
 
         # Contenedor de resultados de búsqueda (oculto por defecto)
-        search_scroll = QScrollArea()
-        search_scroll.setWidgetResizable(True)
-        search_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self._guided_search_scroll_content = QWidget()
-        self._guided_search_scroll_content.setLayout(self._guided_search_results_layout)
-        search_scroll.setWidget(self._guided_search_scroll_content)
-        self._guided_search_results_container = search_scroll
+        self._guided_search_results_container = QScrollArea()
+        self._guided_search_results_container.setWidgetResizable(True)
+        self._guided_search_results_container.setFrameShape(QFrame.Shape.NoFrame)
         self._guided_search_results_container.setVisible(False)
         page_layout.addWidget(self._guided_search_results_container, 1)
 
@@ -2122,22 +2114,27 @@ class QuoteSatelliteWindow(QMainWindow):
         from pos_uniformes.services import meilisearch_service
         families = meilisearch_service.search_as_families(query, limit=60)
 
-        # Limpiar resultados anteriores
-        while self._guided_search_results_layout.count():
-            item = self._guided_search_results_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+        content = QWidget()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(8)
 
         if not families:
             no_results = QLabel("Sin resultados.")
             no_results.setAlignment(Qt.AlignmentFlag.AlignCenter)
             no_results.setStyleSheet("color: #888; padding: 24px;")
-            self._guided_search_results_layout.addWidget(no_results)
+            layout.addWidget(no_results)
         else:
             for fam in families:
                 card = self._build_search_family_card(fam)
-                self._guided_search_results_layout.addWidget(card)
-            self._guided_search_results_layout.addStretch()
+                layout.addWidget(card)
+        layout.addStretch()
+
+        content.setLayout(layout)
+        old = self._guided_search_results_container.widget()
+        self._guided_search_results_container.setWidget(content)
+        if old:
+            old.deleteLater()
 
         self._guided_search_results_container.setVisible(True)
         self.guided_page_scroll.setVisible(False)
