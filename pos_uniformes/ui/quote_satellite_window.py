@@ -2137,9 +2137,9 @@ class QuoteSatelliteWindow(QMainWindow):
         layout.addStretch()
 
         content.setLayout(layout)
-        old = self._guided_search_results_container.widget()
+        old = self._guided_search_results_container.takeWidget()
         self._guided_search_results_container.setWidget(content)
-        if old:
+        if old is not None:
             old.deleteLater()
 
         self._guided_search_results_container.setVisible(True)
