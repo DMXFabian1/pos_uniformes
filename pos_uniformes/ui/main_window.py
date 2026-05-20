@@ -7407,9 +7407,27 @@ class MainWindow(QMainWindow):
             for _ in range(qty):
                 self.sale_sku_input.setText(sku)
                 self._handle_add_sale_item()
+            # Imprimir etiqueta automáticamente
+            self._auto_print_label_for_sku(sku)
 
         dialog.sku_selected.connect(_on_sku_selected)
         dialog.exec()
+
+    def _auto_print_label_for_sku(self, sku: str) -> None:
+        """Imprime etiqueta automáticamente al agregar producto desde búsqueda rápida."""
+        try:
+            with get_session() as session:
+                variante = VentaService.obtener_variante_por_sku(session, sku)
+                if variante is None:
+                    return
+                result = render_inventory_label(session, variante.id, mode="continuous", requested_copies=1)
+            self._print_image_path(
+                result.image_path,
+                title=f"Etiqueta {sku}",
+                copies=1,
+            )
+        except Exception:  # noqa: BLE001
+            pass  # Si falla la etiqueta, no interrumpir el flujo de venta
 
     def _handle_add_sale_item(self) -> None:
         raw_input = self.sale_sku_input.text().strip()
