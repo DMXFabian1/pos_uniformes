@@ -212,6 +212,59 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     printer_layout.addWidget(save_printer_btn)
     printer_box.setLayout(printer_layout)
 
+    # — Meilisearch —
+    meili_box = QGroupBox("Meilisearch (busqueda rapida)")
+    meili_layout = QVBoxLayout()
+    meili_status_label = QLabel("")
+    meili_status_label.setWordWrap(True)
+
+    try:
+        from pos_uniformes.services.meilisearch_service import is_available
+        if is_available():
+            meili_status_label.setText("✓ Meilisearch conectado")
+            meili_status_label.setStyleSheet("color: green;")
+        else:
+            meili_status_label.setText("✗ Meilisearch no disponible")
+            meili_status_label.setStyleSheet("color: red;")
+    except Exception:
+        meili_status_label.setText("✗ Meilisearch no disponible")
+        meili_status_label.setStyleSheet("color: red;")
+
+    reindex_btn = QPushButton("Re-indexar catalogo")
+    reindex_result_label = QLabel("")
+    reindex_result_label.setWordWrap(True)
+
+    def handle_reindex() -> None:
+        reindex_btn.setEnabled(False)
+        reindex_result_label.setText("Indexando...")
+        from PyQt6.QtWidgets import QApplication
+        QApplication.processEvents()
+        try:
+            from pos_uniformes.services.meilisearch_service import configure_index, index_from_db, _get_client
+            if _get_client() is None:
+                reindex_result_label.setText("✗ No se pudo conectar con Meilisearch en 127.0.0.1:7700")
+                reindex_result_label.setStyleSheet("color: red;")
+                reindex_btn.setEnabled(True)
+                return
+            configure_index()
+            from pos_uniformes.database.connection import get_session
+            with get_session() as session:
+                count = index_from_db(session)
+            reindex_result_label.setText(f"✓ Indexados: {count} documentos")
+            reindex_result_label.setStyleSheet("color: green;")
+            meili_status_label.setText("✓ Meilisearch conectado")
+            meili_status_label.setStyleSheet("color: green;")
+        except Exception as exc:
+            reindex_result_label.setText(f"✗ Error: {exc}")
+            reindex_result_label.setStyleSheet("color: red;")
+        reindex_btn.setEnabled(True)
+
+    reindex_btn.clicked.connect(handle_reindex)
+    meili_layout.addWidget(meili_status_label)
+    meili_layout.addWidget(reindex_btn)
+    meili_layout.addWidget(reindex_result_label)
+    meili_box.setLayout(meili_layout)
+
     # — Cerrar —
     close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
     close_buttons.rejected.connect(dialog.reject)
@@ -219,6 +272,7 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     layout.addWidget(status_box)
     layout.addWidget(config_box)
     layout.addWidget(printer_box)
+    layout.addWidget(meili_box)
     layout.addWidget(close_buttons)
     dialog.setLayout(layout)
     dialog.exec()
