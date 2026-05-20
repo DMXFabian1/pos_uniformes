@@ -1013,28 +1013,42 @@ class QuoteSatelliteWindow(QMainWindow):
         detail_box.setObjectName("guidedStepsCard")
         detail_box.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
         detail_layout = QVBoxLayout()
-        detail_layout.setContentsMargins(12, 10, 12, 8)
-        detail_layout.setSpacing(8)
-        _detail_title = QLabel("Producto seleccionado")
-        _detail_title.setObjectName("guidedGroupBoxTitle")
-        detail_layout.addWidget(_detail_title)
+        detail_layout.setContentsMargins(12, 8, 12, 8)
+        detail_layout.setSpacing(4)
 
-        # Header: ícono + texto
-        detail_header = QHBoxLayout()
-        detail_header.setSpacing(10)
-        self.guided_visual_icon_label.setFixedSize(72, 72)
-        detail_header.addWidget(self.guided_visual_icon_label, 0, Qt.AlignmentFlag.AlignTop)
-        detail_text_layout = QVBoxLayout()
+        # Fila compacta: ícono + texto + acciones
+        self._guided_detail_compact_row = QHBoxLayout()
+        self._guided_detail_compact_row.setSpacing(8)
+        self.guided_visual_icon_label.setFixedSize(48, 48)
+        self._guided_detail_compact_row.addWidget(
+            self.guided_visual_icon_label, 0, Qt.AlignmentFlag.AlignVCenter
+        )
         self.guided_detail_title_label.setObjectName("satDetailTitle")
         self.guided_detail_meta_label.setObjectName("satDetailMeta")
         self.guided_detail_meta_label.setWordWrap(True)
         self.guided_detail_notes_label.setObjectName("satDetailNotes")
         self.guided_detail_notes_label.setWordWrap(True)
+        detail_text_layout = QVBoxLayout()
+        detail_text_layout.setSpacing(0)
         detail_text_layout.addWidget(self.guided_detail_title_label)
         detail_text_layout.addWidget(self.guided_detail_meta_label)
-        detail_header.addLayout(detail_text_layout, 1)
+        self._guided_detail_compact_row.addLayout(detail_text_layout, 1)
 
-        # Variantes
+        # Acciones en la misma fila
+        self.guided_qty_spin.setRange(1, 100)
+        self.guided_qty_spin.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
+        self.guided_qty_spin.setValue(1)
+        self.guided_add_button.setObjectName("primaryButton")
+        self.guided_add_button.setMinimumHeight(34)
+        self.guided_print_label_button.setObjectName("ghostButton")
+        self._guided_detail_compact_row.addWidget(self.guided_print_label_button)
+        self._guided_detail_compact_row.addWidget(self.guided_qty_spin)
+        self._guided_detail_compact_row.addWidget(self.guided_add_button)
+
+        detail_layout.addLayout(self._guided_detail_compact_row)
+        detail_layout.addWidget(self.guided_detail_notes_label)
+
+        # Variantes (sección expandida, se oculta durante búsqueda)
         self.guided_variant_section = QWidget()
         variant_section_layout = QVBoxLayout()
         variant_section_layout.setContentsMargins(0, 0, 0, 0)
@@ -1047,27 +1061,9 @@ class QuoteSatelliteWindow(QMainWindow):
         variant_section_layout.addWidget(self.guided_variant_title_label)
         variant_section_layout.addLayout(self.guided_variant_groups_layout)
         self.guided_variant_section.setLayout(variant_section_layout)
-        self.guided_detail_scroll = self.guided_variant_section  # alias para compatibilidad
+        self.guided_detail_scroll = self.guided_variant_section
 
-        # Acciones
-        detail_actions = QHBoxLayout()
-        detail_actions.setSpacing(8)
-        self.guided_qty_spin.setRange(1, 100)
-        self.guided_qty_spin.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
-        self.guided_qty_spin.setValue(1)
-        self.guided_add_button.setObjectName("primaryButton")
-        self.guided_add_button.setMinimumHeight(38)
-        self.guided_print_label_button.setObjectName("ghostButton")
-        detail_actions.addStretch()
-        detail_actions.addWidget(self.guided_print_label_button)
-        detail_actions.addWidget(QLabel("Cantidad"))
-        detail_actions.addWidget(self.guided_qty_spin)
-        detail_actions.addWidget(self.guided_add_button)
-
-        detail_layout.addLayout(detail_header)
-        detail_layout.addWidget(self.guided_detail_notes_label)
         detail_layout.addWidget(self.guided_variant_section)
-        detail_layout.addLayout(detail_actions)
         detail_box.setLayout(detail_layout)
         return detail_box
 
