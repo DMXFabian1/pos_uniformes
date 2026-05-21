@@ -1659,6 +1659,8 @@ class QuoteSatelliteWindow(QMainWindow):
         _guided_ctrl_shift_l = QShortcut(QKeySequence("Ctrl+Shift+L"), self.guided_page_scroll)
         _guided_ctrl_shift_l.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         _guided_ctrl_shift_l.activated.connect(self._open_school_product_link_admin)
+        _esc_shortcut = QShortcut(QKeySequence("Escape"), self)
+        _esc_shortcut.activated.connect(self._handle_escape_key)
         _admin_shortcut = QShortcut(QKeySequence("Ctrl+Shift+A"), self)
         _admin_shortcut.activated.connect(self._open_satellite_admin)
         self.catalog_previous_page_button.clicked.connect(self._handle_catalog_browser_previous_page)
@@ -2139,8 +2141,11 @@ class QuoteSatelliteWindow(QMainWindow):
         if not query:
             return
 
-        from pos_uniformes.services import meilisearch_service
-        families = meilisearch_service.search_as_families(query, limit=60)
+        try:
+            from pos_uniformes.services import meilisearch_service
+            families = meilisearch_service.search_as_families(query, limit=60)
+        except Exception:
+            families = []
 
         # Limpiar resultados anteriores
         while self._search_results_layout.count():
@@ -2159,6 +2164,9 @@ class QuoteSatelliteWindow(QMainWindow):
                 self._search_results_layout.addWidget(card)
 
         self._enter_search_mode()
+        # Scroll al inicio de resultados
+        if self.guided_page_scroll is not None:
+            self.guided_page_scroll.verticalScrollBar().setValue(0)
 
     def _build_search_family_card(self, family: dict) -> QFrame:
         card = QFrame()
@@ -2234,10 +2242,23 @@ class QuoteSatelliteWindow(QMainWindow):
         self._guided_steps_widget.setVisible(False)
         self._search_results_widget.setVisible(True)
 
+    def _handle_escape_key(self) -> None:
+        """ESC: si hay busqueda activa la cierra, si no resetea el flujo guiado."""
+        if self._search_results_widget is not None and self._search_results_widget.isVisible():
+            self._exit_search_mode()
+            return
+        # Resetear flujo guiado completo
+        if self._gfs.mode == "basics":
+            self._reset_guided_route(mode_key="basics")
+        else:
+            self._reset_guided_route(mode_key="school")
+
     def _exit_search_mode(self) -> None:
         self._search_results_widget.setVisible(False)
         self._guided_steps_widget.setVisible(True)
         self._selected_search_btn = None
+        self.guided_search_input.clear()
+        self._guided_search_input_submitted = False
 
     def _on_search_variant_select(self, sku: str, btn: _DoubleClickButton | None = None) -> None:
         """Single click — selecciona variante con highlight naranja + detail card."""
