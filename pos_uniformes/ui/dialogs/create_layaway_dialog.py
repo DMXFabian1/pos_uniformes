@@ -20,11 +20,13 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QSpinBox,
     QTableWidget,
     QTableWidgetItem,
     QTextEdit,
     QVBoxLayout,
+    QWidget,
 )
 
 from pos_uniformes.database.connection import get_session
@@ -63,57 +65,193 @@ def build_create_layaway_dialog(
     initial_items: list[dict[str, object]] | None = None,
     selected_catalog_row: dict[str, object] | None = None,
 ) -> dict[str, object] | None:
-    dialog, layout = window._create_modal_dialog(
-        "Nuevo apartado",
-        "Selecciona un cliente, agrega presentaciones y registra el anticipo.",
-        width=760,
-    )
+    dialog = QDialog(window)
+    dialog.setWindowTitle("Nuevo apartado")
+    dialog.setModal(True)
+    dialog.setMinimumWidth(760)
+    dialog.setMinimumHeight(600)
+
+    outer_layout = QVBoxLayout()
+    outer_layout.setSpacing(8)
+
+    helper = QLabel("Escanea o busca un cliente, agrega presentaciones y registra el anticipo.")
+    helper.setWordWrap(True)
+    helper.setObjectName("subtleLine")
+    outer_layout.addWidget(helper)
+
+    scroll = QScrollArea()
+    scroll.setWidgetResizable(True)
+    scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+    scroll_content = QWidget()
+    layout = QVBoxLayout()
+    layout.setSpacing(12)
+    scroll_content.setLayout(layout)
+    scroll.setWidget(scroll_content)
+
+    # ── Estado del cliente seleccionado ──
+    selected_client_state: dict[str, object] = {"id": None, "nombre": "", "telefono": ""}
 
     # ── Seccion 1: Cliente ──
     client_box = QGroupBox("1. Cliente")
     client_box.setObjectName("infoCard")
-    client_layout = QFormLayout()
-    client_layout.setSpacing(8)
+    client_inner = QVBoxLayout()
+    client_inner.setSpacing(8)
 
-    client_selector = QComboBox()
-    try:
-        with get_session() as session:
-            for client in [item for item in ClientService.list_clients(session) if item.activo]:
-                client_selector.addItem(
-                    f"{client.codigo_cliente} · {client.nombre}",
-                    {
-                        "id": int(client.id),
-                        "nombre": client.nombre,
-                        "telefono": client.telefono or "",
-                    },
+    # Fila de escaneo QR
+    client_qr_input = QLineEdit()
+    client_qr_input.setPlaceholderText("Escanea QR de cliente o escribe codigo (ej. CLI-000012)")
+    client_qr_input.setEchoMode(QLineEdit.EchoMode.Password)
+
+    # Fila de busqueda por nombre
+    client_search_input = QLineEdit()
+    client_search_input.setPlaceholderText("Buscar por nombre o telefono...")
+
+    client_search_results = QComboBox()
+    client_search_results.setVisible(False)
+
+    # Boton crear nuevo
+    create_client_btn = QPushButton("+ Nuevo cliente")
+
+    search_row = QHBoxLayout()
+    search_row.setSpacing(8)
+    search_row.addWidget(client_search_input, 1)
+    search_row.addWidget(create_client_btn)
+
+    # Info del cliente seleccionado
+    client_info_label = QLabel("Ningun cliente seleccionado")
+    client_info_label.setObjectName("analyticsLine")
+    client_info_label.setWordWrap(True)
+    clear_client_btn = QPushButton("Quitar cliente")
+    clear_client_btn.setVisible(False)
+
+    info_row = QHBoxLayout()
+    info_row.addWidget(client_info_label, 1)
+    info_row.addWidget(clear_client_btn)
+
+    def _set_client(client_id: int, nombre: str, telefono: str) -> None:
+        selected_client_state["id"] = client_id
+        selected_client_state["nombre"] = nombre
+        selected_client_state["telefono"] = telefono
+        tel_display = telefono if telefono else "sin telefono"
+        client_info_label.setText(f"✓ {nombre}  ·  {tel_display}")
+        client_info_label.setStyleSheet("color: green; font-weight: bold;")
+        clear_client_btn.setVisible(True)
+        # Re-price items for new client
+        reprice_items_for_selected_client()
+        refresh_items_table()
+
+    def _clear_client() -> None:
+        selected_client_state["id"] = None
+        selected_client_state["nombre"] = ""
+        selected_client_state["telefono"] = ""
+        client_info_label.setText("Ningun cliente seleccionado")
+        client_info_label.setStyleSheet("")
+        clear_client_btn.setVisible(False)
+        reprice_items_for_selected_client()
+        refresh_items_table()
+
+    def handle_client_qr() -> None:
+        raw = client_qr_input.text().strip()
+        client_qr_input.clear()
+        if not raw:
+            return
+        try:
+            with get_session() as session:
+                # Try by codigo_cliente first
+                clients = ClientService.list_clients(session, search_text=raw)
+                active = [c for c in clients if c.activo]
+                if len(active) == 1:
+                    c = active[0]
+                    _set_client(int(c.id), c.nombre, c.telefono or "")
+                    return
+                elif len(active) > 1:
+                    # Multiple matches — pick exact code match
+                    exact = [c for c in active if (c.codigo_cliente or "").strip().upper() == raw.upper()]
+                    if exact:
+                        c = exact[0]
+                        _set_client(int(c.id), c.nombre, c.telefono or "")
+                        return
+                QMessageBox.warning(dialog, "Cliente no encontrado", f"No se encontro un cliente activo con '{raw}'.")
+        except Exception as exc:
+            QMessageBox.warning(dialog, "Error", str(exc))
+
+    def handle_client_search() -> None:
+        query = client_search_input.text().strip()
+        if not query:
+            client_search_results.clear()
+            client_search_results.setVisible(False)
+            return
+        try:
+            with get_session() as session:
+                clients = ClientService.list_clients(session, search_text=query)
+                active = [c for c in clients if c.activo]
+            client_search_results.clear()
+            if not active:
+                client_search_results.addItem("Sin resultados", None)
+                client_search_results.setVisible(True)
+                return
+            for c in active[:20]:
+                tel = f" · {c.telefono}" if c.telefono else ""
+                client_search_results.addItem(
+                    f"{c.codigo_cliente} · {c.nombre}{tel}",
+                    {"id": int(c.id), "nombre": c.nombre, "telefono": c.telefono or ""},
                 )
-    except Exception:
-        pass
+            client_search_results.setVisible(True)
+        except Exception:
+            pass
 
-    if client_selector.count() == 0:
-        client_selector.addItem("Sin clientes registrados", None)
+    def handle_search_result_selected() -> None:
+        data = client_search_results.currentData()
+        if isinstance(data, dict):
+            _set_client(int(data["id"]), str(data["nombre"]), str(data.get("telefono", "")))
+            client_search_results.setVisible(False)
+            client_search_input.clear()
 
-    client_name_label = QLabel("")
-    client_name_label.setObjectName("subtleLine")
-    client_phone_label = QLabel("")
-    client_phone_label.setObjectName("subtleLine")
+    def handle_create_client() -> None:
+        from pos_uniformes.ui.dialogs.settings_prompt_dialogs import prompt_client_data
+        from pos_uniformes.ui.helpers.settings_client_helper import create_settings_client
+        data = prompt_client_data(
+            dialog,
+            title="Crear cliente",
+            helper_text="Captura los datos base del cliente para el apartado.",
+        )
+        if data is None:
+            return
+        try:
+            with get_session() as session:
+                result = create_settings_client(
+                    session,
+                    admin_user_id=window.user_id,
+                    payload=data,
+                    render_card=window._render_client_card_safe,
+                )
+                session.commit()
+                # Find the newly created client
+                all_clients = ClientService.list_clients(session)
+                new_client = next(
+                    (c for c in all_clients if c.nombre == data.get("nombre", "").strip()),
+                    None,
+                )
+                if new_client:
+                    _set_client(int(new_client.id), new_client.nombre, new_client.telefono or "")
+                    QMessageBox.information(dialog, "Cliente creado", f"Cliente '{new_client.nombre}' creado y seleccionado.")
+                    return
+        except Exception as exc:
+            QMessageBox.critical(dialog, "Error", str(exc))
+            return
+        QMessageBox.information(dialog, "Cliente creado", "Cliente creado. Buscalo para seleccionarlo.")
 
-    def sync_selected_client() -> None:
-        selected_client = client_selector.currentData()
-        if isinstance(selected_client, dict):
-            client_name_label.setText(str(selected_client.get("nombre", "")))
-            client_phone_label.setText(str(selected_client.get("telefono", "") or "Sin telefono"))
-        else:
-            client_name_label.setText("")
-            client_phone_label.setText("")
+    client_qr_input.returnPressed.connect(handle_client_qr)
+    client_search_input.returnPressed.connect(handle_client_search)
+    client_search_results.activated.connect(handle_search_result_selected)
+    clear_client_btn.clicked.connect(_clear_client)
+    create_client_btn.clicked.connect(handle_create_client)
 
-    client_selector.currentIndexChanged.connect(lambda: sync_selected_client())
-    sync_selected_client()
-
-    client_layout.addRow("Cliente", client_selector)
-    client_layout.addRow("Nombre", client_name_label)
-    client_layout.addRow("Telefono", client_phone_label)
-    client_box.setLayout(client_layout)
+    client_inner.addWidget(client_qr_input)
+    client_inner.addLayout(search_row)
+    client_inner.addWidget(client_search_results)
+    client_inner.addLayout(info_row)
+    client_box.setLayout(client_inner)
 
     # ── Seccion 2: Productos ──
     products_box = QGroupBox("2. Presentaciones")
@@ -277,12 +415,12 @@ def build_create_layaway_dialog(
 
     # ── Logica ──
     def current_selected_client_id() -> int | None:
-        selected_client = client_selector.currentData()
-        if not isinstance(selected_client, dict):
+        cid = selected_client_state.get("id")
+        if cid is None:
             return None
         try:
-            return int(selected_client["id"])
-        except (KeyError, TypeError, ValueError):
+            return int(cid)
+        except (TypeError, ValueError):
             return None
 
     def current_client_discount_percent() -> Decimal:
@@ -436,47 +574,43 @@ def build_create_layaway_dialog(
             QMessageBox.information(dialog, "Precio restaurado", restore_message)
         refresh_items_table()
 
-    def handle_selected_client_changed() -> None:
-        sync_selected_client()
-        reprice_items_for_selected_client()
-        refresh_items_table()
-
     add_item_button.clicked.connect(handle_add_item)
     remove_item_button.clicked.connect(handle_remove_item)
     sku_input.returnPressed.connect(handle_add_item)
-    client_selector.currentIndexChanged.connect(handle_selected_client_changed)
 
     # ── Botones finales ──
     buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
     buttons.accepted.connect(dialog.accept)
     buttons.rejected.connect(dialog.reject)
 
-    # ── Layout final ──
+    # ── Layout final con scroll ──
     layout.addWidget(client_box)
     layout.addWidget(products_box)
     layout.addWidget(details_box)
-    layout.addWidget(buttons)
+    layout.addStretch()
+
+    outer_layout.addWidget(scroll, 1)
+    outer_layout.addWidget(buttons)
+    dialog.setLayout(outer_layout)
 
     refresh_items_table()
-    sku_input.setFocus()
-    sku_input.selectAll()
+    client_qr_input.setFocus()
 
     if dialog.exec() != int(QDialog.DialogCode.Accepted):
         return None
 
     if current_selected_client_id() is None:
-        QMessageBox.warning(window, "Cliente requerido", "Selecciona un cliente guardado antes de crear el apartado.")
+        QMessageBox.warning(window, "Cliente requerido", "Selecciona un cliente antes de crear el apartado.")
         return None
 
     if not items:
         QMessageBox.warning(window, "Sin presentaciones", "Agrega al menos una presentacion al apartado.")
         return None
 
-    selected_client = client_selector.currentData()
     return {
-        "cliente_id": int(selected_client["id"]) if isinstance(selected_client, dict) else None,
-        "cliente_nombre": str(selected_client.get("nombre", "")) if isinstance(selected_client, dict) else "",
-        "cliente_telefono": str(selected_client.get("telefono", "")) if isinstance(selected_client, dict) else "",
+        "cliente_id": current_selected_client_id(),
+        "cliente_nombre": str(selected_client_state.get("nombre", "")),
+        "cliente_telefono": str(selected_client_state.get("telefono", "")),
         "items": [
             ApartadoItemInput(
                 sku=str(item["sku"]),
