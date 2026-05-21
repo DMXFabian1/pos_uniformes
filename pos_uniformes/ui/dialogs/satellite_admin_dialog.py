@@ -215,29 +215,86 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     # — Meilisearch —
     meili_box = QGroupBox("Meilisearch (busqueda rapida)")
     meili_layout = QVBoxLayout()
+    meili_layout.setSpacing(8)
+
+    # Diagnostico
+    meili_diag_form = QFormLayout()
+    meili_diag_form.setSpacing(4)
     meili_status_label = QLabel("")
     meili_status_label.setWordWrap(True)
+    meili_docs_label = QLabel("")
+    meili_docs_label.setObjectName("subtleLine")
+    meili_binary_label = QLabel("")
+    meili_binary_label.setObjectName("subtleLine")
+    meili_task_label = QLabel("")
+    meili_task_label.setObjectName("subtleLine")
 
-    try:
-        from pos_uniformes.services.meilisearch_service import is_available
-        if is_available():
-            meili_status_label.setText("✓ Meilisearch conectado")
-            meili_status_label.setStyleSheet("color: green;")
-        else:
-            meili_status_label.setText("✗ Meilisearch no disponible")
-            meili_status_label.setStyleSheet("color: red;")
-    except Exception:
-        meili_status_label.setText("✗ Meilisearch no disponible")
-        meili_status_label.setStyleSheet("color: red;")
+    def refresh_meili_diagnostics() -> None:
+        from pathlib import Path
+        # Conexion
+        try:
+            from pos_uniformes.services.meilisearch_service import is_available, _get_client
+            if is_available():
+                meili_status_label.setText("✓ Conectado (127.0.0.1:7700)")
+                meili_status_label.setStyleSheet("color: green; font-weight: bold;")
+                # Doc count
+                try:
+                    client = _get_client()
+                    stats = client.index("variantes").get_stats()
+                    meili_docs_label.setText(f"{stats.get('numberOfDocuments', '?')} documentos indexados")
+                except Exception:
+                    meili_docs_label.setText("No se pudo leer stats del indice")
+            else:
+                meili_status_label.setText("✗ No disponible")
+                meili_status_label.setStyleSheet("color: red; font-weight: bold;")
+                meili_docs_label.setText("—")
+        except Exception:
+            meili_status_label.setText("✗ No disponible")
+            meili_status_label.setStyleSheet("color: red; font-weight: bold;")
+            meili_docs_label.setText("—")
+        # Binario
+        bin_path = Path(r"C:\Meilisearch\meilisearch.exe")
+        meili_binary_label.setText(
+            f"✓ Binario: {bin_path}" if bin_path.exists() else "✗ Binario no encontrado"
+        )
+        # Tarea programada
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["schtasks", "/Query", "/TN", "MeilisearchPOS", "/FO", "CSV", "/NH"],
+                capture_output=True, text=True, timeout=5,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            if result.returncode == 0 and "MeilisearchPOS" in result.stdout:
+                meili_task_label.setText("✓ Tarea programada 'MeilisearchPOS' activa")
+                meili_task_label.setStyleSheet("color: green;")
+            else:
+                meili_task_label.setText("✗ Sin tarea programada (no arranca al encender PC)")
+                meili_task_label.setStyleSheet("color: orange;")
+        except Exception:
+            meili_task_label.setText("? No se pudo verificar tarea programada")
 
+    refresh_meili_diagnostics()
+
+    meili_diag_form.addRow("Estado:", meili_status_label)
+    meili_diag_form.addRow("Indice:", meili_docs_label)
+    meili_diag_form.addRow("Binario:", meili_binary_label)
+    meili_diag_form.addRow("Autostart:", meili_task_label)
+
+    # Botones de accion
+    install_btn = QPushButton("Instalar / iniciar")
     reindex_btn = QPushButton("Re-indexar catalogo")
-    install_btn = QPushButton("Instalar / iniciar Meilisearch")
+    autostart_btn = QPushButton("Crear tarea programada")
     meili_result_label = QLabel("")
     meili_result_label.setWordWrap(True)
 
+    def _set_meili_busy(busy: bool) -> None:
+        install_btn.setEnabled(not busy)
+        reindex_btn.setEnabled(not busy)
+        autostart_btn.setEnabled(not busy)
+
     def handle_reindex() -> None:
-        reindex_btn.setEnabled(False)
-        install_btn.setEnabled(False)
+        _set_meili_busy(True)
         meili_result_label.setText("Indexando...")
         from PyQt6.QtWidgets import QApplication
         QApplication.processEvents()
@@ -246,8 +303,7 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
             if _get_client() is None:
                 meili_result_label.setText("✗ No se pudo conectar con Meilisearch en 127.0.0.1:7700")
                 meili_result_label.setStyleSheet("color: red;")
-                reindex_btn.setEnabled(True)
-                install_btn.setEnabled(True)
+                _set_meili_busy(False)
                 return
             configure_index()
             from pos_uniformes.database.connection import get_session
@@ -255,17 +311,14 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
                 count = index_from_db(session)
             meili_result_label.setText(f"✓ Indexados: {count} documentos")
             meili_result_label.setStyleSheet("color: green;")
-            meili_status_label.setText("✓ Meilisearch conectado")
-            meili_status_label.setStyleSheet("color: green;")
         except Exception as exc:
             meili_result_label.setText(f"✗ Error: {exc}")
             meili_result_label.setStyleSheet("color: red;")
-        reindex_btn.setEnabled(True)
-        install_btn.setEnabled(True)
+        refresh_meili_diagnostics()
+        _set_meili_busy(False)
 
     def handle_install() -> None:
-        install_btn.setEnabled(False)
-        reindex_btn.setEnabled(False)
+        _set_meili_busy(True)
         meili_result_label.setText("Verificando...")
         from PyQt6.QtWidgets import QApplication
 
@@ -274,14 +327,12 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
             QApplication.processEvents()
 
         try:
-            from pos_uniformes.services.meilisearch_service import ensure_installed
+            from pos_uniformes.services.meilisearch_service import ensure_installed, is_available
             result = ensure_installed(on_progress=on_progress)
             meili_result_label.setText(result)
-            from pos_uniformes.services.meilisearch_service import is_available
             if is_available():
                 meili_result_label.setStyleSheet("color: green;")
-                meili_status_label.setText("✓ Meilisearch conectado")
-                meili_status_label.setStyleSheet("color: green;")
+                refresh_meili_diagnostics()
                 handle_reindex()
                 return
             else:
@@ -289,15 +340,52 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
         except Exception as exc:
             meili_result_label.setText(f"✗ Error: {exc}")
             meili_result_label.setStyleSheet("color: red;")
-        install_btn.setEnabled(True)
-        reindex_btn.setEnabled(True)
+        refresh_meili_diagnostics()
+        _set_meili_busy(False)
 
-    reindex_btn.clicked.connect(handle_reindex)
+    def handle_create_scheduled_task() -> None:
+        _set_meili_busy(True)
+        meili_result_label.setText("Creando tarea programada...")
+        from PyQt6.QtWidgets import QApplication
+        QApplication.processEvents()
+        try:
+            import subprocess
+            bin_path = r"C:\Meilisearch\meilisearch.exe"
+            args = "--no-analytics --db-path C:\\Meilisearch\\data --http-addr 127.0.0.1:7700"
+            result = subprocess.run(
+                [
+                    "schtasks", "/Create",
+                    "/TN", "MeilisearchPOS",
+                    "/TR", f'"{bin_path}" {args}',
+                    "/SC", "ONLOGON",
+                    "/RL", "HIGHEST",
+                    "/F",
+                ],
+                capture_output=True, text=True, timeout=10,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
+            if result.returncode == 0:
+                meili_result_label.setText("✓ Tarea 'MeilisearchPOS' creada — arrancara al iniciar sesion")
+                meili_result_label.setStyleSheet("color: green;")
+            else:
+                meili_result_label.setText(f"✗ Error: {result.stderr.strip() or result.stdout.strip()}")
+                meili_result_label.setStyleSheet("color: red;")
+        except Exception as exc:
+            meili_result_label.setText(f"✗ Error: {exc}")
+            meili_result_label.setStyleSheet("color: red;")
+        refresh_meili_diagnostics()
+        _set_meili_busy(False)
+
     install_btn.clicked.connect(handle_install)
+    reindex_btn.clicked.connect(handle_reindex)
+    autostart_btn.clicked.connect(handle_create_scheduled_task)
+
     btn_row = QHBoxLayout()
     btn_row.addWidget(install_btn)
     btn_row.addWidget(reindex_btn)
-    meili_layout.addWidget(meili_status_label)
+    btn_row.addWidget(autostart_btn)
+
+    meili_layout.addLayout(meili_diag_form)
     meili_layout.addLayout(btn_row)
     meili_layout.addWidget(meili_result_label)
     meili_box.setLayout(meili_layout)
