@@ -221,6 +221,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.lookup_snapshot: QuoteKioskLookupSnapshot | None = None
         self.lookup_history: list[QuoteKioskLookupSnapshot] = []
         self.catalog_snapshot_rows: list[dict[str, object]] = []
+        self._sku_index: dict[str, dict[str, object]] = {}
         self.catalog_browser_visible_skus: tuple[str, ...] = ()
         self.catalog_browser_page_index = 0
         self.current_page_key = "kiosk"
@@ -228,6 +229,10 @@ class QuoteSatelliteWindow(QMainWindow):
         self.catalog_browser_debounce_timer.setSingleShot(True)
         self.catalog_browser_debounce_timer.setInterval(SATELLITE_SEARCH_DEBOUNCE_MS)
         self.catalog_browser_debounce_timer.timeout.connect(self._run_catalog_browser_refresh)
+        self._quote_filter_debounce_timer = QTimer(self)
+        self._quote_filter_debounce_timer.setSingleShot(True)
+        self._quote_filter_debounce_timer.setInterval(SATELLITE_SEARCH_DEBOUNCE_MS)
+        self._quote_filter_debounce_timer.timeout.connect(self._handle_quote_filters_changed)
         seed_favorites_from_bundle()
         self._favorites: set[str] = load_favorites()
         self._school_links: list[dict] = load_school_links_cache()
@@ -254,6 +259,7 @@ class QuoteSatelliteWindow(QMainWindow):
     def _init_offline(self, cache_rows: list[dict]) -> None:
         """Inicializa la ventana en modo local sin tocar la base de datos."""
         self.catalog_snapshot_rows = cache_rows
+        self._rebuild_sku_index()
         self.operator_label.setText("Modo local")
 
         # Mostrar banner con antiguedad del cache
@@ -1678,7 +1684,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.quote_emit_button.clicked.connect(self._handle_emit_quote)
         self.quote_print_cart_button.clicked.connect(self._handle_print_cart)
         self.quote_create_client_button.clicked.connect(self._handle_create_quote_client)
-        self.quote_search_input.textChanged.connect(self._handle_quote_filters_changed)
+        self.quote_search_input.textChanged.connect(lambda: self._quote_filter_debounce_timer.start())
         self.quote_state_combo.currentIndexChanged.connect(self._handle_quote_filters_changed)
         self.quote_table.itemSelectionChanged.connect(self._handle_quote_selection)
         self.quote_cart_table.itemSelectionChanged.connect(self._apply_action_state)
@@ -1746,6 +1752,14 @@ class QuoteSatelliteWindow(QMainWindow):
             self._refresh_offline_quotes()
 
     def refresh_all(self) -> None:
+        if self.offline_mode:
+            self._refresh_catalog_browser()
+            self._refresh_guided_browser()
+            self._refresh_quote_cart_table()
+            self._refresh_recent_lookup_table()
+            self._refresh_offline_quotes()
+            self._set_status("Vista refrescada (modo local).")
+            return
         try:
             with get_session() as session:
                 self._refresh_client_combo(session)
@@ -1759,8 +1773,21 @@ class QuoteSatelliteWindow(QMainWindow):
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "No se pudo actualizar", str(exc))
 
+    def _rebuild_sku_index(self) -> None:
+        """Reconstruye el indice por SKU para busquedas O(1) en el catalogo."""
+        self._sku_index = {
+            str(row.get("sku", "")).strip().upper(): row
+            for row in self.catalog_snapshot_rows
+            if row.get("sku")
+        }
+
+    def _find_row_by_sku(self, sku: str) -> dict[str, object] | None:
+        """Busca una fila del catalogo por SKU en O(1)."""
+        return self._sku_index.get(str(sku).strip().upper())
+
     def _refresh_catalog_snapshot(self, session) -> None:
         self.catalog_snapshot_rows = load_catalog_snapshot_rows(session)
+        self._rebuild_sku_index()
         try:
             save_catalog_cache(self.catalog_snapshot_rows)
         except Exception:  # noqa: BLE001
@@ -1876,7 +1903,7 @@ class QuoteSatelliteWindow(QMainWindow):
             try:
                 from pos_uniformes.services import meilisearch_service
                 if meilisearch_service.is_available():
-                    hits = meilisearch_service.search(search_text, limit=500)
+                    hits = meilisearch_service.search(search_text, limit=100)
                     if hits:
                         hit_skus = {str(h.get("sku", "")) for h in hits}
                         source_rows = [r for r in self.catalog_snapshot_rows if str(r.get("sku", "")) in hit_skus]
@@ -1976,7 +2003,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self._apply_catalog_detail(None)
             self._apply_action_state()
             return
-        selected_row = next((row for row in self.catalog_snapshot_rows if str(row["sku"]) == sku), None)
+        selected_row = self._find_row_by_sku(sku)
         self._apply_catalog_detail(selected_row)
         self._apply_action_state()
 
@@ -2075,7 +2102,7 @@ class QuoteSatelliteWindow(QMainWindow):
 
     def _handle_guided_variant_selected(self, sku: str) -> None:
         self._gfs.sku = sku
-        row = next((item for item in self.catalog_snapshot_rows if str(item.get("sku")) == sku), None)
+        row = self._find_row_by_sku(sku)
         self._apply_guided_detail(row)
         self._refresh_guided_product_checks()
         self._refresh_guided_variant_checks()
@@ -2280,7 +2307,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self._selected_search_btn = btn
 
         self._gfs.sku = sku
-        row = next((item for item in self.catalog_snapshot_rows if str(item.get("sku")) == sku), None)
+        row = self._find_row_by_sku(sku)
         self._apply_guided_detail(row)
         self._apply_action_state()
 
@@ -2377,10 +2404,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self._apply_guided_product_section_labels(view)
 
         if self._gfs.sku:
-            row = next(
-                (item for item in self.catalog_snapshot_rows if str(item.get("sku")) == self._gfs.sku),
-                None,
-            )
+            row = self._find_row_by_sku(self._gfs.sku)
             self._apply_guided_detail(row)
         else:
             self._apply_guided_detail(None)
@@ -2838,7 +2862,7 @@ QLabel#favDialogPriceLabel {
             btn.setMinimumHeight(72)
             btn.setFixedWidth(210)
             btn.setSizePolicy(QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Fixed)
-            row = next((r for r in self.catalog_snapshot_rows if str(r.get("sku")) == card.sku), None)
+            row = self._find_row_by_sku(card.sku)
             if row is not None:
                 btn.setIcon(QIcon(_catalog_row_icon(row)))
                 btn.setIconSize(QSize(26, 26))
@@ -2976,7 +3000,7 @@ QLabel#favDialogPriceLabel {
             if card:
                 detail_name_lbl.setText(card.title)
                 detail_subtitle_lbl.setText(card.subtitle or "")
-                row = next((r for r in self.catalog_snapshot_rows if str(r.get("sku")) == card.sku), None)
+                row = self._find_row_by_sku(card.sku)
                 if row is not None:
                     detail_icon_lbl.setPixmap(
                         _catalog_row_icon(row).scaled(
@@ -3009,9 +3033,7 @@ QLabel#favDialogPriceLabel {
             sku = _state["sku"]
             if not sku:
                 return
-            selected_row = next(
-                (r for r in self.catalog_snapshot_rows if str(r.get("sku")) == sku), None
-            )
+            selected_row = self._find_row_by_sku(sku)
             if selected_row is None:
                 return
             self._open_label_dialog_for_row(selected_row)
@@ -3097,7 +3119,7 @@ QLabel#favDialogPriceLabel {
         else:
             button.setMinimumHeight(94)
             button.setMinimumWidth(250)
-        row = next((item for item in self.catalog_snapshot_rows if str(item.get("sku")) == card.sku), None)
+        row = self._find_row_by_sku(card.sku)
         if row is not None:
             button.setIcon(QIcon(_catalog_row_icon(row)))
             button.setIconSize(QSize(24, 24) if compact_card else QSize(34, 34))
@@ -3251,21 +3273,13 @@ QLabel#favDialogPriceLabel {
         from decimal import Decimal as _Decimal
 
         normalized = sku.strip().upper()
-        row = next(
-            (
-                r for r in self.catalog_snapshot_rows
-                if str(r.get("sku", "")).strip().upper() == normalized
-            ),
-            None,
-        )
+        row = self._find_row_by_sku(normalized)
         if row is None:
             raise ValueError(f"No existe una presentacion activa para el SKU '{normalized}' en el catalogo guardado.")
         if not row.get("producto_activo") or not row.get("variante_activo"):
             raise ValueError(f"El SKU '{normalized}' esta inactivo en el catalogo guardado.")
 
         school = str(row.get("escuela_nombre") or "General")
-        if school == "General":
-            school = "General"
         return QuoteKioskLookupSnapshot(
             sku=normalized,
             product_name=str(row.get("producto_nombre_base") or row.get("producto_nombre") or ""),
@@ -3331,10 +3345,7 @@ QLabel#favDialogPriceLabel {
         self._set_status(result.feedback_message)
 
     def _add_quote_item_from_cache(self, normalized_sku: str, quantity: int) -> None:
-        row = next(
-            (r for r in self.catalog_snapshot_rows if str(r.get("sku", "")).upper() == normalized_sku),
-            None,
-        )
+        row = self._find_row_by_sku(normalized_sku)
         if row is None:
             QMessageBox.warning(self, "SKU no encontrado", f"'{normalized_sku}' no esta en el catalogo local.")
             return
@@ -3382,19 +3393,22 @@ QLabel#favDialogPriceLabel {
             return
         item = self.quote_cart[row_index]
         new_qty = max(1, int(item.get("cantidad") or 1) + delta)
-        try:
-            with get_session() as session:
-                update_sale_cart_item_quantity(
-                    session,
-                    sale_cart=self.quote_cart,
-                    row_index=row_index,
-                    new_quantity=new_qty,
-                    variant_loader=PresupuestoService.obtener_variante_por_sku,
-                    stock_validator=lambda _v, _c: None,
-                )
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(self, "Cantidad no actualizada", str(exc))
-            return
+        if self.offline_mode:
+            item["cantidad"] = new_qty
+        else:
+            try:
+                with get_session() as session:
+                    update_sale_cart_item_quantity(
+                        session,
+                        sale_cart=self.quote_cart,
+                        row_index=row_index,
+                        new_quantity=new_qty,
+                        variant_loader=PresupuestoService.obtener_variante_por_sku,
+                        stock_validator=lambda _v, _c: None,
+                    )
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.warning(self, "Cantidad no actualizada", str(exc))
+                return
         self._refresh_quote_cart_table()
 
     def _remove_quote_item_at_index(self, row_index: int) -> None:
@@ -3428,19 +3442,22 @@ QLabel#favDialogPriceLabel {
                 "Usa 'Quitar linea' si quieres sacar por completo el articulo del presupuesto.",
             )
             return
-        try:
-            with get_session() as session:
-                update_sale_cart_item_quantity(
-                    session,
-                    sale_cart=self.quote_cart,
-                    row_index=selected_row,
-                    new_quantity=new_quantity,
-                    variant_loader=PresupuestoService.obtener_variante_por_sku,
-                    stock_validator=lambda _variante, _cantidad: None,
-                )
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(self, "Cantidad no actualizada", str(exc))
-            return
+        if self.offline_mode:
+            selected_item["cantidad"] = new_quantity
+        else:
+            try:
+                with get_session() as session:
+                    update_sale_cart_item_quantity(
+                        session,
+                        sale_cart=self.quote_cart,
+                        row_index=selected_row,
+                        new_quantity=new_quantity,
+                        variant_loader=PresupuestoService.obtener_variante_por_sku,
+                        stock_validator=lambda _variante, _cantidad: None,
+                    )
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.warning(self, "Cantidad no actualizada", str(exc))
+                return
         self._refresh_quote_cart_table()
         self.quote_cart_table.selectRow(selected_row)
 
@@ -3574,9 +3591,8 @@ QLabel#favDialogPriceLabel {
         return {"nombre": name_input.text().strip(), "telefono": phone_input.text().strip()}
 
     def _persist_quote(self, target_state: EstadoPresupuesto) -> None:
-        action_key = "save_quote" if target_state == EstadoPresupuesto.EMITIDO else "save_quote"
         feedback = build_quote_guard_feedback(
-            action_key,
+            "save_quote",
             can_operate=self._can_operate(),
         )
         if feedback is not None:
@@ -4566,10 +4582,7 @@ QLabel#favDialogPriceLabel {
     def _apply_lookup_view(self, lookup_view) -> None:
         lookup_row = None
         if self.lookup_snapshot is not None:
-            lookup_row = next(
-                (row for row in self.catalog_snapshot_rows if str(row.get("sku")) == str(self.lookup_snapshot.sku)),
-                None,
-            )
+            lookup_row = self._find_row_by_sku(self.lookup_snapshot.sku)
         self.kiosk_visual_icon_label.setPixmap(
             _catalog_row_icon(lookup_row) if lookup_row is not None else _scaled_asset_pixmap("qr_icons/default.png", 112)
         )
@@ -4852,9 +4865,7 @@ QLabel#favDialogPriceLabel {
         sku = (sku or "").strip()
         if not sku:
             return
-        selected_row = next(
-            (row for row in self.catalog_snapshot_rows if str(row.get("sku")) == sku), None
-        )
+        selected_row = self._find_row_by_sku(sku)
         if selected_row is None:
             return
         self._open_label_dialog_for_row(selected_row)
@@ -5084,6 +5095,7 @@ def _level_icon(level_name: str) -> QIcon:
         "preescolar": "kiosk_icons/level_pre.svg",
         "primaria": "kiosk_icons/level_prim.svg",
         "secundaria": "kiosk_icons/level_sec.svg",
+        "bachillerato": "kiosk_icons/level_prepa.svg",
         "prepa": "kiosk_icons/level_prepa.svg",
         "preparatoria": "kiosk_icons/level_prepa.svg",
     }.get(normalized, "kiosk_icons/level_prim.svg")

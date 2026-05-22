@@ -8,6 +8,8 @@ el catalogo completo sin necesitar la PC principal.
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
@@ -34,10 +36,8 @@ def save_catalog_cache(rows: list[dict]) -> None:
         "saved_at": datetime.now(timezone.utc).isoformat(),
         "rows": rows,
     }
-    path.write_text(
-        json.dumps(payload, default=_json_default, ensure_ascii=False),
-        encoding="utf-8",
-    )
+    content = json.dumps(payload, default=_json_default, ensure_ascii=False)
+    _atomic_write(path, content)
 
 
 def load_catalog_cache() -> list[dict] | None:
@@ -81,6 +81,21 @@ def format_cache_age_label(saved_at_iso: str) -> str:
         return local_dt.strftime("guardado el %d/%m/%Y a las %H:%M")
     except Exception:  # noqa: BLE001
         return "guardado anteriormente"
+
+
+def _atomic_write(path: Path, content: str) -> None:
+    """Escribe contenido a disco de forma atomica via archivo temporal + os.replace."""
+    fd, tmp_path = tempfile.mkstemp(dir=str(path.parent), suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(content)
+        os.replace(tmp_path, str(path))
+    except BaseException:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 def _json_default(obj: object) -> object:

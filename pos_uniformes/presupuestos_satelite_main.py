@@ -93,14 +93,14 @@ def resolve_satellite_operator_id() -> int:
             )
         ).all()
 
-    if not users:
-        raise RuntimeError("No hay usuarios activos con rol ADMIN o CAJERO para abrir la app satelite.")
+        if not users:
+            raise RuntimeError("No hay usuarios activos con rol ADMIN o CAJERO para abrir la app satelite.")
 
-    def sort_key(user: Usuario) -> tuple[int, str, int]:
-        role_priority = 0 if user.rol == RolUsuario.CAJERO else 1
-        return (role_priority, str(user.username).lower(), int(user.id))
+        def sort_key(user: Usuario) -> tuple[int, str, int]:
+            role_priority = 0 if user.rol == RolUsuario.CAJERO else 1
+            return (role_priority, str(user.username).lower(), int(user.id))
 
-    return int(sorted(users, key=sort_key)[0].id)
+        return int(sorted(users, key=sort_key)[0].id)
 
 
 def main() -> int:
@@ -145,8 +145,8 @@ def main() -> int:
         try:
             from pos_uniformes.services.meilisearch_service import notify_catalog_changed
             notify_catalog_changed()
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001
+            print(f"Meilisearch no disponible: {exc}", file=sys.stderr)
 
         _show_splash_message(splash, "Cargando catálogo...", app)
         try:

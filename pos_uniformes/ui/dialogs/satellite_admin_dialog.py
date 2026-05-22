@@ -295,8 +295,18 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
 
     def handle_reindex() -> None:
         _set_meili_busy(True)
-        meili_result_label.setText("Indexando...")
+        meili_result_label.setText("Verificando conexion a base de datos...")
         from PyQt6.QtWidgets import QApplication
+        QApplication.processEvents()
+        if not probe_database_host():
+            meili_result_label.setText(
+                "✗ No se puede re-indexar: la PC principal no responde.\n"
+                "Enciende la PC principal y vuelve a intentar."
+            )
+            meili_result_label.setStyleSheet("color: red;")
+            _set_meili_busy(False)
+            return
+        meili_result_label.setText("Indexando...")
         QApplication.processEvents()
         try:
             from pos_uniformes.services.meilisearch_service import configure_index, index_from_db, _get_client
