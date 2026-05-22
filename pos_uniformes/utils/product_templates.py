@@ -79,34 +79,47 @@ CONTEXT_STEP_TEMPLATES: list[dict[str, object]] = [
 ]
 
 PRESENTATION_STEP_TEMPLATES: list[dict[str, object]] = [
-    # Deportivo — precios por nivel, escalera común
-    {"label": "Preescolar playera", "sizes": ["2", "4", "6", "8", "10"], "prices": {"2": "199", "4": "199", "6": "199", "8": "199", "10": "199"}},
+    # ── Deportivo por nivel + pieza ──
+    {"label": "Preescolar playera", "sizes": ["2", "4", "6", "8", "10"], "prices": {"2": "195", "4": "195", "6": "195", "8": "195", "10": "195"}},
     {"label": "Preescolar chamarra", "sizes": ["2", "4", "6", "8", "10"], "prices": {"2": "315", "4": "315", "6": "315", "8": "315", "10": "315"}},
-    {"label": "Preescolar pants 2pz", "sizes": ["2", "4", "6", "8", "10"], "prices": {"2": "485", "4": "485", "6": "485", "8": "485", "10": "485"}},
-    {"label": "Preescolar pants 3pz", "sizes": ["2", "4", "6", "8", "10"], "prices": {"2": "585", "4": "585", "6": "585", "8": "585", "10": "585"}},
+    {"label": "Preescolar pants 2pz", "sizes": ["2", "4", "6", "8"], "prices": {"2": "415", "4": "415", "6": "415", "8": "415"}},
+    {"label": "Preescolar pants 3pz", "sizes": ["2", "4", "6", "8"], "prices": {"2": "515", "4": "515", "6": "515", "8": "515"}},
     {"label": "Primaria playera", "sizes": ["4", "6", "8", "10", "12", "14", "16", "CH", "MD", "GD"], "prices": {"4": "199", "6": "199", "8": "199", "10": "199", "12": "209", "14": "209", "16": "209", "CH": "219", "MD": "225", "GD": "235"}},
     {"label": "Primaria chamarra", "sizes": ["4", "6", "8", "10", "12", "14", "16", "CH", "MD", "GD"], "prices": {"4": "335", "6": "335", "8": "335", "10": "335", "12": "335", "14": "335", "16": "335", "CH": "335", "MD": "335", "GD": "335"}},
     {"label": "Primaria pants 2pz", "sizes": ["4", "6", "8", "10", "12", "14", "16", "CH", "MD", "GD"], "prices": {"4": "485", "6": "485", "8": "485", "10": "485", "12": "485", "14": "495", "16": "495", "CH": "585", "MD": "585", "GD": "595"}},
     {"label": "Primaria pants 3pz", "sizes": ["4", "6", "8", "10", "12", "14", "16", "CH", "MD", "GD"], "prices": {"4": "585", "6": "585", "8": "585", "10": "585", "12": "585", "14": "595", "16": "595", "CH": "685", "MD": "685", "GD": "695"}},
-    {"label": "Secundaria deportiva", "sizes": ["10", "12", "14", "16", "CH", "MD", "GD", "EXG"], "prices": {"10": "229", "12": "229", "14": "229", "16": "229", "CH": "239", "MD": "239", "GD": "239", "EXG": "239"}},
-    {"label": "Bachillerato deportiva", "sizes": ["12", "14", "16", "CH", "MD", "GD", "EXG"], "prices": {"12": "385", "14": "385", "16": "385", "CH": "385", "MD": "385", "GD": "385", "EXG": "385"}},
-    # Oficial — suéteres, chalecos, camisas
-    {"label": "Suéter botones / cuello V (preescolar-primaria)", "sizes": ["4", "6", "8", "10"], "prices": {"4": "290", "6": "290", "8": "290", "10": "290"}},
-    {"label": "Suéter botones / cuello V (completo)", "sizes": ["4", "6", "8", "10", "12", "14", "16", "28", "30", "32", "34", "36", "38", "40", "42"], "prices": {"4": "289", "6": "289", "8": "289", "10": "299", "12": "299", "14": "299", "16": "299", "28": "309", "30": "309", "32": "309", "34": "309", "36": "315", "38": "315", "40": "315", "42": "315"}},
+    {"label": "Primaria pants suelto", "sizes": ["4", "6", "8", "10", "12", "14", "16", "CH", "MD", "GD", "EXG"], "prices": {"4": "249", "6": "249", "8": "249", "10": "249", "12": "249", "14": "249", "16": "249", "CH": "269", "MD": "269", "GD": "269", "EXG": "269"}},
+    {"label": "Secundaria playera", "sizes": ["10", "12", "14", "16", "CH", "MD", "GD", "EXG"], "prices": {"10": "229", "12": "229", "14": "229", "16": "229", "CH": "239", "MD": "239", "GD": "239", "EXG": "239"}},
+    {"label": "Secundaria chamarra", "sizes": ["10", "12", "14", "16", "CH", "MD", "GD", "EXG"], "prices": {"10": "385", "12": "385", "14": "385", "16": "385", "CH": "385", "MD": "385", "GD": "385", "EXG": "385"}},
+    {"label": "Secundaria pants 2pz", "sizes": ["10", "12", "14", "16", "CH", "MD", "GD", "EXG"], "prices": {"10": "485", "12": "485", "14": "495", "16": "495", "CH": "585", "MD": "585", "GD": "595", "EXG": "595"}},
+    {"label": "Secundaria pants 3pz", "sizes": ["10", "12", "14", "16", "CH", "MD", "GD", "EXG"], "prices": {"10": "695", "12": "695", "14": "705", "16": "705", "CH": "715", "MD": "715", "GD": "715", "EXG": "715"}},
+    {"label": "Bachillerato chamarra", "sizes": ["12", "14", "16", "CH", "MD", "GD", "EXG"], "prices": {"12": "385", "14": "385", "16": "385", "CH": "385", "MD": "385", "GD": "385", "EXG": "385"}},
+    {"label": "Bachillerato pants 2pz", "sizes": ["12", "14", "16", "CH", "MD", "GD", "EXG"], "prices": {"12": "485", "14": "495", "16": "495", "CH": "585", "MD": "585", "GD": "595", "EXG": "595"}},
+    {"label": "Bachillerato pants 3pz", "sizes": ["12", "14", "16", "CH", "MD", "GD", "EXG"], "prices": {"12": "695", "14": "705", "16": "705", "CH": "715", "MD": "715", "GD": "715", "EXG": "715"}},
+    # ── Oficial ──
+    {"label": "Suéter oficial (preescolar-primaria)", "sizes": ["4", "6", "8", "10"], "prices": {"4": "290", "6": "290", "8": "290", "10": "290"}},
+    {"label": "Suéter oficial (completo)", "sizes": ["4", "6", "8", "10", "12", "14", "16", "28", "30", "32", "34", "36", "38", "40", "42", "44", "46"], "prices": {"4": "289", "6": "289", "8": "289", "10": "299", "12": "299", "14": "299", "16": "299", "28": "309", "30": "309", "32": "309", "34": "309", "36": "315", "38": "315", "40": "315", "42": "315", "44": "325", "46": "325"}},
     {"label": "Chaleco oficial", "sizes": ["4", "6", "8", "10", "12", "14", "16", "28", "30", "32", "34", "36", "38", "40", "42", "44", "46"], "prices": {"4": "229", "6": "229", "8": "229", "10": "239", "12": "239", "14": "239", "16": "239", "28": "259", "30": "259", "32": "259", "34": "259", "36": "269", "38": "269", "40": "269", "42": "269", "44": "269", "46": "269"}},
-    # Básico — pants, chamarras, faldas, jumpers, camisas
+    {"label": "Camisa cuello olan", "sizes": ["2", "4", "6", "8", "10"], "prices": {"2": "139", "4": "139", "6": "139", "8": "139", "10": "139"}},
+    # ── Básico ──
     {"label": "Pants 2pz liso", "sizes": ["2", "4", "6", "8", "10", "12", "14", "16", "28", "CH", "MD", "GD", "EXG"], "prices": {"2": "250", "4": "250", "6": "250", "8": "250", "10": "265", "12": "265", "14": "265", "16": "265", "28": "315", "CH": "315", "MD": "325", "GD": "335", "EXG": "345"}},
     {"label": "Pants 2pz punto", "sizes": ["2", "4", "6", "8", "10", "12", "14", "16", "28", "CH", "MD", "GD", "EXG"], "prices": {"2": "475", "4": "475", "6": "475", "8": "475", "10": "495", "12": "495", "14": "495", "16": "495", "28": "525", "CH": "525", "MD": "535", "GD": "545", "EXG": "555"}},
     {"label": "Pants suelto liso", "sizes": ["2", "4", "6", "8", "10", "12", "14", "16", "28", "CH", "MD", "GD", "EXG"], "prices": {"2": "165", "4": "165", "6": "165", "8": "165", "10": "180", "12": "180", "14": "180", "16": "180", "28": "205", "CH": "205", "MD": "215", "GD": "225", "EXG": "235"}},
+    {"label": "Pants suelto punto", "sizes": ["2", "4", "6", "8", "10", "12", "14", "16", "28", "CH", "MD", "GD", "EXG"], "prices": {"2": "249", "4": "249", "6": "249", "8": "249", "10": "269", "12": "269", "14": "269", "16": "269", "28": "309", "CH": "309", "MD": "319", "GD": "319", "EXG": "339"}},
     {"label": "Chamarra liso", "sizes": ["2", "4", "6", "8", "10", "12", "14", "16", "28", "CH", "MD", "GD", "EXG"], "prices": {"2": "175", "4": "175", "6": "175", "8": "175", "10": "225", "12": "225", "14": "225", "16": "225", "28": "235", "CH": "235", "MD": "235", "GD": "235", "EXG": "235"}},
     {"label": "Chamarra punto", "sizes": ["2", "4", "6", "8", "10", "12", "14", "16", "28", "CH", "MD", "GD", "EXG"], "prices": {"2": "275", "4": "275", "6": "275", "8": "275", "10": "295", "12": "295", "14": "295", "16": "295", "28": "385", "CH": "385", "MD": "395", "GD": "405", "EXG": "415"}},
+    {"label": "Chaleco básico", "sizes": ["4", "6", "8", "10", "12", "14", "16", "28", "30", "32", "34", "36", "38", "40", "42", "44", "46"], "prices": {"4": "229", "6": "229", "8": "229", "10": "239", "12": "239", "14": "239", "16": "239", "28": "259", "30": "259", "32": "259", "34": "259", "36": "269", "38": "269", "40": "269", "42": "269", "44": "269", "46": "269"}},
+    {"label": "Suéter básico (completo)", "sizes": ["4", "6", "8", "10", "12", "14", "16", "28", "30", "32", "34", "36", "38", "40", "42", "44", "46"], "prices": {"4": "289", "6": "289", "8": "289", "10": "299", "12": "299", "14": "299", "16": "299", "28": "309", "30": "309", "32": "309", "34": "309", "36": "315", "38": "315", "40": "315", "42": "315", "44": "325", "46": "325"}},
     {"label": "Pantalón vestir", "sizes": ["2", "4", "6", "8", "10", "12", "14", "16", "18", "20", "28", "30", "32", "34", "36", "38", "40"], "prices": {"2": "235", "4": "235", "6": "235", "8": "235", "10": "245", "12": "245", "14": "255", "16": "255", "18": "265", "20": "265", "28": "275", "30": "275", "32": "285", "34": "285", "36": "295", "38": "295", "40": "295"}},
     {"label": "Falda tableada / cuatro tablas", "sizes": ["2", "4", "6", "8", "10", "12", "14", "16", "28", "30", "32", "34", "36", "38", "40", "42"], "prices": {"2": "195", "4": "195", "6": "195", "8": "195", "10": "195", "12": "195", "14": "195", "16": "205", "28": "205", "30": "205", "32": "215", "34": "215", "36": "225", "38": "225", "40": "235", "42": "235"}},
     {"label": "Jumper", "sizes": ["2", "4", "6", "8", "10", "12", "14", "16", "28", "30", "32", "34", "36", "38"], "prices": {"2": "249", "4": "249", "6": "249", "8": "249", "10": "269", "12": "269", "14": "269", "16": "289", "28": "289", "30": "309", "32": "309", "34": "319", "36": "329", "38": "329"}},
     {"label": "Camisa manga corta", "sizes": ["4", "6", "8", "10", "12", "14", "16", "28", "30", "32", "34", "36", "38", "40", "42"], "prices": {"4": "89", "6": "89", "8": "89", "10": "99", "12": "99", "14": "99", "16": "99", "28": "115", "30": "115", "32": "135", "34": "135", "36": "145", "38": "145", "40": "165", "42": "165"}},
-    # Malla — rangos especiales
+    # ── Accesorios ──
     {"label": "Malla escolar", "sizes": ["0-0", "0-2", "3-5", "6-8", "9-12", "13-18", "CH-MD", "GD-EXG", "Dama"], "prices": {"0-0": "109", "0-2": "109", "3-5": "109", "6-8": "109", "9-12": "129", "13-18": "139", "CH-MD": "139", "GD-EXG": "139", "Dama": "139"}},
-    # Accesorios
+    {"label": "Calceta escolar", "sizes": ["0-0", "0-2", "3-5", "6-8", "9-12", "13-18"], "prices": {"0-0": "49", "0-2": "49", "3-5": "49", "6-8": "49", "9-12": "49", "13-18": "49"}},
+    {"label": "Boina escolta", "sizes": ["Uni"], "prices": {"Uni": "80"}},
+    {"label": "Corbata / corbatín / moño", "sizes": ["Uni"], "prices": {"Uni": "70"}},
+    {"label": "Bata infantil", "sizes": ["Uni"], "prices": {"Uni": "65"}},
     {"label": "Unitalla accesorio", "sizes": ["Uni"], "prices": {"Uni": "70"}},
 ]
 
@@ -209,27 +222,41 @@ def suggest_presentation_template(criteria: dict[str, str]) -> str | None:
     attribute = str(criteria.get("attribute") or "").strip().casefold()
     education_level = str(criteria.get("education_level") or "").strip().casefold()
 
-    if garment_type == "accesorio" or piece_type == "accesorio":
-        return "Unitalla accesorio"
     if piece_type == "malla":
         return "Malla escolar"
+    if piece_type == "calceta":
+        return "Calceta escolar"
+    if piece_type == "boina":
+        return "Boina escolta"
+    if piece_type in ("corbata", "corbatín", "corbatin", "moño"):
+        return "Corbata / corbatín / moño"
+    if piece_type == "bata":
+        return "Bata infantil"
+    if garment_type == "accesorio" or piece_type == "accesorio":
+        return "Unitalla accesorio"
     if garment_type == "deportivo":
         level = education_level or "primaria"
         piece = _match_deportivo_piece(piece_type)
         if level == "preescolar":
             return f"Preescolar {piece}"
         if level == "secundaria":
-            return "Secundaria deportiva"
+            return f"Secundaria {piece}"
         if level == "bachillerato":
-            return "Bachillerato deportiva"
+            if piece == "playera":
+                return None
+            return f"Bachillerato {piece}"
         return f"Primaria {piece}"
     if garment_type == "oficial":
         if piece_type in ("suéter", "sueter"):
-            return "Suéter botones / cuello V (preescolar-primaria)"
+            if education_level in ("preescolar", "primaria", ""):
+                return "Suéter oficial (preescolar-primaria)"
+            return "Suéter oficial (completo)"
         if piece_type == "chaleco":
             return "Chaleco oficial"
+        if piece_type == "camisa" and attribute == "cuello olan":
+            return "Camisa cuello olan"
         return None
-    if garment_type == "basico":
+    if garment_type in ("basico", "básico"):
         if piece_type == "pantalón" and attribute == "vestir":
             return "Pantalón vestir"
         if piece_type == "falda":
@@ -238,12 +265,22 @@ def suggest_presentation_template(criteria: dict[str, str]) -> str | None:
             return "Jumper"
         if piece_type == "camisa":
             return "Camisa manga corta"
-        if piece_type in ("pants 2pz",):
+        if piece_type == "pants 2pz":
+            return "Pants 2pz liso" if attribute in ("liso", "") else "Pants 2pz punto"
+        if piece_type == "pants 3pz":
             return "Pants 2pz liso" if attribute in ("liso", "") else "Pants 2pz punto"
         if piece_type == "pants suelto":
-            return "Pants suelto liso"
+            return "Pants suelto liso" if attribute in ("liso", "") else "Pants suelto punto"
         if piece_type == "chamarra":
             return "Chamarra liso" if attribute in ("liso", "") else "Chamarra punto"
+        if piece_type in ("suéter", "sueter"):
+            return "Suéter básico (completo)"
+        if piece_type == "chaleco":
+            return "Chaleco básico"
+        return None
+    if garment_type == "escolta":
+        if piece_type == "boina":
+            return "Boina escolta"
         return None
     return None
 
