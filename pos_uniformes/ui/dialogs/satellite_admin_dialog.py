@@ -230,6 +230,7 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     meili_task_label.setObjectName("subtleLine")
 
     def refresh_meili_diagnostics() -> None:
+        import shutil
         from pathlib import Path
         # Conexion
         try:
@@ -241,7 +242,10 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
                 try:
                     client = _get_client()
                     stats = client.index("variantes").get_stats()
-                    meili_docs_label.setText(f"{stats.get('numberOfDocuments', '?')} documentos indexados")
+                    n_docs = getattr(stats, "number_of_documents", None)
+                    if n_docs is None:
+                        n_docs = stats.get("numberOfDocuments", "?") if isinstance(stats, dict) else "?"
+                    meili_docs_label.setText(f"{n_docs} documentos indexados")
                 except Exception:
                     meili_docs_label.setText("No se pudo leer stats del indice")
             else:
@@ -252,27 +256,53 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
             meili_status_label.setText("✗ No disponible")
             meili_status_label.setStyleSheet("color: red; font-weight: bold;")
             meili_docs_label.setText("—")
-        # Binario
-        bin_path = Path(r"C:\Meilisearch\meilisearch.exe")
+        # Binario — multiplataforma
+        if sys.platform == "win32":
+            bin_path = Path(r"C:\Meilisearch\meilisearch.exe")
+            found = bin_path.exists()
+            bin_display = str(bin_path)
+        else:
+            bin_which = shutil.which("meilisearch")
+            found = bin_which is not None
+            bin_display = bin_which or "meilisearch"
         meili_binary_label.setText(
-            f"✓ Binario: {bin_path}" if bin_path.exists() else "✗ Binario no encontrado"
+            f"✓ Binario: {bin_display}" if found else "✗ Binario no encontrado"
         )
-        # Tarea programada
-        try:
-            import subprocess
-            result = subprocess.run(
-                ["schtasks", "/Query", "/TN", "MeilisearchPOS", "/FO", "CSV", "/NH"],
-                capture_output=True, text=True, timeout=5,
-                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            )
-            if result.returncode == 0 and "MeilisearchPOS" in result.stdout:
-                meili_task_label.setText("✓ Tarea programada 'MeilisearchPOS' activa")
-                meili_task_label.setStyleSheet("color: green;")
-            else:
-                meili_task_label.setText("✗ Sin tarea programada (no arranca al encender PC)")
-                meili_task_label.setStyleSheet("color: orange;")
-        except Exception:
-            meili_task_label.setText("? No se pudo verificar tarea programada")
+        meili_binary_label.setStyleSheet("color: green;" if found else "color: orange;")
+        # Tarea programada / servicio
+        if sys.platform == "win32":
+            try:
+                import subprocess
+                result = subprocess.run(
+                    ["schtasks", "/Query", "/TN", "MeilisearchPOS", "/FO", "CSV", "/NH"],
+                    capture_output=True, text=True, timeout=5,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
+                if result.returncode == 0 and "MeilisearchPOS" in result.stdout:
+                    meili_task_label.setText("✓ Tarea programada 'MeilisearchPOS' activa")
+                    meili_task_label.setStyleSheet("color: green;")
+                else:
+                    meili_task_label.setText("✗ Sin tarea programada (no arranca al encender PC)")
+                    meili_task_label.setStyleSheet("color: orange;")
+            except Exception:
+                meili_task_label.setText("? No se pudo verificar tarea programada")
+        elif sys.platform == "darwin":
+            try:
+                import subprocess
+                result = subprocess.run(
+                    ["pgrep", "-x", "meilisearch"],
+                    capture_output=True, text=True, timeout=5,
+                )
+                if result.returncode == 0:
+                    meili_task_label.setText("✓ Proceso meilisearch activo")
+                    meili_task_label.setStyleSheet("color: green;")
+                else:
+                    meili_task_label.setText("— Proceso no detectado (puede estar en otra maquina)")
+                    meili_task_label.setStyleSheet("color: orange;")
+            except Exception:
+                meili_task_label.setText("? No se pudo verificar proceso")
+        else:
+            meili_task_label.setText("— Verificacion no disponible en esta plataforma")
 
     refresh_meili_diagnostics()
 
