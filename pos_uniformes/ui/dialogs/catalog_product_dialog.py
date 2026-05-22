@@ -1135,13 +1135,14 @@ def build_catalog_product_dialog(
         template_entry = template_combo.currentData()
         if not isinstance(template_entry, dict):
             return
+        if is_uniform_product_mode():
+            target_index = product_mode_combo.findData("regular")
+            if target_index >= 0:
+                product_mode_combo.setCurrentIndex(target_index)
         defaults = product_template_defaults(template_entry)
         category_name = defaults["category"]
         if category_name:
-            if is_uniform_product_mode():
-                ensure_uniform_category()
-            else:
-                select_combo_text(categoria_combo, category_name)
+            select_combo_text(categoria_combo, category_name)
         brand_name = defaults["brand"]
         if brand_name and not is_placeholder_brand(brand_name):
             select_combo_text(marca_combo, brand_name)
