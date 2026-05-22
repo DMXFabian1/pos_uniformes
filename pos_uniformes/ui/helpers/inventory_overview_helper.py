@@ -66,6 +66,7 @@ def build_inventory_overview_view(
     product_active: bool,
     variant_active: bool,
     stock_actual: int,
+    stock_minimo: int | None = None,
     apartado_cantidad: int,
     talla: str,
     color: str,
@@ -79,8 +80,12 @@ def build_inventory_overview_view(
     movement_date: str,
 ) -> InventoryOverviewView:
     clean_product_name = sanitize_product_display_name(product_name)
-    stock_status = "agotado" if stock_actual == 0 else "bajo" if stock_actual <= 3 else "saludable"
-    stock_tone = resolve_stock_tone(stock_actual)
+    is_virtual = stock_minimo is not None and stock_minimo < 0
+    if is_virtual:
+        stock_status = "virtual"
+    else:
+        stock_status = "agotado" if stock_actual == 0 else "bajo" if stock_actual <= 3 else "saludable"
+    stock_tone = resolve_stock_tone(stock_actual, stock_minimo=stock_minimo)
     if movement_type is None or movement_quantity is None:
         last_movement_label = "Sin movimientos registrados."
     else:

@@ -6,7 +6,9 @@ _LOW_STOCK_THRESHOLD = 3
 
 
 def resolve_stock_tone(stock: int, *, stock_minimo: int | None = None) -> str:
-    """danger=0, warning=bajo/bajo_minimo, positive=saludable."""
+    """danger=0, warning=bajo/bajo_minimo, positive=saludable, neutral=virtual."""
+    if stock_minimo is not None and stock_minimo < 0:
+        return "neutral"
     if stock == 0:
         return "danger"
     below_min = stock_minimo is not None and stock < stock_minimo

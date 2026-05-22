@@ -11775,6 +11775,7 @@ class MainWindow(QMainWindow):
                         product_active=overview_snapshot.product_active,
                         variant_active=overview_snapshot.variant_active,
                         stock_actual=overview_snapshot.stock_actual,
+                        stock_minimo=overview_snapshot.stock_minimo,
                         apartado_cantidad=overview_snapshot.apartado_cantidad,
                         talla=overview_snapshot.talla,
                         color=overview_snapshot.color,

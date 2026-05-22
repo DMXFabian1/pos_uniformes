@@ -24,6 +24,7 @@ class InventoryOverviewSnapshot:
     escuela_nombre: str
     tipo_prenda_nombre: str
     tipo_pieza_nombre: str
+    stock_minimo: int | None
     movement_type: str | None
     movement_quantity: int | None
     movement_date: str
@@ -59,6 +60,7 @@ def load_inventory_overview_snapshot(
         product_active=bool(matching_row["producto_activo"]) if matching_row is not None else True,
         variant_active=bool(matching_row["variante_activo"]) if matching_row is not None else bool(variante.activo),
         stock_actual=int(variante.stock_actual),
+        stock_minimo=int(variante.stock_minimo) if variante.stock_minimo is not None else None,
         apartado_cantidad=int(matching_row["apartado_cantidad"]) if matching_row is not None else 0,
         talla=str(variante.talla),
         color=str(variante.color),

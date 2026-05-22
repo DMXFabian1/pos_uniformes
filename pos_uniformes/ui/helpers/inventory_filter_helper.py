@@ -91,6 +91,8 @@ def _matches_inventory_use_filter(category_name: str, use_filter: str) -> bool:
 
 
 def _matches_inventory_stock_filter(stock_actual: int, stock_filter: str, *, stock_minimo: int | None = None) -> bool:
+    if stock_minimo is not None and stock_minimo < 0:
+        return not stock_filter or stock_filter == "available"
     below_min = stock_minimo is not None and stock_actual < stock_minimo
     return (
         not stock_filter
