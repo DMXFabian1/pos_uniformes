@@ -993,14 +993,15 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_product_scroll = QScrollArea()
         self.guided_product_scroll.setWidgetResizable(True)
         self.guided_product_scroll.setFrameShape(QFrame.Shape.NoFrame)
-        self.guided_product_scroll.setMinimumHeight(160)
+        self.guided_product_scroll.setMinimumHeight(180)
         self.guided_product_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.guided_product_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         self.guided_product_scroll.setObjectName("guidedScrollArea")
         self.guided_product_scroll.viewport().setObjectName("guidedScrollViewport")
         self.guided_product_container = QWidget()
         self.guided_product_container.setObjectName("guidedGridSurface")
         self.guided_product_container.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
-        self.guided_product_flow_layout = FlowLayout(margin=0, h_spacing=4, v_spacing=8)
+        self.guided_product_flow_layout = FlowLayout(margin=4, h_spacing=6, v_spacing=6)
         self.guided_product_container.setLayout(self.guided_product_flow_layout)
         self.guided_product_scroll.setWidget(self.guided_product_container)
         products_section_layout.addWidget(self.guided_products_title_label)
@@ -2568,21 +2569,29 @@ class QuoteSatelliteWindow(QMainWindow):
             product_btn = self._build_guided_product_button(card)
             product_btn.setChecked(self._gfs.product_key == card.key)
             product_btn.clicked.connect(lambda checked=False, selected=card.key: self._handle_guided_product_selected(selected))
+            # Corazón como overlay dentro del botón
             is_fav = card.key in self._favorites
-            heart_btn = QPushButton("♥" if is_fav else "♡")
-            heart_btn.setObjectName("favoriteButton")
-            heart_btn.setFixedHeight(28)
+            heart_btn = QPushButton("♥" if is_fav else "♡", product_btn)
+            heart_btn.setObjectName("favoriteOverlayButton")
+            heart_btn.setFixedSize(26, 26)
             heart_btn.setCheckable(True)
             heart_btn.setChecked(is_fav)
+            heart_btn.setCursor(Qt.CursorShape.PointingHandCursor)
             heart_btn.setToolTip("Quitar de favoritos" if is_fav else "Agregar a favoritos")
+            heart_btn.setStyleSheet(
+                "QPushButton { background: transparent; border: none; font-size: 16px;"
+                " color: #c4b9a8; padding: 0; }"
+                "QPushButton:checked { color: #c45425; }"
+                "QPushButton:hover { color: #a84f2d; }"
+            )
             heart_btn.clicked.connect(lambda checked=False, key=card.key: self._handle_toggle_favorite(key))
-            container = QWidget()
-            container_layout = QVBoxLayout(container)
-            container_layout.setContentsMargins(0, 0, 0, 0)
-            container_layout.setSpacing(2)
-            container_layout.addWidget(product_btn)
-            container_layout.addWidget(heart_btn)
-            self.guided_product_flow_layout.addWidget(container)
+            # Posicionar en esquina superior derecha
+            heart_btn.move(product_btn.width() - 30, 4)
+            _orig_resize = product_btn.resizeEvent
+            product_btn.resizeEvent = lambda event, hb=heart_btn, pb=product_btn, orig=_orig_resize: (
+                orig(event), hb.move(pb.width() - 30, 4)
+            )
+            self.guided_product_flow_layout.addWidget(product_btn)
             self.guided_product_buttons[card.key] = product_btn
 
     def _confirm_favorites_password(self, action: str) -> bool:
