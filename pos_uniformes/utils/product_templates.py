@@ -6,25 +6,10 @@ from html import escape
 from pathlib import Path
 import json
 
-LEGACY_PRODUCT_TEMPLATES_PATH = (
-    Path(__file__).resolve().parents[2] / "Gestor_de_Inventarios" / "plantillas_productos.json"
-)
 LEGACY_CONFIG_PATH = (
     Path(__file__).resolve().parents[2] / "Gestor_de_Inventarios" / "src" / "core" / "config" / "config.json"
 )
 
-_OMIT_LABELS = {
-    "tipo_prenda": "tipo de prenda",
-    "tipo_pieza": "tipo de pieza",
-    "marca": "marca",
-    "atributo": "atributo",
-    "genero": "genero",
-    "nivel_educativo": "nivel educativo",
-    "escuela": "escuela",
-    "ubicacion": "ubicacion",
-    "escudo": "escudo",
-    "colores": "colores",
-}
 
 BASE_STEP_TEMPLATES: list[dict[str, object]] = [
     # Deportivos — nombre: [Pieza] Deportiva/o [Escuela]
@@ -111,54 +96,6 @@ PRESENTATION_STEP_TEMPLATES: list[dict[str, object]] = [
     {"label": "Unitalla accesorio", "sizes": ["Uni"], "colors": ["Sin color"]},
 ]
 
-
-def load_legacy_product_templates(path: Path | None = None) -> list[dict[str, object]]:
-    """Carga las plantillas del sistema legacy y las normaliza para el formulario nuevo."""
-
-    template_path = (path or LEGACY_PRODUCT_TEMPLATES_PATH).expanduser().resolve()
-    if not template_path.exists():
-        return []
-
-    try:
-        raw_data = json.loads(template_path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return []
-
-    templates: list[dict[str, object]] = []
-    for raw_template in raw_data.get("plantillas", []):
-        if not isinstance(raw_template, dict):
-            continue
-        template_name = str(raw_template.get("nombre_plantilla") or "").strip()
-        if not template_name:
-            continue
-        schools = _clean_string_list(raw_template.get("escuelas"))
-        sizes = _clean_string_list(raw_template.get("tallas"))
-        colors = _clean_string_list(raw_template.get("colores"))
-        omit_values = {
-            str(key): bool(value)
-            for key, value in (raw_template.get("omitir") or {}).items()
-        }
-        templates.append(
-            {
-                "source": "legacy",
-                "label": f"Legacy | {template_name}",
-                "name": template_name,
-                "tipo_prenda": str(raw_template.get("tipo_prenda") or "").strip(),
-                "tipo_pieza": str(raw_template.get("tipo_pieza") or "").strip(),
-                "marca": str(raw_template.get("marca") or "").strip(),
-                "atributo": str(raw_template.get("atributo") or "").strip(),
-                "genero": str(raw_template.get("genero") or "").strip(),
-                "nivel_educativo": str(raw_template.get("nivel_educativo") or "").strip(),
-                "ubicacion": str(raw_template.get("ubicacion") or "").strip(),
-                "escudo": str(raw_template.get("escudo") or "").strip(),
-                "precio": str(raw_template.get("precio") or "").strip(),
-                "escuelas": schools,
-                "tallas": sizes,
-                "colores": colors,
-                "omitir": omit_values,
-            }
-        )
-    return templates
 
 
 def load_step_product_templates(step: str) -> list[dict[str, object]]:
@@ -398,69 +335,6 @@ def merge_choice_lists(*groups: list[str]) -> list[str]:
 def build_product_template_preview(template_entry: dict[str, object]) -> str:
     """Genera un resumen compacto en HTML de la plantilla seleccionada."""
 
-    source = str(template_entry.get("source") or "builtin")
-    if source == "legacy":
-        schools = _clean_string_list(template_entry.get("escuelas"))
-        sizes = _clean_string_list(template_entry.get("tallas"))
-        colors = _clean_string_list(template_entry.get("colores"))
-        school_preview = _format_list_preview(schools, max_items=3)
-        size_preview = _format_list_preview(sizes)
-        color_preview = _format_list_preview(colors, max_items=5)
-        omitted = [
-            label
-            for key, label in _OMIT_LABELS.items()
-            if bool((_omitir := template_entry.get("omitir")) and isinstance(_omitir, dict) and _omitir.get(key))
-        ]
-        title = f"Legacy | {str(template_entry.get('name') or '').strip() or '-'}"
-        primary_parts = [
-            str(template_entry.get("tipo_prenda") or "").strip() or "-",
-            str(template_entry.get("tipo_pieza") or "").strip() or "-",
-            str(template_entry.get("atributo") or "").strip() or "-",
-        ]
-        secondary_parts = [
-            f"{len(sizes)} talla{'s' if len(sizes) != 1 else ''}" if sizes else "sin tallas",
-            f"{len(colors)} color{'es' if len(colors) != 1 else ''}" if colors else "sin colores",
-            (
-                f"{len(schools)} escuela{'s' if len(schools) != 1 else ''}"
-                if schools
-                else "sin escuela fija"
-            ),
-        ]
-        context_parts = []
-        if str(template_entry.get("nivel_educativo") or "").strip():
-            context_parts.append(str(template_entry.get("nivel_educativo") or "").strip())
-        if str(template_entry.get("genero") or "").strip():
-            context_parts.append(str(template_entry.get("genero") or "").strip())
-        if str(template_entry.get("escudo") or "").strip():
-            context_parts.append(str(template_entry.get("escudo") or "").strip())
-        if str(template_entry.get("ubicacion") or "").strip():
-            context_parts.append(str(template_entry.get("ubicacion") or "").strip())
-        if str(template_entry.get("precio") or "").strip():
-            context_parts.append(f"${str(template_entry.get('precio') or '').strip()}")
-        if str(template_entry.get("marca") or "").strip():
-            context_parts.append(str(template_entry.get("marca") or "").strip())
-        note_parts = []
-        if omitted:
-            note_parts.append(f"Omitidos: {', '.join(omitted)}")
-        if len(schools) > 1:
-            note_parts.append(
-                "Incluye varias escuelas; aqui solo se usan como referencia visual antes del alta por lote."
-            )
-        if sizes or colors:
-            note_parts.append(
-                "Revisa tallas y colores antes de aplicar para evitar cambios manuales despues."
-            )
-        return (
-            f"<div><b>{escape(title)}</b></div>"
-            f"<div>{escape(' · '.join(primary_parts))}</div>"
-            f"<div>{escape(' · '.join(secondary_parts + context_parts[:2]))}</div>"
-            f"<div style='margin-top:4px; color:#6f665f;'><b>Escuelas:</b> {escape(school_preview)}</div>"
-            f"<div style='color:#6f665f;'><b>Tallas:</b> {escape(size_preview)}</div>"
-            f"<div style='color:#6f665f;'><b>Colores:</b> {escape(color_preview)}</div>"
-            f"<div style='color:#6f665f;'>{escape(' · '.join(context_parts[2:])) if len(context_parts) > 2 else '&nbsp;'}</div>"
-            f"<div style='margin-top:4px; color:#7e3a22;'>{escape(' | '.join(note_parts)) if note_parts else 'Lista para revisar y aplicar.'}</div>"
-        )
-
     title = str(template_entry.get("label") or "").strip() or "-"
     category = str(template_entry.get("category") or "").strip() or "-"
     name = str(template_entry.get("name") or "").strip() or "-"
@@ -475,24 +349,6 @@ def build_product_template_preview(template_entry: dict[str, object]) -> str:
 
 def product_template_defaults(template_entry: dict[str, object]) -> dict[str, str]:
     """Mapea una plantilla a los campos editables del producto base."""
-
-    source = str(template_entry.get("source") or "builtin")
-    if source == "legacy":
-        schools = _clean_string_list(template_entry.get("escuelas"))
-        return {
-            "category": "",
-            "name": str(template_entry.get("name") or "").strip(),
-            "description": "",
-            "brand": str(template_entry.get("marca") or "").strip(),
-            "school": schools[0] if len(schools) == 1 else "",
-            "garment_type": str(template_entry.get("tipo_prenda") or "").strip(),
-            "piece_type": str(template_entry.get("tipo_pieza") or "").strip(),
-            "attribute": str(template_entry.get("atributo") or "").strip(),
-            "education_level": str(template_entry.get("nivel_educativo") or "").strip(),
-            "gender": str(template_entry.get("genero") or "").strip(),
-            "shield": str(template_entry.get("escudo") or "").strip(),
-            "location": str(template_entry.get("ubicacion") or "").strip(),
-        }
 
     return {
         "category": str(template_entry.get("category") or "").strip(),

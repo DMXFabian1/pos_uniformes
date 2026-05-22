@@ -70,7 +70,6 @@ from pos_uniformes.utils.product_templates import (
     build_product_template_preview,
     build_step_template_preview,
     load_legacy_config_choices,
-    load_legacy_product_templates,
     load_step_product_templates,
     merge_choice_lists,
     product_template_defaults,
@@ -182,7 +181,6 @@ def build_catalog_product_dialog(
         width=1040,
         expand_to_screen=True,
     )
-    legacy_templates = load_legacy_product_templates()
     template_entries: list[dict[str, object]] = [
         {
             "source": "builtin",
@@ -193,7 +191,6 @@ def build_catalog_product_dialog(
         }
         for template in product_templates
     ]
-    template_entries.extend(legacy_templates)
     base_step_templates = load_step_product_templates("base")
     context_step_templates = load_step_product_templates("context")
     presentation_step_templates = load_step_product_templates("presentation")
