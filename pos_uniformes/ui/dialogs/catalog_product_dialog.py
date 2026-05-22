@@ -1049,6 +1049,7 @@ def build_catalog_product_dialog(
             {
                 "garment_type": tipo_prenda_combo.currentText(),
                 "piece_type": tipo_pieza_combo.currentText(),
+                "attribute": atributo_combo.currentText(),
                 "education_level": nivel_combo.currentText(),
                 "gender": genero_input.currentText(),
             }
@@ -1267,16 +1268,16 @@ def build_catalog_product_dialog(
             return
         defaults = step_template_defaults("presentation", template_entry)
         variant_sizes_button.set_selected_values(list(defaults.get("sizes", [])))
-        variant_colors_button.set_selected_values(list(defaults.get("colors", [])))
-        if defaults.get("price"):
-            variant_price_input.setText(str(defaults["price"]))
-            price_mode_state["manual_override"] = False
-            target_index = price_mode_combo.findData("single")
+        prices = defaults.get("prices")
+        if isinstance(prices, dict) and prices:
+            price_value_store["manual"] = dict(prices)
+            price_mode_state["manual_override"] = True
+            target_index = price_mode_combo.findData("manual")
             if target_index >= 0:
                 price_mode_combo.setCurrentIndex(target_index)
         if defaults.get("stock"):
             variant_stock_spin.setValue(int(defaults["stock"]))
-        sync_price_mode_suggestion(force=not bool(defaults.get("price")))
+        update_price_inputs_ui()
         update_capture_summary()
         update_review_details()
 
@@ -1392,7 +1393,7 @@ def build_catalog_product_dialog(
     generate_name_button.clicked.connect(lambda: sync_name_suggestion(force=True))
     nombre_input.textEdited.connect(handle_name_manual_edit)
     marca_combo.currentTextChanged.connect(lambda _: sync_name_suggestion())
-    atributo_combo.currentTextChanged.connect(lambda _: sync_name_suggestion())
+    atributo_combo.currentTextChanged.connect(lambda _: (sync_name_suggestion(), update_presentation_template_suggestion()))
     escuela_combo.currentTextChanged.connect(lambda _: (update_final_name_preview(), update_capture_summary()))
     tipo_prenda_combo.currentTextChanged.connect(
         lambda _: (update_final_name_preview(), update_capture_summary(), update_presentation_template_suggestion(), sync_price_mode_suggestion())
