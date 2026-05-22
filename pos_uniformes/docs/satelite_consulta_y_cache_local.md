@@ -1,170 +1,124 @@
-# Satelite de consulta y cache local futuro
+# Satelite de Presupuestos — Arquitectura y modo offline
 
 ## Contexto
 
-La app satelite de `Presupuestos` ya puede operar conectandose por red local a la base PostgreSQL que vive en la PC principal.
+La app satelite de Presupuestos (`presupuestos_satelite_main.py`) opera como terminal de consulta y presupuesto conectada por red local a la base PostgreSQL de la PC principal. Tambien puede operar sin conexion usando un cache local de lectura.
 
-La decision de producto actual es mantener el satelite como una terminal de consulta y presupuesto:
+## Alcance operativo
 
-- consulta precios reales
-- consulta catalogo real
-- arma presupuestos
-- no cobra
-- no descuenta inventario
-- no sustituye a `Caja`
+El satelite es una terminal de:
 
-Esto reduce mucho el riesgo operativo y permite validar el flujo real sin sobrecomplicar la arquitectura.
+- consulta de precios y productos (catalogo completo con tallas, colores, SKUs)
+- armado y guardado de presupuestos
+- busqueda guiada por escuela, tipo de prenda, genero y nivel
+- consulta rapida por SKU (kiosko)
+- busqueda por texto libre (Meilisearch cuando hay conexion)
+- favoritos locales por pieza
 
-## Decision actual
+No es una terminal de:
 
-### Fuente de verdad
+- cobro ni corte de caja
+- inventario ni stock
+- apartados
+- administracion de catalogo
 
-- la PC principal sigue siendo la fuente de verdad
-- PostgreSQL vive en la PC principal
-- la app satelite actua como cliente conectado a esa base
+## Arquitectura de arranque
 
-### Alcance operativo del satelite
+### Flujo de inicio (`presupuestos_satelite_main.py`)
 
-Por ahora el satelite se considera una terminal de:
+1. `probe_database_host()` — TCP probe al host:puerto de PostgreSQL (timeout 3s)
+2. Si hay conexion:
+   - `init_db()` para asegurar schema
+   - `assert_database_ready()` preflight check
+   - `notify_catalog_changed()` para Meilisearch (tolerante a fallos)
+   - `resolve_satellite_operator_id()` — selecciona usuario CAJERO o ADMIN activo
+   - Abre `QuoteSatelliteWindow(user_id=..., offline_mode=False)`
+3. Si no hay conexion:
+   - `load_catalog_cache()` — carga snapshot JSON local
+   - Si no hay cache: mensaje de error y cierre
+   - Si hay cache: abre `QuoteSatelliteWindow(user_id=None, offline_mode=True, offline_catalog_cache=...)`
 
-- consulta de precios
-- consulta de productos
-- armado de presupuestos
-- pruebas reales de atencion en piso
+### Servicios de soporte
 
-No debe considerarse todavia una terminal de:
+| Servicio | Archivo | Funcion |
+|----------|---------|---------|
+| Probe TCP | `satellite_startup_service.py` | Verifica host vivo sin SQLAlchemy |
+| Cache catalogo | `catalog_local_cache_service.py` | Snapshot JSON con escritura atomica |
+| Presupuestos offline | `offline_quote_storage_service.py` | JSON local, no se sincronizan |
+| Favoritos | `satellite_favorites_service.py` | JSON local con escritura atomica, seed desde bundle |
+| Cache links escuela | `school_links_cache_service.py` | Asociaciones escuela-producto para guiado |
 
-- cobro
-- corte
-- inventario
-- apartados sensibles
-- operacion offline completa
+## Modo conectado
 
-## Ventajas del enfoque actual
+- Fuente de verdad: PostgreSQL en PC principal
+- Presupuestos se guardan en DB via `presupuesto_service`
+- Catalogo se obtiene via `catalog_snapshot_service` y se indexa en memoria con `_sku_index` (O(1))
+- Meilisearch disponible para busqueda de texto libre (limite 100 resultados)
+- Al guardar presupuesto se actualiza el cache local para futuro uso offline
 
-- se prueba con productos y precios reales
-- no se duplica catalogo
-- no hace falta instalar el POS principal en la satelite
-- se valida la UX real del kiosko/presupuesto antes de construir mas complejidad
+## Modo offline
 
-## Limite actual
+- Banner visible `Sin conexion — usando catalogo guardado localmente`
+- Catalogo cargado desde `satellite_data_dir()/data/catalog_cache.json`
+- Presupuestos se guardan localmente en `offline_quotes.json` (no se sincronizan)
+- Funciones deshabilitadas: reindexar Meilisearch, compartir presupuesto, administracion
+- Favoritos funcionan igual (son siempre locales)
+- Cantidades del carrito se modifican en memoria sin acceso a DB
 
-La PC principal debe permanecer encendida para que la satelite funcione.
+## Interfaz de usuario
 
-Si la principal se apaga o la red local falla:
+### Paginas principales (tabs)
 
-- la satelite no puede consultar la base
-- la satelite no puede traer precios en vivo
-- la satelite no puede operar como hoy
+1. **Catalogo** — tabla con busqueda por texto, filtro por escuela/genero/nivel
+2. **Presupuesto guiado** — flujo paso a paso: escuela > genero > nivel > tipo prenda > producto > tallas
+3. **Kiosko** — busqueda rapida por SKU con campo de texto grande
+4. **Presupuestos** — lista de presupuestos guardados, detalle, compartir por WhatsApp
+5. **Administracion** — reindexar Meilisearch, diagnostico de conexion (solo conectado)
 
-## Que NO se quiere hacer todavia
+### Carrito lateral
 
-No se recomienda en esta etapa:
+- Sidebar fijo con items del presupuesto activo
+- Botones +/- para cantidad (online: DB, offline: memoria)
+- Eliminar items individuales
+- Boton para guardar/compartir presupuesto
 
-- una replica completa de la base en la satelite
-- sincronizacion general de toda la operacion
-- permitir cobros offline
-- mezclar esta mejora con `Caja` o `Inventario`
+### UX tactil
 
-Eso elevaria demasiado el riesgo para la etapa actual.
+- `QScroller` habilitado en todas las tablas y scroll areas
+- Botones de producto en FlowLayout con corazones de favorito como overlay
+- Debounce de 300ms en campo de filtro de presupuestos
+- Scroll areas con politica `ScrollBarAsNeeded`
 
-## Mejora futura recomendada
+## Persistencia local
 
-La siguiente evolucion razonable del satelite no es una replica completa, sino una `cache local de lectura`.
+Todos los archivos locales se guardan en `satellite_data_dir()`:
 
-Tambien conviene que el propio programa haga el chequeo de arranque, en lugar de depender siempre de un script externo.
+```
+<satellite_data_dir>/
+  data/
+    catalog_cache.json      — snapshot del catalogo
+    favorites.json          — product_keys favoritos
+    offline_quotes.json     — presupuestos sin conexion
+    school_links_cache.json — asociaciones escuela-producto
+```
 
-### Objetivo de esa cache
+La escritura de archivos usa el patron atomico `tempfile.mkstemp` + `os.replace` para evitar corrupcion por cortes de energia o cierres abruptos.
 
-Permitir continuidad minima si la principal no esta disponible temporalmente.
+## Build y distribucion (Windows)
 
-### Alcance sugerido v1
+El satelite se empaqueta con PyInstaller. `seed_favorites_from_bundle()` copia favoritos del bundle al AppData si no existen, permitiendo que favoritos marcados en desarrollo lleguen al build sin sobreescribir los de la empleada.
 
-- al iniciar, intentar validar la configuracion de conexion y regenerar lo minimo necesario para abrir contra la PC principal
-- recordar la ultima configuracion valida de conexion usada por la satelite
-- guardar localmente un snapshot ligero del catalogo visible
-- guardar localmente precios
-- permitir consulta de precio y producto aun sin conexion usando el ultimo snapshot local valido
-- mostrar claramente que el satelite esta en `modo cache`
+## Decisiones de diseno
 
-### Aclaracion importante
-
-No se propone "usar la ultima base de datos" como si la satelite tuviera una copia completa operativa.
-
-La idea correcta es:
-
-- recordar la ultima configuracion valida
-- intentar conectar en cada arranque
-- si no conecta, degradar a `modo cache`
-- usar solo el ultimo snapshot local de lectura para catalogo y precios
-
-Eso evita prometer una operacion offline mas grande de la que realmente existe.
-
-### Lo que no debe hacer esa cache v1
-
-- no cobrar
-- no confirmar ventas
-- no alterar inventario
-- no empujar cambios automaticos complejos
-
-## Posible evolucion posterior
-
-Solo si el uso real lo justifica, evaluar una segunda iteracion:
-
-- borradores de presupuesto offline
-- estado `pendiente de sincronizar`
-- envio posterior a la principal cuando regrese la conexion
-
-Esto debe considerarse un subproyecto aparte, no un parche.
-
-## Propuesta tecnica por fases
-
-### Fase 1. Operacion conectada estable
-
-- mantener la principal como host PostgreSQL
-- estabilizar `pos_uniformes.env` de la satelite
-- validar flujo real de consulta y presupuesto
-- observar dependencias reales de red y tiempos de uso
-
-### Fase 2. Cache local de lectura
-
-- integrar el chequeo de arranque dentro de la app satelite
-- validar o regenerar automaticamente la configuracion de conexion al abrir
-- exportar o sincronizar snapshot de catalogo/precios al iniciar cuando si haya conexion
-- permitir modo lectura si no hay conexion usando el ultimo snapshot local
-- mostrar banner visible `Sin conexion / usando cache`
-
-### Fase 3. Borradores offline
-
-- guardar borradores localmente
-- marcarlos como pendientes
-- sincronizarlos al reconectar
-
-## Riesgos a cuidar
-
-- no confundir cache con fuente de verdad
-- no mostrar precios stale sin advertencia visible
-- no permitir operaciones sensibles en modo degradado
-- no duplicar presupuestos si despues se agrega sincronizacion
-
-## Senales para decidir si vale la pena programarlo
-
-Conviene avanzar esta mejora si se observa en piso que:
-
-- el satelite se usa varias horas al dia
-- la principal no siempre puede quedar encendida
-- la red local se cae de forma perceptible
-- el operador necesita seguir consultando precios aunque no pueda emitir nada
-
-## Anotaciones de UX detectadas en prueba real
-
-- el boton `Agregar al presupuesto` debe ganar protagonismo visual dentro del satelite
-- en ciertas resoluciones o distribuciones de la ventana, la accion queda demasiado abajo o puede sentirse tapada por la densidad de la pestaña
-- antes de mover logica, conviene revisar layout y jerarquia visual para que la accion principal del flujo quede siempre evidente
-- si la satelite va a operar como kiosko tactil, conviene evaluar scroll por arrastre mas natural en tablas y listados, para no depender de barras finas o rueda de mouse
+- **TCP probe vs SQLAlchemy**: el probe TCP es mas rapido (~3s) porque no necesita autenticacion ni negociacion de protocolo
+- **SKU index O(1)**: `_rebuild_sku_index()` construye un dict `sku -> row` al cargar el catalogo, reemplazando busquedas lineales O(n)
+- **Favoritos locales**: cada satelite tiene sus propios favoritos, no se sincronizan a la DB
+- **Sin sincronizacion de presupuestos offline**: los presupuestos creados sin conexion son locales y no se envian a la DB al reconectar — esto es intencional para evitar duplicados y conflictos
 
 ## Estado
 
-- `2026-04-11`: decision de producto tomada
-- `2026-04-11`: documentado como frente futuro
-- implementacion pospuesta hasta terminar la etapa de validacion operativa del satelite conectado
+- `2026-04-11`: decision de producto — satelite como terminal de consulta
+- `2026-04-20`: modo offline implementado (Fase 2 del plan original)
+- `2026-04-20`: presupuestos offline implementados (Fase 3 del plan original)
+- `2026-05-21`: fix bugs offline (refresh, cantidades, reindex sin DB, escritura atomica)
+- `2026-05-22`: corazones overlay en botones de producto, mejoras de spacing
