@@ -13,15 +13,15 @@ LEGACY_CONFIG_PATH = (
 
 BASE_STEP_TEMPLATES: list[dict[str, object]] = [
     # Deportivos — nombre: [Pieza] Deportiva/o [Escuela]
-    {"label": "Playera deportiva", "name": "Playera Deportiva", "piece_type": "Playera", "garment_type": "Deportivo", "description": "Playera deportiva escolar. Color por escuela."},
-    {"label": "Chamarra deportiva", "name": "Chamarra Deportiva", "piece_type": "Chamarra", "garment_type": "Deportivo", "description": "Chamarra deportiva escolar. Color por escuela."},
-    {"label": "Pants 2pz deportivo", "name": "Pants 2pz Deportivo", "piece_type": "Pants 2pz", "garment_type": "Deportivo", "description": "Conjunto deportivo de dos piezas."},
-    {"label": "Pants 3pz deportivo", "name": "Pants 3pz Deportivo", "piece_type": "Pants 3pz", "garment_type": "Deportivo", "description": "Conjunto deportivo de tres piezas."},
+    {"label": "Playera deportiva", "name": "Playera Deportiva", "piece_type": "Playera", "gender": "Unisex", "garment_type": "Deportivo", "description": "Playera deportiva escolar. Color por escuela."},
+    {"label": "Chamarra deportiva", "name": "Chamarra Deportiva", "piece_type": "Chamarra", "gender": "Unisex", "garment_type": "Deportivo", "description": "Chamarra deportiva escolar. Color por escuela."},
+    {"label": "Pants 2pz deportivo", "name": "Pants 2pz Deportivo", "piece_type": "Pants 2pz", "gender": "Unisex", "garment_type": "Deportivo", "description": "Conjunto deportivo de dos piezas."},
+    {"label": "Pants 3pz deportivo", "name": "Pants 3pz Deportivo", "piece_type": "Pants 3pz", "gender": "Unisex", "garment_type": "Deportivo", "description": "Conjunto deportivo de tres piezas."},
     # Básicos — nombre: [Pieza] [Atributo] [Color]
-    {"label": "Pants 2pz liso", "name": "Pants 2pz Liso", "piece_type": "Pants 2pz", "attribute": "Liso", "garment_type": "Basico", "description": "Conjunto basico de dos piezas liso."},
-    {"label": "Pants 2pz punto", "name": "Pants 2pz Punto", "piece_type": "Pants 2pz", "attribute": "Punto", "garment_type": "Basico", "description": "Conjunto basico de dos piezas punto."},
-    {"label": "Pants suelto liso", "name": "Pants Suelto Liso", "piece_type": "Pants Suelto", "attribute": "Liso", "garment_type": "Basico", "description": "Pants suelto liso para uniforme basico."},
-    {"label": "Pants suelto punto", "name": "Pants Suelto Punto", "piece_type": "Pants Suelto", "attribute": "Punto", "garment_type": "Basico", "description": "Pants suelto punto para uniforme basico."},
+    {"label": "Pants 2pz liso", "name": "Pants 2pz Liso", "piece_type": "Pants 2pz", "attribute": "Liso", "gender": "Unisex", "garment_type": "Basico", "description": "Conjunto basico de dos piezas liso."},
+    {"label": "Pants 2pz punto", "name": "Pants 2pz Punto", "piece_type": "Pants 2pz", "attribute": "Punto", "gender": "Unisex", "garment_type": "Basico", "description": "Conjunto basico de dos piezas punto."},
+    {"label": "Pants suelto liso", "name": "Pants Suelto Liso", "piece_type": "Pants Suelto", "attribute": "Liso", "gender": "Unisex", "garment_type": "Basico", "description": "Pants suelto liso para uniforme basico."},
+    {"label": "Pants suelto punto", "name": "Pants Suelto Punto", "piece_type": "Pants Suelto", "attribute": "Punto", "gender": "Unisex", "garment_type": "Basico", "description": "Pants suelto punto para uniforme basico."},
     # Oficiales — nombre: [Pieza] [Atributo] [Género]
     {"label": "Suéter botones M", "name": "Suéter Botones M", "piece_type": "Suéter", "attribute": "Botones", "gender": "Mujer", "garment_type": "Oficial", "description": "Suéter escolar con botones mujer."},
     {"label": "Suéter cuello V H", "name": "Suéter Cuello V H", "piece_type": "Suéter", "attribute": "Cuello V", "gender": "Hombre", "garment_type": "Oficial", "description": "Suéter escolar cuello V hombre."},
