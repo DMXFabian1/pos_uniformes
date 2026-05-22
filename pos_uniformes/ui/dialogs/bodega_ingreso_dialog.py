@@ -36,6 +36,8 @@ from pos_uniformes.services.bodega_service import BodegaService
 
 logger = logging.getLogger(__name__)
 
+_NUEVA_MERCANCIA_LIMIT = 99_999  # sentinel para "sin límite" cuando es mercancía nueva
+
 
 class _IngresoRow:
     __slots__ = ("variante_id", "sku", "producto", "talla", "color", "stock_actual", "en_bodega", "disponible", "cantidad")
@@ -66,6 +68,8 @@ class BodegaIngresoDialog(QDialog):
         self._suggest_timer.setSingleShot(True)
         self._suggest_timer.setInterval(150)
         self._suggest_timer.timeout.connect(self._update_suggestions)
+
+        self._completer_just_activated = False  # bloquea doble-fire Enter tras completer
 
         self.setWindowTitle("Agregar producto a caja")
         self.setModal(True)
@@ -203,7 +207,8 @@ class BodegaIngresoDialog(QDialog):
 
         self.btn_quitar = QPushButton("Quitar fila")
         self.btn_quitar.setStyleSheet(
-            "padding: 6px 14px; border-radius: 10px; border: 1px solid #ccc; background: white;"
+            "padding: 6px 14px; border-radius: 10px; border: 1px solid #e57373; "
+            "background: #ffebee; color: #c62828; font-weight: 600;"
         )
         self.btn_quitar.clicked.connect(self._handle_quitar_fila)
         self.btn_quitar.setAutoDefault(False)
@@ -257,7 +262,7 @@ class BodegaIngresoDialog(QDialog):
     def _on_nueva_toggled(self, checked: bool) -> None:
         if checked:
             for r in self._rows:
-                r.disponible = 9999
+                r.disponible = _NUEVA_MERCANCIA_LIMIT
         else:
             with get_session() as session:
                 for r in self._rows:
@@ -277,19 +282,24 @@ class BodegaIngresoDialog(QDialog):
             self.sku_input.setFocus()
             return
 
-        existing = next((r for r in self._rows if r.sku.upper() == text.upper()), None)
-        if existing:
-            if not self.chk_nueva.isChecked() and existing.cantidad >= existing.disponible:
-                self._set_feedback(f"{existing.sku}: no hay más disponible ({existing.disponible})", "warning")
+        # Buscar por SKU en filas existentes (ignorar si SKU vacío)
+        if text:
+            existing = next(
+                (r for r in self._rows if r.sku and r.sku.upper() == text.upper()),
+                None,
+            )
+            if existing:
+                if not self.chk_nueva.isChecked() and existing.cantidad >= existing.disponible:
+                    self._set_feedback(f"{existing.sku}: no hay más disponible ({existing.disponible})", "warning")
+                    self.sku_input.clear()
+                    self.sku_input.setFocus()
+                    return
+                existing.cantidad += 1
+                self._refresh_table()
+                self._set_feedback(f"{existing.sku} → {existing.cantidad} pz", "success")
                 self.sku_input.clear()
                 self.sku_input.setFocus()
                 return
-            existing.cantidad += 1
-            self._refresh_table()
-            self._set_feedback(f"{existing.sku} → {existing.cantidad} pz", "success")
-            self.sku_input.clear()
-            self.sku_input.setFocus()
-            return
 
         with get_session() as session:
             variante = session.scalar(
@@ -323,7 +333,7 @@ class BodegaIngresoDialog(QDialog):
                     .order_by(Variante.talla)
                 ).unique().all())
 
-                # Filtro local para refinar (ej. "gales verde" → solo verde)
+                # Filtro local para refinar (ej. "calceta escolar verde" → solo las que contengan todos los términos)
                 terms = text.lower().split()
                 filtered: list[Variante] = []
                 for v in variantes:
@@ -333,25 +343,70 @@ class BodegaIngresoDialog(QDialog):
                     ]).lower()
                     if all(t in searchable for t in terms):
                         filtered.append(v)
-                variantes = filtered or variantes  # si filtro vacía todo, usa Meilisearch puro
+                if not filtered:
+                    # Si el filtro local no matchea nada, no usar resultados crudos
+                    self._set_feedback(f"No encontrado: {text}", "warning")
+                    self.sku_input.selectAll()
+                    self.sku_input.setFocus()
+                    return
+                variantes = filtered
+
+                # Si hay múltiples productos distintos, pedir al usuario que elija uno
+                productos_unicos: dict[int, str] = {}
+                for v in variantes:
+                    if v.producto_id not in productos_unicos:
+                        productos_unicos[v.producto_id] = v.producto.nombre if v.producto else "?"
+                if len(productos_unicos) > 1:
+                    from PyQt6.QtWidgets import QInputDialog
+                    nombres = list(productos_unicos.values())
+                    nombre, ok = QInputDialog.getItem(
+                        self, "Seleccionar producto", "Se encontraron varios productos.\nElige uno:", nombres, 0, False
+                    )
+                    if not ok:
+                        self.sku_input.setFocus()
+                        return
+                    # Filtrar solo variantes del producto elegido
+                    pid = next(pid for pid, n in productos_unicos.items() if n == nombre)
+                    variantes = [v for v in variantes if v.producto_id == pid]
 
                 added = 0
                 es_nueva = self.chk_nueva.isChecked()
+                new_rows: list[_IngresoRow] = []
                 for v in variantes:
                     if any(r.variante_id == v.id for r in self._rows):
                         continue
                     en_bodega = BodegaService._total_en_bodega_para_variante(session, v.id)
                     row = _IngresoRow(v, en_bodega)
                     if es_nueva:
-                        row.disponible = 9999
+                        row.disponible = _NUEVA_MERCANCIA_LIMIT
                     if row.disponible > 0:
-                        self._rows.append(row)
+                        new_rows.append(row)
                         added += 1
 
+                # Si solo 1 resultado nuevo, tratarlo como escaneo directo (cantidad=1)
+                if len(new_rows) == 1:
+                    new_rows[0].cantidad = 1
+
+                # Si ya existía y no hay nuevas, sumar 1 a la existente
+                if not new_rows and len(variantes) == 1:
+                    existing = next((r for r in self._rows if r.variante_id == variantes[0].id), None)
+                    if existing and (es_nueva or existing.cantidad < existing.disponible):
+                        existing.cantidad += 1
+                        self._refresh_table()
+                        self._set_feedback(f"{existing.sku} → {existing.cantidad} pz", "success")
+                        self.sku_input.clear()
+                        self.sku_input.setFocus()
+                        return
+
+                self._rows.extend(new_rows)
                 engine = "Meilisearch"
                 if added:
                     self._refresh_table()
-                    self._set_feedback(f"{added} variantes cargadas ({engine}) — ajusta cantidades", "success")
+                    if added == 1:
+                        r = new_rows[0]
+                        self._set_feedback(f"{r.sku} · {r.producto} {r.talla} — 1 pz", "success")
+                    else:
+                        self._set_feedback(f"{added} variantes cargadas ({engine}) — ajusta cantidades", "success")
                 else:
                     self._set_feedback(f"Sin stock disponible para bodega ({engine})", "warning")
 
@@ -394,11 +449,14 @@ class BodegaIngresoDialog(QDialog):
             ).all())
 
             added = 0
+            es_nueva_local = self.chk_nueva.isChecked()
             for v in variantes:
                 if any(r.variante_id == v.id for r in self._rows):
                     continue
                 en_bodega = BodegaService._total_en_bodega_para_variante(session, v.id)
                 row = _IngresoRow(v, en_bodega)
+                if es_nueva_local:
+                    row.disponible = _NUEVA_MERCANCIA_LIMIT
                 if row.disponible > 0:
                     self._rows.append(row)
                     added += 1
@@ -427,7 +485,7 @@ class BodegaIngresoDialog(QDialog):
         en_bodega = BodegaService._total_en_bodega_para_variante(session, variante.id)
         row = _IngresoRow(variante, en_bodega)
         if es_nueva:
-            row.disponible = 9999
+            row.disponible = _NUEVA_MERCANCIA_LIMIT
         if row.disponible <= 0:
             self._set_feedback(f"{row.sku}: sin stock disponible para bodega", "warning")
             return
@@ -465,8 +523,21 @@ class BodegaIngresoDialog(QDialog):
     def _on_completer_activated(self, text: str) -> None:
         # El completer muestra "SKU — Nombre Talla Color", extraer SKU
         sku = text.split("—")[0].strip() if "—" in text else text.strip()
+        # Bloquear suggest_timer y marcar flag para evitar doble-fire de Enter
+        self._suggest_timer.stop()
+        self._completer_just_activated = True
         self.sku_input.setText(sku)
         self._handle_scan()
+        # QCompleter sobreescribe el input DESPUÉS de este handler —
+        # limpiamos en el siguiente ciclo del event loop para ganarle
+        QTimer.singleShot(0, self._deferred_clear_after_completer)
+
+    def _deferred_clear_after_completer(self) -> None:
+        """Limpia el input después de que QCompleter sobreescribe el texto."""
+        self._suggest_timer.stop()
+        self.sku_input.clear()
+        self.sku_input.setFocus()
+        self._completer_just_activated = False
 
     # ─── Table rendering ─────────────────────────────────────────────────
 
@@ -480,7 +551,8 @@ class BodegaIngresoDialog(QDialog):
             self.table.setItem(i, 2, QTableWidgetItem(row.talla))
             self.table.setItem(i, 3, QTableWidgetItem(row.color))
 
-            disp_item = QTableWidgetItem(str(row.disponible))
+            disp_text = "∞" if row.disponible >= _NUEVA_MERCANCIA_LIMIT else str(row.disponible)
+            disp_item = QTableWidgetItem(disp_text)
             disp_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             self.table.setItem(i, 4, disp_item)
 
@@ -502,9 +574,10 @@ class BodegaIngresoDialog(QDialog):
             spin.blockSignals(False)
 
             restante = row.disponible - row.cantidad
-            rest_item = QTableWidgetItem(str(restante))
+            rest_text = "∞" if row.disponible >= _NUEVA_MERCANCIA_LIMIT else str(restante)
+            rest_item = QTableWidgetItem(rest_text)
             rest_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            if restante == 0 and row.cantidad > 0:
+            if restante == 0 and row.cantidad > 0 and row.disponible < _NUEVA_MERCANCIA_LIMIT:
                 rest_item.setForeground(QColor("#c45425"))
             self.table.setItem(i, 6, rest_item)
 
@@ -527,9 +600,10 @@ class BodegaIngresoDialog(QDialog):
             row.cantidad = value
             idx = self._rows.index(row)
             restante = row.disponible - row.cantidad
-            rest_item = QTableWidgetItem(str(restante))
+            rest_text = "∞" if row.disponible >= _NUEVA_MERCANCIA_LIMIT else str(restante)
+            rest_item = QTableWidgetItem(rest_text)
             rest_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            if restante == 0 and row.cantidad > 0:
+            if restante == 0 and row.cantidad > 0 and row.disponible < _NUEVA_MERCANCIA_LIMIT:
                 rest_item.setForeground(QColor("#c45425"))
             self.table.setItem(idx, 6, rest_item)
             self._refresh_summary()
@@ -611,7 +685,7 @@ class BodegaIngresoDialog(QDialog):
                                 creado_por=creado_por,
                             )
 
-                total = BodegaService.ingreso_masivo(session, self._caja_id, items, creado_por)
+                BodegaService.ingreso_masivo(session, self._caja_id, items, creado_por)
                 session.commit()
             except ValueError as e:
                 session.rollback()
@@ -675,13 +749,21 @@ class BodegaIngresoDialog(QDialog):
         if watched is self.sku_input and event.type() == QEvent.Type.KeyPress and event.key() in (
             Qt.Key.Key_Return, Qt.Key.Key_Enter,
         ):
+            # Si el completer acaba de activarse, este Enter es el rebote — consumirlo
+            if self._completer_just_activated:
+                self._completer_just_activated = False
+                return True
+            # Si el popup del completer está visible, dejar que él maneje Enter
+            if self._completer.popup().isVisible():
+                return False
             self._handle_scan()
             return True
 
         if watched is self.sku_input and event.type() == QEvent.Type.ShortcutOverride and event.key() in (
             Qt.Key.Key_Return, Qt.Key.Key_Enter,
         ):
-            event.accept()
-            return True
+            if not self._completer.popup().isVisible():
+                event.accept()
+                return True
 
         return super().eventFilter(watched, event)

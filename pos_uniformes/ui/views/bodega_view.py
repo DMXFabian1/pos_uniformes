@@ -255,11 +255,21 @@ class BodegaWidget(QWidget):
         # ─── Resultados de búsqueda (oculto inicialmente) ────────────────
         self.search_results_group = QGroupBox("Resultados de búsqueda")
         search_layout = QVBoxLayout()
+        search_top = QHBoxLayout()
         self.search_results_text = QLabel("")
         self.search_results_text.setWordWrap(True)
         self.search_results_text.setTextFormat(Qt.TextFormat.RichText)
         self.search_results_text.setStyleSheet("font-size: 12px; padding: 4px;")
-        search_layout.addWidget(self.search_results_text)
+        search_top.addWidget(self.search_results_text, 1)
+        btn_cerrar_busqueda = QPushButton("✕")
+        btn_cerrar_busqueda.setFixedSize(28, 28)
+        btn_cerrar_busqueda.setStyleSheet(
+            "border: none; font-size: 16px; font-weight: bold; color: #888;"
+        )
+        btn_cerrar_busqueda.setToolTip("Cerrar resultados")
+        btn_cerrar_busqueda.clicked.connect(self._close_search_results)
+        search_top.addWidget(btn_cerrar_busqueda, 0, Qt.AlignmentFlag.AlignTop)
+        search_layout.addLayout(search_top)
         self.search_results_group.setLayout(search_layout)
         self.search_results_group.setVisible(False)
         main_layout.addWidget(self.search_results_group)
@@ -360,6 +370,12 @@ class BodegaWidget(QWidget):
         if not rows:
             self._selected_caja_id = None
             self._set_detalle_enabled(False)
+            self.detalle_header.setText("Selecciona una caja")
+            self.detalle_ubicacion_label.setText("")
+            self.detalle_categoria_label.setText("")
+            self.contenido_text.setText("")
+            self.tabla_contenido.setRowCount(0)
+            self.tabla_historial.setRowCount(0)
             return
 
         row = self.tabla_cajas.currentRow()
@@ -411,13 +427,15 @@ class BodegaWidget(QWidget):
             contenido = caja.contenido or []
             self.tabla_contenido.setRowCount(len(contenido))
             for row, c in enumerate(contenido):
-                self.tabla_contenido.setItem(row, 0, QTableWidgetItem(c.variante.producto.nombre))
-                self.tabla_contenido.setItem(row, 1, QTableWidgetItem(c.variante.talla))
-                self.tabla_contenido.setItem(row, 2, QTableWidgetItem(c.variante.color))
+                prod_item = QTableWidgetItem(c.variante.producto.nombre)
+                prod_item.setData(Qt.ItemDataRole.UserRole, c.variante_id)
+                self.tabla_contenido.setItem(row, 0, prod_item)
+                self.tabla_contenido.setItem(row, 1, QTableWidgetItem(c.variante.talla or ""))
+                self.tabla_contenido.setItem(row, 2, QTableWidgetItem(c.variante.color or ""))
                 cant_item = QTableWidgetItem(str(c.cantidad))
                 cant_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self.tabla_contenido.setItem(row, 3, cant_item)
-                self.tabla_contenido.setItem(row, 4, QTableWidgetItem(c.variante.sku))
+                self.tabla_contenido.setItem(row, 4, QTableWidgetItem(c.variante.sku or ""))
 
             # Historial
             movimientos = BodegaService.historial_caja(session, caja_id, limit=20)
@@ -436,6 +454,10 @@ class BodegaWidget(QWidget):
                 self.tabla_historial.setItem(row, 4, QTableWidgetItem(mov.creado_por))
 
     # ─── Búsqueda ────────────────────────────────────────────────────────
+
+    def _close_search_results(self) -> None:
+        self.search_results_group.setVisible(False)
+        self.search_input.clear()
 
     def _on_search(self) -> None:
         query = self.search_input.text().strip()
@@ -501,16 +523,33 @@ class BodegaWidget(QWidget):
             QMessageBox.information(self, "Retirar", "Selecciona un producto de la tabla de contenido.")
             return
 
-        sku = self.tabla_contenido.item(row, 4).text()
-        cant_actual = int(self.tabla_contenido.item(row, 3).text())
+        sku_item = self.tabla_contenido.item(row, 4)
+        cant_item = self.tabla_contenido.item(row, 3)
+        if not sku_item or not cant_item:
+            return
+        sku = sku_item.text() or ""
+        try:
+            cant_actual = int(cant_item.text())
+        except (ValueError, TypeError):
+            cant_actual = 1
 
-        dialog = RetirarDialog(self, sku, cant_actual)
+        # Obtener variante_id de UserRole (más fiable que buscar por SKU)
+        variante_id_item = self.tabla_contenido.item(row, 0)
+        variante_id = variante_id_item.data(Qt.ItemDataRole.UserRole) if variante_id_item else None
+
+        display_name = sku or (variante_id_item.text() if variante_id_item else "producto")
+        dialog = RetirarDialog(self, display_name, cant_actual)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             cantidad = dialog.cantidad()
             with get_session() as session:
-                variante = session.scalar(
-                    sa_select(Variante).where(Variante.sku == sku)
-                )
+                # Buscar por variante_id si está disponible, sino fallback a SKU
+                variante = None
+                if variante_id:
+                    variante = session.get(Variante, variante_id)
+                elif sku:
+                    variante = session.scalar(
+                        sa_select(Variante).where(Variante.sku == sku)
+                    )
                 if variante:
                     try:
                         BodegaService.retirar_producto(
@@ -522,6 +561,9 @@ class BodegaWidget(QWidget):
                         session.rollback()
                         QMessageBox.warning(self, "Error", str(e))
                         return
+                else:
+                    QMessageBox.warning(self, "Error", "No se encontró la variante.")
+                    return
             self._load_caja_detalle(self._selected_caja_id)
             self._refresh_cajas()
 

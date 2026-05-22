@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import base64
+import io
+import logging
 import math
 import tempfile
 import webbrowser
@@ -12,6 +15,25 @@ from sqlalchemy.orm import Session
 
 from pos_uniformes.database.models import CATEGORIA_CAJA_LABELS, BodegaCaja
 from pos_uniformes.services.bodega_service import BodegaService
+
+logger = logging.getLogger(__name__)
+
+
+def _generate_qr_data_uri(data: str) -> str:
+    """Genera un QR como data URI PNG usando segno."""
+    try:
+        import segno
+        qr = segno.make(data)
+        buf = io.BytesIO()
+        qr.save(buf, kind="png", scale=6, border=1)
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        return f"data:image/png;base64,{b64}"
+    except ImportError:
+        logger.debug("segno no instalado, QR no disponible")
+        return ""
+    except Exception:
+        logger.debug("Error generando QR", exc_info=True)
+        return ""
 
 CATEGORIA_COLORS: dict[str, str] = {
     "A": "#2e7d32",
@@ -270,6 +292,12 @@ def generate_caja_label_html(session: Session, caja_id: int, qr_data_uri: str = 
 
 
 def print_caja_label(session: Session, caja_id: int, qr_data_uri: str = "") -> Path:
+    # Generar QR automáticamente si no se proporciona
+    if not qr_data_uri:
+        caja = session.get(BodegaCaja, caja_id)
+        if caja:
+            qr_data = BodegaService.generar_qr_data(caja)
+            qr_data_uri = _generate_qr_data_uri(qr_data)
     html = generate_caja_label_html(session, caja_id, qr_data_uri=qr_data_uri)
     tmp = Path(tempfile.mkdtemp()) / "etiqueta_caja.html"
     tmp.write_text(html, encoding="utf-8")

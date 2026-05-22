@@ -419,11 +419,14 @@ class BodegaService:
     def historial_caja(session: Session, caja_id: int, limit: int = 50) -> list[BodegaMovimiento]:
         stmt = (
             select(BodegaMovimiento)
+            .options(
+                joinedload(BodegaMovimiento.variante).joinedload(Variante.producto),
+            )
             .where(BodegaMovimiento.caja_id == caja_id)
             .order_by(BodegaMovimiento.created_at.desc())
             .limit(limit)
         )
-        return list(session.scalars(stmt).all())
+        return list(session.scalars(stmt).unique().all())
 
     # ─── QR ──────────────────────────────────────────────────────────────
 
