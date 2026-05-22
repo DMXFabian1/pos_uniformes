@@ -2587,10 +2587,14 @@ class QuoteSatelliteWindow(QMainWindow):
             heart_btn.clicked.connect(lambda checked=False, key=card.key: self._handle_toggle_favorite(key))
             # Posicionar en esquina superior derecha
             heart_btn.move(product_btn.width() - 30, 4)
-            _orig_resize = product_btn.resizeEvent
-            product_btn.resizeEvent = lambda event, hb=heart_btn, pb=product_btn, orig=_orig_resize: (
-                orig(event), hb.move(pb.width() - 30, 4)
-            )
+
+            def _make_resize_handler(hb, pb, orig):
+                def _on_resize(event):
+                    orig(event)
+                    hb.move(pb.width() - 30, 4)
+                return _on_resize
+
+            product_btn.resizeEvent = _make_resize_handler(heart_btn, product_btn, product_btn.resizeEvent)
             self.guided_product_flow_layout.addWidget(product_btn)
             self.guided_product_buttons[card.key] = product_btn
 
