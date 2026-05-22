@@ -6,6 +6,10 @@ import sqlalchemy as sa
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, joinedload
 
+from pos_uniformes.ui.helpers.size_option_sort_helper import (
+    _size_sort_key as _talla_sort_key,
+)
+
 from pos_uniformes.database.models import (
     CATEGORIA_CAJA_LABELS,
     BodegaCaja,
@@ -525,7 +529,7 @@ class BodegaService:
             })
             por_producto[prod.id]["total"] += c.cantidad
         for grupo in por_producto.values():
-            grupo["tallas"].sort(key=lambda t: t["talla"])
+            grupo["tallas"].sort(key=lambda t: _talla_sort_key(t["talla"]))
         return list(por_producto.values())
 
     @staticmethod
@@ -583,7 +587,7 @@ class BodegaService:
 
         result = []
         for grupo in por_producto.values():
-            variantes = sorted(grupo["variantes"].values(), key=lambda v: v["talla"])
+            variantes = sorted(grupo["variantes"].values(), key=lambda v: _talla_sort_key(v["talla"]))
             for v in variantes:
                 v["en_tienda"] = v["stock_actual"] - v["en_bodega"]
             result.append({

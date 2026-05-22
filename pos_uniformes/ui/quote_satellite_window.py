@@ -2178,6 +2178,7 @@ class QuoteSatelliteWindow(QMainWindow):
             families = []
 
         # Limpiar resultados anteriores
+        self._selected_search_btn = None
         while self._search_results_layout.count():
             item = self._search_results_layout.takeAt(0)
             if item.widget():

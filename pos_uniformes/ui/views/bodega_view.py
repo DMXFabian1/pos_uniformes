@@ -589,14 +589,9 @@ class BodegaWidget(QWidget):
         from pos_uniformes.services.bodega_label_service import print_caja_label
         with get_session() as session:
             try:
-                path = print_caja_label(session, self._selected_caja_id)
+                print_caja_label(session, self._selected_caja_id)
             except Exception as e:
                 QMessageBox.warning(self, "Error", f"No se pudo generar la etiqueta:\n{e}")
-                return
-        QMessageBox.information(
-            self, "Etiqueta generada",
-            "La etiqueta se abrió en el navegador.\nUsa Ctrl+P para imprimir en tamaño carta horizontal.",
-        )
 
     def _get_usuario_actual(self) -> str:
         if hasattr(self.window, "current_user") and self.window.current_user:

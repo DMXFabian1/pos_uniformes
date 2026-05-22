@@ -1,13 +1,13 @@
-"""Genera HTML imprimible de etiqueta de caja para bodega."""
+"""Genera PDF imprimible de etiqueta de caja para bodega."""
 
 from __future__ import annotations
 
 import base64
-import io
 import logging
 import math
+import subprocess
+import sys
 import tempfile
-import webbrowser
 from datetime import datetime
 from pathlib import Path
 
@@ -15,24 +15,19 @@ from sqlalchemy.orm import Session
 
 from pos_uniformes.database.models import CATEGORIA_CAJA_LABELS, BodegaCaja
 from pos_uniformes.services.bodega_service import BodegaService
+from pos_uniformes.utils.qr_generator import QrGenerator
 
 logger = logging.getLogger(__name__)
 
 
-def _generate_qr_data_uri(data: str) -> str:
-    """Genera un QR como data URI PNG usando segno."""
+def _qr_png_to_data_uri(png_path: Path) -> str:
+    """Convierte un archivo PNG de QR a data URI base64."""
     try:
-        import segno
-        qr = segno.make(data)
-        buf = io.BytesIO()
-        qr.save(buf, kind="png", scale=6, border=1)
-        b64 = base64.b64encode(buf.getvalue()).decode()
+        data = png_path.read_bytes()
+        b64 = base64.b64encode(data).decode()
         return f"data:image/png;base64,{b64}"
-    except ImportError:
-        logger.debug("segno no instalado, QR no disponible")
-        return ""
     except Exception:
-        logger.debug("Error generando QR", exc_info=True)
+        logger.debug("Error leyendo QR PNG", exc_info=True)
         return ""
 
 CATEGORIA_COLORS: dict[str, str] = {
@@ -42,110 +37,26 @@ CATEGORIA_COLORS: dict[str, str] = {
     "D": "#616161",
 }
 
-MAX_ROWS_PAGE_1 = 22
-MAX_ROWS_CONTINUATION = 28
-
-
-def _css() -> str:
-    return """
-  @page { size: letter landscape; margin: 0; }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body {
-    font-family: -apple-system, 'Segoe UI', Arial, sans-serif;
-    color: #1a1a1a;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-  .page {
-    width: 279mm; min-height: 216mm;
-    padding: 10mm 14mm 8mm;
-    page-break-after: always;
-    position: relative;
-  }
-  .page:last-child { page-break-after: auto; }
-
-  .header {
-    display: flex; align-items: flex-start; gap: 16px;
-    padding-bottom: 12px; border-bottom: 3px solid #222;
-  }
-  .header-compact { padding-bottom: 8px; border-bottom: 2px solid #222; }
-  .qr-box {
-    width: 100px; height: 100px; border: 2px solid #333; border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0; background: white; overflow: hidden;
-  }
-  .qr-box img { width: 96px; height: 96px; }
-  .qr-small { width: 60px; height: 60px; }
-  .qr-small img { width: 56px; height: 56px; }
-  .header-info { flex: 1; }
-  .codigo { font-size: 48px; font-weight: 900; letter-spacing: 2px; line-height: 1; }
-  .codigo-compact { font-size: 28px; }
-  .categoria-badge {
-    display: inline-block; padding: 4px 16px; border-radius: 20px;
-    font-size: 16px; font-weight: 700; color: white; margin-top: 6px;
-  }
-  .categoria-badge-compact { font-size: 12px; padding: 2px 12px; margin-top: 4px; }
-  .ubicacion { font-size: 18px; color: #444; margin-top: 6px; font-weight: 500; }
-  .ubicacion-compact { font-size: 13px; margin-top: 2px; }
-
-  .meta-row {
-    display: flex; gap: 24px; padding: 8px 0;
-    border-bottom: 1px solid #ddd; font-size: 13px; color: #555;
-  }
-  .meta-row span { font-weight: 600; color: #222; }
-
-  .contenido-title { font-size: 18px; font-weight: 800; padding: 10px 0 6px; color: #222; }
-  table { width: 100%; border-collapse: collapse; font-size: 14px; }
-  thead th {
-    background: #222; color: white; padding: 7px 10px; text-align: left;
-    font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px;
-  }
-  thead th:last-child, tbody td:last-child { text-align: center; }
-  tbody tr { border-bottom: 1px solid #e0e0e0; }
-  tbody tr:nth-child(even) { background: #f7f7f7; }
-  tbody td { padding: 5px 10px; }
-  .producto-row td {
-    background: #eef5fb; font-weight: 700; font-size: 15px;
-    padding: 8px 10px 5px; border-bottom: 2px solid #c5d9e8;
-  }
-  .talla-row td { padding-left: 28px; color: #333; }
-  .cantidad-cell { font-weight: 800; font-size: 16px; color: #c45425; }
-
-  .leyenda {
-    margin-top: 14px; padding: 8px 14px; border: 1px solid #ddd;
-    border-radius: 8px; display: flex; gap: 20px; font-size: 12px;
-  }
-  .leyenda-item { display: flex; align-items: center; gap: 6px; }
-  .leyenda-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
-
-  .footer {
-    padding-top: 8px; border-top: 1px solid #ddd;
-    display: flex; justify-content: space-between;
-    font-size: 11px; color: #888; margin-top: 10px;
-  }
-  .resumen-box {
-    margin-top: 20px; padding: 12px 16px; background: #f5f9fc;
-    border-radius: 8px; border: 1px solid #dbe6ef;
-  }
-  .resumen-box .title { font-size: 14px; font-weight: 700; color: #222; margin-bottom: 6px; }
-  .resumen-box .body { font-size: 12px; color: #555; line-height: 1.6; }
-
-  @media print {
-    .no-print { display: none !important; }
-    .page { padding: 8mm 12mm 6mm; }
-  }
-"""
+MAX_ROWS_PAGE_1 = 30
+MAX_ROWS_CONTINUATION = 38
 
 
 def _leyenda_html() -> str:
-    items = []
+    cells = []
     for cat, label in CATEGORIA_CAJA_LABELS.items():
-        color = CATEGORIA_COLORS[cat]
-        items.append(
-            f'<div class="leyenda-item">'
-            f'<div class="leyenda-dot" style="background:{color}"></div> {cat} — {label}</div>'
+        color = CATEGORIA_COLORS.get(cat, "#333")
+        cells.append(
+            f'<td style="padding:4px 12px 4px 0;">'
+            f'<span style="display:inline-block;width:10px;height:10px;'
+            f'background:{color};border-radius:5px;margin-right:4px;">'
+            f'&nbsp;</span>'
+            f'<span style="font-size:10px;color:#555;">{cat} — {label}</span></td>'
         )
-    return f'<div class="leyenda">{"".join(items)}</div>'
+    return (
+        f'<table cellpadding="0" cellspacing="0" '
+        f'style="margin-top:12px;border:1px solid #ddd;border-radius:6px;padding:6px 10px;">'
+        f'<tr>{"".join(cells)}</tr></table>'
+    )
 
 
 def _header_html(caja: BodegaCaja, *, compact: bool = False, qr_data_uri: str = "") -> str:
@@ -153,55 +64,100 @@ def _header_html(caja: BodegaCaja, *, compact: bool = False, qr_data_uri: str = 
     color = CATEGORIA_COLORS.get(caja.categoria, "#333")
     ub_text = caja.ubicacion.codigo if caja.ubicacion else "Sin ubicación"
 
-    h_cls = "header header-compact" if compact else "header"
-    qr_cls = "qr-box qr-small" if compact else "qr-box"
-    cod_cls = "codigo codigo-compact" if compact else "codigo"
-    badge_cls = "categoria-badge categoria-badge-compact" if compact else "categoria-badge"
-    ub_cls = "ubicacion ubicacion-compact" if compact else "ubicacion"
-
+    qr_size = 60 if compact else 90
     if qr_data_uri:
-        qr_inner = f'<img src="{qr_data_uri}" alt="QR {caja.codigo}">'
+        qr_cell = f'<img src="{qr_data_uri}" width="{qr_size}" height="{qr_size}">'
     else:
-        qr_inner = f"[ QR ]<br>{caja.codigo}"
+        qr_cell = f'<span style="font-size:10px;color:#999;">[QR]</span>'
 
-    cont = ' <span style="font-size:16px;font-weight:500;color:#666;">— continuación</span>' if compact else ""
+    cod_size = "22px" if compact else "36px"
+    cont = (' <span style="font-size:13px;font-weight:normal;color:#777;">'
+            '— continuación</span>') if compact else ""
+
+    badge_pad = "2px 10px" if compact else "4px 14px"
+    badge_font = "11px" if compact else "13px"
+
+    border_w = "2px" if compact else "3px"
 
     return f"""
-    <div class="{h_cls}">
-      <div class="{qr_cls}">{qr_inner}</div>
-      <div class="header-info">
-        <div class="{cod_cls}">{caja.codigo}{cont}</div>
-        <div class="{badge_cls}" style="background:{color}">{caja.categoria} — {cat_label}</div>
-        <div class="{ub_cls}">📍 {ub_text}</div>
-      </div>
-    </div>"""
+    <table cellpadding="0" cellspacing="0" width="100%"
+           style="border-bottom:{border_w} solid #222;padding-bottom:8px;margin-bottom:6px;">
+      <tr>
+        <td width="{qr_size + 12}" valign="top" style="padding-right:12px;">
+          <div style="border:2px solid #333;border-radius:6px;padding:3px;
+                      width:{qr_size + 6}px;text-align:center;background:white;">
+            {qr_cell}
+          </div>
+        </td>
+        <td valign="top">
+          <div style="font-size:{cod_size};font-weight:900;letter-spacing:1px;
+                      line-height:1.1;color:#111;">{caja.codigo}{cont}</div>
+          <div style="margin-top:5px;">
+            <span style="display:inline-block;padding:{badge_pad};border-radius:14px;
+                         font-size:{badge_font};font-weight:700;color:white;
+                         background:{color};">{caja.categoria} — {cat_label}</span>
+          </div>
+          <div style="font-size:14px;color:#444;margin-top:4px;font-weight:500;">
+            {ub_text}
+          </div>
+        </td>
+      </tr>
+    </table>"""
 
 
-def _table_rows_html(desglose: list[dict], start: int, count: int) -> tuple[str, int]:
-    """Render up to `count` table rows starting from flat index `start`. Returns (html, rows_rendered)."""
-    flat: list[str] = []
+def _meta_html(caja: BodegaCaja, total_prendas: int, now_str: str) -> str:
+    return f"""
+    <table cellpadding="0" cellspacing="0" width="100%"
+           style="border-bottom:1px solid #ddd;padding:6px 0;margin-bottom:4px;font-size:12px;color:#555;">
+      <tr>
+        <td>Estado: <b style="color:#222;">{caja.estado}</b></td>
+        <td align="center">Prendas totales: <b style="color:#222;">{total_prendas}</b></td>
+        <td align="right">Impreso: <b style="color:#222;">{now_str}</b></td>
+      </tr>
+    </table>"""
+
+
+def _content_table_html(desglose: list[dict], start: int, count: int) -> tuple[str, int]:
+    """Genera tabla HTML de contenido. Retorna (html, filas_renderizadas)."""
+    flat: list[dict] = []
     for grupo in desglose:
-        flat.append(
-            f'<tr class="producto-row"><td colspan="3">{grupo["producto"]}</td>'
-            f'<td class="cantidad-cell">{grupo["total"]}</td></tr>'
-        )
+        flat.append({"type": "product", "nombre": grupo["producto"], "total": grupo["total"]})
         for t in grupo["tallas"]:
-            flat.append(
-                f'<tr class="talla-row"><td></td><td>{t["talla"]}</td>'
-                f'<td>{t["color"]}</td><td class="cantidad-cell">{t["cantidad"]}</td></tr>'
+            flat.append({
+                "type": "variant",
+                "talla": t["talla"],
+                "color": t["color"],
+                "cantidad": t["cantidad"],
+            })
+
+    chunk = flat[start: start + count]
+    if not chunk:
+        return "", 0
+
+    rows_html = []
+    for item in chunk:
+        if item["type"] == "product":
+            rows_html.append(
+                f'<tr>'
+                f'<td colspan="3" style="background:#e8f0f7;font-weight:700;font-size:13px;'
+                f'padding:6px 10px 4px;border-bottom:2px solid #c0d4e4;">{item["nombre"]}</td>'
+                f'<td align="center" style="background:#e8f0f7;font-weight:800;font-size:14px;'
+                f'color:#c45425;padding:6px 10px 4px;border-bottom:2px solid #c0d4e4;">'
+                f'{item["total"]}</td>'
+                f'</tr>'
+            )
+        else:
+            rows_html.append(
+                f'<tr>'
+                f'<td style="padding:3px 10px 3px 28px;border-bottom:1px solid #e8e8e8;">&nbsp;</td>'
+                f'<td style="padding:3px 10px;border-bottom:1px solid #e8e8e8;">{item["talla"]}</td>'
+                f'<td style="padding:3px 10px;border-bottom:1px solid #e8e8e8;">{item["color"]}</td>'
+                f'<td align="center" style="padding:3px 10px;border-bottom:1px solid #e8e8e8;'
+                f'font-weight:700;font-size:13px;color:#c45425;">{item["cantidad"]}</td>'
+                f'</tr>'
             )
 
-    chunk = flat[start : start + count]
-    return "\n".join(chunk), len(chunk)
-
-
-def _table_wrap(body: str, title: str = "Contenido de la caja") -> str:
-    return f"""
-    <div class="contenido-title">{title}</div>
-    <table>
-      <thead><tr><th>Producto</th><th>Talla</th><th>Color</th><th>Cantidad</th></tr></thead>
-      <tbody>{body}</tbody>
-    </table>"""
+    return "\n".join(rows_html), len(chunk)
 
 
 def _total_flat_rows(desglose: list[dict]) -> int:
@@ -209,6 +165,36 @@ def _total_flat_rows(desglose: list[dict]) -> int:
     for grupo in desglose:
         total += 1 + len(grupo["tallas"])
     return total
+
+
+def _resumen_html(desglose: list[dict], total_prendas: int, total_productos: int) -> str:
+    if total_productos <= 1:
+        return ""
+    parts = " &middot; ".join(f'{g["producto"]}: {g["total"]}' for g in desglose)
+    return f"""
+    <table cellpadding="0" cellspacing="0" width="100%"
+           style="margin-top:14px;background:#f0f6fb;border:1px solid #d5e2ed;
+                  border-radius:6px;padding:8px 12px;">
+      <tr><td>
+        <div style="font-size:12px;font-weight:700;color:#222;margin-bottom:3px;">
+          Resumen total: {total_prendas} prendas en {total_productos} productos
+        </div>
+        <div style="font-size:10px;color:#555;line-height:1.5;">{parts}</div>
+      </td></tr>
+    </table>"""
+
+
+def _footer_html(page_num: int, num_pages: int) -> str:
+    return f"""
+    <table cellpadding="0" cellspacing="0" width="100%"
+           style="border-top:1px solid #ddd;padding-top:6px;margin-top:10px;
+                  font-size:9px;color:#999;">
+      <tr>
+        <td>POS Uniformes &middot; Bodega</td>
+        <td align="center">Página {page_num} de {num_pages}</td>
+        <td align="right">Generado automáticamente</td>
+      </tr>
+    </table>"""
 
 
 def generate_caja_label_html(session: Session, caja_id: int, qr_data_uri: str = "") -> str:
@@ -237,69 +223,103 @@ def generate_caja_label_html(session: Session, caja_id: int, qr_data_uri: str = 
 
         header = _header_html(caja, compact=not is_first, qr_data_uri=qr_data_uri)
 
-        meta = ""
-        if is_first:
-            meta = f"""
-            <div class="meta-row">
-              <div>Estado: <span>{caja.estado}</span></div>
-              <div>Prendas totales: <span>{total_prendas}</span></div>
-              <div>Impreso: <span>{now_str}</span></div>
-            </div>"""
+        meta = _meta_html(caja, total_prendas, now_str) if is_first else ""
 
-        body_html, rendered = _table_rows_html(desglose, row_cursor, capacity)
+        title_label = "Contenido de la caja" if is_first else "Contenido de la caja (cont.)"
+        title_html = (
+            f'<div style="font-size:15px;font-weight:800;color:#222;'
+            f'padding:8px 0 4px;">{title_label}</div>'
+        )
+
+        content_rows, rendered = _content_table_html(desglose, row_cursor, capacity)
         row_cursor += rendered
 
-        title = "Contenido de la caja" if is_first else "Contenido de la caja (cont.)"
-        table = _table_wrap(body_html, title)
+        content_table = f"""
+        <table cellpadding="0" cellspacing="0" width="100%"
+               style="border-collapse:collapse;">
+          <tr>
+            <th style="background:#222;color:white;padding:5px 10px;text-align:left;
+                       font-size:10px;font-weight:700;text-transform:uppercase;
+                       letter-spacing:0.5px;" width="30%">Producto</th>
+            <th style="background:#222;color:white;padding:5px 10px;text-align:left;
+                       font-size:10px;font-weight:700;text-transform:uppercase;" width="20%">Talla</th>
+            <th style="background:#222;color:white;padding:5px 10px;text-align:left;
+                       font-size:10px;font-weight:700;text-transform:uppercase;" width="25%">Color</th>
+            <th style="background:#222;color:white;padding:5px 10px;text-align:center;
+                       font-size:10px;font-weight:700;text-transform:uppercase;" width="25%">Cantidad</th>
+          </tr>
+          {content_rows}
+        </table>"""
 
-        resumen = ""
-        if page_num == num_pages and total_productos > 1:
-            parts = " · ".join(f'{g["producto"]}: {g["total"]}' for g in desglose)
-            resumen = f"""
-            <div class="resumen-box">
-              <div class="title">Resumen total: {total_prendas} prendas en {total_productos} productos</div>
-              <div class="body">{parts}</div>
-            </div>"""
-
-        footer = f"""
-        <div class="footer">
-          <div>POS Uniformes · Bodega</div>
-          <div>Página {page_num} de {num_pages}</div>
-          <div>Generado automáticamente</div>
-        </div>"""
+        resumen = _resumen_html(desglose, total_prendas, total_productos) if page_num == num_pages else ""
+        leyenda = _leyenda_html()
+        footer = _footer_html(page_num, num_pages)
 
         pages.append(f"""
-        <div class="page">
           {header}
           {meta}
-          {table}
+          {title_html}
+          {content_table}
           {resumen}
-          {_leyenda_html()}
+          {leyenda}
           {footer}
-        </div>""")
+        """)
+
+    # Para múltiples páginas, QTextDocument no soporta page-break explícito,
+    # pero con el contenido suficiente hará page breaks automáticos.
+    body = "\n".join(pages)
 
     return f"""<!DOCTYPE html>
 <html lang="es">
-<head>
-<meta charset="UTF-8">
-<title>Etiqueta — Caja {caja.codigo}</title>
-<style>{_css()}</style>
-</head>
-<body>
-{"".join(pages)}
+<head><meta charset="UTF-8"><title>Etiqueta — Caja {caja.codigo}</title></head>
+<body style="font-family: Helvetica, Arial, sans-serif; color: #1a1a1a; margin: 0; padding: 0;">
+{body}
 </body>
 </html>"""
 
 
+def _html_to_pdf(html: str, pdf_path: Path) -> None:
+    """Renderiza HTML a PDF usando QTextDocument + QPrinter de PyQt6."""
+    from PyQt6.QtCore import QMarginsF
+    from PyQt6.QtGui import QPageLayout, QPageSize, QTextDocument
+    from PyQt6.QtPrintSupport import QPrinter
+
+    printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+    printer.setOutputFormat(QPrinter.OutputFormat.PdfFormat)
+    printer.setOutputFileName(str(pdf_path))
+
+    page_layout = QPageLayout(
+        QPageSize(QPageSize.PageSizeId.Letter),
+        QPageLayout.Orientation.Portrait,
+        QMarginsF(12, 12, 12, 10),
+        QPageLayout.Unit.Millimeter,
+    )
+    printer.setPageLayout(page_layout)
+
+    doc = QTextDocument()
+    doc.setHtml(html)
+    doc.setPageSize(printer.pageRect(QPrinter.Unit.Point).size())
+    doc.print(printer)
+
+
 def print_caja_label(session: Session, caja_id: int, qr_data_uri: str = "") -> Path:
-    # Generar QR automáticamente si no se proporciona
+    """Genera PDF de etiqueta de caja y lo abre con el visor del sistema."""
     if not qr_data_uri:
         caja = session.get(BodegaCaja, caja_id)
         if caja:
-            qr_data = BodegaService.generar_qr_data(caja)
-            qr_data_uri = _generate_qr_data_uri(qr_data)
+            qr_png_path = QrGenerator.generate_for_caja(caja)
+            qr_data_uri = _qr_png_to_data_uri(qr_png_path)
     html = generate_caja_label_html(session, caja_id, qr_data_uri=qr_data_uri)
-    tmp = Path(tempfile.mkdtemp()) / "etiqueta_caja.html"
-    tmp.write_text(html, encoding="utf-8")
-    webbrowser.open(tmp.as_uri())
-    return tmp
+
+    tmp_dir = Path(tempfile.mkdtemp())
+    pdf_path = tmp_dir / "etiqueta_caja.pdf"
+    _html_to_pdf(html, pdf_path)
+
+    if sys.platform == "darwin":
+        subprocess.Popen(["open", str(pdf_path)])
+    elif sys.platform == "win32":
+        subprocess.Popen(["start", "", str(pdf_path)], shell=True)
+    else:
+        subprocess.Popen(["xdg-open", str(pdf_path)])
+
+    return pdf_path

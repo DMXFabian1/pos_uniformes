@@ -824,6 +824,7 @@ class MultiSelectPickerButton(QPushButton):
         helper_text: str,
         columns: int = 4,
         group_values_by_format: bool = False,
+        allow_custom: bool = False,
         presets: list[tuple[str, list[str] | Callable[[list[str]], list[str]]]] | None = None,
     ) -> None:
         super().__init__(default_label)
@@ -833,6 +834,7 @@ class MultiSelectPickerButton(QPushButton):
         self._helper_text = helper_text
         self._columns = max(1, columns)
         self._group_values_by_format = group_values_by_format
+        self._allow_custom = allow_custom
         self._items: list[tuple[str, str]] = []
         self._selected_values: set[str] = set()
         self._presets = presets or []
@@ -935,6 +937,23 @@ class MultiSelectPickerButton(QPushButton):
             preset_row.addStretch(1)
             layout.addLayout(preset_row)
 
+        # ── Custom value input ───────────────────────────────────────────
+        if self._allow_custom:
+            custom_row = QHBoxLayout()
+            custom_row.setSpacing(8)
+            custom_input = QLineEdit()
+            custom_input.setPlaceholderText("Escribir nuevo valor y presionar Agregar...")
+            custom_add_btn = QPushButton("+ Agregar")
+            custom_add_btn.setObjectName("chipButton")
+            custom_add_btn.setStyleSheet(
+                "QPushButton { background: #2e7d32; color: white; font-weight: 600;"
+                " padding: 4px 14px; border-radius: 6px; font-size: 12px; }"
+                "QPushButton:hover { background: #1b5e20; }"
+            )
+            custom_row.addWidget(custom_input, 1)
+            custom_row.addWidget(custom_add_btn)
+            layout.addLayout(custom_row)
+
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
@@ -944,6 +963,11 @@ class MultiSelectPickerButton(QPushButton):
         content_layout.setSpacing(10)
         checkboxes: list[tuple[QCheckBox, str, str]] = []
         checkbox_groups: list[tuple[QWidget, list[QCheckBox]]] = []
+
+        # Grupo especial para valores custom añadidos en esta sesión
+        custom_group_widget: QWidget | None = None
+        custom_grid: QGridLayout | None = None
+        custom_checkboxes: list[QCheckBox] = []
 
         def add_group(group_label: str | None, items: list[tuple[str, str]]) -> None:
             group_widget = QWidget()
@@ -980,6 +1004,60 @@ class MultiSelectPickerButton(QPushButton):
                 add_group(group_label, items)
         else:
             add_group(None, self._items)
+
+        def _add_custom_value() -> None:
+            nonlocal custom_group_widget, custom_grid
+            if not self._allow_custom:
+                return
+            value = custom_input.text().strip()
+            if not value:
+                return
+            # No duplicar
+            existing = {data for _cb, _lbl, data in checkboxes}
+            if value in existing:
+                # Si ya existe, solo marcarlo
+                for cb, _lbl, data in checkboxes:
+                    if data == value:
+                        cb.setChecked(True)
+                        break
+                custom_input.clear()
+                refresh_count()
+                return
+            # Crear grupo "Nuevos" si no existe
+            if custom_group_widget is None:
+                custom_group_widget = QWidget()
+                cg_layout = QVBoxLayout()
+                cg_layout.setContentsMargins(0, 0, 0, 0)
+                cg_layout.setSpacing(6)
+                cg_title = QLabel("Nuevos")
+                cg_title.setObjectName("catalogSectionHint")
+                cg_title.setStyleSheet("font-weight:700; color:#2e7d32;")
+                cg_layout.addWidget(cg_title)
+                custom_grid = QGridLayout()
+                custom_grid.setContentsMargins(0, 0, 0, 0)
+                custom_grid.setHorizontalSpacing(10)
+                custom_grid.setVerticalSpacing(8)
+                cg_layout.addLayout(custom_grid)
+                custom_group_widget.setLayout(cg_layout)
+                # Insertar al inicio del content_layout
+                content_layout.insertWidget(0, custom_group_widget)
+                checkbox_groups.append((custom_group_widget, custom_checkboxes))
+            # Añadir checkbox
+            idx = len(custom_checkboxes)
+            cb = QCheckBox(value)
+            cb.setChecked(True)
+            cb.setProperty("search_text", value.casefold())
+            cb.toggled.connect(lambda _: refresh_count())
+            custom_grid.addWidget(cb, idx // self._columns, idx % self._columns)
+            checkboxes.append((cb, value, value))
+            custom_checkboxes.append(cb)
+            self._items.append((value, value))
+            custom_input.clear()
+            refresh_count()
+
+        if self._allow_custom:
+            custom_add_btn.clicked.connect(_add_custom_value)
+            custom_input.returnPressed.connect(_add_custom_value)
 
         content_layout.addStretch(1)
         content.setLayout(content_layout)
@@ -1074,7 +1152,7 @@ COMMON_COLORS = [
     "Olivo",
     "Amarillo",
     "Beige",
-    "Cafe",
+    "Café",
     "Camel",
     "Khaki",
     "Rosa",

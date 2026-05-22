@@ -286,6 +286,8 @@ def build_catalog_product_dialog(
         title="Seleccionar tallas",
         helper_text="Marca varias tallas sin que el selector se cierre a cada clic. Puedes filtrar, elegir varias y aplicar al final.",
         columns=5,
+        group_values_by_format=True,
+        allow_custom=True,
         presets=[
             ("Basicas", ["2", "4", "6", "8", "10", "12", "14", "16"]),
             ("Pants", ["16", "CH", "MD", "GD", "EXG"]),
@@ -300,6 +302,7 @@ def build_catalog_product_dialog(
         title="Seleccionar colores",
         helper_text="Marca uno o varios colores para generar las presentaciones en lote. Si no eliges color, se usara Sin color.",
         columns=4,
+        allow_custom=True,
         presets=[
             ("Todos", lambda values: [value for value in values if value != default_variant_color]),
             ("Ninguno", []),

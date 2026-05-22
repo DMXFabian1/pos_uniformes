@@ -249,7 +249,7 @@ class BodegaIngresoDialog(QDialog):
         self._completer_model = QStringListModel()
         self._completer = QCompleter(self._completer_model, self)
         self._completer.setCaseSensitivity(Qt.CaseSensitivity.CaseInsensitive)
-        self._completer.setFilterMode(Qt.MatchFlag.MatchContains)
+        self._completer.setCompletionMode(QCompleter.CompletionMode.UnfilteredPopupCompletion)
         self._completer.setMaxVisibleItems(8)
         self._completer.activated.connect(self._on_completer_activated)
         self.sku_input.setCompleter(self._completer)
