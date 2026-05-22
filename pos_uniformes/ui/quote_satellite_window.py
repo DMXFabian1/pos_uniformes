@@ -548,6 +548,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self.guided_product_scroll,
             self.guided_page_scroll,
             self.guided_school_scroll,
+            self.kiosk_hero_scroll,
         ):
             _QScroller.grabGesture(scroll_area.viewport(), _SCROLLER_GESTURE)
 
@@ -1228,8 +1229,15 @@ class QuoteSatelliteWindow(QMainWindow):
         hero_card_layout.addStretch()
         hero_card.setLayout(hero_card_layout)
 
+        self.kiosk_hero_scroll = QScrollArea()
+        self.kiosk_hero_scroll.setWidgetResizable(True)
+        self.kiosk_hero_scroll.setFrameShape(QFrame.Shape.NoFrame)
+        self.kiosk_hero_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.kiosk_hero_scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.kiosk_hero_scroll.setWidget(hero_card)
+
         left_layout.addWidget(scan_card)
-        left_layout.addWidget(hero_card, 1)
+        left_layout.addWidget(self.kiosk_hero_scroll, 1)
         left.setLayout(left_layout)
 
         # ======== COLUMNA DERECHA ========
