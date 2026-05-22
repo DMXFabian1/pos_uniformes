@@ -1394,18 +1394,18 @@ def build_catalog_product_dialog(
     generate_name_button.clicked.connect(lambda: sync_name_suggestion(force=True))
     nombre_input.textEdited.connect(handle_name_manual_edit)
     marca_combo.currentTextChanged.connect(lambda _: sync_name_suggestion())
-    tipo_pieza_combo.currentTextChanged.connect(lambda _: sync_name_suggestion())
     atributo_combo.currentTextChanged.connect(lambda _: sync_name_suggestion())
-    genero_input.currentTextChanged.connect(lambda _: sync_name_suggestion())
     escuela_combo.currentTextChanged.connect(lambda _: (update_final_name_preview(), update_capture_summary()))
     tipo_prenda_combo.currentTextChanged.connect(
         lambda _: (update_final_name_preview(), update_capture_summary(), update_presentation_template_suggestion(), sync_price_mode_suggestion())
     )
     tipo_pieza_combo.currentTextChanged.connect(
-        lambda _: (update_final_name_preview(), update_capture_summary(), update_presentation_template_suggestion(), sync_price_mode_suggestion())
+        lambda _: (sync_name_suggestion(), update_capture_summary(), update_presentation_template_suggestion(), sync_price_mode_suggestion())
     )
     nivel_combo.currentTextChanged.connect(lambda _: (update_presentation_template_suggestion(), sync_price_mode_suggestion()))
-    genero_input.currentTextChanged.connect(lambda _: (update_presentation_template_suggestion(), sync_price_mode_suggestion()))
+    genero_input.currentTextChanged.connect(
+        lambda _: (sync_name_suggestion(), update_presentation_template_suggestion(), sync_price_mode_suggestion())
+    )
     price_mode_combo.currentIndexChanged.connect(
         lambda _: (
             price_mode_state.__setitem__("manual_override", True),
@@ -1785,8 +1785,10 @@ def build_catalog_product_dialog(
         update_review_details()
 
     def go_to_step(target_index: int) -> None:
-        if target_index > current_step["index"] and not validate_step(current_step["index"]):
-            return
+        if target_index > current_step["index"]:
+            for step_i in range(current_step["index"], target_index):
+                if not validate_step(step_i):
+                    return
         current_step["index"] = max(0, min(target_index, len(step_titles) - 1))
         refresh_step_ui()
 
@@ -1812,7 +1814,20 @@ def build_catalog_product_dialog(
     previous_button.clicked.connect(lambda: go_to_step(current_step["index"] - 1))
     next_button.clicked.connect(lambda: go_to_step(current_step["index"] + 1))
     save_button.clicked.connect(lambda: dialog.accept() if validate_step(0) and validate_step(2) else None)
-    cancel_button.clicked.connect(dialog.reject)
+    def confirm_cancel() -> None:
+        if nombre_input.text().strip() or variant_sizes_button.selected_labels():
+            answer = QMessageBox.question(
+                dialog,
+                "Cancelar captura",
+                "Tienes datos capturados. ¿Seguro que quieres cancelar?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+        dialog.reject()
+
+    cancel_button.clicked.connect(confirm_cancel)
     navigation_row.addWidget(previous_button)
     navigation_row.addWidget(next_button)
     navigation_row.addStretch(1)

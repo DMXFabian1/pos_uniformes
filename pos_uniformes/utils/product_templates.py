@@ -27,70 +27,87 @@ _OMIT_LABELS = {
 }
 
 BASE_STEP_TEMPLATES: list[dict[str, object]] = [
-    {"label": "Playera deportiva", "name": "Playera", "piece_type": "Playera", "garment_type": "Deportivo", "description": "Playera deportiva escolar."},
-    {"label": "Chamarra deportiva", "name": "Chamarra", "piece_type": "Chamarra", "garment_type": "Deportivo", "description": "Chamarra deportiva para uniforme."},
-    {"label": "Pants 2pz deportivo", "name": "Pants 2pz", "piece_type": "Pants 2pz", "garment_type": "Deportivo", "description": "Conjunto deportivo de dos piezas."},
-    {"label": "Pants 3pz deportivo", "name": "Pants 3pz", "piece_type": "Pants 3pz", "garment_type": "Deportivo", "description": "Conjunto deportivo de tres piezas."},
-    {"label": "Pants 2pz basico", "name": "Pants 2pz", "piece_type": "Pants 2pz", "attribute": "Liso", "garment_type": "Basico", "description": "Conjunto basico de dos piezas."},
-    {"label": "Pants suelto", "name": "Pants suelto", "piece_type": "Pants Suelto", "attribute": "Liso", "garment_type": "Basico", "description": "Pants suelto para uniforme basico."},
-    {"label": "Sueter botones", "name": "Sueter", "piece_type": "Suéter", "attribute": "Botones", "gender": "Mujer", "garment_type": "Oficial", "description": "Sueter escolar con botones."},
-    {"label": "Sueter botones unisex", "name": "Sueter", "piece_type": "Suéter", "attribute": "Botones", "gender": "Unisex", "garment_type": "Oficial", "description": "Sueter escolar con botones unisex."},
-    {"label": "Sueter cuello V", "name": "Sueter", "piece_type": "Suéter", "attribute": "Cuello V", "gender": "Hombre", "garment_type": "Oficial", "description": "Sueter escolar cuello V."},
-    {"label": "Sueter cuello V unisex", "name": "Sueter", "piece_type": "Suéter", "attribute": "Cuello V", "gender": "Unisex", "garment_type": "Oficial", "description": "Sueter escolar cuello V unisex."},
+    # Deportivos — nombre: [Pieza] Deportiva/o [Escuela]
+    {"label": "Playera deportiva", "name": "Playera Deportiva", "piece_type": "Playera", "garment_type": "Deportivo", "description": "Playera deportiva escolar. Color por escuela."},
+    {"label": "Chamarra deportiva", "name": "Chamarra Deportiva", "piece_type": "Chamarra", "garment_type": "Deportivo", "description": "Chamarra deportiva escolar. Color por escuela."},
+    {"label": "Pants 2pz deportivo", "name": "Pants 2pz Deportivo", "piece_type": "Pants 2pz", "garment_type": "Deportivo", "description": "Conjunto deportivo de dos piezas."},
+    {"label": "Pants 3pz deportivo", "name": "Pants 3pz Deportivo", "piece_type": "Pants 3pz", "garment_type": "Deportivo", "description": "Conjunto deportivo de tres piezas."},
+    # Básicos — nombre: [Pieza] [Atributo] [Color]
+    {"label": "Pants 2pz liso", "name": "Pants 2pz Liso", "piece_type": "Pants 2pz", "attribute": "Liso", "garment_type": "Basico", "description": "Conjunto basico de dos piezas liso."},
+    {"label": "Pants 2pz punto", "name": "Pants 2pz Punto", "piece_type": "Pants 2pz", "attribute": "Punto", "garment_type": "Basico", "description": "Conjunto basico de dos piezas punto."},
+    {"label": "Pants suelto liso", "name": "Pants Suelto Liso", "piece_type": "Pants Suelto", "attribute": "Liso", "garment_type": "Basico", "description": "Pants suelto liso para uniforme basico."},
+    {"label": "Pants suelto punto", "name": "Pants Suelto Punto", "piece_type": "Pants Suelto", "attribute": "Punto", "garment_type": "Basico", "description": "Pants suelto punto para uniforme basico."},
+    # Oficiales — nombre: [Pieza] [Atributo] [Género]
+    {"label": "Suéter botones M", "name": "Suéter Botones M", "piece_type": "Suéter", "attribute": "Botones", "gender": "Mujer", "garment_type": "Oficial", "description": "Suéter escolar con botones mujer."},
+    {"label": "Suéter cuello V H", "name": "Suéter Cuello V H", "piece_type": "Suéter", "attribute": "Cuello V", "gender": "Hombre", "garment_type": "Oficial", "description": "Suéter escolar cuello V hombre."},
     {"label": "Chaleco oficial", "name": "Chaleco", "piece_type": "Chaleco", "gender": "Unisex", "garment_type": "Oficial", "description": "Chaleco escolar oficial."},
-    {"label": "Pantalon vestir", "name": "Pantalon", "piece_type": "Pantalón", "attribute": "Vestir", "garment_type": "Oficial", "description": "Pantalon escolar de vestir."},
-    {"label": "Falda escolar", "name": "Falda", "piece_type": "Falda", "gender": "Mujer", "garment_type": "Oficial", "description": "Falda escolar."},
+    {"label": "Pantalón vestir", "name": "Pantalón Vestir", "piece_type": "Pantalón", "attribute": "Vestir", "garment_type": "Oficial", "description": "Pantalón escolar de vestir."},
+    {"label": "Falda cuatro tablas", "name": "Falda Cuatro tablas", "piece_type": "Falda", "attribute": "Cuatro tablas", "gender": "Mujer", "garment_type": "Oficial", "description": "Falda escolar cuatro tablas."},
+    {"label": "Falda escocés", "name": "Falda Escoces", "piece_type": "Falda", "attribute": "Escoces", "gender": "Mujer", "garment_type": "Oficial", "description": "Falda escolar escocés."},
     {"label": "Malla escolar", "name": "Malla", "piece_type": "Malla", "gender": "Mujer", "garment_type": "Oficial", "description": "Malla escolar."},
     {"label": "Jumper", "name": "Jumper", "piece_type": "Jumper", "gender": "Mujer", "garment_type": "Basico", "description": "Jumper escolar."},
-    {"label": "Camisa manga corta", "name": "Camisa", "piece_type": "Camisa", "attribute": "Manga corta", "garment_type": "Oficial", "description": "Camisa escolar de manga corta."},
-    {"label": "Camisa manga larga", "name": "Camisa", "piece_type": "Camisa", "attribute": "Manga larga", "garment_type": "Oficial", "description": "Camisa escolar de manga larga."},
-    {"label": "Accesorio escolar", "name": "Accesorio", "piece_type": "Accesorio", "garment_type": "Accesorio", "description": "Accesorio escolar para complemento del uniforme."},
+    {"label": "Camisa manga corta", "name": "Camisa Manga Corta", "piece_type": "Camisa", "attribute": "Manga corta", "garment_type": "Oficial", "description": "Camisa escolar de manga corta."},
+    {"label": "Camisa manga larga", "name": "Camisa Manga Larga", "piece_type": "Camisa", "attribute": "Manga larga", "garment_type": "Oficial", "description": "Camisa escolar de manga larga."},
+    {"label": "Camisa cuello olan", "name": "Camisa Cuello olan", "piece_type": "Camisa", "attribute": "Cuello olan", "gender": "Mujer", "garment_type": "Oficial", "description": "Camisa escolar cuello olan."},
+    # Accesorios — nombre: [Pieza] [Tipo]
+    {"label": "Boina escolta", "name": "Boina Escolta", "piece_type": "Boina", "garment_type": "Escolta", "description": "Boina para uniforme de escolta."},
+    {"label": "Corbatín", "name": "Corbatín", "piece_type": "Corbatín", "garment_type": "Accesorio", "description": "Corbatín escolar."},
+    {"label": "Moño", "name": "Moño", "piece_type": "Moño", "garment_type": "Accesorio", "description": "Moño escolar."},
+    {"label": "Bata manga corta", "name": "Bata Manga Corta", "piece_type": "Bata", "attribute": "Manga corta", "garment_type": "Accesorio", "description": "Bata escolar manga corta."},
+    {"label": "Bata manga larga", "name": "Bata Manga Larga", "piece_type": "Bata", "attribute": "Manga larga", "garment_type": "Accesorio", "description": "Bata escolar manga larga."},
 ]
 
 CONTEXT_STEP_TEMPLATES: list[dict[str, object]] = [
-    {"label": "Playera deportiva", "garment_type": "Deportivo", "piece_type": "Playera", "attribute": "Deportivo", "gender": "Unisex"},
-    {"label": "Chamarra deportiva", "garment_type": "Deportivo", "piece_type": "Chamarra", "attribute": "Deportivo", "gender": "Unisex"},
-    {"label": "Pants 2pz deportivo", "garment_type": "Deportivo", "piece_type": "Pants 2pz", "attribute": "Deportivo", "gender": "Unisex"},
-    {"label": "Pants 3pz deportivo", "garment_type": "Deportivo", "piece_type": "Pants 3pz", "attribute": "Deportivo", "gender": "Unisex"},
-    {"label": "Primaria deportiva con escudo", "garment_type": "Deportivo", "attribute": "Deportivo", "education_level": "Primaria", "gender": "Unisex", "shield": "Con Escudo"},
-    {"label": "Preescolar deportiva con escudo", "garment_type": "Deportivo", "attribute": "Deportivo", "education_level": "Preescolar", "gender": "Unisex", "shield": "Con Escudo"},
-    {"label": "Secundaria deportiva con escudo", "garment_type": "Deportivo", "attribute": "Deportivo", "education_level": "Secundaria", "gender": "Unisex", "shield": "Con Escudo"},
-    {"label": "Bachillerato deportiva con escudo", "garment_type": "Deportivo", "attribute": "Deportivo", "education_level": "Bachillerato", "gender": "Unisex", "shield": "Con Escudo"},
-    {"label": "Sueter botones oficial", "garment_type": "Oficial", "piece_type": "Suéter", "attribute": "Botones", "gender": "Mujer", "shield": "Con Escudo"},
-    {"label": "Sueter botones oficial unisex", "garment_type": "Oficial", "piece_type": "Suéter", "attribute": "Botones", "gender": "Unisex", "shield": "Con Escudo"},
-    {"label": "Sueter cuello V oficial", "garment_type": "Oficial", "piece_type": "Suéter", "attribute": "Cuello V", "gender": "Hombre", "shield": "Con Escudo"},
-    {"label": "Sueter cuello V oficial unisex", "garment_type": "Oficial", "piece_type": "Suéter", "attribute": "Cuello V", "gender": "Unisex", "shield": "Con Escudo"},
-    {"label": "Chaleco oficial", "garment_type": "Oficial", "piece_type": "Chaleco", "gender": "Unisex", "shield": "Con Escudo"},
-    {"label": "Pantalon vestir oficial", "garment_type": "Oficial", "piece_type": "Pantalón", "attribute": "Vestir"},
-    {"label": "Falda oficial", "garment_type": "Oficial", "piece_type": "Falda", "gender": "Mujer"},
-    {"label": "Malla escolar", "garment_type": "Accesorio", "piece_type": "Malla", "attribute": "Escolar", "gender": "Mujer"},
+    # Deportivo por nivel — siempre Con Escudo
+    {"label": "Preescolar deportivo", "garment_type": "Deportivo", "education_level": "Preescolar", "shield": "Con Escudo"},
+    {"label": "Primaria deportivo", "garment_type": "Deportivo", "education_level": "Primaria", "shield": "Con Escudo"},
+    {"label": "Secundaria deportivo", "garment_type": "Deportivo", "education_level": "Secundaria", "shield": "Con Escudo"},
+    {"label": "Bachillerato deportivo", "garment_type": "Deportivo", "education_level": "Bachillerato", "shield": "Con Escudo"},
+    # Oficial por nivel + género — siempre Con Escudo
     {"label": "Primaria oficial mujer", "garment_type": "Oficial", "education_level": "Primaria", "gender": "Mujer", "shield": "Con Escudo"},
     {"label": "Primaria oficial hombre", "garment_type": "Oficial", "education_level": "Primaria", "gender": "Hombre", "shield": "Con Escudo"},
     {"label": "Secundaria oficial mujer", "garment_type": "Oficial", "education_level": "Secundaria", "gender": "Mujer", "shield": "Con Escudo"},
     {"label": "Secundaria oficial hombre", "garment_type": "Oficial", "education_level": "Secundaria", "gender": "Hombre", "shield": "Con Escudo"},
-    {"label": "Basico general", "garment_type": "Basico"},
-    {"label": "Basico pantalon vestir", "garment_type": "Basico", "piece_type": "Pantalón", "attribute": "Vestir"},
-    {"label": "Basico falda", "garment_type": "Basico", "piece_type": "Falda", "gender": "Mujer"},
-    {"label": "Basico chamarra", "garment_type": "Basico", "piece_type": "Chamarra", "attribute": "Liso", "gender": "Unisex"},
-    {"label": "Basico pants 2pz", "garment_type": "Basico", "piece_type": "Pants 2pz", "attribute": "Liso", "gender": "Unisex"},
-    {"label": "Basico pants suelto", "garment_type": "Basico", "piece_type": "Pants Suelto", "attribute": "Liso", "gender": "Unisex"},
-    {"label": "Basico jumper", "garment_type": "Basico", "piece_type": "Jumper", "gender": "Mujer"},
-    {"label": "Escolta", "garment_type": "Escolta", "shield": "Con Escudo"},
-    {"label": "Camisa manga corta", "garment_type": "Oficial", "piece_type": "Camisa", "attribute": "Manga corta"},
-    {"label": "Camisa manga larga", "garment_type": "Oficial", "piece_type": "Camisa", "attribute": "Manga larga"},
+    {"label": "Preescolar oficial", "garment_type": "Oficial", "education_level": "Preescolar"},
+    # Oficial por pieza (sin nivel fijo)
+    {"label": "Suéter botones mujer", "garment_type": "Oficial", "piece_type": "Suéter", "attribute": "Botones", "gender": "Mujer", "shield": "Con Escudo"},
+    {"label": "Suéter cuello V hombre", "garment_type": "Oficial", "piece_type": "Suéter", "attribute": "Cuello V", "gender": "Hombre", "shield": "Con Escudo"},
+    {"label": "Chaleco oficial", "garment_type": "Oficial", "piece_type": "Chaleco", "shield": "Con Escudo"},
+    {"label": "Playera polo oficial", "garment_type": "Oficial", "piece_type": "Playera", "attribute": "Polo", "shield": "Con Escudo"},
+    {"label": "Camisa cuello olan", "garment_type": "Oficial", "piece_type": "Camisa", "attribute": "Cuello olan", "education_level": "Preescolar"},
+    # Básico — sin nivel, sin escudo
+    {"label": "Básico general", "garment_type": "Basico"},
+    {"label": "Básico pantalón vestir", "garment_type": "Basico", "piece_type": "Pantalón", "attribute": "Vestir"},
+    {"label": "Básico falda", "garment_type": "Basico", "piece_type": "Falda"},
+    {"label": "Básico pants liso", "garment_type": "Basico", "piece_type": "Pants 2pz", "attribute": "Liso"},
+    {"label": "Básico pants punto", "garment_type": "Basico", "piece_type": "Pants 2pz", "attribute": "Punto"},
+    {"label": "Básico chamarra", "garment_type": "Basico", "piece_type": "Chamarra"},
+    {"label": "Básico suéter mujer", "garment_type": "Basico", "piece_type": "Suéter", "attribute": "Botones", "gender": "Mujer"},
+    {"label": "Básico suéter hombre", "garment_type": "Basico", "piece_type": "Suéter", "attribute": "Cuello V", "gender": "Hombre"},
+    {"label": "Básico jumper", "garment_type": "Basico", "piece_type": "Jumper", "gender": "Mujer"},
+    {"label": "Básico camisa", "garment_type": "Basico", "piece_type": "Camisa", "attribute": "Manga Corta"},
+    # Accesorios
+    {"label": "Malla escolar", "garment_type": "Accesorio", "piece_type": "Malla", "attribute": "Escolar"},
     {"label": "Accesorio escolar", "garment_type": "Accesorio", "attribute": "Escolar"},
+    # Escolta
+    {"label": "Escolta", "garment_type": "Escolta", "shield": "Con Escudo"},
 ]
 
 PRESENTATION_STEP_TEMPLATES: list[dict[str, object]] = [
-    {"label": "Primaria deportiva", "sizes": ["4", "6", "8", "10", "12", "14", "16", "CH", "MD", "GD"], "colors": ["Ad hoc"]},
-    {"label": "Preescolar deportiva", "sizes": ["2", "4", "6", "8"], "colors": ["Ad hoc"]},
-    {"label": "Secundaria deportiva", "sizes": ["10", "12", "14", "16", "CH", "MD", "GD"], "colors": ["Ad hoc"]},
-    {"label": "Bachillerato deportiva", "sizes": ["12", "14", "16", "CH", "MD", "GD", "EXG"], "colors": ["Ad hoc"]},
-    {"label": "Oficial primaria mujer", "sizes": ["6", "8", "10", "12", "14", "16", "34", "36", "38", "40"], "colors": ["Azul Marino", "Rojo", "Azul", "Vino", "Negro"]},
-    {"label": "Oficial primaria hombre", "sizes": ["6", "8", "10", "12", "14", "16", "28", "30", "32", "34", "36", "38", "40"], "colors": ["Azul Marino", "Rojo", "Azul", "Vino", "Negro"]},
-    {"label": "Basico infantil", "sizes": ["2", "4", "6", "8", "10", "12", "14", "16"], "colors": ["Rojo", "Blanco", "Vino", "Gris", "Azul Marino", "Verde", "Azul Rey"]},
-    {"label": "Basico mixto", "sizes": ["4", "6", "8", "10", "12", "14", "16", "28", "30", "32", "34", "36", "38", "40"], "colors": ["Azul Marino", "Blanco", "Negro", "Rojo", "Verde", "Vino"]},
-    {"label": "Malla escolar", "sizes": ["0-0", "0-2", "3-5", "6-8", "9-12", "13-18", "CH-MD", "GD-EXG", "Dama"], "colors": ["Rojo", "Beige", "Vino", "Azul Marino", "Negro", "Verde"]},
+    # Deportivo por nivel — colores varían por escuela, iniciar con paleta común
+    {"label": "Preescolar deportiva", "sizes": ["2", "4", "6", "8", "10"], "colors": ["Azul Marino", "Rojo", "Verde", "Vino", "Blanco"]},
+    {"label": "Primaria deportiva", "sizes": ["4", "6", "8", "10", "12", "14", "16", "18", "CH", "MD", "GD", "EXG"], "colors": ["Azul Marino", "Rojo", "Verde", "Vino", "Blanco"]},
+    {"label": "Secundaria deportiva", "sizes": ["10", "12", "14", "16", "18", "CH", "MD", "GD", "EXG"], "colors": ["Azul Marino", "Rojo", "Verde", "Vino", "Blanco"]},
+    {"label": "Bachillerato deportiva", "sizes": ["12", "14", "16", "CH", "MD", "GD", "EXG"], "colors": ["Azul Marino", "Rojo", "Verde", "Vino", "Blanco"]},
+    # Oficial — separado por género (tallas numéricas difieren)
+    {"label": "Oficial mujer", "sizes": ["4", "6", "8", "10", "12", "14", "16", "18", "28", "30", "32", "34", "36", "38", "40", "42", "44"], "colors": ["Azul Marino", "Rojo", "Vino", "Blanco", "Negro"]},
+    {"label": "Oficial hombre", "sizes": ["4", "6", "8", "10", "12", "14", "16", "18", "30", "32", "34", "36", "38", "40", "42", "44"], "colors": ["Azul Marino", "Rojo", "Vino", "Blanco", "Negro"]},
+    # Básico — infantil (solo numeración chica) y mixto (infantil + adulto)
+    {"label": "Básico infantil", "sizes": ["2", "4", "6", "8", "10", "12", "14", "16"], "colors": ["Azul Marino", "Blanco", "Rojo", "Vino", "Gris", "Verde", "Azul Rey", "Negro"]},
+    {"label": "Básico mixto", "sizes": ["4", "6", "8", "10", "12", "14", "16", "18", "28", "30", "32", "34", "36", "38", "40", "42", "44"], "colors": ["Azul Marino", "Blanco", "Negro", "Rojo", "Verde", "Vino", "Gris"]},
+    # Malla — rangos especiales
+    {"label": "Malla escolar", "sizes": ["0-0", "0-2", "3-5", "6-8", "9-12", "13-18", "CH-MD", "GD-EXG", "Dama"], "colors": ["Rojo", "Beige", "Vino", "Azul Marino", "Negro", "Verde", "Blanco"]},
+    # Accesorios — unitalla o sin color
     {"label": "Unitalla accesorio", "sizes": ["Uni"], "colors": ["Sin color"]},
 ]
 
@@ -248,13 +265,13 @@ def suggest_presentation_template(criteria: dict[str, str]) -> str | None:
         return "Primaria deportiva"
     if garment_type == "oficial":
         if gender == "hombre":
-            return "Oficial primaria hombre"
+            return "Oficial hombre"
         if gender == "mujer":
-            return "Oficial primaria mujer"
+            return "Oficial mujer"
     if garment_type == "basico":
         if education_level in {"secundaria", "bachillerato"}:
-            return "Basico mixto"
-        return "Basico infantil"
+            return "Básico mixto"
+        return "Básico infantil"
     return None
 
 
