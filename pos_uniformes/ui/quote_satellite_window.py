@@ -315,6 +315,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.nav_quote_button = QPushButton("Presupuesto")
         self.nav_search_button = QPushButton("Buscar")
         self.nav_share_button = QPushButton("Compartir")
+        self.nav_tariff_button = QPushButton("Tarifarios")
         self.sidebar_total_label = QLabel("$0.00")
         self.sidebar_summary_label = QLabel("Sin piezas en el presupuesto actual.")
         self.sidebar_items_count_label = QLabel("0 lineas | 0 pzas")
@@ -453,6 +454,12 @@ class QuoteSatelliteWindow(QMainWindow):
         self.share_detail_table = QTableWidget()
         self.share_back_search_button = QPushButton("Ir a buscar")
         self.share_refresh_button = QPushButton("Recargar detalle")
+        # — Tarifario widgets —
+        self.tariff_school_combo = QComboBox()
+        self.tariff_generate_button = QPushButton("Generar tarifario")
+        self.tariff_print_button = QPushButton("Imprimir")
+        self.tariff_preview = QTextEdit()
+        self.tariff_preview.setReadOnly(True)
 
     def _apply_icons(self) -> None:
         nav_icons = {
@@ -462,6 +469,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self.nav_quote_button: _icon_from_asset("kiosk_icons/quote_stack.svg"),
             self.nav_search_button: _icon_from_asset("kiosk_icons/search_quote.svg"),
             self.nav_share_button: _icon_from_asset("kiosk_icons/share_send.svg"),
+            self.nav_tariff_button: _icon_from_asset("kiosk_icons/catalog_grid.svg"),
         }
         for button, icon in nav_icons.items():
             button.setIcon(icon)
@@ -565,7 +573,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self.nav_guided_button,
             self.nav_quote_button,
             self.nav_search_button,
-            self.nav_share_button,
+            self.nav_tariff_button,
         ):
             button.setObjectName("navButton")
             button.setCheckable(True)
@@ -624,6 +632,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.page_stack.addWidget(self._build_quote_page())
         self.page_stack.addWidget(self._build_search_page())
         self.page_stack.addWidget(self._build_share_page())
+        self.page_stack.addWidget(self._build_tariff_page())
         return self.page_stack
 
     def _build_kiosk_page(self) -> QWidget:
@@ -1140,6 +1149,46 @@ class QuoteSatelliteWindow(QMainWindow):
         page.setLayout(layout)
         return page
 
+    def _build_tariff_page(self) -> QWidget:
+        from PyQt6.QtGui import QFontDatabase
+        from pos_uniformes.ui.helpers.ticket_print_layout_helper import TICKET_FONT_POINT_SIZE
+
+        page = QWidget()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(14)
+
+        # — Selector de escuela —
+        selector_card = QGroupBox("Selecciona una escuela")
+        selector_layout = QHBoxLayout()
+        selector_layout.setSpacing(10)
+        self.tariff_school_combo.setMinimumWidth(280)
+        self.tariff_school_combo.setPlaceholderText("Elige escuela...")
+        self.tariff_generate_button.setObjectName("primaryButton")
+        self.tariff_print_button.setObjectName("secondaryButton")
+        self.tariff_print_button.setEnabled(False)
+        selector_layout.addWidget(self.tariff_school_combo, 1)
+        selector_layout.addWidget(self.tariff_generate_button)
+        selector_layout.addWidget(self.tariff_print_button)
+        selector_card.setLayout(selector_layout)
+
+        # — Vista previa —
+        preview_card = QGroupBox("Vista previa del tarifario")
+        preview_layout = QVBoxLayout()
+        mono_family = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont).family()
+        self.tariff_preview.setStyleSheet(
+            f'QTextEdit {{ font-family: "{mono_family}"; font-size: {TICKET_FONT_POINT_SIZE}pt;'
+            f" font-weight: bold; }}"
+        )
+        self.tariff_preview.setPlaceholderText("Selecciona una escuela y presiona Generar.")
+        preview_layout.addWidget(self.tariff_preview)
+        preview_card.setLayout(preview_layout)
+
+        layout.addWidget(selector_card)
+        layout.addWidget(preview_card, 1)
+        page.setLayout(layout)
+        return page
+
     def _build_kiosk_panel(self) -> QWidget:
         root = QWidget()
         layout = QHBoxLayout()
@@ -1641,6 +1690,9 @@ class QuoteSatelliteWindow(QMainWindow):
         self.nav_quote_button.clicked.connect(lambda: self._set_page("quote"))
         self.nav_search_button.clicked.connect(lambda: self._set_page("search"))
         self.nav_share_button.clicked.connect(lambda: self._set_page("share"))
+        self.nav_tariff_button.clicked.connect(lambda: self._set_page("tariff"))
+        self.tariff_generate_button.clicked.connect(self._handle_generate_tariff)
+        self.tariff_print_button.clicked.connect(self._handle_print_tariff)
         self.quick_scan_button.clicked.connect(self._handle_quick_scan)
         self.quick_scan_input.returnPressed.connect(self._handle_quick_scan)
         self.kiosk_open_quote_button.clicked.connect(lambda: self._set_page("quote"))
@@ -1728,6 +1780,7 @@ class QuoteSatelliteWindow(QMainWindow):
             "quote": 3,
             "search": 4,
             "share": 5,
+            "tariff": 6,
         }
         button_map = {
             "kiosk": self.nav_kiosk_button,
@@ -1736,6 +1789,7 @@ class QuoteSatelliteWindow(QMainWindow):
             "quote": self.nav_quote_button,
             "search": self.nav_search_button,
             "share": self.nav_share_button,
+            "tariff": self.nav_tariff_button,
         }
         page_title_map = {
             "kiosk": "Kiosko listo para escaneo rapido.",
@@ -1744,6 +1798,7 @@ class QuoteSatelliteWindow(QMainWindow):
             "quote": "Ajusta el presupuesto.",
             "search": "Busqueda y seguimiento de presupuestos.",
             "share": "Compartir por WhatsApp o imprimir.",
+            "tariff": "Tarifario de precios por escuela.",
         }
         self.current_page_key = page_key
         self.page_stack.setCurrentIndex(page_index_map[page_key])
@@ -1768,6 +1823,7 @@ class QuoteSatelliteWindow(QMainWindow):
                 self._refresh_client_combo(session)
                 self._refresh_catalog_snapshot(session)
                 self._refresh_quotes(session)
+                self._refresh_tariff_schools(session)
             self._refresh_catalog_browser()
             self._refresh_guided_browser()
             self._refresh_quote_cart_table()
@@ -4010,6 +4066,62 @@ QLabel#favDialogPriceLabel {
             ]
             for column_index, value in enumerate(values):
                 self.share_detail_table.setItem(row_index, column_index, _table_item(value))
+
+    # ── Tarifario por escuela ──────────────────────────────────────
+
+    def _refresh_tariff_schools(self, session) -> None:
+        from pos_uniformes.services.school_tariff_service import list_schools_for_tariff
+
+        previous = self.tariff_school_combo.currentData()
+        self.tariff_school_combo.blockSignals(True)
+        self.tariff_school_combo.clear()
+        schools = list_schools_for_tariff(session)
+        for s in schools:
+            self.tariff_school_combo.addItem(s["escuela_nombre"], s["escuela_id"])
+        if previous is not None:
+            for i in range(self.tariff_school_combo.count()):
+                if self.tariff_school_combo.itemData(i) == previous:
+                    self.tariff_school_combo.setCurrentIndex(i)
+                    break
+        self.tariff_school_combo.blockSignals(False)
+
+    def _handle_generate_tariff(self) -> None:
+        from pos_uniformes.services.school_tariff_service import build_school_tariff
+        from pos_uniformes.services.school_tariff_text_service import build_school_tariff_text
+
+        escuela_id = self.tariff_school_combo.currentData()
+        if escuela_id is None:
+            self._set_status("Selecciona una escuela primero.")
+            return
+        try:
+            with get_session() as session:
+                tariff = build_school_tariff(session, escuela_id)
+            business_name = _load_business_name()
+            business_phone = _load_business_phone()
+            text = build_school_tariff_text(
+                tariff=tariff,
+                business_name=business_name,
+                business_phone=business_phone,
+            )
+            self.tariff_preview.setPlainText(text)
+            self.tariff_print_button.setEnabled(True)
+            n = len(tariff.get("productos", []))
+            self._set_status(f"Tarifario generado: {tariff['escuela_nombre']} — {n} productos.")
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Error al generar tarifario", str(exc))
+
+    def _handle_print_tariff(self) -> None:
+        content = self.tariff_preview.toPlainText()
+        if not content.strip():
+            self._set_status("Genera un tarifario primero.")
+            return
+        from pos_uniformes.ui.dialogs.printable_text_dialog import open_printable_text_dialog
+        open_printable_text_dialog(
+            parent=self,
+            title="Tarifario",
+            content=content,
+        )
+
     def _apply_action_state(self) -> None:
         selected_quote_line = 0 <= self.quote_cart_table.currentRow() < len(self.quote_cart)
         if self.offline_mode:
@@ -5161,6 +5273,17 @@ def _load_business_name() -> str:
             return config.nombre_negocio or "POS Uniformes"
     except Exception:  # noqa: BLE001
         return "POS Uniformes"
+
+
+def _load_business_phone() -> str:
+    try:
+        from pos_uniformes.database.connection import get_session
+        from pos_uniformes.services.business_settings_service import BusinessSettingsService
+        with get_session() as session:
+            config = BusinessSettingsService.get_or_create(session)
+            return str(getattr(config, "telefono", "") or "")
+    except Exception:  # noqa: BLE001
+        return ""
 
 
 def _build_snapshot_ticket_text(snapshot: QuoteDetailSnapshot) -> str:

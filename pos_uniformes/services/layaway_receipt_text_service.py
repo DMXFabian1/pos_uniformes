@@ -24,7 +24,7 @@ from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
 )
 from pos_uniformes.ui.helpers.sale_sports_uniform_helper import is_deportivo_playera_variant
 from pos_uniformes.utils.date_format import format_display_date, format_display_datetime
-from pos_uniformes.utils.product_name import sanitize_product_display_name
+from pos_uniformes.utils.product_name import build_ticket_product_name
 
 _IW = _W - 4
 
@@ -79,11 +79,8 @@ def build_layaway_receipt_text(
     first_detail = True
     for detalle in detalles:
         variante = getattr(detalle, "variante", None)
-        producto = (
-            sanitize_product_display_name(getattr(getattr(variante, "producto", None), "nombre", ""))
-            if variante
-            else ""
-        )
+        producto_obj = getattr(variante, "producto", None) if variante else None
+        producto = build_ticket_product_name(producto_obj) if producto_obj else ""
         if variante is not None and _is_three_piece_playera_detail(detalle, variante):
             school_name = str(
                 getattr(getattr(getattr(variante, "producto", None), "escuela", None), "nombre", "") or ""

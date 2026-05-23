@@ -21,7 +21,7 @@ from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
     tk_top,
 )
 from pos_uniformes.utils.date_format import format_display_datetime
-from pos_uniformes.utils.product_name import sanitize_product_display_name
+from pos_uniformes.utils.product_name import build_ticket_product_name, sanitize_product_display_name
 
 _IW = _W - 4
 
@@ -122,9 +122,10 @@ def build_sale_ticket_text(
     first_detail = True
     for detalle in detalles:
         variante = getattr(detalle, "variante", None)
+        producto_obj = getattr(variante, "producto", None) if variante else None
         producto = (
-            sanitize_product_display_name(getattr(getattr(variante, "producto", None), "nombre", ""))
-            if variante
+            build_ticket_product_name(producto_obj)
+            if producto_obj
             else str(getattr(detalle, "descripcion_snapshot", "") or "").strip()
         )
         sku = (
