@@ -25,12 +25,23 @@ def sanitize_product_display_name(value: object | None) -> str:
 
 
 def build_ticket_product_name(producto: object) -> str:
-    """Nombre corto para tickets: nombre_base + escuela (sin tipo prenda/pieza)."""
+    """Nombre corto para tickets: nombre_base + escuela (sin tipo prenda/pieza).
+
+    Si nombre_base ya contiene el nombre de la escuela, lo elimina para
+    evitar duplicación (ej: 'Pants 2pz Deportivo Práxedis Guerrero - Práxedis Guerrero').
+    También elimina 'Ad hoc' / 'Ad Hoc'.
+    """
     nombre_base = str(getattr(producto, "nombre_base", "") or "").strip()
     if not nombre_base:
         return sanitize_product_display_name(getattr(producto, "nombre", ""))
     escuela = getattr(producto, "escuela", None)
     escuela_nombre = str(getattr(escuela, "nombre", "") or "").strip() if escuela else ""
+    # Limpiar Ad hoc
+    cleaned = re.sub(r"\bAd\s+hoc\b", "", nombre_base, flags=re.IGNORECASE).strip()
+    cleaned = re.sub(r"\s{2,}", " ", cleaned)
     if escuela_nombre:
-        return f"{nombre_base} - {escuela_nombre}"
-    return nombre_base
+        # Quitar escuela si ya está en nombre_base
+        cleaned = re.sub(re.escape(escuela_nombre), "", cleaned, flags=re.IGNORECASE).strip()
+        cleaned = re.sub(r"\s{2,}", " ", cleaned)
+        return f"{cleaned} - {escuela_nombre}" if cleaned else escuela_nombre
+    return cleaned or nombre_base
