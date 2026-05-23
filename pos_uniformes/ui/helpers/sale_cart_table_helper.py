@@ -17,6 +17,11 @@ class SaleCartTableView:
     total_items: int
 
 
+def _strikethrough(text: str) -> str:
+    """Aplica tachado Unicode (U+0336) a cada carácter."""
+    return "".join(c + "̶" for c in text)
+
+
 def build_sale_cart_table_view(sale_cart: list[dict[str, object]]) -> SaleCartTableView:
     rows: list[SaleCartTableRow] = []
     total_items = 0
@@ -30,7 +35,8 @@ def build_sale_cart_table_view(sale_cart: list[dict[str, object]]) -> SaleCartTa
         if pricing_label:
             base_price = Decimal(item.get("precio_base", unit_price))
             if base_price != unit_price:
-                display_name += f"\n(${base_price} → ${unit_price} {pricing_label})"
+                struck = _strikethrough(f"${base_price}")
+                display_name += f"\n{struck} → ${unit_price} {pricing_label}"
         rows.append(
             SaleCartTableRow(
                 values=(
