@@ -167,7 +167,7 @@ def build_sale_ticket_text(
             pad = " " * max(0, _IW - visual_len)
             lines.append(f"│ {inner}{pad} │")
             # Línea con precio promo
-            tk_product_price(f"{cantidad} x ${tk_fmt(precio_unitario)} promo 3pz", f"${subtotal_linea}", lines)
+            tk_product_price("promo 3pz", f"${subtotal_linea}", lines)
         else:
             tk_product_price(f"{cantidad} x ${tk_fmt(precio_unitario)}", f"${subtotal_linea}", lines)
 

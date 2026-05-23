@@ -45,6 +45,7 @@ def _load_inventory_history_rows(session, filters: HistorySnapshotFilters) -> li
             movimiento_model.creado_por,
             movimiento_model.observacion,
             producto_model.nombre,
+            variante_model.talla,
         )
         .join(movimiento_model.variante)
         .join(variante_model.producto)
@@ -77,13 +78,15 @@ def _load_inventory_history_rows(session, filters: HistorySnapshotFilters) -> li
         {
             "fecha": row[0],
             "origen": "Inventario",
-            "registro": row[1],
+            "registro": " | ".join(
+                part for part in [row[1], row[8], row[9]] if part
+            ),
             "entidad": "PRESENTACION",
             "tipo": row[2].value if row[2] else "",
             "cambio": row[3],
             "resultado": row[4],
             "usuario": row[6],
-            "detalle": " | ".join(part for part in [row[8], row[5], row[7]] if part),
+            "detalle": " | ".join(part for part in [row[5], row[7]] if part),
         }
         for row in session.execute(statement).all()
     ]
