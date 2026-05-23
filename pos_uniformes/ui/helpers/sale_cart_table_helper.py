@@ -22,13 +22,20 @@ def build_sale_cart_table_view(sale_cart: list[dict[str, object]]) -> SaleCartTa
     total_items = 0
     for item in sale_cart:
         quantity = int(item["cantidad"])
-        line_subtotal = Decimal(item["precio_unitario"]) * quantity
+        unit_price = Decimal(item["precio_unitario"])
+        line_subtotal = unit_price * quantity
         total_items += quantity
+        display_name = str(item["producto_nombre"])
+        pricing_label = str(item.get("pricing_rule_label") or "").strip()
+        if pricing_label:
+            base_price = Decimal(item.get("precio_base", unit_price))
+            if base_price != unit_price:
+                display_name += f"\n(${base_price} → ${unit_price} {pricing_label})"
         rows.append(
             SaleCartTableRow(
                 values=(
                     quantity,
-                    item["producto_nombre"],
+                    display_name,
                     item["precio_unitario"],
                     line_subtotal,
                 )

@@ -11597,6 +11597,7 @@ class MainWindow(QMainWindow):
                 elif column_index in {2, 3}:
                     item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
                 self.sale_cart_table.setItem(row_index, column_index, item)
+        self.sale_cart_table.resizeRowsToContents()
         for column_index in (0, 2, 3):
             self.sale_cart_table.resizeColumnToContents(column_index)
         self.sale_total_label.setText(panel_view.cashier_view.summary.total_label)
