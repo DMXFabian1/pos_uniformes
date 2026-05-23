@@ -26,6 +26,11 @@ from pos_uniformes.utils.product_name import build_ticket_product_name, sanitize
 _IW = _W - 4
 
 
+def _strike(text: str) -> str:
+    """Aplica tachado Unicode (U+0336) a cada carácter."""
+    return "".join(c + "̶" for c in text)
+
+
 def _extract_payment_method(observacion: str) -> str:
     match = re.search(r"Metodo de pago:\s*([^|]+)", observacion)
     if not match:
@@ -152,9 +157,13 @@ def build_sale_ticket_text(
         except Exception:
             precio_unit_dec = None
         if precio_normal and precio_unit_dec and precio_normal > precio_unit_dec:
-            promo = f"${tk_fmt(precio_normal)} -> ${tk_fmt(precio_unit_dec)} promo 3pz"
-            lines.append(tk_line(promo))
-        tk_product_price(f"{cantidad} x ${tk_fmt(precio_unitario)}", f"${subtotal_linea}", lines)
+            normal_sub = tk_fmt(precio_normal * int(cantidad))
+            struck_meta = _strike(f"{cantidad} x ${tk_fmt(precio_normal)}")
+            struck_sub = _strike(f"${normal_sub}")
+            tk_product_price(struck_meta, struck_sub, lines)
+            tk_product_price(f"{cantidad} x ${tk_fmt(precio_unitario)} promo 3pz", f"${subtotal_linea}", lines)
+        else:
+            tk_product_price(f"{cantidad} x ${tk_fmt(precio_unitario)}", f"${subtotal_linea}", lines)
 
     # — Totales —
     ticket_totals = resolve_sale_ticket_totals(
