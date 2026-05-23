@@ -69,6 +69,7 @@ def render_inventory_label_from_cache_row(
     *,
     mode: str,
     requested_copies: int,
+    show_price: bool | None = None,
 ) -> LabelRenderResult:
     """Renderiza una etiqueta directamente desde una fila del cache local (sin DB)."""
     fake_variante = _build_fake_variante_from_cache_row(row)
@@ -76,6 +77,7 @@ def render_inventory_label_from_cache_row(
         fake_variante,
         mode=mode,
         requested_copies=requested_copies,
+        show_price=show_price,
     )
 
 
@@ -85,6 +87,7 @@ def render_inventory_label(
     *,
     mode: str,
     requested_copies: int,
+    show_price: bool | None = None,
 ) -> LabelRenderResult:
     variante = session.get(Variante, int(variant_id))
     if variante is None:
@@ -100,4 +103,5 @@ def render_inventory_label(
         variante,
         mode=mode,
         requested_copies=requested_copies,
+        show_price=show_price,
     )

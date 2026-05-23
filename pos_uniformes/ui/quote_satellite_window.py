@@ -5025,9 +5025,9 @@ QLabel#favDialogPriceLabel {
 
             offline_render_state: dict[str, object] = {"row": selected_row}
 
-            def _render_label_offline(mode: str, requested_copies: int) -> "object":
+            def _render_label_offline(mode: str, requested_copies: int, show_price: bool | None = None) -> "object":
                 return render_inventory_label_from_cache_row(
-                    offline_render_state["row"], mode=mode, requested_copies=requested_copies
+                    offline_render_state["row"], mode=mode, requested_copies=requested_copies, show_price=show_price,
                 )
 
             def _load_context_offline(idx: int) -> "InventoryLabelContext":
@@ -5080,13 +5080,14 @@ QLabel#favDialogPriceLabel {
 
         render_state = {"variant_id": variant_id}
 
-        def _render_label(mode: str, requested_copies: int) -> "object":
+        def _render_label(mode: str, requested_copies: int, show_price: bool | None = None) -> "object":
             with get_session() as session:
                 return render_inventory_label(
                     session,
                     render_state["variant_id"],
                     mode=mode,
                     requested_copies=requested_copies,
+                    show_price=show_price,
                 )
 
         def _load_context(vid: int) -> "InventoryLabelContext":

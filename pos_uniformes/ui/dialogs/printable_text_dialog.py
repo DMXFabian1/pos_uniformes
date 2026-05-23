@@ -66,7 +66,7 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
             printer.setPageLayout(QPageLayout(page_size, QPageLayout.Orientation.Portrait, margins, QPageLayout.Unit.Millimeter))
 
             doc = build_ticket_document(content)
-            doc.print_(printer)
+            doc.print(printer)
         except Exception as exc:
             QMessageBox.warning(dialog, "Error de impresión", f"No se pudo imprimir el ticket:\n{exc}")
 

@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import QEvent, QObject, Qt
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QGridLayout,
@@ -106,7 +107,7 @@ def build_inventory_label_batch_dialog(
     window: "MainWindow",
     *,
     contexts: list["InventoryLabelContext"],
-    render_label: Callable[[int, str, int], "LabelRenderResult"],
+    render_label: Callable[[int, str, int, bool | None], "LabelRenderResult"],
     print_label: Callable[[Path, int, str, QDialog | None, str], bool],
 ) -> None:
     dialog, layout = window._create_modal_dialog(
@@ -127,9 +128,13 @@ def build_inventory_label_batch_dialog(
     mode_hint = QLabel(build_inventory_label_mode_hint("standard"))
     mode_hint.setWordWrap(True)
     mode_hint.setObjectName("subtleLine")
+    price_check = QCheckBox("Mostrar precio")
+    price_check.setChecked(True)
+    price_check.setToolTip("Incluir o quitar el precio de venta en las etiquetas impresas")
     controls_layout.addWidget(QLabel("Modo de impresion"), 0, 0)
     controls_layout.addWidget(mode_combo, 0, 1)
-    controls_layout.addWidget(mode_hint, 1, 0, 1, 2)
+    controls_layout.addWidget(price_check, 0, 2)
+    controls_layout.addWidget(mode_hint, 1, 0, 1, 3)
     layout.addLayout(controls_layout)
 
     table = QTableWidget()
@@ -207,9 +212,10 @@ def build_inventory_label_batch_dialog(
         success_lines: list[str] = []
         failed_lines: list[str] = []
         selected_mode = str(mode_combo.currentData() or "standard")
+        show_price = True if price_check.isChecked() else False
         for context, requested_copies in jobs:
             try:
-                result = render_label(int(context.variant_id), selected_mode, requested_copies)
+                result = render_label(int(context.variant_id), selected_mode, requested_copies, show_price)
                 printed = print_label(
                     result.image_path,
                     int(result.effective_copies),

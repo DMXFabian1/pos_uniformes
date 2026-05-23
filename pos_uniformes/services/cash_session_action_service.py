@@ -14,6 +14,7 @@ class CashSessionGateSnapshot:
     opened_by: str
     opened_at_label: str
     opening_amount: Decimal
+    elapsed_minutes: int = 0
 
 
 @dataclass(frozen=True)
@@ -59,9 +60,15 @@ class CashCloseAndReopenResult:
 
 
 def load_cash_session_gate_snapshot(session, *, user_id: int, is_stale_session) -> CashSessionGateSnapshot:
+    from datetime import datetime, timezone
+
     caja_service, usuario_model, _, _ = _resolve_cash_session_action_dependencies()
     active_session = caja_service.obtener_sesion_activa(session)
     if active_session is not None:
+        elapsed = 0
+        if active_session.abierta_at is not None:
+            now = datetime.now(tz=active_session.abierta_at.tzinfo or timezone.utc)
+            elapsed = max(0, int((now - active_session.abierta_at).total_seconds() // 60))
         return CashSessionGateSnapshot(
             has_active_session=True,
             active_session_id=int(active_session.id),
@@ -77,6 +84,7 @@ def load_cash_session_gate_snapshot(session, *, user_id: int, is_stale_session) 
                 else "sin fecha"
             ),
             opening_amount=Decimal(active_session.monto_apertura).quantize(Decimal("0.01")),
+            elapsed_minutes=elapsed,
         )
     user = session.get(usuario_model, user_id)
     if user is None:

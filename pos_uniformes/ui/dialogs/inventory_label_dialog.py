@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QComboBox,
     QDialog,
     QGridLayout,
@@ -89,7 +90,7 @@ def build_inventory_label_dialog(
     variant_ids: list[int],
     current_index: int,
     load_context: Callable[[int], "InventoryLabelContext"],
-    render_label: Callable[[str, int], "LabelRenderResult"],
+    render_label: Callable[[str, int, bool | None], "LabelRenderResult"],
     print_label: Callable[[Path, int, str, QDialog | None, str], bool],
 ) -> None:
     dialog, layout = window._create_modal_dialog(
@@ -137,6 +138,9 @@ def build_inventory_label_dialog(
     copies_spin = QSpinBox()
     copies_spin.setRange(1, 500)
     copies_spin.setValue(1)
+    price_check = QCheckBox("Mostrar precio")
+    price_check.setChecked(True)
+    price_check.setToolTip("Incluir o quitar el precio de venta en la etiqueta impresa")
     mode_hint = QLabel(build_inventory_label_mode_hint("standard"))
     mode_hint.setWordWrap(True)
     mode_hint.setObjectName("inventoryLabelModeHint")
@@ -144,7 +148,8 @@ def build_inventory_label_dialog(
     controls.addWidget(mode_combo, 0, 1)
     controls.addWidget(QLabel("Piezas / copias"), 0, 2)
     controls.addWidget(copies_spin, 0, 3)
-    controls.addWidget(mode_hint, 1, 0, 1, 4)
+    controls.addWidget(price_check, 0, 4)
+    controls.addWidget(mode_hint, 1, 0, 1, 5)
     controls_layout.addLayout(controls)
     layout.addWidget(controls_card)
 
@@ -209,10 +214,12 @@ def build_inventory_label_dialog(
 
     def refresh_preview() -> None:
         mode_hint.setText(build_inventory_label_mode_hint(str(mode_combo.currentData() or "standard")))
+        show_price = True if price_check.isChecked() else False
         try:
             result = render_label(
                 str(mode_combo.currentData() or "standard"),
                 int(copies_spin.value()),
+                show_price,
             )
         except Exception as exc:  # noqa: BLE001
             preview_state["result"] = None
@@ -284,6 +291,7 @@ def build_inventory_label_dialog(
 
     mode_combo.currentIndexChanged.connect(lambda _: refresh_preview())
     copies_spin.valueChanged.connect(lambda _: refresh_preview())
+    price_check.stateChanged.connect(lambda _: refresh_preview())
     previous_button.clicked.connect(lambda: navigate_variant(-1))
     next_button.clicked.connect(lambda: navigate_variant(1))
     print_button.clicked.connect(handle_print)

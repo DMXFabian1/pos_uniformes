@@ -23,7 +23,7 @@ SPLIT_SIZE = (976, 342)
 SPLIT_SECTION_WIDTH = 244
 CONTINUOUS_SIZE = (244, 260)
 QR_SIZE_STANDARD = 231
-QR_SIZE_SPLIT = 231
+QR_SIZE_SPLIT = 160
 QR_SIZE_CONTINUOUS = 200
 
 _CONTINUOUS_MODES = {"continuous"}
@@ -84,18 +84,19 @@ class LabelGenerator:
         *,
         mode: str = "standard",
         requested_copies: int = 1,
+        show_price: bool | None = None,
     ) -> LabelRenderResult:
         normalized_mode = cls._normalize_mode(mode)
         qr_path = cls.ensure_qr(variante)
         output_path = cls.path_for_variant(variante, normalized_mode)
         if normalized_mode == "split":
-            cls._render_split(variante, qr_path, output_path)
+            cls._render_split(variante, qr_path, output_path, show_price=show_price)
             effective_copies = max(1, math.ceil(max(1, requested_copies) / 4))
         elif normalized_mode == "continuous":
-            cls._render_continuous(variante, qr_path, output_path)
+            cls._render_continuous(variante, qr_path, output_path, show_price=show_price)
             effective_copies = max(1, requested_copies)
         else:
-            cls._render_standard(variante, qr_path, output_path)
+            cls._render_standard(variante, qr_path, output_path, show_price=show_price)
             effective_copies = max(1, requested_copies)
         return LabelRenderResult(
             mode=normalized_mode,
@@ -105,7 +106,7 @@ class LabelGenerator:
         )
 
     @classmethod
-    def _render_standard(cls, variante: Variante, qr_path: Path, output_path: Path) -> None:
+    def _render_standard(cls, variante: Variante, qr_path: Path, output_path: Path, *, show_price: bool | None = None) -> None:
         label_image = Image.new("1", STANDARD_SIZE, 1)
         draw = ImageDraw.Draw(label_image)
         qr_image = Image.open(qr_path).convert("1").resize((QR_SIZE_STANDARD, QR_SIZE_STANDARD))
@@ -115,7 +116,7 @@ class LabelGenerator:
 
         text_x = 20
         max_text_width = qr_x - 40
-        fields = cls._standard_fields(variante)
+        fields = cls._standard_fields(variante, show_price=show_price)
         total_height = cls._measure_lines(draw, fields, max_text_width, base_size=30, min_size=18)
         text_y = (STANDARD_SIZE[1] - total_height) // 2
         for field in fields:
@@ -128,24 +129,20 @@ class LabelGenerator:
         label_image.save(output_path, "PNG")
 
     @classmethod
-    def _render_split(cls, variante: Variante, qr_path: Path, output_path: Path) -> None:
+    def _render_split(cls, variante: Variante, qr_path: Path, output_path: Path, *, show_price: bool | None = None) -> None:
         label_image = Image.new("1", SPLIT_SIZE, 1)
         draw = ImageDraw.Draw(label_image)
         qr_image = Image.open(qr_path).convert("1").resize((QR_SIZE_SPLIT, QR_SIZE_SPLIT))
-        label_lines = cls._split_label_lines(variante)
+        label_lines = cls._split_label_lines(variante, show_price=show_price)
         for section in range(4):
             section_x = section * SPLIT_SECTION_WIDTH
             qr_x = section_x + (SPLIT_SECTION_WIDTH - QR_SIZE_SPLIT) // 2
-            qr_y = 10
+            qr_y = 6
             label_image.paste(qr_image, (qr_x, qr_y))
             text_area_x = section_x + 10
             text_area_width = SPLIT_SECTION_WIDTH - 20
-            text_area_y = qr_y + QR_SIZE_SPLIT + 8
-            text_area_height = SPLIT_SIZE[1] - text_area_y - 10
-            text_y = text_area_y + max(
-                (text_area_height - cls._measure_split_lines(draw, label_lines, text_area_width)) // 2,
-                0,
-            )
+            text_area_y = qr_y + QR_SIZE_SPLIT + 2
+            text_y = text_area_y
             for line in label_lines:
                 font = cls._fit_font(
                     draw,
@@ -163,9 +160,9 @@ class LabelGenerator:
         label_image.save(output_path, "PNG")
 
     @classmethod
-    def _render_continuous(cls, variante: Variante, qr_path: Path, output_path: Path) -> None:
+    def _render_continuous(cls, variante: Variante, qr_path: Path, output_path: Path, *, show_price: bool | None = None) -> None:
         draw_temp = ImageDraw.Draw(Image.new("1", (1, 1), 1))
-        label_lines = cls._split_label_lines(variante)
+        label_lines = cls._split_label_lines(variante, show_price=show_price)
         text_area_width = CONTINUOUS_SIZE[0] - 20
         text_block_height = cls._measure_split_lines(draw_temp, label_lines, text_area_width)
         margin = 5
@@ -199,9 +196,10 @@ class LabelGenerator:
         label_image.save(output_path, "PNG")
 
     @classmethod
-    def _standard_fields(cls, variante: Variante) -> list[str]:
+    def _standard_fields(cls, variante: Variante, *, show_price: bool | None = None) -> list[str]:
         producto = variante.producto
         profile = resolve_inventory_label_profile(variante)
+        price_visible = profile.show_price and (show_price is None or show_price)
         escuela = getattr(getattr(producto, "escuela", None), "nombre", "") or ""
         nivel = getattr(getattr(producto, "nivel_educativo", None), "nombre", "") or ""
         title = cls._label_title(variante)
@@ -214,16 +212,17 @@ class LabelGenerator:
             pieces.append(nivel)
         pieces.append(cls._build_label_text(title, variante.talla))
         pieces.append(variante.sku)
-        if profile.show_price:
+        if price_visible:
             pieces.append(build_inventory_label_price_line(variante))
         return [piece for piece in pieces if piece]
 
     @classmethod
-    def _split_label_lines(cls, variante: Variante) -> list[SplitLabelLine]:
+    def _split_label_lines(cls, variante: Variante, *, show_price: bool | None = None) -> list[SplitLabelLine]:
         producto = variante.producto
         profile = resolve_inventory_label_profile(variante)
+        price_visible = profile.show_price and (show_price is None or show_price)
         title = cls._label_title(variante)
-        if profile.family == "ropa_normal":
+        if profile.family == "ropa_normal" and price_visible:
             return [
                 SplitLabelLine(text=title, base_size=30, min_size=14, gap_after=8),
                 SplitLabelLine(
@@ -234,7 +233,7 @@ class LabelGenerator:
                 ),
             ]
         lines = textwrap.wrap(cls._build_label_text(title, variante.talla), width=20) or [title]
-        if profile.show_price:
+        if price_visible:
             lines.append(build_inventory_label_price_line(variante))
         return [SplitLabelLine(text=line, base_size=34, min_size=16, gap_after=6) for line in lines]
 

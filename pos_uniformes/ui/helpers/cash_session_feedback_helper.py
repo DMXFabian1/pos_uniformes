@@ -12,6 +12,82 @@ class CashSessionFeedbackView:
     message: str
 
 
+def _format_elapsed(minutes: int) -> str:
+    if minutes < 1:
+        return "hace un momento"
+    if minutes < 60:
+        return f"hace {minutes} min"
+    hours = minutes // 60
+    remaining = minutes % 60
+    if hours < 24:
+        if remaining:
+            return f"hace {hours}h {remaining}min"
+        return f"hace {hours}h"
+    days = hours // 24
+    remaining_hours = hours % 24
+    if days == 1:
+        return f"hace 1 dia y {remaining_hours}h" if remaining_hours else "hace 1 dia"
+    return f"hace {days} dias"
+
+
+def _status_pill(text: str, tone: str) -> str:
+    colors = {
+        "ok": "color: #1a7f37; background: #dafbe1;",
+        "warn": "color: #7a4f01; background: #fff8c5;",
+        "error": "color: #cf222e; background: #ffebe9;",
+    }
+    style = colors.get(tone, "")
+    return f'<span style="padding: 3px 10px; border-radius: 6px; font-weight: 700; font-size: 13px; {style}">{text}</span>'
+
+
+def _info_row(label: str, value: str) -> str:
+    return (
+        f'<tr>'
+        f'<td style="padding: 4px 14px 4px 0; color: #57606a; font-weight: 500;">{label}</td>'
+        f'<td style="padding: 4px 0; font-weight: 600; color: #24292f;">{value}</td>'
+        f'</tr>'
+    )
+
+
+def build_cash_session_gate_html(
+    *,
+    requires_cut: bool,
+    opened_at_label: str,
+    opened_by: str,
+    opening_amount: Decimal,
+    elapsed_minutes: int = 0,
+) -> tuple[str, str]:
+    elapsed_text = _format_elapsed(elapsed_minutes)
+
+    if requires_cut:
+        status = _status_pill("Corte pendiente", "error")
+        title = "Caja pendiente de corte"
+        note = (
+            '<p style="color: #cf222e; font-weight: 600; margin-top: 10px;">'
+            'Debes realizar el corte antes de registrar ventas, apartados o abonos.</p>'
+        )
+    else:
+        status = _status_pill("Abierta", "ok")
+        title = "Sesion de caja activa"
+        note = (
+            '<p style="color: #57606a; margin-top: 10px;">'
+            'Se reanudara la sesion actual.</p>'
+        )
+
+    html = (
+        f'<div style="font-size: 13px;">'
+        f'<p style="margin-bottom: 12px;">{status}</p>'
+        f'<table style="font-size: 13px; border-collapse: collapse;">'
+        f'{_info_row("Apertura", f"{opened_at_label} ({elapsed_text})")}'
+        f'{_info_row("Abierta por", opened_by)}'
+        f'{_info_row("Reactivo inicial", f"${opening_amount}")}'
+        f'</table>'
+        f'{note}'
+        f'</div>'
+    )
+    return title, html
+
+
 def build_cash_session_gate_feedback(
     *,
     requires_cut: bool,

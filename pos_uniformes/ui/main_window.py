@@ -343,6 +343,7 @@ from pos_uniformes.ui.helpers.inventory_bulk_qr_helper import (
     InventoryBulkQrCancelled,
     generate_inventory_bulk_qr,
 )
+from pos_uniformes.ui.helpers.bulk_qr_worker import BulkQrWorker
 from pos_uniformes.ui.helpers.catalog_access_helper import build_catalog_access_view
 from pos_uniformes.ui.helpers.catalog_action_guard_helper import build_catalog_action_guard_feedback
 from pos_uniformes.ui.helpers.catalog_action_feedback_helper import (
@@ -426,6 +427,7 @@ from pos_uniformes.ui.helpers.cash_session_feedback_helper import (
     build_cash_movement_success_feedback,
     build_cash_opening_correction_success_feedback,
     build_cash_session_gate_feedback,
+    build_cash_session_gate_html,
 )
 from pos_uniformes.ui.helpers.inventory_context_menu_helper import build_inventory_context_menu_actions
 from pos_uniformes.ui.helpers.inventory_filter_helper import (
@@ -1281,6 +1283,7 @@ class MainWindow(QMainWindow):
         self.dashboard_future_alerts_label = QLabel()
         self.layaway_alerts_label = QLabel()
         self.cash_session_label = QLabel()
+        self.cash_session_label.setTextFormat(Qt.TextFormat.RichText)
         self.kpi_users_value = QLabel("0")
         self.kpi_products_value = QLabel("0")
         self.kpi_stock_value = QLabel("0")
@@ -4660,16 +4663,31 @@ class MainWindow(QMainWindow):
                 if gate_snapshot.has_active_session:
                     self.active_cash_session_id = gate_snapshot.active_session_id
                     self.cash_session_requires_cut = gate_snapshot.requires_cut
-                    feedback = build_cash_session_gate_feedback(
+                    title, html = build_cash_session_gate_html(
                         requires_cut=gate_snapshot.requires_cut,
                         opened_at_label=gate_snapshot.opened_at_label,
                         opened_by=gate_snapshot.opened_by,
                         opening_amount=gate_snapshot.opening_amount,
+                        elapsed_minutes=gate_snapshot.elapsed_minutes,
                     )
-                    if gate_snapshot.requires_cut:
-                        QMessageBox.warning(self, feedback.title, feedback.message)
-                    else:
-                        QMessageBox.information(self, feedback.title, feedback.message)
+                    gate_dialog = QDialog(self)
+                    gate_dialog.setWindowTitle(title)
+                    gate_dialog.setMinimumWidth(420)
+                    gate_layout = QVBoxLayout()
+                    gate_layout.setSpacing(12)
+                    gate_label = QLabel(html)
+                    gate_label.setWordWrap(True)
+                    gate_label.setTextFormat(Qt.TextFormat.RichText)
+                    gate_layout.addWidget(gate_label)
+                    gate_ok = QPushButton("Continuar")
+                    gate_ok.setObjectName("primaryButton")
+                    gate_ok.clicked.connect(gate_dialog.accept)
+                    gate_btn_row = QHBoxLayout()
+                    gate_btn_row.addStretch()
+                    gate_btn_row.addWidget(gate_ok)
+                    gate_layout.addLayout(gate_btn_row)
+                    gate_dialog.setLayout(gate_layout)
+                    gate_dialog.exec()
                     return True
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Caja no disponible", str(exc))
@@ -6703,8 +6721,12 @@ class MainWindow(QMainWindow):
                     variante = session.get(Variante, variant_id)
                     if variante is not None:
                         QrGenerator.sync_after_sku_change(old_sku, variante)
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001
+                QMessageBox.warning(
+                    self,
+                    "QR no sincronizado",
+                    f"El SKU cambio de {old_sku} a {sku.upper()} pero el archivo QR no se pudo actualizar:\n{exc}",
+                )
         self.refresh_all()
         self._set_combo_value(self.inventory_variant_combo, variant_id)
         self._select_catalog_variant(variant_id)
@@ -8500,8 +8522,8 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Ajuste fallido", str(exc))
             return
 
-        self._set_combo_value(self.inventory_variant_combo, variante_id)
         self.refresh_all()
+        self._set_combo_value(self.inventory_variant_combo, variante_id)
         QMessageBox.information(
             self,
             "Inventario actualizado",
@@ -8810,6 +8832,71 @@ class MainWindow(QMainWindow):
             f"Se generaron {len(paths)} QR del lote seleccionado en:\n{directory}",
         )
 
+    def _handle_generate_missing_qr(self) -> None:
+        self._launch_bulk_qr_worker("missing")
+
+    def _handle_regenerate_all_qr(self) -> None:
+        confirmation = QMessageBox.question(
+            self,
+            "Regenerar todos los QR",
+            "Esto va a recrear los QR de TODAS las presentaciones activas.\n"
+            "Los archivos QR existentes se sobreescriben.\n\n"
+            "Continuar?",
+        )
+        if confirmation != QMessageBox.StandardButton.Yes:
+            return
+        self._launch_bulk_qr_worker("all")
+
+    def _launch_bulk_qr_worker(self, mode: str) -> None:
+        if getattr(self, "_bulk_qr_worker", None) is not None and self._bulk_qr_worker.isRunning():
+            QMessageBox.information(self, "En progreso", "Ya hay una generacion masiva de QR en curso.")
+            return
+
+        label = "Generando QR faltantes..." if mode == "missing" else "Regenerando todos los QR..."
+        progress = QProgressDialog(label, "Cancelar", 0, 0, self)
+        progress.setWindowTitle("QR masivo")
+        progress.setWindowModality(Qt.WindowModality.ApplicationModal)
+        progress.setMinimumDuration(0)
+        progress.setAutoClose(False)
+        progress.setAutoReset(False)
+        progress.setValue(0)
+
+        worker = BulkQrWorker(mode, parent=self)
+        self._bulk_qr_worker = worker
+        self._bulk_qr_progress = progress
+
+        def on_progress(current: int, total: int, message: str) -> None:
+            if progress.wasCanceled():
+                return
+            progress.setMaximum(total)
+            progress.setValue(current)
+            progress.setLabelText(message)
+
+        def on_finished(generated: int, skipped: int) -> None:
+            progress.close()
+            self._bulk_qr_worker = None
+            self._bulk_qr_progress = None
+            invalidate_inventory_qr_exists_cache()
+            self._invalidate_listing_snapshot_caches(catalog=False, inventory=True)
+            self._handle_inventory_filters_changed()
+            self._refresh_selected_qr_preview()
+            parts = [f"QR generados: {generated}"]
+            if skipped:
+                parts.append(f"Ya existentes (omitidos): {skipped}")
+            QMessageBox.information(self, "QR masivo completado", "\n".join(parts))
+
+        def on_failed(error: str) -> None:
+            progress.close()
+            self._bulk_qr_worker = None
+            self._bulk_qr_progress = None
+            QMessageBox.critical(self, "QR masivo fallido", error)
+
+        worker.progress.connect(on_progress)
+        worker.finished_ok.connect(on_finished)
+        worker.failed.connect(on_failed)
+        progress.canceled.connect(worker.cancel)
+        worker.start()
+
     def _handle_history_filter(self) -> None:
         try:
             with get_session() as session:
@@ -8860,17 +8947,24 @@ class MainWindow(QMainWindow):
         self.active_cash_session_id = active_session.id if active_session is not None else None
         if active_session is None:
             self.cash_session_requires_cut = False
-            self.cash_session_label.setText(f"Rol {self.current_role.value} · Caja cerrada")
+            self.cash_session_label.setText(
+                f'<span style="color: #57606a;">Rol {self.current_role.value}</span>'
+                f' · <span style="color: #cf222e; font-weight: 700;">Caja cerrada</span>'
+            )
             self.cash_cut_button.setText("Abrir caja")
             return
 
         self.cash_session_requires_cut = self._is_stale_cash_session(active_session)
-        if self.current_role == RolUsuario.ADMIN:
-            session_text = f"Rol {self.current_role.value} · Reactivo inicial ${Decimal(active_session.monto_apertura)}"
+        if self.cash_session_requires_cut:
+            status_html = '<span style="color: #cf222e; font-weight: 700;">Corte pendiente</span>'
         else:
-            session_text = f"Rol {self.current_role.value} · Caja abierta"
+            reactivo = Decimal(active_session.monto_apertura)
+            status_html = (
+                f'<span style="color: #1a7f37; font-weight: 700;">Caja abierta</span>'
+                f' · <span style="color: #57606a;">Reactivo ${reactivo}</span>'
+            )
         self.cash_session_label.setText(
-            session_text + (" · Corte pendiente" if self.cash_session_requires_cut else "")
+            f'<span style="color: #57606a;">Rol {self.current_role.value}</span> · {status_html}'
         )
         self.cash_cut_button.setText("Corte")
 
@@ -11489,13 +11583,14 @@ class MainWindow(QMainWindow):
 
         label_render_state = {"variant_id": label_context.variant_id}
 
-        def render_label(mode: str, requested_copies: int):
+        def render_label(mode: str, requested_copies: int, show_price: bool | None = None):
             with get_session() as session:
                 return render_inventory_label(
                     session,
                     int(label_render_state["variant_id"]),
                     mode=mode,
                     requested_copies=requested_copies,
+                    show_price=show_price,
                 )
 
         def load_context_for_dialog(variant_id: int):
@@ -11538,13 +11633,14 @@ class MainWindow(QMainWindow):
             QMessageBox.critical(self, "Impresion por lote no disponible", str(exc))
             return
 
-        def render_label(variant_id: int, mode: str, requested_copies: int):
+        def render_label(variant_id: int, mode: str, requested_copies: int, show_price: bool | None = None):
             with get_session() as session:
                 return render_inventory_label(
                     session,
                     int(variant_id),
                     mode=mode,
                     requested_copies=requested_copies,
+                    show_price=show_price,
                 )
 
         build_inventory_label_batch_dialog(

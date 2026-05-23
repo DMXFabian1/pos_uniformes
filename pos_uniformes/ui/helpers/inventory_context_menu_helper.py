@@ -42,7 +42,7 @@ def build_inventory_context_menu_actions(
         InventoryContextMenuAction(
             key="print",
             label="Imprimir etiqueta",
-            enabled=is_admin,
+            enabled=True,
         ),
         InventoryContextMenuAction(
             key="toggle",
