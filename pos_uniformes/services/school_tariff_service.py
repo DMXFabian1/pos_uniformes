@@ -81,10 +81,86 @@ def build_school_tariff(session, escuela_id: int) -> dict:
             "tallas": tallas,
         })
 
+    merged = _merge_same_price_products(result_products)
+
     return {
         "escuela_nombre": str(escuela.nombre),
-        "productos": result_products,
+        "productos": merged,
     }
+
+
+def _merge_same_price_products(products: list[dict]) -> list[dict]:
+    """Fusiona productos con precios idénticos en una sola entrada.
+
+    Ej: 'Suéter Botones M Rojo' y 'Suéter Cuello V H Rojo' con mismos
+    precios → 'Suéter (Botones M / Cuello V H) Rojo'.
+    """
+    merged: list[dict] = []
+    used: set[int] = set()
+    for i, a in enumerate(products):
+        if i in used:
+            continue
+        prices_a = [(t["talla"], t["precio"]) for t in a["tallas"]]
+        group = [a]
+        for j in range(i + 1, len(products)):
+            if j in used:
+                continue
+            prices_b = [(t["talla"], t["precio"]) for t in products[j]["tallas"]]
+            if prices_a == prices_b:
+                group.append(products[j])
+                used.add(j)
+        if len(group) == 1:
+            merged.append(a)
+        else:
+            names = [g["nombre"] for g in group]
+            merged.append({
+                "nombre": _build_merged_name(names),
+                "tallas": a["tallas"],
+            })
+    return merged
+
+
+def _build_merged_name(names: list[str]) -> str:
+    """Construye nombre fusionado buscando prefijo/sufijo comunes.
+
+    Ej: ['Suéter Botones M Rojo', 'Suéter Cuello V H Rojo']
+      → 'Suéter (Botones M / Cuello V H) Rojo'
+    """
+    if len(names) == 1:
+        return names[0]
+    words = [n.split() for n in names]
+    # Prefijo común
+    prefix: list[str] = []
+    for parts in zip(*words):
+        if len(set(parts)) == 1:
+            prefix.append(parts[0])
+        else:
+            break
+    # Sufijo común
+    suffix: list[str] = []
+    for parts in zip(*(w[::-1] for w in words)):
+        if len(set(parts)) == 1:
+            suffix.append(parts[0])
+        else:
+            break
+    suffix.reverse()
+    plen = len(prefix)
+    slen = len(suffix)
+    # Partes diferentes
+    diffs = []
+    for w in words:
+        end = len(w) - slen if slen else len(w)
+        diff = w[plen:end]
+        diffs.append(" ".join(diff) if diff else "")
+    diff_str = " / ".join(d for d in diffs if d)
+    parts = []
+    if prefix:
+        parts.append(" ".join(prefix))
+    if diff_str:
+        parts.append(f"({diff_str})")
+    if suffix:
+        parts.append(" ".join(suffix))
+    return " ".join(parts) if parts else " / ".join(names)
 
 
 def _clean_tariff_product_name(name: str, school_name: str) -> str:
