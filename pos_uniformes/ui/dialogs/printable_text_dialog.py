@@ -56,7 +56,7 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
 
     def handle_print() -> None:
         try:
-            printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+            printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
             ticket_printer, copies = _load_print_preferences()
             if ticket_printer:
                 printer.setPrinterName(ticket_printer)
