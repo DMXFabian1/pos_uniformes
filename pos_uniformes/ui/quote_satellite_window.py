@@ -353,6 +353,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_add_button = QPushButton("Agregar al presupuesto")
         self.guided_print_label_button = QPushButton("Imprimir etiqueta")
         self.guided_favorites_button = QPushButton("♥ Favoritos")
+        self.guided_reindex_button = QPushButton("↻ Sync")
         self.guided_reset_button = QPushButton("Limpiar pasos")
         self.guided_basics_button = QPushButton("Piezas generales")
         self.guided_visual_icon_label = QLabel()
@@ -839,8 +840,12 @@ class QuoteSatelliteWindow(QMainWindow):
         _steps_title.setObjectName("guidedGroupBoxTitle")
         self.guided_favorites_button.setObjectName("chipButton")
         self.guided_favorites_button.setFixedHeight(32)
+        self.guided_reindex_button.setObjectName("chipButton")
+        self.guided_reindex_button.setFixedHeight(32)
+        self.guided_reindex_button.setToolTip("Conectar con Meilisearch y re-indexar el catalogo de productos")
         _steps_header.addWidget(_steps_title)
         _steps_header.addStretch()
+        _steps_header.addWidget(self.guided_reindex_button)
         _steps_header.addWidget(self.guided_favorites_button)
         steps_layout.addLayout(_steps_header)
         steps_layout.addWidget(self.guided_path_label)
@@ -1729,6 +1734,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_add_button.clicked.connect(self._handle_add_guided_selection_to_quote)
         self.guided_print_label_button.clicked.connect(self._print_label_for_guided_selection)
         self.guided_favorites_button.clicked.connect(self._open_favorites_dialog)
+        self.guided_reindex_button.clicked.connect(self._handle_reindex_meilisearch)
         self.guided_reset_button.clicked.connect(self._handle_guided_reset_steps)
         self.guided_basics_button.clicked.connect(self._handle_guided_go_to_basics)
         self.quote_remove_button.clicked.connect(self._handle_remove_quote_item)
@@ -2168,6 +2174,26 @@ class QuoteSatelliteWindow(QMainWindow):
         self._apply_action_state()
 
     # ── Búsqueda rápida Meilisearch ─────────────────────────────────────
+
+    def _handle_reindex_meilisearch(self) -> None:
+        self.guided_reindex_button.setEnabled(False)
+        self.guided_reindex_button.setText("↻ Sync...")
+        QApplication.processEvents()
+        try:
+            from pos_uniformes.services import meilisearch_service
+            if not meilisearch_service.is_available():
+                QMessageBox.warning(self, "Meilisearch", "No se pudo conectar con Meilisearch en 127.0.0.1:7700.")
+                return
+            meilisearch_service.configure_index()
+            from pos_uniformes.database.connection import get_session
+            with get_session() as session:
+                count = meilisearch_service.index_from_db(session)
+            QMessageBox.information(self, "Meilisearch", f"Catalogo re-indexado: {count} presentaciones.")
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Meilisearch", f"Error al re-indexar:\n{exc}")
+        finally:
+            self.guided_reindex_button.setText("↻ Sync")
+            self.guided_reindex_button.setEnabled(True)
 
     def _try_index_meilisearch(self, session) -> None:
         try:
