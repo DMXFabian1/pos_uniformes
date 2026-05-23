@@ -7,30 +7,23 @@ from decimal import Decimal
 import re
 
 from pos_uniformes.services.sale_ticket_totals_service import resolve_sale_ticket_totals
+from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
+    TICKET_CHAR_WIDTH as _W,
+    tk_bot,
+    tk_center,
+    tk_dbl,
+    tk_field,
+    tk_fmt,
+    tk_line,
+    tk_mid,
+    tk_product_price,
+    tk_row,
+    tk_top,
+)
 from pos_uniformes.utils.date_format import format_display_datetime
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 
-_W = 38  # ancho en caracteres para papel de 80 mm a 8 pt bold
-
-
-def _sep(char: str = "─") -> str:
-    return char * _W
-
-
-def _center(text: str) -> str:
-    return text.center(_W)
-
-
-def _row(label: str, value: str) -> str:
-    gap = _W - len(label) - len(value)
-    return f"{label}{' ' * max(1, gap)}{value}"
-
-
-def _fmt(value: object) -> str:
-    try:
-        return str(Decimal(str(value)).quantize(Decimal("0.01")))
-    except Exception:
-        return str(value)
+_IW = _W - 4
 
 
 def _extract_payment_method(observacion: str) -> str:
@@ -102,35 +95,31 @@ def build_sale_ticket_text(
     lines: list[str] = []
 
     # — Encabezado —
-    lines.append(_center(business_name))
+    lines.append(business_name.center(_W))
     if business_address:
-        lines.append(_center(business_address))
+        lines.append(business_address.center(_W))
     if business_phone:
-        lines.append(_center(f"Tel: {business_phone}"))
-    lines.append(_center("Ticket de venta"))
-    lines.append(_sep())
+        lines.append(f"Tel: {business_phone}".center(_W))
+    lines.append("Ticket de venta".center(_W))
 
-    # — Folio / Fecha / Pago —
-    lines.append(_row("Folio:", str(getattr(sale, "folio", ""))))
-    lines.append(_row("Fecha:", format_display_datetime(created_at)))
+    # — Datos —
+    lines.append(tk_top())
+    tk_field("Folio:", str(getattr(sale, "folio", "")), lines)
+    tk_field("Fecha:", format_display_datetime(created_at), lines)
     if payment_method:
-        lines.append(_row("Pago:", payment_method))
+        tk_field("Pago:", payment_method, lines)
 
     # — Cliente —
     if cliente is not None:
-        lines.append(_sep())
-        client_name = str(getattr(cliente, "nombre", ""))
-        if len("Cliente:" + client_name) + 1 > _W:
-            lines.append("Cliente:")
-            lines.extend(textwrap.wrap(client_name, width=_W))
-        else:
-            lines.append(_row("Cliente:", client_name))
-        lines.append(_row("Codigo:", str(getattr(cliente, "codigo_cliente", ""))))
+        lines.append(tk_mid())
+        tk_field("Cliente:", str(getattr(cliente, "nombre", "")), lines)
+        tk_field("Codigo:", str(getattr(cliente, "codigo_cliente", "")), lines)
 
     # — Artículos —
-    lines.append(_sep())
-    lines.append("ARTICULOS")
-    lines.append(_sep())
+    lines.append(tk_mid())
+    lines.append(tk_center("ARTICULOS"))
+    lines.append(tk_mid())
+    first_detail = True
     for detalle in detalles:
         variante = getattr(detalle, "variante", None)
         producto = (
@@ -146,20 +135,16 @@ def build_sale_ticket_text(
         talla = str(getattr(variante, "talla", "") or "").strip() if variante else ""
         cantidad = getattr(detalle, "cantidad", "")
         precio_unitario = getattr(detalle, "precio_unitario", "")
-        subtotal_linea = _fmt(getattr(detalle, "subtotal_linea", ""))
+        subtotal_linea = tk_fmt(getattr(detalle, "subtotal_linea", ""))
 
-        lines.append("")
-        lines.extend(textwrap.wrap(str(producto), width=_W) or [str(producto)])
-        meta = f"{sku}"
+        if not first_detail:
+            lines.append(tk_mid())
+        first_detail = False
+        for dl in textwrap.wrap(str(producto), width=_IW) or [str(producto)]:
+            lines.append(tk_line(dl))
         if talla:
-            meta += f" | T:{talla}"
-        meta += f" | {cantidad} x ${_fmt(precio_unitario)}"
-        row_line = _row(meta, f"${subtotal_linea}")
-        if len(row_line) > _W:
-            lines.append(meta)
-            lines.append(f"${subtotal_linea}".rjust(_W))
-        else:
-            lines.append(row_line)
+            lines.append(tk_line(f"Talla: {talla}"))
+        tk_product_price(f"{cantidad} x ${tk_fmt(precio_unitario)}", f"${subtotal_linea}", lines)
 
     # — Totales —
     ticket_totals = resolve_sale_ticket_totals(
@@ -169,32 +154,32 @@ def build_sale_ticket_text(
         total=getattr(sale, "total", Decimal("0.00")),
         rounding_adjustment=rounding_adjustment,
     )
-    lines.append("")
-    lines.append(_sep())
-    lines.append(_row("Subtotal:", f"${ticket_totals.subtotal}"))
+    lines.append(tk_mid())
+    lines.append(tk_row("Subtotal:", f"${ticket_totals.subtotal}"))
     try:
         has_discount = Decimal(str(ticket_totals.discount_amount)) > Decimal("0")
     except Exception:
         has_discount = False
     if has_discount:
-        lines.append(_row(
+        lines.append(tk_row(
             f"Descuento {ticket_totals.discount_percent}%:",
             f"-${ticket_totals.discount_amount}",
         ))
     if rounding_adjustment != Decimal("0.00"):
-        lines.append(_row("Ajuste:", f"${_fmt(rounding_adjustment)}"))
-    lines.append(_sep())
-    lines.append(_row("TOTAL A PAGAR:", f"${_fmt(ticket_totals.total)}"))
-    lines.append(_sep())
+        lines.append(tk_row("Ajuste:", f"${tk_fmt(rounding_adjustment)}"))
+    lines.append(tk_dbl())
+    lines.append(tk_row("TOTAL A PAGAR:", f"${tk_fmt(ticket_totals.total)}"))
+    lines.append(tk_bot())
 
     # — Notas —
     if ticket_notes:
+        lines.append("")
         lines.append("Notas:")
         for note in ticket_notes:
-            lines.append(f"  {note}")
-        lines.append("")
+            lines.extend(textwrap.wrap(f"  {note}", width=_W))
 
     # — Pie —
-    lines.append(_center(ticket_footer))
+    lines.append("")
+    lines.append(ticket_footer.center(_W))
 
     return "\n".join(lines)

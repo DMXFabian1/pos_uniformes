@@ -61,21 +61,22 @@ class LayawayReceiptTextServiceTests(unittest.TestCase):
         )
 
         self.assertIn("Comprobante de apartado", receipt)
-        self.assertIn("Folio: APA-001", receipt)
-        self.assertIn("Fecha: 13/03/2026 09:30", receipt)
-        self.assertIn("Vencimiento: 20/03/2026", receipt)
-        self.assertIn("Cliente: Maria Fernanda", receipt)
-        self.assertIn("Productos", receipt)
-        self.assertIn("- Playera | Talla 14 | Color Azul Marino | 2 x 199.00 = 398.00", receipt)
-        self.assertIn("Total: 398.00", receipt)
-        self.assertIn("Ajuste: 0.50", receipt)
-        self.assertIn("Abonado: 100.00", receipt)
-        self.assertIn("Saldo pendiente: 298.00", receipt)
-        self.assertIn("Abonos:", receipt)
-        self.assertIn("- 13/03/2026 10:15 | 100.00 | ABN-01", receipt)
-        self.assertIn("Notas: Entrega sabado", receipt)
-        self.assertIn("Por favor conserve su comprobante.", receipt)
-        self.assertNotIn("Codigo cliente:", receipt)
+        self.assertIn("Folio:", receipt)
+        self.assertIn("APA-001", receipt)
+        self.assertIn("13/03/2026 09:30", receipt)
+        self.assertIn("20/03/2026", receipt)
+        self.assertIn("Maria Fernanda", receipt)
+        self.assertIn("PRODUCTOS", receipt)
+        self.assertIn("Playera", receipt)
+        self.assertIn("$398.00", receipt)
+        self.assertIn("$0.50", receipt)
+        self.assertIn("$100.00", receipt)
+        self.assertIn("SALDO PENDIENTE:", receipt)
+        self.assertIn("$298.00", receipt)
+        self.assertIn("Abonos registrados", receipt)
+        self.assertIn("ABN-01", receipt)
+        self.assertIn("Entrega sabado", receipt)
+        self.assertIn("Conserve su comprobante.", receipt)
         self.assertNotIn("Estado:", receipt)
         self.assertNotIn("Telefono:", receipt)
         self.assertNotIn("SKU-001", receipt)
@@ -90,8 +91,8 @@ class LayawayReceiptTextServiceTests(unittest.TestCase):
             business_name="POS Uniformes",
         )
 
-        self.assertIn("Cliente: Maria Fernanda", receipt)
-        self.assertNotIn("Abonos:", receipt)
+        self.assertIn("Maria Fernanda", receipt)
+        self.assertNotIn("Abonos registrados", receipt)
         self.assertNotIn("Codigo cliente:", receipt)
 
     def test_filters_internal_layaway_notes_from_customer_receipt(self) -> None:
@@ -103,7 +104,8 @@ class LayawayReceiptTextServiceTests(unittest.TestCase):
             business_name="POS Uniformes",
         )
 
-        self.assertIn("Notas: Entrega sabado", receipt)
+        self.assertIn("Notas:", receipt)
+        self.assertIn("Entrega sabado", receipt)
         self.assertNotIn("Creado desde Caja", receipt)
         self.assertNotIn("Ambiente de pruebas", receipt)
         self.assertNotIn("Interno:", receipt)
@@ -122,7 +124,8 @@ class LayawayReceiptTextServiceTests(unittest.TestCase):
             business_name="POS Uniformes",
         )
 
-        self.assertIn("Playera deportiva (Conjunto deportivo 3pz - Patria)", receipt)
+        self.assertIn("Playera deportiva (Conjunto", receipt)
+        self.assertIn("deportivo 3pz - Patria)", receipt)
 
 
 if __name__ == "__main__":

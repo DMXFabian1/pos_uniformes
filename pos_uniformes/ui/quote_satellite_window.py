@@ -5152,79 +5152,90 @@ def _catalog_row_icon(row: dict[str, object]) -> QPixmap:
     return _scaled_asset_pixmap("qr_icons/default.png", 72)
 
 
+def _load_business_name() -> str:
+    try:
+        from pos_uniformes.database.connection import get_session
+        from pos_uniformes.services.business_settings_service import BusinessSettingsService
+        with get_session() as session:
+            config = BusinessSettingsService.get_or_create(session)
+            return config.nombre_negocio or "POS Uniformes"
+    except Exception:  # noqa: BLE001
+        return "POS Uniformes"
+
+
 def _build_snapshot_ticket_text(snapshot: QuoteDetailSnapshot) -> str:
     from pos_uniformes.services.quote_text_service import DEFAULT_QUOTE_TERMS_LINES
+    from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
+        TICKET_CHAR_WIDTH as _W,
+        tk_bot, tk_center, tk_dbl, tk_field, tk_fmt,
+        tk_line, tk_mid, tk_product_price, tk_row, tk_top,
+    )
 
-    _W = 38
-
-    def _sep() -> str:
-        return "─" * _W
-
-    def _center(text: str) -> str:
-        return text.center(_W)
-
-    def _row(label: str, value: str) -> str:
-        gap = _W - len(label) - len(value)
-        return f"{label}{' ' * max(1, gap)}{value}"
-
-    def _fmt(value: object) -> str:
-        try:
-            return str(Decimal(str(value)).quantize(Decimal("0.01")))
-        except Exception:  # noqa: BLE001
-            return str(value)
-
+    _IW = _W - 4
+    biz = _load_business_name()
     lines: list[str] = []
-    lines.append(_center("POS Uniformes"))
-    lines.append(_center("Presupuesto"))
-    lines.append(_sep())
-    lines.append(_center("ESTE NO ES UN COMPROBANTE"))
-    lines.append(_center("FISCAL NI DE COMPRA"))
-    lines.append(_center("Precios solo de referencia"))
-    lines.append(_sep())
-    lines.append(_row("Folio:", snapshot.folio))
-    lines.append(_row("Estado:", snapshot.status_label))
-    if len("Cliente:" + snapshot.customer_label) + 1 > _W:
-        lines.append("Cliente:")
-        lines.extend(textwrap.wrap(snapshot.customer_label, width=_W))
-    else:
-        lines.append(_row("Cliente:", snapshot.customer_label))
+
+    # — Encabezado —
+    lines.append(biz.center(_W))
+    lines.append("Presupuesto".center(_W))
+    lines.append("")
+    lines.append("ESTE NO ES UN COMPROBANTE".center(_W))
+    lines.append("FISCAL NI DE COMPRA".center(_W))
+    lines.append("Precios solo de referencia".center(_W))
+
+    # — Datos —
+    lines.append(tk_top())
+    tk_field("Folio:", snapshot.folio, lines)
+    tk_field("Estado:", snapshot.status_label, lines)
+    tk_field("Cliente:", snapshot.customer_label, lines)
     if snapshot.phone_text and snapshot.phone_text.lower() != "sin telefono":
-        lines.append(_row("Telefono:", snapshot.phone_text))
+        tk_field("Telefono:", snapshot.phone_text, lines)
     if snapshot.validity_label and snapshot.validity_label.lower() != "sin vigencia":
-        lines.append(_row("Vigencia:", snapshot.validity_label))
-    lines.append(_sep())
-    lines.append("PIEZAS")
-    lines.append(_sep())
+        tk_field("Vigencia:", snapshot.validity_label, lines)
+
+    # — Piezas —
+    lines.append(tk_mid())
+    lines.append(tk_center("PIEZAS"))
+    lines.append(tk_mid())
+    first_detail = True
     for detail in snapshot.detail_rows:
         unit_price = Decimal(str(detail.unit_price)).quantize(Decimal("0.01"))
         subtotal = Decimal(str(detail.subtotal)).quantize(Decimal("0.01"))
         talla = str(detail.size_label or "").strip()
-        lines.append("")
-        lines.extend(textwrap.wrap(str(detail.description), width=_W) or [str(detail.description)])
+        if not first_detail:
+            lines.append(tk_mid())
+        first_detail = False
+        for dl in textwrap.wrap(str(detail.description), width=_IW) or [str(detail.description)]:
+            lines.append(tk_line(dl))
         if talla and talla != "-":
-            lines.append(f"Talla: {talla}")
-        meta = f"{detail.sku} | {detail.quantity} x ${unit_price}"
-        row_line = _row(meta, f"${subtotal}")
-        if len(row_line) > _W:
-            lines.append(meta)
-            lines.append(f"${subtotal}".rjust(_W))
-        else:
-            lines.append(row_line)
-    lines.append("")
-    lines.append(_sep())
-    lines.append(_row("TOTAL ESTIMADO:", f"${_fmt(snapshot.total)}"))
-    lines.append(_sep())
+            lines.append(tk_line(f"Talla: {talla}"))
+        tk_product_price(f"{detail.quantity} x ${unit_price}", f"${subtotal}", lines)
+
+    # — Total —
+    lines.append(tk_dbl())
+    lines.append(tk_row("TOTAL ESTIMADO:", f"${tk_fmt(snapshot.total)}"))
+    lines.append(tk_bot())
+
+    # — Observaciones y términos —
     if snapshot.notes_text and snapshot.notes_text.lower() != "sin observaciones.":
-        lines.append("Observaciones:")
-        lines.append(snapshot.notes_text)
         lines.append("")
+        lines.append("Observaciones:")
+        lines.extend(textwrap.wrap(snapshot.notes_text, width=_W))
+    lines.append("")
     lines.append("Terminos y condiciones")
-    lines.append(_sep())
-    for term_line in DEFAULT_QUOTE_TERMS_LINES:
+    lines.append("─" * _W)
+    all_terms = list(DEFAULT_QUOTE_TERMS_LINES)
+    promo_line = all_terms.pop() if all_terms else ""
+    for term_line in all_terms:
         if term_line == "":
             lines.append("")
         else:
             lines.extend(textwrap.wrap(term_line, width=_W) or [""])
+    if promo_line:
+        lines.append("")
+        lines.append("─" * _W)
+        for wrapped in textwrap.wrap(promo_line, width=_W):
+            lines.append(wrapped.center(_W))
     return "\n".join(lines)
 
 
@@ -5238,80 +5249,79 @@ def _build_cart_ticket_text(
     notes: str,
 ) -> str:
     from pos_uniformes.services.quote_text_service import DEFAULT_QUOTE_TERMS_LINES
+    from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
+        TICKET_CHAR_WIDTH as _W,
+        tk_bot, tk_center, tk_dbl, tk_field, tk_fmt,
+        tk_line, tk_mid, tk_product_price, tk_row, tk_top,
+    )
 
-    _W = 38
-
-    def _sep() -> str:
-        return "─" * _W
-
-    def _center(text: str) -> str:
-        return text.center(_W)
-
-    def _row(label: str, value: str) -> str:
-        gap = _W - len(label) - len(value)
-        return f"{label}{' ' * max(1, gap)}{value}"
-
-    def _fmt(value: object) -> str:
-        try:
-            return str(Decimal(str(value)).quantize(Decimal("0.01")))
-        except Exception:  # noqa: BLE001
-            return str(value)
-
+    _IW = _W - 4
+    biz = _load_business_name()
     lines: list[str] = []
-    lines.append(_center("POS Uniformes"))
-    lines.append(_center("Presupuesto"))
-    lines.append(_sep())
-    lines.append(_center("ESTE NO ES UN COMPROBANTE"))
-    lines.append(_center("FISCAL NI DE COMPRA"))
-    lines.append(_center("Precios solo de referencia"))
-    lines.append(_sep())
-    lines.append(_row("Folio:", folio))
-    if len("Cliente:" + client_name) + 1 > _W:
-        lines.append("Cliente:")
-        lines.extend(textwrap.wrap(client_name, width=_W))
-    else:
-        lines.append(_row("Cliente:", client_name))
+
+    # — Encabezado —
+    lines.append(biz.center(_W))
+    lines.append("Presupuesto".center(_W))
+    lines.append("")
+    lines.append("ESTE NO ES UN COMPROBANTE".center(_W))
+    lines.append("FISCAL NI DE COMPRA".center(_W))
+    lines.append("Precios solo de referencia".center(_W))
+
+    # — Datos —
+    lines.append(tk_top())
+    tk_field("Folio:", folio, lines)
+    tk_field("Cliente:", client_name, lines)
     if validity_date is not None:
         try:
-            lines.append(_row("Vigencia:", validity_date.strftime("%d/%m/%Y")))
+            tk_field("Vigencia:", validity_date.strftime("%d/%m/%Y"), lines)
         except Exception:  # noqa: BLE001
             pass
-    lines.append(_sep())
-    lines.append("PIEZAS")
-    lines.append(_sep())
+
+    # — Piezas —
+    lines.append(tk_mid())
+    lines.append(tk_center("PIEZAS"))
+    lines.append(tk_mid())
+    first_detail = True
     for item in cart:
         qty = int(item["cantidad"])
         unit_price = Decimal(str(item["precio_unitario"])).quantize(Decimal("0.01"))
         subtotal = (unit_price * qty).quantize(Decimal("0.01"))
         description = str(item.get("producto_nombre") or item.get("sku", ""))
-        sku = str(item["sku"])
         talla = str(item.get("talla") or "").strip()
-        lines.append("")
-        lines.extend(textwrap.wrap(description, width=_W) or [description])
+        if not first_detail:
+            lines.append(tk_mid())
+        first_detail = False
+        for dl in textwrap.wrap(description, width=_IW) or [description]:
+            lines.append(tk_line(dl))
         if talla and talla != "-":
-            lines.append(f"Talla: {talla}")
-        meta = f"{sku} | {qty} x ${unit_price}"
-        row_line = _row(meta, f"${subtotal}")
-        if len(row_line) > _W:
-            lines.append(meta)
-            lines.append(f"${subtotal}".rjust(_W))
-        else:
-            lines.append(row_line)
-    lines.append("")
-    lines.append(_sep())
-    lines.append(_row("TOTAL ESTIMADO:", f"${_fmt(total)}"))
-    lines.append(_sep())
+            lines.append(tk_line(f"Talla: {talla}"))
+        tk_product_price(f"{qty} x ${unit_price}", f"${subtotal}", lines)
+
+    # — Total —
+    lines.append(tk_dbl())
+    lines.append(tk_row("TOTAL ESTIMADO:", f"${tk_fmt(total)}"))
+    lines.append(tk_bot())
+
+    # — Observaciones y términos —
     if notes:
-        lines.append("Observaciones:")
-        lines.append(notes)
         lines.append("")
+        lines.append("Observaciones:")
+        lines.extend(textwrap.wrap(notes, width=_W))
+    lines.append("")
     lines.append("Terminos y condiciones")
-    lines.append(_sep())
-    for term_line in DEFAULT_QUOTE_TERMS_LINES:
+    lines.append("─" * _W)
+    all_terms = list(DEFAULT_QUOTE_TERMS_LINES)
+    promo_line = all_terms.pop() if all_terms else ""
+    for term_line in all_terms:
         if term_line == "":
             lines.append("")
         else:
             lines.extend(textwrap.wrap(term_line, width=_W) or [""])
+    if promo_line:
+        lines.append("")
+        lines.append("─" * _W)
+        for wrapped in textwrap.wrap(promo_line, width=_W):
+            lines.append(wrapped.center(_W))
     return "\n".join(lines)
 
 

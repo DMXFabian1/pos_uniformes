@@ -77,8 +77,7 @@ class SaleTicketTextServiceTests(unittest.TestCase):
         self.assertNotIn("Estado:", ticket)
         self.assertIn("ARTICULOS", ticket)
         self.assertIn("Playera deportiva", ticket)
-        self.assertIn("SKU0001", ticket)
-        self.assertIn("Talla CH", ticket)
+        self.assertIn("Talla: CH", ticket)
         self.assertIn("$199.00", ticket)
         self.assertIn("Subtotal:", ticket)
         self.assertIn("Descuento 10.00%:", ticket)
@@ -250,7 +249,6 @@ class SaleTicketTextServiceTests(unittest.TestCase):
         )
 
         self.assertIn("Venta manual", ticket)
-        self.assertIn("SIN-CODIGO", ticket)
         self.assertIn("$75.00", ticket)
 
 
