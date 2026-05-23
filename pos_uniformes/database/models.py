@@ -737,7 +737,7 @@ class Variante(Base):
     __tablename__ = "variante"
     __table_args__ = (
         UniqueConstraint("producto_id", "talla", "color", name="producto_talla_color_unico"),
-        CheckConstraint("stock_actual >= 0", name="variante_stock_actual_no_negativo"),
+        CheckConstraint("stock_actual >= -1", name="variante_stock_actual_no_negativo"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
