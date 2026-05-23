@@ -1,9 +1,9 @@
-"""Helpers puros para construir el comprobante HTML de apartados."""
+"""Helpers puros para construir el comprobante de texto de apartados."""
 
 from __future__ import annotations
 
+import textwrap
 from decimal import Decimal
-from html import escape as _esc
 
 from pos_uniformes.services.sports_uniform_pricing_service import (
     THREE_PIECE_PLAYERA_PRICE,
@@ -13,12 +13,27 @@ from pos_uniformes.ui.helpers.sale_sports_uniform_helper import is_deportivo_pla
 from pos_uniformes.utils.date_format import format_display_date, format_display_datetime
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 
+_W = 38
+
 
 def _fmt(value: object) -> str:
     try:
         return str(Decimal(str(value)).quantize(Decimal("0.01")))
     except Exception:
         return str(value)
+
+
+def _sep() -> str:
+    return "─" * _W
+
+
+def _center(text: str) -> str:
+    return text.center(_W)
+
+
+def _row(label: str, value: str) -> str:
+    gap = _W - len(label) - len(value)
+    return f"{label}{' ' * max(1, gap)}{value}"
 
 
 def build_layaway_receipt_text(
@@ -31,23 +46,20 @@ def build_layaway_receipt_text(
     preferred_printer: str = "",
     ticket_copies: int = 1,
 ) -> str:
-    cliente = getattr(layaway, "cliente", None)
     detalles = getattr(layaway, "detalles", []) or []
     abonos = getattr(layaway, "abonos", []) or []
 
-    p: list[str] = []
+    lines: list[str] = []
 
     # — Encabezado —
-    p.append(
-        f'<p style="text-align:center; margin:2px 0;">'
-        f'<b style="font-size:12pt;">{_esc(business_name)}</b></p>'
-    )
+    lines.append(_center(business_name))
     if business_address:
-        p.append(f'<p style="text-align:center; margin:1px 0; font-size:7pt;">{_esc(business_address)}</p>')
+        lines.extend(textwrap.wrap(business_address, width=_W))
     if business_phone:
-        p.append(f'<p style="text-align:center; margin:1px 0; font-size:7pt;">Tel: {_esc(business_phone)}</p>')
-    p.append('<p style="text-align:center; margin:2px 0; font-size:7pt; color:#555555;">Comprobante de apartado</p>')
-    p.append('<hr/>')
+        lines.append(_center(f"Tel: {business_phone}"))
+    lines.append(_sep())
+    lines.append(_center("Comprobante de apartado"))
+    lines.append(_sep())
 
     # — Datos del apartado —
     fecha_str = (
@@ -62,18 +74,20 @@ def build_layaway_receipt_text(
     )
     cliente_nombre = str(getattr(layaway, "cliente_nombre", "") or "Mostrador")
 
-    p.append('<table width="100%" cellspacing="0" cellpadding="1">')
-    p.append(f'<tr><td><b>Folio</b></td><td align="right">{_esc(str(getattr(layaway, "folio", "")))}</td></tr>')
+    lines.append(_row("Folio:", str(getattr(layaway, "folio", ""))))
     if fecha_str:
-        p.append(f'<tr><td><b>Fecha</b></td><td align="right">{_esc(fecha_str)}</td></tr>')
-    p.append(f'<tr><td><b>Cliente</b></td><td align="right">{_esc(cliente_nombre)}</td></tr>')
-    p.append(f'<tr><td><b>Vencimiento</b></td><td align="right">{_esc(vencimiento_str)}</td></tr>')
-    p.append('</table>')
+        lines.append(_row("Fecha:", fecha_str))
+    if len("Cliente:" + cliente_nombre) + 1 > _W:
+        lines.append("Cliente:")
+        lines.extend(textwrap.wrap(cliente_nombre, width=_W))
+    else:
+        lines.append(_row("Cliente:", cliente_nombre))
+    lines.append(_row("Vencimiento:", vencimiento_str))
+    lines.append(_sep())
 
     # — Productos —
-    p.append('<hr/>')
-    p.append('<p style="margin:3px 0;"><b>PRODUCTOS</b></p>')
-    p.append('<table width="100%" cellspacing="0" cellpadding="2">')
+    lines.append("PRODUCTOS")
+    lines.append(_sep())
     for detalle in detalles:
         variante = getattr(detalle, "variante", None)
         producto = (
@@ -93,26 +107,21 @@ def build_layaway_receipt_text(
             producto = f"{producto} ({label})"
         talla = str(getattr(variante, "talla", "") or "").strip()
         color = str(getattr(variante, "color", "") or "").strip()
-        detail_parts = [part for part in (f"Talla {talla}" if talla else "", f"Color {color}" if color else "") if part]
-        detail_str = " · ".join(detail_parts)
+        detail_parts = [part for part in (f"T:{talla}" if talla else "", f"C:{color}" if color else "") if part]
+        detail_str = " ".join(detail_parts)
+
         subtotal_linea = getattr(detalle, "subtotal_linea", "")
         cantidad = getattr(detalle, "cantidad", "")
         precio_unitario = getattr(detalle, "precio_unitario", "")
-        p.append(
-            f'<tr>'
-            f'<td style="padding-bottom:0;">{_esc(str(producto))}</td>'
-            f'<td align="right" style="padding-bottom:0; white-space:nowrap;"><b>${_esc(_fmt(subtotal_linea))}</b></td>'
-            f'</tr>'
-        )
-        meta = f"{_esc(str(cantidad))} × ${_esc(_fmt(precio_unitario))}"
+
+        lines.append("")
+        lines.extend(textwrap.wrap(str(producto), width=_W) or [str(producto)])
+        meta = f"{cantidad} x ${_fmt(precio_unitario)}"
         if detail_str:
-            meta = f"{_esc(detail_str)} &nbsp;·&nbsp; {meta}"
-        p.append(
-            f'<tr>'
-            f'<td colspan="2" style="font-size:7pt; color:#666666; padding-top:0;">{meta}</td>'
-            f'</tr>'
-        )
-    p.append('</table>')
+            meta = f"{detail_str} | {meta}"
+        lines.append(_row(meta, f"${_fmt(subtotal_linea)}"))
+    lines.append("")
+    lines.append(_sep())
 
     # — Totales / Saldos —
     subtotal = getattr(layaway, "subtotal", "")
@@ -124,28 +133,18 @@ def build_layaway_receipt_text(
     except Exception:
         adjustment = None
 
-    p.append('<hr/>')
-    p.append('<table width="100%" cellspacing="0" cellpadding="1">')
-    p.append(f'<tr><td>Total</td><td align="right">${_esc(_fmt(total))}</td></tr>')
+    lines.append(_row("Total:", f"${_fmt(total)}"))
     if adjustment not in {None, Decimal("0.00"), 0}:
-        p.append(f'<tr><td>Ajuste</td><td align="right">${_esc(_fmt(adjustment))}</td></tr>')
-    p.append(f'<tr><td>Abonado</td><td align="right">${_esc(_fmt(total_abonado))}</td></tr>')
-    p.append('</table>')
-    p.append('<hr/>')
-    p.append('<table width="100%" cellspacing="0" cellpadding="3">')
-    p.append(
-        f'<tr>'
-        f'<td><b style="font-size:10pt;">SALDO PENDIENTE</b></td>'
-        f'<td align="right"><b style="font-size:10pt;">${_esc(_fmt(saldo_pendiente))}</b></td>'
-        f'</tr>'
-    )
-    p.append('</table>')
+        lines.append(_row("Ajuste:", f"${_fmt(adjustment)}"))
+    lines.append(_row("Abonado:", f"${_fmt(total_abonado)}"))
+    lines.append(_sep())
+    lines.append(_row("SALDO PENDIENTE:", f"${_fmt(saldo_pendiente)}"))
+    lines.append(_sep())
 
     # — Abonos —
     if abonos:
-        p.append('<hr/>')
-        p.append('<p style="margin:2px 0;"><b>Abonos registrados</b></p>')
-        p.append('<table width="100%" cellspacing="0" cellpadding="1">')
+        lines.append("Abonos registrados")
+        lines.append(_sep())
         for abono in abonos:
             fecha_abono = (
                 format_display_datetime(abono.created_at)
@@ -157,33 +156,22 @@ def build_layaway_receipt_text(
             label = fecha_abono or "—"
             right = f"${monto_abono}"
             if referencia and referencia.casefold() != "sin referencia":
-                right = f"{right} · {_esc(referencia)}"
-            p.append(
-                f'<tr>'
-                f'<td style="font-size:7pt; color:#555555;">{_esc(label)}</td>'
-                f'<td align="right" style="font-size:7pt; color:#555555;">{right}</td>'
-                f'</tr>'
-            )
-        p.append('</table>')
+                right = f"{right} {referencia}"
+            lines.append(_row(label, right))
+        lines.append(_sep())
 
     # — Notas —
     observacion = _clean_customer_layaway_note(getattr(layaway, "observacion", ""))
     if observacion:
-        p.append('<hr/>')
-        p.append('<p style="margin:2px 0;"><b>Notas</b></p>')
-        p.append(f'<p style="margin:1px 0; font-size:7pt;">{_esc(observacion)}</p>')
+        lines.append("Notas:")
+        lines.extend(textwrap.wrap(observacion, width=_W))
+        lines.append(_sep())
 
     # — Pie —
-    p.append('<hr/>')
-    p.append('<p style="text-align:center; margin:2px 0; font-size:7pt;">Por favor conserve su comprobante.</p>')
-    p.append(f'<p style="text-align:center; margin:3px 0; font-size:7pt;">{_esc(ticket_footer)}</p>')
+    lines.append(_center("Conserve su comprobante."))
+    lines.append(_center(ticket_footer))
 
-    body = "\n".join(p)
-    return (
-        '<html><body style="font-family: Arial, sans-serif; font-size: 8pt; margin: 4px; padding: 0;">'
-        f'{body}'
-        '</body></html>'
-    )
+    return "\n".join(lines)
 
 
 def _clean_customer_layaway_note(note: object) -> str:

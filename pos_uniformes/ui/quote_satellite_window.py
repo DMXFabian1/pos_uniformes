@@ -5183,7 +5183,11 @@ def _build_snapshot_ticket_text(snapshot: QuoteDetailSnapshot) -> str:
     lines.append(_sep())
     lines.append(_row("Folio:", snapshot.folio))
     lines.append(_row("Estado:", snapshot.status_label))
-    lines.append(_row("Cliente:", snapshot.customer_label))
+    if len("Cliente:" + snapshot.customer_label) + 1 > _W:
+        lines.append("Cliente:")
+        lines.extend(textwrap.wrap(snapshot.customer_label, width=_W))
+    else:
+        lines.append(_row("Cliente:", snapshot.customer_label))
     if snapshot.phone_text and snapshot.phone_text.lower() != "sin telefono":
         lines.append(_row("Telefono:", snapshot.phone_text))
     if snapshot.validity_label and snapshot.validity_label.lower() != "sin vigencia":
@@ -5196,7 +5200,7 @@ def _build_snapshot_ticket_text(snapshot: QuoteDetailSnapshot) -> str:
         subtotal = Decimal(str(detail.subtotal)).quantize(Decimal("0.01"))
         talla = str(detail.size_label or "").strip()
         lines.append("")
-        lines.append(str(detail.description))
+        lines.extend(textwrap.wrap(str(detail.description), width=_W) or [str(detail.description)])
         if talla and talla != "-":
             lines.append(f"Talla: {talla}")
         lines.append(_row(f"{detail.sku} | {detail.quantity} x ${unit_price}", f"${subtotal}"))
@@ -5256,7 +5260,11 @@ def _build_cart_ticket_text(
     lines.append(_center("Precios solo de referencia"))
     lines.append(_sep())
     lines.append(_row("Folio:", folio))
-    lines.append(_row("Cliente:", client_name))
+    if len("Cliente:" + client_name) + 1 > _W:
+        lines.append("Cliente:")
+        lines.extend(textwrap.wrap(client_name, width=_W))
+    else:
+        lines.append(_row("Cliente:", client_name))
     if validity_date is not None:
         try:
             lines.append(_row("Vigencia:", validity_date.strftime("%d/%m/%Y")))
@@ -5273,7 +5281,7 @@ def _build_cart_ticket_text(
         sku = str(item["sku"])
         talla = str(item.get("talla") or "").strip()
         lines.append("")
-        lines.append(description)
+        lines.extend(textwrap.wrap(description, width=_W) or [description])
         if talla and talla != "-":
             lines.append(f"Talla: {talla}")
         lines.append(_row(f"{sku} | {qty} x ${unit_price}", f"${subtotal}"))

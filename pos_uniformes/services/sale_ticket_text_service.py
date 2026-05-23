@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import textwrap
 from decimal import Decimal
 import re
 
@@ -118,7 +119,12 @@ def build_sale_ticket_text(
     # — Cliente —
     if cliente is not None:
         lines.append(_sep())
-        lines.append(_row("Cliente:", str(getattr(cliente, "nombre", ""))))
+        client_name = str(getattr(cliente, "nombre", ""))
+        if len("Cliente:" + client_name) + 1 > _W:
+            lines.append("Cliente:")
+            lines.extend(textwrap.wrap(client_name, width=_W))
+        else:
+            lines.append(_row("Cliente:", client_name))
         lines.append(_row("Codigo:", str(getattr(cliente, "codigo_cliente", ""))))
 
     # — Artículos —
@@ -143,7 +149,7 @@ def build_sale_ticket_text(
         subtotal_linea = _fmt(getattr(detalle, "subtotal_linea", ""))
 
         lines.append("")
-        lines.append(str(producto))
+        lines.extend(textwrap.wrap(str(producto), width=_W) or [str(producto)])
         meta = f"{sku}"
         if talla:
             meta += f" | Talla {talla}"
