@@ -145,6 +145,15 @@ def build_sale_ticket_text(
             lines.append(tk_line(dl))
         if talla:
             lines.append(tk_line(f"Talla: {talla}"))
+        # Indicar precio promo si difiere del precio normal
+        precio_normal = Decimal(str(getattr(variante, "precio_venta", 0))) if variante else None
+        try:
+            precio_unit_dec = Decimal(str(precio_unitario))
+        except Exception:
+            precio_unit_dec = None
+        if precio_normal and precio_unit_dec and precio_normal > precio_unit_dec:
+            promo = f"${tk_fmt(precio_normal)} -> ${tk_fmt(precio_unit_dec)} promo 3pz"
+            lines.append(tk_line(promo))
         tk_product_price(f"{cantidad} x ${tk_fmt(precio_unitario)}", f"${subtotal_linea}", lines)
 
     # — Totales —
