@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from decimal import Decimal
 
-from pos_uniformes.utils.product_name import sanitize_product_display_name
+from pos_uniformes.utils.product_name import build_ticket_product_name
 
 
 def add_sale_cart_variant(
@@ -180,7 +180,7 @@ def _apply_sale_cart_variant(
         line_item = {
             "sku": sku,
             "variante_id": getattr(variante, "id", None),
-            "producto_nombre": sanitize_product_display_name(getattr(getattr(variante, "producto", None), "nombre", "")),
+            "producto_nombre": build_ticket_product_name(getattr(variante, "producto", None)),
             "talla": str(getattr(variante, "talla", "") or "-"),
             "cantidad": int(quantity),
             "precio_unitario": unit_price,
