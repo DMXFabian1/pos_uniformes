@@ -157,10 +157,16 @@ def build_sale_ticket_text(
         except Exception:
             precio_unit_dec = None
         if precio_normal and precio_unit_dec and precio_normal > precio_unit_dec:
-            normal_sub = tk_fmt(precio_normal * int(cantidad))
-            struck_meta = _strike(f"{cantidad} x ${tk_fmt(precio_normal)}")
-            struck_sub = _strike(f"${normal_sub}")
-            tk_product_price(struck_meta, struck_sub, lines)
+            # Línea tachada con precio normal
+            meta_plain = f"{cantidad} x ${tk_fmt(precio_normal)}"
+            sub_plain = f"${tk_fmt(precio_normal * int(cantidad))}"
+            gap = _IW - len(meta_plain) - len(sub_plain)
+            inner = _strike(meta_plain) + " " * max(1, gap) + _strike(sub_plain)
+            # Pad usando ancho visual (len de texto plano, no del tachado)
+            visual_len = len(meta_plain) + max(1, gap) + len(sub_plain)
+            pad = " " * max(0, _IW - visual_len)
+            lines.append(f"│ {inner}{pad} │")
+            # Línea con precio promo
             tk_product_price(f"{cantidad} x ${tk_fmt(precio_unitario)} promo 3pz", f"${subtotal_linea}", lines)
         else:
             tk_product_price(f"{cantidad} x ${tk_fmt(precio_unitario)}", f"${subtotal_linea}", lines)
