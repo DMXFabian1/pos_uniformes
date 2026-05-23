@@ -76,6 +76,8 @@ def build_school_tariff_text(
 
     # — Pie —
     lines.append("")
+    lines.append("Tallas en numeros pares".center(_W))
+    lines.append("(4, 6, 8, 10...)".center(_W))
     lines.append("Precios sujetos a cambio".center(_W))
     lines.append("sin previo aviso.".center(_W))
 
