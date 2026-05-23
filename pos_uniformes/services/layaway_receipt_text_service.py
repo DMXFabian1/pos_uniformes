@@ -119,7 +119,12 @@ def build_layaway_receipt_text(
         meta = f"{cantidad} x ${_fmt(precio_unitario)}"
         if detail_str:
             meta = f"{detail_str} | {meta}"
-        lines.append(_row(meta, f"${_fmt(subtotal_linea)}"))
+        row_line = _row(meta, f"${_fmt(subtotal_linea)}")
+        if len(row_line) > _W:
+            lines.append(meta)
+            lines.append(f"${_fmt(subtotal_linea)}".rjust(_W))
+        else:
+            lines.append(row_line)
     lines.append("")
     lines.append(_sep())
 

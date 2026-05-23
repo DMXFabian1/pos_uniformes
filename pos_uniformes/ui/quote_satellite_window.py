@@ -5203,7 +5203,13 @@ def _build_snapshot_ticket_text(snapshot: QuoteDetailSnapshot) -> str:
         lines.extend(textwrap.wrap(str(detail.description), width=_W) or [str(detail.description)])
         if talla and talla != "-":
             lines.append(f"Talla: {talla}")
-        lines.append(_row(f"{detail.sku} | {detail.quantity} x ${unit_price}", f"${subtotal}"))
+        meta = f"{detail.sku} | {detail.quantity} x ${unit_price}"
+        row_line = _row(meta, f"${subtotal}")
+        if len(row_line) > _W:
+            lines.append(meta)
+            lines.append(f"${subtotal}".rjust(_W))
+        else:
+            lines.append(row_line)
     lines.append("")
     lines.append(_sep())
     lines.append(_row("TOTAL ESTIMADO:", f"${_fmt(snapshot.total)}"))
@@ -5284,7 +5290,13 @@ def _build_cart_ticket_text(
         lines.extend(textwrap.wrap(description, width=_W) or [description])
         if talla and talla != "-":
             lines.append(f"Talla: {talla}")
-        lines.append(_row(f"{sku} | {qty} x ${unit_price}", f"${subtotal}"))
+        meta = f"{sku} | {qty} x ${unit_price}"
+        row_line = _row(meta, f"${subtotal}")
+        if len(row_line) > _W:
+            lines.append(meta)
+            lines.append(f"${subtotal}".rjust(_W))
+        else:
+            lines.append(row_line)
     lines.append("")
     lines.append(_sep())
     lines.append(_row("TOTAL ESTIMADO:", f"${_fmt(total)}"))

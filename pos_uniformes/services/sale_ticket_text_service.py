@@ -152,9 +152,14 @@ def build_sale_ticket_text(
         lines.extend(textwrap.wrap(str(producto), width=_W) or [str(producto)])
         meta = f"{sku}"
         if talla:
-            meta += f" | Talla {talla}"
+            meta += f" | T:{talla}"
         meta += f" | {cantidad} x ${_fmt(precio_unitario)}"
-        lines.append(_row(meta, f"${subtotal_linea}"))
+        row_line = _row(meta, f"${subtotal_linea}")
+        if len(row_line) > _W:
+            lines.append(meta)
+            lines.append(f"${subtotal_linea}".rjust(_W))
+        else:
+            lines.append(row_line)
 
     # — Totales —
     ticket_totals = resolve_sale_ticket_totals(
