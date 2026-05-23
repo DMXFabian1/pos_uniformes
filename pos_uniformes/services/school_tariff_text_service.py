@@ -59,16 +59,15 @@ def build_school_tariff_text(
         for dl in textwrap.wrap(str(nombre), width=_IW) or [str(nombre)]:
             lines.append(tk_line(dl))
 
-        # Agrupar tallas por precio
+        # Agrupar tallas por precio como rangos compactos
         price_groups = _group_tallas_by_price(tallas)
         for precio, group_tallas in price_groups:
-            tallas_str = ", ".join(group_tallas)
+            tallas_str = _compact_talla_range(group_tallas)
             price_str = f"${tk_fmt(precio)}"
             label = f"  {tallas_str}"
             if len(label) + 1 + len(price_str) <= _IW:
                 lines.append(tk_row(label, price_str))
             else:
-                # Partir tallas en varias líneas si no caben
                 for chunk in textwrap.wrap(label, width=_IW):
                     lines.append(tk_line(chunk))
                 lines.append(tk_line(price_str.rjust(_IW)))
@@ -94,3 +93,36 @@ def _group_tallas_by_price(tallas: list[dict]) -> list[tuple[Decimal, list[str]]
         else:
             groups.append((precio, [talla]))
     return groups
+
+
+def _compact_talla_range(tallas: list[str]) -> str:
+    """Convierte lista de tallas en rango compacto.
+
+    Ejemplos:
+        ["4", "6", "8", "10"] → "4 a 10"
+        ["CH", "M", "G"]      → "CH a G"
+        ["4"]                  → "4"
+        ["CH"]                 → "CH"
+        ["4", "8"]             → "4, 8"  (no consecutivas)
+    """
+    if len(tallas) <= 1:
+        return tallas[0] if tallas else ""
+    # Intentar detectar secuencia numérica
+    nums = []
+    for t in tallas:
+        try:
+            nums.append(int(t))
+        except ValueError:
+            nums = []
+            break
+    if nums and len(nums) >= 3:
+        # Verificar si son consecutivos (paso uniforme)
+        step = nums[1] - nums[0]
+        is_sequence = all(nums[i + 1] - nums[i] == step for i in range(len(nums) - 1))
+        if is_sequence:
+            return f"{tallas[0]} a {tallas[-1]}"
+    # Tallas letra: si >= 3, usar rango
+    if not nums and len(tallas) >= 3:
+        return f"{tallas[0]} a {tallas[-1]}"
+    # Fallback: listar
+    return ", ".join(tallas)
