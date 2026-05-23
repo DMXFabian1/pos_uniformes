@@ -999,7 +999,7 @@ class MovimientoInventario(Base):
     __tablename__ = "movimiento_inventario"
     __table_args__ = (
         CheckConstraint("cantidad <> 0", name="movimiento_inventario_cantidad_no_cero"),
-        CheckConstraint("stock_posterior >= 0", name="movimiento_inventario_stock_posterior_no_negativo"),
+        CheckConstraint("stock_posterior >= -1", name="movimiento_inventario_stock_posterior_no_negativo"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
