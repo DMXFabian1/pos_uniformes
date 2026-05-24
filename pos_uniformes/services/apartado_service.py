@@ -307,6 +307,174 @@ class ApartadoService:
         session.add(apartado)
         return apartado
 
+    @classmethod
+    def anular_ultimo_abono(
+        cls,
+        session: Session,
+        apartado: Apartado,
+        usuario: Usuario,
+        observacion: str | None = None,
+    ) -> ApartadoAbono:
+        """Anula el último abono registrado y recalcula saldos."""
+        cls._validar_operador(usuario)
+        if apartado.estado in {EstadoApartado.CANCELADO, EstadoApartado.ENTREGADO}:
+            raise ValueError("No puedes anular abonos de un apartado cerrado.")
+        abonos = sorted(apartado.abonos, key=lambda a: a.created_at)
+        if not abonos:
+            raise ValueError("El apartado no tiene abonos registrados.")
+        ultimo = abonos[-1]
+        apartado.total_abonado = Decimal(apartado.total_abonado) - Decimal(ultimo.monto)
+        apartado.saldo_pendiente = Decimal(apartado.total) - Decimal(apartado.total_abonado)
+        cls._recalcular_estado(apartado)
+        session.delete(ultimo)
+        session.add(apartado)
+        return ultimo
+
+    @classmethod
+    def agregar_detalle(
+        cls,
+        session: Session,
+        apartado: Apartado,
+        usuario: Usuario,
+        sku: str,
+        cantidad: int,
+        precio_unitario: Decimal | None = None,
+    ) -> ApartadoDetalle:
+        """Agrega un producto al apartado existente."""
+        cls._validar_operador(usuario)
+        if apartado.estado != EstadoApartado.ACTIVO:
+            raise ValueError("Solo puedes editar apartados activos.")
+        sku = sku.strip().upper()
+        if not sku:
+            raise ValueError("El SKU no puede estar vacio.")
+        if cantidad <= 0:
+            raise ValueError("La cantidad debe ser mayor a cero.")
+        for d in apartado.detalles:
+            if d.variante.sku == sku:
+                raise ValueError(f"El SKU '{sku}' ya existe en el apartado. Usa cambiar cantidad.")
+        variante = cls.obtener_variante_por_sku(session, sku)
+        if variante is None:
+            raise ValueError(f"No existe una presentacion activa para el SKU '{sku}'.")
+        InventarioService.validar_stock_disponible(variante, cantidad)
+        if precio_unitario is None:
+            client_discount = resolve_layaway_client_discount_percent(
+                session, selected_client_id=getattr(apartado.cliente, "id", None),
+            )
+            precio_unitario = resolve_layaway_unit_price(variante.precio_venta, discount_percent=client_discount)
+        else:
+            precio_unitario = Decimal(precio_unitario).quantize(Decimal("0.01"))
+        subtotal_linea = Decimal(cantidad) * precio_unitario
+        detalle = ApartadoDetalle(
+            apartado=apartado,
+            variante=variante,
+            cantidad=cantidad,
+            precio_unitario=precio_unitario,
+            subtotal_linea=subtotal_linea,
+        )
+        session.add(detalle)
+        session.flush()
+        InventarioService.registrar_reserva_apartado(
+            session=session,
+            variante=variante,
+            cantidad=cantidad,
+            referencia=apartado.folio,
+            observacion=f"Agregado a apartado {apartado.folio}",
+            creado_por=usuario.username,
+        )
+        cls._recalcular_totales(session, apartado)
+        return detalle
+
+    @classmethod
+    def quitar_detalle(
+        cls,
+        session: Session,
+        apartado: Apartado,
+        usuario: Usuario,
+        detalle_id: int,
+    ) -> None:
+        """Quita un producto del apartado y libera su inventario."""
+        cls._validar_operador(usuario)
+        if apartado.estado != EstadoApartado.ACTIVO:
+            raise ValueError("Solo puedes editar apartados activos.")
+        detalle = next((d for d in apartado.detalles if d.id == detalle_id), None)
+        if detalle is None:
+            raise ValueError("No se encontro el detalle en el apartado.")
+        if len(apartado.detalles) <= 1:
+            raise ValueError("No puedes quitar el ultimo producto. Cancela el apartado en su lugar.")
+        InventarioService.registrar_liberacion_apartado(
+            session=session,
+            variante=detalle.variante,
+            cantidad=detalle.cantidad,
+            referencia=apartado.folio,
+            observacion=f"Eliminado de apartado {apartado.folio}",
+            creado_por=usuario.username,
+        )
+        session.delete(detalle)
+        session.flush()
+        cls._recalcular_totales(session, apartado)
+
+    @classmethod
+    def cambiar_cantidad_detalle(
+        cls,
+        session: Session,
+        apartado: Apartado,
+        usuario: Usuario,
+        detalle_id: int,
+        nueva_cantidad: int,
+    ) -> ApartadoDetalle:
+        """Cambia la cantidad de un producto en el apartado."""
+        cls._validar_operador(usuario)
+        if apartado.estado != EstadoApartado.ACTIVO:
+            raise ValueError("Solo puedes editar apartados activos.")
+        if nueva_cantidad <= 0:
+            raise ValueError("La cantidad debe ser mayor a cero.")
+        detalle = next((d for d in apartado.detalles if d.id == detalle_id), None)
+        if detalle is None:
+            raise ValueError("No se encontro el detalle en el apartado.")
+        diferencia = nueva_cantidad - detalle.cantidad
+        if diferencia > 0:
+            InventarioService.validar_stock_disponible(detalle.variante, diferencia)
+            InventarioService.registrar_reserva_apartado(
+                session=session,
+                variante=detalle.variante,
+                cantidad=diferencia,
+                referencia=apartado.folio,
+                observacion=f"Aumento cantidad en apartado {apartado.folio}",
+                creado_por=usuario.username,
+            )
+        elif diferencia < 0:
+            InventarioService.registrar_liberacion_apartado(
+                session=session,
+                variante=detalle.variante,
+                cantidad=abs(diferencia),
+                referencia=apartado.folio,
+                observacion=f"Reduccion cantidad en apartado {apartado.folio}",
+                creado_por=usuario.username,
+            )
+        detalle.cantidad = nueva_cantidad
+        detalle.subtotal_linea = Decimal(nueva_cantidad) * Decimal(detalle.precio_unitario)
+        session.add(detalle)
+        session.flush()
+        cls._recalcular_totales(session, apartado)
+        return detalle
+
+    @classmethod
+    def _recalcular_totales(cls, session: Session, apartado: Apartado) -> None:
+        """Recalcula subtotal, total y saldo tras editar detalles."""
+        session.refresh(apartado, ["detalles"])
+        nuevo_subtotal = sum(Decimal(d.subtotal_linea) for d in apartado.detalles)
+        pricing = build_layaway_pricing(nuevo_subtotal)
+        if pricing.total < Decimal(apartado.total_abonado):
+            raise ValueError(
+                f"El nuevo total (${pricing.total}) no puede ser menor "
+                f"a lo ya abonado (${apartado.total_abonado})."
+            )
+        apartado.subtotal = pricing.subtotal
+        apartado.total = pricing.total
+        apartado.saldo_pendiente = pricing.total - Decimal(apartado.total_abonado)
+        cls._recalcular_estado(apartado)
+        session.add(apartado)
+
     @staticmethod
     def listar_apartados(session: Session) -> list[Apartado]:
         statement = (

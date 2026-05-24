@@ -9,6 +9,8 @@ from dataclasses import dataclass
 class LayawayActionState:
     create_enabled: bool
     payment_enabled: bool
+    void_payment_enabled: bool
+    edit_enabled: bool
     deliver_enabled: bool
     cancel_enabled: bool
     receipt_enabled: bool
@@ -29,6 +31,8 @@ def build_layaway_action_state(
     return LayawayActionState(
         create_enabled=can_manage_layaways and can_operate_open_cash,
         payment_enabled=can_manage_layaways and can_operate_open_cash,
+        void_payment_enabled=can_manage_layaways and can_operate_open_cash,
+        edit_enabled=can_manage_layaways and can_operate_open_cash,
         deliver_enabled=can_manage_layaways and can_operate_open_cash,
         cancel_enabled=is_admin,
         receipt_enabled=can_manage_layaways,

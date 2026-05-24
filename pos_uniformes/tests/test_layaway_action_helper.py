@@ -23,6 +23,8 @@ class LayawayActionHelperTests(unittest.TestCase):
             LayawayActionState(
                 create_enabled=False,
                 payment_enabled=False,
+                void_payment_enabled=False,
+                edit_enabled=False,
                 deliver_enabled=False,
                 cancel_enabled=False,
                 receipt_enabled=True,

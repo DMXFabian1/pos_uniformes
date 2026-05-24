@@ -159,6 +159,62 @@ def _finalize_layaway_delivery(
     )
 
 
+def void_last_payment(session, *, layaway_id: int, user_id: int) -> dict:
+    """Anula el último abono del apartado."""
+    apartado_service, usuario_model, _venta_service = _resolve_layaway_closure_dependencies()
+    usuario = session.get(usuario_model, user_id)
+    apartado = apartado_service.obtener_apartado(session, layaway_id)
+    if usuario is None or apartado is None:
+        raise ValueError("No se pudo cargar el apartado seleccionado.")
+    abono = apartado_service.anular_ultimo_abono(session, apartado, usuario)
+    return {"monto": abono.monto, "folio": apartado.folio}
+
+
+def add_layaway_item(
+    session,
+    *,
+    layaway_id: int,
+    user_id: int,
+    sku: str,
+    cantidad: int,
+    precio_unitario=None,
+) -> None:
+    """Agrega un producto al apartado existente."""
+    apartado_service, usuario_model, _venta_service = _resolve_layaway_closure_dependencies()
+    usuario = session.get(usuario_model, user_id)
+    apartado = apartado_service.obtener_apartado(session, layaway_id)
+    if usuario is None or apartado is None:
+        raise ValueError("No se pudo cargar el apartado seleccionado.")
+    apartado_service.agregar_detalle(session, apartado, usuario, sku, cantidad, precio_unitario)
+
+
+def remove_layaway_item(session, *, layaway_id: int, user_id: int, detalle_id: int) -> None:
+    """Quita un producto del apartado."""
+    apartado_service, usuario_model, _venta_service = _resolve_layaway_closure_dependencies()
+    usuario = session.get(usuario_model, user_id)
+    apartado = apartado_service.obtener_apartado(session, layaway_id)
+    if usuario is None or apartado is None:
+        raise ValueError("No se pudo cargar el apartado seleccionado.")
+    apartado_service.quitar_detalle(session, apartado, usuario, detalle_id)
+
+
+def update_layaway_item_quantity(
+    session,
+    *,
+    layaway_id: int,
+    user_id: int,
+    detalle_id: int,
+    nueva_cantidad: int,
+) -> None:
+    """Cambia la cantidad de un producto en el apartado."""
+    apartado_service, usuario_model, _venta_service = _resolve_layaway_closure_dependencies()
+    usuario = session.get(usuario_model, user_id)
+    apartado = apartado_service.obtener_apartado(session, layaway_id)
+    if usuario is None or apartado is None:
+        raise ValueError("No se pudo cargar el apartado seleccionado.")
+    apartado_service.cambiar_cantidad_detalle(session, apartado, usuario, detalle_id, nueva_cantidad)
+
+
 def cancel_layaway(session, *, layaway_id: int, user_id: int, note: str | None = None) -> None:
     apartado_service, usuario_model, _venta_service = _resolve_layaway_closure_dependencies()
     usuario = session.get(usuario_model, user_id)

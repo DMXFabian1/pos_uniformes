@@ -191,10 +191,14 @@ from pos_uniformes.services.quote_action_service import cancel_quote, convert_qu
 from pos_uniformes.services.quote_whatsapp_service import build_quote_whatsapp_view
 from pos_uniformes.services.layaway_alerts_service import load_layaway_alerts_snapshot
 from pos_uniformes.services.layaway_closure_service import (
+    add_layaway_item,
     cancel_layaway,
     deliver_layaway,
     load_layaway_delivery_confirmation,
+    remove_layaway_item,
     settle_and_deliver_layaway,
+    update_layaway_item_quantity,
+    void_last_payment,
 )
 from pos_uniformes.services.layaway_creation_service import create_layaway_from_payload
 from pos_uniformes.services.layaway_detail_service import load_layaway_detail_snapshot
@@ -1548,6 +1552,8 @@ class MainWindow(QMainWindow):
         self.layaway_due_combo = QComboBox()
         self.layaway_create_button = QPushButton("Nuevo apartado")
         self.layaway_payment_button = QPushButton("Registrar abono")
+        self.layaway_void_payment_button = QPushButton("Anular abono")
+        self.layaway_edit_button = QPushButton("Editar apartado")
         self.layaway_deliver_button = QPushButton("Entregar")
         self.layaway_cancel_button = QPushButton("Cancelar")
         self.layaway_receipt_button = QPushButton("Comprobante")
@@ -1949,6 +1955,8 @@ class MainWindow(QMainWindow):
             self.inventory_more_button: "Abre acciones poco frecuentes como eliminar y generar QRs masivos.",
             self.layaway_create_button: "Crea un apartado nuevo y reserva stock disponible.",
             self.layaway_payment_button: "Registra un abono sobre el apartado seleccionado.",
+            self.layaway_void_payment_button: "Anula el último abono registrado en el apartado.",
+            self.layaway_edit_button: "Agrega, quita o cambia cantidad de productos en el apartado.",
             self.layaway_deliver_button: "Marca como entregado un apartado ya liquidado.",
             self.layaway_cancel_button: "Cancela el apartado seleccionado y libera el stock reservado.",
             self.layaway_receipt_button: "Abre un comprobante del apartado seleccionado para revisar o imprimir.",
@@ -9043,6 +9051,8 @@ class MainWindow(QMainWindow):
         )
         self.layaway_create_button.setEnabled(layaway_action_state.create_enabled)
         self.layaway_payment_button.setEnabled(layaway_action_state.payment_enabled)
+        self.layaway_void_payment_button.setEnabled(layaway_action_state.void_payment_enabled)
+        self.layaway_edit_button.setEnabled(layaway_action_state.edit_enabled)
         self.layaway_deliver_button.setEnabled(layaway_action_state.deliver_enabled)
         self.layaway_cancel_button.setEnabled(layaway_action_state.cancel_enabled)
         self.layaway_receipt_button.setEnabled(layaway_action_state.receipt_enabled)
@@ -11371,6 +11381,207 @@ class MainWindow(QMainWindow):
         self.refresh_all()
         self._select_layaway(apartado_id)
         QMessageBox.information(self, "Apartado cancelado", "El stock reservado se libero correctamente.")
+
+    def _handle_void_layaway_payment(self) -> None:
+        apartado_id = self._selected_layaway_id()
+        if apartado_id is None:
+            QMessageBox.warning(self, "Sin selección", "Selecciona un apartado para anular abono.")
+            return
+        confirm = QMessageBox.question(
+            self,
+            "Anular último abono",
+            "¿Seguro que deseas anular el último abono registrado?\nEsta acción no se puede deshacer.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if confirm != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            with get_session() as session:
+                result = void_last_payment(
+                    session,
+                    layaway_id=apartado_id,
+                    user_id=self.user_id,
+                )
+                session.commit()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "No se pudo anular", str(exc))
+            return
+        self.refresh_all()
+        self._select_layaway(apartado_id)
+        QMessageBox.information(
+            self,
+            "Abono anulado",
+            f"Se anuló el abono por ${result['monto']} del apartado {result['folio']}.",
+        )
+
+    def _handle_edit_layaway(self) -> None:
+        apartado_id = self._selected_layaway_id()
+        if apartado_id is None:
+            QMessageBox.warning(self, "Sin selección", "Selecciona un apartado para editarlo.")
+            return
+        try:
+            with get_session() as session:
+                from pos_uniformes.services.apartado_service import ApartadoService
+                apartado = ApartadoService.obtener_apartado(session, apartado_id)
+                if apartado is None:
+                    QMessageBox.warning(self, "Error", "No se encontró el apartado.")
+                    return
+                if apartado.estado != EstadoApartado.ACTIVO:
+                    QMessageBox.warning(self, "No editable", "Sólo puedes editar apartados activos.")
+                    return
+                detalles_info = []
+                for d in apartado.detalles:
+                    detalles_info.append({
+                        "id": d.id,
+                        "sku": d.variante.sku,
+                        "descripcion": str(d.variante.producto.nombre_base if d.variante.producto else d.variante.sku),
+                        "talla": d.variante.talla,
+                        "color": d.variante.color,
+                        "cantidad": d.cantidad,
+                        "precio": d.precio_unitario,
+                        "subtotal": d.subtotal_linea,
+                    })
+                total_abonado = apartado.total_abonado
+                folio = apartado.folio
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Error", str(exc))
+            return
+
+        dialog, layout = self._create_modal_dialog(f"Editar apartado {folio}", width=700)
+        info_label = QLabel(f"Total abonado: ${total_abonado} — El nuevo total no puede ser menor a este monto.")
+        info_label.setStyleSheet("color: #87492c; font-weight: bold; padding: 4px;")
+        layout.addWidget(info_label)
+
+        table = QTableWidget()
+        table.setColumnCount(7)
+        table.setHorizontalHeaderLabels(["SKU", "Producto", "Talla", "Color", "Cantidad", "Precio", "Subtotal"])
+        table.verticalHeader().setVisible(False)
+        table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+
+        def refresh_table():
+            table.setRowCount(len(detalles_info))
+            for i, d in enumerate(detalles_info):
+                table.setItem(i, 0, QTableWidgetItem(str(d["sku"])))
+                table.setItem(i, 1, QTableWidgetItem(str(d["descripcion"])))
+                table.setItem(i, 2, QTableWidgetItem(str(d["talla"])))
+                table.setItem(i, 3, QTableWidgetItem(str(d["color"])))
+                table.setItem(i, 4, QTableWidgetItem(str(d["cantidad"])))
+                table.setItem(i, 5, QTableWidgetItem(f"${d['precio']}"))
+                table.setItem(i, 6, QTableWidgetItem(f"${d['subtotal']}"))
+            table.resizeColumnsToContents()
+
+        refresh_table()
+        layout.addWidget(table)
+
+        btn_row = QHBoxLayout()
+        add_btn = QPushButton("Agregar producto")
+        remove_btn = QPushButton("Quitar seleccionado")
+        qty_btn = QPushButton("Cambiar cantidad")
+        btn_row.addWidget(add_btn)
+        btn_row.addWidget(remove_btn)
+        btn_row.addWidget(qty_btn)
+        btn_row.addStretch()
+        layout.addLayout(btn_row)
+
+        changes: list[tuple] = []  # ("add"|"remove"|"qty", data)
+
+        def on_add():
+            from PyQt6.QtWidgets import QInputDialog
+            sku, ok = QInputDialog.getText(dialog, "Agregar producto", "Escanea o escribe el SKU:")
+            if not ok or not sku.strip():
+                return
+            qty, ok2 = QInputDialog.getInt(dialog, "Cantidad", "Cantidad:", 1, 1, 100)
+            if not ok2:
+                return
+            changes.append(("add", {"sku": sku.strip().upper(), "cantidad": qty}))
+            detalles_info.append({
+                "id": None, "sku": sku.strip().upper(), "descripcion": "(nuevo)",
+                "talla": "-", "color": "-", "cantidad": qty, "precio": "-", "subtotal": "-",
+            })
+            refresh_table()
+
+        def on_remove():
+            row = table.currentRow()
+            if row < 0:
+                QMessageBox.warning(dialog, "Sin selección", "Selecciona un producto para quitar.")
+                return
+            d = detalles_info[row]
+            if d["id"] is not None:
+                changes.append(("remove", {"detalle_id": d["id"]}))
+            else:
+                changes.append(("cancel_add", {"sku": d["sku"]}))
+            detalles_info.pop(row)
+            refresh_table()
+
+        def on_qty():
+            row = table.currentRow()
+            if row < 0:
+                QMessageBox.warning(dialog, "Sin selección", "Selecciona un producto.")
+                return
+            d = detalles_info[row]
+            if d["id"] is None:
+                QMessageBox.warning(dialog, "No disponible", "Primero guarda para cambiar cantidad.")
+                return
+            from PyQt6.QtWidgets import QInputDialog
+            qty, ok = QInputDialog.getInt(dialog, "Nueva cantidad", "Cantidad:", d["cantidad"], 1, 100)
+            if not ok or qty == d["cantidad"]:
+                return
+            changes.append(("qty", {"detalle_id": d["id"], "nueva_cantidad": qty}))
+            d["cantidad"] = qty
+            refresh_table()
+
+        add_btn.clicked.connect(on_add)
+        remove_btn.clicked.connect(on_remove)
+        qty_btn.clicked.connect(on_qty)
+
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        layout.addWidget(buttons)
+
+        if dialog.exec() != int(QDialog.DialogCode.Accepted):
+            return
+        if not changes:
+            return
+
+        errors = []
+        try:
+            with get_session() as session:
+                for change_type, data in changes:
+                    if change_type == "add":
+                        add_layaway_item(
+                            session,
+                            layaway_id=apartado_id,
+                            user_id=self.user_id,
+                            sku=data["sku"],
+                            cantidad=data["cantidad"],
+                        )
+                    elif change_type == "remove":
+                        remove_layaway_item(
+                            session,
+                            layaway_id=apartado_id,
+                            user_id=self.user_id,
+                            detalle_id=data["detalle_id"],
+                        )
+                    elif change_type == "qty":
+                        update_layaway_item_quantity(
+                            session,
+                            layaway_id=apartado_id,
+                            user_id=self.user_id,
+                            detalle_id=data["detalle_id"],
+                            nueva_cantidad=data["nueva_cantidad"],
+                        )
+                session.commit()
+        except Exception as exc:  # noqa: BLE001
+            errors.append(str(exc))
+
+        self.refresh_all()
+        self._select_layaway(apartado_id)
+        if errors:
+            QMessageBox.warning(self, "Edición parcial", "\n".join(errors))
+        else:
+            QMessageBox.information(self, "Apartado editado", "Los cambios se aplicaron correctamente.")
 
     def _select_layaway(self, apartado_id: int) -> None:
         self.layaway_table.blockSignals(True)
