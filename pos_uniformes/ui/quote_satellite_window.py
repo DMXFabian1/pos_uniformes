@@ -5450,7 +5450,7 @@ def _build_snapshot_ticket_text(snapshot: QuoteDetailSnapshot) -> str:
 
     # — Total —
     lines.append(tk_dbl())
-    lines.append(tk_row("TOTAL ESTIMADO:", f"${tk_fmt(snapshot.total)}"))
+    lines.append(tk_row("PRESUPUESTO ESTIMADO:", f"${tk_fmt(snapshot.total)}"))
     lines.append(tk_bot())
 
     # — Observaciones y términos —
@@ -5536,7 +5536,7 @@ def _build_cart_ticket_text(
 
     # — Total —
     lines.append(tk_dbl())
-    lines.append(tk_row("TOTAL ESTIMADO:", f"${tk_fmt(total)}"))
+    lines.append(tk_row("PRESUPUESTO ESTIMADO:", f"${tk_fmt(total)}"))
     lines.append(tk_bot())
 
     # — Observaciones y términos —

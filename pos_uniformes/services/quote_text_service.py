@@ -103,7 +103,7 @@ def build_quote_text(
     # — Total —
     lines.append("")
     lines.append(_sep())
-    lines.append(_row("TOTAL ESTIMADO:", f"${_fmt(quote.total)}"))
+    lines.append(_row("PRESUPUESTO ESTIMADO:", f"${_fmt(quote.total)}"))
     lines.append(_sep())
 
     # — Observaciones —
