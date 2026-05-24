@@ -621,6 +621,7 @@ from pos_uniformes.ui.views.bodega_view import build_bodega_tab
 from pos_uniformes.ui.views.settings_view import build_settings_tab
 from pos_uniformes.ui.styles.main_window_styles import build_main_window_stylesheet
 from pos_uniformes.utils.date_format import format_display_date, format_display_datetime, local_day_window
+from pos_uniformes.utils.product_templates import merge_choice_lists
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 from pos_uniformes.utils.qr_generator import QrGenerator
 
@@ -5065,14 +5066,33 @@ class MainWindow(QMainWindow):
                 dialog.close()
             setattr(self, attr_name, None)
 
+    def _load_db_colors_and_sizes(self) -> tuple[list[str], list[str]]:
+        """Carga colores y tallas distintos de variantes activas en la BD."""
+        db_colors: list[str] = []
+        db_sizes: list[str] = []
+        try:
+            with get_session() as session:
+                rows = session.execute(
+                    select(Variante.color).where(Variante.activo.is_(True)).distinct()
+                ).scalars().all()
+                db_colors = [c.strip() for c in rows if c and c.strip() and c.strip() != DEFAULT_VARIANT_COLOR]
+                rows = session.execute(
+                    select(Variante.talla).where(Variante.activo.is_(True)).distinct()
+                ).scalars().all()
+                db_sizes = [t.strip() for t in rows if t and t.strip() and t.strip() != DEFAULT_VARIANT_SIZE]
+        except Exception:  # noqa: BLE001
+            pass
+        return db_colors, db_sizes
+
     def _prompt_product_data(self, initial: dict[str, object] | None = None) -> dict[str, object] | None:
+        db_colors, db_sizes = self._load_db_colors_and_sizes()
         return build_catalog_product_dialog(
             self,
             initial=initial,
             picker_button_class=MultiSelectPickerButton,
             product_templates=PRODUCT_TEMPLATES,
-            common_sizes=COMMON_SIZES,
-            common_colors=COMMON_COLORS,
+            common_sizes=merge_choice_lists(COMMON_SIZES, db_sizes),
+            common_colors=merge_choice_lists(COMMON_COLORS, db_colors),
             default_variant_size=DEFAULT_VARIANT_SIZE,
             default_variant_color=DEFAULT_VARIANT_COLOR,
         )
@@ -5178,14 +5198,15 @@ class MainWindow(QMainWindow):
         include_stock: bool = False,
         default_product_id: int | None = None,
     ) -> dict[str, object] | None:
+        db_colors, db_sizes = self._load_db_colors_and_sizes()
         return build_catalog_variant_dialog(
             self,
             initial=initial,
             prefill=prefill,
             include_stock=include_stock,
             default_product_id=default_product_id,
-            common_sizes=COMMON_SIZES,
-            common_colors=COMMON_COLORS,
+            common_sizes=merge_choice_lists(COMMON_SIZES, db_sizes),
+            common_colors=merge_choice_lists(COMMON_COLORS, db_colors),
             default_variant_size=DEFAULT_VARIANT_SIZE,
             default_variant_color=DEFAULT_VARIANT_COLOR,
         )
