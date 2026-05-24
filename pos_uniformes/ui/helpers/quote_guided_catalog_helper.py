@@ -775,8 +775,10 @@ def _variant_sort_key(row: dict[str, object]) -> tuple[tuple[int, object], str, 
     )
 
 
-def _piece_group_sort_key(piece_label: str) -> tuple[int, str]:
-    return (_piece_group_rank(piece_label), piece_label.lower())
+def _piece_group_sort_key(piece_label: str) -> tuple[int, int, str]:
+    from pos_uniformes.services.school_tariff_service import _tariff_product_sort_key
+    pieza_order, _ = _tariff_product_sort_key(piece_label.strip())
+    return (_piece_group_rank(piece_label), pieza_order, piece_label.lower())
 
 
 def _piece_group_label(piece_label: str) -> str:
@@ -799,6 +801,7 @@ def _piece_group_rank(piece_label: str) -> int:
         "jumper",
         "pantalon",
         "pants 2pz",
+        "pants 3pz",
     }:
         return 0
     if normalized in {
