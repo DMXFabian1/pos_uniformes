@@ -27,6 +27,7 @@ class GuidedCatalogProductCard:
     meta_label: str
     price_label: str
     gender_key: str
+    tipo_pieza: str = ""
 
 
 @dataclass(frozen=True)
@@ -407,8 +408,8 @@ def _build_product_cards(rows: list[dict[str, object]], *, mode_key: str) -> tup
     for key, family_rows in grouped.items():
         representative = family_rows[0]
         cards.append(_to_grouped_product_card(key, family_rows, representative))
-    if mode_key == "basics":
-        cards.sort(key=lambda card: (card.title.lower(), card.subtitle.lower(), card.key.lower()))
+    from pos_uniformes.services.school_tariff_service import _tariff_product_sort_key
+    cards.sort(key=lambda card: (*_tariff_product_sort_key(card.tipo_pieza), card.title.lower()))
     return tuple(cards)
 
 
@@ -440,6 +441,7 @@ def _to_grouped_product_card(
         meta_label="",
         price_label=f"${price}",
         gender_key=_classify_gender(representative.get("producto_genero")),
+        tipo_pieza=str(representative.get("tipo_pieza_nombre") or ""),
     )
 
 
