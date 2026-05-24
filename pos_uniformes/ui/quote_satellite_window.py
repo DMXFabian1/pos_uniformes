@@ -2181,9 +2181,24 @@ class QuoteSatelliteWindow(QMainWindow):
         QApplication.processEvents()
         try:
             from pos_uniformes.services import meilisearch_service
+
+            # 1. Si no está corriendo, intentar iniciar el servicio
             if not meilisearch_service.is_available():
-                QMessageBox.warning(self, "Meilisearch", "No se pudo conectar con Meilisearch en 127.0.0.1:7700.")
-                return
+                self.guided_reindex_button.setText("↻ Iniciando...")
+                QApplication.processEvents()
+                status = meilisearch_service.ensure_installed(
+                    on_progress=lambda msg: (
+                        self.guided_reindex_button.setText(f"↻ {msg[:18]}"),
+                        QApplication.processEvents(),
+                    ),
+                )
+                if not meilisearch_service.is_available():
+                    QMessageBox.warning(self, "Meilisearch", f"No se pudo iniciar Meilisearch.\n{status}")
+                    return
+
+            # 2. Configurar índice y re-indexar
+            self.guided_reindex_button.setText("↻ Indexando...")
+            QApplication.processEvents()
             meilisearch_service.configure_index()
             from pos_uniformes.database.connection import get_session
             with get_session() as session:

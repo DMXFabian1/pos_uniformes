@@ -85,7 +85,8 @@ def configure_index() -> bool:
             "sortableAttributes": ["nombre_base", "precio_venta"],
             "typoTolerance": {
                 "enabled": True,
-                "minWordSizeForTypos": {"oneTypo": 4, "twoTypos": 12},
+                "minWordSizeForTypos": {"oneTypo": 3, "twoTypos": 8},
+                "disableOnAttributes": ["sku"],
             },
             "rankingRules": [
                 "words",
@@ -95,6 +96,51 @@ def configure_index() -> bool:
                 "sort",
                 "exactness",
             ],
+            # ── Sinónimos ──────────────────────────────────────────
+            # Género de colores (la gente busca "roja" o "rojo" indistintamente)
+            # + abreviaciones comunes de prendas
+            "synonyms": {
+                "blanco": ["blanca"],
+                "blanca": ["blanco"],
+                "rojo": ["roja"],
+                "roja": ["rojo"],
+                "negro": ["negra"],
+                "negra": ["negro"],
+                "azul": ["azul marino", "azul rey"],
+                "gris": ["gris oxford", "gris jaspe"],
+                "cafe": ["café"],
+                "café": ["cafe"],
+                "pants": ["pantalón", "pantalon"],
+                "pantalón": ["pants", "pantalon"],
+                "pantalon": ["pants", "pantalón"],
+                "playera": ["polo", "camiseta"],
+                "suéter": ["sueter", "sweater"],
+                "sueter": ["suéter"],
+                "chamarra": ["chaqueta", "jacket"],
+                "calceta": ["calcetín", "calcetin", "calcetas"],
+                "calcetas": ["calceta", "calcetín"],
+                "falda": ["faldas"],
+                "faldas": ["falda"],
+                "camisa": ["camisas"],
+                "camisas": ["camisa"],
+                "2pz": ["dos piezas"],
+                "3pz": ["tres piezas"],
+                "ch": ["chica", "small"],
+                "md": ["mediana", "medium"],
+                "gd": ["grande", "large"],
+                "exg": ["extra grande"],
+            },
+            # ── Stop words ─────────────────────────────────────────
+            # Palabras que no aportan a la búsqueda
+            "stopWords": [
+                "de", "del", "la", "las", "el", "los", "en", "y", "con",
+                "sin", "para", "por", "una", "un", "ad", "hoc",
+            ],
+            # ── Separadores ────────────────────────────────────────
+            # El pipe "|" aparece en nombres de producto como separador
+            "separatorTokens": ["|"],
+            # ── Paginación ─────────────────────────────────────────
+            "pagination": {"maxTotalHits": 5000},
         })
         return True
     except Exception as exc:
