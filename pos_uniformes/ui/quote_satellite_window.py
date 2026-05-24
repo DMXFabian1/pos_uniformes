@@ -5384,9 +5384,9 @@ def _load_business_name() -> str:
         from pos_uniformes.services.business_settings_service import BusinessSettingsService
         with get_session() as session:
             config = BusinessSettingsService.get_or_create(session)
-            return config.nombre_negocio or "POS Uniformes"
+            return config.nombre_negocio or "MAXIMODA"
     except Exception:  # noqa: BLE001
-        return "POS Uniformes"
+        return "MAXIMODA"
 
 
 def _load_business_phone() -> str:
