@@ -293,6 +293,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self._refresh_offline_saved_list()
         self._refresh_offline_quotes()
         self._refresh_guided_browser()
+        self._refresh_tariff_schools()
         self._set_status("Modo local — catalogo guardado disponible.")
 
     def _build_widgets(self) -> None:
