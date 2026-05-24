@@ -1467,7 +1467,7 @@ class MainWindow(QMainWindow):
         self.quote_status_label = QLabel("Sin presupuestos cargados.")
         self.quote_summary_label = QLabel("Presupuesto vacio.")
         self.quote_total_label = QLabel("$0.00")
-        self.quote_total_meta_label = QLabel("Total estimado")
+        self.quote_total_meta_label = QLabel("Presupuesto estimado")
         self.quote_customer_label = QLabel("Sin detalle.")
         self.quote_meta_label = QLabel("")
         self.quote_notes_label = QLabel("")

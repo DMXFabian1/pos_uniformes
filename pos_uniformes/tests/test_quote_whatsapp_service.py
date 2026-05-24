@@ -43,7 +43,7 @@ class QuoteWhatsappServiceTests(unittest.TestCase):
         self.assertEqual(view.customer_label, "Maria Lopez")
         self.assertIn("Hola Maria Lopez, te compartimos tu presupuesto PRE-001.", view.message)
         self.assertIn("POS Uniformes", view.message)
-        self.assertIn("Total estimado: $449.50", view.message)
+        self.assertIn("Presupuesto estimado: $449.50", view.message)
         self.assertIn("Vigencia: 31/03/2026", view.message)
         self.assertIn("- Playera deportiva CH azul", view.message)
         self.assertIn("SKU SKU-001 | 2 x 149.50 = 299.00", view.message)

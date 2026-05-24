@@ -317,7 +317,7 @@ def build_create_layaway_dialog(
 
     subtotal_label = QLabel("Subtotal estimado: $0.00")
     subtotal_label.setObjectName("analyticsLine")
-    total_label = QLabel("Total estimado: $0.00")
+    total_label = QLabel("Presupuesto estimado: $0.00")
     total_label.setObjectName("analyticsLine")
     minimum_deposit_label = QLabel("Anticipo minimo (20%): $0.00")
     minimum_deposit_label.setObjectName("analyticsLine")
@@ -467,10 +467,10 @@ def build_create_layaway_dialog(
         subtotal_label.setText(f"Subtotal estimado: ${pricing.subtotal}")
         if pricing.rounding_adjustment != Decimal("0.00"):
             total_label.setText(
-                f"Total estimado: ${pricing.total} | Ajuste: ${pricing.rounding_adjustment}"
+                f"Presupuesto estimado: ${pricing.total} | Ajuste: ${pricing.rounding_adjustment}"
             )
         else:
-            total_label.setText(f"Total estimado: ${pricing.total}")
+            total_label.setText(f"Presupuesto estimado: ${pricing.total}")
         minimum_deposit = resolve_layaway_min_deposit(pricing.total)
         minimum_deposit_label.setText(f"Anticipo minimo (20%): ${minimum_deposit}")
         deposit_spin.setMinimum(float(minimum_deposit))

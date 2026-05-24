@@ -66,7 +66,7 @@ def build_quote_cart_view(quote_cart: list[dict[str, object]], *, school_filter:
         summary=QuoteCartSummaryView(
             total_label=f"${normalized_total}",
             summary_label=(
-                f"Lineas: {len(visible_quote_cart)} | Piezas: {total_items} | Total estimado: ${normalized_total}"
+                f"Lineas: {len(visible_quote_cart)} | Piezas: {total_items} | Presupuesto estimado: ${normalized_total}"
                 if visible_quote_cart
                 else "Presupuesto vacio."
             ),

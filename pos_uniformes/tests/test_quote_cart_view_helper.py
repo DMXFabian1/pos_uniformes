@@ -58,7 +58,7 @@ class QuoteCartViewHelperTests(unittest.TestCase):
         self.assertEqual(view.summary.total_label, "$748.50")
         self.assertEqual(
             view.summary.summary_label,
-            "Lineas: 2 | Piezas: 3 | Total estimado: $748.50",
+            "Lineas: 2 | Piezas: 3 | Presupuesto estimado: $748.50",
         )
         self.assertEqual(
             view.summary.school_summary_label,

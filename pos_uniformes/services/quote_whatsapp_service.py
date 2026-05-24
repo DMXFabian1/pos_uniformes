@@ -43,7 +43,7 @@ def _build_quote_whatsapp_message(*, quote, business_name: str) -> str:
     lines = [
         f"Hola {customer_label}, te compartimos tu presupuesto {quote.folio}.",
         business_name,
-        f"Total estimado: ${Decimal(quote.total).quantize(Decimal('0.01'))}",
+        f"Presupuesto estimado: ${Decimal(quote.total).quantize(Decimal('0.01'))}",
     ]
     if quote.vigencia_hasta is not None:
         vh = quote.vigencia_hasta

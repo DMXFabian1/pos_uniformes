@@ -1461,7 +1461,7 @@ class QuoteSatelliteWindow(QMainWindow):
         totals_layout = QVBoxLayout()
         totals_layout.setContentsMargins(16, 14, 16, 14)
         totals_layout.setSpacing(4)
-        totals_title = QLabel("Total estimado")
+        totals_title = QLabel("Presupuesto estimado")
         totals_title.setObjectName("satMeta")
         self.quote_total_label.setObjectName("satTotal")
         totals_layout.addWidget(totals_title)
@@ -5574,7 +5574,7 @@ def _build_offline_whatsapp_message(
     lines = [
         f"Hola {client_name}, te compartimos tu presupuesto {folio}.",
         "POS Uniformes",
-        f"Total estimado: ${Decimal(str(total)).quantize(Decimal('0.01'))}",
+        f"Presupuesto estimado: ${Decimal(str(total)).quantize(Decimal('0.01'))}",
     ]
     if validity_date is not None:
         try:
