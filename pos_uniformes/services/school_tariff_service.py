@@ -76,11 +76,14 @@ def build_school_tariff(session, escuela_id: int) -> dict:
         ]
         raw_name = str(prod.nombre_base or prod.nombre)
         clean_name = _clean_tariff_product_name(raw_name, escuela_nombre)
+        tipo_pieza = prod.tipo_pieza.nombre if prod.tipo_pieza else ""
         result_products.append({
             "nombre": clean_name,
+            "tipo_pieza": tipo_pieza,
             "tallas": tallas,
         })
 
+    result_products.sort(key=lambda p: _tariff_product_sort_key(p.get("tipo_pieza", "")))
     merged = _merge_same_price_products(result_products)
 
     return {
@@ -190,3 +193,35 @@ _TALLA_ORDER = {
 
 def _talla_sort_key(talla: str) -> tuple[int, str]:
     return (_TALLA_ORDER.get(talla.strip(), 99), talla)
+
+
+# Orden de piezas en el tarifario (de arriba a abajo)
+_PIEZA_ORDER = {
+    "Pants 3pz": 1,
+    "Pants 2pz": 2,
+    "Chamarra": 3,
+    "Pants Suelto": 4,
+    "Playera": 5,
+    "Suéter": 6,
+    "Camisa": 7,
+    "Falda": 8,
+    "Jumper": 9,
+    "Blusa": 10,
+    "Chaleco": 11,
+    "Short": 12,
+    "Pantalón": 13,
+    "Malla": 14,
+    "Calceta": 15,
+    "Corbata": 16,
+    "Corbatín": 17,
+    "Moño": 18,
+    "Mascada": 19,
+    "Boina": 20,
+    "Guante": 21,
+    "Bata": 22,
+    "Jeans": 23,
+}
+
+
+def _tariff_product_sort_key(tipo_pieza: str) -> tuple[int, str]:
+    return (_PIEZA_ORDER.get(tipo_pieza.strip(), 50), tipo_pieza)

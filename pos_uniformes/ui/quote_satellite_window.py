@@ -4173,7 +4173,11 @@ QLabel#favDialogPriceLabel {
     def _build_tariff_from_cache(self, escuela_nombre: str) -> dict:
         """Construye tarifario desde catalog_snapshot_rows (modo offline)."""
         from decimal import Decimal
-        from pos_uniformes.services.school_tariff_service import _talla_sort_key
+        from pos_uniformes.services.school_tariff_service import (
+            _merge_same_price_products,
+            _talla_sort_key,
+            _tariff_product_sort_key,
+        )
 
         rows = [
             r for r in self.catalog_snapshot_rows
@@ -4181,35 +4185,40 @@ QLabel#favDialogPriceLabel {
         ]
 
         # Agrupar por nombre_base (producto)
-        products: dict[str, list[dict]] = {}
+        import re
+        products: dict[str, dict] = {}
         for r in rows:
             name = str(r.get("producto_nombre_base") or r.get("producto_nombre") or "")
+            tipo_pieza = str(r.get("tipo_pieza_nombre") or "")
             # Limpiar nombre de escuela y "Ad hoc"
-            import re
             cleaned = re.sub(re.escape(escuela_nombre), "", name, flags=re.IGNORECASE).strip()
             cleaned = re.sub(r"\bAd\s+hoc\b", "", cleaned, flags=re.IGNORECASE).strip()
             cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
             key = cleaned or name
             if key not in products:
-                products[key] = []
-            products[key].append({
+                products[key] = {"tipo_pieza": tipo_pieza, "tallas": []}
+            products[key]["tallas"].append({
                 "talla": str(r.get("talla") or "U"),
                 "precio": Decimal(str(r.get("precio_venta") or 0)),
             })
 
         result_products: list[dict] = []
-        for nombre, tallas in sorted(products.items()):
+        for nombre, data in products.items():
             # Deduplicar y ordenar tallas
             seen: set[str] = set()
             unique: list[dict] = []
-            for t in tallas:
+            for t in data["tallas"]:
                 if t["talla"] not in seen:
                     seen.add(t["talla"])
                     unique.append(t)
             unique.sort(key=lambda t: _talla_sort_key(t["talla"]))
-            result_products.append({"nombre": nombre, "tallas": unique})
+            result_products.append({
+                "nombre": nombre,
+                "tipo_pieza": data["tipo_pieza"],
+                "tallas": unique,
+            })
 
-        from pos_uniformes.services.school_tariff_service import _merge_same_price_products
+        result_products.sort(key=lambda p: _tariff_product_sort_key(p.get("tipo_pieza", "")))
         merged = _merge_same_price_products(result_products)
 
         return {"escuela_nombre": escuela_nombre, "productos": merged}
