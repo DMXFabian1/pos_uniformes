@@ -4183,7 +4183,7 @@ QLabel#favDialogPriceLabel {
         # Agrupar por nombre_base (producto)
         products: dict[str, list[dict]] = {}
         for r in rows:
-            name = str(r.get("nombre_base") or r.get("nombre") or "")
+            name = str(r.get("producto_nombre_base") or r.get("producto_nombre") or "")
             # Limpiar nombre de escuela y "Ad hoc"
             import re
             cleaned = re.sub(re.escape(escuela_nombre), "", name, flags=re.IGNORECASE).strip()
