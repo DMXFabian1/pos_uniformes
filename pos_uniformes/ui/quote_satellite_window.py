@@ -1822,6 +1822,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self._refresh_quote_cart_table()
             self._refresh_recent_lookup_table()
             self._refresh_offline_quotes()
+            self._refresh_tariff_schools()
             self._set_status("Vista refrescada (modo local).")
             return
         try:
@@ -4110,15 +4111,29 @@ QLabel#favDialogPriceLabel {
 
     # ── Tarifario por escuela ──────────────────────────────────────
 
-    def _refresh_tariff_schools(self, session) -> None:
-        from pos_uniformes.services.school_tariff_service import list_schools_for_tariff
-
+    def _refresh_tariff_schools(self, session=None) -> None:
         previous = self.tariff_school_combo.currentData()
         self.tariff_school_combo.blockSignals(True)
         self.tariff_school_combo.clear()
-        schools = list_schools_for_tariff(session)
-        for s in schools:
-            self.tariff_school_combo.addItem(s["escuela_nombre"], s["escuela_id"])
+
+        if session is not None:
+            from pos_uniformes.services.school_tariff_service import list_schools_for_tariff
+            schools = list_schools_for_tariff(session)
+            for s in schools:
+                self.tariff_school_combo.addItem(s["escuela_nombre"], s["escuela_id"])
+        else:
+            # Modo offline: extraer escuelas del cache local
+            seen: set[str] = set()
+            schools_offline: list[str] = []
+            for row in self.catalog_snapshot_rows:
+                name = str(row.get("escuela_nombre") or "").strip()
+                if name and name not in seen:
+                    seen.add(name)
+                    schools_offline.append(name)
+            schools_offline.sort()
+            for name in schools_offline:
+                self.tariff_school_combo.addItem(name, name)
+
         if previous is not None:
             for i in range(self.tariff_school_combo.count()):
                 if self.tariff_school_combo.itemData(i) == previous:
@@ -4127,16 +4142,19 @@ QLabel#favDialogPriceLabel {
         self.tariff_school_combo.blockSignals(False)
 
     def _handle_generate_tariff(self) -> None:
-        from pos_uniformes.services.school_tariff_service import build_school_tariff
         from pos_uniformes.services.school_tariff_text_service import build_school_tariff_text
 
-        escuela_id = self.tariff_school_combo.currentData()
-        if escuela_id is None:
+        escuela_data = self.tariff_school_combo.currentData()
+        if escuela_data is None:
             self._set_status("Selecciona una escuela primero.")
             return
         try:
-            with get_session() as session:
-                tariff = build_school_tariff(session, escuela_id)
+            if self.offline_mode:
+                tariff = self._build_tariff_from_cache(str(self.tariff_school_combo.currentText()))
+            else:
+                from pos_uniformes.services.school_tariff_service import build_school_tariff
+                with get_session() as session:
+                    tariff = build_school_tariff(session, escuela_data)
             business_name = _load_business_name()
             business_phone = _load_business_phone()
             text = build_school_tariff_text(
@@ -4150,6 +4168,50 @@ QLabel#favDialogPriceLabel {
             self._set_status(f"Tarifario generado: {tariff['escuela_nombre']} — {n} productos.")
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Error al generar tarifario", str(exc))
+
+    def _build_tariff_from_cache(self, escuela_nombre: str) -> dict:
+        """Construye tarifario desde catalog_snapshot_rows (modo offline)."""
+        from decimal import Decimal
+        from pos_uniformes.services.school_tariff_service import _talla_sort_key
+
+        rows = [
+            r for r in self.catalog_snapshot_rows
+            if str(r.get("escuela_nombre") or "").strip() == escuela_nombre
+        ]
+
+        # Agrupar por nombre_base (producto)
+        products: dict[str, list[dict]] = {}
+        for r in rows:
+            name = str(r.get("nombre_base") or r.get("nombre") or "")
+            # Limpiar nombre de escuela y "Ad hoc"
+            import re
+            cleaned = re.sub(re.escape(escuela_nombre), "", name, flags=re.IGNORECASE).strip()
+            cleaned = re.sub(r"\bAd\s+hoc\b", "", cleaned, flags=re.IGNORECASE).strip()
+            cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
+            key = cleaned or name
+            if key not in products:
+                products[key] = []
+            products[key].append({
+                "talla": str(r.get("talla") or "U"),
+                "precio": Decimal(str(r.get("precio_venta") or 0)),
+            })
+
+        result_products: list[dict] = []
+        for nombre, tallas in sorted(products.items()):
+            # Deduplicar y ordenar tallas
+            seen: set[str] = set()
+            unique: list[dict] = []
+            for t in tallas:
+                if t["talla"] not in seen:
+                    seen.add(t["talla"])
+                    unique.append(t)
+            unique.sort(key=lambda t: _talla_sort_key(t["talla"]))
+            result_products.append({"nombre": nombre, "tallas": unique})
+
+        from pos_uniformes.services.school_tariff_service import _merge_same_price_products
+        merged = _merge_same_price_products(result_products)
+
+        return {"escuela_nombre": escuela_nombre, "productos": merged}
 
     def _handle_print_tariff(self) -> None:
         content = self.tariff_preview.toPlainText()

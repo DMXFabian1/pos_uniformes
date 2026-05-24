@@ -61,6 +61,21 @@ def main() -> int:
         )
         return 1
 
+    # Sincronizar DB remota → local si el remoto está disponible (Mac dev)
+    try:
+        import platform
+        if platform.system() == "Darwin":
+            from pos_uniformes.services.db_sync_service import can_sync, sync_remote_to_local
+            ok, _reason = can_sync()
+            if ok:
+                success, msg = sync_remote_to_local()
+                if success:
+                    print(f"DB sync: {msg}", file=sys.stderr)
+                else:
+                    print(f"DB sync omitido: {msg}", file=sys.stderr)
+    except Exception:
+        pass
+
     try:
         from pos_uniformes.services.meilisearch_service import notify_catalog_changed
         notify_catalog_changed()
