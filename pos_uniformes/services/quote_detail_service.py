@@ -16,6 +16,7 @@ class QuoteDetailLineSnapshot:
     quantity: int
     unit_price: object
     subtotal: object
+    tipo_pieza: str = ""
 
 
 @dataclass(frozen=True)
@@ -55,6 +56,11 @@ def load_quote_detail_snapshot(session, *, quote_id: int) -> QuoteDetailSnapshot
                 quantity=int(detail.cantidad),
                 unit_price=detail.precio_unitario,
                 subtotal=detail.subtotal_linea,
+                tipo_pieza=(
+                    detail.variante.producto.tipo_pieza.nombre
+                    if detail.variante and detail.variante.producto and detail.variante.producto.tipo_pieza
+                    else ""
+                ),
             )
             for detail in quote.detalles
         ),

@@ -3478,6 +3478,7 @@ QLabel#favDialogPriceLabel {
                 "talla": str(row.get("talla") or ""),
                 "nivel_educativo_nombre": str(row.get("nivel_educativo_nombre") or ""),
                 "escuela_nombre": str(row.get("escuela_nombre") or ""),
+                "tipo_pieza_nombre": str(row.get("tipo_pieza_nombre") or ""),
             })
         self._refresh_quote_cart_table()
         self.kiosk_scan_input.setFocus()
@@ -4006,6 +4007,7 @@ QLabel#favDialogPriceLabel {
                 "quantity": int(item.get("cantidad", 1)),
                 "unit_price": str(_Decimal(str(item.get("precio_unitario", "0"))).quantize(_Decimal("0.01"))),
                 "subtotal": str((_Decimal(str(item.get("precio_unitario", "0"))) * int(item.get("cantidad", 1))).quantize(_Decimal("0.01"))),
+                "tipo_pieza": str(item.get("tipo_pieza_nombre") or item.get("tipo_pieza", "")),
             }
             for item in cart
         ]
@@ -5430,12 +5432,17 @@ def _build_snapshot_ticket_text(snapshot: QuoteDetailSnapshot) -> str:
     if snapshot.validity_label and snapshot.validity_label.lower() != "sin vigencia":
         tk_field("Vigencia:", snapshot.validity_label, lines)
 
-    # — Piezas —
+    # — Piezas (ordenadas por tipo de pieza) —
     lines.append(tk_mid())
     lines.append(tk_center("PIEZAS"))
     lines.append(tk_mid())
+    from pos_uniformes.services.school_tariff_service import _tariff_product_sort_key
+    sorted_details = sorted(
+        snapshot.detail_rows,
+        key=lambda d: _tariff_product_sort_key(getattr(d, "tipo_pieza", "") or ""),
+    )
     first_detail = True
-    for detail in snapshot.detail_rows:
+    for detail in sorted_details:
         unit_price = Decimal(str(detail.unit_price)).quantize(Decimal("0.01"))
         subtotal = Decimal(str(detail.subtotal)).quantize(Decimal("0.01"))
         talla = str(detail.size_label or "").strip()
@@ -5514,12 +5521,19 @@ def _build_cart_ticket_text(
         except Exception:  # noqa: BLE001
             pass
 
-    # — Piezas —
+    # — Piezas (ordenadas por tipo de pieza) —
     lines.append(tk_mid())
     lines.append(tk_center("PIEZAS"))
     lines.append(tk_mid())
+    from pos_uniformes.services.school_tariff_service import _tariff_product_sort_key
+    sorted_cart = sorted(
+        cart,
+        key=lambda item: _tariff_product_sort_key(
+            str(item.get("tipo_pieza_nombre") or item.get("tipo_pieza", ""))
+        ),
+    )
     first_detail = True
-    for item in cart:
+    for item in sorted_cart:
         qty = int(item["cantidad"])
         unit_price = Decimal(str(item["precio_unitario"])).quantize(Decimal("0.01"))
         subtotal = (unit_price * qty).quantize(Decimal("0.01"))

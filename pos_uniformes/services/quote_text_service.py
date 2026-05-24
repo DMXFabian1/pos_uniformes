@@ -87,7 +87,16 @@ def build_quote_text(
     lines.append(_sep())
     lines.append("PIEZAS")
     lines.append(_sep())
-    for detail in quote.detalles:
+    from pos_uniformes.services.school_tariff_service import _tariff_product_sort_key
+    sorted_detalles = sorted(
+        quote.detalles,
+        key=lambda d: _tariff_product_sort_key(
+            d.variante.producto.tipo_pieza.nombre
+            if d.variante and d.variante.producto and d.variante.producto.tipo_pieza
+            else ""
+        ),
+    )
+    for detail in sorted_detalles:
         subtotal = _fmt(detail.subtotal_linea)
         unit_price = _fmt(detail.precio_unitario)
         talla = str(detail.talla_snapshot or "").strip()
