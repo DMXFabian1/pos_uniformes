@@ -7,7 +7,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
-from pos_uniformes.database.models import Escuela, Producto, Variante
+from pos_uniformes.database.models import CatalogSchoolProductLink, Escuela, Producto, Variante
 
 
 def list_schools_for_tariff(session) -> list[dict]:
@@ -50,7 +50,8 @@ def build_school_tariff(session, escuela_id: int) -> dict:
     if escuela is None:
         return {"escuela_nombre": "", "productos": []}
 
-    productos = session.scalars(
+    # Productos directos de la escuela
+    directos = session.scalars(
         select(Producto)
         .options(joinedload(Producto.variantes))
         .where(
@@ -60,10 +61,27 @@ def build_school_tariff(session, escuela_id: int) -> dict:
         .order_by(Producto.nombre_base)
     ).unique().all()
 
+    # Productos ligados via catalog_school_product_link
+    ligados = session.scalars(
+        select(Producto)
+        .join(CatalogSchoolProductLink, CatalogSchoolProductLink.producto_id == Producto.id)
+        .options(joinedload(Producto.variantes))
+        .where(
+            CatalogSchoolProductLink.escuela_id == int(escuela_id),
+            CatalogSchoolProductLink.activo == True,  # noqa: E712
+            Producto.activo == True,  # noqa: E712
+        )
+        .order_by(Producto.nombre_base)
+    ).unique().all()
+
+    # Unión sin duplicados (un producto puede estar directo Y ligado)
+    seen_ids: set[int] = {p.id for p in directos}
+    todos_productos = list(directos) + [p for p in ligados if p.id not in seen_ids]
+
     escuela_nombre = str(escuela.nombre)
 
     result_products: list[dict] = []
-    for prod in productos:
+    for prod in todos_productos:
         variantes = sorted(
             [v for v in prod.variantes if getattr(v, "activo", True)],
             key=lambda v: _talla_sort_key(str(v.talla or "")),
@@ -77,10 +95,12 @@ def build_school_tariff(session, escuela_id: int) -> dict:
         raw_name = str(prod.nombre_base or prod.nombre)
         clean_name = _clean_tariff_product_name(raw_name, escuela_nombre)
         tipo_pieza = prod.tipo_pieza.nombre if prod.tipo_pieza else ""
+        genero = str(prod.genero or "").strip().upper()
         result_products.append({
             "nombre": clean_name,
             "tipo_pieza": tipo_pieza,
             "tallas": tallas,
+            "genero": genero,
         })
 
     result_products.sort(key=lambda p: _tariff_product_sort_key(p.get("tipo_pieza", "")))
@@ -116,9 +136,13 @@ def _merge_same_price_products(products: list[dict]) -> list[dict]:
             merged.append(a)
         else:
             names = [g["nombre"] for g in group]
+            # Preservar género solo si todos coinciden; si hay mezcla → vacío (UNISEX/ambos)
+            generos = {g.get("genero", "") for g in group}
+            merged_genero = list(generos)[0] if len(generos) == 1 else ""
             merged.append({
                 "nombre": _build_merged_name(names),
                 "tallas": a["tallas"],
+                "genero": merged_genero,
             })
     return merged
 

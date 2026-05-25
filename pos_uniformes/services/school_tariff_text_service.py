@@ -20,15 +20,37 @@ from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
 _IW = _W - 4  # ancho interno
 
 
+# Valores de género que siempre se incluyen sin importar el filtro
+_GENEROS_UNISEX = {"", "UNISEX", "ADULTO", "MIXTO"}
+
+
 def build_school_tariff_text(
     *,
     tariff: dict,
     business_name: str = "MAXIMODA",
     business_phone: str = "",
+    genero_filter: str | None = None,
 ) -> str:
-    """Genera el texto del tarifario listo para ticket térmico."""
+    """Genera el texto del tarifario listo para ticket térmico.
+
+    Args:
+        genero_filter: "NIÑO", "NIÑA", "HOMBRE", "MUJER" (o None para todos).
+            Los productos sin género o marcados como UNISEX/ADULTO/MIXTO
+            aparecen siempre, en cualquier filtro.
+    """
     escuela = tariff.get("escuela_nombre", "")
-    productos = tariff.get("productos", [])
+    all_productos = tariff.get("productos", [])
+
+    # Aplicar filtro de género
+    filtro = genero_filter.strip().upper() if genero_filter else None
+    if filtro:
+        productos = [
+            p for p in all_productos
+            if p.get("genero", "").upper() in _GENEROS_UNISEX
+            or p.get("genero", "").upper() == filtro
+        ]
+    else:
+        productos = all_productos
 
     lines: list[str] = []
 
@@ -41,6 +63,12 @@ def build_school_tariff_text(
     # — Escuela —
     lines.append(tk_top())
     lines.append(tk_center(escuela[:_IW]))
+    if filtro:
+        _GENERO_LABEL = {
+            "NIÑO": "Niño", "NIÑA": "Niña",
+            "HOMBRE": "Hombre", "MUJER": "Mujer",
+        }
+        lines.append(tk_center(_GENERO_LABEL.get(filtro, filtro.capitalize())))
     lines.append(tk_dbl())
 
     # — Productos —

@@ -462,6 +462,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.tariff_print_button = QPushButton("Imprimir")
         self.tariff_preview = QTextEdit()
         self.tariff_preview.setReadOnly(True)
+        self._current_tariff: dict | None = None
 
     def _apply_icons(self) -> None:
         nav_icons = {
@@ -4165,6 +4166,7 @@ QLabel#favDialogPriceLabel {
                 business_name=business_name,
                 business_phone=business_phone,
             )
+            self._current_tariff = tariff
             self.tariff_preview.setPlainText(text)
             self.tariff_print_button.setEnabled(True)
             n = len(tariff.get("productos", []))
@@ -4196,9 +4198,10 @@ QLabel#favDialogPriceLabel {
             cleaned = re.sub(re.escape(escuela_nombre), "", name, flags=re.IGNORECASE).strip()
             cleaned = re.sub(r"\bAd\s+hoc\b", "", cleaned, flags=re.IGNORECASE).strip()
             cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
+            genero = str(r.get("producto_genero") or "").strip().upper()
             key = cleaned or name
             if key not in products:
-                products[key] = {"tipo_pieza": tipo_pieza, "tallas": []}
+                products[key] = {"tipo_pieza": tipo_pieza, "tallas": [], "genero": genero}
             products[key]["tallas"].append({
                 "talla": str(r.get("talla") or "U"),
                 "precio": Decimal(str(r.get("precio_venta") or 0)),
@@ -4218,6 +4221,7 @@ QLabel#favDialogPriceLabel {
                 "nombre": nombre,
                 "tipo_pieza": data["tipo_pieza"],
                 "tallas": unique,
+                "genero": data.get("genero", ""),
             })
 
         result_products.sort(key=lambda p: _tariff_product_sort_key(p.get("tipo_pieza", "")))
@@ -4226,10 +4230,51 @@ QLabel#favDialogPriceLabel {
         return {"escuela_nombre": escuela_nombre, "productos": merged}
 
     def _handle_print_tariff(self) -> None:
-        content = self.tariff_preview.toPlainText()
-        if not content.strip():
+        if not self._current_tariff:
             self._set_status("Genera un tarifario primero.")
             return
+
+        # ── Diálogo de selección de género ─────────────────────────────
+        from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QRadioButton, QVBoxLayout, QLabel
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("¿Para quién es el tarifario?")
+        dlg.setFixedWidth(260)
+        layout = QVBoxLayout(dlg)
+        layout.addWidget(QLabel("Selecciona el género para imprimir:"))
+
+        rb_ambos = QRadioButton("Ambos (Niño y Niña)")
+        rb_nino = QRadioButton("Solo Niño")
+        rb_nina = QRadioButton("Solo Niña")
+        rb_ambos.setChecked(True)
+
+        layout.addWidget(rb_ambos)
+        layout.addWidget(rb_nino)
+        layout.addWidget(rb_nina)
+
+        btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        btns.accepted.connect(dlg.accept)
+        btns.rejected.connect(dlg.reject)
+        layout.addWidget(btns)
+
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        if rb_nino.isChecked():
+            genero_filter: str | None = "NIÑO"
+        elif rb_nina.isChecked():
+            genero_filter = "NIÑA"
+        else:
+            genero_filter = None  # Ambos — sin filtro
+
+        # ── Regenerar texto con el filtro elegido ───────────────────────
+        from pos_uniformes.services.school_tariff_text_service import build_school_tariff_text
+        content = build_school_tariff_text(
+            tariff=self._current_tariff,
+            business_name=_load_business_name(),
+            business_phone=_load_business_phone(),
+            genero_filter=genero_filter,
+        )
         from pos_uniformes.ui.dialogs.printable_text_dialog import open_printable_text_dialog
         open_printable_text_dialog(
             parent=self,
