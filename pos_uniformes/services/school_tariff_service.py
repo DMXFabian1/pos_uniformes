@@ -7,27 +7,72 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import joinedload
 
-from pos_uniformes.database.models import CatalogSchoolProductLink, Escuela, Producto, Variante
+from pos_uniformes.database.models import CatalogSchoolProductLink, Escuela, NivelEducativo, Producto, Variante
 
 
 def list_schools_for_tariff(session) -> list[dict]:
-    """Devuelve escuelas activas que tengan al menos un producto con variantes."""
+    """Devuelve entradas de tarifario por escuela (y nivel cuando hay varios).
+
+    Escuelas con productos en un solo nivel → una entrada.
+    Escuelas con productos en múltiples niveles (ej. Primaria + Secundaria) →
+    una entrada por nivel, con display_name = "Escuela — Nivel".
+    Cada entrada incluye: escuela_id, escuela_nombre, nivel_id (None si no aplica),
+    nivel_nombre (None si no aplica), display_name.
+    """
     schools = session.scalars(
         select(Escuela).where(Escuela.activo == True).order_by(Escuela.nombre)  # noqa: E712
     ).all()
+
     result: list[dict] = []
     for s in schools:
-        count = session.scalar(
-            select(Producto.id)
+        # Obtener los niveles distintos que tiene esta escuela
+        nivel_rows = session.execute(
+            select(NivelEducativo.id, NivelEducativo.nombre)
+            .join(Producto, Producto.nivel_educativo_id == NivelEducativo.id)
             .where(Producto.escuela_id == s.id, Producto.activo == True)  # noqa: E712
-            .limit(1)
-        )
-        if count is not None:
-            result.append({"escuela_id": int(s.id), "escuela_nombre": str(s.nombre)})
+            .distinct()
+            .order_by(NivelEducativo.id)
+        ).all()
+
+        if not nivel_rows:
+            # Escuela sin nivel asignado — verificar que tenga productos
+            count = session.scalar(
+                select(Producto.id)
+                .where(Producto.escuela_id == s.id, Producto.activo == True)  # noqa: E712
+                .limit(1)
+            )
+            if count is not None:
+                result.append({
+                    "escuela_id": int(s.id),
+                    "escuela_nombre": str(s.nombre),
+                    "nivel_id": None,
+                    "nivel_nombre": None,
+                    "display_name": str(s.nombre),
+                })
+        elif len(nivel_rows) == 1:
+            # Un solo nivel — entrada simple sin sufijo
+            result.append({
+                "escuela_id": int(s.id),
+                "escuela_nombre": str(s.nombre),
+                "nivel_id": int(nivel_rows[0][0]),
+                "nivel_nombre": str(nivel_rows[0][1]),
+                "display_name": str(s.nombre),
+            })
+        else:
+            # Varios niveles — una entrada por nivel con sufijo
+            for nivel_id, nivel_nombre in nivel_rows:
+                result.append({
+                    "escuela_id": int(s.id),
+                    "escuela_nombre": str(s.nombre),
+                    "nivel_id": int(nivel_id),
+                    "nivel_nombre": str(nivel_nombre),
+                    "display_name": f"{s.nombre} — {nivel_nombre}",
+                })
+
     return result
 
 
-def build_school_tariff(session, escuela_id: int) -> dict:
+def build_school_tariff(session, escuela_id: int, *, nivel_id: int | None = None) -> dict:
     """Construye el tarifario completo de una escuela.
 
     Retorna::
@@ -50,14 +95,14 @@ def build_school_tariff(session, escuela_id: int) -> dict:
     if escuela is None:
         return {"escuela_nombre": "", "productos": []}
 
-    # Productos directos de la escuela
+    # Productos directos de la escuela (con filtro de nivel si aplica)
+    direct_where = [Producto.escuela_id == int(escuela_id), Producto.activo == True]  # noqa: E712
+    if nivel_id is not None:
+        direct_where.append(Producto.nivel_educativo_id == int(nivel_id))
     directos = session.scalars(
         select(Producto)
         .options(joinedload(Producto.variantes))
-        .where(
-            Producto.escuela_id == int(escuela_id),
-            Producto.activo == True,  # noqa: E712
-        )
+        .where(*direct_where)
         .order_by(Producto.nombre_base)
     ).unique().all()
 
@@ -106,8 +151,15 @@ def build_school_tariff(session, escuela_id: int) -> dict:
     result_products.sort(key=lambda p: _tariff_product_sort_key(p.get("tipo_pieza", "")))
     merged = _merge_same_price_products(result_products)
 
+    # Nombre de display: con sufijo de nivel si se filtró por él
+    nivel_nombre = None
+    if nivel_id is not None:
+        ne = session.get(NivelEducativo, nivel_id)
+        nivel_nombre = str(ne.nombre) if ne else None
+    display_nombre = f"{escuela.nombre} — {nivel_nombre}" if nivel_nombre else str(escuela.nombre)
+
     return {
-        "escuela_nombre": str(escuela.nombre),
+        "escuela_nombre": display_nombre,
         "productos": merged,
     }
 

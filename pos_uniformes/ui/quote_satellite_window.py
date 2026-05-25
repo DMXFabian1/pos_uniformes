@@ -4124,7 +4124,8 @@ QLabel#favDialogPriceLabel {
             from pos_uniformes.services.school_tariff_service import list_schools_for_tariff
             schools = list_schools_for_tariff(session)
             for s in schools:
-                self.tariff_school_combo.addItem(s["escuela_nombre"], s["escuela_id"])
+                # userData = (escuela_id, nivel_id) para poder filtrar al generar
+                self.tariff_school_combo.addItem(s["display_name"], (s["escuela_id"], s["nivel_id"]))
         else:
             # Modo offline: extraer escuelas del cache local
             seen: set[str] = set()
@@ -4157,8 +4158,9 @@ QLabel#favDialogPriceLabel {
                 tariff = self._build_tariff_from_cache(str(self.tariff_school_combo.currentText()))
             else:
                 from pos_uniformes.services.school_tariff_service import build_school_tariff
+                escuela_id, nivel_id = escuela_data if isinstance(escuela_data, tuple) else (escuela_data, None)
                 with get_session() as session:
-                    tariff = build_school_tariff(session, escuela_data)
+                    tariff = build_school_tariff(session, escuela_id, nivel_id=nivel_id)
             business_name = _load_business_name()
             business_phone = _load_business_phone()
             text = build_school_tariff_text(
