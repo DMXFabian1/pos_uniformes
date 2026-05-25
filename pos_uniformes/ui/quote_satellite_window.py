@@ -48,7 +48,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QCompleter,
 )
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.exc import SQLAlchemyError
 
 if __package__ in {None, ""}:
@@ -2866,13 +2866,18 @@ class QuoteSatelliteWindow(QMainWindow):
         QTimer.singleShot(0, code_input.setFocus)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return None
-        scanned = code_input.text().strip()
+        raw = code_input.text()
+        # Limpiar caracteres de control que los scanners agregan (\r, \x00, etc.)
+        scanned = "".join(c for c in raw if c.isprintable()).strip()
         if not scanned:
             return None
         try:
             with get_session() as session:
                 emp = session.execute(
-                    select(Empleada).where(Empleada.codigo == scanned, Empleada.activo.is_(True))
+                    select(Empleada).where(
+                        func.lower(Empleada.codigo) == scanned.lower(),
+                        Empleada.activo.is_(True),
+                    )
                 ).scalar_one_or_none()
             if emp is None:
                 QMessageBox.warning(self, "No autorizado", "QR no reconocido o empleado inactivo.")
