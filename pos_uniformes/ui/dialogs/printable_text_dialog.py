@@ -43,7 +43,12 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
     layout = QVBoxLayout()
     editor = QTextEdit()
     editor.setReadOnly(True)
-    editor.setDocument(build_ticket_document(content))
+    mono_family = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont).family()
+    editor.setStyleSheet(
+        f'QTextEdit {{ font-family: "{mono_family}"; font-size: {TICKET_FONT_POINT_SIZE}pt;'
+        f" font-weight: bold; }}"
+    )
+    editor.setPlainText(content)
 
     buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
     print_button = buttons.addButton("Imprimir", QDialogButtonBox.ButtonRole.ActionRole)
