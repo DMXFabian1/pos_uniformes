@@ -64,20 +64,31 @@ def compute_default_na(school_levels, pieces_raw):
     """Generate default NA marks for pieces that schools are known not to carry."""
     na = {}
 
-    # Collect all primaria school IDs
     primaria_eids = {sl["escuela_id"] for sl in school_levels if sl["nivel_nombre"] == "Primaria"}
+    secundaria_eids = {sl["escuela_id"] for sl in school_levels if sl["nivel_nombre"] == "Secundaria"}
+    bachillerato_eids = {sl["escuela_id"] for sl in school_levels if sl["nivel_nombre"] == "Bachillerato"}
 
-    # Pieces that exist per school (from linked + direct)
     has_piece = set()
     for eid, nivel, tipo, cnt in pieces_raw:
         if cnt:
             has_piece.add((eid, nivel, tipo))
 
-    # All primarias: mark Corbata, Corbatín, Moño as NA if school doesn't have them
     for eid in primaria_eids:
         for tipo in ["Corbata", "Corbatín", "Moño"]:
             if (eid, "Primaria", tipo) not in has_piece:
                 na[f"{eid}_Primaria_{tipo}"] = True
+
+    for eid in secundaria_eids:
+        for tipo in ["Corbatín", "Moño"]:
+            if (eid, "Secundaria", tipo) not in has_piece:
+                na[f"{eid}_Secundaria_{tipo}"] = True
+
+    # Bachillerato: each school carries exactly the piece types it needs;
+    # anything missing is truly not applicable (not a gap to fill).
+    for eid in bachillerato_eids:
+        for tipo in PIEZA_ORDER:
+            if (eid, "Bachillerato", tipo) not in has_piece:
+                na[f"{eid}_Bachillerato_{tipo}"] = True
 
     return na
 
