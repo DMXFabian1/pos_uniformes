@@ -19,6 +19,8 @@ _PRICE_FG  = "#1E6B1E"
 _MUTED     = "#A07060"
 _WHITE     = "#FFFFFF"
 _ACCENT    = "#C96030"
+_SEC_BG    = "#F0E0D8"
+_SEC_FG    = "#7B2D14"
 
 
 def build_school_tariff_html(
@@ -70,29 +72,40 @@ def build_school_tariff_html(
         parts.append("</body></html>")
         return "".join(parts)
 
-    # ── Cards en grid de 2 columnas ──────────────────────────────────────────
-    # QTextEdit soporta tablas HTML básicas
-    parts.append(
-        '<table width="100%" cellspacing="8" cellpadding="0"><tr>'
-    )
+    # ── Agrupar por sección (tipo_prenda) ────────────────────────────────────
+    sections = _group_by_section(productos)
+    show_headers = len(sections) > 1
 
-    col = 0
-    for prod in productos:
-        nombre = prod.get("nombre", "")
-        tallas = prod.get("tallas", [])
-        if not tallas:
-            continue
+    parts.append('<table width="100%" cellspacing="8" cellpadding="0">')
 
-        # Agrupar tallas por precio (mismo que text service)
-        price_groups = _group_by_price(tallas)
+    for sec_name, sec_prods in sections:
+        # Encabezado de sección (solo cuando hay más de una)
+        if show_headers:
+            label = escape(sec_name.upper() if sec_name else "OTROS")
+            parts.append(f"""
+<tr>
+  <td colspan="2" style="padding:12px 6px 5px; color:{_SEC_FG};
+      font-size:11px; font-weight:bold; letter-spacing:2px;
+      border-bottom:2px solid {_ACCENT};">
+    {label}
+  </td>
+</tr>
+<tr><td colspan="2" style="padding:2px;"></td></tr>""")
 
-        # Filas de precios
-        rows_html = []
-        for idx, (precio, group_tallas) in enumerate(price_groups):
-            row_bg = _ROW_ALT if idx % 2 == 0 else _CARD_BG
-            talla_str = escape(_compact_range(group_tallas))
-            price_str = f"${precio:,.2f}"
-            rows_html.append(f"""
+        col = 0
+        for prod in sec_prods:
+            nombre = prod.get("nombre", "")
+            tallas = prod.get("tallas", [])
+            if not tallas:
+                continue
+
+            price_groups = _group_by_price(tallas)
+            rows_html = []
+            for idx, (precio, group_tallas) in enumerate(price_groups):
+                row_bg = _ROW_ALT if idx % 2 == 0 else _CARD_BG
+                talla_str = escape(_compact_range(group_tallas))
+                price_str = f"${precio:,.2f}"
+                rows_html.append(f"""
 <tr style="background:{row_bg};">
   <td style="padding:5px 12px; color:{_TALLA_FG}; font-size:12px;">{talla_str}</td>
   <td align="right"
@@ -100,7 +113,7 @@ def build_school_tariff_html(
     {price_str}</td>
 </tr>""")
 
-        card = f"""
+            card = f"""
 <table width="100%" cellpadding="0" cellspacing="0"
   style="background:{_CARD_BG}; border:1px solid {_CARD_BORDER};">
   <tr>
@@ -112,18 +125,16 @@ def build_school_tariff_html(
   {"".join(rows_html)}
 </table>"""
 
-        if col == 0:
-            parts.append(f'<td width="50%" valign="top">{card}</td>')
-            col = 1
-        else:
-            parts.append(f'<td width="50%" valign="top">{card}</td></tr><tr>')
-            col = 0
+            if col == 0:
+                parts.append(f'<tr><td width="50%" valign="top">{card}</td>')
+                col = 1
+            else:
+                parts.append(f'<td width="50%" valign="top">{card}</td></tr>')
+                col = 0
 
-    # Cerrar fila incompleta
-    if col == 1:
-        parts.append('<td width="50%"></td></tr>')
-    else:
-        parts.append("</tr>")
+        # Cerrar fila incompleta de esta sección
+        if col == 1:
+            parts.append('<td width="50%"></td></tr>')
 
     parts.append("</table>")
 
@@ -140,6 +151,18 @@ def build_school_tariff_html(
 
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
+
+def _group_by_section(productos: list[dict]) -> list[tuple[str, list[dict]]]:
+    """Agrupa productos por tipo_prenda preservando el orden de entrada."""
+    groups: list[tuple[str, list[dict]]] = []
+    for p in productos:
+        sec = p.get("tipo_prenda", "") or ""
+        if groups and groups[-1][0] == sec:
+            groups[-1][1].append(p)
+        else:
+            groups.append((sec, [p]))
+    return groups
+
 
 def _group_by_price(
     tallas: list[dict],

@@ -140,15 +140,20 @@ def build_school_tariff(session, escuela_id: int, *, nivel_id: int | None = None
         raw_name = str(prod.nombre_base or prod.nombre)
         clean_name = _clean_tariff_product_name(raw_name, escuela_nombre)
         tipo_pieza = prod.tipo_pieza.nombre if prod.tipo_pieza else ""
+        tipo_prenda = prod.tipo_prenda.nombre if prod.tipo_prenda else ""
         genero = str(prod.genero or "").strip().upper()
         result_products.append({
             "nombre": clean_name,
             "tipo_pieza": tipo_pieza,
+            "tipo_prenda": tipo_prenda,
             "tallas": tallas,
             "genero": genero,
         })
 
-    result_products.sort(key=lambda p: _tariff_product_sort_key(p.get("tipo_pieza", "")))
+    result_products.sort(key=lambda p: (
+        _tariff_section_sort_key(p.get("tipo_prenda", "")),
+        _tariff_product_sort_key(p.get("tipo_pieza", "")),
+    ))
     merged = _merge_same_price_products(result_products)
 
     # Nombre de display: con sufijo de nivel si se filtró por él
@@ -181,7 +186,7 @@ def _merge_same_price_products(products: list[dict]) -> list[dict]:
             if j in used:
                 continue
             prices_b = [(t["talla"], t["precio"]) for t in products[j]["tallas"]]
-            if prices_a == prices_b:
+            if prices_a == prices_b and a.get("tipo_prenda") == products[j].get("tipo_prenda"):
                 group.append(products[j])
                 used.add(j)
         if len(group) == 1:
@@ -191,8 +196,11 @@ def _merge_same_price_products(products: list[dict]) -> list[dict]:
             # Preservar género solo si todos coinciden; si hay mezcla → vacío (UNISEX/ambos)
             generos = {g.get("genero", "") for g in group}
             merged_genero = list(generos)[0] if len(generos) == 1 else ""
+            tipo_prendas = {g.get("tipo_prenda", "") for g in group}
+            merged_tipo_prenda = list(tipo_prendas)[0] if len(tipo_prendas) == 1 else ""
             merged.append({
                 "nombre": _build_merged_name(names),
+                "tipo_prenda": merged_tipo_prenda,
                 "tallas": a["tallas"],
                 "genero": merged_genero,
             })
@@ -301,3 +309,21 @@ _PIEZA_ORDER = {
 
 def _tariff_product_sort_key(tipo_pieza: str) -> tuple[int, str]:
     return (_PIEZA_ORDER.get(tipo_pieza.strip(), 50), tipo_pieza)
+
+
+# Orden de secciones en el tarifario
+_SECCION_ORDER = {
+    "Oficial": 1,
+    "Básico": 2,
+    "Basico": 2,
+    "Deportivo": 3,
+    "Deportivo casual": 4,
+    "Escolta": 5,
+    "Casual": 6,
+    "Accesorio": 7,
+    "Temporada": 8,
+}
+
+
+def _tariff_section_sort_key(tipo_prenda: str) -> int:
+    return _SECCION_ORDER.get(tipo_prenda.strip(), 9)

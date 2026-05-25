@@ -81,34 +81,48 @@ def build_school_tariff_text(
         lines.append(tk_center(_GENERO_LABEL.get(filtro, filtro.capitalize())))
     lines.append(tk_dbl())
 
-    # — Productos —
-    first = True
-    for prod in productos:
-        nombre = prod.get("nombre", "")
-        tallas = prod.get("tallas", [])
-        if not tallas:
-            continue
+    # — Productos agrupados por sección (tipo_prenda) —
+    sections = _group_by_section(productos)
+    show_headers = len(sections) > 1
+    first_global = True
 
-        if not first:
-            lines.append(tk_mid())
-        first = False
+    for sec_name, sec_prods in sections:
+        first_in_section = True
 
-        # Nombre del producto
-        for dl in textwrap.wrap(str(nombre), width=_IW) or [str(nombre)]:
-            lines.append(tk_line(dl))
+        for prod in sec_prods:
+            nombre = prod.get("nombre", "")
+            tallas = prod.get("tallas", [])
+            if not tallas:
+                continue
 
-        # Agrupar tallas por precio como rangos compactos
-        price_groups = _group_tallas_by_price(tallas)
-        for precio, group_tallas in price_groups:
-            tallas_str = _compact_talla_range(group_tallas)
-            price_str = f"${tk_fmt(precio)}"
-            label = f"  {tallas_str}"
-            if len(label) + 1 + len(price_str) <= _IW:
-                lines.append(tk_row(label, price_str))
+            if first_global:
+                first_global = False
             else:
-                for chunk in textwrap.wrap(label, width=_IW):
-                    lines.append(tk_line(chunk))
-                lines.append(tk_line(price_str.rjust(_IW)))
+                lines.append(tk_mid())
+
+            # Encabezado de sección al primer producto del grupo
+            if show_headers and first_in_section:
+                label = (sec_name or "Otros").upper()
+                lines.append(tk_center(label))
+                lines.append(tk_dbl())
+                first_in_section = False
+
+            # Nombre del producto
+            for dl in textwrap.wrap(str(nombre), width=_IW) or [str(nombre)]:
+                lines.append(tk_line(dl))
+
+            # Agrupar tallas por precio como rangos compactos
+            price_groups = _group_tallas_by_price(tallas)
+            for precio, group_tallas in price_groups:
+                tallas_str = _compact_talla_range(group_tallas)
+                price_str = f"${tk_fmt(precio)}"
+                label = f"  {tallas_str}"
+                if len(label) + 1 + len(price_str) <= _IW:
+                    lines.append(tk_row(label, price_str))
+                else:
+                    for chunk in textwrap.wrap(label, width=_IW):
+                        lines.append(tk_line(chunk))
+                    lines.append(tk_line(price_str.rjust(_IW)))
 
     lines.append(tk_bot())
 
@@ -120,6 +134,18 @@ def build_school_tariff_text(
     lines.append("sin previo aviso.".center(_W))
 
     return "\n".join(lines)
+
+
+def _group_by_section(productos: list[dict]) -> list[tuple[str, list[dict]]]:
+    """Agrupa productos por tipo_prenda preservando el orden de entrada."""
+    groups: list[tuple[str, list[dict]]] = []
+    for p in productos:
+        sec = p.get("tipo_prenda", "") or ""
+        if groups and groups[-1][0] == sec:
+            groups[-1][1].append(p)
+        else:
+            groups.append((sec, [p]))
+    return groups
 
 
 def _group_tallas_by_price(tallas: list[dict]) -> list[tuple[Decimal, list[str]]]:
