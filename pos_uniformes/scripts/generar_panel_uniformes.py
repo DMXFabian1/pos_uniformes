@@ -22,6 +22,16 @@ from pathlib import Path
 # ---------------------------------------------------------------------------
 
 def _get_connection():
+    import os, socket as _sock
+    _win = "192.168.0.10"
+    if not os.getenv("POS_UNIFORMES_DB_HOST"):
+        try:
+            s = _sock.create_connection((_win, 5432), timeout=1)
+            s.close()
+            os.environ["POS_UNIFORMES_DB_HOST"] = _win
+            print(f"DB: Windows ({_win})")
+        except OSError:
+            print("DB: local (Mac)")
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
     from pos_uniformes.database.connection import engine  # noqa: PLC0415
     return engine.raw_connection()

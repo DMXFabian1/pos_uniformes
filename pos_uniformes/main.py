@@ -12,6 +12,31 @@ from pos_uniformes.utils.venv_bootstrap import ensure_local_venv_site_packages
 
 ensure_local_venv_site_packages(Path(__file__))
 
+# ---------------------------------------------------------------------------
+# Auto-detección de DB — debe correr ANTES de importar connection.py
+# Windows (LAN) → usa DB de producción directo
+# Sin LAN        → usa DB local de Mac
+# ---------------------------------------------------------------------------
+import os as _os
+import socket as _socket
+
+
+def _detect_db_mode() -> str:
+    _win = "192.168.0.10"
+    if _os.getenv("POS_UNIFORMES_DB_HOST"):
+        return "configured"
+    try:
+        _s = _socket.create_connection((_win, 5432), timeout=1)
+        _s.close()
+        _os.environ["POS_UNIFORMES_DB_HOST"] = _win
+        return "windows"
+    except OSError:
+        return "local"
+
+
+_DB_MODE = _detect_db_mode()
+# ---------------------------------------------------------------------------
+
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication, QMessageBox
 from sqlalchemy.exc import SQLAlchemyError
@@ -61,10 +86,10 @@ def main() -> int:
         )
         return 1
 
-    # Sincronizar DB remota → local si el remoto está disponible (Mac dev)
+    # Sincronizar DB remota → local (solo cuando NO usamos Windows directamente)
     try:
         import platform
-        if platform.system() == "Darwin":
+        if platform.system() == "Darwin" and _DB_MODE == "local":
             from pos_uniformes.services.db_sync_service import can_sync, sync_remote_to_local
             ok, _reason = can_sync()
             if ok:
@@ -83,6 +108,8 @@ def main() -> int:
         pass
 
     login_dialog = LoginDialog()
+    _mode_suffix = "  🟢 Tienda" if _DB_MODE == "windows" else "  🟡 Local"
+    login_dialog.setWindowTitle(f"Acceso{_mode_suffix}")
     startup_window: MainWindow | None = None
 
     def _launch_main_window(user_id: int) -> None:
@@ -112,6 +139,7 @@ def main() -> int:
         login_dialog.clear_loading_state()
         login_dialog.accept()
         startup_window.showMaximized()
+        startup_window.setWindowTitle(startup_window.windowTitle() + _mode_suffix)
 
     login_dialog.authenticated.connect(_launch_main_window)
     login_dialog.rejected.connect(app.quit)
