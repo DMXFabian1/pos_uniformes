@@ -1741,11 +1741,9 @@ function filterVariants() {{
 document.addEventListener('DOMContentLoaded', () => {{
     // Collapse all school/tariff cards by default
     document.querySelectorAll('.school-card, .tariff-card').forEach(c => c.classList.add('collapsed'));
-    // Collapse all nivel sections except the first one per tab
-    document.querySelectorAll('.tab-panel').forEach(tab => {{
-        tab.querySelectorAll('.nivel-section').forEach((sec, i) => {{
-            if (i > 0) sec.classList.add('nivel-collapsed');
-        }});
+    // Collapse all nivel sections by default
+    document.querySelectorAll('.nivel-section').forEach(sec => {{
+        sec.classList.add('nivel-collapsed');
     }});
 }});
 </script>
