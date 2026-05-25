@@ -315,18 +315,24 @@ class ApartadoService:
         usuario: Usuario,
         observacion: str | None = None,
     ) -> ApartadoAbono:
-        """Anula el último abono registrado y recalcula saldos."""
-        cls._validar_operador(usuario)
+        """Anula el último abono registrado y recalcula saldos. Solo ADMIN."""
+        cls._validar_admin(usuario)
         if apartado.estado in {EstadoApartado.CANCELADO, EstadoApartado.ENTREGADO}:
             raise ValueError("No puedes anular abonos de un apartado cerrado.")
-        abonos = sorted(apartado.abonos, key=lambda a: a.created_at)
+        abonos = sorted(
+            [a for a in apartado.abonos if not a.anulado],
+            key=lambda a: a.created_at,
+        )
         if not abonos:
             raise ValueError("El apartado no tiene abonos registrados.")
         ultimo = abonos[-1]
+        ultimo.anulado = True
+        ultimo.anulado_por = usuario
+        ultimo.anulado_at = datetime.now(timezone.utc)
+        ultimo.anulado_observacion = (observacion or "").strip() or None
         apartado.total_abonado = Decimal(apartado.total_abonado) - Decimal(ultimo.monto)
         apartado.saldo_pendiente = Decimal(apartado.total) - Decimal(apartado.total_abonado)
         cls._recalcular_estado(apartado)
-        session.delete(ultimo)
         session.add(apartado)
         return ultimo
 

@@ -290,6 +290,9 @@ def main(argv: list[str] | None = None) -> int:
     root = project_root()
     validate_prereqs(root)
 
+    if not re.fullmatch(r"[a-z_][a-z0-9_]*", args.db_name):
+        raise SystemExit(f"Nombre de base de datos invalido: '{args.db_name}'. Solo letras minusculas, numeros y guiones bajos.")
+
     print(f"Proyecto: {root}")
     print(f"Base objetivo: {args.db_name} @ {args.db_host}:{args.db_port}")
 

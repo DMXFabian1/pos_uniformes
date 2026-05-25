@@ -5,6 +5,7 @@ from __future__ import annotations
 import base64
 import logging
 import math
+import os
 import subprocess
 import sys
 import tempfile
@@ -318,7 +319,7 @@ def print_caja_label(session: Session, caja_id: int, qr_data_uri: str = "") -> P
     if sys.platform == "darwin":
         subprocess.Popen(["open", str(pdf_path)])
     elif sys.platform == "win32":
-        subprocess.Popen(["start", "", str(pdf_path)], shell=True)
+        os.startfile(str(pdf_path))
     else:
         subprocess.Popen(["xdg-open", str(pdf_path)])
 

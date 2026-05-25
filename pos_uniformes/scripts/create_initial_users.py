@@ -19,10 +19,10 @@ from pos_uniformes.services.auth_service import AuthService
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Crea usuarios iniciales para POS Uniformes.")
     parser.add_argument("--admin-user", default="admin", help="Username del administrador inicial.")
-    parser.add_argument("--admin-password", default="admin123", help="Password del administrador inicial.")
+    parser.add_argument("--admin-password", required=True, help="Password del administrador inicial.")
     parser.add_argument("--admin-name", default="Administrador POS Uniformes", help="Nombre del administrador.")
     parser.add_argument("--cashier-user", default="cajero", help="Username del cajero inicial.")
-    parser.add_argument("--cashier-password", default="cajero123", help="Password del cajero inicial.")
+    parser.add_argument("--cashier-password", required=True, help="Password del cajero inicial.")
     parser.add_argument("--cashier-name", default="Cajero POS Uniformes", help="Nombre del cajero.")
     return parser.parse_args()
 

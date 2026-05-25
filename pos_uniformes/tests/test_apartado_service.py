@@ -209,5 +209,98 @@ class ApartadoEmployeeAttributionTests(unittest.TestCase):
         self.assertIsNone(apartado.delivery_employee_code)
 
 
+class AnularUltimoAbonoSecurityTests(unittest.TestCase):
+    """Verifica que anular_ultimo_abono requiere ADMIN y hace soft-delete."""
+
+    def test_cajero_cannot_anular_abono(self) -> None:
+        from pos_uniformes.database.models import EstadoApartado, RolUsuario
+        abono = SimpleNamespace(
+            monto=Decimal("50.00"),
+            created_at=None,
+            anulado=False,
+        )
+        apartado = SimpleNamespace(
+            estado=EstadoApartado.ACTIVO,
+            abonos=[abono],
+            total=Decimal("100.00"),
+            total_abonado=Decimal("50.00"),
+            saldo_pendiente=Decimal("50.00"),
+        )
+        cajero = SimpleNamespace(
+            activo=True,
+            rol=RolUsuario.CAJERO,
+            username="cajero",
+        )
+        with self.assertRaises(PermissionError):
+            ApartadoService.anular_ultimo_abono(
+                session=SimpleNamespace(add=lambda _v: None),
+                apartado=apartado,
+                usuario=cajero,
+            )
+
+    def test_admin_can_anular_abono_soft_delete(self) -> None:
+        from pos_uniformes.database.models import EstadoApartado, RolUsuario
+        abono = SimpleNamespace(
+            monto=Decimal("50.00"),
+            created_at=None,
+            anulado=False,
+            anulado_por=None,
+            anulado_at=None,
+            anulado_observacion=None,
+        )
+        apartado = SimpleNamespace(
+            estado=EstadoApartado.ACTIVO,
+            abonos=[abono],
+            total=Decimal("100.00"),
+            total_abonado=Decimal("50.00"),
+            saldo_pendiente=Decimal("50.00"),
+        )
+        admin = SimpleNamespace(
+            activo=True,
+            rol=RolUsuario.ADMIN,
+            username="admin",
+        )
+        with patch.object(ApartadoService, "_recalcular_estado"):
+            result = ApartadoService.anular_ultimo_abono(
+                session=SimpleNamespace(add=lambda _v: None),
+                apartado=apartado,
+                usuario=admin,
+                observacion="Test anulacion",
+            )
+        self.assertTrue(result.anulado)
+        self.assertEqual(result.anulado_por, admin)
+        self.assertIsNotNone(result.anulado_at)
+        self.assertEqual(result.anulado_observacion, "Test anulacion")
+        self.assertEqual(apartado.total_abonado, Decimal("0.00"))
+
+    def test_anulados_are_excluded_from_next_anulacion(self) -> None:
+        from pos_uniformes.database.models import EstadoApartado, RolUsuario
+        abono_anulado = SimpleNamespace(monto=Decimal("30.00"), created_at=None, anulado=True)
+        abono_activo = SimpleNamespace(
+            monto=Decimal("50.00"),
+            created_at=None,
+            anulado=False,
+            anulado_por=None,
+            anulado_at=None,
+            anulado_observacion=None,
+        )
+        apartado = SimpleNamespace(
+            estado=EstadoApartado.ACTIVO,
+            abonos=[abono_anulado, abono_activo],
+            total=Decimal("100.00"),
+            total_abonado=Decimal("50.00"),
+            saldo_pendiente=Decimal("50.00"),
+        )
+        admin = SimpleNamespace(activo=True, rol=RolUsuario.ADMIN, username="admin")
+        with patch.object(ApartadoService, "_recalcular_estado"):
+            result = ApartadoService.anular_ultimo_abono(
+                session=SimpleNamespace(add=lambda _v: None),
+                apartado=apartado,
+                usuario=admin,
+            )
+        self.assertIs(result, abono_activo)
+        self.assertTrue(result.anulado)
+
+
 if __name__ == "__main__":
     unittest.main()

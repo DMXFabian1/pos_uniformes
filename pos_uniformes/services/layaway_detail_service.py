@@ -94,7 +94,7 @@ def load_layaway_detail_snapshot(
                 reference=str(abono.referencia or ""),
                 username=str(abono.usuario.username),
             )
-            for abono in layaway.abonos
+            for abono in layaway.abonos if not abono.anulado
         ),
         sale_ticket_enabled=can_manage_layaways and layaway.estado == estado_apartado.ENTREGADO,
         whatsapp_enabled=can_manage_layaways and bool((layaway.cliente_telefono or "").strip()),

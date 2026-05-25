@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-from contextlib import asynccontextmanager
+import os
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -44,11 +45,16 @@ app = FastAPI(
     redoc_url="/redoc",
 )
 
-# CORS — red local, se permiten todos los origenes.
-# Restringir por IP si se requiere mayor control en el futuro.
+# CORS — red local. Configurable via POS_CORS_ORIGINS (comas).
+_DEFAULT_ORIGINS = [
+    "http://localhost:8000",
+    "http://127.0.0.1:8000",
+]
+_env_origins = os.environ.get("POS_CORS_ORIGINS", "")
+_ALLOWED_ORIGINS = [o.strip() for o in _env_origins.split(",") if o.strip()] if _env_origins else _DEFAULT_ORIGINS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

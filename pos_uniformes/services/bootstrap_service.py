@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import os
+import secrets
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -146,14 +148,14 @@ class BootstrapService:
             username="admin",
             nombre_completo="Administrador Principal",
             rol=RolUsuario.ADMIN,
-            password_hash="admin123",
+            password_hash=os.environ.get("POS_ADMIN_PASSWORD") or secrets.token_urlsafe(16),
         )
         cls._get_or_create_usuario(
             session=session,
             username="cajero",
             nombre_completo="Cajero General",
             rol=RolUsuario.CAJERO,
-            password_hash="cajero123",
+            password_hash=os.environ.get("POS_CAJERO_PASSWORD") or secrets.token_urlsafe(16),
         )
         cls._get_or_create_proveedor(
             session=session,

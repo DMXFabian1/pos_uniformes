@@ -169,7 +169,10 @@ class Usuario(Base):
         back_populates="entregado_por",
         foreign_keys="Apartado.entregado_por_id",
     )
-    apartados_abonos: Mapped[list["ApartadoAbono"]] = relationship(back_populates="usuario")
+    apartados_abonos: Mapped[list["ApartadoAbono"]] = relationship(
+        back_populates="usuario",
+        foreign_keys="ApartadoAbono.usuario_id",
+    )
     cajas_abiertas: Mapped[list["SesionCaja"]] = relationship(
         back_populates="abierta_por",
         foreign_keys="SesionCaja.abierta_por_id",
@@ -1444,9 +1447,17 @@ class ApartadoAbono(Base):
         server_default=func.now(),
         nullable=False,
     )
+    anulado: Mapped[bool] = mapped_column(default=False, server_default="false", nullable=False)
+    anulado_por_id: Mapped[int | None] = mapped_column(
+        ForeignKey("usuario.id", ondelete="RESTRICT"),
+        nullable=True,
+    )
+    anulado_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    anulado_observacion: Mapped[str | None] = mapped_column(Text(), nullable=True)
 
     apartado: Mapped["Apartado"] = relationship(back_populates="abonos")
-    usuario: Mapped["Usuario"] = relationship(back_populates="apartados_abonos")
+    usuario: Mapped["Usuario"] = relationship(back_populates="apartados_abonos", foreign_keys=[usuario_id])
+    anulado_por: Mapped["Usuario | None"] = relationship(foreign_keys=[anulado_por_id])
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

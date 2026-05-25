@@ -100,7 +100,7 @@ def load_employee_ranking(
         if not code:
             continue
         anticipo = next(
-            (Decimal(str(ab.monto or "0")) for ab in apartado.abonos if str(ab.referencia or "") == "ANTICIPO"),
+            (Decimal(str(ab.monto or "0")) for ab in apartado.abonos if str(ab.referencia or "") == "ANTICIPO" and not getattr(ab, "anulado", False)),
             Decimal("0.00"),
         )
         agg = _ensure_agg(code)
