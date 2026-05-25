@@ -14,7 +14,7 @@ from urllib.parse import quote
 from uuid import uuid4
 import webbrowser
 
-from PyQt6.QtCore import QDate, QSize, QStringListModel, QTimer, Qt
+from PyQt6.QtCore import QDate, QSize, QStringListModel, QThread, QTimer, Qt, pyqtSignal
 from PyQt6.QtGui import QBrush, QColor, QIcon, QImage, QKeySequence, QPixmap, QShortcut
 from PyQt6.QtWidgets import (
     QApplication,
@@ -41,6 +41,7 @@ from PyQt6.QtWidgets import (
     QSizePolicy,
     QTableWidget,
     QTableWidgetItem,
+    QProgressBar,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -143,6 +144,100 @@ try:
     _TOUCH_SCROLL_AVAILABLE = True
 except Exception:
     _TOUCH_SCROLL_AVAILABLE = False
+
+
+class _MeilisearchWorker(QThread):
+    """Ejecuta operaciones de Meilisearch en segundo plano."""
+
+    progress: pyqtSignal = pyqtSignal(str)
+    finished: pyqtSignal = pyqtSignal(bool, str)  # (ok, mensaje)
+
+    def __init__(self, mode: str) -> None:
+        super().__init__()
+        self._mode = mode  # 'start' | 'sync'
+
+    def run(self) -> None:
+        try:
+            from pos_uniformes.services import meilisearch_service
+
+            if self._mode == "start":
+                if meilisearch_service.is_available():
+                    self.finished.emit(True, "Meilisearch ya está corriendo.")
+                    return
+                self.progress.emit("Iniciando Meilisearch...")
+                status = meilisearch_service.ensure_installed(on_progress=self.progress.emit)
+                self.finished.emit(meilisearch_service.is_available(), status)
+
+            elif self._mode == "sync":
+                if not meilisearch_service.is_available():
+                    self.progress.emit("Iniciando Meilisearch...")
+                    meilisearch_service.ensure_installed(on_progress=self.progress.emit)
+                    if not meilisearch_service.is_available():
+                        self.finished.emit(False, "No se pudo iniciar Meilisearch.")
+                        return
+                self.progress.emit("Configurando índice...")
+                meilisearch_service.configure_index()
+                self.progress.emit("Indexando catálogo...")
+                from pos_uniformes.database.connection import get_session
+                with get_session() as session:
+                    count = meilisearch_service.index_from_db(session)
+                self.finished.emit(True, f"Catálogo re-indexado: {count} presentaciones.")
+
+        except Exception as exc:  # noqa: BLE001
+            self.finished.emit(False, f"Error: {exc}")
+
+
+class _MeilisearchProgressDialog(QDialog):
+    """Diálogo con barra de progreso para operaciones de Meilisearch."""
+
+    def __init__(self, title: str, parent=None) -> None:
+        super().__init__(parent)
+        self.setWindowTitle(title)
+        self.setFixedWidth(400)
+        self.setModal(True)
+        self.setWindowFlags(
+            self.windowFlags() & ~Qt.WindowType.WindowCloseButtonHint
+        )
+
+        layout = QVBoxLayout(self)
+        layout.setSpacing(16)
+        layout.setContentsMargins(28, 28, 28, 22)
+
+        self._icon_label = QLabel("⚙️")
+        self._icon_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._icon_label.setStyleSheet("font-size:32px;")
+        layout.addWidget(self._icon_label)
+
+        self._status_label = QLabel("Iniciando...")
+        self._status_label.setWordWrap(True)
+        self._status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._status_label.setStyleSheet("font-size:13px; color:#2f2a24;")
+        layout.addWidget(self._status_label)
+
+        self._bar = QProgressBar()
+        self._bar.setRange(0, 0)
+        self._bar.setFixedHeight(8)
+        self._bar.setTextVisible(False)
+        self._bar.setStyleSheet(
+            "QProgressBar{border-radius:4px;background:#f0ebe4;}"
+            "QProgressBar::chunk{border-radius:4px;background:#7b2d14;}"
+        )
+        layout.addWidget(self._bar)
+
+        self._close_btn = QPushButton("Cerrar")
+        self._close_btn.setEnabled(False)
+        self._close_btn.clicked.connect(self.accept)
+        layout.addWidget(self._close_btn, alignment=Qt.AlignmentFlag.AlignRight)
+
+    def update_status(self, msg: str) -> None:
+        self._status_label.setText(msg)
+
+    def finish(self, success: bool, msg: str) -> None:
+        self._icon_label.setText("✅" if success else "❌")
+        self._status_label.setText(msg)
+        self._bar.setRange(0, 100)
+        self._bar.setValue(100 if success else 0)
+        self._close_btn.setEnabled(True)
 
 
 class _DoubleClickButton(QPushButton):
@@ -355,6 +450,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_print_label_button = QPushButton("Imprimir etiqueta")
         self.guided_favorites_button = QPushButton("♥ Favoritos")
         self.guided_reindex_button = QPushButton("↻ Sync")
+        self.guided_meilisearch_btn = QPushButton("○ Meilisearch")
         self.guided_reset_button = QPushButton("Limpiar pasos")
         self.guided_basics_button = QPushButton("Piezas generales")
         self.guided_visual_icon_label = QLabel()
@@ -844,9 +940,13 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_favorites_button.setFixedHeight(32)
         self.guided_reindex_button.setObjectName("chipButton")
         self.guided_reindex_button.setFixedHeight(32)
-        self.guided_reindex_button.setToolTip("Conectar con Meilisearch y re-indexar el catalogo de productos")
+        self.guided_reindex_button.setToolTip("Conectar con Meilisearch y re-indexar el catálogo de productos")
+        self.guided_meilisearch_btn.setObjectName("chipButton")
+        self.guided_meilisearch_btn.setFixedHeight(32)
+        self.guided_meilisearch_btn.setToolTip("Iniciar el servicio Meilisearch")
         _steps_header.addWidget(_steps_title)
         _steps_header.addStretch()
+        _steps_header.addWidget(self.guided_meilisearch_btn)
         _steps_header.addWidget(self.guided_reindex_button)
         _steps_header.addWidget(self.guided_favorites_button)
         steps_layout.addLayout(_steps_header)
@@ -1737,6 +1837,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_print_label_button.clicked.connect(self._print_label_for_guided_selection)
         self.guided_favorites_button.clicked.connect(self._open_favorites_dialog)
         self.guided_reindex_button.clicked.connect(self._handle_reindex_meilisearch)
+        self.guided_meilisearch_btn.clicked.connect(self._handle_start_meilisearch)
         self.guided_reset_button.clicked.connect(self._handle_guided_reset_steps)
         self.guided_basics_button.clicked.connect(self._handle_guided_go_to_basics)
         self.quote_remove_button.clicked.connect(self._handle_remove_quote_item)
@@ -1867,6 +1968,7 @@ class QuoteSatelliteWindow(QMainWindow):
             pass
         self._rebuild_catalog_level_combo()
         self._try_index_meilisearch(session)
+        self._update_meilisearch_status()
 
     def _refresh_catalog_snapshot_from_cache(self) -> None:
         """Sincroniza el combo de niveles desde el cache local (sin DB)."""
@@ -2178,40 +2280,40 @@ class QuoteSatelliteWindow(QMainWindow):
 
     # ── Búsqueda rápida Meilisearch ─────────────────────────────────────
 
-    def _handle_reindex_meilisearch(self) -> None:
-        self.guided_reindex_button.setEnabled(False)
-        self.guided_reindex_button.setText("↻ Sync...")
-        QApplication.processEvents()
+    def _update_meilisearch_status(self) -> None:
         try:
             from pos_uniformes.services import meilisearch_service
+            running = meilisearch_service.is_available()
+        except Exception:  # noqa: BLE001
+            running = False
+        if running:
+            self.guided_meilisearch_btn.setText("● Meilisearch")
+            self.guided_meilisearch_btn.setStyleSheet(
+                "QPushButton#chipButton { color:#2e7d32; font-weight:bold; }"
+            )
+        else:
+            self.guided_meilisearch_btn.setText("○ Meilisearch")
+            self.guided_meilisearch_btn.setStyleSheet("")
 
-            # 1. Si no está corriendo, intentar iniciar el servicio
-            if not meilisearch_service.is_available():
-                self.guided_reindex_button.setText("↻ Iniciando...")
-                QApplication.processEvents()
-                status = meilisearch_service.ensure_installed(
-                    on_progress=lambda msg: (
-                        self.guided_reindex_button.setText(f"↻ {msg[:18]}"),
-                        QApplication.processEvents(),
-                    ),
-                )
-                if not meilisearch_service.is_available():
-                    QMessageBox.warning(self, "Meilisearch", f"No se pudo iniciar Meilisearch.\n{status}")
-                    return
+    def _handle_start_meilisearch(self) -> None:
+        dlg = _MeilisearchProgressDialog("Iniciando Meilisearch", self)
+        self._ms_worker = _MeilisearchWorker(mode="start")
+        self._ms_worker.progress.connect(dlg.update_status)
+        self._ms_worker.finished.connect(
+            lambda ok, msg: (dlg.finish(ok, msg), self._update_meilisearch_status())
+        )
+        self._ms_worker.start()
+        dlg.exec()
 
-            # 2. Configurar índice y re-indexar
-            self.guided_reindex_button.setText("↻ Indexando...")
-            QApplication.processEvents()
-            meilisearch_service.configure_index()
-            from pos_uniformes.database.connection import get_session
-            with get_session() as session:
-                count = meilisearch_service.index_from_db(session)
-            QMessageBox.information(self, "Meilisearch", f"Catalogo re-indexado: {count} presentaciones.")
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.warning(self, "Meilisearch", f"Error al re-indexar:\n{exc}")
-        finally:
-            self.guided_reindex_button.setText("↻ Sync")
-            self.guided_reindex_button.setEnabled(True)
+    def _handle_reindex_meilisearch(self) -> None:
+        dlg = _MeilisearchProgressDialog("Sincronizando Meilisearch", self)
+        self._ms_worker = _MeilisearchWorker(mode="sync")
+        self._ms_worker.progress.connect(dlg.update_status)
+        self._ms_worker.finished.connect(
+            lambda ok, msg: (dlg.finish(ok, msg), self._update_meilisearch_status())
+        )
+        self._ms_worker.start()
+        dlg.exec()
 
     def _try_index_meilisearch(self, session) -> None:
         try:
