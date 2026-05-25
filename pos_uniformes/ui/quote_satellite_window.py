@@ -4245,38 +4245,91 @@ QLabel#favDialogPriceLabel {
             self._set_status("Genera un tarifario primero.")
             return
 
-        # ── Diálogo de selección de género ─────────────────────────────
-        from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QRadioButton, QVBoxLayout, QLabel
+        # ── Diálogo táctil de selección de género ───────────────────────
+        from PyQt6.QtWidgets import (
+            QDialog, QVBoxLayout, QHBoxLayout, QLabel, QFrame, QPushButton,
+        )
+        from PyQt6.QtCore import Qt
+
+        _SS_CARD = (
+            "QFrame { background:#FFF8F5; border:2px solid #E2C9BE;"
+            " border-radius:14px; }"
+        )
+        _SS_CARD_PRESSED = (
+            "QFrame { background:#7B2D14; border:3px solid #C96030;"
+            " border-radius:14px; }"
+        )
+
+        genero_result: list = [None]
+
+        class _GenderCard(QFrame):
+            def __init__(self_, icon_str, label_str, value):
+                super().__init__()
+                self_._value = value
+                self_.setCursor(Qt.CursorShape.PointingHandCursor)
+                self_.setFixedSize(148, 172)
+                self_.setStyleSheet(_SS_CARD)
+                vbox = QVBoxLayout(self_)
+                vbox.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                vbox.setSpacing(6)
+                vbox.setContentsMargins(8, 16, 8, 16)
+                lbl_icon = QLabel(icon_str)
+                lbl_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                lbl_icon.setStyleSheet(
+                    "font-size:52px; background:transparent; border:none;"
+                )
+                lbl_text = QLabel(label_str)
+                lbl_text.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                lbl_text.setWordWrap(True)
+                lbl_text.setStyleSheet(
+                    "font-size:13px; font-weight:bold;"
+                    " background:transparent; border:none; color:#4A1505;"
+                )
+                vbox.addWidget(lbl_icon)
+                vbox.addWidget(lbl_text)
+
+            def mousePressEvent(self_, _ev):
+                self_.setStyleSheet(_SS_CARD_PRESSED)
+                genero_result[0] = self_._value
+                dlg.accept()
 
         dlg = QDialog(self)
         dlg.setWindowTitle("¿Para quién es el tarifario?")
-        dlg.setFixedWidth(260)
-        layout = QVBoxLayout(dlg)
-        layout.addWidget(QLabel("Selecciona el género para imprimir:"))
+        dlg.setFixedWidth(520)
 
-        rb_ambos = QRadioButton("Ambos (Niño y Niña)")
-        rb_nino = QRadioButton("Solo Niño")
-        rb_nina = QRadioButton("Solo Niña")
-        rb_ambos.setChecked(True)
+        outer = QVBoxLayout(dlg)
+        outer.setSpacing(20)
+        outer.setContentsMargins(24, 24, 24, 20)
 
-        layout.addWidget(rb_ambos)
-        layout.addWidget(rb_nino)
-        layout.addWidget(rb_nina)
+        ttl = QLabel("¿Para quién es el tarifario?")
+        ttl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        ttl.setStyleSheet(
+            "font-size:17px; font-weight:bold; color:#4A1505; margin-bottom:4px;"
+        )
+        outer.addWidget(ttl)
 
-        btns = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        btns.accepted.connect(dlg.accept)
-        btns.rejected.connect(dlg.reject)
-        layout.addWidget(btns)
+        cards_row = QHBoxLayout()
+        cards_row.setSpacing(14)
+        for icon_s, label_s, val in [
+            ("👨‍👩‍👧‍👦", "Ambos\n(Niño y Niña)", None),
+            ("👦", "Solo\nNiño", "NIÑO"),
+            ("👧", "Solo\nNiña", "NIÑA"),
+        ]:
+            cards_row.addWidget(_GenderCard(icon_s, label_s, val))
+        outer.addLayout(cards_row)
+
+        cancel_btn = QPushButton("Cancelar")
+        cancel_btn.setFlat(True)
+        cancel_btn.setStyleSheet(
+            "color:#A07060; font-size:12px; padding:6px 16px;"
+        )
+        cancel_btn.clicked.connect(dlg.reject)
+        outer.addWidget(cancel_btn, alignment=Qt.AlignmentFlag.AlignCenter)
 
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
-        if rb_nino.isChecked():
-            genero_filter: str | None = "NIÑO"
-        elif rb_nina.isChecked():
-            genero_filter = "NIÑA"
-        else:
-            genero_filter = None  # Ambos — sin filtro
+        genero_filter: str | None = genero_result[0]
 
         # ── Regenerar texto con el filtro elegido ───────────────────────
         from pos_uniformes.services.school_tariff_text_service import build_school_tariff_text
