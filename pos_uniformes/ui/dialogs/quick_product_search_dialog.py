@@ -40,14 +40,16 @@ class QuickProductSearchDialog(QDialog):
     """Búsqueda rápida de producto con Meilisearch + tabla de resultados."""
 
     sku_selected = pyqtSignal(str, int)
+    sku_to_kiosk = pyqtSignal(str, int)
 
-    def __init__(self, parent=None, catalog_rows: list[dict] | None = None, **_kwargs):
+    def __init__(self, parent=None, catalog_rows: list[dict] | None = None, *, kiosk_mode: bool = False, **_kwargs):
         super().__init__(parent)
         self.setWindowTitle("Buscar producto")
         self.setModal(True)
         self.setMinimumSize(780, 560)
         self.resize(850, 640)
 
+        self._kiosk_mode = kiosk_mode
         self._catalog_rows = catalog_rows or []
         if not self._catalog_rows:
             self._load_catalog()
@@ -146,14 +148,22 @@ class QuickProductSearchDialog(QDialog):
         self._qty_spin.setFixedWidth(60)
         self._qty_spin.setMinimumHeight(36)
 
-        self._add_btn = QPushButton("Agregar a venta")
+        add_label = "Agregar a presupuesto" if self._kiosk_mode else "Agregar a venta"
+        self._add_btn = QPushButton(add_label)
         self._add_btn.setObjectName("primaryButton")
         self._add_btn.setMinimumHeight(40)
         self._add_btn.setMinimumWidth(160)
         self._add_btn.setEnabled(False)
 
+        self._kiosk_btn = QPushButton("Agregar a consulta")
+        self._kiosk_btn.setObjectName("secondaryButton")
+        self._kiosk_btn.setMinimumHeight(40)
+        self._kiosk_btn.setEnabled(False)
+        self._kiosk_btn.setVisible(self._kiosk_mode)
+
         actions_bar.addWidget(qty_label)
         actions_bar.addWidget(self._qty_spin)
+        actions_bar.addWidget(self._kiosk_btn)
         actions_bar.addWidget(self._add_btn)
         root.addLayout(actions_bar)
 
@@ -177,6 +187,7 @@ class QuickProductSearchDialog(QDialog):
         self._table.itemSelectionChanged.connect(self._on_selection_changed)
         self._table.doubleClicked.connect(self._handle_add)
         self._add_btn.clicked.connect(self._handle_add)
+        self._kiosk_btn.clicked.connect(self._handle_kiosk)
 
     # ── Search ──
 
@@ -189,6 +200,7 @@ class QuickProductSearchDialog(QDialog):
             self._result_rows = []
             self._info_label.setText("Escribe para buscar entre todos los productos.")
             self._add_btn.setEnabled(False)
+            self._kiosk_btn.setEnabled(False)
             self._detail_label.setText("")
 
     def _run_search(self) -> None:
@@ -293,9 +305,11 @@ class QuickProductSearchDialog(QDialog):
         row_idx = self._table.currentRow()
         if row_idx < 0 or row_idx >= len(self._result_rows):
             self._add_btn.setEnabled(False)
+            self._kiosk_btn.setEnabled(False)
             self._detail_label.setText("")
             return
         self._add_btn.setEnabled(True)
+        self._kiosk_btn.setEnabled(True)
         row = self._result_rows[row_idx]
         sku = str(row.get("sku", ""))
         nombre = str(row.get("producto_nombre_base", ""))
@@ -321,4 +335,14 @@ class QuickProductSearchDialog(QDialog):
         if not sku:
             return
         self.sku_selected.emit(sku, self._qty_spin.value())
+        self._qty_spin.setValue(1)
+
+    def _handle_kiosk(self) -> None:
+        row_idx = self._table.currentRow()
+        if row_idx < 0 or row_idx >= len(self._result_rows):
+            return
+        sku = str(self._result_rows[row_idx].get("sku", ""))
+        if not sku:
+            return
+        self.sku_to_kiosk.emit(sku, self._qty_spin.value())
         self._qty_spin.setValue(1)
