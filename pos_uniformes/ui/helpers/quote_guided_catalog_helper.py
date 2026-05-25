@@ -660,7 +660,13 @@ def _matches_segment_filter(filter_key: str, row: dict[str, object]) -> bool:
             return False
         if _is_shared_uniform_top(row):
             return True
-        return _classify_gender(row.get("producto_genero")) in {"NINO", "UNISEX"}
+        gender = _classify_gender(row.get("producto_genero"))
+        if gender == "UNISEX":
+            # Calceta y Malla sin género explícito son de niña — no incluir en niño
+            piece = _normalize_text(row.get("tipo_pieza_nombre"))
+            if piece in {"calceta", "malla"}:
+                return False
+        return gender in {"NINO", "UNISEX"}
     return True
 
 

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from decimal import Decimal
 
 from sqlalchemy import select
@@ -275,8 +276,16 @@ _TALLA_ORDER = {
 }
 
 
-def _talla_sort_key(talla: str) -> tuple[int, str]:
-    return (_TALLA_ORDER.get(talla.strip(), 99), talla)
+_TALLA_RANGE_RE = re.compile(r"^\s*(\d+)\s*-\s*(\d+)\s*$")
+
+
+def _talla_sort_key(talla: str) -> tuple[int, int, int, str]:
+    stripped = talla.strip()
+    m = _TALLA_RANGE_RE.match(stripped)
+    if m:
+        return (0, int(m.group(1)), int(m.group(2)), stripped)
+    order = _TALLA_ORDER.get(stripped, 99)
+    return (1, order, 0, stripped)
 
 
 # Orden de piezas en el tarifario (de arriba a abajo)

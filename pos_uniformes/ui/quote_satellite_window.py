@@ -1829,6 +1829,8 @@ class QuoteSatelliteWindow(QMainWindow):
         _guided_ctrl_shift_l.activated.connect(self._open_school_product_link_admin)
         _esc_shortcut = QShortcut(QKeySequence("Escape"), self)
         _esc_shortcut.activated.connect(self._handle_escape_key)
+        _kiosk_ctrl_s = QShortcut(QKeySequence("Ctrl+S"), self)
+        _kiosk_ctrl_s.activated.connect(self._handle_add_lookup_to_quote)
         _admin_shortcut = QShortcut(QKeySequence("Ctrl+Shift+A"), self)
         _admin_shortcut.activated.connect(self._open_satellite_admin)
         self.catalog_previous_page_button.clicked.connect(self._handle_catalog_browser_previous_page)
@@ -2476,9 +2478,15 @@ class QuoteSatelliteWindow(QMainWindow):
         self._search_results_widget.setVisible(True)
 
     def _handle_escape_key(self) -> None:
-        """ESC: si hay busqueda activa la cierra, si no resetea el flujo guiado."""
+        """ESC: si hay busqueda activa la cierra, si no resetea el flujo guiado o limpia tarifario."""
         if self._search_results_widget is not None and self._search_results_widget.isVisible():
             self._exit_search_mode()
+            return
+        if self.current_page_key == "tariff":
+            self.tariff_school_combo.setCurrentIndex(-1)
+            self.tariff_preview.clear()
+            self._current_tariff = None
+            self.tariff_print_button.setEnabled(False)
             return
         # Resetear flujo guiado completo
         if self._gfs.mode == "basics":
@@ -4492,7 +4500,7 @@ QLabel#favDialogPriceLabel {
             self.quote_whatsapp_button.setEnabled(action_state.whatsapp_enabled)
             self.quote_print_button.setEnabled(action_state.print_enabled)
             self.share_refresh_button.setEnabled(self._selected_quote_id() is not None)
-        self.kiosk_add_button.setEnabled(self.lookup_snapshot is not None and self._can_operate())
+        self.kiosk_add_button.setEnabled(self.lookup_snapshot is not None and self._can_build_cart())
         self.catalog_add_button.setEnabled(bool(self._selected_catalog_sku()) and self._can_build_cart())
         self.catalog_print_label_button.setEnabled(bool(self._selected_catalog_sku()))
         self.guided_add_button.setEnabled(bool(self._gfs.sku) and self._can_build_cart())
