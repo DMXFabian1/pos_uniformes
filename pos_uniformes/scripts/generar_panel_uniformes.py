@@ -17,27 +17,14 @@ from datetime import date, datetime
 from decimal import Decimal
 from pathlib import Path
 
-import psycopg2
-
 # ---------------------------------------------------------------------------
-# Conexión
+# Conexión  (usa el engine de SQLAlchemy — no requiere psycopg2 directo)
 # ---------------------------------------------------------------------------
 
 def _get_connection():
-    env_path = Path(__file__).resolve().parent.parent / "pos_uniformes.env"
-    env = {}
-    if env_path.exists():
-        for line in env_path.read_text().splitlines():
-            if "=" in line and not line.startswith("#"):
-                k, v = line.strip().split("=", 1)
-                env[k] = v
-    return psycopg2.connect(
-        host=env.get("POS_UNIFORMES_DB_HOST", "localhost"),
-        port=int(env.get("POS_UNIFORMES_DB_PORT", "5432")),
-        dbname=env.get("POS_UNIFORMES_DB_NAME", "pos_uniformes"),
-        user=env.get("POS_UNIFORMES_DB_USER", "postgres"),
-        password=env.get("POS_UNIFORMES_DB_PASSWORD", "1234"),
-    )
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from pos_uniformes.database.connection import engine  # noqa: PLC0415
+    return engine.raw_connection()
 
 # ---------------------------------------------------------------------------
 # Constants
