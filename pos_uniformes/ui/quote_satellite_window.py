@@ -1830,7 +1830,7 @@ class QuoteSatelliteWindow(QMainWindow):
         _esc_shortcut = QShortcut(QKeySequence("Escape"), self)
         _esc_shortcut.activated.connect(self._handle_escape_key)
         _kiosk_ctrl_s = QShortcut(QKeySequence("Ctrl+S"), self)
-        _kiosk_ctrl_s.activated.connect(self._handle_add_lookup_to_quote)
+        _kiosk_ctrl_s.activated.connect(self._handle_quick_search)
         _admin_shortcut = QShortcut(QKeySequence("Ctrl+Shift+A"), self)
         _admin_shortcut.activated.connect(self._open_satellite_admin)
         self.catalog_previous_page_button.clicked.connect(self._handle_catalog_browser_previous_page)
@@ -3515,6 +3515,21 @@ QLabel#favDialogPriceLabel {
         self._select_client_id(int(client.id))
         if ui_state.applied_message:
             self._set_status(ui_state.applied_message)
+
+    def _handle_quick_search(self) -> None:
+        """Ctrl+S: abre búsqueda rápida y muestra el resultado en el panel kiosko."""
+        from pos_uniformes.ui.dialogs.quick_product_search_dialog import QuickProductSearchDialog
+
+        dialog = QuickProductSearchDialog(self, catalog_rows=self.catalog_snapshot_rows)
+
+        def _on_sku_selected(sku: str, qty: int) -> None:
+            self._set_page("kiosk")
+            self.kiosk_scan_input.setText(sku)
+            self.kiosk_qty_spin.setValue(max(1, qty))
+            self._handle_lookup_scan()
+
+        dialog.sku_selected.connect(_on_sku_selected)
+        dialog.exec()
 
     def _handle_lookup_scan(self) -> None:
         sku = self.kiosk_scan_input.text().strip().upper()
