@@ -4169,7 +4169,16 @@ QLabel#favDialogPriceLabel {
                 business_phone=business_phone,
             )
             self._current_tariff = tariff
-            self.tariff_preview.setPlainText(text)
+            # Vista previa HTML moderna; plain text solo va a impresión
+            try:
+                from pos_uniformes.services.school_tariff_preview_service import build_school_tariff_html
+                self.tariff_preview.setHtml(build_school_tariff_html(
+                    tariff=tariff,
+                    business_name=business_name,
+                    business_phone=business_phone,
+                ))
+            except Exception:
+                self.tariff_preview.setPlainText(text)
             self.tariff_print_button.setEnabled(True)
             n = len(tariff.get("productos", []))
             self._set_status(f"Tarifario generado: {tariff['escuela_nombre']} — {n} productos.")
