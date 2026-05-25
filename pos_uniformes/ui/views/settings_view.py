@@ -90,6 +90,12 @@ def build_settings_tab(window: "MainWindow") -> QWidget:
             QStyle.StandardPixmap.SP_BrowserReload,
             window._open_meilisearch_settings_dialog,
         ),
+        (
+            window.settings_uniforms_panel_button,
+            "Genera y abre el panel de uniformes con piezas, tarifarios y faltantes.",
+            QStyle.StandardPixmap.SP_FileDialogInfoView,
+            window._handle_open_uniforms_panel,
+        ),
     ]
     for index, (button, description, icon_name, handler) in enumerate(settings_buttons):
         row, column = divmod(index, 3)

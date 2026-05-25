@@ -1613,6 +1613,7 @@ class MainWindow(QMainWindow):
         self.settings_business_button = QPushButton("Negocio e impresion")
         self.settings_catalog_sync_button = QPushButton("Consistencia de catalogo")
         self.settings_meilisearch_button = QPushButton("Meilisearch (busqueda)")
+        self.settings_uniforms_panel_button = QPushButton("Panel de uniformes")
         self.settings_users_table = QTableWidget()
         self.settings_users_status_label = QLabel("Sin usuarios cargados.")
         self.settings_create_user_button = QPushButton("Crear usuario")
@@ -2480,6 +2481,26 @@ class MainWindow(QMainWindow):
     def _open_meilisearch_settings_dialog(self) -> None:
         from pos_uniformes.ui.dialogs.meilisearch_settings_dialog import open_meilisearch_settings_dialog
         open_meilisearch_settings_dialog(self)
+
+    def _handle_open_uniforms_panel(self) -> None:
+        import subprocess
+        import webbrowser
+        from pathlib import Path
+
+        script = Path(__file__).resolve().parent.parent / "scripts" / "generar_panel_uniformes.py"
+        out = Path(__file__).resolve().parent.parent / "panel_uniformes.html"
+        try:
+            result = subprocess.run(
+                [sys.executable, str(script)],
+                capture_output=True, text=True, timeout=30,
+            )
+            if result.returncode != 0:
+                QMessageBox.critical(self, "Error", f"No se pudo generar el panel:\n{result.stderr[:500]}")
+                return
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Error", str(exc))
+            return
+        webbrowser.open(out.as_uri())
 
     def _open_catalog_sync_settings_dialog(self) -> None:
         if self.settings_catalog_sync_dialog is None:
@@ -9112,6 +9133,7 @@ class MainWindow(QMainWindow):
         self.settings_business_button.setEnabled(is_admin)
         self.settings_catalog_sync_button.setEnabled(is_admin)
         self.settings_meilisearch_button.setEnabled(is_admin)
+        self.settings_uniforms_panel_button.setEnabled(is_admin)
         self.settings_create_user_button.setEnabled(is_admin)
         self.settings_edit_user_button.setEnabled(is_admin)
         self.settings_toggle_user_button.setEnabled(is_admin)
