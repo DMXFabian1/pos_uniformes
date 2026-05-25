@@ -313,11 +313,11 @@ def _tariff_product_sort_key(tipo_pieza: str) -> tuple[int, str]:
 
 # Orden de secciones en el tarifario
 _SECCION_ORDER = {
-    "Oficial": 1,
-    "Básico": 2,
-    "Basico": 2,
-    "Deportivo": 3,
-    "Deportivo casual": 4,
+    "Deportivo": 1,
+    "Deportivo casual": 2,
+    "Oficial": 3,
+    "Básico": 4,
+    "Basico": 4,
     "Escolta": 5,
     "Casual": 6,
     "Accesorio": 7,
