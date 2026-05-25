@@ -5703,6 +5703,7 @@ def _guided_display_color_label(raw_value: object) -> str:
 
 _FAV_PIECE_ORDER = [
     "pantalon",   # Pantalón
+    "chaleco",    # Chaleco
     "falda",      # Falda
     "sueter",     # Suéter
     "camisa",     # Camisa

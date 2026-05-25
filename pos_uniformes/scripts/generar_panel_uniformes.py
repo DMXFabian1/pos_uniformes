@@ -52,7 +52,7 @@ NIVEL_COLORS = {
 }
 PIEZA_ORDER = [
     "Pants 3pz", "Pants 2pz", "Pants Suelto", "Chamarra", "Playera",
-    "Suéter", "Falda", "Camisa", "Chaleco", "Pantalón",
+    "Suéter", "Camisa", "Chaleco", "Falda", "Pantalón",
     "Corbata", "Corbatín", "Moño", "Mascada",
 ]
 TALLA_ORDER = [
