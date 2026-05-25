@@ -239,7 +239,7 @@ def compute_insights(stats, school_levels, pieces_raw, catalog_rows, catalog_col
         has = len(pieces_map.get(key, set()))
         nivel_max = max_tipos_por_nivel.get(nivel, 1)
         pct = min(100, round(has / nivel_max * 100)) if nivel_max else 0
-        coverage_data.append({"name": sl["display_name"], "nivel": nivel, "has": has, "total": nivel_max, "pct": pct})
+        coverage_data.append({"eid": sl["escuela_id"], "name": sl["display_name"], "nivel": nivel, "has": has, "total": nivel_max, "pct": pct})
 
     low_coverage = [c for c in coverage_data if c["pct"] < 40]
     full_coverage = [c for c in coverage_data if c["pct"] >= 80]
@@ -351,7 +351,7 @@ def build_resumen(stats, insights, coverage_data):
     for c in sorted(coverage_data, key=lambda x: x["pct"]):
         bar_color = "#c62828" if c["pct"] < 40 else "#e65100" if c["pct"] < 70 else "#2e7d32"
         nivel_color = NIVEL_COLORS.get(c["nivel"], "#999")
-        h.append(f'''<div class="coverage-item">
+        h.append(f'''<div class="coverage-item" data-eid="{c['eid']}" data-nivel="{_esc(c['nivel'])}">
             <div class="coverage-header">
                 <span class="coverage-name">{_esc(c["name"])}</span>
                 <span class="coverage-pct" style="color:{bar_color}">{c["pct"]}%</span>
@@ -1421,7 +1421,50 @@ function toggleNA(cell) {{
     }}
     savePiezasNA(na);
     recalcPiezasCoverage();
+    recalcResumenCoverage();
     refreshFaltantes();
+}}
+
+function recalcResumenCoverage() {{
+    const na = getPiezasNA();
+    document.querySelectorAll('#resumen .coverage-item[data-eid]').forEach(card => {{
+        const eid = card.dataset.eid;
+        const nivel = card.dataset.nivel;
+        const tr = document.querySelector('#piezas .pieces-table tbody tr[data-eid="' + eid + '"][data-nivel="' + nivel + '"]');
+        if (!tr) return;
+        let has = 0, applicable = 0;
+        tr.querySelectorAll('.piece-cell').forEach(cell => {{
+            const key = eid + '_' + nivel + '_' + cell.dataset.tipo;
+            if (na[key]) return; // NA — no cuenta en denominador
+            applicable++;
+            if (cell.classList.contains('has-1') || cell.classList.contains('has-2') || cell.classList.contains('has-3')) has++;
+        }});
+        const pct = applicable > 0 ? Math.round(has * 100 / applicable) : 100;
+        const barColor = pct < 40 ? '#c62828' : pct < 70 ? '#e65100' : '#2e7d32';
+        const pctEl = card.querySelector('.coverage-pct');
+        const barFill = card.querySelector('.coverage-bar-fill');
+        const detail = card.querySelector('.coverage-detail');
+        if (pctEl) {{ pctEl.textContent = pct + '%'; pctEl.style.color = barColor; }}
+        if (barFill) {{ barFill.style.width = pct + '%'; barFill.style.background = barColor; }}
+        if (detail) {{
+            const nivelSpan = detail.querySelector('span');
+            const nivelStyle = nivelSpan ? nivelSpan.getAttribute('style') : '';
+            const naCount = tr.querySelectorAll('.piece-cell').length - applicable;
+            const naText = naCount > 0 ? ' · ' + naCount + ' N/A' : '';
+            detail.innerHTML = has + ' de ' + applicable + ' piezas' + naText + ' · <span style="' + nivelStyle + '">' + nivel + '</span>';
+        }}
+    }});
+    // Re-ordenar cards por pct ascendente
+    const grid = document.querySelector('#resumen .coverage-grid');
+    if (grid) {{
+        const items = [...grid.querySelectorAll('.coverage-item')];
+        items.sort((a, b) => {{
+            const pA = parseInt(a.querySelector('.coverage-pct')?.textContent) || 0;
+            const pB = parseInt(b.querySelector('.coverage-pct')?.textContent) || 0;
+            return pA - pB;
+        }});
+        items.forEach(el => grid.appendChild(el));
+    }}
 }}
 
 function recalcPiezasCoverage() {{
@@ -1474,6 +1517,7 @@ document.addEventListener('DOMContentLoaded', () => {{
         }});
     }});
     recalcPiezasCoverage();
+    recalcResumenCoverage();
     // Also refresh Faltantes tab to hide NA pieces
     refreshFaltantes();
 }});
