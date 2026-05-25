@@ -6,7 +6,7 @@ from __future__ import annotations
 def build_main_window_inventory_analytics_styles() -> str:
     return """
             #inventoryTitle {
-                color: #375063;
+                color: #3d2b1f;
                 font-size: 20px;
                 font-weight: 800;
                 background: transparent;
@@ -22,9 +22,9 @@ def build_main_window_inventory_analytics_styles() -> str:
                 padding: 0;
             }
             #inventoryStatusBadge {
-                background: #e7eef4;
-                color: #365164;
-                border: 1px solid #d3dfe8;
+                background: #f0ebe4;
+                color: #51402f;
+                border: 1px solid #d8c9b8;
                 border-radius: 999px;
                 padding: 4px 10px;
                 font-size: 11px;
@@ -53,18 +53,18 @@ def build_main_window_inventory_analytics_styles() -> str:
             #inventoryMetaCard, #inventoryMetaCardAlt {
                 border-radius: 14px;
                 padding: 10px 12px;
-                border: 1px solid #d6e2ea;
+                border: 1px solid #ddd4c8;
                 font-weight: 600;
             }
             #inventoryMetaCard {
-                background: #ecf3f7;
-                color: #29485d;
-                border: 1px solid #d6e2ea;
+                background: #f5ede5;
+                color: #4a3020;
+                border: 1px solid #d8c9b8;
             }
             #inventoryMetaCardAlt {
-                background: #f5f8fa;
-                color: #5f6c78;
-                border: 1px solid #dde6ec;
+                background: #faf6f2;
+                color: #5f564d;
+                border: 1px solid #ddd4c8;
             }
             #inventoryQrCaption {
                 color: #6f665f;
@@ -74,9 +74,9 @@ def build_main_window_inventory_analytics_styles() -> str:
                 padding: 0 4px 2px 4px;
             }
             #inventoryCounterChip {
-                background: #ecf3f7;
-                color: #365164;
-                border: 1px solid #d6e2ea;
+                background: #f0ebe4;
+                color: #51402f;
+                border: 1px solid #d8c9b8;
                 border-radius: 999px;
                 padding: 5px 10px;
                 font-size: 12px;
@@ -104,6 +104,9 @@ def build_main_window_inventory_analytics_styles() -> str:
                 border: 1px solid #d7cec1;
             }
             #inventoryQrStatus {
+                background: #f0ebe4;
+                color: #51402f;
+                border: 1px solid #d8c9b8;
                 border-radius: 12px;
                 padding: 8px 10px;
                 font-size: 12px;

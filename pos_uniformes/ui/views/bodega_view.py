@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
     QFormLayout,
+    QFrame,
     QGroupBox,
     QHBoxLayout,
     QHeaderView,
@@ -50,6 +51,161 @@ CATEGORIA_COLORS: dict[str, str] = {
     "D": "#616161",
 }
 
+# ── Estilos compartidos ───────────────────────────────────────────────────────
+
+_TABLE_STYLE = """
+    QTableWidget {
+        border: 1px solid #D5CEC9;
+        border-radius: 6px;
+        gridline-color: #EDE8E5;
+        background: white;
+        alternate-background-color: #FAF7F5;
+        selection-background-color: #FDEAE2;
+        selection-color: #2C1810;
+        font-size: 12px;
+        outline: 0;
+    }
+    QTableWidget::item { padding: 5px 8px; }
+    QHeaderView::section {
+        background: #F0EBE6;
+        border: none;
+        border-bottom: 2px solid #C9B9AE;
+        border-right: 1px solid #DDD7D3;
+        padding: 6px 8px;
+        font-weight: bold;
+        font-size: 11px;
+        color: #4A3728;
+    }
+    QHeaderView::section:last-of-type { border-right: none; }
+    QScrollBar:vertical { width: 8px; background: #F5F2F0; border-radius: 4px; }
+    QScrollBar::handle:vertical { background: #C9B9AE; border-radius: 4px; min-height: 20px; }
+    QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+"""
+
+_GROUPBOX_STYLE = """
+    QGroupBox {
+        font-weight: bold;
+        font-size: 12px;
+        color: #4A3728;
+        border: 1px solid #D5CEC9;
+        border-radius: 8px;
+        margin-top: 12px;
+        padding-top: 4px;
+        background: white;
+    }
+    QGroupBox::title {
+        subcontrol-origin: margin;
+        left: 12px;
+        padding: 0 6px;
+        background: white;
+    }
+"""
+
+_BTN_PRIMARY = """
+    QPushButton {
+        background: #B03A2E;
+        border: none;
+        border-radius: 6px;
+        padding: 6px 18px;
+        font-size: 12px;
+        color: white;
+        font-weight: bold;
+    }
+    QPushButton:hover { background: #992D23; }
+    QPushButton:pressed { background: #7D2218; }
+    QPushButton:disabled { background: #D5C5C2; color: #A08880; }
+"""
+
+_BTN_SUCCESS = """
+    QPushButton {
+        background: #1E6B3A;
+        border: none;
+        border-radius: 6px;
+        padding: 6px 14px;
+        font-size: 12px;
+        color: white;
+        font-weight: bold;
+    }
+    QPushButton:hover { background: #185830; }
+    QPushButton:pressed { background: #124524; }
+    QPushButton:disabled { background: #C5D5CA; color: #8AAA95; }
+"""
+
+_BTN_DANGER = """
+    QPushButton {
+        background: white;
+        border: 1.5px solid #C0392B;
+        border-radius: 6px;
+        padding: 5px 14px;
+        font-size: 12px;
+        color: #C0392B;
+        font-weight: bold;
+    }
+    QPushButton:hover { background: #FDEDEB; }
+    QPushButton:pressed { background: #FADBD8; }
+    QPushButton:disabled { border-color: #D5C5C2; color: #C5A5A2; }
+"""
+
+_BTN_SECONDARY = """
+    QPushButton {
+        background: #F0EBE6;
+        border: 1px solid #C9B9AE;
+        border-radius: 6px;
+        padding: 6px 14px;
+        font-size: 12px;
+        color: #4A3728;
+    }
+    QPushButton:hover { background: #E8DFD8; }
+    QPushButton:pressed { background: #DDD4CC; }
+    QPushButton:disabled { background: #F5F2F0; color: #B0A098; border-color: #DDD; }
+"""
+
+_BTN_OUTLINE = """
+    QPushButton {
+        background: white;
+        border: 1px solid #C9B9AE;
+        border-radius: 6px;
+        padding: 6px 14px;
+        font-size: 12px;
+        color: #5A4A3F;
+    }
+    QPushButton:hover { background: #F8F5F2; }
+    QPushButton:pressed { background: #F0EBE6; }
+    QPushButton:disabled { background: #F5F2F0; color: #B0A098; border-color: #DDD; }
+"""
+
+_SEARCH_INPUT_STYLE = """
+    QLineEdit {
+        border: 1.5px solid #C9B9AE;
+        border-radius: 6px;
+        padding: 6px 12px;
+        font-size: 13px;
+        background: white;
+        color: #2C1810;
+    }
+    QLineEdit:focus { border-color: #B03A2E; }
+    QLineEdit:hover:!focus { border-color: #A99088; }
+"""
+
+_COMBO_STYLE = """
+    QComboBox {
+        border: 1px solid #C9B9AE;
+        border-radius: 5px;
+        padding: 4px 8px;
+        background: white;
+        font-size: 12px;
+        color: #333;
+        min-width: 80px;
+    }
+    QComboBox:focus { border-color: #B03A2E; }
+    QComboBox::drop-down { border: none; width: 20px; }
+    QComboBox QAbstractItemView {
+        border: 1px solid #C9B9AE;
+        selection-background-color: #FDEAE2;
+        selection-color: #2C1810;
+    }
+"""
+
 
 def build_bodega_tab(window: "MainWindow") -> QWidget:
     return BodegaWidget(window)
@@ -66,28 +222,37 @@ class BodegaWidget(QWidget):
 
     def _init_ui(self) -> None:
         main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(8, 8, 8, 8)
+        main_layout.setContentsMargins(12, 10, 12, 10)
         main_layout.setSpacing(8)
 
         # ─── Top bar: búsqueda + acciones ────────────────────────────────
         top_bar = QHBoxLayout()
+        top_bar.setSpacing(6)
 
         self.search_input = QLineEdit()
         self.search_input.setPlaceholderText("Buscar producto, SKU, talla o caja...")
+        self.search_input.setStyleSheet(_SEARCH_INPUT_STYLE)
+        self.search_input.setFixedHeight(36)
         self.search_input.returnPressed.connect(self._on_search)
         top_bar.addWidget(self.search_input, 3)
 
         self.btn_buscar = QPushButton("Buscar")
+        self.btn_buscar.setFixedHeight(36)
+        self.btn_buscar.setStyleSheet(_BTN_SECONDARY)
         self.btn_buscar.setToolTip("Busca dónde está un producto, talla o SKU dentro de las cajas")
         self.btn_buscar.clicked.connect(self._on_search)
         top_bar.addWidget(self.btn_buscar)
 
         self.btn_nueva_caja = QPushButton("+ Nueva Caja")
+        self.btn_nueva_caja.setFixedHeight(36)
+        self.btn_nueva_caja.setStyleSheet(_BTN_PRIMARY)
         self.btn_nueva_caja.setToolTip("Crea una caja nueva eligiendo su categoría de rotación (A/B/C/D)")
         self.btn_nueva_caja.clicked.connect(self._on_nueva_caja)
         top_bar.addWidget(self.btn_nueva_caja)
 
         self.btn_ubicaciones = QPushButton("Ubicaciones")
+        self.btn_ubicaciones.setFixedHeight(36)
+        self.btn_ubicaciones.setStyleSheet(_BTN_OUTLINE)
         self.btn_ubicaciones.setToolTip("Administra los racks y niveles donde se colocan las cajas")
         self.btn_ubicaciones.clicked.connect(self._on_gestionar_ubicaciones)
         top_bar.addWidget(self.btn_ubicaciones)
@@ -96,7 +261,7 @@ class BodegaWidget(QWidget):
 
         # ─── Category chips ──────────────────────────────────────────────
         cat_bar = QHBoxLayout()
-        cat_bar.setSpacing(4)
+        cat_bar.setSpacing(6)
         self._cat_buttons: dict[str | None, QPushButton] = {}
         for key, label in [
             (None, "Todas"),
@@ -108,11 +273,14 @@ class BodegaWidget(QWidget):
             btn = QPushButton(label)
             btn.setCheckable(True)
             btn.setChecked(key is None)
-            color = CATEGORIA_COLORS.get(key, "#333")
+            btn.setFixedHeight(28)
+            color = CATEGORIA_COLORS.get(key, "#555555")
             btn.setStyleSheet(
-                f"QPushButton {{ border: 1px solid {color}; border-radius: 10px; "
-                f"padding: 3px 10px; color: {color}; background: white; font-size: 11px; }}"
+                f"QPushButton {{ border: 1.5px solid {color}; border-radius: 14px; "
+                f"padding: 2px 12px; color: {color}; background: white; "
+                f"font-size: 11px; font-weight: 500; }}"
                 f"QPushButton:checked {{ background: {color}; color: white; }}"
+                f"QPushButton:hover:!checked {{ background: {color}22; }}"
             )
             btn.clicked.connect(lambda checked, k=key: self._on_cat_filter(k))
             cat_bar.addWidget(btn)
@@ -120,7 +288,7 @@ class BodegaWidget(QWidget):
         cat_bar.addStretch()
 
         self.resumen_label = QLabel("")
-        self.resumen_label.setStyleSheet("font-size: 11px; color: #555;")
+        self.resumen_label.setStyleSheet("font-size: 11px; color: #7A6055; font-style: italic;")
         cat_bar.addWidget(self.resumen_label)
         main_layout.addLayout(cat_bar)
 
@@ -130,20 +298,28 @@ class BodegaWidget(QWidget):
         # Panel izquierdo: lista de cajas
         left_panel = QWidget()
         left_layout = QVBoxLayout()
-        left_layout.setContentsMargins(0, 0, 0, 0)
+        left_layout.setContentsMargins(0, 0, 4, 0)
+        left_layout.setSpacing(6)
 
         # Filtros
         filtros = QHBoxLayout()
+        filtros.setSpacing(6)
+        lbl_estado = QLabel("Estado:")
+        lbl_estado.setStyleSheet("font-size: 12px; color: #5A4A3F;")
         self.filtro_estado = QComboBox()
         self.filtro_estado.addItems(["Todas", "ACTIVA", "VACIA", "CERRADA"])
+        self.filtro_estado.setStyleSheet(_COMBO_STYLE)
         self.filtro_estado.currentIndexChanged.connect(self._refresh_cajas)
-        filtros.addWidget(QLabel("Estado:"))
+        filtros.addWidget(lbl_estado)
         filtros.addWidget(self.filtro_estado)
 
+        lbl_ub = QLabel("Ubicación:")
+        lbl_ub.setStyleSheet("font-size: 12px; color: #5A4A3F;")
         self.filtro_ubicacion = QComboBox()
         self.filtro_ubicacion.addItem("Todas", None)
+        self.filtro_ubicacion.setStyleSheet(_COMBO_STYLE)
         self.filtro_ubicacion.currentIndexChanged.connect(self._refresh_cajas)
-        filtros.addWidget(QLabel("Ubicación:"))
+        filtros.addWidget(lbl_ub)
         filtros.addWidget(self.filtro_ubicacion)
         filtros.addStretch()
         left_layout.addLayout(filtros)
@@ -157,7 +333,11 @@ class BodegaWidget(QWidget):
         self.tabla_cajas.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tabla_cajas.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
         self.tabla_cajas.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.tabla_cajas.setAlternatingRowColors(True)
+        self.tabla_cajas.setStyleSheet(_TABLE_STYLE)
         self.tabla_cajas.horizontalHeader().setStretchLastSection(True)
+        self.tabla_cajas.verticalHeader().setVisible(False)
+        self.tabla_cajas.setShowGrid(False)
         self.tabla_cajas.itemSelectionChanged.connect(self._on_caja_selected)
         left_layout.addWidget(self.tabla_cajas)
 
@@ -168,46 +348,79 @@ class BodegaWidget(QWidget):
         right_panel = QWidget()
         right_layout = QVBoxLayout()
         right_layout.setContentsMargins(4, 0, 0, 0)
+        right_layout.setSpacing(8)
 
-        # Header
+        # Tarjeta de info de la caja seleccionada
+        self._detalle_card = QFrame()
+        self._detalle_card.setFrameShape(QFrame.Shape.StyledPanel)
+        self._detalle_card.setStyleSheet("""
+            QFrame {
+                background: #FEF9F7;
+                border: 1px solid #E0D5CE;
+                border-radius: 8px;
+            }
+        """)
+        card_layout = QVBoxLayout()
+        card_layout.setContentsMargins(14, 10, 14, 10)
+        card_layout.setSpacing(2)
+
         self.detalle_header = QLabel("Selecciona una caja")
-        self.detalle_header.setStyleSheet("font-size: 14px; font-weight: bold;")
-        right_layout.addWidget(self.detalle_header)
+        self.detalle_header.setStyleSheet(
+            "font-size: 15px; font-weight: bold; color: #2C1810; "
+            "border: none; background: transparent;"
+        )
+        card_layout.addWidget(self.detalle_header)
 
         self.detalle_ubicacion_label = QLabel("")
-        right_layout.addWidget(self.detalle_ubicacion_label)
+        self.detalle_ubicacion_label.setStyleSheet(
+            "font-size: 12px; color: #7A6055; border: none; background: transparent;"
+        )
+        card_layout.addWidget(self.detalle_ubicacion_label)
 
         self.detalle_categoria_label = QLabel("")
-        right_layout.addWidget(self.detalle_categoria_label)
+        self.detalle_categoria_label.setStyleSheet(
+            "font-size: 12px; border: none; background: transparent;"
+        )
+        card_layout.addWidget(self.detalle_categoria_label)
+
+        self._detalle_card.setLayout(card_layout)
+        right_layout.addWidget(self._detalle_card)
 
         # Acciones de caja
         acciones_caja = QHBoxLayout()
+        acciones_caja.setSpacing(6)
+
         self.btn_agregar = QPushButton("+ Agregar producto")
         self.btn_agregar.setToolTip("Escanea o busca productos para ingresar piezas a esta caja")
+        self.btn_agregar.setStyleSheet(_BTN_SUCCESS)
         self.btn_agregar.clicked.connect(self._on_agregar_producto)
         self.btn_agregar.setEnabled(False)
         acciones_caja.addWidget(self.btn_agregar)
 
-        self.btn_retirar = QPushButton("- Retirar")
+        self.btn_retirar = QPushButton("− Retirar")
         self.btn_retirar.setToolTip("Saca piezas de esta caja para llevarlas a tienda")
+        self.btn_retirar.setStyleSheet(_BTN_DANGER)
         self.btn_retirar.clicked.connect(self._on_retirar_producto)
         self.btn_retirar.setEnabled(False)
         acciones_caja.addWidget(self.btn_retirar)
 
         self.btn_mover = QPushButton("Mover caja")
         self.btn_mover.setToolTip("Cambia la ubicación física de esta caja a otro rack o nivel")
+        self.btn_mover.setStyleSheet(_BTN_SECONDARY)
         self.btn_mover.clicked.connect(self._on_mover_caja)
         self.btn_mover.setEnabled(False)
         acciones_caja.addWidget(self.btn_mover)
 
         self.btn_reclasificar = QPushButton("Reclasificar")
         self.btn_reclasificar.setToolTip("Cambia la categoría de rotación (A/B/C/D) de esta caja")
+        self.btn_reclasificar.setStyleSheet(_BTN_SECONDARY)
         self.btn_reclasificar.clicked.connect(self._on_reclasificar)
         self.btn_reclasificar.setEnabled(False)
         acciones_caja.addWidget(self.btn_reclasificar)
 
         self.btn_etiqueta = QPushButton("Imprimir etiqueta")
         self.btn_etiqueta.setToolTip("Genera una hoja tamaño carta con QR, contenido y tallas para pegar a la caja")
+        self.btn_etiqueta.setStyleSheet(_BTN_OUTLINE)
         self.btn_etiqueta.clicked.connect(self._on_imprimir_etiqueta)
         self.btn_etiqueta.setEnabled(False)
         acciones_caja.addWidget(self.btn_etiqueta)
@@ -215,12 +428,16 @@ class BodegaWidget(QWidget):
         acciones_caja.addStretch()
         right_layout.addLayout(acciones_caja)
 
-        # Contenido de caja — desglose por producto
+        # Contenido de caja
         contenido_group = QGroupBox("Contenido")
+        contenido_group.setStyleSheet(_GROUPBOX_STYLE)
         contenido_layout = QVBoxLayout()
+        contenido_layout.setContentsMargins(8, 8, 8, 8)
+        contenido_layout.setSpacing(6)
+
         self.contenido_text = QLabel("")
         self.contenido_text.setWordWrap(True)
-        self.contenido_text.setStyleSheet("font-size: 12px; padding: 4px;")
+        self.contenido_text.setStyleSheet("font-size: 12px; padding: 2px 4px; color: #333;")
         self.contenido_text.setTextFormat(Qt.TextFormat.RichText)
         contenido_layout.addWidget(self.contenido_text)
 
@@ -229,6 +446,10 @@ class BodegaWidget(QWidget):
         self.tabla_contenido.setHorizontalHeaderLabels(["Producto", "Talla", "Color", "Cantidad", "SKU"])
         self.tabla_contenido.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.tabla_contenido.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.tabla_contenido.setAlternatingRowColors(True)
+        self.tabla_contenido.setStyleSheet(_TABLE_STYLE)
+        self.tabla_contenido.verticalHeader().setVisible(False)
+        self.tabla_contenido.setShowGrid(False)
         self.tabla_contenido.horizontalHeader().setStretchLastSection(True)
         contenido_layout.addWidget(self.tabla_contenido)
         contenido_group.setLayout(contenido_layout)
@@ -236,11 +457,18 @@ class BodegaWidget(QWidget):
 
         # Historial
         historial_group = QGroupBox("Últimos movimientos")
+        historial_group.setStyleSheet(_GROUPBOX_STYLE)
         historial_layout = QVBoxLayout()
+        historial_layout.setContentsMargins(8, 8, 8, 8)
+
         self.tabla_historial = QTableWidget()
         self.tabla_historial.setColumnCount(5)
         self.tabla_historial.setHorizontalHeaderLabels(["Fecha", "Tipo", "Producto", "Cantidad", "Usuario"])
         self.tabla_historial.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.tabla_historial.setAlternatingRowColors(True)
+        self.tabla_historial.setStyleSheet(_TABLE_STYLE)
+        self.tabla_historial.verticalHeader().setVisible(False)
+        self.tabla_historial.setShowGrid(False)
         self.tabla_historial.horizontalHeader().setStretchLastSection(True)
         historial_layout.addWidget(self.tabla_historial)
         historial_group.setLayout(historial_layout)
@@ -254,7 +482,9 @@ class BodegaWidget(QWidget):
 
         # ─── Resultados de búsqueda (oculto inicialmente) ────────────────
         self.search_results_group = QGroupBox("Resultados de búsqueda")
+        self.search_results_group.setStyleSheet(_GROUPBOX_STYLE)
         search_layout = QVBoxLayout()
+        search_layout.setContentsMargins(10, 8, 10, 10)
         search_top = QHBoxLayout()
         self.search_results_text = QLabel("")
         self.search_results_text.setWordWrap(True)
@@ -264,7 +494,9 @@ class BodegaWidget(QWidget):
         btn_cerrar_busqueda = QPushButton("✕")
         btn_cerrar_busqueda.setFixedSize(28, 28)
         btn_cerrar_busqueda.setStyleSheet(
-            "border: none; font-size: 16px; font-weight: bold; color: #888;"
+            "QPushButton { border: none; font-size: 15px; font-weight: bold; color: #888; "
+            "background: transparent; border-radius: 14px; }"
+            "QPushButton:hover { background: #F0EBE6; color: #555; }"
         )
         btn_cerrar_busqueda.setToolTip("Cerrar resultados")
         btn_cerrar_busqueda.clicked.connect(self._close_search_results)

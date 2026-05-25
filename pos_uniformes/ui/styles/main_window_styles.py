@@ -33,7 +33,7 @@ def _build_main_window_shell_styles() -> str:
                 font-size: 14px;
             }
             QTabWidget::pane {
-                border: 1px solid #d8e0e7;
+                border: 1px solid #ddd4c8;
                 border-radius: 18px;
                 background: #faf9f5;
                 top: -1px;
@@ -52,31 +52,31 @@ def _build_main_window_shell_styles() -> str:
                 color: #f7f1e8;
             }
             QTabBar::tab:hover:!selected {
-                background: #e6edf3;
-                color: #2f3f4c;
+                background: #f0ebe4;
+                color: #4a3728;
             }
             #statusLine, #subtleLine, #analyticsLine {
-                background: #f5f8fa;
-                border: 1px solid #d9e3ea;
+                background: #f5f0ea;
+                border: 1px solid #d8cfc3;
                 border-radius: 12px;
                 padding: 6px 10px;
             }
             #catalogSpotlightCard, #catalogFiltersCard, #catalogStatusStrip {
-                background: #f8fafb;
-                border: 1px solid #dce5eb;
+                background: #fdfcf9;
+                border: 1px solid #ddd4c8;
                 border-radius: 16px;
                 padding: 10px 12px;
             }
             #catalogSpotlightCard {
                 background: qlineargradient(
                     x1: 0, y1: 0, x2: 1, y2: 1,
-                    stop: 0 #fbfcfd,
-                    stop: 1 #edf3f7
+                    stop: 0 #fdfcf9,
+                    stop: 1 #f5ede5
                 );
-                border: 1px solid #d9e3ea;
+                border: 1px solid #ddd4c8;
             }
             #catalogStatusStrip {
-                background: #f5f8fa;
+                background: #faf6f2;
             }
             #catalogSectionTitle {
                 background: transparent;
@@ -105,33 +105,33 @@ def _build_main_window_shell_styles() -> str:
                 letter-spacing: 0.08em;
             }
             #catalogSelectionLine {
-                background: rgba(245, 248, 250, 0.9);
-                border: 1px solid #dce5eb;
+                background: rgba(245, 240, 234, 0.9);
+                border: 1px solid #ddd4c8;
                 border-radius: 14px;
                 padding: 6px 10px;
-                color: #43515e;
+                color: #4a3728;
                 font-weight: 700;
             }
             #catalogSummaryLine {
-                background: #eef4f8;
-                border: 1px solid #d8e2ea;
+                background: #f0ebe4;
+                border: 1px solid #c9b5a5;
                 border-radius: 14px;
                 padding: 6px 10px;
-                color: #304d60;
+                color: #4a3020;
                 font-weight: 800;
             }
             #catalogPagerLine, #catalogSupportLine {
-                background: #f5f8fa;
-                border: 1px solid #dce5eb;
+                background: #f5f0ea;
+                border: 1px solid #d8cfc3;
                 border-radius: 12px;
                 padding: 5px 9px;
             }
             #catalogPagerLine {
-                color: #5f6870;
+                color: #5f504a;
                 font-weight: 700;
             }
             #catalogSupportLine {
-                color: #66717b;
+                color: #6a5a50;
             }
             #templatePreviewLabel {
                 background: transparent;
@@ -169,18 +169,18 @@ def _build_main_window_shell_styles() -> str:
                 font-weight: 600;
             }
             #chipButton {
-                background: #eef3f7;
-                color: #465866;
-                border: 1px solid #d7e1e8;
+                background: #f0ebe4;
+                color: #514030;
+                border: 1px solid #d8c9b8;
                 border-radius: 999px;
                 padding: 6px 10px;
                 font-size: 12px;
                 font-weight: 700;
             }
             #chipButton:hover {
-                background: #dfeaf2;
-                border-color: #c5d7e4;
-                color: #314c60;
+                background: #e8dfd8;
+                border-color: #c9b5a5;
+                color: #4a3020;
             }
             #chipButton[active="true"] {
                 background: #a84f2d;
@@ -188,9 +188,9 @@ def _build_main_window_shell_styles() -> str:
                 border-color: #8a4326;
             }
             #stepButton {
-                background: #eef3f7;
-                color: #60707d;
-                border: 1px solid #d8e2ea;
+                background: #f0ebe4;
+                color: #514030;
+                border: 1px solid #d8c9b8;
                 border-radius: 999px;
                 padding: 7px 12px;
                 font-size: 12px;
@@ -202,18 +202,18 @@ def _build_main_window_shell_styles() -> str:
                 border-color: #8a4326;
             }
             #stepButton:hover {
-                background: #dfeaf2;
-                color: #314c60;
-                border-color: #c5d7e4;
+                background: #e8dfd8;
+                color: #4a3020;
+                border-color: #c9b5a5;
             }
             #analyticsLine {
-                background: #eef3f7;
-                color: #485762;
+                background: #f0ebe4;
+                color: #514030;
             }
             #readOnlyField {
-                background: #eff4f7;
-                color: #566471;
-                border: 1px solid #d8e2ea;
+                background: #f5f0ea;
+                color: #5a4a3f;
+                border: 1px solid #d8cfc3;
                 border-radius: 12px;
                 padding: 9px 12px;
                 font-weight: 700;
@@ -227,8 +227,8 @@ def _build_main_window_shell_styles() -> str:
                 font-weight: 800;
             }
             #quoteDetailCard {
-                background: #f8fafb;
-                border: 1px solid #dce5eb;
+                background: #fdfcf9;
+                border: 1px solid #ddd4c8;
                 border-radius: 14px;
             }
             #quoteDetailTitle {
@@ -276,8 +276,8 @@ def _build_main_window_shell_styles() -> str:
                 background: #bb613c;
             }
             QGroupBox, #infoCard {
-                background: #f8fafb;
-                border: 1px solid #dce5eb;
+                background: #fdfcf9;
+                border: 1px solid #ddd4c8;
                 border-radius: 18px;
                 margin-top: 12px;
                 padding-top: 12px;

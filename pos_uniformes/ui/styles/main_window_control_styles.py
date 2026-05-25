@@ -262,29 +262,29 @@ def build_main_window_control_styles() -> str:
             """
             #dataTable {
                 background: #fdfcf9;
-                alternate-background-color: #f1f5f8;
-                gridline-color: #d8e0e7;
-                border: 1px solid #d8e0e7;
+                alternate-background-color: #f5f0e9;
+                gridline-color: #e4dbd1;
+                border: 1px solid #d8cfc3;
                 border-radius: 16px;
-                selection-background-color: #d9e7f2;
-                selection-color: #244158;
+                selection-background-color: #fdeae2;
+                selection-color: #4a2810;
                 font-size: 13px;
             }
             QHeaderView::section {
-                background: #e8eef3;
-                color: #43515e;
+                background: #f0ebe4;
+                color: #4a3728;
                 border: none;
-                border-right: 1px solid #d8e0e7;
-                border-bottom: 1px solid #d8e0e7;
+                border-right: 1px solid #d8cfc3;
+                border-bottom: 2px solid #c9b5a5;
                 padding: 8px 10px;
                 font-weight: 700;
             }
             #qrPreview {
-                border: 1px dashed #b7ad9e;
+                border: 1.5px dashed #c9b5a5;
                 border-radius: 18px;
                 background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #ffffff, stop:1 #f6f1e8);
-                color: #8a8075;
+                    stop:0 #fdfcf9, stop:1 #f5ede5);
+                color: #8a7a6a;
                 max-width: 180px;
                 max-height: 180px;
                 padding: 10px;
