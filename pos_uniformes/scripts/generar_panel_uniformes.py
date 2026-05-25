@@ -219,18 +219,27 @@ def compute_insights(stats, school_levels, pieces_raw, catalog_rows, catalog_col
     insights = []
 
     # Pieces per school
-    all_tipos = [t for t in PIEZA_ORDER if any(r[2] == t for r in pieces_raw)]
     pieces_map = defaultdict(set)
     for eid, nivel, tipo, cnt in pieces_raw:
         pieces_map[(eid, nivel)].add(tipo)
+
+    # Máximo de tipos por nivel (peer comparison).
+    # Comparar cada escuela contra la más completa de su mismo nivel evita
+    # penalizar escuelas que no manejan piezas específicas de otro nivel
+    # (p.ej. CBTIS no necesita Corbatín ni Moño aunque existan en Bachillerato).
+    max_tipos_por_nivel: dict[str, int] = defaultdict(int)
+    for (eid, nivel), tipos in pieces_map.items():
+        max_tipos_por_nivel[nivel] = max(max_tipos_por_nivel[nivel], len(tipos))
 
     # Coverage
     coverage_data = []
     for sl in school_levels:
         key = (sl["escuela_id"], sl["nivel_nombre"])
+        nivel = sl["nivel_nombre"]
         has = len(pieces_map.get(key, set()))
-        pct = round(has / len(all_tipos) * 100) if all_tipos else 0
-        coverage_data.append({"name": sl["display_name"], "nivel": sl["nivel_nombre"], "has": has, "total": len(all_tipos), "pct": pct})
+        nivel_max = max_tipos_por_nivel.get(nivel, 1)
+        pct = min(100, round(has / nivel_max * 100)) if nivel_max else 0
+        coverage_data.append({"name": sl["display_name"], "nivel": nivel, "has": has, "total": nivel_max, "pct": pct})
 
     low_coverage = [c for c in coverage_data if c["pct"] < 40]
     full_coverage = [c for c in coverage_data if c["pct"] >= 80]
