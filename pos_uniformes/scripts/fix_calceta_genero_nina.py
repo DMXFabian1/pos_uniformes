@@ -27,7 +27,7 @@ def main() -> None:
         session.execute(
             update(Producto)
             .where(Producto.id.in_(calceta_ids))
-            .values(genero="Niña")
+            .values(genero="Mujer")
         )
         session.commit()
 
