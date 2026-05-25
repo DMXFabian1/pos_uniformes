@@ -55,7 +55,7 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from pos_uniformes.database.connection import get_session
-from pos_uniformes.database.models import Cliente, EstadoPresupuesto, RolUsuario, Usuario
+from pos_uniformes.database.models import Cliente, Empleada, EstadoPresupuesto, RolUsuario, Usuario
 from pos_uniformes.services.active_filter_service import build_active_filter_tokens
 from pos_uniformes.services.catalog_local_cache_service import (
     catalog_cache_saved_at,
@@ -2841,6 +2841,47 @@ class QuoteSatelliteWindow(QMainWindow):
             return False
         return True
 
+    def _authorize_with_employee_qr(self) -> str | None:
+        """Muestra diálogo de escaneo QR. Retorna nombre del empleado si autorizado, None si no."""
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Autorización requerida")
+        dialog.setModal(True)
+        dialog.setMinimumWidth(320)
+        layout = QVBoxLayout()
+        layout.setSpacing(12)
+        lbl = QLabel("Escanea el QR del empleado autorizado para continuar.")
+        lbl.setWordWrap(True)
+        layout.addWidget(lbl)
+        code_input = QLineEdit()
+        code_input.setPlaceholderText("Escanea el QR aquí")
+        layout.addWidget(code_input)
+        buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        buttons.accepted.connect(dialog.accept)
+        buttons.rejected.connect(dialog.reject)
+        code_input.returnPressed.connect(dialog.accept)
+        layout.addWidget(buttons)
+        dialog.setLayout(layout)
+        QTimer.singleShot(0, code_input.setFocus)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return None
+        scanned = code_input.text().strip()
+        if not scanned:
+            return None
+        try:
+            with get_session() as session:
+                emp = session.execute(
+                    select(Empleada).where(Empleada.codigo == scanned, Empleada.activo.is_(True))
+                ).scalar_one_or_none()
+            if emp is None:
+                QMessageBox.warning(self, "No autorizado", "QR no reconocido o empleado inactivo.")
+                return None
+            return emp.nombre_completo
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Error de autorización", str(exc))
+            return None
+
     def _handle_toggle_favorite(self, product_key: str) -> None:
         self._favorites = set(load_favorites())
         if product_key in self._favorites:
@@ -5022,6 +5063,41 @@ QLabel#favDialogPriceLabel {
         save_btn.setMinimumHeight(36)
         save_btn.clicked.connect(lambda: _close_and_run(self._handle_save_quote_draft))
 
+        sale_btn = QPushButton("Ticket de venta")
+        sale_btn.setObjectName("addToCartButton")
+        sale_btn.setMinimumHeight(36)
+
+        def _handle_sale_ticket():
+            emp_name = self._authorize_with_employee_qr()
+            if emp_name is None:
+                return
+            cart_total = sum(
+                Decimal(str(item["precio_unitario"])) * int(item["cantidad"])
+                for item in self.quote_cart
+            )
+            text = _build_sale_ticket_text(authorized_by=emp_name, cart=list(self.quote_cart), total=cart_total)
+            _close_and_run(lambda: open_printable_text_dialog(self, "Ticket de Venta", text))
+
+        sale_btn.clicked.connect(_handle_sale_ticket)
+
+        clear_btn = QPushButton("Limpiar")
+        clear_btn.setObjectName("ghostButton")
+        clear_btn.setMinimumHeight(36)
+
+        def _handle_clear():
+            confirm = QMessageBox.question(
+                dlg,
+                "Limpiar presupuesto",
+                "¿Eliminar todas las piezas del presupuesto actual?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if confirm == QMessageBox.StandardButton.Yes:
+                self.quote_cart.clear()
+                _refresh_table()
+                self._refresh_quote_cart_table()
+
+        clear_btn.clicked.connect(_handle_clear)
+
         close_btn = QPushButton("Cerrar")
         close_btn.setObjectName("ghostButton")
         close_btn.setMinimumHeight(36)
@@ -5030,6 +5106,8 @@ QLabel#favDialogPriceLabel {
         actions_layout.addWidget(print_btn)
         actions_layout.addWidget(whatsapp_btn)
         actions_layout.addWidget(save_btn)
+        actions_layout.addWidget(sale_btn)
+        actions_layout.addWidget(clear_btn)
         actions_layout.addStretch()
         actions_layout.addWidget(close_btn)
 
@@ -5792,6 +5870,66 @@ def _build_cart_ticket_text(
         lines.append("─" * _W)
         for wrapped in textwrap.wrap(promo_line, width=_W):
             lines.append(wrapped.center(_W))
+    return "\n".join(lines)
+
+
+def _build_sale_ticket_text(
+    *,
+    authorized_by: str,
+    cart: list[dict],
+    total: object,
+) -> str:
+    import datetime
+
+    from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
+        TICKET_CHAR_WIDTH as _W,
+        tk_bot, tk_center, tk_dbl, tk_field, tk_fmt,
+        tk_line, tk_mid, tk_product_price, tk_row, tk_top,
+    )
+
+    _IW = _W - 4
+    biz = _load_business_name()
+    lines: list[str] = []
+
+    lines.append(biz.center(_W))
+    lines.append("Ticket de Venta".center(_W))
+    lines.append("")
+
+    lines.append(tk_top())
+    now = datetime.datetime.now()
+    tk_field("Fecha:", now.strftime("%d/%m/%Y %H:%M"), lines)
+    tk_field("Autorizado:", authorized_by, lines)
+
+    lines.append(tk_mid())
+    lines.append(tk_center("PIEZAS"))
+    lines.append(tk_mid())
+    from pos_uniformes.services.school_tariff_service import _tariff_product_sort_key
+    sorted_cart = sorted(
+        cart,
+        key=lambda item: _tariff_product_sort_key(
+            str(item.get("tipo_pieza_nombre") or item.get("tipo_pieza", ""))
+        ),
+    )
+    first_detail = True
+    for item in sorted_cart:
+        qty = int(item["cantidad"])
+        unit_price = Decimal(str(item["precio_unitario"])).quantize(Decimal("0.01"))
+        subtotal = (unit_price * qty).quantize(Decimal("0.01"))
+        description = str(item.get("producto_nombre") or item.get("sku", ""))
+        talla = str(item.get("talla") or "").strip()
+        if not first_detail:
+            lines.append(tk_mid())
+        first_detail = False
+        for dl in textwrap.wrap(description, width=_IW) or [description]:
+            lines.append(tk_line(dl))
+        if talla and talla != "-":
+            lines.append(tk_line(f"Talla: {talla}"))
+        tk_product_price(f"{qty} x ${unit_price}", f"${subtotal}", lines)
+
+    lines.append(tk_dbl())
+    lines.append(tk_row("TOTAL:", f"${tk_fmt(total)}"))
+    lines.append(tk_bot())
+
     return "\n".join(lines)
 
 
