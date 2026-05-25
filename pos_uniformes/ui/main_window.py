@@ -1139,9 +1139,9 @@ def _set_table_row_tint(item: QTableWidgetItem, tone: str) -> None:
     palette = {
         "danger": ("#fff2ef", "#7a2b1d"),
         "warning": ("#fffaf0", "#7a5a14"),
-        "muted": ("#f2f4f6", "#6a727a"),
-        "neutral": ("#f8fafb", "#5f6770"),
-        "reserved": ("#eef4f8", "#385266"),
+        "muted": ("#f5f0ea", "#7a6d60"),
+        "neutral": ("#fdfaf6", "#7a6d60"),
+        "reserved": ("#f0ebe4", "#5a4a3f"),
     }
     background, foreground = palette.get(tone, palette["neutral"])
     item.setBackground(QColor(background))

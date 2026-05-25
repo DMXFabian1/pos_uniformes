@@ -118,7 +118,7 @@ class BodegaIngresoDialog(QDialog):
         # ─── Scan input ──────────────────────────────────────────────────
         scan_card = QFrame()
         scan_card.setStyleSheet(
-            "QFrame { border: 1px solid #d9e5ef; border-radius: 8px; background: #fcfdfd; }"
+            "QFrame { border: 1px solid #d5c9b9; border-radius: 8px; background: #fffdf8; }"
         )
         scan_layout = QHBoxLayout()
         scan_layout.setContentsMargins(12, 10, 12, 10)

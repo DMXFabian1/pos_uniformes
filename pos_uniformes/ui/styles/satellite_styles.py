@@ -112,7 +112,7 @@ QLabel#offlineBanner {
     border-radius: 8px;
 }
 QGroupBox {
-    border: 1px solid #dce5eb;
+    border: 1px solid #ddd0c0;
     border-radius: 16px;
     margin-top: 10px;
     padding-top: 6px;
@@ -138,12 +138,12 @@ QFrame#satHeaderCard {
 }
 QFrame#satTotalsCard {
     background: #fbf8f2;
-    border: 1px solid #dce5eb;
+    border: 1px solid #ddd0c0;
     border-radius: 18px;
 }
 QFrame#satSidebarCard {
     background: #fbf8f2;
-    border: 1px solid #dce5eb;
+    border: 1px solid #ddd0c0;
     border-radius: 22px;
 }
 QFrame#satSidebarItemCard {
@@ -169,7 +169,7 @@ QLabel#satFieldLabel {
 }
 QLabel#satPager {
     background: #f5f8fa;
-    border: 1px solid #dce5eb;
+    border: 1px solid #ddd0c0;
     border-radius: 12px;
     padding: 5px 9px;
     color: #5f6870;
@@ -197,7 +197,7 @@ QLabel#satTotal {
 QLabel#satSummary {
     color: #304d60;
     background: #f2ece3;
-    border: 1px solid #d8e2ea;
+    border: 1px solid #ddd0c0;
     border-radius: 12px;
     padding: 10px 12px;
 }
@@ -214,7 +214,7 @@ QLabel#satSidebarTotal {
 QLabel#satSidebarSummary {
     color: #66717b;
     background: #f1ebe2;
-    border: 1px solid #dce5eb;
+    border: 1px solid #ddd0c0;
     border-radius: 12px;
     padding: 10px 12px;
 }
@@ -281,7 +281,7 @@ QFrame#satHeroDivider {
 }
 QFrame#satRecentCard {
     background: #fbf8f2;
-    border: 1px solid #dce5eb;
+    border: 1px solid #ddd0c0;
     border-radius: 18px;
 }
 QPushButton#addToCartButton {
@@ -348,7 +348,7 @@ QLabel#satFieldValue {
 QLabel#satDetailMeta {
     color: #66717b;
     background: #f1ebe2;
-    border: 1px solid #dce5eb;
+    border: 1px solid #ddd0c0;
     border-radius: 12px;
     padding: 10px 12px;
 }
@@ -545,9 +545,9 @@ QComboBox QAbstractItemView {
 QTableWidget {
     background: #fffaf2;
     alternate-background-color: #f5eee5;
-    border: 1px solid #dce5eb;
+    border: 1px solid #ddd0c0;
     border-radius: 12px;
-    gridline-color: #dce5eb;
+    gridline-color: #ddd0c0;
     color: #2f2a24;
     selection-background-color: #dfb48f;
     selection-color: #1f1c19;
@@ -562,7 +562,7 @@ QHeaderView::section {
     background: #efe4d5;
     color: #304d60;
     border: none;
-    border-bottom: 1px solid #d8e2ea;
+    border-bottom: 1px solid #ddd0c0;
     padding: 8px;
     font-weight: 800;
 }
@@ -572,8 +572,8 @@ QHeaderView {
 QTableCornerButton::section {
     background: #efe4d5;
     border: none;
-    border-bottom: 1px solid #d8e2ea;
-    border-right: 1px solid #d8e2ea;
+    border-bottom: 1px solid #ddd0c0;
+    border-right: 1px solid #ddd0c0;
 }
 QScrollArea#guidedScrollArea,
 QWidget#guidedScrollViewport {

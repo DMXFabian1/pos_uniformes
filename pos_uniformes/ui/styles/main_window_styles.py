@@ -258,8 +258,8 @@ def _build_main_window_shell_styles() -> str:
                 padding: 0;
             }
             #settingsLaunchCard {
-                background: #f8fafb;
-                border: 1px solid #dce5eb;
+                background: #fdfaf6;
+                border: 1px solid #ddd0c0;
                 border-radius: 18px;
             }
             QPushButton#settingsLaunchButton {
@@ -290,8 +290,8 @@ def _build_main_window_shell_styles() -> str:
                 color: #51483f;
             }
             #kpiCard {
-                background: #f8fafb;
-                border: 1px solid #dce5eb;
+                background: #fdfaf6;
+                border: 1px solid #ddd0c0;
                 border-radius: 20px;
             }
             #kpiCard[tone="positive"] {
@@ -307,23 +307,23 @@ def _build_main_window_shell_styles() -> str:
                 border: 1px solid #e3c0b8;
             }
             #kpiCard[tone="neutral"], #kpiCard[tone="muted"] {
-                background: #f8fafb;
-                border: 1px solid #dce5eb;
+                background: #fdfaf6;
+                border: 1px solid #ddd0c0;
             }
             #kpiTitle {
-                color: #66707a;
+                color: #7a6d60;
                 font-size: 12px;
                 text-transform: uppercase;
                 letter-spacing: 0.06em;
                 font-weight: 700;
             }
             #kpiValue {
-                color: #355167;
+                color: #7b2d14;
                 font-size: 30px;
                 font-weight: 800;
             }
             #kpiSubtitle {
-                color: #78818a;
+                color: #8a7a6a;
                 font-size: 12px;
             }
             #kpiSubtitle[tone="positive"] {

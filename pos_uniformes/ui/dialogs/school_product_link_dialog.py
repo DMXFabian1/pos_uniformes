@@ -162,21 +162,21 @@ class SchoolProductLinkDialog(QDialog):
         add_layout.setContentsMargins(12, 12, 12, 10)
         add_layout.setSpacing(6)
         add_section_label = QLabel("Agregar liga")
-        add_section_label.setStyleSheet("font-size: 12px; font-weight: 700; color: #5f6d78; text-transform: uppercase;")
+        add_section_label.setStyleSheet("font-size: 12px; font-weight: 700; color: #7a6d60; text-transform: uppercase;")
         self._search_input = QLineEdit()
         self._search_input.setPlaceholderText("Buscar producto general…")
         self._search_input.setStyleSheet(
-            "QLineEdit { border: 1.5px solid #d7e4ee; border-radius: 8px; padding: 6px 10px;"
-            "  background: #fcfdfd; color: #294f69; font-size: 13px; }"
+            "QLineEdit { border: 1.5px solid #d5c9b9; border-radius: 8px; padding: 6px 10px;"
+            "  background: #fffdf8; color: #2f2a24; font-size: 13px; }"
             "QLineEdit:focus { border-color: #c45425; }"
         )
         self._search_input.textChanged.connect(self._handle_search_changed)
         self._product_list = QListWidget()
         self._product_list.setStyleSheet(
-            "QListWidget { border: 1px solid #e0eaf2; border-radius: 8px; background: #fcfdfd; outline: none; }"
-            "QListWidget::item { padding: 7px 10px; border-radius: 5px; color: #294f69; }"
-            "QListWidget::item:selected { background: #e6f3ff; color: #1a3a54; }"
-            "QListWidget::item:hover:!selected { background: #f0f6fc; }"
+            "QListWidget { border: 1px solid #d5c9b9; border-radius: 8px; background: #fffdf8; outline: none; }"
+            "QListWidget::item { padding: 7px 10px; border-radius: 5px; color: #2f2a24; }"
+            "QListWidget::item:selected { background: #f4d4bb; color: #4a1505; }"
+            "QListWidget::item:hover:!selected { background: #fdf0e8; }"
         )
         self._product_list.setMaximumHeight(160)
         self._product_list.setMinimumHeight(120)

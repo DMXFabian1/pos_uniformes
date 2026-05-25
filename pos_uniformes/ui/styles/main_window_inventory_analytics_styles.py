@@ -115,9 +115,9 @@ def build_main_window_inventory_analytics_styles() -> str:
             #analyticsFlagCard {
                 border-radius: 14px;
                 padding: 10px 12px;
-                border: 1px solid #d6e2ea;
-                background: #f1f5f8;
-                color: #5a6774;
+                border: 1px solid #ddd0c0;
+                background: #fdfaf6;
+                color: #7a6d60;
                 font-size: 13px;
                 font-weight: 800;
             }
@@ -137,8 +137,8 @@ def build_main_window_inventory_analytics_styles() -> str:
                 border: 1px solid #dfb3aa;
             }
             #analyticsFlagCard[tone="neutral"], #analyticsFlagCard[tone="muted"] {
-                background: #f1f5f8;
-                color: #5a6774;
-                border: 1px solid #d6e2ea;
+                background: #fdfaf6;
+                color: #7a6d60;
+                border: 1px solid #ddd0c0;
             }
             """
