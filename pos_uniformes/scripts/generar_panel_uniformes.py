@@ -73,8 +73,15 @@ def compute_default_na(school_levels, pieces_raw):
         if cnt:
             has_piece.add((eid, nivel, tipo))
 
+    preescolar_eids = {sl["escuela_id"] for sl in school_levels if sl["nivel_nombre"] == "Preescolar"}
+
+    for eid in preescolar_eids:
+        for tipo in ["Corbatín", "Moño"]:
+            if (eid, "Preescolar", tipo) not in has_piece:
+                na[f"{eid}_Preescolar_{tipo}"] = True
+
     for eid in primaria_eids:
-        for tipo in ["Corbata", "Corbatín", "Moño"]:
+        for tipo in ["Corbata", "Corbatín", "Moño", "Mascada"]:
             if (eid, "Primaria", tipo) not in has_piece:
                 na[f"{eid}_Primaria_{tipo}"] = True
 
