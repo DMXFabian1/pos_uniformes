@@ -23,6 +23,15 @@ _IW = _W - 4  # ancho interno
 # Valores de género que siempre se incluyen sin importar el filtro
 _GENEROS_UNISEX = {"", "UNISEX", "ADULTO", "MIXTO"}
 
+# Equivalencias: Niña↔Mujer, Niño↔Hombre (un producto con genero="Mujer"
+# aparece cuando el filtro es "NIÑA" y viceversa)
+_GENERO_EQUIV: dict[str, set[str]] = {
+    "NIÑA": {"NIÑA", "MUJER"},
+    "NIÑO": {"NIÑO", "HOMBRE"},
+    "MUJER": {"MUJER", "NIÑA"},
+    "HOMBRE": {"HOMBRE", "NIÑO"},
+}
+
 
 def build_school_tariff_text(
     *,
@@ -44,10 +53,11 @@ def build_school_tariff_text(
     # Aplicar filtro de género
     filtro = genero_filter.strip().upper() if genero_filter else None
     if filtro:
+        allowed = _GENERO_EQUIV.get(filtro, {filtro})
         productos = [
             p for p in all_productos
             if p.get("genero", "").upper() in _GENEROS_UNISEX
-            or p.get("genero", "").upper() == filtro
+            or p.get("genero", "").upper() in allowed
         ]
     else:
         productos = all_productos
