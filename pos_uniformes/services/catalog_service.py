@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 from decimal import Decimal
+
+logger = logging.getLogger(__name__)
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -43,7 +46,7 @@ class CatalogService:
             from pos_uniformes.services.meilisearch_service import notify_catalog_changed
             notify_catalog_changed()
         except Exception:
-            pass
+            logger.debug("notify_catalog_changed falló (Meilisearch no disponible)", exc_info=True)
 
     @staticmethod
     def _optional_name(value: object | None) -> str | None:

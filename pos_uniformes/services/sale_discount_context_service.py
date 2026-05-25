@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from decimal import Decimal
 from typing import Callable
+
+logger = logging.getLogger(__name__)
 
 from pos_uniformes.services.manual_promo_flow_service import (
     build_manual_promo_state,
@@ -53,6 +56,7 @@ def load_sale_discount_presets(
             normalize_discount_value(config.discount_mayorista),
         ]
     except Exception:
+        logger.warning("No se pudo leer configuración de descuentos; usando presets por defecto", exc_info=True)
         values = default_values
     return sorted({value for value in values if value > Decimal("0.00")})
 
@@ -84,6 +88,7 @@ def resolve_sale_client_discount_ui_state(
             normalize_discount_value=normalize_discount_value,
         )
     except Exception:
+        logger.warning("Error resolviendo cliente seleccionado; descartando selección", exc_info=True)
         sync_state = selected_client_service.resolve_sale_selected_client_sync_state(
             None,
             selected_client_id=None,

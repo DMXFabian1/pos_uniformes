@@ -396,7 +396,7 @@ class CustomerCardService:
                     canvas.alpha_composite(logo, (pos_x, 190))
                     return
                 except Exception:
-                    pass
+                    logger.debug("No se pudo aplicar logo en credencial: %s", logo_path, exc_info=True)
 
         draw = ImageDraw.Draw(canvas)
         draw.text(

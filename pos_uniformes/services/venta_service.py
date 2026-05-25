@@ -131,7 +131,7 @@ class VentaService:
                 detalle = VentaDetalle(
                     variante=variante,
                     sku_snapshot=variante.sku,
-                    descripcion_snapshot=sanitize_product_display_name(getattr(variante.producto, "nombre", "")),
+                    descripcion_snapshot=sanitize_product_display_name(variante.producto.nombre),
                     cantidad=item.cantidad,
                     precio_unitario=unit_price,
                     subtotal_linea=subtotal_linea,
@@ -208,8 +208,8 @@ class VentaService:
         for detalle_apartado in apartado.detalles:
             detalle = VentaDetalle(
                 variante=detalle_apartado.variante,
-                sku_snapshot=getattr(detalle_apartado.variante, "sku", None),
-                descripcion_snapshot=sanitize_product_display_name(getattr(detalle_apartado.variante.producto, "nombre", "")),
+                sku_snapshot=detalle_apartado.variante.sku,
+                descripcion_snapshot=sanitize_product_display_name(detalle_apartado.variante.producto.nombre),
                 cantidad=detalle_apartado.cantidad,
                 precio_unitario=detalle_apartado.precio_unitario,
                 subtotal_linea=detalle_apartado.subtotal_linea,
@@ -218,7 +218,7 @@ class VentaService:
             total += Decimal(detalle_apartado.subtotal_linea)
 
         venta.subtotal = total
-        layaway_total = Decimal(getattr(apartado, "total", total) or total).quantize(Decimal("0.01"))
+        layaway_total = Decimal(apartado.total).quantize(Decimal("0.01"))
         venta.total = layaway_total
         rounding_adjustment = (layaway_total - total).quantize(Decimal("0.01"))
         if rounding_adjustment != Decimal("0.00"):

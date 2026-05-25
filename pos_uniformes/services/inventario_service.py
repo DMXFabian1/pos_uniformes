@@ -83,6 +83,15 @@ class InventarioService:
         if cantidad == 0:
             raise ValueError("La cantidad del movimiento no puede ser cero.")
 
+        # Adquirir lock a nivel de fila antes de leer y modificar stock.
+        # Evita race conditions cuando dos transacciones concurrentes reducen
+        # el mismo variante simultáneamente.
+        _locked = session.scalar(
+            select(Variante).where(Variante.id == variante.id).with_for_update()
+        )
+        if _locked is None:
+            raise ValueError(f"La variante id={variante.id} ya no existe en la base de datos.")
+
         stock_anterior = variante.stock_actual
         stock_posterior = stock_anterior + cantidad
 

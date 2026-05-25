@@ -51,7 +51,7 @@ class VentaServiceLayawayTests(unittest.TestCase):
     def test_crear_confirmada_desde_apartado_preserves_rounded_total(self) -> None:
         session = _SessionStub()
         usuario = SimpleNamespace(activo=True, rol="CAJERO", username="caja")
-        variante = SimpleNamespace(producto=SimpleNamespace(nombre="Playera"))
+        variante = SimpleNamespace(sku="PLY-001-S-BL", producto=SimpleNamespace(nombre="Playera"))
         detalle = SimpleNamespace(
             variante=variante,
             cantidad=1,
@@ -87,7 +87,7 @@ class VentaServiceLayawayTests(unittest.TestCase):
     def test_crear_confirmada_desde_apartado_keeps_observation_without_adjustment(self) -> None:
         session = _SessionStub()
         usuario = SimpleNamespace(activo=True, rol="CAJERO", username="caja")
-        variante = SimpleNamespace(producto=SimpleNamespace(nombre="Pantalon"))
+        variante = SimpleNamespace(sku="PNT-002-M-AZ", producto=SimpleNamespace(nombre="Pantalon"))
         detalle = SimpleNamespace(
             variante=variante,
             cantidad=1,

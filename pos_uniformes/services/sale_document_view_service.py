@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 from pos_uniformes.services.sale_ticket_text_service import build_sale_ticket_text
 from pos_uniformes.services.layaway_receipt_text_service import build_layaway_receipt_text
@@ -98,6 +101,7 @@ def _load_print_settings_snapshot(
             ticket_copies=snapshot.ticket_copies,
         )
     except Exception:
+        logger.warning("No se pudo cargar configuración de impresión; usando valores por defecto", exc_info=True)
         return PrintableDocumentSettings(
             business_name="POS Uniformes",
             business_phone="",

@@ -59,7 +59,8 @@ def configure_index() -> bool:
     try:
         client.create_index(INDEX_NAME, {"primaryKey": "id"})
     except Exception:
-        pass
+        # El índice puede ya existir — es el caso esperado en ejecuciones posteriores.
+        logger.debug("create_index falló (índice ya existe o error menor)", exc_info=True)
     try:
         index = client.index(INDEX_NAME)
         index.update_settings({

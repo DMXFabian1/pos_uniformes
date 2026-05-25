@@ -81,6 +81,87 @@ def can_sync() -> tuple[bool, str]:
     return True, "OK"
 
 
+def _verify_remote_fingerprint(
+    *,
+    host: str,
+    port: int,
+    db_name: str,
+    user: str,
+    pg_env: dict[str, str],
+) -> tuple[bool, str]:
+    """Verifica que la DB remota sea la base de producción esperada.
+
+    Comprueba:
+    1. La tabla `variante` existe y contiene al menos una fila.
+    2. La tabla `configuracion_negocio` existe y tiene nombre_negocio no vacío.
+
+    Cualquier DB vacía, de prueba o incorrecta falla al menos una de estas condiciones.
+    Returns (ok, motivo).
+    """
+    psql = _find_pg_tool("psql")
+    if not psql:
+        # Sin psql no podemos verificar — dejamos pasar con advertencia
+        logger.warning("psql no encontrado; omitiendo verificación de fingerprint remoto")
+        return True, "psql no disponible — fingerprint omitido"
+
+    query = (
+        "SELECT "
+        "(SELECT COUNT(*) FROM variante) AS variantes, "
+        "(SELECT COALESCE(nombre_negocio, '') FROM configuracion_negocio LIMIT 1) AS negocio;"
+    )
+    try:
+        result = subprocess.run(
+            [
+                psql,
+                "-h", host,
+                "-p", str(port),
+                "-U", user,
+                "-d", db_name,
+                "-t",            # tuples only
+                "-A",            # unaligned
+                "-F", "|",       # field separator
+                "-c", query,
+            ],
+            env=pg_env,
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+    except subprocess.TimeoutExpired:
+        return False, "Timeout verificando fingerprint remoto (>10 s)"
+    except Exception as exc:
+        return False, f"Error verificando fingerprint remoto: {exc}"
+
+    if result.returncode != 0:
+        return False, f"No se pudo consultar la DB remota: {result.stderr[:200]}"
+
+    raw = result.stdout.strip()
+    if not raw:
+        return False, "DB remota sin datos — posible base incorrecta o vacía"
+
+    parts = raw.split("|")
+    if len(parts) < 2:
+        return False, f"Respuesta inesperada de fingerprint: {raw!r}"
+
+    try:
+        variante_count = int(parts[0].strip())
+    except ValueError:
+        return False, f"No se pudo parsear conteo de variantes: {parts[0]!r}"
+
+    negocio = parts[1].strip()
+
+    if variante_count == 0:
+        return False, "La DB remota no tiene variantes — ¿es la base correcta?"
+
+    if not negocio:
+        return False, "La DB remota no tiene nombre de negocio configurado — ¿es la base correcta?"
+
+    logger.info(
+        "Fingerprint remoto OK — negocio=%r variantes=%d", negocio, variante_count
+    )
+    return True, f"Fingerprint OK ({negocio}, {variante_count} variantes)"
+
+
 def sync_remote_to_local(
     *,
     on_progress: object | None = None,
@@ -100,13 +181,27 @@ def sync_remote_to_local(
     if not ok:
         return False, reason
 
+    pg_env = os.environ.copy()
+    pg_env["PGPASSWORD"] = password
+
+    # Verificar fingerprint antes de sobrescribir la DB local
+    if on_progress:
+        on_progress("Verificando base de datos remota...")
+    fp_ok, fp_reason = _verify_remote_fingerprint(
+        host=remote_host,
+        port=port,
+        db_name=db_name,
+        user=user,
+        pg_env=pg_env,
+    )
+    if not fp_ok:
+        logger.warning("Fingerprint remoto inválido: %s", fp_reason)
+        return False, f"Verificación fallida: {fp_reason}"
+
     pg_dump = _find_pg_tool("pg_dump")
     psql = _find_pg_tool("psql")
     if not pg_dump or not psql:
         return False, "pg_dump o psql no encontrados"
-
-    pg_env = os.environ.copy()
-    pg_env["PGPASSWORD"] = password
 
     # 1. Dump remoto a archivo temporal
     if on_progress:
