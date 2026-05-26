@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QSizeF, Qt
+from PyQt6.QtCore import QSizeF, Qt, QTimer
 from PyQt6.QtGui import QFontDatabase, QPageLayout, QPainter, QPageSize
 from PyQt6.QtPrintSupport import QPrinter
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QMessageBox, QTextEdit, QVBoxLayout, QWidget
@@ -53,7 +53,13 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
     buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
     print_button = buttons.addButton("Imprimir", QDialogButtonBox.ButtonRole.ActionRole)
 
+    _COOLDOWN_MS = 3000  # ms antes de re-habilitar el botón tras imprimir
+
     def handle_print() -> None:
+        # Bloquear el botón inmediatamente para evitar doble impresión
+        print_button.setEnabled(False)
+        print_button.setText("Imprimiendo…")
+
         try:
             printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
             ticket_printer, copies = _load_print_preferences()
@@ -71,6 +77,7 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
                     "Error de impresión",
                     "No se pudo iniciar el trabajo de impresión.\nVerifica que la impresora esté conectada.",
                 )
+                _reset_print_button()
                 return
             try:
                 font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
@@ -86,8 +93,16 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
                 )
             finally:
                 painter.end()
+            # Impresión exitosa — mostrar confirmación antes de re-habilitar
+            print_button.setText("✓ Impreso")
+            QTimer.singleShot(_COOLDOWN_MS, _reset_print_button)
         except Exception as exc:
             QMessageBox.warning(dialog, "Error de impresión", f"No se pudo imprimir el ticket:\n{exc}")
+            _reset_print_button()
+
+    def _reset_print_button() -> None:
+        print_button.setText("Imprimir")
+        print_button.setEnabled(True)
 
     print_button.clicked.connect(handle_print)
     buttons.rejected.connect(dialog.reject)
