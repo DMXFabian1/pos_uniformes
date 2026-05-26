@@ -998,6 +998,78 @@ class AjusteInventarioLoteDetalle(Base):
     variante: Mapped["Variante"] = relationship()
 
 
+class ConteoInventario(Base):
+    """Registro de cada conteo físico de inventario por variante."""
+
+    __tablename__ = "conteo_inventario"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    variante_id: Mapped[int] = mapped_column(
+        ForeignKey("variante.id", ondelete="RESTRICT"),
+        nullable=False,
+        index=True,
+    )
+    escuela_id: Mapped[int | None] = mapped_column(
+        ForeignKey("escuela.id", ondelete="RESTRICT"),
+        nullable=True,
+        index=True,
+    )
+    stock_sistema: Mapped[int] = mapped_column(Integer, nullable=False)
+    stock_fisico: Mapped[int] = mapped_column(Integer, nullable=False)
+    diferencia: Mapped[int] = mapped_column(Integer, nullable=False)
+    ajustado: Mapped[bool] = mapped_column(default=False, nullable=False, index=True)
+    ajuste_lote_id: Mapped[int | None] = mapped_column(
+        ForeignKey("ajuste_inventario_lote.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    contado_por: Mapped[str] = mapped_column(String(100), nullable=False)
+    contado_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True,
+    )
+    notas: Mapped[str | None] = mapped_column(Text())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+
+    variante: Mapped["Variante"] = relationship()
+    escuela: Mapped["Escuela"] = relationship()
+    ajuste_lote: Mapped["AjusteInventarioLote"] = relationship()
+
+
+class ConfigConteoEscuela(Base):
+    """Configuración de frecuencia de conteo por escuela."""
+
+    __tablename__ = "config_conteo_escuela"
+    __table_args__ = (
+        UniqueConstraint("escuela_id", name="config_conteo_escuela_escuela_unico"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    escuela_id: Mapped[int] = mapped_column(
+        ForeignKey("escuela.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    dias_vigencia: Mapped[int] = mapped_column(Integer, nullable=False, default=90)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+    escuela: Mapped["Escuela"] = relationship()
+
+
 class MovimientoInventario(Base):
     __tablename__ = "movimiento_inventario"
     __table_args__ = (

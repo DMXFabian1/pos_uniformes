@@ -622,6 +622,7 @@ from pos_uniformes.ui.views.layaway_view import build_layaway_tab
 from pos_uniformes.ui.views.products_view import build_products_tab
 from pos_uniformes.ui.views.quotes_view import build_quotes_tab
 from pos_uniformes.ui.views.bodega_view import build_bodega_tab
+from pos_uniformes.ui.views.panel_uniformes_view import build_panel_uniformes_tab
 from pos_uniformes.ui.views.settings_view import build_settings_tab
 from pos_uniformes.ui.styles.main_window_styles import build_main_window_stylesheet
 from pos_uniformes.utils.date_format import format_display_date, format_display_datetime, local_day_window
@@ -1613,7 +1614,6 @@ class MainWindow(QMainWindow):
         self.settings_business_button = QPushButton("Negocio e impresion")
         self.settings_catalog_sync_button = QPushButton("Consistencia de catalogo")
         self.settings_meilisearch_button = QPushButton("Meilisearch (busqueda)")
-        self.settings_uniforms_panel_button = QPushButton("Panel de uniformes")
         self.settings_users_table = QTableWidget()
         self.settings_users_status_label = QLabel("Sin usuarios cargados.")
         self.settings_create_user_button = QPushButton("Crear usuario")
@@ -1898,6 +1898,7 @@ class MainWindow(QMainWindow):
         self.tabs.addTab(self._wrap_tab_scroll(self._build_inventory_tab()), "Inventario")
         self.tabs.addTab(self._build_bodega_tab(), "Bodega")
         self.tabs.addTab(self._wrap_tab_scroll(self._build_history_tab()), "Historial inventarios")
+        self.tabs.addTab(self._build_panel_uniformes_tab(), "Panel Uniformes")
         self.tabs.addTab(self._wrap_tab_scroll(self._build_analytics_tab()), "Analitica")
         self.tabs.addTab(self._wrap_tab_scroll(self._build_settings_tab()), "Configuracion")
 
@@ -2220,9 +2221,11 @@ class MainWindow(QMainWindow):
             3: can_manage_layaways,  # Apartados
             4: True,      # Catalogo
             5: is_admin,  # Inventario
-            6: is_admin,  # Historial inventarios
-            7: is_admin,  # Analitica
-            8: is_admin,  # Configuracion
+            6: is_admin,  # Bodega
+            7: is_admin,  # Historial inventarios
+            8: is_admin,  # Panel Uniformes
+            9: is_admin,  # Analitica
+            10: is_admin, # Configuracion
         }
         for index, is_visible in visible_by_index.items():
             self.tabs.setTabVisible(index, is_visible)
@@ -2326,6 +2329,9 @@ class MainWindow(QMainWindow):
 
     def _build_settings_tab(self) -> QWidget:
         return build_settings_tab(self)
+
+    def _build_panel_uniformes_tab(self) -> QWidget:
+        return build_panel_uniformes_tab(self)
 
     def _refresh_settings_backups(self) -> None:
         backup_dir = backup_output_dir()
@@ -2483,24 +2489,9 @@ class MainWindow(QMainWindow):
         open_meilisearch_settings_dialog(self)
 
     def _handle_open_uniforms_panel(self) -> None:
-        import subprocess
-        import webbrowser
-        from pathlib import Path
-
-        script = Path(__file__).resolve().parent.parent / "scripts" / "generar_panel_uniformes.py"
-        out = Path(__file__).resolve().parent.parent / "panel_uniformes.html"
-        try:
-            result = subprocess.run(
-                [sys.executable, str(script)],
-                capture_output=True, text=True, timeout=30,
-            )
-            if result.returncode != 0:
-                QMessageBox.critical(self, "Error", f"No se pudo generar el panel:\n{result.stderr[:500]}")
-                return
-        except Exception as exc:  # noqa: BLE001
-            QMessageBox.critical(self, "Error", str(exc))
-            return
-        webbrowser.open(out.as_uri())
+        # Navegar a la pestaña Panel Uniformes (índice 8)
+        if self.tabs is not None:
+            self.tabs.setCurrentIndex(8)
 
     def _open_catalog_sync_settings_dialog(self) -> None:
         if self.settings_catalog_sync_dialog is None:
@@ -9133,7 +9124,6 @@ class MainWindow(QMainWindow):
         self.settings_business_button.setEnabled(is_admin)
         self.settings_catalog_sync_button.setEnabled(is_admin)
         self.settings_meilisearch_button.setEnabled(is_admin)
-        self.settings_uniforms_panel_button.setEnabled(is_admin)
         self.settings_create_user_button.setEnabled(is_admin)
         self.settings_edit_user_button.setEnabled(is_admin)
         self.settings_toggle_user_button.setEnabled(is_admin)

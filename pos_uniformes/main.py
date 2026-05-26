@@ -12,6 +12,12 @@ from pos_uniformes.utils.venv_bootstrap import ensure_local_venv_site_packages
 
 ensure_local_venv_site_packages(Path(__file__))
 
+# QtWebEngineWidgets debe importarse ANTES de crear QApplication
+try:
+    from PyQt6.QtWebEngineWidgets import QWebEngineView  # noqa: F401
+except ImportError:
+    pass
+
 # ---------------------------------------------------------------------------
 # Auto-detección de DB — debe correr ANTES de importar connection.py
 # Windows (LAN) → usa DB de producción directo

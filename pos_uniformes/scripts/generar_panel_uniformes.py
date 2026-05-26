@@ -25,13 +25,19 @@ def _get_connection():
     import os, socket as _sock
     _win = "192.168.0.10"
     if not os.getenv("POS_UNIFORMES_DB_HOST"):
+        # Primero intentamos localhost; solo si no responde usamos la red (Windows/remoto).
         try:
-            s = _sock.create_connection((_win, 5432), timeout=1)
+            s = _sock.create_connection(("127.0.0.1", 5432), timeout=1)
             s.close()
-            os.environ["POS_UNIFORMES_DB_HOST"] = _win
-            print(f"DB: Windows ({_win})")
-        except OSError:
             print("DB: local (Mac)")
+        except OSError:
+            try:
+                s = _sock.create_connection((_win, 5432), timeout=1)
+                s.close()
+                os.environ["POS_UNIFORMES_DB_HOST"] = _win
+                print(f"DB: red ({_win})")
+            except OSError:
+                print("DB: local (sin red, usando localhost por defecto)")
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
     from pos_uniformes.database.connection import engine  # noqa: PLC0415
     return engine.raw_connection()
@@ -49,7 +55,7 @@ NIVEL_COLORS = {
 }
 PIEZA_ORDER = [
     "Pants 3pz", "Pants 2pz", "Pants Suelto", "Chamarra", "Playera",
-    "Suéter", "Camisa", "Chaleco", "Falda", "Pantalón",
+    "Suéter", "Camisa", "Chaleco", "Falda", "Jumper", "Pantalón",
     "Corbata", "Corbatín", "Moño", "Mascada",
 ]
 TALLA_ORDER = [
@@ -71,41 +77,52 @@ def _esc(s):
 
 
 def compute_default_na(school_levels, pieces_raw):
-    """Generate default NA marks for pieces that schools are known not to carry."""
+    """Generate default NA marks based on actual data.
+
+    Strategy: for each nivel, compute what % of schools carry each piece type.
+    If fewer than 50% of schools of a nivel have a piece type, schools that
+    don't have it get N/A (it's optional, not missing).  Piece types that ≥50%
+    of schools carry are considered standard → missing means a real gap.
+    Bachillerato is always fully N/A for missing pieces (each school is unique).
+    """
     na = {}
 
-    primaria_eids = {sl["escuela_id"] for sl in school_levels if sl["nivel_nombre"] == "Primaria"}
-    secundaria_eids = {sl["escuela_id"] for sl in school_levels if sl["nivel_nombre"] == "Secundaria"}
-    bachillerato_eids = {sl["escuela_id"] for sl in school_levels if sl["nivel_nombre"] == "Bachillerato"}
-
-    has_piece = set()
+    has_piece: set[tuple] = set()
     for eid, nivel, tipo, cnt in pieces_raw:
         if cnt:
             has_piece.add((eid, nivel, tipo))
 
-    preescolar_eids = {sl["escuela_id"] for sl in school_levels if sl["nivel_nombre"] == "Preescolar"}
+    # Group school IDs by nivel
+    eids_by_nivel: dict[str, set[int]] = {}
+    for sl in school_levels:
+        eids_by_nivel.setdefault(sl["nivel_nombre"], set()).add(sl["escuela_id"])
 
-    for eid in preescolar_eids:
-        for tipo in ["Corbatín", "Moño"]:
-            if (eid, "Preescolar", tipo) not in has_piece:
-                na[f"{eid}_Preescolar_{tipo}"] = True
+    all_eids_niveles = {(sl["escuela_id"], sl["nivel_nombre"]) for sl in school_levels}
 
-    for eid in primaria_eids:
-        for tipo in ["Corbata", "Corbatín", "Moño", "Mascada"]:
-            if (eid, "Primaria", tipo) not in has_piece:
-                na[f"{eid}_Primaria_{tipo}"] = True
+    # Compute adoption rate per (nivel, tipo)
+    for nivel, eids in eids_by_nivel.items():
+        total = len(eids)
+        if total == 0:
+            continue
 
-    for eid in secundaria_eids:
-        for tipo in ["Corbatín", "Moño"]:
-            if (eid, "Secundaria", tipo) not in has_piece:
-                na[f"{eid}_Secundaria_{tipo}"] = True
+        # Bachillerato: each school is unique, everything missing is N/A
+        if nivel == "Bachillerato":
+            for eid in eids:
+                for tipo in PIEZA_ORDER:
+                    if (eid, nivel, tipo) not in has_piece:
+                        na[f"{eid}_{nivel}_{tipo}"] = True
+            continue
 
-    # Bachillerato: each school carries exactly the piece types it needs;
-    # anything missing is truly not applicable (not a gap to fill).
-    for eid in bachillerato_eids:
+        # For other niveles: check adoption rate
         for tipo in PIEZA_ORDER:
-            if (eid, "Bachillerato", tipo) not in has_piece:
-                na[f"{eid}_Bachillerato_{tipo}"] = True
+            schools_with = sum(1 for eid in eids if (eid, nivel, tipo) in has_piece)
+            adoption_pct = schools_with / total * 100
+
+            # < 50% adoption → optional piece, mark missing as N/A
+            if adoption_pct < 50:
+                for eid in eids:
+                    if (eid, nivel, tipo) not in has_piece:
+                        na[f"{eid}_{nivel}_{tipo}"] = True
 
     return na
 
@@ -233,20 +250,17 @@ def compute_insights(stats, school_levels, pieces_raw, catalog_rows, catalog_col
     col_idx = {c: i for i, c in enumerate(catalog_cols)}
     insights = []
 
-    # Pieces per school
+    # ── Pieces per school ──────────────────────────────────────────────
     pieces_map = defaultdict(set)
     for eid, nivel, tipo, cnt in pieces_raw:
         pieces_map[(eid, nivel)].add(tipo)
 
     # Máximo de tipos por nivel (peer comparison).
-    # Comparar cada escuela contra la más completa de su mismo nivel evita
-    # penalizar escuelas que no manejan piezas específicas de otro nivel
-    # (p.ej. CBTIS no necesita Corbatín ni Moño aunque existan en Bachillerato).
     max_tipos_por_nivel: dict[str, int] = defaultdict(int)
     for (eid, nivel), tipos in pieces_map.items():
         max_tipos_por_nivel[nivel] = max(max_tipos_por_nivel[nivel], len(tipos))
 
-    # Coverage
+    # ── Coverage data ──────────────────────────────────────────────────
     coverage_data = []
     for sl in school_levels:
         key = (sl["escuela_id"], sl["nivel_nombre"])
@@ -256,18 +270,66 @@ def compute_insights(stats, school_levels, pieces_raw, catalog_rows, catalog_col
         pct = min(100, round(has / nivel_max * 100)) if nivel_max else 0
         coverage_data.append({"eid": sl["escuela_id"], "name": sl["display_name"], "nivel": nivel, "has": has, "total": nivel_max, "pct": pct})
 
-    low_coverage = [c for c in coverage_data if c["pct"] < 40]
+    n_escuelas = len({c["eid"] for c in coverage_data})
+    n_school_levels = len(coverage_data)
+    has_multi = n_school_levels > n_escuelas
+
+    low_coverage = sorted([c for c in coverage_data if c["pct"] < 40], key=lambda x: x["pct"])
+    mid_coverage = [c for c in coverage_data if 40 <= c["pct"] < 80]
     full_coverage = [c for c in coverage_data if c["pct"] >= 80]
+    avg_pct = round(sum(c["pct"] for c in coverage_data) / n_school_levels) if n_school_levels else 0
 
+    # 1) Resumen de cobertura general
+    label_suffix = f" ({n_school_levels} escuela-nivel)" if has_multi else ""
+    insights.append(("ok", f"Cobertura promedio: {avg_pct}%",
+                     f"{len(full_coverage)} completas (≥80%) · {len(mid_coverage)} en progreso · {len(low_coverage)} críticas (<40%){label_suffix}"))
+
+    # 2) Cobertura por nivel educativo
+    nivel_stats: dict[str, list[int]] = defaultdict(list)
+    for c in coverage_data:
+        nivel_stats[c["nivel"]].append(c["pct"])
+    nivel_parts = []
+    for nivel in NIVEL_ORDER:
+        if nivel not in nivel_stats:
+            continue
+        pcts = nivel_stats[nivel]
+        avg = round(sum(pcts) / len(pcts))
+        nivel_parts.append(f"{nivel}: {avg}% ({len(pcts)})")
+    if nivel_parts:
+        insights.append(("info", "Cobertura por nivel", " · ".join(nivel_parts)))
+
+    # 3) Escuelas críticas (<40%) con piezas faltantes
     if low_coverage:
-        names = ", ".join(c["name"] for c in sorted(low_coverage, key=lambda x: x["pct"])[:4])
-        insights.append(("warn", f"{len(low_coverage)} escuelas con menos del 40% de piezas base", names))
-    insights.append(("ok", f"{len(full_coverage)} de {len(coverage_data)} escuelas con cobertura ≥80%", ""))
+        detail_parts = []
+        for c in low_coverage:
+            missing = set(PIEZA_ORDER) - pieces_map.get((c["eid"], c["nivel"]), set())
+            # Solo mostrar piezas comunes que faltan (las que >30% de escuelas tienen)
+            relevant_missing = [p for p in PIEZA_ORDER if p in missing]
+            miss_str = ", ".join(relevant_missing[:5])
+            if len(relevant_missing) > 5:
+                miss_str += f" (+{len(relevant_missing)-5})"
+            detail_parts.append(f"{c['name']} ({c['pct']}%) — faltan: {miss_str}")
+        insights.append(("warn", f"{len(low_coverage)} escuelas con menos del 40% de piezas",
+                         "\n".join(detail_parts)))
 
-    # Stock analysis
+    # 4) Piezas menos cubiertas (oportunidad de mejora)
+    all_school_levels = {(c["eid"], c["nivel"]) for c in coverage_data}
+    piece_coverage: dict[str, int] = {}
+    for pieza in PIEZA_ORDER:
+        count = sum(1 for key in all_school_levels if pieza in pieces_map.get(key, set()))
+        piece_coverage[pieza] = count
+    # Mostrar piezas que tienen cobertura <60% de escuelas
+    low_pieces = [(p, cnt) for p, cnt in piece_coverage.items() if cnt < n_school_levels * 0.6]
+    low_pieces.sort(key=lambda x: x[1])
+    if low_pieces:
+        detail = " · ".join(f"{p} ({cnt}/{n_school_levels})" for p, cnt in low_pieces)
+        insights.append(("info", "Piezas con menor cobertura entre escuelas", detail))
+
+    # ── Stock analysis ─────────────────────────────────────────────────
     stock_by_product = defaultdict(lambda: {"stock": 0, "variants": 0, "name": "", "school": ""})
     zero_stock_products = 0
     total_products = 0
+    zero_stock_schools: set[str] = set()
     for row in catalog_rows:
         pid = row[col_idx["producto_id"]]
         vid = row[col_idx["variante_id"]]
@@ -289,24 +351,14 @@ def compute_insights(stats, school_levels, pieces_raw, catalog_rows, catalog_col
         total_products += 1
         if p["stock"] == 0:
             zero_stock_products += 1
+            zero_stock_schools.add(p["school"])
 
     if zero_stock_products > 0:
         pct = round(zero_stock_products / total_products * 100)
-        insights.append(("alert", f"{zero_stock_products} productos sin stock ({pct}%)", "Revisar en la pestaña Variantes con filtro 'Sin stock'"))
-
-    # Top schools by variants
-    variants_by_school = defaultdict(int)
-    for row in catalog_rows:
-        if row[col_idx["variante_id"]] and row[col_idx["v_activo"]]:
-            eid = row[col_idx["escuela_id"]]
-            ename = row[col_idx["escuela"]]
-            nivel = row[col_idx["nivel"]]
-            display = f"{ename} {nivel}" if eid in multi_level_ids else ename
-            variants_by_school[display] += 1
-    top_3 = sorted(variants_by_school.items(), key=lambda x: -x[1])[:3]
-    if top_3:
-        detail = " · ".join(f"{n} ({c})" for n, c in top_3)
-        insights.append(("info", "Escuelas con más variantes", detail))
+        with_stock = total_products - zero_stock_products
+        insights.append(("alert",
+                         f"{zero_stock_products} de {total_products} productos sin stock ({pct}%)",
+                         f"{with_stock} productos con inventario · {len(zero_stock_schools)} escuelas afectadas"))
 
     return insights, coverage_data
 
@@ -350,13 +402,21 @@ def build_resumen(stats, insights, coverage_data):
 
     # Insights
     h.append('<div class="section-card"><h3>Diagnóstico automático</h3><div class="insights-list">')
-    icons = {"ok": "✅", "warn": "⚠️", "alert": "🔴", "info": "💡"}
+    icons = {"ok": "✅", "warn": "⚠️", "alert": "🔴", "info": "📊"}
     for kind, title, detail in insights:
         h.append(f'''<div class="insight-row {kind}">
             <span class="insight-icon">{icons.get(kind, "")}</span>
             <div class="insight-body"><div class="insight-title">{_esc(title)}</div>''')
         if detail:
-            h.append(f'<div class="insight-detail">{_esc(detail)}</div>')
+            # Soportar detalles multilínea (warn con lista de escuelas)
+            if "\n" in detail:
+                lines = detail.split("\n")
+                h.append('<div class="insight-detail insight-detail-list">')
+                for line in lines:
+                    h.append(f'<div class="insight-detail-item">{_esc(line)}</div>')
+                h.append('</div>')
+            else:
+                h.append(f'<div class="insight-detail">{_esc(detail)}</div>')
         h.append('</div></div>')
     h.append('</div></div>')
 
@@ -980,11 +1040,114 @@ def build_variants(catalog_rows, catalog_cols, multi_level_ids):
     return "\n".join(h)
 
 
+def build_conteo(school_levels):
+    """Genera la pestaña de conteo de inventario (interactiva via QWebChannel)."""
+    # Escuelas únicas para el dropdown
+    seen = set()
+    schools = []
+    for sl in school_levels:
+        eid = sl["escuela_id"]
+        if eid not in seen:
+            seen.add(eid)
+            schools.append((eid, sl["escuela_nombre"]))
+    schools.sort(key=lambda x: x[1])
+
+    h = []
+
+    # Fallback message for browser mode
+    h.append('<div id="conteo-fallback" style="display:none">')
+    h.append('<div class="section-card" style="text-align:center;padding:40px">')
+    h.append('<h3 style="color:var(--text-muted)">Conteo de inventario</h3>')
+    h.append('<p style="color:var(--text-muted)">Esta funcionalidad solo esta disponible dentro de la aplicacion POS.</p>')
+    h.append('<p style="color:var(--text-muted);font-size:12px">Abre el panel desde la pestana "Panel Uniformes" en la aplicacion.</p>')
+    h.append('</div></div>')
+
+    # Main conteo interface (hidden in browser, shown in app)
+    h.append('<div id="conteo-app">')
+
+    # Controls bar
+    h.append('<div class="filter-bar" style="flex-wrap:wrap;gap:10px">')
+    h.append('<div style="display:flex;align-items:center;gap:8px">')
+    h.append('<label style="font-weight:600;font-size:13px">Escuela:</label>')
+    h.append('<select id="conteo-escuela" onchange="conteoLoadEscuela()" style="padding:6px 10px;border-radius:var(--radius-xs);border:1px solid var(--border);font-size:13px;min-width:200px">')
+    h.append('<option value="">— Seleccionar —</option>')
+    for eid, ename in schools:
+        h.append(f'<option value="{eid}">{_esc(ename)}</option>')
+    h.append('</select>')
+    h.append('</div>')
+    h.append('<div style="display:flex;align-items:center;gap:8px">')
+    h.append('<label style="font-weight:600;font-size:13px">Contado por:</label>')
+    h.append('<input type="text" id="conteo-por" placeholder="Nombre" style="padding:6px 10px;border-radius:var(--radius-xs);border:1px solid var(--border);font-size:13px;width:150px">')
+    h.append('</div>')
+    h.append('<div style="display:flex;gap:6px">')
+    h.append('<button class="btn btn-outline" onclick="conteoGuardar()" id="conteo-guardar-btn" disabled>Guardar conteo</button>')
+    h.append('<button class="btn btn-outline" onclick="conteoVerPendientes()" id="conteo-pendientes-btn">Pendientes</button>')
+    h.append('</div>')
+    h.append('</div>')
+
+    # Estado card
+    h.append('<div id="conteo-estado" class="section-card" style="display:none">')
+    h.append('<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">')
+    h.append('<div id="conteo-estado-info" style="flex:1;font-size:13px"></div>')
+    h.append('<div style="display:flex;align-items:center;gap:8px">')
+    h.append('<label style="font-size:12px;color:var(--text-muted)">Vigencia (dias):</label>')
+    h.append('<input type="number" id="conteo-vigencia" min="1" max="365" value="90" style="width:60px;padding:4px;border-radius:var(--radius-xs);border:1px solid var(--border);font-size:12px">')
+    h.append('<button class="btn btn-outline" onclick="conteoGuardarConfig()" style="font-size:11px;padding:3px 8px">Guardar</button>')
+    h.append('</div>')
+    h.append('</div>')
+    h.append('</div>')
+
+    # Conteo table
+    h.append('<div id="conteo-tabla-container" class="section-card" style="display:none">')
+    h.append('<div class="table-scroll"><table class="data-table" id="conteo-tabla">')
+    h.append('<thead><tr>')
+    h.append('<th>SKU</th><th>Producto</th><th>Talla</th><th>Color</th>')
+    h.append('<th>Stock Sistema</th><th style="min-width:80px">Stock Fisico</th>')
+    h.append('<th>Diferencia</th><th>Ultimo Conteo</th><th>Estado</th>')
+    h.append('</tr></thead>')
+    h.append('<tbody id="conteo-tbody"></tbody>')
+    h.append('</table></div>')
+    h.append('</div>')
+
+    # Pendientes panel
+    h.append('<div id="conteo-pendientes-panel" class="section-card" style="display:none">')
+    h.append('<h3>Conteos pendientes de ajuste</h3>')
+    h.append('<div class="table-scroll"><table class="data-table">')
+    h.append('<thead><tr>')
+    h.append('<th><input type="checkbox" id="conteo-select-all" onchange="conteoToggleAll(this)"></th>')
+    h.append('<th>SKU</th><th>Producto</th><th>Sistema</th><th>Fisico</th>')
+    h.append('<th>Diferencia</th><th>Contado por</th><th>Fecha</th>')
+    h.append('</tr></thead>')
+    h.append('<tbody id="conteo-pendientes-tbody"></tbody>')
+    h.append('</table></div>')
+    h.append('<div style="margin-top:10px;display:flex;gap:8px">')
+    h.append('<button class="btn btn-outline" onclick="conteoConfirmarAjustes()" id="conteo-ajustar-btn" disabled>Confirmar ajustes seleccionados</button>')
+    h.append('<span id="conteo-ajuste-info" style="font-size:12px;color:var(--text-muted);align-self:center"></span>')
+    h.append('</div>')
+    h.append('</div>')
+
+    # Historial panel
+    h.append('<div id="conteo-historial-panel" class="section-card" style="display:none">')
+    h.append('<h3>Historial de conteos</h3>')
+    h.append('<div class="table-scroll"><table class="data-table">')
+    h.append('<thead><tr>')
+    h.append('<th>SKU</th><th>Producto</th><th>Sistema</th><th>Fisico</th>')
+    h.append('<th>Dif</th><th>Ajustado</th><th>Contado por</th><th>Fecha</th>')
+    h.append('</tr></thead>')
+    h.append('<tbody id="conteo-historial-tbody"></tbody>')
+    h.append('</table></div>')
+    h.append('</div>')
+
+    h.append('</div>')  # close conteo-app
+
+    return "\n".join(h)
+
+
 # ---------------------------------------------------------------------------
 # Full HTML
 # ---------------------------------------------------------------------------
 
-def generate_html(resumen, pieces, tariffs, catalog, missing, variants):
+def generate_html(resumen, pieces, tariffs, catalog, missing, variants, conteo):
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     return f"""<!DOCTYPE html>
 <html lang="es">
@@ -1101,6 +1264,8 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sys
 .insight-icon {{ font-size: 16px; flex-shrink: 0; margin-top: 1px; }}
 .insight-title {{ font-weight: 600; font-size: 13px; }}
 .insight-detail {{ font-size: 12px; color: var(--text-muted); margin-top: 2px; }}
+.insight-detail-list {{ display: flex; flex-direction: column; gap: 3px; margin-top: 4px; }}
+.insight-detail-item {{ font-size: 12px; color: var(--text-muted); padding-left: 4px; border-left: 2px solid rgba(0,0,0,.1); }}
 
 /* ============ COVERAGE ============ */
 .coverage-grid {{ display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 10px; }}
@@ -1351,6 +1516,7 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sys
     <div class="nav-tab" onclick="showTab('catalogo')">Catálogo</div>
     <div class="nav-tab" onclick="showTab('faltantes')">Faltantes</div>
     <div class="nav-tab" onclick="showTab('variantes')">Variantes</div>
+    <div class="nav-tab" onclick="showTab('conteo')">Conteo</div>
 </div>
 
 <div class="page">
@@ -1360,6 +1526,7 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sys
     <div id="catalogo" class="tab-panel">{catalog}</div>
     <div id="faltantes" class="tab-panel">{missing}</div>
     <div id="variantes" class="tab-panel">{variants}</div>
+    <div id="conteo" class="tab-panel">{conteo}</div>
 </div>
 
 <script>
@@ -1388,7 +1555,7 @@ function showTab(id) {{
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
     document.getElementById(id).classList.add('active');
-    const names = ['resumen','piezas','tarifarios','catalogo','faltantes','variantes'];
+    const names = ['resumen','piezas','tarifarios','catalogo','faltantes','variantes','conteo'];
     const idx = names.indexOf(id);
     if (idx >= 0) document.querySelectorAll('.nav-tab')[idx].classList.add('active');
 }}
@@ -1397,10 +1564,31 @@ function showTab(id) {{
 let piezasConfigMode = false;
 
 function getPiezasNA() {{
-    try {{ return JSON.parse(localStorage.getItem('piezas-na') || '{{}}'); }}
-    catch {{ return {{}}; }}
+    // Base: defaults from DB (computed by Python)
+    const base = window.__defaultNA || {{}};
+    // Overrides: manual user toggles stored in localStorage
+    try {{
+        const overrides = JSON.parse(localStorage.getItem('piezas-na-overrides') || '{{}}');
+        const merged = Object.assign({{}}, base);
+        for (const key in overrides) {{
+            if (overrides[key]) merged[key] = true;
+            else delete merged[key];
+        }}
+        return merged;
+    }} catch {{ return base; }}
 }}
-function savePiezasNA(na) {{ localStorage.setItem('piezas-na', JSON.stringify(na)); }}
+function savePiezasNA(na) {{
+    // Only save the diff vs defaults
+    const base = window.__defaultNA || {{}};
+    const overrides = {{}};
+    for (const key in na) {{
+        if (!base[key]) overrides[key] = true;  // user added NA
+    }}
+    for (const key in base) {{
+        if (!na[key]) overrides[key] = false;  // user removed NA
+    }}
+    localStorage.setItem('piezas-na-overrides', JSON.stringify(overrides));
+}}
 
 function naKey(cell) {{
     const tr = cell.closest('tr');
@@ -1507,19 +1695,11 @@ function recalcPiezasCoverage() {{
     }});
 }}
 
-// Apply saved NA config (merged with defaults) and calc coverage on load
+// Apply NA config and calc coverage on load
 document.addEventListener('DOMContentLoaded', () => {{
-    const defaults = window.__defaultNA || {{}};
-    let na = getPiezasNA();
-    // Merge defaults: apply default NA where localStorage has no explicit entry
-    let merged = false;
-    for (const key in defaults) {{
-        if (!(key in na)) {{
-            na[key] = true;
-            merged = true;
-        }}
-    }}
-    if (merged) savePiezasNA(na);
+    // Clean up old localStorage format (migration)
+    localStorage.removeItem('piezas-na');
+    const na = getPiezasNA();
     document.querySelectorAll('#piezas .pieces-table tbody tr').forEach(tr => {{
         tr.querySelectorAll('.piece-cell.miss').forEach(cell => {{
             const key = naKey(cell);
@@ -1814,6 +1994,220 @@ document.addEventListener('DOMContentLoaded', () => {{
         sec.classList.add('nivel-collapsed');
     }});
 }});
+
+/* ============ CONTEO DE INVENTARIO ============ */
+let _bridge = null;
+let _conteoVariantes = [];
+let _conteoPendientes = [];
+
+// Init QWebChannel bridge (only available inside PyQt app)
+(function() {{
+    if (typeof QWebChannel === 'undefined') {{
+        // Running in browser — show fallback
+        const fb = document.getElementById('conteo-fallback');
+        const app = document.getElementById('conteo-app');
+        if (fb) fb.style.display = 'block';
+        if (app) app.style.display = 'none';
+        return;
+    }}
+    new QWebChannel(qt.webChannelTransport, function(channel) {{
+        _bridge = channel.objects.bridge;
+    }});
+}})();
+
+function _callBridge(method, args, callback) {{
+    if (!_bridge) {{ alert('Bridge no disponible'); return; }}
+    _bridge[method](...args, function(resultJson) {{
+        const r = JSON.parse(resultJson);
+        if (!r.ok) {{ alert('Error: ' + (r.error || 'desconocido')); return; }}
+        callback(r);
+    }});
+}}
+
+function conteoLoadEscuela() {{
+    const eid = parseInt(document.getElementById('conteo-escuela').value);
+    if (!eid) {{
+        document.getElementById('conteo-estado').style.display = 'none';
+        document.getElementById('conteo-tabla-container').style.display = 'none';
+        document.getElementById('conteo-pendientes-panel').style.display = 'none';
+        document.getElementById('conteo-historial-panel').style.display = 'none';
+        return;
+    }}
+    // Load estado
+    _callBridge('getEstadoConteo', [eid], function(r) {{
+        const info = document.getElementById('conteo-estado-info');
+        const pct = r.pct_vigente;
+        const color = pct >= 80 ? '#16a34a' : pct >= 40 ? '#ea580c' : '#dc2626';
+        const semaforo = pct >= 80 ? '🟢' : pct >= 40 ? '🟡' : '🔴';
+        info.innerHTML = semaforo + ' <b>' + r.escuela_nombre + '</b> — ' +
+            '<span style="color:' + color + '">' + pct + '% vigente</span> · ' +
+            r.contadas_vigentes + '/' + r.total_variantes + ' contadas · ' +
+            r.pendientes_conteo + ' pendientes' +
+            (r.ultimo_conteo ? ' · Ultimo: ' + new Date(r.ultimo_conteo).toLocaleDateString() : '');
+        document.getElementById('conteo-vigencia').value = r.dias_vigencia;
+        document.getElementById('conteo-estado').style.display = 'block';
+    }});
+    // Load config
+    _callBridge('getConfigConteo', [eid], function(r) {{
+        document.getElementById('conteo-vigencia').value = r.dias_vigencia;
+    }});
+    // Load variantes
+    _callBridge('getVariantesParaConteo', [eid], function(r) {{
+        _conteoVariantes = r.data;
+        const tbody = document.getElementById('conteo-tbody');
+        tbody.innerHTML = '';
+        r.data.forEach(function(v, i) {{
+            const statusColor = v.requiere_conteo ? (v.ultimo_conteo_at ? '#ea580c' : '#dc2626') : '#16a34a';
+            const statusText = v.requiere_conteo ? (v.ultimo_conteo_at ? 'Vencido' : 'Nunca') : 'Vigente';
+            const diasText = v.dias_desde_conteo !== null ? v.dias_desde_conteo + 'd' : '—';
+            const tr = document.createElement('tr');
+            tr.innerHTML =
+                '<td style="font-family:monospace;font-size:12px">' + v.sku + '</td>' +
+                '<td>' + v.producto_nombre + '</td>' +
+                '<td>' + v.talla + '</td>' +
+                '<td>' + v.color + '</td>' +
+                '<td style="text-align:center">' + v.stock_actual + '</td>' +
+                '<td><input type="number" class="conteo-input" data-idx="' + i + '" value="' + v.stock_actual + '" ' +
+                    'style="width:70px;padding:4px;border:1px solid var(--border);border-radius:var(--radius-xs);text-align:center" ' +
+                    'onchange="conteoCalcDiff(this,' + i + ',' + v.stock_actual + ')"></td>' +
+                '<td class="conteo-diff" data-idx="' + i + '" style="text-align:center;font-weight:600">0</td>' +
+                '<td style="text-align:center;font-size:12px;color:var(--text-muted)">' + diasText + '</td>' +
+                '<td style="text-align:center"><span style="color:' + statusColor + ';font-size:12px;font-weight:600">' + statusText + '</span></td>';
+            tbody.appendChild(tr);
+        }});
+        document.getElementById('conteo-tabla-container').style.display = 'block';
+        document.getElementById('conteo-guardar-btn').disabled = false;
+    }});
+    // Load pendientes
+    conteoVerPendientes();
+    // Load historial
+    conteoLoadHistorial(eid);
+}}
+
+function conteoCalcDiff(input, idx, stockSistema) {{
+    const fisico = parseInt(input.value) || 0;
+    const diff = fisico - stockSistema;
+    const cell = document.querySelector('.conteo-diff[data-idx="' + idx + '"]');
+    cell.textContent = diff > 0 ? '+' + diff : diff;
+    cell.style.color = diff === 0 ? 'var(--text-muted)' : diff > 0 ? '#16a34a' : '#dc2626';
+}}
+
+function conteoGuardar() {{
+    const contadoPor = document.getElementById('conteo-por').value.trim();
+    if (!contadoPor) {{ alert('Ingresa quien realiza el conteo'); return; }}
+    const inputs = document.querySelectorAll('.conteo-input');
+    const conteos = [];
+    inputs.forEach(function(inp) {{
+        const idx = parseInt(inp.dataset.idx);
+        const v = _conteoVariantes[idx];
+        conteos.push({{ variante_id: v.variante_id, stock_fisico: parseInt(inp.value) || 0 }});
+    }});
+    if (!conteos.length) return;
+    const payload = JSON.stringify({{ contado_por: contadoPor, conteos: conteos }});
+    _callBridge('guardarConteo', [payload], function(r) {{
+        alert('Conteo guardado: ' + r.total + ' variantes (' + r.con_diferencia + ' con diferencia)');
+        // Reload
+        conteoLoadEscuela();
+    }});
+}}
+
+function conteoGuardarConfig() {{
+    const eid = parseInt(document.getElementById('conteo-escuela').value);
+    const dias = parseInt(document.getElementById('conteo-vigencia').value);
+    if (!eid || !dias || dias < 1) return;
+    _callBridge('setConfigConteo', [eid, dias], function() {{
+        conteoLoadEscuela();
+    }});
+}}
+
+function conteoVerPendientes() {{
+    const eid = parseInt(document.getElementById('conteo-escuela').value) || 0;
+    _callBridge('getConteosPendientes', [eid], function(r) {{
+        _conteoPendientes = r.data;
+        const tbody = document.getElementById('conteo-pendientes-tbody');
+        tbody.innerHTML = '';
+        if (!r.data.length) {{
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px">Sin conteos pendientes de ajuste</td></tr>';
+            document.getElementById('conteo-ajustar-btn').disabled = true;
+        }} else {{
+            r.data.forEach(function(c) {{
+                const diffColor = c.diferencia > 0 ? '#16a34a' : '#dc2626';
+                const diffText = c.diferencia > 0 ? '+' + c.diferencia : c.diferencia;
+                const fecha = c.contado_at ? new Date(c.contado_at).toLocaleString() : '—';
+                const tr = document.createElement('tr');
+                tr.innerHTML =
+                    '<td><input type="checkbox" class="conteo-check" value="' + c.id + '"></td>' +
+                    '<td style="font-family:monospace;font-size:12px">' + c.sku + '</td>' +
+                    '<td>' + c.producto + '</td>' +
+                    '<td style="text-align:center">' + c.stock_sistema + '</td>' +
+                    '<td style="text-align:center">' + c.stock_fisico + '</td>' +
+                    '<td style="text-align:center;color:' + diffColor + ';font-weight:600">' + diffText + '</td>' +
+                    '<td>' + c.contado_por + '</td>' +
+                    '<td style="font-size:12px">' + fecha + '</td>';
+                tbody.appendChild(tr);
+            }});
+            document.getElementById('conteo-ajustar-btn').disabled = false;
+        }}
+        document.getElementById('conteo-pendientes-panel').style.display = 'block';
+    }});
+}}
+
+function conteoToggleAll(master) {{
+    document.querySelectorAll('.conteo-check').forEach(function(cb) {{ cb.checked = master.checked; }});
+}}
+
+function conteoConfirmarAjustes() {{
+    const checks = document.querySelectorAll('.conteo-check:checked');
+    if (!checks.length) {{ alert('Selecciona al menos un conteo'); return; }}
+    const ids = Array.from(checks).map(function(cb) {{ return parseInt(cb.value); }});
+    if (!confirm('Confirmar ajuste de ' + ids.length + ' conteo(s)? Esto modificara el stock del sistema.')) return;
+    _callBridge('confirmarAjuste', [JSON.stringify(ids)], function(r) {{
+        alert('Ajustados: ' + r.ajustados + ', Omitidos: ' + r.omitidos);
+        conteoLoadEscuela();
+    }});
+}}
+
+function conteoLoadHistorial(eid) {{
+    _callBridge('getHistorialConteos', [eid, 50], function(r) {{
+        const tbody = document.getElementById('conteo-historial-tbody');
+        tbody.innerHTML = '';
+        if (!r.data.length) {{
+            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px">Sin historial</td></tr>';
+        }} else {{
+            r.data.forEach(function(c) {{
+                const diffColor = c.diferencia === 0 ? 'var(--text-muted)' : c.diferencia > 0 ? '#16a34a' : '#dc2626';
+                const diffText = c.diferencia === 0 ? '0' : (c.diferencia > 0 ? '+' + c.diferencia : c.diferencia);
+                const fecha = c.contado_at ? new Date(c.contado_at).toLocaleString() : '—';
+                const tr = document.createElement('tr');
+                tr.innerHTML =
+                    '<td style="font-family:monospace;font-size:12px">' + c.sku + '</td>' +
+                    '<td>' + c.producto + '</td>' +
+                    '<td style="text-align:center">' + c.stock_sistema + '</td>' +
+                    '<td style="text-align:center">' + c.stock_fisico + '</td>' +
+                    '<td style="text-align:center;color:' + diffColor + ';font-weight:600">' + diffText + '</td>' +
+                    '<td style="text-align:center">' + (c.ajustado ? '✅' : '⏳') + '</td>' +
+                    '<td>' + c.contado_por + '</td>' +
+                    '<td style="font-size:12px">' + fecha + '</td>';
+                tbody.appendChild(tr);
+            }});
+        }}
+        document.getElementById('conteo-historial-panel').style.display = 'block';
+    }});
+}}
+</script>
+
+<script src="qrc:///qtwebchannel/qwebchannel.js"></script>
+<script>
+// Re-init bridge after qwebchannel.js loads
+if (typeof QWebChannel !== 'undefined' && typeof qt !== 'undefined') {{
+    new QWebChannel(qt.webChannelTransport, function(channel) {{
+        _bridge = channel.objects.bridge;
+        const fb = document.getElementById('conteo-fallback');
+        const app = document.getElementById('conteo-app');
+        if (fb) fb.style.display = 'none';
+        if (app) app.style.display = 'block';
+    }});
+}}
 </script>
 
 </body>
@@ -1844,8 +2238,9 @@ def main():
     catalog = build_catalog(catalog_rows, catalog_cols, multi_level_ids, pieces_raw)
     missing_html = build_missing(school_levels, pieces_raw, multi_level_ids)
     variants = build_variants(catalog_rows, catalog_cols, multi_level_ids)
+    conteo = build_conteo(school_levels)
 
-    html = generate_html(resumen, pieces, tariffs, catalog, missing_html, variants)
+    html = generate_html(resumen, pieces, tariffs, catalog, missing_html, variants, conteo)
 
     out_path = Path(__file__).resolve().parent.parent / "panel_uniformes.html"
     out_path.write_text(html, encoding="utf-8")
