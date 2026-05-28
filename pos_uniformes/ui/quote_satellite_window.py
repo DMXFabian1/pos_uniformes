@@ -4385,13 +4385,16 @@ QLabel#favDialogPriceLabel {
             cleaned = re.sub(r"\bAd\s+hoc\b", "", cleaned, flags=re.IGNORECASE).strip()
             cleaned = re.sub(r"\s{2,}", " ", cleaned).strip()
             genero = str(r.get("producto_genero") or "").strip().upper()
+            color = str(r.get("color") or "").strip()
             key = cleaned or name
             if key not in products:
-                products[key] = {"tipo_pieza": tipo_pieza, "tallas": [], "genero": genero}
+                products[key] = {"tipo_pieza": tipo_pieza, "tallas": [], "genero": genero, "colores": set()}
             products[key]["tallas"].append({
                 "talla": str(r.get("talla") or "U"),
                 "precio": Decimal(str(r.get("precio_venta") or 0)),
             })
+            if color:
+                products[key]["colores"].add(color)
 
         result_products: list[dict] = []
         for nombre, data in products.items():
@@ -4408,6 +4411,7 @@ QLabel#favDialogPriceLabel {
                 "tipo_pieza": data["tipo_pieza"],
                 "tallas": unique,
                 "genero": data.get("genero", ""),
+                "colores": sorted(data.get("colores", set())),
             })
 
         result_products.sort(key=lambda p: _tariff_product_sort_key(p.get("tipo_pieza", "")))

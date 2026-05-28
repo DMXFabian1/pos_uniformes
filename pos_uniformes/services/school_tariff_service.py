@@ -134,10 +134,19 @@ def build_school_tariff(session, escuela_id: int, *, nivel_id: int | None = None
         )
         if not variantes:
             continue
-        tallas = [
-            {"talla": str(v.talla or "U"), "precio": Decimal(str(v.precio_venta))}
-            for v in variantes
-        ]
+        # Deduplicar por talla (si hay varios colores del mismo precio/talla,
+        # solo incluir una vez la talla) y recolectar colores distintos.
+        seen_tallas: set[str] = set()
+        tallas: list[dict] = []
+        colores_set: set[str] = set()
+        for v in variantes:
+            t = str(v.talla or "U")
+            color = str(v.color or "").strip()
+            if color:
+                colores_set.add(color)
+            if t not in seen_tallas:
+                seen_tallas.add(t)
+                tallas.append({"talla": t, "precio": Decimal(str(v.precio_venta))})
         raw_name = str(prod.nombre_base or prod.nombre)
         clean_name = _clean_tariff_product_name(raw_name, escuela_nombre)
         tipo_pieza = prod.tipo_pieza.nombre if prod.tipo_pieza else ""
@@ -149,6 +158,7 @@ def build_school_tariff(session, escuela_id: int, *, nivel_id: int | None = None
             "tipo_prenda": tipo_prenda,
             "tallas": tallas,
             "genero": genero,
+            "colores": sorted(colores_set),
         })
 
     result_products.sort(key=lambda p: (
@@ -199,11 +209,16 @@ def _merge_same_price_products(products: list[dict]) -> list[dict]:
             merged_genero = list(generos)[0] if len(generos) == 1 else ""
             tipo_prendas = {g.get("tipo_prenda", "") for g in group}
             merged_tipo_prenda = list(tipo_prendas)[0] if len(tipo_prendas) == 1 else ""
+            # Unir colores de todos los productos fusionados
+            merged_colores: set[str] = set()
+            for g in group:
+                merged_colores.update(g.get("colores", []))
             merged.append({
                 "nombre": _build_merged_name(names),
                 "tipo_prenda": merged_tipo_prenda,
                 "tallas": a["tallas"],
                 "genero": merged_genero,
+                "colores": sorted(merged_colores),
             })
     return merged
 
