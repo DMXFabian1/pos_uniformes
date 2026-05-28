@@ -90,14 +90,16 @@ def registrar_conteo(
     """Registra un conteo físico para una variante. NO ajusta stock."""
     variante = session.scalar(
         select(Variante)
-        .options(joinedload(Variante.producto))
         .where(Variante.id == variante_id)
         .with_for_update()
     )
     if variante is None:
         raise ValueError(f"Variante id={variante_id} no encontrada.")
+    # Cargar producto por separado (joinedload + with_for_update no compatible en PG)
+    if variante.producto is None:
+        session.refresh(variante, ["producto"])
 
-    stock_sistema = variante.stock_tienda
+    stock_sistema = variante.stock_actual
     diferencia = stock_fisico - stock_sistema
 
     conteo = ConteoInventario(
