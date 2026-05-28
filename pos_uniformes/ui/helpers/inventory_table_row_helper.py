@@ -24,14 +24,17 @@ def build_inventory_table_row_views(visible_rows: list[dict[str, object]]) -> tu
 
 
 def build_inventory_table_row_view(row: dict[str, object]) -> InventoryTableRowView:
-    stock_value = int(row["stock_actual"])
+    stock_total = int(row["stock_actual"])
+    stock_bodega = int(row.get("stock_bodega", 0))
+    stock_piso = int(row.get("stock_piso", 0))
+    stock_tienda = stock_total - stock_bodega - stock_piso
     committed_value = int(row["apartado_cantidad"])
     stock_minimo = row.get("stock_minimo")
     stock_minimo_int = int(stock_minimo) if stock_minimo is not None else None
-    below_min = stock_minimo_int is not None and stock_value < stock_minimo_int
-    stock_tone = resolve_stock_tone(stock_value, stock_minimo=stock_minimo_int)
+    below_min = stock_minimo_int is not None and stock_tienda < stock_minimo_int
+    stock_tone = resolve_stock_tone(stock_tienda, stock_minimo=stock_minimo_int)
     row_tone = _build_inventory_row_tone(
-        stock_value=stock_value,
+        stock_value=stock_tienda,
         committed_value=committed_value,
         variant_active=bool(row["variante_activa"]),
         qr_exists=bool(row["qr_exists"]),
@@ -50,7 +53,9 @@ def build_inventory_table_row_view(row: dict[str, object]) -> InventoryTableRowV
             row["producto_nombre_base"],
             row["talla"],
             row["color"],
-            _build_stock_table_text(stock_value, stock_minimo=stock_minimo_int),
+            _build_stock_table_text(stock_tienda, stock_minimo=stock_minimo_int),
+            stock_piso if stock_piso > 0 else "",
+            stock_bodega if stock_bodega > 0 else "",
             committed_value,
             status_text,
             qr_text,

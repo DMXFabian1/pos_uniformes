@@ -139,10 +139,36 @@ def fetch_all_data(conn):
         SELECT
             (SELECT COUNT(*) FROM escuela WHERE activo=true),
             (SELECT COUNT(*) FROM producto WHERE activo=true),
-            (SELECT COUNT(*) FROM variante WHERE activo=true AND producto_id IN (SELECT id FROM producto WHERE activo=true)),
-            (SELECT COUNT(*) FROM variante WHERE activo=false AND producto_id IN (SELECT id FROM producto WHERE activo=true))
+            (SELECT COUNT(*) FROM variante v JOIN producto p ON p.id=v.producto_id
+             WHERE v.activo=true AND p.activo=true),
+            (SELECT COUNT(*) FROM variante v JOIN producto p ON p.id=v.producto_id
+             WHERE v.activo=false AND p.activo=true)
     """)
     stats = dict(zip(["escuelas", "productos", "variantes_activas", "variantes_inactivas"], cur.fetchone()))
+
+    # Stock breakdown
+    cur.execute("""
+        SELECT
+            COALESCE(SUM(v.stock_actual), 0),
+            COALESCE(SUM(v.stock_bodega), 0),
+            COALESCE(SUM(v.stock_piso), 0),
+            COALESCE(SUM(v.stock_actual - v.stock_bodega - v.stock_piso), 0),
+            COUNT(*) FILTER (WHERE v.stock_actual = 0),
+            COUNT(*) FILTER (WHERE v.stock_actual > 0
+                AND (v.stock_actual - v.stock_bodega - v.stock_piso) < COALESCE(v.stock_minimo, 2)),
+            COALESCE(SUM(v.stock_actual * v.precio_venta), 0)
+        FROM variante v
+        JOIN producto p ON p.id = v.producto_id
+        WHERE v.activo = true AND p.activo = true
+    """)
+    row = cur.fetchone()
+    stats["stock_total"] = int(row[0])
+    stats["stock_bodega"] = int(row[1])
+    stats["stock_piso"] = int(row[2])
+    stats["stock_tienda"] = int(row[3])
+    stats["variantes_sin_stock"] = int(row[4])
+    stats["variantes_bajo_min"] = int(row[5])
+    stats["valor_inventario"] = float(row[6])
 
     # Schools per nivel
     cur.execute("""
@@ -224,7 +250,9 @@ def fetch_all_data(conn):
             ne.nombre AS nivel, tp.nombre AS tipo_pieza,
             p.id AS producto_id, p.nombre_base,
             v.id AS variante_id, v.sku, v.talla, v.color,
-            v.precio_venta, v.stock_actual, v.activo AS v_activo
+            v.precio_venta, v.stock_actual, v.activo AS v_activo,
+            v.stock_bodega, v.stock_piso, v.stock_minimo,
+            p.escuela_id AS producto_escuela_id
         FROM all_school_products asp
         JOIN escuela e ON e.id=asp.escuela_id AND e.activo=true
         JOIN producto p ON p.id=asp.producto_id
@@ -369,74 +397,136 @@ def compute_insights(stats, school_levels, pieces_raw, catalog_rows, catalog_col
 
 def build_resumen(stats, insights, coverage_data):
     niveles = stats["por_nivel"]
-    total = stats["escuelas"]
+    total_escuelas = stats["escuelas"]
     h = []
 
-    # KPI cards row
-    h.append('<div class="kpi-row">')
+    # ── Row 1: KPIs principales ──
+    valor_inv = stats["valor_inventario"]
+    valor_str = f"${valor_inv/1_000_000:.1f}M" if valor_inv >= 1_000_000 else f"${valor_inv/1000:.0f}K" if valor_inv >= 1000 else f"${valor_inv:,.0f}"
+    h.append('<div class="res-kpi-row">')
     kpis = [
-        (stats["escuelas"], "Escuelas", "school", ""),
-        (stats["productos"], "Productos", "product", "activos"),
-        (stats["variantes_activas"], "Variantes", "variant", "activas"),
-        (stats["variantes_inactivas"], "Inactivas", "inactive", "variantes"),
+        (f'{stats["escuelas"]}', "Escuelas", "school", "activas"),
+        (f'{stats["productos"]:,}', "Productos", "product", "activos"),
+        (f'{stats["stock_tienda"]:,}', "Piezas en tienda", "stock", f'{stats["stock_total"]:,} total'),
+        (valor_str, "Valor inventario", "valor", "precio de venta"),
     ]
     for val, label, cls, sub in kpis:
-        h.append(f'<div class="kpi-card {cls}"><div class="kpi-value">{val:,}</div><div class="kpi-label">{label}</div>')
-        if sub:
-            h.append(f'<div class="kpi-sub">{sub}</div>')
-        h.append('</div>')
+        h.append(f'<div class="res-kpi {cls}"><div class="res-kpi-val">{val}</div>'
+                 f'<div class="res-kpi-label">{label}</div>'
+                 f'<div class="res-kpi-sub">{sub}</div></div>')
     h.append('</div>')
 
-    # Distribution by nivel
-    h.append('<div class="section-card"><h3>Distribución por nivel educativo</h3><div class="nivel-bars">')
+    # ── Row 2: Stock por ubicación + Salud inventario ──
+    h.append('<div class="res-two-col">')
+
+    # -- Col A: Stock por ubicación (stacked bar) --
+    st = stats["stock_tienda"]
+    sp = stats["stock_piso"]
+    sb = stats["stock_bodega"]
+    stotal = stats["stock_total"] or 1
+    pct_t = round(st / stotal * 100)
+    pct_p = round(sp / stotal * 100)
+    pct_b = round(sb / stotal * 100)
+    h.append('<div class="res-card">')
+    h.append('<div class="res-card-title">Stock por ubicación</div>')
+    h.append(f'<div class="res-stacked-bar">'
+             f'<div class="res-sb-seg tienda" style="width:{pct_t}%" title="Tienda: {st:,}"></div>'
+             f'<div class="res-sb-seg piso" style="width:{pct_p}%" title="Piso: {sp:,}"></div>'
+             f'<div class="res-sb-seg bodega" style="width:{pct_b}%" title="Almacén: {sb:,}"></div>'
+             f'</div>')
+    h.append('<div class="res-legend">')
+    h.append(f'<span class="res-leg-item"><span class="res-leg-dot tienda"></span>Tienda <b>{st:,}</b> ({pct_t}%)</span>')
+    h.append(f'<span class="res-leg-item"><span class="res-leg-dot piso"></span>Piso <b>{sp:,}</b> ({pct_p}%)</span>')
+    h.append(f'<span class="res-leg-item"><span class="res-leg-dot bodega"></span>Almacén <b>{sb:,}</b> ({pct_b}%)</span>')
+    h.append('</div></div>')
+
+    # -- Col B: Salud del inventario --
+    v_activas = stats["variantes_activas"]
+    v_sin = stats["variantes_sin_stock"]
+    v_bajo = stats["variantes_bajo_min"]
+    v_ok = v_activas - v_sin - v_bajo
+    pct_ok = round(v_ok / v_activas * 100) if v_activas else 0
+    pct_sin = round(v_sin / v_activas * 100) if v_activas else 0
+    pct_bajo = round(v_bajo / v_activas * 100) if v_activas else 0
+    h.append('<div class="res-card">')
+    h.append('<div class="res-card-title">Salud del inventario</div>')
+    h.append(f'<div class="res-stacked-bar">'
+             f'<div class="res-sb-seg ok" style="width:{pct_ok}%" title="OK: {v_ok:,}"></div>'
+             f'<div class="res-sb-seg bajo" style="width:{pct_bajo}%" title="Bajo mínimo: {v_bajo:,}"></div>'
+             f'<div class="res-sb-seg sin" style="width:{pct_sin}%" title="Sin stock: {v_sin:,}"></div>'
+             f'</div>')
+    h.append('<div class="res-legend">')
+    h.append(f'<span class="res-leg-item"><span class="res-leg-dot ok"></span>OK <b>{v_ok:,}</b></span>')
+    h.append(f'<span class="res-leg-item"><span class="res-leg-dot bajo"></span>Bajo mínimo <b>{v_bajo:,}</b></span>')
+    h.append(f'<span class="res-leg-item"><span class="res-leg-dot sin"></span>Sin stock <b>{v_sin:,}</b></span>')
+    h.append('</div></div>')
+    h.append('</div>')  # close res-two-col
+
+    # ── Row 3: Cobertura por nivel + Escuelas por nivel ──
+    h.append('<div class="res-two-col">')
+
+    # -- Col A: Cobertura por nivel --
+    nivel_stats: dict[str, list[int]] = defaultdict(list)
+    for c in coverage_data:
+        nivel_stats[c["nivel"]].append(c["pct"])
+    low_coverage = [c for c in coverage_data if c["pct"] < 40]
+    full_coverage = [c for c in coverage_data if c["pct"] >= 80]
+    avg_pct = round(sum(c["pct"] for c in coverage_data) / len(coverage_data)) if coverage_data else 0
+
+    h.append('<div class="res-card">')
+    h.append(f'<div class="res-card-title">Cobertura de piezas <span class="res-card-badge" style="background:{"var(--green-bg);color:var(--green)" if avg_pct >= 70 else "var(--orange-bg);color:var(--orange)" if avg_pct >= 40 else "var(--red-bg);color:var(--red)"}"">{avg_pct}% promedio</span></div>')
+    for nivel in NIVEL_ORDER:
+        if nivel not in nivel_stats:
+            continue
+        pcts = nivel_stats[nivel]
+        avg = round(sum(pcts) / len(pcts))
+        color = NIVEL_COLORS.get(nivel, "#999")
+        bar_color = "#c62828" if avg < 40 else "#e65100" if avg < 70 else "#2e7d32"
+        h.append(f'<div class="res-cov-row">'
+                 f'<span class="res-cov-nivel"><span class="nivel-dot" style="background:{color}"></span>{nivel}</span>'
+                 f'<div class="res-cov-bar"><div class="res-cov-fill" style="width:{avg}%;background:{bar_color}"></div></div>'
+                 f'<span class="res-cov-pct" style="color:{bar_color}">{avg}%</span>'
+                 f'</div>')
+    h.append(f'<div class="res-cov-summary">{len(full_coverage)} completas · {len(low_coverage)} críticas</div>')
+    h.append('</div>')
+
+    # -- Col B: Distribución por nivel --
+    h.append('<div class="res-card">')
+    h.append('<div class="res-card-title">Escuelas por nivel</div>')
     for nivel in NIVEL_ORDER:
         cnt = niveles.get(nivel, 0)
-        pct = round(cnt / total * 100) if total else 0
+        pct = round(cnt / total_escuelas * 100) if total_escuelas else 0
         color = NIVEL_COLORS.get(nivel, "#999")
-        h.append(f'''<div class="nivel-bar-row">
-            <span class="nivel-bar-label">{nivel}</span>
-            <div class="nivel-bar-track"><div class="nivel-bar-fill" style="width:{pct}%;background:{color}"></div></div>
-            <span class="nivel-bar-count">{cnt}</span>
-        </div>''')
-    h.append('</div></div>')
+        h.append(f'<div class="res-cov-row">'
+                 f'<span class="res-cov-nivel"><span class="nivel-dot" style="background:{color}"></span>{nivel}</span>'
+                 f'<div class="res-cov-bar"><div class="res-cov-fill" style="width:{pct}%;background:{color}"></div></div>'
+                 f'<span class="res-cov-pct" style="color:{color}">{cnt}</span>'
+                 f'</div>')
+    h.append('</div>')
+    h.append('</div>')  # close res-two-col
 
-    # Insights
-    h.append('<div class="section-card"><h3>Diagnóstico automático</h3><div class="insights-list">')
-    icons = {"ok": "✅", "warn": "⚠️", "alert": "🔴", "info": "📊"}
-    for kind, title, detail in insights:
-        h.append(f'''<div class="insight-row {kind}">
-            <span class="insight-icon">{icons.get(kind, "")}</span>
-            <div class="insight-body"><div class="insight-title">{_esc(title)}</div>''')
-        if detail:
-            # Soportar detalles multilínea (warn con lista de escuelas)
-            if "\n" in detail:
-                lines = detail.split("\n")
-                h.append('<div class="insight-detail insight-detail-list">')
-                for line in lines:
-                    h.append(f'<div class="insight-detail-item">{_esc(line)}</div>')
-                h.append('</div>')
-            else:
-                h.append(f'<div class="insight-detail">{_esc(detail)}</div>')
-        h.append('</div></div>')
-    h.append('</div></div>')
-
-    # Coverage overview
-    h.append('<div class="section-card"><h3>Cobertura de piezas por escuela</h3>')
-    h.append('<div class="coverage-grid">')
-    for c in sorted(coverage_data, key=lambda x: x["pct"]):
-        bar_color = "#c62828" if c["pct"] < 40 else "#e65100" if c["pct"] < 70 else "#2e7d32"
-        nivel_color = NIVEL_COLORS.get(c["nivel"], "#999")
-        h.append(f'''<div class="coverage-item" data-eid="{c['eid']}" data-nivel="{_esc(c['nivel'])}">
-            <div class="coverage-header">
-                <span class="coverage-name">{_esc(c["name"])}</span>
-                <span class="coverage-pct" style="color:{bar_color}">{c["pct"]}%</span>
-            </div>
-            <div class="coverage-bar-track">
-                <div class="coverage-bar-fill" style="width:{c["pct"]}%;background:{bar_color}"></div>
-            </div>
-            <div class="coverage-detail">{c["has"]} de {c["total"]} piezas · <span style="color:{nivel_color}">{c["nivel"]}</span></div>
-        </div>''')
-    h.append('</div></div>')
+    # ── Row 4: Alertas (solo si hay) ──
+    alerts = [i for i in insights if i[0] in ("warn", "alert")]
+    if alerts:
+        h.append('<div class="res-card res-alerts">')
+        h.append('<div class="res-card-title">⚠ Alertas</div>')
+        for kind, title, detail in alerts:
+            cls = "res-alert-warn" if kind == "warn" else "res-alert-danger"
+            h.append(f'<div class="res-alert {cls}">')
+            h.append(f'<div class="res-alert-title">{_esc(title)}</div>')
+            if detail:
+                if "\n" in detail:
+                    lines = detail.split("\n")
+                    h.append('<div class="res-alert-detail">')
+                    for line in lines[:5]:
+                        h.append(f'<div class="res-alert-line">{_esc(line)}</div>')
+                    if len(lines) > 5:
+                        h.append(f'<div class="res-alert-line" style="color:var(--text-muted)">… y {len(lines)-5} más</div>')
+                    h.append('</div>')
+                else:
+                    h.append(f'<div class="res-alert-detail">{_esc(detail)}</div>')
+            h.append('</div>')
+        h.append('</div>')
 
     return "\n".join(h)
 
@@ -734,315 +824,217 @@ def build_tariffs(catalog_rows, catalog_cols, multi_level_ids):
     return "\n".join(h)
 
 
-def build_catalog(catalog_rows, catalog_cols, multi_level_ids, pieces_raw):
-    col_idx = {c: i for i, c in enumerate(catalog_cols)}
-    all_tipos = [t for t in PIEZA_ORDER if any(r[2] == t for r in pieces_raw)]
 
-    schools = OrderedDict()
+
+
+def build_variants(catalog_rows, catalog_cols, multi_level_ids):
+    col_idx = {c: i for i, c in enumerate(catalog_cols)}
+
+    # Build product data with per-talla stock
+    _SIEMPRE_VIRTUALES = {"Pants 3pz", "Chamarra"}
+    _VIRTUALES_SI_NO_ESCUELA = {"Jumper", "Falda"}
+    schools: dict[str, dict] = OrderedDict()
     for row in catalog_rows:
         eid = row[col_idx["escuela_id"]]
         ename = row[col_idx["escuela"]]
         nivel = row[col_idx["nivel"]]
         display = f"{ename} {nivel}" if eid in multi_level_ids else ename
         pid = row[col_idx["producto_id"]]
-        pname = row[col_idx["nombre_base"]]
-        tipo = row[col_idx["tipo_pieza"]]
+        vid = row[col_idx["variante_id"]]
 
         if display not in schools:
             schools[display] = {"nivel": nivel, "eid": eid, "products": OrderedDict()}
         if pid not in schools[display]["products"]:
-            schools[display]["products"][pid] = {"nombre": pname, "tipo": tipo, "variants": []}
-
-        vid = row[col_idx["variante_id"]]
-        if vid is not None:
-            schools[display]["products"][pid]["variants"].append({
-                "sku": row[col_idx["sku"]], "talla": row[col_idx["talla"]] or "-",
-                "color": row[col_idx["color"]] or "-", "precio": row[col_idx["precio_venta"]],
-                "stock": row[col_idx["stock_actual"]], "activo": row[col_idx["v_activo"]],
-            })
-
-    # Pieces per school for coverage
-    pieces_map = defaultdict(set)
-    for eid, nivel, tipo, cnt in pieces_raw:
-        pieces_map[(eid, nivel)].add(tipo)
-
-    h = []
-    h.append('''<div class="filter-bar">
-        <input type="text" id="catalogSearch" placeholder="Buscar escuela, producto, SKU..." class="search-box" oninput="filterCatalog()">
-        <select id="catalogNivel" class="filter-select" onchange="filterCatalog()"><option value="">Todos los niveles</option>''')
-    for n in NIVEL_ORDER:
-        h.append(f'<option value="{n}">{n}</option>')
-    h.append('</select></div>')
-
-    schools_sorted_cat = sorted(
-        schools.items(),
-        key=lambda x: (NIVEL_ORDER.index(x[1]["nivel"]) if x[1]["nivel"] in NIVEL_ORDER else 99, x[0]),
-    )
-    current_nivel_cat = None
-
-    for school_name, sdata in schools_sorted_cat:
-        # Section header per nivel (collapsible)
-        if sdata["nivel"] != current_nivel_cat:
-            if current_nivel_cat is not None:
-                h.append('</div></div>')  # close previous nivel-section-body + nivel-section
-            current_nivel_cat = sdata["nivel"]
-            n_color = NIVEL_COLORS.get(current_nivel_cat, "#999")
-            n_count = sum(1 for _, sd in schools_sorted_cat if sd["nivel"] == current_nivel_cat)
-            h.append(f'<div class="nivel-section" data-nivel="{_esc(current_nivel_cat)}">')
-            h.append(f'<div class="nivel-section-header" onclick="this.parentElement.classList.toggle(\'nivel-collapsed\')" style="border-left:4px solid {n_color};padding:8px 14px;margin:18px 0 0;background:var(--card-bg);border-radius:var(--radius-sm);font-weight:700;font-size:14px;color:var(--text);display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none">')
-            h.append(f'<span class="nivel-dot" style="background:{n_color}"></span>{_esc(current_nivel_cat)}<span style="font-weight:400;font-size:12px;color:var(--text-muted)">({n_count} escuelas)</span><span class="nivel-arrow">▾</span></div>')
-            h.append('<div class="nivel-section-body">')
-
-        prods = sdata["products"]
-        nivel_color = NIVEL_COLORS.get(sdata["nivel"], "#999")
-        total_active = sum(sum(1 for v in p["variants"] if v["activo"]) for p in prods.values())
-        total_inactive = sum(sum(1 for v in p["variants"] if not v["activo"]) for p in prods.values())
-        total_stock = sum(sum(v["stock"] or 0 for v in p["variants"] if v["activo"]) for p in prods.values())
-        tipos_in = pieces_map.get((sdata["eid"], sdata["nivel"]), set())
-        cov = len(tipos_in)
-        cov_pct = round(cov / len(all_tipos) * 100) if all_tipos else 0
-        cov_color = "#c62828" if cov_pct < 40 else "#e65100" if cov_pct < 70 else "#2e7d32"
-
-        h.append(f'<div class="school-card" data-school="{_esc(school_name)}" data-nivel="{_esc(sdata["nivel"])}">')
-        h.append(f'<div class="card-header" onclick="this.parentElement.classList.toggle(\'collapsed\')">')
-        h.append(f'<div class="card-title-row"><span class="nivel-dot" style="background:{nivel_color}"></span><span class="card-title">{_esc(school_name)}</span></div>')
-        h.append(f'<div class="card-meta">')
-        h.append(f'<span class="meta-chip">{len(prods)} prod.</span>')
-        h.append(f'<span class="meta-chip">{total_active} var.</span>')
-        h.append(f'<span class="meta-chip stock-chip-{("zero" if total_stock == 0 else "ok")}">Stock: {total_stock}</span>')
-        h.append(f'<span class="meta-chip" style="color:{cov_color}">{cov}/{len(all_tipos)} piezas</span>')
-        if total_inactive > 0:
-            h.append(f'<span class="meta-chip warn">{total_inactive} inact.</span>')
-        h.append('<span class="toggle-arrow">▾</span></div></div>')
-        h.append('<div class="card-body">')
-
-        prods_sorted = sorted(
-            prods.items(),
-            key=lambda x: (PIEZA_ORDER.index(x[1]["tipo"]) if x[1]["tipo"] in PIEZA_ORDER else 99, x[1]["nombre"]),
-        )
-        for pid, pdata in prods_sorted:
-            if not pdata["variants"]:
-                continue
-            active_v = [v for v in pdata["variants"] if v["activo"]]
-            prices = sorted(set(float(v["precio"]) for v in active_v if v["precio"]))
-            tallas = sorted(set(v["talla"] for v in active_v), key=talla_sort_key)
-            colors = sorted(set(v["color"] for v in active_v if v["color"] not in ("-", "Sin color")))
-            prod_stock = sum(v["stock"] or 0 for v in active_v)
-            price_str = f"${prices[0]:,.0f}" if len(prices) == 1 else f"${prices[0]:,.0f}–${prices[-1]:,.0f}" if prices else "—"
-
-            stock_cls = "stock-zero" if prod_stock == 0 else "stock-low" if prod_stock < 10 else "stock-ok"
-
-            h.append(f'<div class="product-card" data-name="{_esc(pdata["nombre"])}">')
-            h.append(f'<div class="prod-top"><span class="tipo-tag">{_esc(pdata["tipo"])}</span><span class="prod-name">{_esc(pdata["nombre"])}</span><span class="prod-price">{price_str}</span></div>')
-            h.append('<div class="prod-details">')
-
-            # Tallas as chips
-            h.append('<div class="chip-group"><span class="chip-label">Tallas</span>')
-            for t in tallas:
-                h.append(f'<span class="talla-chip">{_esc(t)}</span>')
-            h.append('</div>')
-
-            # Colors as chips
-            if colors:
-                h.append('<div class="chip-group"><span class="chip-label">Colores</span>')
-                for c in colors:
-                    h.append(f'<span class="color-chip">{_esc(c)}</span>')
-                h.append('</div>')
-
-            # Stock bar
-            max_stock = 200
-            bar_w = min(prod_stock / max_stock * 100, 100)
-            h.append(f'''<div class="stock-indicator {stock_cls}">
-                <span class="chip-label">Stock</span>
-                <div class="stock-bar-track"><div class="stock-bar-fill" style="width:{bar_w}%"></div></div>
-                <span class="stock-num">{prod_stock}</span>
-            </div>''')
-
-            h.append(f'<span class="var-count">{len(active_v)} variantes</span>')
-            h.append('</div></div>')
-
-        h.append('</div></div>')
-
-    if current_nivel_cat is not None:
-        h.append('</div></div>')  # close last nivel-section-body + nivel-section
-
-    return "\n".join(h)
-
-
-def build_missing(school_levels, pieces_raw, multi_level_ids):
-    all_tipos = [t for t in PIEZA_ORDER if any(r[2] == t for r in pieces_raw)]
-
-    pieces_by_nivel = defaultdict(lambda: defaultdict(int))
-    for eid, nivel, tipo, cnt in pieces_raw:
-        pieces_by_nivel[nivel][tipo] += 1
-
-    nivel_school_counts = defaultdict(int)
-    for sl in school_levels:
-        nivel_school_counts[sl["nivel_nombre"]] += 1
-
-    templates = {}
-    for nivel, tipos in pieces_by_nivel.items():
-        total = nivel_school_counts.get(nivel, 1)
-        templates[nivel] = [t for t, c in tipos.items() if c >= total * 0.5]
-
-    school_pieces = defaultdict(set)
-    for eid, nivel, tipo, cnt in pieces_raw:
-        school_pieces[(eid, nivel)].add(tipo)
-
-    h = []
-    # Template cards
-    h.append('<div class="template-cards">')
-    for nivel in NIVEL_ORDER:
-        if nivel not in templates:
-            continue
-        tipos = sorted(templates[nivel], key=lambda t: PIEZA_ORDER.index(t) if t in PIEZA_ORDER else 99)
-        nivel_color = NIVEL_COLORS.get(nivel, "#999")
-        h.append(f'<div class="template-card"><div class="template-header" style="border-color:{nivel_color}"><span class="nivel-dot" style="background:{nivel_color}"></span>{nivel}</div>')
-        h.append('<div class="template-pieces">')
-        for t in tipos:
-            h.append(f'<span class="template-piece">{_esc(t)}</span>')
-        h.append('</div></div>')
-    h.append('</div>')
-    h.append('<p class="template-note">Piezas que &gt;50% de las escuelas del mismo nivel tienen. Las escuelas sin alguna aparecen abajo.</p>')
-
-    sorted_niveles = OrderedDict()
-    for sl in school_levels:
-        n = sl["nivel_nombre"]
-        if n not in sorted_niveles:
-            sorted_niveles[n] = []
-        sorted_niveles[n].append(sl)
-
-    has_any = False
-    for nivel in NIVEL_ORDER:
-        if nivel not in sorted_niveles:
-            continue
-        template = set(templates.get(nivel, []))
-        if not template:
-            continue
-        missing_schools = []
-        for sl in sorted_niveles[nivel]:
-            school_tipos = school_pieces.get((sl["escuela_id"], nivel), set())
-            missing = template - school_tipos
-            if missing:
-                missing_schools.append((sl, sorted(missing, key=lambda t: PIEZA_ORDER.index(t) if t in PIEZA_ORDER else 99), school_tipos))
-
-        if not missing_schools:
-            continue
-        has_any = True
-        nivel_color = NIVEL_COLORS.get(nivel, "#999")
-        h.append(f'<div class="section-card"><h3><span class="nivel-dot" style="background:{nivel_color}"></span>{_esc(nivel)} <span class="count-label warn">{len(missing_schools)} con faltantes</span></h3>')
-
-        for sl, missing, has_set in sorted(missing_schools, key=lambda x: -len(x[1])):
-            severity = "severe" if len(missing) >= 4 else "moderate" if len(missing) >= 2 else "mild"
-            has_list = sorted(has_set, key=lambda t: PIEZA_ORDER.index(t) if t in PIEZA_ORDER else 99)
-            h.append(f'<div class="missing-row {severity}" data-eid="{sl["escuela_id"]}" data-nivel="{_esc(nivel)}">')
-            h.append(f'<div class="missing-school">{_esc(sl["display_name"])}</div>')
-            h.append(f'<div class="missing-pieces">')
-            for m in missing:
-                h.append(f'<span class="missing-tag" data-tipo="{_esc(m)}">{_esc(m)}</span>')
-            h.append('</div>')
-            h.append(f'<div class="has-pieces">Tiene: {_esc(", ".join(has_list))}</div>')
-            h.append('</div>')
-
-        h.append('</div>')
-
-    if not has_any:
-        h.append('<div class="all-good-card"><div class="all-good-icon">✅</div><div class="all-good-text">Todas las escuelas tienen las piezas base de su nivel.</div></div>')
-
-    return "\n".join(h)
-
-
-def build_variants(catalog_rows, catalog_cols, multi_level_ids):
-    col_idx = {c: i for i, c in enumerate(catalog_cols)}
-    products = OrderedDict()
-
-    for row in catalog_rows:
-        pid = row[col_idx["producto_id"]]
-        if pid not in products:
-            eid = row[col_idx["escuela_id"]]
-            ename = row[col_idx["escuela"]]
-            nivel = row[col_idx["nivel"]]
-            display = f"{ename} {nivel}" if eid in multi_level_ids else ename
-            products[pid] = {
-                "nombre": row[col_idx["nombre_base"]], "escuela": display,
-                "nivel": nivel, "tipo": row[col_idx["tipo_pieza"]],
-                "activas": 0, "inactivas": 0,
-                "tallas": set(), "colores": set(), "precios": set(), "stock": 0,
+            schools[display]["products"][pid] = {
+                "nombre": row[col_idx["nombre_base"]],
+                "tipo": row[col_idx["tipo_pieza"]],
+                "escuela_directa": row[col_idx["producto_escuela_id"]] is not None,
+                "tallas": [],  # list of {talla, stock_tienda, stock_piso, stock_bodega, estado}
+                "stock_total": 0,
+                "agotadas": 0,
+                "bajo_min": 0,
             }
-        vid = row[col_idx["variante_id"]]
-        if vid is None:
+        if vid is None or not row[col_idx["v_activo"]]:
             continue
-        p = products[pid]
-        if row[col_idx["v_activo"]]:
-            p["activas"] += 1
-            t = row[col_idx["talla"]] or "-"
-            c = row[col_idx["color"]] or "-"
-            if t != "-":
-                p["tallas"].add(t)
-            if c not in ("-", "Sin color"):
-                p["colores"].add(c)
-            if row[col_idx["precio_venta"]]:
-                p["precios"].add(float(row[col_idx["precio_venta"]]))
-            p["stock"] += row[col_idx["stock_actual"]] or 0
+        tipo_pieza = row[col_idx["tipo_pieza"]]
+        if tipo_pieza in _SIEMPRE_VIRTUALES:
+            continue
+        if tipo_pieza in _VIRTUALES_SI_NO_ESCUELA and row[col_idx["producto_escuela_id"]] is None:
+            continue
+
+        p = schools[display]["products"][pid]
+        t = row[col_idx["talla"]] or "-"
+        stock_actual = row[col_idx["stock_actual"]] or 0
+        stock_bodega = row[col_idx.get("stock_bodega", -1)] if "stock_bodega" in col_idx else 0
+        stock_piso = row[col_idx.get("stock_piso", -1)] if "stock_piso" in col_idx else 0
+        stock_minimo = row[col_idx.get("stock_minimo", -1)] if "stock_minimo" in col_idx else None
+        stock_tienda = stock_actual - (stock_bodega or 0) - (stock_piso or 0)
+        min_val = int(stock_minimo) if stock_minimo is not None else 2
+
+        if stock_tienda <= 0:
+            estado = "agotado"
+            p["agotadas"] += 1
+        elif stock_tienda < min_val:
+            estado = "bajo"
+            p["bajo_min"] += 1
         else:
-            p["inactivas"] += 1
+            estado = "ok"
+
+        p["tallas"].append({
+            "talla": t,
+            "stock_tienda": stock_tienda,
+            "stock_piso": stock_piso or 0,
+            "stock_bodega": stock_bodega or 0,
+            "estado": estado,
+        })
+        p["stock_total"] += stock_tienda
+
+    # Remove virtual/empty products, sort tallas
+    def _es_visible(p):
+        if not p["tallas"]:
+            return False
+        if p["tipo"] in _SIEMPRE_VIRTUALES:
+            return False
+        if p["tipo"] in _VIRTUALES_SI_NO_ESCUELA and not p["escuela_directa"]:
+            return False
+        return True
+
+    for sdata in schools.values():
+        sdata["products"] = {
+            pid: p for pid, p in sdata["products"].items()
+            if _es_visible(p)
+        }
+        for p in sdata["products"].values():
+            p["tallas"].sort(key=lambda x: talla_sort_key(x["talla"]))
+            p["n_tallas"] = len(p["tallas"])
+
+    # Global stats
+    total_tallas = 0
+    tallas_agotadas = 0
+    tallas_bajo = 0
+    productos_criticos = 0
+    total_stock = 0
+    for sdata in schools.values():
+        for p in sdata["products"].values():
+            total_tallas += p["n_tallas"]
+            tallas_agotadas += p["agotadas"]
+            tallas_bajo += p["bajo_min"]
+            total_stock += p["stock_total"]
+            if p["agotadas"] > 0:
+                productos_criticos += 1
+
+    cobertura_pct = round((total_tallas - tallas_agotadas) / total_tallas * 100) if total_tallas > 0 else 0
 
     h = []
-    h.append('''<div class="filter-bar">
-        <input type="text" id="variantSearch" placeholder="Buscar producto, escuela..." class="search-box" oninput="filterVariants()">
-        <select id="variantFilter" class="filter-select" onchange="filterVariants()">
+
+    # ── Stats bar ──
+    _cob_color = "var(--green)" if cobertura_pct >= 80 else "var(--orange)" if cobertura_pct >= 50 else "var(--red)"
+    h.append('<div class="disp-stats">')
+    h.append(f'<div class="disp-stat agotado"><div class="disp-stat-val">{tallas_agotadas}</div><div class="disp-stat-label">Agotadas</div></div>')
+    h.append(f'<div class="disp-stat bajo"><div class="disp-stat-val">{tallas_bajo}</div><div class="disp-stat-label">Bajo mínimo</div></div>')
+    h.append(f'<div class="disp-stat critico"><div class="disp-stat-val">{productos_criticos}</div><div class="disp-stat-label">Con faltantes</div></div>')
+    h.append(f'<div class="disp-stat cob"><div class="disp-stat-val" style="color:{_cob_color}">{cobertura_pct}%</div><div class="disp-stat-label">Cobertura</div></div>')
+    h.append('</div>')
+
+    # ── Filters ──
+    h.append('''<div class="disp-filter-bar">
+        <div class="disp-search-wrap">
+            <span class="disp-search-icon">🔍</span>
+            <input type="text" id="variantSearch" placeholder="Buscar producto, escuela..." class="disp-search" oninput="filterDisponibilidad()">
+        </div>
+        <select id="variantFilter" class="disp-select" onchange="filterDisponibilidad()">
             <option value="">Todos</option>
-            <option value="few">Pocas variantes (≤2)</option>
-            <option value="inactive">Con inactivas</option>
-            <option value="nostock">Sin stock</option>
-            <option value="multicolor">Multi-color</option>
+            <option value="critico">Con agotadas</option>
+            <option value="bajo">Bajo mínimo</option>
+            <option value="ok">Completo</option>
         </select>
     </div>''')
 
-    h.append('<div class="table-scroll"><table class="variants-table" id="variantTable">')
-    h.append('<thead><tr><th>Escuela</th><th>Producto</th><th>Tipo</th><th>Act.</th><th>Inact.</th><th>Tallas</th><th>Colores</th><th>Precio</th><th>Stock</th></tr></thead><tbody>')
+    # ── School sections ──
+    schools_sorted = sorted(
+        schools.items(),
+        key=lambda x: (NIVEL_ORDER.index(x[1]["nivel"]) if x[1]["nivel"] in NIVEL_ORDER else 99, x[0]),
+    )
 
-    for pid, p in products.items():
-        prices = sorted(p["precios"])
-        tallas = sorted(p["tallas"], key=talla_sort_key)
-        colores = sorted(p["colores"])
-        price_str = f"${prices[0]:,.0f}" if len(prices) == 1 else f"${prices[0]:,.0f}–${prices[-1]:,.0f}" if prices else "—"
+    for school_name, sdata in schools_sorted:
+        products_sorted = sorted(
+            sdata["products"].values(),
+            key=lambda p: (PIEZA_ORDER.index(p["tipo"]) if p["tipo"] in PIEZA_ORDER else 99, p["nombre"]),
+        )
+        n_prods = len(products_sorted)
+        sch_agotadas = sum(p["agotadas"] for p in products_sorted)
+        sch_bajo = sum(p["bajo_min"] for p in products_sorted)
+        sch_total_tallas = sum(p["n_tallas"] for p in products_sorted)
+        sch_ok_tallas = sch_total_tallas - sum(p["agotadas"] for p in products_sorted) - sum(p["bajo_min"] for p in products_sorted)
+        sch_pct = round(sch_ok_tallas / sch_total_tallas * 100) if sch_total_tallas else 100
+        nivel_color = NIVEL_COLORS.get(sdata["nivel"], "#999")
 
-        classes = []
-        if p["activas"] <= 2:
-            classes.append("row-few")
-        if p["inactivas"] > 0:
-            classes.append("row-inactive")
-        if p["stock"] == 0:
-            classes.append("row-nostock")
-        if len(colores) > 1:
-            classes.append("row-multicolor")
+        # Status chips
+        chips = ""
+        if sch_agotadas > 0:
+            chips += f'<span class="disp-sch-chip agotado">{sch_agotadas} agotada{"s" if sch_agotadas != 1 else ""}</span>'
+        if sch_bajo > 0:
+            chips += f'<span class="disp-sch-chip bajo">{sch_bajo} bajo mín</span>'
+        if not chips:
+            chips = '<span class="disp-sch-chip ok">✓ Completo</span>'
 
-        stock_cls = "val-zero" if p["stock"] == 0 else "val-low" if p["stock"] < 10 else ""
-        inact_cls = "val-warn" if p["inactivas"] > 0 else ""
+        h.append(f'<div class="disp-school-group" data-school="{_esc(school_name)}">')
+        h.append(f'<div class="disp-sch-header" onclick="this.parentElement.classList.toggle(\'collapsed\')">')
+        h.append(f'<span class="disp-chevron">▾</span>')
+        h.append(f'<span class="nivel-dot" style="background:{nivel_color}"></span>')
+        h.append(f'<span class="disp-sch-name">{_esc(school_name)}</span>')
+        h.append(f'{chips}')
+        h.append(f'<span class="disp-sch-meta">{n_prods} prod · {sch_total_tallas} tallas</span>')
+        # Mini progress bar
+        bar_color = "#c62828" if sch_pct < 50 else "#e65100" if sch_pct < 80 else "#2e7d32"
+        h.append(f'<div class="disp-sch-bar"><div class="disp-sch-bar-fill" style="width:{sch_pct}%;background:{bar_color}"></div></div>')
+        h.append(f'<span class="disp-sch-pct" style="color:{bar_color}">{sch_pct}%</span>')
+        h.append('</div>')
+        h.append('<div class="disp-school-body">')
 
-        h.append(f'<tr class="{" ".join(classes)}" data-school="{_esc(p["escuela"])}" data-name="{_esc(p["nombre"])}">')
-        h.append(f'<td class="school-name">{_esc(p["escuela"])}</td>')
-        h.append(f'<td>{_esc(p["nombre"])}</td>')
-        h.append(f'<td><span class="tipo-tag sm">{_esc(p["tipo"])}</span></td>')
-        h.append(f'<td class="num-cell">{p["activas"]}</td>')
-        h.append(f'<td class="num-cell {inact_cls}">{p["inactivas"]}</td>')
-        h.append(f'<td class="tallas-cell">{_esc(", ".join(tallas))}</td>')
-        h.append(f'<td>{_esc(", ".join(colores)) if colores else "—"}</td>')
-        h.append(f'<td class="num-cell">{price_str}</td>')
-        # Stock with inline bar
-        max_s = 200
-        bar_w = min(p["stock"] / max_s * 100, 100) if p["stock"] > 0 else 0
-        h.append(f'<td class="num-cell {stock_cls}"><div class="inline-stock"><div class="inline-stock-bar" style="width:{bar_w}%"></div><span>{p["stock"]}</span></div></td>')
-        h.append('</tr>')
+        for p in products_sorted:
+            if p["agotadas"] > 0:
+                status_cls = "disp-critico"
+            elif p["bajo_min"] > 0:
+                status_cls = "disp-bajo"
+            else:
+                status_cls = "disp-ok"
 
-    h.append('</tbody></table></div>')
+            h.append(f'<div class="disp-product-card {status_cls}" data-name="{_esc(p["nombre"])}" data-status="{status_cls}">')
+            h.append(f'<div class="disp-prod-header">')
+            h.append(f'<span class="disp-tipo">{_esc(p["tipo"])}</span>')
+            h.append(f'<span class="disp-prod-name">{_esc(p["nombre"])}</span>')
+            # Status summary
+            if p["agotadas"] > 0:
+                h.append(f'<span class="disp-prod-status agotado">{p["agotadas"]}/{p["n_tallas"]} agotadas</span>')
+            elif p["bajo_min"] > 0:
+                h.append(f'<span class="disp-prod-status bajo">{p["bajo_min"]} bajo mín</span>')
+            else:
+                h.append(f'<span class="disp-prod-status ok">✓</span>')
+            h.append('</div>')
+            # Talla grid
+            h.append('<div class="disp-talla-grid">')
+            for t in p["tallas"]:
+                cls = f"disp-talla disp-talla-{t['estado']}"
+                tooltip = f'{t["talla"]}: {t["stock_tienda"]} en tienda'
+                if t["stock_piso"] > 0:
+                    tooltip += f', {t["stock_piso"]} en piso'
+                if t["stock_bodega"] > 0:
+                    tooltip += f', {t["stock_bodega"]} en almacén'
+                h.append(f'<div class="{cls}" title="{_esc(tooltip)}">')
+                h.append(f'<span class="disp-talla-label">{_esc(t["talla"])}</span>')
+                h.append(f'<span class="disp-talla-stock">{t["stock_tienda"]}</span>')
+                h.append('</div>')
+            h.append('</div>')
+            h.append('</div>')
+
+        h.append('</div></div>')
+
     return "\n".join(h)
 
 
 def build_conteo(school_levels):
     """Genera la pestaña de conteo de inventario (interactiva via QWebChannel)."""
-    # Escuelas únicas para el dropdown
     seen = set()
     schools = []
     for sl in school_levels:
@@ -1054,92 +1046,117 @@ def build_conteo(school_levels):
 
     h = []
 
-    # Fallback message for browser mode
+    # Fallback for browser mode
     h.append('<div id="conteo-fallback" style="display:none">')
     h.append('<div class="section-card" style="text-align:center;padding:40px">')
     h.append('<h3 style="color:var(--text-muted)">Conteo de inventario</h3>')
     h.append('<p style="color:var(--text-muted)">Esta funcionalidad solo esta disponible dentro de la aplicacion POS.</p>')
-    h.append('<p style="color:var(--text-muted);font-size:12px">Abre el panel desde la pestana "Panel Uniformes" en la aplicacion.</p>')
     h.append('</div></div>')
 
-    # Main conteo interface (hidden in browser, shown in app)
     h.append('<div id="conteo-app">')
 
-    # Controls bar
-    h.append('<div class="filter-bar" style="flex-wrap:wrap;gap:10px">')
+    # ── Top controls ──
+    h.append('<div class="filter-bar" style="flex-wrap:wrap;gap:10px;align-items:center">')
     h.append('<div style="display:flex;align-items:center;gap:8px">')
     h.append('<label style="font-weight:600;font-size:13px">Escuela:</label>')
-    h.append('<select id="conteo-escuela" onchange="conteoLoadEscuela()" style="padding:6px 10px;border-radius:var(--radius-xs);border:1px solid var(--border);font-size:13px;min-width:200px">')
-    h.append('<option value="">— Seleccionar —</option>')
+    h.append('<select id="conteo-escuela" onchange="conteoLoadEscuela()" class="filter-select" style="min-width:220px">')
+    h.append('<option value="">— Seleccionar escuela —</option>')
     for eid, ename in schools:
         h.append(f'<option value="{eid}">{_esc(ename)}</option>')
     h.append('</select>')
     h.append('</div>')
     h.append('<div style="display:flex;align-items:center;gap:8px">')
     h.append('<label style="font-weight:600;font-size:13px">Contado por:</label>')
-    h.append('<input type="text" id="conteo-por" placeholder="Nombre" style="padding:6px 10px;border-radius:var(--radius-xs);border:1px solid var(--border);font-size:13px;width:150px">')
+    h.append('<input type="text" id="conteo-por" placeholder="Nombre" class="search-box" style="min-width:140px;flex:0">')
     h.append('</div>')
-    h.append('<div style="display:flex;gap:6px">')
-    h.append('<button class="btn btn-outline" onclick="conteoGuardar()" id="conteo-guardar-btn" disabled>Guardar conteo</button>')
-    h.append('<button class="btn btn-outline" onclick="conteoVerPendientes()" id="conteo-pendientes-btn">Pendientes</button>')
-    h.append('</div>')
+    h.append('<button class="btn" onclick="conteoGuardar()" id="conteo-guardar-btn" disabled style="margin-left:auto">Guardar conteo</button>')
     h.append('</div>')
 
-    # Estado card
+    # ── Sub-tabs ──
+    h.append('<div id="conteo-subtabs" style="display:none;margin-bottom:14px;gap:6px">')
+    h.append('<button class="btn btn-sm btn-outline active" onclick="conteoShowSubtab(\'contar\')" data-subtab="contar">Contar</button>')
+    h.append('<button class="btn btn-sm btn-outline" onclick="conteoShowSubtab(\'pendientes\')" data-subtab="pendientes">Pendientes <span id="conteo-pendientes-badge" style="display:none;background:var(--red);color:#fff;border-radius:99px;padding:0 6px;font-size:10px;margin-left:4px"></span></button>')
+    h.append('<button class="btn btn-sm btn-outline" onclick="conteoShowSubtab(\'historial\')" data-subtab="historial">Historial</button>')
+    h.append('</div>')
+
+    # ── Estado card with progress ──
     h.append('<div id="conteo-estado" class="section-card" style="display:none">')
     h.append('<div style="display:flex;gap:16px;align-items:center;flex-wrap:wrap">')
     h.append('<div id="conteo-estado-info" style="flex:1;font-size:13px"></div>')
     h.append('<div style="display:flex;align-items:center;gap:8px">')
     h.append('<label style="font-size:12px;color:var(--text-muted)">Vigencia (dias):</label>')
-    h.append('<input type="number" id="conteo-vigencia" min="1" max="365" value="90" style="width:60px;padding:4px;border-radius:var(--radius-xs);border:1px solid var(--border);font-size:12px">')
-    h.append('<button class="btn btn-outline" onclick="conteoGuardarConfig()" style="font-size:11px;padding:3px 8px">Guardar</button>')
+    h.append('<input type="number" id="conteo-vigencia" min="1" max="365" value="90" style="width:60px;padding:4px;border-radius:var(--radius-xs);border:1px solid var(--border);font-size:12px;background:var(--card-bg);color:var(--text)">')
+    h.append('<button class="btn btn-sm btn-outline" onclick="conteoGuardarConfig()" style="font-size:11px;padding:3px 8px">Guardar</button>')
+    h.append('</div>')
+    h.append('</div>')
+    # Session progress bar
+    h.append('<div id="conteo-progress" style="margin-top:12px">')
+    h.append('<div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px">')
+    h.append('<span id="conteo-progress-text" style="color:var(--text-muted)">0 de 0 productos contados</span>')
+    h.append('<span id="conteo-progress-pct" style="font-weight:700;color:var(--brand)">0%</span>')
+    h.append('</div>')
+    h.append('<div style="height:8px;width:100%;background:var(--border-light);border-radius:99px;overflow:hidden">')
+    h.append('<div id="conteo-progress-fill" style="height:100%;background:var(--brand);width:0%;transition:width 0.4s cubic-bezier(0.4,0,0.2,1);border-radius:99px"></div>')
     h.append('</div>')
     h.append('</div>')
     h.append('</div>')
 
-    # Conteo table
-    h.append('<div id="conteo-tabla-container" class="section-card" style="display:none">')
-    h.append('<div class="table-scroll"><table class="data-table" id="conteo-tabla">')
-    h.append('<thead><tr>')
-    h.append('<th>SKU</th><th>Producto</th><th>Talla</th><th>Color</th>')
-    h.append('<th>Stock Sistema</th><th style="min-width:80px">Stock Fisico</th>')
-    h.append('<th>Diferencia</th><th>Ultimo Conteo</th><th>Estado</th>')
-    h.append('</tr></thead>')
-    h.append('<tbody id="conteo-tbody"></tbody>')
-    h.append('</table></div>')
+    # ── Panel: Contar ──
+    h.append('<div id="conteo-panel-contar" class="conteo-subtab-panel" style="display:none">')
+    # Search & filters
+    h.append('<div class="filter-bar" style="gap:8px;margin-bottom:14px">')
+    h.append('<input type="text" id="conteo-search" placeholder="Buscar producto o SKU..." class="search-box" oninput="conteoFilterProducts()">')
+    h.append('<button class="btn btn-sm btn-outline active" onclick="conteoSetFilter(\'todos\',this)" data-filter="todos">Todos</button>')
+    h.append('<button class="btn btn-sm btn-outline" onclick="conteoSetFilter(\'sincontar\',this)" data-filter="sincontar">Sin contar</button>')
+    h.append('<button class="btn btn-sm btn-outline" onclick="conteoSetFilter(\'diferencia\',this)" data-filter="diferencia">Con diferencia</button>')
+    h.append('</div>')
+    # Adjust prompt (hidden)
+    h.append('<div id="conteo-adjust-prompt" class="section-card conteo-adjust-prompt" style="display:none">')
+    h.append('<div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap">')
+    h.append('<span id="conteo-adjust-msg" style="font-size:13px"></span>')
+    h.append('<button class="btn btn-sm" onclick="conteoApplyAdjustments()">Si, ajustar stock</button>')
+    h.append('<button class="btn btn-sm btn-outline" onclick="conteoDismissPrompt()">No, ver pendientes</button>')
+    h.append('</div>')
+    h.append('</div>')
+    # Product cards container
+    h.append('<div id="conteo-products-container"></div>')
     h.append('</div>')
 
-    # Pendientes panel
-    h.append('<div id="conteo-pendientes-panel" class="section-card" style="display:none">')
-    h.append('<h3>Conteos pendientes de ajuste</h3>')
-    h.append('<div class="table-scroll"><table class="data-table">')
-    h.append('<thead><tr>')
-    h.append('<th><input type="checkbox" id="conteo-select-all" onchange="conteoToggleAll(this)"></th>')
-    h.append('<th>SKU</th><th>Producto</th><th>Sistema</th><th>Fisico</th>')
-    h.append('<th>Diferencia</th><th>Contado por</th><th>Fecha</th>')
-    h.append('</tr></thead>')
-    h.append('<tbody id="conteo-pendientes-tbody"></tbody>')
-    h.append('</table></div>')
-    h.append('<div style="margin-top:10px;display:flex;gap:8px">')
-    h.append('<button class="btn btn-outline" onclick="conteoConfirmarAjustes()" id="conteo-ajustar-btn" disabled>Confirmar ajustes seleccionados</button>')
-    h.append('<span id="conteo-ajuste-info" style="font-size:12px;color:var(--text-muted);align-self:center"></span>')
+    # ── Panel: Pendientes ──
+    h.append('<div id="conteo-panel-pendientes" class="conteo-subtab-panel" style="display:none">')
+    h.append('<div class="section-card" style="padding:20px">')
+    # Toolbar
+    h.append('<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">')
+    h.append('<div style="display:flex;align-items:center;gap:10px">')
+    h.append('<h3 style="margin:0;font-size:17px">Conteos pendientes de ajuste</h3>')
+    h.append('<span id="conteo-pendientes-count" class="meta-chip" style="background:var(--red-bg,#fbe9e7);color:var(--red)"></span>')
+    h.append('</div>')
+    h.append('<div style="display:flex;gap:8px;align-items:center">')
+    h.append('<label style="font-size:13px;display:flex;align-items:center;gap:4px;cursor:pointer"><input type="checkbox" id="conteo-select-all" onchange="conteoToggleAll(this)"> Seleccionar todos</label>')
+    h.append('<button class="btn btn-sm" onclick="conteoConfirmarAjustes()" id="conteo-ajustar-btn" disabled style="white-space:nowrap">Confirmar seleccionados</button>')
+    h.append('</div>')
+    h.append('</div>')
+    # Cards container
+    h.append('<div id="conteo-pendientes-container"></div>')
+    h.append('<div id="conteo-pendientes-empty" style="display:none;text-align:center;padding:40px;color:var(--text-muted)">')
+    h.append('<span style="font-size:32px">✅</span><p style="margin-top:8px">Sin conteos pendientes de ajuste</p></div>')
     h.append('</div>')
     h.append('</div>')
 
-    # Historial panel
-    h.append('<div id="conteo-historial-panel" class="section-card" style="display:none">')
-    h.append('<h3>Historial de conteos</h3>')
-    h.append('<div class="table-scroll"><table class="data-table">')
-    h.append('<thead><tr>')
-    h.append('<th>SKU</th><th>Producto</th><th>Sistema</th><th>Fisico</th>')
-    h.append('<th>Dif</th><th>Ajustado</th><th>Contado por</th><th>Fecha</th>')
-    h.append('</tr></thead>')
-    h.append('<tbody id="conteo-historial-tbody"></tbody>')
-    h.append('</table></div>')
+    # ── Panel: Historial ──
+    h.append('<div id="conteo-panel-historial" class="conteo-subtab-panel" style="display:none">')
+    h.append('<div class="section-card" style="padding:20px">')
+    h.append('<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">')
+    h.append('<h3 style="margin:0;font-size:17px">Historial de conteos</h3>')
+    h.append('<span id="conteo-historial-count" class="meta-chip" style="color:var(--text-muted)"></span>')
+    h.append('</div>')
+    h.append('<div id="conteo-historial-container"></div>')
+    h.append('<div id="conteo-historial-empty" style="display:none;text-align:center;padding:40px;color:var(--text-muted)">')
+    h.append('<span style="font-size:32px">📋</span><p style="margin-top:8px">Sin historial de conteos</p></div>')
+    h.append('</div>')
     h.append('</div>')
 
     h.append('</div>')  # close conteo-app
-
     return "\n".join(h)
 
 
@@ -1147,7 +1164,7 @@ def build_conteo(school_levels):
 # Full HTML
 # ---------------------------------------------------------------------------
 
-def generate_html(resumen, pieces, tariffs, catalog, missing, variants, conteo):
+def generate_html(resumen, pieces, tariffs, variants, conteo):
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
     return f"""<!DOCTYPE html>
 <html lang="es">
@@ -1221,6 +1238,69 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sys
 @keyframes fadeIn {{ from {{ opacity: 0; transform: translateY(4px); }} to {{ opacity: 1; transform: translateY(0); }} }}
 
 /* ============ KPI CARDS ============ */
+/* ============ RESUMEN ============ */
+.res-kpi-row {{ display:grid; grid-template-columns:repeat(4, 1fr); gap:14px; margin-bottom:16px; }}
+.res-kpi {{ background:var(--card-bg); border-radius:var(--radius); padding:18px 20px;
+    box-shadow:var(--shadow); border-left:4px solid var(--border); }}
+.res-kpi.school {{ border-left-color:var(--purple); }}
+.res-kpi.product {{ border-left-color:var(--blue); }}
+.res-kpi.stock {{ border-left-color:var(--green); }}
+.res-kpi.valor {{ border-left-color:var(--brand); }}
+.res-kpi-val {{ font-size:28px; font-weight:800; letter-spacing:-1px; }}
+.res-kpi.school .res-kpi-val {{ color:var(--purple); }}
+.res-kpi.product .res-kpi-val {{ color:var(--blue); }}
+.res-kpi.stock .res-kpi-val {{ color:var(--green); }}
+.res-kpi.valor .res-kpi-val {{ color:var(--brand); }}
+.res-kpi-label {{ font-size:13px; font-weight:600; color:var(--text-muted); margin-top:2px; }}
+.res-kpi-sub {{ font-size:11px; color:var(--text-muted); }}
+
+.res-two-col {{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:16px; }}
+.res-card {{ background:var(--card-bg); border-radius:var(--radius); padding:18px 20px; box-shadow:var(--shadow); }}
+.res-card-title {{ font-weight:700; font-size:14px; margin-bottom:14px; display:flex; align-items:center; gap:8px; }}
+.res-card-badge {{ font-size:11px; font-weight:700; padding:2px 8px; border-radius:99px; }}
+
+.res-stacked-bar {{ display:flex; height:28px; border-radius:var(--radius-sm); overflow:hidden; margin-bottom:10px; }}
+.res-sb-seg {{ transition:width 0.5s ease; min-width:2px; }}
+.res-sb-seg.tienda {{ background:var(--green); }}
+.res-sb-seg.piso {{ background:var(--orange); }}
+.res-sb-seg.bodega {{ background:var(--blue); }}
+.res-sb-seg.ok {{ background:var(--green); }}
+.res-sb-seg.bajo {{ background:var(--orange); }}
+.res-sb-seg.sin {{ background:var(--red); }}
+
+.res-legend {{ display:flex; gap:16px; flex-wrap:wrap; }}
+.res-leg-item {{ font-size:12px; color:var(--text-muted); display:flex; align-items:center; gap:4px; }}
+.res-leg-item b {{ color:var(--text); }}
+.res-leg-dot {{ width:10px; height:10px; border-radius:50%; flex-shrink:0; }}
+.res-leg-dot.tienda {{ background:var(--green); }}
+.res-leg-dot.piso {{ background:var(--orange); }}
+.res-leg-dot.bodega {{ background:var(--blue); }}
+.res-leg-dot.ok {{ background:var(--green); }}
+.res-leg-dot.bajo {{ background:var(--orange); }}
+.res-leg-dot.sin {{ background:var(--red); }}
+
+.res-cov-row {{ display:flex; align-items:center; gap:10px; margin-bottom:8px; }}
+.res-cov-nivel {{ display:flex; align-items:center; gap:6px; font-size:13px; font-weight:600; min-width:110px; }}
+.res-cov-bar {{ flex:1; height:8px; background:var(--border-light); border-radius:99px; overflow:hidden; }}
+.res-cov-fill {{ height:100%; border-radius:99px; transition:width 0.5s ease; }}
+.res-cov-pct {{ font-weight:700; font-size:13px; min-width:40px; text-align:right; }}
+.res-cov-summary {{ font-size:12px; color:var(--text-muted); margin-top:8px; padding-top:8px;
+    border-top:1px solid var(--border-light); }}
+
+.res-alerts {{ margin-bottom:0; }}
+.res-alert {{ padding:10px 14px; border-radius:var(--radius-sm); margin-bottom:6px; }}
+.res-alert-warn {{ background:var(--orange-bg); }}
+.res-alert-danger {{ background:var(--red-bg); }}
+.res-alert-title {{ font-weight:600; font-size:13px; }}
+.res-alert-detail {{ font-size:12px; color:var(--text-muted); margin-top:4px; }}
+.res-alert-line {{ padding-left:4px; border-left:2px solid rgba(0,0,0,.1); margin-bottom:2px; }}
+
+@media (max-width: 800px) {{
+    .res-kpi-row {{ grid-template-columns:repeat(2, 1fr); }}
+    .res-two-col {{ grid-template-columns:1fr; }}
+}}
+
+/* legacy KPI classes kept for other sections */
 .kpi-row {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 20px; }}
 .kpi-card {{ background: var(--card-bg); border-radius: var(--radius); padding: 20px;
     box-shadow: var(--shadow); border-left: 4px solid var(--brand); transition: transform var(--transition), box-shadow var(--transition); }}
@@ -1295,12 +1375,10 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sys
 .piece-cell.has-1 {{ color: var(--green); background: color-mix(in srgb, var(--green) 8%, transparent); }}
 .piece-cell.has-2 {{ color: #15803d; background: color-mix(in srgb, var(--green) 14%, transparent); }}
 .piece-cell.has-3 {{ color: #166534; background: color-mix(in srgb, var(--green) 22%, transparent); }}
-.piece-cell.miss {{ color: var(--red); font-weight: 400; cursor: default; }}
-.piece-cell.na {{ color: var(--text-muted); font-weight: 400; opacity: 0.4; cursor: default; font-size: 11px; }}
-.config-active .piece-cell.miss {{ cursor: pointer; }}
-.config-active .piece-cell.miss:hover {{ background: color-mix(in srgb, var(--orange) 15%, transparent); }}
-.config-active .piece-cell.na {{ cursor: pointer; }}
-.config-active .piece-cell.na:hover {{ background: color-mix(in srgb, var(--blue) 15%, transparent); }}
+.piece-cell.miss {{ color: var(--red); font-weight: 400; cursor: pointer; }}
+.piece-cell.miss:hover {{ background: color-mix(in srgb, var(--orange) 15%, transparent); }}
+.piece-cell.na {{ color: var(--text-muted); font-weight: 400; opacity: 0.4; cursor: pointer; font-size: 11px; }}
+.piece-cell.na:hover {{ background: color-mix(in srgb, var(--blue) 15%, transparent); }}
 .config-banner {{ background: var(--orange-bg); border: 1px solid var(--orange); border-radius: var(--radius-sm);
     padding: 10px 16px; font-size: 12px; color: var(--orange); margin-bottom: 12px; animation: fadeIn 0.3s ease; }}
 .legend-chip {{ font-size: 11px; padding: 3px 10px; border-radius: 99px; font-weight: 600; }}
@@ -1445,48 +1523,133 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sys
 .filter-select {{ padding: 10px 16px; border: 2px solid var(--border); border-radius: var(--radius-sm);
     font-size: 13px; background: var(--card-bg); color: var(--text); cursor: pointer; }}
 
-/* ============ MISSING ============ */
-.template-cards {{ display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 12px; }}
-.template-card {{ background: var(--card-bg); border-radius: var(--radius); padding: 14px; box-shadow: var(--shadow); }}
-.template-header {{ font-weight: 700; font-size: 14px; padding-bottom: 8px; margin-bottom: 8px;
-    border-bottom: 3px solid var(--border); display: flex; align-items: center; gap: 8px; }}
-.template-pieces {{ display: flex; flex-wrap: wrap; gap: 4px; }}
-.template-piece {{ background: var(--green-bg); color: var(--green); padding: 3px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; }}
-.template-note {{ font-size: 12px; color: var(--text-muted); margin-bottom: 16px; }}
-.missing-row {{ display: flex; align-items: center; gap: 12px; padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 4px; flex-wrap: wrap; }}
-.missing-row.severe {{ background: var(--red-bg); }}
-.missing-row.moderate {{ background: var(--orange-bg); }}
-.missing-row.mild {{ background: var(--blue-bg); }}
-.missing-school {{ font-weight: 700; min-width: 200px; }}
-.missing-pieces {{ display: flex; gap: 4px; flex-wrap: wrap; }}
-.missing-tag {{ background: var(--red); color: white; padding: 2px 10px; border-radius: 99px; font-size: 11px; font-weight: 600; }}
-.missing-row.moderate .missing-tag {{ background: var(--orange); }}
-.missing-row.mild .missing-tag {{ background: var(--blue); }}
-.has-pieces {{ font-size: 11px; color: var(--text-muted); flex: 1; }}
-.all-good-card {{ background: var(--green-bg); border-radius: var(--radius); padding: 40px; text-align: center; }}
-.all-good-icon {{ font-size: 40px; margin-bottom: 8px; }}
-.all-good-text {{ font-size: 16px; font-weight: 600; color: var(--green); }}
+/* (Faltantes tab removed — merged into Piezas) */
 
-/* ============ VARIANTS TABLE ============ */
-.variants-table {{ border-collapse: separate; border-spacing: 0; width: 100%; font-size: 12px; }}
-.variants-table th {{ background: var(--brand); color: white; padding: 10px 8px; font-size: 10px;
-    text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; text-align: left; }}
-.variants-table th:first-child {{ border-radius: var(--radius-xs) 0 0 0; }}
-.variants-table th:last-child {{ border-radius: 0 var(--radius-xs) 0 0; }}
-.variants-table td {{ padding: 8px; border-bottom: 1px solid var(--border-light); }}
-.variants-table tbody tr {{ transition: background var(--transition); }}
-.variants-table tbody tr:hover {{ background: var(--brand-light); }}
+/* ============ DISPONIBILIDAD ============ */
+.disp-stats {{ display:flex; gap:10px; margin-bottom:16px; }}
+.disp-stat {{ flex:1; background:var(--card-bg); border-radius:var(--radius); padding:14px 16px;
+    box-shadow:var(--shadow); text-align:center; border-bottom:3px solid transparent; }}
+.disp-stat.agotado {{ border-bottom-color:var(--red); }}
+.disp-stat.bajo {{ border-bottom-color:var(--orange); }}
+.disp-stat.critico {{ border-bottom-color:var(--red); }}
+.disp-stat.cob {{ border-bottom-color:var(--brand); }}
+.disp-stat-val {{ font-size:22px; font-weight:800; letter-spacing:-0.5px; }}
+.disp-stat.agotado .disp-stat-val {{ color:var(--red); }}
+.disp-stat.bajo .disp-stat-val {{ color:var(--orange); }}
+.disp-stat.critico .disp-stat-val {{ color:var(--red); }}
+.disp-stat-label {{ font-size:11px; font-weight:600; color:var(--text-muted); margin-top:2px; text-transform:uppercase; letter-spacing:.3px; }}
+
+.disp-filter-bar {{ display:flex; gap:10px; margin-bottom:16px; align-items:center; }}
+.disp-search-wrap {{ flex:1; position:relative; }}
+.disp-search-icon {{ position:absolute; left:12px; top:50%; transform:translateY(-50%); font-size:13px; opacity:.5; }}
+.disp-search {{ width:100%; padding:10px 12px 10px 34px; border:1px solid var(--border); border-radius:var(--radius);
+    font-size:13px; background:var(--card-bg); color:var(--text); outline:none; }}
+.disp-search:focus {{ border-color:var(--brand); box-shadow:0 0 0 3px rgba(135,73,44,.1); }}
+.disp-select {{ padding:10px 14px; border:1px solid var(--border); border-radius:var(--radius);
+    font-size:13px; background:var(--card-bg); color:var(--text); min-width:140px; cursor:pointer; }}
+
+.disp-school-group {{ background:var(--card-bg); border-radius:var(--radius); box-shadow:var(--shadow);
+    margin-bottom:10px; overflow:hidden; }}
+.disp-school-group.collapsed .disp-school-body {{ display:none; }}
+.disp-school-group.collapsed .disp-chevron {{ transform:rotate(-90deg); }}
+.disp-sch-header {{ display:flex; align-items:center; gap:8px; padding:12px 16px; cursor:pointer;
+    user-select:none; transition:background .15s; }}
+.disp-sch-header:hover {{ background:var(--hover-bg, rgba(0,0,0,.02)); }}
+.disp-chevron {{ font-size:11px; color:var(--text-muted); transition:transform .2s; flex-shrink:0; }}
+.disp-sch-name {{ font-weight:700; font-size:14px; }}
+.disp-sch-chip {{ font-size:10px; font-weight:700; padding:2px 8px; border-radius:99px; }}
+.disp-sch-chip.agotado {{ background:var(--red-bg); color:var(--red); }}
+.disp-sch-chip.bajo {{ background:var(--orange-bg); color:var(--orange); }}
+.disp-sch-chip.ok {{ background:var(--green-bg); color:var(--green); }}
+.disp-sch-meta {{ font-size:11px; color:var(--text-muted); margin-left:auto; white-space:nowrap; }}
+.disp-sch-bar {{ width:60px; height:6px; background:var(--border-light); border-radius:99px; overflow:hidden; flex-shrink:0; }}
+.disp-sch-bar-fill {{ height:100%; border-radius:99px; transition:width .4s ease; }}
+.disp-sch-pct {{ font-size:11px; font-weight:700; min-width:32px; text-align:right; }}
+
+.disp-school-body {{ padding:4px 16px 12px; }}
+
+.disp-product-card {{ padding:10px 14px; border-radius:var(--radius-sm); margin-bottom:6px;
+    border-left:3px solid transparent; background:var(--bg); transition:box-shadow .15s; }}
+.disp-product-card:hover {{ box-shadow:0 1px 4px rgba(0,0,0,.06); }}
+.disp-product-card.disp-critico {{ border-left-color:var(--red); }}
+.disp-product-card.disp-bajo {{ border-left-color:var(--orange); }}
+.disp-product-card.disp-ok {{ border-left-color:var(--green); }}
+
+.disp-prod-header {{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }}
+.disp-tipo {{ font-size:10px; font-weight:700; color:var(--text-muted); text-transform:uppercase; letter-spacing:.3px;
+    background:var(--border-light); padding:2px 7px; border-radius:4px; }}
+.disp-prod-name {{ font-weight:600; font-size:13px; }}
+.disp-prod-status {{ font-size:11px; margin-left:auto; font-weight:600; white-space:nowrap; }}
+.disp-prod-status.agotado {{ color:var(--red); }}
+.disp-prod-status.bajo {{ color:var(--orange); }}
+.disp-prod-status.ok {{ color:var(--green); }}
+
+.disp-talla-grid {{ display:flex; flex-wrap:wrap; gap:5px; }}
+.disp-talla {{ display:flex; flex-direction:column; align-items:center; justify-content:center;
+    min-width:46px; height:42px; border-radius:6px; border:1px solid var(--border);
+    padding:0 4px; transition:transform .12s, box-shadow .12s; cursor:default; }}
+.disp-talla:hover {{ transform:translateY(-1px); box-shadow:0 2px 6px rgba(0,0,0,.08); }}
+.disp-talla-label {{ font-size:10px; font-weight:600; color:var(--text-muted); line-height:1; }}
+.disp-talla-stock {{ font-size:14px; font-weight:800; line-height:1.2; }}
+.disp-talla-agotado {{ background:var(--red-bg); border-color:color-mix(in srgb, var(--red) 30%, transparent); }}
+.disp-talla-agotado .disp-talla-stock {{ color:var(--red); }}
+.disp-talla-agotado .disp-talla-label {{ color:var(--red); opacity:.7; }}
+.disp-talla-bajo {{ background:var(--orange-bg); border-color:color-mix(in srgb, var(--orange) 30%, transparent); }}
+.disp-talla-bajo .disp-talla-stock {{ color:var(--orange); }}
+.disp-talla-bajo .disp-talla-label {{ color:var(--orange); opacity:.7; }}
+.disp-talla-ok {{ background:var(--green-bg); border-color:color-mix(in srgb, var(--green) 20%, transparent); }}
+.disp-talla-ok .disp-talla-stock {{ color:var(--green); }}
+
+@media (max-width: 700px) {{
+    .disp-stats {{ flex-wrap:wrap; }}
+    .disp-stat {{ min-width:calc(50% - 5px); }}
+    .disp-sch-bar, .disp-sch-pct {{ display:none; }}
+}}
 .num-cell {{ text-align: right; font-variant-numeric: tabular-nums; }}
 .val-warn {{ color: var(--orange); font-weight: 700; }}
 .val-zero {{ color: var(--red); font-weight: 700; }}
 .val-low {{ color: var(--orange); }}
 .tallas-cell {{ font-size: 11px; max-width: 220px; }}
-.inline-stock {{ display: flex; align-items: center; gap: 6px; justify-content: flex-end; }}
-.inline-stock-bar {{ height: 6px; background: var(--green); border-radius: 99px; min-width: 0; transition: width 0.4s ease; }}
-.row-nostock .inline-stock-bar {{ background: var(--red); }}
-.row-nostock td:last-child {{ background: var(--red-bg); }}
 
 /* ============ PRINT ============ */
+/* ============ CONTEO ============ */
+.conteo-variant-row {{
+    display:flex; align-items:center; gap:12px; padding:10px 14px;
+    border-bottom:1px solid var(--border-light); flex-wrap:wrap;
+}}
+.conteo-variant-row:last-child {{ border-bottom:none; }}
+.conteo-input {{
+    width:80px; padding:6px 8px; border:2px solid var(--border);
+    border-radius:var(--radius-xs); text-align:center; font-size:14px;
+    font-weight:600; background:var(--card-bg); color:var(--text);
+    transition:border-color var(--transition);
+}}
+.conteo-input::placeholder {{ color:var(--border); opacity:1; }}
+.conteo-input:focus {{ border-color:var(--brand); outline:none;
+    box-shadow:0 0 0 3px rgba(135,73,44,0.15); }}
+.conteo-input.has-value {{ border-color:var(--green); }}
+.conteo-input.has-diff {{ border-color:var(--orange); }}
+.conteo-diff {{ min-width:50px; text-align:center; font-weight:700; font-size:13px; }}
+.conteo-product-card {{ transition:border-left-color var(--transition); border-left:4px solid transparent; }}
+.conteo-product-card.card-complete {{ border-left-color:var(--green); }}
+.conteo-product-card.card-hasdiff {{ border-left-color:var(--orange); }}
+.conteo-status-chip {{
+    display:inline-flex; align-items:center; gap:4px;
+    padding:2px 8px; border-radius:99px; font-size:11px; font-weight:600;
+    background:var(--border-light); color:var(--text-muted);
+}}
+.conteo-status-chip.done {{ background:var(--green-bg); color:var(--green); }}
+.conteo-status-chip.partial {{ background:var(--orange-bg); color:var(--orange); }}
+.conteo-adjust-prompt {{
+    border-left:4px solid var(--orange); animation:fadeIn 0.3s ease;
+}}
+.conteo-subtab-panel {{ animation:fadeIn 0.3s ease; }}
+.conteo-virtual {{ opacity:0.7; }}
+.conteo-virtual .card-header {{ background:var(--border-light); }}
+.conteo-sys-stock {{
+    font-size:12px; color:var(--text-muted); min-width:80px;
+}}
+
 @media print {{
     .topbar, .nav {{ position: static; }}
     .nav {{ display: none; }}
@@ -1513,9 +1676,7 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sys
     <div class="nav-tab active" onclick="showTab('resumen')">Resumen</div>
     <div class="nav-tab" onclick="showTab('piezas')">Piezas</div>
     <div class="nav-tab" onclick="showTab('tarifarios')">Tarifarios</div>
-    <div class="nav-tab" onclick="showTab('catalogo')">Catálogo</div>
-    <div class="nav-tab" onclick="showTab('faltantes')">Faltantes</div>
-    <div class="nav-tab" onclick="showTab('variantes')">Variantes</div>
+    <div class="nav-tab" onclick="showTab('variantes')">Disponibilidad</div>
     <div class="nav-tab" onclick="showTab('conteo')">Conteo</div>
 </div>
 
@@ -1523,8 +1684,7 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sys
     <div id="resumen" class="tab-panel active">{resumen}</div>
     <div id="piezas" class="tab-panel">{pieces}</div>
     <div id="tarifarios" class="tab-panel">{tariffs}</div>
-    <div id="catalogo" class="tab-panel">{catalog}</div>
-    <div id="faltantes" class="tab-panel">{missing}</div>
+
     <div id="variantes" class="tab-panel">{variants}</div>
     <div id="conteo" class="tab-panel">{conteo}</div>
 </div>
@@ -1555,7 +1715,7 @@ function showTab(id) {{
     document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
     document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
     document.getElementById(id).classList.add('active');
-    const names = ['resumen','piezas','tarifarios','catalogo','faltantes','variantes','conteo'];
+    const names = ['resumen','piezas','tarifarios','variantes','conteo'];
     const idx = names.indexOf(id);
     if (idx >= 0) document.querySelectorAll('.nav-tab')[idx].classList.add('active');
 }}
@@ -1606,7 +1766,9 @@ function togglePiezasConfig() {{
 }}
 
 function toggleNA(cell) {{
-    if (!piezasConfigMode) return;
+    if (!piezasConfigMode) {{
+        togglePiezasConfig();
+    }}
     const na = getPiezasNA();
     const key = naKey(cell);
     if (cell.classList.contains('miss')) {{
@@ -1625,49 +1787,10 @@ function toggleNA(cell) {{
     savePiezasNA(na);
     recalcPiezasCoverage();
     recalcResumenCoverage();
-    refreshFaltantes();
 }}
 
 function recalcResumenCoverage() {{
-    const na = getPiezasNA();
-    document.querySelectorAll('#resumen .coverage-item[data-eid]').forEach(card => {{
-        const eid = card.dataset.eid;
-        const nivel = card.dataset.nivel;
-        const tr = document.querySelector('#piezas .pieces-table tbody tr[data-eid="' + eid + '"][data-nivel="' + nivel + '"]');
-        if (!tr) return;
-        let has = 0, applicable = 0;
-        tr.querySelectorAll('.piece-cell').forEach(cell => {{
-            const key = eid + '_' + nivel + '_' + cell.dataset.tipo;
-            if (na[key]) return; // NA — no cuenta en denominador
-            applicable++;
-            if (cell.classList.contains('has-1') || cell.classList.contains('has-2') || cell.classList.contains('has-3')) has++;
-        }});
-        const pct = applicable > 0 ? Math.round(has * 100 / applicable) : 100;
-        const barColor = pct < 40 ? '#c62828' : pct < 70 ? '#e65100' : '#2e7d32';
-        const pctEl = card.querySelector('.coverage-pct');
-        const barFill = card.querySelector('.coverage-bar-fill');
-        const detail = card.querySelector('.coverage-detail');
-        if (pctEl) {{ pctEl.textContent = pct + '%'; pctEl.style.color = barColor; }}
-        if (barFill) {{ barFill.style.width = pct + '%'; barFill.style.background = barColor; }}
-        if (detail) {{
-            const nivelSpan = detail.querySelector('span');
-            const nivelStyle = nivelSpan ? nivelSpan.getAttribute('style') : '';
-            const naCount = tr.querySelectorAll('.piece-cell').length - applicable;
-            const naText = naCount > 0 ? ' · ' + naCount + ' N/A' : '';
-            detail.innerHTML = has + ' de ' + applicable + ' piezas' + naText + ' · <span style="' + nivelStyle + '">' + nivel + '</span>';
-        }}
-    }});
-    // Re-ordenar cards por pct ascendente
-    const grid = document.querySelector('#resumen .coverage-grid');
-    if (grid) {{
-        const items = [...grid.querySelectorAll('.coverage-item')];
-        items.sort((a, b) => {{
-            const pA = parseInt(a.querySelector('.coverage-pct')?.textContent) || 0;
-            const pB = parseInt(b.querySelector('.coverage-pct')?.textContent) || 0;
-            return pA - pB;
-        }});
-        items.forEach(el => grid.appendChild(el));
-    }}
+    /* Resumen ya no tiene coverage-grid individual; noop */
 }}
 
 function recalcPiezasCoverage() {{
@@ -1713,67 +1836,7 @@ document.addEventListener('DOMContentLoaded', () => {{
     }});
     recalcPiezasCoverage();
     recalcResumenCoverage();
-    // Also refresh Faltantes tab to hide NA pieces
-    refreshFaltantes();
 }});
-
-function refreshFaltantes() {{
-    const na = getPiezasNA();
-    document.querySelectorAll('#faltantes .missing-row').forEach(row => {{
-        const eid = row.dataset.eid;
-        const nivel = row.dataset.nivel;
-        let visibleTags = 0;
-        row.querySelectorAll('.missing-tag').forEach(tag => {{
-            const key = eid + '_' + nivel + '_' + tag.dataset.tipo;
-            if (na[key]) {{
-                tag.style.display = 'none';
-            }} else {{
-                tag.style.display = '';
-                visibleTags++;
-            }}
-        }});
-        // Hide the entire row if no visible missing tags remain
-        row.style.display = visibleTags === 0 ? 'none' : '';
-    }});
-    // Update nivel section counts
-    document.querySelectorAll('#faltantes .section-card').forEach(card => {{
-        const visible = card.querySelectorAll('.missing-row:not([style*="display: none"])').length;
-        const label = card.querySelector('.count-label');
-        if (label) {{
-            label.textContent = visible + ' con faltantes';
-            if (visible === 0) card.style.display = 'none';
-            else card.style.display = '';
-        }}
-    }});
-}}
-
-function filterCatalog() {{
-    const q = document.getElementById('catalogSearch').value.toLowerCase();
-    const nivel = document.getElementById('catalogNivel').value;
-    document.querySelectorAll('#catalogo .school-card').forEach(block => {{
-        const school = block.dataset.school.toLowerCase();
-        const blockNivel = block.dataset.nivel;
-        const products = block.querySelectorAll('.product-card');
-        let anyMatch = false;
-        products.forEach(row => {{
-            const name = (row.dataset.name || '').toLowerCase();
-            const match = (school.includes(q) || name.includes(q)) && (!nivel || blockNivel === nivel);
-            row.style.display = match ? '' : 'none';
-            if (match) anyMatch = true;
-        }});
-        const schoolMatch = school.includes(q) && (!nivel || blockNivel === nivel);
-        block.style.display = (schoolMatch || anyMatch) ? '' : 'none';
-        if (anyMatch) block.classList.remove('collapsed');
-    }});
-    // Hide/show nivel sections
-    document.querySelectorAll('#catalogo .nivel-section').forEach(sec => {{
-        const sNivel = sec.dataset.nivel;
-        if (nivel && sNivel !== nivel) {{ sec.style.display = 'none'; return; }}
-        const hasVisible = [...sec.querySelectorAll('.school-card')].some(c => c.style.display !== 'none');
-        sec.style.display = hasVisible ? '' : '';
-        if (q || nivel) sec.classList.remove('nivel-collapsed');
-    }});
-}}
 
 function filterTariffs() {{
     const q = document.getElementById('tariffSearch').value.toLowerCase();
@@ -1970,19 +2033,28 @@ function showToast(msg) {{
     setTimeout(() => toast.style.opacity = '0', 2000);
 }}
 
-function filterVariants() {{
+function filterDisponibilidad() {{
     const q = document.getElementById('variantSearch').value.toLowerCase();
     const f = document.getElementById('variantFilter').value;
-    document.querySelectorAll('#variantTable tbody tr').forEach(row => {{
-        const school = (row.dataset.school || '').toLowerCase();
-        const name = (row.dataset.name || '').toLowerCase();
-        let textMatch = school.includes(q) || name.includes(q);
-        let filterMatch = true;
-        if (f === 'few') filterMatch = row.classList.contains('row-few');
-        if (f === 'inactive') filterMatch = row.classList.contains('row-inactive');
-        if (f === 'nostock') filterMatch = row.classList.contains('row-nostock');
-        if (f === 'multicolor') filterMatch = row.classList.contains('row-multicolor');
-        row.style.display = (textMatch && filterMatch) ? '' : 'none';
+
+    document.querySelectorAll('.disp-school-group').forEach(function(group) {{
+        const schoolName = (group.dataset.school || '').toLowerCase();
+        let anyVisible = false;
+
+        group.querySelectorAll('.disp-product-card').forEach(function(card) {{
+            const name = (card.dataset.name || '').toLowerCase();
+            const status = card.dataset.status || '';
+            let textMatch = schoolName.includes(q) || name.includes(q);
+            let filterMatch = true;
+            if (f === 'critico') filterMatch = status === 'disp-critico';
+            if (f === 'bajo') filterMatch = status === 'disp-bajo';
+            if (f === 'ok') filterMatch = status === 'disp-ok';
+            const show = textMatch && filterMatch;
+            card.style.display = show ? '' : 'none';
+            if (show) anyVisible = true;
+        }});
+
+        group.style.display = anyVisible ? '' : 'none';
     }});
 }}
 
@@ -1993,17 +2065,19 @@ document.addEventListener('DOMContentLoaded', () => {{
     document.querySelectorAll('.nivel-section').forEach(sec => {{
         sec.classList.add('nivel-collapsed');
     }});
+    // Collapse all disponibilidad school groups by default
+    document.querySelectorAll('.disp-school-group').forEach(g => g.classList.add('collapsed'));
 }});
 
 /* ============ CONTEO DE INVENTARIO ============ */
 let _bridge = null;
-let _conteoVariantes = [];
+let _conteoProductos = [];
 let _conteoPendientes = [];
+let _conteoCurrentFilter = 'todos';
+let _conteoLastSavedIds = [];
 
-// Init QWebChannel bridge (only available inside PyQt app)
 (function() {{
     if (typeof QWebChannel === 'undefined') {{
-        // Running in browser — show fallback
         const fb = document.getElementById('conteo-fallback');
         const app = document.getElementById('conteo-app');
         if (fb) fb.style.display = 'block';
@@ -2016,189 +2090,492 @@ let _conteoPendientes = [];
 }})();
 
 function _callBridge(method, args, callback) {{
-    if (!_bridge) {{ alert('Bridge no disponible'); return; }}
+    if (!_bridge) {{ showToast('Bridge no disponible'); return; }}
     _bridge[method](...args, function(resultJson) {{
         const r = JSON.parse(resultJson);
-        if (!r.ok) {{ alert('Error: ' + (r.error || 'desconocido')); return; }}
+        if (!r.ok) {{ showToast('Error: ' + (r.error || 'desconocido')); return; }}
         callback(r);
     }});
 }}
 
+/* ── Sub-tab navigation ── */
+function conteoShowSubtab(name) {{
+    document.querySelectorAll('.conteo-subtab-panel').forEach(function(p) {{ p.style.display = 'none'; }});
+    document.querySelectorAll('#conteo-subtabs button').forEach(function(b) {{ b.classList.remove('active'); }});
+    const panel = document.getElementById('conteo-panel-' + name);
+    if (panel) panel.style.display = 'block';
+    const btn = document.querySelector('#conteo-subtabs button[data-subtab="' + name + '"]');
+    if (btn) btn.classList.add('active');
+    if (name === 'pendientes') conteoLoadPendientes();
+    if (name === 'historial') conteoLoadHistorial();
+}}
+
+/* ── Main loader ── */
 function conteoLoadEscuela() {{
     const eid = parseInt(document.getElementById('conteo-escuela').value);
+    const estado = document.getElementById('conteo-estado');
+    const subtabs = document.getElementById('conteo-subtabs');
     if (!eid) {{
-        document.getElementById('conteo-estado').style.display = 'none';
-        document.getElementById('conteo-tabla-container').style.display = 'none';
-        document.getElementById('conteo-pendientes-panel').style.display = 'none';
-        document.getElementById('conteo-historial-panel').style.display = 'none';
+        estado.style.display = 'none';
+        subtabs.style.display = 'none';
+        document.querySelectorAll('.conteo-subtab-panel').forEach(function(p) {{ p.style.display = 'none'; }});
+        document.getElementById('conteo-guardar-btn').disabled = true;
         return;
     }}
     // Load estado
     _callBridge('getEstadoConteo', [eid], function(r) {{
         const info = document.getElementById('conteo-estado-info');
         const pct = r.pct_vigente;
-        const color = pct >= 80 ? '#16a34a' : pct >= 40 ? '#ea580c' : '#dc2626';
+        const color = pct >= 80 ? 'var(--green)' : pct >= 40 ? 'var(--orange)' : 'var(--red)';
         const semaforo = pct >= 80 ? '🟢' : pct >= 40 ? '🟡' : '🔴';
         info.innerHTML = semaforo + ' <b>' + r.escuela_nombre + '</b> — ' +
-            '<span style="color:' + color + '">' + pct + '% vigente</span> · ' +
+            '<span style="color:' + color + ';font-weight:700">' + pct + '% vigente</span> · ' +
             r.contadas_vigentes + '/' + r.total_variantes + ' contadas · ' +
-            r.pendientes_conteo + ' pendientes' +
+            '<span style="color:var(--orange)">' + r.pendientes_conteo + ' pendientes</span>' +
             (r.ultimo_conteo ? ' · Ultimo: ' + new Date(r.ultimo_conteo).toLocaleDateString() : '');
         document.getElementById('conteo-vigencia').value = r.dias_vigencia;
-        document.getElementById('conteo-estado').style.display = 'block';
+        estado.style.display = 'block';
     }});
-    // Load config
     _callBridge('getConfigConteo', [eid], function(r) {{
         document.getElementById('conteo-vigencia').value = r.dias_vigencia;
     }});
-    // Load variantes
-    _callBridge('getVariantesParaConteo', [eid], function(r) {{
-        _conteoVariantes = r.data;
-        const tbody = document.getElementById('conteo-tbody');
-        tbody.innerHTML = '';
-        r.data.forEach(function(v, i) {{
-            const statusColor = v.requiere_conteo ? (v.ultimo_conteo_at ? '#ea580c' : '#dc2626') : '#16a34a';
-            const statusText = v.requiere_conteo ? (v.ultimo_conteo_at ? 'Vencido' : 'Nunca') : 'Vigente';
-            const diasText = v.dias_desde_conteo !== null ? v.dias_desde_conteo + 'd' : '—';
-            const tr = document.createElement('tr');
-            tr.innerHTML =
-                '<td style="font-family:monospace;font-size:12px">' + v.sku + '</td>' +
-                '<td>' + v.producto_nombre + '</td>' +
-                '<td>' + v.talla + '</td>' +
-                '<td>' + v.color + '</td>' +
-                '<td style="text-align:center">' + v.stock_actual + '</td>' +
-                '<td><input type="number" class="conteo-input" data-idx="' + i + '" value="' + v.stock_actual + '" ' +
-                    'style="width:70px;padding:4px;border:1px solid var(--border);border-radius:var(--radius-xs);text-align:center" ' +
-                    'onchange="conteoCalcDiff(this,' + i + ',' + v.stock_actual + ')"></td>' +
-                '<td class="conteo-diff" data-idx="' + i + '" style="text-align:center;font-weight:600">0</td>' +
-                '<td style="text-align:center;font-size:12px;color:var(--text-muted)">' + diasText + '</td>' +
-                '<td style="text-align:center"><span style="color:' + statusColor + ';font-size:12px;font-weight:600">' + statusText + '</span></td>';
-            tbody.appendChild(tr);
-        }});
-        document.getElementById('conteo-tabla-container').style.display = 'block';
+    // Load grouped variants
+    _callBridge('getVariantesAgrupadas', [eid], function(r) {{
+        _conteoProductos = r.data;
+        conteoRenderProducts();
+        subtabs.style.display = 'flex';
+        conteoShowSubtab('contar');
+        conteoUpdateProgress();
         document.getElementById('conteo-guardar-btn').disabled = false;
     }});
-    // Load pendientes
-    conteoVerPendientes();
-    // Load historial
-    conteoLoadHistorial(eid);
+    // Update pendientes badge
+    _callBridge('getConteosPendientes', [eid], function(r) {{
+        const badge = document.getElementById('conteo-pendientes-badge');
+        if (r.data.length > 0) {{
+            badge.textContent = r.data.length;
+            badge.style.display = 'inline';
+        }} else {{
+            badge.style.display = 'none';
+        }}
+    }});
 }}
 
-function conteoCalcDiff(input, idx, stockSistema) {{
-    const fisico = parseInt(input.value) || 0;
-    const diff = fisico - stockSistema;
-    const cell = document.querySelector('.conteo-diff[data-idx="' + idx + '"]');
-    cell.textContent = diff > 0 ? '+' + diff : diff;
-    cell.style.color = diff === 0 ? 'var(--text-muted)' : diff > 0 ? '#16a34a' : '#dc2626';
+/* ── Render product cards ── */
+function conteoRenderProducts() {{
+    const container = document.getElementById('conteo-products-container');
+    container.innerHTML = '';
+    if (!_conteoProductos.length) {{
+        container.innerHTML = '<div class="section-card" style="text-align:center;padding:30px;color:var(--text-muted)">No hay variantes para esta escuela</div>';
+        return;
+    }}
+    _conteoProductos.forEach(function(grupo, gi) {{
+        const card = document.createElement('div');
+        card.className = 'school-card conteo-product-card';
+        if (grupo.virtual) card.classList.add('conteo-virtual');
+        card.dataset.product = grupo.producto_nombre;
+        card.dataset.groupIdx = gi;
+        card.dataset.virtual = grupo.virtual ? '1' : '0';
+
+        const totalV = grupo.variantes.length;
+        const isVirtual = !!grupo.virtual;
+
+        // Header
+        const header = document.createElement('div');
+        header.className = 'card-header';
+        header.onclick = function() {{ card.classList.toggle('collapsed'); }};
+
+        const tipoTag = '<span class="tipo-tag">' + grupo.tipo_pieza + '</span>';
+        const virtualTag = isVirtual ? ' <span class="meta-chip" style="background:var(--purple);color:#fff;font-size:10px">Virtual</span>' : '';
+
+        header.innerHTML =
+            '<div class="card-title-row" style="gap:8px">' +
+                tipoTag +
+                '<span class="card-title">' + grupo.producto_nombre + '</span>' +
+                virtualTag +
+            '</div>' +
+            '<div style="display:flex;align-items:center;gap:8px">' +
+                '<span class="meta-chip">' + totalV + (totalV === 1 ? ' talla' : ' tallas') + '</span>' +
+                (isVirtual ? '' : '<span class="conteo-status-chip" data-group="' + gi + '">0/' + totalV + '</span>') +
+                '<span class="toggle-arrow">&#9662;</span>' +
+            '</div>';
+        card.appendChild(header);
+
+        // Body
+        const body = document.createElement('div');
+        body.className = 'card-body';
+        body.style.padding = '4px 14px 10px';
+
+        if (isVirtual) {{
+            // Virtual product info message
+            body.innerHTML = '<div style="padding:10px 0;color:var(--text-muted);font-size:13px;display:flex;align-items:center;gap:8px">' +
+                '<span style="font-size:16px">📦</span> Producto virtual — se arma con componentes individuales. ' +
+                'El stock se cuenta en cada componente por separado.</div>';
+        }} else {{
+            // Normal variant rows
+            grupo.variantes.forEach(function(v) {{
+                const row = document.createElement('div');
+                row.className = 'conteo-variant-row';
+                row.dataset.sku = v.sku;
+
+                const statusColor = v.requiere_conteo ? (v.ultimo_conteo_at ? 'var(--orange)' : 'var(--red)') : 'var(--green)';
+                const statusDot = '<span style="width:8px;height:8px;border-radius:50%;background:' + statusColor + ';flex-shrink:0" title="' +
+                    (v.requiere_conteo ? (v.ultimo_conteo_at ? 'Vencido' : 'Nunca contado') : 'Vigente') + '"></span>';
+
+                var ubicChips = '';
+                if (v.stock_piso > 0) ubicChips += '<span class="meta-chip" style="font-size:10px;background:var(--orange-bg,#fff3e0);color:var(--orange,#e65100);padding:1px 6px">Piso: ' + v.stock_piso + '</span>';
+                if (v.stock_bodega > 0) ubicChips += '<span class="meta-chip" style="font-size:10px;background:var(--blue-bg,#e3f2fd);color:var(--blue,#1565c0);padding:1px 6px">Almacén: ' + v.stock_bodega + '</span>';
+
+                row.innerHTML =
+                    statusDot +
+                    '<span style="font-family:monospace;font-size:11px;color:var(--text-muted);min-width:55px">' + v.sku + '</span>' +
+                    '<span style="font-weight:600;min-width:50px">' + v.talla + '</span>' +
+                    '<span class="meta-chip" style="font-size:11px">' + v.color + '</span>' +
+                    ubicChips +
+                    '<span class="conteo-sys-stock">Tienda: ' + v.stock_tienda + '</span>' +
+                    '<input type="number" class="conteo-input" data-varid="' + v.variante_id + '" data-stock="' + v.stock_tienda + '" data-group="' + gi + '" ' +
+                        'placeholder="' + v.stock_tienda + '" min="0" oninput="conteoOnInput(this)">' +
+                    '<span class="conteo-diff" data-varid="' + v.variante_id + '">—</span>';
+                body.appendChild(row);
+            }});
+        }}
+
+        card.appendChild(body);
+        // Virtual cards start collapsed
+        if (isVirtual) card.classList.add('collapsed');
+        container.appendChild(card);
+    }});
+    document.getElementById('conteo-adjust-prompt').style.display = 'none';
 }}
 
+/* ── Input handler ── */
+function conteoOnInput(input) {{
+    const stock = parseInt(input.dataset.stock);
+    const varid = input.dataset.varid;
+    const diffEl = document.querySelector('.conteo-diff[data-varid="' + varid + '"]');
+    const val = input.value.trim();
+
+    if (val === '') {{
+        diffEl.textContent = '—';
+        diffEl.style.color = 'var(--text-muted)';
+        input.className = 'conteo-input';
+    }} else {{
+        const fisico = parseInt(val) || 0;
+        const diff = fisico - stock;
+        if (diff === 0) {{
+            diffEl.textContent = '0';
+            diffEl.style.color = 'var(--text-muted)';
+            input.className = 'conteo-input has-value';
+        }} else {{
+            diffEl.textContent = diff > 0 ? '+' + diff : '' + diff;
+            diffEl.style.color = diff > 0 ? 'var(--green)' : 'var(--red)';
+            input.className = 'conteo-input has-diff';
+        }}
+    }}
+    // Update card status
+    conteoUpdateCardStatus(parseInt(input.dataset.group));
+    conteoUpdateProgress();
+    // Enable save if any input has value
+    const anyFilled = document.querySelector('.conteo-input[data-varid]');
+    let hasFilled = false;
+    document.querySelectorAll('.conteo-input[data-varid]').forEach(function(inp) {{
+        if (inp.value.trim() !== '') hasFilled = true;
+    }});
+    document.getElementById('conteo-guardar-btn').disabled = !hasFilled;
+}}
+
+function conteoUpdateCardStatus(groupIdx) {{
+    const inputs = document.querySelectorAll('.conteo-input[data-group="' + groupIdx + '"]');
+    let filled = 0;
+    let hasDiff = false;
+    inputs.forEach(function(inp) {{
+        if (inp.value.trim() !== '') {{
+            filled++;
+            const stock = parseInt(inp.dataset.stock);
+            const fisico = parseInt(inp.value) || 0;
+            if (fisico !== stock) hasDiff = true;
+        }}
+    }});
+    const total = inputs.length;
+    const chip = document.querySelector('.conteo-status-chip[data-group="' + groupIdx + '"]');
+    chip.textContent = filled + '/' + total;
+    chip.className = 'conteo-status-chip' + (filled === total ? ' done' : filled > 0 ? ' partial' : '');
+
+    const card = document.querySelector('.conteo-product-card[data-group-idx="' + groupIdx + '"]');
+    card.classList.remove('card-complete', 'card-hasdiff');
+    if (filled === total && !hasDiff) card.classList.add('card-complete');
+    else if (hasDiff) card.classList.add('card-hasdiff');
+}}
+
+/* ── Progress bar ── */
+function conteoUpdateProgress() {{
+    let totalProducts = 0;
+    let countedProducts = 0;
+    _conteoProductos.forEach(function(g, gi) {{
+        if (g.virtual) return; // Skip virtual products
+        totalProducts++;
+        const inputs = document.querySelectorAll('.conteo-input[data-group="' + gi + '"]');
+        let allFilled = true;
+        inputs.forEach(function(inp) {{
+            if (inp.value.trim() === '') allFilled = false;
+        }});
+        if (allFilled && inputs.length > 0) countedProducts++;
+    }});
+    const pct = totalProducts > 0 ? Math.round(countedProducts / totalProducts * 100) : 0;
+    document.getElementById('conteo-progress-text').textContent = countedProducts + ' de ' + totalProducts + ' productos contados';
+    document.getElementById('conteo-progress-pct').textContent = pct + '%';
+    document.getElementById('conteo-progress-fill').style.width = pct + '%';
+}}
+
+/* ── Search & filter ── */
+function conteoFilterProducts() {{
+    const search = (document.getElementById('conteo-search').value || '').toLowerCase();
+    document.querySelectorAll('.conteo-product-card').forEach(function(card) {{
+        const name = (card.dataset.product || '').toLowerCase();
+        const skus = Array.from(card.querySelectorAll('[data-sku]')).map(function(r) {{ return (r.dataset.sku || '').toLowerCase(); }});
+        const matchSearch = !search || name.indexOf(search) >= 0 || skus.some(function(s) {{ return s.indexOf(search) >= 0; }});
+
+        let matchFilter = true;
+        if (_conteoCurrentFilter === 'sincontar') {{
+            const inputs = card.querySelectorAll('.conteo-input');
+            let allFilled = true;
+            inputs.forEach(function(inp) {{ if (inp.value.trim() === '') allFilled = false; }});
+            matchFilter = !allFilled;
+        }} else if (_conteoCurrentFilter === 'diferencia') {{
+            const inputs = card.querySelectorAll('.conteo-input');
+            let anyDiff = false;
+            inputs.forEach(function(inp) {{
+                if (inp.value.trim() !== '') {{
+                    const fisico = parseInt(inp.value) || 0;
+                    const stock = parseInt(inp.dataset.stock);
+                    if (fisico !== stock) anyDiff = true;
+                }}
+            }});
+            matchFilter = anyDiff;
+        }}
+        card.style.display = (matchSearch && matchFilter) ? '' : 'none';
+    }});
+}}
+
+function conteoSetFilter(filter, btn) {{
+    _conteoCurrentFilter = filter;
+    document.querySelectorAll('#conteo-panel-contar .filter-bar button[data-filter]').forEach(function(b) {{ b.classList.remove('active'); }});
+    if (btn) btn.classList.add('active');
+    conteoFilterProducts();
+}}
+
+/* ── Save ── */
 function conteoGuardar() {{
     const contadoPor = document.getElementById('conteo-por').value.trim();
-    if (!contadoPor) {{ alert('Ingresa quien realiza el conteo'); return; }}
-    const inputs = document.querySelectorAll('.conteo-input');
+    if (!contadoPor) {{ showToast('Ingresa quien realiza el conteo'); return; }}
+    const inputs = document.querySelectorAll('.conteo-input[data-varid]');
     const conteos = [];
     inputs.forEach(function(inp) {{
-        const idx = parseInt(inp.dataset.idx);
-        const v = _conteoVariantes[idx];
-        conteos.push({{ variante_id: v.variante_id, stock_fisico: parseInt(inp.value) || 0 }});
+        if (inp.value.trim() !== '') {{
+            conteos.push({{ variante_id: parseInt(inp.dataset.varid), stock_fisico: parseInt(inp.value) || 0 }});
+        }}
     }});
-    if (!conteos.length) return;
+    if (!conteos.length) {{ showToast('No hay variantes contadas'); return; }}
     const payload = JSON.stringify({{ contado_por: contadoPor, conteos: conteos }});
+    document.getElementById('conteo-guardar-btn').disabled = true;
     _callBridge('guardarConteo', [payload], function(r) {{
-        alert('Conteo guardado: ' + r.total + ' variantes (' + r.con_diferencia + ' con diferencia)');
-        // Reload
-        conteoLoadEscuela();
+        showToast('Conteo guardado: ' + r.total + ' variantes (' + r.con_diferencia + ' con diferencia)');
+        if (r.con_diferencia > 0) {{
+            // Show inline adjust prompt
+            const prompt = document.getElementById('conteo-adjust-prompt');
+            document.getElementById('conteo-adjust-msg').innerHTML =
+                '<b>' + r.con_diferencia + '</b> variante(s) con diferencia de stock.';
+            prompt.style.display = 'block';
+            prompt.scrollIntoView({{ behavior: 'smooth', block: 'nearest' }});
+        }} else {{
+            conteoLoadEscuela();
+        }}
+        // Update pendientes badge
+        const eid = parseInt(document.getElementById('conteo-escuela').value);
+        _callBridge('getConteosPendientes', [eid], function(r2) {{
+            const badge = document.getElementById('conteo-pendientes-badge');
+            if (r2.data.length > 0) {{
+                badge.textContent = r2.data.length;
+                badge.style.display = 'inline';
+            }} else {{
+                badge.style.display = 'none';
+            }}
+        }});
     }});
 }}
 
+function conteoApplyAdjustments() {{
+    const eid = parseInt(document.getElementById('conteo-escuela').value);
+    _callBridge('getConteosPendientes', [eid], function(r) {{
+        if (!r.data.length) {{ showToast('No hay ajustes pendientes'); conteoLoadEscuela(); return; }}
+        const ids = r.data.map(function(c) {{ return c.id; }});
+        _callBridge('confirmarAjuste', [JSON.stringify(ids)], function(r2) {{
+            showToast('Stock ajustado: ' + r2.ajustados + ' variante(s)');
+            conteoLoadEscuela();
+        }});
+    }});
+}}
+
+function conteoDismissPrompt() {{
+    document.getElementById('conteo-adjust-prompt').style.display = 'none';
+    conteoShowSubtab('pendientes');
+}}
+
+/* ── Config ── */
 function conteoGuardarConfig() {{
     const eid = parseInt(document.getElementById('conteo-escuela').value);
     const dias = parseInt(document.getElementById('conteo-vigencia').value);
     if (!eid || !dias || dias < 1) return;
     _callBridge('setConfigConteo', [eid, dias], function() {{
+        showToast('Vigencia actualizada a ' + dias + ' dias');
         conteoLoadEscuela();
     }});
 }}
 
-function conteoVerPendientes() {{
+/* ── Pendientes ── */
+function conteoLoadPendientes() {{
     const eid = parseInt(document.getElementById('conteo-escuela').value) || 0;
     _callBridge('getConteosPendientes', [eid], function(r) {{
         _conteoPendientes = r.data;
-        const tbody = document.getElementById('conteo-pendientes-tbody');
-        tbody.innerHTML = '';
+        const container = document.getElementById('conteo-pendientes-container');
+        const empty = document.getElementById('conteo-pendientes-empty');
+        const countEl = document.getElementById('conteo-pendientes-count');
+        container.innerHTML = '';
+
         if (!r.data.length) {{
-            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px">Sin conteos pendientes de ajuste</td></tr>';
+            container.style.display = 'none';
+            empty.style.display = 'block';
+            countEl.textContent = '';
             document.getElementById('conteo-ajustar-btn').disabled = true;
         }} else {{
+            container.style.display = 'block';
+            empty.style.display = 'none';
+            countEl.textContent = r.data.length + ' pendiente' + (r.data.length > 1 ? 's' : '');
+
             r.data.forEach(function(c) {{
-                const diffColor = c.diferencia > 0 ? '#16a34a' : '#dc2626';
-                const diffText = c.diferencia > 0 ? '+' + c.diferencia : c.diferencia;
-                const fecha = c.contado_at ? new Date(c.contado_at).toLocaleString() : '—';
-                const tr = document.createElement('tr');
-                tr.innerHTML =
-                    '<td><input type="checkbox" class="conteo-check" value="' + c.id + '"></td>' +
-                    '<td style="font-family:monospace;font-size:12px">' + c.sku + '</td>' +
-                    '<td>' + c.producto + '</td>' +
-                    '<td style="text-align:center">' + c.stock_sistema + '</td>' +
-                    '<td style="text-align:center">' + c.stock_fisico + '</td>' +
-                    '<td style="text-align:center;color:' + diffColor + ';font-weight:600">' + diffText + '</td>' +
-                    '<td>' + c.contado_por + '</td>' +
-                    '<td style="font-size:12px">' + fecha + '</td>';
-                tbody.appendChild(tr);
+                const diffColor = c.diferencia > 0 ? 'var(--green)' : 'var(--red)';
+                const diffSign = c.diferencia > 0 ? '+' : '';
+                const fecha = c.contado_at ? _conteoFormatFecha(c.contado_at) : '—';
+
+                const card = document.createElement('div');
+                card.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--bg-card,#fff);transition:background .15s';
+                card.onmouseenter = function(){{ this.style.background='var(--bg-hover,#fafafa)'; }};
+                card.onmouseleave = function(){{ this.style.background='var(--bg-card,#fff)'; }};
+
+                card.innerHTML =
+                    '<input type="checkbox" class="conteo-check" value="' + c.id + '" onchange="conteoUpdateCheckInfo()" style="width:16px;height:16px;cursor:pointer;flex-shrink:0">' +
+                    '<div style="flex:1;min-width:0">' +
+                        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+                            '<span style="font-weight:600">' + c.producto + '</span>' +
+                            '<span style="font-family:monospace;font-size:11px;color:var(--text-muted)">' + c.sku + '</span>' +
+                        '</div>' +
+                        '<div style="display:flex;align-items:center;gap:12px;margin-top:4px;font-size:13px;color:var(--text-muted)">' +
+                            '<span>Sistema: <b style="color:var(--text)">' + c.stock_sistema + '</b></span>' +
+                            '<span>Físico: <b style="color:var(--text)">' + c.stock_fisico + '</b></span>' +
+                            '<span>👤 ' + c.contado_por + '</span>' +
+                            '<span>📅 ' + fecha + '</span>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div style="text-align:center;flex-shrink:0;min-width:50px">' +
+                        '<div style="font-size:20px;font-weight:700;color:' + diffColor + '">' + diffSign + c.diferencia + '</div>' +
+                        '<div style="font-size:10px;color:var(--text-muted)">' + (c.diferencia > 0 ? 'sobran' : 'faltan') + '</div>' +
+                    '</div>';
+                container.appendChild(card);
             }});
             document.getElementById('conteo-ajustar-btn').disabled = false;
         }}
-        document.getElementById('conteo-pendientes-panel').style.display = 'block';
     }});
+}}
+
+function _conteoFormatFecha(iso) {{
+    try {{
+        const d = new Date(iso);
+        const now = new Date();
+        const diffMs = now - d;
+        const diffDays = Math.floor(diffMs / 86400000);
+        if (diffDays === 0) return 'Hoy ' + d.toLocaleTimeString([], {{hour:'2-digit',minute:'2-digit'}});
+        if (diffDays === 1) return 'Ayer';
+        if (diffDays < 7) return 'Hace ' + diffDays + 'd';
+        return d.toLocaleDateString();
+    }} catch(e) {{ return iso; }}
 }}
 
 function conteoToggleAll(master) {{
     document.querySelectorAll('.conteo-check').forEach(function(cb) {{ cb.checked = master.checked; }});
+    conteoUpdateCheckInfo();
+}}
+
+function conteoUpdateCheckInfo() {{
+    const checked = document.querySelectorAll('.conteo-check:checked').length;
+    document.getElementById('conteo-ajustar-btn').disabled = checked === 0;
+    document.getElementById('conteo-ajustar-btn').textContent = checked > 0 ? 'Confirmar ' + checked + ' ajuste' + (checked > 1 ? 's' : '') : 'Confirmar seleccionados';
 }}
 
 function conteoConfirmarAjustes() {{
     const checks = document.querySelectorAll('.conteo-check:checked');
-    if (!checks.length) {{ alert('Selecciona al menos un conteo'); return; }}
+    if (!checks.length) {{ showToast('Selecciona al menos un conteo'); return; }}
     const ids = Array.from(checks).map(function(cb) {{ return parseInt(cb.value); }});
-    if (!confirm('Confirmar ajuste de ' + ids.length + ' conteo(s)? Esto modificara el stock del sistema.')) return;
     _callBridge('confirmarAjuste', [JSON.stringify(ids)], function(r) {{
-        alert('Ajustados: ' + r.ajustados + ', Omitidos: ' + r.omitidos);
+        showToast('Ajustados: ' + r.ajustados + (r.omitidos > 0 ? ', Omitidos: ' + r.omitidos : ''));
         conteoLoadEscuela();
     }});
 }}
 
-function conteoLoadHistorial(eid) {{
+/* ── Historial ── */
+function conteoLoadHistorial() {{
+    const eid = parseInt(document.getElementById('conteo-escuela').value) || 0;
+    if (!eid) return;
     _callBridge('getHistorialConteos', [eid, 50], function(r) {{
-        const tbody = document.getElementById('conteo-historial-tbody');
-        tbody.innerHTML = '';
+        const container = document.getElementById('conteo-historial-container');
+        const empty = document.getElementById('conteo-historial-empty');
+        const countEl = document.getElementById('conteo-historial-count');
+        container.innerHTML = '';
+
         if (!r.data.length) {{
-            tbody.innerHTML = '<tr><td colspan="8" style="text-align:center;color:var(--text-muted);padding:20px">Sin historial</td></tr>';
+            container.style.display = 'none';
+            empty.style.display = 'block';
+            countEl.textContent = '';
         }} else {{
+            container.style.display = 'block';
+            empty.style.display = 'none';
+            countEl.textContent = r.data.length + ' registro' + (r.data.length > 1 ? 's' : '');
+
             r.data.forEach(function(c) {{
-                const diffColor = c.diferencia === 0 ? 'var(--text-muted)' : c.diferencia > 0 ? '#16a34a' : '#dc2626';
-                const diffText = c.diferencia === 0 ? '0' : (c.diferencia > 0 ? '+' + c.diferencia : c.diferencia);
-                const fecha = c.contado_at ? new Date(c.contado_at).toLocaleString() : '—';
-                const tr = document.createElement('tr');
-                tr.innerHTML =
-                    '<td style="font-family:monospace;font-size:12px">' + c.sku + '</td>' +
-                    '<td>' + c.producto + '</td>' +
-                    '<td style="text-align:center">' + c.stock_sistema + '</td>' +
-                    '<td style="text-align:center">' + c.stock_fisico + '</td>' +
-                    '<td style="text-align:center;color:' + diffColor + ';font-weight:600">' + diffText + '</td>' +
-                    '<td style="text-align:center">' + (c.ajustado ? '✅' : '⏳') + '</td>' +
-                    '<td>' + c.contado_por + '</td>' +
-                    '<td style="font-size:12px">' + fecha + '</td>';
-                tbody.appendChild(tr);
+                const diffColor = c.diferencia === 0 ? 'var(--text-muted)' : (c.diferencia > 0 ? 'var(--green)' : 'var(--red)');
+                const diffSign = c.diferencia > 0 ? '+' : '';
+                const diffText = c.diferencia === 0 ? '0' : diffSign + c.diferencia;
+                const fecha = c.contado_at ? _conteoFormatFecha(c.contado_at) : '—';
+                const statusIcon = c.ajustado ? '✅' : '⏳';
+                const statusText = c.ajustado ? 'Ajustado' : 'Pendiente';
+                const borderColor = c.diferencia === 0 ? 'var(--border)' : (c.ajustado ? 'var(--green)' : 'var(--orange)');
+
+                const card = document.createElement('div');
+                card.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 14px;border:1px solid var(--border);border-left:3px solid ' + borderColor + ';border-radius:8px;margin-bottom:6px;background:var(--bg-card,#fff);font-size:13px';
+
+                card.innerHTML =
+                    '<div style="flex:1;min-width:0">' +
+                        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">' +
+                            '<span style="font-weight:600">' + c.producto + '</span>' +
+                            '<span style="font-family:monospace;font-size:11px;color:var(--text-muted)">' + c.sku + '</span>' +
+                            '<span style="font-size:11px">' + statusIcon + ' ' + statusText + '</span>' +
+                        '</div>' +
+                        '<div style="display:flex;align-items:center;gap:12px;margin-top:3px;color:var(--text-muted)">' +
+                            '<span>Sistema: <b style="color:var(--text)">' + c.stock_sistema + '</b></span>' +
+                            '<span>Físico: <b style="color:var(--text)">' + c.stock_fisico + '</b></span>' +
+                            '<span>Dif: <b style="color:' + diffColor + '">' + diffText + '</b></span>' +
+                            '<span>👤 ' + c.contado_por + '</span>' +
+                            '<span>📅 ' + fecha + '</span>' +
+                            (c.notas ? '<span>📝 ' + c.notas + '</span>' : '') +
+                        '</div>' +
+                    '</div>';
+                container.appendChild(card);
             }});
         }}
-        document.getElementById('conteo-historial-panel').style.display = 'block';
     }});
 }}
 </script>
 
 <script src="qrc:///qtwebchannel/qwebchannel.js"></script>
 <script>
-// Re-init bridge after qwebchannel.js loads
 if (typeof QWebChannel !== 'undefined' && typeof qt !== 'undefined') {{
     new QWebChannel(qt.webChannelTransport, function(channel) {{
         _bridge = channel.objects.bridge;
@@ -2235,12 +2612,10 @@ def main():
     resumen = build_resumen(stats, insights, coverage_data)
     pieces = build_pieces(school_levels, pieces_raw, multi_level_ids, default_na)
     tariffs = build_tariffs(catalog_rows, catalog_cols, multi_level_ids)
-    catalog = build_catalog(catalog_rows, catalog_cols, multi_level_ids, pieces_raw)
-    missing_html = build_missing(school_levels, pieces_raw, multi_level_ids)
     variants = build_variants(catalog_rows, catalog_cols, multi_level_ids)
     conteo = build_conteo(school_levels)
 
-    html = generate_html(resumen, pieces, tariffs, catalog, missing_html, variants, conteo)
+    html = generate_html(resumen, pieces, tariffs, variants, conteo)
 
     out_path = Path(__file__).resolve().parent.parent / "panel_uniformes.html"
     out_path.write_text(html, encoding="utf-8")

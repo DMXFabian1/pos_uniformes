@@ -87,6 +87,41 @@ class PanelBridge(QObject):
         except Exception as exc:  # noqa: BLE001
             return json.dumps({"ok": False, "error": str(exc)})
 
+    @pyqtSlot(int, result=str)
+    def getVariantesAgrupadas(self, escuela_id: int) -> str:
+        from pos_uniformes.database.connection import get_session
+        from pos_uniformes.services.conteo_service import obtener_variantes_agrupadas_por_producto
+
+        try:
+            with get_session() as session:
+                grupos = obtener_variantes_agrupadas_por_producto(session, escuela_id)
+                data = []
+                for g in grupos:
+                    data.append({
+                        "producto_nombre": g["producto_nombre"],
+                        "tipo_pieza": g["tipo_pieza"],
+                        "virtual": g["virtual"],
+                        "variantes": [
+                            {
+                                "variante_id": v.variante_id,
+                                "sku": v.sku,
+                                "talla": v.talla,
+                                "color": v.color,
+                                "stock_actual": v.stock_actual,
+                                "stock_bodega": v.stock_bodega,
+                                "stock_piso": v.stock_piso,
+                                "stock_tienda": v.stock_tienda,
+                                "ultimo_conteo_at": v.ultimo_conteo_at.isoformat() if v.ultimo_conteo_at else None,
+                                "dias_desde_conteo": v.dias_desde_conteo,
+                                "requiere_conteo": v.requiere_conteo,
+                            }
+                            for v in g["variantes"]
+                        ],
+                    })
+                return json.dumps({"ok": True, "data": data})
+        except Exception as exc:  # noqa: BLE001
+            return json.dumps({"ok": False, "error": str(exc)})
+
     @pyqtSlot(str, result=str)
     def guardarConteo(self, data_json: str) -> str:
         from pos_uniformes.database.connection import get_session
@@ -276,13 +311,22 @@ class PanelUniformesWidget(QWidget):
         toolbar = QHBoxLayout()
         toolbar.setContentsMargins(12, 8, 12, 8)
 
+        _btn_style = (
+            "QPushButton { color: #333; background: #fff; border: 1px solid #ccc;"
+            " border-radius: 4px; padding: 4px 10px; font-size: 13px; }"
+            "QPushButton:hover { background: #e8e8e8; }"
+            "QPushButton:pressed { background: #ddd; }"
+        )
+
         self._regen_btn = QPushButton("🔄 Regenerar")
         self._regen_btn.setFixedWidth(130)
+        self._regen_btn.setStyleSheet(_btn_style)
         self._regen_btn.clicked.connect(self._regenerar)
         toolbar.addWidget(self._regen_btn)
 
         self._open_browser_btn = QPushButton("🌐 Abrir en navegador")
         self._open_browser_btn.setFixedWidth(170)
+        self._open_browser_btn.setStyleSheet(_btn_style)
         self._open_browser_btn.clicked.connect(self._open_in_browser)
         toolbar.addWidget(self._open_browser_btn)
 

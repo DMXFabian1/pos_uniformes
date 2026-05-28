@@ -246,9 +246,9 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_variant_combo.currentIndexChanged.connect(window._refresh_selected_qr_preview)
     side_box.setLayout(side_layout)
 
-    window.inventory_table.setColumnCount(9)
+    window.inventory_table.setColumnCount(11)
     window.inventory_table.setHorizontalHeaderLabels(
-        ["SKU", "Producto", "Talla", "Color", "Stock", "Apartado", "Estado", "QR", "Ult. conteo"]
+        ["SKU", "Producto", "Talla", "Color", "Stock", "Piso", "Almacén", "Apartado", "Estado", "QR", "Ult. conteo"]
     )
     window.inventory_table.setObjectName("dataTable")
     window.inventory_table.verticalHeader().setVisible(False)
@@ -258,15 +258,17 @@ def build_inventory_tab(window: "MainWindow") -> QWidget:
     window.inventory_table.setMinimumHeight(320)
     window.inventory_table.horizontalHeader().setStretchLastSection(True)
     inventory_header = window.inventory_table.horizontalHeader()
-    inventory_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
-    inventory_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
-    inventory_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-    inventory_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-    inventory_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
-    inventory_header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)
-    inventory_header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)
-    inventory_header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)
-    inventory_header.setSectionResizeMode(8, QHeaderView.ResizeMode.ResizeToContents)
+    inventory_header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)   # SKU
+    inventory_header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)             # Producto
+    inventory_header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)   # Talla
+    inventory_header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)   # Color
+    inventory_header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)   # Stock
+    inventory_header.setSectionResizeMode(5, QHeaderView.ResizeMode.ResizeToContents)   # Piso
+    inventory_header.setSectionResizeMode(6, QHeaderView.ResizeMode.ResizeToContents)   # Bodega
+    inventory_header.setSectionResizeMode(7, QHeaderView.ResizeMode.ResizeToContents)   # Apartado
+    inventory_header.setSectionResizeMode(8, QHeaderView.ResizeMode.ResizeToContents)   # Estado
+    inventory_header.setSectionResizeMode(9, QHeaderView.ResizeMode.ResizeToContents)   # QR
+    inventory_header.setSectionResizeMode(10, QHeaderView.ResizeMode.ResizeToContents)  # Ult. conteo
     inventory_header.setStretchLastSection(False)
     window.inventory_table.itemSelectionChanged.connect(window._handle_inventory_table_selection)
     window.inventory_table.currentCellChanged.connect(lambda *_: window._handle_inventory_table_selection())

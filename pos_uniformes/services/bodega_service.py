@@ -26,6 +26,29 @@ from pos_uniformes.database.models import (
 
 class BodegaService:
 
+    # ─── Helpers ubicación → campo stock ─────────────────────────────────
+
+    @staticmethod
+    def _es_ubicacion_piso(ubicacion: BodegaUbicacion | None) -> bool:
+        """True si la ubicación es Piso (tienda), False si es Almacén."""
+        if ubicacion is None:
+            return True  # sin ubicación asignada → asumimos piso
+        return ubicacion.rack.upper() == "PISO"
+
+    @classmethod
+    def _ajustar_stock_ubicacion(
+        cls,
+        session: Session,
+        variante: Variante,
+        cantidad: int,
+        ubicacion: BodegaUbicacion | None,
+    ) -> None:
+        """Suma (o resta si negativo) cantidad al campo correcto de la variante."""
+        if cls._es_ubicacion_piso(ubicacion):
+            variante.stock_piso = max(0, variante.stock_piso + cantidad)
+        else:
+            variante.stock_bodega = max(0, variante.stock_bodega + cantidad)
+
     # ─── Ubicaciones ─────────────────────────────────────────────────────
 
     @staticmethod
@@ -105,16 +128,34 @@ class BodegaService:
         session.flush()
         return caja
 
-    @staticmethod
+    @classmethod
     def mover_caja(
+        cls,
         session: Session,
         caja_id: int,
         nueva_ubicacion_id: int | None,
         creado_por: str = "SYSTEM",
     ) -> BodegaCaja:
-        caja = session.get(BodegaCaja, caja_id)
+        caja = session.scalar(
+            select(BodegaCaja)
+            .options(joinedload(BodegaCaja.ubicacion), joinedload(BodegaCaja.contenido))
+            .where(BodegaCaja.id == caja_id)
+        )
         if not caja:
             raise ValueError("Caja no encontrada.")
+
+        ubicacion_anterior = caja.ubicacion
+        nueva_ubicacion = session.get(BodegaUbicacion, nueva_ubicacion_id) if nueva_ubicacion_id else None
+
+        # Si cambia tipo de ubicación, reasignar stock de todo el contenido
+        anterior_piso = cls._es_ubicacion_piso(ubicacion_anterior)
+        nueva_piso = cls._es_ubicacion_piso(nueva_ubicacion)
+        if anterior_piso != nueva_piso and caja.contenido:
+            for c in caja.contenido:
+                variante = session.get(Variante, c.variante_id)
+                if variante:
+                    cls._ajustar_stock_ubicacion(session, variante, -c.cantidad, ubicacion_anterior)
+                    cls._ajustar_stock_ubicacion(session, variante, c.cantidad, nueva_ubicacion)
 
         anterior_id = caja.ubicacion_id
         caja.ubicacion_id = nueva_ubicacion_id
@@ -216,6 +257,12 @@ class BodegaService:
                 f"Stock total: {variante.stock_actual}, ya en bodega: {total_en_bodega}."
             )
 
+        caja = session.scalar(
+            select(BodegaCaja).options(joinedload(BodegaCaja.ubicacion)).where(BodegaCaja.id == caja_id)
+        )
+        if not caja:
+            raise ValueError("Caja no encontrada.")
+
         contenido = session.scalar(
             select(BodegaContenido).where(
                 BodegaContenido.caja_id == caja_id,
@@ -231,6 +278,9 @@ class BodegaService:
                 cantidad=cantidad,
             )
             session.add(contenido)
+
+        # Actualizar stock por ubicación
+        cls._ajustar_stock_ubicacion(session, variante, cantidad, caja.ubicacion)
 
         mov = BodegaMovimiento(
             caja_id=caja_id,
@@ -257,6 +307,12 @@ class BodegaService:
         if cantidad <= 0:
             raise ValueError("La cantidad debe ser mayor a cero.")
 
+        caja = session.scalar(
+            select(BodegaCaja).options(joinedload(BodegaCaja.ubicacion)).where(BodegaCaja.id == caja_id)
+        )
+        if not caja:
+            raise ValueError("Caja no encontrada.")
+
         contenido = session.scalar(
             select(BodegaContenido).where(
                 BodegaContenido.caja_id == caja_id,
@@ -274,6 +330,11 @@ class BodegaService:
         if contenido.cantidad == 0:
             session.delete(contenido)
             contenido = None
+
+        # Actualizar stock por ubicación
+        variante = session.get(Variante, variante_id)
+        if variante:
+            cls._ajustar_stock_ubicacion(session, variante, -cantidad, caja.ubicacion)
 
         mov = BodegaMovimiento(
             caja_id=caja_id,
@@ -299,6 +360,13 @@ class BodegaService:
     ) -> None:
         if cantidad <= 0:
             raise ValueError("La cantidad debe ser mayor a cero.")
+
+        caja_origen = session.scalar(
+            select(BodegaCaja).options(joinedload(BodegaCaja.ubicacion)).where(BodegaCaja.id == caja_origen_id)
+        )
+        caja_destino = session.scalar(
+            select(BodegaCaja).options(joinedload(BodegaCaja.ubicacion)).where(BodegaCaja.id == caja_destino_id)
+        )
 
         contenido_origen = session.scalar(
             select(BodegaContenido).where(
@@ -330,6 +398,15 @@ class BodegaService:
                 cantidad=cantidad,
             )
             session.add(contenido_destino)
+
+        # Si cambia tipo de ubicación (piso↔almacén), ajustar campos
+        origen_piso = cls._es_ubicacion_piso(caja_origen.ubicacion if caja_origen else None)
+        destino_piso = cls._es_ubicacion_piso(caja_destino.ubicacion if caja_destino else None)
+        if origen_piso != destino_piso:
+            variante = session.get(Variante, variante_id)
+            if variante:
+                cls._ajustar_stock_ubicacion(session, variante, -cantidad, caja_origen.ubicacion if caja_origen else None)
+                cls._ajustar_stock_ubicacion(session, variante, cantidad, caja_destino.ubicacion if caja_destino else None)
 
         mov = BodegaMovimiento(
             caja_id=caja_origen_id,

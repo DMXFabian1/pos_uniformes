@@ -43,9 +43,13 @@ class VarianteParaConteo:
     variante_id: int
     sku: str
     producto_nombre: str
+    tipo_pieza: str
     talla: str
     color: str
     stock_actual: int
+    stock_bodega: int
+    stock_piso: int
+    stock_tienda: int
     ultimo_conteo_at: datetime | None
     dias_desde_conteo: int | None
     requiere_conteo: bool
@@ -91,7 +95,7 @@ def registrar_conteo(
     if variante is None:
         raise ValueError(f"Variante id={variante_id} no encontrada.")
 
-    stock_sistema = variante.stock_actual
+    stock_sistema = variante.stock_tienda
     diferencia = stock_fisico - stock_sistema
 
     conteo = ConteoInventario(
@@ -235,6 +239,7 @@ def obtener_variantes_para_conteo(
     variantes = session.scalars(
         select(Variante)
         .join(Variante.producto)
+        .options(joinedload(Variante.producto).joinedload(Producto.tipo_pieza))
         .where(
             Producto.escuela_id == escuela_id,
             Producto.activo.is_(True),
@@ -245,7 +250,7 @@ def obtener_variantes_para_conteo(
             Producto.nombre,
             Variante.talla,
         )
-    ).all()
+    ).unique().all()
 
     ahora = datetime.now(timezone.utc)
     resultado: list[VarianteParaConteo] = []
@@ -258,18 +263,83 @@ def obtener_variantes_para_conteo(
             dias = None
             requiere = True
 
+        tipo_nombre = v.producto.tipo_pieza.nombre if v.producto.tipo_pieza else ""
+
         resultado.append(VarianteParaConteo(
             variante_id=v.id,
             sku=v.sku,
             producto_nombre=v.producto.nombre,
+            tipo_pieza=tipo_nombre,
             talla=v.talla,
             color=v.color,
             stock_actual=v.stock_actual,
+            stock_bodega=v.stock_bodega,
+            stock_piso=v.stock_piso,
+            stock_tienda=v.stock_tienda,
             ultimo_conteo_at=v.ultimo_conteo_at,
             dias_desde_conteo=dias,
             requiere_conteo=requiere,
         ))
 
+    return resultado
+
+
+_PIEZA_ORDER = {
+    "Pants 3pz": 1, "Pants 2pz": 2, "Pants Suelto": 3, "Chamarra": 4,
+    "Playera": 5, "Suéter": 6, "Camisa": 7, "Chaleco": 8, "Falda": 9,
+    "Jumper": 10, "Blusa": 11, "Short": 12, "Pantalón": 13, "Malla": 14,
+    "Calceta": 15, "Corbata": 16, "Corbatín": 17, "Moño": 18,
+    "Mascada": 19, "Boina": 20, "Guante": 21, "Bata": 22, "Jeans": 23,
+}
+
+_TIPOS_VIRTUALES = {"Pants 3pz", "Chamarra"}
+
+
+def obtener_variantes_agrupadas_por_producto(
+    session: Session,
+    escuela_id: int,
+) -> list[dict]:
+    """Variantes agrupadas por producto, ordenadas según PIEZA_ORDER."""
+    variantes = obtener_variantes_para_conteo(session, escuela_id)
+    grupos: dict[str, dict] = {}
+    for v in variantes:
+        key = v.producto_nombre
+        if key not in grupos:
+            grupos[key] = {
+                "producto_nombre": key,
+                "tipo_pieza": v.tipo_pieza,
+                "virtual": v.tipo_pieza in _TIPOS_VIRTUALES,
+                "variantes": [],
+            }
+        grupos[key]["variantes"].append(v)
+
+    def _talla_sort_key(v: VarianteParaConteo):
+        """Ordena tallas: numéricas (4,6,8...) luego letra (CH,MD,GD,EXG)."""
+        t = v.talla.strip().upper()
+        # Tallas numéricas con sufijo (4CH, 6CH, etc.)
+        if len(t) > 2 and t[:-2].isdigit():
+            return (0, int(t[:-2]), t)
+        # Tallas numéricas puras
+        try:
+            return (1, int(t), "")
+        except ValueError:
+            pass
+        # Tallas con letra: CH, MD, GD, EXG, XS, S, M, L, XL, XXL
+        letra_order = {
+            "CH": 0, "MD": 1, "GD": 2, "EXG": 3,
+            "XXS": 4, "XS": 5, "S": 6, "M": 7, "L": 8, "XL": 9, "XXL": 10,
+        }
+        return (2, letra_order.get(t, 99), t)
+
+    # Ordenar variantes por talla dentro de cada grupo
+    for g in grupos.values():
+        g["variantes"].sort(key=_talla_sort_key)
+
+    # Ordenar grupos por PIEZA_ORDER, luego por nombre de producto
+    resultado = sorted(
+        grupos.values(),
+        key=lambda g: (_PIEZA_ORDER.get(g["tipo_pieza"], 99), g["producto_nombre"]),
+    )
     return resultado
 
 

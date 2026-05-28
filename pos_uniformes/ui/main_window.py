@@ -10073,9 +10073,9 @@ class MainWindow(QMainWindow):
                         _set_table_row_tint(item, row_view.row_tone)
             self.inventory_table.item(row_index, 0).setData(Qt.ItemDataRole.UserRole, row_view.variant_id)
             stock_item = self.inventory_table.item(row_index, 4)
-            committed_item = self.inventory_table.item(row_index, 5)
-            status_item = self.inventory_table.item(row_index, 6)
-            qr_item = self.inventory_table.item(row_index, 7)
+            committed_item = self.inventory_table.item(row_index, 7)
+            status_item = self.inventory_table.item(row_index, 8)
+            qr_item = self.inventory_table.item(row_index, 9)
             if stock_item is not None:
                 _set_table_badge_style(stock_item, row_view.stock_tone)
             if committed_item is not None and row_view.committed_tone is not None:

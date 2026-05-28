@@ -757,8 +757,15 @@ class Variante(Base):
     precio_venta: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
     costo_referencia: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     stock_actual: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    stock_bodega: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    stock_piso: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     stock_minimo: Mapped[int | None] = mapped_column(Integer, nullable=True)
     ultimo_conteo_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    @property
+    def stock_tienda(self) -> int:
+        """Stock disponible en estantes de tienda (total - bodega - piso)."""
+        return self.stock_actual - self.stock_bodega - self.stock_piso
     activo: Mapped[bool] = mapped_column(default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
