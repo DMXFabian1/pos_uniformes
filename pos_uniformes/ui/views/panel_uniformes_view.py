@@ -285,28 +285,26 @@ class PanelBridge(QObject):
     @pyqtSlot(int, str, result=str)
     def imprimirHojasConteo(self, escuela_id: int, escuela_nombre: str) -> str:
         from pos_uniformes.database.connection import get_session
-        from pos_uniformes.services.conteo_sheet_service import build_conteo_sheets_combined
+        from pos_uniformes.services.conteo_sheet_service import build_conteo_sheets
 
         try:
             with get_session() as session:
-                content = build_conteo_sheets_combined(
+                sheets = build_conteo_sheets(
                     session, escuela_id, escuela_nombre,
                 )
-            if not content:
+            if not sheets:
                 return json.dumps({"ok": False, "error": "No hay productos para esta escuela."})
 
-            # Abrir diálogo de impresión en el hilo principal
-            from pos_uniformes.ui.dialogs.printable_text_dialog import open_printable_text_dialog
+            from pos_uniformes.ui.dialogs.conteo_print_dialog import open_conteo_print_dialog
 
             parent = self.parent()
-            # Buscar la MainWindow subiendo la jerarquía
             while parent is not None and not hasattr(parent, "windowTitle"):
                 parent = parent.parent()
 
-            open_printable_text_dialog(
+            open_conteo_print_dialog(
                 parent,
                 f"Hojas de conteo — {escuela_nombre}",
-                content,
+                sheets,
             )
             return json.dumps({"ok": True})
         except Exception as exc:  # noqa: BLE001
