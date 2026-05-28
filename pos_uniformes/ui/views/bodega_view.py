@@ -746,6 +746,7 @@ class BodegaWidget(QWidget):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self._load_caja_detalle(self._selected_caja_id)
             self._refresh_cajas()
+            self._notify_inventory_changed()
 
     def _on_retirar_producto(self) -> None:
         if not self._selected_caja_id:
@@ -798,6 +799,7 @@ class BodegaWidget(QWidget):
                     return
             self._load_caja_detalle(self._selected_caja_id)
             self._refresh_cajas()
+            self._notify_inventory_changed()
 
     def _on_mover_caja(self) -> None:
         if not self._selected_caja_id:
@@ -806,6 +808,11 @@ class BodegaWidget(QWidget):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self._load_caja_detalle(self._selected_caja_id)
             self._refresh_cajas()
+            self._notify_inventory_changed()
+
+    def _notify_inventory_changed(self) -> None:
+        self.window._invalidate_listing_snapshot_caches(catalog=False, inventory=True)
+        self.window._refresh_inventory_table()
 
     def _on_reclasificar(self) -> None:
         if not self._selected_caja_id:
@@ -968,12 +975,21 @@ class MoverCajaDialog(QDialog):
 
         layout = QFormLayout()
         self.ubicacion_combo = QComboBox()
-        self.ubicacion_combo.addItem("Sin asignar", None)
+        ubicacion_actual_label = "—"
         with get_session() as session:
+            caja = BodegaService.obtener_caja_detalle(session, caja_id)
+            ubicacion_actual_id = caja.ubicacion_id if caja else None
+            if caja and caja.ubicacion:
+                ubicacion_actual_label = caja.ubicacion.codigo
+
             ubicaciones = BodegaService.listar_ubicaciones(session)
             for ub in ubicaciones:
+                if ub.id == ubicacion_actual_id:
+                    continue
                 self.ubicacion_combo.addItem(ub.codigo, ub.id)
-        layout.addRow("Nueva ubicación:", self.ubicacion_combo)
+
+        layout.addRow("Ubicación actual:", QLabel(ubicacion_actual_label))
+        layout.addRow("Mover a:", self.ubicacion_combo)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self._on_accept)

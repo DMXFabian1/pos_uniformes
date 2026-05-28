@@ -26,50 +26,9 @@ from pos_uniformes.database.models import (
 
 class BodegaService:
 
-    # ─── Helpers ubicación → campo stock ─────────────────────────────────
+    # ─── Ubicaciones (fijas: PISO y ALMACEN) ────────────────────────────
 
-    @staticmethod
-    def _es_ubicacion_piso(ubicacion: BodegaUbicacion | None) -> bool:
-        """True si la ubicación es Piso (tienda), False si es Almacén."""
-        if ubicacion is None:
-            return True  # sin ubicación asignada → asumimos piso
-        return ubicacion.rack.upper() == "PISO"
-
-    @classmethod
-    def _ajustar_stock_ubicacion(
-        cls,
-        session: Session,
-        variante: Variante,
-        cantidad: int,
-        ubicacion: BodegaUbicacion | None,
-    ) -> None:
-        """Suma (o resta si negativo) cantidad al campo correcto de la variante."""
-        if cls._es_ubicacion_piso(ubicacion):
-            variante.stock_piso = max(0, variante.stock_piso + cantidad)
-        else:
-            variante.stock_bodega = max(0, variante.stock_bodega + cantidad)
-
-    # ─── Ubicaciones ─────────────────────────────────────────────────────
-
-    @staticmethod
-    def crear_ubicacion(
-        session: Session,
-        rack: str,
-        nivel: int,
-        codigo: str | None = None,
-        descripcion: str | None = None,
-    ) -> BodegaUbicacion:
-        if not codigo:
-            codigo = f"{rack}-N{nivel}"
-        ubicacion = BodegaUbicacion(
-            codigo=codigo,
-            rack=rack.strip().upper(),
-            nivel=nivel,
-            descripcion=descripcion,
-        )
-        session.add(ubicacion)
-        session.flush()
-        return ubicacion
+    RACKS_PERMITIDOS = {"PISO", "ALMACEN"}
 
     @staticmethod
     def listar_ubicaciones(session: Session, *, activas: bool = True) -> list[BodegaUbicacion]:
@@ -77,14 +36,6 @@ class BodegaService:
         if activas:
             stmt = stmt.where(BodegaUbicacion.activo.is_(True))
         return list(session.scalars(stmt).all())
-
-    @staticmethod
-    def desactivar_ubicacion(session: Session, ubicacion_id: int) -> None:
-        ub = session.get(BodegaUbicacion, ubicacion_id)
-        if not ub:
-            raise ValueError("Ubicación no encontrada.")
-        ub.activo = False
-        session.flush()
 
     # ─── Cajas ───────────────────────────────────────────────────────────
 
@@ -143,19 +94,6 @@ class BodegaService:
         )
         if not caja:
             raise ValueError("Caja no encontrada.")
-
-        ubicacion_anterior = caja.ubicacion
-        nueva_ubicacion = session.get(BodegaUbicacion, nueva_ubicacion_id) if nueva_ubicacion_id else None
-
-        # Si cambia tipo de ubicación, reasignar stock de todo el contenido
-        anterior_piso = cls._es_ubicacion_piso(ubicacion_anterior)
-        nueva_piso = cls._es_ubicacion_piso(nueva_ubicacion)
-        if anterior_piso != nueva_piso and caja.contenido:
-            for c in caja.contenido:
-                variante = session.get(Variante, c.variante_id)
-                if variante:
-                    cls._ajustar_stock_ubicacion(session, variante, -c.cantidad, ubicacion_anterior)
-                    cls._ajustar_stock_ubicacion(session, variante, c.cantidad, nueva_ubicacion)
 
         anterior_id = caja.ubicacion_id
         caja.ubicacion_id = nueva_ubicacion_id
@@ -279,9 +217,6 @@ class BodegaService:
             )
             session.add(contenido)
 
-        # Actualizar stock por ubicación
-        cls._ajustar_stock_ubicacion(session, variante, cantidad, caja.ubicacion)
-
         mov = BodegaMovimiento(
             caja_id=caja_id,
             variante_id=variante_id,
@@ -330,11 +265,6 @@ class BodegaService:
         if contenido.cantidad == 0:
             session.delete(contenido)
             contenido = None
-
-        # Actualizar stock por ubicación
-        variante = session.get(Variante, variante_id)
-        if variante:
-            cls._ajustar_stock_ubicacion(session, variante, -cantidad, caja.ubicacion)
 
         mov = BodegaMovimiento(
             caja_id=caja_id,
@@ -398,15 +328,6 @@ class BodegaService:
                 cantidad=cantidad,
             )
             session.add(contenido_destino)
-
-        # Si cambia tipo de ubicación (piso↔almacén), ajustar campos
-        origen_piso = cls._es_ubicacion_piso(caja_origen.ubicacion if caja_origen else None)
-        destino_piso = cls._es_ubicacion_piso(caja_destino.ubicacion if caja_destino else None)
-        if origen_piso != destino_piso:
-            variante = session.get(Variante, variante_id)
-            if variante:
-                cls._ajustar_stock_ubicacion(session, variante, -cantidad, caja_origen.ubicacion if caja_origen else None)
-                cls._ajustar_stock_ubicacion(session, variante, cantidad, caja_destino.ubicacion if caja_destino else None)
 
         mov = BodegaMovimiento(
             caja_id=caja_origen_id,

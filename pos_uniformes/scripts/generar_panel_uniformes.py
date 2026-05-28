@@ -146,19 +146,29 @@ def fetch_all_data(conn):
     """)
     stats = dict(zip(["escuelas", "productos", "variantes_activas", "variantes_inactivas"], cur.fetchone()))
 
-    # Stock breakdown
+    # Stock breakdown (derived from bodega_contenido)
     cur.execute("""
+        WITH bodega_stock AS (
+            SELECT bc.variante_id,
+                COALESCE(SUM(bc.cantidad) FILTER (WHERE UPPER(bu.rack) = 'PISO'), 0) AS stock_piso,
+                COALESCE(SUM(bc.cantidad) FILTER (WHERE UPPER(bu.rack) != 'PISO'), 0) AS stock_bodega
+            FROM bodega_contenido bc
+            JOIN bodega_caja bx ON bx.id = bc.caja_id
+            JOIN bodega_ubicacion bu ON bu.id = bx.ubicacion_id
+            GROUP BY bc.variante_id
+        )
         SELECT
             COALESCE(SUM(v.stock_actual), 0),
-            COALESCE(SUM(v.stock_bodega), 0),
-            COALESCE(SUM(v.stock_piso), 0),
-            COALESCE(SUM(v.stock_actual - v.stock_bodega - v.stock_piso), 0),
+            COALESCE(SUM(COALESCE(bs.stock_bodega, 0)), 0),
+            COALESCE(SUM(COALESCE(bs.stock_piso, 0)), 0),
+            COALESCE(SUM(v.stock_actual - COALESCE(bs.stock_bodega, 0) - COALESCE(bs.stock_piso, 0)), 0),
             COUNT(*) FILTER (WHERE v.stock_actual = 0),
             COUNT(*) FILTER (WHERE v.stock_actual > 0
-                AND (v.stock_actual - v.stock_bodega - v.stock_piso) < COALESCE(v.stock_minimo, 2)),
+                AND (v.stock_actual - COALESCE(bs.stock_bodega, 0) - COALESCE(bs.stock_piso, 0)) < COALESCE(v.stock_minimo, 2)),
             COALESCE(SUM(v.stock_actual * v.precio_venta), 0)
         FROM variante v
         JOIN producto p ON p.id = v.producto_id
+        LEFT JOIN bodega_stock bs ON bs.variante_id = v.id
         WHERE v.activo = true AND p.activo = true
     """)
     row = cur.fetchone()
@@ -251,7 +261,9 @@ def fetch_all_data(conn):
             p.id AS producto_id, p.nombre_base,
             v.id AS variante_id, v.sku, v.talla, v.color,
             v.precio_venta, v.stock_actual, v.activo AS v_activo,
-            v.stock_bodega, v.stock_piso, v.stock_minimo,
+            COALESCE((SELECT SUM(bc.cantidad) FROM bodega_contenido bc JOIN bodega_caja bx ON bx.id=bc.caja_id JOIN bodega_ubicacion bu ON bu.id=bx.ubicacion_id WHERE bc.variante_id=v.id AND UPPER(bu.rack)!='PISO'), 0) AS stock_bodega,
+            COALESCE((SELECT SUM(bc.cantidad) FROM bodega_contenido bc JOIN bodega_caja bx ON bx.id=bc.caja_id JOIN bodega_ubicacion bu ON bu.id=bx.ubicacion_id WHERE bc.variante_id=v.id AND UPPER(bu.rack)='PISO'), 0) AS stock_piso,
+            v.stock_minimo,
             p.escuela_id AS producto_escuela_id
         FROM all_school_products asp
         JOIN escuela e ON e.id=asp.escuela_id AND e.activo=true
@@ -265,8 +277,21 @@ def fetch_all_data(conn):
     catalog_rows = cur.fetchall()
     catalog_cols = [d[0] for d in cur.description]
 
+    # Valor de inventario por nivel educativo
+    cur.execute("""
+        SELECT ne.nombre,
+            COALESCE(SUM(v.stock_actual * v.precio_venta), 0) AS valor
+        FROM variante v
+        JOIN producto p ON p.id = v.producto_id AND p.activo = true
+        JOIN nivel_educativo ne ON ne.id = p.nivel_educativo_id
+        WHERE v.activo = true AND p.escuela_id IS NOT NULL
+        GROUP BY ne.nombre
+        ORDER BY ne.nombre
+    """)
+    valor_por_nivel = {r[0]: float(r[1]) for r in cur.fetchall()}
+
     cur.close()
-    return stats, multi_level_ids, school_levels, pieces_raw, catalog_rows, catalog_cols
+    return stats, multi_level_ids, school_levels, pieces_raw, catalog_rows, catalog_cols, valor_por_nivel
 
 
 # ---------------------------------------------------------------------------
@@ -395,7 +420,7 @@ def compute_insights(stats, school_levels, pieces_raw, catalog_rows, catalog_col
 # HTML Section builders
 # ---------------------------------------------------------------------------
 
-def build_resumen(stats, insights, coverage_data):
+def build_resumen(stats, insights, coverage_data, valor_por_nivel=None):
     niveles = stats["por_nivel"]
     total_escuelas = stats["escuelas"]
     h = []
@@ -465,29 +490,24 @@ def build_resumen(stats, insights, coverage_data):
     # ── Row 3: Cobertura por nivel + Escuelas por nivel ──
     h.append('<div class="res-two-col">')
 
-    # -- Col A: Cobertura por nivel --
-    nivel_stats: dict[str, list[int]] = defaultdict(list)
-    for c in coverage_data:
-        nivel_stats[c["nivel"]].append(c["pct"])
-    low_coverage = [c for c in coverage_data if c["pct"] < 40]
-    full_coverage = [c for c in coverage_data if c["pct"] >= 80]
-    avg_pct = round(sum(c["pct"] for c in coverage_data) / len(coverage_data)) if coverage_data else 0
-
+    # -- Col A: Valor de inventario por nivel --
+    vpn = valor_por_nivel or {}
+    valor_total_nivel = sum(vpn.values()) or 1
     h.append('<div class="res-card">')
-    h.append(f'<div class="res-card-title">Cobertura de piezas <span class="res-card-badge" style="background:{"var(--green-bg);color:var(--green)" if avg_pct >= 70 else "var(--orange-bg);color:var(--orange)" if avg_pct >= 40 else "var(--red-bg);color:var(--red)"}"">{avg_pct}% promedio</span></div>')
+    valor_total_str = f"${valor_total_nivel/1_000_000:.1f}M" if valor_total_nivel >= 1_000_000 else f"${valor_total_nivel/1000:.0f}K"
+    h.append(f'<div class="res-card-title">Valor por nivel <span class="res-card-badge" style="background:var(--green-bg);color:var(--green)">{valor_total_str}</span></div>')
     for nivel in NIVEL_ORDER:
-        if nivel not in nivel_stats:
+        val = vpn.get(nivel, 0)
+        if val == 0:
             continue
-        pcts = nivel_stats[nivel]
-        avg = round(sum(pcts) / len(pcts))
+        pct = round(val / valor_total_nivel * 100)
         color = NIVEL_COLORS.get(nivel, "#999")
-        bar_color = "#c62828" if avg < 40 else "#e65100" if avg < 70 else "#2e7d32"
+        val_str = f"${val/1_000_000:.1f}M" if val >= 1_000_000 else f"${val/1000:.0f}K" if val >= 1000 else f"${val:,.0f}"
         h.append(f'<div class="res-cov-row">'
                  f'<span class="res-cov-nivel"><span class="nivel-dot" style="background:{color}"></span>{nivel}</span>'
-                 f'<div class="res-cov-bar"><div class="res-cov-fill" style="width:{avg}%;background:{bar_color}"></div></div>'
-                 f'<span class="res-cov-pct" style="color:{bar_color}">{avg}%</span>'
+                 f'<div class="res-cov-bar"><div class="res-cov-fill" style="width:{pct}%;background:{color}"></div></div>'
+                 f'<span class="res-cov-pct" style="color:{color}">{val_str}</span>'
                  f'</div>')
-    h.append(f'<div class="res-cov-summary">{len(full_coverage)} completas · {len(low_coverage)} críticas</div>')
     h.append('</div>')
 
     # -- Col B: Distribución por nivel --
@@ -2599,7 +2619,7 @@ def main():
     print("Conectando a la base de datos...")
     conn = _get_connection()
     print("Consultando datos...")
-    stats, multi_level_ids, school_levels, pieces_raw, catalog_rows, catalog_cols = fetch_all_data(conn)
+    stats, multi_level_ids, school_levels, pieces_raw, catalog_rows, catalog_cols, valor_por_nivel = fetch_all_data(conn)
     conn.close()
     print(f"  {stats['escuelas']} escuelas, {stats['productos']} productos, {stats['variantes_activas']} variantes")
 
@@ -2609,7 +2629,7 @@ def main():
     default_na = compute_default_na(school_levels, pieces_raw)
 
     print("Generando secciones...")
-    resumen = build_resumen(stats, insights, coverage_data)
+    resumen = build_resumen(stats, insights, coverage_data, valor_por_nivel)
     pieces = build_pieces(school_levels, pieces_raw, multi_level_ids, default_na)
     tariffs = build_tariffs(catalog_rows, catalog_cols, multi_level_ids)
     variants = build_variants(catalog_rows, catalog_cols, multi_level_ids)

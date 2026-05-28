@@ -15,6 +15,8 @@ from sqlalchemy.orm import Session, joinedload
 from pos_uniformes.database.models import (
     AjusteInventarioLote,
     AjusteInventarioLoteDetalle,
+    BodegaCaja,
+    BodegaContenido,
     ConfigConteoEscuela,
     ConteoInventario,
     Escuela,
@@ -239,7 +241,12 @@ def obtener_variantes_para_conteo(
     variantes = session.scalars(
         select(Variante)
         .join(Variante.producto)
-        .options(joinedload(Variante.producto).joinedload(Producto.tipo_pieza))
+        .options(
+            joinedload(Variante.producto).joinedload(Producto.tipo_pieza),
+            joinedload(Variante.bodega_contenidos)
+            .joinedload(BodegaContenido.caja)
+            .joinedload(BodegaCaja.ubicacion),
+        )
         .where(
             Producto.escuela_id == escuela_id,
             Producto.activo.is_(True),

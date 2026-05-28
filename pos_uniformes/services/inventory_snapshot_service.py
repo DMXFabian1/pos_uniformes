@@ -79,11 +79,14 @@ def invalidate_inventory_qr_exists_cache(*, sku: str | None = None) -> None:
 
 
 def _execute_inventory_snapshot_query(session) -> list[tuple[object, ...]]:
-    from sqlalchemy import func, select
+    from sqlalchemy import func, literal, select, and_
 
     from pos_uniformes.database.models import (
         Apartado,
         ApartadoDetalle,
+        BodegaCaja,
+        BodegaContenido,
+        BodegaUbicacion,
         Categoria,
         Escuela,
         EstadoApartado,
@@ -106,6 +109,30 @@ def _execute_inventory_snapshot_query(session) -> list[tuple[object, ...]]:
         .subquery()
     )
 
+    stock_bodega_subq = (
+        select(func.coalesce(func.sum(BodegaContenido.cantidad), 0))
+        .join(BodegaCaja, BodegaContenido.caja_id == BodegaCaja.id)
+        .join(BodegaUbicacion, BodegaCaja.ubicacion_id == BodegaUbicacion.id)
+        .where(
+            BodegaContenido.variante_id == Variante.id,
+            func.upper(BodegaUbicacion.rack) != literal("PISO"),
+        )
+        .correlate(Variante)
+        .scalar_subquery()
+    )
+
+    stock_piso_subq = (
+        select(func.coalesce(func.sum(BodegaContenido.cantidad), 0))
+        .join(BodegaCaja, BodegaContenido.caja_id == BodegaCaja.id)
+        .join(BodegaUbicacion, BodegaCaja.ubicacion_id == BodegaUbicacion.id)
+        .where(
+            BodegaContenido.variante_id == Variante.id,
+            func.upper(BodegaUbicacion.rack) == literal("PISO"),
+        )
+        .correlate(Variante)
+        .scalar_subquery()
+    )
+
     statement = (
         select(
             Variante.id,
@@ -124,8 +151,8 @@ def _execute_inventory_snapshot_query(session) -> list[tuple[object, ...]]:
             Variante.precio_venta,
             Variante.costo_referencia,
             Variante.stock_actual,
-            Variante.stock_bodega,
-            Variante.stock_piso,
+            stock_bodega_subq.label("stock_bodega"),
+            stock_piso_subq.label("stock_piso"),
             func.coalesce(layaway_reserved_subquery.c.apartado_cantidad, 0),
             Variante.activo,
             func.coalesce(ImportacionCatalogoFila.producto_fallback, False),
