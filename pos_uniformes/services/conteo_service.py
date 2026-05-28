@@ -369,7 +369,7 @@ def obtener_conteos_pendientes(
     if escuela_id is not None:
         stmt = stmt.where(ConteoInventario.escuela_id == escuela_id)
 
-    return list(session.scalars(stmt).all())
+    return list(session.scalars(stmt).unique().all())
 
 
 def obtener_historial_conteos(
@@ -380,11 +380,13 @@ def obtener_historial_conteos(
     """Últimos conteos de una escuela."""
     return list(session.scalars(
         select(ConteoInventario)
-        .options(joinedload(ConteoInventario.variante))
+        .options(
+            joinedload(ConteoInventario.variante).joinedload(Variante.producto),
+        )
         .where(ConteoInventario.escuela_id == escuela_id)
         .order_by(ConteoInventario.contado_at.desc())
         .limit(limite)
-    ).all())
+    ).unique().all())
 
 
 def obtener_estado_conteo_escuela(
