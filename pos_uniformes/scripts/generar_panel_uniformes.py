@@ -1089,7 +1089,8 @@ def build_conteo(school_levels):
     h.append('<label style="font-weight:600;font-size:13px">Contado por:</label>')
     h.append('<input type="text" id="conteo-por" placeholder="Nombre" class="search-box" style="min-width:140px;flex:0">')
     h.append('</div>')
-    h.append('<button class="btn" onclick="conteoGuardar()" id="conteo-guardar-btn" disabled style="margin-left:auto">Guardar conteo</button>')
+    h.append('<button class="btn btn-outline" onclick="conteoImprimirHojas()" id="conteo-print-btn" disabled style="margin-left:auto">🖨 Hojas de conteo</button>')
+    h.append('<button class="btn" onclick="conteoGuardar()" id="conteo-guardar-btn" disabled>Guardar conteo</button>')
     h.append('</div>')
 
     # ── Sub-tabs ──
@@ -2140,6 +2141,7 @@ function conteoLoadEscuela() {{
         subtabs.style.display = 'none';
         document.querySelectorAll('.conteo-subtab-panel').forEach(function(p) {{ p.style.display = 'none'; }});
         document.getElementById('conteo-guardar-btn').disabled = true;
+        document.getElementById('conteo-print-btn').disabled = true;
         return;
     }}
     // Load estado
@@ -2167,6 +2169,7 @@ function conteoLoadEscuela() {{
         conteoShowSubtab('contar');
         conteoUpdateProgress();
         document.getElementById('conteo-guardar-btn').disabled = false;
+        document.getElementById('conteo-print-btn').disabled = false;
     }});
     // Update pendientes badge
     _callBridge('getConteosPendientes', [eid], function(r) {{
@@ -2438,6 +2441,17 @@ function conteoApplyAdjustments() {{
 function conteoDismissPrompt() {{
     document.getElementById('conteo-adjust-prompt').style.display = 'none';
     conteoShowSubtab('pendientes');
+}}
+
+/* ── Imprimir hojas de conteo ── */
+function conteoImprimirHojas() {{
+    const sel = document.getElementById('conteo-escuela');
+    const eid = parseInt(sel.value);
+    if (!eid) {{ showToast('Selecciona una escuela primero'); return; }}
+    const ename = sel.options[sel.selectedIndex].text;
+    _callBridge('imprimirHojasConteo', [eid, ename], function() {{
+        showToast('Hojas de conteo enviadas');
+    }});
 }}
 
 /* ── Config ── */
