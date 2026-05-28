@@ -75,6 +75,10 @@ def build_conteo_sheets(
     sheets: list[str] = []
 
     for grupo in grupos:
+        # Saltar productos virtuales (Pants 3pz, Chamarra)
+        if grupo.get("virtual", False):
+            continue
+
         producto_raw = grupo["producto_nombre"]
         tipo_pieza = grupo["tipo_pieza"]
         variantes: list[VarianteParaConteo] = grupo["variantes"]
