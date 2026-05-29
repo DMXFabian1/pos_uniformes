@@ -15,8 +15,9 @@ ensure_local_venv_site_packages(Path(__file__))
 # QtWebEngineWidgets debe importarse ANTES de crear QApplication
 try:
     from PyQt6.QtWebEngineWidgets import QWebEngineView  # noqa: F401
-except ImportError:
-    pass
+    print("[main] QtWebEngineWidgets cargado OK")
+except Exception as _webengine_exc:
+    print(f"[main] QtWebEngineWidgets no disponible: {_webengine_exc}")
 
 # ---------------------------------------------------------------------------
 # Auto-detección de DB — debe correr ANTES de importar connection.py
