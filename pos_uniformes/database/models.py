@@ -7,7 +7,7 @@ from decimal import Decimal
 from enum import Enum
 
 from sqlalchemy import CheckConstraint, DateTime, Enum as SqlEnum
-from sqlalchemy import ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from pos_uniformes.database.connection import Base
