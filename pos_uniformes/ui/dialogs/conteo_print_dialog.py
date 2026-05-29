@@ -7,9 +7,12 @@ venta (80mm x 600mm, ScreenResolution) que ya funciona bien.
 
 from __future__ import annotations
 
+import time
+
 from PyQt6.QtCore import QSizeF, Qt, QTimer
 from PyQt6.QtGui import QFontDatabase, QPageLayout, QPainter, QPageSize
 from PyQt6.QtPrintSupport import QPrinter
+from PyQt6.QtWidgets import QApplication
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -116,11 +119,16 @@ def open_conteo_print_dialog(
         try:
             printer_name, copies = _load_print_preferences()
             errores = 0
-            for sheet in sheets:
+            for i, sheet in enumerate(sheets):
                 try:
                     _print_single_sheet(sheet, printer_name, copies)
                 except Exception:
                     errores += 1
+                # Pausa entre jobs para que el spooler procese cada uno
+                # y la térmica active el corte por separado
+                if i < len(sheets) - 1:
+                    QApplication.processEvents()
+                    time.sleep(1.0)
 
             if errores:
                 QMessageBox.warning(
