@@ -309,6 +309,25 @@ class PanelBridge(QObject):
         except Exception as exc:  # noqa: BLE001
             return json.dumps({"ok": False, "error": str(exc)})
 
+    @pyqtSlot(int, result=str)
+    def toggleDisponibilidadOculta(self, variante_id: int) -> str:
+        from pos_uniformes.database.connection import get_session
+        from pos_uniformes.database.models import Variante
+        from sqlalchemy import select
+
+        try:
+            with get_session() as session:
+                v = session.scalar(
+                    select(Variante).where(Variante.id == variante_id)
+                )
+                if v is None:
+                    return json.dumps({"ok": False, "error": "Variante no encontrada"})
+                v.disponibilidad_oculta = not v.disponibilidad_oculta
+                session.commit()
+                return json.dumps({"ok": True, "oculta": v.disponibilidad_oculta})
+        except Exception as exc:  # noqa: BLE001
+            return json.dumps({"ok": False, "error": str(exc)})
+
     @pyqtSlot(str, str, result=str)
     def imprimirHojasConteo(self, key: str, escuela_nombre: str) -> str:
         from pos_uniformes.database.connection import get_session

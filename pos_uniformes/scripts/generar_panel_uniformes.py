@@ -264,7 +264,8 @@ def fetch_all_data(conn):
             COALESCE((SELECT SUM(bc.cantidad) FROM bodega_contenido bc JOIN bodega_caja bx ON bx.id=bc.caja_id JOIN bodega_ubicacion bu ON bu.id=bx.ubicacion_id WHERE bc.variante_id=v.id AND UPPER(bu.rack)!='PISO'), 0) AS stock_bodega,
             COALESCE((SELECT SUM(bc.cantidad) FROM bodega_contenido bc JOIN bodega_caja bx ON bx.id=bc.caja_id JOIN bodega_ubicacion bu ON bu.id=bx.ubicacion_id WHERE bc.variante_id=v.id AND UPPER(bu.rack)='PISO'), 0) AS stock_piso,
             v.stock_minimo,
-            p.escuela_id AS producto_escuela_id
+            p.escuela_id AS producto_escuela_id,
+            COALESCE(v.disponibilidad_oculta, false) AS disp_oculta
         FROM all_school_products asp
         JOIN escuela e ON e.id=asp.escuela_id AND e.activo=true
         JOIN producto p ON p.id=asp.producto_id
@@ -891,21 +892,29 @@ def build_variants(catalog_rows, catalog_cols, multi_level_ids):
         stock_tienda = stock_actual - (stock_bodega or 0) - (stock_piso or 0)
         min_val = int(stock_minimo) if stock_minimo is not None else 2
 
+        disp_oculta_val = row[col_idx["disp_oculta"]] if "disp_oculta" in col_idx else False
+
         if stock_tienda <= 0:
             estado = "agotado"
-            p["agotadas"] += 1
+            if not disp_oculta_val:
+                p["agotadas"] += 1
         elif stock_tienda < min_val:
             estado = "bajo"
-            p["bajo_min"] += 1
+            if not disp_oculta_val:
+                p["bajo_min"] += 1
         else:
             estado = "ok"
 
+        disp_oculta = row[col_idx["disp_oculta"]] if "disp_oculta" in col_idx else False
+
         p["tallas"].append({
             "talla": t,
+            "vid": vid,
             "stock_tienda": stock_tienda,
             "stock_piso": stock_piso or 0,
             "stock_bodega": stock_bodega or 0,
             "estado": estado,
+            "oculta": bool(disp_oculta),
         })
         p["stock_total"] += stock_tienda
 
@@ -1036,12 +1045,16 @@ def build_variants(catalog_rows, catalog_cols, multi_level_ids):
             h.append('<div class="disp-talla-grid">')
             for t in p["tallas"]:
                 cls = f"disp-talla disp-talla-{t['estado']}"
+                if t.get("oculta"):
+                    cls += " disp-talla-disabled"
                 tooltip = f'{t["talla"]}: {t["stock_tienda"]} en tienda'
                 if t["stock_piso"] > 0:
                     tooltip += f', {t["stock_piso"]} en piso'
                 if t["stock_bodega"] > 0:
                     tooltip += f', {t["stock_bodega"]} en almacén'
-                h.append(f'<div class="{cls}" data-talla="{_esc(t["talla"])}" title="{_esc(tooltip)}" ondblclick="dispToggleDisabled(this)">')
+                if t.get("oculta"):
+                    tooltip += ' (desactivada)'
+                h.append(f'<div class="{cls}" data-vid="{t["vid"]}" data-talla="{_esc(t["talla"])}" title="{_esc(tooltip)}" ondblclick="dispToggleDisabled(this)">')
                 h.append(f'<span class="disp-talla-label">{_esc(t["talla"])}</span>')
                 h.append(f'<span class="disp-talla-stock">{t["stock_tienda"]}</span>')
                 h.append('</div>')
@@ -2057,35 +2070,20 @@ function showToast(msg) {{
     setTimeout(() => toast.style.opacity = '0', 2000);
 }}
 
-/* ── Disponibilidad: desactivar tallas (doble clic) ── */
-var _dispDisabled = {{}};
-try {{ _dispDisabled = JSON.parse(localStorage.getItem('disp-disabled') || '{{}}'); }} catch(e) {{}}
-
-function _dispKey(el) {{
-    const card = el.closest('.disp-product-card');
-    return card ? card.dataset.pid + ':' + el.dataset.talla : null;
-}}
-
+/* ── Disponibilidad: desactivar tallas (doble clic → BD) ── */
 function dispToggleDisabled(el) {{
-    const key = _dispKey(el);
-    if (!key) return;
-    if (_dispDisabled[key]) {{
-        delete _dispDisabled[key];
-        el.classList.remove('disp-talla-disabled');
-    }} else {{
-        _dispDisabled[key] = 1;
-        el.classList.add('disp-talla-disabled');
-    }}
-    localStorage.setItem('disp-disabled', JSON.stringify(_dispDisabled));
-    dispRecalcStats();
-}}
-
-function dispRestoreDisabled() {{
-    document.querySelectorAll('.disp-talla[data-talla]').forEach(function(el) {{
-        const key = _dispKey(el);
-        if (key && _dispDisabled[key]) el.classList.add('disp-talla-disabled');
+    const vid = parseInt(el.dataset.vid);
+    if (!vid || !_bridge) return;
+    _bridge.toggleDisponibilidadOculta(vid, function(resultJson) {{
+        var r = JSON.parse(resultJson);
+        if (!r.ok) {{ showToast('Error: ' + (r.error || '')); return; }}
+        if (r.oculta) {{
+            el.classList.add('disp-talla-disabled');
+        }} else {{
+            el.classList.remove('disp-talla-disabled');
+        }}
+        dispRecalcStats();
     }});
-    dispRecalcStats();
 }}
 
 function dispRecalcStats() {{
@@ -2212,8 +2210,6 @@ document.addEventListener('DOMContentLoaded', () => {{
     }});
     // Collapse all disponibilidad school groups by default
     document.querySelectorAll('.disp-school-group').forEach(g => g.classList.add('collapsed'));
-    // Restore disabled tallas
-    dispRestoreDisabled();
 }});
 
 /* ============ CONTEO DE INVENTARIO ============ */

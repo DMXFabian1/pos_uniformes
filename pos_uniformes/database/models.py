@@ -759,6 +759,7 @@ class Variante(Base):
     stock_actual: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     stock_minimo: Mapped[int | None] = mapped_column(Integer, nullable=True)
     ultimo_conteo_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    disponibilidad_oculta: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     bodega_contenidos: Mapped[list["BodegaContenido"]] = relationship(
         "BodegaContenido", viewonly=True, lazy="noload",
