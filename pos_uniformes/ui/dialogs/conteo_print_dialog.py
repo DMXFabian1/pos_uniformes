@@ -1,7 +1,8 @@
 """Diálogo para previsualizar e imprimir hojas de conteo.
 
-Un solo print job con newPage() entre hojas — el form-feed activa el
-autocutter de la impresora térmica para cortar entre cada producto.
+Cada hoja se envía como un print job separado (el fin de job activa el
+autocutter). Usa exactamente la misma configuración que los tickets de
+venta (80mm x 600mm, ScreenResolution) que ya funciona bien.
 """
 
 from __future__ import annotations
@@ -45,12 +46,8 @@ def _load_print_preferences() -> tuple[str, int]:
         return "", 1
 
 
-def _print_all_sheets(sheets: list[str], printer_name: str, copies: int) -> None:
-    """Imprime todas las hojas en UN solo job, con newPage() entre cada una.
-
-    newPage() envía form-feed → activa el autocutter de la térmica.
-    Altura generosa (600mm) por página — la térmica solo avanza lo impreso.
-    """
+def _print_single_sheet(sheet_text: str, printer_name: str, copies: int) -> None:
+    """Imprime una hoja — mismo setup que tickets de venta (600mm, funciona)."""
     printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
     if printer_name:
         printer.setPrinterName(printer_name)
@@ -64,23 +61,18 @@ def _print_all_sheets(sheets: list[str], printer_name: str, copies: int) -> None
     painter = QPainter()
     if not painter.begin(printer):
         raise RuntimeError("No se pudo iniciar el trabajo de impresión.")
-
     try:
         font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
         font.setPointSize(TICKET_FONT_POINT_SIZE)
         font.setBold(True)
         painter.setFont(font)
 
-        for i, sheet_text in enumerate(sheets):
-            if i > 0:
-                printer.newPage()  # form-feed → corte en térmica
-
-            rect = painter.viewport()
-            painter.drawText(
-                rect,
-                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap,
-                sheet_text,
-            )
+        rect = painter.viewport()
+        painter.drawText(
+            rect,
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap,
+            sheet_text,
+        )
     finally:
         painter.end()
 
@@ -90,14 +82,16 @@ def open_conteo_print_dialog(
     title: str,
     sheets: list[str],
 ) -> None:
-    """Abre diálogo con preview de todas las hojas y botón para imprimir."""
+    """Abre diálogo con preview de todas las hojas y botón para imprimir.
+
+    Cada hoja se imprime como job separado (fin de job = corte).
+    """
     dialog = QDialog(parent)
     dialog.setWindowTitle(title)
     dialog.resize(620, 520)
 
     layout = QVBoxLayout()
 
-    # Preview: todas las hojas concatenadas
     editor = QTextEdit()
     editor.setReadOnly(True)
     mono_family = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont).family()
@@ -121,8 +115,21 @@ def open_conteo_print_dialog(
 
         try:
             printer_name, copies = _load_print_preferences()
-            _print_all_sheets(sheets, printer_name, copies)
-            print_button.setText(f"✓ {len(sheets)} hojas impresas")
+            errores = 0
+            for sheet in sheets:
+                try:
+                    _print_single_sheet(sheet, printer_name, copies)
+                except Exception:
+                    errores += 1
+
+            if errores:
+                QMessageBox.warning(
+                    dialog,
+                    "Impresión parcial",
+                    f"Se imprimieron {len(sheets) - errores} de {len(sheets)} hojas.\n"
+                    f"{errores} hoja(s) fallaron.",
+                )
+            print_button.setText(f"✓ {len(sheets) - errores} hojas impresas")
             QTimer.singleShot(_COOLDOWN_MS, _reset_print_button)
         except Exception as exc:
             QMessageBox.warning(
