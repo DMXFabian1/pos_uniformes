@@ -147,14 +147,16 @@ def _query_printer_dpi(win32ui, printer_name: str) -> tuple[int, int]:
 def _find_continuous_roll_paper_id(win32print, printer_name: str, target_width_mm10: int) -> int | None:
     """Busca el ID de rollo continuo (257-264) cuyo ancho coincide con el ancho del rollo actual."""
     try:
-        paper_ids = win32print.DeviceCapabilities(printer_name, None, win32print.DC_PAPERS)
-        paper_sizes = win32print.DeviceCapabilities(printer_name, None, win32print.DC_PAPERSIZE)
+        paper_ids = win32print.DeviceCapabilities(printer_name, '', 2)   # DC_PAPERS
+        paper_sizes = win32print.DeviceCapabilities(printer_name, '', 3)  # DC_PAPERSIZE
         if not paper_ids or not paper_sizes:
             return None
-        candidates = [
-            (pid, w, h) for pid, (w, h) in zip(paper_ids, paper_sizes)
-            if 257 <= pid <= 264
-        ]
+        candidates = []
+        for pid, sz in zip(paper_ids, paper_sizes):
+            w = sz['x'] if isinstance(sz, dict) else sz[0]
+            h = sz['y'] if isinstance(sz, dict) else sz[1]
+            if 257 <= pid <= 264:
+                candidates.append((pid, w, h))
         if not candidates:
             return None
         return min(candidates, key=lambda x: abs(x[1] - target_width_mm10))[0]
@@ -169,18 +171,19 @@ def _find_die_cut_paper_id(win32print, printer_name: str, target_w_mm10: int, ta
     die-cut soportada. Excluimos los IDs de rollo continuo (257-264).
     """
     try:
-        paper_ids = win32print.DeviceCapabilities(printer_name, None, win32print.DC_PAPERS)
-        paper_sizes = win32print.DeviceCapabilities(printer_name, None, win32print.DC_PAPERSIZE)
+        paper_ids = win32print.DeviceCapabilities(printer_name, '', 2)   # DC_PAPERS
+        paper_sizes = win32print.DeviceCapabilities(printer_name, '', 3)  # DC_PAPERSIZE
         if not paper_ids or not paper_sizes:
             return None
-        candidates = [
-            (pid, w, h) for pid, (w, h) in zip(paper_ids, paper_sizes)
-            if pid < 257 or pid > 264
-        ]
+        candidates = []
+        for pid, sz in zip(paper_ids, paper_sizes):
+            w = sz['x'] if isinstance(sz, dict) else sz[0]
+            h = sz['y'] if isinstance(sz, dict) else sz[1]
+            if pid < 257 or pid > 264:
+                candidates.append((pid, w, h))
         if not candidates:
             return None
         best = min(candidates, key=lambda x: abs(x[1] - target_w_mm10) + abs(x[2] - target_h_mm10))
-        # Aceptar solo si la diferencia es menor a 5mm en cada eje
         if abs(best[1] - target_w_mm10) <= 50 and abs(best[2] - target_h_mm10) <= 50:
             return best[0]
         return None
