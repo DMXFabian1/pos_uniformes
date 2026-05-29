@@ -21,7 +21,7 @@ def build_inventory_label_mode_hint(mode: str) -> str:
     if normalized == "continuous":
         return "Continua envia cada etiqueta como trabajo independiente para que la impresora de rollo corte automaticamente entre cada una."
     if normalized == "dk1221":
-        return "DK-1221 genera una etiqueta cuadrada (23x23mm) por pieza con solo el codigo QR. Ideal para etiquetas individuales die-cut."
+        return "Label genera una etiqueta cuadrada (23x23mm) con el codigo QR y nombre del producto. Una etiqueta por pieza, corte automatico."
     return "Normal imprime una etiqueta por pieza y es el formato recomendado para impresion directa."
 
 
@@ -50,7 +50,7 @@ def build_inventory_label_preview_view(result: LabelRenderResult) -> InventoryLa
             f"Archivo generado: {result.image_path.name}"
         )
     elif result.mode == "dk1221":
-        mode_label = "DK-1221"
+        mode_label = "Label"
         summary_text = (
             f"Modo seleccionado: {mode_label} (23x23mm)\n"
             f"Etiquetas a imprimir: {result.effective_copies} (una por trabajo)\n"
@@ -80,7 +80,7 @@ def build_inventory_label_print_confirmation(
     elif result.mode == "continuous":
         mode_label = "Continua"
     elif result.mode == "dk1221":
-        mode_label = "DK-1221"
+        mode_label = "Label"
     else:
         mode_label = "Normal"
     return (
