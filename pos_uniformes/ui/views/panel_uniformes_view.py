@@ -58,8 +58,9 @@ class _PanelGeneratorWorker(QThread):
 class PanelBridge(QObject):
     """Métodos expuestos al JavaScript del panel via QWebChannel."""
 
-    def __init__(self, parent: QObject | None = None) -> None:
+    def __init__(self, parent: QObject | None = None, window: object | None = None) -> None:
         super().__init__(parent)
+        self._window = window
 
     @pyqtSlot(int, result=str)
     def getVariantesParaConteo(self, escuela_id: int) -> str:
@@ -166,6 +167,17 @@ class PanelBridge(QObject):
                     session, conteo_ids, "ADMIN"
                 )
                 session.commit()
+
+                # Refrescar inventario en la tabla principal
+                if ajustados > 0 and self._window is not None:
+                    try:
+                        self._window._invalidate_listing_snapshot_caches(
+                            catalog=False, inventory=True,
+                        )
+                        self._window._refresh_inventory_table()
+                    except Exception:
+                        pass
+
                 return json.dumps({
                     "ok": True,
                     "ajustados": ajustados,
@@ -379,7 +391,7 @@ class PanelUniformesWidget(QWidget):
 
             # Setup QWebChannel bridge
             channel = QWebChannel(self._web_view.page())
-            self._bridge = PanelBridge(self)
+            self._bridge = PanelBridge(self, window=self._window)
             channel.registerObject("bridge", self._bridge)
             self._web_view.page().setWebChannel(channel)
 
