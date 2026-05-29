@@ -1020,7 +1020,7 @@ def build_variants(catalog_rows, catalog_cols, multi_level_ids):
             else:
                 status_cls = "disp-ok"
 
-            h.append(f'<div class="disp-product-card {status_cls}" data-name="{_esc(p["nombre"])}" data-status="{status_cls}">')
+            h.append(f'<div class="disp-product-card {status_cls}" data-pid="{pid}" data-name="{_esc(p["nombre"])}" data-status="{status_cls}">')
             h.append(f'<div class="disp-prod-header">')
             h.append(f'<span class="disp-tipo">{_esc(p["tipo"])}</span>')
             h.append(f'<span class="disp-prod-name">{_esc(p["nombre"])}</span>')
@@ -1041,7 +1041,7 @@ def build_variants(catalog_rows, catalog_cols, multi_level_ids):
                     tooltip += f', {t["stock_piso"]} en piso'
                 if t["stock_bodega"] > 0:
                     tooltip += f', {t["stock_bodega"]} en almacén'
-                h.append(f'<div class="{cls}" title="{_esc(tooltip)}">')
+                h.append(f'<div class="{cls}" data-talla="{_esc(t["talla"])}" title="{_esc(tooltip)}" ondblclick="dispToggleDisabled(this)">')
                 h.append(f'<span class="disp-talla-label">{_esc(t["talla"])}</span>')
                 h.append(f'<span class="disp-talla-stock">{t["stock_tienda"]}</span>')
                 h.append('</div>')
@@ -1620,6 +1620,9 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sys
 .disp-talla-bajo .disp-talla-label {{ color:var(--orange); opacity:.7; }}
 .disp-talla-ok {{ background:var(--green-bg); border-color:color-mix(in srgb, var(--green) 20%, transparent); }}
 .disp-talla-ok .disp-talla-stock {{ color:var(--green); }}
+.disp-talla-disabled {{ background:#f0f0f0 !important; border-color:#ddd !important; opacity:.45; }}
+.disp-talla-disabled .disp-talla-stock {{ color:#999 !important; text-decoration:line-through; }}
+.disp-talla-disabled .disp-talla-label {{ color:#999 !important; }}
 
 @media (max-width: 700px) {{
     .disp-stats {{ flex-wrap:wrap; }}
@@ -2054,6 +2057,127 @@ function showToast(msg) {{
     setTimeout(() => toast.style.opacity = '0', 2000);
 }}
 
+/* ── Disponibilidad: desactivar tallas (doble clic) ── */
+var _dispDisabled = {{}};
+try {{ _dispDisabled = JSON.parse(localStorage.getItem('disp-disabled') || '{{}}'); }} catch(e) {{}}
+
+function _dispKey(el) {{
+    const card = el.closest('.disp-product-card');
+    return card ? card.dataset.pid + ':' + el.dataset.talla : null;
+}}
+
+function dispToggleDisabled(el) {{
+    const key = _dispKey(el);
+    if (!key) return;
+    if (_dispDisabled[key]) {{
+        delete _dispDisabled[key];
+        el.classList.remove('disp-talla-disabled');
+    }} else {{
+        _dispDisabled[key] = 1;
+        el.classList.add('disp-talla-disabled');
+    }}
+    localStorage.setItem('disp-disabled', JSON.stringify(_dispDisabled));
+    dispRecalcStats();
+}}
+
+function dispRestoreDisabled() {{
+    document.querySelectorAll('.disp-talla[data-talla]').forEach(function(el) {{
+        const key = _dispKey(el);
+        if (key && _dispDisabled[key]) el.classList.add('disp-talla-disabled');
+    }});
+    dispRecalcStats();
+}}
+
+function dispRecalcStats() {{
+    // Recalcular stats por escuela y globales
+    let gAgotadas = 0, gBajo = 0, gCriticos = 0, gTotal = 0;
+
+    document.querySelectorAll('.disp-school-group').forEach(function(group) {{
+        let sAgotadas = 0, sBajo = 0, sTotal = 0, sOk = 0;
+
+        group.querySelectorAll('.disp-product-card').forEach(function(card) {{
+            let pAgotadas = 0, pBajo = 0, pTotal = 0;
+
+            card.querySelectorAll('.disp-talla[data-talla]').forEach(function(el) {{
+                if (el.classList.contains('disp-talla-disabled')) return;
+                pTotal++;
+                if (el.classList.contains('disp-talla-agotado')) pAgotadas++;
+                else if (el.classList.contains('disp-talla-bajo')) pBajo++;
+            }});
+
+            // Update product status text
+            const statusEl = card.querySelector('.disp-prod-status');
+            if (statusEl) {{
+                if (pAgotadas > 0) {{
+                    statusEl.className = 'disp-prod-status agotado';
+                    statusEl.textContent = pAgotadas + '/' + pTotal + ' agotadas';
+                }} else if (pBajo > 0) {{
+                    statusEl.className = 'disp-prod-status bajo';
+                    statusEl.textContent = pBajo + ' bajo mín';
+                }} else {{
+                    statusEl.className = 'disp-prod-status ok';
+                    statusEl.textContent = '✓';
+                }}
+            }}
+
+            sAgotadas += pAgotadas;
+            sBajo += pBajo;
+            sTotal += pTotal;
+            sOk += (pTotal - pAgotadas - pBajo);
+            if (pAgotadas > 0) gCriticos++;
+        }});
+
+        // Update school chips
+        const header = group.querySelector('.disp-sch-header');
+        if (header) {{
+            const oldChips = header.querySelectorAll('.disp-sch-chip');
+            oldChips.forEach(function(c) {{ c.remove(); }});
+            const meta = header.querySelector('.disp-sch-meta');
+            if (sAgotadas > 0) {{
+                const chip = document.createElement('span');
+                chip.className = 'disp-sch-chip agotado';
+                chip.textContent = sAgotadas + ' agotada' + (sAgotadas !== 1 ? 's' : '');
+                meta.parentElement.insertBefore(chip, meta);
+            }}
+            if (sBajo > 0) {{
+                const chip = document.createElement('span');
+                chip.className = 'disp-sch-chip bajo';
+                chip.textContent = sBajo + ' bajo mín';
+                meta.parentElement.insertBefore(chip, meta);
+            }}
+            if (sAgotadas === 0 && sBajo === 0) {{
+                const chip = document.createElement('span');
+                chip.className = 'disp-sch-chip ok';
+                chip.textContent = '✓ Completo';
+                meta.parentElement.insertBefore(chip, meta);
+            }}
+            // Update progress bar
+            const pct = sTotal > 0 ? Math.round(sOk / sTotal * 100) : 100;
+            const bar = header.querySelector('.disp-sch-bar-fill');
+            const pctEl = header.querySelector('.disp-sch-pct');
+            const barColor = pct < 50 ? '#c62828' : pct < 80 ? '#e65100' : '#2e7d32';
+            if (bar) {{ bar.style.width = pct + '%'; bar.style.background = barColor; }}
+            if (pctEl) {{ pctEl.textContent = pct + '%'; pctEl.style.color = barColor; }}
+        }}
+
+        gAgotadas += sAgotadas;
+        gBajo += sBajo;
+        gTotal += sTotal;
+    }});
+
+    // Update global stats
+    const statEls = document.querySelectorAll('.disp-stat');
+    if (statEls.length >= 4) {{
+        statEls[0].querySelector('.disp-stat-val').textContent = gAgotadas;
+        statEls[1].querySelector('.disp-stat-val').textContent = gBajo;
+        statEls[2].querySelector('.disp-stat-val').textContent = gCriticos;
+        const covPct = gTotal > 0 ? Math.round((gTotal - gAgotadas) / gTotal * 100) : 100;
+        const covEl = statEls[3].querySelector('.disp-stat-val');
+        covEl.textContent = covPct + '%';
+        covEl.style.color = covPct >= 80 ? 'var(--green)' : covPct >= 50 ? 'var(--orange)' : 'var(--red)';
+    }}
+}}
+
 function filterDisponibilidad() {{
     const q = document.getElementById('variantSearch').value.toLowerCase();
     const f = document.getElementById('variantFilter').value;
@@ -2088,6 +2212,8 @@ document.addEventListener('DOMContentLoaded', () => {{
     }});
     // Collapse all disponibilidad school groups by default
     document.querySelectorAll('.disp-school-group').forEach(g => g.classList.add('collapsed'));
+    // Restore disabled tallas
+    dispRestoreDisabled();
 }});
 
 /* ============ CONTEO DE INVENTARIO ============ */
