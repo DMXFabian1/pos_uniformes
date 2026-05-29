@@ -1,18 +1,16 @@
 """Diálogo para previsualizar e imprimir hojas de conteo.
 
-Cada hoja se envía como un print job separado (el fin de job activa el
-autocutter). Usa exactamente la misma configuración que los tickets de
-venta (80mm x 600mm, ScreenResolution) que ya funciona bien.
+Cada hoja se envía como print job separado con QTimer entre cada una,
+permitiendo que el event loop de Qt y el spooler de Windows procesen
+cada job antes de enviar el siguiente. Usa la misma configuración
+exacta que open_printable_text_dialog (presupuestos/tickets de venta).
 """
 
 from __future__ import annotations
 
-import time
-
 from PyQt6.QtCore import QSizeF, Qt, QTimer
 from PyQt6.QtGui import QFontDatabase, QPageLayout, QPainter, QPageSize
 from PyQt6.QtPrintSupport import QPrinter
-from PyQt6.QtWidgets import QApplication
 from PyQt6.QtWidgets import (
     QDialog,
     QDialogButtonBox,
@@ -49,46 +47,12 @@ def _load_print_preferences() -> tuple[str, int]:
         return "", 1
 
 
-def _print_single_sheet(sheet_text: str, printer_name: str, copies: int) -> None:
-    """Imprime una hoja — mismo setup que tickets de venta (600mm, funciona)."""
-    printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
-    if printer_name:
-        printer.setPrinterName(printer_name)
-    printer.setCopyCount(copies)
-    printer.setPageSize(
-        QPageSize(QSizeF(TICKET_PAPER_WIDTH_MM, 600.0), QPageSize.Unit.Millimeter)
-    )
-    printer.setFullPage(True)
-    printer.setPageOrientation(QPageLayout.Orientation.Portrait)
-
-    painter = QPainter()
-    if not painter.begin(printer):
-        raise RuntimeError("No se pudo iniciar el trabajo de impresión.")
-    try:
-        font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
-        font.setPointSize(TICKET_FONT_POINT_SIZE)
-        font.setBold(True)
-        painter.setFont(font)
-
-        rect = painter.viewport()
-        painter.drawText(
-            rect,
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap,
-            sheet_text,
-        )
-    finally:
-        painter.end()
-
-
 def open_conteo_print_dialog(
     parent: QWidget,
     title: str,
     sheets: list[str],
 ) -> None:
-    """Abre diálogo con preview de todas las hojas y botón para imprimir.
-
-    Cada hoja se imprime como job separado (fin de job = corte).
-    """
+    """Abre diálogo con preview de todas las hojas y botón para imprimir."""
     dialog = QDialog(parent)
     dialog.setWindowTitle(title)
     dialog.resize(620, 520)
@@ -110,40 +74,78 @@ def open_conteo_print_dialog(
         f"Imprimir {len(sheets)} hojas", QDialogButtonBox.ButtonRole.ActionRole
     )
 
-    _COOLDOWN_MS = 3000
+    # Estado de la cola de impresión
+    _print_state = {"idx": 0, "errores": 0, "printing": False}
 
-    def handle_print() -> None:
-        print_button.setEnabled(False)
-        print_button.setText("Imprimiendo…")
-
-        try:
-            printer_name, copies = _load_print_preferences()
-            errores = 0
-            for i, sheet in enumerate(sheets):
-                try:
-                    _print_single_sheet(sheet, printer_name, copies)
-                except Exception:
-                    errores += 1
-                # Pausa entre jobs para que el spooler procese cada uno
-                # y la térmica active el corte por separado
-                if i < len(sheets) - 1:
-                    QApplication.processEvents()
-                    time.sleep(1.0)
-
-            if errores:
+    def _print_next_sheet() -> None:
+        """Imprime la siguiente hoja en la cola (llamado por QTimer)."""
+        idx = _print_state["idx"]
+        if idx >= len(sheets):
+            # Todas las hojas enviadas
+            ok = len(sheets) - _print_state["errores"]
+            if _print_state["errores"]:
                 QMessageBox.warning(
                     dialog,
                     "Impresión parcial",
-                    f"Se imprimieron {len(sheets) - errores} de {len(sheets)} hojas.\n"
-                    f"{errores} hoja(s) fallaron.",
+                    f"Se imprimieron {ok} de {len(sheets)} hojas.\n"
+                    f"{_print_state['errores']} hoja(s) fallaron.",
                 )
-            print_button.setText(f"✓ {len(sheets) - errores} hojas impresas")
-            QTimer.singleShot(_COOLDOWN_MS, _reset_print_button)
-        except Exception as exc:
-            QMessageBox.warning(
-                dialog, "Error de impresión", f"No se pudo imprimir:\n{exc}"
+            print_button.setText(f"✓ {ok} hojas impresas")
+            _print_state["printing"] = False
+            QTimer.singleShot(3000, _reset_print_button)
+            return
+
+        print_button.setText(f"Imprimiendo {idx + 1}/{len(sheets)}…")
+
+        try:
+            # ── Mismo código exacto que printable_text_dialog.py ──
+            printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
+            printer_name, copies = _load_print_preferences()
+            if printer_name:
+                printer.setPrinterName(printer_name)
+            printer.setCopyCount(copies)
+            printer.setPageSize(
+                QPageSize(QSizeF(TICKET_PAPER_WIDTH_MM, 600.0), QPageSize.Unit.Millimeter)
             )
-            _reset_print_button()
+            printer.setFullPage(True)
+            printer.setPageOrientation(QPageLayout.Orientation.Portrait)
+
+            painter = QPainter()
+            if not painter.begin(printer):
+                _print_state["errores"] += 1
+            else:
+                try:
+                    font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+                    font.setPointSize(TICKET_FONT_POINT_SIZE)
+                    font.setBold(True)
+                    painter.setFont(font)
+
+                    rect = painter.viewport()
+                    painter.drawText(
+                        rect,
+                        Qt.AlignmentFlag.AlignLeft
+                        | Qt.AlignmentFlag.AlignTop
+                        | Qt.TextFlag.TextWordWrap,
+                        sheets[idx],
+                    )
+                finally:
+                    painter.end()
+        except Exception:
+            _print_state["errores"] += 1
+
+        _print_state["idx"] += 1
+        # Siguiente hoja después de 1.5s — da tiempo al spooler
+        QTimer.singleShot(1500, _print_next_sheet)
+
+    def handle_print() -> None:
+        if _print_state["printing"]:
+            return
+        _print_state["printing"] = True
+        _print_state["idx"] = 0
+        _print_state["errores"] = 0
+        print_button.setEnabled(False)
+        # Arrancar la primera impresión
+        _print_next_sheet()
 
     def _reset_print_button() -> None:
         print_button.setText(f"Imprimir {len(sheets)} hojas")
