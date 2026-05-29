@@ -46,19 +46,20 @@ def _load_print_preferences() -> tuple[str, int]:
 
 
 def _print_single_sheet(sheet_text: str, printer_name: str, copies: int) -> None:
-    """Envía una hoja como un print job independiente."""
-    from pos_uniformes.ui.helpers.ticket_print_layout_helper import build_ticket_document
+    """Envía una hoja como un print job independiente.
 
-    # Calcular altura del contenido
-    doc = build_ticket_document(sheet_text)
-    content_height_mm = (doc.size().height() / 72.0) * 25.4 + 15  # +margen inferior
+    Usa altura generosa (rollo continuo) — la térmica solo avanza lo necesario.
+    """
+    # Altura basada en líneas: ~4mm por línea a 8pt + margen
+    num_lines = sheet_text.count("\n") + 1
+    height_mm = max(num_lines * 4.0 + 20, 120)
 
     printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
     if printer_name:
         printer.setPrinterName(printer_name)
     printer.setCopyCount(copies)
     printer.setPageSize(
-        QPageSize(QSizeF(TICKET_PAPER_WIDTH_MM, content_height_mm), QPageSize.Unit.Millimeter)
+        QPageSize(QSizeF(TICKET_PAPER_WIDTH_MM, height_mm), QPageSize.Unit.Millimeter)
     )
     printer.setFullPage(True)
     printer.setPageOrientation(QPageLayout.Orientation.Portrait)
