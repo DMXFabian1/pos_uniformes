@@ -62,12 +62,13 @@ def build_conteo_sheets(
     escuela_id: int,
     escuela_nombre: str,
     fecha: str | None = None,
+    nivel_id: int | None = None,
 ) -> list[str]:
     """Genera una lista de hojas de conteo (una por producto) como texto plano.
 
     Cada string es una hoja lista para imprimir en la térmica.
     """
-    grupos = obtener_variantes_agrupadas_por_producto(session, escuela_id)
+    grupos = obtener_variantes_agrupadas_por_producto(session, escuela_id, nivel_id=nivel_id)
     if not grupos:
         return []
 
@@ -154,10 +155,11 @@ def build_conteo_sheets_combined(
     escuela_id: int,
     escuela_nombre: str,
     fecha: str | None = None,
+    nivel_id: int | None = None,
 ) -> str:
     """Genera todas las hojas de conteo concatenadas en un solo string.
 
     Separadas por líneas vacías para que la térmica las imprima en secuencia.
     """
-    sheets = build_conteo_sheets(session, escuela_id, escuela_nombre, fecha)
+    sheets = build_conteo_sheets(session, escuela_id, escuela_nombre, fecha, nivel_id=nivel_id)
     return "\n\n".join(sheets)

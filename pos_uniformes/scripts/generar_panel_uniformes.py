@@ -1055,14 +1055,14 @@ def build_variants(catalog_rows, catalog_cols, multi_level_ids):
 
 def build_conteo(school_levels):
     """Genera la pestaña de conteo de inventario (interactiva via QWebChannel)."""
-    seen = set()
+    # Cada escuela-nivel es una entrada separada en el selector
     schools = []
     for sl in school_levels:
         eid = sl["escuela_id"]
-        if eid not in seen:
-            seen.add(eid)
-            schools.append((eid, sl["escuela_nombre"]))
-    schools.sort(key=lambda x: x[1])
+        nid = sl.get("nivel_id") or 0
+        display = sl.get("display_name", sl["escuela_nombre"])
+        schools.append((eid, nid, display))
+    schools.sort(key=lambda x: x[2])
 
     h = []
 
@@ -1081,8 +1081,8 @@ def build_conteo(school_levels):
     h.append('<label style="font-weight:600;font-size:13px">Escuela:</label>')
     h.append('<select id="conteo-escuela" onchange="conteoLoadEscuela()" class="filter-select" style="min-width:220px">')
     h.append('<option value="">— Seleccionar escuela —</option>')
-    for eid, ename in schools:
-        h.append(f'<option value="{eid}">{_esc(ename)}</option>')
+    for eid, nid, display in schools:
+        h.append(f'<option value="{eid}:{nid}">{_esc(display)}</option>')
     h.append('</select>')
     h.append('</div>')
     h.append('<div style="display:flex;align-items:center;gap:8px">')
@@ -2131,9 +2131,18 @@ function conteoShowSubtab(name) {{
     if (name === 'historial') conteoLoadHistorial();
 }}
 
+/* ── Helpers para escuela:nivel ── */
+function _conteoParseSelection() {{
+    const val = document.getElementById('conteo-escuela').value || '';
+    const parts = val.split(':');
+    return {{ eid: parseInt(parts[0]) || 0, nid: parseInt(parts[1]) || 0 }};
+}}
+
 /* ── Main loader ── */
 function conteoLoadEscuela() {{
-    const eid = parseInt(document.getElementById('conteo-escuela').value);
+    const sel = _conteoParseSelection();
+    const eid = sel.eid;
+    const nid = sel.nid;
     const estado = document.getElementById('conteo-estado');
     const subtabs = document.getElementById('conteo-subtabs');
     if (!eid) {{
@@ -2145,7 +2154,7 @@ function conteoLoadEscuela() {{
         return;
     }}
     // Load estado
-    _callBridge('getEstadoConteo', [eid], function(r) {{
+    _callBridge('getEstadoConteo', [eid, nid], function(r) {{
         const info = document.getElementById('conteo-estado-info');
         const pct = r.pct_vigente;
         const color = pct >= 80 ? 'var(--green)' : pct >= 40 ? 'var(--orange)' : 'var(--red)';
@@ -2158,11 +2167,11 @@ function conteoLoadEscuela() {{
         document.getElementById('conteo-vigencia').value = r.dias_vigencia;
         estado.style.display = 'block';
     }});
-    _callBridge('getConfigConteo', [eid], function(r) {{
+    _callBridge('getConfigConteo', [eid, nid], function(r) {{
         document.getElementById('conteo-vigencia').value = r.dias_vigencia;
     }});
     // Load grouped variants
-    _callBridge('getVariantesAgrupadas', [eid], function(r) {{
+    _callBridge('getVariantesAgrupadas', [eid, nid], function(r) {{
         _conteoProductos = r.data;
         conteoRenderProducts();
         subtabs.style.display = 'flex';
@@ -2413,7 +2422,7 @@ function conteoGuardar() {{
             conteoLoadEscuela();
         }}
         // Update pendientes badge
-        const eid = parseInt(document.getElementById('conteo-escuela').value);
+        const sel = _conteoParseSelection(); const eid = sel.eid; const nid = sel.nid;
         _callBridge('getConteosPendientes', [eid], function(r2) {{
             const badge = document.getElementById('conteo-pendientes-badge');
             if (r2.data.length > 0) {{
@@ -2427,7 +2436,7 @@ function conteoGuardar() {{
 }}
 
 function conteoApplyAdjustments() {{
-    const eid = parseInt(document.getElementById('conteo-escuela').value);
+    const sel = _conteoParseSelection(); const eid = sel.eid; const nid = sel.nid;
     _callBridge('getConteosPendientes', [eid], function(r) {{
         if (!r.data.length) {{ showToast('No hay ajustes pendientes'); conteoLoadEscuela(); return; }}
         const ids = r.data.map(function(c) {{ return c.id; }});
@@ -2445,18 +2454,18 @@ function conteoDismissPrompt() {{
 
 /* ── Imprimir hojas de conteo ── */
 function conteoImprimirHojas() {{
-    const sel = document.getElementById('conteo-escuela');
-    const eid = parseInt(sel.value);
-    if (!eid) {{ showToast('Selecciona una escuela primero'); return; }}
-    const ename = sel.options[sel.selectedIndex].text;
-    _callBridge('imprimirHojasConteo', [eid, ename], function() {{
+    const sel = _conteoParseSelection();
+    if (!sel.eid) {{ showToast('Selecciona una escuela primero'); return; }}
+    const selEl = document.getElementById('conteo-escuela');
+    const ename = selEl.options[selEl.selectedIndex].text;
+    _callBridge('imprimirHojasConteo', [sel.eid, sel.nid, ename], function() {{
         showToast('Hojas de conteo enviadas');
     }});
 }}
 
 /* ── Config ── */
 function conteoGuardarConfig() {{
-    const eid = parseInt(document.getElementById('conteo-escuela').value);
+    const sel = _conteoParseSelection(); const eid = sel.eid; const nid = sel.nid;
     const dias = parseInt(document.getElementById('conteo-vigencia').value);
     if (!eid || !dias || dias < 1) return;
     _callBridge('setConfigConteo', [eid, dias], function() {{
@@ -2467,7 +2476,7 @@ function conteoGuardarConfig() {{
 
 /* ── Pendientes ── */
 function conteoLoadPendientes() {{
-    const eid = parseInt(document.getElementById('conteo-escuela').value) || 0;
+    const sel = _conteoParseSelection(); const eid = sel.eid; const nid = sel.nid || 0;
     _callBridge('getConteosPendientes', [eid], function(r) {{
         _conteoPendientes = r.data;
         const container = document.getElementById('conteo-pendientes-container');
@@ -2556,7 +2565,7 @@ function conteoConfirmarAjustes() {{
 
 /* ── Historial ── */
 function conteoLoadHistorial() {{
-    const eid = parseInt(document.getElementById('conteo-escuela').value) || 0;
+    const sel = _conteoParseSelection(); const eid = sel.eid; const nid = sel.nid || 0;
     if (!eid) return;
     _callBridge('getHistorialConteos', [eid, 50], function(r) {{
         const container = document.getElementById('conteo-historial-container');

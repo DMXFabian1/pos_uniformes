@@ -62,14 +62,15 @@ class PanelBridge(QObject):
         super().__init__(parent)
         self._window = window
 
-    @pyqtSlot(int, result=str)
-    def getVariantesParaConteo(self, escuela_id: int) -> str:
+    @pyqtSlot(int, int, result=str)
+    def getVariantesParaConteo(self, escuela_id: int, nivel_id: int = 0) -> str:
         from pos_uniformes.database.connection import get_session
         from pos_uniformes.services.conteo_service import obtener_variantes_para_conteo
 
         try:
+            nid = nivel_id if nivel_id > 0 else None
             with get_session() as session:
-                variantes = obtener_variantes_para_conteo(session, escuela_id)
+                variantes = obtener_variantes_para_conteo(session, escuela_id, nivel_id=nid)
                 data = [
                     {
                         "variante_id": v.variante_id,
@@ -88,14 +89,15 @@ class PanelBridge(QObject):
         except Exception as exc:  # noqa: BLE001
             return json.dumps({"ok": False, "error": str(exc)})
 
-    @pyqtSlot(int, result=str)
-    def getVariantesAgrupadas(self, escuela_id: int) -> str:
+    @pyqtSlot(int, int, result=str)
+    def getVariantesAgrupadas(self, escuela_id: int, nivel_id: int = 0) -> str:
         from pos_uniformes.database.connection import get_session
         from pos_uniformes.services.conteo_service import obtener_variantes_agrupadas_por_producto
 
         try:
+            nid = nivel_id if nivel_id > 0 else None
             with get_session() as session:
-                grupos = obtener_variantes_agrupadas_por_producto(session, escuela_id)
+                grupos = obtener_variantes_agrupadas_por_producto(session, escuela_id, nivel_id=nid)
                 data = []
                 for g in grupos:
                     data.append({
@@ -213,14 +215,15 @@ class PanelBridge(QObject):
         except Exception as exc:  # noqa: BLE001
             return json.dumps({"ok": False, "error": str(exc)})
 
-    @pyqtSlot(int, result=str)
-    def getEstadoConteo(self, escuela_id: int) -> str:
+    @pyqtSlot(int, int, result=str)
+    def getEstadoConteo(self, escuela_id: int, nivel_id: int = 0) -> str:
         from pos_uniformes.database.connection import get_session
         from pos_uniformes.services.conteo_service import obtener_estado_conteo_escuela
 
         try:
+            nid = nivel_id if nivel_id > 0 else None
             with get_session() as session:
-                e = obtener_estado_conteo_escuela(session, escuela_id)
+                e = obtener_estado_conteo_escuela(session, escuela_id, nivel_id=nid)
                 return json.dumps({
                     "ok": True,
                     "escuela_nombre": e.escuela_nombre,
@@ -234,8 +237,8 @@ class PanelBridge(QObject):
         except Exception as exc:  # noqa: BLE001
             return json.dumps({"ok": False, "error": str(exc)})
 
-    @pyqtSlot(int, result=str)
-    def getConfigConteo(self, escuela_id: int) -> str:
+    @pyqtSlot(int, int, result=str)
+    def getConfigConteo(self, escuela_id: int, nivel_id: int = 0) -> str:
         from pos_uniformes.database.connection import get_session
         from pos_uniformes.database.models import ConfigConteoEscuela
         from pos_uniformes.services.conteo_service import DIAS_VIGENCIA_DEFAULT
@@ -294,15 +297,16 @@ class PanelBridge(QObject):
         except Exception as exc:  # noqa: BLE001
             return json.dumps({"ok": False, "error": str(exc)})
 
-    @pyqtSlot(int, str, result=str)
-    def imprimirHojasConteo(self, escuela_id: int, escuela_nombre: str) -> str:
+    @pyqtSlot(int, int, str, result=str)
+    def imprimirHojasConteo(self, escuela_id: int, nivel_id: int, escuela_nombre: str) -> str:
         from pos_uniformes.database.connection import get_session
         from pos_uniformes.services.conteo_sheet_service import build_conteo_sheets
 
         try:
+            nid = nivel_id if nivel_id > 0 else None
             with get_session() as session:
                 sheets = build_conteo_sheets(
-                    session, escuela_id, escuela_nombre,
+                    session, escuela_id, escuela_nombre, nivel_id=nid,
                 )
             if not sheets:
                 return json.dumps({"ok": False, "error": "No hay productos para esta escuela."})

@@ -233,12 +233,21 @@ def confirmar_ajustes_lote(
 def obtener_variantes_para_conteo(
     session: Session,
     escuela_id: int,
+    nivel_id: int | None = None,
 ) -> list[VarianteParaConteo]:
-    """Variantes activas de una escuela, ordenadas por urgencia de conteo."""
+    """Variantes activas de una escuela (y nivel opcional), ordenadas por urgencia."""
     config = session.scalar(
         select(ConfigConteoEscuela).where(ConfigConteoEscuela.escuela_id == escuela_id)
     )
     dias_vigencia = config.dias_vigencia if config else DIAS_VIGENCIA_DEFAULT
+
+    wheres = [
+        Producto.escuela_id == escuela_id,
+        Producto.activo.is_(True),
+        Variante.activo.is_(True),
+    ]
+    if nivel_id is not None:
+        wheres.append(Producto.nivel_educativo_id == nivel_id)
 
     variantes = session.scalars(
         select(Variante)
@@ -249,11 +258,7 @@ def obtener_variantes_para_conteo(
             .joinedload(BodegaContenido.caja)
             .joinedload(BodegaCaja.ubicacion),
         )
-        .where(
-            Producto.escuela_id == escuela_id,
-            Producto.activo.is_(True),
-            Variante.activo.is_(True),
-        )
+        .where(*wheres)
         .order_by(
             Variante.ultimo_conteo_at.asc().nulls_first(),
             Producto.nombre,
@@ -307,9 +312,10 @@ _TIPOS_VIRTUALES = {"Pants 3pz", "Chamarra"}
 def obtener_variantes_agrupadas_por_producto(
     session: Session,
     escuela_id: int,
+    nivel_id: int | None = None,
 ) -> list[dict]:
     """Variantes agrupadas por producto, ordenadas según PIEZA_ORDER."""
-    variantes = obtener_variantes_para_conteo(session, escuela_id)
+    variantes = obtener_variantes_para_conteo(session, escuela_id, nivel_id=nivel_id)
     grupos: dict[str, dict] = {}
     for v in variantes:
         key = v.producto_nombre
@@ -392,8 +398,9 @@ def obtener_historial_conteos(
 def obtener_estado_conteo_escuela(
     session: Session,
     escuela_id: int,
+    nivel_id: int | None = None,
 ) -> EstadoConteoEscuela:
-    """Resumen del estado de conteo para una escuela."""
+    """Resumen del estado de conteo para una escuela (y nivel opcional)."""
     escuela = session.scalar(select(Escuela).where(Escuela.id == escuela_id))
     if escuela is None:
         raise ValueError(f"Escuela id={escuela_id} no encontrada.")
@@ -403,15 +410,20 @@ def obtener_estado_conteo_escuela(
     )
     dias_vigencia = config.dias_vigencia if config else DIAS_VIGENCIA_DEFAULT
 
+    # Filtros base
+    base_wheres = [
+        Producto.escuela_id == escuela_id,
+        Producto.activo.is_(True),
+        Variante.activo.is_(True),
+    ]
+    if nivel_id is not None:
+        base_wheres.append(Producto.nivel_educativo_id == nivel_id)
+
     # Total variantes activas
     total = session.scalar(
         select(func.count(Variante.id))
         .join(Variante.producto)
-        .where(
-            Producto.escuela_id == escuela_id,
-            Producto.activo.is_(True),
-            Variante.activo.is_(True),
-        )
+        .where(*base_wheres)
     ) or 0
 
     # Contadas dentro de vigencia
@@ -420,18 +432,22 @@ def obtener_estado_conteo_escuela(
         select(func.count(Variante.id))
         .join(Variante.producto)
         .where(
-            Producto.escuela_id == escuela_id,
-            Producto.activo.is_(True),
-            Variante.activo.is_(True),
+            *base_wheres,
             Variante.ultimo_conteo_at.isnot(None),
             Variante.ultimo_conteo_at >= limite_fecha,
         )
     ) or 0
 
     # Último conteo
+    ultimo_wheres = [ConteoInventario.escuela_id == escuela_id]
+    if nivel_id is not None:
+        ultimo_wheres.append(
+            ConteoInventario.variante_id.in_(
+                select(Variante.id).join(Variante.producto).where(*base_wheres)
+            )
+        )
     ultimo = session.scalar(
-        select(func.max(ConteoInventario.contado_at))
-        .where(ConteoInventario.escuela_id == escuela_id)
+        select(func.max(ConteoInventario.contado_at)).where(*ultimo_wheres)
     )
 
     pendientes = total - contadas_vigentes
