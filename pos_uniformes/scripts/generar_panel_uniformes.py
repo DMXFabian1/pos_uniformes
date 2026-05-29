@@ -2135,7 +2135,7 @@ function conteoShowSubtab(name) {{
 function _conteoParseSelection() {{
     const val = document.getElementById('conteo-escuela').value || '';
     const parts = val.split(':');
-    return {{ eid: parseInt(parts[0]) || 0, nid: parseInt(parts[1]) || 0 }};
+    return {{ key: val, eid: parseInt(parts[0]) || 0, nid: parseInt(parts[1]) || 0 }};
 }}
 
 /* ── Main loader ── */
@@ -2154,7 +2154,7 @@ function conteoLoadEscuela() {{
         return;
     }}
     // Load estado
-    _callBridge('getEstadoConteo', [eid, nid], function(r) {{
+    _callBridge('getEstadoConteo', [sel.key], function(r) {{
         const info = document.getElementById('conteo-estado-info');
         const pct = r.pct_vigente;
         const color = pct >= 80 ? 'var(--green)' : pct >= 40 ? 'var(--orange)' : 'var(--red)';
@@ -2167,11 +2167,11 @@ function conteoLoadEscuela() {{
         document.getElementById('conteo-vigencia').value = r.dias_vigencia;
         estado.style.display = 'block';
     }});
-    _callBridge('getConfigConteo', [eid, nid], function(r) {{
+    _callBridge('getConfigConteo', [sel.key], function(r) {{
         document.getElementById('conteo-vigencia').value = r.dias_vigencia;
     }});
     // Load grouped variants
-    _callBridge('getVariantesAgrupadas', [eid, nid], function(r) {{
+    _callBridge('getVariantesAgrupadas', [sel.key], function(r) {{
         _conteoProductos = r.data;
         conteoRenderProducts();
         subtabs.style.display = 'flex';
@@ -2458,7 +2458,7 @@ function conteoImprimirHojas() {{
     if (!sel.eid) {{ showToast('Selecciona una escuela primero'); return; }}
     const selEl = document.getElementById('conteo-escuela');
     const ename = selEl.options[selEl.selectedIndex].text;
-    _callBridge('imprimirHojasConteo', [sel.eid, sel.nid, ename], function() {{
+    _callBridge('imprimirHojasConteo', [sel.key, ename], function() {{
         showToast('Hojas de conteo enviadas');
     }});
 }}
