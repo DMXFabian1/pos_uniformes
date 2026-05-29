@@ -11680,9 +11680,7 @@ class MainWindow(QMainWindow):
         title: str,
         copies: int,
         parent: QDialog | None = None,
-        cut_between_copies: bool = False,
-        configure_paper: bool = True,
-        paper_mode: str = "continuous",
+        paper_mode: str = "standard",
     ) -> bool:
         image = QImage(str(image_path))
         if image.isNull():
@@ -11699,8 +11697,6 @@ class MainWindow(QMainWindow):
                 sku=title.replace("Etiqueta ", "", 1),
                 copies=copies,
                 preferred_printer_name=preferred_printer,
-                cut_between_copies=cut_between_copies,
-                configure_paper=configure_paper,
                 paper_mode=paper_mode,
             )
             if resolution.fallback_used:
@@ -11858,8 +11854,7 @@ class MainWindow(QMainWindow):
                 title=f"Etiqueta {sku}",
                 copies=copies,
                 parent=parent,
-                cut_between_copies=(mode in ("continuous", "dk1221")),
-                paper_mode="die_cut" if mode == "dk1221" else "continuous",
+                paper_mode={"continuous": "continuous", "dk1221": "die_cut"}.get(mode, "standard"),
             ),
         )
 
@@ -11901,8 +11896,7 @@ class MainWindow(QMainWindow):
                 title=f"Etiqueta {sku}",
                 copies=copies,
                 parent=parent,
-                cut_between_copies=(mode in ("continuous", "dk1221")),
-                paper_mode="die_cut" if mode == "dk1221" else "continuous",
+                paper_mode={"continuous": "continuous", "dk1221": "die_cut"}.get(mode, "standard"),
             ),
         )
 
