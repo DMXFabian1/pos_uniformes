@@ -191,6 +191,61 @@ def _build_continuous_devmode(win32print, win32ui, printer_name: str, hprinter, 
         return None
 
 
+def _find_die_cut_paper_id(win32print, printer_name: str, target_w_mm10: int, target_h_mm10: int) -> int | None:
+    """Busca el ID de papel die-cut cuyo tamaño coincide con las dimensiones objetivo."""
+    try:
+        paper_ids = win32print.DeviceCapabilities(printer_name, None, win32print.DC_PAPERS)
+        paper_sizes = win32print.DeviceCapabilities(printer_name, None, win32print.DC_PAPERSIZE)
+        if not paper_ids or not paper_sizes:
+            return None
+        # Excluir rollo continuo (257-264), buscar die-cut que coincida
+        candidates = [
+            (pid, w, h) for pid, (w, h) in zip(paper_ids, paper_sizes)
+            if pid < 257 or pid > 264
+        ]
+        if not candidates:
+            return None
+        # Buscar el que más se acerque al tamaño objetivo (ambas dimensiones)
+        best = min(candidates, key=lambda x: abs(x[1] - target_w_mm10) + abs(x[2] - target_h_mm10))
+        # Solo aceptar si la diferencia es menor a 5mm en cada eje
+        if abs(best[1] - target_w_mm10) <= 50 and abs(best[2] - target_h_mm10) <= 50:
+            return best[0]
+        return None
+    except Exception:
+        return None
+
+
+def _build_die_cut_devmode(win32print, win32ui, printer_name: str, hprinter, label_width_px: int, label_height_px: int):
+    """Devuelve un DEVMODE configurado para etiqueta die-cut con dimensiones exactas."""
+    try:
+        dpi_x, dpi_y = _query_printer_dpi(win32ui, printer_name)
+        width_mm10 = max(1, int(round((label_width_px / dpi_x) * 254)))
+        height_mm10 = max(1, int(round((label_height_px / dpi_y) * 254)))
+
+        props = win32print.GetPrinter(hprinter, 2)
+        devmode = props.get("pDevMode")
+        if devmode is None:
+            return None
+
+        die_cut_id = _find_die_cut_paper_id(win32print, printer_name, width_mm10, height_mm10)
+        if die_cut_id is not None:
+            devmode.PaperSize = die_cut_id
+            devmode.Fields = (getattr(devmode, "Fields", 0) or 0) | 0x2
+        else:
+            devmode.PaperSize = 256  # DMPAPER_USER
+            devmode.PaperWidth = width_mm10
+            devmode.PaperLength = height_mm10
+            devmode.Fields = (getattr(devmode, "Fields", 0) or 0) | 0x2 | 0x4 | 0x8
+
+        win32print.DocumentProperties(
+            0, hprinter, printer_name, devmode, devmode,
+            win32print.DM_IN_BUFFER | win32print.DM_OUT_BUFFER,
+        )
+        return devmode
+    except Exception:
+        return None
+
+
 def _send_single_label_job(
     win32print,
     win32ui,
@@ -200,6 +255,7 @@ def _send_single_label_job(
     label_height: int,
     job_name: str,
     configure_paper: bool = False,
+    paper_mode: str = "continuous",
 ) -> None:
     hprinter = None
     hdc = None
@@ -212,9 +268,14 @@ def _send_single_label_job(
                 original_devmode = win32print.GetPrinter(hprinter, 8).get("pDevMode")
             except Exception:
                 pass
-            devmode = _build_continuous_devmode(
-                win32print, win32ui, printer_name, hprinter, label_width, label_height
-            )
+            if paper_mode == "die_cut":
+                devmode = _build_die_cut_devmode(
+                    win32print, win32ui, printer_name, hprinter, label_width, label_height
+                )
+            else:
+                devmode = _build_continuous_devmode(
+                    win32print, win32ui, printer_name, hprinter, label_width, label_height
+                )
             if devmode is not None:
                 try:
                     win32print.SetPrinter(hprinter, 8, {"pDevMode": devmode}, 0)
@@ -254,11 +315,13 @@ def print_inventory_label_via_windows(
     preferred_printer_name: str,
     cut_between_copies: bool = False,
     configure_paper: bool = True,
+    paper_mode: str = "continuous",
 ) -> WindowsInventoryLabelPrinterResolution:
     """Imprime la etiqueta como bitmap monocromatico usando el spooler de Windows.
 
     Cuando cut_between_copies=True, cada copia se envia como trabajo independiente
     para garantizar el corte automatico en impresoras de rollo continuo.
+    paper_mode: "continuous" para rollo continuo, "die_cut" para etiquetas die-cut (DK-1221).
     """
     win32print, win32ui = _load_win32_modules()
     resolution = resolve_windows_inventory_label_printer(preferred_printer_name)
@@ -280,6 +343,7 @@ def print_inventory_label_via_windows(
                 label_height,
                 job_name,
                 configure_paper=configure_paper,
+                paper_mode=paper_mode,
             )
         return resolution
 
