@@ -11681,6 +11681,7 @@ class MainWindow(QMainWindow):
         copies: int,
         parent: QDialog | None = None,
         cut_between_copies: bool = False,
+        configure_paper: bool = True,
     ) -> bool:
         image = QImage(str(image_path))
         if image.isNull():
@@ -11698,6 +11699,7 @@ class MainWindow(QMainWindow):
                 copies=copies,
                 preferred_printer_name=preferred_printer,
                 cut_between_copies=cut_between_copies,
+                configure_paper=configure_paper,
             )
             if resolution.fallback_used:
                 QMessageBox.information(
@@ -11855,6 +11857,7 @@ class MainWindow(QMainWindow):
                 copies=copies,
                 parent=parent,
                 cut_between_copies=(mode in ("continuous", "dk1221")),
+                configure_paper=(mode != "dk1221"),
             ),
         )
 
@@ -11897,6 +11900,7 @@ class MainWindow(QMainWindow):
                 copies=copies,
                 parent=parent,
                 cut_between_copies=(mode in ("continuous", "dk1221")),
+                configure_paper=(mode != "dk1221"),
             ),
         )
 

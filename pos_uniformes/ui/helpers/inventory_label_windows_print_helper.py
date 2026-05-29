@@ -253,6 +253,7 @@ def print_inventory_label_via_windows(
     copies: int,
     preferred_printer_name: str,
     cut_between_copies: bool = False,
+    configure_paper: bool = True,
 ) -> WindowsInventoryLabelPrinterResolution:
     """Imprime la etiqueta como bitmap monocromatico usando el spooler de Windows.
 
@@ -278,7 +279,7 @@ def print_inventory_label_via_windows(
                 label_width,
                 label_height,
                 job_name,
-                configure_paper=True,
+                configure_paper=configure_paper,
             )
         return resolution
 
