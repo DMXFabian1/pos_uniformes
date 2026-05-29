@@ -242,24 +242,9 @@ def obtener_variantes_para_conteo(
     )
     dias_vigencia = config.dias_vigencia if config else DIAS_VIGENCIA_DEFAULT
 
-    # IDs de productos directos + ligados via catalog_school_product_link
-    direct_ids = select(Producto.id).where(
+    wheres = [
         Producto.escuela_id == escuela_id,
         Producto.activo.is_(True),
-    )
-    linked_ids = (
-        select(CatalogSchoolProductLink.producto_id)
-        .join(Producto, Producto.id == CatalogSchoolProductLink.producto_id)
-        .where(
-            CatalogSchoolProductLink.escuela_id == escuela_id,
-            CatalogSchoolProductLink.activo.is_(True),
-            Producto.activo.is_(True),
-        )
-    )
-    all_product_ids = direct_ids.union(linked_ids)
-
-    wheres = [
-        Producto.id.in_(all_product_ids),
         Variante.activo.is_(True),
     ]
     if nivel_id is not None:
@@ -426,24 +411,10 @@ def obtener_estado_conteo_escuela(
     )
     dias_vigencia = config.dias_vigencia if config else DIAS_VIGENCIA_DEFAULT
 
-    # IDs de productos directos + ligados
-    direct_ids = select(Producto.id).where(
-        Producto.escuela_id == escuela_id, Producto.activo.is_(True),
-    )
-    linked_ids = (
-        select(CatalogSchoolProductLink.producto_id)
-        .join(Producto, Producto.id == CatalogSchoolProductLink.producto_id)
-        .where(
-            CatalogSchoolProductLink.escuela_id == escuela_id,
-            CatalogSchoolProductLink.activo.is_(True),
-            Producto.activo.is_(True),
-        )
-    )
-    all_product_ids = direct_ids.union(linked_ids)
-
     # Filtros base
     base_wheres = [
-        Producto.id.in_(all_product_ids),
+        Producto.escuela_id == escuela_id,
+        Producto.activo.is_(True),
         Variante.activo.is_(True),
     ]
     if nivel_id is not None:
