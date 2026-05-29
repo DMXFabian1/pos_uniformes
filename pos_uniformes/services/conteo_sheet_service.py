@@ -72,13 +72,13 @@ def build_conteo_sheets(
         return []
 
     fecha_str = fecha or datetime.now().strftime("%d/%m/%Y")
+
+    # Filtrar virtuales primero para saber el total
+    grupos_reales = [g for g in grupos if not g.get("virtual", False)]
+    total_hojas = len(grupos_reales)
     sheets: list[str] = []
 
-    for grupo in grupos:
-        # Saltar productos virtuales (Pants 3pz, Chamarra)
-        if grupo.get("virtual", False):
-            continue
-
+    for idx, grupo in enumerate(grupos_reales, start=1):
         producto_raw = grupo["producto_nombre"]
         tipo_pieza = grupo["tipo_pieza"]
         variantes: list[VarianteParaConteo] = grupo["variantes"]
@@ -103,7 +103,7 @@ def build_conteo_sheets(
 
         lines: list[str] = []
         lines.append(_top())
-        lines.append(_center("HOJA DE CONTEO"))
+        lines.append(_center(f"HOJA DE CONTEO {idx}/{total_hojas}"))
         lines.append(_mid())
 
         # Encabezado
