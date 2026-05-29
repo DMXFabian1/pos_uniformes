@@ -1074,7 +1074,8 @@ def build_conteo(school_levels):
         eid = sl["escuela_id"]
         nid = sl.get("nivel_id") or 0
         display = sl.get("display_name", sl["escuela_nombre"])
-        schools.append((eid, nid, display))
+        nivel = sl.get("nivel_nombre", "")
+        schools.append((eid, nid, display, nivel))
     schools.sort(key=lambda x: x[2])
 
     h = []
@@ -1094,8 +1095,8 @@ def build_conteo(school_levels):
     h.append('<label style="font-weight:600;font-size:13px">Escuela:</label>')
     h.append('<select id="conteo-escuela" onchange="conteoLoadEscuela()" class="filter-select" style="min-width:220px">')
     h.append('<option value="">— Seleccionar escuela —</option>')
-    for eid, nid, display in schools:
-        h.append(f'<option value="{eid}:{nid}">{_esc(display)}</option>')
+    for eid, nid, display, nivel in schools:
+        h.append(f'<option value="{eid}:{nid}" data-nivel="{_esc(nivel)}">{_esc(display)}</option>')
     h.append('</select>')
     h.append('</div>')
     h.append('<div style="display:flex;align-items:center;gap:8px">')
@@ -2579,8 +2580,18 @@ function conteoImprimirHojas() {{
     const sel = _conteoParseSelection();
     if (!sel.eid) {{ showToast('Selecciona una escuela primero'); return; }}
     const selEl = document.getElementById('conteo-escuela');
-    const ename = selEl.options[selEl.selectedIndex].text;
-    _callBridge('imprimirHojasConteo', [sel.key, ename], function() {{
+    const opt = selEl.options[selEl.selectedIndex];
+    const ename = opt.text;
+    const nivel = opt.getAttribute('data-nivel') || '';
+    /* Calcular posición de esta escuela entre las del mismo nivel */
+    var escNum = 1, escTotal = 0;
+    for (var i = 1; i < selEl.options.length; i++) {{
+        if (selEl.options[i].getAttribute('data-nivel') === nivel) {{
+            escTotal++;
+            if (i < selEl.selectedIndex) escNum++;
+        }}
+    }}
+    _callBridge('imprimirHojasConteo', [sel.key, ename, nivel, escNum + '/' + escTotal], function() {{
         showToast('Hojas de conteo enviadas');
     }});
 }}

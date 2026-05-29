@@ -328,8 +328,9 @@ class PanelBridge(QObject):
         except Exception as exc:  # noqa: BLE001
             return json.dumps({"ok": False, "error": str(exc)})
 
-    @pyqtSlot(str, str, result=str)
-    def imprimirHojasConteo(self, key: str, escuela_nombre: str) -> str:
+    @pyqtSlot(str, str, str, str, result=str)
+    def imprimirHojasConteo(self, key: str, escuela_nombre: str,
+                            nivel_nombre: str = "", escuela_num: str = "") -> str:
         from pos_uniformes.database.connection import get_session
         from pos_uniformes.services.conteo_sheet_service import build_conteo_sheets
 
@@ -338,6 +339,8 @@ class PanelBridge(QObject):
             with get_session() as session:
                 sheets = build_conteo_sheets(
                     session, eid, escuela_nombre, nivel_id=nid,
+                    nivel_nombre=nivel_nombre or None,
+                    escuela_num=escuela_num or None,
                 )
             if not sheets:
                 return json.dumps({"ok": False, "error": "No hay productos para esta escuela."})

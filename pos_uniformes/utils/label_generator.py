@@ -22,12 +22,15 @@ STANDARD_SIZE = (992, 271)
 SPLIT_SIZE = (976, 342)
 SPLIT_SECTION_WIDTH = 244
 CONTINUOUS_SIZE = (244, 260)
+DK1221_SIZE = 272  # 23mm × 23mm @ 300 DPI
 QR_SIZE_STANDARD = 231
 QR_SIZE_SPLIT = 160
 QR_SIZE_CONTINUOUS = 200
+QR_SIZE_DK1221 = 240
 
 _CONTINUOUS_MODES = {"continuous"}
 _SPLIT_MODES = {"split"}
+_DK1221_MODES = {"dk1221"}
 
 
 @dataclass(frozen=True)
@@ -56,18 +59,21 @@ class LabelGenerator:
             return "split"
         if raw in _CONTINUOUS_MODES:
             return "continuous"
+        if raw in _DK1221_MODES:
+            return "dk1221"
         return "standard"
 
     @classmethod
     def output_dir(cls, mode: str) -> Path:
-        folder = "split" if mode == "split" else ("continuous" if mode == "continuous" else "standard")
+        _FOLDER_MAP = {"split": "split", "continuous": "continuous", "dk1221": "dk1221"}
+        folder = _FOLDER_MAP.get(mode, "standard")
         directory = LABELS_OUTPUT_DIR / folder
         directory.mkdir(parents=True, exist_ok=True)
         return directory
 
     @classmethod
     def path_for_variant(cls, variante: Variante, mode: str) -> Path:
-        suffix = mode if mode in {"split", "continuous"} else "standard"
+        suffix = mode if mode in {"split", "continuous", "dk1221"} else "standard"
         return cls.output_dir(mode) / f"{variante.sku}_{suffix}.png"
 
     @classmethod
@@ -94,6 +100,9 @@ class LabelGenerator:
             effective_copies = max(1, math.ceil(max(1, requested_copies) / 4))
         elif normalized_mode == "continuous":
             cls._render_continuous(variante, qr_path, output_path, show_price=show_price)
+            effective_copies = max(1, requested_copies)
+        elif normalized_mode == "dk1221":
+            cls._render_dk1221(variante, qr_path, output_path)
             effective_copies = max(1, requested_copies)
         else:
             cls._render_standard(variante, qr_path, output_path, show_price=show_price)
@@ -192,6 +201,26 @@ class LabelGenerator:
             draw.text((text_x, text_y), line.text, font=font, fill=0)
             text_y += cls._line_height(font) + line.gap_after
 
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        label_image.save(output_path, "PNG")
+
+    @classmethod
+    def _render_dk1221(cls, variante: Variante, qr_path: Path, output_path: Path) -> None:
+        size = DK1221_SIZE
+        label_image = Image.new("1", (size, size), 1)
+        draw = ImageDraw.Draw(label_image)
+        qr_image = Image.open(qr_path).convert("1").resize((QR_SIZE_DK1221, QR_SIZE_DK1221))
+        qr_x = (size - QR_SIZE_DK1221) // 2
+        qr_y = 4
+        label_image.paste(qr_image, (qr_x, qr_y))
+        title = cls._label_title(variante)
+        text = cls._build_label_text(title, variante.talla)
+        if text:
+            font = cls._fit_font(draw, text, size - 12, base_size=18, min_size=8)
+            tw = cls._text_width(draw, text, font)
+            tx = (size - tw) // 2
+            ty = qr_y + QR_SIZE_DK1221 + 2
+            draw.text((tx, ty), text, font=font, fill=0)
         output_path.parent.mkdir(parents=True, exist_ok=True)
         label_image.save(output_path, "PNG")
 

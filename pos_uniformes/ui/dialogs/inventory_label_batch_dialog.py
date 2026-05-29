@@ -125,6 +125,7 @@ def build_inventory_label_batch_dialog(
     mode_combo.addItem("Normal", "standard")
     mode_combo.addItem("Split", "split")
     mode_combo.addItem("Continua", "continuous")
+    mode_combo.addItem("DK-1221", "dk1221")
     mode_hint = QLabel(build_inventory_label_mode_hint("standard"))
     mode_hint.setWordWrap(True)
     mode_hint.setObjectName("subtleLine")

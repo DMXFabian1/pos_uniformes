@@ -63,6 +63,8 @@ def build_conteo_sheets(
     escuela_nombre: str,
     fecha: str | None = None,
     nivel_id: int | None = None,
+    nivel_nombre: str | None = None,
+    escuela_num: str | None = None,
 ) -> list[str]:
     """Genera una lista de hojas de conteo (una por producto) como texto plano.
 
@@ -104,11 +106,16 @@ def build_conteo_sheets(
 
         lines: list[str] = []
         lines.append(_top())
-        lines.append(_center(f"HOJA DE CONTEO {idx}/{total_hojas}"))
+        titulo = f"HOJA DE CONTEO {idx}/{total_hojas}"
+        if escuela_num:
+            titulo += f"  ({escuela_num})"
+        lines.append(_center(titulo))
         lines.append(_mid())
 
         # Encabezado
         lines.append(_line(f"Escuela: {escuela_nombre}"))
+        if nivel_nombre:
+            lines.append(_line(f"Nivel:   {nivel_nombre}"))
         lines.append(_line(f"Fecha:   {fecha_str}"))
         lines.append(_mid())
 

@@ -135,6 +135,7 @@ def build_inventory_label_dialog(
     mode_combo.addItem("Normal", "standard")
     mode_combo.addItem("Split", "split")
     mode_combo.addItem("Continua", "continuous")
+    mode_combo.addItem("DK-1221", "dk1221")
     copies_spin = QSpinBox()
     copies_spin.setRange(1, 500)
     copies_spin.setValue(1)

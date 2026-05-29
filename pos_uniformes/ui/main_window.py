@@ -11854,7 +11854,7 @@ class MainWindow(QMainWindow):
                 title=f"Etiqueta {sku}",
                 copies=copies,
                 parent=parent,
-                cut_between_copies=(mode == "continuous"),
+                cut_between_copies=(mode in ("continuous", "dk1221")),
             ),
         )
 
@@ -11896,7 +11896,7 @@ class MainWindow(QMainWindow):
                 title=f"Etiqueta {sku}",
                 copies=copies,
                 parent=parent,
-                cut_between_copies=(mode == "continuous"),
+                cut_between_copies=(mode in ("continuous", "dk1221")),
             ),
         )
 
