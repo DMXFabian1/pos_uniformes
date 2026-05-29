@@ -148,8 +148,11 @@ def open_conteo_print_dialog(
         _print_next_sheet()
 
     def _reset_print_button() -> None:
-        print_button.setText(f"Imprimir {len(sheets)} hojas")
-        print_button.setEnabled(True)
+        try:
+            print_button.setText(f"Imprimir {len(sheets)} hojas")
+            print_button.setEnabled(True)
+        except RuntimeError:
+            pass  # diálogo ya cerrado
 
     print_button.clicked.connect(handle_print)
     buttons.rejected.connect(dialog.reject)
