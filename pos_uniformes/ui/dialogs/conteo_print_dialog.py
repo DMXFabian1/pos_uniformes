@@ -1,7 +1,7 @@
 """Diálogo para previsualizar e imprimir hojas de conteo.
 
-Cada hoja se envía como un print job separado para que la impresora
-térmica corte entre cada producto.
+Un solo print job con newPage() entre hojas — el form-feed activa el
+autocutter de la impresora térmica para cortar entre cada producto.
 """
 
 from __future__ import annotations
@@ -45,21 +45,18 @@ def _load_print_preferences() -> tuple[str, int]:
         return "", 1
 
 
-def _print_single_sheet(sheet_text: str, printer_name: str, copies: int) -> None:
-    """Envía una hoja como un print job independiente.
+def _print_all_sheets(sheets: list[str], printer_name: str, copies: int) -> None:
+    """Imprime todas las hojas en UN solo job, con newPage() entre cada una.
 
-    Usa altura generosa (rollo continuo) — la térmica solo avanza lo necesario.
+    newPage() envía form-feed → activa el autocutter de la térmica.
+    Altura generosa (600mm) por página — la térmica solo avanza lo impreso.
     """
-    # Altura basada en líneas: ~4mm por línea a 8pt + margen
-    num_lines = sheet_text.count("\n") + 1
-    height_mm = max(num_lines * 4.0 + 20, 120)
-
     printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
     if printer_name:
         printer.setPrinterName(printer_name)
     printer.setCopyCount(copies)
     printer.setPageSize(
-        QPageSize(QSizeF(TICKET_PAPER_WIDTH_MM, height_mm), QPageSize.Unit.Millimeter)
+        QPageSize(QSizeF(TICKET_PAPER_WIDTH_MM, 600.0), QPageSize.Unit.Millimeter)
     )
     printer.setFullPage(True)
     printer.setPageOrientation(QPageLayout.Orientation.Portrait)
@@ -67,18 +64,23 @@ def _print_single_sheet(sheet_text: str, printer_name: str, copies: int) -> None
     painter = QPainter()
     if not painter.begin(printer):
         raise RuntimeError("No se pudo iniciar el trabajo de impresión.")
+
     try:
         font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
         font.setPointSize(TICKET_FONT_POINT_SIZE)
         font.setBold(True)
         painter.setFont(font)
 
-        rect = painter.viewport()
-        painter.drawText(
-            rect,
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap,
-            sheet_text,
-        )
+        for i, sheet_text in enumerate(sheets):
+            if i > 0:
+                printer.newPage()  # form-feed → corte en térmica
+
+            rect = painter.viewport()
+            painter.drawText(
+                rect,
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap,
+                sheet_text,
+            )
     finally:
         painter.end()
 
@@ -88,11 +90,7 @@ def open_conteo_print_dialog(
     title: str,
     sheets: list[str],
 ) -> None:
-    """Abre diálogo con preview de todas las hojas y botón para imprimir.
-
-    Al imprimir, cada hoja se envía como un print job separado para que
-    la impresora térmica corte entre cada producto.
-    """
+    """Abre diálogo con preview de todas las hojas y botón para imprimir."""
     dialog = QDialog(parent)
     dialog.setWindowTitle(title)
     dialog.resize(620, 520)
@@ -123,21 +121,8 @@ def open_conteo_print_dialog(
 
         try:
             printer_name, copies = _load_print_preferences()
-            errores = 0
-            for i, sheet in enumerate(sheets):
-                try:
-                    _print_single_sheet(sheet, printer_name, copies)
-                except Exception:
-                    errores += 1
-
-            if errores:
-                QMessageBox.warning(
-                    dialog,
-                    "Impresión parcial",
-                    f"Se imprimieron {len(sheets) - errores} de {len(sheets)} hojas.\n"
-                    f"{errores} hoja(s) fallaron.",
-                )
-            print_button.setText(f"✓ {len(sheets) - errores} hojas impresas")
+            _print_all_sheets(sheets, printer_name, copies)
+            print_button.setText(f"✓ {len(sheets)} hojas impresas")
             QTimer.singleShot(_COOLDOWN_MS, _reset_print_button)
         except Exception as exc:
             QMessageBox.warning(
