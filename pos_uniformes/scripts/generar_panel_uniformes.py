@@ -2525,9 +2525,11 @@ function conteoGuardar() {{
     const inputs = document.querySelectorAll('.conteo-input[data-varid]');
     const conteos = [];
     inputs.forEach(function(inp) {{
-        if (inp.value.trim() !== '') {{
-            conteos.push({{ variante_id: parseInt(inp.dataset.varid), stock_fisico: parseInt(inp.value) || 0 }});
-        }}
+        const raw = inp.value.trim();
+        if (raw === '') return;
+        const fisico = parseInt(raw, 10);
+        if (isNaN(fisico) || fisico < 0) return;  // ignorar entradas invalidas, no registrar 0
+        conteos.push({{ variante_id: parseInt(inp.dataset.varid), stock_fisico: fisico }});
     }});
     if (!conteos.length) {{ showToast('No hay variantes contadas'); return; }}
     const payload = JSON.stringify({{ contado_por: contadoPor, conteos: conteos }});
