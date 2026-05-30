@@ -5,6 +5,7 @@ PyQt6-WebEngine>=6.7
 alembic>=1.13
 qrcode[pil]>=7.4
 pywin32>=311; platform_system == "Windows"
+brother_ql>=0.9.4; platform_system == "Windows"  # etiquetas die-cut DK-1221
 
 # API movil
 fastapi>=0.111

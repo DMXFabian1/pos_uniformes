@@ -11692,6 +11692,28 @@ class MainWindow(QMainWindow):
             preferred_printer = ""
 
         if sys.platform.startswith("win"):
+            # DK-1221 die-cut: brother_ql genera raster + spooler RAW.
+            # Esquiva el GDI/DEVMODE (que no respeta el paper size en QL-800).
+            if paper_mode == "die_cut":
+                from pos_uniformes.ui.helpers.brother_ql_print_helper import (
+                    is_brother_ql_available,
+                    print_dk1221_via_brother_ql,
+                )
+                from pos_uniformes.ui.helpers.inventory_label_windows_print_helper import (
+                    resolve_windows_inventory_label_printer,
+                )
+                if is_brother_ql_available():
+                    try:
+                        target = resolve_windows_inventory_label_printer(preferred_printer)
+                        print_dk1221_via_brother_ql(
+                            image_path,
+                            printer_name=target.printer_name,
+                            copies=copies,
+                        )
+                        return True
+                    except Exception as exc:  # noqa: BLE001 - caer a GDI como fallback
+                        print(f"[etiquetas] brother_ql fallo, usando GDI: {exc}")
+
             resolution = print_inventory_label_via_windows(
                 image_path,
                 sku=title.replace("Etiqueta ", "", 1),

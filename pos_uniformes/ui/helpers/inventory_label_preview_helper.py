@@ -53,7 +53,7 @@ def build_inventory_label_preview_view(result: LabelRenderResult) -> InventoryLa
         mode_label = "Label"
         summary_text = (
             f"Modo seleccionado: {mode_label} (23x23mm)\n"
-            f"Etiquetas a imprimir: {result.effective_copies} (una por trabajo)\n"
+            f"Etiquetas a imprimir: {result.effective_copies} (corte automatico entre cada una)\n"
             f"Archivo generado: {result.image_path.name}"
         )
     else:

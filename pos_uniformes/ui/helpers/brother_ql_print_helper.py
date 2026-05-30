@@ -1,7 +1,16 @@
-"""Impresion directa a Brother QL via protocolo raster (sin driver Windows).
+"""Impresion de etiquetas die-cut DK-1221 en Brother QL-800.
 
-Usa la libreria brother_ql para enviar imagenes directamente por USB.
-Mas confiable que win32print para etiquetas die-cut como DK-1221.
+Estrategia: brother_ql genera las instrucciones raster nativas de la
+impresora (incluido el comando de auto-corte entre etiquetas) y esos
+bytes se envian al spooler de Windows en modo RAW.
+
+Ventajas sobre win32print + GDI/DEVMODE:
+  - brother_ql conoce el formato exacto de DK-1221 (no hay que pelear
+    con el paper size del driver).
+  - El modo RAW del spooler entrega los bytes sin tocarlos, asi que no
+    interviene el GDI ni el DEVMODE (que es fragil con drivers Brother).
+  - No necesita libusb/pyusb: usa el puerto del driver Brother ya
+    instalado en Windows.
 """
 
 from __future__ import annotations
@@ -12,9 +21,7 @@ from PIL import Image
 
 
 BROTHER_QL_MODEL = "QL-800"
-BROTHER_QL_LABEL_23x23 = "23x23"
-# USB vendor:product para QL-800
-BROTHER_QL_USB_ID = "usb://0x04f9:0x209b"
+BROTHER_QL_LABEL_23x23 = "23x23"  # DK-1221 die-cut (area imprimible 202x202)
 
 
 def is_brother_ql_available() -> bool:
@@ -26,65 +33,75 @@ def is_brother_ql_available() -> bool:
         return False
 
 
-def _discover_usb_printer() -> str:
-    """Busca la impresora Brother QL conectada por USB.
+def build_dk1221_raster(image_path: Path, *, copies: int = 1) -> bytes:
+    """Genera las instrucciones raster para N copias de una etiqueta DK-1221.
 
-    Devuelve el URI (usb://...) o el default si no puede descubrir.
+    El raster incluye el comando de auto-corte (cut=True) por lo que la
+    QL-800 corta entre cada etiqueta automaticamente.
     """
+    from brother_ql.raster import BrotherQLRaster
+    from brother_ql.conversion import convert
+
+    img = Image.open(image_path)
+    # brother_ql aplica su propio umbral; convertir a escala de grises
+    if img.mode not in ("L", "RGB"):
+        img = img.convert("L")
+    # El area imprimible de la etiqueta 23x23 es 202x202 px
+    if img.size != (202, 202):
+        img = img.resize((202, 202), Image.LANCZOS)
+
+    images = [img] * max(1, int(copies))
+
+    qlr = BrotherQLRaster(BROTHER_QL_MODEL)
+    qlr.exception_on_warning = True
+    instructions = convert(
+        qlr=qlr,
+        images=images,
+        label=BROTHER_QL_LABEL_23x23,
+        rotate="auto",
+        threshold=70.0,
+        dither=False,
+        compress=False,
+        red=False,
+        dpi_600=False,
+        hq=True,
+        cut=True,
+    )
+    return instructions
+
+
+def send_raw_to_spooler(printer_name: str, data: bytes, job_name: str = "Etiqueta DK-1221") -> None:
+    """Envia bytes crudos al spooler de Windows en modo RAW.
+
+    El modo RAW entrega los bytes directamente al puerto de la impresora
+    sin procesarlos por GDI. Requiere el nombre EXACTO de la cola de
+    impresion instalada (no el modelo).
+    """
+    import win32print
+
+    handle = win32print.OpenPrinter(printer_name)
     try:
-        from brother_ql.backends.helpers import discover
-        printers = discover(backend_identifier="pyusb")
-        if printers:
-            return printers[0]["instance"]
-    except Exception:
-        pass
-    return BROTHER_QL_USB_ID
+        win32print.StartDocPrinter(handle, 1, (job_name, None, "RAW"))
+        try:
+            win32print.StartPagePrinter(handle)
+            win32print.WritePrinter(handle, data)
+            win32print.EndPagePrinter(handle)
+        finally:
+            win32print.EndDocPrinter(handle)
+    finally:
+        win32print.ClosePrinter(handle)
 
 
 def print_dk1221_via_brother_ql(
     image_path: Path,
     *,
+    printer_name: str,
     copies: int = 1,
-    label_type: str = BROTHER_QL_LABEL_23x23,
 ) -> None:
-    """Imprime una etiqueta die-cut DK-1221 (23x23mm) directamente via USB.
+    """Imprime N etiquetas DK-1221 generando raster con brother_ql y
+    enviandolo por el spooler RAW de Windows.
 
-    Envia N copias en una sola llamada. El auto-cutter de la QL-800
-    corta entre cada etiqueta usando el sensor de gap.
+    Lanza excepcion si algo falla (el caller decide el fallback).
     """
-    from brother_ql import BrotherQLRaster
-    from brother_ql.conversion import convert
-    from brother_ql.backends.helpers import send
-
-    printer_uri = _discover_usb_printer()
-    img = Image.open(image_path)
-
-    # brother_ql espera 202x202 para 23x23 die-cut
-    if img.size != (202, 202):
-        img = img.resize((202, 202), Image.LANCZOS)
-
-    # Convertir a instrucciones raster
-    qlr = BrotherQLRaster(BROTHER_QL_MODEL)
-    qlr.exception_on_warning = True
-
-    for _ in range(max(1, copies)):
-        convert(
-            qlr=qlr,
-            images=[img],
-            label=label_type,
-            cut=True,
-            dither=False,
-            compress=False,
-            red=False,
-            dpi_600=False,
-            hq=True,
-            rotate="auto",
-        )
-
-    # Enviar todo de golpe
-    send(
-        instructions=qlr.data,
-        printer_identifier=printer_uri,
-        backend_identifier="pyusb",
-        blocking=True,
-    )
+    data = build_dk1221_raster(image_path, copies=copies)
+    send_raw_to_spooler(printer_name, data)
