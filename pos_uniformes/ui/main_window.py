@@ -11691,16 +11691,6 @@ class MainWindow(QMainWindow):
         except Exception:
             preferred_printer = ""
 
-        # DK-1221 die-cut: usar brother_ql directo por USB (sin driver Windows)
-        if paper_mode == "die_cut":
-            from pos_uniformes.ui.helpers.brother_ql_print_helper import (
-                is_brother_ql_available,
-                print_dk1221_via_brother_ql,
-            )
-            if is_brother_ql_available():
-                print_dk1221_via_brother_ql(image_path, copies=copies)
-                return True
-
         if sys.platform.startswith("win"):
             resolution = print_inventory_label_via_windows(
                 image_path,

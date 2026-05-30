@@ -224,31 +224,35 @@ def _build_continuous_devmode(win32print, win32ui, printer_name: str, hprinter, 
 
 
 def _build_die_cut_devmode(win32print, win32ui, printer_name: str, hprinter, label_width_px: int, label_height_px: int):
-    """Devuelve un DEVMODE configurado para etiqueta die-cut.
+    """Devuelve un DEVMODE configurado para etiqueta die-cut DK-1221 (23x23mm).
 
-    Busca el paper ID del driver Brother que coincide con el tamaño de la etiqueta.
-    El sensor de gap de la QL-800 detecta los bordes de cada etiqueta die-cut
-    y el auto-cutter corta automáticamente entre cada una.
+    Usa paper ID 370 ("23mm x 23mm") del driver Brother QL-800.
+    El sensor de gap detecta los bordes de cada etiqueta y el auto-cutter
+    corta automáticamente entre cada una.
     """
-    try:
-        dpi_x, dpi_y = _query_printer_dpi(win32ui, printer_name)
-        width_mm10 = max(1, int(round((label_width_px / dpi_x) * 254)))
-        height_mm10 = max(1, int(round((label_height_px / dpi_y) * 254)))
+    # Paper IDs conocidos del driver Brother QL-800 para DK-1221
+    DK1221_PAPER_IDS = (370, 330)  # "23mm x 23mm", "Etiqueta cuadrada 23mm"
 
+    try:
         props = win32print.GetPrinter(hprinter, 2)
         devmode = props.get("pDevMode")
         if devmode is None:
             return None
 
-        die_cut_id = _find_die_cut_paper_id(win32print, printer_name, width_mm10, height_mm10)
-        if die_cut_id is not None:
-            devmode.PaperSize = die_cut_id
-            devmode.Fields = (getattr(devmode, "Fields", 0) or 0) | 0x2
-        else:
-            devmode.PaperSize = 256  # DMPAPER_USER
-            devmode.PaperWidth = width_mm10
-            devmode.PaperLength = height_mm10
-            devmode.Fields = (getattr(devmode, "Fields", 0) or 0) | 0x2 | 0x4 | 0x8
+        # Buscar cuál de los IDs conocidos existe en el driver
+        paper_id = DK1221_PAPER_IDS[0]  # default: 370
+        try:
+            available_ids = win32print.DeviceCapabilities(printer_name, '', 2)
+            if available_ids:
+                for known_id in DK1221_PAPER_IDS:
+                    if known_id in available_ids:
+                        paper_id = known_id
+                        break
+        except Exception:
+            pass
+
+        devmode.PaperSize = paper_id
+        devmode.Fields = (getattr(devmode, "Fields", 0) or 0) | 0x2  # DM_PAPERSIZE
 
         win32print.DocumentProperties(
             0, hprinter, printer_name, devmode, devmode,
