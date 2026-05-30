@@ -19,13 +19,16 @@ from pos_uniformes.database.models import (
     BodegaContenido,
     BodegaUbicacion,
     Categoria,
+    Escuela,
     EstadoCaja,
     Marca,
+    NivelEducativo,
     Producto,
     Variante,
 )
 from pos_uniformes.services.conteo_service import (
     confirmar_ajustes_lote,
+    obtener_conteos_pendientes,
     registrar_conteo,
 )
 
@@ -136,6 +139,59 @@ class TestConteoScopeTienda(unittest.TestCase):
         conteo = registrar_conteo(session, v.id, stock_fisico=10, contado_por="Ana")
         self.assertEqual(conteo.stock_sistema, 10)
         self.assertEqual(conteo.diferencia, 0)
+
+
+class TestConteosPendientesPorNivel(unittest.TestCase):
+    def _seed_en_nivel(
+        self, session: Session, escuela: Escuela, nivel: NivelEducativo,
+        sku: str, stock_actual: int,
+    ) -> Variante:
+        cat = session.query(Categoria).first() or Categoria(nombre="Uniformes")
+        marca = session.query(Marca).first() or Marca(nombre="Genérica")
+        session.add_all([cat, marca])
+        session.flush()
+        prod = Producto(
+            nombre=f"Producto {sku}",
+            nombre_base=f"Producto {sku}",
+            categoria_id=cat.id,
+            marca_id=marca.id,
+            escuela_id=escuela.id,
+            nivel_educativo_id=nivel.id,
+        )
+        session.add(prod)
+        session.flush()
+        v = Variante(
+            producto_id=prod.id, sku=sku, talla="T12", color="NEGRO",
+            precio_venta=350.00, stock_actual=stock_actual,
+        )
+        session.add(v)
+        session.flush()
+        return v
+
+    def test_pendientes_se_filtran_por_nivel(self) -> None:
+        session = _make_session()
+        escuela = Escuela(nombre="Escuela X")
+        primaria = NivelEducativo(nombre="Primaria")
+        secundaria = NivelEducativo(nombre="Secundaria")
+        session.add_all([escuela, primaria, secundaria])
+        session.flush()
+
+        v_prim = self._seed_en_nivel(session, escuela, primaria, "PRIM-1", 10)
+        v_sec = self._seed_en_nivel(session, escuela, secundaria, "SEC-1", 10)
+
+        # Conteos con diferencia (12 vs 10) en ambos niveles
+        registrar_conteo(session, v_prim.id, stock_fisico=12, contado_por="Ana")
+        registrar_conteo(session, v_sec.id, stock_fisico=12, contado_por="Ana")
+        session.flush()
+
+        # Sin filtro de nivel: ambos pendientes
+        todos = obtener_conteos_pendientes(session, escuela.id)
+        self.assertEqual(len(todos), 2)
+
+        # Filtrando por Primaria: solo el de primaria
+        solo_prim = obtener_conteos_pendientes(session, escuela.id, nivel_id=primaria.id)
+        self.assertEqual(len(solo_prim), 1)
+        self.assertEqual(solo_prim[0].variante_id, v_prim.id)
 
 
 if __name__ == "__main__":

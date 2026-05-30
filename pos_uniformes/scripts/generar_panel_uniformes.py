@@ -2304,7 +2304,7 @@ function conteoLoadEscuela() {{
         document.getElementById('conteo-print-btn').disabled = false;
     }});
     // Update pendientes badge
-    _callBridge('getConteosPendientes', [eid], function(r) {{
+    _callBridge('getConteosPendientes', [eid, nid], function(r) {{
         const badge = document.getElementById('conteo-pendientes-badge');
         if (r.data.length > 0) {{
             badge.textContent = r.data.length;
@@ -2546,7 +2546,7 @@ function conteoGuardar() {{
         }}
         // Update pendientes badge
         const sel = _conteoParseSelection(); const eid = sel.eid; const nid = sel.nid;
-        _callBridge('getConteosPendientes', [eid], function(r2) {{
+        _callBridge('getConteosPendientes', [eid, nid], function(r2) {{
             const badge = document.getElementById('conteo-pendientes-badge');
             if (r2.data.length > 0) {{
                 badge.textContent = r2.data.length;
@@ -2560,7 +2560,7 @@ function conteoGuardar() {{
 
 function conteoApplyAdjustments() {{
     const sel = _conteoParseSelection(); const eid = sel.eid; const nid = sel.nid;
-    _callBridge('getConteosPendientes', [eid], function(r) {{
+    _callBridge('getConteosPendientes', [eid, nid], function(r) {{
         if (!r.data.length) {{ showToast('No hay ajustes pendientes'); conteoLoadEscuela(); return; }}
         const ids = r.data.map(function(c) {{ return c.id; }});
         _callBridge('confirmarAjuste', [JSON.stringify(ids)], function(r2) {{
@@ -2610,7 +2610,7 @@ function conteoGuardarConfig() {{
 /* ── Pendientes ── */
 function conteoLoadPendientes() {{
     const sel = _conteoParseSelection(); const eid = sel.eid; const nid = sel.nid || 0;
-    _callBridge('getConteosPendientes', [eid], function(r) {{
+    _callBridge('getConteosPendientes', [eid, nid], function(r) {{
         _conteoPendientes = r.data;
         const container = document.getElementById('conteo-pendientes-container');
         const empty = document.getElementById('conteo-pendientes-empty');

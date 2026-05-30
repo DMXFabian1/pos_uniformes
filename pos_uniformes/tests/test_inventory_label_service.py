@@ -71,6 +71,7 @@ class InventoryLabelServiceTests(unittest.TestCase):
             variant,
             mode="standard",
             requested_copies=2,
+            show_price=None,
         )
         self.assertEqual(result, expected)
 

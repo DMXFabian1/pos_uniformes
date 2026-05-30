@@ -375,6 +375,7 @@ def obtener_variantes_agrupadas_por_producto(
 def obtener_conteos_pendientes(
     session: Session,
     escuela_id: int | None = None,
+    nivel_id: int | None = None,
 ) -> list[ConteoInventario]:
     """Conteos con diferencia != 0 que aún no se han ajustado."""
     stmt = (
@@ -388,6 +389,14 @@ def obtener_conteos_pendientes(
     )
     if escuela_id is not None:
         stmt = stmt.where(ConteoInventario.escuela_id == escuela_id)
+    if nivel_id is not None:
+        stmt = stmt.where(
+            ConteoInventario.variante_id.in_(
+                select(Variante.id)
+                .join(Variante.producto)
+                .where(Producto.nivel_educativo_id == nivel_id)
+            )
+        )
 
     return list(session.scalars(stmt).unique().all())
 

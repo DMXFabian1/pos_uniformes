@@ -175,9 +175,16 @@ class PanelBridge(QObject):
 
         try:
             conteo_ids = json.loads(conteo_ids_json)
+            usuario = "ADMIN"
+            if self._window is not None:
+                usuario = (
+                    getattr(self._window, "current_full_name", "")
+                    or getattr(self._window, "current_username", "")
+                    or "ADMIN"
+                )
             with get_session() as session:
                 ajustados, omitidos = confirmar_ajustes_lote(
-                    session, conteo_ids, "ADMIN"
+                    session, conteo_ids, usuario
                 )
                 session.commit()
 
@@ -199,15 +206,16 @@ class PanelBridge(QObject):
         except Exception as exc:  # noqa: BLE001
             return json.dumps({"ok": False, "error": str(exc)})
 
-    @pyqtSlot(int, result=str)
-    def getConteosPendientes(self, escuela_id: int) -> str:
+    @pyqtSlot(int, int, result=str)
+    def getConteosPendientes(self, escuela_id: int, nivel_id: int = 0) -> str:
         from pos_uniformes.database.connection import get_session
         from pos_uniformes.services.conteo_service import obtener_conteos_pendientes
 
         try:
             eid = escuela_id if escuela_id > 0 else None
+            nid = nivel_id if nivel_id > 0 else None
             with get_session() as session:
-                conteos = obtener_conteos_pendientes(session, eid)
+                conteos = obtener_conteos_pendientes(session, eid, nivel_id=nid)
                 data = [
                     {
                         "id": c.id,

@@ -62,7 +62,7 @@ class InventoryLabelDialogTests(unittest.TestCase):
             image_path = Path(temp_dir) / "label.png"
             image_path.write_bytes(b"not-a-real-png")
 
-            def render_label(mode: str, requested_copies: int) -> LabelRenderResult:
+            def render_label(mode: str, requested_copies: int, show_price: bool | None = None) -> LabelRenderResult:
                 render_calls.append((mode, requested_copies))
                 return LabelRenderResult(
                     mode=mode,

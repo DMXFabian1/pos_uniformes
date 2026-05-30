@@ -52,7 +52,7 @@ class InventoryLabelBatchDialogTests(unittest.TestCase):
             image_path = Path(temp_dir) / "label.png"
             image_path.write_bytes(b"not-a-real-png")
 
-            def render_label(variant_id: int, mode: str, requested_copies: int) -> LabelRenderResult:
+            def render_label(variant_id: int, mode: str, requested_copies: int, show_price: bool = True) -> LabelRenderResult:
                 render_calls.append((variant_id, mode, requested_copies))
                 return LabelRenderResult(
                     mode=mode,
@@ -61,7 +61,7 @@ class InventoryLabelBatchDialogTests(unittest.TestCase):
                     requested_copies=requested_copies,
                 )
 
-            def print_label(image_path: Path, copies: int, sku: str, _dialog: QDialog | None) -> bool:
+            def print_label(image_path: Path, copies: int, sku: str, _dialog: QDialog | None, _mode: str = "standard") -> bool:
                 print_calls.append((sku, copies))
                 return True
 
@@ -114,13 +114,13 @@ class InventoryLabelBatchDialogTests(unittest.TestCase):
             build_inventory_label_batch_dialog(
                 host,
                 contexts=contexts,
-                render_label=lambda variant_id, mode, requested_copies: LabelRenderResult(
+                render_label=lambda variant_id, mode, requested_copies, show_price=True: LabelRenderResult(
                     mode=mode,
                     image_path=Path("/tmp/label.png"),
                     effective_copies=requested_copies,
                     requested_copies=requested_copies,
                 ),
-                print_label=lambda image_path, copies, sku, dialog: True,
+                print_label=lambda image_path, copies, sku, dialog, mode=None: True,
             )
 
         self.assertEqual(len(tab_calls), 4)
