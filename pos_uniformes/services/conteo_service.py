@@ -96,11 +96,24 @@ def registrar_conteo(
     )
     if variante is None:
         raise ValueError(f"Variante id={variante_id} no encontrada.")
-    # Cargar producto por separado (joinedload + with_for_update no compatible en PG)
-    if variante.producto is None:
-        session.refresh(variante, ["producto"])
+    # Cargar producto + contenidos de bodega para calcular stock_tienda igual que
+    # lo ve el usuario en el panel. Se hace en un query aparte con populate_existing
+    # porque joinedload + with_for_update no se combinan en PG.
+    session.scalar(
+        select(Variante)
+        .where(Variante.id == variante_id)
+        .options(
+            joinedload(Variante.producto),
+            joinedload(Variante.bodega_contenidos)
+            .joinedload(BodegaContenido.caja)
+            .joinedload(BodegaCaja.ubicacion),
+        )
+        .execution_options(populate_existing=True)
+    )
 
-    stock_sistema = variante.stock_actual
+    # El conteo es SOLO de tienda: la diferencia se mide contra stock_tienda,
+    # nunca contra el total. Bodega y piso no se ven afectados por esta herramienta.
+    stock_sistema = variante.stock_tienda
     diferencia = stock_fisico - stock_sistema
 
     conteo = ConteoInventario(
