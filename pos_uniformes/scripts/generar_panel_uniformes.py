@@ -1087,6 +1087,7 @@ def build_variants(catalog_rows, catalog_cols, multi_level_ids):
     h.append('</div>')
     h.append('<div style="display:flex;gap:8px">')
     h.append('<button class="btn btn-outline btn-sm" onclick="pedidoLimpiar()">Limpiar</button>')
+    h.append('<button class="btn btn-outline btn-sm" onclick="pedidoCopiar()">📋 Copiar</button>')
     h.append('<button class="btn btn-sm" onclick="pedidoImprimir()">🖨 Imprimir pedido</button>')
     h.append('</div>')
     h.append('</div>')
@@ -1773,8 +1774,7 @@ function toggleTheme() {{
 }}
 (function() {{
     const saved = localStorage.getItem('panel-theme');
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    const theme = saved || (prefersDark ? 'dark' : 'light');
+    const theme = saved || 'light';
     if (theme === 'dark') {{
         document.documentElement.setAttribute('data-theme', 'dark');
         document.addEventListener('DOMContentLoaded', () => {{
@@ -2160,6 +2160,14 @@ function pedidoImprimir() {{
     if (!items.length) {{ showToast('Selecciona al menos una talla'); return; }}
     _callBridge('imprimirPedido', [JSON.stringify(items)], function() {{
         showToast('Pedido enviado a impresión');
+    }});
+}}
+
+function pedidoCopiar() {{
+    const items = Object.values(_pedidoCart);
+    if (!items.length) {{ showToast('Selecciona al menos una talla'); return; }}
+    _callBridge('copiarPedido', [JSON.stringify(items)], function(r) {{
+        if (r.ok) showToast('Pedido copiado al portapapeles');
     }});
 }}
 

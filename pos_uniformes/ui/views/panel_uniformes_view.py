@@ -406,6 +406,23 @@ class PanelBridge(QObject):
         except Exception as exc:  # noqa: BLE001
             return json.dumps({"ok": False, "error": str(exc)})
 
+    @pyqtSlot(str, result=str)
+    def copiarPedido(self, data_json: str) -> str:
+        from PyQt6.QtWidgets import QApplication
+
+        from pos_uniformes.services.pedido_sheet_service import build_pedido_texto
+
+        try:
+            items = json.loads(data_json)
+            texto = build_pedido_texto(items)
+            if not texto:
+                return json.dumps({"ok": False, "error": "No hay items."})
+            clipboard = QApplication.clipboard()
+            clipboard.setText(texto)
+            return json.dumps({"ok": True})
+        except Exception as exc:  # noqa: BLE001
+            return json.dumps({"ok": False, "error": str(exc)})
+
 
 # ---------------------------------------------------------------------------
 # Main widget

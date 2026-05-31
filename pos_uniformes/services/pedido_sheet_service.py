@@ -131,3 +131,42 @@ def build_pedido_sheets(items: list[dict]) -> list[str]:
             sheets.append("\n".join(lines))
 
     return sheets
+
+
+def build_pedido_texto(items: list[dict]) -> str:
+    """Genera resumen de pedido como texto plano (para copiar/pegar en WhatsApp, etc.)."""
+    if not items:
+        return ""
+
+    fecha_str = datetime.now().strftime("%d/%m/%Y")
+
+    # Agrupar por escuela → producto → tallas
+    escuelas: OrderedDict[str, OrderedDict[str, list[dict]]] = OrderedDict()
+    for item in items:
+        escuela = item.get("escuela", "Sin escuela")
+        nombre = item.get("producto", "Sin nombre")
+        if escuela not in escuelas:
+            escuelas[escuela] = OrderedDict()
+        if nombre not in escuelas[escuela]:
+            escuelas[escuela][nombre] = []
+        escuelas[escuela][nombre].append(item)
+
+    escuelas_sorted = OrderedDict(sorted(escuelas.items(), key=lambda x: x[0]))
+    for productos in escuelas_sorted.values():
+        for tallas in productos.values():
+            tallas.sort(key=lambda x: _talla_sort_key(x.get("talla", "")))
+
+    lines = [f"📋 PEDIDO — {fecha_str}", ""]
+
+    for escuela, productos in escuelas_sorted.items():
+        lines.append(f"🏫 {escuela}")
+        for producto, tallas in productos.items():
+            parts = []
+            for t in tallas:
+                talla = t.get("talla", "U")
+                stock = t.get("stock_tienda", 0)
+                parts.append(f"{talla} ({stock})")
+            lines.append(f"• {producto}: {', '.join(parts)}")
+        lines.append("")
+
+    return "\n".join(lines).rstrip()
