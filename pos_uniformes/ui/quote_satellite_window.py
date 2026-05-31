@@ -5361,7 +5361,7 @@ QLabel#favDialogPriceLabel {
         title: str,
         copies: int,
         parent: "QDialog | None" = None,
-        cut_between_copies: bool = False,
+        paper_mode: str = "die_cut",
     ) -> bool:
         image = QImage(str(image_path))
         if image.isNull():
@@ -5383,7 +5383,7 @@ QLabel#favDialogPriceLabel {
                 sku=title.replace("Etiqueta ", "", 1),
                 copies=copies,
                 preferred_printer_name=preferred_printer,
-                cut_between_copies=cut_between_copies,
+                paper_mode=paper_mode,
             )
             if resolution.fallback_used:
                 QMessageBox.information(
@@ -5487,7 +5487,7 @@ QLabel#favDialogPriceLabel {
                     title=f"Etiqueta {sku_val}",
                     copies=copies,
                     parent=parent,
-                    cut_between_copies=(mode == "continuous"),
+                    paper_mode=mode,
                 ),
             )
             return
