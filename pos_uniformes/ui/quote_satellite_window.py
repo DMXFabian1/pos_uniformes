@@ -5548,7 +5548,7 @@ QLabel#favDialogPriceLabel {
                 title=f"Etiqueta {sku_val}",
                 copies=copies,
                 parent=parent,
-                cut_between_copies=(mode == "continuous"),
+                paper_mode=mode,
             ),
         )
 
