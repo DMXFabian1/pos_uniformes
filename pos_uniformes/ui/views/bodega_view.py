@@ -873,6 +873,7 @@ class NuevaCajaDialog(QDialog):
         self.preview_label.setStyleSheet("font-size: 11px; color: #555;")
         layout.addRow("", self.preview_label)
         self.categoria_combo.currentIndexChanged.connect(self._update_preview)
+        self.ubicacion_combo.currentIndexChanged.connect(self._update_preview)
         self._update_preview()
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
@@ -886,8 +887,10 @@ class NuevaCajaDialog(QDialog):
         cat: CategoriaCaja = self.categoria_combo.currentData()
         if not cat:
             return
+        ubicacion_id = self.ubicacion_combo.currentData()
         with get_session() as session:
-            codigo = BodegaService._siguiente_codigo(session, cat)
+            ubicacion = session.get(BodegaUbicacion, ubicacion_id) if ubicacion_id else None
+            codigo = BodegaService._siguiente_codigo(session, cat, ubicacion)
         self.preview_label.setText(f"Se creará con código: {codigo}")
 
     def _on_accept(self) -> None:
