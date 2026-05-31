@@ -14,6 +14,7 @@ from datetime import datetime
 from pos_uniformes.services.conteo_service import (
     VarianteParaConteo,
     obtener_variantes_agrupadas_por_producto,
+    obtener_variantes_basicos_agrupadas,
 )
 
 # ── Box-drawing (38 cols, 80mm thermal) ─────────────────────────────────────
@@ -170,3 +171,72 @@ def build_conteo_sheets_combined(
     """
     sheets = build_conteo_sheets(session, escuela_id, escuela_nombre, fecha, nivel_id=nivel_id)
     return "\n\n".join(sheets)
+
+
+def build_conteo_sheets_basicos(
+    session,
+    fecha: str | None = None,
+    tipo_pieza: str | None = None,
+) -> list[str]:
+    """Hojas de conteo para productos básicos (ligados por catálogo, sin escuela directa)."""
+    grupos = obtener_variantes_basicos_agrupadas(session, tipo_pieza=tipo_pieza)
+    if not grupos:
+        return []
+
+    fecha_str = fecha or datetime.now().strftime("%d/%m/%Y")
+    grupos_reales = [g for g in grupos if not g.get("virtual", False)]
+    total_hojas = len(grupos_reales)
+    sheets: list[str] = []
+
+    for idx, grupo in enumerate(grupos_reales, start=1):
+        producto = grupo["producto_nombre"]
+        tipo_pieza = grupo["tipo_pieza"]
+        variantes: list[VarianteParaConteo] = grupo["variantes"]
+
+        if not variantes:
+            continue
+
+        colores = sorted({
+            v.color for v in variantes
+            if v.color and v.color.lower() not in ("sin color", "")
+        })
+        color_str = ", ".join(colores) if colores else ""
+
+        lines: list[str] = []
+        lines.append(_top())
+        lines.append(_center(f"HOJA DE CONTEO {idx}/{total_hojas}"))
+        lines.append(_mid())
+
+        lines.append(_center("PRODUCTOS BÁSICOS"))
+        lines.append(_line(f"Fecha:   {fecha_str}"))
+        lines.append(_mid())
+
+        for part in textwrap.wrap(producto, width=_IW):
+            lines.append(_center(part))
+
+        if tipo_pieza and tipo_pieza not in producto:
+            lines.append(_center(tipo_pieza))
+
+        if color_str:
+            for part in textwrap.wrap(color_str, width=_IW):
+                lines.append(_center(part))
+
+        lines.append(_mid())
+
+        col_widths = (14, 10, 10)
+        lines.append(_row3("Talla", "Exist.", "Pedido", col_widths))
+        lines.append(_mid())
+
+        for v in variantes:
+            talla = v.talla or "U"
+            lines.append(_row3(talla, "____", "____", col_widths))
+
+        lines.append(_bot())
+        lines.append("")
+        lines.append(f"  Contó: {'_' * 24}")
+        lines.append("")
+        lines.append("")
+
+        sheets.append("\n".join(lines))
+
+    return sheets

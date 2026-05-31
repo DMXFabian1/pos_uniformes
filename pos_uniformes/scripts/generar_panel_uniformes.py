@@ -156,19 +156,32 @@ def fetch_all_data(conn):
             JOIN bodega_caja bx ON bx.id = bc.caja_id
             JOIN bodega_ubicacion bu ON bu.id = bx.ubicacion_id
             GROUP BY bc.variante_id
+        ),
+        school_products AS (
+            SELECT DISTINCT producto_id FROM (
+                SELECT id AS producto_id FROM producto WHERE escuela_id IS NOT NULL AND activo = true
+                UNION
+                SELECT l.producto_id FROM catalog_school_product_link l
+                JOIN producto p2 ON p2.id = l.producto_id AND p2.activo = true
+                WHERE l.activo = true
+            ) sub
         )
         SELECT
             COALESCE(SUM(v.stock_actual), 0),
             COALESCE(SUM(COALESCE(bs.stock_bodega, 0)), 0),
             COALESCE(SUM(COALESCE(bs.stock_piso, 0)), 0),
             COALESCE(SUM(v.stock_actual - COALESCE(bs.stock_bodega, 0) - COALESCE(bs.stock_piso, 0)), 0),
-            COUNT(*) FILTER (WHERE v.stock_actual = 0),
-            COUNT(*) FILTER (WHERE v.stock_actual > 0
+            COUNT(*) FILTER (WHERE sp.producto_id IS NOT NULL
+                AND (v.stock_actual - COALESCE(bs.stock_bodega, 0) - COALESCE(bs.stock_piso, 0)) <= 0),
+            COUNT(*) FILTER (WHERE sp.producto_id IS NOT NULL
+                AND (v.stock_actual - COALESCE(bs.stock_bodega, 0) - COALESCE(bs.stock_piso, 0)) > 0
                 AND (v.stock_actual - COALESCE(bs.stock_bodega, 0) - COALESCE(bs.stock_piso, 0)) < COALESCE(v.stock_minimo, 2)),
-            COALESCE(SUM(v.stock_actual * v.precio_venta), 0)
+            COALESCE(SUM(v.stock_actual * v.precio_venta), 0),
+            COUNT(*) FILTER (WHERE sp.producto_id IS NOT NULL)
         FROM variante v
         JOIN producto p ON p.id = v.producto_id
         LEFT JOIN bodega_stock bs ON bs.variante_id = v.id
+        LEFT JOIN school_products sp ON sp.producto_id = p.id
         WHERE v.activo = true AND p.activo = true
     """)
     row = cur.fetchone()
@@ -179,6 +192,7 @@ def fetch_all_data(conn):
     stats["variantes_sin_stock"] = int(row[4])
     stats["variantes_bajo_min"] = int(row[5])
     stats["valor_inventario"] = float(row[6])
+    stats["variantes_con_escuela"] = int(row[7])
 
     # Schools per nivel
     cur.execute("""
@@ -452,7 +466,7 @@ def build_resumen(stats, insights, coverage_data, valor_por_nivel=None):
     stotal = stats["stock_total"] or 1
     pct_t = round(st / stotal * 100)
     pct_p = round(sp / stotal * 100)
-    pct_b = round(sb / stotal * 100)
+    pct_b = 100 - pct_t - pct_p
     h.append('<div class="res-card">')
     h.append('<div class="res-card-title">Stock por ubicación</div>')
     h.append(f'<div class="res-stacked-bar">'
@@ -467,13 +481,13 @@ def build_resumen(stats, insights, coverage_data, valor_por_nivel=None):
     h.append('</div></div>')
 
     # -- Col B: Salud del inventario --
-    v_activas = stats["variantes_activas"]
+    v_total = stats["variantes_con_escuela"]
     v_sin = stats["variantes_sin_stock"]
     v_bajo = stats["variantes_bajo_min"]
-    v_ok = v_activas - v_sin - v_bajo
-    pct_ok = round(v_ok / v_activas * 100) if v_activas else 0
-    pct_sin = round(v_sin / v_activas * 100) if v_activas else 0
-    pct_bajo = round(v_bajo / v_activas * 100) if v_activas else 0
+    v_ok = v_total - v_sin - v_bajo
+    pct_ok = round(v_ok / v_total * 100) if v_total else 0
+    pct_bajo = round(v_bajo / v_total * 100) if v_total else 0
+    pct_sin = (100 - pct_ok - pct_bajo) if v_total else 0
     h.append('<div class="res-card">')
     h.append('<div class="res-card-title">Salud del inventario</div>')
     h.append(f'<div class="res-stacked-bar">'
@@ -1054,7 +1068,7 @@ def build_variants(catalog_rows, catalog_cols, multi_level_ids):
                     tooltip += f', {t["stock_bodega"]} en almacén'
                 if t.get("oculta"):
                     tooltip += ' (desactivada)'
-                h.append(f'<div class="{cls}" data-vid="{t["vid"]}" data-talla="{_esc(t["talla"])}" title="{_esc(tooltip)}" ondblclick="dispToggleDisabled(this)">')
+                h.append(f'<div class="{cls}" data-vid="{t["vid"]}" data-talla="{_esc(t["talla"])}" data-stock="{t["stock_tienda"]}" data-bodega="{t["stock_bodega"]}" data-piso="{t["stock_piso"]}" title="{_esc(tooltip)}" onclick="pedidoToggle(this)" ondblclick="dispToggleDisabled(this)">')
                 h.append(f'<span class="disp-talla-label">{_esc(t["talla"])}</span>')
                 h.append(f'<span class="disp-talla-stock">{t["stock_tienda"]}</span>')
                 h.append('</div>')
@@ -1062,6 +1076,21 @@ def build_variants(catalog_rows, catalog_cols, multi_level_ids):
             h.append('</div>')
 
         h.append('</div></div>')
+
+    # ── Pedido floating bar ──
+    h.append('<div id="pedido-bar" style="display:none;position:sticky;bottom:0;left:0;right:0;background:var(--card-bg);border-top:2px solid var(--brand);padding:12px 20px;z-index:50;box-shadow:0 -4px 12px rgba(0,0,0,.1);display:none">')
+    h.append('<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">')
+    h.append('<div style="display:flex;align-items:center;gap:12px">')
+    h.append('<span style="font-size:20px">🛒</span>')
+    h.append('<span id="pedido-count" style="font-weight:700;font-size:15px">0 tallas seleccionadas</span>')
+    h.append('<span id="pedido-prods" style="font-size:13px;color:var(--text-muted)"></span>')
+    h.append('</div>')
+    h.append('<div style="display:flex;gap:8px">')
+    h.append('<button class="btn btn-outline btn-sm" onclick="pedidoLimpiar()">Limpiar</button>')
+    h.append('<button class="btn btn-sm" onclick="pedidoImprimir()">🖨 Imprimir pedido</button>')
+    h.append('</div>')
+    h.append('</div>')
+    h.append('</div>')
 
     return "\n".join(h)
 
@@ -1095,8 +1124,12 @@ def build_conteo(school_levels):
     h.append('<label style="font-weight:600;font-size:13px">Escuela:</label>')
     h.append('<select id="conteo-escuela" onchange="conteoLoadEscuela()" class="filter-select" style="min-width:220px">')
     h.append('<option value="">— Seleccionar escuela —</option>')
+    h.append('<option value="basicos" data-nivel="">📦 Productos Básicos</option>')
     for eid, nid, display, nivel in schools:
         h.append(f'<option value="{eid}:{nid}" data-nivel="{_esc(nivel)}">{_esc(display)}</option>')
+    h.append('</select>')
+    h.append('<select id="conteo-tipo-pieza" onchange="conteoFilterTipoPieza()" class="filter-select" style="min-width:160px;display:none">')
+    h.append('<option value="">Todos los tipos</option>')
     h.append('</select>')
     h.append('</div>')
     h.append('<div style="display:flex;align-items:center;gap:8px">')
@@ -1636,6 +1669,8 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sys
 .disp-talla-ok .disp-talla-stock {{ color:var(--green); }}
 .disp-talla-disabled {{ background:#f0f0f0 !important; border-color:#ddd !important; opacity:.45; }}
 .disp-talla-disabled .disp-talla-stock {{ color:#999 !important; text-decoration:line-through; }}
+.disp-talla.pedido-selected {{ outline:3px solid var(--brand); outline-offset:-1px; position:relative; }}
+.disp-talla.pedido-selected::after {{ content:'✓'; position:absolute; top:-4px; right:-4px; background:var(--brand); color:#fff; font-size:9px; width:14px; height:14px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; }}
 .disp-talla-disabled .disp-talla-label {{ color:#999 !important; }}
 
 @media (max-width: 700px) {{
@@ -2071,6 +2106,63 @@ function showToast(msg) {{
     setTimeout(() => toast.style.opacity = '0', 2000);
 }}
 
+/* ── Pedido: carrito de selección ── */
+var _pedidoCart = {{}};
+
+function pedidoToggle(el) {{
+    const vid = el.dataset.vid;
+    if (!vid || el.classList.contains('disp-talla-disabled')) return;
+    if (_pedidoCart[vid]) {{
+        delete _pedidoCart[vid];
+        el.classList.remove('pedido-selected');
+    }} else {{
+        const prodCard = el.closest('.disp-product-card');
+        const schoolGroup = el.closest('.disp-school-group');
+        _pedidoCart[vid] = {{
+            vid: parseInt(vid),
+            producto: prodCard ? prodCard.dataset.name : '',
+            talla: el.dataset.talla,
+            stock_tienda: parseInt(el.dataset.stock) || 0,
+            stock_bodega: parseInt(el.dataset.bodega) || 0,
+            stock_piso: parseInt(el.dataset.piso) || 0,
+            escuela: schoolGroup ? schoolGroup.dataset.school : '',
+        }};
+        el.classList.add('pedido-selected');
+    }}
+    pedidoUpdateBar();
+}}
+
+function pedidoUpdateBar() {{
+    const items = Object.values(_pedidoCart);
+    const bar = document.getElementById('pedido-bar');
+    const countEl = document.getElementById('pedido-count');
+    const prodsEl = document.getElementById('pedido-prods');
+    if (items.length === 0) {{
+        bar.style.display = 'none';
+        return;
+    }}
+    bar.style.display = 'block';
+    countEl.textContent = items.length + ' talla' + (items.length !== 1 ? 's' : '') + ' seleccionada' + (items.length !== 1 ? 's' : '');
+    const prods = new Set(items.map(function(i) {{ return i.producto; }}));
+    prodsEl.textContent = prods.size + ' producto' + (prods.size !== 1 ? 's' : '');
+}}
+
+function pedidoLimpiar() {{
+    _pedidoCart = {{}};
+    document.querySelectorAll('.pedido-selected').forEach(function(el) {{
+        el.classList.remove('pedido-selected');
+    }});
+    pedidoUpdateBar();
+}}
+
+function pedidoImprimir() {{
+    const items = Object.values(_pedidoCart);
+    if (!items.length) {{ showToast('Selecciona al menos una talla'); return; }}
+    _callBridge('imprimirPedido', [JSON.stringify(items)], function() {{
+        showToast('Pedido enviado a impresión');
+    }});
+}}
+
 /* ── Disponibilidad: desactivar tallas (doble clic → BD) ── */
 function dispToggleDisabled(el) {{
     const vid = parseInt(el.dataset.vid);
@@ -2257,8 +2349,9 @@ function conteoShowSubtab(name) {{
 /* ── Helpers para escuela:nivel ── */
 function _conteoParseSelection() {{
     const val = document.getElementById('conteo-escuela').value || '';
+    if (val === 'basicos') return {{ key: 'basicos', eid: 'basicos', nid: 0, isBasicos: true }};
     const parts = val.split(':');
-    return {{ key: val, eid: parseInt(parts[0]) || 0, nid: parseInt(parts[1]) || 0 }};
+    return {{ key: val, eid: parseInt(parts[0]) || 0, nid: parseInt(parts[1]) || 0, isBasicos: false }};
 }}
 
 /* ── Main loader ── */
@@ -2276,26 +2369,65 @@ function conteoLoadEscuela() {{
         document.getElementById('conteo-print-btn').disabled = true;
         return;
     }}
-    // Load estado
-    _callBridge('getEstadoConteo', [sel.key], function(r) {{
+    // Load estado (skip for básicos — no per-school config)
+    if (sel.isBasicos) {{
         const info = document.getElementById('conteo-estado-info');
-        const pct = r.pct_vigente;
-        const color = pct >= 80 ? 'var(--green)' : pct >= 40 ? 'var(--orange)' : 'var(--red)';
-        const semaforo = pct >= 80 ? '🟢' : pct >= 40 ? '🟡' : '🔴';
-        info.innerHTML = semaforo + ' <b>' + r.escuela_nombre + '</b> — ' +
-            '<span style="color:' + color + ';font-weight:700">' + pct + '% vigente</span> · ' +
-            r.contadas_vigentes + '/' + r.total_variantes + ' contadas · ' +
-            '<span style="color:var(--orange)">' + r.pendientes_conteo + ' pendientes</span>' +
-            (r.ultimo_conteo ? ' · Ultimo: ' + new Date(r.ultimo_conteo).toLocaleDateString() : '');
-        document.getElementById('conteo-vigencia').value = r.dias_vigencia;
+        info.innerHTML = '📦 <b>Productos Básicos</b> — variantes compartidas entre escuelas';
         estado.style.display = 'block';
-    }});
-    _callBridge('getConfigConteo', [sel.key], function(r) {{
-        document.getElementById('conteo-vigencia').value = r.dias_vigencia;
-    }});
+        document.getElementById('conteo-pendientes-badge').style.display = 'none';
+    }} else {{
+        _callBridge('getEstadoConteo', [sel.key], function(r) {{
+            const info = document.getElementById('conteo-estado-info');
+            const pct = r.pct_vigente;
+            const color = pct >= 80 ? 'var(--green)' : pct >= 40 ? 'var(--orange)' : 'var(--red)';
+            const semaforo = pct >= 80 ? '🟢' : pct >= 40 ? '🟡' : '🔴';
+            info.innerHTML = semaforo + ' <b>' + r.escuela_nombre + '</b> — ' +
+                '<span style="color:' + color + ';font-weight:700">' + pct + '% vigente</span> · ' +
+                r.contadas_vigentes + '/' + r.total_variantes + ' contadas · ' +
+                '<span style="color:var(--orange)">' + r.pendientes_conteo + ' pendientes</span>' +
+                (r.ultimo_conteo ? ' · Ultimo: ' + new Date(r.ultimo_conteo).toLocaleDateString() : '');
+            document.getElementById('conteo-vigencia').value = r.dias_vigencia;
+            estado.style.display = 'block';
+        }});
+        _callBridge('getConfigConteo', [sel.key], function(r) {{
+            document.getElementById('conteo-vigencia').value = r.dias_vigencia;
+        }});
+        // Update pendientes badge
+        _callBridge('getConteosPendientes', [eid, nid], function(r) {{
+            const badge = document.getElementById('conteo-pendientes-badge');
+            if (r.data.length > 0) {{
+                badge.textContent = r.data.length;
+                badge.style.display = 'inline';
+            }} else {{
+                badge.style.display = 'none';
+            }}
+        }});
+    }}
     // Load grouped variants
+    const tpSel = document.getElementById('conteo-tipo-pieza');
     _callBridge('getVariantesAgrupadas', [sel.key], function(r) {{
         _conteoProductos = r.data;
+        // Populate tipo_pieza dropdown for básicos
+        if (sel.isBasicos) {{
+            const tipos = [];
+            const seen = {{}};
+            r.data.forEach(function(g) {{
+                if (!g.virtual && g.tipo_pieza && !seen[g.tipo_pieza]) {{
+                    seen[g.tipo_pieza] = true;
+                    tipos.push(g.tipo_pieza);
+                }}
+            }});
+            tipos.sort();
+            tpSel.innerHTML = '<option value="">Todos (' + r.data.filter(function(g){{ return !g.virtual; }}).length + ')</option>';
+            tipos.forEach(function(tp) {{
+                const n = r.data.filter(function(g){{ return g.tipo_pieza === tp && !g.virtual; }}).length;
+                tpSel.innerHTML += '<option value="' + tp + '">' + tp + ' (' + n + ')</option>';
+            }});
+            tpSel.style.display = '';
+        }} else {{
+            tpSel.style.display = 'none';
+            tpSel.value = '';
+        }}
         conteoRenderProducts();
         subtabs.style.display = 'flex';
         conteoShowSubtab('contar');
@@ -2303,16 +2435,12 @@ function conteoLoadEscuela() {{
         document.getElementById('conteo-guardar-btn').disabled = false;
         document.getElementById('conteo-print-btn').disabled = false;
     }});
-    // Update pendientes badge
-    _callBridge('getConteosPendientes', [eid, nid], function(r) {{
-        const badge = document.getElementById('conteo-pendientes-badge');
-        if (r.data.length > 0) {{
-            badge.textContent = r.data.length;
-            badge.style.display = 'inline';
-        }} else {{
-            badge.style.display = 'none';
-        }}
-    }});
+}}
+
+/* ── Filter by tipo_pieza ── */
+function conteoFilterTipoPieza() {{
+    conteoRenderProducts();
+    conteoUpdateProgress();
 }}
 
 /* ── Render product cards ── */
@@ -2323,11 +2451,14 @@ function conteoRenderProducts() {{
         container.innerHTML = '<div class="section-card" style="text-align:center;padding:30px;color:var(--text-muted)">No hay variantes para esta escuela</div>';
         return;
     }}
+    const tipoFilter = document.getElementById('conteo-tipo-pieza').value;
     _conteoProductos.forEach(function(grupo, gi) {{
         const card = document.createElement('div');
         card.className = 'school-card conteo-product-card';
         if (grupo.virtual) card.classList.add('conteo-virtual');
+        if (tipoFilter && grupo.tipo_pieza !== tipoFilter) card.style.display = 'none';
         card.dataset.product = grupo.producto_nombre;
+        card.dataset.tipo = grupo.tipo_pieza || '';
         card.dataset.groupIdx = gi;
         card.dataset.virtual = grupo.virtual ? '1' : '0';
 
@@ -2548,15 +2679,17 @@ function conteoGuardar() {{
         }}
         // Update pendientes badge
         const sel = _conteoParseSelection(); const eid = sel.eid; const nid = sel.nid;
-        _callBridge('getConteosPendientes', [eid, nid], function(r2) {{
-            const badge = document.getElementById('conteo-pendientes-badge');
-            if (r2.data.length > 0) {{
-                badge.textContent = r2.data.length;
-                badge.style.display = 'inline';
-            }} else {{
-                badge.style.display = 'none';
-            }}
-        }});
+        if (!sel.isBasicos) {{
+            _callBridge('getConteosPendientes', [eid, nid], function(r2) {{
+                const badge = document.getElementById('conteo-pendientes-badge');
+                if (r2.data.length > 0) {{
+                    badge.textContent = r2.data.length;
+                    badge.style.display = 'inline';
+                }} else {{
+                    badge.style.display = 'none';
+                }}
+            }});
+        }}
     }});
 }}
 
@@ -2581,6 +2714,14 @@ function conteoDismissPrompt() {{
 function conteoImprimirHojas() {{
     const sel = _conteoParseSelection();
     if (!sel.eid) {{ showToast('Selecciona una escuela primero'); return; }}
+    if (sel.isBasicos) {{
+        const tp = document.getElementById('conteo-tipo-pieza').value || '';
+        const label = tp ? 'Básicos — ' + tp : 'Productos Básicos';
+        _callBridge('imprimirHojasConteo', ['basicos', label, tp, ''], function() {{
+            showToast('Hojas de conteo enviadas');
+        }});
+        return;
+    }}
     const selEl = document.getElementById('conteo-escuela');
     const opt = selEl.options[selEl.selectedIndex];
     const ename = opt.text;
@@ -2601,6 +2742,7 @@ function conteoImprimirHojas() {{
 /* ── Config ── */
 function conteoGuardarConfig() {{
     const sel = _conteoParseSelection(); const eid = sel.eid; const nid = sel.nid;
+    if (sel.isBasicos) {{ showToast('Vigencia no aplica para productos básicos'); return; }}
     const dias = parseInt(document.getElementById('conteo-vigencia').value);
     if (!eid || !dias || dias < 1) return;
     _callBridge('setConfigConteo', [eid, dias], function() {{
@@ -2612,6 +2754,12 @@ function conteoGuardarConfig() {{
 /* ── Pendientes ── */
 function conteoLoadPendientes() {{
     const sel = _conteoParseSelection(); const eid = sel.eid; const nid = sel.nid || 0;
+    if (sel.isBasicos) {{
+        document.getElementById('conteo-pendientes-container').innerHTML = '';
+        document.getElementById('conteo-pendientes-empty').style.display = 'block';
+        document.getElementById('conteo-pendientes-count').textContent = '';
+        return;
+    }}
     _callBridge('getConteosPendientes', [eid, nid], function(r) {{
         _conteoPendientes = r.data;
         const container = document.getElementById('conteo-pendientes-container');

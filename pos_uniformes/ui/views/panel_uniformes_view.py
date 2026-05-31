@@ -76,12 +76,18 @@ class PanelBridge(QObject):
     @pyqtSlot(str, result=str)
     def getVariantesParaConteo(self, key: str) -> str:
         from pos_uniformes.database.connection import get_session
-        from pos_uniformes.services.conteo_service import obtener_variantes_para_conteo
+        from pos_uniformes.services.conteo_service import (
+            obtener_variantes_basicos_para_conteo,
+            obtener_variantes_para_conteo,
+        )
 
         try:
-            eid, nid = self._parse_key(key)
             with get_session() as session:
-                variantes = obtener_variantes_para_conteo(session, eid, nivel_id=nid)
+                if key == "basicos":
+                    variantes = obtener_variantes_basicos_para_conteo(session)
+                else:
+                    eid, nid = self._parse_key(key)
+                    variantes = obtener_variantes_para_conteo(session, eid, nivel_id=nid)
                 data = [
                     {
                         "variante_id": v.variante_id,
@@ -103,12 +109,18 @@ class PanelBridge(QObject):
     @pyqtSlot(str, result=str)
     def getVariantesAgrupadas(self, key: str) -> str:
         from pos_uniformes.database.connection import get_session
-        from pos_uniformes.services.conteo_service import obtener_variantes_agrupadas_por_producto
+        from pos_uniformes.services.conteo_service import (
+            obtener_variantes_agrupadas_por_producto,
+            obtener_variantes_basicos_agrupadas,
+        )
 
         try:
-            eid, nid = self._parse_key(key)
             with get_session() as session:
-                grupos = obtener_variantes_agrupadas_por_producto(session, eid, nivel_id=nid)
+                if key == "basicos":
+                    grupos = obtener_variantes_basicos_agrupadas(session)
+                else:
+                    eid, nid = self._parse_key(key)
+                    grupos = obtener_variantes_agrupadas_por_producto(session, eid, nivel_id=nid)
                 data = []
                 for g in grupos:
                     data.append({
@@ -340,18 +352,26 @@ class PanelBridge(QObject):
     def imprimirHojasConteo(self, key: str, escuela_nombre: str,
                             nivel_nombre: str = "", escuela_num: str = "") -> str:
         from pos_uniformes.database.connection import get_session
-        from pos_uniformes.services.conteo_sheet_service import build_conteo_sheets
+        from pos_uniformes.services.conteo_sheet_service import (
+            build_conteo_sheets,
+            build_conteo_sheets_basicos,
+        )
 
         try:
-            eid, nid = self._parse_key(key)
             with get_session() as session:
-                sheets = build_conteo_sheets(
-                    session, eid, escuela_nombre, nivel_id=nid,
-                    nivel_nombre=nivel_nombre or None,
-                    escuela_num=escuela_num or None,
-                )
+                if key == "basicos":
+                    # nivel_nombre carries tipo_pieza filter for básicos
+                    tp_filter = nivel_nombre if nivel_nombre else None
+                    sheets = build_conteo_sheets_basicos(session, tipo_pieza=tp_filter)
+                else:
+                    eid, nid = self._parse_key(key)
+                    sheets = build_conteo_sheets(
+                        session, eid, escuela_nombre, nivel_id=nid,
+                        nivel_nombre=nivel_nombre or None,
+                        escuela_num=escuela_num or None,
+                    )
             if not sheets:
-                return json.dumps({"ok": False, "error": "No hay productos para esta escuela."})
+                return json.dumps({"ok": False, "error": "No hay productos para imprimir."})
 
             from pos_uniformes.ui.dialogs.conteo_print_dialog import open_conteo_print_dialog
 
@@ -359,11 +379,29 @@ class PanelBridge(QObject):
             while parent is not None and not hasattr(parent, "windowTitle"):
                 parent = parent.parent()
 
-            open_conteo_print_dialog(
-                parent,
-                f"Hojas de conteo — {escuela_nombre}",
-                sheets,
-            )
+            titulo = "Hojas de conteo — Productos Básicos" if key == "basicos" else f"Hojas de conteo — {escuela_nombre}"
+            open_conteo_print_dialog(parent, titulo, sheets)
+            return json.dumps({"ok": True})
+        except Exception as exc:  # noqa: BLE001
+            return json.dumps({"ok": False, "error": str(exc)})
+
+    @pyqtSlot(str, result=str)
+    def imprimirPedido(self, data_json: str) -> str:
+        from pos_uniformes.services.pedido_sheet_service import build_pedido_sheets
+
+        try:
+            items = json.loads(data_json)
+            sheets = build_pedido_sheets(items)
+            if not sheets:
+                return json.dumps({"ok": False, "error": "No hay items para imprimir."})
+
+            from pos_uniformes.ui.dialogs.conteo_print_dialog import open_conteo_print_dialog
+
+            parent = self.parent()
+            while parent is not None and not hasattr(parent, "windowTitle"):
+                parent = parent.parent()
+
+            open_conteo_print_dialog(parent, "Pedido de mercancía", sheets)
             return json.dumps({"ok": True})
         except Exception as exc:  # noqa: BLE001
             return json.dumps({"ok": False, "error": str(exc)})

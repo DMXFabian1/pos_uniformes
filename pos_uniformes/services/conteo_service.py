@@ -380,6 +380,117 @@ def obtener_variantes_agrupadas_por_producto(
     return resultado
 
 
+def obtener_variantes_basicos_para_conteo(
+    session: Session,
+) -> list[VarianteParaConteo]:
+    """Variantes de productos básicos (sin escuela directa, vinculados por catálogo)."""
+    # Sub-query: productos con al menos un link activo en catálogo
+    linked_ids = (
+        select(CatalogSchoolProductLink.producto_id)
+        .where(CatalogSchoolProductLink.activo.is_(True))
+        .distinct()
+        .scalar_subquery()
+    )
+
+    variantes = session.scalars(
+        select(Variante)
+        .join(Variante.producto)
+        .options(
+            joinedload(Variante.producto).joinedload(Producto.tipo_pieza),
+            joinedload(Variante.bodega_contenidos)
+            .joinedload(BodegaContenido.caja)
+            .joinedload(BodegaCaja.ubicacion),
+        )
+        .where(
+            Producto.escuela_id.is_(None),
+            Producto.activo.is_(True),
+            Variante.activo.is_(True),
+            Producto.id.in_(linked_ids),
+        )
+        .order_by(
+            Variante.ultimo_conteo_at.asc().nulls_first(),
+            Producto.nombre,
+            Variante.talla,
+        )
+    ).unique().all()
+
+    ahora = datetime.now(timezone.utc)
+    resultado: list[VarianteParaConteo] = []
+
+    for v in variantes:
+        if v.ultimo_conteo_at is not None:
+            dias = (ahora - v.ultimo_conteo_at).days
+            requiere = dias >= DIAS_VIGENCIA_DEFAULT
+        else:
+            dias = None
+            requiere = True
+
+        tipo_nombre = v.producto.tipo_pieza.nombre if v.producto.tipo_pieza else ""
+
+        resultado.append(VarianteParaConteo(
+            variante_id=v.id,
+            sku=v.sku,
+            producto_nombre=v.producto.nombre,
+            tipo_pieza=tipo_nombre,
+            talla=v.talla,
+            color=v.color,
+            stock_actual=v.stock_actual,
+            stock_bodega=v.stock_bodega,
+            stock_piso=v.stock_piso,
+            stock_tienda=v.stock_tienda,
+            ultimo_conteo_at=v.ultimo_conteo_at,
+            dias_desde_conteo=dias,
+            requiere_conteo=requiere,
+        ))
+
+    return resultado
+
+
+def obtener_variantes_basicos_agrupadas(
+    session: Session,
+    tipo_pieza: str | None = None,
+) -> list[dict]:
+    """Variantes básicas agrupadas por producto, ordenadas según PIEZA_ORDER."""
+    variantes = obtener_variantes_basicos_para_conteo(session)
+    if tipo_pieza:
+        variantes = [v for v in variantes if v.tipo_pieza == tipo_pieza]
+    grupos: dict[str, dict] = {}
+    for v in variantes:
+        key = v.producto_nombre
+        if key not in grupos:
+            grupos[key] = {
+                "producto_nombre": key,
+                "tipo_pieza": v.tipo_pieza,
+                "virtual": v.tipo_pieza in _TIPOS_VIRTUALES,
+                "variantes": [],
+            }
+        grupos[key]["variantes"].append(v)
+
+    # Reusar la misma lógica de ordenamiento de tallas
+    def _talla_sort_key(v: VarianteParaConteo):
+        t = v.talla.strip().upper()
+        if len(t) > 2 and t[:-2].isdigit():
+            return (0, int(t[:-2]), t)
+        try:
+            return (1, int(t), "")
+        except ValueError:
+            pass
+        letra_order = {
+            "CH": 0, "MD": 1, "GD": 2, "EXG": 3,
+            "XXS": 4, "XS": 5, "S": 6, "M": 7, "L": 8, "XL": 9, "XXL": 10,
+        }
+        return (2, letra_order.get(t, 99), t)
+
+    for g in grupos.values():
+        g["variantes"].sort(key=_talla_sort_key)
+
+    resultado = sorted(
+        grupos.values(),
+        key=lambda g: (_PIEZA_ORDER.get(g["tipo_pieza"], 99), g["producto_nombre"]),
+    )
+    return resultado
+
+
 def obtener_conteos_pendientes(
     session: Session,
     escuela_id: int | None = None,
