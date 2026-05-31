@@ -40,14 +40,34 @@ class BodegaService:
     # ─── Cajas ───────────────────────────────────────────────────────────
 
     @staticmethod
-    def _siguiente_codigo(session: Session, categoria: CategoriaCaja) -> str:
-        prefix = categoria.value
+    def _abrev_ubicacion(ubicacion: BodegaUbicacion | None) -> str:
+        """PISO N1 → P1, ALMACEN N1 → A1, sin ubicación → XX."""
+        if not ubicacion:
+            return "XX"
+        return f"{ubicacion.rack[0]}{ubicacion.nivel}"
+
+    @classmethod
+    def _siguiente_codigo(cls, session: Session, categoria: CategoriaCaja,
+                          ubicacion: BodegaUbicacion | None = None) -> str:
+        abrev = cls._abrev_ubicacion(ubicacion)
+        prefix = f"{categoria.value}-{abrev}"
+        # Extraer el número secuencial de códigos con este prefijo
         max_num = session.scalar(
             select(func.max(
-                func.cast(func.substr(BodegaCaja.codigo, 3), sa.Integer)
+                func.cast(func.substr(BodegaCaja.codigo, len(prefix) + 2), sa.Integer)
             )).where(BodegaCaja.codigo.like(f"{prefix}-%"))
         )
         return f"{prefix}-{(max_num or 0) + 1:03d}"
+
+    @classmethod
+    def _regenerar_codigo(cls, session: Session, caja: BodegaCaja) -> str:
+        """Genera nuevo código para una caja existente (reclasificar/mover)."""
+        ubicacion = caja.ubicacion
+        cat = CategoriaCaja(caja.categoria)
+        nuevo = cls._siguiente_codigo(session, cat, ubicacion)
+        caja.codigo = nuevo
+        caja.qr_data = f"BODEGA:CAJA:{nuevo}"
+        return nuevo
 
     @classmethod
     def crear_caja(
@@ -58,7 +78,8 @@ class BodegaService:
         notas: str | None = None,
         creado_por: str = "SYSTEM",
     ) -> BodegaCaja:
-        codigo = cls._siguiente_codigo(session, categoria)
+        ubicacion = session.get(BodegaUbicacion, ubicacion_id) if ubicacion_id else None
+        codigo = cls._siguiente_codigo(session, categoria, ubicacion)
         caja = BodegaCaja(
             codigo=codigo,
             categoria=categoria.value,
@@ -96,13 +117,21 @@ class BodegaService:
             raise ValueError("Caja no encontrada.")
 
         anterior_id = caja.ubicacion_id
+        codigo_anterior = caja.codigo
         caja.ubicacion_id = nueva_ubicacion_id
+        # Recargar la nueva ubicación para regenerar código
+        if nueva_ubicacion_id:
+            caja.ubicacion = session.get(BodegaUbicacion, nueva_ubicacion_id)
+        else:
+            caja.ubicacion = None
+        nuevo_codigo = cls._regenerar_codigo(session, caja)
 
         mov = BodegaMovimiento(
             caja_id=caja.id,
             tipo=TipoMovimientoBodega.MOVER_CAJA.value,
             ubicacion_anterior_id=anterior_id,
             ubicacion_nueva_id=nueva_ubicacion_id,
+            observacion=f"{codigo_anterior} → {nuevo_codigo}" if codigo_anterior != nuevo_codigo else None,
             creado_por=creado_por,
         )
         session.add(mov)
@@ -450,22 +479,29 @@ class BodegaService:
         )
         return int(result)
 
-    @staticmethod
+    @classmethod
     def reclasificar_caja(
+        cls,
         session: Session,
         caja_id: int,
         nueva_categoria: CategoriaCaja,
         creado_por: str = "SYSTEM",
     ) -> BodegaCaja:
-        caja = session.get(BodegaCaja, caja_id)
+        caja = session.scalar(
+            select(BodegaCaja)
+            .options(joinedload(BodegaCaja.ubicacion))
+            .where(BodegaCaja.id == caja_id)
+        )
         if not caja:
             raise ValueError("Caja no encontrada.")
+        codigo_anterior = caja.codigo
         anterior = caja.categoria
         caja.categoria = nueva_categoria.value
+        nuevo_codigo = cls._regenerar_codigo(session, caja)
         mov = BodegaMovimiento(
             caja_id=caja.id,
             tipo=TipoMovimientoBodega.AJUSTE.value,
-            observacion=f"Reclasificada de {anterior} a {nueva_categoria.value}",
+            observacion=f"Reclasificada de {anterior} a {nueva_categoria.value} ({codigo_anterior} → {nuevo_codigo})",
             creado_por=creado_por,
         )
         session.add(mov)
