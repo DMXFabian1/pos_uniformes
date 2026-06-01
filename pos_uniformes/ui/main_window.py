@@ -2164,6 +2164,19 @@ class MainWindow(QMainWindow):
         quick_search_shortcut.activated.connect(self._open_quick_product_search)
         quick_search_shortcut_mac = QShortcut(QKeySequence("Meta+S"), self)
         quick_search_shortcut_mac.activated.connect(self._open_quick_product_search)
+        kiosk_shortcut = QShortcut(QKeySequence("Ctrl+K"), self)
+        kiosk_shortcut.activated.connect(self._open_quick_kiosk)
+        kiosk_shortcut_mac = QShortcut(QKeySequence("Meta+K"), self)
+        kiosk_shortcut_mac.activated.connect(self._open_quick_kiosk)
+
+    def _open_quick_kiosk(self) -> None:
+        from pos_uniformes.ui.dialogs.quick_kiosk_dialog import QuickKioskDialog
+
+        if not hasattr(self, "_quick_kiosk_dialog") or self._quick_kiosk_dialog is None:
+            self._quick_kiosk_dialog = QuickKioskDialog(self)
+        self._quick_kiosk_dialog.show()
+        self._quick_kiosk_dialog.raise_()
+        self._quick_kiosk_dialog.activateWindow()
 
     def _focus_sale_capture(self) -> None:
         self.sale_sku_input.setFocus()
