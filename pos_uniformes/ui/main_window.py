@@ -2165,8 +2165,10 @@ class MainWindow(QMainWindow):
         quick_search_shortcut_mac = QShortcut(QKeySequence("Meta+S"), self)
         quick_search_shortcut_mac.activated.connect(self._open_quick_product_search)
         kiosk_shortcut = QShortcut(QKeySequence("Ctrl+K"), self)
+        kiosk_shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
         kiosk_shortcut.activated.connect(self._open_quick_kiosk)
         kiosk_shortcut_mac = QShortcut(QKeySequence("Meta+K"), self)
+        kiosk_shortcut_mac.setContext(Qt.ShortcutContext.ApplicationShortcut)
         kiosk_shortcut_mac.activated.connect(self._open_quick_kiosk)
 
     def _open_quick_kiosk(self) -> None:

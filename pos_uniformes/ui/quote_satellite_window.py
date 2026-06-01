@@ -1834,6 +1834,7 @@ class QuoteSatelliteWindow(QMainWindow):
         _admin_shortcut = QShortcut(QKeySequence("Ctrl+Shift+A"), self)
         _admin_shortcut.activated.connect(self._open_satellite_admin)
         _kiosk_ctrl_k = QShortcut(QKeySequence("Ctrl+K"), self)
+        _kiosk_ctrl_k.setContext(Qt.ShortcutContext.ApplicationShortcut)
         _kiosk_ctrl_k.activated.connect(self._open_quick_kiosk)
         self.catalog_previous_page_button.clicked.connect(self._handle_catalog_browser_previous_page)
         self.catalog_next_page_button.clicked.connect(self._handle_catalog_browser_next_page)
