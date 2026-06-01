@@ -5,7 +5,7 @@ from __future__ import annotations
 import unicodedata
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from pos_uniformes.api.dependencies import get_current_employee, get_db
@@ -50,11 +50,11 @@ def _sql_fallback_search(db: Session, q: str, mode: str | None, limit: int):
             Producto.activo.is_(True),
             Variante.activo.is_(True),
             or_(
-                func.unaccent(func.lower(Producto.nombre_base)).ilike(pattern),
-                func.unaccent(func.lower(Producto.nombre)).ilike(pattern),
+                func.lower(Producto.nombre_base).ilike(pattern),
+                func.lower(Producto.nombre).ilike(pattern),
                 func.lower(Variante.sku).ilike(f"%{q.lower()}%"),
                 Producto.tipo_pieza.has(
-                    func.unaccent(func.lower(TipoPieza.nombre)).ilike(pattern)
+                    func.lower(TipoPieza.nombre).ilike(pattern)
                 ),
             ),
         )
