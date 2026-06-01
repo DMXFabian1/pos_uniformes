@@ -87,6 +87,7 @@ class QuickKioskDialog(QDialog):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
         self.setWindowTitle("Consulta de Precios")
         self.setModal(False)
         self.setMinimumSize(600, 420)
