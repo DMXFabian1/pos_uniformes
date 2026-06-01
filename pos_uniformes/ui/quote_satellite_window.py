@@ -1833,9 +1833,26 @@ class QuoteSatelliteWindow(QMainWindow):
         _kiosk_ctrl_s.activated.connect(self._handle_quick_search)
         _admin_shortcut = QShortcut(QKeySequence("Ctrl+Shift+A"), self)
         _admin_shortcut.activated.connect(self._open_satellite_admin)
-        _kiosk_ctrl_k = QShortcut(QKeySequence("Ctrl+K"), self)
-        _kiosk_ctrl_k.setContext(Qt.ShortcutContext.ApplicationShortcut)
-        _kiosk_ctrl_k.activated.connect(self._open_quick_kiosk)
+        # Ctrl+K global via event filter (funciona en diálogos modales)
+        from PyQt6.QtCore import QEvent, QObject as _QObj
+
+        class _KioskKeyFilter(_QObj):
+            def __init__(self, owner):
+                super().__init__(owner)
+                self._owner = owner
+
+            def eventFilter(self, obj, event):
+                if event.type() == QEvent.Type.KeyPress:
+                    mods = event.modifiers()
+                    key = event.key()
+                    ctrl = mods & Qt.KeyboardModifier.ControlModifier or mods & Qt.KeyboardModifier.MetaModifier
+                    if ctrl and key == Qt.Key.Key_K:
+                        self._owner._open_quick_kiosk()
+                        return True
+                return False
+
+        self._kiosk_filter = _KioskKeyFilter(self)
+        QApplication.instance().installEventFilter(self._kiosk_filter)
         self.catalog_previous_page_button.clicked.connect(self._handle_catalog_browser_previous_page)
         self.catalog_next_page_button.clicked.connect(self._handle_catalog_browser_next_page)
         self.guided_add_button.clicked.connect(self._handle_add_guided_selection_to_quote)

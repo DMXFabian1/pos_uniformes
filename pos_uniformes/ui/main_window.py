@@ -2164,12 +2164,28 @@ class MainWindow(QMainWindow):
         quick_search_shortcut.activated.connect(self._open_quick_product_search)
         quick_search_shortcut_mac = QShortcut(QKeySequence("Meta+S"), self)
         quick_search_shortcut_mac.activated.connect(self._open_quick_product_search)
-        kiosk_shortcut = QShortcut(QKeySequence("Ctrl+K"), self)
-        kiosk_shortcut.setContext(Qt.ShortcutContext.ApplicationShortcut)
-        kiosk_shortcut.activated.connect(self._open_quick_kiosk)
-        kiosk_shortcut_mac = QShortcut(QKeySequence("Meta+K"), self)
-        kiosk_shortcut_mac.setContext(Qt.ShortcutContext.ApplicationShortcut)
-        kiosk_shortcut_mac.activated.connect(self._open_quick_kiosk)
+        # Ctrl+K global via event filter (funciona incluso en diálogos modales)
+        from PyQt6.QtWidgets import QApplication
+        from PyQt6.QtCore import QEvent
+
+        class _KioskKeyFilter(QObject):
+            def __init__(self, owner):
+                super().__init__(owner)
+                self._owner = owner
+
+            def eventFilter(self, obj, event):
+                if event.type() == QEvent.Type.KeyPress:
+                    from PyQt6.QtCore import Qt as _Qt
+                    mods = event.modifiers()
+                    key = event.key()
+                    ctrl = mods & _Qt.KeyboardModifier.ControlModifier or mods & _Qt.KeyboardModifier.MetaModifier
+                    if ctrl and key == _Qt.Key.Key_K:
+                        self._owner._open_quick_kiosk()
+                        return True
+                return False
+
+        self._kiosk_filter = _KioskKeyFilter(self)
+        QApplication.instance().installEventFilter(self._kiosk_filter)
 
     def _open_quick_kiosk(self) -> None:
         from pos_uniformes.ui.dialogs.quick_kiosk_dialog import QuickKioskDialog
