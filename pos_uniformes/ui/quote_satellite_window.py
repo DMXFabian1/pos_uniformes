@@ -1833,6 +1833,8 @@ class QuoteSatelliteWindow(QMainWindow):
         _kiosk_ctrl_s.activated.connect(self._handle_quick_search)
         _admin_shortcut = QShortcut(QKeySequence("Ctrl+Shift+A"), self)
         _admin_shortcut.activated.connect(self._open_satellite_admin)
+        _kiosk_ctrl_k = QShortcut(QKeySequence("Ctrl+K"), self)
+        _kiosk_ctrl_k.activated.connect(self._open_quick_kiosk)
         self.catalog_previous_page_button.clicked.connect(self._handle_catalog_browser_previous_page)
         self.catalog_next_page_button.clicked.connect(self._handle_catalog_browser_next_page)
         self.guided_add_button.clicked.connect(self._handle_add_guided_selection_to_quote)
@@ -2900,6 +2902,15 @@ class QuoteSatelliteWindow(QMainWindow):
         toggle_favorite(product_key)
         self._favorites = set(load_favorites())
         self._refresh_guided_browser()
+
+    def _open_quick_kiosk(self) -> None:
+        from pos_uniformes.ui.dialogs.quick_kiosk_dialog import QuickKioskDialog
+
+        if not hasattr(self, "_quick_kiosk_dialog") or self._quick_kiosk_dialog is None:
+            self._quick_kiosk_dialog = QuickKioskDialog(self)
+        self._quick_kiosk_dialog.show()
+        self._quick_kiosk_dialog.raise_()
+        self._quick_kiosk_dialog.activateWindow()
 
     def _open_satellite_admin(self) -> None:
         from pos_uniformes.ui.dialogs.satellite_admin_dialog import open_satellite_admin_dialog
