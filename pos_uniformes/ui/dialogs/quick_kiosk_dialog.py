@@ -128,9 +128,9 @@ class QuickKioskDialog(QDialog):
         recent_label.setStyleSheet(f"font-size:12px;font-weight:600;color:{_BRAND};margin-top:4px;")
         layout.addWidget(recent_label)
 
-        self._recent_table = QTableWidget(0, 5)
+        self._recent_table = QTableWidget(0, 4)
         self._recent_table.setObjectName("kioskRecent")
-        self._recent_table.setHorizontalHeaderLabels(["SKU", "Producto", "Talla", "Precio", "Stock"])
+        self._recent_table.setHorizontalHeaderLabels(["SKU", "Producto", "Talla", "Precio"])
         self._recent_table.horizontalHeader().setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         self._recent_table.verticalHeader().setVisible(False)
         self._recent_table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -182,10 +182,6 @@ class QuickKioskDialog(QDialog):
             price_item.setTextAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
             self._recent_table.setItem(i, 3, price_item)
 
-            stock_item = QTableWidgetItem(str(snap.stock_actual))
-            stock_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            self._recent_table.setItem(i, 4, stock_item)
-
         self._recent_table.resizeRowsToContents()
 
     def showEvent(self, event):
@@ -225,15 +221,12 @@ class _ProductCard(QLabel):
         )
 
     def show_product(self, snap: QuoteKioskLookupSnapshot) -> None:
-        stock_color = "#27ae60" if snap.stock_actual > 0 else "#c0392b"
-        stock_text = f"{snap.stock_actual} en stock" if snap.stock_actual > 0 else "Agotado"
         self.setText(
             f'<div style="text-align:center;">'
             f'<div style="font-size:13px;color:#888;">{snap.school_name} &middot; {snap.piece_type_name}</div>'
             f'<div style="font-size:22px;font-weight:700;color:#333;margin:4px 0;">{snap.product_name}</div>'
             f'<div style="font-size:14px;color:#666;">{snap.size_label} &middot; {snap.color_label}</div>'
             f'<div style="font-size:48px;font-weight:800;color:#87492c;margin:8px 0;">${snap.price:,.2f}</div>'
-            f'<div style="font-size:14px;font-weight:600;color:{stock_color};">{stock_text}</div>'
             f'<div style="font-size:11px;color:#aaa;margin-top:4px;">SKU: {snap.sku}</div>'
             f'</div>'
         )
