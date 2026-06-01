@@ -83,6 +83,8 @@ class Settings:
     db_echo: bool
     auto_create_schema: bool
     backup_external_dir: str | None
+    api_secret_key: str = "dev-secret-key-cambiar-en-produccion"
+    api_token_expire_hours: int = 8
 
     @property
     def database_url(self) -> str:

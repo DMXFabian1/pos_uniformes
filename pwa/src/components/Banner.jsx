@@ -22,8 +22,11 @@ export default function Banner() {
   if (online) return null
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-amber-500 text-white text-center text-sm font-semibold py-2 px-4 shadow">
-      Sin conexion con la PC principal — modo lectura
+    <div className="bg-warning-500 text-white text-center text-sm font-semibold py-2.5 px-4 animate-slide-down safe-area-top">
+      <div className="flex items-center justify-center gap-2">
+        <span className="w-2 h-2 rounded-full bg-white/80 animate-pulse" />
+        Sin conexion con la PC principal
+      </div>
     </div>
   )
 }

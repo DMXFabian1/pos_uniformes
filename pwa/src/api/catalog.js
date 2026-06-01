@@ -11,7 +11,6 @@ export const catalogApi = {
 
   bySku: (sku) => api.get(`/api/v1/catalog/sku/${encodeURIComponent(sku)}`),
 
-  // ── Catálogo guiado ──────────────────────────────────────────────────────
   guidedOptions: () => api.get('/api/v1/catalog/guided/options'),
 
   guidedProducts: ({ mode, escuela_id, tipo_prenda, genero, tipo_pieza_id } = {}) => {
@@ -23,7 +22,6 @@ export const catalogApi = {
     return api.get(`/api/v1/catalog/guided/products?${params}`)
   },
 
-  // ── Búsqueda rápida (Meilisearch) ─────────────────────────────────────────
   quickSearch: (q, { mode, limit } = {}) => {
     const params = new URLSearchParams({ q })
     if (mode)  params.set('mode', mode)

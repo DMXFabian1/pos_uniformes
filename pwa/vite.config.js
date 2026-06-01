@@ -1,12 +1,11 @@
+import fs from 'fs'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
-import basicSsl from '@vitejs/plugin-basic-ssl'
 
 export default defineConfig({
   plugins: [
     react(),
-    basicSsl(),
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['icons/*.png'],
@@ -14,8 +13,8 @@ export default defineConfig({
         name: 'POS Uniformes — Vendedora',
         short_name: 'Uniformes',
         description: 'Herramienta de trabajo para vendedoras de uniformes',
-        theme_color: '#1e40af',
-        background_color: '#ffffff',
+        theme_color: '#8a4326',
+        background_color: '#fdfaf4',
         display: 'standalone',
         orientation: 'portrait',
         start_url: '/',
@@ -41,7 +40,10 @@ export default defineConfig({
   ],
   server: {
     host: true,
-    https: true,
+    https: {
+      key: fs.readFileSync('.certs/key.pem'),
+      cert: fs.readFileSync('.certs/cert.pem'),
+    },
     proxy: {
       '/api': {
         target: process.env.VITE_API_URL || 'http://localhost:8000',

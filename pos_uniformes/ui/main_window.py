@@ -1757,6 +1757,8 @@ class MainWindow(QMainWindow):
         self.connection_action: QAction | None = None
         self.seed_action: QAction | None = None
         self.quick_backup_action: QAction | None = None
+        self.api_server_action: QAction | None = None
+        self._api_server_process: object | None = None
         self.page_help_button: QPushButton | None = None
         self.refresh_button: QPushButton | None = None
 
@@ -1777,6 +1779,10 @@ class MainWindow(QMainWindow):
         )
 
     def closeEvent(self, event: QCloseEvent) -> None:  # type: ignore[override]
+        if self._api_server_process is not None and self._api_server_process.poll() is None:
+            self._api_server_process.terminate()
+            self._api_server_process = None
+
         if self._force_close:
             self._force_close = False
             event.accept()
@@ -1836,6 +1842,9 @@ class MainWindow(QMainWindow):
         self.seed_action.triggered.connect(self._handle_seed_data)
         self.quick_backup_action = header_menu.addAction("Respaldo rapido (.dump)")
         self.quick_backup_action.triggered.connect(self._handle_quick_backup)
+        header_menu.addSeparator()
+        self.api_server_action = header_menu.addAction("Iniciar servidor movil")
+        self.api_server_action.triggered.connect(self._toggle_api_server)
         self.header_more_button = QToolButton()
         self.header_more_button.setText("Mas")
         self.header_more_button.setObjectName("toolbarSoftButton")
@@ -4590,6 +4599,56 @@ class MainWindow(QMainWindow):
         )
         QMessageBox.information(self, "Respaldo rapido listo", result_feedback.message)
         return True
+
+    def _toggle_api_server(self) -> None:
+        import subprocess
+        import socket
+
+        if self._api_server_process is not None and self._api_server_process.poll() is None:
+            self._api_server_process.terminate()
+            self._api_server_process.wait(timeout=5)
+            self._api_server_process = None
+            if self.api_server_action:
+                self.api_server_action.setText("Iniciar servidor movil")
+            QMessageBox.information(self, "Servidor movil", "Servidor detenido.")
+            return
+
+        try:
+            venv_python = Path(__file__).resolve().parent.parent / ".venv" / ("Scripts" if os.name == "nt" else "bin") / "python"
+            if not venv_python.exists():
+                venv_python = sys.executable
+
+            self._api_server_process = subprocess.Popen(
+                [str(venv_python), "-m", "uvicorn", "pos_uniformes.api.main:app",
+                 "--host", "0.0.0.0", "--port", "8000", "--workers", "1"],
+                cwd=str(Path(__file__).resolve().parent.parent.parent),
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+            )
+
+            hostname = socket.gethostname()
+            local_ip = socket.gethostbyname(hostname)
+            try:
+                s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                s.connect(("8.8.8.8", 80))
+                local_ip = s.getsockname()[0]
+                s.close()
+            except Exception:
+                pass
+
+            if self.api_server_action:
+                self.api_server_action.setText("Detener servidor movil")
+
+            QMessageBox.information(
+                self,
+                "Servidor movil",
+                f"Servidor iniciado.\n\n"
+                f"Las empleadas pueden entrar desde su celular a:\n"
+                f"https://{local_ip}:5173\n\n"
+                f"(deben estar en la misma red WiFi)",
+            )
+        except Exception as exc:
+            QMessageBox.warning(self, "Error", f"No se pudo iniciar el servidor:\n{exc}")
 
     def _handle_quick_backup(self) -> None:
         self._run_quick_backup_flow()

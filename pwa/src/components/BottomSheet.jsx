@@ -1,10 +1,3 @@
-/**
- * BottomSheet reutilizable
- * - Anima entrada desde abajo (slide-up)
- * - Handle superior arrastrable para cerrar
- * - Se cierra al arrastrar >30% de su altura o tocar el overlay
- * - maxHeight configurable (default 55vh = media pantalla aprox)
- */
 import { useRef, useState } from 'react'
 
 export default function BottomSheet({ children, onClose, maxHeight = '55vh' }) {
@@ -32,32 +25,29 @@ export default function BottomSheet({ children, onClose, maxHeight = '55vh' }) {
 
   return (
     <>
-      {/* Overlay oscuro — toca para cerrar */}
       <div
-        className="absolute inset-0 z-10 bg-black/40"
+        className="absolute inset-0 z-10 bg-ink-900/40 backdrop-blur-[2px] animate-fade-in"
         onClick={onClose}
       />
 
-      {/* Sheet */}
       <div
         ref={sheetRef}
-        className="absolute inset-x-0 bottom-0 z-20 bg-white rounded-t-3xl shadow-2xl
+        className="absolute inset-x-0 bottom-0 z-20 bg-surface-0 rounded-t-3xl shadow-float
           flex flex-col animate-slide-up"
         style={{
           maxHeight,
           transform: `translateY(${dragY}px)`,
-          transition: dragY === 0 ? 'transform 0.25s ease-out' : 'none',
+          transition: dragY === 0 ? 'transform 0.3s cubic-bezier(0.32, 0.72, 0, 1)' : 'none',
           willChange: 'transform',
         }}
       >
-        {/* Handle — solo esta zona arrastra */}
         <div
-          className="flex justify-center pt-3 pb-1 touch-none cursor-grab active:cursor-grabbing shrink-0"
+          className="flex justify-center pt-3 pb-2 touch-none cursor-grab active:cursor-grabbing shrink-0"
           onTouchStart={onTouchStart}
           onTouchMove={onTouchMove}
           onTouchEnd={onTouchEnd}
         >
-          <div className="w-10 h-1 rounded-full bg-gray-200" />
+          <div className="w-10 h-1.5 rounded-full bg-surface-300" />
         </div>
 
         {children}

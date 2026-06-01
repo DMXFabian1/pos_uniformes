@@ -124,15 +124,14 @@ export default function Scanner({ onScan, active = true }) {
         await scanner.start(
           { facingMode: 'environment' },
           {
-            fps: 25,
+            fps: 30,
             qrbox: { width: boxW, height: boxH },
             aspectRatio: 1.5,
-            disableFlip: false,
-            // Resolución baja = arranca más rápido y procesa más rápido
+            disableFlip: true,
             videoConstraints: {
               facingMode: { ideal: 'environment' },
-              width:  { ideal: 640 },
-              height: { ideal: 480 },
+              width:  { ideal: 1280 },
+              height: { ideal: 720 },
             },
           },
           (decoded) => {
@@ -153,13 +152,16 @@ export default function Scanner({ onScan, active = true }) {
           const track = video?.srcObject?.getVideoTracks?.()[0]
           if (track?.applyConstraints) {
             trackRef.current = track
-            await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {})
             const caps = track.getCapabilities?.()
+            // Forzar lente principal en iOS (zoom 2x = lente 1x real)
+            if (caps?.zoom && caps.zoom.max >= 1) {
+              await track.applyConstraints({ advanced: [{ zoom: 1.0 }] }).catch(() => {})
+              setZoom(1.0)
+            }
+            await track.applyConstraints({ advanced: [{ focusMode: 'continuous' }] }).catch(() => {})
             if (caps?.torch) setHasTorch(true)
-            // Detectar rango de zoom soportado
             if (caps?.zoom) {
               setZoomRange({ min: caps.zoom.min, max: caps.zoom.max, step: caps.zoom.step ?? 0.1 })
-              setZoom(caps.zoom.min)
             }
           }
         } catch (_) {}
@@ -223,42 +225,59 @@ export default function Scanner({ onScan, active = true }) {
     <div className="relative w-full h-full overflow-hidden bg-black">
       <div id={containerId} className="w-full h-full" />
 
-      {/* Flash verde */}
-      <div className={`absolute inset-0 pointer-events-none transition-opacity duration-150
-        bg-green-400/35 ${flash ? 'opacity-100' : 'opacity-0'}`} />
+      {/* Flash */}
+      <div className={`absolute inset-0 pointer-events-none transition-opacity duration-200
+        ${flash ? 'opacity-100' : 'opacity-0'}`}
+        style={{ background: 'radial-gradient(circle, rgba(168,79,45,0.3) 0%, transparent 70%)' }} />
 
-      {/* Marco guia — tamaño reducido para coincidir con el qrbox */}
+      {/* Viñeta oscura alrededor del area de escaneo */}
+      <div className="absolute inset-0 pointer-events-none"
+        style={{ background: 'radial-gradient(ellipse 55% 35% at center, transparent 0%, rgba(0,0,0,0.55) 100%)' }} />
+
+      {/* Marco guia */}
       <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className="relative w-52 h-32">
-          {['top-0 left-0 border-t-[3px] border-l-[3px] rounded-tl-md',
-            'top-0 right-0 border-t-[3px] border-r-[3px] rounded-tr-md',
-            'bottom-0 left-0 border-b-[3px] border-l-[3px] rounded-bl-md',
-            'bottom-0 right-0 border-b-[3px] border-r-[3px] rounded-br-md',
+        <div className="relative w-60 h-40">
+          {/* Esquinas */}
+          {[
+            'top-0 left-0 border-t-[3px] border-l-[3px] rounded-tl-xl',
+            'top-0 right-0 border-t-[3px] border-r-[3px] rounded-tr-xl',
+            'bottom-0 left-0 border-b-[3px] border-l-[3px] rounded-bl-xl',
+            'bottom-0 right-0 border-b-[3px] border-r-[3px] rounded-br-xl',
           ].map((cls, i) => (
-            <span key={i} className={`absolute w-6 h-6 ${cls} transition-colors duration-200
-              ${ready ? 'border-green-400 animate-ready-pulse' : 'border-white'}`} />
+            <span key={i} className={`absolute w-8 h-8 ${cls} transition-all duration-300
+              ${ready ? 'border-brand-400 shadow-[0_0_12px_rgba(168,79,45,0.5)]' : flash ? 'border-brand-400' : 'border-white/80'}`} />
           ))}
-          <div className="absolute top-2 left-3 right-3 h-[2px] animate-scan
-            bg-gradient-to-r from-transparent via-green-400 to-transparent" />
+          {/* Linea de escaneo */}
+          <div className="absolute left-4 right-4 h-[2px] animate-scan rounded-full"
+            style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(168,79,45,0.8) 30%, rgba(168,79,45,0.8) 70%, transparent 100%)' }} />
         </div>
       </div>
 
-      {/* Linterna */}
-      {hasTorch && (
-        <button
-          onClick={() => setTorch(t => !t)}
-          className={`absolute top-4 right-4 w-11 h-11 rounded-full flex items-center justify-center
-            text-xl transition-all active:scale-90 shadow-lg
-            ${torch ? 'bg-yellow-400 text-gray-900' : 'bg-black/40 text-white/70 border border-white/20'}`}
-        >
-          🔦
-        </button>
-      )}
+      {/* Controles superiores */}
+      <div className="absolute top-4 left-4 right-4 flex items-center justify-between pointer-events-none">
+        <div className="pointer-events-auto" />
+        {hasTorch && (
+          <button
+            onClick={() => setTorch(t => !t)}
+            className={`pointer-events-auto w-10 h-10 rounded-full flex items-center justify-center
+              transition-all active:scale-90 backdrop-blur-md
+              ${torch
+                ? 'bg-brand-400 text-white shadow-[0_0_16px_rgba(168,79,45,0.4)]'
+                : 'bg-white/10 text-white/70 border border-white/20'}`}
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 18v-5.25m0 0a6.01 6.01 0 001.5-.189m-1.5.189a6.01 6.01 0 01-1.5-.189m3.75 7.478a12.06 12.06 0 01-4.5 0m3.75 2.383a14.406 14.406 0 01-3 0M14.25 18v-.192c0-.983.658-1.823 1.508-2.316a7.5 7.5 0 10-7.517 0c.85.493 1.509 1.333 1.509 2.316V18" />
+            </svg>
+          </button>
+        )}
+      </div>
 
-      {/* Slider de zoom — solo si el dispositivo lo soporta */}
+      {/* Zoom slider */}
       {zoomRange && (
-        <div className="absolute bottom-4 left-6 right-6 flex items-center gap-3">
-          <span className="text-white/50 text-xs">🔍</span>
+        <div className="absolute bottom-5 left-8 right-8 flex items-center gap-3">
+          <svg className="w-4 h-4 text-white/40 shrink-0" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607zM10.5 7.5v6m3-3h-6" />
+          </svg>
           <input
             type="range"
             min={zoomRange.min}
@@ -266,9 +285,9 @@ export default function Scanner({ onScan, active = true }) {
             step={zoomRange.step}
             value={zoom}
             onChange={e => setZoom(Number(e.target.value))}
-            className="flex-1 h-1 accent-white cursor-pointer"
+            className="flex-1 h-1 accent-brand-400 cursor-pointer"
           />
-          <span className="text-white/50 text-xs w-8 text-right">{zoom.toFixed(1)}×</span>
+          <span className="text-white/50 text-xs font-medium w-8 text-right tabular-nums">{zoom.toFixed(1)}x</span>
         </div>
       )}
     </div>

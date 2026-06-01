@@ -20,6 +20,7 @@ from pos_uniformes.api.schemas.catalog import (
     VarianteScanOut,
 )
 from pos_uniformes.database.models import (
+    CatalogSchoolProductLink,
     Categoria,
     Escuela,
     Marca,
@@ -36,9 +37,9 @@ router = APIRouter(prefix="/api/v1/catalog", tags=["catalog"])
 _TALLA_ALPHA: dict[str, int] = {
     "XCH": 0, "XXS": 0,
     "CH": 1, "XS": 1,
-    "M": 2, "S": 2,
-    "G": 3,
-    "XG": 4, "L": 4,
+    "M": 2, "S": 2, "MD": 2,
+    "G": 3, "GD": 3,
+    "XG": 4, "L": 4, "EXG": 4,
     "XXG": 5, "XL": 5,
     "XXXG": 6, "XXL": 6,
     "4XL": 7,
@@ -46,14 +47,47 @@ _TALLA_ALPHA: dict[str, int] = {
 }
 
 
+_PIEZA_ORDER: dict[str, int] = {
+    "Playera": 0,
+    "Pants 3pz": 1,
+    "Pants 2pz": 2,
+    "Pants Suelto": 3,
+    "Chamarra": 4,
+    "Suéter": 5,
+    "Chaleco": 6,
+    "Pantalón": 7,
+    "Falda": 8,
+    "Jumper": 9,
+    "Camisa": 10,
+    "Corbata": 11,
+    "Corbatín": 12,
+    "Moño": 13,
+    "Mascada": 14,
+    "Calceta": 15,
+    "Malla": 16,
+    "Bata": 17,
+    "Boina": 18,
+    "Guante": 19,
+    "Short": 20,
+    "Blusa": 21,
+    "Jeans": 22,
+}
+
+
+def _pieza_sort_key(nombre: str | None) -> int:
+    return _PIEZA_ORDER.get(nombre or "", 99)
+
+
 def _talla_sort_key(talla: str) -> tuple:
     t = talla.strip().upper()
-    if t in _TALLA_ALPHA:
-        return (0, _TALLA_ALPHA[t], "")
     try:
-        return (1, float(t), "")   # tallas numéricas (2, 4, 6, 8 …)
+        return (0, float(t), "")
     except ValueError:
-        return (2, 0, t)           # fallback alfabético
+        pass
+    if t in _TALLA_ALPHA:
+        return (1, _TALLA_ALPHA[t], "")
+    return (2, 0, t)
+
 
 DEFAULT_PAGE_SIZE = 30
 MAX_PAGE_SIZE = 100
@@ -230,7 +264,7 @@ def guided_options(
             Producto.escuela_id.isnot(None),
         )
         .distinct()
-        .order_by(NivelEducativo.nombre)
+        .order_by(NivelEducativo.id)
     ).all()
 
     niveles = []
@@ -269,8 +303,11 @@ def guided_options(
             q = q.where(Producto.escuela_id.isnot(None))
         else:
             q = q.where(Producto.escuela_id.is_(None))
-        rows = db.execute(q.distinct().order_by(TipoPieza.nombre)).all()
-        return [{"id": r[0], "nombre": r[1]} for r in rows]
+        rows = db.execute(q.distinct()).all()
+        return sorted(
+            [{"id": r[0], "nombre": r[1]} for r in rows],
+            key=lambda x: _pieza_sort_key(x["nombre"]),
+        )
 
     return GuidedOptionsOut(
         niveles=niveles,
@@ -325,7 +362,34 @@ def guided_products(
     if tipo_pieza_id is not None:
         stmt = stmt.where(Producto.tipo_pieza_id == tipo_pieza_id)
 
-    productos = db.scalars(stmt).all()
+    productos = list(db.scalars(stmt).all())
+
+    # Inyectar productos ligados (básicos asociados a escuelas)
+    if mode == "school" and escuela_id is not None:
+        linked_producto_ids = db.scalars(
+            select(CatalogSchoolProductLink.producto_id).where(
+                CatalogSchoolProductLink.escuela_id == escuela_id,
+                CatalogSchoolProductLink.activo.is_(True),
+            )
+        ).all()
+        if linked_producto_ids:
+            linked_stmt = (
+                select(Producto)
+                .where(
+                    Producto.id.in_(linked_producto_ids),
+                    Producto.activo.is_(True),
+                )
+                .options(
+                    selectinload(Producto.variantes),
+                    selectinload(Producto.tipo_pieza),
+                    selectinload(Producto.tipo_prenda),
+                )
+            )
+            linked_prods = db.scalars(linked_stmt).all()
+            existing_ids = {p.id for p in productos}
+            for lp in linked_prods:
+                if lp.id not in existing_ids:
+                    productos.append(lp)
 
     # Recopilar opciones de filtro disponibles en la selección actual
     genero_set: set[str] = set()
@@ -345,7 +409,6 @@ def guided_products(
         if not variantes_activas:
             continue
 
-        # Mismo formato de clave que el satélite desktop:  "TipoPieza||NombreBase"
         tipo_pieza_nombre = p.tipo_pieza.nombre if p.tipo_pieza else "Sin pieza"
         fam_key = f"{tipo_pieza_nombre}||{p.nombre_base}"
         if fam_key not in families_map:
@@ -369,8 +432,11 @@ def guided_products(
                 "stock_actual": v.stock_actual,
             })
 
-    # Ordenar familias y variantes
-    families = sorted(families_map.values(), key=lambda f: f["nombre_base"])
+    # Ordenar familias por tipo_pieza (mismo orden que el kiosco) y luego nombre
+    families = sorted(
+        families_map.values(),
+        key=lambda f: (_pieza_sort_key(f["tipo_pieza"]), f["nombre_base"]),
+    )
     for fam in families:
         fam["variantes"].sort(key=lambda v: (_talla_sort_key(v["talla"]), v["color"]))
 
@@ -379,7 +445,7 @@ def guided_products(
         tipo_prenda_options=sorted(tipo_prenda_set),
         tipo_pieza_options=sorted(
             [{"id": k, "nombre": v} for k, v in tipo_pieza_map.items()],
-            key=lambda x: x["nombre"],
+            key=lambda x: _pieza_sort_key(x["nombre"]),
         ),
         families=[ProductFamilyOut(**f) for f in families],
     )

@@ -17,7 +17,14 @@ export default function LoginScreen() {
 
   useEffect(() => {
     authApi.getEmployees()
-      .then(setEmployees)
+      .then(data => {
+        setEmployees(data)
+        const lastId = localStorage.getItem('pos_last_employee_id')
+        if (lastId) {
+          const last = data.find(e => String(e.id) === lastId && e.tiene_pin)
+          if (last) setSelected(last)
+        }
+      })
       .catch(() => setError('No se pudo conectar con la PC principal.'))
       .finally(() => setFetching(false))
   }, [])
@@ -28,6 +35,7 @@ export default function LoginScreen() {
     setError('')
     try {
       const data = await authApi.login(selected.id, pin, deviceId)
+      localStorage.setItem('pos_last_employee_id', String(selected.id))
       login(data)
       navigate('/scanner', { replace: true })
     } catch (e) {
@@ -39,68 +47,70 @@ export default function LoginScreen() {
   }
 
   if (fetching) return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-brand-800">
-      <Spinner className="text-white" />
-      <p className="mt-4 text-white/70 text-sm">Conectando…</p>
+    <div className="min-h-screen flex flex-col items-center justify-center bg-brand-700">
+      <Spinner className="text-white" size="lg" />
+      <p className="mt-4 text-white/60 text-sm">Conectando...</p>
     </div>
   )
 
   return (
-    <div className="min-h-screen bg-brand-800 flex flex-col">
-      {/* Header */}
-      <div className="flex flex-col items-center pt-12 pb-6 px-6">
-        <div className="w-16 h-16 bg-white/10 rounded-2xl flex items-center justify-center mb-4">
-          <span className="text-3xl">👕</span>
+    <div className="min-h-screen bg-brand-700 flex flex-col safe-area-top">
+      <div className="flex flex-col items-center pt-14 pb-8 px-6">
+        <div className="w-16 h-16 bg-white/10 backdrop-blur-sm rounded-3xl flex items-center justify-center mb-5 shadow-lg border border-white/10">
+          <span className="text-3xl">U</span>
         </div>
-        <h1 className="text-white text-xl font-bold">POS Uniformes</h1>
-        <p className="text-white/60 text-sm mt-1">Selecciona tu nombre y escribe tu PIN</p>
+        <h1 className="text-white text-xl font-bold tracking-tight">POS Uniformes</h1>
+        <p className="text-white/50 text-sm mt-1.5">
+          {selected ? 'Ingresa tu PIN' : 'Selecciona tu nombre'}
+        </p>
       </div>
 
-      {/* Tarjeta principal */}
-      <div className="flex-1 bg-white rounded-t-3xl px-6 pt-8 pb-6 overflow-auto">
-        {/* Lista de empleadas */}
+      <div className="flex-1 bg-surface-0 rounded-t-[32px] px-6 pt-8 pb-6 overflow-auto shadow-[0_-4px_32px_rgba(0,0,0,0.1)]">
         {!selected ? (
           <>
-            <h2 className="text-gray-700 font-semibold mb-3">¿Quién eres?</h2>
+            <h2 className="text-ink-700 font-bold text-base mb-4">Quien eres?</h2>
             {employees.length === 0 ? (
-              <p className="text-center text-gray-400 py-8">No hay empleadas activas con PIN configurado.</p>
+              <p className="text-center text-ink-400 py-8 text-sm">No hay empleadas activas con PIN configurado.</p>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-2.5">
                 {employees.filter(e => e.tiene_pin).map(emp => (
                   <button
                     key={emp.id}
                     onClick={() => { setSelected(emp); setPin('') }}
-                    className="w-full flex items-center gap-3 p-4 rounded-2xl border border-gray-200 active:bg-brand-50 active:border-brand-300 transition-colors text-left"
+                    className="w-full flex items-center gap-3.5 p-4 rounded-2xl border border-surface-300
+                      active:bg-brand-50 active:border-brand-300 active:scale-[0.98] transition-all text-left touch-target"
                   >
-                    <div className="w-10 h-10 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold text-sm shrink-0">
+                    <div className="w-11 h-11 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold text-sm shrink-0">
                       {emp.nombre_visible.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                     </div>
-                    <span className="font-medium text-gray-800">{emp.nombre_visible}</span>
+                    <span className="font-semibold text-ink-900">{emp.nombre_visible}</span>
                   </button>
                 ))}
               </div>
             )}
           </>
         ) : (
-          /* PIN keypad */
           <>
-            <div className="flex items-center gap-3 mb-6">
+            <div className="flex items-center gap-3 mb-8">
               <button
                 onClick={() => { setSelected(null); setPin(''); setError('') }}
-                className="text-brand-600 text-sm font-medium"
+                className="btn-ghost text-sm px-3 py-2"
               >
-                ← Cambiar
+                <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                </svg>
+                Cambiar
               </button>
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold text-xs">
+              <div className="flex items-center gap-2.5 ml-auto">
+                <div className="w-9 h-9 rounded-full bg-brand-100 flex items-center justify-center text-brand-700 font-bold text-xs">
                   {selected.nombre_visible.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                 </div>
-                <span className="font-semibold text-gray-800">{selected.nombre_visible}</span>
+                <span className="font-semibold text-ink-900 text-sm">{selected.nombre_visible}</span>
               </div>
             </div>
 
             {error && (
-              <div className="mb-4 bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm text-center">
+              <div className="mb-5 bg-danger-50 border border-danger-100 text-danger-500 rounded-2xl px-4 py-3 text-sm text-center font-medium">
                 {error}
               </div>
             )}
