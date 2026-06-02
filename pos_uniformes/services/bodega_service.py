@@ -308,6 +308,102 @@ class BodegaService:
         return contenido
 
     @classmethod
+    def corregir_producto(
+        cls,
+        session: Session,
+        caja_id: int,
+        variante_id: int,
+        cantidad: int,
+        creado_por: str = "SYSTEM",
+        observacion: str | None = None,
+    ) -> BodegaContenido | None:
+        """Elimina piezas de la caja Y descuenta stock_actual (error humano)."""
+        if cantidad <= 0:
+            raise ValueError("La cantidad debe ser mayor a cero.")
+
+        contenido = session.scalar(
+            select(BodegaContenido).where(
+                BodegaContenido.caja_id == caja_id,
+                BodegaContenido.variante_id == variante_id,
+            )
+        )
+        if not contenido:
+            raise ValueError("La variante no existe en esta caja.")
+        if contenido.cantidad < cantidad:
+            raise ValueError(f"Solo hay {contenido.cantidad} unidades en la caja.")
+
+        variante = session.get(Variante, variante_id)
+        if not variante:
+            raise ValueError("Variante no encontrada.")
+
+        contenido.cantidad -= cantidad
+        if contenido.cantidad == 0:
+            session.delete(contenido)
+            contenido = None
+
+        variante.stock_actual = max(0, variante.stock_actual - cantidad)
+
+        mov = BodegaMovimiento(
+            caja_id=caja_id,
+            variante_id=variante_id,
+            tipo=TipoMovimientoBodega.CORRECCION.value,
+            cantidad=cantidad,
+            observacion=observacion or "Corrección por error humano",
+            creado_por=creado_por,
+        )
+        session.add(mov)
+        session.flush()
+        return contenido
+
+    @classmethod
+    def crear_caja_adjunta(
+        cls,
+        session: Session,
+        caja_base_id: int,
+        notas: str | None = None,
+        creado_por: str = "SYSTEM",
+    ) -> BodegaCaja:
+        """Crea una caja con sufijo (B, C, D...) junto a la caja base."""
+        caja_base = session.scalar(
+            select(BodegaCaja)
+            .options(joinedload(BodegaCaja.ubicacion))
+            .where(BodegaCaja.id == caja_base_id)
+        )
+        if not caja_base:
+            raise ValueError("Caja base no encontrada.")
+
+        codigo_raiz = caja_base.codigo.rstrip("BCDEFGHIJKLMNOPQRSTUVWXYZ")
+        sufijo = "B"
+        while session.scalar(
+            select(BodegaCaja.id).where(BodegaCaja.codigo == f"{codigo_raiz}{sufijo}")
+        ):
+            sufijo = chr(ord(sufijo) + 1)
+            if sufijo > "Z":
+                raise ValueError("Se alcanzó el límite de cajas adjuntas.")
+
+        codigo = f"{codigo_raiz}{sufijo}"
+        caja = BodegaCaja(
+            codigo=codigo,
+            categoria=caja_base.categoria,
+            ubicacion_id=caja_base.ubicacion_id,
+            estado=EstadoCaja.ACTIVA.value,
+            notas=notas,
+        )
+        session.add(caja)
+        session.flush()
+
+        mov = BodegaMovimiento(
+            caja_id=caja.id,
+            tipo=TipoMovimientoBodega.CREAR_CAJA.value,
+            ubicacion_nueva_id=caja_base.ubicacion_id,
+            observacion=f"Adjunta a {caja_base.codigo}",
+            creado_por=creado_por,
+        )
+        session.add(mov)
+        session.flush()
+        return caja
+
+    @classmethod
     def transferir_producto(
         cls,
         session: Session,

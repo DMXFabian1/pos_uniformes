@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QColor
 from PyQt6.QtWidgets import (
+    QButtonGroup,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -19,6 +20,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QRadioButton,
     QSpinBox,
     QSplitter,
     QTableWidget,
@@ -418,6 +420,13 @@ class BodegaWidget(QWidget):
         self.btn_reclasificar.setEnabled(False)
         acciones_caja.addWidget(self.btn_reclasificar)
 
+        self.btn_adjunta = QPushButton("+ Caja adjunta")
+        self.btn_adjunta.setToolTip("Crea una caja con sufijo (ej: 7B) junto a esta, misma categoría y ubicación")
+        self.btn_adjunta.setStyleSheet(_BTN_SECONDARY)
+        self.btn_adjunta.clicked.connect(self._on_caja_adjunta)
+        self.btn_adjunta.setEnabled(False)
+        acciones_caja.addWidget(self.btn_adjunta)
+
         self.btn_etiqueta = QPushButton("Imprimir etiqueta")
         self.btn_etiqueta.setToolTip("Genera una hoja tamaño carta con QR, contenido y tallas para pegar a la caja")
         self.btn_etiqueta.setStyleSheet(_BTN_OUTLINE)
@@ -624,6 +633,7 @@ class BodegaWidget(QWidget):
         self.btn_retirar.setEnabled(enabled)
         self.btn_mover.setEnabled(enabled)
         self.btn_reclasificar.setEnabled(enabled)
+        self.btn_adjunta.setEnabled(enabled)
         self.btn_etiqueta.setEnabled(enabled)
 
     def _load_caja_detalle(self, caja_id: int) -> None:
@@ -766,7 +776,6 @@ class BodegaWidget(QWidget):
         except (ValueError, TypeError):
             cant_actual = 1
 
-        # Obtener variante_id de UserRole (más fiable que buscar por SKU)
         variante_id_item = self.tabla_contenido.item(row, 0)
         variante_id = variante_id_item.data(Qt.ItemDataRole.UserRole) if variante_id_item else None
 
@@ -774,8 +783,8 @@ class BodegaWidget(QWidget):
         dialog = RetirarDialog(self, display_name, cant_actual)
         if dialog.exec() == QDialog.DialogCode.Accepted:
             cantidad = dialog.cantidad()
+            es_correccion = dialog.es_correccion()
             with get_session() as session:
-                # Buscar por variante_id si está disponible, sino fallback a SKU
                 variante = None
                 if variante_id:
                     variante = session.get(Variante, variante_id)
@@ -785,10 +794,16 @@ class BodegaWidget(QWidget):
                     )
                 if variante:
                     try:
-                        BodegaService.retirar_producto(
-                            session, self._selected_caja_id, variante.id, cantidad,
-                            creado_por=self._get_usuario_actual(),
-                        )
+                        if es_correccion:
+                            BodegaService.corregir_producto(
+                                session, self._selected_caja_id, variante.id, cantidad,
+                                creado_por=self._get_usuario_actual(),
+                            )
+                        else:
+                            BodegaService.retirar_producto(
+                                session, self._selected_caja_id, variante.id, cantidad,
+                                creado_por=self._get_usuario_actual(),
+                            )
                         session.commit()
                     except ValueError as e:
                         session.rollback()
@@ -821,6 +836,39 @@ class BodegaWidget(QWidget):
         if dialog.exec() == QDialog.DialogCode.Accepted:
             self._load_caja_detalle(self._selected_caja_id)
             self._refresh_cajas()
+
+    def _on_caja_adjunta(self) -> None:
+        if not self._selected_caja_id:
+            return
+        with get_session() as session:
+            caja_base = BodegaService.obtener_caja_detalle(session, self._selected_caja_id)
+            if not caja_base:
+                return
+            codigo_base = caja_base.codigo
+        reply = QMessageBox.question(
+            self,
+            "Caja adjunta",
+            f"Crear caja adjunta a {codigo_base}?\n"
+            "Hereda categoría y ubicación.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        )
+        if reply != QMessageBox.StandardButton.Yes:
+            return
+        with get_session() as session:
+            try:
+                nueva = BodegaService.crear_caja_adjunta(
+                    session, self._selected_caja_id,
+                    creado_por=self._get_usuario_actual(),
+                )
+                session.commit()
+                QMessageBox.information(
+                    self, "Caja creada", f"Se creó la caja {nueva.codigo}"
+                )
+            except ValueError as e:
+                session.rollback()
+                QMessageBox.warning(self, "Error", str(e))
+                return
+        self._refresh_cajas()
 
     def _on_imprimir_etiqueta(self) -> None:
         if not self._selected_caja_id:
@@ -951,22 +999,44 @@ class RetirarDialog(QDialog):
     def __init__(self, parent: QWidget, sku: str, max_cantidad: int):
         super().__init__(parent)
         self.setWindowTitle(f"Retirar — {sku}")
+        self.setMinimumWidth(340)
 
-        layout = QFormLayout()
+        layout = QVBoxLayout()
+
+        # Destino
+        destino_group = QGroupBox("Destino")
+        destino_layout = QVBoxLayout()
+        self._radio_tienda = QRadioButton("A tienda (stock se mantiene)")
+        self._radio_correccion = QRadioButton("Eliminar por error (descuenta stock)")
+        self._radio_tienda.setChecked(True)
+        self._radio_correccion.setStyleSheet("color: #C0392B;")
+        destino_layout.addWidget(self._radio_tienda)
+        destino_layout.addWidget(self._radio_correccion)
+        destino_group.setLayout(destino_layout)
+        layout.addWidget(destino_group)
+
+        # Cantidad
+        cant_layout = QHBoxLayout()
+        cant_layout.addWidget(QLabel("Cantidad:"))
         self._spin = QSpinBox()
         self._spin.setMinimum(1)
         self._spin.setMaximum(max_cantidad)
         self._spin.setValue(1)
-        layout.addRow("Cantidad a retirar:", self._spin)
+        cant_layout.addWidget(self._spin)
+        cant_layout.addStretch()
+        layout.addLayout(cant_layout)
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
-        layout.addRow(buttons)
+        layout.addWidget(buttons)
         self.setLayout(layout)
 
     def cantidad(self) -> int:
         return self._spin.value()
+
+    def es_correccion(self) -> bool:
+        return self._radio_correccion.isChecked()
 
 
 class MoverCajaDialog(QDialog):

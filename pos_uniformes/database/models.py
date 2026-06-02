@@ -30,6 +30,7 @@ class TipoMovimientoBodega(str, Enum):
     MOVER_CAJA = "MOVER_CAJA"
     CREAR_CAJA = "CREAR_CAJA"
     AJUSTE = "AJUSTE"
+    CORRECCION = "CORRECCION"
 
 
 class CategoriaCaja(str, Enum):
@@ -1664,7 +1665,7 @@ class BodegaMovimiento(Base):
     __tablename__ = "bodega_movimiento"
     __table_args__ = (
         CheckConstraint(
-            "tipo IN ('INGRESO', 'RETIRO', 'TRANSFERENCIA', 'MOVER_CAJA', 'CREAR_CAJA', 'AJUSTE')",
+            "tipo IN ('INGRESO', 'RETIRO', 'TRANSFERENCIA', 'MOVER_CAJA', 'CREAR_CAJA', 'AJUSTE', 'CORRECCION')",
             name="bodega_movimiento_tipo_valido",
         ),
     )
