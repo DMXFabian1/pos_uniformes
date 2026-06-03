@@ -51,11 +51,15 @@ class BodegaService:
                           ubicacion: BodegaUbicacion | None = None) -> str:
         abrev = cls._abrev_ubicacion(ubicacion)
         prefix = f"{categoria.value}-{abrev}"
-        # Extraer el número secuencial de códigos con este prefijo
+        # Extraer el número secuencial — excluir sufijos de cajas adjuntas (007B, etc.)
+        suffix_expr = func.substr(BodegaCaja.codigo, len(prefix) + 2)
         max_num = session.scalar(
             select(func.max(
-                func.cast(func.substr(BodegaCaja.codigo, len(prefix) + 2), sa.Integer)
-            )).where(BodegaCaja.codigo.like(f"{prefix}-%"))
+                func.cast(suffix_expr, sa.Integer)
+            )).where(
+                BodegaCaja.codigo.like(f"{prefix}-%"),
+                suffix_expr.op("~")(r"^\d+$"),
+            )
         )
         return f"{prefix}-{(max_num or 0) + 1:03d}"
 
