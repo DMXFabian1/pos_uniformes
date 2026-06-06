@@ -1,4 +1,4 @@
-# Checador de precios — ESP32-S3 (WROOM N16R8) + OV3660
+# Checador de precios — ESP32-S3 (WROOM N16R8) + cámara OV2640/OV3660
 
 Versión para la placa **ESP32-S3 dual USB-C con cámara OV3660** (tipo KLYCKIT /
 Freenove ESP32-S3-CAM). Hace lo mismo que la versión AI-Thinker, pero adaptada
@@ -17,7 +17,7 @@ al ESP32-S3. El QR contiene el **SKU** del producto (`variante.sku`).
 
 | Componente | Detalle |
 |---|---|
-| Placa | ESP32-S3-WROOM-1 **N16R8** (16MB flash, 8MB PSRAM) + cámara **OV3660**, dual USB-C |
+| Placa | ESP32-S3-WROOM-1 **N16R8** (16MB flash, 8MB PSRAM) + cámara **OV2640 u OV3660**, dual USB-C |
 | Pantalla | OLED **SSD1306 128x64 I2C** |
 | Buzzer | Activo |
 | Cable | **USB-C** (al puerto rotulado **COM**) |

@@ -1,7 +1,10 @@
 /* ===========================================================================
- *  CHECADOR DE PRECIOS  —  ESP32-S3 (WROOM-1 N16R8) + cámara OV3660
+ *  CHECADOR DE PRECIOS  —  ESP32-S3 (WROOM-1 N16R8) + cámara OV2640 u OV3660
  *  (placa "dual USB-C", tipo KLYCKIT / Freenove ESP32-S3-CAM clon)
  * ===========================================================================
+ *
+ *  NOTA cámara: funciona igual con OV2640 (2MP) u OV3660 (3MP). El driver
+ *  esp_camera detecta el sensor automáticamente; no hay que cambiar nada.
  *
  *  Igual que la versión del ESP32-CAM AI-Thinker, pero adaptado al ESP32-S3:
  *    - Inicializa la cámara con los pines PROPIOS de esta placa (no AI-Thinker).
