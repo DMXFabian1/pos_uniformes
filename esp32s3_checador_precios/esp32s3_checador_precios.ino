@@ -1,0 +1,400 @@
+/* ===========================================================================
+ *  CHECADOR DE PRECIOS  —  ESP32-S3 (WROOM-1 N16R8) + cámara OV3660
+ *  (placa "dual USB-C", tipo KLYCKIT / Freenove ESP32-S3-CAM clon)
+ * ===========================================================================
+ *
+ *  Igual que la versión del ESP32-CAM AI-Thinker, pero adaptado al ESP32-S3:
+ *    - Inicializa la cámara con los pines PROPIOS de esta placa (no AI-Thinker).
+ *    - Decodifica el QR con la librería 'quirc' directamente (control total).
+ *    - OLED y buzzer en pines LIBRES (en el S3 los 12/14/15 los usa la cámara).
+ *    - Se programa por USB-C: NO necesita adaptador FTDI.
+ *
+ *  Flujo: lee QR -> beep -> GET /api/v1/precio/<sku> -> muestra nombre+precio
+ *         en la OLED -> 5 s -> vuelve a la pantalla de espera.
+ *
+ * ---------------------------------------------------------------------------
+ *  ⚠️ IMPORTANTE — ANTES DE NADA:
+ *
+ *  1) PINOUT DE CÁMARA: los #define de la sección [A] YA están confirmados
+ *     contra el diagrama de pines de esta placa (coinciden todos). Los pines
+ *     de OLED/buzzer [C] también se eligieron libres según ese diagrama.
+ *
+ *  2) Este sketch NO se pudo probar en hardware al escribirlo. Hay que
+ *     compilarlo y flashearlo en la placa real y ajustar si hace falta.
+ *
+ * ---------------------------------------------------------------------------
+ *  LIBRERÍAS A INSTALAR EN EL ARDUINO IDE (Gestor de Librerías):
+ *    - "ArduinoJson"            por Benoit Blanchon   (v7+)
+ *    - "Adafruit SSD1306"       por Adafruit
+ *    - "Adafruit GFX Library"   por Adafruit
+ *    - "ESP32QRCodeReader"      por Álvaro Viebrantz
+ *          --> NO usamos su API de alto nivel, pero esta librería INCLUYE el
+ *              decodificador 'quirc' (quirc.h) que sí usamos. Es la forma más
+ *              sencilla de tener quirc disponible en el Arduino IDE.
+ *
+ *  'esp_camera', WiFi, HTTPClient y Wire vienen con el paquete de placas esp32.
+ *
+ * ---------------------------------------------------------------------------
+ *  CONFIGURACIÓN DEL ARDUINO IDE:
+ *    - Placa:              "ESP32S3 Dev Module"
+ *    - PSRAM:              "OPI PSRAM"            (¡obligatorio!)
+ *    - Flash Size:         "16MB (128Mb)"
+ *    - USB CDC On Boot:    "Enabled"   (para ver el Monitor Serie por USB-C)
+ *    - Partition Scheme:   "16M Flash (3MB APP/9.9MB FATFS)" o "Huge APP"
+ *    - Para subir: conecta el cable al puerto USB rotulado "COM" (el de carga).
+ *      Si no entra en modo descarga: mantén BOOT, pulsa y suelta RST, suelta BOOT.
+ *
+ * ---------------------------------------------------------------------------
+ *  CONEXIONES (pines LIBRES confirmados con el diagrama de la placa):
+ *    OLED SSD1306 (I2C):   SDA -> GPIO 47 ,  SCL -> GPIO 21 ,  VCC 3V3 , GND
+ *    Buzzer (activo):      (+) -> GPIO 14 ,  (-) -> GND
+ *
+ *  (47 y 21 están juntos en el header y no tienen función especial; 14 es
+ *   libre. Se EVITARON: GPIO2 = "LED ON", GPIO42 = JTAG/MTMS, GPIO48 = LED
+ *   RGB WS2812, los pines de cámara, y 19/20 = USB nativo.)
+ * ===========================================================================
+ */
+
+#include <WiFi.h>
+#include <HTTPClient.h>
+#include <Wire.h>
+#include <ArduinoJson.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include "esp_camera.h"
+#include "quirc.h"          // viene dentro de la librería ESP32QRCodeReader
+
+// ===========================================================================
+// [A] PINOUT DE LA CÁMARA  —  ✅ CONFIRMADO con el diagrama de TU placa
+//     (coincide pin por pin con el pinout ESP32-S3-WROOM CAM enviado)
+// ===========================================================================
+#define PWDN_GPIO_NUM   -1
+#define RESET_GPIO_NUM  -1
+#define XCLK_GPIO_NUM   15
+#define SIOD_GPIO_NUM    4   // SDA del bus de la cámara (SCCB) — NO es el de la OLED
+#define SIOC_GPIO_NUM    5   // SCL del bus de la cámara (SCCB)
+#define Y9_GPIO_NUM     16
+#define Y8_GPIO_NUM     17
+#define Y7_GPIO_NUM     18
+#define Y6_GPIO_NUM     12
+#define Y5_GPIO_NUM     10
+#define Y4_GPIO_NUM      8
+#define Y3_GPIO_NUM      9
+#define Y2_GPIO_NUM     11
+#define VSYNC_GPIO_NUM   6
+#define HREF_GPIO_NUM    7
+#define PCLK_GPIO_NUM   13
+
+// ===========================================================================
+// [B] CONFIGURACIÓN — EDITA ESTOS VALORES
+// ===========================================================================
+const char* WIFI_SSID     = "TU_RED_WIFI";
+const char* WIFI_PASSWORD = "TU_PASSWORD_WIFI";
+
+// IP del servidor del POS en tu red local + puerto.
+const char* API_BASE = "http://192.168.0.10:8000";
+// El firmware arma:  API_BASE + "/api/v1/precio/" + <sku>
+
+// ===========================================================================
+// [C] PINES OLED / BUZZER  (pines libres confirmados con el diagrama)
+// ===========================================================================
+#define PIN_SDA     47    // I2C SDA de la OLED (GPIO47, libre)
+#define PIN_SCL     21    // I2C SCL de la OLED (GPIO21, libre)
+#define PIN_BUZZER  14    // Buzzer activo      (GPIO14, libre)
+
+#define OLED_ANCHO  128
+#define OLED_ALTO   64
+#define OLED_DIR    0x3C  // dirección I2C típica (o 0x3D)
+
+Adafruit_SSD1306 oled(OLED_ANCHO, OLED_ALTO, &Wire, -1);
+
+// Resolución de captura para leer el QR. QVGA (320x240) en escala de grises:
+// suficiente para QR y ligero para quirc.
+#define QR_ANCHO  320
+#define QR_ALTO   240
+
+struct quirc* qr = nullptr;
+
+const unsigned long TIEMPO_RESULTADO_MS = 5000;
+
+// ===========================================================================
+//  PANTALLA OLED  (idénticas a la versión AI-Thinker)
+// ===========================================================================
+void imprimirAjustado(const String& texto, int caracteresPorLinea) {
+  String palabra = "";
+  int columnaActual = 0;
+  for (unsigned int i = 0; i <= texto.length(); i++) {
+    char c = (i < texto.length()) ? texto[i] : ' ';
+    if (c == ' ') {
+      if (columnaActual + (int)palabra.length() > caracteresPorLinea) {
+        oled.println();
+        columnaActual = 0;
+      }
+      oled.print(palabra);
+      oled.print(' ');
+      columnaActual += palabra.length() + 1;
+      palabra = "";
+    } else {
+      palabra += c;
+    }
+  }
+}
+
+void mostrarMensaje(const String& linea1, const String& linea2 = "") {
+  oled.clearDisplay();
+  oled.setTextSize(1);
+  oled.setTextColor(SSD1306_WHITE);
+  oled.setCursor(0, 8);
+  oled.println(linea1);
+  if (linea2.length() > 0) { oled.println(); oled.println(linea2); }
+  oled.display();
+}
+
+void mostrarEspera() {
+  oled.clearDisplay();
+  oled.setTextColor(SSD1306_WHITE);
+  oled.setTextSize(1);
+  oled.setCursor(0, 4);
+  oled.println("Checador de precios");
+  oled.drawLine(0, 16, 127, 16, SSD1306_WHITE);
+  oled.setTextSize(2);
+  oled.setCursor(0, 26); oled.println("Escanea");
+  oled.setCursor(0, 46); oled.println("un QR");
+  oled.display();
+}
+
+void mostrarProducto(const String& nombre, const String& talla,
+                     const String& color, float precio) {
+  oled.clearDisplay();
+  oled.setTextColor(SSD1306_WHITE);
+  oled.setTextSize(1);
+  oled.setCursor(0, 0);
+  imprimirAjustado(nombre, 21);
+  oled.setCursor(0, 30);
+  String detalle = "";
+  if (talla.length() > 0) detalle += "T:" + talla + " ";
+  if (color.length() > 0) detalle += color;
+  oled.println(detalle);
+  oled.setTextSize(2);
+  oled.setCursor(0, 44);
+  oled.print("$"); oled.println(precio, 2);
+  oled.display();
+}
+
+void mostrarNoEncontrado(const String& sku) {
+  oled.clearDisplay();
+  oled.setTextColor(SSD1306_WHITE);
+  oled.setTextSize(2);
+  oled.setCursor(0, 6);
+  oled.println("No"); oled.println("encontrado");
+  oled.setTextSize(1);
+  oled.setCursor(0, 50);
+  oled.print("SKU: "); oled.println(sku);
+  oled.display();
+}
+
+// ===========================================================================
+//  BUZZER
+// ===========================================================================
+// Buzzer ACTIVO. Si el tuyo es PASIVO usa:  tone(PIN_BUZZER, 2000, 150);
+void pitar() {
+  digitalWrite(PIN_BUZZER, HIGH);
+  delay(120);
+  digitalWrite(PIN_BUZZER, LOW);
+}
+
+// ===========================================================================
+//  WIFI
+// ===========================================================================
+void conectarWiFi() {
+  mostrarMensaje("Conectando a WiFi...", String(WIFI_SSID));
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  unsigned long inicio = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - inicio < 20000) {
+    delay(300); Serial.print(".");
+  }
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.printf("\nWiFi OK. IP: %s\n", WiFi.localIP().toString().c_str());
+    mostrarMensaje("WiFi conectado", WiFi.localIP().toString());
+    delay(1200);
+  } else {
+    Serial.println("\nSin WiFi.");
+    mostrarMensaje("Sin WiFi", "Revisa SSID/clave");
+    delay(2000);
+  }
+}
+
+// ===========================================================================
+//  CÁMARA  (esp_camera con los pines de la sección [A])
+// ===========================================================================
+bool iniciarCamara() {
+  camera_config_t config;
+  config.ledc_channel = LEDC_CHANNEL_0;
+  config.ledc_timer   = LEDC_TIMER_0;
+  config.pin_d0 = Y2_GPIO_NUM;  config.pin_d1 = Y3_GPIO_NUM;
+  config.pin_d2 = Y4_GPIO_NUM;  config.pin_d3 = Y5_GPIO_NUM;
+  config.pin_d4 = Y6_GPIO_NUM;  config.pin_d5 = Y7_GPIO_NUM;
+  config.pin_d6 = Y8_GPIO_NUM;  config.pin_d7 = Y9_GPIO_NUM;
+  config.pin_xclk = XCLK_GPIO_NUM;
+  config.pin_pclk = PCLK_GPIO_NUM;
+  config.pin_vsync = VSYNC_GPIO_NUM;
+  config.pin_href = HREF_GPIO_NUM;
+  config.pin_sccb_sda = SIOD_GPIO_NUM;
+  config.pin_sccb_scl = SIOC_GPIO_NUM;
+  config.pin_pwdn = PWDN_GPIO_NUM;
+  config.pin_reset = RESET_GPIO_NUM;
+  config.xclk_freq_hz = 20000000;
+  config.frame_size   = FRAMESIZE_QVGA;       // 320x240
+  config.pixel_format = PIXFORMAT_GRAYSCALE;  // ideal para quirc
+  config.fb_location  = CAMERA_FB_IN_PSRAM;
+  config.fb_count     = 1;
+  config.grab_mode    = CAMERA_GRAB_LATEST;
+
+  esp_err_t err = esp_camera_init(&config);
+  if (err != ESP_OK) {
+    Serial.printf("Fallo al iniciar la camara: 0x%x\n", err);
+    return false;
+  }
+  return true;
+}
+
+// ===========================================================================
+//  CONSULTA A LA API
+// ===========================================================================
+String urlEncode(const String& s) {
+  String salida = ""; char buf[4];
+  for (unsigned int i = 0; i < s.length(); i++) {
+    char c = s[i];
+    if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') salida += c;
+    else { sprintf(buf, "%%%02X", (unsigned char)c); salida += buf; }
+  }
+  return salida;
+}
+
+void consultarYMostrar(const String& sku) {
+  if (WiFi.status() != WL_CONNECTED) { conectarWiFi(); return; }
+
+  String url = String(API_BASE) + "/api/v1/precio/" + urlEncode(sku);
+  Serial.println("GET " + url);
+
+  HTTPClient http;
+  http.setConnectTimeout(4000);
+  http.setTimeout(4000);
+  http.begin(url);
+  int codigoHTTP = http.GET();
+
+  if (codigoHTTP == 200) {
+    String cuerpo = http.getString();
+    Serial.println(cuerpo);
+    JsonDocument doc;
+    DeserializationError err = deserializeJson(doc, cuerpo);
+    if (err) {
+      mostrarMensaje("Error de datos");
+    } else if (doc["encontrado"] | false) {
+      String nombre = String((const char*)(doc["nombre"] | ""));
+      String talla  = String((const char*)(doc["talla"]  | ""));
+      String color  = String((const char*)(doc["color"]  | ""));
+      float precio  = doc["precio"] | 0.0;
+      mostrarProducto(nombre, talla, color, precio);
+    } else {
+      mostrarNoEncontrado(sku);
+    }
+  } else {
+    Serial.printf("HTTP %d\n", codigoHTTP);
+    mostrarMensaje("Error de servidor", "HTTP " + String(codigoHTTP));
+  }
+  http.end();
+}
+
+// ===========================================================================
+//  LECTURA DE QR con quirc
+// ===========================================================================
+// Captura un cuadro de la cámara, lo pasa por quirc y, si hay un QR válido,
+// devuelve su contenido en 'salida'. Devuelve true si leyó algo.
+bool leerQR(String& salida) {
+  camera_fb_t* fb = esp_camera_fb_get();
+  if (!fb) return false;
+
+  bool leido = false;
+  int w, h;
+  uint8_t* imagen = quirc_begin(qr, &w, &h);   // buffer interno de quirc (w*h)
+
+  // Copiamos el cuadro en escala de grises (1 byte por pixel) a quirc.
+  if ((int)fb->len >= w * h) {
+    memcpy(imagen, fb->buf, w * h);
+    quirc_end(qr);
+
+    int n = quirc_count(qr);
+    for (int i = 0; i < n && !leido; i++) {
+      struct quirc_code code;
+      struct quirc_data data;
+      quirc_extract(qr, i, &code);
+      if (quirc_decode(&code, &data) == 0) {   // 0 = sin error
+        salida = String((const char*)data.payload);
+        salida.trim();
+        leido = salida.length() > 0;
+      }
+    }
+  }
+
+  esp_camera_fb_return(fb);
+  return leido;
+}
+
+// ===========================================================================
+//  SETUP
+// ===========================================================================
+void setup() {
+  Serial.begin(115200);
+  delay(400);
+
+  pinMode(PIN_BUZZER, OUTPUT);
+  digitalWrite(PIN_BUZZER, LOW);
+
+  // OLED (bus I2C en pines propios, distinto al de la cámara).
+  Wire.begin(PIN_SDA, PIN_SCL);
+  if (!oled.begin(SSD1306_SWITCHCAPVCC, OLED_DIR)) {
+    Serial.println("No se encontro la OLED. Revisa cableado/direccion.");
+  }
+  oled.clearDisplay(); oled.display();
+
+  conectarWiFi();
+
+  // Cámara.
+  if (!iniciarCamara()) {
+    mostrarMensaje("Error de camara", "Revisa pines [A]");
+    while (true) delay(1000);   // sin cámara no hay nada que hacer
+  }
+
+  // quirc al tamaño del cuadro.
+  qr = quirc_new();
+  if (!qr || quirc_resize(qr, QR_ANCHO, QR_ALTO) < 0) {
+    mostrarMensaje("Error de memoria", "quirc");
+    while (true) delay(1000);
+  }
+
+  Serial.println("Lector de QR (quirc) listo.");
+  mostrarEspera();
+}
+
+// ===========================================================================
+//  LOOP
+// ===========================================================================
+void loop() {
+  if (WiFi.status() != WL_CONNECTED) {
+    conectarWiFi();
+    mostrarEspera();
+  }
+
+  String sku;
+  if (leerQR(sku)) {
+    Serial.println("QR leido: " + sku);
+    pitar();
+    consultarYMostrar(sku);
+    delay(TIEMPO_RESULTADO_MS);
+    mostrarEspera();
+  }
+
+  delay(80);   // pequeño respiro entre capturas
+}
