@@ -27,17 +27,28 @@ al ESP32-S3. El QR contiene el **SKU** del producto (`variante.sku`).
 
 ### Conexiones (confirmadas con el diagrama de pines)
 
-| Señal | Pin ESP32-S3 |
-|---|---|
-| OLED **SDA** | GPIO **47** |
-| OLED **SCL** | GPIO **21** |
-| OLED VCC | 3V3 |
-| OLED GND | GND |
-| Buzzer (+) | GPIO **14** |
-| Buzzer (–) | GND |
+| Señal | Pin ESP32-S3 | Notas |
+|---|---|---|
+| OLED **SDA** | GPIO **47** | |
+| OLED **SCL** | GPIO **21** | |
+| OLED VCC / GND | 3V3 / GND | |
+| Buzzer (+) / (–) | GPIO **14** / GND | buzzer activo |
+| **Botón** | GPIO **1** ↔ GND | sin resistencia externa (pull-up interno) |
+| **LED** iluminación | GPIO **41** → LED → **R 220Ω** → GND | LED blanco recomendado |
 
 Pines evitados a propósito: `GPIO2` (LED ON), `GPIO42` (JTAG/MTMS),
 `GPIO48` (LED RGB WS2812), los de la cámara y `GPIO19/20` (USB nativo).
+
+### Alimentación
+
+- **Más fácil:** cable **USB-C** (al puerto **COM**) o un **power bank USB**.
+- **Con pilas AA recargables (NiMH):** NO las conectes directo. Usa
+  `3–4 pilas AA → módulo step-up (boost) a 5V → pin 5V de la placa`.
+  El boost mantiene 5 V estables aunque las pilas se descarguen.
+- ⚠️ Alimenta por **una sola fuente a la vez** (USB **o** pilas, no ambas).
+- 🔋 El **botón** ahorra batería (la cámara solo captura al escanear). Para
+  máxima duración se puede añadir *deep sleep* y despertar con el botón
+  (GPIO1 es apto para wake) — pídelo y lo agrego.
 
 ## 2. Software (Arduino IDE)
 
@@ -77,10 +88,12 @@ const char* API_BASE      = "http://192.168.0.10:8000";  // IP del POS + puerto
 
 ## 5. Cómo funciona
 
-1. Conecta WiFi y muestra **"Escanea un QR"**.
-2. La cámara captura en escala de grises (QVGA) y `quirc` busca un QR.
-3. Al leerlo: **beep** y `GET /api/v1/precio/<sku>` a la API del POS.
-4. Muestra **nombre, talla/color y precio**; si no existe, **"No encontrado"**.
+1. Conecta WiFi y muestra **"Pulsa el botón"**.
+2. Al **pulsar el botón**: enciende el **LED** y la cámara busca un QR durante
+   unos segundos (`VENTANA_ESCANEO_MS`).
+3. Si lo lee: **beep**, apaga el LED y hace `GET /api/v1/precio/<sku>`.
+4. Muestra **nombre, talla/color y precio**; si no existe, **"No encontrado"**;
+   si no detectó QR, **"No se detectó ningún código"**.
 5. A los **5 segundos** vuelve a la pantalla de espera.
 
 ## 6. Endpoint que consume

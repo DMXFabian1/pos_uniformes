@@ -9,8 +9,9 @@
  *    - OLED y buzzer en pines LIBRES (en el S3 los 12/14/15 los usa la cámara).
  *    - Se programa por USB-C: NO necesita adaptador FTDI.
  *
- *  Flujo: lee QR -> beep -> GET /api/v1/precio/<sku> -> muestra nombre+precio
- *         en la OLED -> 5 s -> vuelve a la pantalla de espera.
+ *  Flujo: pulsas el BOTÓN -> enciende LED -> lee QR -> beep -> GET
+ *         /api/v1/precio/<sku> -> muestra nombre+precio en la OLED -> 5 s ->
+ *         vuelve a la pantalla de espera.
  *
  * ---------------------------------------------------------------------------
  *  ⚠️ IMPORTANTE — ANTES DE NADA:
@@ -48,10 +49,15 @@
  *  CONEXIONES (pines LIBRES confirmados con el diagrama de la placa):
  *    OLED SSD1306 (I2C):   SDA -> GPIO 47 ,  SCL -> GPIO 21 ,  VCC 3V3 , GND
  *    Buzzer (activo):      (+) -> GPIO 14 ,  (-) -> GND
+ *    Botón "escanear":     GPIO 1  <-> GND  (usa pull-up interno)
+ *    LED iluminación:      GPIO 41 -> LED -> R 220Ω -> GND
  *
- *  (47 y 21 están juntos en el header y no tienen función especial; 14 es
- *   libre. Se EVITARON: GPIO2 = "LED ON", GPIO42 = JTAG/MTMS, GPIO48 = LED
+ *  (47 y 21 están juntos en el header y no tienen función especial; 14, 1 y 41
+ *   son libres. Se EVITARON: GPIO2 = "LED ON", GPIO42 = JTAG/MTMS, GPIO48 = LED
  *   RGB WS2812, los pines de cámara, y 19/20 = USB nativo.)
+ *
+ *  ALIMENTACIÓN: USB-C / power bank, o pilas AA NiMH con módulo step-up a 5V
+ *  hacia el pin 5V (usa UNA sola fuente a la vez).
  * ===========================================================================
  */
 
@@ -96,11 +102,16 @@ const char* API_BASE = "http://192.168.0.10:8000";
 // El firmware arma:  API_BASE + "/api/v1/precio/" + <sku>
 
 // ===========================================================================
-// [C] PINES OLED / BUZZER  (pines libres confirmados con el diagrama)
+// [C] PINES OLED / BUZZER / BOTÓN / LED  (pines libres confirmados)
 // ===========================================================================
 #define PIN_SDA     47    // I2C SDA de la OLED (GPIO47, libre)
 #define PIN_SCL     21    // I2C SCL de la OLED (GPIO21, libre)
 #define PIN_BUZZER  14    // Buzzer activo      (GPIO14, libre)
+#define PIN_BOTON    1    // Botón "escanear"   (GPIO1 -> a GND; pull-up interno)
+#define PIN_LED     41    // LED de iluminación (GPIO41 -> LED + resistencia ~220Ω -> GND)
+
+// Cuánto tiempo busca un QR tras pulsar el botón (ms) antes de rendirse.
+const unsigned long VENTANA_ESCANEO_MS = 6000;
 
 #define OLED_ANCHO  128
 #define OLED_ALTO   64
@@ -158,8 +169,8 @@ void mostrarEspera() {
   oled.println("Checador de precios");
   oled.drawLine(0, 16, 127, 16, SSD1306_WHITE);
   oled.setTextSize(2);
-  oled.setCursor(0, 26); oled.println("Escanea");
-  oled.setCursor(0, 46); oled.println("un QR");
+  oled.setCursor(0, 24); oled.println("Pulsa el");
+  oled.setCursor(0, 44); oled.println("boton");
   oled.display();
 }
 
@@ -352,6 +363,13 @@ void setup() {
   pinMode(PIN_BUZZER, OUTPUT);
   digitalWrite(PIN_BUZZER, LOW);
 
+  // Botón con resistencia pull-up interna: en reposo lee HIGH, pulsado LOW.
+  pinMode(PIN_BOTON, INPUT_PULLUP);
+
+  // LED de iluminación, apagado al inicio.
+  pinMode(PIN_LED, OUTPUT);
+  digitalWrite(PIN_LED, LOW);
+
   // OLED (bus I2C en pines propios, distinto al de la cámara).
   Wire.begin(PIN_SDA, PIN_SCL);
   if (!oled.begin(SSD1306_SWITCHCAPVCC, OLED_DIR)) {
@@ -379,6 +397,38 @@ void setup() {
 }
 
 // ===========================================================================
+//  ESCANEO BAJO DEMANDA (al pulsar el botón)
+// ===========================================================================
+// Enciende el LED, busca un QR durante VENTANA_ESCANEO_MS y, si lo encuentra,
+// consulta el precio y lo muestra. Si no, avisa. Apaga el LED al terminar.
+void escanearUnaVez() {
+  mostrarMensaje("Escaneando...", "Acerca el codigo QR");
+  digitalWrite(PIN_LED, HIGH);          // enciende la luz para la cámara
+
+  String sku;
+  bool leido = false;
+  unsigned long inicio = millis();
+  while (millis() - inicio < VENTANA_ESCANEO_MS) {
+    if (leerQR(sku)) { leido = true; break; }
+    delay(50);
+  }
+
+  digitalWrite(PIN_LED, LOW);           // apaga la luz
+
+  if (leido) {
+    Serial.println("QR leido: " + sku);
+    pitar();
+    consultarYMostrar(sku);
+  } else {
+    Serial.println("No se detecto QR en la ventana.");
+    mostrarMensaje("No se detecto", "ningun codigo QR");
+  }
+
+  delay(TIEMPO_RESULTADO_MS);           // deja ver el resultado 5 s
+  mostrarEspera();
+}
+
+// ===========================================================================
 //  LOOP
 // ===========================================================================
 void loop() {
@@ -387,14 +437,15 @@ void loop() {
     mostrarEspera();
   }
 
-  String sku;
-  if (leerQR(sku)) {
-    Serial.println("QR leido: " + sku);
-    pitar();
-    consultarYMostrar(sku);
-    delay(TIEMPO_RESULTADO_MS);
-    mostrarEspera();
+  // Espera a que se pulse el botón (lectura LOW por el pull-up).
+  if (digitalRead(PIN_BOTON) == LOW) {
+    delay(30);                          // antirrebote simple
+    if (digitalRead(PIN_BOTON) == LOW) {
+      escanearUnaVez();
+      // Espera a que se suelte el botón para no re-disparar.
+      while (digitalRead(PIN_BOTON) == LOW) delay(10);
+    }
   }
 
-  delay(80);   // pequeño respiro entre capturas
+  delay(20);
 }
