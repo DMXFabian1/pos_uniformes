@@ -46,9 +46,9 @@ Pines evitados a propósito: `GPIO2` (LED ON), `GPIO42` (JTAG/MTMS),
   `3–4 pilas AA → módulo step-up (boost) a 5V → pin 5V de la placa`.
   El boost mantiene 5 V estables aunque las pilas se descarguen.
 - ⚠️ Alimenta por **una sola fuente a la vez** (USB **o** pilas, no ambas).
-- 🔋 El **botón** ahorra batería (la cámara solo captura al escanear). Para
-  máxima duración se puede añadir *deep sleep* y despertar con el botón
-  (GPIO1 es apto para wake) — pídelo y lo agrego.
+- 🔋 **Deep sleep activado** (`USAR_DEEP_SLEEP = true`): entre escaneos la placa
+  duerme y despierta al pulsar el botón (GPIO1). Esto lleva la autonomía de
+  ~horas a **días/semanas** con pilas AA recargables.
 
 ## 2. Software (Arduino IDE)
 
@@ -88,13 +88,19 @@ const char* API_BASE      = "http://192.168.0.10:8000";  // IP del POS + puerto
 
 ## 5. Cómo funciona
 
-1. Conecta WiFi y muestra **"Pulsa el botón"**.
-2. Al **pulsar el botón**: enciende el **LED** y la cámara busca un QR durante
-   unos segundos (`VENTANA_ESCANEO_MS`).
-3. Si lo lee: **beep**, apaga el LED y hace `GET /api/v1/precio/<sku>`.
-4. Muestra **nombre, talla/color y precio**; si no existe, **"No encontrado"**;
-   si no detectó QR, **"No se detectó ningún código"**.
-5. A los **5 segundos** vuelve a la pantalla de espera.
+Hay dos modos, según `USAR_DEEP_SLEEP` en la sección **[B]** del `.ino`:
+
+### Modo batería (`USAR_DEEP_SLEEP = true`) — por defecto
+1. La placa está **dormida** (consumo mínimo, ~microamperios).
+2. **Pulsas el botón** → despierta, conecta WiFi e inicia la cámara (~3-4 s).
+3. Enciende el **LED** y busca el QR; al leerlo: **beep** y
+   `GET /api/v1/precio/<sku>`.
+4. Muestra **nombre, talla/color y precio** (o "No encontrado") por 5 s.
+5. **Vuelve a dormir** hasta el siguiente botonazo.
+
+### Modo USB (`USAR_DEEP_SLEEP = false`)
+Igual, pero **siempre encendido**: responde al instante (sin los 3-4 s de
+arranque), a costa de más consumo. Ideal si está conectado por USB.
 
 ## 6. Endpoint que consume
 
@@ -110,6 +116,42 @@ Prueba desde una PC en la red:
 ```
 curl http://192.168.0.10:8000/api/v1/precio/JUMP-6
 ```
+
+## 7. Lista de compras
+
+Precios aproximados en **MXN (México, 2026)**; varían por tienda.
+
+### Electrónica (lo esencial)
+| # | Componente | Cant. | Precio aprox. |
+|---|---|---|---|
+| 1 | Placa **ESP32-S3 N16R8 + OV3660** (KLYCKIT, dual USB-C) | 1 | $250 – $400 |
+| 2 | **OLED SSD1306 0.96" 128x64 I2C** (4 pines) | 1 | $70 – $150 |
+| 3 | **Buzzer activo** 5V | 1 | $10 – $30 |
+| 4 | **Botón** push (momentáneo, tipo tact o de panel) | 1 | $5 – $30 |
+| 5 | **LED blanco** 5mm + **resistencia 220Ω** | 1 | $5 – $15 |
+| 6 | Cable **USB-C** (para programar) | 1 | $30 – $60 |
+
+### Para alimentar con pilas AA recargables
+| # | Componente | Cant. | Precio aprox. |
+|---|---|---|---|
+| 7 | Módulo **step-up boost MT3608** (ajustable a 5V) | 1 | $20 – $40 |
+| 8 | **Portapilas 3×AA** (con interruptor, ideal) | 1 | $20 – $50 |
+| 9 | **Pilas AA NiMH recargables** | **3** (pack de 4) | $80 – $180 |
+| 10 | **Cargador** de pilas AA (si no tienes) | 1 | $150 – $300 |
+
+### Armado (si no lo tienes)
+| # | Componente | Precio aprox. |
+|---|---|---|
+| 11 | **Tiras de headers** macho (la placa viene SIN soldar) | $10 – $30 |
+| 12 | **Cautín + soldadura** (para soldar headers/cables) | $150 – $400 |
+| 13 | Cables dupont y/o protoboard | $40 – $100 |
+
+> 💡 **Atajo:** si no quieres lidiar con boost + pilas, un **power bank USB**
+> (~$150–300) reemplaza los puntos 7–10: solo conectas el USB-C.
+
+**Estimado solo electrónica (1–6):** ~$370 – $685
+**Con kit de pilas (7–10):** +$270 – $570
+**Total típico armado:** **~$650 – $1,250 MXN**
 
 ## Notas / pendientes
 - El sketch **no se ha probado en hardware**; hay que compilarlo y flashearlo.

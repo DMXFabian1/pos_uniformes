@@ -69,6 +69,8 @@
 #include <Adafruit_SSD1306.h>
 #include "esp_camera.h"
 #include "quirc.h"          // viene dentro de la librería ESP32QRCodeReader
+#include "esp_sleep.h"      // sueño profundo (deep sleep)
+#include "driver/rtc_io.h"  // pull-up del botón durante el sueño
 
 // ===========================================================================
 // [A] PINOUT DE LA CÁMARA  —  ✅ CONFIRMADO con el diagrama de TU placa
@@ -100,6 +102,13 @@ const char* WIFI_PASSWORD = "TU_PASSWORD_WIFI";
 // IP del servidor del POS en tu red local + puerto.
 const char* API_BASE = "http://192.168.0.10:8000";
 // El firmware arma:  API_BASE + "/api/v1/precio/" + <sku>
+
+// MODO DE ENERGÍA:
+//   true  -> SUEÑO PROFUNDO (batería): duerme y despierta al pulsar el botón;
+//            escanea una vez y vuelve a dormir. Máxima duración de pilas.
+//            (Cada escaneo tarda ~3-4 s extra porque reconecta WiFi y cámara.)
+//   false -> SIEMPRE ENCENDIDO (USB): responde al instante, gasta más.
+const bool USAR_DEEP_SLEEP = true;
 
 // ===========================================================================
 // [C] PINES OLED / BUZZER / BOTÓN / LED  (pines libres confirmados)
@@ -354,11 +363,57 @@ bool leerQR(String& salida) {
 }
 
 // ===========================================================================
+//  ARRANQUE DE SUBSISTEMAS (WiFi + cámara + quirc)
+// ===========================================================================
+// Conecta WiFi e inicializa cámara y quirc. Es lo "caro" en energía y tiempo;
+// en modo batería solo se ejecuta cuando el botón despierta la placa.
+bool sistemaListo = false;
+void prepararSistema() {
+  if (sistemaListo) return;
+
+  conectarWiFi();
+
+  if (!iniciarCamara()) {
+    mostrarMensaje("Error de camara", "Revisa pines [A]");
+    while (true) delay(1000);   // sin cámara no hay nada que hacer
+  }
+
+  qr = quirc_new();
+  if (!qr || quirc_resize(qr, QR_ANCHO, QR_ALTO) < 0) {
+    mostrarMensaje("Error de memoria", "quirc");
+    while (true) delay(1000);
+  }
+
+  sistemaListo = true;
+  Serial.println("Lector de QR (quirc) listo.");
+}
+
+// ===========================================================================
+//  SUEÑO PROFUNDO  (se despierta pulsando el botón)
+// ===========================================================================
+void irADormir() {
+  mostrarMensaje("En reposo.", "Pulsa el boton");
+  delay(1000);
+  oled.clearDisplay(); oled.display();   // apaga los pixeles (ahorra)
+  digitalWrite(PIN_LED, LOW);
+
+  // El botón (GPIO1, que es RTC) despierta la placa cuando se pone en LOW.
+  // Mantenemos su pull-up activo durante el sueño para que en reposo lea HIGH.
+  rtc_gpio_pullup_en((gpio_num_t)PIN_BOTON);
+  rtc_gpio_pulldown_dis((gpio_num_t)PIN_BOTON);
+  esp_sleep_enable_ext1_wakeup(1ULL << PIN_BOTON, ESP_EXT1_WAKEUP_ANY_LOW);
+
+  Serial.println("Durmiendo. Pulsa el boton para despertar.");
+  Serial.flush();
+  esp_deep_sleep_start();   // NO regresa: al despertar se reinicia setup()
+}
+
+// ===========================================================================
 //  SETUP
 // ===========================================================================
 void setup() {
   Serial.begin(115200);
-  delay(400);
+  delay(300);
 
   pinMode(PIN_BUZZER, OUTPUT);
   digitalWrite(PIN_BUZZER, LOW);
@@ -377,23 +432,24 @@ void setup() {
   }
   oled.clearDisplay(); oled.display();
 
-  conectarWiFi();
-
-  // Cámara.
-  if (!iniciarCamara()) {
-    mostrarMensaje("Error de camara", "Revisa pines [A]");
-    while (true) delay(1000);   // sin cámara no hay nada que hacer
+  if (USAR_DEEP_SLEEP) {
+    // Modo batería: cada arranque viene de un botonazo (o del encendido).
+    esp_sleep_wakeup_cause_t causa = esp_sleep_get_wakeup_cause();
+    if (causa == ESP_SLEEP_WAKEUP_EXT1) {
+      // Despertó por el botón -> prepara todo y escanea una vez.
+      prepararSistema();
+      escanearUnaVez();
+    } else {
+      // Primer encendido normal -> saluda y duerme esperando el botón.
+      mostrarMensaje("Listo.", "Pulsa el boton");
+      delay(1500);
+    }
+    irADormir();   // NO regresa
+  } else {
+    // Modo siempre encendido (alimentado por USB).
+    prepararSistema();
+    mostrarEspera();
   }
-
-  // quirc al tamaño del cuadro.
-  qr = quirc_new();
-  if (!qr || quirc_resize(qr, QR_ANCHO, QR_ALTO) < 0) {
-    mostrarMensaje("Error de memoria", "quirc");
-    while (true) delay(1000);
-  }
-
-  Serial.println("Lector de QR (quirc) listo.");
-  mostrarEspera();
 }
 
 // ===========================================================================
@@ -425,13 +481,17 @@ void escanearUnaVez() {
   }
 
   delay(TIEMPO_RESULTADO_MS);           // deja ver el resultado 5 s
-  mostrarEspera();
+  // No volvemos a "espera" aquí: lo decide quien llama (dormir o mostrarEspera).
 }
 
 // ===========================================================================
 //  LOOP
 // ===========================================================================
 void loop() {
+  // En modo SUEÑO PROFUNDO nunca se llega aquí (setup() duerme la placa).
+  if (USAR_DEEP_SLEEP) return;
+
+  // --- Modo SIEMPRE ENCENDIDO (alimentado por USB) ---
   if (WiFi.status() != WL_CONNECTED) {
     conectarWiFi();
     mostrarEspera();
@@ -442,6 +502,7 @@ void loop() {
     delay(30);                          // antirrebote simple
     if (digitalRead(PIN_BOTON) == LOW) {
       escanearUnaVez();
+      mostrarEspera();
       // Espera a que se suelte el botón para no re-disparar.
       while (digitalRead(PIN_BOTON) == LOW) delay(10);
     }
