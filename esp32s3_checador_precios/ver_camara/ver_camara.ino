@@ -23,6 +23,7 @@
 #include "esp_camera.h"
 #include "esp_http_server.h"
 #include "esp_timer.h"
+#include "img_converters.h"   // convertir el cuadro a JPEG por software
 
 // ── CONFIG — EDITA ESTO ─────────────────────────────────────────────────────
 const char* WIFI_SSID     = "TU_RED_WIFI";
@@ -65,13 +66,13 @@ bool iniciarCamara() {
   config.pin_sccb_scl = SIOC_GPIO_NUM;
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 20000000;
-  config.frame_size   = FRAMESIZE_VGA;     // 640x480
-  config.pixel_format = PIXFORMAT_JPEG;    // JPEG para transmitir
+  config.xclk_freq_hz = 10000000;
+  config.frame_size   = FRAMESIZE_QVGA;       // 320x240 (sensor GC2145, sin JPEG HW)
+  config.pixel_format = PIXFORMAT_GRAYSCALE;  // grises: lo que SÍ soporta el sensor
   config.fb_location  = CAMERA_FB_IN_PSRAM;
   config.fb_count     = 2;
   config.grab_mode    = CAMERA_GRAB_LATEST;
-  config.jpeg_quality = 12;                // 10-15: menor = mejor calidad
+  config.jpeg_quality = 12;
 
   esp_err_t err = esp_camera_init(&config);
   if (err != ESP_OK) {
@@ -96,15 +97,22 @@ static esp_err_t stream_handler(httpd_req_t* req) {
     camera_fb_t* fb = esp_camera_fb_get();
     if (!fb) { res = ESP_FAIL; break; }
 
+    // El sensor no da JPEG; convertimos el cuadro (grises) a JPEG por software.
+    uint8_t* jpg = NULL;
+    size_t jpg_len = 0;
+    bool ok = frame2jpg(fb, 80, &jpg, &jpg_len);
+    esp_camera_fb_return(fb);
+    if (!ok) { res = ESP_FAIL; break; }
+
     res = httpd_resp_send_chunk(req, STREAM_SEP, strlen(STREAM_SEP));
     if (res == ESP_OK) {
-      size_t n = snprintf(cab, sizeof(cab), STREAM_CAB, fb->len);
+      size_t n = snprintf(cab, sizeof(cab), STREAM_CAB, jpg_len);
       res = httpd_resp_send_chunk(req, cab, n);
     }
     if (res == ESP_OK)
-      res = httpd_resp_send_chunk(req, (const char*)fb->buf, fb->len);
+      res = httpd_resp_send_chunk(req, (const char*)jpg, jpg_len);
 
-    esp_camera_fb_return(fb);
+    free(jpg);
     if (res != ESP_OK) break;   // el navegador cerró la conexión
   }
   return res;
