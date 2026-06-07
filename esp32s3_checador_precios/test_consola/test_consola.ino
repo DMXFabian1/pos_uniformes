@@ -89,6 +89,15 @@ bool iniciarCamara() {
     Serial.printf("Fallo al iniciar la camara: 0x%x\n", err);
     return false;
   }
+
+  // Ajustes de imagen que ayudan a que quirc descifre el QR (no sustituyen
+  // el enfoque del lente, pero suman): más contraste y nitidez.
+  sensor_t* s = esp_camera_sensor_get();
+  if (s) {
+    if (s->set_contrast)  s->set_contrast(s, 2);
+    if (s->set_sharpness) s->set_sharpness(s, 2);
+    if (s->set_brightness) s->set_brightness(s, 1);
+  }
   return true;
 }
 
