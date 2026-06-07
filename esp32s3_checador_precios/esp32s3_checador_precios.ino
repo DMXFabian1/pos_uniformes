@@ -270,11 +270,11 @@ bool iniciarCamara() {
   config.pin_sccb_scl = SIOC_GPIO_NUM;
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
-  config.xclk_freq_hz = 20000000;
+  config.xclk_freq_hz = 10000000;   // 10MHz: evita overflow del buffer (EV-EOF-OVF)
   config.frame_size   = FRAMESIZE_QVGA;       // 320x240
   config.pixel_format = PIXFORMAT_GRAYSCALE;  // ideal para quirc
   config.fb_location  = CAMERA_FB_IN_PSRAM;
-  config.fb_count     = 1;
+  config.fb_count     = 2;                // doble buffer: la cámara no se satura mientras quirc procesa
   config.grab_mode    = CAMERA_GRAB_LATEST;
 
   esp_err_t err = esp_camera_init(&config);
