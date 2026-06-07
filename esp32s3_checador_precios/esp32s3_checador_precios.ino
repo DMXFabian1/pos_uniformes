@@ -40,12 +40,15 @@
  *
  * ---------------------------------------------------------------------------
  *  CONFIGURACIÓN DEL ARDUINO IDE:
+ *    - DRIVER:             instala primero el driver CH343 en la PC (esta placa
+ *                          usa el chip CH343 USB-a-serial; sin él no se reconoce).
  *    - Placa:              "ESP32S3 Dev Module"
  *    - PSRAM:              "OPI PSRAM"            (¡obligatorio!)
  *    - Flash Size:         "16MB (128Mb)"
- *    - USB CDC On Boot:    "Enabled"   (para ver el Monitor Serie por USB-C)
+ *    - USB CDC On Boot:    "Disabled"  (la placa carga por el chip CH343; con
+ *                          Disabled el Serial sale por ese puerto USB-to-serial)
  *    - Partition Scheme:   "16M Flash (3MB APP/9.9MB FATFS)" o "Huge APP"
- *    - Para subir: conecta el cable al puerto USB rotulado "COM" (el de carga).
+ *    - Para subir: usa el puerto USB-C rotulado "USB to serial" (CH343).
  *      Si no entra en modo descarga: mantén BOOT, pulsa y suelta RST, suelta BOOT.
  *
  * ---------------------------------------------------------------------------

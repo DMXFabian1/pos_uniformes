@@ -52,6 +52,18 @@ Pines evitados a propósito: `GPIO2` (LED ON), `GPIO42` (JTAG/MTMS),
 
 ## 2. Software (Arduino IDE)
 
+### Driver (¡primero esto!)
+Esta placa usa un chip **CH343 (USB-a-serial)**. Instala el **driver CH343** en
+tu PC **antes de nada**; si no, Windows no reconoce la tarjeta. Reinicia la PC
+tras instalarlo. (No necesitas un FTDI externo: el CH343 ya está integrado.)
+
+### Paquete de placas
+En *Preferencias → URLs adicionales del Gestor de Tarjetas*:
+```
+https://dl.espressif.com/dl/package_esp32_index.json
+```
+Luego instala **esp32 by Espressif Systems** en el *Gestor de Tarjetas*.
+
 ### Librerías (Gestor de Librerías)
 - **ArduinoJson** — Benoit Blanchon (v7+)
 - **Adafruit SSD1306** + **Adafruit GFX Library**
@@ -66,7 +78,8 @@ Pines evitados a propósito: `GPIO2` (LED ON), `GPIO42` (JTAG/MTMS),
 - **Placa:** `ESP32S3 Dev Module`
 - **PSRAM:** `OPI PSRAM`  *(obligatorio)*
 - **Flash Size:** `16MB (128Mb)`
-- **USB CDC On Boot:** `Enabled`  *(para ver el Monitor Serie por USB-C)*
+- **USB CDC On Boot:** `Disabled`  *(esta placa carga por el chip CH343 / puerto
+  USB-to-serial; con Disabled el Serial sale por ese puerto, que es el que usas)*
 - **Partition Scheme:** `16M Flash (3MB APP/9.9MB FATFS)` o `Huge APP`
 
 ## 3. Configura el sketch
@@ -81,8 +94,9 @@ const char* API_BASE      = "http://192.168.0.10:8000";  // IP del POS + puerto
 
 ## 4. Subir el firmware
 
-1. Conecta el cable **USB-C** al puerto **COM**.
-2. Selecciona el puerto en *Herramientas → Puerto*.
+1. Conecta el cable **USB-C** al puerto rotulado **"USB to serial"** (el del
+   chip CH343), no al puerto "USB" nativo.
+2. Selecciona ese puerto en *Herramientas → Puerto* (aparece gracias al driver CH343).
 3. Sube el sketch. Si no entra en modo descarga: mantén **BOOT**, pulsa y
    suelta **RST**, luego suelta **BOOT** y vuelve a subir.
 
