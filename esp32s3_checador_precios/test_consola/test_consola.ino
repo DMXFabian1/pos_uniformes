@@ -26,6 +26,7 @@
 #include <ArduinoJson.h>
 #include "esp_camera.h"
 #include "src/quirc.h"
+#include "esp_log.h"        // para silenciar los mensajes de la cámara
 
 // ── CONFIG — EDITA ESTO ─────────────────────────────────────────────────────
 const char* WIFI_SSID     = "TU_RED_WIFI";
@@ -178,6 +179,10 @@ void consultar(const String& sku) {
 void setup() {
   Serial.begin(115200);
   delay(600);
+  // Silencia los mensajes "cam_hal: EV-EOF-OVF" (cuadros que la cámara descarta).
+  esp_log_level_set("*", ESP_LOG_WARN);
+  esp_log_level_set("cam_hal", ESP_LOG_NONE);
+  esp_log_level_set("s3 ll_cam", ESP_LOG_NONE);
   Serial.println("\n\n=== CHECADOR DE PRECIOS — prueba por consola ===");
 
   conectarWiFi();
