@@ -118,11 +118,28 @@ static esp_err_t stream_handler(httpd_req_t* req) {
   return res;
 }
 
+// Página HTML que muestra el video con una etiqueta <img> (más compatible
+// con Safari/Brave que el stream "pelón").
+static esp_err_t index_handler(httpd_req_t* req) {
+  httpd_resp_set_type(req, "text/html");
+  const char* html =
+    "<!DOCTYPE html><html><head><meta name='viewport' "
+    "content='width=device-width,initial-scale=1'><title>Camara ESP32</title></head>"
+    "<body style='margin:0;background:#000;text-align:center'>"
+    "<p style='color:#fff;font-family:sans-serif'>Camara ESP32-S3 (grises)</p>"
+    "<img src='/stream' style='width:100%;max-width:480px'/>"
+    "</body></html>";
+  return httpd_resp_send(req, html, strlen(html));
+}
+
 void iniciarServidor() {
   httpd_config_t config = HTTPD_DEFAULT_CONFIG();
-  httpd_uri_t uri = { .uri = "/", .method = HTTP_GET, .handler = stream_handler, .user_ctx = NULL };
+  config.max_uri_handlers = 4;
+  httpd_uri_t uri_index  = { .uri = "/",       .method = HTTP_GET, .handler = index_handler,  .user_ctx = NULL };
+  httpd_uri_t uri_stream = { .uri = "/stream", .method = HTTP_GET, .handler = stream_handler, .user_ctx = NULL };
   if (httpd_start(&servidor, &config) == ESP_OK) {
-    httpd_register_uri_handler(servidor, &uri);
+    httpd_register_uri_handler(servidor, &uri_index);
+    httpd_register_uri_handler(servidor, &uri_stream);
   }
 }
 
