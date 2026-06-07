@@ -67,10 +67,11 @@ Luego instala **esp32 by Espressif Systems** en el *Gestor de Tarjetas*.
 ### Librerías (Gestor de Librerías)
 - **ArduinoJson** — Benoit Blanchon (v7+)
 - **Adafruit SSD1306** + **Adafruit GFX Library**
-- **ESP32QRCodeReader** — Álvaro Viebrantz
-  - No usamos su API de alto nivel, pero **incluye `quirc.h`** (el
-    decodificador de QR que sí usamos). Es la forma más fácil de tener `quirc`
-    disponible en el IDE.
+
+> El decodificador de QR (**quirc**) ya viene **incluido dentro del sketch**
+> (carpeta `src/`), así que **NO necesitas instalar ninguna librería de QR**.
+> quirc es de Daniel Beer (licencia ISC); incluye también dos archivos de
+> apoyo de OpenMV. Verificado: el sketch **compila** con esp32 core 3.3.8.
 
 `esp_camera`, `WiFi`, `HTTPClient` y `Wire` vienen con el paquete **esp32**.
 

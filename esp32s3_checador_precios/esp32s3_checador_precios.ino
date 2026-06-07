@@ -31,10 +31,10 @@
  *    - "ArduinoJson"            por Benoit Blanchon   (v7+)
  *    - "Adafruit SSD1306"       por Adafruit
  *    - "Adafruit GFX Library"   por Adafruit
- *    - "ESP32QRCodeReader"      por Álvaro Viebrantz
- *          --> NO usamos su API de alto nivel, pero esta librería INCLUYE el
- *              decodificador 'quirc' (quirc.h) que sí usamos. Es la forma más
- *              sencilla de tener quirc disponible en el Arduino IDE.
+ *
+ *  El decodificador de QR 'quirc' YA viene incluido en este sketch (carpeta
+ *  src/), no necesitas instalar ninguna librería de QR. (quirc: Daniel Beer,
+ *  licencia ISC. Verificado: compila con esp32 core 3.3.8.)
  *
  *  'esp_camera', WiFi, HTTPClient y Wire vienen con el paquete de placas esp32.
  *
@@ -74,7 +74,7 @@
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 #include "esp_camera.h"
-#include "quirc.h"          // viene dentro de la librería ESP32QRCodeReader
+#include "src/quirc.h"      // quirc viene incluido en este sketch (carpeta src/)
 #include "esp_sleep.h"      // sueño profundo (deep sleep)
 #include "driver/rtc_io.h"  // pull-up del botón durante el sueño
 
