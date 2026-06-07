@@ -51,9 +51,10 @@ const char* API_BASE      = "http://192.168.0.10:8000";   // IP del POS + puerto
 #define HREF_GPIO_NUM    7
 #define PCLK_GPIO_NUM   13
 
-#define QR_ANCHO  320
-#define QR_ALTO   240
+#define QR_ANCHO  640
+#define QR_ALTO   480
 struct quirc* qr = nullptr;
+int g_candidatos = 0;   // cuántos QR "candidatos" vio quirc en el ultimo cuadro
 
 // Anti-repetición: no procesar el mismo SKU una y otra vez por segundo.
 String ultimoSku = "";
@@ -77,7 +78,7 @@ bool iniciarCamara() {
   config.pin_pwdn = PWDN_GPIO_NUM;
   config.pin_reset = RESET_GPIO_NUM;
   config.xclk_freq_hz = 10000000;   // 10MHz: evita overflow del buffer (EV-EOF-OVF)
-  config.frame_size   = FRAMESIZE_QVGA;
+  config.frame_size   = FRAMESIZE_VGA;     // 640x480: mas detalle para leer el QR
   config.pixel_format = PIXFORMAT_GRAYSCALE;
   config.fb_location  = CAMERA_FB_IN_PSRAM;
   config.fb_count     = 2;                // doble buffer: la cámara no se satura mientras quirc procesa
@@ -117,6 +118,7 @@ bool leerQR(String& salida) {
     memcpy(imagen, fb->buf, w * h);
     quirc_end(qr);
     int n = quirc_count(qr);
+    g_candidatos = n;
     for (int i = 0; i < n && !leido; i++) {
       struct quirc_code code;
       struct quirc_data data;
@@ -211,5 +213,16 @@ void loop() {
       Serial.println();
     }
   }
+
+  // Diagnóstico cada 2 s: dice si la cámara "ve" patrones de QR.
+  //   candidatos > 0  -> ve el QR pero no lo descifra (acerca/aleja, mas luz)
+  //   candidatos = 0  -> no lo ve (encuadre/distancia)
+  static unsigned long latido = 0;
+  if (millis() - latido > 2000) {
+    latido = millis();
+    Serial.printf("...buscando QR (candidatos en el cuadro: %d)\n", g_candidatos);
+    g_candidatos = 0;
+  }
+
   delay(50);
 }
