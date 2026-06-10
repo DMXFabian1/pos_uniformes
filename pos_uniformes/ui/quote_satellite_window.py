@@ -77,6 +77,7 @@ from pos_uniformes.services.offline_quote_storage_service import (
 )
 from pos_uniformes.services.quote_client_creation_feedback_service import build_quote_client_created_feedback
 from pos_uniformes.services.quote_action_service import cancel_quote, emit_quote
+from pos_uniformes.ui.views.quick_sale_view import QuickSaleWidget
 from pos_uniformes.services.quote_detail_service import QuoteDetailSnapshot, load_quote_detail_snapshot
 from pos_uniformes.services.quote_editor_service import QuoteSavePayload, load_quote_editor_snapshot, save_quote_from_editor
 from pos_uniformes.services.quote_kiosk_lookup_service import QuoteKioskLookupSnapshot, load_quote_kiosk_lookup_snapshot
@@ -367,8 +368,6 @@ class QuoteSatelliteWindow(QMainWindow):
         self.offline_banner.setVisible(True)
 
         # Deshabilitar pestanas que requieren base de datos
-        self.nav_search_button.setEnabled(True)
-        self.nav_search_button.setToolTip("Presupuestos guardados localmente")
         self.nav_share_button.setEnabled(True)
         self.nav_share_button.setToolTip("Compartir presupuesto guardado localmente")
         self.refresh_button.setEnabled(False)
@@ -409,7 +408,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.nav_catalog_button = QPushButton("Catalogo")
         self.nav_guided_button = QPushButton("Presupuesto guiado")
         self.nav_quote_button = QPushButton("Presupuesto")
-        self.nav_search_button = QPushButton("Buscar")
+        self.nav_quicksale_button = QPushButton("Venta rapida")
         self.nav_share_button = QPushButton("Compartir")
         self.nav_tariff_button = QPushButton("Tarifarios")
         self.sidebar_total_label = QLabel("$0.00")
@@ -566,7 +565,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self.nav_catalog_button: _icon_from_asset("kiosk_icons/catalog_grid.svg"),
             self.nav_guided_button: _icon_from_asset("kiosk_icons/quote_stack.svg"),
             self.nav_quote_button: _icon_from_asset("kiosk_icons/quote_stack.svg"),
-            self.nav_search_button: _icon_from_asset("kiosk_icons/search_quote.svg"),
+            self.nav_quicksale_button: _icon_from_asset("kiosk_icons/kiosk_scan.svg"),
             self.nav_share_button: _icon_from_asset("kiosk_icons/share_send.svg"),
             self.nav_tariff_button: _icon_from_asset("kiosk_icons/catalog_grid.svg"),
         }
@@ -650,12 +649,18 @@ class QuoteSatelliteWindow(QMainWindow):
             self.quote_cart_table,
         ):
             _QScroller.grabGesture(widget.viewport(), _SCROLLER_GESTURE)
-        for scroll_area in (
+        page_scrolls = [
+            self.page_stack.widget(i)
+            for i in range(self.page_stack.count())
+            if isinstance(self.page_stack.widget(i), QScrollArea)
+        ]
+        for scroll_area in [
             self.sidebar_items_scroll,
             self.guided_product_scroll,
             self.guided_page_scroll,
             self.guided_school_scroll,
-        ):
+            *page_scrolls,
+        ]:
             _QScroller.grabGesture(scroll_area.viewport(), _SCROLLER_GESTURE)
 
     def _build_sidebar(self) -> QWidget:
@@ -668,10 +673,10 @@ class QuoteSatelliteWindow(QMainWindow):
 
         for button in (
             self.nav_kiosk_button,
+            self.nav_quicksale_button,
             self.nav_catalog_button,
             self.nav_guided_button,
             self.nav_quote_button,
-            self.nav_search_button,
             self.nav_tariff_button,
         ):
             button.setObjectName("navButton")
@@ -724,14 +729,24 @@ class QuoteSatelliteWindow(QMainWindow):
         card.setLayout(layout)
         return card
 
+    @staticmethod
+    def _scrollable(widget: QWidget) -> QScrollArea:
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.Shape.NoFrame)
+        scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        scroll.setWidget(widget)
+        return scroll
+
     def _build_page_stack(self) -> QWidget:
-        self.page_stack.addWidget(self._build_kiosk_page())
-        self.page_stack.addWidget(self._build_catalog_page())
-        self.page_stack.addWidget(self._build_guided_page())
-        self.page_stack.addWidget(self._build_quote_page())
-        self.page_stack.addWidget(self._build_search_page())
-        self.page_stack.addWidget(self._build_share_page())
-        self.page_stack.addWidget(self._build_tariff_page())
+        self.page_stack.addWidget(self._scrollable(self._build_kiosk_page()))
+        self.quick_sale_widget = QuickSaleWidget(self)
+        self.page_stack.addWidget(self._scrollable(self.quick_sale_widget))
+        self.page_stack.addWidget(self._scrollable(self._build_catalog_page()))
+        self.page_stack.addWidget(self._scrollable(self._build_guided_page()))
+        self.page_stack.addWidget(self._scrollable(self._build_quote_page()))
+        self.page_stack.addWidget(self._scrollable(self._build_share_page()))
+        self.page_stack.addWidget(self._scrollable(self._build_tariff_page()))
         return self.page_stack
 
     def _build_kiosk_page(self) -> QWidget:
@@ -1795,7 +1810,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.nav_catalog_button.clicked.connect(lambda: self._set_page("catalog"))
         self.nav_guided_button.clicked.connect(lambda: self._set_page("guided"))
         self.nav_quote_button.clicked.connect(lambda: self._set_page("quote"))
-        self.nav_search_button.clicked.connect(lambda: self._set_page("search"))
+        self.nav_quicksale_button.clicked.connect(lambda: self._set_page("quicksale"))
         self.nav_share_button.clicked.connect(lambda: self._set_page("share"))
         self.nav_tariff_button.clicked.connect(lambda: self._set_page("tariff"))
         self.tariff_generate_button.clicked.connect(self._handle_generate_tariff)
@@ -1906,28 +1921,28 @@ class QuoteSatelliteWindow(QMainWindow):
     def _set_page(self, page_key: str) -> None:
         page_index_map = {
             "kiosk": 0,
-            "catalog": 1,
-            "guided": 2,
-            "quote": 3,
-            "search": 4,
+            "quicksale": 1,
+            "catalog": 2,
+            "guided": 3,
+            "quote": 4,
             "share": 5,
             "tariff": 6,
         }
         button_map = {
             "kiosk": self.nav_kiosk_button,
+            "quicksale": self.nav_quicksale_button,
             "catalog": self.nav_catalog_button,
             "guided": self.nav_guided_button,
             "quote": self.nav_quote_button,
-            "search": self.nav_search_button,
             "share": self.nav_share_button,
             "tariff": self.nav_tariff_button,
         }
         page_title_map = {
             "kiosk": "Kiosko listo para escaneo rapido.",
+            "quicksale": "Venta rapida — escanea productos y genera nota.",
             "catalog": "Catalogo simplificado para cotizar por escuela.",
             "guided": "Cotiza por pasos.",
             "quote": "Ajusta el presupuesto.",
-            "search": "Busqueda y seguimiento de presupuestos.",
             "share": "Compartir por WhatsApp o imprimir.",
             "tariff": "Tarifario de precios por escuela.",
         }
@@ -1937,8 +1952,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self._set_status(page_title_map[page_key])
         if page_key == "kiosk":
             QTimer.singleShot(0, self.kiosk_scan_input.setFocus)
-        if page_key == "search" and self.offline_mode:
-            self._refresh_offline_quotes()
+        if page_key == "quicksale":
+            self.quick_sale_widget.focus_input()
 
     def refresh_all(self) -> None:
         if self.offline_mode:
@@ -2887,8 +2902,11 @@ class QuoteSatelliteWindow(QMainWindow):
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return None
         raw = code_input.text()
-        # Limpiar caracteres de control que los scanners agregan (\r, \x00, etc.)
         scanned = "".join(c for c in raw if c.isprintable()).strip()
+        # QR scanner sends HID keycodes; Spanish keyboard maps : → Ñ, - → '
+        scanned = scanned.replace("Ñ", ":").replace("ñ", ":").replace("'", "-")
+        if scanned.upper().startswith("EMP:"):
+            scanned = scanned[4:]
         if not scanned:
             return None
         try:
@@ -4580,7 +4598,7 @@ QLabel#favDialogPriceLabel {
             self.quote_emit_selected_button.setEnabled(action_state.emit_enabled)
             _state = self.selected_quote_state.strip().upper()
             if self._selected_quote_id() is None:
-                _hint = "Selecciona un presupuesto para ver las acciones disponibles."
+                _hint = ""
             elif _state == "BORRADOR":
                 _hint = "Borrador — puedes retomarlo o emitirlo directamente."
             elif _state == "EMITIDO":
@@ -5986,6 +6004,23 @@ def _build_sale_ticket_text(
     lines.append(tk_dbl())
     lines.append(tk_row("TOTAL:", f"${tk_fmt(total)}"))
     lines.append(tk_bot())
+
+    lines.append("")
+    lines.append("Terminos y Condiciones".center(_W))
+    _SALE_TERMS = (
+        "1. Revise su mercancia antes de retirarse del establecimiento.\n"
+        "2. Tiene 15 dias naturales para realizar cambios presentando este ticket."
+        " La prenda debe estar en buen estado y con sus etiquetas.\n"
+        "3. Conserve este ticket como comprobante de pago.\n"
+        "4. Para cualquier aclaracion, presente este ticket.\n"
+        "5. No se aceptan devoluciones.\n"
+        "6. Para solicitar factura, presente este ticket y sus datos fiscales."
+    )
+    for term_line in _SALE_TERMS.split("\n"):
+        lines.extend(textwrap.wrap(term_line, width=_W, subsequent_indent="   "))
+
+    lines.append("")
+    lines.append("Gracias por su compra.".center(_W))
 
     return "\n".join(lines)
 
