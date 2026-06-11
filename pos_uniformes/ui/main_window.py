@@ -4377,13 +4377,9 @@ class MainWindow(QMainWindow):
         self._refresh_settings_employees()
         if result.asset_path is not None:
             self._reveal_path(result.asset_path)
-        result_feedback = build_settings_employee_result_feedback(
-            "generate_employee_card",
-            employee_name=result.employee_name,
-            employee_code=result.employee_code,
-            asset_path=str(result.asset_path) if result.asset_path is not None else "",
+        self.settings_employees_status_label.setText(
+            f"Credencial de staff '{result.employee_code}' generada."
         )
-        QMessageBox.information(self, result_feedback.title, result_feedback.message)
 
     def _prepare_client_qr_delivery(self, client: Cliente) -> tuple[str, Path, str]:
         if not (client.telefono or "").strip():
