@@ -559,6 +559,7 @@ class QuickSaleWidget(QWidget):
     # ─── Descuento ───────────────────────────────────────────────────────
 
     _DISCOUNT_PERCENT = Decimal("5")
+    _MIN_LAYAWAY_PERCENT = Decimal("20")
     _OWNER_NAME = "daniel fabian"
     _OWNER_CODE = "VEND-1"
 
@@ -676,7 +677,7 @@ class QuickSaleWidget(QWidget):
     _TERMS_APARTADO = (
         "1. Requisitos para el Apartado\n"
         "  1.1. El cliente debe proporcionar nombre completo, con el que recogera su apartado.\n"
-        "  1.2. El minimo de apartado es el 25% del valor total.\n"
+        "  1.2. El minimo de apartado es el 20% del valor total.\n"
         "2. Plazo para Liquidacion\n"
         "  2.1. El cliente tiene 30 dias naturales para liquidar el total.\n"
         "  2.2. Si no liquida en el tiempo establecido, el apartado se cancelara sin reembolso.\n"
@@ -782,11 +783,14 @@ class QuickSaleWidget(QWidget):
         nombre = name_input.text().strip()
         if not nombre:
             return
-        text = self._build_apartado_text(nombre)
-        open_printable_text_dialog(self, "Ticket de apartado", text)
-        if self._discount_active:
-            copy = self._build_employee_copy_text()
-            open_printable_text_dialog(self, "Copia empleada", copy)
+        cliente_text = self._build_apartado_text(
+            nombre, copy_label="CLIENTE", include_terms=True
+        )
+        open_printable_text_dialog(self, "Apartado - Cliente", cliente_text)
+        tienda_text = self._build_apartado_text(
+            nombre, copy_label="COPIA TIENDA", include_terms=False
+        )
+        open_printable_text_dialog(self, "Apartado - Copia tienda", tienda_text)
         self._scan_input.setFocus()
 
     def _load_business_info(self) -> tuple[str, str, str]:
@@ -865,10 +869,19 @@ class QuickSaleWidget(QWidget):
 
         return "\n".join(lines)
 
-    def _build_apartado_text(self, cliente: str) -> str:
+    def _build_apartado_text(
+        self,
+        cliente: str,
+        *,
+        copy_label: str = "",
+        include_terms: bool = True,
+    ) -> str:
         biz_name, biz_phone, biz_addr = self._load_business_info()
         now = datetime.now().strftime("%d/%m/%Y %H:%M")
         subtotal, discount, total = self._compute_totals()
+        minimo = self._round_total(
+            (total * self._MIN_LAYAWAY_PERCENT / Decimal("100")).quantize(Decimal("0.01"))
+        )
 
         lines: list[str] = []
 
@@ -878,6 +891,8 @@ class QuickSaleWidget(QWidget):
         if biz_phone:
             lines.append(f"Tel: {biz_phone}".center(_TW))
         lines.append("Ticket de apartado".center(_TW))
+        if copy_label:
+            lines.append(f"- {copy_label} -".center(_TW))
 
         lines.append(tk_top())
         tk_field("Fecha:", now, lines)
@@ -895,6 +910,8 @@ class QuickSaleWidget(QWidget):
             lines.append(tk_row("Descuento:", f"-${tk_fmt(discount)}"))
         lines.append(tk_dbl())
         lines.append(tk_row("TOTAL:", f"${tk_fmt(total)}"))
+        lines.append(tk_mid())
+        lines.append(tk_row("Apartado minimo (20%):", f"${tk_fmt(minimo)}"))
         lines.append(tk_bot())
 
         lines.append("")
@@ -906,7 +923,8 @@ class QuickSaleWidget(QWidget):
             lines.append(tk_line(""))
         lines.append(tk_bot())
 
-        self._append_terms(lines, self._TERMS_APARTADO)
+        if include_terms:
+            self._append_terms(lines, self._TERMS_APARTADO)
 
         lines.append("")
         lines.append("")
