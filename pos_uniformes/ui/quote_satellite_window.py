@@ -403,6 +403,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.refresh_button = QPushButton("Refrescar")
         self.exit_button = QPushButton("Salir")
         self.page_stack = QStackedWidget()
+        self.page_stack.setFrameShape(QFrame.Shape.NoFrame)
         self.nav_button_group = QButtonGroup(self)
         self.nav_kiosk_button = QPushButton("Kiosko")
         self.nav_catalog_button = QPushButton("Catalogo")
@@ -734,7 +735,9 @@ class QuoteSatelliteWindow(QMainWindow):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.Shape.NoFrame)
-        scroll.setStyleSheet("QScrollArea { border: none; background: transparent; }")
+        scroll.setStyleSheet(
+            "QScrollArea, QScrollArea > QWidget { border: none; background: transparent; }"
+        )
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setWidget(widget)
         return scroll
