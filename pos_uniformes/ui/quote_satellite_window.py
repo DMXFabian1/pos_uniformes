@@ -2913,10 +2913,18 @@ class QuoteSatelliteWindow(QMainWindow):
         scanned = "".join(c for c in raw if c.isprintable()).strip()
         # QR scanner sends HID keycodes; Spanish keyboard maps : → Ñ, - → '
         scanned = scanned.replace("Ñ", ":").replace("ñ", ":").replace("'", "-")
-        if scanned.upper().startswith("EMP:"):
+        scanned = scanned.upper()
+        if scanned.startswith("EMP:"):
             scanned = scanned[4:]
         if not scanned:
             return None
+        if self.offline_mode:
+            if not scanned.startswith("VEND-"):
+                QMessageBox.warning(
+                    self, "No autorizado", "Formato esperado: VEND-1, VEND-2, etc."
+                )
+                return None
+            return scanned
         try:
             with get_session() as session:
                 emp = session.execute(

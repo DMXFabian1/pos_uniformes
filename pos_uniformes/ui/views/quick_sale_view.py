@@ -548,6 +548,7 @@ class QuickSaleWidget(QWidget):
 
     _DISCOUNT_PERCENT = Decimal("5")
     _OWNER_NAME = "daniel fabian"
+    _OWNER_CODE = "VEND-1"
 
     def _on_discount_toggle(self) -> None:
         if self._discount_check.isChecked():
@@ -589,7 +590,12 @@ class QuickSaleWidget(QWidget):
         if not scanned:
             return False
         if self.satellite.offline_mode:
-            return scanned.startswith("VEND-")
+            if scanned != self._OWNER_CODE:
+                QMessageBox.warning(
+                    self, "No autorizado", "Solo el administrador puede autorizar descuentos."
+                )
+                return False
+            return True
         try:
             with get_session() as session:
                 emp = session.scalar(
