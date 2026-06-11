@@ -559,7 +559,7 @@ class QuickSaleWidget(QWidget):
     # ─── Descuento ───────────────────────────────────────────────────────
 
     _DISCOUNT_PERCENT = Decimal("5")
-    _MIN_LAYAWAY_PERCENT = Decimal("20")
+    _MIN_LAYAWAY_PERCENT = Decimal("25")
     _OWNER_NAME = "daniel fabian"
     _OWNER_CODE = "VEND-1"
 
@@ -677,7 +677,7 @@ class QuickSaleWidget(QWidget):
     _TERMS_APARTADO = (
         "1. Requisitos para el Apartado\n"
         "  1.1. El cliente debe proporcionar nombre completo, con el que recogera su apartado.\n"
-        "  1.2. El minimo de apartado es el 20% del valor total.\n"
+        "  1.2. El minimo de apartado es el 25% del valor total.\n"
         "2. Plazo para Liquidacion\n"
         "  2.1. El cliente tiene 30 dias naturales para liquidar el total.\n"
         "  2.2. Si no liquida en el tiempo establecido, el apartado se cancelara sin reembolso.\n"
@@ -911,7 +911,12 @@ class QuickSaleWidget(QWidget):
         lines.append(tk_dbl())
         lines.append(tk_row("TOTAL:", f"${tk_fmt(total)}"))
         lines.append(tk_mid())
-        lines.append(tk_row("Apartado minimo (20%):", f"${tk_fmt(minimo)}"))
+        lines.append(
+            tk_row(
+                f"Apartado minimo ({self._MIN_LAYAWAY_PERCENT:.0f}%):",
+                f"${tk_fmt(minimo)}",
+            )
+        )
         lines.append(tk_bot())
 
         lines.append("")

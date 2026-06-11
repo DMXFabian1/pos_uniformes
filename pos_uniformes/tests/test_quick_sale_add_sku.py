@@ -115,13 +115,17 @@ class ApartadoTicketTests(unittest.TestCase):
         self.assertNotIn("Terminos y Condiciones", text)
         self.assertIn("- COPIA TIENDA -", text)
 
-    def test_both_copies_show_minimum_20pct(self) -> None:
+    def test_both_copies_show_minimum_25pct_rounded(self) -> None:
         widget = self._make_widget()
+        widget._items = [
+            {"sku": "SKU004838", "nombre": "Pants", "talla": "6", "color": "",
+             "precio": Decimal("515.00"), "cantidad": 1},
+        ]
         with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")):
             text = widget._build_apartado_text("Ana", include_terms=True)
-        # 20% de 500 = 100.00
-        self.assertIn("Apartado minimo (20%):", text)
-        self.assertIn("$100.00", text)
+        # 25% de 515 = 128.75 -> regla de redondeo -> 129.00
+        self.assertIn("Apartado minimo (25%):", text)
+        self.assertIn("$129.00", text)
 
 
 if __name__ == "__main__":
