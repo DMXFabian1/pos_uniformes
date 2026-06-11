@@ -451,6 +451,22 @@ class QuickSaleWidget(QWidget):
         sku = self._scan_input.text().strip().upper()
         if not sku:
             return
+        self.add_sku(sku, self._qty_spin.value())
+        self._qty_spin.setValue(1)
+        self._scan_input.clear()
+        self._scan_input.setFocus()
+
+    def add_sku(self, sku: str, qty: int = 1) -> bool:
+        """Busca el SKU y lo agrega a la venta. Punto de entrada para Ctrl+S.
+
+        Retorna True si se agregó, False si falló o falta autorización.
+        """
+        if not self._employee_code:
+            QMessageBox.warning(self, "Sin autorizar", "Escanea primero tu QR de empleada.")
+            return False
+        sku = (sku or "").strip().upper()
+        if not sku:
+            return False
         try:
             if self.satellite.offline_mode:
                 snap = self.satellite._kiosk_lookup_from_cache(sku)
@@ -459,11 +475,9 @@ class QuickSaleWidget(QWidget):
                     snap = load_quote_kiosk_lookup_snapshot(session, sku=sku)
         except Exception as exc:
             QMessageBox.warning(self, "SKU no encontrado", str(exc))
-            self._scan_input.clear()
-            self._scan_input.setFocus()
-            return
+            return False
 
-        qty = self._qty_spin.value()
+        qty = max(1, int(qty))
         existing = next((it for it in self._items if it["sku"] == snap.sku), None)
         if existing:
             existing["cantidad"] += qty
@@ -477,11 +491,9 @@ class QuickSaleWidget(QWidget):
                 "cantidad": qty,
             })
 
-        self._qty_spin.setValue(1)
         self._refresh_items_table()
         self._refresh_totals()
-        self._scan_input.clear()
-        self._scan_input.setFocus()
+        return True
 
     # ─── Tabla de items ──────────────────────────────────────────────────
 

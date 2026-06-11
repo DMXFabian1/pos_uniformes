@@ -3580,8 +3580,18 @@ QLabel#favDialogPriceLabel {
             self._set_status(ui_state.applied_message)
 
     def _handle_quick_search(self) -> None:
-        """Ctrl+S: abre búsqueda rápida con botones Agregar a consulta y Agregar a presupuesto."""
+        """Ctrl+S: abre búsqueda rápida. En Venta Rápida agrega a la venta;
+        en el resto, a consulta de kiosko o al presupuesto."""
         from pos_uniformes.ui.dialogs.quick_product_search_dialog import QuickProductSearchDialog
+
+        if getattr(self, "current_page_key", None) == "quicksale":
+            dialog = QuickProductSearchDialog(
+                self, catalog_rows=self.catalog_snapshot_rows, kiosk_mode=False
+            )
+            dialog.sku_selected.connect(self.quick_sale_widget.add_sku)
+            dialog.exec()
+            self.quick_sale_widget.focus_input()
+            return
 
         dialog = QuickProductSearchDialog(self, catalog_rows=self.catalog_snapshot_rows, kiosk_mode=True)
 
