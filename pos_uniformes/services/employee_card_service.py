@@ -301,13 +301,17 @@ class EmployeeCardService:
             path = Path(logo_path)
             if path.exists():
                 try:
-                    logo = Image.open(path).convert("RGB")
+                    logo = Image.open(path).convert("RGBA")
                     logo.thumbnail((240, 120))
+                    # aplanar alfa sobre blanco y multiplicar: funde tanto
+                    # fondos blancos (JPEG) como transparencias (PNG)
+                    flat = Image.alpha_composite(
+                        Image.new("RGBA", logo.size, "#FFFFFF"), logo
+                    ).convert("RGB")
                     pos_x = (CARD_SIZE[0] - logo.width) // 2
-                    # multiply funde el fondo blanco del JPEG con la tarjeta
                     box = (pos_x, 190, pos_x + logo.width, 190 + logo.height)
                     region = canvas.crop(box).convert("RGB")
-                    canvas.paste(ImageChops.multiply(region, logo), (pos_x, 190))
+                    canvas.paste(ImageChops.multiply(region, flat), (pos_x, 190))
                     return
                 except Exception:
                     pass
