@@ -998,6 +998,13 @@ class QuickSaleWidget(QWidget):
 
     # ─── API pública ─────────────────────────────────────────────────────
 
+    def logout(self) -> None:
+        """Cierra sesión, borra la venta y vuelve al escaneo de empleada."""
+        self._on_logout()
+
+    def is_session_active(self) -> bool:
+        return bool(self._employee_code)
+
     def focus_input(self) -> None:
         if self._employee_code:
             self._scan_input.setFocus()

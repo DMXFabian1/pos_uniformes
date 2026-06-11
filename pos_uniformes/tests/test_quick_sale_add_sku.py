@@ -85,6 +85,40 @@ class QuickSaleAddSkuTests(unittest.TestCase):
         warn.assert_called_once()
 
 
+class QuickSaleLogoutTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _make_active_widget(self) -> QuickSaleWidget:
+        satellite = SimpleNamespace(offline_mode=True, _kiosk_lookup_from_cache=None)
+        widget = QuickSaleWidget(satellite)
+        widget._employee_code = "VEND-1"
+        widget._employee_name = "Daniel Fabian"
+        widget._items = [
+            {"sku": "X", "nombre": "Pants", "talla": "6", "color": "",
+             "precio": Decimal("100.00"), "cantidad": 2},
+        ]
+        widget._discount_active = True
+        widget._sale_widget.setVisible(True)
+        widget._gate_widget.setVisible(False)
+        return widget
+
+    def test_is_session_active(self) -> None:
+        widget = self._make_active_widget()
+        self.assertTrue(widget.is_session_active())
+
+    def test_logout_clears_and_returns_to_gate(self) -> None:
+        widget = self._make_active_widget()
+        widget.logout()
+        self.assertFalse(widget.is_session_active())
+        self.assertEqual(widget._items, [])
+        self.assertFalse(widget._discount_active)
+        # isVisibleTo refleja la visibilidad local sin necesitar top-level visible
+        self.assertFalse(widget._sale_widget.isVisibleTo(widget))
+        self.assertTrue(widget._gate_widget.isVisibleTo(widget))
+
+
 class ApartadoTicketTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:

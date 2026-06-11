@@ -2525,6 +2525,9 @@ class QuoteSatelliteWindow(QMainWindow):
         if self._search_results_widget is not None and self._search_results_widget.isVisible():
             self._exit_search_mode()
             return
+        if self.current_page_key == "quicksale" and self.quick_sale_widget.is_session_active():
+            self.quick_sale_widget.logout()
+            return
         if self.current_page_key == "tariff":
             self.tariff_school_combo.setCurrentIndex(-1)
             self.tariff_preview.clear()
