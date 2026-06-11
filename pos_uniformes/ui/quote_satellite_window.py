@@ -740,6 +740,10 @@ class QuoteSatelliteWindow(QMainWindow):
         )
         scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         scroll.setWidget(widget)
+        # setWidget() activa autoFillBackground y pinta la paleta del sistema
+        # (oscura en Windows) en los huecos entre tarjetas.
+        widget.setAutoFillBackground(False)
+        scroll.viewport().setAutoFillBackground(False)
         return scroll
 
     def _build_page_stack(self) -> QWidget:
