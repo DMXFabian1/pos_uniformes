@@ -162,6 +162,8 @@ body {
   height: auto;
   object-fit: contain;
   filter: saturate(0.98) contrast(1.04);
+  /* el logo es JPEG con fondo blanco; multiply lo funde con la tarjeta */
+  mix-blend-mode: multiply;
 }
 
 .brand-caption,

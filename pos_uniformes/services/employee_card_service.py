@@ -9,7 +9,7 @@ import subprocess
 import tempfile
 from urllib.parse import quote
 
-from PIL import Image, ImageDraw, ImageFilter, ImageFont
+from PIL import Image, ImageChops, ImageDraw, ImageFilter, ImageFont
 
 from pos_uniformes.database.models import Empleada
 from pos_uniformes.services.employee_identity_service import EmployeeIdentityService
@@ -301,10 +301,13 @@ class EmployeeCardService:
             path = Path(logo_path)
             if path.exists():
                 try:
-                    logo = Image.open(path).convert("RGBA")
+                    logo = Image.open(path).convert("RGB")
                     logo.thumbnail((240, 120))
                     pos_x = (CARD_SIZE[0] - logo.width) // 2
-                    canvas.alpha_composite(logo, (pos_x, 190))
+                    # multiply funde el fondo blanco del JPEG con la tarjeta
+                    box = (pos_x, 190, pos_x + logo.width, 190 + logo.height)
+                    region = canvas.crop(box).convert("RGB")
+                    canvas.paste(ImageChops.multiply(region, logo), (pos_x, 190))
                     return
                 except Exception:
                     pass
