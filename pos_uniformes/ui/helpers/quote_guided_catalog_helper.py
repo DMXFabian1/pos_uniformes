@@ -869,6 +869,35 @@ def _size_sort_key(raw_value: object) -> tuple[int, object]:
     return (5, normalized)
 
 
+def build_search_price_groups(
+    variantes: list[dict[str, object]],
+) -> list[tuple[float, list[dict[str, object]]]]:
+    """Agrupa variantes de búsqueda por precio y ordena tallas de menor a mayor.
+
+    Meilisearch devuelve las variantes en orden de relevancia (arbitrario para
+    tallas); aquí cada grupo de precio queda con sus tallas ordenadas con
+    _size_sort_key (numéricas primero, luego CH < MD < GD < EXG...).
+    """
+    groups: dict[float, list[dict[str, object]]] = {}
+    for variante in variantes:
+        price = float(variante.get("precio_venta") or 0)
+        groups.setdefault(price, []).append(variante)
+    return [
+        (
+            price,
+            sorted(
+                group,
+                key=lambda v: (
+                    _size_sort_key(v.get("talla")),
+                    str(v.get("color") or "").lower(),
+                    str(v.get("sku") or ""),
+                ),
+            ),
+        )
+        for price, group in sorted(groups.items())
+    ]
+
+
 def _segment_row_label(segment_key: str, gender_key: str) -> str:
     if segment_key == "DEPORTIVO":
         return "Deportivo"

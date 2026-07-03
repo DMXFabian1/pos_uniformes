@@ -3,7 +3,10 @@ from __future__ import annotations
 from decimal import Decimal
 import unittest
 
-from pos_uniformes.ui.helpers.quote_guided_catalog_helper import build_guided_catalog_view
+from pos_uniformes.ui.helpers.quote_guided_catalog_helper import (
+    build_guided_catalog_view,
+    build_search_price_groups,
+)
 
 
 class QuoteGuidedCatalogHelperTests(unittest.TestCase):
@@ -567,6 +570,51 @@ def _row(
 
         titles = [card.title for card in view.product_cards]
         self.assertEqual(titles.count("Camisa Escolar"), 1)
+
+
+class SearchPriceGroupsTests(unittest.TestCase):
+    """Tallas de menor a mayor dentro de cada grupo de precio en la búsqueda guiada.
+
+    Bug original: la tarjeta de resultados pintaba las variantes en el orden
+    de relevancia de Meilisearch — las tallas salían revueltas.
+    """
+
+    @staticmethod
+    def _variant(talla: str, precio: float = 100.0, sku: str = "") -> dict[str, object]:
+        return {"talla": talla, "precio_venta": precio, "sku": sku or f"SKU-{talla}", "color": ""}
+
+    def test_numeric_sizes_sort_numerically_not_as_strings(self) -> None:
+        groups = build_search_price_groups(
+            [self._variant(t) for t in ["12", "4", "10", "6", "8"]]
+        )
+        self.assertEqual(len(groups), 1)
+        self.assertEqual([v["talla"] for v in groups[0][1]], ["4", "6", "8", "10", "12"])
+
+    def test_letter_sizes_sort_by_size_scale_not_alphabet(self) -> None:
+        groups = build_search_price_groups(
+            [self._variant(t) for t in ["EXG", "CH", "GD", "MD"]]
+        )
+        self.assertEqual([v["talla"] for v in groups[0][1]], ["CH", "MD", "GD", "EXG"])
+
+    def test_numeric_sizes_come_before_letter_sizes(self) -> None:
+        groups = build_search_price_groups(
+            [self._variant(t) for t in ["GD", "14", "CH", "16"]]
+        )
+        self.assertEqual([v["talla"] for v in groups[0][1]], ["14", "16", "CH", "GD"])
+
+    def test_price_groups_sorted_ascending(self) -> None:
+        groups = build_search_price_groups(
+            [
+                self._variant("6", precio=250.0),
+                self._variant("4", precio=150.0),
+                self._variant("8", precio=250.0),
+            ]
+        )
+        self.assertEqual([precio for precio, _ in groups], [150.0, 250.0])
+        self.assertEqual([v["talla"] for v in groups[1][1]], ["6", "8"])
+
+    def test_empty_variantes_returns_empty(self) -> None:
+        self.assertEqual(build_search_price_groups([]), [])
 
 
 if __name__ == "__main__":

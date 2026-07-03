@@ -2475,12 +2475,11 @@ class QuoteSatelliteWindow(QMainWindow):
         card_layout.addWidget(meta)
 
         variantes = family.get("variantes", [])
-        price_groups: dict[float, list[dict]] = {}
-        for v in variantes:
-            p = v.get("precio_venta", 0)
-            price_groups.setdefault(p, []).append(v)
+        # Tallas de menor a mayor dentro de cada grupo de precio (Meilisearch
+        # las devuelve por relevancia, no por talla).
+        from pos_uniformes.ui.helpers.quote_guided_catalog_helper import build_search_price_groups
 
-        for precio, grupo in sorted(price_groups.items()):
+        for precio, grupo in build_search_price_groups(variantes):
             price_header = QLabel(f"${precio:,.2f}")
             price_header.setStyleSheet(
                 "font-size: 12px; font-weight: 600; color: #6B4226;"
