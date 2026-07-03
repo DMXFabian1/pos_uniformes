@@ -124,6 +124,9 @@ def main() -> int:
             "Presupuestos Satélite ya está corriendo.\n\nBusca la ventana en la barra de tareas.",
         )
         return 0
+    # El menu admin necesita soltar este candado antes de reiniciar la app
+    # (os.execv) — si no, la instancia nueva muere con "Ya esta abierto".
+    app._instance_lock = lock_file
 
     # ── Splash ────────────────────────────────────────────────────────
     splash = QSplashScreen(_build_splash_pixmap())

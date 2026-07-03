@@ -8,6 +8,7 @@ from pathlib import Path
 
 from PyQt6.QtPrintSupport import QPrinterInfo
 from PyQt6.QtWidgets import (
+    QApplication,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -57,7 +58,25 @@ def _write_env(host: str, password: str) -> None:
     path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
 
+def _release_instance_lock() -> None:
+    """Suelta el QLockFile de instancia única antes de reiniciar.
+
+    En Windows os.execv arranca el proceso nuevo mientras el viejo muere: si
+    el candado sigue tomado, la instancia nueva ve "Ya está abierto" y la app
+    queda cerrada en vez de reiniciada.
+    """
+    app = QApplication.instance()
+    lock = getattr(app, "_instance_lock", None)
+    if lock is None:
+        return
+    try:
+        lock.unlock()
+    except Exception:  # noqa: BLE001 — reiniciar es mejor que quedarse trabado
+        pass
+
+
 def _restart_app() -> None:
+    _release_instance_lock()
     os.execv(sys.executable, sys.argv)
 
 
