@@ -28,6 +28,7 @@ from pos_uniformes.services.satellite_startup_service import probe_database_host
 from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
 from pos_uniformes.utils.config import settings
 from pos_uniformes.utils.app_metadata import satellite_display_name, satellite_windows_icon_path
+from pos_uniformes.utils.satellite_excepthook import install_satellite_excepthook
 
 
 def _build_splash_pixmap() -> QPixmap:
@@ -104,6 +105,8 @@ def resolve_satellite_operator_id() -> int:
 
 
 def main() -> int:
+    # Una excepcion que escape de un slot no debe cerrar el kiosko.
+    install_satellite_excepthook()
     app = QApplication(sys.argv)
     app.setApplicationName(satellite_display_name())
     app.setOrganizationName("POSUniformes")
