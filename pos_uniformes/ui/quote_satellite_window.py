@@ -3261,18 +3261,8 @@ QLabel#favDialogPriceLabel {
                 ) == product_key
                 and r.get("activo", True)
             ]
-            def _talla_sort_key(talla_str: str):
-                try:
-                    return (0, float(talla_str))
-                except (ValueError, TypeError):
-                    return (1, talla_str)
-
-            family_rows.sort(key=lambda r: (
-                str(r.get("escuela_nombre") or "General") != "General",  # General primero (False < True)
-                str(r.get("escuela_nombre") or ""),
-                _D(str(r.get("precio_venta") or "0")),
-                _talla_sort_key(str(r.get("talla") or "")),
-            ))
+            from pos_uniformes.ui.helpers.quote_guided_catalog_helper import favorites_variant_sort_key
+            family_rows.sort(key=favorites_variant_sort_key)
 
             if not family_rows:
                 variants_title_lbl.setVisible(False)
@@ -3537,6 +3527,14 @@ QLabel#favDialogPriceLabel {
         scan_code = self.quick_scan_input.text().strip().upper()
         if not scan_code:
             QMessageBox.warning(self, "Codigo faltante", "Escanea o captura un codigo de cliente o SKU.")
+            return
+        if self.offline_mode:
+            # Sin conexion no hay lookup de clientes (get_session bloquearia
+            # el connect_timeout completo); el escaneo se trata como SKU y la
+            # ruta de SKU ya resuelve contra el catalogo local.
+            self._add_quote_item_by_sku(scan_code, 1)
+            self.quick_scan_input.clear()
+            self.quick_scan_input.setFocus()
             return
         try:
             with get_session() as session:
@@ -4128,6 +4126,11 @@ QLabel#favDialogPriceLabel {
         }
 
     def _handle_quote_filters_changed(self) -> None:
+        if self.offline_mode:
+            # Los presupuestos locales no tienen estados que filtrar; solo se
+            # re-pinta la lista local (sin tocar la DB, que bloquearia 5s).
+            self._refresh_offline_quotes()
+            return
         try:
             with get_session() as session:
                 self._refresh_quotes(session)

@@ -6,6 +6,7 @@ import unittest
 from pos_uniformes.ui.helpers.quote_guided_catalog_helper import (
     build_guided_catalog_view,
     build_search_price_groups,
+    favorites_variant_sort_key,
 )
 
 
@@ -615,6 +616,39 @@ class SearchPriceGroupsTests(unittest.TestCase):
 
     def test_empty_variantes_returns_empty(self) -> None:
         self.assertEqual(build_search_price_groups([]), [])
+
+
+class FavoritesVariantSortKeyTests(unittest.TestCase):
+    """Orden del picker de variantes del diálogo de favoritos.
+
+    Bug original: las tallas de letra ordenaban alfabético (CH < EXG < GD < MD).
+    """
+
+    @staticmethod
+    def _row(talla: str, escuela: str = "General", precio: str = "100") -> dict[str, object]:
+        return {"talla": talla, "escuela_nombre": escuela, "precio_venta": precio}
+
+    def test_letter_sizes_sort_by_scale_not_alphabet(self) -> None:
+        rows = [self._row(t) for t in ["EXG", "CH", "GD", "MD"]]
+        rows.sort(key=favorites_variant_sort_key)
+        self.assertEqual([r["talla"] for r in rows], ["CH", "MD", "GD", "EXG"])
+
+    def test_numeric_sizes_sort_numerically(self) -> None:
+        rows = [self._row(t) for t in ["12", "4", "10", "6"]]
+        rows.sort(key=favorites_variant_sort_key)
+        self.assertEqual([r["talla"] for r in rows], ["4", "6", "10", "12"])
+
+    def test_general_school_comes_first_then_price_ascending(self) -> None:
+        rows = [
+            self._row("4", escuela="Colegio Mexico", precio="150"),
+            self._row("6", escuela="General", precio="250"),
+            self._row("4", escuela="General", precio="150"),
+        ]
+        rows.sort(key=favorites_variant_sort_key)
+        self.assertEqual(
+            [(r["escuela_nombre"], r["talla"]) for r in rows],
+            [("General", "4"), ("General", "6"), ("Colegio Mexico", "4")],
+        )
 
 
 if __name__ == "__main__":

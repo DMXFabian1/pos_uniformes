@@ -869,6 +869,22 @@ def _size_sort_key(raw_value: object) -> tuple[int, object]:
     return (5, normalized)
 
 
+def favorites_variant_sort_key(row: dict[str, object]) -> tuple[object, ...]:
+    """Orden del picker de variantes en el diálogo de favoritos.
+
+    General primero, luego por escuela, precio ascendente y talla de menor a
+    mayor (con _size_sort_key: numéricas primero, CH < MD < GD < EXG — antes
+    las tallas de letra ordenaban alfabético).
+    """
+    school = str(row.get("escuela_nombre") or "General").strip() or "General"
+    return (
+        school != "General",
+        school,
+        Decimal(str(row.get("precio_venta") or "0")),
+        _size_sort_key(row.get("talla")),
+    )
+
+
 def build_search_price_groups(
     variantes: list[dict[str, object]],
 ) -> list[tuple[float, list[dict[str, object]]]]:
