@@ -90,7 +90,7 @@ from pos_uniformes.ui.helpers.date_field_helper import configure_friendly_date_e
 from pos_uniformes.ui.helpers.flow_layout import FlowLayout
 from pos_uniformes.ui.helpers.active_filter_chip_helper import rebuild_active_filter_chips
 from pos_uniformes.ui.helpers.catalog_pagination_helper import build_catalog_pagination_view
-from pos_uniformes.ui.helpers.quote_cart_view_helper import build_quote_cart_view
+from pos_uniformes.ui.helpers.quote_cart_view_helper import build_quote_cart_view, normalize_cart_row_index
 from pos_uniformes.ui.helpers.quote_detail_helper import (
     build_empty_quote_detail_view,
     build_error_quote_detail_view,
@@ -3757,9 +3757,10 @@ QLabel#favDialogPriceLabel {
         self._remove_quote_item_at_index(selected_row)
 
     def _change_sidebar_item_quantity(self, row_index: int, delta: int) -> None:
-        if row_index < 0 or row_index >= len(self.quote_cart):
+        index = normalize_cart_row_index(row_index, len(self.quote_cart))
+        if index is None:
             return
-        item = self.quote_cart[row_index]
+        item = self.quote_cart[index]
         new_qty = max(1, int(item.get("cantidad") or 1) + delta)
         if self.offline_mode:
             item["cantidad"] = new_qty
@@ -3769,7 +3770,7 @@ QLabel#favDialogPriceLabel {
                     update_sale_cart_item_quantity(
                         session,
                         sale_cart=self.quote_cart,
-                        row_index=row_index,
+                        row_index=index,
                         new_quantity=new_qty,
                         variant_loader=PresupuestoService.obtener_variante_por_sku,
                         stock_validator=lambda _v, _c: None,
@@ -3780,17 +3781,18 @@ QLabel#favDialogPriceLabel {
         self._refresh_quote_cart_table()
 
     def _remove_quote_item_at_index(self, row_index: int) -> None:
-        if row_index < 0 or row_index >= len(self.quote_cart):
+        index = normalize_cart_row_index(row_index, len(self.quote_cart))
+        if index is None:
             return
-        removed_line_item = dict(self.quote_cart[row_index])
-        self.quote_cart.pop(row_index)
+        removed_line_item = dict(self.quote_cart[index])
+        self.quote_cart.pop(index)
         restore_message = restore_sports_uniform_playera_price_if_needed(
             self.quote_cart,
             removed_line_item=removed_line_item,
         )
         self._refresh_quote_cart_table()
         if self.quote_cart:
-            self.quote_cart_table.selectRow(min(row_index, len(self.quote_cart) - 1))
+            self.quote_cart_table.selectRow(min(index, len(self.quote_cart) - 1))
         if restore_message:
             self._set_status(restore_message)
 
@@ -5097,10 +5099,12 @@ QLabel#favDialogPriceLabel {
                     plus_btn.setCursor(Qt.CursorShape.PointingHandCursor)
                     plus_btn.setStyleSheet(_qty_btn_style)
 
-                    def _on_minus(index=original_idx):
+                    # clicked pasa checked como primer argumento posicional:
+                    # sin absorberlo, index recibiria False (== fila 0).
+                    def _on_minus(checked=False, index=original_idx):
                         self._change_sidebar_item_quantity(index, -1)
                         _refresh_table()
-                    def _on_plus(index=original_idx):
+                    def _on_plus(checked=False, index=original_idx):
                         self._change_sidebar_item_quantity(index, 1)
                         _refresh_table()
                     minus_btn.clicked.connect(_on_minus)
@@ -5115,7 +5119,7 @@ QLabel#favDialogPriceLabel {
                     remove_btn = QPushButton("✕")
                     remove_btn.setObjectName("sidebarItemRemoveButton")
                     remove_btn.setFixedSize(26, 26)
-                    def _on_remove(index=original_idx):
+                    def _on_remove(checked=False, index=original_idx):
                         self._remove_quote_item_at_index(index)
                         _refresh_table()
                     remove_btn.clicked.connect(_on_remove)

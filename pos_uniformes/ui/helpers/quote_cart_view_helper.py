@@ -27,6 +27,21 @@ class QuoteCartView:
     school_options: tuple[str, ...]
 
 
+def normalize_cart_row_index(row_index: object, cart_length: int) -> int | None:
+    """Devuelve el indice de carrito como int seguro, o None si no es usable.
+
+    La señal clicked de Qt pasa checked (bool) como primer argumento
+    posicional: si un handler mal cableado deja llegar ese bool como indice,
+    False == 0 tocaria la primera linea del carrito en vez de la
+    seleccionada. Un bool jamas es un indice valido.
+    """
+    if isinstance(row_index, bool) or not isinstance(row_index, int):
+        return None
+    if row_index < 0 or row_index >= cart_length:
+        return None
+    return row_index
+
+
 def build_quote_cart_view(quote_cart: list[dict[str, object]], *, school_filter: str = "") -> QuoteCartView:
     rows: list[QuoteCartRowView] = []
     total_items = 0
