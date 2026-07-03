@@ -84,6 +84,17 @@ class QuickSaleAddSkuTests(unittest.TestCase):
         self.assertEqual(widget._items, [])
         warn.assert_called_once()
 
+    def test_add_sku_with_corrupt_quantity_falls_back_to_one(self) -> None:
+        widget = self._make_widget()
+        widget._employee_code = "VEND-1"
+        widget.satellite._kiosk_lookup_from_cache = lambda sku: _snap(sku)
+        with patch.object(QuickSaleWidget, "_refresh_items_table"), patch.object(
+            QuickSaleWidget, "_refresh_totals"
+        ):
+            added = widget.add_sku("SKU004838", "abc")
+        self.assertTrue(added)
+        self.assertEqual(widget._items[0]["cantidad"], 1)
+
 
 class QuickSaleLogoutTests(unittest.TestCase):
     @classmethod

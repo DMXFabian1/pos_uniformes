@@ -487,7 +487,12 @@ class QuickSaleWidget(QWidget):
             QMessageBox.warning(self, "SKU no encontrado", str(exc))
             return False
 
-        qty = max(1, int(qty))
+        try:
+            qty = max(1, int(qty))
+        except (TypeError, ValueError):
+            # Una cantidad corrupta no debe tumbar la venta — cae a 1 pieza.
+            _logger.warning("Cantidad invalida %r para SKU %s; usando 1", qty, snap.sku)
+            qty = 1
         existing = next((it for it in self._items if it["sku"] == snap.sku), None)
         if existing:
             existing["cantidad"] += qty
