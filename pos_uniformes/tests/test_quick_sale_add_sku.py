@@ -162,5 +162,27 @@ class ApartadoTicketTests(unittest.TestCase):
         self.assertIn("$129.00", text)
 
 
+class GateScanDbErrorLoggingTests(unittest.TestCase):
+    """Un error real de DB en el gate debe quedar en el log, no solo verse
+    como "codigo no encontrado" (era imposible de diagnosticar)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_gate_scan_db_error_is_logged(self) -> None:
+        satellite = SimpleNamespace(offline_mode=False, _kiosk_lookup_from_cache=None)
+        widget = QuickSaleWidget(satellite)
+        widget._gate_input.setText("EMP:VEND-2")
+        with patch(
+            "pos_uniformes.ui.views.quick_sale_view.get_session",
+            side_effect=RuntimeError("db caida"),
+        ), self.assertLogs("pos_uniformes.ui.views.quick_sale_view", level="ERROR") as logs:
+            widget._on_gate_scan()
+        self.assertTrue(any("VEND-2" in line for line in logs.output))
+        # El gate sigue mostrando el error amigable y no inicia sesion.
+        self.assertTrue(widget._gate_error.isVisible() or not widget._employee_code)
+
+
 if __name__ == "__main__":
     unittest.main()

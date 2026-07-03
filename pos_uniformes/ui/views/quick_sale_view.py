@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import textwrap
 from datetime import datetime
 from decimal import Decimal, ROUND_FLOOR
@@ -33,6 +34,8 @@ from pos_uniformes.services.quote_kiosk_lookup_service import (
     load_quote_kiosk_lookup_snapshot,
 )
 from sqlalchemy import select
+
+_logger = logging.getLogger(__name__)
 
 from pos_uniformes.services.business_settings_service import BusinessSettingsService
 from pos_uniformes.services.business_info_cache_service import (
@@ -280,6 +283,8 @@ class QuickSaleWidget(QWidget):
                         )
                     )
             except Exception:
+                # Sin log, un error real de DB se veia como "codigo no encontrado".
+                _logger.exception("Error de DB al validar empleada '%s' en el gate", code)
                 emp = None
 
             if not emp:
@@ -623,6 +628,8 @@ class QuickSaleWidget(QWidget):
                     )
                 )
         except Exception:
+            # Sin log, un error real de DB se veia como "QR no reconocido".
+            _logger.exception("Error de DB al autorizar descuento con QR '%s'", scanned)
             emp = None
         if emp is None:
             QMessageBox.warning(self, "No autorizado", "QR no reconocido.")
