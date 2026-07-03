@@ -1,4 +1,12 @@
-"""Dialogo reutilizable para mostrar e imprimir texto."""
+"""Dialogo reutilizable para mostrar e imprimir tickets de 80 mm.
+
+- open_printable_text_dialog: un solo documento (presupuestos, etc.).
+- open_tickets_print_dialog : uno o varios tickets; un solo "Imprimir" los
+  manda todos como jobs separados (autocut entre cada uno).
+
+Ambos comparten la misma cola segura (TicketPrintQueue): si se cierra el
+dialogo mientras hay un QTimer pendiente, no se tocan widgets ya destruidos.
+"""
 
 from __future__ import annotations
 
@@ -12,8 +20,8 @@ from pos_uniformes.services.business_settings_service import BusinessSettingsSer
 from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
     TICKET_FONT_POINT_SIZE,
     TICKET_PAPER_WIDTH_MM,
-    build_ticket_document,
 )
+from pos_uniformes.ui.helpers.ticket_print_queue import TicketPrintQueue
 
 
 def _load_print_preferences() -> tuple[str, int]:
@@ -35,12 +43,42 @@ def _load_print_preferences() -> tuple[str, int]:
         return "", 1
 
 
-def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> None:
-    dialog = QDialog(parent)
-    dialog.setWindowTitle(title)
-    dialog.resize(620, 520)
+def _print_ticket_job(content: str) -> bool:
+    """Envia un ticket a la impresora como un job independiente.
 
-    layout = QVBoxLayout()
+    Devuelve True si el job se inicio correctamente. Cada llamada crea su
+    propio QPrinter -> el autocutter corta entre tickets.
+    """
+    printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
+    ticket_printer, copies = _load_print_preferences()
+    if ticket_printer:
+        printer.setPrinterName(ticket_printer)
+    printer.setCopyCount(copies)
+    printer.setPageSize(QPageSize(QSizeF(TICKET_PAPER_WIDTH_MM, 600.0), QPageSize.Unit.Millimeter))
+    printer.setFullPage(True)
+    printer.setPageOrientation(QPageLayout.Orientation.Portrait)
+
+    painter = QPainter()
+    if not painter.begin(printer):
+        return False
+    try:
+        font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+        font.setPointSize(TICKET_FONT_POINT_SIZE)
+        font.setBold(True)
+        painter.setFont(font)
+
+        rect = painter.viewport()
+        painter.drawText(
+            rect,
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap,
+            content,
+        )
+    finally:
+        painter.end()
+    return True
+
+
+def _build_ticket_editor(content: str) -> QTextEdit:
     editor = QTextEdit()
     editor.setReadOnly(True)
     mono_family = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont).family()
@@ -49,64 +87,65 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
         f" font-weight: bold; }}"
     )
     editor.setPlainText(content)
+    return editor
 
+
+def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> None:
+    """Muestra un texto e imprime un unico ticket (un job)."""
+    open_tickets_print_dialog(parent, title, [content])
+
+
+def open_tickets_print_dialog(parent: QWidget, title: str, tickets: list[str]) -> None:
+    """Muestra uno o varios tickets en una sola vista.
+
+    Un solo clic en "Imprimir" manda todos los tickets como jobs separados
+    (cada uno se corta por el autocutter). Reemplaza el flujo anterior de un
+    dialogo por copia, que obligaba a imprimir dos veces.
+    """
+    tickets = [t for t in tickets if t and t.strip()]
+    if not tickets:
+        return
+
+    dialog = QDialog(parent)
+    dialog.setWindowTitle(title)
+    dialog.resize(620, 520)
+
+    layout = QVBoxLayout()
+    editor = _build_ticket_editor("\n\n".join(tickets))
+
+    n = len(tickets)
+    idle_label = "Imprimir" if n == 1 else f"Imprimir {n} tickets"
     buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-    print_button = buttons.addButton("Imprimir", QDialogButtonBox.ButtonRole.ActionRole)
+    print_button = buttons.addButton(idle_label, QDialogButtonBox.ButtonRole.ActionRole)
 
-    _COOLDOWN_MS = 3000  # ms antes de re-habilitar el botón tras imprimir
+    def _set_status(text: str) -> None:
+        print_button.setText(text)
+        print_button.setEnabled(text == idle_label)
 
-    def handle_print() -> None:
-        # Bloquear el botón inmediatamente para evitar doble impresión
-        print_button.setEnabled(False)
-        print_button.setText("Imprimiendo…")
+    def _report(ok: int, errors: int) -> None:
+        if not errors:
+            return
+        if ok == 0:
+            msg = "No se pudo imprimir.\nVerifica que la impresora este conectada."
+        else:
+            msg = f"Se imprimieron {ok} de {n} tickets.\n{errors} fallaron."
+        QMessageBox.warning(dialog, "Error de impresion", msg)
 
-        try:
-            printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
-            ticket_printer, copies = _load_print_preferences()
-            if ticket_printer:
-                printer.setPrinterName(ticket_printer)
-            printer.setCopyCount(copies)
-            printer.setPageSize(QPageSize(QSizeF(TICKET_PAPER_WIDTH_MM, 600.0), QPageSize.Unit.Millimeter))
-            printer.setFullPage(True)
-            printer.setPageOrientation(QPageLayout.Orientation.Portrait)
+    queue = TicketPrintQueue(
+        tickets,
+        print_fn=_print_ticket_job,
+        schedule=QTimer.singleShot,
+        on_status=_set_status,
+        on_done=_report,
+        idle_label=idle_label,
+    )
 
-            painter = QPainter()
-            if not painter.begin(printer):
-                QMessageBox.warning(
-                    dialog,
-                    "Error de impresión",
-                    "No se pudo iniciar el trabajo de impresión.\nVerifica que la impresora esté conectada.",
-                )
-                _reset_print_button()
-                return
-            try:
-                font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
-                font.setPointSize(TICKET_FONT_POINT_SIZE)
-                font.setBold(True)
-                painter.setFont(font)
-
-                rect = painter.viewport()
-                painter.drawText(
-                    rect,
-                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap,
-                    content,
-                )
-            finally:
-                painter.end()
-            # Impresión exitosa — mostrar confirmación antes de re-habilitar
-            print_button.setText("✓ Impreso")
-            QTimer.singleShot(_COOLDOWN_MS, _reset_print_button)
-        except Exception as exc:
-            QMessageBox.warning(dialog, "Error de impresión", f"No se pudo imprimir el ticket:\n{exc}")
-            _reset_print_button()
-
-    def _reset_print_button() -> None:
-        print_button.setText("Imprimir")
-        print_button.setEnabled(True)
-
-    print_button.clicked.connect(handle_print)
+    print_button.clicked.connect(queue.start)
     buttons.rejected.connect(dialog.reject)
     buttons.accepted.connect(dialog.accept)
+    # Al cerrar el dialogo, la cola deja de tocar sus widgets (evita crash).
+    dialog.finished.connect(lambda _result: queue.close())
+
     layout.addWidget(editor)
     layout.addWidget(buttons)
     dialog.setLayout(layout)

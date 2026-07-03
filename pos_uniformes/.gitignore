@@ -30,3 +30,4 @@ backups/database/*.dump
 backups/database/.automatic_backup_status.json
 data/catalog_cache.json
 data/school_links_cache.json
+data/business_info.json

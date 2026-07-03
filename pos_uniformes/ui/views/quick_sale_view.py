@@ -35,7 +35,11 @@ from pos_uniformes.services.quote_kiosk_lookup_service import (
 from sqlalchemy import select
 
 from pos_uniformes.services.business_settings_service import BusinessSettingsService
-from pos_uniformes.ui.dialogs.printable_text_dialog import open_printable_text_dialog
+from pos_uniformes.services.business_info_cache_service import (
+    load_business_info as load_business_info_cache,
+    save_business_info as save_business_info_cache,
+)
+from pos_uniformes.ui.dialogs.printable_text_dialog import open_tickets_print_dialog
 from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
     TICKET_CHAR_WIDTH as _TW,
     tk_bot,
@@ -173,6 +177,7 @@ class QuickSaleWidget(QWidget):
         self._employee_name: str | None = None
         self._items: list[dict] = []
         self._discount_active = False
+        self._biz_info: tuple[str, str, str] | None = None
 
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
@@ -693,11 +698,10 @@ class QuickSaleWidget(QWidget):
         if not self._items:
             QMessageBox.information(self, "Sin piezas", "Agrega piezas antes de generar ticket.")
             return
-        text = self._build_venta_text()
-        open_printable_text_dialog(self, "Ticket de venta", text)
+        tickets = [self._build_venta_text()]
         if self._discount_active:
-            copy = self._build_employee_copy_text()
-            open_printable_text_dialog(self, "Copia empleada", copy)
+            tickets.append(self._build_employee_copy_text())
+        open_tickets_print_dialog(self, "Ticket de venta", tickets)
         self._scan_input.setFocus()
 
     def _on_ticket_apartado(self) -> None:
@@ -786,24 +790,42 @@ class QuickSaleWidget(QWidget):
         cliente_text = self._build_apartado_text(
             nombre, copy_label="CLIENTE", include_terms=True
         )
-        open_printable_text_dialog(self, "Apartado - Cliente", cliente_text)
         tienda_text = self._build_apartado_text(
             nombre, copy_label="COPIA TIENDA", include_terms=False
         )
-        open_printable_text_dialog(self, "Apartado - Copia tienda", tienda_text)
+        open_tickets_print_dialog(self, "Apartado", [cliente_text, tienda_text])
         self._scan_input.setFocus()
 
     def _load_business_info(self) -> tuple[str, str, str]:
+        # Memo por sesion: la info del negocio no cambia mientras se usa la app.
+        if self._biz_info is not None:
+            return self._biz_info
+        self._biz_info = self._resolve_business_info()
+        return self._biz_info
+
+    def _resolve_business_info(self) -> tuple[str, str, str]:
+        default = ("Uniformes", "", "")
+        # Offline: usa el cache local -> evita el connect_timeout (5s) por ticket.
+        if getattr(self.satellite, "offline_mode", False):
+            cached = load_business_info_cache()
+            return cached if cached and cached[0] else default
+        # Online: la DB es la fuente de verdad; refresca el cache para offline.
         try:
             with get_session() as session:
                 config = BusinessSettingsService.get_or_create(session)
-                return (
+                info = (
                     config.nombre_negocio or "Uniformes",
                     config.telefono or "",
                     config.direccion or "",
                 )
+            try:
+                save_business_info_cache(*info)
+            except Exception:
+                pass
+            return info
         except Exception:
-            return ("Uniformes", "", "")
+            cached = load_business_info_cache()
+            return cached if cached and cached[0] else default
 
     def _build_items_block(self, lines: list[str]) -> None:
         first = True
