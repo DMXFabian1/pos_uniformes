@@ -224,23 +224,27 @@ class QuickProductSearchDialog(QDialog):
         except Exception:
             pass
 
-        # Filtro local refina (siempre se aplica)
+        # Con Meilisearch (matchingStrategy=all) el texto ya quedó resuelto con
+        # typos y sinónimos — re-filtrar por substring los mataría. El filtro
+        # de términos solo corre como fallback local.
         q_lower = query.lower()
         terms = q_lower.split()
         for row in source_rows:
                 if not row.get("producto_activo") or not row.get("variante_activo"):
                     continue
-                searchable = " ".join([
-                    str(row.get("sku", "")),
-                    str(row.get("producto_nombre_base", "")),
-                    str(row.get("talla", "")),
-                    str(row.get("color", "")),
-                    str(row.get("escuela_nombre", "")),
-                    str(row.get("tipo_prenda_nombre", "")),
-                    str(row.get("tipo_pieza_nombre", "")),
-                ]).lower()
-                if all(t in searchable for t in terms):
-                    hits.append(row)
+                if not used_meili:
+                    searchable = " ".join([
+                        str(row.get("sku", "")),
+                        str(row.get("producto_nombre_base", "")),
+                        str(row.get("talla", "")),
+                        str(row.get("color", "")),
+                        str(row.get("escuela_nombre", "")),
+                        str(row.get("tipo_prenda_nombre", "")),
+                        str(row.get("tipo_pieza_nombre", "")),
+                    ]).lower()
+                    if not all(t in searchable for t in terms):
+                        continue
+                hits.append(row)
                 if len(hits) >= 200:
                     break
 

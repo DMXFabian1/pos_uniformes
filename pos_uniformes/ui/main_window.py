@@ -9326,8 +9326,10 @@ class MainWindow(QMainWindow):
         catalog_snapshot_rows = self._load_catalog_snapshot_rows(session)
 
         search_text = self.catalog_search_input.text().strip()
+        used_meili = False
 
-        # Meilisearch pre-filtra por relevancia (typo-tolerant), filtros locales refinan
+        # Meilisearch resuelve el texto (matchingStrategy=all); el filtro local
+        # de texto solo corre como fallback para no matar los typos/sinónimos.
         if search_text:
             try:
                 from pos_uniformes.services import meilisearch_service
@@ -9339,10 +9341,11 @@ class MainWindow(QMainWindow):
                             r for r in catalog_snapshot_rows
                             if str(r.get("sku", "")) in hit_skus
                         ]
+                        used_meili = True
             except Exception:
                 pass
 
-        search_terms = compile_search_terms(search_text)
+        search_terms = compile_search_terms("" if used_meili else search_text)
         school_scope_filter = str(self.catalog_school_scope_filter_combo.currentData() or "")
         category_filters = (
             self.catalog_category_filter_combo.selected_values()
@@ -9922,8 +9925,10 @@ class MainWindow(QMainWindow):
         inventory_snapshot_rows = self._load_inventory_snapshot_rows(session)
 
         search_text = self.inventory_search_input.text().strip()
+        used_meili = False
 
-        # Meilisearch pre-filtra por relevancia (typo-tolerant), luego filtros locales refinan
+        # Meilisearch resuelve el texto (matchingStrategy=all); el filtro local
+        # de texto solo corre como fallback para no matar los typos/sinónimos.
         if search_text:
             try:
                 from pos_uniformes.services import meilisearch_service
@@ -9935,9 +9940,10 @@ class MainWindow(QMainWindow):
                             r for r in inventory_snapshot_rows
                             if str(r.get("sku", "")) in hit_skus
                         ]
+                        used_meili = True
             except Exception:
                 pass
-        search_terms = compile_search_terms(search_text)
+        search_terms = compile_search_terms("" if used_meili else search_text)
         use_filter = str(self.inventory_use_filter_combo.currentData() or "")
         category_filters = (
             self.inventory_category_filter_combo.selected_values()

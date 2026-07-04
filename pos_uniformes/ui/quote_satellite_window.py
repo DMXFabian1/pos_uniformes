@@ -2112,8 +2112,11 @@ class QuoteSatelliteWindow(QMainWindow):
 
         search_text = self.catalog_search_input.text().strip()
         source_rows = self.catalog_snapshot_rows
+        used_meili = False
 
-        # Búsqueda inteligente con Meilisearch (pre-filtra por relevancia, luego filtro local refina)
+        # Meilisearch resuelve el texto (matchingStrategy=all: exige todas las
+        # palabras con typos y sinónimos). El filtro local de texto solo corre
+        # como fallback — si se re-aplicara, mataría la tolerancia a typos.
         if search_text:
             try:
                 from pos_uniformes.services import meilisearch_service
@@ -2122,6 +2125,7 @@ class QuoteSatelliteWindow(QMainWindow):
                     if hits:
                         hit_skus = {str(h.get("sku", "")) for h in hits}
                         source_rows = [r for r in self.catalog_snapshot_rows if str(r.get("sku", "")) in hit_skus]
+                        used_meili = True
             except Exception:
                 pass  # fallback al filtro local
 
@@ -2130,7 +2134,7 @@ class QuoteSatelliteWindow(QMainWindow):
             level_filter=str(self.catalog_level_combo.currentData() or ""),
             school_filter=effective_school_filter,
             include_general=include_general,
-            search_text=search_text,
+            search_text="" if used_meili else search_text,
         )
         pagination_view = build_catalog_pagination_view(
             list(rows),

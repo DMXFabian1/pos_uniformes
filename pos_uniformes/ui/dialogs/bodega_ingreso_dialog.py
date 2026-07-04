@@ -333,23 +333,14 @@ class BodegaIngresoDialog(QDialog):
                     .order_by(Variante.talla)
                 ).unique().all())
 
-                # Filtro local para refinar (ej. "calceta escolar verde" → solo las que contengan todos los términos)
-                terms = text.lower().split()
-                filtered: list[Variante] = []
-                for v in variantes:
-                    searchable = " ".join([
-                        v.sku or "", v.producto.nombre if v.producto else "",
-                        v.talla or "", v.color or "",
-                    ]).lower()
-                    if all(t in searchable for t in terms):
-                        filtered.append(v)
-                if not filtered:
-                    # Si el filtro local no matchea nada, no usar resultados crudos
+                # Con matchingStrategy=all Meilisearch ya exige todas las
+                # palabras (con typos y sinónimos vivos) — re-filtrar por
+                # substring mataba la tolerancia a typos.
+                if not variantes:
                     self._set_feedback(f"No encontrado: {text}", "warning")
                     self.sku_input.selectAll()
                     self.sku_input.setFocus()
                     return
-                variantes = filtered
 
                 # Si hay múltiples productos distintos, pedir al usuario que elija uno
                 productos_unicos: dict[int, str] = {}

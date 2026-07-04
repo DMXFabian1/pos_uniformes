@@ -221,6 +221,11 @@ def search(query: str, *, limit: int = 40, mode: str | None = None) -> list[dict
 
     opts: dict[str, Any] = {
         "limit": limit,
+        # Exigir TODAS las palabras del query (con typos y sinónimos vivos).
+        # Sin esto Meilisearch puede ignorar palabras ("gales verde" → azules)
+        # y los consumidores tenían que re-filtrar localmente por substring,
+        # lo que mataba la tolerancia a typos.
+        "matchingStrategy": "all",
         "attributesToRetrieve": [
             "id", "sku", "talla", "color", "precio_venta", "stock_actual",
             "producto_id", "nombre_base", "nombre_producto", "categoria",
