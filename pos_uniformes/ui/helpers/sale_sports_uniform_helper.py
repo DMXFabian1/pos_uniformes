@@ -19,7 +19,9 @@ from pos_uniformes.services.venta_service import VentaService
 from pos_uniformes.utils.text_normalization import normalize_text_unicode as _normalize_text
 
 _TWO_PIECE_PATTERNS = ("2pz", "2 pz", "2 piezas", "dos piezas", "conjunto 2", "set 2")
-_SPORT_PATTERNS = ("deportivo", "deporte")
+# "deportiva" cubre nombres en femenino ("Playera Deportiva") que el patrón
+# masculino no detectaba.
+_SPORT_PATTERNS = ("deportivo", "deportiva", "deporte")
 _PLAYERA_PATTERNS = ("playera", "camiseta", "jersey", "camisa deportiva")
 
 

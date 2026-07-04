@@ -43,6 +43,17 @@ from pos_uniformes.services.business_info_cache_service import (
     save_business_info as save_business_info_cache,
 )
 from pos_uniformes.ui.dialogs.printable_text_dialog import open_tickets_print_dialog
+from pos_uniformes.ui.helpers.quick_sale_sports_uniform_helper import (
+    adapt_cache_row,
+    build_promo_playera_item,
+    load_playera_candidates_from_rows,
+    mark_promo_base_item,
+    restore_promo_playera_after_base_removed,
+)
+from pos_uniformes.ui.helpers.sale_sports_uniform_helper import (
+    is_deportivo_two_piece_variant,
+    resolve_sale_scan_variants,
+)
 from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
     TICKET_CHAR_WIDTH as _TW,
     tk_bot,
@@ -493,22 +504,77 @@ class QuickSaleWidget(QWidget):
             # Una cantidad corrupta no debe tumbar la venta — cae a 1 pieza.
             _logger.warning("Cantidad invalida %r para SKU %s; usando 1", qty, snap.sku)
             qty = 1
+
+        # ── Promo 3pz: pants 2pz deportivo puede llevar playera a $100 ──
+        promo_playera_item: dict | None = None
+        base_adapter = adapt_cache_row(self._find_satellite_row(snap.sku))
+        if base_adapter is not None and is_deportivo_two_piece_variant(base_adapter):
+            try:
+                resolution = resolve_sale_scan_variants(
+                    self,
+                    None,  # sin sesión: los loaders resuelven contra el cache
+                    base_adapter,
+                    variant_loader=lambda _s, sku2: adapt_cache_row(self._find_satellite_row(sku2)),
+                    playera_candidates_loader=lambda _s, base: load_playera_candidates_from_rows(
+                        self._satellite_rows(), base
+                    ),
+                )
+            except ValueError as exc:
+                QMessageBox.warning(self, "Playera no valida", str(exc))
+                return False
+            if resolution is None:
+                return False  # la empleada canceló el flujo
+            if resolution.composed_as_three_pieces:
+                promo_playera_item = build_promo_playera_item(
+                    resolution.variants[1], base_sku=snap.sku
+                )
+
         existing = next((it for it in self._items if it["sku"] == snap.sku), None)
         if existing:
             existing["cantidad"] += qty
+            base_item = existing
         else:
-            self._items.append({
+            base_item = {
                 "sku": snap.sku,
                 "nombre": snap.product_name,
                 "talla": snap.size_label,
                 "color": snap.color_label,
                 "precio": snap.price,
                 "cantidad": qty,
-            })
+            }
+            self._items.append(base_item)
+
+        if promo_playera_item is not None:
+            mark_promo_base_item(base_item, playera_sku=str(promo_playera_item["sku"]))
+            existing_playera = next(
+                (
+                    it
+                    for it in self._items
+                    if it["sku"] == promo_playera_item["sku"]
+                    and it.get("sports_uniform_role") == "playera"
+                ),
+                None,
+            )
+            if existing_playera:
+                existing_playera["cantidad"] += 1
+            else:
+                self._items.append(promo_playera_item)
 
         self._refresh_items_table()
         self._refresh_totals()
         return True
+
+    def _satellite_rows(self) -> list[dict]:
+        return list(getattr(self.satellite, "catalog_snapshot_rows", None) or [])
+
+    def _find_satellite_row(self, sku: str) -> dict | None:
+        finder = getattr(self.satellite, "_find_row_by_sku", None)
+        if not callable(finder):
+            return None
+        try:
+            return finder(sku.strip().upper())
+        except Exception:  # noqa: BLE001
+            return None
 
     # ─── Tabla de items ──────────────────────────────────────────────────
 
@@ -567,7 +633,12 @@ class QuickSaleWidget(QWidget):
             if item["cantidad"] > 1:
                 item["cantidad"] -= 1
             else:
-                self._items.pop(row)
+                removed = self._items.pop(row)
+                # Si se quitó el pants base de la promo 3pz, la playera
+                # regresa a su precio original (igual que en caja).
+                message = restore_promo_playera_after_base_removed(self._items, removed)
+                if message:
+                    QMessageBox.information(self, "Promo 3pz", message)
             self._refresh_items_table()
             self._refresh_totals()
 
