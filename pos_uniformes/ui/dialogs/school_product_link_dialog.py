@@ -370,4 +370,12 @@ class SchoolProductLinkDialog(QDialog):
         color = {"success": "#1f6a3b", "warning": "#8a5a0a"}.get(tone, "#5f6d78")
         self._status_label.setText(text)
         self._status_label.setStyleSheet(f"color: {color}; font-size: 12px;")
-        QTimer.singleShot(4000, lambda: self._status_label.setText(""))
+        QTimer.singleShot(4000, self._clear_status)
+
+    def _clear_status(self) -> None:
+        try:
+            self._status_label.setText("")
+        except RuntimeError:
+            # El diálogo pudo destruirse antes de que dispare el timer de 4s —
+            # tocar un widget muerto abortaría el proceso (qFatal).
+            pass
