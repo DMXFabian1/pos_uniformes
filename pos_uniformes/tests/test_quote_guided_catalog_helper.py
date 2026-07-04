@@ -61,8 +61,9 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
         self.assertEqual(
             [(option.label, option.group_label) for option in view.piece_options],
             [
-                ("Camisa", "Prendas principales"),
+                # _PIEZA_ORDER: Playera va antes que Camisa (2026-05-24)
                 ("Playera", "Prendas principales"),
+                ("Camisa", "Prendas principales"),
                 ("Chaleco", "Complementos"),
                 ("Calceta", "Accesorios"),
                 ("Bata", "Especial"),
@@ -83,7 +84,9 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
             gender_filter="Oficial Niña",
         )
 
-        self.assertEqual([card.sku for card in view.product_cards], ["SKU-1", "SKU-2"])
+        # Suéter (unisex) antes que Falda por _PIEZA_ORDER; lo importante es
+        # que ambas piezas se conservan para Oficial Niña.
+        self.assertEqual([card.sku for card in view.product_cards], ["SKU-2", "SKU-1"])
 
     def test_oficial_filters_keep_shared_camisa_even_if_gender_is_other_side(self) -> None:
         nina_view = build_guided_catalog_view(
@@ -107,7 +110,9 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
             gender_filter="Oficial Niño",
         )
 
-        self.assertEqual([card.sku for card in nina_view.product_cards], ["SKU-2", "SKU-1"])
+        # Camisa antes que Blusa por _PIEZA_ORDER; lo importante es que la
+        # camisa compartida se conserva en la vista de Niña.
+        self.assertEqual([card.sku for card in nina_view.product_cards], ["SKU-1", "SKU-2"])
         self.assertEqual([card.sku for card in nino_view.product_cards], ["SKU-1"])
 
     def test_oficial_nino_keeps_official_unisex(self) -> None:
@@ -158,12 +163,14 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
     def test_deportivo_filter_prioritizes_complete_uniforms_before_loose_pieces(self) -> None:
         view = build_guided_catalog_view(
             snapshot_rows=[
-                _row("SKU-1", "Primaria", "Colegio Mexico", "Unisex", "Deportivo", producto="Playera Deportiva"),
-                _row("SKU-2", "Primaria", "Colegio Mexico", "Unisex", "Deportivo", producto="Chamarra Deportiva"),
-                _row("SKU-3", "Primaria", "Colegio Mexico", "Unisex", "Deportivo", producto="Pants Deportivo"),
-                _row("SKU-4", "Primaria", "Colegio Mexico", "Unisex", "Deportivo", producto="Uniforme Deportivo 3 Piezas"),
-                _row("SKU-5", "Primaria", "Colegio Mexico", "Unisex", "Deportivo", producto="Pants 2pz Deportivo"),
-                _row("SKU-6", "Primaria", "Colegio Mexico", "Unisex", "Deportivo", producto="Short Deportivo"),
+                # El orden de tarjetas viene de tipo_pieza (_PIEZA_ORDER),
+                # como en la DB real — no del nombre del producto.
+                _row("SKU-1", "Primaria", "Colegio Mexico", "Unisex", "Deportivo", producto="Playera Deportiva", pieza="Playera"),
+                _row("SKU-2", "Primaria", "Colegio Mexico", "Unisex", "Deportivo", producto="Chamarra Deportiva", pieza="Chamarra"),
+                _row("SKU-3", "Primaria", "Colegio Mexico", "Unisex", "Deportivo", producto="Pants Deportivo", pieza="Pants Suelto"),
+                _row("SKU-4", "Primaria", "Colegio Mexico", "Unisex", "Deportivo", producto="Uniforme Deportivo 3 Piezas", pieza="Pants 3pz"),
+                _row("SKU-5", "Primaria", "Colegio Mexico", "Unisex", "Deportivo", producto="Pants 2pz Deportivo", pieza="Pants 2pz"),
+                _row("SKU-6", "Primaria", "Colegio Mexico", "Unisex", "Deportivo", producto="Short Deportivo", pieza="Short"),
             ],
             mode_key="school",
             level_filter="Primaria",
@@ -255,7 +262,8 @@ class QuoteGuidedCatalogHelperTests(unittest.TestCase):
         self.assertEqual([card.sku for card in basics_view.product_cards], ["SKU-1"])
         self.assertEqual([card.sku for card in extras_view.product_cards], ["SKU-2"])
         self.assertEqual([option.label for option in basics_view.bucket_options], ["Basicos", "Extras", "Todos"])
-        self.assertEqual([option.label for option in basics_view.piece_options], ["Pantalón", "Playera"])
+        # _PIEZA_ORDER: Playera antes que Pantalón
+        self.assertEqual([option.label for option in basics_view.piece_options], ["Playera", "Pantalón"])
         self.assertEqual(basics_view.path_label, "Basicos > Todos > Basicos > Pantalón")
 
     def test_basics_mode_requires_piece_and_groups_models_before_variants(self) -> None:
