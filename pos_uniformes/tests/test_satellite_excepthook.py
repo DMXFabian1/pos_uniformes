@@ -11,6 +11,7 @@ from pathlib import Path
 from pos_uniformes.utils.satellite_excepthook import (
     append_to_error_log,
     format_unhandled_exception,
+    install_gui_excepthook,
     install_satellite_excepthook,
 )
 
@@ -53,6 +54,25 @@ class AppendTests(unittest.TestCase):
     def test_unwritable_path_does_not_raise(self) -> None:
         # Un log roto jamas debe tumbar al hook (que corre durante un crash).
         append_to_error_log("entrada\n", Path("/dev/null/imposible/errors.log"))
+
+
+class InstallGuiTests(unittest.TestCase):
+    """install_gui_excepthook escribe en la ruta que le pasa cada app
+    (el POS principal usa data/pos_errors.log)."""
+
+    def test_hook_writes_to_the_given_log_path(self) -> None:
+        original = sys.excepthook
+        try:
+            with tempfile.TemporaryDirectory() as tmp:
+                log_path = Path(tmp) / "data" / "pos_errors.log"
+                install_gui_excepthook(log_path)
+                exc_type, exc, tb = _make_exc_info()
+                sys.excepthook(exc_type, exc, tb)
+                content = log_path.read_text(encoding="utf-8")
+                self.assertIn("RuntimeError", content)
+                self.assertIn("has been deleted", content)
+        finally:
+            sys.excepthook = original
 
 
 class InstallTests(unittest.TestCase):

@@ -73,6 +73,13 @@ def bootstrap_schema() -> None:
 
 
 def main() -> int:
+    # Una excepcion que escape de un slot no debe cerrar el POS (qFatal);
+    # se loguea a stderr + data/pos_errors.log y la app sigue viva.
+    from pos_uniformes.utils.config import runtime_base_dir
+    from pos_uniformes.utils.satellite_excepthook import install_gui_excepthook
+
+    install_gui_excepthook(runtime_base_dir() / "data" / "pos_errors.log")
+
     bootstrap_schema()
 
     app = QApplication(sys.argv)

@@ -32,3 +32,4 @@ data/catalog_cache.json
 data/school_links_cache.json
 data/business_info.json
 data/satellite_errors.log
+data/pos_errors.log

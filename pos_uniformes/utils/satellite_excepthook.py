@@ -48,8 +48,12 @@ def append_to_error_log(entry: str, path: Path) -> None:
         pass
 
 
-def install_satellite_excepthook() -> None:
-    """Reemplaza sys.excepthook para que PyQt6 no aborte el proceso."""
+def install_gui_excepthook(log_path: Path) -> None:
+    """Reemplaza sys.excepthook para que PyQt6 no aborte el proceso.
+
+    Sirve para cualquier app Qt del proyecto (satélite y POS principal);
+    cada una pasa su propia ruta de log.
+    """
 
     def hook(
         exc_type: type[BaseException],
@@ -61,6 +65,10 @@ def install_satellite_excepthook() -> None:
             return
         entry = format_unhandled_exception(exc_type, exc, tb)
         print(entry, end="", file=sys.stderr)
-        append_to_error_log(entry, _log_path())
+        append_to_error_log(entry, log_path)
 
     sys.excepthook = hook
+
+
+def install_satellite_excepthook() -> None:
+    install_gui_excepthook(_log_path())
