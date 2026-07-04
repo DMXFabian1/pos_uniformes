@@ -16,6 +16,30 @@ from unittest.mock import Mock, patch
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
+class IndexSettingsTests(unittest.TestCase):
+    def test_genero_is_searchable(self) -> None:
+        from pos_uniformes.services.meilisearch_service import index_settings
+
+        self.assertIn("genero", index_settings()["searchableAttributes"])
+
+    def test_level_gender_and_color_synonyms_present(self) -> None:
+        from pos_uniformes.services.meilisearch_service import index_settings
+
+        synonyms = index_settings()["synonyms"]
+        self.assertIn("secundaria", synonyms["sec"])
+        self.assertIn("primaria", synonyms["prim"])
+        self.assertIn("preescolar", synonyms["kinder"])
+        self.assertIn("mujer", synonyms["niña"])
+        self.assertIn("hombre", synonyms["niño"])
+        self.assertIn("azul marino", synonyms["marino"])
+        self.assertIn("moño", synonyms["corbatin"])
+
+    def test_typo_tolerance_still_disabled_on_sku(self) -> None:
+        from pos_uniformes.services.meilisearch_service import index_settings
+
+        self.assertIn("sku", index_settings()["typoTolerance"]["disableOnAttributes"])
+
+
 class SearchUsesMatchingStrategyAllTests(unittest.TestCase):
     def test_search_requests_all_words_matching(self) -> None:
         from pos_uniformes.services import meilisearch_service

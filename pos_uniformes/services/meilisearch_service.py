@@ -52,18 +52,9 @@ def _get_index():
         return None
 
 
-def configure_index() -> bool:
-    client = _get_client()
-    if client is None:
-        return False
-    try:
-        client.create_index(INDEX_NAME, {"primaryKey": "id"})
-    except Exception:
-        # El índice puede ya existir — es el caso esperado en ejecuciones posteriores.
-        logger.debug("create_index falló (índice ya existe o error menor)", exc_info=True)
-    try:
-        index = client.index(INDEX_NAME)
-        index.update_settings({
+def index_settings() -> dict[str, Any]:
+    """Configuración del índice (separada para poder testearla)."""
+    return {
             "searchableAttributes": [
                 "nombre_base",
                 "nombre_producto",
@@ -74,6 +65,7 @@ def configure_index() -> bool:
                 "tipo_prenda",
                 "categoria",
                 "escuela",
+                "genero",
                 "marca",
             ],
             "filterableAttributes": [
@@ -130,6 +122,28 @@ def configure_index() -> bool:
                 "md": ["mediana", "medium"],
                 "gd": ["grande", "large"],
                 "exg": ["extra grande"],
+                # Niveles educativos (abreviaciones comunes)
+                "sec": ["secundaria"],
+                "secu": ["secundaria"],
+                "prim": ["primaria"],
+                "bach": ["bachillerato"],
+                "prepa": ["bachillerato"],
+                "kinder": ["preescolar"],
+                "kínder": ["preescolar"],
+                # Género (convención DB: Mujer/Hombre)
+                "niña": ["mujer"],
+                "nina": ["mujer"],
+                "niño": ["hombre"],
+                "nino": ["hombre"],
+                "dama": ["mujer"],
+                "caballero": ["hombre"],
+                # Colores compuestos
+                "marino": ["azul marino"],
+                "oxford": ["gris oxford"],
+                # Accesorios que se piden indistinto
+                "corbatin": ["corbatín", "moño"],
+                "corbatín": ["corbatin", "moño"],
+                "moño": ["corbatin", "corbatín"],
             },
             # ── Stop words ─────────────────────────────────────────
             # Palabras que no aportan a la búsqueda
@@ -142,7 +156,21 @@ def configure_index() -> bool:
             "separatorTokens": ["|"],
             # ── Paginación ─────────────────────────────────────────
             "pagination": {"maxTotalHits": 5000},
-        })
+    }
+
+
+def configure_index() -> bool:
+    client = _get_client()
+    if client is None:
+        return False
+    try:
+        client.create_index(INDEX_NAME, {"primaryKey": "id"})
+    except Exception:
+        # El índice puede ya existir — es el caso esperado en ejecuciones posteriores.
+        logger.debug("create_index falló (índice ya existe o error menor)", exc_info=True)
+    try:
+        index = client.index(INDEX_NAME)
+        index.update_settings(index_settings())
         return True
     except Exception as exc:
         logger.warning("No se pudo configurar el indice Meilisearch: %s", exc)
