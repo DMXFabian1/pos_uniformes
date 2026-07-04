@@ -449,8 +449,12 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_add_button = QPushButton("Agregar al presupuesto")
         self.guided_print_label_button = QPushButton("Imprimir etiqueta")
         self.guided_favorites_button = QPushButton("♥ Favoritos")
+        # Los controles de Meilisearch viven en el menú admin (Ctrl+Shift+A);
+        # el header solo muestra un indicador pasivo ●/○. Los botones siguen
+        # existiendo (sin agregarse a ningún layout) para no romper wiring.
         self.guided_reindex_button = QPushButton("↻ Sync")
         self.guided_meilisearch_btn = QPushButton("○ Meilisearch")
+        self.guided_meili_indicator = QLabel("○")
         self.guided_reset_button = QPushButton("Limpiar pasos")
         self.guided_basics_button = QPushButton("Piezas generales")
         self.guided_visual_icon_label = QLabel()
@@ -961,16 +965,12 @@ class QuoteSatelliteWindow(QMainWindow):
         _steps_title.setObjectName("guidedGroupBoxTitle")
         self.guided_favorites_button.setObjectName("chipButton")
         self.guided_favorites_button.setFixedHeight(32)
-        self.guided_reindex_button.setObjectName("chipButton")
-        self.guided_reindex_button.setFixedHeight(32)
-        self.guided_reindex_button.setToolTip("Conectar con Meilisearch y re-indexar el catálogo de productos")
-        self.guided_meilisearch_btn.setObjectName("chipButton")
-        self.guided_meilisearch_btn.setFixedHeight(32)
-        self.guided_meilisearch_btn.setToolTip("Iniciar el servicio Meilisearch")
+        self.guided_meili_indicator.setToolTip(
+            "Estado de la búsqueda inteligente — se administra en Ctrl+Shift+A"
+        )
         _steps_header.addWidget(_steps_title)
         _steps_header.addStretch()
-        _steps_header.addWidget(self.guided_meilisearch_btn)
-        _steps_header.addWidget(self.guided_reindex_button)
+        _steps_header.addWidget(self.guided_meili_indicator)
         _steps_header.addWidget(self.guided_favorites_button)
         steps_layout.addLayout(_steps_header)
         steps_layout.addWidget(self.guided_path_label)
@@ -2014,6 +2014,9 @@ class QuoteSatelliteWindow(QMainWindow):
         self._rebuild_catalog_level_combo()
         self._try_index_meilisearch(session)
         self._update_meilisearch_status()
+        # El auto-arranque de Meilisearch corre en background al abrir la app;
+        # re-checar el indicador cuando ya haya tenido tiempo de levantar.
+        QTimer.singleShot(10_000, self._update_meilisearch_status)
 
     def _refresh_catalog_snapshot_from_cache(self) -> None:
         """Sincroniza el combo de niveles desde el cache local (sin DB)."""
@@ -2335,14 +2338,21 @@ class QuoteSatelliteWindow(QMainWindow):
             running = meilisearch_service.is_available()
         except Exception:  # noqa: BLE001
             running = False
-        if running:
-            self.guided_meilisearch_btn.setText("● Meilisearch")
-            self.guided_meilisearch_btn.setStyleSheet(
-                "QPushButton#chipButton { color:#2e7d32; font-weight:bold; }"
-            )
-        else:
-            self.guided_meilisearch_btn.setText("○ Meilisearch")
-            self.guided_meilisearch_btn.setStyleSheet("")
+        try:
+            if running:
+                self.guided_meili_indicator.setText("●")
+                self.guided_meili_indicator.setStyleSheet("color:#2e7d32; font-weight:bold; font-size:15px;")
+                self.guided_meili_indicator.setToolTip("Búsqueda inteligente activa (typos y sinónimos)")
+            else:
+                self.guided_meili_indicator.setText("○")
+                self.guided_meili_indicator.setStyleSheet("color:#9a8c7c; font-size:15px;")
+                self.guided_meili_indicator.setToolTip(
+                    "Búsqueda inteligente no disponible — se usa búsqueda local.\nAdministrar: Ctrl+Shift+A"
+                )
+        except RuntimeError:
+            # El re-chequeo diferido (QTimer 10s) puede disparar con la
+            # ventana ya destruida.
+            pass
 
     def _handle_start_meilisearch(self) -> None:
         dlg = _MeilisearchProgressDialog("Iniciando Meilisearch", self)

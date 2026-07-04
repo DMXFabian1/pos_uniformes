@@ -149,8 +149,10 @@ def main() -> int:
             return 1
 
         try:
-            from pos_uniformes.services.meilisearch_service import notify_catalog_changed
-            notify_catalog_changed()
+            # Arranca el servicio solo (si está instalado) y re-indexa en
+            # background — la empleada no tiene que tocar ningún botón.
+            from pos_uniformes.services.meilisearch_service import autostart_and_reindex
+            autostart_and_reindex()
         except Exception as exc:  # noqa: BLE001
             print(f"Meilisearch no disponible: {exc}", file=sys.stderr)
 

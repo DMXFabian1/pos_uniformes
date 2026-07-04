@@ -347,6 +347,46 @@ def _ensure_vcruntime(on_progress: Any = None) -> None:
             pass
 
 
+def _start_binary(bin_path, data_dir, port: int = 7700) -> bool:
+    """Lanza el binario de Meilisearch y espera a que responda."""
+    import subprocess
+    import time
+
+    subprocess.Popen(
+        [str(bin_path), "--no-analytics", "--db-path", str(data_dir), "--http-addr", f"127.0.0.1:{port}"],
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    time.sleep(3)
+    global _client, _client_checked_at
+    _client = None
+    _client_checked_at = 0
+    return is_available()
+
+
+def ensure_running(*, install_dir: str = "C:\\Meilisearch", port: int = 7700) -> bool:
+    """Arranca el servicio si el binario ya está instalado — sin descargar.
+
+    Pensado para el auto-arranque silencioso al abrir la app: si Meilisearch
+    no está instalado simplemente devuelve False y la búsqueda cae al
+    fallback local. La descarga/instalación queda en el menú admin
+    (ensure_installed).
+    """
+    from pathlib import Path
+
+    if is_available():
+        return True
+    bin_path = Path(install_dir) / "meilisearch.exe"
+    if not bin_path.exists():
+        return False
+    try:
+        return _start_binary(bin_path, Path(install_dir) / "data", port)
+    except Exception as exc:
+        logger.warning("Auto-arranque de Meilisearch falló: %s", exc)
+        return False
+
+
 def ensure_installed(
     *,
     install_dir: str = "C:\\Meilisearch",
@@ -359,7 +399,6 @@ def ensure_installed(
     Returns status message string.
     """
     import os
-    import subprocess
     import urllib.request
     from pathlib import Path
 
@@ -372,18 +411,7 @@ def ensure_installed(
     _ensure_vcruntime(on_progress)
 
     def _start(bin_: Path) -> bool:
-        subprocess.Popen(
-            [str(bin_), "--no-analytics", "--db-path", str(data_dir), "--http-addr", f"127.0.0.1:{port}"],
-            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
-        import time
-        time.sleep(3)
-        global _client, _client_checked_at
-        _client = None
-        _client_checked_at = 0
-        return is_available()
+        return _start_binary(bin_, data_dir, port)
 
     if bin_path.exists():
         if on_progress:
@@ -414,6 +442,24 @@ def ensure_installed(
         return "Meilisearch instalado pero no responde aún. Reintenta en unos segundos."
     except Exception as exc:
         return f"Error iniciando: {exc}"
+
+
+def autostart_and_reindex() -> None:
+    """Auto-arranque silencioso + re-indexado, todo en un hilo aparte.
+
+    Para el arranque de las apps: si el binario está instalado lo levanta y
+    re-indexa; si no, no molesta al usuario (fallback local).
+    """
+    import threading
+
+    def _run():
+        try:
+            ensure_running()
+        except Exception:
+            logger.debug("autostart de Meilisearch falló", exc_info=True)
+        notify_catalog_changed()
+
+    threading.Thread(target=_run, daemon=True, name="meili-autostart").start()
 
 
 def notify_catalog_changed() -> None:

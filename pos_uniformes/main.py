@@ -116,8 +116,9 @@ def main() -> int:
         pass
 
     try:
-        from pos_uniformes.services.meilisearch_service import notify_catalog_changed
-        notify_catalog_changed()
+        # Arranca Meilisearch solo (si está instalado) y re-indexa en background.
+        from pos_uniformes.services.meilisearch_service import autostart_and_reindex
+        autostart_and_reindex()
     except Exception:
         pass
 

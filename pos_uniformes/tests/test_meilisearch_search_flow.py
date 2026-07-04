@@ -40,6 +40,41 @@ class IndexSettingsTests(unittest.TestCase):
         self.assertIn("sku", index_settings()["typoTolerance"]["disableOnAttributes"])
 
 
+class EnsureRunningTests(unittest.TestCase):
+    """Auto-arranque silencioso: sin binario instalado NO descarga nada."""
+
+    def test_returns_true_if_already_running(self) -> None:
+        from pos_uniformes.services import meilisearch_service
+
+        with patch.object(meilisearch_service, "is_available", return_value=True):
+            self.assertTrue(meilisearch_service.ensure_running())
+
+    def test_missing_binary_returns_false_without_downloading(self) -> None:
+        from pos_uniformes.services import meilisearch_service
+
+        with patch.object(meilisearch_service, "is_available", return_value=False), patch.object(
+            meilisearch_service, "_start_binary"
+        ) as start:
+            result = meilisearch_service.ensure_running(install_dir="/ruta/inexistente")
+        self.assertFalse(result)
+        start.assert_not_called()
+
+    def test_starts_binary_when_installed(self) -> None:
+        import tempfile
+        from pathlib import Path
+
+        from pos_uniformes.services import meilisearch_service
+
+        with tempfile.TemporaryDirectory() as tmp:
+            (Path(tmp) / "meilisearch.exe").write_bytes(b"")
+            with patch.object(meilisearch_service, "is_available", return_value=False), patch.object(
+                meilisearch_service, "_start_binary", return_value=True
+            ) as start:
+                result = meilisearch_service.ensure_running(install_dir=tmp)
+            self.assertTrue(result)
+            start.assert_called_once()
+
+
 class SearchUsesMatchingStrategyAllTests(unittest.TestCase):
     def test_search_requests_all_words_matching(self) -> None:
         from pos_uniformes.services import meilisearch_service
