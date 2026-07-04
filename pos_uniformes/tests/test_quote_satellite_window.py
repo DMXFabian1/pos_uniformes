@@ -148,7 +148,7 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
 
     def test_add_from_guided_keeps_current_page(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
-        window.guided_selected_sku = "SKU000002"
+        window._gfs.sku = "SKU000002"
         window.guided_qty_spin.setValue(3)
 
         window._set_page("guided")
@@ -417,49 +417,49 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
     def test_guided_reset_steps_returns_to_school_start(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
         window.guided_mode = "basics"
-        window.guided_selected_level = "Primaria"
-        window.guided_selected_school = "Colegio Mexico"
-        window.guided_selected_gender = "OFICIAL"
-        window.guided_selected_profile = "NINA"
-        window.guided_selected_bucket = "EXTRAS"
-        window.guided_selected_piece = "Bata"
-        window.guided_selected_product_key = "Bata||Bata Infantil Blanca"
-        window.guided_selected_sku = "SKU000001"
+        window._gfs.level = "Primaria"
+        window._gfs.school = "Colegio Mexico"
+        window._gfs.gender = "OFICIAL"
+        window._gfs.profile = "NINA"
+        window._gfs.bucket = "EXTRAS"
+        window._gfs.piece = "Bata"
+        window._gfs.product_key = "Bata||Bata Infantil Blanca"
+        window._gfs.sku = "SKU000001"
         window.guided_qty_spin.setValue(4)
 
         with patch.object(window, "_refresh_guided_browser") as refresh_guided_browser:
             window._handle_guided_reset_steps()
 
-        self.assertEqual(window.guided_mode, "school")
-        self.assertEqual(window.guided_selected_level, "")
-        self.assertEqual(window.guided_selected_school, "")
-        self.assertEqual(window.guided_selected_gender, "TODOS")
-        self.assertEqual(window.guided_selected_profile, "TODOS")
-        self.assertEqual(window.guided_selected_bucket, "TODOS")
-        self.assertEqual(window.guided_selected_piece, "")
-        self.assertEqual(window.guided_selected_product_key, "")
-        self.assertEqual(window.guided_selected_sku, "")
+        self.assertEqual(window._gfs.mode, "school")
+        self.assertEqual(window._gfs.level, "")
+        self.assertEqual(window._gfs.school, "")
+        self.assertEqual(window._gfs.gender, "TODOS")
+        self.assertEqual(window._gfs.profile, "TODOS")
+        self.assertEqual(window._gfs.bucket, "TODOS")
+        self.assertEqual(window._gfs.piece, "")
+        self.assertEqual(window._gfs.product_key, "")
+        self.assertEqual(window._gfs.sku, "")
         self.assertEqual(window.guided_qty_spin.value(), 1)
         refresh_guided_browser.assert_called_once()
 
     def test_guided_basics_button_moves_to_clean_basics_route(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
-        window.guided_mode = "school"
-        window.guided_selected_level = "Primaria"
-        window.guided_selected_school = "Colegio Mexico"
-        window.guided_selected_piece = "Camisa"
-        window.guided_selected_sku = "SKU000002"
+        window._gfs.mode = "school"
+        window._gfs.level = "Primaria"
+        window._gfs.school = "Colegio Mexico"
+        window._gfs.piece = "Camisa"
+        window._gfs.sku = "SKU000002"
         window.guided_qty_spin.setValue(3)
 
         with patch.object(window, "_refresh_guided_browser") as refresh_guided_browser:
             window._handle_guided_go_to_basics()
 
-        self.assertEqual(window.guided_mode, "basics")
-        self.assertEqual(window.guided_selected_level, "")
-        self.assertEqual(window.guided_selected_school, "")
-        self.assertEqual(window.guided_selected_bucket, "BASICO")
-        self.assertEqual(window.guided_selected_piece, "")
-        self.assertEqual(window.guided_selected_sku, "")
+        self.assertEqual(window._gfs.mode, "basics")
+        self.assertEqual(window._gfs.level, "")
+        self.assertEqual(window._gfs.school, "")
+        self.assertEqual(window._gfs.bucket, "BASICO")
+        self.assertEqual(window._gfs.piece, "")
+        self.assertEqual(window._gfs.sku, "")
         self.assertEqual(window.guided_qty_spin.value(), 1)
         refresh_guided_browser.assert_called_once()
 
