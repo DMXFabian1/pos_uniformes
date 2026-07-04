@@ -3602,8 +3602,17 @@ QLabel#favDialogPriceLabel {
             dialog = QuickProductSearchDialog(
                 self, catalog_rows=self.catalog_snapshot_rows, kiosk_mode=False
             )
-            dialog.sku_selected.connect(self.quick_sale_widget.add_sku)
+            added_skus: list[str] = []
+
+            def _add_and_track(sku: str, qty: int) -> None:
+                if self.quick_sale_widget.add_sku(sku, qty):
+                    added_skus.append(sku)
+
+            dialog.sku_selected.connect(_add_and_track)
             dialog.exec()
+            # Igual que en caja: ofrecer imprimir etiquetas de lo agregado.
+            if added_skus:
+                self._offer_label_print_for_added_skus(added_skus)
             self.quick_sale_widget.focus_input()
             return
 
@@ -3621,6 +3630,47 @@ QLabel#favDialogPriceLabel {
         dialog.sku_to_kiosk.connect(_on_kiosk)
         dialog.sku_selected.connect(_on_add_to_quote)
         dialog.exec()
+
+    def _offer_label_print_for_added_skus(self, skus: list[str]) -> None:
+        """Confirmación con checkboxes (como caja) e impresión de etiquetas."""
+        from pos_uniformes.ui.dialogs.label_print_confirmation_dialog import (
+            build_label_entries,
+            open_label_print_confirmation,
+        )
+
+        entries = build_label_entries(skus, self._find_row_by_sku)
+        selected = open_label_print_confirmation(self, entries)
+        if selected:
+            self._print_labels_for_skus(selected)
+
+    def _print_labels_for_skus(self, skus: list[str]) -> None:
+        from pos_uniformes.services.inventory_label_service import (
+            render_inventory_label_from_cache_row,
+        )
+
+        failed: list[str] = []
+        for sku in skus:
+            row = self._find_row_by_sku(sku)
+            if row is None:
+                failed.append(sku)
+                continue
+            try:
+                result = render_inventory_label_from_cache_row(
+                    row, mode="standard", requested_copies=1
+                )
+                if not self._print_satellite_label(
+                    result.image_path, title=f"Etiqueta {sku}", copies=1
+                ):
+                    failed.append(sku)
+            except Exception:  # noqa: BLE001 — una etiqueta fallida no aborta el resto
+                logger.exception("Error imprimiendo etiqueta de %s", sku)
+                failed.append(sku)
+        if failed:
+            QMessageBox.warning(
+                self,
+                "Etiquetas",
+                "No se pudieron imprimir: " + ", ".join(failed),
+            )
 
     def _handle_lookup_scan(self) -> None:
         sku = self.kiosk_scan_input.text().strip().upper()
