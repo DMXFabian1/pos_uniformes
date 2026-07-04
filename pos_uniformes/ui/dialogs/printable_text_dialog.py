@@ -95,12 +95,21 @@ def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> Non
     open_tickets_print_dialog(parent, title, [content])
 
 
-def open_tickets_print_dialog(parent: QWidget, title: str, tickets: list[str]) -> None:
+def open_tickets_print_dialog(
+    parent: QWidget,
+    title: str,
+    tickets: list[str],
+    *,
+    unit_label: str = "ticket",
+) -> None:
     """Muestra uno o varios tickets en una sola vista.
 
     Un solo clic en "Imprimir" manda todos los tickets como jobs separados
     (cada uno se corta por el autocutter). Reemplaza el flujo anterior de un
     dialogo por copia, que obligaba a imprimir dos veces.
+
+    unit_label permite reutilizar el dialogo para otros documentos del mismo
+    formato (p.ej. "hoja" para las hojas de conteo).
     """
     tickets = [t for t in tickets if t and t.strip()]
     if not tickets:
@@ -114,7 +123,7 @@ def open_tickets_print_dialog(parent: QWidget, title: str, tickets: list[str]) -
     editor = _build_ticket_editor("\n\n".join(tickets))
 
     n = len(tickets)
-    idle_label = "Imprimir" if n == 1 else f"Imprimir {n} tickets"
+    idle_label = "Imprimir" if n == 1 else f"Imprimir {n} {unit_label}s"
     buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
     print_button = buttons.addButton(idle_label, QDialogButtonBox.ButtonRole.ActionRole)
 
@@ -128,7 +137,7 @@ def open_tickets_print_dialog(parent: QWidget, title: str, tickets: list[str]) -
         if ok == 0:
             msg = "No se pudo imprimir.\nVerifica que la impresora este conectada."
         else:
-            msg = f"Se imprimieron {ok} de {n} tickets.\n{errors} fallaron."
+            msg = f"Se imprimieron {ok} de {n} {unit_label}s.\n{errors} fallaron."
         QMessageBox.warning(dialog, "Error de impresion", msg)
 
     queue = TicketPrintQueue(
