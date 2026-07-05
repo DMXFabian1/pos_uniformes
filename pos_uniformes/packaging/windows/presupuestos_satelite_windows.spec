@@ -45,6 +45,10 @@ hiddenimports += collect_submodules("alembic")
 hiddenimports += collect_submodules("meilisearch")
 hiddenimports += [
     "pos_uniformes.ui.dialogs.satellite_admin_dialog",
+    # Imports lazy (dentro de métodos) — mismo precedente que el admin dialog:
+    "pos_uniformes.ui.dialogs.label_print_confirmation_dialog",
+    "pos_uniformes.services.inventory_label_service",
+    "pos_uniformes.ui.helpers.quick_sale_sports_uniform_helper",
 ]
 
 
