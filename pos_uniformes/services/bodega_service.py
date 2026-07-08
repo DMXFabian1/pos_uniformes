@@ -58,7 +58,7 @@ class BodegaService:
                 func.cast(suffix_expr, sa.Integer)
             )).where(
                 BodegaCaja.codigo.like(f"{prefix}-%"),
-                suffix_expr.op("~")(r"^\d+$"),
+                suffix_expr.regexp_match(r"^\d+$"),
             )
         )
         return f"{prefix}-{(max_num or 0) + 1:03d}"

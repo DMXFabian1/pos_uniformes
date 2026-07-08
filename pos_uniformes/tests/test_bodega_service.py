@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import re
 import unittest
 
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 
 from pos_uniformes.database.connection import Base
@@ -24,8 +25,25 @@ from pos_uniformes.services.bodega_service import BodegaService
 
 def _make_session() -> Session:
     engine = create_engine("sqlite:///:memory:")
+
+    @event.listens_for(engine, "connect")
+    def _register_regexp(dbapi_connection, connection_record):
+        # SQLite no trae REGEXP; el orden de argumentos es (pattern, value).
+        dbapi_connection.create_function(
+            "regexp", 2,
+            lambda pat, val: re.search(pat, val or "") is not None,
+        )
+
     Base.metadata.create_all(engine)
     return Session(engine)
+
+
+def _make_ubicacion(session: Session, rack: str = "PISO", nivel: int = 1) -> BodegaUbicacion:
+    """Las ubicaciones son fijas (PISO/ALMACEN); se siembran directo en BD."""
+    ub = BodegaUbicacion(codigo=f"{rack}-N{nivel}", rack=rack, nivel=nivel)
+    session.add(ub)
+    session.flush()
+    return ub
 
 
 def _seed_variante(session: Session, stock: int = 20, talla: str = "T12") -> Variante:
@@ -60,30 +78,40 @@ def _seed_variante(session: Session, stock: int = 20, talla: str = "T12") -> Var
 
 
 class TestBodegaUbicaciones(unittest.TestCase):
-    def test_crear_y_listar(self) -> None:
+    def test_listar_ordenado_por_rack_y_nivel(self) -> None:
         session = _make_session()
-        ub = BodegaService.crear_ubicacion(session, "A1", 2)
-        self.assertEqual(ub.codigo, "A1-N2")
-        self.assertEqual(ub.rack, "A1")
-        self.assertEqual(ub.nivel, 2)
+        _make_ubicacion(session, "PISO", 2)
+        _make_ubicacion(session, "PISO", 1)
+        _make_ubicacion(session, "ALMACEN", 1)
 
         todas = BodegaService.listar_ubicaciones(session)
-        self.assertEqual(len(todas), 1)
+        self.assertEqual(len(todas), 3)
+        self.assertEqual(
+            [(u.rack, u.nivel) for u in todas],
+            [("ALMACEN", 1), ("PISO", 1), ("PISO", 2)],
+        )
 
-    def test_desactivar(self) -> None:
+    def test_listar_filtra_inactivas(self) -> None:
         session = _make_session()
-        ub = BodegaService.crear_ubicacion(session, "B1", 1)
-        BodegaService.desactivar_ubicacion(session, ub.id)
+        _make_ubicacion(session, "PISO", 1)
+        inactiva = _make_ubicacion(session, "ALMACEN", 1)
+        inactiva.activo = False
+        session.flush()
+
         activas = BodegaService.listar_ubicaciones(session, activas=True)
-        self.assertEqual(len(activas), 0)
+        self.assertEqual(len(activas), 1)
+        self.assertEqual(activas[0].rack, "PISO")
+
+        todas = BodegaService.listar_ubicaciones(session, activas=False)
+        self.assertEqual(len(todas), 2)
 
 
 class TestBodegaCajas(unittest.TestCase):
     def test_crear_caja_auto_codigo(self) -> None:
         session = _make_session()
-        ub = BodegaService.crear_ubicacion(session, "A1", 1)
+        ub = _make_ubicacion(session, "PISO", 1)
         caja = BodegaService.crear_caja(session, CategoriaCaja.A, ub.id)
-        self.assertEqual(caja.codigo, "A-001")
+        self.assertEqual(caja.codigo, "A-P1-001")
         self.assertEqual(caja.categoria, "A")
         self.assertEqual(caja.estado, EstadoCaja.ACTIVA.value)
 
@@ -96,18 +124,20 @@ class TestBodegaCajas(unittest.TestCase):
         c1 = BodegaService.crear_caja(session, CategoriaCaja.A)
         c2 = BodegaService.crear_caja(session, CategoriaCaja.A)
         c3 = BodegaService.crear_caja(session, CategoriaCaja.B)
-        self.assertEqual(c1.codigo, "A-001")
-        self.assertEqual(c2.codigo, "A-002")
-        self.assertEqual(c3.codigo, "B-001")
+        self.assertEqual(c1.codigo, "A-XX-001")
+        self.assertEqual(c2.codigo, "A-XX-002")
+        self.assertEqual(c3.codigo, "B-XX-001")
 
     def test_mover_caja(self) -> None:
         session = _make_session()
-        ub1 = BodegaService.crear_ubicacion(session, "A1", 1)
-        ub2 = BodegaService.crear_ubicacion(session, "A1", 2)
+        ub1 = _make_ubicacion(session, "PISO", 1)
+        ub2 = _make_ubicacion(session, "ALMACEN", 1)
         caja = BodegaService.crear_caja(session, CategoriaCaja.A, ub1.id)
+        self.assertEqual(caja.codigo, "A-P1-001")
 
         BodegaService.mover_caja(session, caja.id, ub2.id)
         self.assertEqual(caja.ubicacion_id, ub2.id)
+        self.assertEqual(caja.codigo, "A-A1-001")
 
         historial = BodegaService.historial_caja(session, caja.id)
         mover = [m for m in historial if m.tipo == "MOVER_CAJA"]
@@ -259,8 +289,8 @@ class TestBodegaBusqueda(unittest.TestCase):
         resultados = BodegaService.buscar_variante_en_bodega(session, variante.id)
         self.assertEqual(len(resultados), 2)
         cantidades = {r["caja_codigo"]: r["cantidad"] for r in resultados}
-        self.assertEqual(cantidades["A-001"], 5)
-        self.assertEqual(cantidades["B-001"], 3)
+        self.assertEqual(cantidades["A-XX-001"], 5)
+        self.assertEqual(cantidades["B-XX-001"], 3)
 
     def test_buscar_por_texto_agrupado(self) -> None:
         session = _make_session()
