@@ -12,7 +12,15 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from PyQt6.QtCore import QEvent, Qt
 from PyQt6.QtGui import QKeyEvent
 from PyQt6.QtTest import QTest
-from PyQt6.QtWidgets import QApplication, QDoubleSpinBox, QMessageBox, QPushButton, QSpinBox, QTableWidgetItem
+from PyQt6.QtWidgets import (
+    QApplication,
+    QDialog,
+    QDoubleSpinBox,
+    QMessageBox,
+    QPushButton,
+    QSpinBox,
+    QTableWidgetItem,
+)
 
 from pos_uniformes.services.active_filter_service import ActiveFilterToken
 from pos_uniformes.database.models import ModoOrigenVenta, RolUsuario, TipoMovimientoCaja
@@ -171,12 +179,16 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             def activateWindow(self) -> None:
                 return None
 
-        with patch(
-            "pos_uniformes.ui.main_window.QMessageBox.question",
-            side_effect=[
-                QMessageBox.StandardButton.Yes,
-                QMessageBox.StandardButton.No,
-            ],
+        # El diálogo de confirmación es un QDialog propio (no QMessageBox):
+        # sin este mock, exec() modal cuelga la suite en offscreen.
+        with patch.object(
+            QDialog,
+            "exec",
+            return_value=int(QDialog.DialogCode.Accepted),
+        ), patch.object(
+            window,
+            "_run_quick_backup_flow",
+            return_value=True,
         ), patch("pos_uniformes.ui.main_window.LoginDialog", FakeLoginDialog), patch.object(
             window,
             "show",
@@ -255,9 +267,11 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             def activateWindow(self) -> None:
                 return None
 
-        with patch(
-            "pos_uniformes.ui.main_window.QMessageBox.question",
-            return_value=QMessageBox.StandardButton.Yes,
+        # Idem: el QDialog de confirmación real colgaría la suite en offscreen.
+        with patch.object(
+            QDialog,
+            "exec",
+            return_value=int(QDialog.DialogCode.Accepted),
         ), patch("pos_uniformes.ui.main_window.LoginDialog", FakeLoginDialog), patch.object(
             window,
             "ensure_cash_session",
