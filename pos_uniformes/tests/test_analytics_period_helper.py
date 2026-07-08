@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, time, timezone
 import unittest
 
 from pos_uniformes.ui.helpers.analytics_period_helper import (
@@ -10,6 +10,16 @@ from pos_uniformes.ui.helpers.analytics_period_helper import (
     resolve_previous_analytics_period_bounds,
     resolve_analytics_period_bounds,
 )
+
+_LOCAL_TZ = datetime.now(timezone.utc).astimezone().tzinfo
+
+
+def _local_day_start(day: date) -> datetime:
+    return datetime.combine(day, time.min, tzinfo=_LOCAL_TZ)
+
+
+def _local_day_end(day: date) -> datetime:
+    return datetime.combine(day, time.max, tzinfo=_LOCAL_TZ)
 
 
 class AnalyticsPeriodHelperTests(unittest.TestCase):
@@ -25,20 +35,20 @@ class AnalyticsPeriodHelperTests(unittest.TestCase):
             manual_to=date(2026, 3, 10),
         )
 
-        self.assertEqual(start, datetime(2026, 3, 10, 0, 0, 0))
-        self.assertEqual(end, datetime(2026, 3, 21, 0, 0, 0))
+        self.assertEqual(start, _local_day_start(date(2026, 3, 10)))
+        self.assertEqual(end, _local_day_end(date(2026, 3, 20)))
 
     def test_resolve_analytics_period_bounds_for_7d(self) -> None:
         start, end = resolve_analytics_period_bounds("7d", today=date(2026, 3, 19))
 
-        self.assertEqual(start, datetime(2026, 3, 13, 0, 0, 0))
-        self.assertEqual(end, datetime(2026, 3, 20, 0, 0, 0))
+        self.assertEqual(start, _local_day_start(date(2026, 3, 13)))
+        self.assertEqual(end, _local_day_end(date(2026, 3, 19)))
 
     def test_resolve_analytics_period_bounds_for_month(self) -> None:
         start, end = resolve_analytics_period_bounds("month", today=date(2026, 3, 19))
 
-        self.assertEqual(start, datetime(2026, 3, 1, 0, 0, 0))
-        self.assertEqual(end, datetime(2026, 3, 20, 0, 0, 0))
+        self.assertEqual(start, _local_day_start(date(2026, 3, 1)))
+        self.assertEqual(end, _local_day_end(date(2026, 3, 19)))
 
     def test_build_analytics_export_status_text(self) -> None:
         self.assertEqual(

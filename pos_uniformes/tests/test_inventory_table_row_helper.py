@@ -29,7 +29,7 @@ class InventoryTableRowHelperTests(unittest.TestCase):
         self.assertEqual(view.variant_id, 8)
         self.assertEqual(
             view.values,
-            ("SKU-008", "Pants Deportivo", "16", "Azul Marino", "2 Bajo", 1, "INACTIVA", "Pendiente", "Nunca"),
+            ("SKU-008", "Pants Deportivo", "16", "Azul Marino", "2 Bajo", "", "", 1, "INACTIVA", "Pendiente", "Nunca"),
         )
         self.assertEqual(view.row_tone, "muted")
         self.assertEqual(view.stock_tone, "warning")

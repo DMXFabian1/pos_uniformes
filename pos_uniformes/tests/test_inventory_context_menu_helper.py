@@ -42,7 +42,7 @@ class InventoryContextMenuHelperTests(unittest.TestCase):
                 ("entry", "Registrar entrada", False),
                 ("adjust", "Corregir stock", False),
                 ("qr", "Generar QR", True),
-                ("print", "Imprimir etiqueta", False),
+                ("print", "Imprimir etiqueta", True),
                 ("toggle", "Activar presentacion", False),
             ],
         )

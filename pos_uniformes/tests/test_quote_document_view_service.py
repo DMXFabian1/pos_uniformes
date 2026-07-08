@@ -15,6 +15,7 @@ def _make_settings(**overrides) -> BusinessPrintSettingsSnapshot:
         business_address="Calle Principal 1",
         ticket_footer="",
         preferred_printer="Brother",
+        ticket_printer="Brother",
         ticket_copies=1,
     )
     defaults.update(overrides)

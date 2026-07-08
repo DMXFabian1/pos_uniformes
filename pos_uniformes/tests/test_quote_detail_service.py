@@ -33,6 +33,9 @@ class QuoteDetailServiceTests(unittest.TestCase):
                     cantidad=2,
                     precio_unitario=Decimal("175.00"),
                     subtotal_linea=Decimal("350.00"),
+                    variante=SimpleNamespace(
+                        producto=SimpleNamespace(tipo_pieza=SimpleNamespace(nombre="Playera")),
+                    ),
                 )
             ],
         )
@@ -63,6 +66,7 @@ class QuoteDetailServiceTests(unittest.TestCase):
                         quantity=2,
                         unit_price=Decimal("175.00"),
                         subtotal=Decimal("350.00"),
+                        tipo_pieza="Playera",
                     ),
                 ),
             ),

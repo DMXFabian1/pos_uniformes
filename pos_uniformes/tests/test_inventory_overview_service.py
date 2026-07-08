@@ -19,6 +19,7 @@ class InventoryOverviewServiceTests(unittest.TestCase):
             talla="16",
             color="Azul Marino",
             stock_actual=4,
+            stock_minimo=3,
             precio_venta=Decimal("249.00"),
             activo=False,
             producto=SimpleNamespace(nombre="Chamarra Deportiva | Patria | Chamarra #4"),
@@ -67,6 +68,7 @@ class InventoryOverviewServiceTests(unittest.TestCase):
                 escuela_nombre="Patria",
                 tipo_prenda_nombre="Deportivo",
                 tipo_pieza_nombre="Chamarra",
+                stock_minimo=3,
                 movement_type="Ajuste Entrada",
                 movement_quantity=3,
                 movement_date="19/03/2026 09:45",
@@ -80,6 +82,7 @@ class InventoryOverviewServiceTests(unittest.TestCase):
             talla="CH",
             color="Blanco",
             stock_actual=0,
+            stock_minimo=None,
             precio_venta=Decimal("199.00"),
             activo=True,
             producto=SimpleNamespace(nombre="Playera Polo | Morelos | Playera #7"),
@@ -103,6 +106,7 @@ class InventoryOverviewServiceTests(unittest.TestCase):
         self.assertEqual(snapshot.escuela_nombre, "General")
         self.assertEqual(snapshot.tipo_prenda_nombre, "-")
         self.assertEqual(snapshot.tipo_pieza_nombre, "-")
+        self.assertIsNone(snapshot.stock_minimo)
         self.assertIsNone(snapshot.movement_type)
         self.assertIsNone(snapshot.movement_quantity)
         self.assertEqual(snapshot.movement_date, "")

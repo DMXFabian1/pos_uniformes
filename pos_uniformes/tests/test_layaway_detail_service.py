@@ -45,6 +45,7 @@ class LayawayDetailServiceTests(unittest.TestCase):
                     monto=Decimal("500.00"),
                     referencia="REF-1",
                     usuario=SimpleNamespace(username="admin"),
+                    anulado=False,
                 )
             ],
         )

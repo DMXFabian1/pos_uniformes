@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, time, timezone
 import unittest
 
 from pos_uniformes.ui.helpers.history_filter_state_helper import (
@@ -21,8 +21,9 @@ class HistoryFilterStateHelperTests(unittest.TestCase):
             to_date=date(2026, 3, 12),
             minimum_date=date(2000, 1, 1),
         )
-        self.assertEqual(state.start_datetime, datetime(2026, 3, 10, 0, 0))
-        self.assertEqual(state.end_datetime, datetime(2026, 3, 13, 0, 0))
+        local_tz = datetime.now(timezone.utc).astimezone().tzinfo
+        self.assertEqual(state.start_datetime, datetime.combine(date(2026, 3, 10), time.min, tzinfo=local_tz))
+        self.assertEqual(state.end_datetime, datetime.combine(date(2026, 3, 12), time.max, tzinfo=local_tz))
         self.assertEqual(state.start_date_label, "10/03/2026")
         self.assertEqual(state.end_date_label, "12/03/2026")
 

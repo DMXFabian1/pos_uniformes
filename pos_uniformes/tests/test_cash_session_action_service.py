@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from decimal import Decimal
 from types import SimpleNamespace
 import unittest
@@ -30,7 +30,7 @@ class CashSessionActionServiceTests(unittest.TestCase):
         active_session = SimpleNamespace(
             id=9,
             abierta_por=SimpleNamespace(nombre_completo="Daniel"),
-            abierta_at=datetime(2026, 3, 19, 10, 30),
+            abierta_at=datetime(2026, 3, 19, 10, 30, tzinfo=timezone.utc),
             monto_apertura=Decimal("500.00"),
         )
         fake_service = SimpleNamespace(obtener_sesion_activa=lambda session: active_session)

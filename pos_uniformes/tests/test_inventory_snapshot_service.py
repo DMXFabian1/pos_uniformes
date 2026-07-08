@@ -38,6 +38,8 @@ class InventorySnapshotServiceTests(unittest.TestCase):
                 Decimal("219"),
                 Decimal("140"),
                 6,
+                4,
+                1,
                 2,
                 False,
                 True,
@@ -63,6 +65,11 @@ class InventorySnapshotServiceTests(unittest.TestCase):
         self.assertEqual(row["escuela_nombre"], "General")
         self.assertEqual(row["tipo_pieza_nombre"], "-")
         self.assertEqual(row["precio_venta"], Decimal("219.00"))
+        self.assertEqual(row["stock_actual"], 6)
+        self.assertEqual(row["stock_bodega"], 4)
+        self.assertEqual(row["stock_piso"], 1)
+        self.assertEqual(row["apartado_cantidad"], 2)
+        self.assertIsNone(row["stock_minimo"])
         self.assertTrue(row["qr_exists"])
         self.assertEqual(row["fallback_text"], "fallback")
         self.assertIn("pants deportivo", row[SEARCH_GENERAL_BLOB_KEY])
@@ -87,6 +94,8 @@ class InventorySnapshotServiceTests(unittest.TestCase):
                 Decimal("219"),
                 Decimal("140"),
                 6,
+                4,
+                1,
                 2,
                 False,
                 True,

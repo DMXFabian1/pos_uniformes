@@ -110,11 +110,16 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         ), patch.object(window, "_is_stale_cash_session", return_value=True):
             window._refresh_cash_session(object())
 
-        self.assertIn("Reactivo inicial $1000.00", window.cash_session_label.text())
-        self.assertIn("Corte pendiente", window.cash_session_label.text())
-        self.assertNotIn("Esperado", window.cash_session_label.text())
+        # Desde cc21062 el label es HTML con spans y, con corte pendiente,
+        # tampoco muestra el reactivo de apertura.
+        label_text = window.cash_session_label.text()
+        self.assertIn("Rol ADMIN", label_text)
+        self.assertIn("Corte pendiente", label_text)
+        self.assertNotIn("Esperado", label_text)
+        self.assertNotIn("2450", label_text)
+        self.assertNotIn("1000.00", label_text)
 
-    def test_cashier_role_hides_opening_amount_from_hero(self) -> None:
+    def test_cashier_role_sees_open_session_reactivo_in_hero(self) -> None:
         window = MainWindow(user_id=1)
         window.current_role = RolUsuario.CAJERO
         active_session = SimpleNamespace(id=5, monto_apertura="1000.00")
@@ -124,8 +129,15 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         ):
             window._refresh_cash_session(object())
 
-        self.assertEqual(window.cash_session_label.text(), "Rol CAJERO · Caja abierta")
-        self.assertNotIn("Reactivo inicial", window.cash_session_label.text())
+        # Desde cc21062 el hero usa spans HTML y muestra "Reactivo $X" para
+        # todos los roles con caja abierta (antes, 6dbabe1 lo ocultaba a
+        # CAJERO). El monto esperado del corte sigue sin aparecer.
+        label_text = window.cash_session_label.text()
+        self.assertIn("Rol CAJERO", label_text)
+        self.assertIn("Caja abierta", label_text)
+        self.assertIn("Reactivo $1000.00", label_text)
+        self.assertNotIn("Reactivo inicial", label_text)
+        self.assertNotIn("Esperado", label_text)
 
     def test_cashier_role_hides_manual_discount_controls(self) -> None:
         window = MainWindow(user_id=1)

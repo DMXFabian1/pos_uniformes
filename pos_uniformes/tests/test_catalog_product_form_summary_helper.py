@@ -17,7 +17,7 @@ class CatalogProductFormSummaryHelperTests(unittest.TestCase):
             context_values=("General", "Deportivo", "Pants"),
         )
 
-        self.assertEqual(preview, "Pants Deportivo | General")
+        self.assertEqual(preview, "Pants Deportivo General")
 
     def test_build_catalog_variant_examples_preview_uses_defaults_when_empty(self) -> None:
         preview = build_catalog_variant_examples_preview(
