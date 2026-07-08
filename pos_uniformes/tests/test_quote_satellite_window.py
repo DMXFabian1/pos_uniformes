@@ -68,15 +68,19 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         self.assertFalse(window.catalog_previous_page_button.isEnabled())
         self.assertTrue(window.catalog_next_page_button.isEnabled())
 
-    def test_catalog_defaults_to_solo_escuela_mode(self) -> None:
+    def test_catalog_defaults_to_escuela_mas_extras_generales_mode(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
 
-        self.assertEqual(window.catalog_include_general_combo.currentData(), "school_only")
-        self.assertEqual(window.catalog_include_general_combo.currentText(), "Solo escuela")
+        # Default cambiado en 6c27540: de "Solo escuela" a
+        # "Escuela + extras generales".
+        self.assertEqual(window.catalog_include_general_combo.currentData(), "include_general")
+        self.assertEqual(window.catalog_include_general_combo.currentText(), "Escuela + extras generales")
 
     def test_catalog_status_label_is_not_shown_in_browser_layout(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
-        catalog_page = window.page_stack.widget(1)
+        # Desde 4d13bea las paginas van envueltas en QScrollArea y el catalogo
+        # ocupa el indice 2 (el 1 es venta rapida).
+        catalog_page = window.page_stack.widget(2).widget()
         browser_box = catalog_page.layout().itemAt(0).widget()
         browser_layout = browser_box.layout()
 
@@ -102,6 +106,12 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         window.catalog_search_input.blockSignals(True)
         window.catalog_search_input.setText("pants")
         window.catalog_search_input.blockSignals(False)
+        # "Solo escuela" ya no es el default (6c27540); se selecciona para
+        # que el chip de ruta siga cubierto por el test.
+        route_combo = window.catalog_include_general_combo
+        route_combo.blockSignals(True)
+        route_combo.setCurrentIndex(route_combo.findData("school_only"))
+        route_combo.blockSignals(False)
 
         window._refresh_catalog_active_filter_chips()
 
@@ -307,8 +317,9 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
 
     def test_grouped_kiosk_product_cards_use_compact_layout(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
-        window.guided_mode = "basics"
-        window.guided_selected_piece = "Bata"
+        # El flujo guiado ahora vive en el estado _gfs (refactor d4b547e).
+        window._gfs.mode = "basics"
+        window._gfs.piece = "Bata"
         window.catalog_snapshot_rows = [
             {
                 "sku": "SKU000179",
@@ -336,8 +347,9 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
 
     def test_school_guided_product_cards_use_same_compact_layout(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
-        window.guided_mode = "school"
-        window.guided_selected_school = "Colegio Mexico"
+        # El flujo guiado ahora vive en el estado _gfs (refactor d4b547e).
+        window._gfs.mode = "school"
+        window._gfs.school = "Colegio Mexico"
         window.catalog_snapshot_rows = [
             {
                 "sku": "SKU000200",
@@ -464,6 +476,9 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         refresh_guided_browser.assert_called_once()
 
     def test_reveal_saved_quote_switches_filter_and_search_page(self) -> None:
+        # Regresión de 4d13bea (reparada): la página "search" quedó fuera del
+        # stack pero _reveal_saved_quote y "Ir a buscar" seguían navegando a
+        # ella (KeyError tras guardar/emitir). Restaurada al final del stack.
         window = QuoteSatelliteWindow(user_id=1)
         fake_session = Mock()
         session_cm = MagicMock()

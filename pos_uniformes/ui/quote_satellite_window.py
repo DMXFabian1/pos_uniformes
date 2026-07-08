@@ -368,6 +368,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self.offline_banner.setVisible(True)
 
         # Deshabilitar pestanas que requieren base de datos
+        self.nav_search_button.setEnabled(True)
+        self.nav_search_button.setToolTip("Presupuestos guardados localmente")
         self.nav_share_button.setEnabled(True)
         self.nav_share_button.setToolTip("Compartir presupuesto guardado localmente")
         self.refresh_button.setEnabled(False)
@@ -411,6 +413,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.nav_quote_button = QPushButton("Presupuesto")
         self.nav_quicksale_button = QPushButton("Venta rapida")
         self.nav_share_button = QPushButton("Compartir")
+        self.nav_search_button = QPushButton("Buscar")
         self.nav_tariff_button = QPushButton("Tarifarios")
         self.sidebar_total_label = QLabel("$0.00")
         self.sidebar_summary_label = QLabel("Sin piezas en el presupuesto actual.")
@@ -572,6 +575,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self.nav_quote_button: _icon_from_asset("kiosk_icons/quote_stack.svg"),
             self.nav_quicksale_button: _icon_from_asset("kiosk_icons/kiosk_scan.svg"),
             self.nav_share_button: _icon_from_asset("kiosk_icons/share_send.svg"),
+            self.nav_search_button: _icon_from_asset("kiosk_icons/search_quote.svg"),
             self.nav_tariff_button: _icon_from_asset("kiosk_icons/catalog_grid.svg"),
         }
         for button, icon in nav_icons.items():
@@ -682,6 +686,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self.nav_catalog_button,
             self.nav_guided_button,
             self.nav_quote_button,
+            self.nav_search_button,
             self.nav_tariff_button,
         ):
             button.setObjectName("navButton")
@@ -759,6 +764,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self.page_stack.addWidget(self._scrollable(self._build_quote_page()))
         self.page_stack.addWidget(self._scrollable(self._build_share_page()))
         self.page_stack.addWidget(self._scrollable(self._build_tariff_page()))
+        # "search" va al final del stack para no mover los indices existentes
+        self.page_stack.addWidget(self._scrollable(self._build_search_page()))
         return self.page_stack
 
     def _build_kiosk_page(self) -> QWidget:
@@ -1820,6 +1827,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.nav_quote_button.clicked.connect(lambda: self._set_page("quote"))
         self.nav_quicksale_button.clicked.connect(lambda: self._set_page("quicksale"))
         self.nav_share_button.clicked.connect(lambda: self._set_page("share"))
+        self.nav_search_button.clicked.connect(lambda: self._set_page("search"))
         self.nav_tariff_button.clicked.connect(lambda: self._set_page("tariff"))
         self.tariff_generate_button.clicked.connect(self._handle_generate_tariff)
         self.tariff_print_button.clicked.connect(self._handle_print_tariff)
@@ -1935,6 +1943,7 @@ class QuoteSatelliteWindow(QMainWindow):
             "quote": 4,
             "share": 5,
             "tariff": 6,
+            "search": 7,
         }
         button_map = {
             "kiosk": self.nav_kiosk_button,
@@ -1944,6 +1953,7 @@ class QuoteSatelliteWindow(QMainWindow):
             "quote": self.nav_quote_button,
             "share": self.nav_share_button,
             "tariff": self.nav_tariff_button,
+            "search": self.nav_search_button,
         }
         page_title_map = {
             "kiosk": "Kiosko listo para escaneo rapido.",
@@ -1953,6 +1963,7 @@ class QuoteSatelliteWindow(QMainWindow):
             "quote": "Ajusta el presupuesto.",
             "share": "Compartir por WhatsApp o imprimir.",
             "tariff": "Tarifario de precios por escuela.",
+            "search": "Busqueda y seguimiento de presupuestos.",
         }
         self.current_page_key = page_key
         self.page_stack.setCurrentIndex(page_index_map[page_key])
@@ -1962,6 +1973,8 @@ class QuoteSatelliteWindow(QMainWindow):
             QTimer.singleShot(0, self.kiosk_scan_input.setFocus)
         if page_key == "quicksale":
             self.quick_sale_widget.focus_input()
+        if page_key == "search" and self.offline_mode:
+            self._refresh_offline_quotes()
 
     def refresh_all(self) -> None:
         if self.offline_mode:
