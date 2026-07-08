@@ -14,12 +14,12 @@ El satelite es una terminal de:
 - consulta rapida por SKU (kiosko)
 - busqueda por texto libre (Meilisearch cuando hay conexion)
 - favoritos locales por pieza
+- **Venta Rapida** (desde 2026-06/07): gate por QR de empleada, escaneo de productos, tickets de venta/apartado con terminos, copia empleada con descuento autorizado, promo 3pz (pants deportivo + playera a $100), impresion de etiquetas desde Ctrl+S. Impresion multi-ticket via `TicketPrintQueue` (`ui/views/quick_sale_view.py`).
 
 No es una terminal de:
 
-- cobro ni corte de caja
+- corte de caja
 - inventario ni stock
-- apartados
 - administracion de catalogo
 
 ## Arquitectura de arranque
@@ -30,7 +30,7 @@ No es una terminal de:
 2. Si hay conexion:
    - `init_db()` para asegurar schema
    - `assert_database_ready()` preflight check
-   - `notify_catalog_changed()` para Meilisearch (tolerante a fallos)
+   - `autostart_and_reindex()` para Meilisearch — arranca el binario si esta instalado y re-indexa en hilo aparte (tolerante a fallos; antes solo `notify_catalog_changed()`)
    - `resolve_satellite_operator_id()` — selecciona usuario CAJERO o ADMIN activo
    - Abre `QuoteSatelliteWindow(user_id=..., offline_mode=False)`
 3. Si no hay conexion:
@@ -73,7 +73,8 @@ No es una terminal de:
 2. **Presupuesto guiado** — flujo paso a paso: escuela > genero > nivel > tipo prenda > producto > tallas
 3. **Kiosko** — busqueda rapida por SKU con campo de texto grande
 4. **Presupuestos** — lista de presupuestos guardados, detalle, compartir por WhatsApp
-5. **Administracion** — reindexar Meilisearch, diagnostico de conexion (solo conectado)
+5. **Venta Rapida** — escaneo de productos y generacion de nota (gate por QR de empleada)
+6. **Administracion** — diagnostico de conexion. Los controles de Meilisearch se movieron al menu admin oculto **Ctrl+Shift+A** (sin botones a la vista de las empleadas; el header del guiado solo muestra indicador pasivo)
 
 ### Carrito lateral
 
@@ -122,3 +123,6 @@ El satelite se empaqueta con PyInstaller. `seed_favorites_from_bundle()` copia f
 - `2026-04-20`: presupuestos offline implementados (Fase 3 del plan original)
 - `2026-05-21`: fix bugs offline (refresh, cantidades, reindex sin DB, escritura atomica)
 - `2026-05-22`: corazones overlay en botones de producto, mejoras de spacing
+- `2026-06/07`: Venta Rapida (gate QR empleada, tickets venta/apartado, promo 3pz, etiquetas Ctrl+S)
+- `2026-07-03`: `TicketPrintQueue` (cola de impresion segura), excepthook global (`utils/satellite_excepthook.py`, loguea a `satellite_errors.log`), Meilisearch auto-arranque
+- `2026-07-05`: version `2026.07.05` lista para bundle (hiddenimports nuevos en el spec)

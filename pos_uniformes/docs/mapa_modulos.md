@@ -9,9 +9,10 @@
   - `Fase 4` cerrada con estado `validated-manual`
 - Regla vigente:
   - `ui/main_window.py` se acepta como coordinador principal, pero las mejoras nuevas deben nacer fuera de ahi y solo integrarse desde la ventana
-- Siguiente iniciativa grande despues de `Fase 5`:
-  - `API, app movil y modulo de empleadas` como frente unificado
-  - convergen tres iniciativas: llevar la funcion del satelite a moviles, abrir el modulo de empleadas, e introducir una capa de API REST en la PC principal
+- Iniciativa `API, app movil y modulo de empleadas` — YA INICIADA (2026-07-08):
+  - existe la capa `api/` (FastAPI: `main.py`, `routers/`, `schemas/`, `services/`, `dependencies.py`)
+  - existe el modelo `Empleada` y los servicios `employee_*`
+  - la atribucion usa campos denormalizados `seller_employee_code` + `seller_employee_display_name` en `venta`/`presupuesto`/`apartado` (NO el `seller_employee_id` FK que proponia el diseno original)
   - documento base: `docs/arquitectura_api_movil_y_empleadas.md`
   - complementa `docs/empleadas_y_comisiones.md` y `docs/satelite_consulta_y_cache_local.md`
 
@@ -60,6 +61,12 @@
   - Vista de analitica.
 - `ui/views/settings_view.py`
   - Vista de configuracion.
+- `ui/views/bodega_view.py`
+  - Modulo Bodega (mini-WMS): cajas, racks, distribucion fisica.
+- `ui/views/panel_uniformes_view.py`
+  - Panel Uniformes embebido (QWebEngineView + QWebChannel, conteo con bridge JS-Python).
+- `ui/views/quick_sale_view.py`
+  - Venta Rapida (app satelite): escaneo, tickets, promo 3pz, etiquetas.
 
 ## Dialogs
 
@@ -73,6 +80,13 @@
   - Alta operativa de apartados con calendario, botones rapidos de vencimiento y pricing alineado al cliente.
 - `ui/dialogs/layaway_payment_dialog.py`
   - Registro de abonos y cierre `Liquidar y entregar` con calculadora tipo Caja.
+- Dialogs mas recientes (lista no exhaustiva, ver `ui/dialogs/`):
+  - `bodega_ingreso_dialog.py`, `bodega_ubicaciones_dialog.py` — modulo Bodega
+  - `conteo_print_dialog.py` — hojas de conteo (delega en `TicketPrintQueue`)
+  - `quick_kiosk_dialog.py` — consulta rapida Ctrl+K
+  - `meilisearch_settings_dialog.py`, `satellite_admin_dialog.py` — administracion busqueda/satelite
+  - `label_print_confirmation_dialog.py` — confirmacion de etiquetas por SKU
+  - `school_product_link_dialog.py` e `inventory_*_dialog.py` — ligas escuela-producto e inventario
 
 ## Servicios de dominio
 
@@ -114,6 +128,12 @@
   - Datos base/demo.
 - `services/customer_card_service.py`
   - Credenciales/QR de cliente.
+- Bloques mas recientes (lista no exhaustiva, ver `services/`):
+  - `meilisearch_service.py` — busqueda typo-tolerant con auto-arranque
+  - `bodega_service.py` y afines — modulo Bodega
+  - `employee_identity_service.py` y demas `employee_*` — empleadas
+  - `satellite_startup_service.py`, `catalog_local_cache_service.py`, `catalog_snapshot_service.py`, `offline_quote_storage_service.py`, `school_links_cache_service.py` — satelite y cache offline
+  - `inventory_label_service.py`, `ticket_print_queue.py` (en `ui/helpers/`) — etiquetas e impresion segura
 
 ## Servicios puros ya extraidos
 

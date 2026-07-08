@@ -5,12 +5,16 @@ Fuente de verdad usada para este mapa:
 - `pos_uniformes/database/models.py`
 - Metadata ORM cargada desde `pos_uniformes/.venv`
 
+Vigencia: 2026-07-08, HEAD `787be20`.
+
 Estado observado hoy:
 
-- 35 tablas en el esquema actual de `pos_uniformes`
+- 43 tablas en el esquema actual de `pos_uniformes`
 - `variante` es el nodo mas conectado del catalogo y de las operaciones
 - `cliente` y `usuario` funcionan como ejes transversales de ventas, apartados, presupuestos, caja y auditoria
-- `configuracion_negocio` y `sku_sequence` son tablas aisladas de configuracion
+- `escuela` gana peso: ademas del catalogo, ancla conteos ciclicos y el vinculo escuela-producto
+- la bodega tiene su propio mini-WMS: ubicaciones, cajas, contenido y movimientos
+- `configuracion_negocio`, `sku_sequence` y `empleada` son tablas aisladas sin FKs
 
 ## Vista general
 
@@ -27,12 +31,14 @@ flowchart LR
         P[producto]
         V[variante]
         A[producto_asset]
+        CSP[catalog_school_product_link]
     end
 
     subgraph Personas
         U[usuario]
         CL[cliente]
         PR[proveedor]
+        EM[empleada]
     end
 
     subgraph Operacion
@@ -56,6 +62,15 @@ flowchart LR
         MI[movimiento_inventario]
         AL[ajuste_inventario_lote]
         ALD[ajuste_inventario_lote_detalle]
+        CI[conteo_inventario]
+        CCE[config_conteo_escuela]
+    end
+
+    subgraph Bodega
+        BU[bodega_ubicacion]
+        BC[bodega_caja]
+        BCO[bodega_contenido]
+        BM[bodega_movimiento]
     end
 
     subgraph Importacion_y_Auditoria
@@ -76,6 +91,8 @@ flowchart LR
     C7 --> P
     P --> V
     V --> A
+    C3 --> CSP
+    P --> CSP
 
     U --> VE
     U --> AP
@@ -105,6 +122,17 @@ flowchart LR
     V --> CD
     V --> MI
     V --> ALD
+    V --> CI
+    C3 --> CI
+    AL --> CI
+    C3 --> CCE
+
+    BU --> BC
+    BC --> BCO
+    BC --> BM
+    BU --> BM
+    V --> BCO
+    V --> BM
 
     SC --> MC
     IC --> ICF
@@ -129,6 +157,8 @@ erDiagram
     ATRIBUTO_PRODUCTO ||--o{ PRODUCTO : atributo_id
     PRODUCTO ||--o{ VARIANTE : producto_id
     VARIANTE ||--o{ PRODUCTO_ASSET : variante_id
+    ESCUELA ||--o{ CATALOG_SCHOOL_PRODUCT_LINK : escuela_id
+    PRODUCTO ||--o{ CATALOG_SCHOOL_PRODUCT_LINK : producto_id
 ```
 
 Lectura rapida:
@@ -137,6 +167,7 @@ Lectura rapida:
 - `variante` representa el SKU vendible con talla, color, precio y stock
 - las tablas de catalogo alrededor de `producto` normalizan escuela, tipo de prenda y atributos
 - `producto_asset` cuelga de `variante`, no de `producto`
+- `catalog_school_product_link` es el vinculo N a N entre escuela y producto, con unicidad por par y flag `activo`
 
 ## Operacion comercial
 
@@ -212,20 +243,59 @@ Lectura rapida:
 - importaciones guardan corrida, filas procesadas e incidencias separadas
 - auditoria de catalogo y marketing esta modelada como historial orientado a usuario
 
+## Conteo de inventario
+
+```mermaid
+erDiagram
+    VARIANTE ||--o{ CONTEO_INVENTARIO : variante_id
+    ESCUELA ||--o{ CONTEO_INVENTARIO : escuela_id
+    AJUSTE_INVENTARIO_LOTE ||--o{ CONTEO_INVENTARIO : ajuste_lote_id
+    ESCUELA ||--|| CONFIG_CONTEO_ESCUELA : escuela_id
+```
+
+Lectura rapida:
+
+- `conteo_inventario` registra cada conteo fisico por variante: `stock_sistema`, `stock_fisico`, `diferencia`, quien conto y cuando
+- cuando el conteo genera ajuste, queda ligado al lote via `ajuste_lote_id` y se marca `ajustado`
+- `config_conteo_escuela` define la frecuencia (`dias_vigencia`) de conteo ciclico, una fila por escuela
+
+## Bodega (mini-WMS)
+
+```mermaid
+erDiagram
+    BODEGA_UBICACION ||--o{ BODEGA_CAJA : ubicacion_id
+    BODEGA_CAJA ||--o{ BODEGA_CONTENIDO : caja_id
+    VARIANTE ||--o{ BODEGA_CONTENIDO : variante_id
+    BODEGA_CAJA ||--o{ BODEGA_MOVIMIENTO : caja_id
+    BODEGA_CAJA ||--o{ BODEGA_MOVIMIENTO : caja_destino_id
+    VARIANTE ||--o{ BODEGA_MOVIMIENTO : variante_id
+    BODEGA_UBICACION ||--o{ BODEGA_MOVIMIENTO : ubicacion_anterior_id
+    BODEGA_UBICACION ||--o{ BODEGA_MOVIMIENTO : ubicacion_nueva_id
+```
+
+Lectura rapida:
+
+- `bodega_ubicacion` es la posicion fisica: `rack` + `nivel` con `codigo` unico
+- `bodega_caja` es la caja con QR: categoria A-D, estado (ACTIVA, VACIA, CERRADA) y ubicacion opcional
+- `bodega_contenido` dice que variante y cuanta cantidad hay en cada caja (par caja-variante unico)
+- `bodega_movimiento` es la bitacora: INGRESO, RETIRO, TRANSFERENCIA, MOVER_CAJA, CREAR_CAJA, AJUSTE y CORRECCION, con caja destino y ubicaciones anterior/nueva cuando aplica
+
 ## Tablas de soporte o configuracion
 
 Estas tablas no son hubs relacionales fuertes, pero forman parte del esquema:
 
 - `configuracion_negocio`
 - `sku_sequence`
+- `empleada` (codigo, nombre_completo, pin_hash, activo; sin FKs, se referencia por texto en flujos como el conteo)
 
 ## Donde veo mas densidad hoy
 
 Si queremos seguir ordenando el modelo, los centros de gravedad actuales son:
 
-1. `variante`: inventario, compras, ventas, apartados, presupuestos, assets e importacion
+1. `variante`: inventario, compras, ventas, apartados, presupuestos, assets, importacion, conteo y bodega
 2. `usuario`: ventas, apartados, compras, caja, auditoria y autorizaciones
 3. `cliente`: ventas, apartados, presupuestos, promociones manuales y nivel de lealtad
+4. `escuela`: catalogo, vinculo escuela-producto, conteos y su configuracion de frecuencia
 
 ## Siguiente mejora util para este mapa
 

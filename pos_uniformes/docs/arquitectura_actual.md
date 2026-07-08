@@ -1,8 +1,18 @@
 # Arquitectura Actual
 
+> Actualizado 2026-07-08 (HEAD `787be20`). Este doc describe el POS principal;
+> los subsistemas grandes tienen doc propio o nota en el vault de Obsidian.
+
+## Puntos de entrada
+
+- `main.py` — POS principal (PC tienda).
+- `presupuestos_satelite_main.py` — app satelite de presupuestos/venta rapida
+  (ver `docs/satelite_consulta_y_cache_local.md`).
+- `api/` — API FastAPI para app movil y empleadas (routers, schemas, services).
+
 ## Flujo de arranque
 
-1. `main.py` arranca la aplicacion.
+1. `main.py` arranca la aplicacion (instala excepthook global que loguea a `data/pos_errors.log`).
 2. Se ejecuta `database/preflight.py` para validar conexion y version de esquema.
 3. Se crea `QApplication`.
 4. `ui/login_dialog.py` autentica al usuario.
@@ -26,6 +36,7 @@
 ### Servicios de dominio
 
 - `services/`: logica de negocio, auditoria, backup, caja, ventas, inventario, clientes y helpers puros.
+- Subsistemas mas recientes: bodega (mini-WMS), empleadas (`employee_*`), busqueda Meilisearch (`meilisearch_service.py`, auto-arranque), cache local del satelite (`catalog_local_cache_service.py` y afines), conteo de inventario.
 
 ### Vistas y dialogs
 
