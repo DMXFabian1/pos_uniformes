@@ -3697,22 +3697,37 @@ QLabel#favDialogPriceLabel {
         if not sku:
             QMessageBox.warning(self, "SKU faltante", "Escanea o captura un SKU para consultarlo.")
             return
+        fell_back_to_cache = False
         try:
             if self.offline_mode:
                 snapshot = self._kiosk_lookup_from_cache(sku)
             else:
-                with get_session() as session:
-                    snapshot = load_quote_kiosk_lookup_snapshot(session, sku=sku)
+                try:
+                    with get_session() as session:
+                        snapshot = load_quote_kiosk_lookup_snapshot(session, sku=sku)
+                except SQLAlchemyError as db_exc:
+                    # La conexión con la PC principal se cayó (LAN inestable /
+                    # Postgres reiniciado). En vez del traceback feo, usamos el
+                    # catálogo guardado localmente — igual que en modo offline.
+                    logger.warning("Consulta online falló, usando catálogo local: %s", db_exc)
+                    snapshot = self._kiosk_lookup_from_cache(sku)
+                    fell_back_to_cache = True
             self.lookup_snapshot = snapshot
             self.lookup_history = push_quote_kiosk_recent_scan(self.lookup_history, snapshot)
             self._apply_lookup_view(build_quote_kiosk_lookup_view(snapshot))
             self._refresh_recent_lookup_table()
             self.kiosk_scan_input.clear()
-            self._set_status(f"{snapshot.sku} — precio del catalogo guardado.")
+            if fell_back_to_cache:
+                self._set_status(f"{snapshot.sku} — precio del catalogo guardado (sin conexion).")
+            else:
+                self._set_status(f"{snapshot.sku} — precio del catalogo guardado.")
         except Exception as exc:  # noqa: BLE001
             self.lookup_snapshot = None
-            self._apply_lookup_view(build_error_quote_kiosk_lookup_view(str(exc)))
-            QMessageBox.warning(self, "Consulta no disponible", str(exc))
+            friendly = str(exc)
+            if isinstance(exc, SQLAlchemyError):
+                friendly = "Sin conexion con la PC principal. Intenta de nuevo en unos segundos."
+            self._apply_lookup_view(build_error_quote_kiosk_lookup_view(friendly))
+            QMessageBox.warning(self, "Consulta no disponible", friendly)
         self._apply_action_state()
         self.kiosk_scan_input.setFocus()
 
@@ -3784,6 +3799,11 @@ QLabel#favDialogPriceLabel {
                 if result is None:
                     self.kiosk_scan_input.setFocus()
                     return
+        except SQLAlchemyError as db_exc:
+            # Conexión caída: agregar desde el catálogo local en vez de fallar.
+            logger.warning("Agregar online falló, usando catálogo local: %s", db_exc)
+            self._add_quote_item_from_cache(normalized_sku, quantity)
+            return
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "No se pudo agregar", str(exc))
             return
