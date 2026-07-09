@@ -135,6 +135,16 @@ def main() -> int:
     app.processEvents()
 
     # ── Arranque ──────────────────────────────────────────────────────
+    # Meilisearch es LOCAL de esta PC: arranca solo (si está instalado) y
+    # re-indexa en background — también cuando la PC principal está apagada.
+    # Sin DB conserva el índice persistido en disco de la última vez online,
+    # así la búsqueda con typos funciona igual en modo offline.
+    try:
+        from pos_uniformes.services.meilisearch_service import autostart_and_reindex
+        autostart_and_reindex()
+    except Exception as exc:  # noqa: BLE001
+        print(f"Meilisearch no disponible: {exc}", file=sys.stderr)
+
     _show_splash_message(splash, "Verificando conexión...", app)
     connection_available = probe_database_host()
 
@@ -147,14 +157,6 @@ def main() -> int:
             splash.close()
             QMessageBox.critical(None, "Base de datos no lista", str(exc))
             return 1
-
-        try:
-            # Arranca el servicio solo (si está instalado) y re-indexa en
-            # background — la empleada no tiene que tocar ningún botón.
-            from pos_uniformes.services.meilisearch_service import autostart_and_reindex
-            autostart_and_reindex()
-        except Exception as exc:  # noqa: BLE001
-            print(f"Meilisearch no disponible: {exc}", file=sys.stderr)
 
         _show_splash_message(splash, "Cargando catálogo...", app)
         try:

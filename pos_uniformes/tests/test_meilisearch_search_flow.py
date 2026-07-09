@@ -198,5 +198,30 @@ class SatelliteCatalogSearchTests(unittest.TestCase):
         self.assertEqual([r["sku"] for r in captured.get("snapshot_rows", [])], ["SKU-1"])
 
 
+class AutostartRunsOfflineTests(unittest.TestCase):
+    """El auto-arranque de Meilisearch NO debe depender de la PC principal.
+
+    Bug original: autostart_and_reindex() estaba dentro de la rama online del
+    arranque — si el satélite encendía antes que la PC principal, Meilisearch
+    nunca se levantaba y las empleadas se quedaban sin búsqueda con typos.
+    """
+
+    def test_autostart_is_called_before_db_probe_in_entry_point(self) -> None:
+        from pathlib import Path
+
+        import pos_uniformes.presupuestos_satelite_main as entry
+
+        source = Path(entry.__file__).read_text(encoding="utf-8")
+        autostart_pos = source.index("autostart_and_reindex()")
+        probe_pos = source.index("connection_available = probe_database_host()")
+        self.assertLess(
+            autostart_pos,
+            probe_pos,
+            "autostart_and_reindex() debe correr ANTES del probe de DB para "
+            "que Meilisearch levante también en modo offline",
+        )
+
+
 if __name__ == "__main__":
+
     unittest.main()
