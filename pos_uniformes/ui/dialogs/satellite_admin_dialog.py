@@ -231,6 +231,62 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     printer_layout.addWidget(save_printer_btn)
     printer_box.setLayout(printer_layout)
 
+    # — Impresoras de etiquetas (una por tipo de rollo) —
+    from pos_uniformes.services.label_printer_settings_cache_service import (
+        load_label_printer_settings,
+        save_label_printer_settings,
+    )
+
+    label_box = QGroupBox("Impresoras de etiquetas")
+    label_form = QFormLayout()
+    label_form.setSpacing(8)
+
+    cached_normal, cached_label = load_label_printer_settings()
+
+    def _build_label_combo(selected: str) -> QComboBox:
+        combo = QComboBox()
+        combo.addItem("Autodetectar (Brother)", "")
+        for p in QPrinterInfo.availablePrinters():
+            combo.addItem(p.printerName(), p.printerName())
+        found = combo.findData(selected)
+        combo.setCurrentIndex(found if found >= 0 else 0)
+        return combo
+
+    normal_label_combo = _build_label_combo(cached_normal)
+    label_label_combo = _build_label_combo(cached_label)
+
+    label_form.addRow("Normal / Split / Continua:", normal_label_combo)
+    label_form.addRow("Label (troquelada):", label_label_combo)
+
+    save_label_btn = QPushButton("Guardar impresoras de etiquetas")
+    save_label_btn.setObjectName("primaryButton")
+
+    def handle_save_label_printers() -> None:
+        normal_sel = str(normal_label_combo.currentData() or "")
+        label_sel = str(label_label_combo.currentData() or "")
+        try:
+            save_label_printer_settings(normal_sel, label_sel)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(dialog, "Error", f"No se pudo guardar:\n{exc}")
+            return
+        QMessageBox.information(
+            dialog,
+            "Guardado",
+            "Impresoras de etiquetas guardadas.\n"
+            f"Normal/Split/Continua: {normal_label_combo.currentText()}\n"
+            f"Label: {label_label_combo.currentText()}",
+        )
+
+    save_label_btn.clicked.connect(handle_save_label_printers)
+
+    label_layout = QVBoxLayout()
+    label_layout.addWidget(
+        QLabel("Normal, Split y Continua salen a la primera; Label (rollo troquelado) a la segunda.")
+    )
+    label_layout.addLayout(label_form)
+    label_layout.addWidget(save_label_btn)
+    label_box.setLayout(label_layout)
+
     # — Meilisearch —
     meili_box = QGroupBox("Meilisearch (busqueda rapida)")
     meili_layout = QVBoxLayout()
@@ -456,6 +512,7 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     layout.addWidget(status_box)
     layout.addWidget(config_box)
     layout.addWidget(printer_box)
+    layout.addWidget(label_box)
     layout.addWidget(meili_box)
     layout.addWidget(close_buttons)
     dialog.setLayout(layout)

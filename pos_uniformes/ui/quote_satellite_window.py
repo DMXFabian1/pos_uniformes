@@ -5536,8 +5536,18 @@ QLabel#favDialogPriceLabel {
             from pos_uniformes.ui.helpers.inventory_label_windows_print_helper import (
                 print_inventory_label_via_windows,
             )
-            preferred_printer = ""
-            if not self.offline_mode:
+            # Prioridad 1: config local de impresoras de etiquetas por modo
+            # (menú admin). Normal/Split/Continua → una impresora, Label → otra.
+            from pos_uniformes.services.label_printer_settings_cache_service import (
+                load_label_printer_settings,
+                resolve_label_printer_for_mode,
+            )
+            normal_printer, label_printer = load_label_printer_settings()
+            preferred_printer = resolve_label_printer_for_mode(
+                paper_mode, normal_printer=normal_printer, label_printer=label_printer
+            )
+            # Prioridad 2 (sin config local): impresora preferida de la BD.
+            if not preferred_printer and not self.offline_mode:
                 try:
                     with get_session() as session:
                         from pos_uniformes.services.business_print_settings_service import load_business_print_settings_snapshot
