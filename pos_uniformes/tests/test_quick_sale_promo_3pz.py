@@ -83,10 +83,21 @@ class AdapterDetectionTests(unittest.TestCase):
         row["tipo_pieza_nombre"] = "Pants 2pz"
         self.assertTrue(is_deportivo_two_piece_variant(adapt_cache_row(row)))
 
-    def test_playera_without_deportivo_word_is_detected_by_pieza(self) -> None:
-        # Caso real: "Playera Tortuga Blanca" / "Chazarilla" — pieza Playera.
-        row = _row("PLY-050", "Playera Tortuga Blanca")
+    def test_tortuga_chazarilla_and_polos_are_not_promo_playeras(self) -> None:
+        # Regla de negocio: solo la playera deportiva del conjunto entra a la
+        # promo — Tortuga/Chazarilla/Polo quedan fuera aunque su pieza sea
+        # "Playera".
+        for nombre in ("Playera Tortuga Blanca", "Playera Chazarilla Rojo", "Playera Polo Blanca"):
+            row = _row("PLY-050", nombre)
+            row["tipo_pieza_nombre"] = "Playera"
+            self.assertFalse(is_deportivo_playera_variant(adapt_cache_row(row)), nombre)
+
+    def test_conjunto_playera_detected_by_prenda_deportivo(self) -> None:
+        # Caso real: "Playera Blanca Alvaro Obregon" — la palabra viene del
+        # tipo de prenda ("Deportivo"), no del nombre.
+        row = _row("PLY-051", "Playera Blanca Alvaro Obregon")
         row["tipo_pieza_nombre"] = "Playera"
+        row["tipo_prenda_nombre"] = "Deportivo"
         self.assertTrue(is_deportivo_playera_variant(adapt_cache_row(row)))
 
     def test_non_deportivo_pieza_still_not_detected(self) -> None:

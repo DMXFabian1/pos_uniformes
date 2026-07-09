@@ -19,11 +19,14 @@ from pos_uniformes.ui.helpers.sale_sports_uniform_helper import (
 
 _PROMO_NAME_SUFFIX = " (promo 3pz)"
 
-# Piezas cuyo tipo_uniforme es 'deportivo' en la DB (migración 2026-05-25).
-# El cache del satélite no incluye tipo_uniforme, y muchos productos no traen
-# la palabra "deportivo" en el nombre (ej. "Pants 2pz Punto Verde") — la pieza
-# es la fuente de verdad para que los detectores de caja funcionen.
-_DEPORTIVO_PIEZAS = ("pants 2pz", "pants 3pz", "pants suelto", "chamarra", "playera", "short")
+# Piezas que son deportivas POR DEFINICIÓN aunque el nombre no diga
+# "deportivo" (ej. "Pants 2pz Punto Verde"). El cache no trae tipo_uniforme,
+# así que la pieza es la señal. OJO: "Playera" NO va aquí — la pieza Playera
+# mezcla las del conjunto deportivo con Tortuga/Chazarilla/Polos, y solo las
+# del conjunto (con "Deportiva/o" en nombre o tipo de prenda) entran a la
+# promo 3pz. Regla confirmada con datos reales: 48 deportivas la traen,
+# las 15 excluidas (Básico/Oficial) no.
+_DEPORTIVO_PIEZAS = ("pants 2pz", "pants 3pz", "pants suelto", "chamarra")
 
 
 class _SchoolAdapter:
