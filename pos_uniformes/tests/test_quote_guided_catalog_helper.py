@@ -625,6 +625,22 @@ class SearchPriceGroupsTests(unittest.TestCase):
     def test_empty_variantes_returns_empty(self) -> None:
         self.assertEqual(build_search_price_groups([]), [])
 
+    def test_range_sizes_sort_by_numeric_start_not_as_strings(self) -> None:
+        # Tallas reales de calcetas: como texto "13-18" quedaba antes que "3-5".
+        groups = build_search_price_groups(
+            [self._variant(t) for t in ["13-18", "0-0", "3-5", "9-12", "0-2", "6-8"]]
+        )
+        self.assertEqual(
+            [v["talla"] for v in groups[0][1]],
+            ["0-0", "0-2", "3-5", "6-8", "9-12", "13-18"],
+        )
+
+    def test_ranges_and_plain_numbers_interleave_numerically(self) -> None:
+        groups = build_search_price_groups(
+            [self._variant(t) for t in ["4", "13-18", "3-5", "12"]]
+        )
+        self.assertEqual([v["talla"] for v in groups[0][1]], ["3-5", "4", "12", "13-18"])
+
 
 class FavoritesVariantSortKeyTests(unittest.TestCase):
     """Orden del picker de variantes del diálogo de favoritos.

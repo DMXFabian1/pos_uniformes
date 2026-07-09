@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from decimal import Decimal
 
@@ -839,7 +840,12 @@ def _size_sort_key(raw_value: object) -> tuple[int, object]:
     if not normalized:
         return (9, "")
     if normalized.isdigit():
-        return (0, int(normalized))
+        return (0, (int(normalized), int(normalized)))
+    # Tallas de rango (calcetas: "0-2", "3-5", "13-18") — ordenar por el
+    # inicio numérico del rango; como texto "13-18" quedaba antes que "3-5".
+    range_match = re.fullmatch(r"(\d+)[-a](\d+)", normalized)
+    if range_match:
+        return (0, (int(range_match.group(1)), int(range_match.group(2))))
 
     alpha_sizes = {
         "xxch": 0,
