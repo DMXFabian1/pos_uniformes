@@ -19,6 +19,12 @@ from pos_uniformes.ui.helpers.sale_sports_uniform_helper import (
 
 _PROMO_NAME_SUFFIX = " (promo 3pz)"
 
+# Piezas cuyo tipo_uniforme es 'deportivo' en la DB (migración 2026-05-25).
+# El cache del satélite no incluye tipo_uniforme, y muchos productos no traen
+# la palabra "deportivo" en el nombre (ej. "Pants 2pz Punto Verde") — la pieza
+# es la fuente de verdad para que los detectores de caja funcionen.
+_DEPORTIVO_PIEZAS = ("pants 2pz", "pants 3pz", "pants suelto", "chamarra", "playera", "short")
+
 
 class _SchoolAdapter:
     def __init__(self, nombre: str) -> None:
@@ -38,7 +44,13 @@ class _ProductAdapter:
         self.escuela_id = row.get("escuela_id")  # puede no existir → fallback por nombre
         self.escuela = _SchoolAdapter(str(row.get("escuela_nombre") or ""))
         self.tipo_prenda = _NamedAdapter(str(row.get("tipo_prenda_nombre") or ""))
-        self.tipo_pieza = _NamedAdapter(str(row.get("tipo_pieza_nombre") or ""))
+        pieza = str(row.get("tipo_pieza_nombre") or "")
+        self.tipo_pieza = _NamedAdapter(pieza)
+        # Reinyectar la señal de taxonomía deportiva que el cache no trae:
+        # sin esto, "Pants 2pz Punto Verde" o "Playera Tortuga" no disparan
+        # la promo porque su nombre no contiene "deportivo".
+        if pieza.strip().lower() in _DEPORTIVO_PIEZAS:
+            self.descripcion = f"{self.descripcion} deportivo".strip()
 
 
 class CacheRowVariantAdapter:

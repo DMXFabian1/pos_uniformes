@@ -76,6 +76,24 @@ class AdapterDetectionTests(unittest.TestCase):
     def test_adapt_none_returns_none(self) -> None:
         self.assertIsNone(adapt_cache_row(None))
 
+    def test_pants_2pz_without_deportivo_word_is_detected_by_pieza(self) -> None:
+        # Caso real de la DB: "Pants 2pz Punto Verde" — sin la palabra
+        # "deportivo" en ningún texto; la pieza es la fuente de verdad.
+        row = _row("P2-050", "Pants 2pz Punto Verde")
+        row["tipo_pieza_nombre"] = "Pants 2pz"
+        self.assertTrue(is_deportivo_two_piece_variant(adapt_cache_row(row)))
+
+    def test_playera_without_deportivo_word_is_detected_by_pieza(self) -> None:
+        # Caso real: "Playera Tortuga Blanca" / "Chazarilla" — pieza Playera.
+        row = _row("PLY-050", "Playera Tortuga Blanca")
+        row["tipo_pieza_nombre"] = "Playera"
+        self.assertTrue(is_deportivo_playera_variant(adapt_cache_row(row)))
+
+    def test_non_deportivo_pieza_still_not_detected(self) -> None:
+        row = _row("C-050", "Camisa Escolar 2pz Blanca")
+        row["tipo_pieza_nombre"] = "Camisa"
+        self.assertFalse(is_deportivo_two_piece_variant(adapt_cache_row(row)))
+
 
 class PlayeraCandidatesTests(unittest.TestCase):
     def test_filters_same_school_active_playeras(self) -> None:
