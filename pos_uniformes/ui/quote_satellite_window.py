@@ -415,6 +415,11 @@ class QuoteSatelliteWindow(QMainWindow):
         self.nav_share_button = QPushButton("Compartir")
         self.nav_search_button = QPushButton("Buscar")
         self.nav_tariff_button = QPushButton("Tarifarios")
+        # Ocultos temporalmente (2026-07-05, decisión de Daniel): "Presupuesto"
+        # y "Buscar" no se usan en piso por ahora — las páginas siguen vivas y
+        # se retomarán después; para restaurarlas basta quitar estas 2 líneas.
+        self.nav_quote_button.setVisible(False)
+        self.nav_search_button.setVisible(False)
         self.sidebar_total_label = QLabel("$0.00")
         self.sidebar_summary_label = QLabel("Sin piezas en el presupuesto actual.")
         self.sidebar_items_count_label = QLabel("0 lineas | 0 pzas")
@@ -422,6 +427,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self.sidebar_items_content = QWidget()
         self.sidebar_items_layout = QVBoxLayout()
         self.kiosk_open_quote_button = QPushButton("Ver presupuesto")
+        # Navega a la página "Presupuesto" (oculta temporalmente) — se oculta junto.
+        self.kiosk_open_quote_button.setVisible(False)
         self.kiosk_open_search_button = QPushButton("Abrir catalogo")
         self.kiosk_budget_total_label = QLabel("$0.00")
         self.kiosk_budget_summary_label = QLabel("Sin piezas en el presupuesto actual.")

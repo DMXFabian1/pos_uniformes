@@ -180,6 +180,17 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         add_item.assert_called_once_with("SKU000003", 1)
         self.assertEqual(window.current_page_key, "kiosk")
 
+    def test_quote_and_search_nav_are_hidden_for_now(self) -> None:
+        # Decisión 2026-07-05: "Presupuesto" y "Buscar" ocultos temporalmente;
+        # las páginas siguen vivas para retomarlas después.
+        window = QuoteSatelliteWindow(user_id=1)
+        self.assertTrue(window.nav_quote_button.isHidden())
+        self.assertTrue(window.nav_search_button.isHidden())
+        self.assertTrue(window.kiosk_open_quote_button.isHidden())
+        self.assertFalse(window.nav_kiosk_button.isHidden())
+        self.assertFalse(window.nav_quicksale_button.isHidden())
+        self.assertFalse(window.nav_tariff_button.isHidden())
+
     def test_stylesheet_includes_combo_hover_feedback(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
 
