@@ -3763,8 +3763,12 @@ QLabel#favDialogPriceLabel {
                 result = render_inventory_label_from_cache_row(
                     row, mode="standard", requested_copies=1
                 )
+                # Etiqueta normal → impresora "Normal/Split" del menú admin
+                # (paper_mode "standard"; el default "die_cut" la mandaba con
+                # config de rollo troquelado, que no es lo que toca aquí).
                 if not self._print_satellite_label(
-                    result.image_path, title=f"Etiqueta {sku}", copies=1
+                    result.image_path, title=f"Etiqueta {sku}", copies=1,
+                    paper_mode="standard",
                 ):
                     failed.append(sku)
             except Exception:  # noqa: BLE001 — una etiqueta fallida no aborta el resto

@@ -90,6 +90,11 @@ class SatelliteLabelPrintFlowTests(unittest.TestCase):
             window._print_labels_for_skus(["SKU-1", "SKU-2"])
         self.assertEqual(render.call_count, 2)
         self.assertEqual(window._print_satellite_label.call_count, 2)
+        # Etiqueta normal → paper_mode "standard" para que salga a la impresora
+        # "Normal/Split" del menú admin (no la troquelada).
+        self.assertEqual(
+            window._print_satellite_label.call_args.kwargs["paper_mode"], "standard"
+        )
 
     def test_print_labels_reports_failures_without_aborting(self) -> None:
         window = self._make_window()
