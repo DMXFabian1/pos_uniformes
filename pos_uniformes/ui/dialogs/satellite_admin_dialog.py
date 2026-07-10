@@ -11,6 +11,7 @@ from PyQt6.QtWidgets import (
     QApplication,
     QComboBox,
     QScrollArea,
+    QTabWidget,
     QDialog,
     QDialogButtonBox,
     QFormLayout,
@@ -112,8 +113,6 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     dialog = QDialog(parent)
     dialog.setWindowTitle("Administracion del satelite")
     dialog.setMinimumWidth(480)
-    layout = QVBoxLayout()
-    layout.setSpacing(16)
 
     # — Estado actual —
     status_box = QGroupBox("Estado de conexion")
@@ -510,34 +509,40 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
     close_buttons.rejected.connect(dialog.reject)
 
-    # Todas las secciones van dentro de un área con scroll — en pantallas
-    # táctiles pequeñas no cabía toda la info (Meilisearch quedaba fuera).
-    # El botón Cerrar queda fijo abajo, siempre visible.
-    layout.addWidget(status_box)
-    layout.addWidget(config_box)
-    layout.addWidget(printer_box)
-    layout.addWidget(label_box)
-    layout.addWidget(meili_box)
-    layout.addStretch()
+    # Rediseño en pestañas: antes eran 5 secciones apiladas (saturado en el
+    # táctil, Meilisearch quedaba fuera). Ahora se agrupan en 3 pestañas
+    # despejadas; cada una con su propio scroll por si la pantalla es chica.
+    def _make_tab(*boxes: QWidget) -> QScrollArea:
+        page_layout = QVBoxLayout()
+        page_layout.setSpacing(16)
+        page_layout.setContentsMargins(12, 12, 12, 12)
+        for box in boxes:
+            page_layout.addWidget(box)
+        page_layout.addStretch()
+        page = QWidget()
+        page.setLayout(page_layout)
+        page_scroll = QScrollArea()
+        page_scroll.setWidgetResizable(True)
+        page_scroll.setWidget(page)
+        page_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        return page_scroll
 
-    content = QWidget()
-    content.setLayout(layout)
-    scroll = QScrollArea()
-    scroll.setWidgetResizable(True)
-    scroll.setWidget(content)
-    scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+    tabs = QTabWidget()
+    tabs.addTab(_make_tab(status_box, config_box), "🔌  Conexión")
+    tabs.addTab(_make_tab(printer_box, label_box), "🖨  Impresoras")
+    tabs.addTab(_make_tab(meili_box), "🔍  Búsqueda")
 
     outer = QVBoxLayout()
-    outer.setContentsMargins(0, 0, 0, 0)
-    outer.addWidget(scroll)
+    outer.setContentsMargins(12, 12, 12, 12)
+    outer.addWidget(tabs)
     outer.addWidget(close_buttons)
     dialog.setLayout(outer)
 
-    # Altura acotada a la pantalla para que el scroll realmente aplique.
+    # Tamaño acotado a la pantalla; cada pestaña scrollea si hace falta.
     screen = dialog.screen() or QApplication.primaryScreen()
     if screen is not None:
         avail = screen.availableGeometry()
-        dialog.resize(max(520, int(avail.width() * 0.5)), int(avail.height() * 0.85))
+        dialog.resize(max(560, int(avail.width() * 0.5)), int(avail.height() * 0.8))
         dialog.setMaximumHeight(avail.height())
 
     dialog.exec()
