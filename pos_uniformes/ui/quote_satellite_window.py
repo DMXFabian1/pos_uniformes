@@ -3805,7 +3805,6 @@ QLabel#favDialogPriceLabel {
             self.lookup_history = push_quote_kiosk_recent_scan(self.lookup_history, snapshot)
             self._apply_lookup_view(build_quote_kiosk_lookup_view(snapshot))
             self._refresh_recent_lookup_table()
-            self.kiosk_scan_input.clear()
             if fell_back_to_cache:
                 self._set_status(f"{snapshot.sku} — precio del catalogo guardado (sin conexion).")
             else:
@@ -3817,6 +3816,9 @@ QLabel#favDialogPriceLabel {
                 friendly = "Sin conexion con la PC principal. Intenta de nuevo en unos segundos."
             self._apply_lookup_view(build_error_quote_kiosk_lookup_view(friendly))
             QMessageBox.warning(self, "Consulta no disponible", friendly)
+        # Limpiar el cajón SIEMPRE (éxito o error) para que el siguiente
+        # escaneo no se apile con un código previo que no existía.
+        self.kiosk_scan_input.clear()
         self._apply_action_state()
         self.kiosk_scan_input.setFocus()
 

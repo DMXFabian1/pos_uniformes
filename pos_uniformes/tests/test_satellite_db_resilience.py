@@ -113,5 +113,26 @@ class KioskLookupFallbackTests(unittest.TestCase):
         window._add_quote_item_from_cache.assert_called_once_with("SKU004201", 1)
 
 
+    def test_lookup_clears_input_on_unknown_sku(self) -> None:
+        # SKU inexistente: el cajón debe quedar vacío para que el siguiente
+        # escaneo no se apile con el código que no existía.
+        window = self._online_window()
+        window.offline_mode = True  # busca solo en el cache local
+        window.catalog_snapshot_rows = []  # nada → "no encontrado"
+        window.kiosk_scan_input.setText("NOEXISTE123")
+        with patch(
+            "pos_uniformes.ui.quote_satellite_window.QMessageBox.warning"
+        ):
+            window._handle_lookup_scan()
+        self.assertEqual(window.kiosk_scan_input.text(), "")
+
+    def test_lookup_clears_input_on_success(self) -> None:
+        window = self._online_window()
+        window.offline_mode = True
+        window.kiosk_scan_input.setText("SKU004201")
+        window._handle_lookup_scan()
+        self.assertEqual(window.kiosk_scan_input.text(), "")
+
+
 if __name__ == "__main__":
     unittest.main()
