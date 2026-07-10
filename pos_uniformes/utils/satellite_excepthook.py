@@ -49,7 +49,8 @@ def append_to_error_log(entry: str, path: Path) -> None:
 
 
 def install_gui_excepthook(log_path: Path) -> None:
-    """Reemplaza sys.excepthook para que PyQt6 no aborte el proceso.
+    """Reemplaza sys.excepthook (y threading.excepthook) para que ni una
+    excepción en un slot ni en un hilo de fondo tumben el proceso.
 
     Sirve para cualquier app Qt del proyecto (satélite y POS principal);
     cada una pasa su propia ruta de log.
@@ -68,6 +69,23 @@ def install_gui_excepthook(log_path: Path) -> None:
         append_to_error_log(entry, log_path)
 
     sys.excepthook = hook
+
+    # Los hilos de fondo (reindex de Meilisearch, watchdog de reconexión)
+    # tocan la DB; si la PC principal se apaga, su excepción no debe quedar
+    # sin registrar. threading.excepthook nunca cierra el proceso, solo
+    # queremos que el error vaya al mismo log.
+    import threading
+
+    def thread_hook(args: "threading.ExceptHookArgs") -> None:
+        if issubclass(args.exc_type, SystemExit):
+            return
+        entry = format_unhandled_exception(
+            args.exc_type, args.exc_value, args.exc_traceback
+        )
+        print(entry, end="", file=sys.stderr)
+        append_to_error_log(entry, log_path)
+
+    threading.excepthook = thread_hook
 
 
 def install_satellite_excepthook() -> None:

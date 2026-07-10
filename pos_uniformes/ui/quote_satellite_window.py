@@ -293,6 +293,10 @@ class GuidedFlowState:
 
 
 class QuoteSatelliteWindow(QMainWindow):
+    # Emite el resultado del watchdog de reconexión desde el hilo de fondo al
+    # hilo de UI: (rows | None, school_links | None). None = DB no disponible.
+    _db_refresh_ready = pyqtSignal(object, object)
+
     def __init__(
         self,
         user_id: int | None,
@@ -351,6 +355,87 @@ class QuoteSatelliteWindow(QMainWindow):
             self.refresh_all()
 
         QTimer.singleShot(0, self.kiosk_scan_input.setFocus)
+
+        # Watchdog de reconexión: el modo (online/offline) se fija al arrancar,
+        # pero la PC principal puede encenderse/apagarse después. Este timer
+        # revisa la DB en segundo plano y refresca el catálogo cuando está
+        # disponible — así el orden de encendido deja de importar y el satélite
+        # nunca se queda con precios viejos ni se cae si la PC se apaga.
+        self._db_refresh_ready.connect(self._on_db_refresh_ready)
+        self._reconnect_timer = QTimer(self)
+        self._reconnect_timer.setInterval(300_000)  # cada 5 min
+        self._reconnect_timer.timeout.connect(self._start_background_db_refresh)
+        self._reconnect_timer.start()
+        # Primer chequeo pronto (60 s) para tomar la PC si encendió tarde.
+        QTimer.singleShot(60_000, self._start_background_db_refresh)
+
+    def _start_background_db_refresh(self) -> None:
+        """Lanza un hilo que revisa la DB y trae catálogo fresco si se puede."""
+        if getattr(self, "_db_refresh_running", False):
+            return
+        self._db_refresh_running = True
+        import threading
+
+        def _worker() -> None:
+            rows = None
+            links = None
+            try:
+                from pos_uniformes.services.satellite_startup_service import probe_database_host
+                if probe_database_host():
+                    with get_session() as session:
+                        rows = load_catalog_snapshot_rows(session)
+                        try:
+                            links = list_all_active_links(session)
+                        except Exception:  # noqa: BLE001
+                            links = None
+            except Exception:  # noqa: BLE001 — nunca tumbar por el watchdog
+                rows = None
+                links = None
+            finally:
+                self._db_refresh_ready.emit(rows, links)
+
+        threading.Thread(target=_worker, daemon=True, name="satellite-db-watchdog").start()
+
+    def _on_db_refresh_ready(self, rows, links) -> None:
+        """Slot en hilo de UI: aplica el catálogo fresco (o marca sin conexión)."""
+        self._db_refresh_running = False
+        if not rows:
+            # DB no disponible ahora — seguimos con el cache, sin cerrar nada.
+            self._set_db_connectivity_banner(online=False)
+            return
+        self.catalog_snapshot_rows = rows
+        self._rebuild_sku_index()
+        try:
+            save_catalog_cache(rows)
+        except Exception:  # noqa: BLE001
+            pass
+        if links is not None:
+            self._school_links = links
+            try:
+                save_school_links_cache(links)
+            except Exception:  # noqa: BLE001
+                pass
+        self._set_db_connectivity_banner(online=True)
+
+    def _set_db_connectivity_banner(self, *, online: bool) -> None:
+        """Actualiza el banner según la conectividad detectada en runtime."""
+        if online:
+            # Con conexión: ocultar el banner de modo local (si estaba).
+            if not self.offline_mode:
+                self.offline_banner.setVisible(False)
+            else:
+                self.offline_banner.setText(
+                    "Catalogo actualizado desde la PC principal. "
+                    "Reinicia para operar en linea completa."
+                )
+                self.offline_banner.setVisible(True)
+        else:
+            saved_at = catalog_cache_saved_at()
+            age_text = format_cache_age_label(saved_at) if saved_at else "cache local"
+            self.offline_banner.setText(
+                f"Sin conexion con la PC principal — Catalogo {age_text}."
+            )
+            self.offline_banner.setVisible(True)
 
     def _init_offline(self, cache_rows: list[dict]) -> None:
         """Inicializa la ventana en modo local sin tocar la base de datos."""
