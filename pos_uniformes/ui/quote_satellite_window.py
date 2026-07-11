@@ -294,6 +294,8 @@ class GuidedFlowState:
 
 # Escuelas por página en el paso guiado "Elige escuela".
 _GUIDED_SCHOOLS_PER_PAGE = 9
+# Modelos por página en el paso guiado "Modelos sugeridos".
+_GUIDED_MODELS_PER_PAGE = 9
 
 
 def _paginate(options: list, page: int, per_page: int) -> tuple[list, int, int]:
@@ -688,6 +690,10 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_piece_buttons: dict[str, QPushButton] = {}
         self.guided_variant_buttons: dict[str, QPushButton] = {}
         self.guided_product_buttons: dict[str, QPushButton] = {}
+        # Paginación del paso "Modelos sugeridos".
+        self._guided_product_all_cards: list = []
+        self._guided_product_key_set: frozenset | None = None
+        self._guided_product_page: int = 0
 
         # Búsqueda rápida Meilisearch
         self.guided_search_input = QLineEdit()
@@ -1409,8 +1415,34 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_product_scroll.setWidget(self.guided_product_container)
         products_section_layout.addWidget(self.guided_products_title_label)
         products_section_layout.addWidget(self.guided_products_hint_label)
+        # Se agrega el paginador de modelos al final (tras el scroll).
         products_section_layout.addWidget(self.guided_empty_label)
         products_section_layout.addWidget(self.guided_product_scroll, 1)
+
+        # Paginación de modelos: avanzar / regresar de página.
+        self.guided_product_prev_button = QPushButton("◀ Anterior")
+        self.guided_product_prev_button.setObjectName("secondaryButton")
+        self.guided_product_prev_button.setMinimumHeight(44)
+        self.guided_product_next_button = QPushButton("Siguiente ▶")
+        self.guided_product_next_button.setObjectName("secondaryButton")
+        self.guided_product_next_button.setMinimumHeight(44)
+        self.guided_product_page_label = QLabel("Página 1 / 1")
+        self.guided_product_page_label.setObjectName("guidedStepHint")
+        self.guided_product_prev_button.clicked.connect(lambda: self._handle_guided_product_page(-1))
+        self.guided_product_next_button.clicked.connect(lambda: self._handle_guided_product_page(1))
+        self.guided_product_pager = QWidget()
+        _product_pager_layout = QHBoxLayout()
+        _product_pager_layout.setContentsMargins(0, 0, 0, 0)
+        _product_pager_layout.setSpacing(8)
+        _product_pager_layout.addWidget(self.guided_product_prev_button)
+        _product_pager_layout.addStretch()
+        _product_pager_layout.addWidget(self.guided_product_page_label)
+        _product_pager_layout.addStretch()
+        _product_pager_layout.addWidget(self.guided_product_next_button)
+        self.guided_product_pager.setLayout(_product_pager_layout)
+        self.guided_product_pager.setVisible(False)
+        products_section_layout.addWidget(self.guided_product_pager)
+
         self.guided_products_section.setLayout(products_section_layout)
         steps_layout.addWidget(self.guided_products_section, 1)
 
@@ -3125,10 +3157,25 @@ class QuoteSatelliteWindow(QMainWindow):
             self.guided_piece_groups_layout.addLayout(row_layout)
 
     def _rebuild_guided_product_buttons(self, product_cards) -> None:
+        sorted_cards = sorted(product_cards, key=lambda c: (c.key not in self._favorites, 0))
+        key_set = frozenset(getattr(c, "key", None) for c in sorted_cards)
+        # Al cambiar el conjunto de modelos (otro filtro), volver a la página 1.
+        # Marcar favorito reordena pero no cambia el conjunto -> conserva la página.
+        if key_set != self._guided_product_key_set:
+            self._guided_product_page = 0
+            self._guided_product_key_set = key_set
+        self._guided_product_all_cards = sorted_cards
+        self._render_guided_product_page()
+
+    def _render_guided_product_page(self) -> None:
+        """Dibuja solo la página actual de modelos y actualiza el paginador."""
+        page_cards, page, total_pages = _paginate(
+            self._guided_product_all_cards, self._guided_product_page, _GUIDED_MODELS_PER_PAGE
+        )
+        self._guided_product_page = page
         _clear_layout(self.guided_product_flow_layout)
         self.guided_product_buttons = {}
-        sorted_cards = sorted(product_cards, key=lambda c: (c.key not in self._favorites, 0))
-        for card in sorted_cards:
+        for card in page_cards:
             product_btn = self._build_guided_product_button(card)
             product_btn.setChecked(self._gfs.product_key == card.key)
             product_btn.clicked.connect(lambda checked=False, selected=card.key: self._handle_guided_product_selected(selected))
@@ -3160,6 +3207,16 @@ class QuoteSatelliteWindow(QMainWindow):
             product_btn.resizeEvent = _make_resize_handler(heart_btn, product_btn, product_btn.resizeEvent)
             self.guided_product_flow_layout.addWidget(product_btn)
             self.guided_product_buttons[card.key] = product_btn
+
+        self.guided_product_page_label.setText(f"Página {page + 1} / {total_pages}")
+        self.guided_product_prev_button.setEnabled(page > 0)
+        self.guided_product_next_button.setEnabled(page < total_pages - 1)
+        # El paginador solo aparece si hay más de una página.
+        self.guided_product_pager.setVisible(total_pages > 1)
+
+    def _handle_guided_product_page(self, delta: int) -> None:
+        self._guided_product_page += delta
+        self._render_guided_product_page()
 
     def _confirm_favorites_password(self, action: str) -> bool:
         """Pide contraseña para agregar o quitar un favorito. Retorna True si es correcta."""
