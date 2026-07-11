@@ -15,6 +15,7 @@ el llamador controla la transacción. Solo se hace flush donde se necesita el id
 
 from __future__ import annotations
 
+import base64
 from collections.abc import Iterable, Sequence
 
 from sqlalchemy import func, select
@@ -110,6 +111,53 @@ def texto_de_ticket(trabajo: Trabajo) -> str:
     if not texto:
         raise ValueError(f"El trabajo TICKET id={trabajo.id} no trae texto.")
     return texto
+
+
+def enviar_etiqueta(
+    session: Session,
+    imagen: bytes,
+    *,
+    sku: str,
+    copies: int = 1,
+    paper_mode: str = "standard",
+    origen: str = "principal",
+    creado_por: str = "SYSTEM",
+) -> Trabajo:
+    """Encola una etiqueta ya renderizada (PNG) para imprimir en el satélite.
+
+    La imagen viaja en base64 dentro del payload; el satélite la vuelca a un
+    archivo temporal y la imprime con `paper_mode`/`copies` en su impresora de
+    etiquetas configurada. Enviar la imagen (y no re-renderizar) garantiza que
+    el satélite imprima exactamente lo que se previsualizó.
+    """
+    if not imagen:
+        raise ValueError("La imagen de la etiqueta está vacía.")
+    contenido = {
+        "image_b64": base64.b64encode(imagen).decode("ascii"),
+        "sku": (sku or "").strip(),
+        "copies": max(1, int(copies)),
+        "paper_mode": paper_mode or "standard",
+    }
+    return encolar(
+        session, TipoTrabajo.ETIQUETA, contenido, origen=origen, creado_por=creado_por
+    )
+
+
+def datos_de_etiqueta(trabajo: Trabajo) -> tuple[bytes, str, int, str]:
+    """Devuelve (imagen_bytes, sku, copies, paper_mode) del payload de una ETIQUETA."""
+    if trabajo.tipo != TipoTrabajo.ETIQUETA:
+        raise ValueError(f"El trabajo id={trabajo.id} no es una ETIQUETA.")
+    contenido = trabajo.contenido or {}
+    image_b64 = contenido.get("image_b64")
+    if not image_b64:
+        raise ValueError(f"El trabajo ETIQUETA id={trabajo.id} no trae imagen.")
+    imagen = base64.b64decode(image_b64)
+    return (
+        imagen,
+        str(contenido.get("sku", "")),
+        max(1, int(contenido.get("copies", 1))),
+        str(contenido.get("paper_mode", "standard")),
+    )
 
 
 def listar(

@@ -11663,6 +11663,16 @@ class MainWindow(QMainWindow):
         parent: QDialog | None = None,
         paper_mode: str = "standard",
     ) -> bool:
+        from pos_uniformes.ui.helpers.label_routing_helper import maybe_route_label_to_satellite
+        if maybe_route_label_to_satellite(
+            image_path,
+            sku=title.replace("Etiqueta ", "", 1),
+            copies=copies,
+            paper_mode=paper_mode,
+            parent=parent or self,
+        ):
+            return True
+
         image = QImage(str(image_path))
         if image.isNull():
             raise ValueError(f"No se pudo abrir la imagen de etiqueta:\n{image_path}")

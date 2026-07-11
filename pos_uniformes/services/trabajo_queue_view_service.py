@@ -58,9 +58,13 @@ def resumen(trabajo: Trabajo) -> str:
                 return linea.strip()
         return "(ticket vacío)"
     if trabajo.tipo == TipoTrabajo.ETIQUETA:
-        sku = contenido.get("sku") or contenido.get("SKU") or ""
-        desc = contenido.get("descripcion") or contenido.get("nombre") or ""
-        return " · ".join(p for p in (str(sku), str(desc)) if p) or "Etiqueta"
+        sku = contenido.get("sku") or ""
+        copies = contenido.get("copies") or 1
+        modo = contenido.get("paper_mode") or ""
+        partes = [str(sku) if sku else "Etiqueta", f"{copies} copia(s)"]
+        if modo:
+            partes.append(str(modo))
+        return " · ".join(partes)
     if trabajo.tipo == TipoTrabajo.CONTEO:
         return "Hoja de conteo"
     if trabajo.tipo == TipoTrabajo.PEDIDO:

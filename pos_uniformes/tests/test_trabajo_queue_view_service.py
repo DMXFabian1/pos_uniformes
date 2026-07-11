@@ -54,9 +54,11 @@ class ResumenTests(unittest.TestCase):
 
     def test_resumen_etiqueta(self) -> None:
         t = svc.encolar(
-            self.session, TipoTrabajo.ETIQUETA, {"sku": "SKU1", "descripcion": "Pants"}
+            self.session,
+            TipoTrabajo.ETIQUETA,
+            {"sku": "SKU1", "copies": 3, "paper_mode": "standard"},
         )
-        self.assertEqual(view.resumen(t), "SKU1 · Pants")
+        self.assertEqual(view.resumen(t), "SKU1 · 3 copia(s) · standard")
 
     def test_resumen_conteo(self) -> None:
         t = svc.encolar(self.session, TipoTrabajo.CONTEO, {"hojas": 3})
