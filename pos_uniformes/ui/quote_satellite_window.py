@@ -912,6 +912,21 @@ class QuoteSatelliteWindow(QMainWindow):
         items_layout.setSpacing(8)
         items_title = QLabel("Piezas agregadas")
         items_title.setObjectName("satSidebarTitle")
+        self.sidebar_clear_button = QPushButton("🗑")
+        self.sidebar_clear_button.setObjectName("satSidebarClearButton")
+        self.sidebar_clear_button.setToolTip("Limpiar piezas agregadas")
+        self.sidebar_clear_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.sidebar_clear_button.setFixedSize(34, 34)
+        self.sidebar_clear_button.setStyleSheet(
+            "QPushButton { border: none; background: transparent; font-size: 16px; }"
+            "QPushButton:hover { background: #fdecea; border-radius: 8px; }"
+        )
+        self.sidebar_clear_button.clicked.connect(self._handle_sidebar_clear_pieces)
+        items_header = QHBoxLayout()
+        items_header.setContentsMargins(0, 0, 0, 0)
+        items_header.addWidget(items_title)
+        items_header.addStretch(1)
+        items_header.addWidget(self.sidebar_clear_button)
         self.sidebar_items_count_label.setObjectName("satSidebarSectionMeta")
         self.sidebar_items_scroll.setObjectName("satSidebarItemsScroll")
         self.sidebar_items_scroll.setWidgetResizable(True)
@@ -924,7 +939,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.sidebar_items_content.setLayout(self.sidebar_items_layout)
         self.sidebar_items_scroll.setWidget(self.sidebar_items_content)
         self.sidebar_items_scroll.setMinimumHeight(180)
-        items_layout.addWidget(items_title)
+        items_layout.addLayout(items_header)
         items_layout.addWidget(self.sidebar_items_count_label)
         items_layout.addWidget(self.sidebar_items_scroll, 1)
         items_card.setLayout(items_layout)
@@ -4169,6 +4184,18 @@ QLabel#favDialogPriceLabel {
         self._refresh_quote_cart_table()
         self._reset_quote_form()
         self._set_status("Armado limpiado.")
+
+    def _handle_sidebar_clear_pieces(self) -> None:
+        """Papelera de la barra 'Piezas agregadas': vacía el armado actual."""
+        if not self.quote_cart:
+            return  # nada que limpiar
+        confirm = QMessageBox.question(
+            self,
+            "Limpiar piezas",
+            "¿Quitar todas las piezas agregadas del presupuesto actual?",
+        )
+        if confirm == QMessageBox.StandardButton.Yes:
+            self._handle_clear_quote_cart()
 
     def _handle_save_quote_draft(self) -> None:
         if self.offline_mode:
