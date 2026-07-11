@@ -295,7 +295,8 @@ class GuidedFlowState:
 # Escuelas por página en el paso guiado "Elige escuela".
 _GUIDED_SCHOOLS_PER_PAGE = 9
 # Modelos por página en el paso guiado "Modelos sugeridos".
-_GUIDED_MODELS_PER_PAGE = 9
+# 8 = 2 filas de 4 en la pantalla del kiosko (evita la 3ª fila que obliga a scroll).
+_GUIDED_MODELS_PER_PAGE = 8
 
 
 def _paginate(options: list, page: int, per_page: int) -> tuple[list, int, int]:
