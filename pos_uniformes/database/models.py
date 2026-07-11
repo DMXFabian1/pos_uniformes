@@ -7,7 +7,8 @@ from decimal import Decimal
 from enum import Enum
 
 from sqlalchemy import CheckConstraint, DateTime, Enum as SqlEnum
-from sqlalchemy import Boolean, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import JSON, Boolean, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from pos_uniformes.database.connection import Base
@@ -1706,3 +1707,76 @@ class BodegaMovimiento(Base):
     )
     variante: Mapped["Variante | None"] = relationship()
     caja_destino: Mapped["BodegaCaja | None"] = relationship(foreign_keys=[caja_destino_id])
+
+
+class TipoTrabajo(str, Enum):
+    """Qué clase de trabajo se despacha al satélite."""
+
+    TICKET = "TICKET"
+    ETIQUETA = "ETIQUETA"
+    CONTEO = "CONTEO"
+    PEDIDO = "PEDIDO"
+
+
+class EstadoTrabajo(str, Enum):
+    """Ciclo de vida genérico de un trabajo.
+
+    Es intencionalmente compartido por todos los tipos para que el esquema
+    no cambie fase a fase. La GUI etiqueta cada estado según el tipo:
+    EN_PROCESO -> "imprimiendo" (ticket/etiqueta/conteo) o "preparando" (pedido);
+    HECHO -> "impreso" o "listo".
+    """
+
+    PENDIENTE = "PENDIENTE"
+    EN_PROCESO = "EN_PROCESO"
+    HECHO = "HECHO"
+    ERROR = "ERROR"
+    CANCELADO = "CANCELADO"
+
+
+class Trabajo(Base):
+    """Cola de trabajos que el POS/kiosko envían al satélite para imprimir o atender.
+
+    El emisor (principal/kiosko) solo hace INSERT; el despachador del satélite
+    toma los PENDIENTE por (prioridad, created_at) y actualiza su estado.
+    `contenido` guarda el payload específico del tipo (texto del ticket, datos de
+    la etiqueta, hojas de conteo, etc.) como JSON, para no acoplar el esquema a
+    cada formato de impresión.
+    """
+
+    __tablename__ = "trabajo"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tipo: Mapped[TipoTrabajo] = mapped_column(
+        SqlEnum(TipoTrabajo, name="tipo_trabajo"),
+        nullable=False,
+        index=True,
+    )
+    estado: Mapped[EstadoTrabajo] = mapped_column(
+        SqlEnum(EstadoTrabajo, name="estado_trabajo"),
+        nullable=False,
+        default=EstadoTrabajo.PENDIENTE,
+        server_default=EstadoTrabajo.PENDIENTE.value,
+        index=True,
+    )
+    origen: Mapped[str] = mapped_column(String(60), nullable=False, default="principal", index=True)
+    prioridad: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    contenido: Mapped[dict] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"),
+        nullable=False,
+    )
+    error_msg: Mapped[str | None] = mapped_column(Text())
+    creado_por: Mapped[str] = mapped_column(String(60), default="SYSTEM", nullable=False)
+    procesado_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
