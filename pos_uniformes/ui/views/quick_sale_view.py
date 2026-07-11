@@ -369,6 +369,12 @@ class QuickSaleWidget(QWidget):
         btn_apartado.clicked.connect(self._on_ticket_apartado)
         tb_layout.addWidget(btn_apartado)
 
+        btn_pedido = QPushButton("Enviar a preparar")
+        btn_pedido.setObjectName("btnGhost")
+        btn_pedido.setToolTip("Manda las piezas al tablero de pedidos del satélite para prepararlas")
+        btn_pedido.clicked.connect(self._on_enviar_pedido)
+        tb_layout.addWidget(btn_pedido)
+
         total_bar.setLayout(tb_layout)
         layout.addWidget(total_bar)
 
@@ -877,6 +883,42 @@ class QuickSaleWidget(QWidget):
             nombre, copy_label="COPIA TIENDA", include_terms=False
         )
         route_tickets(self, "Apartado", [cliente_text, tienda_text])
+        self._scan_input.setFocus()
+
+    def _on_enviar_pedido(self) -> None:
+        """Manda las piezas del carrito al tablero de pedidos del satélite."""
+        if not self._items:
+            QMessageBox.information(self, "Sin piezas", "Agrega piezas antes de enviar a preparar.")
+            return
+        from pos_uniformes.services import trabajos_service as svc
+        from pos_uniformes.services.print_routing_cache_service import load_print_routing
+
+        items = [
+            {
+                "sku": it.get("sku", ""),
+                "nombre": it.get("nombre", ""),
+                "talla": it.get("talla", ""),
+                "cantidad": it.get("cantidad", 1),
+            }
+            for it in self._items
+        ]
+        try:
+            _, origen = load_print_routing()
+            with get_session() as session:
+                svc.enviar_pedido(session, items, origen=origen)
+                session.commit()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(
+                self,
+                "No se pudo enviar",
+                f"No se pudo enviar el pedido al satélite.\n\n{exc}",
+            )
+            return
+        QMessageBox.information(
+            self,
+            "Enviado a preparar",
+            f"{len(items)} pieza(s) enviadas al tablero de pedidos del satélite.",
+        )
         self._scan_input.setFocus()
 
     def _load_business_info(self) -> tuple[str, str, str]:

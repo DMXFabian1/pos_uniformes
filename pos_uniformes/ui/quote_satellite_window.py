@@ -2011,6 +2011,8 @@ class QuoteSatelliteWindow(QMainWindow):
         _admin_shortcut.activated.connect(self._open_satellite_admin)
         _cola_shortcut = QShortcut(QKeySequence("Ctrl+Shift+Q"), self)
         _cola_shortcut.activated.connect(self._open_dispatcher_panel)
+        _pedidos_shortcut = QShortcut(QKeySequence("Ctrl+Shift+P"), self)
+        _pedidos_shortcut.activated.connect(self._open_pedido_board)
         # Ctrl+K global via event filter (funciona en diálogos modales)
         from PyQt6.QtCore import QEvent, QObject as _QObj
 
@@ -3157,6 +3159,20 @@ class QuoteSatelliteWindow(QMainWindow):
         else:
             panel.raise_()
             panel.activateWindow()
+
+    def _open_pedido_board(self) -> None:
+        """Abre el tablero de pedidos del satélite (Ctrl+Shift+P)."""
+        from pos_uniformes.ui.dialogs.pedido_board_dialog import PedidoBoardDialog
+
+        board = getattr(self, "_pedido_board", None)
+        if board is None:
+            board = PedidoBoardDialog(self)
+            board.finished.connect(lambda _r: setattr(self, "_pedido_board", None))
+            self._pedido_board = board
+            board.show()
+        else:
+            board.raise_()
+            board.activateWindow()
 
     def _open_school_product_link_admin(self) -> None:
         if self.offline_mode:

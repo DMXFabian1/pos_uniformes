@@ -71,10 +71,17 @@ def resumen(trabajo: Trabajo) -> str:
         n = len(hojas) if isinstance(hojas, list) else 0
         return f"{titulo} · {n} hoja(s)"
     if trabajo.tipo == TipoTrabajo.PEDIDO:
+        cliente = str(contenido.get("cliente") or "").strip()
         items = contenido.get("items")
-        if isinstance(items, list):
-            return f"{len(items)} artículo(s)"
-        return "Pedido"
+        n = len(items) if isinstance(items, list) else 0
+        partes = []
+        if cliente:
+            partes.append(cliente)
+        partes.append(f"{n} artículo(s)")
+        nota = str(contenido.get("nota") or "").strip()
+        if nota:
+            partes.append(nota)
+        return " · ".join(partes)
     return ", ".join(str(k) for k in contenido) or "—"
 
 
@@ -91,10 +98,13 @@ class RowView:
     puede_cancelar: bool
     puede_reintentar: bool
     puede_reimprimir: bool
+    puede_tomar: bool
+    puede_marcar_listo: bool
 
 
 def _to_row(trabajo: Trabajo) -> RowView:
     estado = trabajo.estado
+    es_pedido = trabajo.tipo in _ATENDER
     return RowView(
         id=trabajo.id,
         tipo=trabajo.tipo,
@@ -104,9 +114,13 @@ def _to_row(trabajo: Trabajo) -> RowView:
         origen=trabajo.origen,
         detalle=resumen(trabajo),
         error_msg=trabajo.error_msg,
-        puede_cancelar=estado == EstadoTrabajo.PENDIENTE,
+        puede_cancelar=estado in (EstadoTrabajo.PENDIENTE, EstadoTrabajo.EN_PROCESO)
+        if es_pedido
+        else estado == EstadoTrabajo.PENDIENTE,
         puede_reintentar=estado in (EstadoTrabajo.ERROR, EstadoTrabajo.CANCELADO),
-        puede_reimprimir=estado == EstadoTrabajo.HECHO,
+        puede_reimprimir=(not es_pedido) and estado == EstadoTrabajo.HECHO,
+        puede_tomar=es_pedido and estado == EstadoTrabajo.PENDIENTE,
+        puede_marcar_listo=es_pedido and estado == EstadoTrabajo.EN_PROCESO,
     )
 
 
@@ -123,6 +137,27 @@ def listar_para_vista(
         session, estados=estados, tipos=tipos, origenes=origenes, limite=limite
     )
     return [_to_row(t) for t in trabajos]
+
+
+def pedidos_por_columna(
+    session: Session, *, limite_listos: int = 30
+) -> dict[str, list[RowView]]:
+    """Pedidos agrupados para el tablero: pendiente / preparando / listo.
+
+    Los 'listos' se limitan a los más recientes para no crecer sin fin.
+    """
+    pendiente = listar_para_vista(
+        session, tipos=[TipoTrabajo.PEDIDO], estados=[EstadoTrabajo.PENDIENTE]
+    )
+    preparando = listar_para_vista(
+        session, tipos=[TipoTrabajo.PEDIDO], estados=[EstadoTrabajo.EN_PROCESO]
+    )
+    listos = listar_para_vista(
+        session, tipos=[TipoTrabajo.PEDIDO], estados=[EstadoTrabajo.HECHO]
+    )
+    # Los más recientes primero, acotados.
+    listos = list(reversed(listos))[:limite_listos]
+    return {"pendiente": pendiente, "preparando": preparando, "listo": listos}
 
 
 def contar_por_estado(session: Session) -> dict[EstadoTrabajo, int]:

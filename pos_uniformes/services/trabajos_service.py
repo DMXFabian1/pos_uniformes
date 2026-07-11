@@ -143,6 +143,70 @@ def enviar_etiqueta(
     )
 
 
+def enviar_pedido(
+    session: Session,
+    items: Sequence[dict],
+    *,
+    cliente: str = "",
+    nota: str = "",
+    origen: str = "principal",
+    creado_por: str = "SYSTEM",
+) -> Trabajo:
+    """Encola un PEDIDO para que alguien lo prepare en el satélite.
+
+    A diferencia de los otros tipos, un pedido NO se imprime: el despachador lo
+    ignora (no tiene handler) y se atiende a mano desde el tablero
+    (PENDIENTE→EN_PROCESO→HECHO). `items` es una lista de dicts (sku/talla/…).
+    """
+    items = [dict(it) for it in items if it]
+    cliente = (cliente or "").strip()
+    nota = (nota or "").strip()
+    if not items and not cliente and not nota:
+        raise ValueError("Un pedido necesita al menos artículos, cliente o nota.")
+    contenido = {"items": items, "cliente": cliente, "nota": nota}
+    return encolar(
+        session, TipoTrabajo.PEDIDO, contenido, origen=origen, creado_por=creado_por
+    )
+
+
+def datos_de_pedido(trabajo: Trabajo) -> dict:
+    """Devuelve el payload {items, cliente, nota} de un PEDIDO."""
+    if trabajo.tipo != TipoTrabajo.PEDIDO:
+        raise ValueError(f"El trabajo id={trabajo.id} no es un PEDIDO.")
+    contenido = trabajo.contenido or {}
+    return {
+        "items": list(contenido.get("items") or []),
+        "cliente": str(contenido.get("cliente", "")),
+        "nota": str(contenido.get("nota", "")),
+    }
+
+
+def tomar_pedido(session: Session, trabajo_id: int) -> Trabajo:
+    """Marca un pedido como EN_PROCESO (alguien lo está preparando)."""
+    trabajo = _requerir(session, trabajo_id)
+    if trabajo.tipo != TipoTrabajo.PEDIDO:
+        raise ValueError(f"El trabajo id={trabajo_id} no es un PEDIDO.")
+    if trabajo.estado != EstadoTrabajo.PENDIENTE:
+        raise ValueError(
+            f"Solo se puede tomar un pedido en espera; id={trabajo_id} está en {trabajo.estado.value}."
+        )
+    trabajo.estado = EstadoTrabajo.EN_PROCESO
+    session.flush()
+    return trabajo
+
+
+def marcar_pedido_listo(session: Session, trabajo_id: int) -> Trabajo:
+    """Marca un pedido en preparación como HECHO (listo)."""
+    trabajo = _requerir(session, trabajo_id)
+    if trabajo.tipo != TipoTrabajo.PEDIDO:
+        raise ValueError(f"El trabajo id={trabajo_id} no es un PEDIDO.")
+    if trabajo.estado != EstadoTrabajo.EN_PROCESO:
+        raise ValueError(
+            f"Solo se marca listo un pedido en preparación; id={trabajo_id} está en {trabajo.estado.value}."
+        )
+    return _finalizar(session, trabajo_id, EstadoTrabajo.HECHO, error_msg=None)
+
+
 def enviar_conteo(
     session: Session,
     hojas: Sequence[str],
