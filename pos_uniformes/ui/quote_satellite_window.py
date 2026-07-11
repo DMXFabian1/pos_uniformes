@@ -602,6 +602,10 @@ class QuoteSatelliteWindow(QMainWindow):
         # se retomarán después; para restaurarlas basta quitar estas 2 líneas.
         self.nav_quote_button.setVisible(False)
         self.nav_search_button.setVisible(False)
+        # Sección "Catálogo" oculta (decisión de Daniel, 2026-07-11): no se usa
+        # en piso. La página sigue viva; para restaurarla, quitar esta línea y la
+        # del botón "Abrir catalogo" más abajo.
+        self.nav_catalog_button.setVisible(False)
         self.sidebar_total_label = QLabel("$0.00")
         self.sidebar_summary_label = QLabel("Sin piezas en el presupuesto actual.")
         self.sidebar_items_count_label = QLabel("0 lineas | 0 pzas")
@@ -612,6 +616,8 @@ class QuoteSatelliteWindow(QMainWindow):
         # Navega a la página "Presupuesto" (oculta temporalmente) — se oculta junto.
         self.kiosk_open_quote_button.setVisible(False)
         self.kiosk_open_search_button = QPushButton("Abrir catalogo")
+        # Atajo a la sección "Catálogo" (oculta) — se oculta junto.
+        self.kiosk_open_search_button.setVisible(False)
         self.kiosk_budget_total_label = QLabel("$0.00")
         self.kiosk_budget_summary_label = QLabel("Sin piezas en el presupuesto actual.")
         self.catalog_school_combo = QComboBox()
