@@ -219,6 +219,23 @@ def reintentar(session: Session, trabajo_id: int) -> Trabajo:
     return trabajo
 
 
+def reimprimir(session: Session, trabajo_id: int) -> Trabajo:
+    """Encola una copia nueva (PENDIENTE) de un trabajo, sea cual sea su estado.
+
+    A diferencia de `reintentar` (que resetea el mismo trabajo, solo desde
+    ERROR/CANCELADO), esto CLONA: el original queda como está (p.ej. HECHO) y
+    se crea un trabajo nuevo con el mismo contenido. Ideal para "reimprimir".
+    """
+    original = _requerir(session, trabajo_id)
+    return encolar(
+        session,
+        original.tipo,
+        dict(original.contenido or {}),
+        origen=original.origen,
+        creado_por=original.creado_por,
+    )
+
+
 def reordenar(session: Session, orden_ids: Sequence[int]) -> list[Trabajo]:
     """Reasigna `prioridad` a los trabajos dados según su posición en la lista.
 

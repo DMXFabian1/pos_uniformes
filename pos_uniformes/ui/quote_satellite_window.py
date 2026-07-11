@@ -406,7 +406,6 @@ class QuoteSatelliteWindow(QMainWindow):
             self._trabajo_dispatcher = None
 
     def _on_trabajo_event(self, trabajo_id, estado, error) -> None:
-        # Fase 2 mostrará esto en la GUI del despachador; por ahora, log.
         import logging
 
         msg = f"[despachador] trabajo {trabajo_id} -> {estado.value}"
@@ -414,6 +413,14 @@ class QuoteSatelliteWindow(QMainWindow):
             logging.getLogger(__name__).warning("%s: %s", msg, error)
         else:
             logging.getLogger(__name__).info(msg)
+
+        # Si el panel de la cola está abierto, refrescarlo en vivo.
+        panel = getattr(self, "_dispatcher_panel", None)
+        if panel is not None:
+            try:
+                panel.refresh()
+            except Exception:  # noqa: BLE001
+                pass
 
     def _start_background_db_refresh(self) -> None:
         """Lanza un hilo que revisa la DB y trae catálogo fresco si se puede."""
@@ -2002,6 +2009,8 @@ class QuoteSatelliteWindow(QMainWindow):
         _kiosk_ctrl_s.activated.connect(self._handle_quick_search)
         _admin_shortcut = QShortcut(QKeySequence("Ctrl+Shift+A"), self)
         _admin_shortcut.activated.connect(self._open_satellite_admin)
+        _cola_shortcut = QShortcut(QKeySequence("Ctrl+Shift+Q"), self)
+        _cola_shortcut.activated.connect(self._open_dispatcher_panel)
         # Ctrl+K global via event filter (funciona en diálogos modales)
         from PyQt6.QtCore import QEvent, QObject as _QObj
 
@@ -3134,6 +3143,20 @@ class QuoteSatelliteWindow(QMainWindow):
     def _open_satellite_admin(self) -> None:
         from pos_uniformes.ui.dialogs.satellite_admin_dialog import open_satellite_admin_dialog
         open_satellite_admin_dialog(self)
+
+    def _open_dispatcher_panel(self) -> None:
+        """Abre el panel de la cola del satélite (Ctrl+Shift+Q)."""
+        from pos_uniformes.ui.dialogs.dispatcher_panel_dialog import DispatcherPanelDialog
+
+        panel = getattr(self, "_dispatcher_panel", None)
+        if panel is None:
+            panel = DispatcherPanelDialog(self)
+            panel.finished.connect(lambda _r: setattr(self, "_dispatcher_panel", None))
+            self._dispatcher_panel = panel
+            panel.show()
+        else:
+            panel.raise_()
+            panel.activateWindow()
 
     def _open_school_product_link_admin(self) -> None:
         if self.offline_mode:
