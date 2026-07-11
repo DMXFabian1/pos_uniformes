@@ -61,8 +61,12 @@ class ResumenTests(unittest.TestCase):
         self.assertEqual(view.resumen(t), "SKU1 · 3 copia(s) · standard")
 
     def test_resumen_conteo(self) -> None:
-        t = svc.encolar(self.session, TipoTrabajo.CONTEO, {"hojas": 3})
-        self.assertEqual(view.resumen(t), "Hoja de conteo")
+        t = svc.encolar(
+            self.session,
+            TipoTrabajo.CONTEO,
+            {"hojas": ["h1", "h2"], "titulo": "Conteo Primaria"},
+        )
+        self.assertEqual(view.resumen(t), "Conteo Primaria · 2 hoja(s)")
 
     def test_resumen_pedido_cuenta_items(self) -> None:
         t = svc.encolar(self.session, TipoTrabajo.PEDIDO, {"items": [1, 2, 3]})

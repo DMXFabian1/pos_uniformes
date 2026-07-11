@@ -143,6 +143,38 @@ def enviar_etiqueta(
     )
 
 
+def enviar_conteo(
+    session: Session,
+    hojas: Sequence[str],
+    *,
+    titulo: str = "Conteo",
+    origen: str = "principal",
+    creado_por: str = "SYSTEM",
+) -> Trabajo | None:
+    """Encola una orden de conteo (varias hojas de texto) para el satélite.
+
+    Devuelve None si no hay hojas con contenido. Las hojas se imprimen en la
+    misma impresora térmica que los tickets, una por página (autocut entre).
+    """
+    hojas_validas = [h for h in hojas if h and h.strip()]
+    if not hojas_validas:
+        return None
+    contenido = {"hojas": hojas_validas, "titulo": (titulo or "Conteo").strip() or "Conteo"}
+    return encolar(
+        session, TipoTrabajo.CONTEO, contenido, origen=origen, creado_por=creado_por
+    )
+
+
+def hojas_de_conteo(trabajo: Trabajo) -> list[str]:
+    """Devuelve las hojas imprimibles del payload de un trabajo CONTEO."""
+    if trabajo.tipo != TipoTrabajo.CONTEO:
+        raise ValueError(f"El trabajo id={trabajo.id} no es un CONTEO.")
+    hojas = (trabajo.contenido or {}).get("hojas") or []
+    if not hojas:
+        raise ValueError(f"El trabajo CONTEO id={trabajo.id} no trae hojas.")
+    return [str(h) for h in hojas]
+
+
 def datos_de_etiqueta(trabajo: Trabajo) -> tuple[bytes, str, int, str]:
     """Devuelve (imagen_bytes, sku, copies, paper_mode) del payload de una ETIQUETA."""
     if trabajo.tipo != TipoTrabajo.ETIQUETA:

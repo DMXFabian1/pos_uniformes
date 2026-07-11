@@ -66,7 +66,10 @@ def resumen(trabajo: Trabajo) -> str:
             partes.append(str(modo))
         return " · ".join(partes)
     if trabajo.tipo == TipoTrabajo.CONTEO:
-        return "Hoja de conteo"
+        titulo = str(contenido.get("titulo") or "Conteo")
+        hojas = contenido.get("hojas")
+        n = len(hojas) if isinstance(hojas, list) else 0
+        return f"{titulo} · {n} hoja(s)"
     if trabajo.tipo == TipoTrabajo.PEDIDO:
         items = contenido.get("items")
         if isinstance(items, list):

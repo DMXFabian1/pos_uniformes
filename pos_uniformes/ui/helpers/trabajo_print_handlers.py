@@ -42,9 +42,24 @@ def _etiqueta_handler(trabajo: Trabajo) -> None:
     print_label_image_headless(tmp_path, sku=sku, copies=copies, paper_mode=paper_mode)
 
 
+def _conteo_handler(trabajo: Trabajo) -> None:
+    from pos_uniformes.ui.dialogs.printable_text_dialog import print_ticket_text
+
+    hojas = svc.hojas_de_conteo(trabajo)
+    errores = 0
+    for hoja in hojas:
+        if not print_ticket_text(hoja):
+            errores += 1
+    if errores:
+        raise RuntimeError(
+            f"{errores} de {len(hojas)} hoja(s) de conteo no se imprimieron."
+        )
+
+
 def build_handlers() -> dict[TipoTrabajo, Handler]:
     """Handlers disponibles en el satélite. Se amplía por fase."""
     return {
         TipoTrabajo.TICKET: _ticket_handler,
         TipoTrabajo.ETIQUETA: _etiqueta_handler,
+        TipoTrabajo.CONTEO: _conteo_handler,
     }

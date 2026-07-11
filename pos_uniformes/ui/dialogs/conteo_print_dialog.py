@@ -21,5 +21,15 @@ def open_conteo_print_dialog(
     title: str,
     sheets: list[str],
 ) -> None:
-    """Abre diálogo con preview de todas las hojas y botón para imprimir."""
+    """Abre diálogo con preview de todas las hojas y botón para imprimir.
+
+    Si esta máquina está en modo satélite, encola las hojas para el satélite en
+    vez de abrir el diálogo de impresión local.
+    """
+    from pos_uniformes.ui.helpers.conteo_routing_helper import (
+        maybe_route_conteo_to_satellite,
+    )
+
+    if maybe_route_conteo_to_satellite(sheets, titulo=title, parent=parent):
+        return
     open_tickets_print_dialog(parent, title, sheets, unit_label="hoja")
