@@ -525,6 +525,40 @@ def _row(
         self.assertIn("Pantalón Azul", titles)
         self.assertIn("Camisa Escolar", titles)
 
+    def test_school_links_respect_own_nivel_over_school_first_level(self) -> None:
+        """Un general ligado CON su propio nivel cae en ese nivel, no en el primero de la escuela.
+
+        La escuela tiene productos propios en Primaria (primero) y Secundaria.
+        Un general ligado con nivel=Secundaria debe salir solo en Secundaria.
+        """
+        school_links = [
+            {
+                "escuela_id": 1,
+                "escuela_nombre": "Colegio Mexico",
+                "producto_nombre_base": "Falda Gales",
+            }
+        ]
+        snapshot_rows = [
+            _row("SKU-PRI", "Primaria", "Colegio Mexico", "Niño", "Oficial", producto="Camisa Prim", pieza="Camisa"),
+            _row("SKU-SEC", "Secundaria", "Colegio Mexico", "Niño", "Oficial", producto="Camisa Sec", pieza="Camisa"),
+            # General ligado con su PROPIO nivel = Secundaria
+            _row("SKU-GEN", "Secundaria", "General", "Unisex", "Oficial", producto="Falda Gales", pieza="Falda"),
+        ]
+
+        def _titles(level: str) -> list[str]:
+            view = build_guided_catalog_view(
+                snapshot_rows=snapshot_rows,
+                mode_key="school",
+                level_filter=level,
+                school_filter="Colegio Mexico",
+                gender_filter="TODOS",
+                school_links=school_links,
+            )
+            return [card.title for card in view.product_cards]
+
+        self.assertIn("Falda Gales", _titles("Secundaria"))     # aparece en Secundaria
+        self.assertNotIn("Falda Gales", _titles("Primaria"))    # NO en Primaria (antes sí caía aquí)
+
     def test_school_links_nivel_derived_from_all_rows_not_just_official(self) -> None:
         """School with only OTRO-type own products still gets correct nivel for injected products."""
         school_links = [

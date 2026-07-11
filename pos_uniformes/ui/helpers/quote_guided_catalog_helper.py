@@ -1074,7 +1074,14 @@ def _inject_linked_products(
             synthetic = dict(row)
             synthetic["escuela_id"] = escuela_id
             synthetic["escuela_nombre"] = school_name
-            synthetic["nivel_educativo_nombre"] = nivel
+            # Si el producto ligado trae su propio nivel, se respeta; si no, se
+            # hereda el nivel inferido de la escuela (comportamiento anterior).
+            # Esto permite que un general con nivel explícito (p.ej. Secundaria)
+            # caiga en ese nivel aunque la escuela tenga varios niveles.
+            own_nivel = str(row.get("nivel_educativo_nombre") or "").strip()
+            synthetic["nivel_educativo_nombre"] = (
+                own_nivel if own_nivel and own_nivel != "Sin nivel" else nivel
+            )
             synthetic["_linked"] = True
             injected.append(synthetic)
 
