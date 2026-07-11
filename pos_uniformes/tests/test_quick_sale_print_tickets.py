@@ -47,7 +47,7 @@ class QuickSaleTicketDialogTests(unittest.TestCase):
         widget = self._make_widget()
         widget._discount_active = False
         with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")), \
-                patch(f"{_MOD}.open_tickets_print_dialog") as opd:
+                patch(f"{_MOD}.route_tickets") as opd:
             widget._on_ticket_venta()
         opd.assert_called_once()
         tickets = opd.call_args.args[2]
@@ -57,7 +57,7 @@ class QuickSaleTicketDialogTests(unittest.TestCase):
         widget = self._make_widget()
         widget._discount_active = True
         with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")), \
-                patch(f"{_MOD}.open_tickets_print_dialog") as opd:
+                patch(f"{_MOD}.route_tickets") as opd:
             widget._on_ticket_venta()
         # Un solo dialogo, dos tickets -> un solo clic en Imprimir.
         opd.assert_called_once()
@@ -69,7 +69,7 @@ class QuickSaleTicketDialogTests(unittest.TestCase):
         with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")), \
                 patch(f"{_MOD}.QDialog.exec", return_value=QDialog.DialogCode.Accepted), \
                 patch.object(QLineEdit, "text", return_value="Ana Lopez"), \
-                patch(f"{_MOD}.open_tickets_print_dialog") as opd:
+                patch(f"{_MOD}.route_tickets") as opd:
             widget._on_ticket_apartado()
         opd.assert_called_once()
         tickets = opd.call_args.args[2]
@@ -79,7 +79,7 @@ class QuickSaleTicketDialogTests(unittest.TestCase):
         widget = self._make_widget()
         widget._items = []
         with patch(f"{_MOD}.QMessageBox.information") as info, \
-                patch(f"{_MOD}.open_tickets_print_dialog") as opd:
+                patch(f"{_MOD}.route_tickets") as opd:
             widget._on_ticket_venta()
         opd.assert_not_called()
         info.assert_called_once()

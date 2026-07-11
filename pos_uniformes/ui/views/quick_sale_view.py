@@ -42,7 +42,7 @@ from pos_uniformes.services.business_info_cache_service import (
     load_business_info as load_business_info_cache,
     save_business_info as save_business_info_cache,
 )
-from pos_uniformes.ui.dialogs.printable_text_dialog import open_tickets_print_dialog
+from pos_uniformes.ui.helpers.ticket_routing_helper import route_tickets
 from pos_uniformes.ui.helpers.quick_sale_sports_uniform_helper import (
     adapt_cache_row,
     build_promo_playera_item,
@@ -784,7 +784,7 @@ class QuickSaleWidget(QWidget):
         tickets = [self._build_venta_text()]
         if self._discount_active:
             tickets.append(self._build_employee_copy_text())
-        open_tickets_print_dialog(self, "Ticket de venta", tickets)
+        route_tickets(self, "Ticket de venta", tickets)
         self._scan_input.setFocus()
 
     def _on_ticket_apartado(self) -> None:
@@ -876,7 +876,7 @@ class QuickSaleWidget(QWidget):
         tienda_text = self._build_apartado_text(
             nombre, copy_label="COPIA TIENDA", include_terms=False
         )
-        open_tickets_print_dialog(self, "Apartado", [cliente_text, tienda_text])
+        route_tickets(self, "Apartado", [cliente_text, tienda_text])
         self._scan_input.setFocus()
 
     def _load_business_info(self) -> tuple[str, str, str]:

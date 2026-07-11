@@ -369,6 +369,52 @@ class QuoteSatelliteWindow(QMainWindow):
         # Primer chequeo pronto (60 s) para tomar la PC si encendió tarde.
         QTimer.singleShot(60_000, self._start_background_db_refresh)
 
+        # Despachador de trabajos: si esta PC imprime local (es el satélite
+        # físico con las impresoras), drena la cola que le mandan el POS/kiosko.
+        self._trabajo_dispatcher = None
+        QTimer.singleShot(2_000, self._start_trabajo_dispatcher)
+
+    def _start_trabajo_dispatcher(self) -> None:
+        """Arranca el despachador solo si esta máquina está en modo LOCAL.
+
+        En modo LOCAL esta PC tiene las impresoras: además de imprimir sus
+        propios tickets, drena la cola de trabajos enviados por otras máquinas.
+        En modo SATÉLITE (envía a otra PC) no despacha nada.
+        """
+        try:
+            from pos_uniformes.services.print_routing_cache_service import (
+                MODO_LOCAL,
+                load_print_routing,
+            )
+
+            modo, _origen = load_print_routing()
+            if modo != MODO_LOCAL:
+                return
+
+            from pos_uniformes.database.connection import get_session
+            from pos_uniformes.services.trabajo_dispatcher import TrabajoDispatcher
+            from pos_uniformes.ui.helpers.trabajo_print_handlers import build_handlers
+
+            self._trabajo_dispatcher = TrabajoDispatcher(
+                get_session,
+                build_handlers(),
+                schedule=QTimer.singleShot,
+                on_event=self._on_trabajo_event,
+            )
+            self._trabajo_dispatcher.start()
+        except Exception:  # noqa: BLE001 — nunca impedir que la ventana funcione
+            self._trabajo_dispatcher = None
+
+    def _on_trabajo_event(self, trabajo_id, estado, error) -> None:
+        # Fase 2 mostrará esto en la GUI del despachador; por ahora, log.
+        import logging
+
+        msg = f"[despachador] trabajo {trabajo_id} -> {estado.value}"
+        if error:
+            logging.getLogger(__name__).warning("%s: %s", msg, error)
+        else:
+            logging.getLogger(__name__).info(msg)
+
     def _start_background_db_refresh(self) -> None:
         """Lanza un hilo que revisa la DB y trae catálogo fresco si se puede."""
         if getattr(self, "_db_refresh_running", False):

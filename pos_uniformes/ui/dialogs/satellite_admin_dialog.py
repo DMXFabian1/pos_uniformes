@@ -21,6 +21,7 @@ from PyQt6.QtWidgets import (
     QLineEdit,
     QMessageBox,
     QPushButton,
+    QRadioButton,
     QSpinBox,
     QVBoxLayout,
     QWidget,
@@ -505,6 +506,55 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     meili_layout.addWidget(meili_result_label)
     meili_box.setLayout(meili_layout)
 
+    # — Modo de impresión (ajuste por máquina) —
+    from pos_uniformes.services.print_routing_cache_service import (
+        MODO_LOCAL,
+        MODO_SATELITE,
+        load_print_routing,
+        save_print_routing,
+    )
+
+    routing_box = QGroupBox("Modo de impresión de esta PC")
+    routing_layout = QVBoxLayout()
+    routing_help = QLabel(
+        "Local: imprime en las impresoras conectadas a esta PC.\n"
+        "Enviar al satélite: encola los tickets para que los imprima la PC satélite."
+    )
+    routing_help.setWordWrap(True)
+
+    current_modo, current_origen = load_print_routing()
+    radio_local = QRadioButton("Imprimir local (esta PC tiene las impresoras)")
+    radio_sat = QRadioButton("Enviar al satélite")
+    (radio_sat if current_modo == MODO_SATELITE else radio_local).setChecked(True)
+
+    origen_form = QFormLayout()
+    origen_edit = QLineEdit(current_origen)
+    origen_edit.setPlaceholderText("principal / kiosko")
+    origen_form.addRow("Nombre de esta PC (origen):", origen_edit)
+
+    save_routing_btn = QPushButton("Guardar modo de impresión")
+    save_routing_btn.setObjectName("primaryButton")
+
+    def handle_save_routing() -> None:
+        modo = MODO_SATELITE if radio_sat.isChecked() else MODO_LOCAL
+        origen = origen_edit.text().strip() or "principal"
+        try:
+            save_print_routing(modo, origen)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(dialog, "Error", f"No se pudo guardar:\n{exc}")
+            return
+        etiqueta = "enviar al satélite" if modo == MODO_SATELITE else "imprimir local"
+        QMessageBox.information(dialog, "Guardado", f"Esta PC ahora va a: {etiqueta}.")
+
+    save_routing_btn.clicked.connect(handle_save_routing)
+
+    routing_layout.addWidget(routing_help)
+    routing_layout.addWidget(radio_local)
+    routing_layout.addWidget(radio_sat)
+    routing_layout.addLayout(origen_form)
+    routing_layout.addWidget(save_routing_btn)
+    routing_box.setLayout(routing_layout)
+
     # — Cerrar —
     close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
     close_buttons.rejected.connect(dialog.reject)
@@ -529,7 +579,7 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
 
     tabs = QTabWidget()
     tabs.addTab(_make_tab(status_box, config_box), "🔌  Conexión")
-    tabs.addTab(_make_tab(printer_box, label_box), "🖨  Impresoras")
+    tabs.addTab(_make_tab(routing_box, printer_box, label_box), "🖨  Impresoras")
     tabs.addTab(_make_tab(meili_box), "🔍  Búsqueda")
 
     outer = QVBoxLayout()

@@ -78,6 +78,11 @@ def _print_ticket_job(content: str) -> bool:
     return True
 
 
+# Nombre público reutilizable por el despachador del satélite: imprime un ticket
+# de texto plano a la impresora térmica configurada. Devuelve True si arrancó.
+print_ticket_text = _print_ticket_job
+
+
 def _build_ticket_editor(content: str) -> QTextEdit:
     editor = QTextEdit()
     editor.setReadOnly(True)

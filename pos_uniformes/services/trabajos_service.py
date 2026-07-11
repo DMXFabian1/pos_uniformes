@@ -59,6 +59,59 @@ def obtener(session: Session, trabajo_id: int) -> Trabajo | None:
     return session.get(Trabajo, trabajo_id)
 
 
+# ---------------------------------------------------------------------------
+# Emisores de alto nivel (POS / kiosko)
+#
+# Encapsulan el esquema de `contenido` de cada tipo, para que el emisor y el
+# despachador no lo dupliquen. La clave de un ticket es siempre "texto".
+# ---------------------------------------------------------------------------
+
+def enviar_ticket(
+    session: Session,
+    texto: str,
+    *,
+    origen: str = "principal",
+    creado_por: str = "SYSTEM",
+) -> Trabajo:
+    """Encola un ticket (texto ya renderizado a 80mm) para imprimir en el satélite."""
+    if not texto or not texto.strip():
+        raise ValueError("El texto del ticket está vacío.")
+    return encolar(
+        session,
+        TipoTrabajo.TICKET,
+        {"texto": texto},
+        origen=origen,
+        creado_por=creado_por,
+    )
+
+
+def enviar_tickets(
+    session: Session,
+    textos: Sequence[str],
+    *,
+    origen: str = "principal",
+    creado_por: str = "SYSTEM",
+) -> list[Trabajo]:
+    """Encola varios tickets de una venta/apartado en orden. Ignora los vacíos."""
+    creados: list[Trabajo] = []
+    for texto in textos:
+        if texto and texto.strip():
+            creados.append(
+                enviar_ticket(session, texto, origen=origen, creado_por=creado_por)
+            )
+    return creados
+
+
+def texto_de_ticket(trabajo: Trabajo) -> str:
+    """Extrae el texto imprimible del payload de un trabajo TICKET."""
+    if trabajo.tipo != TipoTrabajo.TICKET:
+        raise ValueError(f"El trabajo id={trabajo.id} no es un TICKET.")
+    texto = (trabajo.contenido or {}).get("texto", "")
+    if not texto:
+        raise ValueError(f"El trabajo TICKET id={trabajo.id} no trae texto.")
+    return texto
+
+
 def listar(
     session: Session,
     *,
