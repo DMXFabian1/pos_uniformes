@@ -1768,6 +1768,10 @@ class Trabajo(Base):
     error_msg: Mapped[str | None] = mapped_column(Text())
     creado_por: Mapped[str] = mapped_column(String(60), default="SYSTEM", nullable=False)
     procesado_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Reintentos automáticos: cuántas veces se intentó y desde cuándo vuelve a
+    # estar disponible (backoff). disponible_en NULL = disponible ya.
+    intentos: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    disponible_en: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

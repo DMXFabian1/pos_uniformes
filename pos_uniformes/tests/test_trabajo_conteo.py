@@ -101,7 +101,8 @@ class ConteoHandlerTests(unittest.TestCase):
             "pos_uniformes.ui.dialogs.printable_text_dialog.print_ticket_text",
             side_effect=flaky,
         ):
-            disp = TrabajoDispatcher(self.factory, build_handlers())
+            # max_intentos=1 => el fallo va directo a ERROR (sin reintento).
+            disp = TrabajoDispatcher(self.factory, build_handlers(), max_intentos=1)
             resultado = disp.poll_once()
 
         self.assertEqual(resultado, EstadoTrabajo.ERROR)

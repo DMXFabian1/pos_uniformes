@@ -17,14 +17,20 @@ from __future__ import annotations
 
 import base64
 from collections.abc import Iterable, Sequence
+from datetime import datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from pos_uniformes.database.models import EstadoTrabajo, TipoTrabajo, Trabajo
 
 # Estados desde los que tiene sentido reintentar un trabajo.
 _REINTENTABLES = {EstadoTrabajo.ERROR, EstadoTrabajo.CANCELADO}
+
+
+def _disponible_ahora():
+    """Cláusula: el trabajo está disponible ya (sin backoff pendiente)."""
+    return or_(Trabajo.disponible_en.is_(None), Trabajo.disponible_en <= func.now())
 
 
 def encolar(
@@ -288,10 +294,11 @@ def siguiente_pendiente(
     *,
     tipos: Iterable[TipoTrabajo] | None = None,
 ) -> Trabajo | None:
-    """Devuelve el siguiente trabajo PENDIENTE sin cambiar su estado (peek)."""
+    """Devuelve el siguiente trabajo PENDIENTE disponible sin cambiar su estado (peek)."""
     stmt = (
         select(Trabajo)
         .where(Trabajo.estado == EstadoTrabajo.PENDIENTE)
+        .where(_disponible_ahora())
         .order_by(Trabajo.prioridad, Trabajo.created_at, Trabajo.id)
         .limit(1)
     )
@@ -314,6 +321,7 @@ def reclamar_siguiente(
     stmt = (
         select(Trabajo)
         .where(Trabajo.estado == EstadoTrabajo.PENDIENTE)
+        .where(_disponible_ahora())
         .order_by(Trabajo.prioridad, Trabajo.created_at, Trabajo.id)
         .limit(1)
         .with_for_update(skip_locked=True)
@@ -336,6 +344,62 @@ def marcar_hecho(session: Session, trabajo_id: int) -> Trabajo:
 def marcar_error(session: Session, trabajo_id: int, mensaje: str) -> Trabajo:
     """Marca el trabajo como ERROR guardando el mensaje y sella procesado_en."""
     return _finalizar(session, trabajo_id, EstadoTrabajo.ERROR, error_msg=mensaje)
+
+
+def registrar_fallo(
+    session: Session,
+    trabajo_id: int,
+    mensaje: str,
+    *,
+    max_intentos: int = 3,
+    disponible_en: datetime | None = None,
+) -> Trabajo:
+    """Registra un intento fallido: reprograma (backoff) o marca ERROR definitivo.
+
+    Suma 1 a `intentos`. Si aún no se alcanzó `max_intentos`, vuelve a PENDIENTE
+    con `disponible_en` en el futuro (backoff) para reintentar más tarde. Al
+    alcanzar el tope, queda en ERROR. En ambos casos guarda el mensaje.
+    """
+    trabajo = _requerir(session, trabajo_id)
+    trabajo.intentos = (trabajo.intentos or 0) + 1
+    trabajo.error_msg = mensaje
+    if trabajo.intentos >= max_intentos:
+        trabajo.estado = EstadoTrabajo.ERROR
+        trabajo.procesado_en = func.now()
+        trabajo.disponible_en = None
+    else:
+        trabajo.estado = EstadoTrabajo.PENDIENTE
+        trabajo.procesado_en = None
+        trabajo.disponible_en = disponible_en
+    session.flush()
+    return trabajo
+
+
+def limpiar_trabajos_viejos(
+    session: Session,
+    *,
+    dias: int = 7,
+    ahora: datetime | None = None,
+    estados: Iterable[EstadoTrabajo] = (EstadoTrabajo.HECHO, EstadoTrabajo.CANCELADO),
+) -> int:
+    """Borra trabajos terminados (HECHO/CANCELADO) más viejos que `dias`.
+
+    Devuelve cuántos se borraron. `ahora` se puede inyectar para tests.
+    """
+    from datetime import timedelta, timezone
+
+    referencia = ahora or datetime.now(timezone.utc)
+    corte = referencia - timedelta(days=dias)
+    viejos = session.scalars(
+        select(Trabajo).where(
+            Trabajo.estado.in_(list(estados)),
+            Trabajo.created_at < corte,
+        )
+    ).all()
+    for trabajo in viejos:
+        session.delete(trabajo)
+    session.flush()
+    return len(viejos)
 
 
 def cancelar(session: Session, trabajo_id: int) -> Trabajo:

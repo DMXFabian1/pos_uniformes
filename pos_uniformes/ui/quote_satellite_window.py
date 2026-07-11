@@ -404,6 +404,40 @@ class QuoteSatelliteWindow(QMainWindow):
             self._trabajo_dispatcher.start()
         except Exception:  # noqa: BLE001 — nunca impedir que la ventana funcione
             self._trabajo_dispatcher = None
+            return
+
+        # LISTEN/NOTIFY: despacha al instante cuando llega un trabajo. Si no se
+        # puede (driver/conexión), el polling del despachador sigue de respaldo.
+        try:
+            from pos_uniformes.ui.helpers.trabajo_listener import TrabajoNotifyListener
+
+            self._trabajo_listener = TrabajoNotifyListener(self)
+            self._trabajo_listener.notificado.connect(self._trabajo_dispatcher.drain)
+            self._trabajo_listener.start()
+        except Exception:  # noqa: BLE001
+            self._trabajo_listener = None
+
+        # Limpieza periódica de trabajos terminados viejos.
+        self._trabajo_cleanup_timer = QTimer(self)
+        self._trabajo_cleanup_timer.setInterval(6 * 60 * 60 * 1000)  # cada 6h
+        self._trabajo_cleanup_timer.timeout.connect(self._limpiar_trabajos_viejos)
+        self._trabajo_cleanup_timer.start()
+        QTimer.singleShot(300_000, self._limpiar_trabajos_viejos)  # una vez a los 5 min
+
+    def _limpiar_trabajos_viejos(self) -> None:
+        try:
+            from pos_uniformes.database.connection import get_session
+            from pos_uniformes.services import trabajos_service as trabajos_svc
+
+            with get_session() as session:
+                n = trabajos_svc.limpiar_trabajos_viejos(session, dias=7)
+                session.commit()
+            if n:
+                import logging
+
+                logging.getLogger(__name__).info("Limpieza: %s trabajo(s) viejos borrados", n)
+        except Exception:  # noqa: BLE001 — la limpieza nunca debe molestar
+            pass
 
     def _on_trabajo_event(self, trabajo_id, estado, error) -> None:
         import logging
@@ -421,6 +455,16 @@ class QuoteSatelliteWindow(QMainWindow):
                 panel.refresh()
             except Exception:  # noqa: BLE001
                 pass
+
+    def closeEvent(self, event) -> None:  # noqa: N802 (API de Qt)
+        listener = getattr(self, "_trabajo_listener", None)
+        if listener is not None:
+            try:
+                listener.stop()
+                listener.wait(1000)
+            except Exception:  # noqa: BLE001
+                pass
+        super().closeEvent(event)
 
     def _start_background_db_refresh(self) -> None:
         """Lanza un hilo que revisa la DB y trae catálogo fresco si se puede."""

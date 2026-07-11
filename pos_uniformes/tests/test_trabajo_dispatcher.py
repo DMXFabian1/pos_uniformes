@@ -64,13 +64,14 @@ class DispatcherTests(unittest.TestCase):
     def _ticket_handler(self, trabajo) -> None:
         self.impresos.append(svc.texto_de_ticket(trabajo))
 
-    def _dispatcher(self, handlers=None) -> TrabajoDispatcher:
+    def _dispatcher(self, handlers=None, **kw) -> TrabajoDispatcher:
         if handlers is None:
             handlers = {TipoTrabajo.TICKET: self._ticket_handler}
         return TrabajoDispatcher(
             self.session_factory,
             handlers,
             on_event=lambda tid, estado, err: self.eventos.append((tid, estado, err)),
+            **kw,
         )
 
     def _seed(self, texto: str) -> int:
@@ -112,7 +113,8 @@ class DispatcherTests(unittest.TestCase):
         def handler(trabajo):
             raise RuntimeError("impresora sin papel")
 
-        disp = self._dispatcher({TipoTrabajo.TICKET: handler})
+        # max_intentos=1 => un solo fallo va directo a ERROR (sin reintento).
+        disp = self._dispatcher({TipoTrabajo.TICKET: handler}, max_intentos=1)
         resultado = disp.poll_once()
         self.assertEqual(resultado, EstadoTrabajo.ERROR)
         s = self.session_factory()
@@ -128,7 +130,9 @@ class DispatcherTests(unittest.TestCase):
         s.commit()
         tid = t.id
         s.close()
-        disp = TrabajoDispatcher(self.session_factory, {}, tipos=[TipoTrabajo.TICKET])
+        disp = TrabajoDispatcher(
+            self.session_factory, {}, tipos=[TipoTrabajo.TICKET], max_intentos=1
+        )
         self.assertEqual(disp.poll_once(), EstadoTrabajo.ERROR)
         s = self.session_factory()
         self.assertEqual(svc.obtener(s, tid).estado, EstadoTrabajo.ERROR)
