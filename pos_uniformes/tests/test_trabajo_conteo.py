@@ -74,12 +74,16 @@ class ConteoHandlerTests(unittest.TestCase):
         with patch(
             "pos_uniformes.ui.dialogs.printable_text_dialog.print_ticket_text",
             side_effect=lambda hoja: impresas.append(hoja) or True,
-        ):
+        ), patch(
+            "pos_uniformes.ui.helpers.trabajo_print_handlers._qt_sleep"
+        ) as sleep_mock:
             disp = TrabajoDispatcher(self.factory, build_handlers())
             resultado = disp.poll_once()
 
         self.assertEqual(resultado, EstadoTrabajo.HECHO)
         self.assertEqual(impresas, ["A", "B", "C"])
+        # Pausó entre las 3 hojas (2 pausas), no después de la última.
+        self.assertEqual(sleep_mock.call_count, 2)
         s = self.factory()
         self.assertEqual(svc.obtener(s, tid).estado, EstadoTrabajo.HECHO)
         s.close()
@@ -100,7 +104,7 @@ class ConteoHandlerTests(unittest.TestCase):
         with patch(
             "pos_uniformes.ui.dialogs.printable_text_dialog.print_ticket_text",
             side_effect=flaky,
-        ):
+        ), patch("pos_uniformes.ui.helpers.trabajo_print_handlers._qt_sleep"):
             # max_intentos=1 => el fallo va directo a ERROR (sin reintento).
             disp = TrabajoDispatcher(self.factory, build_handlers(), max_intentos=1)
             resultado = disp.poll_once()
@@ -111,6 +115,42 @@ class ConteoHandlerTests(unittest.TestCase):
         self.assertEqual(t.estado, EstadoTrabajo.ERROR)
         self.assertIn("1 de 2", t.error_msg)
         s.close()
+
+
+class PacingTests(unittest.TestCase):
+    """imprimir_hojas_paced: pausa entre hojas como el apartado, sin Qt."""
+
+    def test_pausa_entre_hojas_no_despues_de_la_ultima(self) -> None:
+        from pos_uniformes.ui.helpers.trabajo_print_handlers import imprimir_hojas_paced
+
+        impresas, pausas = [], []
+        errores = imprimir_hojas_paced(
+            ["A", "B", "C"],
+            print_fn=lambda h: impresas.append(h) or True,
+            sleep_fn=lambda s: pausas.append(s),
+        )
+        self.assertEqual(errores, 0)
+        self.assertEqual(impresas, ["A", "B", "C"])
+        self.assertEqual(len(pausas), 2)  # 3 hojas -> 2 pausas
+
+    def test_una_hoja_no_pausa(self) -> None:
+        from pos_uniformes.ui.helpers.trabajo_print_handlers import imprimir_hojas_paced
+
+        pausas = []
+        imprimir_hojas_paced(
+            ["sola"], print_fn=lambda h: True, sleep_fn=lambda s: pausas.append(s)
+        )
+        self.assertEqual(pausas, [])
+
+    def test_cuenta_errores(self) -> None:
+        from pos_uniformes.ui.helpers.trabajo_print_handlers import imprimir_hojas_paced
+
+        errores = imprimir_hojas_paced(
+            ["A", "B", "C"],
+            print_fn=lambda h: h != "B",  # B falla
+            sleep_fn=lambda s: None,
+        )
+        self.assertEqual(errores, 1)
 
 
 class ConteoRoutingTests(unittest.TestCase):

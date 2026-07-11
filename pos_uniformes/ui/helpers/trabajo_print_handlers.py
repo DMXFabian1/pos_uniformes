@@ -10,11 +10,50 @@ Fase 1: solo TICKET. Etiquetas y conteo se agregan en fases posteriores.
 
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from pos_uniformes.database.models import TipoTrabajo, Trabajo
 from pos_uniformes.services import trabajos_service as svc
 from pos_uniformes.services.trabajo_dispatcher import Handler
+
+# Misma pausa que TicketPrintQueue usa entre tickets (apartado): le da tiempo al
+# spooler/autocutter de terminar una hoja antes de mandar la siguiente. Sin esto,
+# imprimir las hojas en un bucle apretado hacía que se cortaran antes de tiempo.
+DELAY_ENTRE_HOJAS_S = 1.5
+
+
+def _qt_sleep(seconds: float) -> None:
+    """Espera `seconds` sin congelar la UI (event loop anidado)."""
+    from PyQt6.QtCore import QEventLoop, QTimer
+
+    loop = QEventLoop()
+    QTimer.singleShot(int(seconds * 1000), loop.quit)
+    loop.exec()
+
+
+def imprimir_hojas_paced(
+    hojas: Sequence[str],
+    *,
+    print_fn: Callable[[str], bool],
+    sleep_fn: Callable[[float], None] | None = None,
+    delay_s: float = DELAY_ENTRE_HOJAS_S,
+) -> int:
+    """Imprime cada hoja como job separado con una pausa entre ellas.
+
+    Devuelve cuántas fallaron. La pausa va ENTRE hojas (no después de la última),
+    igual que TicketPrintQueue. `print_fn`/`sleep_fn` se inyectan para testear sin Qt.
+    """
+    if sleep_fn is None:
+        sleep_fn = _qt_sleep
+    errores = 0
+    n = len(hojas)
+    for i, hoja in enumerate(hojas):
+        if not print_fn(hoja):
+            errores += 1
+        if i < n - 1:
+            sleep_fn(delay_s)
+    return errores
 
 
 def _ticket_handler(trabajo: Trabajo) -> None:
@@ -46,10 +85,7 @@ def _conteo_handler(trabajo: Trabajo) -> None:
     from pos_uniformes.ui.dialogs.printable_text_dialog import print_ticket_text
 
     hojas = svc.hojas_de_conteo(trabajo)
-    errores = 0
-    for hoja in hojas:
-        if not print_ticket_text(hoja):
-            errores += 1
+    errores = imprimir_hojas_paced(hojas, print_fn=print_ticket_text)
     if errores:
         raise RuntimeError(
             f"{errores} de {len(hojas)} hoja(s) de conteo no se imprimieron."
