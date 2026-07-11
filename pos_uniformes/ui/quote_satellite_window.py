@@ -6163,6 +6163,15 @@ def _build_cart_ticket_text(
     # — Total —
     lines.append(tk_dbl())
     lines.append(tk_row("PRESUPUESTO ESTIMADO:", f"${tk_fmt(total)}"))
+    # Mínimo para apartar (25% con la regla de redondeo de caja) — mismo dato
+    # que muestra el ticket de apartado de Venta Rápida.
+    from pos_uniformes.services.sale_rounding_service import resolve_sale_rounding
+    _LAYAWAY_MIN_PCT = Decimal("25")
+    minimo_apartado = resolve_sale_rounding(
+        (Decimal(str(total)) * _LAYAWAY_MIN_PCT / Decimal("100")).quantize(Decimal("0.01"))
+    ).collected_total
+    lines.append(tk_mid())
+    lines.append(tk_row(f"Apartado minimo ({_LAYAWAY_MIN_PCT:.0f}%):", f"${tk_fmt(minimo_apartado)}"))
     lines.append(tk_bot())
 
     # — Observaciones y términos —
