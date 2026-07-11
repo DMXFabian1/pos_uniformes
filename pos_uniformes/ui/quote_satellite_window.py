@@ -292,6 +292,22 @@ class GuidedFlowState:
         self.sku = ""
 
 
+# Escuelas por página en el paso guiado "Elige escuela".
+_GUIDED_SCHOOLS_PER_PAGE = 9
+
+
+def _paginate(options: list, page: int, per_page: int) -> tuple[list, int, int]:
+    """Devuelve (opciones_de_la_pagina, pagina_ajustada, total_paginas).
+
+    `page` se acota a [0, total_paginas-1]. Con lista vacía -> ([], 0, 1).
+    """
+    total = len(options)
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    page = max(0, min(page, total_pages - 1))
+    start = page * per_page
+    return options[start : start + per_page], page, total_pages
+
+
 class QuoteSatelliteWindow(QMainWindow):
     # Emite el resultado del watchdog de reconexión desde el hilo de fondo al
     # hilo de UI: (rows | None, school_links | None). None = DB no disponible.
@@ -662,6 +678,10 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_mode_buttons: dict[str, QPushButton] = {}
         self.guided_level_buttons: dict[str, QPushButton] = {}
         self.guided_school_buttons: dict[str, QPushButton] = {}
+        # Paginación del paso "Elige escuela".
+        self._guided_school_all_options: list = []
+        self._guided_school_option_keys: list | None = None
+        self._guided_school_page: int = 0
         self.guided_gender_buttons: dict[str, QPushButton] = {}
         self.guided_profile_buttons: dict[str, QPushButton] = {}
         self.guided_bucket_buttons: dict[str, QPushButton] = {}
@@ -1256,6 +1276,31 @@ class QuoteSatelliteWindow(QMainWindow):
         school_layout.addWidget(school_title)
         school_layout.addWidget(school_hint)
         school_layout.addWidget(school_scroll, 1)
+
+        # Paginación de escuelas: avanzar / regresar de página.
+        self.guided_school_prev_button = QPushButton("◀ Anterior")
+        self.guided_school_prev_button.setObjectName("secondaryButton")
+        self.guided_school_prev_button.setMinimumHeight(44)
+        self.guided_school_next_button = QPushButton("Siguiente ▶")
+        self.guided_school_next_button.setObjectName("secondaryButton")
+        self.guided_school_next_button.setMinimumHeight(44)
+        self.guided_school_page_label = QLabel("Página 1 / 1")
+        self.guided_school_page_label.setObjectName("guidedStepHint")
+        self.guided_school_prev_button.clicked.connect(lambda: self._handle_guided_school_page(-1))
+        self.guided_school_next_button.clicked.connect(lambda: self._handle_guided_school_page(1))
+        self.guided_school_pager = QWidget()
+        _school_pager_layout = QHBoxLayout()
+        _school_pager_layout.setContentsMargins(0, 0, 0, 0)
+        _school_pager_layout.setSpacing(8)
+        _school_pager_layout.addWidget(self.guided_school_prev_button)
+        _school_pager_layout.addStretch()
+        _school_pager_layout.addWidget(self.guided_school_page_label)
+        _school_pager_layout.addStretch()
+        _school_pager_layout.addWidget(self.guided_school_next_button)
+        self.guided_school_pager.setLayout(_school_pager_layout)
+        self.guided_school_pager.setVisible(False)
+        school_layout.addWidget(self.guided_school_pager)
+
         self.guided_school_section.setLayout(school_layout)
         steps_layout.addWidget(self.guided_school_section, 1)
 
@@ -1369,15 +1414,10 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_products_section.setLayout(products_section_layout)
         steps_layout.addWidget(self.guided_products_section, 1)
 
-        # Footer
-        guided_footer_actions = QHBoxLayout()
-        guided_footer_actions.setSpacing(8)
-        guided_footer_actions.addStretch()
-        self.guided_reset_button.setObjectName("ghostButton")
-        self.guided_basics_button.setObjectName("secondaryButton")
-        guided_footer_actions.addWidget(self.guided_reset_button)
-        guided_footer_actions.addWidget(self.guided_basics_button)
-        steps_layout.addLayout(guided_footer_actions)
+        # Footer removido (2026-07-11): "Limpiar pasos" y "Piezas generales" ya
+        # no se usan — la ruta se elige en el paso 1 y la navegación de escuelas
+        # ahora es por páginas (paso 3). Los botones siguen creados por si se
+        # retoman, pero no se muestran.
 
         steps_box.setLayout(steps_layout)
         return steps_box
@@ -2981,12 +3021,36 @@ class QuoteSatelliteWindow(QMainWindow):
         )
 
     def _rebuild_guided_school_buttons(self, options) -> None:
+        options = list(options)
+        keys = [getattr(o, "key", None) for o in options]
+        # Al cambiar la lista de escuelas (p.ej. otro nivel), volver a la página 1.
+        if keys != self._guided_school_option_keys:
+            self._guided_school_page = 0
+            self._guided_school_option_keys = keys
+        self._guided_school_all_options = options
+        self._render_guided_school_page()
+
+    def _render_guided_school_page(self) -> None:
+        """Dibuja solo la página actual de escuelas y actualiza el paginador."""
+        page_options, page, total_pages = _paginate(
+            self._guided_school_all_options, self._guided_school_page, _GUIDED_SCHOOLS_PER_PAGE
+        )
+        self._guided_school_page = page
         self.guided_school_buttons = self._rebuild_guided_option_grid(
             layout=self.guided_school_grid,
-            options=options,
+            options=page_options,
             selected_key=self._gfs.school,
             click_handler=self._handle_guided_school_selected,
         )
+        self.guided_school_page_label.setText(f"Página {page + 1} / {total_pages}")
+        self.guided_school_prev_button.setEnabled(page > 0)
+        self.guided_school_next_button.setEnabled(page < total_pages - 1)
+        # El paginador solo aparece si hay más de una página.
+        self.guided_school_pager.setVisible(total_pages > 1)
+
+    def _handle_guided_school_page(self, delta: int) -> None:
+        self._guided_school_page += delta
+        self._render_guided_school_page()
 
     def _rebuild_guided_hrow(self, layout: QHBoxLayout, options, selected_key: str, click_handler) -> dict:
         _clear_layout(layout)
