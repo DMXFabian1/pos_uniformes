@@ -699,6 +699,80 @@ def _build_print_routing_box(dialog: QDialog) -> QGroupBox:
     return box
 
 
+def _build_label_printers_box(dialog: QDialog) -> QGroupBox:
+    """Config por máquina de la impresora de cada TIPO de etiqueta.
+
+    Normal / Split / Continua salen a una impresora (rollo continuo) y Label
+    (troquelada DK-1221) a otra, para no cambiar el rollo entre trabajos. Es la
+    misma config local que usa el satélite (Ctrl+Shift+A); acá se expone también
+    en el POS. Tiene prioridad sobre la "Impresora etiquetas" única de la BD.
+    """
+    from pos_uniformes.services.label_printer_settings_cache_service import (
+        load_label_printer_settings,
+        save_label_printer_settings,
+    )
+
+    box = QGroupBox("Impresoras de etiquetas por tipo")
+    box.setObjectName("infoCard")
+    box_layout = QVBoxLayout()
+    box_layout.setSpacing(8)
+
+    hint = QLabel(
+        "Normal, Split y Continua salen a la primera (rollo continuo); "
+        "Label (rollo troquelado DK-1221) a la segunda. Dejar en "
+        "«Autodetectar» para usar la Brother que se encuentre."
+    )
+    hint.setWordWrap(True)
+    hint.setObjectName("subtleLine")
+
+    cached_normal, cached_label = load_label_printer_settings()
+
+    def _build_combo(selected: str) -> QComboBox:
+        combo = QComboBox()
+        combo.addItem("Autodetectar (Brother)", "")
+        for p in QPrinterInfo.availablePrinters():
+            combo.addItem(p.printerName(), p.printerName())
+        found = combo.findData(selected)
+        combo.setCurrentIndex(found if found >= 0 else 0)
+        return combo
+
+    normal_combo = _build_combo(cached_normal)
+    label_combo = _build_combo(cached_label)
+
+    form = QFormLayout()
+    form.setSpacing(8)
+    form.addRow("Normal / Split / Continua:", normal_combo)
+    form.addRow("Label (troquelada):", label_combo)
+
+    save_btn = QPushButton("Guardar impresoras de etiquetas")
+    save_btn.setObjectName("toolbarPrimaryButton")
+
+    def _handle_save() -> None:
+        try:
+            save_label_printer_settings(
+                str(normal_combo.currentData() or ""),
+                str(label_combo.currentData() or ""),
+            )
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(dialog, "Error", f"No se pudo guardar:\n{exc}")
+            return
+        QMessageBox.information(
+            dialog,
+            "Guardado",
+            "Impresoras de etiquetas guardadas.\n"
+            f"Normal/Split/Continua: {normal_combo.currentText()}\n"
+            f"Label: {label_combo.currentText()}",
+        )
+
+    save_btn.clicked.connect(_handle_save)
+
+    box_layout.addWidget(hint)
+    box_layout.addLayout(form)
+    box_layout.addWidget(save_btn, 0, Qt.AlignmentFlag.AlignLeft)
+    box.setLayout(box_layout)
+    return box
+
+
 def build_business_settings_dialog(window: "MainWindow") -> QDialog:
     dialog, layout = _create_settings_dialog(
         window,
@@ -804,6 +878,7 @@ def build_business_settings_dialog(window: "MainWindow") -> QDialog:
 
     # --- Modo de impresion (ajuste por maquina) ---
     routing_box = _build_print_routing_box(dialog)
+    label_printers_box = _build_label_printers_box(dialog)
 
     # --- Grid layout ---
     top_row = QHBoxLayout()
@@ -822,6 +897,7 @@ def build_business_settings_dialog(window: "MainWindow") -> QDialog:
     content_layout.addLayout(top_row)
     content_layout.addLayout(bottom_row)
     content_layout.addWidget(routing_box)
+    content_layout.addWidget(label_printers_box)
     content_layout.addStretch()
     content_widget.setLayout(content_layout)
 

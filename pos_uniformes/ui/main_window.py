@@ -11676,11 +11676,23 @@ class MainWindow(QMainWindow):
         image = QImage(str(image_path))
         if image.isNull():
             raise ValueError(f"No se pudo abrir la imagen de etiqueta:\n{image_path}")
-        try:
-            with get_session() as session:
-                preferred_printer = load_business_print_settings_snapshot(session).preferred_printer
-        except Exception:
-            preferred_printer = ""
+        # Impresora según el TIPO de etiqueta (config local por máquina), igual
+        # que el satélite: Normal/Split/Continua → una; Label (dk1221) → otra.
+        from pos_uniformes.services.label_printer_settings_cache_service import (
+            load_label_printer_settings,
+            resolve_label_printer_for_mode,
+        )
+        normal_printer, label_printer = load_label_printer_settings()
+        preferred_printer = resolve_label_printer_for_mode(
+            paper_mode, normal_printer=normal_printer, label_printer=label_printer
+        )
+        # Fallback (sin config local): impresora preferida de la BD.
+        if not preferred_printer:
+            try:
+                with get_session() as session:
+                    preferred_printer = load_business_print_settings_snapshot(session).preferred_printer
+            except Exception:
+                preferred_printer = ""
 
         if sys.platform.startswith("win"):
             # DK-1221 die-cut: brother_ql genera raster + spooler RAW.
