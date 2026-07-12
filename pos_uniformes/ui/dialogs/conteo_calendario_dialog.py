@@ -61,16 +61,34 @@ class ConteoCalendarioDialog(QDialog):
     # ── UI ────────────────────────────────────────────────────────────────────
 
     def _build_ui(self) -> None:
+        self.setStyleSheet(
+            "QDialog { background: #faf6f0; }"
+            "#calTitulo { color: #7b2d14; font-size: 19px; font-weight: 800; background: transparent; }"
+            "#calHint { color: #8a7a6a; background: transparent; }"
+            "#calResumen { color: #5a4a3f; font-weight: 800; background: transparent; }"
+            "QTableWidget { background: #fffdf8; border: 1px solid #e0d5c5; border-radius: 10px;"
+            "  gridline-color: #efe6d8; alternate-background-color: #f8f0e6; }"
+            "QTableWidget::item { padding: 6px 8px; color: #5a4a3f; }"
+            "QHeaderView::section { background: #f3e7d6; color: #7b2d14; font-weight: 800;"
+            "  border: none; padding: 8px; }"
+        )
         layout = QVBoxLayout()
+        layout.setContentsMargins(16, 14, 16, 12)
+        layout.setSpacing(8)
+
+        titulo = QLabel("Calendario de conteos")
+        titulo.setObjectName("calTitulo")
+        layout.addWidget(titulo)
 
         hint = QLabel(
-            "Frecuencia de conteo por escuela. En rojo, las que ya toca contar. "
-            "Ajusta los días y pulsa «Guardar frecuencias»."
+            "Frecuencia de conteo por escuela. Ajusta los días y pulsa «Guardar frecuencias»."
         )
+        hint.setObjectName("calHint")
         hint.setWordWrap(True)
         layout.addWidget(hint)
 
         self._resumen_label = QLabel("")
+        self._resumen_label.setObjectName("calResumen")
         layout.addWidget(self._resumen_label)
 
         self._table = QTableWidget()
@@ -79,11 +97,16 @@ class ConteoCalendarioDialog(QDialog):
             ["Escuela", "Días vigencia", "Último conteo", "Próxima", "Estado"]
         )
         self._table.verticalHeader().setVisible(False)
+        self._table.setShowGrid(False)
+        self._table.setAlternatingRowColors(True)
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._table.verticalHeader().setDefaultSectionSize(40)
         header = self._table.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        for col in range(1, 5):
+        for col in (1, 2, 3):
             header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.Fixed)
+        self._table.setColumnWidth(4, 172)
         layout.addWidget(self._table, 1)
 
         actions = QHBoxLayout()
@@ -138,9 +161,7 @@ class ConteoCalendarioDialog(QDialog):
             proxima = e.proxima_fecha.isoformat() if e.proxima_fecha else "—"
             self._table.setItem(fila, 3, QTableWidgetItem(proxima))
 
-            estado_item = QTableWidgetItem(self._estado_texto(e))
-            estado_item.setForeground(QBrush(self._estado_color(e)))
-            self._table.setItem(fila, 4, estado_item)
+            self._table.setCellWidget(fila, 4, self._estado_pill(e))
 
         self._resumen_label.setText(
             f"{len(calendario)} escuelas · {vencidas} requieren conteo"
@@ -161,13 +182,23 @@ class ConteoCalendarioDialog(QDialog):
             return f"Vencida (hace {abs(e.dias_para_vencer)}d)"
         return f"Al día ({e.dias_para_vencer}d)"
 
-    @staticmethod
-    def _estado_color(e) -> QColor:
+    def _estado_pill(self, e) -> QWidget:
         if e.nunca_contada or e.vencida:
-            return _ROJO
-        if e.dias_para_vencer is not None and e.dias_para_vencer <= 7:
-            return _AMBAR
-        return _VERDE
+            bg, fg = "#fbe3e0", "#b0341f"
+        elif e.dias_para_vencer is not None and e.dias_para_vencer <= 7:
+            bg, fg = "#fbeecb", "#a06a10"
+        else:
+            bg, fg = "#e3f0e0", "#2e7d32"
+        lbl = QLabel(self._estado_texto(e))
+        lbl.setStyleSheet(
+            f"background: {bg}; color: {fg}; border-radius: 9px; padding: 3px 10px; font-weight: 700;"
+        )
+        cont = QWidget()
+        h = QHBoxLayout(cont)
+        h.setContentsMargins(6, 3, 6, 3)
+        h.addWidget(lbl)
+        h.addStretch()
+        return cont
 
     # ── Guardar ───────────────────────────────────────────────────────────────
 

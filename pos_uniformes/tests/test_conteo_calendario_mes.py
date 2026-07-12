@@ -122,7 +122,8 @@ class MesDialogTests(unittest.TestCase):
         s.commit()
         s.close()
         d = ConteoCalendarioMesDialog(session_factory=self.factory, hoy=date(2026, 7, 12))
-        self.assertIn("vencida", d._vencidas_label.text().lower())
+        self.assertIn("Atrasada", d._vencidas_label.text())
+        self.assertIn("requieren conteo", d._vencidas_label.text())
 
 
 if __name__ == "__main__":
