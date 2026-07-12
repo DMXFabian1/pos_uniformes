@@ -113,7 +113,10 @@ class ConteoCalendarioMesPanel(QWidget):
 
         self._grid_host = QWidget()
         self._grid = QGridLayout(self._grid_host)
-        self._grid.setSpacing(6)
+        self._grid.setSpacing(8)
+        # Columnas de ancho IGUAL (si no, la última se come todo el ancho).
+        for c in range(7):
+            self._grid.setColumnStretch(c, 1)
         layout.addWidget(self._grid_host, 1)
 
     def _cambiar_mes(self, delta: int) -> None:
@@ -155,6 +158,8 @@ class ConteoCalendarioMesPanel(QWidget):
             w = item.widget()
             if w is not None:
                 w.deleteLater()
+        for r in range(8):
+            self._grid.setRowStretch(r, 0)  # reset (meses varían de 4 a 6 semanas)
 
         for col, nombre in enumerate(_DIAS_SEMANA):
             cab = QLabel(nombre)
@@ -164,29 +169,38 @@ class ConteoCalendarioMesPanel(QWidget):
 
         semanas = calendar.Calendar(firstweekday=0).monthdayscalendar(self._anio, self._mes)
         for fila, semana in enumerate(semanas, start=1):
+            self._grid.setRowStretch(fila, 1)  # semanas de alto igual, llenan el espacio
             for col, dia in enumerate(semana):
                 if dia == 0:
+                    self._grid.addWidget(self._celda_vacia(), fila, col)
                     continue
                 self._grid.addWidget(self._celda(dia, por_dia.get(dia, []), col), fila, col)
+
+    @staticmethod
+    def _celda_vacia() -> QWidget:
+        celda = QFrame()
+        celda.setStyleSheet("QFrame { background: #f6f1e8; border: none; border-radius: 12px; }")
+        celda.setMinimumHeight(72)
+        return celda
 
     def _celda(self, dia: int, escuelas: list, col: int = 0) -> QWidget:
         celda = QFrame()
         es_hoy = date(self._anio, self._mes, dia) == self._hoy
         es_finde = col >= 5
         if es_hoy:
-            fondo, borde, grosor = "#fdf3ea", "#c45425", "2px"
+            fondo, borde, grosor = "#fdf4ec", "#d1622f", "2px"
         elif escuelas:
-            fondo, borde, grosor = "#fffdf8", "#e0cdb2", "1px"
+            fondo, borde, grosor = "#fffdf8", "#e2d0b6", "1px"
         elif es_finde:
-            fondo, borde, grosor = "#f3ece1", "#e6dccc", "1px"
+            fondo, borde, grosor = "#f7f1e6", "#eadfcd", "1px"
         else:
-            fondo, borde, grosor = "#fbf7f1", "#ece3d5", "1px"
+            fondo, borde, grosor = "#fffefb", "#eae0cf", "1px"
         celda.setStyleSheet(
             f"QFrame {{ background: {fondo}; border: {grosor} solid {borde}; border-radius: 12px; }}"
         )
-        celda.setMinimumHeight(94)
+        celda.setMinimumHeight(72)
         v = QVBoxLayout(celda)
-        v.setContentsMargins(8, 6, 8, 6)
+        v.setContentsMargins(9, 7, 9, 7)
         v.setSpacing(3)
         num = QLabel(str(dia))
         if es_hoy:
