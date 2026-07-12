@@ -92,8 +92,11 @@ class ConteoCalendarioDialog(QDialog):
         save_btn.clicked.connect(self._guardar)
         refresh_btn = QPushButton("Refrescar")
         refresh_btn.clicked.connect(self.refresh)
+        calendario_btn = QPushButton("📅 Ver calendario")
+        calendario_btn.clicked.connect(self._abrir_calendario_mes)
         actions.addWidget(save_btn)
         actions.addWidget(refresh_btn)
+        actions.addWidget(calendario_btn)
         actions.addStretch()
         layout.addLayout(actions)
 
@@ -142,6 +145,13 @@ class ConteoCalendarioDialog(QDialog):
         self._resumen_label.setText(
             f"{len(calendario)} escuelas · {vencidas} requieren conteo"
         )
+
+    def _abrir_calendario_mes(self) -> None:
+        from pos_uniformes.ui.dialogs.conteo_calendario_mes_dialog import (
+            ConteoCalendarioMesDialog,
+        )
+
+        ConteoCalendarioMesDialog(self, session_factory=self._session_factory).exec()
 
     @staticmethod
     def _estado_texto(e) -> str:

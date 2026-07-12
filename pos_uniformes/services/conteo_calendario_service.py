@@ -112,3 +112,19 @@ def escuelas_con_conteo_vencido(
 ) -> list[EstadoCalendarioConteo]:
     """Solo las escuelas que ya requieren conteo (vencidas o nunca contadas)."""
     return [e for e in obtener_calendario_conteo(session, ahora=ahora) if e.vencida]
+
+
+def agrupar_calendario_por_dia(
+    estados: list[EstadoCalendarioConteo], anio: int, mes: int
+) -> dict[int, list[EstadoCalendarioConteo]]:
+    """Agrupa por día-del-mes las escuelas cuya próxima fecha cae en (anio, mes).
+
+    Para pintar el calendario visual. Las escuelas sin próxima fecha (nunca
+    contadas) no entran aquí; se muestran aparte como vencidas.
+    """
+    por_dia: dict[int, list[EstadoCalendarioConteo]] = {}
+    for estado in estados:
+        p = estado.proxima_fecha
+        if p is not None and p.year == anio and p.month == mes:
+            por_dia.setdefault(p.day, []).append(estado)
+    return por_dia
