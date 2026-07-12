@@ -1834,6 +1834,9 @@ class MainWindow(QMainWindow):
         header_menu.addSeparator()
         self.api_server_action = header_menu.addAction("Iniciar servidor movil")
         self.api_server_action.triggered.connect(self._toggle_api_server)
+        header_menu.addSeparator()
+        self.conteo_calendario_action = header_menu.addAction("Calendario de conteos")
+        self.conteo_calendario_action.triggered.connect(self._handle_open_conteo_calendario)
         self.header_more_button = QToolButton()
         self.header_more_button.setText("Mas")
         self.header_more_button.setObjectName("toolbarSoftButton")
@@ -8664,6 +8667,16 @@ class MainWindow(QMainWindow):
                 f"Sin cambios: {resumen['sin_cambios']}"
             ),
         )
+
+    def _handle_open_conteo_calendario(self) -> None:
+        if self.current_role != RolUsuario.ADMIN:
+            QMessageBox.warning(
+                self, "Sin permisos", "Solo ADMIN puede ver el calendario de conteos."
+            )
+            return
+        from pos_uniformes.ui.dialogs.conteo_calendario_dialog import ConteoCalendarioDialog
+
+        ConteoCalendarioDialog(self).exec()
 
     def _handle_inventory_count(self) -> None:
         if self.current_role != RolUsuario.ADMIN:
