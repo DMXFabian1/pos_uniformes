@@ -630,7 +630,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.nav_share_button = QPushButton("Compartir")
         self.nav_search_button = QPushButton("Buscar")
         self.nav_tariff_button = QPushButton("Tarifarios")
-        self.nav_conteos_button = QPushButton("Conteos")
+        self.nav_conteos_button = QPushButton("Calendario")
         # Ocultos temporalmente (2026-07-05, decisión de Daniel): "Presupuesto"
         # y "Buscar" no se usan en piso por ahora — las páginas siguen vivas y
         # se retomarán después; para restaurarlas basta quitar estas 2 líneas.
@@ -1026,15 +1026,33 @@ class QuoteSatelliteWindow(QMainWindow):
         return self.page_stack
 
     def _build_conteos_page(self) -> QWidget:
-        """Página del kiosko con el calendario de conteos (después de Tarifarios)."""
-        from pos_uniformes.ui.dialogs.conteo_calendario_panel import ConteoCalendarioPanel
+        """Página "Calendario" del kiosko (después de Tarifarios).
+
+        Vista principal = calendario visual del mes; los trabajadores pueden ver
+        qué toca y imprimir la orden. La frecuencia se edita solo desde el admin.
+        """
+        from pos_uniformes.ui.dialogs.conteo_calendario_mes_panel import (
+            ConteoCalendarioMesPanel,
+        )
 
         page = QWidget()
         layout = QVBoxLayout()
-        layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(0)
-        self.conteos_panel = ConteoCalendarioPanel(page, refresh_on_init=False)
-        layout.addWidget(self.conteos_panel)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(10)
+
+        header = QHBoxLayout()
+        titulo = QLabel("Calendario de conteos")
+        titulo.setObjectName("guidedStepTitle")
+        header.addWidget(titulo)
+        header.addStretch()
+        orden_btn = QPushButton("🖨 Imprimir orden de conteo")
+        orden_btn.setObjectName("secondaryButton")
+        orden_btn.clicked.connect(self._open_conteo_orden)
+        header.addWidget(orden_btn)
+        layout.addLayout(header)
+
+        self.conteos_panel = ConteoCalendarioMesPanel(page, refresh_on_init=False)
+        layout.addWidget(self.conteos_panel, 1)
         page.setLayout(layout)
         return page
 

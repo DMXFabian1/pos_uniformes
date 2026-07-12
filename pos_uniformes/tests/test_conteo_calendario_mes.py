@@ -26,7 +26,7 @@ from pos_uniformes.services.conteo_calendario_service import (
     EstadoCalendarioConteo,
     agrupar_calendario_por_dia,
 )
-from pos_uniformes.ui.dialogs.conteo_calendario_mes_dialog import ConteoCalendarioMesDialog
+from pos_uniformes.ui.dialogs.conteo_calendario_mes_panel import ConteoCalendarioMesPanel
 
 _AHORA = datetime(2026, 7, 12, tzinfo=timezone.utc)
 
@@ -102,7 +102,7 @@ class MesDialogTests(unittest.TestCase):
         _seed(s, "X", ultimo_hace=1)
         s.commit()
         s.close()
-        d = ConteoCalendarioMesDialog(session_factory=self.factory, hoy=date(2026, 7, 12))
+        d = ConteoCalendarioMesPanel(session_factory=self.factory, hoy=date(2026, 7, 12))
         self.assertIn("Julio 2026", d._mes_label.text())
 
     def test_navegacion_de_mes(self) -> None:
@@ -110,7 +110,7 @@ class MesDialogTests(unittest.TestCase):
         _seed(s, "X", ultimo_hace=1)
         s.commit()
         s.close()
-        d = ConteoCalendarioMesDialog(session_factory=self.factory, hoy=date(2026, 7, 12))
+        d = ConteoCalendarioMesPanel(session_factory=self.factory, hoy=date(2026, 7, 12))
         d._cambiar_mes(1)
         self.assertIn("Agosto 2026", d._mes_label.text())
         d._cambiar_mes(-2)
@@ -121,7 +121,7 @@ class MesDialogTests(unittest.TestCase):
         _seed(s, "Atrasada", ultimo_hace=60)
         s.commit()
         s.close()
-        d = ConteoCalendarioMesDialog(session_factory=self.factory, hoy=date(2026, 7, 12))
+        d = ConteoCalendarioMesPanel(session_factory=self.factory, hoy=date(2026, 7, 12))
         self.assertIn("Atrasada", d._vencidas_label.text())
         self.assertIn("requieren conteo", d._vencidas_label.text())
 
