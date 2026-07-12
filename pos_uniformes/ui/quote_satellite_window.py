@@ -630,6 +630,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.nav_share_button = QPushButton("Compartir")
         self.nav_search_button = QPushButton("Buscar")
         self.nav_tariff_button = QPushButton("Tarifarios")
+        self.nav_conteos_button = QPushButton("Conteos")
         # Ocultos temporalmente (2026-07-05, decisión de Daniel): "Presupuesto"
         # y "Buscar" no se usan en piso por ahora — las páginas siguen vivas y
         # se retomarán después; para restaurarlas basta quitar estas 2 líneas.
@@ -813,6 +814,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self.nav_share_button: _icon_from_asset("kiosk_icons/share_send.svg"),
             self.nav_search_button: _icon_from_asset("kiosk_icons/search_quote.svg"),
             self.nav_tariff_button: _icon_from_asset("kiosk_icons/catalog_grid.svg"),
+            self.nav_conteos_button: _icon_from_asset("kiosk_icons/calendar.svg"),
         }
         for button, icon in nav_icons.items():
             button.setIcon(icon)
@@ -924,6 +926,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self.nav_quote_button,
             self.nav_search_button,
             self.nav_tariff_button,
+            self.nav_conteos_button,
         ):
             button.setObjectName("navButton")
             button.setCheckable(True)
@@ -1019,7 +1022,21 @@ class QuoteSatelliteWindow(QMainWindow):
         self.page_stack.addWidget(self._scrollable(self._build_tariff_page()))
         # "search" va al final del stack para no mover los indices existentes
         self.page_stack.addWidget(self._scrollable(self._build_search_page()))
+        self.page_stack.addWidget(self._scrollable(self._build_conteos_page()))
         return self.page_stack
+
+    def _build_conteos_page(self) -> QWidget:
+        """Página del kiosko con el calendario de conteos (después de Tarifarios)."""
+        from pos_uniformes.ui.dialogs.conteo_calendario_panel import ConteoCalendarioPanel
+
+        page = QWidget()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(4, 4, 4, 4)
+        layout.setSpacing(0)
+        self.conteos_panel = ConteoCalendarioPanel(page, refresh_on_init=False)
+        layout.addWidget(self.conteos_panel)
+        page.setLayout(layout)
+        return page
 
     def _build_kiosk_page(self) -> QWidget:
         page = QWidget()
@@ -2221,6 +2238,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.nav_share_button.clicked.connect(lambda: self._set_page("share"))
         self.nav_search_button.clicked.connect(lambda: self._set_page("search"))
         self.nav_tariff_button.clicked.connect(lambda: self._set_page("tariff"))
+        self.nav_conteos_button.clicked.connect(lambda: self._set_page("conteos"))
         self.tariff_generate_button.clicked.connect(self._handle_generate_tariff)
         self.tariff_print_button.clicked.connect(self._handle_print_tariff)
         self.quick_scan_button.clicked.connect(self._handle_quick_scan)
@@ -2340,6 +2358,7 @@ class QuoteSatelliteWindow(QMainWindow):
             "share": 5,
             "tariff": 6,
             "search": 7,
+            "conteos": 8,
         }
         button_map = {
             "kiosk": self.nav_kiosk_button,
@@ -2350,6 +2369,7 @@ class QuoteSatelliteWindow(QMainWindow):
             "share": self.nav_share_button,
             "tariff": self.nav_tariff_button,
             "search": self.nav_search_button,
+            "conteos": self.nav_conteos_button,
         }
         page_title_map = {
             "kiosk": "Kiosko listo para escaneo rapido.",
@@ -2360,11 +2380,14 @@ class QuoteSatelliteWindow(QMainWindow):
             "share": "Compartir por WhatsApp o imprimir.",
             "tariff": "Tarifario de precios por escuela.",
             "search": "Busqueda y seguimiento de presupuestos.",
+            "conteos": "Calendario de conteos por escuela.",
         }
         self.current_page_key = page_key
         self.page_stack.setCurrentIndex(page_index_map[page_key])
         button_map[page_key].setChecked(True)
         self._set_status(page_title_map[page_key])
+        if page_key == "conteos":
+            self.conteos_panel.refresh()
         if page_key == "kiosk":
             QTimer.singleShot(0, self.kiosk_scan_input.setFocus)
         if page_key == "quicksale":

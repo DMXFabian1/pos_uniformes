@@ -25,7 +25,7 @@ from pos_uniformes.database.models import (
     Variante,
 )
 from pos_uniformes.services.conteo_service import obtener_estado_conteo_escuela
-from pos_uniformes.ui.dialogs.conteo_calendario_dialog import ConteoCalendarioDialog
+from pos_uniformes.ui.dialogs.conteo_calendario_panel import ConteoCalendarioPanel
 
 _AHORA = datetime(2026, 7, 12, tzinfo=timezone.utc)
 
@@ -69,8 +69,8 @@ class ConteoCalendarioDialogTests(unittest.TestCase):
         Base.metadata.create_all(self.engine)
         self.factory = lambda: Session(self.engine)
 
-    def _dialog(self) -> ConteoCalendarioDialog:
-        return ConteoCalendarioDialog(session_factory=self.factory)
+    def _dialog(self) -> ConteoCalendarioPanel:
+        return ConteoCalendarioPanel(session_factory=self.factory)
 
     def test_tabla_lista_escuelas(self) -> None:
         s = self.factory()
@@ -101,7 +101,7 @@ class ConteoCalendarioDialogTests(unittest.TestCase):
         d = self._dialog()
         d._spins[eid].setValue(15)
         with patch(
-            "pos_uniformes.ui.dialogs.conteo_calendario_dialog.QMessageBox.information"
+            "pos_uniformes.ui.dialogs.conteo_calendario_panel.QMessageBox.information"
         ):
             d._guardar()
         s = self.factory()
