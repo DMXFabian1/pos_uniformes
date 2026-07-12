@@ -594,8 +594,20 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
         ConteoCalendarioDialog(dialog).exec()
 
     open_calendario_btn.clicked.connect(_abrir_calendario_conteos)
+
+    subir_conteo_btn = QPushButton("Subir conteo (registrar físico)")
+    subir_conteo_btn.setObjectName("secondaryButton")
+
+    def _abrir_subir_conteo() -> None:
+        from pos_uniformes.ui.dialogs.conteo_subir_dialog import ConteoSubirDialog
+
+        ConteoSubirDialog(dialog).exec()
+
+    subir_conteo_btn.clicked.connect(_abrir_subir_conteo)
+
     conteo_layout.addWidget(conteo_hint)
     conteo_layout.addWidget(open_calendario_btn)
+    conteo_layout.addWidget(subir_conteo_btn)
     conteo_layout.addStretch()
     conteo_box.setLayout(conteo_layout)
 
