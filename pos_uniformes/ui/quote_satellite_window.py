@@ -393,6 +393,13 @@ class QuoteSatelliteWindow(QMainWindow):
         self._trabajo_dispatcher = None
         QTimer.singleShot(2_000, self._start_trabajo_dispatcher)
 
+        # Banner de conteo pendiente: chequeo inicial + periódico (cada 10 min).
+        QTimer.singleShot(4_000, self._refresh_conteo_banner)
+        self._conteo_banner_timer = QTimer(self)
+        self._conteo_banner_timer.setInterval(600_000)
+        self._conteo_banner_timer.timeout.connect(self._refresh_conteo_banner)
+        self._conteo_banner_timer.start()
+
     def _start_trabajo_dispatcher(self) -> None:
         """Arranca el despachador solo si esta máquina está en modo LOCAL.
 
@@ -1012,9 +1019,67 @@ class QuoteSatelliteWindow(QMainWindow):
         layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
+        layout.addWidget(self._build_conteo_banner())
         layout.addWidget(self._build_kiosk_panel(), 1)
         page.setLayout(layout)
         return page
+
+    def _build_conteo_banner(self) -> QWidget:
+        """Aviso de conteo pendiente (oculto si no hay nada vencido)."""
+        self.conteo_banner = QFrame()
+        self.conteo_banner.setObjectName("conteoBanner")
+        self.conteo_banner.setStyleSheet(
+            "#conteoBanner { background: #fff3e0; border: 1px solid #e0a96d; border-radius: 10px; }"
+            "#conteoBanner QLabel { color: #8a4b1a; font-weight: 700; background: transparent; border: none; }"
+        )
+        row = QHBoxLayout()
+        row.setContentsMargins(14, 8, 14, 8)
+        row.setSpacing(10)
+        self.conteo_banner_label = QLabel("")
+        row.addWidget(self.conteo_banner_label, 1)
+        banner_btn = QPushButton("Imprimir orden de conteo")
+        banner_btn.setObjectName("secondaryButton")
+        banner_btn.clicked.connect(self._open_conteo_orden)
+        row.addWidget(banner_btn)
+        self.conteo_banner.setLayout(row)
+        self.conteo_banner.setVisible(False)
+        return self.conteo_banner
+
+    def _refresh_conteo_banner(self) -> None:
+        """Consulta escuelas con conteo vencido y muestra/oculta el banner."""
+        banner = getattr(self, "conteo_banner", None)
+        if banner is None:
+            return
+        if self.offline_mode:
+            banner.setVisible(False)
+            return
+        try:
+            from pos_uniformes.services.conteo_calendario_service import (
+                escuelas_con_conteo_vencido,
+            )
+
+            with get_session() as session:
+                vencidas = escuelas_con_conteo_vencido(session)
+        except Exception:  # noqa: BLE001 — sin conexión: no molestar
+            banner.setVisible(False)
+            return
+
+        n = len(vencidas)
+        if n == 0:
+            banner.setVisible(False)
+            return
+        if n == 1:
+            texto = f"⚠  Conteo pendiente: {vencidas[0].escuela_nombre}"
+        else:
+            texto = f"⚠  Conteo pendiente en {n} escuelas"
+        self.conteo_banner_label.setText(texto)
+        banner.setVisible(True)
+
+    def _open_conteo_orden(self) -> None:
+        from pos_uniformes.ui.dialogs.conteo_orden_dialog import ConteoOrdenDialog
+
+        ConteoOrdenDialog(self).exec()
+        self._refresh_conteo_banner()
 
     def _build_quote_page(self) -> QWidget:
         page = QWidget()
