@@ -577,10 +577,33 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
         page_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
         return page_scroll
 
+    # — Conteos (calendario admin) —
+    conteo_box = QGroupBox("Calendario de conteos")
+    conteo_layout = QVBoxLayout()
+    conteo_hint = QLabel(
+        "Configura la frecuencia de conteo por escuela y revisa cuáles ya "
+        "requieren conteo (lista y calendario)."
+    )
+    conteo_hint.setWordWrap(True)
+    open_calendario_btn = QPushButton("Abrir calendario de conteos")
+    open_calendario_btn.setObjectName("primaryButton")
+
+    def _abrir_calendario_conteos() -> None:
+        from pos_uniformes.ui.dialogs.conteo_calendario_dialog import ConteoCalendarioDialog
+
+        ConteoCalendarioDialog(dialog).exec()
+
+    open_calendario_btn.clicked.connect(_abrir_calendario_conteos)
+    conteo_layout.addWidget(conteo_hint)
+    conteo_layout.addWidget(open_calendario_btn)
+    conteo_layout.addStretch()
+    conteo_box.setLayout(conteo_layout)
+
     tabs = QTabWidget()
     tabs.addTab(_make_tab(status_box, config_box), "🔌  Conexión")
     tabs.addTab(_make_tab(routing_box, printer_box, label_box), "🖨  Impresoras")
     tabs.addTab(_make_tab(meili_box), "🔍  Búsqueda")
+    tabs.addTab(_make_tab(conteo_box), "📋  Conteos")
 
     outer = QVBoxLayout()
     outer.setContentsMargins(12, 12, 12, 12)
