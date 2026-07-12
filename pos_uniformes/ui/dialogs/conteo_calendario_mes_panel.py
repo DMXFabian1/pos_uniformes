@@ -97,11 +97,19 @@ class ConteoCalendarioMesPanel(QWidget):
         nav.addWidget(next_btn)
         layout.addLayout(nav)
 
-        self._vencidas_label = QLabel("")
-        self._vencidas_label.setObjectName("mesVencidas")
-        self._vencidas_label.setWordWrap(True)
-        self._vencidas_label.setVisible(False)
-        layout.addWidget(self._vencidas_label)
+        sumario = QHBoxLayout()
+        sumario.setSpacing(8)
+        _chip_qss = "border-radius: 13px; padding: 6px 14px; font-weight: 800; font-size: 13px;"
+        self._chip_vencidas = QLabel("")
+        self._chip_vencidas.setStyleSheet(f"background: #fbe3e0; color: #b0341f; {_chip_qss}")
+        self._chip_aldia = QLabel("")
+        self._chip_aldia.setStyleSheet(f"background: #e3f0e0; color: #2e7d32; {_chip_qss}")
+        self._chip_mes = QLabel("")
+        self._chip_mes.setStyleSheet(f"background: #f1e5d1; color: #7b2d14; {_chip_qss}")
+        for c in (self._chip_vencidas, self._chip_aldia, self._chip_mes):
+            sumario.addWidget(c)
+        sumario.addStretch()
+        layout.addLayout(sumario)
 
         self._grid_host = QWidget()
         self._grid = QGridLayout(self._grid_host)
@@ -134,19 +142,13 @@ class ConteoCalendarioMesPanel(QWidget):
     def _render(self) -> None:
         self._mes_label.setText(f"{_MESES[self._mes]} {self._anio}")
 
+        por_dia = agrupar_calendario_por_dia(self._estados, self._anio, self._mes)
         vencidas = [e for e in self._estados if e.vencida]
-        n = len(vencidas)
-        if n == 0:
-            self._vencidas_label.setVisible(False)
-        elif n <= 4:
-            nombres = ", ".join(e.escuela_nombre for e in vencidas)
-            self._vencidas_label.setText(f"⚠  {n} requieren conteo: {nombres}")
-            self._vencidas_label.setVisible(True)
-        else:
-            self._vencidas_label.setText(
-                f"⚠  {n} escuelas requieren conteo — imprime su orden con el botón de arriba."
-            )
-            self._vencidas_label.setVisible(True)
+        al_dia = [e for e in self._estados if not e.vencida]
+        este_mes = sum(len(v) for v in por_dia.values())
+        self._chip_vencidas.setText(f"🔴  {len(vencidas)} requieren conteo")
+        self._chip_aldia.setText(f"🟢  {len(al_dia)} al día")
+        self._chip_mes.setText(f"📅  {este_mes} este mes")
 
         while self._grid.count():
             item = self._grid.takeAt(0)
@@ -160,21 +162,23 @@ class ConteoCalendarioMesPanel(QWidget):
             cab.setAlignment(Qt.AlignmentFlag.AlignCenter)
             self._grid.addWidget(cab, 0, col)
 
-        por_dia = agrupar_calendario_por_dia(self._estados, self._anio, self._mes)
         semanas = calendar.Calendar(firstweekday=0).monthdayscalendar(self._anio, self._mes)
         for fila, semana in enumerate(semanas, start=1):
             for col, dia in enumerate(semana):
                 if dia == 0:
                     continue
-                self._grid.addWidget(self._celda(dia, por_dia.get(dia, [])), fila, col)
+                self._grid.addWidget(self._celda(dia, por_dia.get(dia, []), col), fila, col)
 
-    def _celda(self, dia: int, escuelas: list) -> QWidget:
+    def _celda(self, dia: int, escuelas: list, col: int = 0) -> QWidget:
         celda = QFrame()
         es_hoy = date(self._anio, self._mes, dia) == self._hoy
+        es_finde = col >= 5
         if es_hoy:
             fondo, borde, grosor = "#fdf3ea", "#c45425", "2px"
         elif escuelas:
             fondo, borde, grosor = "#fffdf8", "#e0cdb2", "1px"
+        elif es_finde:
+            fondo, borde, grosor = "#f3ece1", "#e6dccc", "1px"
         else:
             fondo, borde, grosor = "#fbf7f1", "#ece3d5", "1px"
         celda.setStyleSheet(
@@ -185,11 +189,24 @@ class ConteoCalendarioMesPanel(QWidget):
         v.setContentsMargins(8, 6, 8, 6)
         v.setSpacing(3)
         num = QLabel(str(dia))
-        num.setStyleSheet(
-            "font-weight: 800; font-size: 13px; background: transparent; border: none;"
-            f" color: {'#c45425' if es_hoy else '#8a7358'};"
-        )
-        v.addWidget(num)
+        if es_hoy:
+            num.setFixedSize(26, 26)
+            num.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            num.setStyleSheet(
+                "background: #c45425; color: white; border-radius: 13px;"
+                " font-weight: 800; font-size: 12px;"
+            )
+            num_row = QHBoxLayout()
+            num_row.setContentsMargins(0, 0, 0, 0)
+            num_row.addWidget(num)
+            num_row.addStretch()
+            v.addLayout(num_row)
+        else:
+            num.setStyleSheet(
+                "font-weight: 800; font-size: 13px; background: transparent; border: none;"
+                f" color: {'#b3a08a' if es_finde else '#8a7358'};"
+            )
+            v.addWidget(num)
         for e in escuelas[:3]:
             v.addWidget(self._chip(e))
         if len(escuelas) > 3:
