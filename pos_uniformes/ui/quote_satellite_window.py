@@ -939,13 +939,15 @@ class QuoteSatelliteWindow(QMainWindow):
         items_layout.setSpacing(8)
         items_title = QLabel("Piezas agregadas")
         items_title.setObjectName("satSidebarTitle")
-        self.sidebar_clear_button = QPushButton("🗑")
+        self.sidebar_clear_button = QPushButton()
         self.sidebar_clear_button.setObjectName("satSidebarClearButton")
         self.sidebar_clear_button.setToolTip("Limpiar piezas agregadas")
         self.sidebar_clear_button.setCursor(Qt.CursorShape.PointingHandCursor)
         self.sidebar_clear_button.setFixedSize(34, 34)
+        self.sidebar_clear_button.setIcon(_icon_from_asset("kiosk_icons/trash.svg"))
+        self.sidebar_clear_button.setIconSize(QSize(20, 20))
         self.sidebar_clear_button.setStyleSheet(
-            "QPushButton { border: none; background: transparent; font-size: 16px; }"
+            "QPushButton { border: none; background: transparent; }"
             "QPushButton:hover { background: #fdecea; border-radius: 8px; }"
         )
         self.sidebar_clear_button.clicked.connect(self._handle_sidebar_clear_pieces)
