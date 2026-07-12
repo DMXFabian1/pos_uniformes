@@ -400,6 +400,13 @@ class QuoteSatelliteWindow(QMainWindow):
         self._conteo_banner_timer.timeout.connect(self._refresh_conteo_banner)
         self._conteo_banner_timer.start()
 
+        # Órdenes de conteo automáticas al vencer (solo la máquina LOCAL, cada 6h).
+        QTimer.singleShot(30_000, self._run_auto_conteo_check)
+        self._auto_conteo_timer = QTimer(self)
+        self._auto_conteo_timer.setInterval(6 * 3600 * 1000)
+        self._auto_conteo_timer.timeout.connect(self._run_auto_conteo_check)
+        self._auto_conteo_timer.start()
+
     def _start_trabajo_dispatcher(self) -> None:
         """Arranca el despachador solo si esta máquina está en modo LOCAL.
 
@@ -1080,6 +1087,41 @@ class QuoteSatelliteWindow(QMainWindow):
 
         ConteoOrdenDialog(self).exec()
         self._refresh_conteo_banner()
+
+    def _run_auto_conteo_check(self) -> None:
+        """Genera órdenes de conteo automáticas al vencer.
+
+        Solo en la PC que imprime (modo LOCAL) y con conexión, para que no lo
+        hagan dos máquinas a la vez. Encola las hojas al despachador (que las
+        imprime) con candado anti-spam por ciclo.
+        """
+        if self.offline_mode:
+            return
+        try:
+            from pos_uniformes.services.print_routing_cache_service import (
+                MODO_LOCAL,
+                load_print_routing,
+            )
+
+            modo, _origen = load_print_routing()
+            if modo != MODO_LOCAL:
+                return
+
+            from pos_uniformes.services.conteo_auto_orden_service import (
+                generar_ordenes_automaticas,
+            )
+
+            with get_session() as session:
+                generadas = generar_ordenes_automaticas(session)
+            if generadas:
+                import logging
+
+                logging.getLogger(__name__).info(
+                    "Órdenes de conteo automáticas encoladas: %s", ", ".join(generadas)
+                )
+                self._refresh_conteo_banner()
+        except Exception:  # noqa: BLE001 — nunca romper el kiosko
+            pass
 
     def _build_quote_page(self) -> QWidget:
         page = QWidget()
