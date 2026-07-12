@@ -60,8 +60,20 @@ class ConteoOrdenDialog(QDialog):
     # ── UI ────────────────────────────────────────────────────────────────────
 
     def _build_ui(self) -> None:
+        self.setStyleSheet(
+            "QDialog { background: #faf6f0; }"
+            "#ordTitulo { color: #7b2d14; font-size: 16px; font-weight: 800; background: transparent; }"
+            "QListWidget { background: #fffdf8; border: 1px solid #e0d5c5; border-radius: 10px;"
+            "  padding: 4px; outline: none; }"
+            "QListWidget::item { border-radius: 8px; margin: 1px; }"
+            "QListWidget::item:selected { background: #f3e2cf; }"
+            "QListWidget::item:hover { background: #f7ede0; }"
+        )
         layout = QVBoxLayout()
+        layout.setContentsMargins(16, 14, 16, 12)
+        layout.setSpacing(8)
         self._hint = QLabel("Escuelas que ya requieren conteo:")
+        self._hint.setObjectName("ordTitulo")
         self._hint.setWordWrap(True)
         layout.addWidget(self._hint)
 
@@ -81,7 +93,7 @@ class ConteoOrdenDialog(QDialog):
         layout.addWidget(close_buttons)
 
         self.setLayout(layout)
-        self.resize(460, 420)
+        self.resize(520, 460)
 
     # ── Datos ─────────────────────────────────────────────────────────────────
 
@@ -93,14 +105,19 @@ class ConteoOrdenDialog(QDialog):
             session.close()
 
         self._list.clear()
+        self._filas = []  # (nombre, detalle) — dato inspeccionable para tests
         for e in vencidas:
             if e.nunca_contada:
                 detalle = "nunca contada"
             else:
                 detalle = f"vencida hace {abs(e.dias_para_vencer)} días"
-            item = QListWidgetItem(f"{e.escuela_nombre}  ·  {detalle}")
+            self._filas.append((e.escuela_nombre, detalle))
+            item = QListWidgetItem()
             item.setData(Qt.ItemDataRole.UserRole, (e.escuela_id, e.escuela_nombre))
             self._list.addItem(item)
+            row = self._build_row(e.escuela_nombre, detalle)
+            item.setSizeHint(row.sizeHint())
+            self._list.setItemWidget(item, row)
 
         hay = self._list.count() > 0
         self._print_btn.setEnabled(hay)
@@ -109,6 +126,25 @@ class ConteoOrdenDialog(QDialog):
             self._list.setCurrentRow(0)
         else:
             self._hint.setText("Ninguna escuela requiere conteo por ahora. ✓")
+
+    @staticmethod
+    def _build_row(nombre: str, detalle: str) -> QWidget:
+        row = QWidget()
+        h = QHBoxLayout(row)
+        h.setContentsMargins(10, 7, 10, 7)
+        name = QLabel(nombre)
+        name.setStyleSheet(
+            "color: #5a4a3f; font-weight: 600; font-size: 14px; background: transparent; border: none;"
+        )
+        h.addWidget(name)
+        h.addStretch()
+        chip = QLabel(detalle)
+        chip.setStyleSheet(
+            "background: #fbe3e0; color: #b0341f; border: none; border-radius: 8px;"
+            " padding: 2px 9px; font-size: 12px; font-weight: 700;"
+        )
+        h.addWidget(chip)
+        return row
 
     # ── Acción ────────────────────────────────────────────────────────────────
 

@@ -135,13 +135,18 @@ class ConteoCalendarioMesPanel(QWidget):
         self._mes_label.setText(f"{_MESES[self._mes]} {self._anio}")
 
         vencidas = [e for e in self._estados if e.vencida]
-        if vencidas:
-            nombres = ", ".join(e.escuela_nombre for e in vencidas[:6])
-            extra = f" y {len(vencidas) - 6} más" if len(vencidas) > 6 else ""
-            self._vencidas_label.setText(f"⚠  {len(vencidas)} requieren conteo: {nombres}{extra}")
+        n = len(vencidas)
+        if n == 0:
+            self._vencidas_label.setVisible(False)
+        elif n <= 4:
+            nombres = ", ".join(e.escuela_nombre for e in vencidas)
+            self._vencidas_label.setText(f"⚠  {n} requieren conteo: {nombres}")
             self._vencidas_label.setVisible(True)
         else:
-            self._vencidas_label.setVisible(False)
+            self._vencidas_label.setText(
+                f"⚠  {n} escuelas requieren conteo — imprime su orden con el botón de arriba."
+            )
+            self._vencidas_label.setVisible(True)
 
         while self._grid.count():
             item = self._grid.takeAt(0)

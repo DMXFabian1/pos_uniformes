@@ -84,10 +84,12 @@ class ConteoOrdenDialogTests(unittest.TestCase):
         s.commit()
         s.close()
         d = self._dialog()
-        nombres = [d._list.item(i).text() for i in range(d._list.count())]
-        self.assertEqual(len(nombres), 2)
-        self.assertTrue(any("Vencida" in n for n in nombres))
-        self.assertTrue(any("Nunca" in n and "nunca contada" in n for n in nombres))
+        self.assertEqual(d._list.count(), 2)
+        nombres = [n for (n, _det) in d._filas]
+        detalles = [det for (_n, det) in d._filas]
+        self.assertIn("Vencida", nombres)
+        self.assertIn("Nunca", nombres)
+        self.assertIn("nunca contada", detalles)
 
     def test_sin_vencidas_desactiva_boton(self) -> None:
         s = self.factory()
