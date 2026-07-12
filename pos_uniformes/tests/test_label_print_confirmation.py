@@ -62,10 +62,11 @@ class SatelliteLabelPrintFlowTests(unittest.TestCase):
         window._print_labels_for_skus = Mock()
         with patch(
             "pos_uniformes.ui.dialogs.label_print_confirmation_dialog.open_label_print_confirmation",
-            return_value=["SKU-1"],
+            return_value=(["SKU-1"], "dk1221"),
         ):
             window._offer_label_print_for_added_skus(["SKU-1", "SKU-2"])
-        window._print_labels_for_skus.assert_called_once_with(["SKU-1"])
+        # Se propaga el tipo elegido al impresor.
+        window._print_labels_for_skus.assert_called_once_with(["SKU-1"], "dk1221")
 
     def test_offer_skips_print_when_nothing_selected(self) -> None:
         window = self._make_window()
@@ -73,7 +74,7 @@ class SatelliteLabelPrintFlowTests(unittest.TestCase):
         window._print_labels_for_skus = Mock()
         with patch(
             "pos_uniformes.ui.dialogs.label_print_confirmation_dialog.open_label_print_confirmation",
-            return_value=[],
+            return_value=([], "standard"),
         ):
             window._offer_label_print_for_added_skus(["SKU-1"])
         window._print_labels_for_skus.assert_not_called()
@@ -94,6 +95,22 @@ class SatelliteLabelPrintFlowTests(unittest.TestCase):
         # "Normal/Split" del menú admin (no la troquelada).
         self.assertEqual(
             window._print_satellite_label.call_args.kwargs["paper_mode"], "standard"
+        )
+
+    def test_print_labels_uses_chosen_mode(self) -> None:
+        window = self._make_window()
+        window._find_row_by_sku = _ROWS.get
+        window._print_satellite_label = Mock(return_value=True)
+        render_result = SimpleNamespace(image_path="/tmp/etiqueta.png")
+        with patch(
+            "pos_uniformes.services.inventory_label_service.render_inventory_label_from_cache_row",
+            return_value=render_result,
+        ) as render:
+            window._print_labels_for_skus(["SKU-1"], "dk1221")
+        # El tipo elegido llega al render y a la impresora (paper_mode).
+        self.assertEqual(render.call_args.kwargs["mode"], "dk1221")
+        self.assertEqual(
+            window._print_satellite_label.call_args.kwargs["paper_mode"], "dk1221"
         )
 
     def test_print_labels_reports_failures_without_aborting(self) -> None:

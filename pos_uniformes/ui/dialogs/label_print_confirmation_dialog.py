@@ -11,6 +11,7 @@ from typing import Callable
 
 from PyQt6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QDialog,
     QHBoxLayout,
     QLabel,
@@ -18,6 +19,14 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+# Tipos de etiqueta ofrecidos y su paper_mode (define la impresora):
+# Normal/Split → impresora de rollo continuo; Label → troquelada DK-1221.
+_LABEL_TYPE_OPTIONS = [
+    ("Normal", "standard"),
+    ("Split", "split"),
+    ("Label (troquelada)", "dk1221"),
+]
 
 
 def build_label_entries(
@@ -50,10 +59,13 @@ def build_label_entries(
 def open_label_print_confirmation(
     parent: QWidget | None,
     entries: list[tuple[str, str]],
-) -> list[str]:
-    """Muestra la confirmación y devuelve los SKUs seleccionados ([] = nada)."""
+) -> tuple[list[str], str]:
+    """Muestra la confirmación y devuelve (SKUs seleccionados, tipo de etiqueta).
+
+    El tipo (paper_mode) elegido decide la impresora. ([], "standard") = nada.
+    """
     if not entries:
-        return []
+        return [], "standard"
 
     dialog = QDialog(parent)
     dialog.setWindowTitle("Imprimir etiquetas")
@@ -85,6 +97,15 @@ def open_label_print_confirmation(
     select_row.addStretch()
     layout.addLayout(select_row)
 
+    # Tipo de etiqueta (define la impresora que se usa).
+    mode_row = QHBoxLayout()
+    mode_row.addWidget(QLabel("Tipo de etiqueta:"))
+    mode_combo = QComboBox()
+    for texto, valor in _LABEL_TYPE_OPTIONS:
+        mode_combo.addItem(texto, valor)
+    mode_row.addWidget(mode_combo, 1)
+    layout.addLayout(mode_row)
+
     action_row = QHBoxLayout()
     skip_btn = QPushButton("No imprimir")
     skip_btn.setObjectName("ghostButton")
@@ -100,5 +121,7 @@ def open_label_print_confirmation(
 
     dialog.setLayout(layout)
     if dialog.exec() != QDialog.DialogCode.Accepted:
-        return []
-    return [sku for sku, checkbox in checkboxes if checkbox.isChecked()]
+        return [], "standard"
+    selected = [sku for sku, checkbox in checkboxes if checkbox.isChecked()]
+    mode = str(mode_combo.currentData() or "standard")
+    return selected, mode

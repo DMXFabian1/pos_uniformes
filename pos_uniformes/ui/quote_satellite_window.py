@@ -4018,11 +4018,11 @@ QLabel#favDialogPriceLabel {
         )
 
         entries = build_label_entries(skus, self._find_row_by_sku)
-        selected = open_label_print_confirmation(self, entries)
+        selected, mode = open_label_print_confirmation(self, entries)
         if selected:
-            self._print_labels_for_skus(selected)
+            self._print_labels_for_skus(selected, mode)
 
-    def _print_labels_for_skus(self, skus: list[str]) -> None:
+    def _print_labels_for_skus(self, skus: list[str], mode: str = "standard") -> None:
         from pos_uniformes.services.inventory_label_service import (
             render_inventory_label_from_cache_row,
         )
@@ -4035,14 +4035,13 @@ QLabel#favDialogPriceLabel {
                 continue
             try:
                 result = render_inventory_label_from_cache_row(
-                    row, mode="standard", requested_copies=1
+                    row, mode=mode, requested_copies=1
                 )
-                # Etiqueta normal → impresora "Normal/Split" del menú admin
-                # (paper_mode "standard"; el default "die_cut" la mandaba con
-                # config de rollo troquelado, que no es lo que toca aquí).
+                # El tipo elegido decide la impresora: Normal/Split → rollo
+                # continuo; Label (dk1221) → troquelada. paper_mode = mode.
                 if not self._print_satellite_label(
                     result.image_path, title=f"Etiqueta {sku}", copies=1,
-                    paper_mode="standard",
+                    paper_mode=mode,
                 ):
                     failed.append(sku)
             except Exception:  # noqa: BLE001 — una etiqueta fallida no aborta el resto
