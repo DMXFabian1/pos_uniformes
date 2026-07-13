@@ -33,3 +33,17 @@ def load_ticket_print_settings() -> tuple[str, int]:
         return str(data.get("ticket_printer", "")), int(data.get("copies", 1))
     except Exception:  # noqa: BLE001
         return "", 1
+
+
+def falta_impresora_tickets() -> bool:
+    """True si no se eligió una impresora de tickets en esta PC.
+
+    Sin elegir, los tickets salen por la impresora PREDETERMINADA de Windows (que
+    puede no ser la térmica y hace que el trabajo se marque "impreso" sin salir
+    papel). Sirve para avisar al operador del Servidor de impresión.
+    """
+    try:
+        printer, _ = load_ticket_print_settings()
+    except Exception:  # noqa: BLE001
+        return True
+    return not printer.strip()

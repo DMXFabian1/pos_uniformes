@@ -453,6 +453,32 @@ class QuoteSatelliteWindow(QMainWindow):
         self._trabajo_cleanup_timer.start()
         QTimer.singleShot(300_000, self._limpiar_trabajos_viejos)  # una vez a los 5 min
 
+        # Servidor de impresión sin impresora de tickets elegida: avisar. Si no,
+        # los tickets van a la predeterminada de Windows y se marcan "impresos"
+        # sin salir papel. Diferido para no bloquear el arranque de la ventana.
+        QTimer.singleShot(1_500, self._advertir_impresora_tickets_sin_elegir)
+
+    def _advertir_impresora_tickets_sin_elegir(self) -> None:
+        """Avisa (una vez, al arrancar el servidor) si falta elegir impresora."""
+        try:
+            from pos_uniformes.services.ticket_print_settings_cache_service import (
+                falta_impresora_tickets,
+            )
+
+            if not falta_impresora_tickets():
+                return
+        except Exception:  # noqa: BLE001
+            return
+        QMessageBox.warning(
+            self,
+            "Falta elegir la impresora de tickets",
+            "Esta PC es el Servidor de impresión pero no tiene una impresora de "
+            "tickets elegida.\n\nLos tickets saldrán por la impresora "
+            "PREDETERMINADA de Windows (que puede no ser la térmica) y se marcarán "
+            "como impresos aunque no salga papel.\n\n"
+            "Ve a Ctrl+Shift+A → 🖨 Impresoras y elige la impresora térmica.",
+        )
+
     def _limpiar_trabajos_viejos(self) -> None:
         try:
             from pos_uniformes.database.connection import get_session
