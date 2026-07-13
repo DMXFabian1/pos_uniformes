@@ -14,6 +14,7 @@ from collections.abc import Callable
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
@@ -27,7 +28,7 @@ from PyQt6.QtWidgets import (
 )
 from sqlalchemy.orm import Session
 
-from pos_uniformes.services.conteo_calendario_service import escuelas_con_conteo_vencido
+from pos_uniformes.services.conteo_calendario_service import obtener_calendario_conteo
 from pos_uniformes.services.conteo_sheet_service import build_conteo_sheets
 
 
@@ -77,6 +78,12 @@ class ConteoOrdenDialog(QDialog):
         self._hint.setWordWrap(True)
         layout.addWidget(self._hint)
 
+        # Por defecto solo las pendientes; el checkbox agrega las que están al
+        # día para poder adelantarse y contarlas antes de que venzan.
+        self._mostrar_al_dia = QCheckBox("Mostrar también las que están al día")
+        self._mostrar_al_dia.toggled.connect(self.refresh)
+        layout.addWidget(self._mostrar_al_dia)
+
         self._list = QListWidget()
         layout.addWidget(self._list, 1)
 
@@ -100,35 +107,61 @@ class ConteoOrdenDialog(QDialog):
     def refresh(self) -> None:
         session = self._session_factory()
         try:
-            vencidas = escuelas_con_conteo_vencido(session)
+            estados = obtener_calendario_conteo(session)
         finally:
             session.close()
 
+        mostrar_al_dia = self._mostrar_al_dia.isChecked()
+        # obtener_calendario_conteo ya ordena por urgencia (vencidas primero).
+        visibles = [e for e in estados if e.vencida or mostrar_al_dia]
+
         self._list.clear()
         self._filas = []  # (nombre, detalle) — dato inspeccionable para tests
-        for e in vencidas:
-            if e.nunca_contada:
-                detalle = "nunca contada"
-            else:
-                detalle = f"vencida hace {abs(e.dias_para_vencer)} días"
+        for e in visibles:
+            detalle, vencida = self._detalle_de(e)
             self._filas.append((e.escuela_nombre, detalle))
             item = QListWidgetItem()
             item.setData(Qt.ItemDataRole.UserRole, (e.escuela_id, e.escuela_nombre))
             self._list.addItem(item)
-            row = self._build_row(e.escuela_nombre, detalle)
+            row = self._build_row(e.escuela_nombre, detalle, vencida=vencida)
             item.setSizeHint(row.sizeHint())
             self._list.setItemWidget(item, row)
 
+        n_vencidas = sum(1 for e in visibles if e.vencida)
         hay = self._list.count() > 0
         self._print_btn.setEnabled(hay)
-        if hay:
-            self._hint.setText(f"{self._list.count()} escuela(s) requieren conteo. Elige una e imprime.")
-            self._list.setCurrentRow(0)
+        if not hay:
+            self._hint.setText("No hay escuelas con conteo configurado.")
+        elif mostrar_al_dia:
+            self._hint.setText(
+                f"{self._list.count()} escuela(s) — {n_vencidas} pendiente(s). "
+                "Elige una e imprime (puedes adelantarte con las que están al día)."
+            )
+        elif n_vencidas:
+            self._hint.setText(f"{n_vencidas} escuela(s) requieren conteo. Elige una e imprime.")
         else:
-            self._hint.setText("Ninguna escuela requiere conteo por ahora. ✓")
+            self._hint.setText(
+                "Ninguna escuela requiere conteo por ahora. ✓  "
+                "Marca la casilla para adelantar las que están al día."
+            )
+        if hay:
+            self._list.setCurrentRow(0)
 
     @staticmethod
-    def _build_row(nombre: str, detalle: str) -> QWidget:
+    def _detalle_de(e) -> tuple[str, bool]:
+        """(texto del chip, es_vencida) para una escuela según su estado."""
+        if e.vencida:
+            if e.nunca_contada:
+                return "nunca contada", True
+            return f"vencida hace {abs(e.dias_para_vencer)} días", True
+        if e.dias_para_vencer == 0:
+            return "vence hoy", False
+        if e.dias_para_vencer == 1:
+            return "en 1 día", False
+        return f"en {e.dias_para_vencer} días", False
+
+    @staticmethod
+    def _build_row(nombre: str, detalle: str, *, vencida: bool = True) -> QWidget:
         row = QWidget()
         h = QHBoxLayout(row)
         h.setContentsMargins(10, 7, 10, 7)
@@ -139,8 +172,13 @@ class ConteoOrdenDialog(QDialog):
         h.addWidget(name)
         h.addStretch()
         chip = QLabel(detalle)
+        # Rojo = vencida (ya toca); verde = al día (puedes adelantarte).
+        if vencida:
+            chip_css = "background: #fbe3e0; color: #b0341f;"
+        else:
+            chip_css = "background: #dcfce7; color: #166534;"
         chip.setStyleSheet(
-            "background: #fbe3e0; color: #b0341f; border: none; border-radius: 8px;"
+            chip_css + " border: none; border-radius: 8px;"
             " padding: 2px 9px; font-size: 12px; font-weight: 700;"
         )
         h.addWidget(chip)

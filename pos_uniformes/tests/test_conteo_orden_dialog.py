@@ -100,6 +100,33 @@ class ConteoOrdenDialogTests(unittest.TestCase):
         self.assertEqual(d._list.count(), 0)
         self.assertFalse(d._print_btn.isEnabled())
 
+    def test_toggle_muestra_las_al_dia(self) -> None:
+        s = self.factory()
+        _seed(s, "AlDia", ultimo_hace=1)       # al día
+        _seed(s, "Vencida", ultimo_hace=60)    # vencida
+        s.commit()
+        s.close()
+        d = self._dialog()
+        self.assertEqual(d._list.count(), 1)   # por defecto: solo la vencida
+        d._mostrar_al_dia.setChecked(True)     # dispara refresh
+        self.assertEqual(d._list.count(), 2)   # ahora incluye la que está al día
+        nombres = [n for (n, _det) in d._filas]
+        detalles = [det for (_n, det) in d._filas]
+        self.assertIn("AlDia", nombres)
+        self.assertTrue(any(det.startswith("en ") for det in detalles))
+
+    def test_imprimir_una_al_dia(self) -> None:
+        s = self.factory()
+        _seed(s, "AlDia", ultimo_hace=1)
+        s.commit()
+        s.close()
+        d = self._dialog()
+        d._mostrar_al_dia.setChecked(True)
+        d._list.setCurrentRow(0)
+        d._imprimir()
+        self.assertEqual(len(self.impreso), 1)
+        self.assertIn("AlDia", self.impreso[0][0])
+
     def test_imprimir_genera_y_manda_hojas(self) -> None:
         s = self.factory()
         _seed(s, "Vencida", ultimo_hace=60)
