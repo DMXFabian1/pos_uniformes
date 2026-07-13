@@ -10,6 +10,9 @@ y recortada): la impresora imprime a su ancho nativo y corta donde le decimos.
 
 from __future__ import annotations
 
+import subprocess
+import sys
+
 from pos_uniformes.services.escpos_settings_cache_service import (
     EscPosSettings,
     load_escpos_settings,
@@ -38,21 +41,14 @@ def build_escpos_bytes(text: str, settings: EscPosSettings | None = None) -> byt
     return _INIT + _codepage_cmd(s.codepage) + encoded + feed + corte
 
 
-def print_ticket_escpos(printer_name: str, text: str, *, copies: int = 1) -> bool:
-    """Envía el ticket como datos RAW a la impresora. True si se mandó.
-
-    Solo Windows (usa pywin32). Lanza si falta pywin32 o el spooler falla, para
-    que el llamador pueda caer al camino QPrinter.
-    """
-    import win32print  # pywin32 (igual que la impresión de etiquetas)
-
-    settings = load_escpos_settings()
-    data = build_escpos_bytes(text, settings)
+def _send_raw_windows(printer_name: str, data: bytes, copies: int) -> bool:
+    """Windows: spooler RAW vía pywin32 (igual que la impresión de etiquetas)."""
+    import win32print
 
     handle = win32print.OpenPrinter(printer_name)
     try:
         for _ in range(max(1, copies)):
-            job = win32print.StartDocPrinter(handle, 1, ("Hoja de conteo", None, "RAW"))
+            win32print.StartDocPrinter(handle, 1, ("Hoja de conteo", None, "RAW"))
             try:
                 win32print.StartPagePrinter(handle)
                 win32print.WritePrinter(handle, data)
@@ -62,3 +58,31 @@ def print_ticket_escpos(printer_name: str, text: str, *, copies: int = 1) -> boo
     finally:
         win32print.ClosePrinter(handle)
     return True
+
+
+def _send_raw_cups(printer_name: str, data: bytes, copies: int) -> bool:
+    """macOS/Linux: CUPS raw vía `lp -o raw` (bypassa el driver)."""
+    for _ in range(max(1, copies)):
+        proc = subprocess.run(
+            ["lp", "-d", printer_name, "-o", "raw"],
+            input=data,
+            capture_output=True,
+        )
+        if proc.returncode != 0:
+            detalle = proc.stderr.decode(errors="replace").strip() or "lp falló"
+            raise RuntimeError(detalle)
+    return True
+
+
+def print_ticket_escpos(printer_name: str, text: str, *, copies: int = 1) -> bool:
+    """Envía el ticket como datos RAW a la impresora. True si se mandó.
+
+    Windows usa el spooler RAW (pywin32); macOS/Linux usan CUPS (`lp -o raw`).
+    Lanza si el envío falla, para que el llamador caiga al camino QPrinter.
+    """
+    settings = load_escpos_settings()
+    data = build_escpos_bytes(text, settings)
+
+    if sys.platform.startswith("win"):
+        return _send_raw_windows(printer_name, data, copies)
+    return _send_raw_cups(printer_name, data, copies)

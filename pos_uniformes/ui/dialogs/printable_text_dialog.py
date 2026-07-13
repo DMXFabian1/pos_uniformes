@@ -10,8 +10,6 @@ dialogo mientras hay un QTimer pendiente, no se tocan widgets ya destruidos.
 
 from __future__ import annotations
 
-import sys
-
 from PyQt6.QtCore import QSizeF, Qt, QTimer
 from PyQt6.QtGui import QFontDatabase, QImage, QPageLayout, QPainter, QPageSize
 from PyQt6.QtPrintSupport import QPrinter
@@ -124,8 +122,11 @@ def _warm_up_printer_once() -> None:
 
 
 def _try_print_escpos(printer_name: str, content: str, copies: int) -> bool:
-    """Intenta imprimir por ESC/POS crudo (Windows). False si no aplica/falla."""
-    if not printer_name or not sys.platform.startswith("win"):
+    """Intenta imprimir por ESC/POS crudo (Windows: pywin32; Mac/Linux: CUPS).
+
+    False si no hay impresora, está apagado, o el envío falla → cae a QPrinter.
+    """
+    if not printer_name:
         return False
     try:
         from pos_uniformes.services.escpos_settings_cache_service import (
