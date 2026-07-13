@@ -18,6 +18,7 @@ from pos_uniformes.ui.dialogs.printable_text_dialog import (
     TICKET_BOTTOM_FEED_MM,
     _ticket_page_height_mm,
 )
+from pos_uniformes.ui.helpers.ticket_print_layout_helper import tk_line, tk_top
 
 
 class TicketDynamicPageHeightTests(unittest.TestCase):
@@ -36,6 +37,15 @@ class TicketDynamicPageHeightTests(unittest.TestCase):
         self.assertGreater(largo, corto)
         # La diferencia refleja las ~57 líneas extra (no un tamaño fijo).
         self.assertGreater(largo - corto, 50)
+
+    def test_no_sobreestima_por_envoltura_de_caja(self) -> None:
+        # Líneas de caja de 38 columnas SÍ caben en 80 mm: no deben contarse
+        # dobles (el bug que movía el corte y dejaba mucho papel). Con envoltura
+        # el alto sería ~2x. Cota generosa: ~4.5 mm/línea + colchón.
+        n = 20
+        content = "\n".join([tk_top()] + [tk_line("x" * 30)] * n)
+        alto = _ticket_page_height_mm(content)
+        self.assertLess(alto, (n + 1) * 4.5 + TICKET_BOTTOM_FEED_MM)
 
     def test_no_es_el_fijo_de_600(self) -> None:
         # El bug viejo: 600 mm fijos. Un ticket normal debe ser mucho menor.

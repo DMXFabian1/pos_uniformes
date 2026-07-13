@@ -11,7 +11,7 @@ dialogo mientras hay un QTimer pendiente, no se tocan widgets ya destruidos.
 from __future__ import annotations
 
 from PyQt6.QtCore import QSizeF, Qt, QTimer
-from PyQt6.QtGui import QFontDatabase, QPageLayout, QPainter, QPageSize
+from PyQt6.QtGui import QFontDatabase, QImage, QPageLayout, QPainter, QPageSize
 from PyQt6.QtPrintSupport import QPrinter
 from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QMessageBox, QTextEdit, QVBoxLayout, QWidget
 
@@ -20,7 +20,6 @@ from pos_uniformes.services.business_settings_service import BusinessSettingsSer
 from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
     TICKET_FONT_POINT_SIZE,
     TICKET_PAPER_WIDTH_MM,
-    build_ticket_document,
 )
 from pos_uniformes.ui.helpers.ticket_print_queue import TicketPrintQueue
 
@@ -29,8 +28,10 @@ from pos_uniformes.ui.helpers.ticket_print_queue import TicketPrintQueue
 # página de alto dinámico, este es el único "colchón" de papel entre el fin del
 # ticket y el corte, en vez de los 600 mm fijos de antes que cortaban a destiempo.
 TICKET_BOTTOM_FEED_MM = 12.0
-# Punto tipográfico ↔ milímetro (1 pt = 1/72 pulgada).
-_PT_PER_MM = 72.0 / 25.4
+# DPI de referencia para medir el alto del texto (ScreenResolution ≈ 96 dpi). El
+# alto físico en mm es independiente del dpi (la fuente está en puntos), así que
+# medir a 96 dpi coincide con lo que dibuja drawText en la impresora.
+_MEASURE_DPI = 96
 
 
 def _load_print_preferences() -> tuple[str, int]:
@@ -53,26 +54,48 @@ def _load_print_preferences() -> tuple[str, int]:
 
 
 def _ticket_page_height_mm(content: str) -> float:
-    """Alto de página (mm) = alto real del contenido + colchón para el corte.
+    """Alto de página (mm) = alto REAL del texto (como lo dibuja drawText) + colchón.
 
     Antes la página era fija de 600 mm y el driver cortaba según SU longitud de
-    papel, no la del contenido: hojas largas se cortaban a la mitad. Midiendo el
-    documento y haciendo la página de ese tamaño, el borde de la página coincide
-    con el fin del ticket y el autocutter corta justo ahí, una sola vez.
+    papel: hojas largas se cortaban a la mitad. Se mide con boundingRect sobre un
+    QImage con el MISMO ancho (80 mm) y flags que usa drawText, así la página
+    coincide exacto con lo impreso y el autocutter corta justo al final. (Medir
+    con QTextDocument daba de más: envolvía las líneas de caja a un ancho menor.)
     """
-    document = build_ticket_document(content)
-    alto_contenido_mm = document.size().height() / _PT_PER_MM
-    return alto_contenido_mm + TICKET_BOTTOM_FEED_MM
+    font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+    font.setPointSize(TICKET_FONT_POINT_SIZE)
+    font.setBold(True)
+
+    ancho_px = max(1, round(TICKET_PAPER_WIDTH_MM / 25.4 * _MEASURE_DPI))
+    lienzo = QImage(ancho_px, 8, QImage.Format.Format_ARGB32)  # solo aporta dpi/fuente
+    lienzo.setDotsPerMeterX(round(_MEASURE_DPI / 0.0254))
+    lienzo.setDotsPerMeterY(round(_MEASURE_DPI / 0.0254))
+
+    medidor = QPainter(lienzo)
+    try:
+        medidor.setFont(font)
+        flags = (
+            Qt.AlignmentFlag.AlignLeft
+            | Qt.AlignmentFlag.AlignTop
+            | Qt.TextFlag.TextWordWrap
+        )
+        bound = medidor.boundingRect(0, 0, ancho_px, 100_000, flags, content)
+    finally:
+        medidor.end()
+
+    alto_mm = bound.height() / _MEASURE_DPI * 25.4
+    return alto_mm + TICKET_BOTTOM_FEED_MM
 
 
 def _print_ticket_job(content: str) -> bool:
     """Envia un ticket a la impresora como un job independiente.
 
-    Devuelve True si el job se inicio correctamente. Cada llamada crea su
-    propio QPrinter (con la pagina de alto exacto al contenido) -> el autocutter
-    corta justo al final del ticket.
+    Cada llamada crea su propio QPrinter. Lo ÚNICO que cambia respecto al
+    comportamiento histórico es el alto de página (ahora dinámico, = contenido,
+    para que el autocutter corte justo al final). El renderizado sigue siendo el
+    mismo `drawText` de siempre para NO mover el formato del ticket/hoja.
     """
-    printer = QPrinter(QPrinter.PrinterMode.HighResolution)
+    printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
     ticket_printer, copies = _load_print_preferences()
     if ticket_printer:
         printer.setPrinterName(ticket_printer)
@@ -90,12 +113,17 @@ def _print_ticket_job(content: str) -> bool:
     if not painter.begin(printer):
         return False
     try:
-        # El documento vive en puntos; escalamos a la resolucion del printer para
-        # dibujarlo del mismo tamaño con que lo medimos (mismo alto = corte exacto).
-        document = build_ticket_document(content)
-        escala = printer.resolution() / 72.0
-        painter.scale(escala, escala)
-        document.drawContents(painter)
+        font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+        font.setPointSize(TICKET_FONT_POINT_SIZE)
+        font.setBold(True)
+        painter.setFont(font)
+
+        rect = painter.viewport()
+        painter.drawText(
+            rect,
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap,
+            content,
+        )
     finally:
         painter.end()
     return True
