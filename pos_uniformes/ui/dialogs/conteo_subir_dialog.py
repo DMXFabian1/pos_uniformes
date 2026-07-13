@@ -13,7 +13,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QBrush, QColor, QFont
+from PyQt6.QtGui import QBrush, QColor, QFont, QIntValidator
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -21,9 +21,9 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QHeaderView,
     QLabel,
+    QLineEdit,
     QMessageBox,
     QPushButton,
-    QSpinBox,
     QTableWidget,
     QTableWidgetItem,
     QVBoxLayout,
@@ -61,7 +61,8 @@ class ConteoSubirDialog(QDialog):
         self._session_factory = session_factory or _default_session_factory
         self._contado_por = contado_por
         self._variant_ids: list[int] = []
-        self._fisico_spins: list[QSpinBox] = []
+        self._fisico_inputs: list[QLineEdit] = []
+        self._sistemas: list[int] = []
         self._build_ui()
         self._cargar_escuelas()
 
@@ -122,8 +123,10 @@ class ConteoSubirDialog(QDialog):
         layout.addWidget(self._hint)
 
         self._table = QTableWidget()
-        self._table.setColumnCount(4)
-        self._table.setHorizontalHeaderLabels(["Talla", "Color", "Sistema", "Físico"])
+        self._table.setColumnCount(5)
+        self._table.setHorizontalHeaderLabels(
+            ["Talla", "Color", "Tienda", "Físico", "Diferencia"]
+        )
         self._table.verticalHeader().setVisible(False)
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._table.setShowGrid(False)
@@ -134,6 +137,7 @@ class ConteoSubirDialog(QDialog):
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         layout.addWidget(self._table, 1)
 
         actions = QHBoxLayout()
@@ -213,7 +217,8 @@ class ConteoSubirDialog(QDialog):
             session.close()
 
         self._variant_ids = []
-        self._fisico_spins = []
+        self._fisico_inputs = []
+        self._sistemas = []
 
         # Misma estructura que el panel de uniformes: se agrupa por producto y se
         # EXCLUYEN los productos virtuales (Pants 3pz, Chamarra) — esos no se
@@ -240,17 +245,27 @@ class ConteoSubirDialog(QDialog):
                 sistema_item = QTableWidgetItem(str(v.stock_tienda))
                 sistema_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
                 self._table.setItem(fila, 2, sistema_item)
-                spin = QSpinBox()
-                spin.setRange(0, 99999)
-                spin.setValue(v.stock_tienda)  # default = sistema (sin diferencia)
-                spin.valueChanged.connect(
-                    lambda _val, f=fila, s=v.stock_tienda, sp=spin: (
-                        self._resaltar_diferencia(f, s, sp)
-                    )
+
+                # Físico: vacío, con el esperado (Tienda) como placeholder en gris.
+                # Si se deja vacío se toma el esperado (sin diferencia).
+                inp = QLineEdit()
+                inp.setValidator(QIntValidator(0, 999999, inp))
+                inp.setPlaceholderText(str(v.stock_tienda))
+                inp.setAlignment(Qt.AlignmentFlag.AlignCenter)
+                inp.setMaximumWidth(90)
+                inp.textChanged.connect(
+                    lambda _t, f=fila, s=v.stock_tienda, w=inp: self._on_fisico_changed(f, s, w)
                 )
-                self._table.setCellWidget(fila, 3, spin)
+                self._table.setCellWidget(fila, 3, inp)
+
+                dif_item = QTableWidgetItem("—")
+                dif_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                dif_item.setForeground(QBrush(QColor("#9a8b7f")))
+                self._table.setItem(fila, 4, dif_item)
+
                 self._variant_ids.append(v.variante_id)
-                self._fisico_spins.append(spin)
+                self._fisico_inputs.append(inp)
+                self._sistemas.append(v.stock_tienda)
                 fila += 1
 
         hay = total_piezas > 0
@@ -274,39 +289,46 @@ class ConteoSubirDialog(QDialog):
         self._table.setItem(fila, 0, item)
         self._table.setSpan(fila, 0, 1, self._table.columnCount())
 
-    def _resaltar_diferencia(self, fila: int, sistema: int, spin: QSpinBox) -> None:
-        """Colorea la fila según el físico capturado vs. el sistema.
+    def _on_fisico_changed(self, fila: int, sistema: int, widget: QLineEdit) -> None:
+        """Muestra la diferencia (físico − esperado) en la columna Diferencia.
 
-        Rojo = hay MENOS de lo registrado (faltante); naranja = hay de más.
+        Vacío o igual = "—" en gris; menos = "-N" en rojo; más = "+N" en verde.
+        Es lo mismo que el panel de uniformes: cuántas menos/más desde el conteo.
         """
-        fisico = spin.value()
-        if fisico < sistema:  # faltante: menos uniformes de los registrados
-            fila_bg, spin_border, spin_txt = "#fef2f2", "#dc2626", "#b91c1c"
-        elif fisico > sistema:  # sobrante
-            fila_bg, spin_border, spin_txt = "#fff7ed", "#ea580c", "#c2410c"
-        else:  # coincide
-            fila_bg, spin_border, spin_txt = None, None, None
+        dif_item = self._table.item(fila, 4)
+        if dif_item is None:
+            return
+        txt = widget.text().strip()
+        dif = 0 if not txt else int(txt) - sistema
 
-        for col in (0, 1, 2):
-            item = self._table.item(fila, col)
-            if item is None:
-                continue
-            item.setBackground(QBrush(QColor(fila_bg)) if fila_bg else QBrush())
+        borde = ""
+        if dif == 0:
+            dif_item.setText("—")
+            dif_item.setForeground(QBrush(QColor("#9a8b7f")))
+        elif dif < 0:  # faltante: hay MENOS de lo esperado
+            dif_item.setText(str(dif))  # p.ej. -19
+            dif_item.setForeground(QBrush(QColor("#b91c1c")))
+            borde = "#dc2626"
+        else:  # sobrante: hay de MÁS
+            dif_item.setText(f"+{dif}")
+            dif_item.setForeground(QBrush(QColor("#166534")))
+            borde = "#16a34a"
 
-        if spin_border:
-            spin.setStyleSheet(
-                f"QSpinBox {{ background: {fila_bg}; color: {spin_txt};"
-                f" font-weight: 700; border: 1px solid {spin_border};"
-                " border-radius: 6px; padding: 3px 6px; }"
+        if borde:
+            widget.setStyleSheet(
+                f"QLineEdit {{ border: 1px solid {borde}; border-radius: 6px;"
+                " padding: 3px 6px; font-weight: 700; }"
             )
         else:
-            spin.setStyleSheet("")
+            widget.setStyleSheet("")
 
     def _registrar(self) -> None:
-        conteos = [
-            ConteoInput(variante_id=vid, stock_fisico=spin.value())
-            for vid, spin in zip(self._variant_ids, self._fisico_spins)
-        ]
+        # Si el campo se deja vacío, se toma el esperado (Tienda) = sin diferencia.
+        conteos = []
+        for vid, inp, sistema in zip(self._variant_ids, self._fisico_inputs, self._sistemas):
+            txt = inp.text().strip()
+            fisico = int(txt) if txt else sistema
+            conteos.append(ConteoInput(variante_id=vid, stock_fisico=fisico))
         if not conteos:
             return
         session = self._session_factory()

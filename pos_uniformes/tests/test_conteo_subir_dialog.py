@@ -84,10 +84,11 @@ class ConteoSubirDialogTests(unittest.TestCase):
         d._cargar_piezas()
         # 1 fila-encabezado del producto + 2 variantes
         self.assertEqual(d._table.rowCount(), 3)
-        self.assertEqual(len(d._fisico_spins), 2)
+        self.assertEqual(len(d._fisico_inputs), 2)
         self.assertTrue(d._registrar_btn.isEnabled())
-        # Físico default = stock de tienda (10)
-        self.assertEqual(d._fisico_spins[0].value(), 10)
+        # Físico vacío por defecto; el esperado (Tienda=10) va como placeholder gris.
+        self.assertEqual(d._fisico_inputs[0].text(), "")
+        self.assertEqual(d._fisico_inputs[0].placeholderText(), "10")
 
     def test_excluye_productos_virtuales(self) -> None:
         # Pants 3pz y Chamarra son virtuales: no se cuentan (se arman de otros).
@@ -123,9 +124,9 @@ class ConteoSubirDialogTests(unittest.TestCase):
         d._escuela_combo.setCurrentIndex(d._escuela_combo.findText("EscV"))
         d._cargar_piezas()
         # Solo la variante real aparece; la virtual (Pants 3pz) se excluye.
-        self.assertEqual(len(d._fisico_spins), 1)
+        self.assertEqual(len(d._fisico_inputs), 1)
 
-    def test_resalta_faltante_y_limpia_al_coincidir(self) -> None:
+    def test_diferencia_menos_y_limpia_al_coincidir(self) -> None:
         s = self.factory()
         _seed(s, "Uno", stock=10)
         s.commit()
@@ -133,23 +134,21 @@ class ConteoSubirDialogTests(unittest.TestCase):
         d = self._dialog()
         d._escuela_combo.setCurrentIndex(d._escuela_combo.findText("Uno"))
         d._cargar_piezas()
-        spin = d._fisico_spins[0]
+        inp = d._fisico_inputs[0]
         fila = next(
             r for r in range(d._table.rowCount())
-            if d._table.cellWidget(r, 3) is spin
+            if d._table.cellWidget(r, 3) is inp
         )
 
-        # Físico < sistema → faltante: la fila se pinta y el spin queda con estilo.
-        spin.setValue(8)
-        self.assertTrue(spin.styleSheet())  # no vacío
-        self.assertTrue(d._table.item(fila, 0).background().color().isValid())
-        self.assertEqual(
-            d._table.item(fila, 0).background().color().name(), "#fef2f2"
-        )
+        # Físico < esperado → "-2" en la columna Diferencia + input con estilo.
+        inp.setText("8")
+        self.assertEqual(d._table.item(fila, 4).text(), "-2")
+        self.assertTrue(inp.styleSheet())  # no vacío
 
-        # Vuelve a coincidir → se limpia el resaltado.
-        spin.setValue(10)
-        self.assertFalse(spin.styleSheet())
+        # Vuelve a coincidir → "—" y sin estilo.
+        inp.setText("10")
+        self.assertEqual(d._table.item(fila, 4).text(), "—")
+        self.assertFalse(inp.styleSheet())
 
     def test_registrar_guarda_conteos(self) -> None:
         s = self.factory()
@@ -160,8 +159,9 @@ class ConteoSubirDialogTests(unittest.TestCase):
         d = self._dialog()
         d._escuela_combo.setCurrentIndex(d._escuela_combo.findText("Uno"))
         d._cargar_piezas()
-        # Capturar una diferencia: una pieza con físico 8 (sistema 10)
-        d._fisico_spins[0].setValue(8)
+        # Capturar una diferencia: una pieza con físico 8 (esperado 10); la otra
+        # se deja vacía → toma el esperado (sin diferencia).
+        d._fisico_inputs[0].setText("8")
         with patch("pos_uniformes.ui.dialogs.conteo_subir_dialog.QMessageBox.information"):
             d._registrar()
 

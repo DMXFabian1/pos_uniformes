@@ -133,7 +133,7 @@ class ConteoBasicosDialogTests(unittest.TestCase):
         self.assertGreaterEqual(idx, 0)
         d._escuela_combo.setCurrentIndex(idx)
         d._cargar_piezas()
-        self.assertEqual(len(d._fisico_spins), 1)  # la única variante básica
+        self.assertEqual(len(d._fisico_inputs), 1)  # la única variante básica
 
     def test_orden_filtro_tipo_para_basicos(self) -> None:
         from pos_uniformes.ui.dialogs.conteo_orden_dialog import ConteoOrdenDialog
