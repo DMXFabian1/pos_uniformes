@@ -9,6 +9,7 @@ from pathlib import Path
 from PyQt6.QtPrintSupport import QPrinterInfo
 from PyQt6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QComboBox,
     QScrollArea,
     QTabWidget,
@@ -287,6 +288,110 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     label_layout.addLayout(label_form)
     label_layout.addWidget(save_label_btn)
     label_box.setLayout(label_layout)
+
+    # — Impresión ESC/POS (crudo) de tickets —
+    from pos_uniformes.services.escpos_settings_cache_service import (
+        EscPosSettings,
+        load_escpos_settings,
+        save_escpos_settings,
+    )
+
+    escpos_box = QGroupBox("Impresión de tickets (ESC/POS)")
+    escpos_layout = QVBoxLayout()
+    escpos_help = QLabel(
+        "ESC/POS manda el texto directo a la térmica (sin el driver de Windows), "
+        "así la 1ª hoja no sale ancha/recortada y el corte es exacto. Si la caja o "
+        "los acentos salen raros, ajusta el «Codepage» y vuelve a probar."
+    )
+    escpos_help.setWordWrap(True)
+    _esc = load_escpos_settings()
+    escpos_enabled = QCheckBox("Usar ESC/POS crudo (recomendado para térmica)")
+    escpos_enabled.setChecked(_esc.enabled)
+    escpos_fullcut = QCheckBox("Corte total (desmarca para corte parcial)")
+    escpos_fullcut.setChecked(_esc.full_cut)
+    escpos_form = QFormLayout()
+    escpos_codepage = QSpinBox()
+    escpos_codepage.setRange(0, 255)
+    escpos_codepage.setValue(_esc.codepage)
+    escpos_form.addRow("Codepage (ESC t n; 2 = CP850):", escpos_codepage)
+    escpos_feed = QSpinBox()
+    escpos_feed.setRange(0, 20)
+    escpos_feed.setValue(_esc.feed_lines)
+    escpos_form.addRow("Líneas antes del corte:", escpos_feed)
+
+    def _escpos_actuales() -> EscPosSettings:
+        return EscPosSettings(
+            enabled=escpos_enabled.isChecked(),
+            codepage=escpos_codepage.value(),
+            encoding=_esc.encoding,
+            feed_lines=escpos_feed.value(),
+            full_cut=escpos_fullcut.isChecked(),
+        )
+
+    save_escpos_btn = QPushButton("Guardar ESC/POS")
+    save_escpos_btn.setObjectName("primaryButton")
+
+    def handle_save_escpos() -> None:
+        try:
+            save_escpos_settings(_escpos_actuales())
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(dialog, "Error", f"No se pudo guardar:\n{exc}")
+            return
+        QMessageBox.information(dialog, "Guardado", "Ajustes ESC/POS guardados.")
+
+    save_escpos_btn.clicked.connect(handle_save_escpos)
+
+    test_escpos_btn = QPushButton("Imprimir hoja de prueba")
+    test_escpos_btn.setObjectName("secondaryButton")
+
+    def handle_test_escpos() -> None:
+        printer_name = str(printer_combo.currentData() or "")
+        if not printer_name:
+            QMessageBox.warning(
+                dialog, "Sin impresora",
+                "Elige primero la impresora de tickets arriba.",
+            )
+            return
+        prueba = (
+            "┌────────────────────────────────────┐\n"
+            "│           HOJA DE PRUEBA           │\n"
+            "├────────────────────────────────────┤\n"
+            "│         PRODUCTOS BÁSICOS          │\n"
+            "│ Suéter · Falda Escocés · Camisón   │\n"
+            "├────────────────────────────────────┤\n"
+            "│ Talla        Exist.    Pedido      │\n"
+            "│ 9-12          ____      ____       │\n"
+            "│ 13-18         ____      ____       │\n"
+            "└────────────────────────────────────┘\n"
+        )
+        try:
+            from pos_uniformes.ui.helpers.escpos_ticket_print_helper import (
+                print_ticket_escpos,
+            )
+
+            print_ticket_escpos(printer_name, prueba, copies=1)
+            QMessageBox.information(
+                dialog, "Enviado",
+                "Se envió la hoja de prueba. Revisa la caja, los acentos y el corte.",
+            )
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(
+                dialog, "Error",
+                f"No se pudo imprimir la prueba (¿Windows/impresora?):\n{exc}",
+            )
+
+    test_escpos_btn.clicked.connect(handle_test_escpos)
+
+    escpos_layout.addWidget(escpos_help)
+    escpos_layout.addWidget(escpos_enabled)
+    escpos_layout.addWidget(escpos_fullcut)
+    escpos_layout.addLayout(escpos_form)
+    escpos_btn_row = QHBoxLayout()
+    escpos_btn_row.addWidget(save_escpos_btn)
+    escpos_btn_row.addWidget(test_escpos_btn)
+    escpos_btn_row.addStretch()
+    escpos_layout.addLayout(escpos_btn_row)
+    escpos_box.setLayout(escpos_layout)
 
     # — Meilisearch —
     meili_box = QGroupBox("Meilisearch (busqueda rapida)")
@@ -575,6 +680,7 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     def _aplicar_visibilidad_rol(es_servidor: bool) -> None:
         printer_box.setVisible(es_servidor)
         label_box.setVisible(es_servidor)
+        escpos_box.setVisible(es_servidor)
         estacion_hint.setVisible(not es_servidor)
 
     # radio_local y radio_sat son mutuamente exclusivos (mismo padre): basta
@@ -641,7 +747,8 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     tabs = QTabWidget()
     tabs.addTab(_make_tab(status_box, config_box), "🔌  Conexión")
     tabs.addTab(
-        _make_tab(routing_box, estacion_hint, printer_box, label_box), "🖨  Impresoras"
+        _make_tab(routing_box, estacion_hint, printer_box, label_box, escpos_box),
+        "🖨  Impresoras",
     )
     tabs.addTab(_make_tab(meili_box), "🔍  Búsqueda")
     tabs.addTab(_make_tab(conteo_box), "📋  Conteos")

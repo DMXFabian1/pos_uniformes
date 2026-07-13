@@ -10,6 +10,8 @@ dialogo mientras hay un QTimer pendiente, no se tocan widgets ya destruidos.
 
 from __future__ import annotations
 
+import sys
+
 from PyQt6.QtCore import QSizeF, Qt, QTimer
 from PyQt6.QtGui import QFontDatabase, QImage, QPageLayout, QPainter, QPageSize
 from PyQt6.QtPrintSupport import QPrinter
@@ -121,20 +123,46 @@ def _warm_up_printer_once() -> None:
         pass
 
 
+def _try_print_escpos(printer_name: str, content: str, copies: int) -> bool:
+    """Intenta imprimir por ESC/POS crudo (Windows). False si no aplica/falla."""
+    if not printer_name or not sys.platform.startswith("win"):
+        return False
+    try:
+        from pos_uniformes.services.escpos_settings_cache_service import (
+            load_escpos_settings,
+        )
+
+        if not load_escpos_settings().enabled:
+            return False
+        from pos_uniformes.ui.helpers.escpos_ticket_print_helper import (
+            print_ticket_escpos,
+        )
+
+        return print_ticket_escpos(printer_name, content, copies=copies)
+    except Exception:  # noqa: BLE001 — cae al camino QPrinter
+        return False
+
+
 def _print_ticket_job(content: str) -> bool:
     """Envia un ticket a la impresora como un job independiente.
 
-    Cada llamada crea su propio QPrinter. Lo ÚNICO que cambia respecto al
-    comportamiento histórico es el alto de página (ahora dinámico, = contenido,
-    para que el autocutter corte justo al final). El renderizado sigue siendo el
-    mismo `drawText` de siempre para NO mover el formato del ticket/hoja.
+    En Windows (térmica) usa ESC/POS crudo: manda los bytes al spooler RAW sin
+    pasar por el driver, así la impresora imprime a su ancho nativo y corta donde
+    le decimos (elimina el problema del tamaño de página de la 1ª hoja).
+
+    Si ESC/POS está apagado, falla, o no es Windows, cae al camino QPrinter de
+    siempre (alto de página dinámico + drawText).
     """
+    ticket_printer, copies = _load_print_preferences()
+
+    if _try_print_escpos(ticket_printer, content, copies):
+        return True
+
     # El primer trabajo de la sesión sale con el tamaño por defecto del driver;
     # se calienta una vez para que la primera hoja real ya salga bien.
     _warm_up_printer_once()
 
     printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
-    ticket_printer, copies = _load_print_preferences()
     if ticket_printer:
         printer.setPrinterName(ticket_printer)
     printer.setCopyCount(copies)
