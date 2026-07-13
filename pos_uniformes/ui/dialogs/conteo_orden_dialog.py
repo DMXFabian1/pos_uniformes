@@ -29,7 +29,11 @@ from PyQt6.QtWidgets import (
 from sqlalchemy.orm import Session
 
 from pos_uniformes.services.conteo_calendario_service import obtener_calendario_conteo
-from pos_uniformes.services.conteo_sheet_service import build_conteo_sheets
+from pos_uniformes.services.conteo_service import ESCUELA_ID_BASICOS
+from pos_uniformes.services.conteo_sheet_service import (
+    build_conteo_sheets,
+    build_conteo_sheets_basicos,
+)
 
 
 def _default_session_factory() -> Session:
@@ -194,7 +198,10 @@ class ConteoOrdenDialog(QDialog):
 
         session = self._session_factory()
         try:
-            sheets = build_conteo_sheets(session, escuela_id, escuela_nombre)
+            if escuela_id == ESCUELA_ID_BASICOS:
+                sheets = build_conteo_sheets_basicos(session)
+            else:
+                sheets = build_conteo_sheets(session, escuela_id, escuela_nombre)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Error", f"No se pudieron generar las hojas:\n{exc}")
             return

@@ -27,7 +27,11 @@ from PyQt6.QtWidgets import (
 from sqlalchemy.orm import Session
 
 from pos_uniformes.services.conteo_calendario_service import obtener_calendario_conteo
-from pos_uniformes.services.conteo_service import guardar_config_conteo
+from pos_uniformes.services.conteo_service import (
+    ESCUELA_ID_BASICOS,
+    guardar_config_conteo,
+    guardar_dias_vigencia_basicos,
+)
 
 _STYLES = (
     "#calTitulo { color: #7b2d14; font-size: 20px; font-weight: 800; background: transparent; }"
@@ -206,7 +210,10 @@ class ConteoCalendarioPanel(QWidget):
         session = self._session_factory()
         try:
             for escuela_id, spin in self._spins.items():
-                guardar_config_conteo(session, escuela_id, spin.value())
+                if escuela_id == ESCUELA_ID_BASICOS:
+                    guardar_dias_vigencia_basicos(session, spin.value())
+                else:
+                    guardar_config_conteo(session, escuela_id, spin.value())
             session.commit()
         except Exception as exc:  # noqa: BLE001
             session.rollback()

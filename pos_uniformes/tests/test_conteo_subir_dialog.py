@@ -68,7 +68,10 @@ class ConteoSubirDialogTests(unittest.TestCase):
         s.commit()
         s.close()
         d = self._dialog()
-        self.assertEqual(d._escuela_combo.count(), 2)
+        # 2 escuelas + la entrada especial "Productos básicos".
+        self.assertEqual(d._escuela_combo.count(), 3)
+        self.assertGreaterEqual(d._escuela_combo.findText("Uno"), 0)
+        self.assertGreaterEqual(d._escuela_combo.findText("Dos"), 0)
 
     def test_cargar_piezas_llena_tabla(self) -> None:
         s = self.factory()
@@ -76,7 +79,7 @@ class ConteoSubirDialogTests(unittest.TestCase):
         s.commit()
         s.close()
         d = self._dialog()
-        d._escuela_combo.setCurrentIndex(0)
+        d._escuela_combo.setCurrentIndex(d._escuela_combo.findText("Uno"))
         d._cargar_piezas()
         # 1 fila-encabezado del producto + 2 variantes
         self.assertEqual(d._table.rowCount(), 3)
@@ -91,7 +94,7 @@ class ConteoSubirDialogTests(unittest.TestCase):
         s.commit()
         s.close()
         d = self._dialog()
-        d._escuela_combo.setCurrentIndex(0)
+        d._escuela_combo.setCurrentIndex(d._escuela_combo.findText("Uno"))
         d._cargar_piezas()
         spin = d._fisico_spins[0]
         fila = next(
@@ -118,7 +121,7 @@ class ConteoSubirDialogTests(unittest.TestCase):
         eid = e.id
         s.close()
         d = self._dialog()
-        d._escuela_combo.setCurrentIndex(0)
+        d._escuela_combo.setCurrentIndex(d._escuela_combo.findText("Uno"))
         d._cargar_piezas()
         # Capturar una diferencia: una pieza con físico 8 (sistema 10)
         d._fisico_spins[0].setValue(8)

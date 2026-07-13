@@ -33,7 +33,10 @@ from sqlalchemy.orm import Session
 
 from pos_uniformes.services.catalog_school_link_service import list_all_schools
 from pos_uniformes.services.conteo_service import (
+    ESCUELA_ID_BASICOS,
+    NOMBRE_BASICOS,
     ConteoInput,
+    obtener_variantes_basicos_para_conteo,
     obtener_variantes_para_conteo,
     registrar_conteos_lote,
 )
@@ -155,6 +158,8 @@ class ConteoSubirDialog(QDialog):
         finally:
             session.close()
         self._escuela_combo.clear()
+        # Entrada especial: productos básicos (sin escuela), al inicio.
+        self._escuela_combo.addItem(f"— {NOMBRE_BASICOS} —", ESCUELA_ID_BASICOS)
         for e in escuelas:
             self._escuela_combo.addItem(e["escuela_nombre"], e["escuela_id"])
 
@@ -164,7 +169,10 @@ class ConteoSubirDialog(QDialog):
             return
         session = self._session_factory()
         try:
-            variantes = obtener_variantes_para_conteo(session, int(escuela_id))
+            if int(escuela_id) == ESCUELA_ID_BASICOS:
+                variantes = obtener_variantes_basicos_para_conteo(session)
+            else:
+                variantes = obtener_variantes_para_conteo(session, int(escuela_id))
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Error", f"No se pudieron cargar las piezas:\n{exc}")
             return

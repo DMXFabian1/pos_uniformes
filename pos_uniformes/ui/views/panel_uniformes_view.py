@@ -292,11 +292,18 @@ class PanelBridge(QObject):
     @pyqtSlot(int, int, result=str)
     def setConfigConteo(self, escuela_id: int, dias_vigencia: int) -> str:
         from pos_uniformes.database.connection import get_session
-        from pos_uniformes.services.conteo_service import guardar_config_conteo
+        from pos_uniformes.services.conteo_service import (
+            ESCUELA_ID_BASICOS,
+            guardar_config_conteo,
+            guardar_dias_vigencia_basicos,
+        )
 
         try:
             with get_session() as session:
-                guardar_config_conteo(session, escuela_id, dias_vigencia)
+                if escuela_id == ESCUELA_ID_BASICOS:
+                    guardar_dias_vigencia_basicos(session, dias_vigencia)
+                else:
+                    guardar_config_conteo(session, escuela_id, dias_vigencia)
                 session.commit()
                 return json.dumps({"ok": True})
         except Exception as exc:  # noqa: BLE001
