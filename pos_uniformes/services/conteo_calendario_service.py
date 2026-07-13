@@ -18,7 +18,10 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from pos_uniformes.database.models import Escuela
-from pos_uniformes.services.conteo_service import obtener_estado_conteo_escuela
+from pos_uniformes.services.conteo_service import (
+    obtener_estado_conteo_basicos,
+    obtener_estado_conteo_escuela,
+)
 
 
 @dataclass(frozen=True)
@@ -93,6 +96,11 @@ def obtener_calendario_conteo(
         if solo_con_productos and estado.total_variantes == 0:
             continue
         resultado.append(_estado_desde(estado, ahora))
+
+    # "Productos básicos" (sin escuela) entran como una entidad más del calendario.
+    estado_basicos = obtener_estado_conteo_basicos(session)
+    if not (solo_con_productos and estado_basicos.total_variantes == 0):
+        resultado.append(_estado_desde(estado_basicos, ahora))
 
     # Orden: vencidas/nunca contadas primero (más urgente = menor dias_para_vencer);
     # las nunca contadas van al frente. Empate por nombre.

@@ -231,6 +231,9 @@ class ConfiguracionNegocio(Base):
     impresora_preferida: Mapped[str | None] = mapped_column(String(200))
     impresora_tickets: Mapped[str | None] = mapped_column(String(200))
     copias_ticket: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    # Frecuencia de conteo de "productos básicos" (sin escuela). NULL = usar el
+    # default global. Es global porque los básicos no pertenecen a una escuela.
+    dias_vigencia_basicos: Mapped[int | None] = mapped_column(Integer)
     promo_authorization_code_hash: Mapped[str | None] = mapped_column(String(255))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

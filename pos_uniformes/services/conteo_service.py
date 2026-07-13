@@ -19,6 +19,7 @@ from pos_uniformes.database.models import (
     BodegaContenido,
     CatalogSchoolProductLink,
     ConfigConteoEscuela,
+    ConfiguracionNegocio,
     ConteoInventario,
     Escuela,
     MovimientoInventario,
@@ -28,6 +29,11 @@ from pos_uniformes.database.models import (
 )
 
 DIAS_VIGENCIA_DEFAULT = 90
+
+# "Productos básicos" (sin escuela) se tratan como una entidad más en el
+# calendario. Usan este id-centinela (no hay Escuela con id 0) y este nombre.
+ESCUELA_ID_BASICOS = 0
+NOMBRE_BASICOS = "Productos básicos"
 
 
 # ---------------------------------------------------------------------------
@@ -605,6 +611,88 @@ def obtener_estado_conteo_escuela(
         ultimo_conteo=ultimo,
         pct_vigente=pct,
     )
+
+
+def obtener_dias_vigencia_basicos(session: Session) -> int:
+    """Días de vigencia configurados para productos básicos (o el default)."""
+    valor = session.scalar(select(ConfiguracionNegocio.dias_vigencia_basicos))
+    return int(valor) if valor else DIAS_VIGENCIA_DEFAULT
+
+
+def _basico_variant_ids_subquery():
+    """Sub-query con los ids de variantes de productos básicos activos."""
+    linked_ids = (
+        select(CatalogSchoolProductLink.producto_id)
+        .where(CatalogSchoolProductLink.activo.is_(True))
+        .distinct()
+        .scalar_subquery()
+    )
+    return (
+        select(Variante.id)
+        .join(Variante.producto)
+        .where(
+            Producto.escuela_id.is_(None),
+            Producto.activo.is_(True),
+            Variante.activo.is_(True),
+            Producto.id.in_(linked_ids),
+        )
+    )
+
+
+def obtener_estado_conteo_basicos(session: Session) -> EstadoConteoEscuela:
+    """Estado de conteo de los productos básicos (entidad sin escuela).
+
+    Mismo cálculo que una escuela pero sobre las variantes básicas (escuela_id
+    NULL ligadas por catálogo) y con la frecuencia global de básicos.
+    """
+    dias_vigencia = obtener_dias_vigencia_basicos(session)
+    ids_subq = _basico_variant_ids_subquery().subquery()
+
+    total = session.scalar(
+        select(func.count()).select_from(ids_subq)
+    ) or 0
+
+    limite_fecha = datetime.now(timezone.utc) - timedelta(days=dias_vigencia)
+    contadas_vigentes = session.scalar(
+        select(func.count(Variante.id)).where(
+            Variante.id.in_(select(ids_subq.c.id)),
+            Variante.ultimo_conteo_at.isnot(None),
+            Variante.ultimo_conteo_at >= limite_fecha,
+        )
+    ) or 0
+
+    # Último conteo registrado de básicos (sus ConteoInventario tienen escuela NULL).
+    ultimo = session.scalar(
+        select(func.max(ConteoInventario.contado_at)).where(
+            ConteoInventario.escuela_id.is_(None),
+            ConteoInventario.variante_id.in_(select(ids_subq.c.id)),
+        )
+    )
+
+    pendientes = total - contadas_vigentes
+    pct = round(contadas_vigentes / total * 100) if total > 0 else 0
+
+    return EstadoConteoEscuela(
+        escuela_id=ESCUELA_ID_BASICOS,
+        escuela_nombre=NOMBRE_BASICOS,
+        dias_vigencia=dias_vigencia,
+        total_variantes=total,
+        contadas_vigentes=contadas_vigentes,
+        pendientes_conteo=pendientes,
+        ultimo_conteo=ultimo,
+        pct_vigente=pct,
+    )
+
+
+def guardar_dias_vigencia_basicos(session: Session, dias_vigencia: int) -> None:
+    """Fija la frecuencia de conteo de productos básicos (global)."""
+    if dias_vigencia < 1:
+        raise ValueError("Los días de vigencia deben ser al menos 1.")
+    config = session.scalar(select(ConfiguracionNegocio).limit(1))
+    if config is None:
+        config = ConfiguracionNegocio()
+        session.add(config)
+    config.dias_vigencia_basicos = dias_vigencia
 
 
 # ---------------------------------------------------------------------------
