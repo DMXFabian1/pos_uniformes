@@ -37,6 +37,7 @@
 
 - `services/`: logica de negocio, auditoria, backup, caja, ventas, inventario, clientes y helpers puros.
 - Subsistemas mas recientes: bodega (mini-WMS), empleadas (`employee_*`), busqueda Meilisearch (`meilisearch_service.py`, auto-arranque), cache local del satelite (`catalog_local_cache_service.py` y afines), conteo de inventario.
+- Impresion centralizada Servidor/Estacion (cola en tabla `trabajo` + despachador): ver [`arquitectura_impresion.md`](arquitectura_impresion.md).
 
 ### Vistas y dialogs
 

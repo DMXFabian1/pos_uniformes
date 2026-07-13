@@ -1,10 +1,18 @@
 # Guía de pruebas — Despachador al satélite (Windows)
 
-Circuito a validar: el POS/kiosko **encolan** trabajos y el satélite (la PC con las
-impresoras) los **imprime/atiende**. Todo por la red local, contra la Postgres de
-la PC principal.
+Circuito a validar: las **Estaciones** (POS/kiosko/cajas) **encolan** trabajos y el
+**Servidor de impresión** (la única PC con las impresoras) los **imprime/atiende**.
+Todo por la red local, contra la Postgres de la PC principal.
 
 > Rama: `feat/despachador-satelite`. Nada está mergeado a `main`.
+
+> **Terminología (rol por PC, se elige en el admin → Impresoras):**
+> - **Servidor de impresión** = la PC que tiene las impresoras conectadas. Imprime
+>   lo suyo y lo que le mandan las estaciones. (En código: `MODO_LOCAL`.)
+> - **Estación** = cualquier otra PC (caja, kiosko). Solo encola trabajos al
+>   servidor; **no detecta ni configura ninguna impresora**. (En código: `MODO_SATELITE`.)
+> - Docs viejos decían "satélite" a la PC con impresoras y "modo satélite" a la que
+>   envía. Ahora: PC con impresoras = **Servidor**; la que envía = **Estación**.
 
 ---
 
@@ -19,25 +27,30 @@ la PC principal.
    `listen_addresses='*'` en `postgresql.conf` y una regla para la subred en
    `pg_hba.conf`. Anotar la **IP local** de esta PC (`ipconfig`).
 
-**En la PC satélite (la de las impresoras):**
+**En el Servidor de impresión (la única PC con las impresoras):**
 1. Mismo checkout de la rama.
-2. En `pos_uniformes.env`, apuntar a la principal:
+2. En `pos_uniformes.env`, apuntar a la principal (si la Postgres está en otra PC):
    `POS_UNIFORMES_DB_HOST=<IP de la principal>` (no `localhost`).
-3. Abrir la app del satélite. Menú admin (**Ctrl+Shift+A**) → pestaña
-   **🖨 Impresoras** → “Modo de impresión de esta PC” = **Imprimir local**.
-   Confirmar que las impresoras de tickets y etiquetas estén elegidas.
+3. Abrir la app. Menú admin (**Ctrl+Shift+A**) → pestaña **🖨 Impresoras** →
+   rol = **🖨 Servidor de impresión**. Ahí se muestran y se eligen las impresoras
+   de tickets y de etiquetas (Normal/Split/Continua → una; Label → otra).
 
-**En la PC principal (POS/kiosko):**
-1. Menú admin → “Modo de impresión de esta PC” = **Enviar al satélite**.
-   Poner un “origen” reconocible (p.ej. `principal` o `kiosko`).
+**En cada Estación (cajas, kioskos):**
+1. Mismo checkout de la rama.
+2. En `pos_uniformes.env`, apuntar a la principal: `POS_UNIFORMES_DB_HOST=<IP>`.
+3. Menú admin → pestaña Impresoras → rol = **📡 Estación**. Poner un “Nombre de
+   esta PC” reconocible (p.ej. `principal`, `kiosko`, `caja 2`).
+   - Nota: en rol Estación **no** aparece config de impresoras (es correcto: la
+     estación no imprime, solo encola). Si ves las cajas de impresora, esta PC
+     está marcada como Servidor.
 
-**Atajos en el satélite:**
+**Atajos en el Servidor de impresión:**
 - **Ctrl+Shift+Q** → panel de la cola (ver/reordenar/reimprimir/cancelar).
 - **Ctrl+Shift+P** → tablero de pedidos.
 
-> Regla de oro: con modo **Local**, el comportamiento es el de siempre (imprime
-> en su impresora). El ruteo al satélite SOLO ocurre en las máquinas marcadas
-> como **Enviar al satélite**.
+> Regla de oro: en rol **Servidor de impresión** imprime local (comportamiento de
+> siempre) y drena la cola. El envío a la cola SOLO ocurre en las PCs marcadas como
+> **Estación**. Debe haber **un solo Servidor** (la PC con las impresoras).
 
 ---
 
