@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
+from PyQt6.QtCore import Qt
+from PyQt6.QtGui import QBrush, QColor, QFont
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -63,6 +65,37 @@ class ConteoSubirDialog(QDialog):
     # ── UI ────────────────────────────────────────────────────────────────────
 
     def _build_ui(self) -> None:
+        # Paleta del panel de uniformes (café/crema) para un look coherente.
+        self.setStyleSheet(
+            """
+            QDialog { background: #f7f5f2; }
+            QLabel { color: #1a1a1a; background: transparent; }
+            QComboBox, QSpinBox {
+                background: #ffffff; color: #1a1a1a;
+                border: 1px solid #e5e5e5; border-radius: 6px; padding: 3px 6px;
+            }
+            QTableWidget {
+                background: #ffffff; alternate-background-color: #faf7f3;
+                color: #1a1a1a; border: 1px solid #e5e5e5; border-radius: 8px;
+            }
+            QTableWidget::item { padding: 4px 6px; }
+            QHeaderView::section {
+                background: #f5ebe0; color: #5c3019; font-weight: 600;
+                border: none; padding: 7px 6px;
+            }
+            QPushButton {
+                background: #ffffff; color: #87492c;
+                border: 1px solid #e5d9cd; border-radius: 8px; padding: 6px 14px;
+            }
+            QPushButton:hover { background: #f5ebe0; }
+            QPushButton#primaryButton {
+                background: #87492c; color: #ffffff; border: none; font-weight: 600;
+            }
+            QPushButton#primaryButton:hover { background: #5c3019; }
+            QPushButton#primaryButton:disabled { background: #d8ccc2; color: #f7f5f2; }
+            """
+        )
+
         layout = QVBoxLayout()
 
         top = QHBoxLayout()
@@ -80,14 +113,18 @@ class ConteoSubirDialog(QDialog):
         layout.addWidget(self._hint)
 
         self._table = QTableWidget()
-        self._table.setColumnCount(5)
-        self._table.setHorizontalHeaderLabels(["Producto", "Talla", "Color", "Sistema", "Físico"])
+        self._table.setColumnCount(4)
+        self._table.setHorizontalHeaderLabels(["Talla", "Color", "Sistema", "Físico"])
         self._table.verticalHeader().setVisible(False)
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._table.setShowGrid(False)
+        self._table.setWordWrap(False)
+        self._table.setAlternatingRowColors(True)
         header = self._table.horizontalHeader()
-        header.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        for col in (1, 2, 3, 4):
-            header.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
+        header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
         layout.addWidget(self._table, 1)
 
         actions = QHBoxLayout()
@@ -136,18 +173,42 @@ class ConteoSubirDialog(QDialog):
 
         self._variant_ids = []
         self._fisico_spins = []
-        self._table.setRowCount(len(variantes))
-        for fila, v in enumerate(variantes):
-            self._table.setItem(fila, 0, QTableWidgetItem(v.producto_nombre))
-            self._table.setItem(fila, 1, QTableWidgetItem(v.talla))
-            self._table.setItem(fila, 2, QTableWidgetItem(v.color))
-            self._table.setItem(fila, 3, QTableWidgetItem(str(v.stock_tienda)))
-            spin = QSpinBox()
-            spin.setRange(0, 99999)
-            spin.setValue(v.stock_tienda)  # default = sistema (sin diferencia)
-            self._table.setCellWidget(fila, 4, spin)
-            self._variant_ids.append(v.variante_id)
-            self._fisico_spins.append(spin)
+
+        # Agrupa por producto (conservando el orden del backend) para que el
+        # nombre no se repita en cada fila y las piezas se separen visualmente.
+        grupos: list[tuple[str, list]] = []
+        for v in variantes:
+            if not grupos or grupos[-1][0] != v.producto_nombre:
+                grupos.append((v.producto_nombre, []))
+            grupos[-1][1].append(v)
+
+        total_filas = sum(1 + len(items) for _, items in grupos)
+        self._table.clearSpans()
+        self._table.setRowCount(0)
+        self._table.setRowCount(total_filas)
+
+        fila = 0
+        for producto, items in grupos:
+            self._agregar_encabezado(fila, f"{producto}  ·  {len(items)} pzs")
+            fila += 1
+            for v in items:
+                self._table.setItem(fila, 0, QTableWidgetItem(f"  {v.talla}"))
+                self._table.setItem(fila, 1, QTableWidgetItem(v.color))
+                sistema_item = QTableWidgetItem(str(v.stock_tienda))
+                sistema_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self._table.setItem(fila, 2, sistema_item)
+                spin = QSpinBox()
+                spin.setRange(0, 99999)
+                spin.setValue(v.stock_tienda)  # default = sistema (sin diferencia)
+                spin.valueChanged.connect(
+                    lambda _val, f=fila, s=v.stock_tienda, sp=spin: (
+                        self._resaltar_diferencia(f, s, sp)
+                    )
+                )
+                self._table.setCellWidget(fila, 3, spin)
+                self._variant_ids.append(v.variante_id)
+                self._fisico_spins.append(spin)
+                fila += 1
 
         hay = len(variantes) > 0
         self._registrar_btn.setEnabled(hay)
@@ -157,6 +218,46 @@ class ConteoSubirDialog(QDialog):
             )
         else:
             self._hint.setText("Esta escuela no tiene piezas para contar.")
+
+    def _agregar_encabezado(self, fila: int, texto: str) -> None:
+        """Fila-encabezado de un producto: negrita, con fondo, ocupa todo el ancho."""
+        item = QTableWidgetItem(texto)
+        fuente = QFont()
+        fuente.setBold(True)
+        item.setFont(fuente)
+        item.setBackground(QBrush(QColor("#f5ebe0")))  # --brand-light
+        item.setForeground(QBrush(QColor("#5c3019")))  # --brand-dark
+        item.setFlags(Qt.ItemFlag.ItemIsEnabled)  # no seleccionable
+        self._table.setItem(fila, 0, item)
+        self._table.setSpan(fila, 0, 1, self._table.columnCount())
+
+    def _resaltar_diferencia(self, fila: int, sistema: int, spin: QSpinBox) -> None:
+        """Colorea la fila según el físico capturado vs. el sistema.
+
+        Rojo = hay MENOS de lo registrado (faltante); naranja = hay de más.
+        """
+        fisico = spin.value()
+        if fisico < sistema:  # faltante: menos uniformes de los registrados
+            fila_bg, spin_border, spin_txt = "#fef2f2", "#dc2626", "#b91c1c"
+        elif fisico > sistema:  # sobrante
+            fila_bg, spin_border, spin_txt = "#fff7ed", "#ea580c", "#c2410c"
+        else:  # coincide
+            fila_bg, spin_border, spin_txt = None, None, None
+
+        for col in (0, 1, 2):
+            item = self._table.item(fila, col)
+            if item is None:
+                continue
+            item.setBackground(QBrush(QColor(fila_bg)) if fila_bg else QBrush())
+
+        if spin_border:
+            spin.setStyleSheet(
+                f"QSpinBox {{ background: {fila_bg}; color: {spin_txt};"
+                f" font-weight: 700; border: 1px solid {spin_border};"
+                " border-radius: 6px; padding: 3px 6px; }"
+            )
+        else:
+            spin.setStyleSheet("")
 
     def _registrar(self) -> None:
         conteos = [

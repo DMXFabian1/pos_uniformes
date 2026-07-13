@@ -1045,6 +1045,10 @@ class QuoteSatelliteWindow(QMainWindow):
         titulo.setObjectName("guidedStepTitle")
         header.addWidget(titulo)
         header.addStretch()
+        subir_btn = QPushButton("📤 Subir conteo")
+        subir_btn.setObjectName("secondaryButton")
+        subir_btn.clicked.connect(self._open_conteo_subir)
+        header.addWidget(subir_btn)
         orden_btn = QPushButton("🖨 Imprimir orden de conteo")
         orden_btn.setObjectName("secondaryButton")
         orden_btn.clicked.connect(self._open_conteo_orden)
@@ -1121,6 +1125,12 @@ class QuoteSatelliteWindow(QMainWindow):
         from pos_uniformes.ui.dialogs.conteo_orden_dialog import ConteoOrdenDialog
 
         ConteoOrdenDialog(self).exec()
+        self._refresh_conteo_banner()
+
+    def _open_conteo_subir(self) -> None:
+        from pos_uniformes.ui.dialogs.conteo_subir_dialog import ConteoSubirDialog
+
+        ConteoSubirDialog(self).exec()
         self._refresh_conteo_banner()
 
     def _run_auto_conteo_check(self) -> None:
