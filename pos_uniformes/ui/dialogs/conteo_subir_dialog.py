@@ -36,8 +36,8 @@ from pos_uniformes.services.conteo_service import (
     ESCUELA_ID_BASICOS,
     NOMBRE_BASICOS,
     ConteoInput,
-    obtener_variantes_basicos_para_conteo,
-    obtener_variantes_para_conteo,
+    obtener_variantes_agrupadas_por_producto,
+    obtener_variantes_basicos_agrupadas,
     registrar_conteos_lote,
 )
 
@@ -170,9 +170,9 @@ class ConteoSubirDialog(QDialog):
         session = self._session_factory()
         try:
             if int(escuela_id) == ESCUELA_ID_BASICOS:
-                variantes = obtener_variantes_basicos_para_conteo(session)
+                grupos_raw = obtener_variantes_basicos_agrupadas(session)
             else:
-                variantes = obtener_variantes_para_conteo(session, int(escuela_id))
+                grupos_raw = obtener_variantes_agrupadas_por_producto(session, int(escuela_id))
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Error", f"No se pudieron cargar las piezas:\n{exc}")
             return
@@ -182,13 +182,15 @@ class ConteoSubirDialog(QDialog):
         self._variant_ids = []
         self._fisico_spins = []
 
-        # Agrupa por producto (conservando el orden del backend) para que el
-        # nombre no se repita en cada fila y las piezas se separen visualmente.
-        grupos: list[tuple[str, list]] = []
-        for v in variantes:
-            if not grupos or grupos[-1][0] != v.producto_nombre:
-                grupos.append((v.producto_nombre, []))
-            grupos[-1][1].append(v)
+        # Misma estructura que el panel de uniformes: se agrupa por producto y se
+        # EXCLUYEN los productos virtuales (Pants 3pz, Chamarra) — esos no se
+        # cuentan directo, se arman de sus componentes (Pants 2pz + playera).
+        grupos: list[tuple[str, list]] = [
+            (g["producto_nombre"], g["variantes"])
+            for g in grupos_raw
+            if not g.get("virtual", False) and g["variantes"]
+        ]
+        total_piezas = sum(len(items) for _, items in grupos)
 
         total_filas = sum(1 + len(items) for _, items in grupos)
         self._table.clearSpans()
@@ -218,11 +220,11 @@ class ConteoSubirDialog(QDialog):
                 self._fisico_spins.append(spin)
                 fila += 1
 
-        hay = len(variantes) > 0
+        hay = total_piezas > 0
         self._registrar_btn.setEnabled(hay)
         if hay:
             self._hint.setText(
-                f"{len(variantes)} piezas. Captura el «Físico» de cada una y pulsa «Registrar conteo»."
+                f"{total_piezas} piezas. Captura el «Físico» de cada una y pulsa «Registrar conteo»."
             )
         else:
             self._hint.setText("Esta escuela no tiene piezas para contar.")

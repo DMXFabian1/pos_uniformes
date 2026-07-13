@@ -20,6 +20,7 @@ from pos_uniformes.database.models import (
     Escuela,
     Marca,
     Producto,
+    TipoPieza,
     Variante,
 )
 from pos_uniformes.ui.dialogs.conteo_subir_dialog import ConteoSubirDialog
@@ -87,6 +88,42 @@ class ConteoSubirDialogTests(unittest.TestCase):
         self.assertTrue(d._registrar_btn.isEnabled())
         # Físico default = stock de tienda (10)
         self.assertEqual(d._fisico_spins[0].value(), 10)
+
+    def test_excluye_productos_virtuales(self) -> None:
+        # Pants 3pz y Chamarra son virtuales: no se cuentan (se arman de otros).
+        s = self.factory()
+        e = Escuela(nombre="EscV")
+        s.add(e)
+        s.flush()
+        cat = Categoria(nombre="CV")
+        marca = Marca(nombre="MV")
+        pieza_real = TipoPieza(nombre="Playera")
+        pieza_virtual = TipoPieza(nombre="Pants 3pz")
+        s.add_all([cat, marca, pieza_real, pieza_virtual])
+        s.flush()
+        p_real = Producto(
+            nombre="Playera Real", nombre_base="Playera Real",
+            categoria_id=cat.id, marca_id=marca.id, escuela_id=e.id,
+            tipo_pieza_id=pieza_real.id,
+        )
+        p_virt = Producto(
+            nombre="Pants 3pz Combo", nombre_base="Pants 3pz Combo",
+            categoria_id=cat.id, marca_id=marca.id, escuela_id=e.id,
+            tipo_pieza_id=pieza_virtual.id,
+        )
+        s.add_all([p_real, p_virt])
+        s.flush()
+        s.add(Variante(producto_id=p_real.id, sku="R1", talla="CH", color="A",
+                       precio_venta=100, stock_actual=5))
+        s.add(Variante(producto_id=p_virt.id, sku="V1", talla="CH", color="A",
+                       precio_venta=200, stock_actual=5))
+        s.commit()
+        s.close()
+        d = self._dialog()
+        d._escuela_combo.setCurrentIndex(d._escuela_combo.findText("EscV"))
+        d._cargar_piezas()
+        # Solo la variante real aparece; la virtual (Pants 3pz) se excluye.
+        self.assertEqual(len(d._fisico_spins), 1)
 
     def test_resalta_faltante_y_limpia_al_coincidir(self) -> None:
         s = self.factory()
