@@ -119,8 +119,14 @@ def _build_ticket_editor(content: str) -> QTextEdit:
 
 
 def open_printable_text_dialog(parent: QWidget, title: str, content: str) -> None:
-    """Muestra un texto e imprime un unico ticket (un job)."""
-    open_tickets_print_dialog(parent, title, [content])
+    """Imprime un documento térmico (presupuesto, ticket de venta) respetando el
+    rol de la PC: el Servidor de impresión lo imprime local (con preview); una
+    Estación lo encola para que lo imprima el servidor. Así las estaciones nunca
+    tocan una impresora.
+    """
+    from pos_uniformes.ui.helpers.ticket_routing_helper import route_tickets
+
+    route_tickets(parent, title, [content])
 
 
 def open_tickets_print_dialog(

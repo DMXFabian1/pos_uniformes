@@ -1,21 +1,33 @@
 """Estructura del menú admin del satélite (Ctrl+Shift+A).
 
 Rediseño 2026-07-08: de 5 secciones apiladas (saturado en pantalla táctil) a
-3 pestañas — Conexión, Impresoras, Búsqueda. Este test fija que las pestañas
-existen y que ninguna sección se perdió en el rediseño.
+pestañas — Conexión, Impresoras, Búsqueda, Conteos. Este test fija que las
+pestañas existen y que ninguna sección se perdió.
+
+Además: en rol "Estación" la config de impresoras se oculta (la PC no tiene
+impresoras); en rol "Servidor de impresión" se muestra.
 """
 
 from __future__ import annotations
 
 import os
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
-from PyQt6.QtWidgets import QApplication, QGroupBox, QTabWidget
+from PyQt6.QtWidgets import QApplication, QGroupBox, QLabel, QTabWidget
 
 import pos_uniformes.ui.dialogs.satellite_admin_dialog as admin
+from pos_uniformes.services.print_routing_cache_service import (
+    MODO_LOCAL,
+    MODO_SATELITE,
+    save_print_routing,
+)
+
+_SDD = "pos_uniformes.services.print_routing_cache_service.satellite_data_dir"
 
 
 class AdminDialogTabsTests(unittest.TestCase):
@@ -36,18 +48,30 @@ class AdminDialogTabsTests(unittest.TestCase):
             admin.open_satellite_admin_dialog(None)
         return captured["dialog"]
 
-    def test_dialog_has_three_tabs(self) -> None:
+    def _build_dialog_con_rol(self, modo: str):
+        with tempfile.TemporaryDirectory() as d:
+            with patch(_SDD, return_value=Path(d)):
+                save_print_routing(modo, "pc-test")
+                return self._build_dialog()
+
+    @staticmethod
+    def _groupbox(dialog, title: str) -> QGroupBox | None:
+        for gb in dialog.findChildren(QGroupBox):
+            if gb.title() == title:
+                return gb
+        return None
+
+    def test_dialog_has_expected_tabs(self) -> None:
         dialog = self._build_dialog()
         tabs = dialog.findChild(QTabWidget)
         self.assertIsNotNone(tabs)
         labels = [tabs.tabText(i) for i in range(tabs.count())]
-        self.assertEqual(len(labels), 3)
+        self.assertEqual(len(labels), 4)
         joined = " ".join(labels)
-        self.assertIn("Conexión", joined)
-        self.assertIn("Impresoras", joined)
-        self.assertIn("Búsqueda", joined)
+        for esperado in ("Conexión", "Impresoras", "Búsqueda", "Conteos"):
+            self.assertIn(esperado, joined)
 
-    def test_all_five_sections_survive_the_redesign(self) -> None:
+    def test_all_sections_survive_the_redesign(self) -> None:
         dialog = self._build_dialog()
         titles = {gb.title() for gb in dialog.findChildren(QGroupBox)}
         self.assertIn("Estado de conexion", titles)
@@ -55,6 +79,22 @@ class AdminDialogTabsTests(unittest.TestCase):
         self.assertIn("Impresora de tickets", titles)
         self.assertIn("Impresoras de etiquetas", titles)
         self.assertIn("Meilisearch (busqueda rapida)", titles)
+
+    def test_estacion_oculta_config_de_impresoras(self) -> None:
+        dialog = self._build_dialog_con_rol(MODO_SATELITE)
+        self.assertTrue(self._groupbox(dialog, "Impresora de tickets").isHidden())
+        self.assertTrue(self._groupbox(dialog, "Impresoras de etiquetas").isHidden())
+        # Y muestra el aviso de estación.
+        avisos = [
+            lbl for lbl in dialog.findChildren(QLabel)
+            if "Estación" in lbl.text() and not lbl.isHidden()
+        ]
+        self.assertTrue(avisos)
+
+    def test_servidor_muestra_config_de_impresoras(self) -> None:
+        dialog = self._build_dialog_con_rol(MODO_LOCAL)
+        self.assertFalse(self._groupbox(dialog, "Impresora de tickets").isHidden())
+        self.assertFalse(self._groupbox(dialog, "Impresoras de etiquetas").isHidden())
 
 
 if __name__ == "__main__":

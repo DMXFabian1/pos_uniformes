@@ -514,25 +514,27 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
         save_print_routing,
     )
 
-    routing_box = QGroupBox("Modo de impresión de esta PC")
+    routing_box = QGroupBox("Rol de impresión de esta PC")
     routing_layout = QVBoxLayout()
     routing_help = QLabel(
-        "Local: imprime en las impresoras conectadas a esta PC.\n"
-        "Enviar al satélite: encola los tickets para que los imprima la PC satélite."
+        "Servidor de impresión: esta PC tiene las impresoras conectadas e imprime "
+        "tanto lo suyo como lo que le mandan las estaciones.\n"
+        "Estación: no tiene impresoras; envía todo (tickets, etiquetas y conteo) al "
+        "servidor. Las estaciones no configuran ninguna impresora."
     )
     routing_help.setWordWrap(True)
 
     current_modo, current_origen = load_print_routing()
-    radio_local = QRadioButton("Imprimir local (esta PC tiene las impresoras)")
-    radio_sat = QRadioButton("Enviar al satélite")
+    radio_local = QRadioButton("🖨  Servidor de impresión (esta PC tiene las impresoras)")
+    radio_sat = QRadioButton("📡  Estación (envía todo al servidor)")
     (radio_sat if current_modo == MODO_SATELITE else radio_local).setChecked(True)
 
     origen_form = QFormLayout()
     origen_edit = QLineEdit(current_origen)
-    origen_edit.setPlaceholderText("principal / kiosko")
-    origen_form.addRow("Nombre de esta PC (origen):", origen_edit)
+    origen_edit.setPlaceholderText("principal / kiosko / caja 2")
+    origen_form.addRow("Nombre de esta PC:", origen_edit)
 
-    save_routing_btn = QPushButton("Guardar modo de impresión")
+    save_routing_btn = QPushButton("Guardar rol")
     save_routing_btn.setObjectName("primaryButton")
 
     def handle_save_routing() -> None:
@@ -543,8 +545,12 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(dialog, "Error", f"No se pudo guardar:\n{exc}")
             return
-        etiqueta = "enviar al satélite" if modo == MODO_SATELITE else "imprimir local"
-        QMessageBox.information(dialog, "Guardado", f"Esta PC ahora va a: {etiqueta}.")
+        etiqueta = (
+            "Estación (envía al servidor)"
+            if modo == MODO_SATELITE
+            else "Servidor de impresión (imprime local)"
+        )
+        QMessageBox.information(dialog, "Guardado", f"Esta PC ahora es: {etiqueta}.")
 
     save_routing_btn.clicked.connect(handle_save_routing)
 
@@ -554,6 +560,27 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     routing_layout.addLayout(origen_form)
     routing_layout.addWidget(save_routing_btn)
     routing_box.setLayout(routing_layout)
+
+    # Las estaciones no tienen impresoras: se ocultan las cajas de config de
+    # impresora de tickets y de etiquetas (así no intentan autodetectar hardware
+    # que no existe) y se muestra un aviso. El servidor de impresión sí las ve.
+    estacion_hint = QLabel(
+        "📡  Esta PC es una Estación: no detecta ni configura impresoras. "
+        "Todo se imprime en el Servidor de impresión. Si esta PC tiene las "
+        "impresoras conectadas, cámbiala a «Servidor de impresión» arriba."
+    )
+    estacion_hint.setWordWrap(True)
+    estacion_hint.setObjectName("satStatus")
+
+    def _aplicar_visibilidad_rol(es_servidor: bool) -> None:
+        printer_box.setVisible(es_servidor)
+        label_box.setVisible(es_servidor)
+        estacion_hint.setVisible(not es_servidor)
+
+    # radio_local y radio_sat son mutuamente exclusivos (mismo padre): basta
+    # escuchar el toggle del de servidor. Aplicar estado inicial según el cache.
+    radio_local.toggled.connect(_aplicar_visibilidad_rol)
+    _aplicar_visibilidad_rol(current_modo != MODO_SATELITE)
 
     # — Cerrar —
     close_buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
@@ -613,7 +640,9 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
 
     tabs = QTabWidget()
     tabs.addTab(_make_tab(status_box, config_box), "🔌  Conexión")
-    tabs.addTab(_make_tab(routing_box, printer_box, label_box), "🖨  Impresoras")
+    tabs.addTab(
+        _make_tab(routing_box, estacion_hint, printer_box, label_box), "🖨  Impresoras"
+    )
     tabs.addTab(_make_tab(meili_box), "🔍  Búsqueda")
     tabs.addTab(_make_tab(conteo_box), "📋  Conteos")
 
