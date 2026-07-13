@@ -87,6 +87,40 @@ def _ticket_page_height_mm(content: str) -> float:
     return alto_mm + TICKET_BOTTOM_FEED_MM
 
 
+_printer_warmed_up = False
+
+
+def _warm_up_printer_once() -> None:
+    """Consume el PRIMER trabajo de impresión de la sesión con una página mínima.
+
+    El driver de la térmica aplica el tamaño de página custom recién desde el
+    SEGUNDO trabajo; el primero sale con el tamaño por defecto (más ancho) y se
+    recorta por la derecha (lo centrado se corre y el borde derecho se pierde).
+    Este calentamiento (una sola vez por proceso, página casi vacía) absorbe ese
+    primer trabajo defectuoso para que TODAS las hojas reales salgan con su
+    tamaño correcto. Nunca rompe la impresión si falla.
+    """
+    global _printer_warmed_up
+    if _printer_warmed_up:
+        return
+    _printer_warmed_up = True
+    try:
+        printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
+        ticket_printer, _ = _load_print_preferences()
+        if ticket_printer:
+            printer.setPrinterName(ticket_printer)
+        printer.setPageSize(
+            QPageSize(QSizeF(TICKET_PAPER_WIDTH_MM, 6.0), QPageSize.Unit.Millimeter)
+        )
+        printer.setFullPage(True)
+        printer.setPageOrientation(QPageLayout.Orientation.Portrait)
+        painter = QPainter()
+        if painter.begin(printer):
+            painter.end()  # página en blanco mínima
+    except Exception:  # noqa: BLE001 — el calentamiento nunca debe romper la impresión
+        pass
+
+
 def _print_ticket_job(content: str) -> bool:
     """Envia un ticket a la impresora como un job independiente.
 
@@ -95,6 +129,10 @@ def _print_ticket_job(content: str) -> bool:
     para que el autocutter corte justo al final). El renderizado sigue siendo el
     mismo `drawText` de siempre para NO mover el formato del ticket/hoja.
     """
+    # El primer trabajo de la sesión sale con el tamaño por defecto del driver;
+    # se calienta una vez para que la primera hoja real ya salga bien.
+    _warm_up_printer_once()
+
     printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
     ticket_printer, copies = _load_print_preferences()
     if ticket_printer:
