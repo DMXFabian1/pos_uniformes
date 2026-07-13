@@ -14,13 +14,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 
-from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from pos_uniformes.database.models import Escuela
 from pos_uniformes.services.conteo_service import (
     obtener_estado_conteo_basicos,
-    obtener_estado_conteo_escuela,
+    obtener_estados_conteo_todas_escuelas,
 )
 
 
@@ -89,13 +87,11 @@ def obtener_calendario_conteo(
     contadas, luego las que están por vencer. `ahora` es inyectable para tests.
     """
     ahora = ahora or _ahora_utc()
-    escuelas = session.scalars(
-        select(Escuela).where(Escuela.activo.is_(True)).order_by(Escuela.nombre)
-    ).all()
 
     resultado: list[EstadoCalendarioConteo] = []
-    for escuela in escuelas:
-        estado = obtener_estado_conteo_escuela(session, escuela.id)
+    # Estados de todas las escuelas en pocas queries (evita el N+1 que hacía
+    # ~245 queries y ~9 s, congelando la UI). Ver obtener_estados_conteo_todas_escuelas.
+    for estado in obtener_estados_conteo_todas_escuelas(session):
         if solo_con_productos and estado.total_variantes == 0:
             continue
         resultado.append(_estado_desde(estado, ahora))

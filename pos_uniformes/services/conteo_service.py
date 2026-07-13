@@ -611,6 +611,61 @@ def obtener_estado_conteo_escuela(
     )
 
 
+def obtener_estados_conteo_todas_escuelas(session: Session) -> list[EstadoConteoEscuela]:
+    """Estado de conteo de TODAS las escuelas activas, en POCAS queries agregadas.
+
+    Evita el N+1 de llamar `obtener_estado_conteo_escuela` por escuela (que hacía
+    ~5 queries × N escuelas = cientos de queries y segundos de espera). Solo trae
+    lo que usa el calendario: dias_vigencia, total_variantes y último conteo. Los
+    campos contadas_vigentes/pendientes/pct van en 0 (el calendario no los usa).
+    """
+    escuelas = session.scalars(
+        select(Escuela).where(Escuela.activo.is_(True)).order_by(Escuela.nombre)
+    ).all()
+
+    dias_por_escuela = dict(
+        session.execute(
+            select(ConfigConteoEscuela.escuela_id, ConfigConteoEscuela.dias_vigencia)
+        ).all()
+    )
+    total_por_escuela = dict(
+        session.execute(
+            select(Producto.escuela_id, func.count(Variante.id))
+            .select_from(Variante)
+            .join(Producto, Variante.producto_id == Producto.id)
+            .where(
+                Producto.escuela_id.isnot(None),
+                Producto.activo.is_(True),
+                Variante.activo.is_(True),
+            )
+            .group_by(Producto.escuela_id)
+        ).all()
+    )
+    ultimo_por_escuela = dict(
+        session.execute(
+            select(ConteoInventario.escuela_id, func.max(ConteoInventario.contado_at))
+            .where(ConteoInventario.escuela_id.isnot(None))
+            .group_by(ConteoInventario.escuela_id)
+        ).all()
+    )
+
+    resultado: list[EstadoConteoEscuela] = []
+    for e in escuelas:
+        resultado.append(
+            EstadoConteoEscuela(
+                escuela_id=e.id,
+                escuela_nombre=e.nombre,
+                dias_vigencia=dias_por_escuela.get(e.id, DIAS_VIGENCIA_DEFAULT),
+                total_variantes=total_por_escuela.get(e.id, 0) or 0,
+                contadas_vigentes=0,
+                pendientes_conteo=0,
+                ultimo_conteo=ultimo_por_escuela.get(e.id),
+                pct_vigente=0,
+            )
+        )
+    return resultado
+
+
 def obtener_dias_vigencia_basicos(session: Session) -> int:
     """Días de vigencia configurados para productos básicos (o el default)."""
     valor = session.scalar(select(ConfiguracionNegocio.dias_vigencia_basicos))

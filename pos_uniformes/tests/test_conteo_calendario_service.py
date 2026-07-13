@@ -97,6 +97,30 @@ class CalendarioConteoTests(unittest.TestCase):
         cal = obtener_calendario_conteo(self.session, ahora=_AHORA)
         return next(e for e in cal if e.escuela_nombre == nombre)
 
+    def test_calendario_es_pocas_queries_no_n_mas_1(self) -> None:
+        # Blindaje contra el N+1 que hacía ~245 queries / 9 s: el número de
+        # queries debe ser CONSTANTE, no crecer con el número de escuelas.
+        from sqlalchemy import event
+
+        for i in range(8):
+            _seed_escuela(self.session, f"Esc{i}", dias_vigencia=30)
+        self.session.commit()
+        engine = self.session.get_bind()
+        n = {"c": 0}
+
+        def _contar(*_a):
+            n["c"] += 1
+
+        event.listen(engine, "before_cursor_execute", _contar)
+        try:
+            cal = obtener_calendario_conteo(self.session, ahora=_AHORA)
+        finally:
+            event.remove(engine, "before_cursor_execute", _contar)
+
+        self.assertGreaterEqual(len(cal), 8)
+        # Con N+1 serían ~8×5=40+; agregado son pocas (escuelas + básicos).
+        self.assertLess(n["c"], 15)
+
     def test_nunca_contada_esta_vencida(self) -> None:
         _seed_escuela(self.session, "Nueva", dias_vigencia=30)  # sin conteos
         e = self._de("Nueva")
