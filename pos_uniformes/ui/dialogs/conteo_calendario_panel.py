@@ -156,7 +156,12 @@ class ConteoCalendarioPanel(QWidget):
             self._spins[e.escuela_id] = spin
             self._table.setCellWidget(fila, 1, spin)
 
-            ultimo = e.ultimo_conteo.date().isoformat() if e.ultimo_conteo else "Nunca"
+            if e.ultimo_conteo is None:
+                ultimo = "Nunca"
+            else:
+                fecha = e.ultimo_conteo.date().isoformat()
+                d = e.dias_sin_contar
+                ultimo = f"{fecha}  ({d} día{'s' if d != 1 else ''} sin contar)" if d is not None else fecha
             self._table.setItem(fila, 2, QTableWidgetItem(ultimo))
             proxima = e.proxima_fecha.isoformat() if e.proxima_fecha else "—"
             self._table.setItem(fila, 3, QTableWidgetItem(proxima))

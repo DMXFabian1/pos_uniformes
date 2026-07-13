@@ -19,6 +19,7 @@ from pos_uniformes.database.models import (
     Escuela,
     Marca,
     Producto,
+    TipoPieza,
     Variante,
 )
 from pos_uniformes.services.conteo_calendario_service import obtener_calendario_conteo
@@ -32,16 +33,18 @@ from pos_uniformes.services.conteo_service import (
 )
 
 
-def _seed_basico(session: Session) -> None:
+def _seed_basico(session: Session, tipo_nombre: str = "Playera") -> None:
     """Un producto básico: sin escuela, ligado por catálogo a una escuela."""
     esc = Escuela(nombre="EscuelaLink")
     cat = Categoria(nombre="CatB")
     marca = Marca(nombre="MarcaB")
-    session.add_all([esc, cat, marca])
+    pieza = TipoPieza(nombre=tipo_nombre)
+    session.add_all([esc, cat, marca, pieza])
     session.flush()
     prod = Producto(
         nombre="Playera Básica", nombre_base="Playera Básica",
         categoria_id=cat.id, marca_id=marca.id, escuela_id=None,  # básico
+        tipo_pieza_id=pieza.id,
     )
     session.add(prod)
     session.flush()
@@ -131,6 +134,30 @@ class ConteoBasicosDialogTests(unittest.TestCase):
         d._escuela_combo.setCurrentIndex(idx)
         d._cargar_piezas()
         self.assertEqual(len(d._fisico_spins), 1)  # la única variante básica
+
+    def test_orden_filtro_tipo_para_basicos(self) -> None:
+        from pos_uniformes.ui.dialogs.conteo_orden_dialog import ConteoOrdenDialog
+
+        d = ConteoOrdenDialog(
+            session_factory=self.factory, print_sheets=lambda t, s: None
+        )
+        fila = next(
+            r for r in range(d._list.count())
+            if d._list.item(r).data(Qt.ItemDataRole.UserRole)[0] == ESCUELA_ID_BASICOS
+        )
+        d._list.setCurrentRow(fila)
+        # Al elegir básicos, aparece el filtro de tipo con el tipo sembrado.
+        self.assertFalse(d._tipo_row.isHidden())
+        self.assertGreaterEqual(d._tipo_combo.findText("Playera"), 0)
+
+    def test_subir_filtro_tipo_para_basicos(self) -> None:
+        from pos_uniformes.ui.dialogs.conteo_subir_dialog import ConteoSubirDialog
+
+        d = ConteoSubirDialog(session_factory=self.factory)
+        idx = d._escuela_combo.findData(ESCUELA_ID_BASICOS)
+        d._escuela_combo.setCurrentIndex(idx)
+        self.assertFalse(d._tipo_combo.isHidden())
+        self.assertGreaterEqual(d._tipo_combo.findText("Playera"), 0)
 
     def test_panel_guarda_frecuencia_de_basicos(self) -> None:
         from unittest.mock import patch

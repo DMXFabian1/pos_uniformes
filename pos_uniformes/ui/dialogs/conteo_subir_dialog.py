@@ -105,7 +105,13 @@ class ConteoSubirDialog(QDialog):
         top.addWidget(QLabel("Escuela:"))
         self._escuela_combo = QComboBox()
         self._escuela_combo.setMinimumWidth(260)
+        self._escuela_combo.currentIndexChanged.connect(self._on_escuela_cambiada)
         top.addWidget(self._escuela_combo, 1)
+        # Filtro de tipo — solo visible con Productos básicos.
+        self._tipo_combo = QComboBox()
+        self._tipo_combo.setMinimumWidth(150)
+        self._tipo_combo.setVisible(False)
+        top.addWidget(self._tipo_combo)
         self._cargar_btn = QPushButton("Cargar piezas")
         self._cargar_btn.clicked.connect(self._cargar_piezas)
         top.addWidget(self._cargar_btn)
@@ -163,14 +169,41 @@ class ConteoSubirDialog(QDialog):
         for e in escuelas:
             self._escuela_combo.addItem(e["escuela_nombre"], e["escuela_id"])
 
+    def _on_escuela_cambiada(self) -> None:
+        """Muestra el filtro de tipo solo cuando se elige Productos básicos."""
+        es_basicos = self._escuela_combo.currentData() == ESCUELA_ID_BASICOS
+        self._tipo_combo.setVisible(es_basicos)
+        if es_basicos:
+            self._poblar_tipos_basicos()
+
+    def _poblar_tipos_basicos(self) -> None:
+        session = self._session_factory()
+        try:
+            grupos = obtener_variantes_basicos_agrupadas(session)
+        except Exception:  # noqa: BLE001
+            grupos = []
+        finally:
+            session.close()
+        tipos = sorted({
+            g["tipo_pieza"] for g in grupos
+            if not g.get("virtual", False) and g["tipo_pieza"]
+        })
+        self._tipo_combo.clear()
+        self._tipo_combo.addItem("Todos", None)
+        for t in tipos:
+            self._tipo_combo.addItem(t, t)
+
     def _cargar_piezas(self) -> None:
         escuela_id = self._escuela_combo.currentData()
         if escuela_id is None:
             return
+        tipo_basicos = (
+            self._tipo_combo.currentData() if int(escuela_id) == ESCUELA_ID_BASICOS else None
+        )
         session = self._session_factory()
         try:
             if int(escuela_id) == ESCUELA_ID_BASICOS:
-                grupos_raw = obtener_variantes_basicos_agrupadas(session)
+                grupos_raw = obtener_variantes_basicos_agrupadas(session, tipo_pieza=tipo_basicos)
             else:
                 grupos_raw = obtener_variantes_agrupadas_por_producto(session, int(escuela_id))
         except Exception as exc:  # noqa: BLE001

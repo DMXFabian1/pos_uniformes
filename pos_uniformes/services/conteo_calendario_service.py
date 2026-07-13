@@ -35,6 +35,7 @@ class EstadoCalendarioConteo:
     vencida: bool                        # True = ya toca contar
     dias_para_vencer: int | None         # >0 faltan; <=0 vencida; None si nunca contada
     nunca_contada: bool
+    dias_sin_contar: int | None = None   # días desde el último conteo (None = nunca)
 
 
 def _ahora_utc() -> datetime:
@@ -58,6 +59,7 @@ def _estado_desde(estado, ahora: datetime) -> EstadoCalendarioConteo:
             vencida=estado.total_variantes > 0,
             dias_para_vencer=None,
             nunca_contada=True,
+            dias_sin_contar=None,
         )
 
     # Normalizar a aware para restar contra `ahora` (UTC).
@@ -71,6 +73,7 @@ def _estado_desde(estado, ahora: datetime) -> EstadoCalendarioConteo:
         vencida=ahora >= proxima,
         dias_para_vencer=(proxima - ahora).days,
         nunca_contada=False,
+        dias_sin_contar=max(0, (ahora - ultimo).days),
     )
 
 

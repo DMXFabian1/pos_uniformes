@@ -248,13 +248,30 @@ class PanelBridge(QObject):
 
     @pyqtSlot(str, result=str)
     def getEstadoConteo(self, key: str) -> str:
+        from datetime import datetime, timezone
+
         from pos_uniformes.database.connection import get_session
-        from pos_uniformes.services.conteo_service import obtener_estado_conteo_escuela
+        from pos_uniformes.services.conteo_service import (
+            obtener_estado_conteo_basicos,
+            obtener_estado_conteo_escuela,
+        )
 
         try:
-            eid, nid = self._parse_key(key)
             with get_session() as session:
-                e = obtener_estado_conteo_escuela(session, eid, nivel_id=nid)
+                if key == "basicos":
+                    e = obtener_estado_conteo_basicos(session)
+                else:
+                    eid, nid = self._parse_key(key)
+                    e = obtener_estado_conteo_escuela(session, eid, nivel_id=nid)
+
+                # Días desde el último conteo (None = nunca contado).
+                dias_sin_contar = None
+                if e.ultimo_conteo is not None:
+                    ultimo = e.ultimo_conteo
+                    if ultimo.tzinfo is None:
+                        ultimo = ultimo.replace(tzinfo=timezone.utc)
+                    dias_sin_contar = max(0, (datetime.now(timezone.utc) - ultimo).days)
+
                 return json.dumps({
                     "ok": True,
                     "escuela_nombre": e.escuela_nombre,
@@ -264,6 +281,7 @@ class PanelBridge(QObject):
                     "pendientes_conteo": e.pendientes_conteo,
                     "pct_vigente": e.pct_vigente,
                     "ultimo_conteo": e.ultimo_conteo.isoformat() if e.ultimo_conteo else None,
+                    "dias_sin_contar": dias_sin_contar,
                 })
         except Exception as exc:  # noqa: BLE001
             return json.dumps({"ok": False, "error": str(exc)})

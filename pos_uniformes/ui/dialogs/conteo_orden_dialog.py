@@ -15,6 +15,7 @@ from collections.abc import Callable
 from PyQt6.QtCore import Qt
 from PyQt6.QtWidgets import (
     QCheckBox,
+    QComboBox,
     QDialog,
     QDialogButtonBox,
     QHBoxLayout,
@@ -29,7 +30,10 @@ from PyQt6.QtWidgets import (
 from sqlalchemy.orm import Session
 
 from pos_uniformes.services.conteo_calendario_service import obtener_calendario_conteo
-from pos_uniformes.services.conteo_service import ESCUELA_ID_BASICOS
+from pos_uniformes.services.conteo_service import (
+    ESCUELA_ID_BASICOS,
+    obtener_variantes_basicos_agrupadas,
+)
 from pos_uniformes.services.conteo_sheet_service import (
     build_conteo_sheets,
     build_conteo_sheets_basicos,
@@ -89,7 +93,20 @@ class ConteoOrdenDialog(QDialog):
         layout.addWidget(self._mostrar_al_dia)
 
         self._list = QListWidget()
+        self._list.currentItemChanged.connect(self._on_seleccion_cambiada)
         layout.addWidget(self._list, 1)
+
+        # Filtro de tipo de pieza — solo visible cuando se elige Productos básicos.
+        self._tipo_row = QWidget()
+        tipo_layout = QHBoxLayout(self._tipo_row)
+        tipo_layout.setContentsMargins(2, 0, 2, 0)
+        tipo_layout.addWidget(QLabel("Tipo de pieza:"))
+        self._tipo_combo = QComboBox()
+        self._tipo_combo.setMinimumWidth(200)
+        tipo_layout.addWidget(self._tipo_combo)
+        tipo_layout.addStretch()
+        self._tipo_row.setVisible(False)
+        layout.addWidget(self._tipo_row)
 
         actions = QHBoxLayout()
         self._print_btn = QPushButton("Imprimir hojas de conteo")
@@ -127,7 +144,9 @@ class ConteoOrdenDialog(QDialog):
             item = QListWidgetItem()
             item.setData(Qt.ItemDataRole.UserRole, (e.escuela_id, e.escuela_nombre))
             self._list.addItem(item)
-            row = self._build_row(e.escuela_nombre, detalle, vencida=vencida)
+            row = self._build_row(
+                e.escuela_nombre, detalle, vencida=vencida, dias_sin_contar=e.dias_sin_contar
+            )
             item.setSizeHint(row.sizeHint())
             self._list.setItemWidget(item, row)
 
@@ -165,15 +184,29 @@ class ConteoOrdenDialog(QDialog):
         return f"en {e.dias_para_vencer} días", False
 
     @staticmethod
-    def _build_row(nombre: str, detalle: str, *, vencida: bool = True) -> QWidget:
+    def _build_row(
+        nombre: str, detalle: str, *, vencida: bool = True, dias_sin_contar: int | None = None
+    ) -> QWidget:
         row = QWidget()
         h = QHBoxLayout(row)
         h.setContentsMargins(10, 7, 10, 7)
+        izq = QVBoxLayout()
+        izq.setSpacing(1)
         name = QLabel(nombre)
         name.setStyleSheet(
             "color: #5a4a3f; font-weight: 600; font-size: 14px; background: transparent; border: none;"
         )
-        h.addWidget(name)
+        izq.addWidget(name)
+        # Días sin contarse (por entidad). "Nunca" ya lo dice el chip, así que solo
+        # se muestra cuando hay un último conteo.
+        if dias_sin_contar is not None:
+            d = 1 if dias_sin_contar == 0 else dias_sin_contar
+            dias_lbl = QLabel(f"{d} día sin contar" if d == 1 else f"{d} días sin contar")
+            dias_lbl.setStyleSheet(
+                "color: #9a8b7f; font-size: 11px; background: transparent; border: none;"
+            )
+            izq.addWidget(dias_lbl)
+        h.addLayout(izq)
         h.addStretch()
         chip = QLabel(detalle)
         # Rojo = vencida (ya toca); verde = al día (puedes adelantarte).
@@ -188,6 +221,35 @@ class ConteoOrdenDialog(QDialog):
         h.addWidget(chip)
         return row
 
+    # ── Filtro de tipo (solo básicos) ──────────────────────────────────────────
+
+    def _on_seleccion_cambiada(self, current, _previous=None) -> None:
+        """Muestra el filtro de tipo de pieza solo para Productos básicos."""
+        es_basicos = (
+            current is not None
+            and current.data(Qt.ItemDataRole.UserRole)[0] == ESCUELA_ID_BASICOS
+        )
+        self._tipo_row.setVisible(es_basicos)
+        if es_basicos:
+            self._poblar_tipos_basicos()
+
+    def _poblar_tipos_basicos(self) -> None:
+        session = self._session_factory()
+        try:
+            grupos = obtener_variantes_basicos_agrupadas(session)
+        except Exception:  # noqa: BLE001
+            grupos = []
+        finally:
+            session.close()
+        tipos = sorted({
+            g["tipo_pieza"] for g in grupos
+            if not g.get("virtual", False) and g["tipo_pieza"]
+        })
+        self._tipo_combo.clear()
+        self._tipo_combo.addItem("Todos", None)
+        for t in tipos:
+            self._tipo_combo.addItem(t, t)
+
     # ── Acción ────────────────────────────────────────────────────────────────
 
     def _imprimir(self) -> None:
@@ -195,11 +257,14 @@ class ConteoOrdenDialog(QDialog):
         if item is None:
             return
         escuela_id, escuela_nombre = item.data(Qt.ItemDataRole.UserRole)
+        tipo_basicos = (
+            self._tipo_combo.currentData() if escuela_id == ESCUELA_ID_BASICOS else None
+        )
 
         session = self._session_factory()
         try:
             if escuela_id == ESCUELA_ID_BASICOS:
-                sheets = build_conteo_sheets_basicos(session)
+                sheets = build_conteo_sheets_basicos(session, tipo_pieza=tipo_basicos)
             else:
                 sheets = build_conteo_sheets(session, escuela_id, escuela_nombre)
         except Exception as exc:  # noqa: BLE001
