@@ -135,6 +135,9 @@ class ConteoOrdenDialog(QDialog):
         mostrar_al_dia = self._mostrar_al_dia.isChecked()
         # obtener_calendario_conteo ya ordena por urgencia (vencidas primero).
         visibles = [e for e in estados if e.vencida or mostrar_al_dia]
+        # "Productos básicos" al frente (no enterrado alfabéticamente) para que sea
+        # fácil de encontrar y su filtro de tipo se vea al abrir. Sort estable.
+        visibles.sort(key=lambda e: e.escuela_id != ESCUELA_ID_BASICOS)
 
         self._list.clear()
         self._filas = []  # (nombre, detalle) — dato inspeccionable para tests

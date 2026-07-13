@@ -336,6 +336,36 @@ _PIEZA_ORDER = {
 
 _TIPOS_VIRTUALES = {"Pants 3pz", "Chamarra"}
 
+_LETRA_ORDER = {
+    "CH": 0, "MD": 1, "GD": 2, "EXG": 3,
+    "XXS": 4, "XS": 5, "S": 6, "M": 7, "L": 8, "XL": 9, "XXL": 10,
+}
+
+
+def _talla_sort_key(v: VarianteParaConteo):
+    """Orden de tallas: numéricas y rangos de edad primero, luego letras.
+
+    Maneja rangos numéricos ("0-2", "9-12", "13-18") ordenando por el PRIMER
+    número (y el segundo como desempate), para que 9-12 vaya antes de 13-18.
+    """
+    t = v.talla.strip().upper()
+    # Rango numérico de tallas/edades: "0-2", "9-12", "13-18".
+    if "-" in t:
+        izq, _, der = t.partition("-")
+        izq, der = izq.strip(), der.strip()
+        if izq.isdigit():
+            return (1, int(izq), int(der) if der.isdigit() else 0, t)
+    # Numéricas con sufijo de letra (4CH, 6CH...).
+    if len(t) > 2 and t[:-2].isdigit():
+        return (0, int(t[:-2]), 0, t)
+    # Numéricas puras.
+    try:
+        return (1, int(t), 0, "")
+    except ValueError:
+        pass
+    # Letras (CH, MD, GD, EXG...) y rangos con letra (CH-MD) van al final.
+    return (2, _LETRA_ORDER.get(t, 99), 0, t)
+
 
 def obtener_variantes_agrupadas_por_producto(
     session: Session,
@@ -355,24 +385,6 @@ def obtener_variantes_agrupadas_por_producto(
                 "variantes": [],
             }
         grupos[key]["variantes"].append(v)
-
-    def _talla_sort_key(v: VarianteParaConteo):
-        """Ordena tallas: numéricas (4,6,8...) luego letra (CH,MD,GD,EXG)."""
-        t = v.talla.strip().upper()
-        # Tallas numéricas con sufijo (4CH, 6CH, etc.)
-        if len(t) > 2 and t[:-2].isdigit():
-            return (0, int(t[:-2]), t)
-        # Tallas numéricas puras
-        try:
-            return (1, int(t), "")
-        except ValueError:
-            pass
-        # Tallas con letra: CH, MD, GD, EXG, XS, S, M, L, XL, XXL
-        letra_order = {
-            "CH": 0, "MD": 1, "GD": 2, "EXG": 3,
-            "XXS": 4, "XS": 5, "S": 6, "M": 7, "L": 8, "XL": 9, "XXL": 10,
-        }
-        return (2, letra_order.get(t, 99), t)
 
     # Ordenar variantes por talla dentro de cada grupo
     for g in grupos.values():
@@ -473,20 +485,6 @@ def obtener_variantes_basicos_agrupadas(
         grupos[key]["variantes"].append(v)
 
     # Reusar la misma lógica de ordenamiento de tallas
-    def _talla_sort_key(v: VarianteParaConteo):
-        t = v.talla.strip().upper()
-        if len(t) > 2 and t[:-2].isdigit():
-            return (0, int(t[:-2]), t)
-        try:
-            return (1, int(t), "")
-        except ValueError:
-            pass
-        letra_order = {
-            "CH": 0, "MD": 1, "GD": 2, "EXG": 3,
-            "XXS": 4, "XS": 5, "S": 6, "M": 7, "L": 8, "XL": 9, "XXL": 10,
-        }
-        return (2, letra_order.get(t, 99), t)
-
     for g in grupos.values():
         g["variantes"].sort(key=_talla_sort_key)
 
