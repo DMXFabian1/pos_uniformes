@@ -13,7 +13,7 @@ from __future__ import annotations
 from collections.abc import Callable
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QBrush, QColor, QFont, QIntValidator
+from PyQt6.QtGui import QBrush, QColor, QFont, QIntValidator, QPalette
 from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
@@ -78,6 +78,14 @@ class ConteoSubirDialog(QDialog):
                 background: #ffffff; color: #1a1a1a;
                 border: 1px solid #e5e5e5; border-radius: 6px; padding: 3px 6px;
             }
+            /* El campo "Físico": explícito para que no lo dibuje el estilo nativo
+               de macOS, que a poca altura recorta el número. */
+            QLineEdit {
+                background: #ffffff; color: #1a1a1a;
+                border: 1px solid #d8ccc2; border-radius: 6px;
+                padding: 4px 6px; font-size: 14px;
+            }
+            QLineEdit:focus { border: 1px solid #87492c; }
             QTableWidget {
                 background: #ffffff; alternate-background-color: #faf7f3;
                 color: #1a1a1a; border: 1px solid #e5e5e5; border-radius: 8px;
@@ -128,6 +136,9 @@ class ConteoSubirDialog(QDialog):
             ["Talla", "Color", "Tienda", "Físico", "Diferencia"]
         )
         self._table.verticalHeader().setVisible(False)
+        # Filas con aire: si la fila queda corta, el campo "Físico" se comprime y
+        # el número del placeholder se recorta (se ve como una rayita).
+        self._table.verticalHeader().setDefaultSectionSize(38)
         self._table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self._table.setShowGrid(False)
         self._table.setWordWrap(False)
@@ -252,7 +263,13 @@ class ConteoSubirDialog(QDialog):
                 inp.setValidator(QIntValidator(0, 999999, inp))
                 inp.setPlaceholderText(str(v.stock_tienda))
                 inp.setAlignment(Qt.AlignmentFlag.AlignCenter)
-                inp.setMaximumWidth(90)
+                inp.setMinimumHeight(30)
+                inp.setMinimumWidth(72)
+                inp.setMaximumWidth(110)
+                # Placeholder (el esperado) legible pero distinto del texto real.
+                paleta = inp.palette()
+                paleta.setColor(QPalette.ColorRole.PlaceholderText, QColor("#8a7a6d"))
+                inp.setPalette(paleta)
                 inp.textChanged.connect(
                     lambda _t, f=fila, s=v.stock_tienda, w=inp: self._on_fisico_changed(f, s, w)
                 )
