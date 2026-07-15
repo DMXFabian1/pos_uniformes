@@ -2293,6 +2293,13 @@ class QuoteSatelliteWindow(QMainWindow):
         _cola_shortcut.activated.connect(self._open_dispatcher_panel)
         _pedidos_shortcut = QShortcut(QKeySequence("Ctrl+Shift+P"), self)
         _pedidos_shortcut.activated.connect(self._open_pedido_board)
+        # Navegación de secciones con Ctrl+←/→. Se usa Ctrl (no flechas peladas)
+        # porque el campo de escaneo y los buscadores tienen el foco casi siempre
+        # y se quedarían con las flechas.
+        _sec_next = QShortcut(QKeySequence("Ctrl+Right"), self)
+        _sec_next.activated.connect(lambda: self._navegar_seccion(1))
+        _sec_prev = QShortcut(QKeySequence("Ctrl+Left"), self)
+        _sec_prev.activated.connect(lambda: self._navegar_seccion(-1))
         # Ctrl+K global via event filter (funciona en diálogos modales)
         from PyQt6.QtCore import QEvent, QObject as _QObj
 
@@ -2409,6 +2416,42 @@ class QuoteSatelliteWindow(QMainWindow):
             self.quick_sale_widget.focus_input()
         if page_key == "search" and self.offline_mode:
             self._refresh_offline_quotes()
+
+    # Orden de las secciones tal como aparecen en el sidebar. Las ocultas
+    # (Catálogo, Presupuesto, Buscar) se saltan solas al navegar.
+    _SECCIONES_NAV = (
+        "kiosk", "quicksale", "catalog", "guided", "quote", "search", "tariff", "conteos",
+    )
+
+    def _secciones_visibles(self) -> list[str]:
+        """Secciones navegables, en orden del sidebar, sin las ocultas."""
+        botones = {
+            "kiosk": self.nav_kiosk_button,
+            "quicksale": self.nav_quicksale_button,
+            "catalog": self.nav_catalog_button,
+            "guided": self.nav_guided_button,
+            "quote": self.nav_quote_button,
+            "search": self.nav_search_button,
+            "tariff": self.nav_tariff_button,
+            "conteos": self.nav_conteos_button,
+        }
+        return [k for k in self._SECCIONES_NAV if not botones[k].isHidden()]
+
+    def _navegar_seccion(self, delta: int) -> None:
+        """Ctrl+→ / Ctrl+← : sección siguiente / anterior. Se detiene en el extremo."""
+        secciones = self._secciones_visibles()
+        if not secciones:
+            return
+        actual = getattr(self, "current_page_key", None)
+        try:
+            i = secciones.index(actual)
+        except ValueError:
+            # Página que no está en el sidebar (p.ej. "share"): arranca del inicio.
+            self._set_page(secciones[0])
+            return
+        destino = i + delta
+        if 0 <= destino < len(secciones):
+            self._set_page(secciones[destino])
 
     def refresh_all(self) -> None:
         if self.offline_mode:
