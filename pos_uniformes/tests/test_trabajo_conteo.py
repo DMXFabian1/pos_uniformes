@@ -72,7 +72,7 @@ class ConteoHandlerTests(unittest.TestCase):
 
         impresas = []
         with patch(
-            "pos_uniformes.ui.dialogs.printable_text_dialog.print_ticket_text",
+            "pos_uniformes.ui.dialogs.printable_text_dialog.print_conteo_sheet",
             side_effect=lambda hoja: impresas.append(hoja) or True,
         ), patch(
             "pos_uniformes.ui.helpers.trabajo_print_handlers._qt_sleep"
@@ -97,12 +97,12 @@ class ConteoHandlerTests(unittest.TestCase):
         tid = t.id
         s.close()
 
-        # La segunda hoja falla (print_ticket_text devuelve False).
+        # La segunda hoja falla (print_conteo_sheet devuelve False).
         def flaky(hoja):
             return hoja != "B"
 
         with patch(
-            "pos_uniformes.ui.dialogs.printable_text_dialog.print_ticket_text",
+            "pos_uniformes.ui.dialogs.printable_text_dialog.print_conteo_sheet",
             side_effect=flaky,
         ), patch("pos_uniformes.ui.helpers.trabajo_print_handlers._qt_sleep"):
             # max_intentos=1 => el fallo va directo a ERROR (sin reintento).

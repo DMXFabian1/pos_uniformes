@@ -10,6 +10,8 @@ dialogo mientras hay un QTimer pendiente, no se tocan widgets ya destruidos.
 
 from __future__ import annotations
 
+from collections.abc import Callable
+
 from PyQt6.QtCore import QSizeF, Qt, QTimer
 from PyQt6.QtGui import QFontDatabase, QImage, QPageLayout, QPainter, QPageSize
 from PyQt6.QtPrintSupport import QPrinter
@@ -28,6 +30,10 @@ from pos_uniformes.ui.helpers.ticket_print_queue import TicketPrintQueue
 # página de alto dinámico, este es el único "colchón" de papel entre el fin del
 # ticket y el corte, en vez de los 600 mm fijos de antes que cortaban a destiempo.
 TICKET_BOTTOM_FEED_MM = 12.0
+# Alto de página histórico de los TICKETS (venta/apartado/presupuesto). No se
+# toca: el driver escala el render según el tamaño de página, así que cambiarlo
+# altera su fuente y espaciado. Solo las hojas de conteo usan alto dinámico.
+_LEGACY_PAGE_HEIGHT_MM = 600.0
 # DPI de referencia para medir el alto del texto (ScreenResolution ≈ 96 dpi). El
 # alto físico en mm es independiente del dpi (la fuente está en puntos), así que
 # medir a 96 dpi coincide con lo que dibuja drawText en la impresora.
@@ -144,15 +150,59 @@ def _try_print_escpos(printer_name: str, content: str, copies: int) -> bool:
         return False
 
 
+def _render_drawtext(printer: QPrinter, content: str) -> bool:
+    """Dibuja el texto en la página con la fuente/flags de siempre."""
+    painter = QPainter()
+    if not painter.begin(printer):
+        return False
+    try:
+        font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
+        font.setPointSize(TICKET_FONT_POINT_SIZE)
+        font.setBold(True)
+        painter.setFont(font)
+
+        rect = painter.viewport()
+        painter.drawText(
+            rect,
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap,
+            content,
+        )
+    finally:
+        painter.end()
+    return True
+
+
 def _print_ticket_job(content: str) -> bool:
-    """Envia un ticket a la impresora como un job independiente.
+    """Tickets de venta / apartado / presupuesto: camino HISTÓRICO, intacto.
 
-    En Windows (térmica) usa ESC/POS crudo: manda los bytes al spooler RAW sin
-    pasar por el driver, así la impresora imprime a su ancho nativo y corta donde
-    le decimos (elimina el problema del tamaño de página de la 1ª hoja).
+    Página FIJA de 600 mm + drawText, exactamente como siempre. No se le aplica
+    alto dinámico ni ESC/POS a propósito: el driver escala el render según el
+    tamaño de página, así que cambiarlo altera la fuente y el espaciado del
+    ticket. El alto dinámico y ESC/POS son SOLO para las hojas de conteo
+    (ver `_print_conteo_job`), que es donde había problema de corte.
+    """
+    printer = QPrinter(QPrinter.PrinterMode.ScreenResolution)
+    ticket_printer, copies = _load_print_preferences()
+    if ticket_printer:
+        printer.setPrinterName(ticket_printer)
+    printer.setCopyCount(copies)
+    printer.setPageSize(
+        QPageSize(
+            QSizeF(TICKET_PAPER_WIDTH_MM, _LEGACY_PAGE_HEIGHT_MM),
+            QPageSize.Unit.Millimeter,
+        )
+    )
+    printer.setFullPage(True)
+    printer.setPageOrientation(QPageLayout.Orientation.Portrait)
+    return _render_drawtext(printer, content)
 
-    Si ESC/POS está apagado, falla, o no es Windows, cae al camino QPrinter de
-    siempre (alto de página dinámico + drawText).
+
+def _print_conteo_job(content: str) -> bool:
+    """Hojas de conteo: ESC/POS crudo si aplica; si no, página de alto dinámico.
+
+    Solo para conteos. En Windows/Mac con ESC/POS habilitado manda los bytes al
+    spooler RAW (sin driver → corte exacto). Si no, cae al QPrinter con la página
+    del alto del contenido (que arregló el corte de las hojas).
     """
     ticket_printer, copies = _load_print_preferences()
 
@@ -175,30 +225,14 @@ def _print_ticket_job(content: str) -> bool:
     )
     printer.setFullPage(True)
     printer.setPageOrientation(QPageLayout.Orientation.Portrait)
-
-    painter = QPainter()
-    if not painter.begin(printer):
-        return False
-    try:
-        font = QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont)
-        font.setPointSize(TICKET_FONT_POINT_SIZE)
-        font.setBold(True)
-        painter.setFont(font)
-
-        rect = painter.viewport()
-        painter.drawText(
-            rect,
-            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignTop | Qt.TextFlag.TextWordWrap,
-            content,
-        )
-    finally:
-        painter.end()
-    return True
+    return _render_drawtext(printer, content)
 
 
-# Nombre público reutilizable por el despachador del satélite: imprime un ticket
-# de texto plano a la impresora térmica configurada. Devuelve True si arrancó.
+# Nombres públicos para el despachador del satélite. OJO: son distintos a
+# propósito — los tickets conservan su estética histórica y los conteos usan el
+# camino nuevo (alto dinámico / ESC/POS).
 print_ticket_text = _print_ticket_job
+print_conteo_sheet = _print_conteo_job
 
 
 def _build_ticket_editor(content: str) -> QTextEdit:
@@ -230,6 +264,7 @@ def open_tickets_print_dialog(
     tickets: list[str],
     *,
     unit_label: str = "ticket",
+    print_fn: "Callable[[str], bool] | None" = None,
 ) -> None:
     """Muestra uno o varios tickets en una sola vista.
 
@@ -239,6 +274,9 @@ def open_tickets_print_dialog(
 
     unit_label permite reutilizar el dialogo para otros documentos del mismo
     formato (p.ej. "hoja" para las hojas de conteo).
+
+    print_fn permite elegir el camino de impresión: por defecto el de TICKETS
+    (estética histórica); las hojas de conteo pasan `print_conteo_sheet`.
     """
     tickets = [t for t in tickets if t and t.strip()]
     if not tickets:
@@ -271,7 +309,7 @@ def open_tickets_print_dialog(
 
     queue = TicketPrintQueue(
         tickets,
-        print_fn=_print_ticket_job,
+        print_fn=print_fn or _print_ticket_job,
         schedule=QTimer.singleShot,
         on_status=_set_status,
         on_done=_report,

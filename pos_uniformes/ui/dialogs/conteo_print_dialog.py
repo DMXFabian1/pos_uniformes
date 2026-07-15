@@ -32,4 +32,11 @@ def open_conteo_print_dialog(
 
     if maybe_route_conteo_to_satellite(sheets, titulo=title, parent=parent):
         return
-    open_tickets_print_dialog(parent, title, sheets, unit_label="hoja")
+
+    # Las hojas de conteo usan su propio camino (ESC/POS / alto dinámico). Los
+    # tickets de venta/apartado/presupuesto conservan su estética histórica.
+    from pos_uniformes.ui.dialogs.printable_text_dialog import print_conteo_sheet
+
+    open_tickets_print_dialog(
+        parent, title, sheets, unit_label="hoja", print_fn=print_conteo_sheet
+    )

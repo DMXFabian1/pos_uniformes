@@ -82,10 +82,12 @@ def _etiqueta_handler(trabajo: Trabajo) -> None:
 
 
 def _conteo_handler(trabajo: Trabajo) -> None:
-    from pos_uniformes.ui.dialogs.printable_text_dialog import print_ticket_text
+    # Camino propio de las hojas de conteo (ESC/POS / alto dinámico). Los tickets
+    # usan print_ticket_text, que conserva su estética histórica.
+    from pos_uniformes.ui.dialogs.printable_text_dialog import print_conteo_sheet
 
     hojas = svc.hojas_de_conteo(trabajo)
-    errores = imprimir_hojas_paced(hojas, print_fn=print_ticket_text)
+    errores = imprimir_hojas_paced(hojas, print_fn=print_conteo_sheet)
     if errores:
         raise RuntimeError(
             f"{errores} de {len(hojas)} hoja(s) de conteo no se imprimieron."

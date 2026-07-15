@@ -54,5 +54,44 @@ class TicketDynamicPageHeightTests(unittest.TestCase):
         self.assertLess(alto, 200.0)
 
 
+class SeparacionTicketVsConteoTests(unittest.TestCase):
+    """Los TICKETS conservan su página histórica (600 mm) — cambiarla altera su
+    fuente/espaciado porque el driver escala según el tamaño. Solo las HOJAS DE
+    CONTEO usan alto dinámico."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _alto_pagina_mm(self, fn, content: str) -> float:
+        from unittest.mock import patch
+
+        from PyQt6.QtGui import QPageSize
+
+        import pos_uniformes.ui.dialogs.printable_text_dialog as m
+
+        with patch.object(m, "_load_print_preferences", return_value=("", 1)), \
+             patch.object(m, "_render_drawtext", return_value=True), \
+             patch.object(m, "_try_print_escpos", return_value=False), \
+             patch.object(m, "_warm_up_printer_once"), \
+             patch.object(m, "QPrinter") as FakePrinter:
+            fn(content)
+            page_size = FakePrinter.return_value.setPageSize.call_args.args[0]
+        return page_size.size(QPageSize.Unit.Millimeter).height()
+
+    def test_ticket_usa_pagina_fija_de_600(self) -> None:
+        import pos_uniformes.ui.dialogs.printable_text_dialog as m
+
+        alto = self._alto_pagina_mm(m._print_ticket_job, "Ticket de venta\nlinea")
+        self.assertEqual(round(alto), 600)
+
+    def test_conteo_usa_alto_dinamico(self) -> None:
+        import pos_uniformes.ui.dialogs.printable_text_dialog as m
+
+        alto = self._alto_pagina_mm(m._print_conteo_job, "Hoja\nde\nconteo")
+        self.assertNotEqual(round(alto), 600)
+        self.assertLess(alto, 100)  # se ajusta al contenido
+
+
 if __name__ == "__main__":
     unittest.main()
