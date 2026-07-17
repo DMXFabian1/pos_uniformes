@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import Decimal
 from enum import Enum
 
 from sqlalchemy import CheckConstraint, DateTime, Enum as SqlEnum
-from sqlalchemy import JSON, Boolean, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import Date, JSON, Boolean, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -1100,6 +1100,35 @@ class ConfigConteoEscuela(Base):
     )
 
     escuela: Mapped["Escuela"] = relationship()
+
+
+class Recordatorio(Base):
+    """Recordatorio del calendario: pagos, descansos o notas.
+
+    Puede ser en una fecha específica (recurrencia='unica') o repetirse cada mes
+    (día del mes) o cada semana (día de la semana). Compartido entre todas las PCs.
+    """
+
+    __tablename__ = "recordatorio"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # "pago" | "descanso" | "nota" (validado en el servicio, no como enum de PG).
+    tipo: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    titulo: Mapped[str] = mapped_column(String(160), nullable=False)
+    monto: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))  # opcional, para pagos
+    # "unica" | "mensual" | "semanal"
+    recurrencia: Mapped[str] = mapped_column(String(20), nullable=False, default="unica")
+    fecha: Mapped[date | None] = mapped_column(Date, index=True)   # para 'unica'
+    dia_mes: Mapped[int | None] = mapped_column(Integer)           # 1..31 para 'mensual'
+    dia_semana: Mapped[int | None] = mapped_column(Integer)        # 0=lun..6=dom para 'semanal'
+    notas: Mapped[str | None] = mapped_column(Text())
+    activo: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
 
 
 class MovimientoInventario(Base):
