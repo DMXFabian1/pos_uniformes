@@ -46,6 +46,16 @@ class RecordatorioDialogTests(unittest.TestCase):
         self.assertEqual(recs[0].titulo, "Renta")
         self.assertEqual(recs[0].dia_mes, 1)
 
+    def test_defaults_de_cuando_arrancan_en_hoy(self) -> None:
+        # Bug: el semanal arrancaba en lunes; ahora arranca en el día de hoy.
+        from pos_uniformes.ui.dialogs.recordatorio_dialog import RecordatoriosDialog
+
+        eng = _make_engine()
+        d = RecordatoriosDialog(session_factory=lambda: Session(eng))
+        hoy = date.today()
+        self.assertEqual(d._dia_semana_combo.currentData(), hoy.weekday())
+        self.assertEqual(d._dia_mes_spin.value(), hoy.day)
+
     def test_monto_solo_visible_para_pago(self) -> None:
         from pos_uniformes.ui.dialogs.recordatorio_dialog import RecordatoriosDialog
 

@@ -8,6 +8,7 @@ monto opcional y notas. `session_factory` inyectable para tests.
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import date
 
 from PyQt6.QtCore import QDate, Qt
 from PyQt6.QtGui import QDoubleValidator
@@ -119,11 +120,16 @@ class RecordatoriosDialog(QDialog):
         self._fecha_edit = QDateEdit(QDate.currentDate())
         self._fecha_edit.setCalendarPopup(True)
         self._fecha_edit.setDisplayFormat("dd/MM/yyyy")
+        # Ambos arrancan en HOY: si agregas un descanso/pago "hoy" y no cambias
+        # nada, se agenda en el día de hoy (antes el semanal caía siempre en lunes).
+        hoy = date.today()
         self._dia_mes_spin = QSpinBox()
         self._dia_mes_spin.setRange(1, 31)
+        self._dia_mes_spin.setValue(hoy.day)
         self._dia_semana_combo = QComboBox()
         for i, d in enumerate(_DIAS_SEMANA):
             self._dia_semana_combo.addItem(d, i)
+        self._dia_semana_combo.setCurrentIndex(hoy.weekday())  # 0=lun..6=dom
         self._cuando_stack.addWidget(self._fecha_edit)       # idx 0 = unica
         self._cuando_stack.addWidget(self._dia_mes_spin)     # idx 1 = mensual
         self._cuando_stack.addWidget(self._dia_semana_combo)  # idx 2 = semanal
