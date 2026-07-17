@@ -66,6 +66,7 @@ class ConteoCalendarioMesPanel(QWidget):
         self._anio = self._hoy.year
         self._mes = self._hoy.month
         self._estados: list = []
+        self._recordatorios: list = []
         self._build_ui()
         if refresh_on_init:
             self.refresh()
@@ -90,12 +91,27 @@ class ConteoCalendarioMesPanel(QWidget):
         self._mes_label = QLabel("")
         self._mes_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._mes_label.setObjectName("mesTitulo")
+        self._recordatorio_btn = QPushButton("➕ Recordatorio")
+        self._recordatorio_btn.setObjectName("mesNavBtn")
+        self._recordatorio_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._recordatorio_btn.clicked.connect(self._abrir_recordatorios)
         nav.addWidget(prev_btn)
         nav.addStretch()
         nav.addWidget(self._mes_label)
         nav.addStretch()
+        nav.addWidget(self._recordatorio_btn)
         nav.addWidget(next_btn)
         layout.addLayout(nav)
+
+        # Banner de próximos recordatorios (oculto si no hay nada cercano).
+        self._proximos_label = QLabel("")
+        self._proximos_label.setWordWrap(True)
+        self._proximos_label.setStyleSheet(
+            "background: #eef4ff; color: #2b4a7a; border: 1px solid #c7d6ef;"
+            " border-radius: 10px; padding: 8px 12px; font-weight: 600;"
+        )
+        self._proximos_label.setVisible(False)
+        layout.addWidget(self._proximos_label)
 
         sumario = QHBoxLayout()
         sumario.setSpacing(8)
@@ -136,22 +152,39 @@ class ConteoCalendarioMesPanel(QWidget):
             session = self._session_factory()
             try:
                 self._estados = obtener_calendario_conteo(session)
+                from pos_uniformes.services.recordatorio_service import listar_recordatorios
+
+                self._recordatorios = listar_recordatorios(session)
             finally:
                 session.close()
         except Exception:  # noqa: BLE001 — sin conexión: calendario vacío, no crashear
             self._estados = []
+            self._recordatorios = []
         self._render()
+
+    def _abrir_recordatorios(self) -> None:
+        from pos_uniformes.ui.dialogs.recordatorio_dialog import RecordatoriosDialog
+
+        RecordatoriosDialog(self, session_factory=self._session_factory).exec()
+        self.refresh()
 
     def _render(self) -> None:
         self._mes_label.setText(f"{_MESES[self._mes]} {self._anio}")
 
         por_dia = agrupar_calendario_por_dia(self._estados, self._anio, self._mes)
+        from pos_uniformes.services.recordatorio_service import (
+            proximos_recordatorios,
+            recordatorios_del_mes,
+        )
+
+        rec_por_dia = recordatorios_del_mes(self._recordatorios, self._anio, self._mes)
         vencidas = [e for e in self._estados if e.vencida]
         al_dia = [e for e in self._estados if not e.vencida]
         este_mes = sum(len(v) for v in por_dia.values())
         self._chip_vencidas.setText(f"🔴  {len(vencidas)} requieren conteo")
         self._chip_aldia.setText(f"🟢  {len(al_dia)} al día")
         self._chip_mes.setText(f"📅  {este_mes} este mes")
+        self._render_banner_proximos(proximos_recordatorios(self._recordatorios, self._hoy, dias=7))
 
         while self._grid.count():
             item = self._grid.takeAt(0)
@@ -174,7 +207,10 @@ class ConteoCalendarioMesPanel(QWidget):
                 if dia == 0:
                     self._grid.addWidget(self._celda_vacia(), fila, col)
                     continue
-                self._grid.addWidget(self._celda(dia, por_dia.get(dia, []), col), fila, col)
+                self._grid.addWidget(
+                    self._celda(dia, por_dia.get(dia, []), rec_por_dia.get(dia, []), col),
+                    fila, col,
+                )
 
     @staticmethod
     def _celda_vacia() -> QWidget:
@@ -183,13 +219,14 @@ class ConteoCalendarioMesPanel(QWidget):
         celda.setMinimumHeight(72)
         return celda
 
-    def _celda(self, dia: int, escuelas: list, col: int = 0) -> QWidget:
+    def _celda(self, dia: int, escuelas: list, recordatorios: list | None = None, col: int = 0) -> QWidget:
+        recordatorios = recordatorios or []
         celda = QFrame()
         es_hoy = date(self._anio, self._mes, dia) == self._hoy
         es_finde = col >= 5
         if es_hoy:
             fondo, borde, grosor = "#fdf4ec", "#d1622f", "2px"
-        elif escuelas:
+        elif escuelas or recordatorios:
             fondo, borde, grosor = "#fffdf8", "#e2d0b6", "1px"
         elif es_finde:
             fondo, borde, grosor = "#f7f1e6", "#eadfcd", "1px"
@@ -221,14 +258,58 @@ class ConteoCalendarioMesPanel(QWidget):
                 f" color: {'#b3a08a' if es_finde else '#8a7358'};"
             )
             v.addWidget(num)
-        for e in escuelas[:3]:
-            v.addWidget(self._chip(e))
-        if len(escuelas) > 3:
-            mas = QLabel(f"+{len(escuelas) - 3} más")
+        # Recordatorios primero (pagos/descansos/notas), luego conteos.
+        chips = [self._chip_recordatorio(r) for r in recordatorios]
+        chips += [self._chip(e) for e in escuelas]
+        for w in chips[:3]:
+            v.addWidget(w)
+        if len(chips) > 3:
+            mas = QLabel(f"+{len(chips) - 3} más")
             mas.setStyleSheet("font-size: 11px; color: #8a7a6a; background: transparent; border: none;")
             v.addWidget(mas)
         v.addStretch()
         return celda
+
+    # Colores por tipo de recordatorio.
+    _REC_COLORS = {
+        "pago": ("#dcedff", "#1e4e8c"),
+        "descanso": ("#e7dcff", "#5b3a99"),
+        "nota": ("#eee7dc", "#6b5a45"),
+    }
+
+    @classmethod
+    def _chip_recordatorio(cls, r) -> QLabel:
+        from pos_uniformes.services.recordatorio_service import TIPO_ICONO
+
+        bg, fg = cls._REC_COLORS.get(r.tipo, ("#eee", "#444"))
+        texto = r.titulo if len(r.titulo) <= 13 else r.titulo[:12] + "…"
+        chip = QLabel(f"{TIPO_ICONO.get(r.tipo, '')} {texto}")
+        chip.setToolTip(r.titulo)
+        chip.setStyleSheet(
+            f"background: {bg}; color: {fg}; border: none; border-radius: 7px;"
+            " padding: 2px 7px; font-size: 11px; font-weight: 700;"
+        )
+        return chip
+
+    def _render_banner_proximos(self, proximos: list) -> None:
+        """Banner con los recordatorios de los próximos días (o se oculta)."""
+        if not proximos:
+            self._proximos_label.setVisible(False)
+            return
+        from pos_uniformes.services.recordatorio_service import TIPO_ICONO
+
+        partes = []
+        for fecha, r in proximos[:5]:
+            if fecha == self._hoy:
+                cuando = "hoy"
+            elif (fecha - self._hoy).days == 1:
+                cuando = "mañana"
+            else:
+                cuando = f"en {(fecha - self._hoy).days} días"
+            partes.append(f"{TIPO_ICONO.get(r.tipo, '')} {r.titulo} ({cuando})")
+        extra = f"  +{len(proximos) - 5} más" if len(proximos) > 5 else ""
+        self._proximos_label.setText("Próximos:  " + "   ·   ".join(partes) + extra)
+        self._proximos_label.setVisible(True)
 
     @staticmethod
     def _chip(e) -> QLabel:
