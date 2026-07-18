@@ -11,7 +11,7 @@ import calendar
 from collections.abc import Callable
 from datetime import date
 
-from PyQt6.QtCore import Qt
+from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import (
     QFrame,
     QGridLayout,
@@ -21,6 +21,26 @@ from PyQt6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+
+class _DiaCelda(QFrame):
+    """Celda de día del calendario que emite `clicked` al pulsarla."""
+
+    clicked = pyqtSignal()
+
+    def mousePressEvent(self, ev) -> None:  # noqa: N802 (API de Qt)
+        self.clicked.emit()
+        super().mousePressEvent(ev)
+
+
+class _ChipRecordatorio(QLabel):
+    """Chip de recordatorio; emite `clicked` y NO propaga al día (para no abrir alta)."""
+
+    clicked = pyqtSignal()
+
+    def mousePressEvent(self, ev) -> None:  # noqa: N802
+        self.clicked.emit()
+        ev.accept()  # consume el clic: no llega a la celda del día
 from sqlalchemy.orm import Session
 
 from pos_uniformes.services.conteo_calendario_service import (
@@ -70,6 +90,7 @@ class ConteoCalendarioMesPanel(QWidget):
         self._mes = self._hoy.month
         self._estados: list = []
         self._recordatorios: list = []
+        self._completados: set = set()  # (recordatorio_id, fecha) marcados como hechos
         self._build_ui()
         if refresh_on_init:
             self.refresh()
@@ -157,21 +178,32 @@ class ConteoCalendarioMesPanel(QWidget):
             session = self._session_factory()
             try:
                 self._estados = obtener_calendario_conteo(session)
-                from pos_uniformes.services.recordatorio_service import listar_recordatorios
+                from pos_uniformes.services.recordatorio_service import (
+                    completados_todos,
+                    listar_recordatorios,
+                )
 
                 self._recordatorios = listar_recordatorios(session)
+                self._completados = completados_todos(session)
             finally:
                 session.close()
         except Exception:  # noqa: BLE001 — sin conexión: calendario vacío, no crashear
             self._estados = []
             self._recordatorios = []
+            self._completados = set()
         self._render()
 
-    def _abrir_recordatorios(self) -> None:
+    def _abrir_recordatorios(self, fecha_inicial: date | None = None) -> None:
         from pos_uniformes.ui.dialogs.recordatorio_dialog import RecordatoriosDialog
 
-        RecordatoriosDialog(self, session_factory=self._session_factory).exec()
+        RecordatoriosDialog(
+            self, session_factory=self._session_factory, fecha_inicial=fecha_inicial
+        ).exec()
         self.refresh()
+
+    def _agregar_recordatorio_en(self, fecha: date) -> None:
+        """Clic en un día del calendario: abre alta con esa fecha precargada."""
+        self._abrir_recordatorios(fecha_inicial=fecha)
 
     def _render(self) -> None:
         self._mes_label.setText(f"{_MESES[self._mes]} {self._anio}")
@@ -226,8 +258,11 @@ class ConteoCalendarioMesPanel(QWidget):
 
     def _celda(self, dia: int, escuelas: list, recordatorios: list | None = None, col: int = 0) -> QWidget:
         recordatorios = recordatorios or []
-        celda = QFrame()
-        es_hoy = date(self._anio, self._mes, dia) == self._hoy
+        celda = _DiaCelda()
+        celda.setCursor(Qt.CursorShape.PointingHandCursor)
+        fecha_celda = date(self._anio, self._mes, dia)
+        celda.clicked.connect(lambda f=fecha_celda: self._agregar_recordatorio_en(f))
+        es_hoy = fecha_celda == self._hoy
         es_finde = col >= 5
         if es_hoy:
             fondo, borde, grosor = "#fdf4ec", "#d1622f", "2px"
@@ -264,7 +299,10 @@ class ConteoCalendarioMesPanel(QWidget):
             )
             v.addWidget(num)
         # Recordatorios primero (pagos/descansos/notas), luego conteos.
-        chips = [self._chip_recordatorio(r) for r in recordatorios]
+        chips = [
+            self._chip_recordatorio(r, fecha_celda, (r.id, fecha_celda) in self._completados)
+            for r in recordatorios
+        ]
         chips += [self._chip(e) for e in escuelas]
         for w in chips[:3]:
             v.addWidget(w)
@@ -282,19 +320,50 @@ class ConteoCalendarioMesPanel(QWidget):
         "nota": ("#eee7dc", "#6b5a45"),
     }
 
-    @classmethod
-    def _chip_recordatorio(cls, r) -> QLabel:
+    def _chip_recordatorio(self, r, fecha, completado: bool) -> QLabel:
         from pos_uniformes.services.recordatorio_service import TIPO_ICONO
 
-        bg, fg = cls._REC_COLORS.get(r.tipo, ("#eee", "#444"))
         texto = r.titulo if len(r.titulo) <= 13 else r.titulo[:12] + "…"
-        chip = QLabel(f"{TIPO_ICONO.get(r.tipo, '')} {texto}")
-        chip.setToolTip(r.titulo)
-        chip.setStyleSheet(
-            f"background: {bg}; color: {fg}; border: none; border-radius: 7px;"
-            " padding: 2px 7px; font-size: 11px; font-weight: 700;"
-        )
+        chip = _ChipRecordatorio()
+        chip.setCursor(Qt.CursorShape.PointingHandCursor)
+        if completado:
+            # Hecho/pagado: gris + tachado + ✓.
+            chip.setText(f"✓ {texto}")
+            chip.setToolTip(f"{r.titulo} — hecho (clic para desmarcar)")
+            chip.setStyleSheet(
+                "background: #e7e3dc; color: #9a9088; border: none; border-radius: 7px;"
+                " padding: 2px 7px; font-size: 11px; font-weight: 700; text-decoration: line-through;"
+            )
+        else:
+            bg, fg = self._REC_COLORS.get(r.tipo, ("#eee", "#444"))
+            chip.setText(f"{TIPO_ICONO.get(r.tipo, '')} {texto}")
+            chip.setToolTip(f"{r.titulo} (clic para marcar hecho)")
+            chip.setStyleSheet(
+                f"background: {bg}; color: {fg}; border: none; border-radius: 7px;"
+                " padding: 2px 7px; font-size: 11px; font-weight: 700;"
+            )
+        chip.clicked.connect(lambda rid=r.id, f=fecha: self._toggle_completado(rid, f))
         return chip
+
+    def _toggle_completado(self, recordatorio_id: int, fecha: date) -> None:
+        """Marca/desmarca una ocurrencia como hecha (clic en su chip)."""
+        from pos_uniformes.services.recordatorio_service import toggle_completado
+
+        session = self._session_factory()
+        try:
+            nuevo = toggle_completado(session, recordatorio_id, fecha)
+            session.commit()
+        except Exception:  # noqa: BLE001 — no romper el calendario
+            session.rollback()
+            return
+        finally:
+            session.close()
+        # Actualiza el set en memoria y re-pinta (sin re-consultar todo).
+        if nuevo:
+            self._completados.add((recordatorio_id, fecha))
+        else:
+            self._completados.discard((recordatorio_id, fecha))
+        self._render()
 
     def _render_banner_proximos(self, proximos: list) -> None:
         """Banner con los recordatorios de los próximos días (o se oculta)."""

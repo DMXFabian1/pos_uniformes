@@ -126,6 +126,15 @@ class RecordatorioDialogTests(unittest.TestCase):
         self.assertEqual([r.titulo for r in recs], ["Renta"])
 
 
+    def test_fecha_inicial_precarga_fecha_especifica(self) -> None:
+        from pos_uniformes.ui.dialogs.recordatorio_dialog import RecordatoriosDialog
+
+        eng = _make_engine()
+        d = RecordatoriosDialog(session_factory=lambda: Session(eng), fecha_inicial=date(2026, 6, 20))
+        self.assertEqual(d._recurrencia_combo.currentData(), "unica")
+        self.assertEqual(d._fecha_edit.date().toPyDate(), date(2026, 6, 20))
+
+
 class CalendarioRecordatoriosTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -145,6 +154,23 @@ class CalendarioRecordatoriosTests(unittest.TestCase):
         self.assertEqual(len(panel._recordatorios), 1)
         self.assertFalse(panel._proximos_label.isHidden())
         self.assertIn("Renta", panel._proximos_label.text())
+
+    def test_toggle_completado_en_el_panel(self) -> None:
+        from pos_uniformes.ui.dialogs.conteo_calendario_mes_panel import ConteoCalendarioMesPanel
+
+        eng = _make_engine()
+        with Session(eng) as s:
+            r = crear_recordatorio(s, tipo="pago", titulo="Renta", recurrencia="mensual", dia_mes=1)
+            s.commit()
+            rid = r.id
+        panel = ConteoCalendarioMesPanel(
+            session_factory=lambda: Session(eng), hoy=date(2026, 6, 16)
+        )
+        self.assertEqual(panel._completados, set())
+        panel._toggle_completado(rid, date(2026, 6, 1))  # marcar pagada
+        self.assertIn((rid, date(2026, 6, 1)), panel._completados)
+        panel._toggle_completado(rid, date(2026, 6, 1))  # desmarcar
+        self.assertNotIn((rid, date(2026, 6, 1)), panel._completados)
 
 
 if __name__ == "__main__":

@@ -1131,6 +1131,28 @@ class Recordatorio(Base):
     )
 
 
+class RecordatorioCompletado(Base):
+    """Marca de que una ocurrencia de un recordatorio ya se hizo/pagó.
+
+    `fecha` es la fecha de la ocurrencia marcada (ej. un pago mensual del día 1
+    de junio → 2026-06-01). Un par (recordatorio, fecha) es único.
+    """
+
+    __tablename__ = "recordatorio_completado"
+    __table_args__ = (
+        UniqueConstraint("recordatorio_id", "fecha", name="uq_recordatorio_completado"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    recordatorio_id: Mapped[int] = mapped_column(
+        ForeignKey("recordatorio.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    fecha: Mapped[date] = mapped_column(Date, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 class MovimientoInventario(Base):
     __tablename__ = "movimiento_inventario"
     __table_args__ = (

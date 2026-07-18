@@ -58,6 +58,7 @@ class RecordatoriosDialog(QDialog):
         parent: QWidget | None = None,
         *,
         session_factory: Callable[[], Session] | None = None,
+        fecha_inicial: date | None = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Recordatorios")
@@ -65,6 +66,13 @@ class RecordatoriosDialog(QDialog):
         self._editando_id: int | None = None  # None = alta; id = editando ese
         self._build_ui()
         self._refrescar_lista()
+        # Si se abrió desde un día del calendario, precargar esa fecha (alta rápida).
+        if fecha_inicial is not None:
+            self._recurrencia_combo.setCurrentIndex(self._recurrencia_combo.findData("unica"))
+            self._fecha_edit.setDate(
+                QDate(fecha_inicial.year, fecha_inicial.month, fecha_inicial.day)
+            )
+            self._titulo_edit.setFocus()
 
     # ── UI ──────────────────────────────────────────────────────────────────
     def _build_ui(self) -> None:

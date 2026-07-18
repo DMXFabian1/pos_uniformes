@@ -11,6 +11,7 @@ from sqlalchemy.orm import Session
 from pos_uniformes.database.connection import Base
 from pos_uniformes.services.recordatorio_service import (
     actualizar_recordatorio,
+    completados_todos,
     crear_recordatorio,
     eliminar_recordatorio,
     eliminar_recordatorios_vencidos,
@@ -18,6 +19,7 @@ from pos_uniformes.services.recordatorio_service import (
     ocurre_en,
     proximos_recordatorios,
     recordatorios_del_mes,
+    toggle_completado,
 )
 
 
@@ -79,6 +81,20 @@ class RecordatorioCrudTests(unittest.TestCase):
         self.s.commit()
         self.assertEqual(n, 1)
         self.assertEqual({r.titulo for r in listar_recordatorios(self.s)}, {"Futura", "Renta"})
+
+    def test_toggle_completado(self) -> None:
+        r = crear_recordatorio(self.s, tipo="pago", titulo="Renta", recurrencia="mensual", dia_mes=1)
+        self.s.commit()
+        # Marcar la ocurrencia de junio como pagada.
+        self.assertTrue(toggle_completado(self.s, r.id, date(2026, 6, 1)))
+        self.s.commit()
+        self.assertIn((r.id, date(2026, 6, 1)), completados_todos(self.s))
+        # Otra ocurrencia (julio) sigue pendiente.
+        self.assertNotIn((r.id, date(2026, 7, 1)), completados_todos(self.s))
+        # Desmarcar.
+        self.assertFalse(toggle_completado(self.s, r.id, date(2026, 6, 1)))
+        self.s.commit()
+        self.assertEqual(completados_todos(self.s), set())
 
     def test_eliminar(self) -> None:
         r = crear_recordatorio(self.s, tipo="nota", titulo="X", recurrencia="unica", fecha=date(2026, 1, 1))

@@ -14,7 +14,7 @@ from decimal import Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from pos_uniformes.database.models import Recordatorio
+from pos_uniformes.database.models import Recordatorio, RecordatorioCompletado
 
 TIPOS = ("pago", "descanso", "nota")
 RECURRENCIAS = ("unica", "mensual", "semanal")
@@ -170,6 +170,29 @@ def eliminar_recordatorio(session: Session, recordatorio_id: int) -> None:
     rec = session.get(Recordatorio, recordatorio_id)
     if rec is not None:
         session.delete(rec)
+
+
+def completados_todos(session: Session) -> set[tuple[int, date]]:
+    """{(recordatorio_id, fecha)} de las ocurrencias ya marcadas como hechas."""
+    filas = session.execute(
+        select(RecordatorioCompletado.recordatorio_id, RecordatorioCompletado.fecha)
+    ).all()
+    return {(rid, f) for rid, f in filas}
+
+
+def toggle_completado(session: Session, recordatorio_id: int, fecha: date) -> bool:
+    """Marca/desmarca una ocurrencia como hecha. Devuelve el nuevo estado."""
+    existente = session.scalar(
+        select(RecordatorioCompletado).where(
+            RecordatorioCompletado.recordatorio_id == recordatorio_id,
+            RecordatorioCompletado.fecha == fecha,
+        )
+    )
+    if existente is not None:
+        session.delete(existente)
+        return False
+    session.add(RecordatorioCompletado(recordatorio_id=recordatorio_id, fecha=fecha))
+    return True
 
 
 def eliminar_recordatorios_vencidos(session: Session, hoy: date) -> int:
