@@ -7,7 +7,7 @@ from decimal import Decimal
 from enum import Enum
 
 from sqlalchemy import CheckConstraint, DateTime, Enum as SqlEnum
-from sqlalchemy import Date, JSON, Boolean, ForeignKey, Integer, Numeric, String, Text, UniqueConstraint, func
+from sqlalchemy import Date, JSON, Boolean, ForeignKey, Integer, LargeBinary, Numeric, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -1836,5 +1836,73 @@ class Trabajo(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class Anuncio(Base):
+    """Anuncio/imagen que se difunde a TODOS los satélites (cartelera + aviso).
+
+    A diferencia de `Trabajo` (una máquina reclama y consume cada trabajo), un
+    anuncio es *broadcast*: cada satélite lee los que están `activo=True` y los
+    muestra. Membresía en la cartelera = `activo`; el aviso inmediato lo dispara
+    un NOTIFY al canal 'anuncio' (no un estado persistente). Se crea desde el
+    menú admin del propio satélite y se replica al resto vía la DB central.
+
+    El contenido es texto (`titulo`/`mensaje`) y/o una imagen embebida (`imagen`,
+    JPEG/PNG ya reducido). Se embebe en la DB para que los satélites la reciban
+    por la misma conexión que ya usan, sin carpetas compartidas.
+    """
+
+    __tablename__ = "anuncio"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    titulo: Mapped[str | None] = mapped_column(String(120))
+    mensaje: Mapped[str | None] = mapped_column(Text())
+    imagen: Mapped[bytes | None] = mapped_column(LargeBinary())
+    imagen_mime: Mapped[str | None] = mapped_column(String(40))
+    # A qué satélites va dirigido: lista de `identificador`. NULL o vacío = TODOS.
+    destinos: Mapped[list | None] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql")
+    )
+    activo: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, server_default="true", index=True
+    )
+    prioridad: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    # Segundos que se muestra en la rotación de cartelera antes de pasar al siguiente.
+    duracion_seg: Mapped[int] = mapped_column(Integer, nullable=False, default=8, server_default="8")
+    creado_por: Mapped[str] = mapped_column(String(60), nullable=False, default="satelite")
+    creado_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class Satelite(Base):
+    """Registro de satélites conocidos, para presencia y para dirigir anuncios.
+
+    Cada satélite se autoregistra al arrancar y late (`ultimo_visto`) cada
+    minuto. "Encendido" = latió hace poco. `identificador` es el id estable que
+    guarda cada máquina localmente; `nombre` es la etiqueta legible editable.
+    La misma tabla la puede leer la PWA para mostrar el estado.
+    """
+
+    __tablename__ = "satelite"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    identificador: Mapped[str] = mapped_column(String(40), nullable=False, unique=True, index=True)
+    nombre: Mapped[str] = mapped_column(String(60), nullable=False, default="satelite")
+    ultimo_visto: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    creado_en: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
         nullable=False,
     )

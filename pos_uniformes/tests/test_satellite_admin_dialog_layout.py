@@ -42,10 +42,15 @@ class AdminDialogTabsTests(unittest.TestCase):
             captured["dialog"] = self
             return 0
 
-        with patch.object(admin, "_prompt_pin", return_value=True), patch.object(
-            admin.QDialog, "exec", _fake_exec
-        ):
-            admin.open_satellite_admin_dialog(None)
+        # Aísla el archivo de identidad del satélite en un temp (no ensuciar data/).
+        with tempfile.TemporaryDirectory() as ident_dir:
+            with patch.object(admin, "_prompt_pin", return_value=True), patch.object(
+                admin.QDialog, "exec", _fake_exec
+            ), patch(
+                "pos_uniformes.services.satellite_identity_service.satellite_data_dir",
+                return_value=Path(ident_dir),
+            ):
+                admin.open_satellite_admin_dialog(None)
         return captured["dialog"]
 
     def _build_dialog_con_rol(self, modo: str):
@@ -66,9 +71,9 @@ class AdminDialogTabsTests(unittest.TestCase):
         tabs = dialog.findChild(QTabWidget)
         self.assertIsNotNone(tabs)
         labels = [tabs.tabText(i) for i in range(tabs.count())]
-        self.assertEqual(len(labels), 4)
+        self.assertEqual(len(labels), 5)
         joined = " ".join(labels)
-        for esperado in ("Conexión", "Impresoras", "Búsqueda", "Conteos"):
+        for esperado in ("Conexión", "Impresoras", "Búsqueda", "Conteos", "Anuncios"):
             self.assertIn(esperado, joined)
 
     def test_all_sections_survive_the_redesign(self) -> None:
@@ -79,6 +84,22 @@ class AdminDialogTabsTests(unittest.TestCase):
         self.assertIn("Impresora de tickets", titles)
         self.assertIn("Impresoras de etiquetas", titles)
         self.assertIn("Meilisearch (busqueda rapida)", titles)
+        self.assertIn("Nuevo anuncio", titles)
+        self.assertIn("Anuncios activos", titles)
+        self.assertIn("Este satélite", titles)
+        self.assertIn("Satélites", titles)
+
+    def test_selector_de_destinos_arranca_en_todos(self) -> None:
+        from PyQt6.QtWidgets import QCheckBox
+
+        dialog = self._build_dialog()
+        # El checkbox "Mostrar en todos los satélites" existe y viene marcado.
+        todos = [
+            cb for cb in dialog.findChildren(QCheckBox)
+            if "todos los satélites" in cb.text().lower()
+        ]
+        self.assertTrue(todos)
+        self.assertTrue(todos[0].isChecked())
 
     def test_estacion_oculta_config_de_impresoras(self) -> None:
         dialog = self._build_dialog_con_rol(MODO_SATELITE)

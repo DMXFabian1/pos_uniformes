@@ -315,6 +315,8 @@ class QuoteSatelliteWindow(QMainWindow):
     # Emite el resultado del watchdog de reconexión desde el hilo de fondo al
     # hilo de UI: (rows | None, school_links | None). None = DB no disponible.
     _db_refresh_ready = pyqtSignal(object, object)
+    # Avisa (en hilo de UI) que el cache de anuncios se refrescó desde la DB.
+    _anuncios_ready = pyqtSignal()
 
     def __init__(
         self,
@@ -325,6 +327,10 @@ class QuoteSatelliteWindow(QMainWindow):
         super().__init__()
         self.user_id = user_id
         self.offline_mode = offline_mode
+        # Estado de conectividad cacheado (lo mantiene el watchdog off-thread).
+        # Arranca según cómo booteó la ventana: si booteó offline, la DB no está.
+        # El despachador lo consulta para NO abrir conexiones que congelan la UI.
+        self._db_online = not offline_mode
         self.current_username = ""
         self.current_full_name = ""
         self.current_role = RolUsuario.CAJERO
@@ -388,6 +394,15 @@ class QuoteSatelliteWindow(QMainWindow):
         # Primer chequeo pronto (60 s) para tomar la PC si encendió tarde.
         QTimer.singleShot(60_000, self._start_background_db_refresh)
 
+        # Heartbeat de presencia: este satélite se registra y late cada 60 s para
+        # que el punto de control (Mac / satélite-servidor / PWA) sepa que está
+        # encendido y pueda dirigirle anuncios. Off-thread, best-effort.
+        self._heartbeat_timer = QTimer(self)
+        self._heartbeat_timer.setInterval(60_000)
+        self._heartbeat_timer.timeout.connect(self._enviar_heartbeat)
+        self._heartbeat_timer.start()
+        QTimer.singleShot(3_000, self._enviar_heartbeat)  # primer latido pronto
+
         # Despachador de trabajos: si esta PC imprime local (es el satélite
         # físico con las impresoras), drena la cola que le mandan el POS/kiosko.
         self._trabajo_dispatcher = None
@@ -402,6 +417,15 @@ class QuoteSatelliteWindow(QMainWindow):
         # Nota: NO se imprimen órdenes de conteo automáticamente. El banner solo
         # avisa qué escuelas están vencidas; la impresión es manual desde
         # "Imprimir orden de conteo" (el trabajador elige la escuela).
+
+        # Cartelera de anuncios: overlay a pantalla completa con los anuncios que
+        # se difunden a todos los satélites (cartelera al estar inactivo + aviso
+        # inmediato). Se crea diferido para no bloquear el arranque de la ventana.
+        self._anuncio_cartelera = None
+        self._anuncio_listener = None
+        self._anuncio_inmediato_pendiente = None
+        self._anuncios_ready.connect(self._on_anuncios_ready)
+        QTimer.singleShot(2_500, self._setup_anuncio_cartelera)
 
     def _start_trabajo_dispatcher(self) -> None:
         """Arranca el despachador solo si esta máquina está en modo LOCAL.
@@ -429,6 +453,9 @@ class QuoteSatelliteWindow(QMainWindow):
                 build_handlers(),
                 schedule=QTimer.singleShot,
                 on_event=self._on_trabajo_event,
+                # No abrir conexión (que bloquea el hilo de UI hasta el
+                # connect_timeout) mientras el watchdog sepa que la DB está caída.
+                connectivity_probe=lambda: self._db_online,
             )
             self._trabajo_dispatcher.start()
         except Exception:  # noqa: BLE001 — nunca impedir que la ventana funcione
@@ -512,13 +539,14 @@ class QuoteSatelliteWindow(QMainWindow):
                 pass
 
     def closeEvent(self, event) -> None:  # noqa: N802 (API de Qt)
-        listener = getattr(self, "_trabajo_listener", None)
-        if listener is not None:
-            try:
-                listener.stop()
-                listener.wait(1000)
-            except Exception:  # noqa: BLE001
-                pass
+        for attr in ("_trabajo_listener", "_anuncio_listener"):
+            listener = getattr(self, attr, None)
+            if listener is not None:
+                try:
+                    listener.stop()
+                    listener.wait(1000)
+                except Exception:  # noqa: BLE001
+                    pass
         super().closeEvent(event)
 
     def _start_background_db_refresh(self) -> None:
@@ -531,6 +559,7 @@ class QuoteSatelliteWindow(QMainWindow):
         def _worker() -> None:
             rows = None
             links = None
+            anuncios_ok = False
             try:
                 from pos_uniformes.services.satellite_startup_service import probe_database_host
                 if probe_database_host():
@@ -540,11 +569,34 @@ class QuoteSatelliteWindow(QMainWindow):
                             links = list_all_active_links(session)
                         except Exception:  # noqa: BLE001
                             links = None
+                        # Baja los anuncios DIRIGIDOS a este satélite y los cachea
+                        # localmente para que la cartelera funcione aun con el
+                        # servidor apagado. De paso, late (presencia).
+                        try:
+                            from pos_uniformes.services.anuncio_service import filas_para_cache
+                            from pos_uniformes.services.anuncio_local_cache_service import (
+                                save_anuncios_cache,
+                            )
+                            from pos_uniformes.services.satellite_identity_service import (
+                                get_satellite_id,
+                                get_satellite_name,
+                            )
+                            from pos_uniformes.services.satelite_registry_service import registrar
+
+                            mi_id = get_satellite_id()
+                            registrar(session, mi_id, get_satellite_name())
+                            session.commit()
+                            save_anuncios_cache(filas_para_cache(session, para=mi_id))
+                            anuncios_ok = True
+                        except Exception:  # noqa: BLE001
+                            anuncios_ok = False
             except Exception:  # noqa: BLE001 — nunca tumbar por el watchdog
                 rows = None
                 links = None
             finally:
                 self._db_refresh_ready.emit(rows, links)
+                if anuncios_ok:
+                    self._anuncios_ready.emit()
 
         threading.Thread(target=_worker, daemon=True, name="satellite-db-watchdog").start()
 
@@ -553,8 +605,14 @@ class QuoteSatelliteWindow(QMainWindow):
         self._db_refresh_running = False
         if not rows:
             # DB no disponible ahora — seguimos con el cache, sin cerrar nada.
+            self._db_online = False
             self._set_db_connectivity_banner(online=False)
             return
+        self._db_online = True
+        # El servidor volvió: drena de una lo que se haya acumulado en la cola.
+        disp = getattr(self, "_trabajo_dispatcher", None)
+        if disp is not None:
+            QTimer.singleShot(0, disp.drain)
         self.catalog_snapshot_rows = rows
         self._rebuild_sku_index()
         try:
@@ -2309,7 +2367,18 @@ class QuoteSatelliteWindow(QMainWindow):
                 self._owner = owner
 
             def eventFilter(self, obj, event):
-                if event.type() == QEvent.Type.KeyPress:
+                tipo = event.type()
+                # Actividad del usuario: reinicia la inactividad de la cartelera y
+                # cierra el overlay si estaba puesto. Barato (solo press/teclas).
+                if tipo in (
+                    QEvent.Type.KeyPress,
+                    QEvent.Type.MouseButtonPress,
+                    QEvent.Type.TouchBegin,
+                ):
+                    cartelera = getattr(self._owner, "_anuncio_cartelera", None)
+                    if cartelera is not None:
+                        cartelera.notar_actividad()
+                if tipo == QEvent.Type.KeyPress:
                     mods = event.modifiers()
                     key = event.key()
                     ctrl = mods & Qt.KeyboardModifier.ControlModifier or mods & Qt.KeyboardModifier.MetaModifier
@@ -3518,6 +3587,84 @@ class QuoteSatelliteWindow(QMainWindow):
         self._quick_kiosk_dialog.show()
         self._quick_kiosk_dialog.raise_()
         self._quick_kiosk_dialog.activateWindow()
+
+    def _setup_anuncio_cartelera(self) -> None:
+        """Crea el controlador de la cartelera y arranca el listener de anuncios.
+
+        Nunca impide que la ventana funcione si algo falla (kiosko robusto).
+        """
+        try:
+            from pos_uniformes.ui.helpers.anuncio_cartelera import AnuncioCartelera
+            from pos_uniformes.services.anuncio_local_cache_service import load_anuncios_cache
+
+            self._anuncio_cartelera = AnuncioCartelera(self)
+            # Arranca con lo último cacheado (funciona aun sin conexión).
+            self._anuncio_cartelera.set_anuncios(load_anuncios_cache())
+            self._anuncio_cartelera.start()
+        except Exception:  # noqa: BLE001
+            self._anuncio_cartelera = None
+            return
+
+        # Si hay conexión, el watchdog ya refrescará; forzamos un primer refresco
+        # pronto para no depender de su ciclo de 5 min al abrir.
+        if not self.offline_mode:
+            QTimer.singleShot(1_000, self._start_background_db_refresh)
+
+        # Listener NOTIFY: refresca/avisa al instante cuando cambia un anuncio.
+        try:
+            from pos_uniformes.ui.helpers.anuncio_listener import AnuncioNotifyListener
+
+            self._anuncio_listener = AnuncioNotifyListener(self)
+            self._anuncio_listener.recibido.connect(self._on_anuncio_notify)
+            self._anuncio_listener.start()
+        except Exception:  # noqa: BLE001
+            self._anuncio_listener = None
+
+    def _enviar_heartbeat(self) -> None:
+        """Registra/actualiza este satélite en la DB (off-thread, best-effort)."""
+        import threading
+
+        def _worker() -> None:
+            try:
+                from pos_uniformes.services.satellite_startup_service import probe_database_host
+
+                if not probe_database_host():
+                    return  # DB caída: no bloquear ni fallar ruidosamente
+                from pos_uniformes.services.satellite_identity_service import (
+                    get_satellite_id,
+                    get_satellite_name,
+                )
+                from pos_uniformes.services.satelite_registry_service import registrar
+
+                with get_session() as session:
+                    registrar(session, get_satellite_id(), get_satellite_name())
+                    session.commit()
+            except Exception:  # noqa: BLE001 — presencia es best-effort
+                pass
+
+        threading.Thread(target=_worker, daemon=True, name="satellite-heartbeat").start()
+
+    def _on_anuncio_notify(self, accion: str, anuncio_id: int) -> None:
+        """Llega un NOTIFY del canal 'anuncio': recarga y, si aplica, avisa ya."""
+        if accion == "inmediato" and anuncio_id:
+            self._anuncio_inmediato_pendiente = anuncio_id
+        self._start_background_db_refresh()
+
+    def _on_anuncios_ready(self) -> None:
+        """El cache de anuncios se refrescó: actualiza la cartelera (hilo de UI)."""
+        cartelera = getattr(self, "_anuncio_cartelera", None)
+        if cartelera is None:
+            return
+        from pos_uniformes.services.anuncio_local_cache_service import load_anuncios_cache
+
+        anuncios = load_anuncios_cache()
+        cartelera.set_anuncios(anuncios)
+        pendiente = self._anuncio_inmediato_pendiente
+        if pendiente:
+            self._anuncio_inmediato_pendiente = None
+            match = next((a for a in anuncios if a.get("id") == pendiente), None)
+            if match:
+                cartelera.mostrar_inmediato(match)
 
     def _open_satellite_admin(self) -> None:
         from pos_uniformes.ui.dialogs.satellite_admin_dialog import open_satellite_admin_dialog

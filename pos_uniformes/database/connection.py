@@ -33,7 +33,9 @@ engine: Engine = create_engine(
     pool_pre_ping=True,
     pool_recycle=1800,  # recicla conexiones > 30 min (NAT/firewall las cortan)
     connect_args={
-        "connect_timeout": 5,
+        # 2s: en LAN el connect es <100ms; solo importa cuando el host está
+        # apagado, y ahí acota cuánto puede bloquear un intento de conexión.
+        "connect_timeout": 2,
         # TCP keepalives: mantienen viva la conexión inactiva y detectan
         # cortes de red rápido en vez de colgarse.
         "keepalives": 1,

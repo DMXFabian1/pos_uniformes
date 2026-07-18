@@ -50,6 +50,15 @@ hiddenimports += [
     "pos_uniformes.services.inventory_label_service",
     "pos_uniformes.ui.helpers.quick_sale_sports_uniform_helper",
     "pos_uniformes.services.label_printer_settings_cache_service",
+    # Anuncios / cartelera (todos con imports lazy dentro de métodos):
+    "pos_uniformes.ui.anuncio_overlay",
+    "pos_uniformes.ui.helpers.anuncio_cartelera",
+    "pos_uniformes.ui.helpers.anuncio_listener",
+    "pos_uniformes.services.anuncio_service",
+    "pos_uniformes.services.anuncio_local_cache_service",
+    "pos_uniformes.services.anuncio_image_service",
+    "pos_uniformes.services.satellite_identity_service",
+    "pos_uniformes.services.satelite_registry_service",
 ]
 
 

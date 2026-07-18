@@ -215,5 +215,98 @@ class DispatcherLoopTests(unittest.TestCase):
         self.assertTrue(any(d > 0 for d in delays))  # luego idleó
 
 
+class DispatcherOfflineTests(unittest.TestCase):
+    """El loop no debe abrir conexión cuando la DB está caída (congela la UI)."""
+
+    def setUp(self) -> None:
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.session_factory = lambda: Session(self.engine)
+        self.pendientes: list[tuple[int, object]] = []
+
+    def _schedule(self, delay_ms, cb) -> None:
+        self.pendientes.append((delay_ms, cb))
+
+    def test_gate_offline_no_pollea_y_reagenda_lento(self) -> None:
+        # connectivity_probe=False: ni siquiera abre sesión (que bloquearía la UI).
+        abierta = {"n": 0}
+
+        def factory():
+            abierta["n"] += 1
+            return Session(self.engine)
+
+        disp = TrabajoDispatcher(
+            factory,
+            {TipoTrabajo.TICKET: lambda t: None},
+            schedule=self._schedule,
+            connectivity_probe=lambda: False,
+            offline_interval_ms=30_000,
+        )
+        disp.start()  # dispara el primer _tick
+        # No abrió ninguna sesión y reagendó al intervalo offline.
+        self.assertEqual(abierta["n"], 0)
+        self.assertEqual(len(self.pendientes), 1)
+        self.assertEqual(self.pendientes[0][0], 30_000)
+
+    def test_gate_online_si_pollea(self) -> None:
+        s = self.session_factory()
+        svc.enviar_ticket(s, "T")
+        s.commit()
+        s.close()
+        impresos: list[str] = []
+        disp = TrabajoDispatcher(
+            self.session_factory,
+            {TipoTrabajo.TICKET: lambda t: impresos.append(svc.texto_de_ticket(t))},
+            schedule=self._schedule,
+            connectivity_probe=lambda: True,
+        )
+        disp.start()
+        # Con la DB "arriba" sí procesó el trabajo.
+        self.assertEqual(impresos, ["T"])
+
+    def test_autoproteccion_db_caida_reagenda_lento(self) -> None:
+        # Sin probe externo, pero la sesión falla (DB caída): debe pasar al
+        # intervalo offline por su cuenta, no seguir martillando cada 1.5s.
+        def factory():
+            raise OSError("connection refused")
+
+        disp = TrabajoDispatcher(
+            factory,
+            {TipoTrabajo.TICKET: lambda t: None},
+            schedule=self._schedule,
+            idle_interval_ms=1500,
+            offline_interval_ms=30_000,
+        )
+        disp.start()
+        self.assertTrue(disp._last_poll_db_down)
+        self.assertEqual(self.pendientes[0][0], 30_000)
+
+    def test_recupera_intervalo_normal_tras_reconectar(self) -> None:
+        # Un poll fallido marca db_down; el siguiente poll exitoso (cola vacía)
+        # vuelve al idle normal.
+        estado = {"caida": True}
+
+        def factory():
+            if estado["caida"]:
+                raise OSError("down")
+            return Session(self.engine)
+
+        disp = TrabajoDispatcher(
+            factory,
+            {TipoTrabajo.TICKET: lambda t: None},
+            schedule=self._schedule,
+            idle_interval_ms=1500,
+            offline_interval_ms=30_000,
+        )
+        disp.start()
+        self.assertEqual(self.pendientes[-1][0], 30_000)  # caída → lento
+        estado["caida"] = False
+        # Ejecutar el tick reagendado: ahora la DB responde (cola vacía → idle).
+        _, cb = self.pendientes.pop()
+        cb()
+        self.assertFalse(disp._last_poll_db_down)
+        self.assertEqual(self.pendientes[-1][0], 1500)  # de vuelta al idle normal
+
+
 if __name__ == "__main__":
     unittest.main()

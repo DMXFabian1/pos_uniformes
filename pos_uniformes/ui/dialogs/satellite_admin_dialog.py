@@ -6,11 +6,13 @@ import os
 import sys
 from pathlib import Path
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtPrintSupport import QPrinterInfo
 from PyQt6.QtWidgets import (
     QApplication,
     QCheckBox,
     QComboBox,
+    QFileDialog,
     QScrollArea,
     QTabWidget,
     QDialog,
@@ -20,10 +22,13 @@ from PyQt6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QPushButton,
     QRadioButton,
     QSpinBox,
+    QTextEdit,
     QVBoxLayout,
     QWidget,
 )
@@ -105,6 +110,329 @@ def _prompt_pin(parent: QWidget) -> bool:
     if dialog.exec() != QDialog.DialogCode.Accepted:
         return False
     return pin_input.text().strip() == _ADMIN_PIN
+
+
+def _build_anuncios_boxes(dialog: QWidget) -> list[QGroupBox]:
+    """Sección de anuncios/cartelera: este satélite + satélites + crear + lista.
+
+    Devuelve la lista de cajas. Toda la I/O de DB es defensiva: si la PC
+    principal está apagada, avisa en vez de reventar.
+    """
+    estado_img: dict = {"bytes": None, "mime": None, "nombre": None}
+    # Estado de satélites conocidos (para el selector de destinos y la lista).
+    sat_estado: list[dict] = []
+
+    def _nombre_de(identificador: str) -> str:
+        for s in sat_estado:
+            if s["identificador"] == identificador:
+                return s["nombre"]
+        return identificador
+
+    # — Este satélite (identidad) —
+    este_box = QGroupBox("Este satélite")
+    try:
+        from pos_uniformes.services.satellite_identity_service import (
+            get_satellite_id,
+            get_satellite_name,
+        )
+
+        _mi_id = get_satellite_id()
+        _mi_nombre = get_satellite_name()
+    except Exception:  # noqa: BLE001
+        _mi_id, _mi_nombre = "", ""
+    nombre_in = QLineEdit(_mi_nombre)
+    nombre_in.setPlaceholderText("Nombre de esta pantalla (ej. Entrada, Caja 2)")
+    guardar_nombre_btn = QPushButton("Guardar nombre")
+    id_lbl = QLabel(f"id: {_mi_id}")
+    id_lbl.setObjectName("satStatus")
+
+    # — Satélites (presencia) —
+    satelites_box = QGroupBox("Satélites")
+    satelites_list = QListWidget()
+    refrescar_sat_btn = QPushButton("Actualizar")
+
+    # — Crear —
+    crear_box = QGroupBox("Nuevo anuncio")
+    titulo_in = QLineEdit()
+    titulo_in.setPlaceholderText("Título (opcional)")
+    mensaje_in = QTextEdit()
+    mensaje_in.setPlaceholderText("Mensaje (opcional)")
+    mensaje_in.setFixedHeight(90)
+    duracion_in = QSpinBox()
+    duracion_in.setRange(3, 120)
+    duracion_in.setValue(8)
+    duracion_in.setSuffix(" s en cartelera")
+    imagen_btn = QPushButton("Elegir imagen…")
+    imagen_lbl = QLabel("Sin imagen")
+    imagen_lbl.setWordWrap(True)
+    quitar_img_btn = QPushButton("Quitar imagen")
+    quitar_img_btn.setVisible(False)
+    inmediato_chk = QCheckBox("Mostrar ahora (aviso inmediato)")
+    # Destinos: por defecto TODOS; se puede destildar y elegir satélites.
+    todos_chk = QCheckBox("Mostrar en todos los satélites")
+    todos_chk.setChecked(True)
+    destinos_list = QListWidget()
+    destinos_list.setMaximumHeight(120)
+    destinos_list.setEnabled(False)  # habilitado solo si se destilda "todos"
+    enviar_btn = QPushButton("Enviar anuncio")
+    enviar_btn.setObjectName("primaryButton")
+    resultado_lbl = QLabel("")
+    resultado_lbl.setWordWrap(True)
+    resultado_lbl.setObjectName("satStatus")
+
+    # — Lista de activos —
+    lista_box = QGroupBox("Anuncios activos")
+    lista = QListWidget()
+    quitar_btn = QPushButton("Quitar seleccionado")
+    quitar_todos_btn = QPushButton("Quitar todos")
+
+    def _refrescar_satelites() -> None:
+        """Baja la lista de satélites conocidos + su estado encendido/apagado."""
+        sat_estado.clear()
+        try:
+            from pos_uniformes.database.connection import get_session
+            from pos_uniformes.services import satelite_registry_service as rsvc
+
+            with get_session() as session:
+                sat_estado.extend(rsvc.listar_con_estado(session))
+        except Exception:  # noqa: BLE001
+            pass
+        # Lista de presencia (solo lectura).
+        satelites_list.clear()
+        if not sat_estado:
+            satelites_list.addItem("(Sin satélites registrados o sin conexión)")
+        else:
+            for s in sat_estado:
+                punto = "🟢" if s["online"] else "⚪"
+                marca = "  (este)" if s["identificador"] == _mi_id else ""
+                satelites_list.addItem(f"{punto}  {s['nombre']}{marca}")
+        # Lista de destinos (checkable) para el nuevo anuncio.
+        destinos_list.clear()
+        for s in sat_estado:
+            punto = "🟢" if s["online"] else "⚪"
+            item = QListWidgetItem(f"{punto}  {s['nombre']}")
+            item.setData(Qt.ItemDataRole.UserRole, s["identificador"])
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Unchecked)
+            destinos_list.addItem(item)
+
+    def _guardar_nombre() -> None:
+        try:
+            from pos_uniformes.services.satellite_identity_service import set_satellite_name
+
+            efectivo = set_satellite_name(nombre_in.text())
+            nombre_in.setText(efectivo)
+            QMessageBox.information(
+                dialog,
+                "Nombre guardado",
+                f"Este satélite se llamará «{efectivo}». Se actualiza en la red en ~1 min.",
+            )
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(dialog, "No se pudo guardar", str(exc))
+
+    def _destinos_elegidos() -> list[str] | None:
+        """None = todos; si no, los identificadores marcados."""
+        if todos_chk.isChecked():
+            return None
+        elegidos: list[str] = []
+        for i in range(destinos_list.count()):
+            item = destinos_list.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                elegidos.append(item.data(Qt.ItemDataRole.UserRole))
+        return elegidos or None
+
+    def _quitar_imagen() -> None:
+        estado_img.update(bytes=None, mime=None, nombre=None)
+        imagen_lbl.setText("Sin imagen")
+        quitar_img_btn.setVisible(False)
+
+    def _elegir_imagen() -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            dialog, "Elegir imagen", "", "Imágenes (*.png *.jpg *.jpeg *.webp *.gif *.bmp)"
+        )
+        if not path:
+            return
+        try:
+            from pos_uniformes.services.anuncio_image_service import preparar_imagen
+
+            data, mime = preparar_imagen(path)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(dialog, "Imagen no válida", str(exc))
+            return
+        estado_img.update(bytes=data, mime=mime, nombre=Path(path).name)
+        imagen_lbl.setText(f"{Path(path).name} — {len(data) // 1024} KB (reducida)")
+        quitar_img_btn.setVisible(True)
+
+    def _refrescar_lista() -> None:
+        lista.clear()
+        try:
+            from pos_uniformes.database.connection import get_session
+            from pos_uniformes.services import anuncio_service as asvc
+
+            with get_session() as session:
+                activos = asvc.listar_activos(session)
+                for a in activos:
+                    etiqueta = a.titulo or (a.mensaje or "")[:40] or "(imagen)"
+                    if a.imagen is not None:
+                        etiqueta += "  🖼"
+                    if a.destinos:
+                        destino = ", ".join(_nombre_de(x) for x in a.destinos)
+                    else:
+                        destino = "Todos"
+                    etiqueta += f"   → {destino}"
+                    item = QListWidgetItem(etiqueta)
+                    item.setData(Qt.ItemDataRole.UserRole, a.id)
+                    lista.addItem(item)
+            if not activos:
+                lista.addItem("(No hay anuncios activos)")
+        except Exception:  # noqa: BLE001
+            lista.addItem("(Sin conexión con la PC principal)")
+
+    def _enviar() -> None:
+        titulo = titulo_in.text().strip()
+        mensaje = mensaje_in.toPlainText().strip()
+        if not titulo and not mensaje and not estado_img["bytes"]:
+            QMessageBox.warning(
+                dialog, "Anuncio vacío", "Escribe un título o mensaje, o elige una imagen."
+            )
+            return
+        try:
+            from pos_uniformes.database.connection import get_session
+            from pos_uniformes.services import anuncio_service as asvc
+
+            with get_session() as session:
+                anuncio = asvc.crear_anuncio(
+                    session,
+                    titulo=titulo or None,
+                    mensaje=mensaje or None,
+                    imagen=estado_img["bytes"],
+                    imagen_mime=estado_img["mime"],
+                    destinos=_destinos_elegidos(),
+                    duracion_seg=duracion_in.value(),
+                    creado_por="satelite",
+                )
+                if inmediato_chk.isChecked():
+                    asvc.notificar(session, "inmediato", anuncio.id)
+                session.commit()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(
+                dialog,
+                "No se pudo enviar",
+                f"¿La PC principal está encendida?\n\n{exc}",
+            )
+            return
+        titulo_in.clear()
+        mensaje_in.clear()
+        _quitar_imagen()
+        inmediato_chk.setChecked(False)
+        resultado_lbl.setText("✅ Anuncio enviado.")
+        _refrescar_lista()
+
+    def _quitar_seleccionado() -> None:
+        item = lista.currentItem()
+        anuncio_id = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+        if not anuncio_id:
+            return
+        try:
+            from pos_uniformes.database.connection import get_session
+            from pos_uniformes.services import anuncio_service as asvc
+
+            with get_session() as session:
+                asvc.desactivar(session, int(anuncio_id))
+                session.commit()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(dialog, "No se pudo quitar", str(exc))
+            return
+        _refrescar_lista()
+
+    def _quitar_todos() -> None:
+        if (
+            QMessageBox.question(
+                dialog, "Quitar todos", "¿Quitar todos los anuncios activos?"
+            )
+            != QMessageBox.StandardButton.Yes
+        ):
+            return
+        try:
+            from pos_uniformes.database.connection import get_session
+            from pos_uniformes.services import anuncio_service as asvc
+
+            with get_session() as session:
+                asvc.desactivar_todos(session)
+                session.commit()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(dialog, "No se pudo quitar", str(exc))
+            return
+        _refrescar_lista()
+
+    imagen_btn.clicked.connect(_elegir_imagen)
+    quitar_img_btn.clicked.connect(_quitar_imagen)
+    enviar_btn.clicked.connect(_enviar)
+    quitar_btn.clicked.connect(_quitar_seleccionado)
+    quitar_todos_btn.clicked.connect(_quitar_todos)
+    guardar_nombre_btn.clicked.connect(_guardar_nombre)
+    refrescar_sat_btn.clicked.connect(_refrescar_satelites)
+    todos_chk.toggled.connect(lambda marcado: destinos_list.setEnabled(not marcado))
+
+    # — Layout: Este satélite —
+    este_layout = QVBoxLayout()
+    este_hint = QLabel(
+        "Ponle un nombre a esta pantalla para reconocerla al mandar anuncios."
+    )
+    este_hint.setWordWrap(True)
+    este_layout.addWidget(este_hint)
+    nombre_row = QHBoxLayout()
+    nombre_row.addWidget(nombre_in, 1)
+    nombre_row.addWidget(guardar_nombre_btn)
+    este_layout.addLayout(nombre_row)
+    este_layout.addWidget(id_lbl)
+    este_box.setLayout(este_layout)
+
+    # — Layout: Satélites —
+    sat_layout = QVBoxLayout()
+    sat_hint = QLabel("🟢 encendido · ⚪ apagado (sin señal reciente).")
+    sat_hint.setWordWrap(True)
+    sat_layout.addWidget(sat_hint)
+    sat_layout.addWidget(satelites_list)
+    sat_layout.addWidget(refrescar_sat_btn)
+    satelites_box.setLayout(sat_layout)
+
+    # — Layout: Crear —
+    crear_layout = QVBoxLayout()
+    crear_hint = QLabel(
+        "Se muestra en la cartelera cuando el satélite está inactivo. Marca "
+        "«Mostrar ahora» para que además salte de inmediato."
+    )
+    crear_hint.setWordWrap(True)
+    crear_layout.addWidget(crear_hint)
+    crear_layout.addWidget(titulo_in)
+    crear_layout.addWidget(mensaje_in)
+    img_row = QHBoxLayout()
+    img_row.addWidget(imagen_btn)
+    img_row.addWidget(quitar_img_btn)
+    img_row.addWidget(imagen_lbl, 1)
+    crear_layout.addLayout(img_row)
+    crear_layout.addWidget(duracion_in)
+    crear_layout.addWidget(inmediato_chk)
+    crear_layout.addWidget(todos_chk)
+    crear_layout.addWidget(QLabel("O elige en cuáles mostrarlo:"))
+    crear_layout.addWidget(destinos_list)
+    crear_layout.addWidget(enviar_btn)
+    crear_layout.addWidget(resultado_lbl)
+    crear_box.setLayout(crear_layout)
+
+    # — Layout: Lista de activos —
+    lista_layout = QVBoxLayout()
+    lista_layout.addWidget(lista)
+    lista_btn_row = QHBoxLayout()
+    lista_btn_row.addWidget(quitar_btn)
+    lista_btn_row.addWidget(quitar_todos_btn)
+    lista_layout.addLayout(lista_btn_row)
+    lista_box.setLayout(lista_layout)
+
+    _refrescar_satelites()
+    _refrescar_lista()
+    return [este_box, satelites_box, crear_box, lista_box]
 
 
 def open_satellite_admin_dialog(parent: QWidget) -> None:
@@ -744,6 +1072,9 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     conteo_layout.addStretch()
     conteo_box.setLayout(conteo_layout)
 
+    # — Anuncios / Cartelera —
+    anuncios_boxes = _build_anuncios_boxes(dialog)
+
     tabs = QTabWidget()
     tabs.addTab(_make_tab(status_box, config_box), "🔌  Conexión")
     tabs.addTab(
@@ -752,6 +1083,7 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     )
     tabs.addTab(_make_tab(meili_box), "🔍  Búsqueda")
     tabs.addTab(_make_tab(conteo_box), "📋  Conteos")
+    tabs.addTab(_make_tab(*anuncios_boxes), "📣  Anuncios")
 
     outer = QVBoxLayout()
     outer.setContentsMargins(12, 12, 12, 12)
