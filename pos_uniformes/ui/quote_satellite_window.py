@@ -2375,9 +2375,14 @@ class QuoteSatelliteWindow(QMainWindow):
                     QEvent.Type.MouseButtonPress,
                     QEvent.Type.TouchBegin,
                 ):
-                    cartelera = getattr(self._owner, "_anuncio_cartelera", None)
-                    if cartelera is not None:
-                        cartelera.notar_actividad()
+                    # Un hook GLOBAL (corre en cada tecla/clic) jamás debe poder
+                    # tumbar la app: cualquier fallo aquí se traga y se sigue.
+                    try:
+                        cartelera = getattr(self._owner, "_anuncio_cartelera", None)
+                        if cartelera is not None:
+                            cartelera.notar_actividad()
+                    except Exception:  # noqa: BLE001
+                        pass
                 if tipo == QEvent.Type.KeyPress:
                     mods = event.modifiers()
                     key = event.key()

@@ -1073,7 +1073,12 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     conteo_box.setLayout(conteo_layout)
 
     # — Anuncios / Cartelera —
-    anuncios_boxes = _build_anuncios_boxes(dialog)
+    # Nunca impedir que el menú admin abra si la pestaña de anuncios falla al
+    # construirse (p.ej. DB en estado raro): se omite la pestaña y ya.
+    try:
+        anuncios_boxes = _build_anuncios_boxes(dialog)
+    except Exception:  # noqa: BLE001
+        anuncios_boxes = []
 
     tabs = QTabWidget()
     tabs.addTab(_make_tab(status_box, config_box), "🔌  Conexión")
@@ -1083,7 +1088,8 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     )
     tabs.addTab(_make_tab(meili_box), "🔍  Búsqueda")
     tabs.addTab(_make_tab(conteo_box), "📋  Conteos")
-    tabs.addTab(_make_tab(*anuncios_boxes), "📣  Anuncios")
+    if anuncios_boxes:
+        tabs.addTab(_make_tab(*anuncios_boxes), "📣  Anuncios")
 
     outer = QVBoxLayout()
     outer.setContentsMargins(12, 12, 12, 12)
