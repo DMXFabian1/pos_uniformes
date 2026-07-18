@@ -198,11 +198,15 @@ class RecordatoriosDialog(QDialog):
 
     def _agregar(self) -> None:
         recurrencia = self._recurrencia_combo.currentData()
+        tipo = self._tipo_combo.currentData()
+        # El monto solo aplica a pagos: si el usuario lo escribió y luego cambió a
+        # descanso/nota, el campo queda oculto pero con texto — se ignora.
+        monto = self._monto_edit.text().strip() if tipo == "pago" else None
         kwargs = dict(
-            tipo=self._tipo_combo.currentData(),
+            tipo=tipo,
             titulo=self._titulo_edit.text(),
             recurrencia=recurrencia,
-            monto=(self._monto_edit.text().strip() or None),
+            monto=(monto or None),
             notas=self._notas_edit.text(),
         )
         if recurrencia == "unica":

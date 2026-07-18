@@ -62,6 +62,9 @@ class ConteoCalendarioMesPanel(QWidget):
     ) -> None:
         super().__init__(parent)
         self._session_factory = session_factory or _default_session_factory
+        # Si se inyecta `hoy` (tests) queda fijo; si no, refresh() lo actualiza a
+        # la fecha real para que un kiosko 24/7 no quede con el "hoy" de ayer.
+        self._hoy_fijo = hoy is not None
         self._hoy = hoy or date.today()
         self._anio = self._hoy.year
         self._mes = self._hoy.month
@@ -148,6 +151,8 @@ class ConteoCalendarioMesPanel(QWidget):
         self._render()
 
     def refresh(self) -> None:
+        if not self._hoy_fijo:
+            self._hoy = date.today()  # kiosko 24/7: al refrescar, "hoy" es hoy
         try:
             session = self._session_factory()
             try:

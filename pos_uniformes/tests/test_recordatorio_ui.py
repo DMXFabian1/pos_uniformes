@@ -56,6 +56,23 @@ class RecordatorioDialogTests(unittest.TestCase):
         self.assertEqual(d._dia_semana_combo.currentData(), hoy.weekday())
         self.assertEqual(d._dia_mes_spin.value(), hoy.day)
 
+    def test_monto_no_se_pega_a_descanso(self) -> None:
+        # Bug: escribir monto para un pago y cambiar a descanso guardaba el monto.
+        from pos_uniformes.ui.dialogs.recordatorio_dialog import RecordatoriosDialog
+
+        eng = _make_engine()
+        d = RecordatoriosDialog(session_factory=lambda: Session(eng))
+        d._tipo_combo.setCurrentIndex(d._tipo_combo.findData("pago"))
+        d._monto_edit.setText("5000")  # escribió monto como pago
+        d._tipo_combo.setCurrentIndex(d._tipo_combo.findData("descanso"))  # cambió a descanso
+        d._titulo_edit.setText("Descanso Ana")
+        d._recurrencia_combo.setCurrentIndex(d._recurrencia_combo.findData("semanal"))
+        d._agregar()
+        with Session(eng) as s:
+            recs = listar_recordatorios(s)
+        self.assertEqual(len(recs), 1)
+        self.assertIsNone(recs[0].monto)  # el descanso NO se queda con el monto
+
     def test_monto_solo_visible_para_pago(self) -> None:
         from pos_uniformes.ui.dialogs.recordatorio_dialog import RecordatoriosDialog
 
