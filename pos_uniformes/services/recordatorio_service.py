@@ -82,19 +82,10 @@ def listar_recordatorios(session: Session, *, solo_activos: bool = True) -> list
     return list(session.scalars(stmt).all())
 
 
-def crear_recordatorio(
-    session: Session,
-    *,
-    tipo: str,
-    titulo: str,
-    recurrencia: str = "unica",
-    fecha: date | None = None,
-    dia_mes: int | None = None,
-    dia_semana: int | None = None,
-    monto: Decimal | float | None = None,
-    notas: str | None = None,
-) -> Recordatorio:
-    """Crea un recordatorio validando el tipo, la recurrencia y su fecha/día."""
+def _validar_y_normalizar(
+    *, tipo, titulo, recurrencia, fecha, dia_mes, dia_semana, monto, notas
+) -> dict:
+    """Valida y devuelve los campos limpios (compartido por crear/actualizar)."""
     if tipo not in TIPOS:
         raise ValueError(f"Tipo inválido: {tipo!r}")
     if recurrencia not in RECURRENCIAS:
@@ -112,7 +103,7 @@ def crear_recordatorio(
         if dia_semana is None or not (0 <= dia_semana <= 6):
             raise ValueError("El recordatorio semanal necesita un día de la semana (0–6).")
 
-    rec = Recordatorio(
+    return dict(
         tipo=tipo,
         titulo=titulo,
         recurrencia=recurrencia,
@@ -122,7 +113,54 @@ def crear_recordatorio(
         monto=Decimal(str(monto)) if monto not in (None, "") else None,
         notas=(notas or "").strip() or None,
     )
+
+
+def crear_recordatorio(
+    session: Session,
+    *,
+    tipo: str,
+    titulo: str,
+    recurrencia: str = "unica",
+    fecha: date | None = None,
+    dia_mes: int | None = None,
+    dia_semana: int | None = None,
+    monto: Decimal | float | None = None,
+    notas: str | None = None,
+) -> Recordatorio:
+    """Crea un recordatorio validando el tipo, la recurrencia y su fecha/día."""
+    datos = _validar_y_normalizar(
+        tipo=tipo, titulo=titulo, recurrencia=recurrencia, fecha=fecha,
+        dia_mes=dia_mes, dia_semana=dia_semana, monto=monto, notas=notas,
+    )
+    rec = Recordatorio(**datos)
     session.add(rec)
+    session.flush()
+    return rec
+
+
+def actualizar_recordatorio(
+    session: Session,
+    recordatorio_id: int,
+    *,
+    tipo: str,
+    titulo: str,
+    recurrencia: str = "unica",
+    fecha: date | None = None,
+    dia_mes: int | None = None,
+    dia_semana: int | None = None,
+    monto: Decimal | float | None = None,
+    notas: str | None = None,
+) -> Recordatorio:
+    """Actualiza un recordatorio existente (mismas validaciones que crear)."""
+    rec = session.get(Recordatorio, recordatorio_id)
+    if rec is None:
+        raise ValueError("El recordatorio ya no existe.")
+    datos = _validar_y_normalizar(
+        tipo=tipo, titulo=titulo, recurrencia=recurrencia, fecha=fecha,
+        dia_mes=dia_mes, dia_semana=dia_semana, monto=monto, notas=notas,
+    )
+    for campo, valor in datos.items():
+        setattr(rec, campo, valor)
     session.flush()
     return rec
 
@@ -132,3 +170,22 @@ def eliminar_recordatorio(session: Session, recordatorio_id: int) -> None:
     rec = session.get(Recordatorio, recordatorio_id)
     if rec is not None:
         session.delete(rec)
+
+
+def eliminar_recordatorios_vencidos(session: Session, hoy: date) -> int:
+    """Borra los de fecha específica ya pasada. Devuelve cuántos borró.
+
+    Los recurrentes (mensual/semanal) nunca "vencen": no se tocan.
+    """
+    vencidos = list(
+        session.scalars(
+            select(Recordatorio).where(
+                Recordatorio.recurrencia == "unica",
+                Recordatorio.fecha.is_not(None),
+                Recordatorio.fecha < hoy,
+            )
+        ).all()
+    )
+    for r in vencidos:
+        session.delete(r)
+    return len(vencidos)

@@ -39,7 +39,7 @@ class RecordatorioDialogTests(unittest.TestCase):
         d._recurrencia_combo.setCurrentIndex(d._recurrencia_combo.findData("mensual"))
         d._dia_mes_spin.setValue(1)
         d._monto_edit.setText("8000")
-        d._agregar()
+        d._guardar()
         with Session(eng) as s:
             recs = listar_recordatorios(s)
         self.assertEqual(len(recs), 1)
@@ -67,7 +67,7 @@ class RecordatorioDialogTests(unittest.TestCase):
         d._tipo_combo.setCurrentIndex(d._tipo_combo.findData("descanso"))  # cambió a descanso
         d._titulo_edit.setText("Descanso Ana")
         d._recurrencia_combo.setCurrentIndex(d._recurrencia_combo.findData("semanal"))
-        d._agregar()
+        d._guardar()
         with Session(eng) as s:
             recs = listar_recordatorios(s)
         self.assertEqual(len(recs), 1)
@@ -82,6 +82,48 @@ class RecordatorioDialogTests(unittest.TestCase):
         self.assertFalse(d._monto_edit.isHidden())
         d._tipo_combo.setCurrentIndex(d._tipo_combo.findData("descanso"))
         self.assertTrue(d._monto_edit.isHidden())
+
+    def test_editar_recordatorio(self) -> None:
+        from pos_uniformes.ui.dialogs.recordatorio_dialog import RecordatoriosDialog
+
+        eng = _make_engine()
+        with Session(eng) as s:
+            crear_recordatorio(s, tipo="pago", titulo="Renta", recurrencia="mensual", dia_mes=1, monto=8000)
+            s.commit()
+        d = RecordatoriosDialog(session_factory=lambda: Session(eng))
+        d._lista.setCurrentRow(0)
+        d._cargar_para_editar()
+        self.assertIsNotNone(d._editando_id)
+        self.assertEqual(d._titulo_edit.text(), "Renta")
+        self.assertTrue(d._cancelar_btn.isVisible() or not d.isVisible())  # visible al editar
+        # Cambia el título y el día, guarda.
+        d._titulo_edit.setText("Renta local")
+        d._dia_mes_spin.setValue(5)
+        d._guardar()
+        with Session(eng) as s:
+            recs = listar_recordatorios(s)
+        self.assertEqual(len(recs), 1)  # no se duplicó
+        self.assertEqual(recs[0].titulo, "Renta local")
+        self.assertEqual(recs[0].dia_mes, 5)
+        self.assertIsNone(d._editando_id)  # volvió a modo alta
+
+    def test_limpiar_vencidos(self) -> None:
+        from pos_uniformes.ui.dialogs.recordatorio_dialog import RecordatoriosDialog
+
+        eng = _make_engine()
+        with Session(eng) as s:
+            crear_recordatorio(s, tipo="nota", titulo="Vieja", recurrencia="unica", fecha=date(2020, 1, 1))
+            crear_recordatorio(s, tipo="pago", titulo="Renta", recurrencia="mensual", dia_mes=1)
+            s.commit()
+        d = RecordatoriosDialog(session_factory=lambda: Session(eng))
+        with patch("pos_uniformes.ui.dialogs.recordatorio_dialog.QMessageBox.question",
+                   return_value=__import__("PyQt6.QtWidgets", fromlist=["QMessageBox"]).QMessageBox.StandardButton.Yes), \
+             patch("pos_uniformes.ui.dialogs.recordatorio_dialog.QMessageBox.information"):
+            d._limpiar_vencidos()
+        with Session(eng) as s:
+            recs = listar_recordatorios(s)
+        # La única vencida se borró; la recurrente se queda.
+        self.assertEqual([r.titulo for r in recs], ["Renta"])
 
 
 class CalendarioRecordatoriosTests(unittest.TestCase):

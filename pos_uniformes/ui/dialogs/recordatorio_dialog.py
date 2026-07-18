@@ -32,11 +32,14 @@ from PyQt6.QtWidgets import (
 )
 from sqlalchemy.orm import Session
 
+from pos_uniformes.database.models import Recordatorio
 from pos_uniformes.services.recordatorio_service import (
     TIPO_ICONO,
     TIPO_LABEL,
+    actualizar_recordatorio,
     crear_recordatorio,
     eliminar_recordatorio,
+    eliminar_recordatorios_vencidos,
     listar_recordatorios,
 )
 
@@ -59,6 +62,7 @@ class RecordatoriosDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Recordatorios")
         self._session_factory = session_factory or _default_session_factory
+        self._editando_id: int | None = None  # None = alta; id = editando ese
         self._build_ui()
         self._refrescar_lista()
 
@@ -83,19 +87,26 @@ class RecordatoriosDialog(QDialog):
         layout.addWidget(titulo)
 
         self._lista = QListWidget()
+        self._lista.itemDoubleClicked.connect(lambda _i: self._cargar_para_editar())
         layout.addWidget(self._lista, 1)
 
         del_row = QHBoxLayout()
-        self._del_btn = QPushButton("🗑  Borrar seleccionado")
+        self._editar_btn = QPushButton("✏️  Editar")
+        self._editar_btn.clicked.connect(self._cargar_para_editar)
+        self._del_btn = QPushButton("🗑  Borrar")
         self._del_btn.clicked.connect(self._borrar_seleccionado)
+        self._limpiar_btn = QPushButton("🧹  Limpiar vencidos")
+        self._limpiar_btn.clicked.connect(self._limpiar_vencidos)
+        del_row.addWidget(self._editar_btn)
         del_row.addWidget(self._del_btn)
+        del_row.addWidget(self._limpiar_btn)
         del_row.addStretch()
         layout.addLayout(del_row)
 
-        # ── Formulario de alta ──
-        alta = QLabel("Agregar recordatorio")
-        alta.setStyleSheet("font-weight: 700; color: #5c3019; margin-top: 6px;")
-        layout.addWidget(alta)
+        # ── Formulario de alta / edición ──
+        self._form_titulo = QLabel("Agregar recordatorio")
+        self._form_titulo.setStyleSheet("font-weight: 700; color: #5c3019; margin-top: 6px;")
+        layout.addWidget(self._form_titulo)
 
         form = QFormLayout()
         self._tipo_combo = QComboBox()
@@ -146,10 +157,17 @@ class RecordatoriosDialog(QDialog):
         form.addRow("Notas:", self._notas_edit)
         layout.addLayout(form)
 
+        btn_row = QHBoxLayout()
         self._agregar_btn = QPushButton("Agregar recordatorio")
         self._agregar_btn.setObjectName("primaryButton")
-        self._agregar_btn.clicked.connect(self._agregar)
-        layout.addWidget(self._agregar_btn)
+        self._agregar_btn.clicked.connect(self._guardar)
+        self._cancelar_btn = QPushButton("Cancelar edición")
+        self._cancelar_btn.clicked.connect(self._modo_alta)
+        self._cancelar_btn.setVisible(False)
+        btn_row.addWidget(self._agregar_btn)
+        btn_row.addWidget(self._cancelar_btn)
+        btn_row.addStretch()
+        layout.addLayout(btn_row)
 
         close = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
         close.rejected.connect(self.reject)
@@ -196,7 +214,8 @@ class RecordatoriosDialog(QDialog):
         monto = f" · ${r.monto:,.2f}" if r.monto is not None else ""
         return f"{TIPO_ICONO.get(r.tipo, '')}  {r.titulo} · {cuando}{monto}"
 
-    def _agregar(self) -> None:
+    def _guardar(self) -> None:
+        """Alta o edición según `_editando_id`."""
         recurrencia = self._recurrencia_combo.currentData()
         tipo = self._tipo_combo.currentData()
         # El monto solo aplica a pagos: si el usuario lo escribió y luego cambió a
@@ -218,7 +237,10 @@ class RecordatoriosDialog(QDialog):
 
         session = self._session_factory()
         try:
-            crear_recordatorio(session, **kwargs)
+            if self._editando_id is not None:
+                actualizar_recordatorio(session, self._editando_id, **kwargs)
+            else:
+                crear_recordatorio(session, **kwargs)
             session.commit()
         except ValueError as exc:
             QMessageBox.warning(self, "Faltan datos", str(exc))
@@ -229,9 +251,73 @@ class RecordatoriosDialog(QDialog):
             return
         finally:
             session.close()
+        self._modo_alta()
+        self._refrescar_lista()
+
+    def _cargar_para_editar(self) -> None:
+        """Carga el recordatorio seleccionado en el formulario para editarlo."""
+        item = self._lista.currentItem()
+        rec_id = item.data(Qt.ItemDataRole.UserRole) if item else None
+        if rec_id is None:
+            return
+        session = self._session_factory()
+        try:
+            r = session.get(Recordatorio, int(rec_id))
+        finally:
+            session.close()
+        if r is None:
+            self._refrescar_lista()
+            return
+        self._tipo_combo.setCurrentIndex(self._tipo_combo.findData(r.tipo))
+        self._titulo_edit.setText(r.titulo)
+        self._recurrencia_combo.setCurrentIndex(self._recurrencia_combo.findData(r.recurrencia))
+        if r.recurrencia == "unica" and r.fecha:
+            self._fecha_edit.setDate(QDate(r.fecha.year, r.fecha.month, r.fecha.day))
+        elif r.recurrencia == "mensual" and r.dia_mes:
+            self._dia_mes_spin.setValue(r.dia_mes)
+        elif r.recurrencia == "semanal" and r.dia_semana is not None:
+            self._dia_semana_combo.setCurrentIndex(r.dia_semana)
+        self._monto_edit.setText(str(r.monto) if r.monto is not None else "")
+        self._notas_edit.setText(r.notas or "")
+        self._actualizar_visibilidad()
+
+        self._editando_id = int(rec_id)
+        self._form_titulo.setText("Editar recordatorio")
+        self._agregar_btn.setText("Guardar cambios")
+        self._cancelar_btn.setVisible(True)
+
+    def _modo_alta(self) -> None:
+        """Vuelve al modo de alta (limpia el formulario)."""
+        self._editando_id = None
         self._titulo_edit.clear()
         self._monto_edit.clear()
         self._notas_edit.clear()
+        self._form_titulo.setText("Agregar recordatorio")
+        self._agregar_btn.setText("Agregar recordatorio")
+        self._cancelar_btn.setVisible(False)
+
+    def _limpiar_vencidos(self) -> None:
+        """Borra los recordatorios de fecha específica ya pasada."""
+        from datetime import date as _date
+
+        if QMessageBox.question(
+            self, "Limpiar vencidos",
+            "¿Borrar los recordatorios de fecha específica que ya pasaron?\n"
+            "(Los recurrentes —cada mes/semana— no se tocan.)",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+        ) != QMessageBox.StandardButton.Yes:
+            return
+        session = self._session_factory()
+        try:
+            n = eliminar_recordatorios_vencidos(session, _date.today())
+            session.commit()
+        except Exception as exc:  # noqa: BLE001
+            session.rollback()
+            QMessageBox.critical(self, "Error", f"No se pudo limpiar:\n{exc}")
+            return
+        finally:
+            session.close()
+        QMessageBox.information(self, "Listo", f"Se borraron {n} recordatorio(s) vencido(s).")
         self._refrescar_lista()
 
     def _borrar_seleccionado(self) -> None:

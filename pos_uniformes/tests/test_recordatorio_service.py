@@ -10,8 +10,10 @@ from sqlalchemy.orm import Session
 
 from pos_uniformes.database.connection import Base
 from pos_uniformes.services.recordatorio_service import (
+    actualizar_recordatorio,
     crear_recordatorio,
     eliminar_recordatorio,
+    eliminar_recordatorios_vencidos,
     listar_recordatorios,
     ocurre_en,
     proximos_recordatorios,
@@ -49,6 +51,34 @@ class RecordatorioCrudTests(unittest.TestCase):
             crear_recordatorio(self.s, tipo="pago", titulo="Renta", recurrencia="unica")  # sin fecha
         with self.assertRaises(ValueError):
             crear_recordatorio(self.s, tipo="pago", titulo="Nómina", recurrencia="mensual")  # sin día
+
+    def test_actualizar_cambia_recurrencia_y_limpia_campos(self) -> None:
+        r = crear_recordatorio(
+            self.s, tipo="pago", titulo="Renta", recurrencia="unica",
+            fecha=date(2026, 6, 5), monto=8000,
+        )
+        self.s.commit()
+        actualizar_recordatorio(
+            self.s, r.id, tipo="pago", titulo="Renta local",
+            recurrencia="mensual", dia_mes=1,
+        )
+        self.s.commit()
+        recs = listar_recordatorios(self.s)
+        self.assertEqual(len(recs), 1)  # no duplicó
+        self.assertEqual(recs[0].titulo, "Renta local")
+        self.assertEqual(recs[0].recurrencia, "mensual")
+        self.assertEqual(recs[0].dia_mes, 1)
+        self.assertIsNone(recs[0].fecha)  # el campo de la recurrencia vieja se limpió
+
+    def test_limpiar_vencidos_solo_borra_unicas_pasadas(self) -> None:
+        crear_recordatorio(self.s, tipo="nota", titulo="Pasada", recurrencia="unica", fecha=date(2020, 1, 1))
+        crear_recordatorio(self.s, tipo="nota", titulo="Futura", recurrencia="unica", fecha=date(2030, 1, 1))
+        crear_recordatorio(self.s, tipo="pago", titulo="Renta", recurrencia="mensual", dia_mes=1)
+        self.s.commit()
+        n = eliminar_recordatorios_vencidos(self.s, date(2026, 6, 16))
+        self.s.commit()
+        self.assertEqual(n, 1)
+        self.assertEqual({r.titulo for r in listar_recordatorios(self.s)}, {"Futura", "Renta"})
 
     def test_eliminar(self) -> None:
         r = crear_recordatorio(self.s, tipo="nota", titulo="X", recurrencia="unica", fecha=date(2026, 1, 1))
