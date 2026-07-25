@@ -1,2 +1,12 @@
 .DS_Store
 pos_uniformes_sync/
+
+# Basura y artefactos locales
+.claude/
+C:\\Meilisearch/
+*.db-shm
+*.db-wal
+*.bak_*
+pwa/.certs/
+Gestor_de_Inventarios/tarifarios_cache_*.json
+pos_uniformes/data/satellite_identity.json
