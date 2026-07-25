@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mapa de la Tienda</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Nunito:wght@400;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand">
+    <svg viewBox="0 0 24 24" class="brand-icon" aria-hidden="true">
+      <path d="M3 9.5 5 4h14l2 5.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+      <path d="M4 9.5v10h16v-10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+      <path d="M9 19.5v-6h6v6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/>
+    </svg>
+    <h1>Mapa de la Tienda</h1>
+  </div>
+
+  <div class="mode-switch" role="tablist" aria-label="Modo">
+    <button class="mode-btn active" role="tab" aria-selected="true">Arquitecto</button>
+    <button class="mode-btn" role="tab" aria-selected="false" disabled title="Próximamente: las chicas llenan el mapa">Juego 🔒</button>
+  </div>
+
+  <div class="top-actions">
+    <button id="btnUndo" class="ghost-btn" title="Deshacer (Ctrl+Z)">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14 4 9l5-5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 9h9a7 7 0 0 1 7 7v3" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Deshacer
+    </button>
+    <button id="btnPrint" class="ghost-btn" title="Imprimir el piso actual">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 8V3h10v5M7 17H4a1 1 0 0 1-1-1v-6a1 1 0 0 1 1-1h16a1 1 0 0 1 1 1v6a1 1 0 0 1-1 1h-3" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M7 14h10v7H7z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+      Imprimir
+    </button>
+    <button id="btnExport" class="ghost-btn" title="Descargar el mapa como archivo JSON">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11m0 0 4-4m-4 4-4-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      Exportar
+    </button>
+    <button id="btnImport" class="ghost-btn" title="Cargar un mapa desde archivo JSON">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15V4m0 0 4 4m-4-4L8 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 19h16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      Importar
+    </button>
+    <input type="file" id="fileImport" accept="application/json" hidden>
+    <button id="btnClear" class="ghost-btn danger" title="Borrar todo el mapa">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M9 7V5h6v2m-8 0 1 13h8l1-13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      Limpiar
+    </button>
+  </div>
+</header>
+
+<div class="layout">
+
+  <aside class="palette">
+    <section class="palette-group">
+      <h2>Herramientas</h2>
+      <button class="tool-btn active" data-tool="select">
+        <span class="tool-icon" style="--c:#64748B">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3.5 18.5 12l-5.4 1.3L16 19.7l-2.8 1.2-2.9-6.4L6.5 18Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="tool-name">Seleccionar</span>
+        <span class="tool-hint">mover · girar</span>
+      </button>
+      <button class="tool-btn" data-tool="marco">
+        <span class="tool-icon" style="--c:#F97316">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="4.5" width="15" height="15" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="4 3"/><rect x="2.5" y="2.5" width="4" height="4" rx="1" fill="currentColor"/><rect x="17.5" y="17.5" width="4" height="4" rx="1" fill="currentColor"/></svg>
+        </span>
+        <span class="tool-name">Marco</span>
+        <span class="tool-hint">selecciona un área</span>
+      </button>
+      <button class="tool-btn" data-tool="borrador">
+        <span class="tool-icon" style="--c:#EF4444">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 18-4-4L14 4l6 6-8 8H8Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M11 7l6 6" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 20h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </span>
+        <span class="tool-name">Borrador</span>
+        <span class="tool-hint">quita celda por celda</span>
+      </button>
+    </section>
+
+    <section class="palette-group">
+      <h2>Estructura</h2>
+      <button class="tool-btn" data-tool="pared">
+        <span class="tool-icon" style="--c:#78716C">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18v14H3zM3 10h18M3 15h18M8 5v5m8 0v5M12 10v5m-4 4v-4m8 4v-4" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+        </span>
+        <span class="tool-name">Pared</span>
+        <span class="tool-hint">arrastra para pintar</span>
+      </button>
+      <button class="tool-btn" data-tool="puerta">
+        <span class="tool-icon" style="--c:#0EA5E9">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 20V4h12v16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M6 4c6 1.5 6 14.5 0 16" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M3 20h18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </span>
+        <span class="tool-name">Puerta</span>
+        <span class="tool-hint">entrada / paso</span>
+      </button>
+      <button class="tool-btn" data-tool="columna">
+        <span class="tool-icon" style="--c:#57534E">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4h8M8 20h8M10 4v16M14 4v16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </span>
+        <span class="tool-name">Columna</span>
+        <span class="tool-hint">1×1 · clic</span>
+      </button>
+      <button class="tool-btn" data-tool="escalera">
+        <span class="tool-icon" style="--c:#0891B2">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 21h4v-4h4v-4h4V9h4V5h2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="tool-name">Escalera</span>
+        <span class="tool-hint">sube / baja</span>
+      </button>
+    </section>
+
+    <section class="palette-group">
+      <h2>Zonas</h2>
+      <button class="tool-btn" data-tool="sector">
+        <span class="tool-icon" style="--c:#D97706">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5.5" width="17" height="13" rx="2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-dasharray="3.5 3"/><path d="M7 9.5h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </span>
+        <span class="tool-name">Sector</span>
+        <span class="tool-hint">área con nombre</span>
+      </button>
+    </section>
+
+    <section class="palette-group">
+      <h2>Muebles</h2>
+      <button class="tool-btn" data-tool="gondola">
+        <span class="tool-icon" style="--c:#4F46E5">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4v16m16-16v16M4 9h16M4 14h16M4 19h16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </span>
+        <span class="tool-name">Góndola</span>
+        <span class="tool-hint">arrastra el tamaño</span>
+      </button>
+      <button class="tool-btn" data-tool="rack">
+        <span class="tool-icon" style="--c:#0D9488">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M6 6v14m12-14v14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M9 6v3a1.5 1.5 0 0 0 3 0m2-3v3a1.5 1.5 0 0 0 3 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </span>
+        <span class="tool-name">Rack</span>
+        <span class="tool-hint">colgado</span>
+      </button>
+      <button class="tool-btn" data-tool="tubular">
+        <span class="tool-icon" style="--c:#64748B">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v18M19 3v18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M5 7h14M5 12h14M5 17h14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </span>
+        <span class="tool-name">Tubular</span>
+        <span class="tool-hint">tubos · 3-4 niveles</span>
+      </button>
+      <button class="tool-btn" data-tool="cascada">
+        <span class="tool-icon" style="--c:#C026D3">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3v18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M5 5h5m-5 5h8m-8 5h11" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M10 5v3m3 2v3m3 2v3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        </span>
+        <span class="tool-name">Cascada</span>
+        <span class="tool-hint">ganchos escalonados</span>
+      </button>
+      <button class="tool-btn" data-tool="estanteria">
+        <span class="tool-icon" style="--c:#15803D">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 9h16M4 15h16" fill="none" stroke="currentColor" stroke-width="1.6"/><path d="M8 5.5v2m4 4v2m-2 4v2" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
+        </span>
+        <span class="tool-name">Estantería</span>
+        <span class="tool-hint">entrepaños</span>
+      </button>
+      <button class="tool-btn" data-tool="vitrina">
+        <span class="tool-icon" style="--c:#DB2777">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v14H4z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="m7 16 9-8m-4 9 5-4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </span>
+        <span class="tool-name">Vitrina</span>
+        <span class="tool-hint">cristal</span>
+      </button>
+      <button class="tool-btn" data-tool="mostrador">
+        <span class="tool-icon" style="--c:#F97316">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9h18v11H3z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M7 13h6v3H7z" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M6 9V6a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v3" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>
+        </span>
+        <span class="tool-name">Mostrador</span>
+        <span class="tool-hint">caja / atención</span>
+      </button>
+      <button class="tool-btn" data-tool="mesa">
+        <span class="tool-icon" style="--c:#CA8A04">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><ellipse cx="12" cy="7" rx="9" ry="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M4 7v4m16-4v4M8 9.5V20m8-10.5V20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        </span>
+        <span class="tool-name">Mesa</span>
+        <span class="tool-hint">exhibición</span>
+      </button>
+      <button class="tool-btn" data-tool="caja">
+        <span class="tool-icon" style="--c:#A16207">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8 12 3l9 5v8l-9 5-9-5V8Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><path d="M3 8l9 5 9-5M12 13v8" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        </span>
+        <span class="tool-name">Caja</span>
+        <span class="tool-hint">mercancía apilada</span>
+      </button>
+      <button class="tool-btn" data-tool="probador">
+        <span class="tool-icon" style="--c:#7C3AED">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M6 5c0 5-1 13 1 15m5-15c0 5-.5 13 1 15m5-15c0 5 1 13-1 15" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        </span>
+        <span class="tool-name">Probador</span>
+        <span class="tool-hint">vestidor</span>
+      </button>
+    </section>
+
+    <section class="palette-group counts-card">
+      <h2>Resumen · este piso</h2>
+      <div id="counts" class="counts"></div>
+    </section>
+  </aside>
+
+  <main class="workspace">
+    <div class="canvas-toolbar">
+      <div class="piso-controls">
+        <div id="pisoTabs" class="piso-tabs"></div>
+        <button id="btnAddPiso" class="small-btn" title="Agregar un piso">+ Piso</button>
+        <button id="btnRenPiso" class="small-btn" title="Renombrar este piso" aria-label="Renombrar piso">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m14.5 5.5 4 4L8 20H4v-4L14.5 5.5Zm2-2 2-2 4 4-2 2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg>
+        </button>
+        <button id="btnDupPiso" class="small-btn" title="Duplicar este piso: copia paredes, puertas, columnas y escaleras" aria-label="Duplicar piso">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="8" width="12" height="12" rx="2" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+        </button>
+        <button id="btnDelPiso" class="small-btn" title="Eliminar este piso (debe estar vacío)" aria-label="Eliminar piso">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 7h14M9 7V5h6v2m-8 0 1 13h8l1-13" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </button>
+      </div>
+      <div class="size-controls">
+        <label>Ancho <input type="number" id="inpCols" min="6" max="60" value="24"></label>
+        <span class="times">×</span>
+        <label>Alto <input type="number" id="inpRows" min="6" max="60" value="16"></label>
+        <button id="btnApplySize" class="small-btn">Aplicar</button>
+        <span class="scale-note">1 celda ≈ 50 cm</span>
+      </div>
+      <div class="zoom-controls">
+        <button id="btnNombres" class="small-btn" title="Ocultar / mostrar nombres" aria-label="Ocultar o mostrar nombres">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12Z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/><circle cx="12" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>
+          Nombres
+        </button>
+        <button id="btnZoomOut" class="small-btn" title="Alejar" aria-label="Alejar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-4.5-4.5M7.5 10.5h6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+        <span id="zoomLabel">100%</span>
+        <button id="btnZoomIn" class="small-btn" title="Acercar" aria-label="Acercar">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" fill="none" stroke="currentColor" stroke-width="2"/><path d="m20 20-4.5-4.5M7.5 10.5h6m-3-3v6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <div id="printHead" class="print-head"></div>
+    <div class="canvas-scroll" id="canvasScroll">
+      <div class="grid-stage" id="stage">
+        <div class="grid-bg" id="gridBg"></div>
+        <div class="layer" id="layerSectores"></div>
+        <div class="layer" id="layerCells"></div>
+        <div class="layer" id="layerPieces"></div>
+        <div class="layer" id="layerPreview"></div>
+      </div>
+    </div>
+
+    <div class="statusbar">
+      <div id="selInfo" class="sel-info empty">
+        <span class="sel-placeholder">Elige una herramienta y dibuja sobre la cuadrícula · clic en una pieza para seleccionarla</span>
+        <div class="sel-detail" hidden>
+          <span id="selName" class="sel-name"></span>
+          <span id="selSize" class="sel-size"></span>
+          <select id="selTipo" class="small-btn" title="Cambiar el tipo de esta pieza" hidden>
+            <option value="gondola">Góndola</option>
+            <option value="rack">Rack</option>
+            <option value="tubular">Tubular</option>
+            <option value="cascada">Cascada</option>
+            <option value="estanteria">Estantería</option>
+            <option value="vitrina">Vitrina</option>
+            <option value="mostrador">Mostrador</option>
+            <option value="mesa">Mesa</option>
+            <option value="probador">Probador</option>
+            <option value="caja">Caja</option>
+            <option value="escalera">Escalera</option>
+            <option value="columna">Columna</option>
+          </select>
+          <button id="btnNiveles" class="small-btn">Niveles</button>
+          <button id="btnRename" class="small-btn">Renombrar</button>
+          <button id="btnRotate" class="small-btn">Girar (R)</button>
+          <button id="btnDuplicar" class="small-btn">Duplicar (Ctrl+C/V)</button>
+          <button id="btnCopiarSel" class="small-btn" hidden>Copiar (Ctrl+C)</button>
+          <button id="btnUnificar" class="small-btn" hidden>Unificar</button>
+          <button id="btnSeparar" class="small-btn" hidden>Separar</button>
+          <button id="btnColorSector" class="small-btn" hidden>Color</button>
+          <button id="btnDelete" class="small-btn danger-solid">Eliminar (⌫)</button>
+        </div>
+      </div>
+      <span id="toast" class="toast" hidden></span>
+    </div>
+  </main>
+
+</div>
+
+<div class="modal-backdrop" id="modalNiveles" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="mnTitle">
+    <header class="modal-head">
+      <h2 id="mnTitle">Pieza</h2>
+      <button id="mnClose" class="small-btn" aria-label="Cerrar">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m6 6 12 12M18 6 6 18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+      </button>
+    </header>
+    <div class="niveles-ctrl">
+      <span class="ctrl-group">
+        <span>Niveles:</span>
+        <button id="mnMenos" class="small-btn" aria-label="Quitar nivel">−</button>
+        <b id="mnCount">4</b>
+        <button id="mnMas" class="small-btn" aria-label="Agregar nivel">+</button>
+      </span>
+      <span class="ctrl-group" id="ctrlColumnas">
+        <span id="mcLabel">Columnas:</span>
+        <button id="mcMenos" class="small-btn" aria-label="Quitar columna">−</button>
+        <b id="mcCount">5</b>
+        <button id="mcMas" class="small-btn" aria-label="Agregar columna">+</button>
+      </span>
+    </div>
+    <div class="frente-scroll">
+      <div class="frente" id="mnFrente"></div>
+      <div class="piso"></div>
+    </div>
+    <p class="mn-hint">Vista de frente · cada hueco ≈ 50 cm · en el modo Juego las chicas llenarán estos huecos con productos</p>
+  </div>
+</div>
+
+<script src="app.js"></script>
+</body>
+</html>
