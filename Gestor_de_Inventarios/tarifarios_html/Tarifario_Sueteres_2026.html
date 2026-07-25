@@ -240,6 +240,57 @@ tbody tr:last-child td { border-bottom: none; }
   color: #CBD5E1;
   flex-shrink: 0;
 }
+
+/* Encabezado de hoja: recuadro transparente con letras negras */
+.page-header {
+  background: none; box-shadow: none;
+  border: 2px solid #22303F; border-radius: 10px;
+}
+.page-header::before { display: none; }
+.header-category { color: #555C66; }
+.header-title { color: #111111; }
+.header-date { color: #777F88; }
+/* Títulos de producto: azul cielo 2024 */
+.block-title {
+  background: #66CCF9;
+  color: #093A54;
+  border-left: 3px solid #1B9AD6;
+}
+/* Barras Tallas/Precio: verde 2024 */
+thead th {
+  background: #A8D08D;
+  color: #1E4620;
+  border-bottom-color: #8DBE6E;
+}
+/* Separadores por tipo de sección */
+.divider.d-general { color: #0F7DB5; }
+.divider.d-general::after { background: #66CCF9; height: 2px; opacity: .8; }
+.divider.d-nivel { color: #C08A00; }
+.divider.d-nivel::after { background: #F8C045; height: 2px; opacity: .8; }
+.divider.d-exc { color: var(--red); }
+.divider.d-exc::after { background: var(--red); height: 2px; opacity: .35; }
+/* Bloques de "por nivel": dorado 2024 */
+.block-title.nivel {
+  color: #5C4300;
+  background: #F8C045;
+  border-left: 3px solid #D99A00;
+}
+/* Prendas de niña (falda, jumper, suéter de botones, cuello olán): rosa 2024 */
+.block-title.rosa {
+  color: #6E1F78;
+  background: #F5B8FB;
+  border-left: 3px solid #C85AD6;
+}
+/* Formato de impresión: A4 horizontal (pedido de Daniel 2026-07-23) */
+@page { size: A4 landscape; margin: 0; }
+.page { width: 297mm; min-height: 210mm; }
+@media print {
+  /* alto libre al imprimir: evita que el redondeo de 210mm derrame
+     una segunda página casi vacía por hoja */
+  /* zoom 0.88: da aire vertical para que las hojas densas (faldas,
+     pantalones, pants 2pz) quepan en un solo A4; el ancho se compensa */
+  .page { min-height: 0; height: auto; zoom: 0.88; width: calc(297mm / 0.88); }
+}
 </style>
 </head>
 <body>
@@ -247,74 +298,57 @@ tbody tr:last-child td { border-bottom: none; }
 <div class="page">
   <div class="page-header">
     <div class="header-left">
-      <div class="header-category">Tarifario Rápido · Suéteres</div>
+      <div class="header-category">Tarifario General · Suéteres</div>
       <div class="header-title">Suéteres</div>
     </div>
     <div class="header-right">
-      <div class="header-date">Actualizado: Abril 2026</div>
+      <div class="header-date">Actualizado: Julio 2026 · precios del sistema</div>
     </div>
   </div>
-  <div class="grid cols-3">
+  <div class="divider d-exc">Excepciones activas</div><div class="grid cols-1">
+<div class="block">
+  <div class="block-title exc">Oficial Preescolar</div>
+  <table class="exc-table">
+    <thead><tr><th>Escuela / Producto</th><th>Tallas</th><th>Precio</th></tr></thead>
+    <tbody><tr><td>Margarita Paz Paredes</td><td>4, 6, 8, 10</td><td>$315</td></tr></tbody>
+  </table>
+</div></div><div class="divider d-general">Precios generales</div><div class="grid cols-3">
 <div class="block">
   <div class="block-title ">Básico</div>
   <table class="">
     <thead><tr><th>Tallas</th><th>Precio</th></tr></thead>
-    <tbody><tr><td>4, 6, 8</td><td>$289</td></tr><tr><td>10, 12, 14, 16</td><td>$299</td></tr><tr><td>30, 32, 34</td><td>$309</td></tr><tr><td>36, 38, 40, 42</td><td>$315</td></tr><tr><td>44, 46</td><td>$325</td></tr></tbody>
+    <tbody><tr><td>4, 6, 8</td><td>$289</td></tr><tr><td>10, 12, 14, 16</td><td>$299</td></tr><tr><td>28, 30, 32, 34</td><td>$309</td></tr><tr><td>36, 38, 40, 42</td><td>$315</td></tr><tr><td>44, 46</td><td>$325</td></tr></tbody>
   </table>
-</div>
-
+</div></div><div class="divider d-nivel">Oficial por nivel</div><div class="grid cols-4">
 <div class="block">
-  <div class="block-title ">Oficial Preescolar</div>
+  <div class="block-title nivel">Oficial Preescolar</div>
   <table class="">
     <thead><tr><th>Tallas</th><th>Precio</th></tr></thead>
-    <tbody><tr><td>4, 6, 8, 10</td><td>$290</td></tr></tbody>
+    <tbody><tr><td>4, 6, 8, 10</td><td>$299</td></tr></tbody>
   </table>
 </div>
 
 <div class="block">
-  <div class="block-title ">Oficial Primaria</div>
+  <div class="block-title nivel">Oficial Primaria</div>
   <table class="">
     <thead><tr><th>Tallas</th><th>Precio</th></tr></thead>
-    <tbody><tr><td>4, 6, 8, 10</td><td>$290</td></tr><tr><td>12, 14, 16</td><td>$315</td></tr><tr><td>30 – 42</td><td>$325</td></tr></tbody>
+    <tbody><tr><td>4, 6, 8, 10</td><td>$299</td></tr><tr><td>12, 14, 16</td><td>$315</td></tr><tr><td>18, 30, 32, 34, 36, 38</td><td>$325</td></tr><tr><td>40, 42</td><td>$335</td></tr></tbody>
   </table>
 </div>
 
 <div class="block">
-  <div class="block-title ">Oficial Secundaria</div>
+  <div class="block-title nivel">Oficial Secundaria</div>
   <table class="">
     <thead><tr><th>Tallas</th><th>Precio</th></tr></thead>
-    <tbody><tr><td>12, 14, 16</td><td>$325</td></tr><tr><td>30 – 44</td><td>$345</td></tr></tbody>
+    <tbody><tr><td>12, 14, 16, 18</td><td>$325</td></tr><tr><td>30, 32, 34, 36, 38</td><td>$345</td></tr><tr><td>40, 42, 44</td><td>$355</td></tr></tbody>
   </table>
 </div>
 
 <div class="block">
-  <div class="block-title ">Oficial Bachillerato</div>
+  <div class="block-title nivel">Oficial Bachillerato</div>
   <table class="">
     <thead><tr><th>Tallas</th><th>Precio</th></tr></thead>
-    <tbody><tr><td>14, 16</td><td>$325</td></tr><tr><td>32, 34</td><td>$335</td></tr><tr><td>36, 38</td><td>$345</td></tr><tr><td>40, 42, 44</td><td>$355</td></tr></tbody>
-  </table>
-</div></div><div class="divider">Excepciones activas</div><div class="grid cols-3">
-<div class="block">
-  <div class="block-title exc">Preescolar</div>
-  <table class="exc-table">
-    <thead><tr><th>Escuela</th><th>Tallas</th><th>Precio</th></tr></thead>
-    <tbody><tr><td>Margarita Paz Paredes</td><td>4, 6, 8, 10</td><td>$315</td></tr></tbody>
-  </table>
-</div>
-
-<div class="block">
-  <div class="block-title exc">Primaria</div>
-  <table class="exc-table">
-    <thead><tr><th>Escuela</th><th>Tallas</th><th>Precio</th></tr></thead>
-    <tbody><tr><td>Benito Juárez</td><td>40, 42</td><td>$335</td></tr><tr><td>Colegio Motolinea</td><td>40</td><td>$335</td></tr><tr><td>Francisco Villa</td><td>40</td><td>$335</td></tr><tr><td>Ignacio Allende</td><td>40</td><td>$335</td></tr><tr><td>Miguel Hidalgo</td><td>40, 42</td><td>$335</td></tr></tbody>
-  </table>
-</div>
-
-<div class="block">
-  <div class="block-title exc">Bachillerato</div>
-  <table class="exc-table">
-    <thead><tr><th>Escuela</th><th>Tallas</th><th>Precio</th></tr></thead>
-    <tbody><tr><td>UVEG</td><td>14, 16, 32–42</td><td>$355</td></tr></tbody>
+    <tbody><tr><td>14, 16</td><td>$325</td></tr><tr><td>32, 34, 36, 38</td><td>$345</td></tr><tr><td>40, 42, 44</td><td>$355</td></tr></tbody>
   </table>
 </div></div>
 </div>

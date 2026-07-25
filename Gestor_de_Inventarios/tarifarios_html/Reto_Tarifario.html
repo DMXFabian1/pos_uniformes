@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reto Tarifario 2026</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, 'Segoe UI', sans-serif;
+  background: linear-gradient(135deg, #1B3557, #0F7DB5);
+  min-height: 100vh; display: flex; align-items: center; justify-content: center;
+  color: #fff; padding: 18px;
+}
+.card {
+  width: 100%; max-width: 720px; background: rgba(255,255,255,.07);
+  border-radius: 18px; padding: 28px; backdrop-filter: blur(6px);
+  box-shadow: 0 10px 40px rgba(0,0,0,.35);
+}
+h1 { font-size: 30px; margin-bottom: 6px; }
+.sub { opacity: .85; margin-bottom: 20px; font-size: 15px; }
+input[type=text] {
+  width: 100%; padding: 13px 15px; border-radius: 10px; border: none;
+  font-size: 17px; margin-bottom: 14px;
+}
+button.big {
+  width: 100%; padding: 15px; border: none; border-radius: 10px;
+  background: #F8C045; color: #4A3500; font-size: 19px; font-weight: 800;
+  cursor: pointer; transition: transform .1s;
+}
+button.big:hover { transform: scale(1.02); }
+.top { display: flex; justify-content: space-between; font-size: 14px;
+  font-weight: 700; margin-bottom: 12px; opacity: .9; }
+.timerbar { height: 10px; background: rgba(255,255,255,.2); border-radius: 5px;
+  overflow: hidden; margin-bottom: 18px; }
+.timerbar div { height: 100%; background: #F8C045; width: 100%;
+  transition: width .1s linear; }
+.pregunta { font-size: 21px; font-weight: 700; line-height: 1.4;
+  margin-bottom: 20px; min-height: 60px; }
+.ops { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.op {
+  padding: 17px 15px; border: none; border-radius: 12px; font-size: 16.5px;
+  font-weight: 700; color: #fff; cursor: pointer; text-align: left;
+  transition: transform .1s, opacity .2s; line-height: 1.3;
+}
+.op:hover { transform: scale(1.02); }
+.op:nth-child(1) { background: #E21B3C; }
+.op:nth-child(2) { background: #1368CE; }
+.op:nth-child(3) { background: #D89E00; }
+.op:nth-child(4) { background: #26890C; }
+.op .fig { font-size: 19px; margin-right: 9px; }
+.op.mal { opacity: .25; }
+.op.bien { outline: 4px solid #fff; }
+.feedback { border-radius: 12px; padding: 15px 18px; margin-top: 16px;
+  font-size: 15.5px; line-height: 1.55; }
+.feedback.ok { background: #26890C; }
+.feedback.err { background: #E21B3C; }
+.feedback b { display: block; font-size: 18px; margin-bottom: 6px; }
+button.sig {
+  margin-top: 14px; width: 100%; padding: 13px; border: none;
+  border-radius: 10px; background: #fff; color: #1B3557; font-size: 17px;
+  font-weight: 800; cursor: pointer;
+}
+button.sig:hover { transform: scale(1.01); }
+.resultado { text-align: center; }
+.resultado .medalla { font-size: 74px; margin: 8px 0; }
+.resultado .pts { font-size: 42px; font-weight: 900; color: #F8C045; }
+table.tabla { width: 100%; margin: 16px 0; border-collapse: collapse; }
+table.tabla td, table.tabla th { padding: 8px 10px; text-align: left;
+  border-bottom: 1px solid rgba(255,255,255,.2); font-size: 15px; }
+table.tabla th { opacity: .7; font-size: 12.5px; text-transform: uppercase; }
+.oculto { display: none; }
+</style>
+</head>
+<body>
+<div class="card">
+
+  <div id="inicio">
+    <h1>🎯 Reto Tarifario</h1>
+    <p class="sub">10 preguntas · contra reloj · puntos por velocidad.<br>
+    Banco de <b id="nbanco"></b> preguntas — cada partida es distinta.</p>
+    <input type="text" id="nombre" placeholder="Tu nombre" maxlength="18">
+    <button class="big" onclick="empezar()">¡JUGAR!</button>
+    <div id="records"></div>
+  </div>
+
+  <div id="juego" class="oculto">
+    <div class="top">
+      <span id="progreso"></span>
+      <span id="rachaTxt"></span>
+      <span id="puntosTxt">0 pts</span>
+    </div>
+    <div class="timerbar"><div id="barra"></div></div>
+    <div class="pregunta" id="ptexto"></div>
+    <div class="ops" id="ops"></div>
+    <div id="fb"></div>
+  </div>
+
+  <div id="fin" class="oculto resultado"></div>
+</div>
+
+<script>
+const BANCO = [{"q": "Falda Cuatro Tablas / Tableada / Azul Marino / Vino, talla 32: ¿precio?", "ops": ["$195", "$205", "$215", "$225"], "ok": 2, "exp": "Escalera — Falda Cuatro Tablas / Tableada / Azul Marino / Vino: 2, 4, 6, 8, 10, 12, 14 = $195 · 16, 18, 20, 28, 30 = $205 · 32, 34 = $215 · 36, 38 = $225 · 40, 42 = $235. Las 4 comparten escalera."}, {"q": "Chamarra deportiva de Primaria, talla MD: ¿precio?", "ops": ["$315", "$325", "$335", "$345"], "ok": 2, "exp": "Escalera — Chamarra deportiva de Primaria: 4, 6, 8, 10, 12, 14, 16, CH, MD, GD = $335."}, {"q": "Falda Gris (clara/obscura), talla 32: ¿precio?", "ops": ["$265", "$275", "$285", "$295"], "ok": 1, "exp": "Escalera — Falda Gris (clara/obscura): 4, 6, 8, 10, 12, 14, 16 = $265 · 28, 30, 32, 34 = $275 · 36, 38 = $285 · 40, 42 = $295."}, {"q": "Cliente de FRANCISCO VILLA pide camisa oficial talla 14: ¿precio?", "ops": ["$215", "$225", "$245", "$265"], "ok": 1, "exp": "¡Excepción! Francisco Villa: 4-10 $215 · 12-16 $225 · 18-38 $245. La línea oficial estándar es $265."}, {"q": "Suéter OFICIAL de Secundaria, talla 32: ¿precio?", "ops": ["$325", "$335", "$345", "$355"], "ok": 2, "exp": "Escalera — Suéter OFICIAL de Secundaria: 12, 14, 16, 18 = $325 · 30, 32, 34, 36, 38 = $345 · 40, 42, 44 = $355."}, {"q": "Chamarra BÁSICA Punto, talla 14: ¿precio?", "ops": ["$275", "$295", "$385", "$395"], "ok": 1, "exp": "Escalera — Chamarra BÁSICA Punto: 2, 4, 6, 8 = $275 · 10, 12, 14, 16 = $295 · 28, CH = $385 · MD, GD, EXG = $395."}, {"q": "Pants SUELTO Punto, talla CH: ¿precio?", "ops": ["$269", "$309", "$319", "$339"], "ok": 1, "exp": "Escalera — Pants SUELTO Punto: 2, 4, 6, 8 = $249 · 10, 12, 14, 16 = $269 · 28, CH = $309 · MD, GD = $319 · EXG = $339."}, {"q": "¿Qué significa la talla UNI?", "ops": ["Uniforme", "Unitalla", "Único color", "Universitario"], "ok": 1, "exp": "UNI = unitalla: boinas, guantes, corbatas y accesorios."}, {"q": "Malla Escolar, talla GD-EXG: ¿precio?", "ops": ["$109", "$129", "$139", "$149"], "ok": 2, "exp": "Escalera — Malla Escolar: 0-0, 0-2, 3-5, 6-8 = $109 · 9-12 = $129 · 13-18, CH-MD, GD-EXG, DAMA = $139."}, {"q": "Pants 3pz deportivo de Secundaria, talla 12: ¿precio?", "ops": ["$685", "$695", "$705", "$715"], "ok": 1, "exp": "Escalera — Pants 3pz deportivo de Secundaria: 10, 12, 18 = $695 · 14, 16 = $705 · CH, MD, GD, EXG = $715. Telesec. 454 y 512 son excepción: $750."}, {"q": "Jumper, talla 6: ¿precio?", "ops": ["$249", "$269", "$289", "$309"], "ok": 0, "exp": "Escalera — Jumper: 2, 4, 6, 8 = $249 · 10, 12, 14, 16 = $269 · 28, 30 = $289 · 32, 34 = $309 · 36, 38 = $319 · 40, 42 = $329."}, {"q": "Pants SUELTO Punto, talla MD: ¿precio?", "ops": ["$269", "$309", "$319", "$339"], "ok": 2, "exp": "Escalera — Pants SUELTO Punto: 2, 4, 6, 8 = $249 · 10, 12, 14, 16 = $269 · 28, CH = $309 · MD, GD = $319 · EXG = $339."}, {"q": "Pants 3pz deportivo de Primaria, talla GD: ¿precio?", "ops": ["$585", "$595", "$685", "$695"], "ok": 3, "exp": "Escalera — Pants 3pz deportivo de Primaria: 4, 6, 8, 10, 12 = $585 · 14, 16, 18 = $595 · CH, MD = $685 · GD, EXG = $695. Motolinea es excepción ($695-$750)."}, {"q": "Calceta Escolar, talla 9-12: ¿precio?", "ops": ["$29", "$39", "$49", "$59"], "ok": 2, "exp": "Escalera — Calceta Escolar: 0-0, 0-2, 3-5, 6-8, 9-12, 13-18 = $49."}, {"q": "Pants 2pz deportivo de Preescolar, talla 6: ¿precio?", "ops": ["$395", "$405", "$415", "$425"], "ok": 2, "exp": "Escalera — Pants 2pz deportivo de Preescolar: 2, 4, 6, 8, 10 = $415."}, {"q": "¿Qué es lo primero que le preguntas al cliente?", "ops": ["Su nombre", "¿Para qué escuela es?", "¿Cuánto quiere gastar?", "La talla"], "ok": 1, "exp": "La escuela define nivel, precios especiales y prendas correctas."}, {"q": "¿Qué es LO PRIMERO que revisas en una hoja del tarifario antes de dar un precio?", "ops": ["El bloque rojo de Excepciones activas", "La tabla más grande", "El precio más barato", "La fecha de actualización"], "ok": 0, "exp": "Regla de oro: si la escuela del cliente está en el bloque rojo, ese precio manda."}, {"q": "Pants 3pz deportivo de Preescolar, talla 10: ¿precio?", "ops": ["$495", "$505", "$515", "$525"], "ok": 2, "exp": "Escalera — Pants 3pz deportivo de Preescolar: 2, 4, 6, 8, 10 = $515."}, {"q": "¿Qué prendas van en tablas ROSAS?", "ops": ["Las más caras", "Las de temporada", "Las de niña: faldas, jumpers, cuello olán y suéter de botones", "Las de preescolar"], "ok": 2, "exp": "El rosa te ayuda a ubicar rápido el uniforme de niña."}, {"q": "Pantalón de vestir Gris (claro/obscuro), talla 6: ¿precio?", "ops": ["$249", "$259", "$269", "$279"], "ok": 0, "exp": "Escalera — Pantalón de vestir Gris (claro/obscuro): 4, 6, 8 = $249 · 10, 12 = $259 · 14, 16 = $269 · 18, 20 = $279 · 28, 30 = $289 · 32, 34 = $299 · 36, 38 = $309 · 40, 42, 44 = $329."}, {"q": "Pants 2pz deportivo de Primaria, talla GD: ¿precio?", "ops": ["$485", "$495", "$585", "$595"], "ok": 3, "exp": "Escalera — Pants 2pz deportivo de Primaria: 4, 6, 8, 10, 12 = $485 · 14, 16, 18 = $495 · CH, MD = $585 · GD, EXG = $595. Motolinea es excepción ($595-$650)."}, {"q": "Playera Polo Blanca, talla 18: ¿precio?", "ops": ["$135", "$145", "$155", "$170"], "ok": 2, "exp": "Escalera — Playera Polo Blanca: 2, 4, 6, 8 = $135 · 10, 12 = $145 · 14, 16, 18 = $155 · 28, 30, 32, 34, 36, 38 = $170 · 40, 42 = $180 · CH, MD = $185 · GD, EXG = $195."}, {"q": "La etiqueta de una prenda marca MÁS que el tarifario. ¿Qué cobras?", "ops": ["El del tarifario", "El precio marcado en la prenda", "El promedio", "Le pregunto al cliente"], "ok": 1, "exp": "Se respeta el precio mayor marcado. Nunca se cobra de menos sin autorización."}, {"q": "Pantalón de vestir (colores estándar), talla 10: ¿precio?", "ops": ["$235", "$245", "$255", "$265"], "ok": 1, "exp": "Escalera — Pantalón de vestir (colores estándar): 2, 4, 6, 8 = $235 · 10, 12 = $245 · 14, 16 = $255 · 18, 20 = $265 · 28, 30 = $275 · 32, 34 = $285 · 36, 38 = $295 · 40, 42, 44 = $315."}, {"q": "Suéter OFICIAL de Secundaria, talla 42: ¿precio?", "ops": ["$325", "$345", "$355", "$365"], "ok": 2, "exp": "Escalera — Suéter OFICIAL de Secundaria: 12, 14, 16, 18 = $325 · 30, 32, 34, 36, 38 = $345 · 40, 42, 44 = $355."}, {"q": "Boina Escolta, talla UNI: ¿precio?", "ops": ["$65", "$75", "$85", "$95"], "ok": 2, "exp": "Escalera — Boina Escolta: UNI = $85."}, {"q": "Pantalón Escocés (genérico), talla 2: ¿precio?", "ops": ["$189", "$199", "$239", "$269"], "ok": 1, "exp": "Escalera — Pantalón Escocés (genérico): 2, 3, 4, 6, 8 = $199 · 10, 12, 14, 16 = $239 · 28, 30, 32 = $269. Margarita es excepción: 2-8 a $239."}, {"q": "Pants 3pz deportivo de Primaria, talla 12: ¿precio?", "ops": ["$585", "$595", "$685", "$695"], "ok": 0, "exp": "Escalera — Pants 3pz deportivo de Primaria: 4, 6, 8, 10, 12 = $585 · 14, 16, 18 = $595 · CH, MD = $685 · GD, EXG = $695. Motolinea es excepción ($695-$750)."}, {"q": "Pants 2 piezas PUNTO, talla MD: ¿precio?", "ops": ["$525", "$535", "$545", "$555"], "ok": 1, "exp": "Escalera — Pants 2 piezas PUNTO: 2, 4, 6, 8 = $475 · 10, 12, 14, 16 = $495 · 28, CH = $525 · MD = $535 · GD = $545 · EXG = $555."}, {"q": "Jumper, talla 42: ¿precio?", "ops": ["$289", "$309", "$319", "$329"], "ok": 3, "exp": "Escalera — Jumper: 2, 4, 6, 8 = $249 · 10, 12, 14, 16 = $269 · 28, 30 = $289 · 32, 34 = $309 · 36, 38 = $319 · 40, 42 = $329."}, {"q": "Malla Escolar, talla 9-12: ¿precio?", "ops": ["$109", "$119", "$129", "$139"], "ok": 2, "exp": "Escalera — Malla Escolar: 0-0, 0-2, 3-5, 6-8 = $109 · 9-12 = $129 · 13-18, CH-MD, GD-EXG, DAMA = $139."}, {"q": "Pants 2pz deportivo de Primaria, talla 16: ¿precio?", "ops": ["$485", "$495", "$585", "$595"], "ok": 1, "exp": "Escalera — Pants 2pz deportivo de Primaria: 4, 6, 8, 10, 12 = $485 · 14, 16, 18 = $495 · CH, MD = $585 · GD, EXG = $595. Motolinea es excepción ($595-$650)."}, {"q": "Pants 2pz deportivo de Secundaria, talla 16: ¿precio?", "ops": ["$585", "$595", "$605", "$615"], "ok": 2, "exp": "Escalera — Pants 2pz deportivo de Secundaria: 10, 12, 18 = $595 · 14, 16 = $605 · CH, MD, GD, EXG = $615. Telesec. 454 y 512 son excepción: $650."}, {"q": "Camisa Manga Corta Blanca, talla 4: ¿precio?", "ops": ["$89", "$99", "$115", "$135"], "ok": 0, "exp": "Escalera — Camisa Manga Corta Blanca: 4, 6, 8 = $89 · 10, 12, 14, 16 = $99 · 28, 30 = $115 · 32, 34 = $135 · 36, 38 = $145 · 40, 42 = $165."}, {"q": "Pantalón de vestir (colores estándar), talla 6: ¿precio?", "ops": ["$235", "$245", "$255", "$265"], "ok": 0, "exp": "Escalera — Pantalón de vestir (colores estándar): 2, 4, 6, 8 = $235 · 10, 12 = $245 · 14, 16 = $255 · 18, 20 = $265 · 28, 30 = $275 · 32, 34 = $285 · 36, 38 = $295 · 40, 42, 44 = $315."}, {"q": "Pants 2pz deportivo de Primaria, talla MD: ¿precio?", "ops": ["$485", "$495", "$585", "$595"], "ok": 2, "exp": "Escalera — Pants 2pz deportivo de Primaria: 4, 6, 8, 10, 12 = $485 · 14, 16, 18 = $495 · CH, MD = $585 · GD, EXG = $595. Motolinea es excepción ($595-$650)."}, {"q": "Chaleco BÁSICO (sin escuela), talla 8: ¿precio?", "ops": ["$229", "$239", "$259", "$269"], "ok": 0, "exp": "Escalera — Chaleco BÁSICO (sin escuela): 4, 6, 8 = $229 · 10, 12, 14, 16 = $239 · 28, 30, 32, 34 = $259 · 36, 38, 40 = $269 · 42, 44, 46 = $289."}, {"q": "Pantalón de vestir (colores estándar), talla 18: ¿precio?", "ops": ["$245", "$255", "$265", "$275"], "ok": 2, "exp": "Escalera — Pantalón de vestir (colores estándar): 2, 4, 6, 8 = $235 · 10, 12 = $245 · 14, 16 = $255 · 18, 20 = $265 · 28, 30 = $275 · 32, 34 = $285 · 36, 38 = $295 · 40, 42, 44 = $315."}, {"q": "Cliente de MARGARITA PAZ PAREDES pide falda escocesa talla 8: ¿precio?", "ops": ["$235", "$239", "$245", "$255"], "ok": 1, "exp": "¡Excepción! Margarita paga $239 en 2-8. La genérica sería $215."}, {"q": "Pantalón Gales, talla 36: ¿precio?", "ops": ["$265", "$285", "$295", "$315"], "ok": 2, "exp": "Escalera — Pantalón Gales: 2, 4, 5, 6, 8 = $235 · 10, 12, 14, 16 = $245 · 18, 20, 28, 30 = $265 · 32, 34 = $285 · 36, 38 = $295 · 40, 42, 44 = $315."}, {"q": "Pantalón de vestir Gris (claro/obscuro), talla 20: ¿precio?", "ops": ["$259", "$269", "$279", "$289"], "ok": 2, "exp": "Escalera — Pantalón de vestir Gris (claro/obscuro): 4, 6, 8 = $249 · 10, 12 = $259 · 14, 16 = $269 · 18, 20 = $279 · 28, 30 = $289 · 32, 34 = $299 · 36, 38 = $309 · 40, 42, 44 = $329."}, {"q": "Cliente de COLEGIO MOTOLINEA pide pants 2 piezas talla 8: ¿precio?", "ops": ["$585", "$595", "$630", "$640"], "ok": 1, "exp": "¡Excepción! Motolinea paga $595 en tallas chicas. El estándar de primaria es $485."}, {"q": "Camisa Manga Larga M Blanca, talla EXG: ¿precio?", "ops": ["$279", "$289", "$299", "$309"], "ok": 3, "exp": "Escalera — Camisa Manga Larga M Blanca: 30, CH = $279 · MD, GD = $289 · EXG = $309."}, {"q": "Camisa Manga Larga H Blanca, talla 34: ¿precio?", "ops": ["$219", "$239", "$249", "$259"], "ok": 1, "exp": "Escalera — Camisa Manga Larga H Blanca: 2, 4, 6, 8 = $199 · 10, 12, 14, 16, 18 = $219 · 32, 34 = $239 · 36, 38 = $249 · 40, 42, 44, CH = $259 · MD = $269 · GD = $279 · EXG = $289."}, {"q": "Falda Escocesa (genérica), talla 30: ¿precio?", "ops": ["$235", "$245", "$255", "$265"], "ok": 1, "exp": "Escalera — Falda Escocesa (genérica): 2, 4, 6, 8 = $215 · 10, 12, 14, 16 = $235 · 28, 30, 32, 34 = $245 · 36, 38 = $255 · 40, 42 = $265. Margarita es excepción: 2-8 a $239."}, {"q": "Chamarra BÁSICA Punto, talla EXG: ¿precio?", "ops": ["$275", "$295", "$385", "$395"], "ok": 3, "exp": "Escalera — Chamarra BÁSICA Punto: 2, 4, 6, 8 = $275 · 10, 12, 14, 16 = $295 · 28, CH = $385 · MD, GD, EXG = $395."}, {"q": "Cliente de UVEG pide pants 3 piezas talla CH: ¿precio?", "ops": ["$715", "$750", "$780", "$790"], "ok": 3, "exp": "¡Excepción! UVEG paga $790 en 3pz. El estándar de bachillerato es $750."}, {"q": "Suéter BÁSICO (sin escuela), talla 6: ¿precio?", "ops": ["$289", "$299", "$309", "$315"], "ok": 0, "exp": "Escalera — Suéter BÁSICO (sin escuela): 4, 6, 8 = $289 · 10, 12, 14, 16 = $299 · 28, 30, 32, 34 = $309 · 36, 38, 40, 42 = $315 · 44, 46 = $325."}, {"q": "Chaleco BÁSICO (sin escuela), talla 42: ¿precio?", "ops": ["$239", "$259", "$269", "$289"], "ok": 3, "exp": "Escalera — Chaleco BÁSICO (sin escuela): 4, 6, 8 = $229 · 10, 12, 14, 16 = $239 · 28, 30, 32, 34 = $259 · 36, 38, 40 = $269 · 42, 44, 46 = $289."}, {"q": "Chamarra BÁSICA Punto, talla 8: ¿precio?", "ops": ["$275", "$295", "$385", "$395"], "ok": 0, "exp": "Escalera — Chamarra BÁSICA Punto: 2, 4, 6, 8 = $275 · 10, 12, 14, 16 = $295 · 28, CH = $385 · MD, GD, EXG = $395."}, {"q": "Falda Cuatro Tablas / Tableada / Azul Marino / Vino, talla 2: ¿precio?", "ops": ["$195", "$205", "$215", "$225"], "ok": 0, "exp": "Escalera — Falda Cuatro Tablas / Tableada / Azul Marino / Vino: 2, 4, 6, 8, 10, 12, 14 = $195 · 16, 18, 20, 28, 30 = $205 · 32, 34 = $215 · 36, 38 = $225 · 40, 42 = $235. Las 4 comparten escalera."}, {"q": "Cliente de CBTIS 148 pide pants 2 piezas talla CH: ¿precio?", "ops": ["$605", "$615", "$650", "$690"], "ok": 1, "exp": "¡Excepción! CBTIS y SABES van a $615; Conalep/CECYTE a $650 y UVEG a $690."}, {"q": "Camisa Prowear Manga Corta, talla 30: ¿precio?", "ops": ["$145", "$155", "$165", "$185"], "ok": 2, "exp": "Escalera — Camisa Prowear Manga Corta: 4, 6, 8 = $125 · 10, 12 = $145 · 14, 16 = $155 · 28, 30, 32, 34, 36, 38 = $165 · 40, 42 = $185."}, {"q": "Playera deportiva de Secundaria, talla CH: ¿precio?", "ops": ["$219", "$229", "$239", "$249"], "ok": 2, "exp": "Escalera — Playera deportiva de Secundaria: 10, 12, 14, 16, 18, 32 = $229 · CH, MD, GD, EXG = $239."}, {"q": "Falda Escocesa (genérica), talla 4: ¿precio?", "ops": ["$215", "$235", "$245", "$255"], "ok": 0, "exp": "Escalera — Falda Escocesa (genérica): 2, 4, 6, 8 = $215 · 10, 12, 14, 16 = $235 · 28, 30, 32, 34 = $245 · 36, 38 = $255 · 40, 42 = $265. Margarita es excepción: 2-8 a $239."}, {"q": "Pants SUELTO Punto, talla EXG: ¿precio?", "ops": ["$269", "$309", "$319", "$339"], "ok": 3, "exp": "Escalera — Pants SUELTO Punto: 2, 4, 6, 8 = $249 · 10, 12, 14, 16 = $269 · 28, CH = $309 · MD, GD = $319 · EXG = $339."}, {"q": "Suéter BÁSICO (sin escuela), talla 34: ¿precio?", "ops": ["$299", "$309", "$315", "$325"], "ok": 1, "exp": "Escalera — Suéter BÁSICO (sin escuela): 4, 6, 8 = $289 · 10, 12, 14, 16 = $299 · 28, 30, 32, 34 = $309 · 36, 38, 40, 42 = $315 · 44, 46 = $325."}, {"q": "Cliente de CONALEP pide corbata: ¿precio?", "ops": ["$70", "$115", "$125", "$135"], "ok": 2, "exp": "¡Excepción! La corbata (y corbatín) de Conalep cuesta $125. Las genéricas van a $70."}, {"q": "Playera Polo Blanca, talla 40: ¿precio?", "ops": ["$170", "$180", "$185", "$195"], "ok": 1, "exp": "Escalera — Playera Polo Blanca: 2, 4, 6, 8 = $135 · 10, 12 = $145 · 14, 16, 18 = $155 · 28, 30, 32, 34, 36, 38 = $170 · 40, 42 = $180 · CH, MD = $185 · GD, EXG = $195."}, {"q": "Suéter OFICIAL de Bachillerato, talla 14: ¿precio?", "ops": ["$315", "$325", "$345", "$355"], "ok": 1, "exp": "Escalera — Suéter OFICIAL de Bachillerato: 14, 16 = $325 · 32, 34, 36, 38 = $345 · 40, 42, 44 = $355."}, {"q": "Pantalón de vestir Gris (claro/obscuro), talla 44: ¿precio?", "ops": ["$289", "$299", "$309", "$329"], "ok": 3, "exp": "Escalera — Pantalón de vestir Gris (claro/obscuro): 4, 6, 8 = $249 · 10, 12 = $259 · 14, 16 = $269 · 18, 20 = $279 · 28, 30 = $289 · 32, 34 = $299 · 36, 38 = $309 · 40, 42, 44 = $329."}, {"q": "El precio del tarifario no coincide con el de la caja. ¿Qué haces?", "ops": ["Cobro el del tarifario", "Cobro el de la caja y aviso a Daniel", "No vendo la prenda", "Invento un precio intermedio"], "ok": 1, "exp": "La caja siempre manda; el tarifario se regenera para volver a coincidir."}, {"q": "Camisa Manga Larga M Blanca, talla GD: ¿precio?", "ops": ["$279", "$289", "$299", "$309"], "ok": 1, "exp": "Escalera — Camisa Manga Larga M Blanca: 30, CH = $279 · MD, GD = $289 · EXG = $309."}, {"q": "¿Qué significa la talla EXG?", "ops": ["Extra grande", "Extra género", "Exclusivo general", "Escolar general"], "ok": 0, "exp": "CH chica · MD mediana · GD grande · EXG extra grande."}, {"q": "Jumper, talla 16: ¿precio?", "ops": ["$249", "$269", "$289", "$309"], "ok": 1, "exp": "Escalera — Jumper: 2, 4, 6, 8 = $249 · 10, 12, 14, 16 = $269 · 28, 30 = $289 · 32, 34 = $309 · 36, 38 = $319 · 40, 42 = $329."}, {"q": "Pantalón Gales, talla 20: ¿precio?", "ops": ["$235", "$245", "$265", "$285"], "ok": 2, "exp": "Escalera — Pantalón Gales: 2, 4, 5, 6, 8 = $235 · 10, 12, 14, 16 = $245 · 18, 20, 28, 30 = $265 · 32, 34 = $285 · 36, 38 = $295 · 40, 42, 44 = $315."}, {"q": "Suéter OFICIAL de Primaria, talla 42: ¿precio?", "ops": ["$299", "$315", "$325", "$335"], "ok": 3, "exp": "Escalera — Suéter OFICIAL de Primaria: 4, 6, 8, 10 = $299 · 12, 14, 16 = $315 · 18, 30, 32, 34, 36, 38 = $325 · 40, 42 = $335."}, {"q": "Playera deportiva de Primaria, talla MD: ¿precio?", "ops": ["$215", "$219", "$225", "$235"], "ok": 2, "exp": "Escalera — Playera deportiva de Primaria: 4, 6, 8, 10, 18 = $199 · 12, 14, 16 = $209 · 30 = $215 · CH, EXG = $219 · MD = $225 · GD = $235. Motolinea es excepción: $235 parejo."}, {"q": "Pants 2pz deportivo de Secundaria, talla 18: ¿precio?", "ops": ["$585", "$595", "$605", "$615"], "ok": 1, "exp": "Escalera — Pants 2pz deportivo de Secundaria: 10, 12, 18 = $595 · 14, 16 = $605 · CH, MD, GD, EXG = $615. Telesec. 454 y 512 son excepción: $650."}, {"q": "Camisa Manga Larga H Blanca, talla EXG: ¿precio?", "ops": ["$259", "$269", "$279", "$289"], "ok": 3, "exp": "Escalera — Camisa Manga Larga H Blanca: 2, 4, 6, 8 = $199 · 10, 12, 14, 16, 18 = $219 · 32, 34 = $239 · 36, 38 = $249 · 40, 42, 44, CH = $259 · MD = $269 · GD = $279 · EXG = $289."}, {"q": "Cliente de MARGARITA PAZ PAREDES (preescolar) pide suéter oficial talla 8: ¿precio?", "ops": ["$299", "$305", "$315", "$325"], "ok": 2, "exp": "¡Excepción! Margarita paga $315 en su suéter oficial. El estándar de preescolar es $299."}, {"q": "Pantalón Escocés (genérico), talla 28: ¿precio?", "ops": ["$199", "$239", "$259", "$269"], "ok": 3, "exp": "Escalera — Pantalón Escocés (genérico): 2, 3, 4, 6, 8 = $199 · 10, 12, 14, 16 = $239 · 28, 30, 32 = $269. Margarita es excepción: 2-8 a $239."}, {"q": "Chamarra BÁSICA Liso, talla EXG: ¿precio?", "ops": ["$175", "$225", "$235", "$245"], "ok": 2, "exp": "Escalera — Chamarra BÁSICA Liso: 2, 4, 6, 8 = $175 · 10, 12, 14, 16 = $225 · 28, CH, MD, GD, EXG = $235."}, {"q": "Playera deportiva de Secundaria, talla 32: ¿precio?", "ops": ["$209", "$219", "$229", "$239"], "ok": 2, "exp": "Escalera — Playera deportiva de Secundaria: 10, 12, 14, 16, 18, 32 = $229 · CH, MD, GD, EXG = $239."}, {"q": "Falda Cuatro Tablas / Tableada / Azul Marino / Vino, talla 42: ¿precio?", "ops": ["$205", "$215", "$225", "$235"], "ok": 3, "exp": "Escalera — Falda Cuatro Tablas / Tableada / Azul Marino / Vino: 2, 4, 6, 8, 10, 12, 14 = $195 · 16, 18, 20, 28, 30 = $205 · 32, 34 = $215 · 36, 38 = $225 · 40, 42 = $235. Las 4 comparten escalera."}, {"q": "Camisa Manga Larga M Blanca, talla CH: ¿precio?", "ops": ["$269", "$279", "$289", "$309"], "ok": 1, "exp": "Escalera — Camisa Manga Larga M Blanca: 30, CH = $279 · MD, GD = $289 · EXG = $309."}, {"q": "Playera deportiva de Preescolar, talla 10: ¿precio?", "ops": ["$155", "$165", "$175", "$185"], "ok": 2, "exp": "Escalera — Playera deportiva de Preescolar: 2, 4, 6, 8, 10 = $175."}, {"q": "Cliente de TELESECUNDARIA 512 pide pants 2 piezas talla 14: ¿precio?", "ops": ["$595", "$605", "$615", "$650"], "ok": 3, "exp": "¡Excepción! Telesec. 512 va a $650 parejo. Sin revisar el rojo habrías cobrado $605."}, {"q": "Pants 2 piezas PUNTO, talla CH: ¿precio?", "ops": ["$495", "$525", "$535", "$545"], "ok": 1, "exp": "Escalera — Pants 2 piezas PUNTO: 2, 4, 6, 8 = $475 · 10, 12, 14, 16 = $495 · 28, CH = $525 · MD = $535 · GD = $545 · EXG = $555."}, {"q": "Camisa Manga Larga H Blanca, talla GD: ¿precio?", "ops": ["$259", "$269", "$279", "$289"], "ok": 2, "exp": "Escalera — Camisa Manga Larga H Blanca: 2, 4, 6, 8 = $199 · 10, 12, 14, 16, 18 = $219 · 32, 34 = $239 · 36, 38 = $249 · 40, 42, 44, CH = $259 · MD = $269 · GD = $279 · EXG = $289."}, {"q": "Bata Manga Larga, talla 12: ¿precio?", "ops": ["$345", "$355", "$365", "$375"], "ok": 2, "exp": "Escalera — Bata Manga Larga: 12, 14, 16, 18, 20, 28, 32, 34, 36, 38, 40, 42, 44, 46 = $365."}, {"q": "Corbata (genérica), talla UNI: ¿precio?", "ops": ["$50", "$60", "$70", "$80"], "ok": 2, "exp": "Escalera — Corbata (genérica): UNI = $70. La de Conalep es excepción: $125."}, {"q": "Playera Polo Blanca, talla 28: ¿precio?", "ops": ["$155", "$170", "$180", "$185"], "ok": 1, "exp": "Escalera — Playera Polo Blanca: 2, 4, 6, 8 = $135 · 10, 12 = $145 · 14, 16, 18 = $155 · 28, 30, 32, 34, 36, 38 = $170 · 40, 42 = $180 · CH, MD = $185 · GD, EXG = $195."}, {"q": "Pants 3pz deportivo de Secundaria, talla 14: ¿precio?", "ops": ["$685", "$695", "$705", "$715"], "ok": 2, "exp": "Escalera — Pants 3pz deportivo de Secundaria: 10, 12, 18 = $695 · 14, 16 = $705 · CH, MD, GD, EXG = $715. Telesec. 454 y 512 son excepción: $750."}, {"q": "Camisa Cuello Olán (preescolar), talla 12: ¿precio?", "ops": ["$119", "$129", "$139", "$149"], "ok": 2, "exp": "Escalera — Camisa Cuello Olán (preescolar): 2, 4, 6, 8, 10, 12, 14, 16, CH, MD, GD = $139."}, {"q": "Falda Gales, talla 6: ¿precio?", "ops": ["$195", "$205", "$215", "$225"], "ok": 0, "exp": "Escalera — Falda Gales: 2, 4, 6, 8 = $195 · 10, 12 = $205 · 14, 16 = $215 · 28, 30, 32, 34 = $225 · 36, 38, 40, 42 = $235 · 44 = $245."}, {"q": "Falda Gris (clara/obscura), talla 42: ¿precio?", "ops": ["$265", "$275", "$285", "$295"], "ok": 3, "exp": "Escalera — Falda Gris (clara/obscura): 4, 6, 8, 10, 12, 14, 16 = $265 · 28, 30, 32, 34 = $275 · 36, 38 = $285 · 40, 42 = $295."}, {"q": "Falda Gales, talla 32: ¿precio?", "ops": ["$205", "$215", "$225", "$235"], "ok": 2, "exp": "Escalera — Falda Gales: 2, 4, 6, 8 = $195 · 10, 12 = $205 · 14, 16 = $215 · 28, 30, 32, 34 = $225 · 36, 38, 40, 42 = $235 · 44 = $245."}, {"q": "Bata Manga Corta, talla 14: ¿precio?", "ops": ["$375", "$385", "$395", "$405"], "ok": 2, "exp": "Escalera — Bata Manga Corta: 12, 14, 16, 18, 20, 28, 32, 34, 36, 38, 40, 42, 44, 46 = $395."}, {"q": "Pants 2 piezas LISO, talla EXG: ¿precio?", "ops": ["$315", "$325", "$335", "$345"], "ok": 3, "exp": "Escalera — Pants 2 piezas LISO: 2, 4, 6, 8 = $250 · 10, 12, 14, 16 = $265 · 28, CH = $315 · MD = $325 · GD = $335 · EXG = $345. Ojo: Az. Marino, Az. Rey, Rojo, Verde y Vino andan en oferta ($175/$190 en 2-16)."}, {"q": "Suéter OFICIAL de Primaria, talla 30: ¿precio?", "ops": ["$299", "$315", "$325", "$335"], "ok": 2, "exp": "Escalera — Suéter OFICIAL de Primaria: 4, 6, 8, 10 = $299 · 12, 14, 16 = $315 · 18, 30, 32, 34, 36, 38 = $325 · 40, 42 = $335."}, {"q": "Pants 2 piezas LISO, talla 14: ¿precio?", "ops": ["$250", "$265", "$315", "$325"], "ok": 1, "exp": "Escalera — Pants 2 piezas LISO: 2, 4, 6, 8 = $250 · 10, 12, 14, 16 = $265 · 28, CH = $315 · MD = $325 · GD = $335 · EXG = $345. Ojo: Az. Marino, Az. Rey, Rojo, Verde y Vino andan en oferta ($175/$190 en 2-16)."}, {"q": "Falda Gales, talla 40: ¿precio?", "ops": ["$215", "$225", "$235", "$245"], "ok": 2, "exp": "Escalera — Falda Gales: 2, 4, 6, 8 = $195 · 10, 12 = $205 · 14, 16 = $215 · 28, 30, 32, 34 = $225 · 36, 38, 40, 42 = $235 · 44 = $245."}, {"q": "Suéter BÁSICO (sin escuela), talla 38: ¿precio?", "ops": ["$299", "$309", "$315", "$325"], "ok": 2, "exp": "Escalera — Suéter BÁSICO (sin escuela): 4, 6, 8 = $289 · 10, 12, 14, 16 = $299 · 28, 30, 32, 34 = $309 · 36, 38, 40, 42 = $315 · 44, 46 = $325."}, {"q": "Camisa Prowear Manga Corta, talla 10: ¿precio?", "ops": ["$125", "$145", "$155", "$165"], "ok": 1, "exp": "Escalera — Camisa Prowear Manga Corta: 4, 6, 8 = $125 · 10, 12 = $145 · 14, 16 = $155 · 28, 30, 32, 34, 36, 38 = $165 · 40, 42 = $185."}, {"q": "Suéter OFICIAL de Preescolar, talla 10: ¿precio?", "ops": ["$279", "$289", "$299", "$309"], "ok": 2, "exp": "Escalera — Suéter OFICIAL de Preescolar: 4, 6, 8, 10 = $299. Margarita es excepción a $315."}, {"q": "Chaleco BÁSICO (sin escuela), talla 32: ¿precio?", "ops": ["$229", "$239", "$259", "$269"], "ok": 2, "exp": "Escalera — Chaleco BÁSICO (sin escuela): 4, 6, 8 = $229 · 10, 12, 14, 16 = $239 · 28, 30, 32, 34 = $259 · 36, 38, 40 = $269 · 42, 44, 46 = $289."}, {"q": "Suéter OFICIAL de Bachillerato, talla 44: ¿precio?", "ops": ["$325", "$345", "$355", "$365"], "ok": 2, "exp": "Escalera — Suéter OFICIAL de Bachillerato: 14, 16 = $325 · 32, 34, 36, 38 = $345 · 40, 42, 44 = $355."}, {"q": "Pants 2 piezas PUNTO, talla EXG: ¿precio?", "ops": ["$525", "$535", "$545", "$555"], "ok": 3, "exp": "Escalera — Pants 2 piezas PUNTO: 2, 4, 6, 8 = $475 · 10, 12, 14, 16 = $495 · 28, CH = $525 · MD = $535 · GD = $545 · EXG = $555."}, {"q": "Suéter OFICIAL de Bachillerato, talla 32: ¿precio?", "ops": ["$325", "$335", "$345", "$355"], "ok": 2, "exp": "Escalera — Suéter OFICIAL de Bachillerato: 14, 16 = $325 · 32, 34, 36, 38 = $345 · 40, 42, 44 = $355."}, {"q": "Suéter OFICIAL de Primaria, talla 12: ¿precio?", "ops": ["$299", "$315", "$325", "$335"], "ok": 1, "exp": "Escalera — Suéter OFICIAL de Primaria: 4, 6, 8, 10 = $299 · 12, 14, 16 = $315 · 18, 30, 32, 34, 36, 38 = $325 · 40, 42 = $335."}, {"q": "Chamarra BÁSICA Liso, talla 10: ¿precio?", "ops": ["$175", "$215", "$225", "$235"], "ok": 2, "exp": "Escalera — Chamarra BÁSICA Liso: 2, 4, 6, 8 = $175 · 10, 12, 14, 16 = $225 · 28, CH, MD, GD, EXG = $235."}, {"q": "Chamarra BÁSICA Liso, talla 8: ¿precio?", "ops": ["$165", "$175", "$225", "$235"], "ok": 1, "exp": "Escalera — Chamarra BÁSICA Liso: 2, 4, 6, 8 = $175 · 10, 12, 14, 16 = $225 · 28, CH, MD, GD, EXG = $235."}, {"q": "Chaleco OFICIAL (con escudo), talla GD: ¿precio?", "ops": ["$269", "$289", "$299", "$309"], "ok": 3, "exp": "Escalera — Chaleco OFICIAL (con escudo): 2, 4, 6, 8 = $249 · 10, 12, 14, 16 = $269 · 30, 32, 34 = $289 · 36, 38, 40, CH, MD = $299 · 42, 44, GD, EXG = $309."}, {"q": "Playera deportiva de Primaria, talla 30: ¿precio?", "ops": ["$209", "$215", "$219", "$225"], "ok": 1, "exp": "Escalera — Playera deportiva de Primaria: 4, 6, 8, 10, 18 = $199 · 12, 14, 16 = $209 · 30 = $215 · CH, EXG = $219 · MD = $225 · GD = $235. Motolinea es excepción: $235 parejo."}, {"q": "Falda Escocesa (genérica), talla 38: ¿precio?", "ops": ["$235", "$245", "$255", "$265"], "ok": 2, "exp": "Escalera — Falda Escocesa (genérica): 2, 4, 6, 8 = $215 · 10, 12, 14, 16 = $235 · 28, 30, 32, 34 = $245 · 36, 38 = $255 · 40, 42 = $265. Margarita es excepción: 2-8 a $239."}, {"q": "¿Qué significa una tabla con encabezado DORADO?", "ops": ["Que está en oferta", "Que el precio depende del nivel escolar", "Que es prenda de niña", "Que es precio de mayoreo"], "ok": 1, "exp": "Dorado = por nivel: pregunta la escuela y ubica si es preescolar, primaria, secundaria o bachillerato."}, {"q": "Pants suelto deportivo de Primaria, talla CH: ¿precio?", "ops": ["$249", "$259", "$269", "$279"], "ok": 2, "exp": "Escalera — Pants suelto deportivo de Primaria: 4, 6, 8, 10, 12, 14, 16, 18 = $259 · CH, MD, GD, EXG = $269."}, {"q": "Pants 3pz deportivo de Primaria, talla MD: ¿precio?", "ops": ["$585", "$595", "$685", "$695"], "ok": 2, "exp": "Escalera — Pants 3pz deportivo de Primaria: 4, 6, 8, 10, 12 = $585 · 14, 16, 18 = $595 · CH, MD = $685 · GD, EXG = $695. Motolinea es excepción ($695-$750)."}, {"q": "Malla Escolar, talla 3-5: ¿precio?", "ops": ["$99", "$109", "$129", "$139"], "ok": 1, "exp": "Escalera — Malla Escolar: 0-0, 0-2, 3-5, 6-8 = $109 · 9-12 = $129 · 13-18, CH-MD, GD-EXG, DAMA = $139."}, {"q": "Falda Gris (clara/obscura), talla 36: ¿precio?", "ops": ["$265", "$275", "$285", "$295"], "ok": 2, "exp": "Escalera — Falda Gris (clara/obscura): 4, 6, 8, 10, 12, 14, 16 = $265 · 28, 30, 32, 34 = $275 · 36, 38 = $285 · 40, 42 = $295."}, {"q": "Pants suelto deportivo de Primaria, talla 6: ¿precio?", "ops": ["$239", "$249", "$259", "$269"], "ok": 2, "exp": "Escalera — Pants suelto deportivo de Primaria: 4, 6, 8, 10, 12, 14, 16, 18 = $259 · CH, MD, GD, EXG = $269."}, {"q": "Pants SUELTO Liso, talla MD: ¿precio?", "ops": ["$205", "$215", "$225", "$235"], "ok": 1, "exp": "Escalera — Pants SUELTO Liso: 2, 4, 6, 8 = $165 · 10, 12, 14, 16 = $180 · 28, CH = $205 · MD = $215 · GD = $225 · EXG = $235."}, {"q": "Chaleco OFICIAL (con escudo), talla MD: ¿precio?", "ops": ["$269", "$289", "$299", "$309"], "ok": 2, "exp": "Escalera — Chaleco OFICIAL (con escudo): 2, 4, 6, 8 = $249 · 10, 12, 14, 16 = $269 · 30, 32, 34 = $289 · 36, 38, 40, CH, MD = $299 · 42, 44, GD, EXG = $309."}, {"q": "Pants 3pz deportivo de Secundaria, talla CH: ¿precio?", "ops": ["$695", "$705", "$715", "$725"], "ok": 2, "exp": "Escalera — Pants 3pz deportivo de Secundaria: 10, 12, 18 = $695 · 14, 16 = $705 · CH, MD, GD, EXG = $715. Telesec. 454 y 512 son excepción: $750."}, {"q": "Playera deportiva de Primaria, talla 10: ¿precio?", "ops": ["$199", "$209", "$215", "$219"], "ok": 0, "exp": "Escalera — Playera deportiva de Primaria: 4, 6, 8, 10, 18 = $199 · 12, 14, 16 = $209 · 30 = $215 · CH, EXG = $219 · MD = $225 · GD = $235. Motolinea es excepción: $235 parejo."}, {"q": "Pantalón Gales, talla 6: ¿precio?", "ops": ["$235", "$245", "$265", "$285"], "ok": 0, "exp": "Escalera — Pantalón Gales: 2, 4, 5, 6, 8 = $235 · 10, 12, 14, 16 = $245 · 18, 20, 28, 30 = $265 · 32, 34 = $285 · 36, 38 = $295 · 40, 42, 44 = $315."}, {"q": "Camisa Prowear Manga Corta, talla 8: ¿precio?", "ops": ["$125", "$145", "$155", "$165"], "ok": 0, "exp": "Escalera — Camisa Prowear Manga Corta: 4, 6, 8 = $125 · 10, 12 = $145 · 14, 16 = $155 · 28, 30, 32, 34, 36, 38 = $165 · 40, 42 = $185."}, {"q": "Suéter OFICIAL de Secundaria, talla 14: ¿precio?", "ops": ["$315", "$325", "$345", "$355"], "ok": 1, "exp": "Escalera — Suéter OFICIAL de Secundaria: 12, 14, 16, 18 = $325 · 30, 32, 34, 36, 38 = $345 · 40, 42, 44 = $355."}, {"q": "Pants 2pz deportivo de Secundaria, talla CH: ¿precio?", "ops": ["$595", "$605", "$615", "$625"], "ok": 2, "exp": "Escalera — Pants 2pz deportivo de Secundaria: 10, 12, 18 = $595 · 14, 16 = $605 · CH, MD, GD, EXG = $615. Telesec. 454 y 512 son excepción: $650."}, {"q": "En el suéter de botones, ¿para quién es normalmente?", "ops": ["Para niña", "Para niño", "Unisex en todas las escuelas", "Solo maestras"], "ok": 0, "exp": "El de botones es de niña (tabla rosa) — salvo Margarita Paz Paredes y SABES, donde es unisex."}, {"q": "Camisa Manga Corta Blanca, talla 28: ¿precio?", "ops": ["$89", "$99", "$115", "$135"], "ok": 2, "exp": "Escalera — Camisa Manga Corta Blanca: 4, 6, 8 = $89 · 10, 12, 14, 16 = $99 · 28, 30 = $115 · 32, 34 = $135 · 36, 38 = $145 · 40, 42 = $165."}, {"q": "Pants SUELTO Liso, talla EXG: ¿precio?", "ops": ["$205", "$215", "$225", "$235"], "ok": 3, "exp": "Escalera — Pants SUELTO Liso: 2, 4, 6, 8 = $165 · 10, 12, 14, 16 = $180 · 28, CH = $205 · MD = $215 · GD = $225 · EXG = $235."}, {"q": "Pants 2 piezas LISO, talla CH: ¿precio?", "ops": ["$315", "$325", "$335", "$345"], "ok": 0, "exp": "Escalera — Pants 2 piezas LISO: 2, 4, 6, 8 = $250 · 10, 12, 14, 16 = $265 · 28, CH = $315 · MD = $325 · GD = $335 · EXG = $345. Ojo: Az. Marino, Az. Rey, Rojo, Verde y Vino andan en oferta ($175/$190 en 2-16)."}, {"q": "Pantalón Escocés (genérico), talla 12: ¿precio?", "ops": ["$199", "$229", "$239", "$269"], "ok": 2, "exp": "Escalera — Pantalón Escocés (genérico): 2, 3, 4, 6, 8 = $199 · 10, 12, 14, 16 = $239 · 28, 30, 32 = $269. Margarita es excepción: 2-8 a $239."}, {"q": "Chaleco OFICIAL (con escudo), talla 2: ¿precio?", "ops": ["$249", "$269", "$289", "$299"], "ok": 0, "exp": "Escalera — Chaleco OFICIAL (con escudo): 2, 4, 6, 8 = $249 · 10, 12, 14, 16 = $269 · 30, 32, 34 = $289 · 36, 38, 40, CH, MD = $299 · 42, 44, GD, EXG = $309."}, {"q": "Pants SUELTO Liso, talla GD: ¿precio?", "ops": ["$205", "$215", "$225", "$235"], "ok": 2, "exp": "Escalera — Pants SUELTO Liso: 2, 4, 6, 8 = $165 · 10, 12, 14, 16 = $180 · 28, CH = $205 · MD = $215 · GD = $225 · EXG = $235."}, {"q": "Camisa Manga Corta Blanca, talla 34: ¿precio?", "ops": ["$115", "$135", "$145", "$165"], "ok": 1, "exp": "Escalera — Camisa Manga Corta Blanca: 4, 6, 8 = $89 · 10, 12, 14, 16 = $99 · 28, 30 = $115 · 32, 34 = $135 · 36, 38 = $145 · 40, 42 = $165."}];
+const FIGS = ['▲','◆','●','■'];
+const TIEMPO = 20;
+const N = 10;
+
+let jugador = '', qs = [], idx = 0, puntos = 0, racha = 0, aciertos = 0;
+let timer = null, t0 = 0, restante = TIEMPO;
+
+function barajar(a) {
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function empezar() {
+  jugador = document.getElementById('nombre').value.trim() || 'Anónimo';
+  qs = barajar([...BANCO]).slice(0, N).map(q => {
+    const orden = barajar([...Array(q.ops.length).keys()]);
+    return { q: q.q, exp: q.exp,
+             ops: orden.map(i => q.ops[i]),
+             ok: orden.indexOf(q.ok) };
+  });
+  idx = 0; puntos = 0; racha = 0; aciertos = 0;
+  document.getElementById('inicio').classList.add('oculto');
+  document.getElementById('fin').classList.add('oculto');
+  document.getElementById('juego').classList.remove('oculto');
+  mostrar();
+}
+
+function mostrar() {
+  const q = qs[idx];
+  document.getElementById('progreso').textContent = `Pregunta ${idx+1} / ${qs.length}`;
+  document.getElementById('puntosTxt').textContent = `${puntos} pts`;
+  document.getElementById('rachaTxt').textContent = racha >= 2 ? `🔥 racha x${racha}` : '';
+  document.getElementById('ptexto').textContent = q.q;
+  document.getElementById('fb').innerHTML = '';
+  const cont = document.getElementById('ops');
+  cont.innerHTML = '';
+  q.ops.forEach((op, i) => {
+    const b = document.createElement('button');
+    b.className = 'op';
+    b.innerHTML = `<span class="fig">${FIGS[i]}</span>${op}`;
+    b.onclick = () => responder(i);
+    cont.appendChild(b);
+  });
+  restante = TIEMPO; t0 = Date.now();
+  clearInterval(timer);
+  timer = setInterval(() => {
+    restante = TIEMPO - (Date.now() - t0) / 1000;
+    document.getElementById('barra').style.width = Math.max(0, restante / TIEMPO * 100) + '%';
+    if (restante <= 0) responder(-1);
+  }, 100);
+}
+
+function responder(i) {
+  clearInterval(timer);
+  const q = qs[idx];
+  document.querySelectorAll('.op').forEach((b, j) => {
+    b.onclick = null;
+    if (j === q.ok) b.classList.add('bien');
+    else b.classList.add('mal');
+  });
+  const fb = document.getElementById('fb');
+  let bloque;
+  if (i === q.ok) {
+    const bono = Math.round(500 * Math.max(0, restante) / TIEMPO);
+    const extra = racha >= 2 ? 100 : 0;
+    puntos += 500 + bono + extra;
+    racha += 1; aciertos += 1;
+    bloque = `<div class="feedback ok"><b>✅ ¡Correcto! +${500 + bono + extra} pts</b>${q.exp}</div>`;
+  } else {
+    racha = 0;
+    const cual = i === -1 ? '⏰ ¡Se acabó el tiempo!' : '❌ Incorrecto';
+    bloque = `<div class="feedback err"><b>${cual}</b>La respuesta era: <u>${q.ops[q.ok]}</u>.<br>${q.exp}</div>`;
+  }
+  // sin prisa: cada quien avanza cuando termina de leer
+  bloque += `<button class="sig" onclick="siguiente()">${idx + 1 < qs.length ? 'SIGUIENTE →' : 'VER RESULTADO 🏁'}</button>`;
+  fb.innerHTML = bloque;
+  document.getElementById('puntosTxt').textContent = `${puntos} pts`;
+  document.querySelector('.sig').focus();
+}
+
+function siguiente() {
+  idx += 1;
+  if (idx < qs.length) mostrar();
+  else terminar();
+}
+
+function medalla(p) {
+  if (aciertos === qs.length) return ['🏆', '¡PERFECTO! Dominas el tarifario.'];
+  if (p >= 7000) return ['🥇', '¡Excelente! Ya casi te lo sabes de memoria.'];
+  if (p >= 5000) return ['🥈', 'Muy bien, sigue practicando las excepciones.'];
+  if (p >= 3000) return ['🥉', 'Vas bien — repasa la guía y vuelve a intentar.'];
+  return ['📖', 'Repasa la guía con calma y vuelve a jugar.'];
+}
+
+function terminar() {
+  document.getElementById('juego').classList.add('oculto');
+  const [m, msg] = medalla(puntos);
+  const tabla = JSON.parse(localStorage.getItem('reto_tarifario_records') || '[]');
+  tabla.push({ n: jugador, p: puntos, f: new Date().toLocaleDateString('es-MX') });
+  tabla.sort((a, b) => b.p - a.p);
+  localStorage.setItem('reto_tarifario_records', JSON.stringify(tabla.slice(0, 8)));
+  const fin = document.getElementById('fin');
+  fin.classList.remove('oculto');
+  fin.innerHTML = `
+    <h1>${jugador}</h1>
+    <div class="medalla">${m}</div>
+    <div class="pts">${puntos} pts</div>
+    <p class="sub">${aciertos} de ${qs.length} correctas · ${msg}</p>
+    ${tablaRecords()}
+    <button class="big" onclick="reiniciar()">JUGAR OTRA VEZ</button>`;
+}
+
+function tablaRecords() {
+  const tabla = JSON.parse(localStorage.getItem('reto_tarifario_records') || '[]');
+  if (!tabla.length) return '';
+  const filas = tabla.map((r, i) =>
+    `<tr><td>${['🥇','🥈','🥉'][i] || (i+1)}</td><td>${r.n}</td><td>${r.p} pts</td><td>${r.f}</td></tr>`).join('');
+  return `<table class="tabla"><tr><th></th><th>Nombre</th><th>Puntos</th><th>Fecha</th></tr>${filas}</table>`;
+}
+
+function reiniciar() {
+  document.getElementById('fin').classList.add('oculto');
+  document.getElementById('inicio').classList.remove('oculto');
+  document.getElementById('records').innerHTML = tablaRecords();
+}
+
+document.getElementById('nbanco').textContent = BANCO.length;
+document.getElementById('records').innerHTML = tablaRecords();
+document.getElementById('nombre').addEventListener('keydown', e => {
+  if (e.key === 'Enter') empezar();
+});
+</script>
+</body>
+</html>

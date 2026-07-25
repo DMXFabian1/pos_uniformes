@@ -240,6 +240,57 @@ tbody tr:last-child td { border-bottom: none; }
   color: #CBD5E1;
   flex-shrink: 0;
 }
+
+/* Encabezado de hoja: recuadro transparente con letras negras */
+.page-header {
+  background: none; box-shadow: none;
+  border: 2px solid #22303F; border-radius: 10px;
+}
+.page-header::before { display: none; }
+.header-category { color: #555C66; }
+.header-title { color: #111111; }
+.header-date { color: #777F88; }
+/* Títulos de producto: azul cielo 2024 */
+.block-title {
+  background: #66CCF9;
+  color: #093A54;
+  border-left: 3px solid #1B9AD6;
+}
+/* Barras Tallas/Precio: verde 2024 */
+thead th {
+  background: #A8D08D;
+  color: #1E4620;
+  border-bottom-color: #8DBE6E;
+}
+/* Separadores por tipo de sección */
+.divider.d-general { color: #0F7DB5; }
+.divider.d-general::after { background: #66CCF9; height: 2px; opacity: .8; }
+.divider.d-nivel { color: #C08A00; }
+.divider.d-nivel::after { background: #F8C045; height: 2px; opacity: .8; }
+.divider.d-exc { color: var(--red); }
+.divider.d-exc::after { background: var(--red); height: 2px; opacity: .35; }
+/* Bloques de "por nivel": dorado 2024 */
+.block-title.nivel {
+  color: #5C4300;
+  background: #F8C045;
+  border-left: 3px solid #D99A00;
+}
+/* Prendas de niña (falda, jumper, suéter de botones, cuello olán): rosa 2024 */
+.block-title.rosa {
+  color: #6E1F78;
+  background: #F5B8FB;
+  border-left: 3px solid #C85AD6;
+}
+/* Formato de impresión: A4 horizontal (pedido de Daniel 2026-07-23) */
+@page { size: A4 landscape; margin: 0; }
+.page { width: 297mm; min-height: 210mm; }
+@media print {
+  /* alto libre al imprimir: evita que el redondeo de 210mm derrame
+     una segunda página casi vacía por hoja */
+  /* zoom 0.88: da aire vertical para que las hojas densas (faldas,
+     pantalones, pants 2pz) quepan en un solo A4; el ancho se compensa */
+  .page { min-height: 0; height: auto; zoom: 0.88; width: calc(297mm / 0.88); }
+}
 </style>
 </head>
 <body>
@@ -247,27 +298,50 @@ tbody tr:last-child td { border-bottom: none; }
 <div class="page">
   <div class="page-header">
     <div class="header-left">
-      <div class="header-category">Tarifario Rápido · Accesorios</div>
-      <div class="header-title">Accesorios · Playera Polo</div>
+      <div class="header-category">Tarifario General · Accesorios</div>
+      <div class="header-title">Accesorios · Malla · Bata</div>
     </div>
     <div class="header-right">
-      <div class="header-date">Actualizado: Abril 2026</div>
+      <div class="header-date">Actualizado: Julio 2026 · precios del sistema</div>
     </div>
   </div>
-  <div class="grid cols-2">
+  <div class="divider d-exc">Excepciones activas</div><div class="grid cols-2">
 <div class="block">
-  <div class="block-title ">Accesorios</div>
-  <table class="">
-    <thead><tr><th>Pieza</th><th>Precio</th></tr></thead>
-    <tbody><tr><td>Calceta Escolar</td><td>$49</td></tr><tr><td>Guante Escolta</td><td>$49</td></tr><tr><td>Corbata</td><td>$70</td></tr><tr><td>Corbatín</td><td>$70</td></tr><tr><td>Moño</td><td>$70</td></tr><tr><td>Boina Escolta</td><td>$80</td></tr></tbody>
+  <div class="block-title exc">Corbata</div>
+  <table class="exc-table">
+    <thead><tr><th>Escuela / Producto</th><th>Tallas</th><th>Precio</th></tr></thead>
+    <tbody><tr><td>Conalep</td><td>UNI</td><td>$125</td></tr></tbody>
   </table>
 </div>
 
 <div class="block">
-  <div class="block-title ">Playera Polo Blanca</div>
+  <div class="block-title exc">Corbatín</div>
+  <table class="exc-table">
+    <thead><tr><th>Escuela / Producto</th><th>Tallas</th><th>Precio</th></tr></thead>
+    <tbody><tr><td>Conalep</td><td>UNI</td><td>$125</td></tr></tbody>
+  </table>
+</div></div><div class="divider d-general">Precios generales</div><div class="grid cols-3">
+<div class="block">
+  <div class="block-title ">Accesorios</div>
+  <table class="">
+    <thead><tr><th>Pieza</th><th>Precio</th></tr></thead>
+    <tbody><tr><td>Calceta Escolar</td><td>$49</td></tr><tr><td>Guante Escolta</td><td>$49</td></tr><tr><td>Corbata</td><td>$70</td></tr><tr><td>Corbatín</td><td>$70</td></tr><tr><td>Moño</td><td>$70</td></tr><tr><td>Boina Escolta</td><td>$85</td></tr></tbody>
+  </table>
+</div>
+
+<div class="block">
+  <div class="block-title ">Malla Escolar</div>
   <table class="">
     <thead><tr><th>Tallas</th><th>Precio</th></tr></thead>
-    <tbody><tr><td>2, 4, 6, 8</td><td>$135</td></tr><tr><td>10, 12</td><td>$145</td></tr><tr><td>14, 16, 18</td><td>$155</td></tr><tr><td>28, 30, 32, 34, 36, 38</td><td>$170</td></tr><tr><td>40, 42</td><td>$180</td></tr><tr><td>CH, MD</td><td>$185</td></tr><tr><td>GD, EXG</td><td>$195</td></tr></tbody>
+    <tbody><tr><td>0-0, 0-2, 3-5, 6-8</td><td>$109</td></tr><tr><td>9-12</td><td>$129</td></tr><tr><td>13-18, CH-MD, GD-EXG, DAMA</td><td>$139</td></tr></tbody>
+  </table>
+</div>
+
+<div class="block">
+  <div class="block-title ">Bata</div>
+  <table class="">
+    <thead><tr><th>Tipo</th><th>Tallas</th><th>Precio</th></tr></thead>
+    <tbody><tr><td>Infantil</td><td>UNI</td><td>$65</td></tr><tr><td>Manga Corta</td><td>12, 14, 16, 18, 20, 28, 32, 34, 36, 38, 40, 42, 44, 46</td><td>$395</td></tr><tr><td>Manga Larga</td><td>12, 14, 16, 18, 20, 28, 32, 34, 36, 38, 40, 42, 44, 46</td><td>$365</td></tr></tbody>
   </table>
 </div></div>
 </div>

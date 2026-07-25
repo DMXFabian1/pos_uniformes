@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Tarifario Pants 2pz 3pz 2026</title>
+  <title>Tarifario Pants 3pz 2026</title>
   <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
@@ -240,6 +240,57 @@ tbody tr:last-child td { border-bottom: none; }
   color: #CBD5E1;
   flex-shrink: 0;
 }
+
+/* Encabezado de hoja: recuadro transparente con letras negras */
+.page-header {
+  background: none; box-shadow: none;
+  border: 2px solid #22303F; border-radius: 10px;
+}
+.page-header::before { display: none; }
+.header-category { color: #555C66; }
+.header-title { color: #111111; }
+.header-date { color: #777F88; }
+/* Títulos de producto: azul cielo 2024 */
+.block-title {
+  background: #66CCF9;
+  color: #093A54;
+  border-left: 3px solid #1B9AD6;
+}
+/* Barras Tallas/Precio: verde 2024 */
+thead th {
+  background: #A8D08D;
+  color: #1E4620;
+  border-bottom-color: #8DBE6E;
+}
+/* Separadores por tipo de sección */
+.divider.d-general { color: #0F7DB5; }
+.divider.d-general::after { background: #66CCF9; height: 2px; opacity: .8; }
+.divider.d-nivel { color: #C08A00; }
+.divider.d-nivel::after { background: #F8C045; height: 2px; opacity: .8; }
+.divider.d-exc { color: var(--red); }
+.divider.d-exc::after { background: var(--red); height: 2px; opacity: .35; }
+/* Bloques de "por nivel": dorado 2024 */
+.block-title.nivel {
+  color: #5C4300;
+  background: #F8C045;
+  border-left: 3px solid #D99A00;
+}
+/* Prendas de niña (falda, jumper, suéter de botones, cuello olán): rosa 2024 */
+.block-title.rosa {
+  color: #6E1F78;
+  background: #F5B8FB;
+  border-left: 3px solid #C85AD6;
+}
+/* Formato de impresión: A4 horizontal (pedido de Daniel 2026-07-23) */
+@page { size: A4 landscape; margin: 0; }
+.page { width: 297mm; min-height: 210mm; }
+@media print {
+  /* alto libre al imprimir: evita que el redondeo de 210mm derrame
+     una segunda página casi vacía por hoja */
+  /* zoom 0.88: da aire vertical para que las hojas densas (faldas,
+     pantalones, pants 2pz) quepan en un solo A4; el ancho se compensa */
+  .page { min-height: 0; height: auto; zoom: 0.88; width: calc(297mm / 0.88); }
+}
 </style>
 </head>
 <body>
@@ -247,89 +298,66 @@ tbody tr:last-child td { border-bottom: none; }
 <div class="page">
   <div class="page-header">
     <div class="header-left">
-      <div class="header-category">Tarifario Rápido · Pants</div>
-      <div class="header-title">Pants 2 y 3 Piezas</div>
+      <div class="header-category">Tarifario General · Pants</div>
+      <div class="header-title">Pants 3 Piezas</div>
     </div>
     <div class="header-right">
-      <div class="header-date">Actualizado: Abril 2026</div>
+      <div class="header-date">Actualizado: Julio 2026 · precios del sistema</div>
     </div>
   </div>
-  <div class="divider">Liso · Punto · Algodón (genérico)</div><div class="grid cols-3">
+  <div class="divider d-exc">Excepciones activas</div><div class="grid cols-3">
 <div class="block">
-  <div class="block-title ">Liso · todos los colores</div>
+  <div class="block-title exc">Deportivo · Primaria</div>
+  <table class="exc-table">
+    <thead><tr><th>Escuela / Producto</th><th>Tallas</th><th>Precio</th></tr></thead>
+    <tbody><tr><td>Colegio Motolinea</td><td>4, 6, 8, 10, 12, 14, 16</td><td>$695</td></tr><tr><td>Colegio Motolinea</td><td>CH</td><td>$730</td></tr><tr><td>Colegio Motolinea</td><td>MD</td><td>$740</td></tr><tr><td>Colegio Motolinea</td><td>GD</td><td>$750</td></tr></tbody>
+  </table>
+</div>
+
+<div class="block">
+  <div class="block-title exc">Deportivo · Secundaria</div>
+  <table class="exc-table">
+    <thead><tr><th>Escuela / Producto</th><th>Tallas</th><th>Precio</th></tr></thead>
+    <tbody><tr><td>Telesecundaria 454</td><td>10, 12, 14, 16, CH, MD, GD</td><td>$750</td></tr><tr><td>Telesecundaria 512</td><td>10, 12, 14, 16, CH, MD, GD</td><td>$750</td></tr></tbody>
+  </table>
+</div>
+
+<div class="block">
+  <div class="block-title exc">Deportivo · Bachillerato</div>
+  <table class="exc-table">
+    <thead><tr><th>Escuela / Producto</th><th>Tallas</th><th>Precio</th></tr></thead>
+    <tbody><tr><td>CBTIS 148</td><td>16, CH, MD, GD, EXG</td><td>$715</td></tr><tr><td>SABES</td><td>16, CH, MD, GD, EXG</td><td>$715</td></tr><tr><td>UVEG</td><td>16, CH, MD, GD, EXG</td><td>$790</td></tr></tbody>
+  </table>
+</div></div><div class="divider d-nivel">Deportivo por nivel</div><div class="grid cols-4">
+<div class="block">
+  <div class="block-title nivel">Deportivo · Preescolar</div>
   <table class="">
     <thead><tr><th>Tallas</th><th>Precio</th></tr></thead>
-    <tbody><tr><td>2, 4, 6, 8</td><td>$250</td></tr><tr><td>10, 12, 14, 16</td><td>$265</td></tr><tr><td>28, CH</td><td>$315</td></tr><tr><td>MD</td><td>$325</td></tr><tr><td>GD</td><td>$335</td></tr><tr><td>EXG</td><td>$345</td></tr></tbody>
+    <tbody><tr><td>2, 4, 6, 8, 10</td><td>$515</td></tr></tbody>
   </table>
 </div>
 
 <div class="block">
-  <div class="block-title ">Punto · todos los colores</div>
+  <div class="block-title nivel">Deportivo · Primaria</div>
   <table class="">
     <thead><tr><th>Tallas</th><th>Precio</th></tr></thead>
-    <tbody><tr><td>2, 4, 6, 8</td><td>$475</td></tr><tr><td>10, 12, 14, 16</td><td>$495</td></tr><tr><td>28, CH</td><td>$525</td></tr><tr><td>MD</td><td>$535</td></tr><tr><td>GD</td><td>$545</td></tr><tr><td>EXG</td><td>$555</td></tr></tbody>
+    <tbody><tr><td>4, 6, 8, 10, 12</td><td>$585</td></tr><tr><td>14, 16, 18</td><td>$595</td></tr><tr><td>CH, MD</td><td>$685</td></tr><tr><td>GD, EXG</td><td>$695</td></tr></tbody>
   </table>
 </div>
 
 <div class="block">
-  <div class="block-title ">Algodón Azul Marino</div>
+  <div class="block-title nivel">Deportivo · Secundaria</div>
   <table class="">
     <thead><tr><th>Tallas</th><th>Precio</th></tr></thead>
-    <tbody><tr><td>4, 6, 8</td><td>$260</td></tr><tr><td>10, 12</td><td>$265</td></tr><tr><td>14, 16</td><td>$275</td></tr></tbody>
+    <tbody><tr><td>10, 12, 18</td><td>$695</td></tr><tr><td>14, 16</td><td>$705</td></tr><tr><td>CH, MD, GD</td><td>$715</td></tr></tbody>
   </table>
-</div></div><div class="divider">Deportivo por nivel</div><div class="grid cols-4">
+</div>
+
 <div class="block">
-  <div class="block-title ">Preescolar</div>
+  <div class="block-title nivel">Deportivo · Bachillerato</div>
   <table class="">
-    <thead><tr><th>Tallas</th><th>2 pzas</th><th>3 pzas</th></tr></thead>
-    <tbody><tr><td>2, 4, 6, 8, 10</td><td>$445</td><td>$545</td></tr></tbody>
-  </table>
-</div>
-
-<div class="block">
-  <div class="block-title ">Primaria</div>
-  <table class="">
-    <thead><tr><th>Tallas</th><th>2 pzas</th><th>3 pzas</th></tr></thead>
-    <tbody><tr><td>4, 6, 8, 10, 12</td><td>$485</td><td>$585</td></tr><tr><td>14, 16</td><td>$495</td><td>$595</td></tr><tr><td>CH, MD, GD</td><td>$585</td><td>$685</td></tr></tbody>
-  </table>
-</div>
-
-<div class="block">
-  <div class="block-title ">Secundaria</div>
-  <table class="">
-    <thead><tr><th>Tallas</th><th>2 pzas</th><th>3 pzas</th></tr></thead>
-    <tbody><tr><td>10, 12</td><td>$595</td><td>$695</td></tr><tr><td>14, 16</td><td>$605</td><td>$705</td></tr><tr><td>CH, MD, GD, EXG</td><td>$615</td><td>$715</td></tr></tbody>
-  </table>
-</div>
-
-<div class="block">
-  <div class="block-title ">Bachillerato</div>
-  <table class="">
-    <thead><tr><th>Tallas</th><th>2 pzas</th><th>3 pzas</th></tr></thead>
-    <tbody><tr><td>16</td><td>$615</td><td>$715</td></tr><tr><td>CH, MD, GD, EXG</td><td>$615</td><td>$715</td></tr></tbody>
-  </table>
-</div></div><div class="divider">Excepciones activas</div><div class="grid cols-3">
-<div class="block">
-  <div class="block-title exc">Preescolar</div>
-  <table class="exc-table">
-    <thead><tr><th>Escuela</th><th>2 pzas</th><th>3 pzas</th></tr></thead>
-    <tbody><tr><td>Sor Juana Inés de la Cruz</td><td>$515</td><td>—</td></tr></tbody>
-  </table>
-</div>
-
-<div class="block">
-  <div class="block-title exc">Primaria</div>
-  <table class="exc-table">
-    <thead><tr><th>Escuela</th><th>2 pzas</th><th>3 pzas</th></tr></thead>
-    <tbody><tr><td>Adolfo Lopez Mateo</td><td>575/585/595</td><td>—</td></tr><tr><td>Colegio Motolinea</td><td>595/630/640/650</td><td>695/730/740/750</td></tr></tbody>
-  </table>
-</div>
-
-<div class="block">
-  <div class="block-title exc">Secundaria · Bachillerato</div>
-  <table class="exc-table">
-    <thead><tr><th>Escuela</th><th>2 pzas</th><th>3 pzas</th></tr></thead>
-    <tbody><tr><td>Telesecundaria 454</td><td>$650</td><td>$750</td></tr><tr><td>Telesecundaria 512</td><td>$650</td><td>$750</td></tr><tr><td>CECYTE</td><td>$650</td><td>$750</td></tr><tr><td>Conalep</td><td>$650</td><td>$750</td></tr><tr><td>UVEG</td><td>$650</td><td>$750</td></tr></tbody>
+    <thead><tr><th>Tallas</th><th>Precio</th></tr></thead>
+    <tbody><tr><td>16, CH, MD, GD, EXG</td><td>$750</td></tr></tbody>
   </table>
 </div></div>
 </div>

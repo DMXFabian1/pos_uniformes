@@ -240,6 +240,57 @@ tbody tr:last-child td { border-bottom: none; }
   color: #CBD5E1;
   flex-shrink: 0;
 }
+
+/* Encabezado de hoja: recuadro transparente con letras negras */
+.page-header {
+  background: none; box-shadow: none;
+  border: 2px solid #22303F; border-radius: 10px;
+}
+.page-header::before { display: none; }
+.header-category { color: #555C66; }
+.header-title { color: #111111; }
+.header-date { color: #777F88; }
+/* Títulos de producto: azul cielo 2024 */
+.block-title {
+  background: #66CCF9;
+  color: #093A54;
+  border-left: 3px solid #1B9AD6;
+}
+/* Barras Tallas/Precio: verde 2024 */
+thead th {
+  background: #A8D08D;
+  color: #1E4620;
+  border-bottom-color: #8DBE6E;
+}
+/* Separadores por tipo de sección */
+.divider.d-general { color: #0F7DB5; }
+.divider.d-general::after { background: #66CCF9; height: 2px; opacity: .8; }
+.divider.d-nivel { color: #C08A00; }
+.divider.d-nivel::after { background: #F8C045; height: 2px; opacity: .8; }
+.divider.d-exc { color: var(--red); }
+.divider.d-exc::after { background: var(--red); height: 2px; opacity: .35; }
+/* Bloques de "por nivel": dorado 2024 */
+.block-title.nivel {
+  color: #5C4300;
+  background: #F8C045;
+  border-left: 3px solid #D99A00;
+}
+/* Prendas de niña (falda, jumper, suéter de botones, cuello olán): rosa 2024 */
+.block-title.rosa {
+  color: #6E1F78;
+  background: #F5B8FB;
+  border-left: 3px solid #C85AD6;
+}
+/* Formato de impresión: A4 horizontal (pedido de Daniel 2026-07-23) */
+@page { size: A4 landscape; margin: 0; }
+.page { width: 297mm; min-height: 210mm; }
+@media print {
+  /* alto libre al imprimir: evita que el redondeo de 210mm derrame
+     una segunda página casi vacía por hoja */
+  /* zoom 0.88: da aire vertical para que las hojas densas (faldas,
+     pantalones, pants 2pz) quepan en un solo A4; el ancho se compensa */
+  .page { min-height: 0; height: auto; zoom: 0.88; width: calc(297mm / 0.88); }
+}
 </style>
 </head>
 <body>
@@ -247,14 +298,14 @@ tbody tr:last-child td { border-bottom: none; }
 <div class="page">
   <div class="page-header">
     <div class="header-left">
-      <div class="header-category">Tarifario Rápido · Pants</div>
-      <div class="header-title">Pants Suelto Básico</div>
+      <div class="header-category">Tarifario General · Pants</div>
+      <div class="header-title">Pants Suelto</div>
     </div>
     <div class="header-right">
-      <div class="header-date">Actualizado: Abril 2026</div>
+      <div class="header-date">Actualizado: Julio 2026 · precios del sistema</div>
     </div>
   </div>
-  <div class="grid cols-2">
+  <div class="divider d-general">Precios generales</div><div class="grid cols-3">
 <div class="block">
   <div class="block-title ">Liso</div>
   <table class="">
@@ -268,6 +319,13 @@ tbody tr:last-child td { border-bottom: none; }
   <table class="">
     <thead><tr><th>Tallas</th><th>Precio</th></tr></thead>
     <tbody><tr><td>2, 4, 6, 8</td><td>$249</td></tr><tr><td>10, 12, 14, 16</td><td>$269</td></tr><tr><td>28, CH</td><td>$309</td></tr><tr><td>MD, GD</td><td>$319</td></tr><tr><td>EXG</td><td>$339</td></tr></tbody>
+  </table>
+</div></div><div class="divider d-nivel">Deportivo por nivel</div><div class="grid cols-3">
+<div class="block">
+  <div class="block-title nivel">Deportivo por nivel</div>
+  <table class="">
+    <thead><tr><th>Nivel</th><th>Tallas</th><th>Precio</th></tr></thead>
+    <tbody><tr><td>Preescolar</td><td>2, 4, 6, 8, 10</td><td>$239</td></tr><tr><td>Primaria</td><td>4, 6, 8, 10, 12, 14, 16, 18</td><td>$259</td></tr><tr><td>Primaria</td><td>CH, MD, GD, EXG</td><td>$269</td></tr><tr><td>Secundaria</td><td>10, 12, 14, 16, CH, MD, GD, EXG</td><td>$279</td></tr><tr><td>Bachillerato</td><td>14, 16, CH, MD, GD, EXG</td><td>$289</td></tr></tbody>
   </table>
 </div></div>
 </div>
