@@ -10,3 +10,19 @@ C:\\Meilisearch/
 pwa/.certs/
 Gestor_de_Inventarios/tarifarios_cache_*.json
 pos_uniformes/data/satellite_identity.json
+
+# Dependencias y caches
+node_modules/
+__pycache__/
+*.pyc
+.mypy_cache/
+.pytest_cache/
+
+# Logs, respaldos y artefactos que no se versionan
+logs/
+*.log
+*.zip
+*.exe
+ownership-map-out/
+pos_uniformes/backups/database/
+pos_uniformes/pos.db
