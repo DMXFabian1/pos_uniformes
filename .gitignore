@@ -23,6 +23,6 @@ logs/
 *.log
 *.zip
 *.exe
-ownership-map-out/
+ownership-map-out*/
 pos_uniformes/backups/database/
 pos_uniformes/pos.db
