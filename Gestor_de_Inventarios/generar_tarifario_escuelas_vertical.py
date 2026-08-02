@@ -122,12 +122,15 @@ def pagina_v(category, title, items, foto, num):
 </div>"""
 
 
-def generate():
-    FOTOS.mkdir(exist_ok=True)
-    filas = G.cargar_filas()
-    P = E.paginas_escuelas(filas)
+CON_INDICE = ("Preescolar", "Primaria", "Secundaria", "Bachillerato")
 
-    CON_INDICE = ("Preescolar", "Primaria", "Secundaria", "Bachillerato")
+
+def secuencia_numerada(filas):
+    """Secuencia de hojas numeradas del documento vertical.
+
+    -> [(num, tipo, nivel/categoría, título, items)]
+    """
+    P = E.paginas_escuelas(filas)
     secuencia = []
     # tarifario general al inicio (pedido de Daniel 2026-07-23)
     for _name, cat, tit, items_g in G.paginas(G.Filas(filas)):
@@ -141,8 +144,13 @@ def generate():
         if nivel in CON_INDICE:
             secuencia.append(("indice", nivel, f"Índice · {nivel}", None))
         secuencia += [("pagina",) + pg for pg in grupo]
+    return [(i + 1, *item) for i, item in enumerate(secuencia)]
 
-    numerada = [(i + 1, *item) for i, item in enumerate(secuencia)]
+
+def generate():
+    FOTOS.mkdir(exist_ok=True)
+    filas = G.cargar_filas()
+    numerada = secuencia_numerada(filas)
     html_pages = []
     con_foto = 0
     for num, tipo, nivel, titulo, items in numerada:

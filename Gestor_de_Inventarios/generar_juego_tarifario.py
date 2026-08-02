@@ -5,8 +5,11 @@ Genera un HTML autocontenido (funciona offline) con:
 - Un banco GRANDE de preguntas de precios construido automáticamente desde las
   escaleras reales de la DB/cache (una pregunta por peldaño de cada familia)
 - Preguntas de excepciones por escuela y de concepto
-- Cronómetro, puntos por velocidad, racha, explicación con la escalera completa
-  y botón "Siguiente" para leer con calma; tabla de récords local
+- 3 modos: Rápido (10), Completo (20) y Práctica (sin reloj)
+- Cronómetro, puntos por velocidad, racha con bono escalado, explicación con la
+  escalera completa, repaso de falladas al final y tabla de récords local
+- Sonidos, cuenta regresiva, confeti en partida perfecta y teclado 1-4
+- Las preguntas no se repiten entre partidas hasta agotar el banco
 
 Regenerar cuando cambien precios: preguntas y distractores se actualizan solos.
 """
@@ -23,8 +26,8 @@ F = G.Filas(filas)
 PREGUNTAS = []
 
 
-def preg(texto, opciones, correcta, exp):
-    PREGUNTAS.append({"q": texto, "ops": opciones, "ok": correcta, "exp": exp})
+def preg(texto, opciones, correcta, exp, cat="Concepto"):
+    PREGUNTAS.append({"q": texto, "ops": opciones, "ok": correcta, "exp": exp, "cat": cat})
 
 
 def opciones_precio(correcto, pool):
@@ -70,7 +73,7 @@ def preguntas_familia(etiqueta, fn, exp_extra="", max_preguntas=3):
         correcto = float(precio_s.replace("$", "").replace(",", ""))
         ops = opciones_precio(correcto, pool)
         preg(f"{etiqueta}, talla {talla}: ¿precio?", ops,
-             ops.index(f"${correcto:,.0f}"), exp)
+             ops.index(f"${correcto:,.0f}"), exp, cat="Precio")
 
 
 def pregunta_excepcion(texto, fn, talla, exp, pool_fn):
@@ -80,7 +83,7 @@ def pregunta_excepcion(texto, fn, talla, exp, pool_fn):
     correcto = vals.pop()
     pool = sorted({float(pr) for _, _, _, pr in F.sel(pool_fn)})
     ops = opciones_precio(correcto, pool)
-    preg(texto, ops, ops.index(f"${correcto:,.0f}"), exp)
+    preg(texto, ops, ops.index(f"${correcto:,.0f}"), exp, cat="Excepción")
 
 
 random.seed(20260724)
@@ -254,16 +257,29 @@ body {
   color: #fff; padding: 18px;
 }
 .card {
-  width: 100%; max-width: 720px; background: rgba(255,255,255,.07);
+  position: relative; width: 100%; max-width: 720px; background: rgba(255,255,255,.07);
   border-radius: 18px; padding: 28px; backdrop-filter: blur(6px);
   box-shadow: 0 10px 40px rgba(0,0,0,.35);
 }
 h1 { font-size: 30px; margin-bottom: 6px; }
 .sub { opacity: .85; margin-bottom: 20px; font-size: 15px; }
+#btnMudo {
+  position: absolute; top: 16px; right: 16px; border: none; border-radius: 8px;
+  background: rgba(255,255,255,.15); color: #fff; font-size: 18px;
+  padding: 6px 10px; cursor: pointer;
+}
 input[type=text] {
   width: 100%; padding: 13px 15px; border-radius: 10px; border: none;
   font-size: 17px; margin-bottom: 14px;
 }
+.modos { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+.modo {
+  padding: 11px 8px; border: 2px solid transparent; border-radius: 10px;
+  background: rgba(255,255,255,.12); color: #fff; font-weight: 700;
+  font-size: 14px; cursor: pointer; line-height: 1.35;
+}
+.modo small { display: block; font-weight: 400; opacity: .75; font-size: 11.5px; }
+.modo.sel { border-color: #F8C045; background: rgba(248,192,69,.18); }
 button.big {
   width: 100%; padding: 15px; border: none; border-radius: 10px;
   background: #F8C045; color: #4A3500; font-size: 19px; font-weight: 800;
@@ -272,10 +288,18 @@ button.big {
 button.big:hover { transform: scale(1.02); }
 .top { display: flex; justify-content: space-between; font-size: 14px;
   font-weight: 700; margin-bottom: 12px; opacity: .9; }
+.chip {
+  display: inline-block; padding: 3px 11px; border-radius: 99px; font-size: 12px;
+  font-weight: 800; margin-bottom: 10px; text-transform: uppercase; letter-spacing: .5px;
+}
+.chip.c-con { background: #1368CE; }
+.chip.c-pre { background: #26890C; }
+.chip.c-exc { background: #E21B3C; }
 .timerbar { height: 10px; background: rgba(255,255,255,.2); border-radius: 5px;
   overflow: hidden; margin-bottom: 18px; }
 .timerbar div { height: 100%; background: #F8C045; width: 100%;
-  transition: width .1s linear; }
+  transition: width .1s linear, background .3s; }
+.timerbar div.low { background: #E21B3C; }
 .pregunta { font-size: 21px; font-weight: 700; line-height: 1.4;
   margin-bottom: 20px; min-height: 60px; }
 .ops { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
@@ -310,18 +334,44 @@ table.tabla { width: 100%; margin: 16px 0; border-collapse: collapse; }
 table.tabla td, table.tabla th { padding: 8px 10px; text-align: left;
   border-bottom: 1px solid rgba(255,255,255,.2); font-size: 15px; }
 table.tabla th { opacity: .7; font-size: 12.5px; text-transform: uppercase; }
-.oculto { display: none; }
+.fallos { text-align: left; margin: 18px 0; }
+.fallos h3 { font-size: 17px; margin-bottom: 10px; }
+.fallo { background: rgba(0,0,0,.22); border-left: 4px solid #E21B3C;
+  border-radius: 8px; padding: 11px 13px; margin-bottom: 9px; }
+.fallo .fq { font-weight: 700; font-size: 14.5px; margin-bottom: 4px; }
+.fallo .fa { color: #7CE87C; font-weight: 800; font-size: 14px; margin-bottom: 4px; }
+.fallo .fe { font-size: 13px; opacity: .85; line-height: 1.45; }
+#cuenta {
+  position: fixed; inset: 0; display: flex; align-items: center;
+  justify-content: center; font-size: 130px; font-weight: 900;
+  background: rgba(12,32,58,.8); z-index: 50;
+}
+.confeti {
+  position: fixed; top: -20px; width: 10px; height: 14px; z-index: 99;
+  pointer-events: none; animation-name: caer;
+  animation-timing-function: linear; animation-fill-mode: forwards;
+}
+@keyframes caer { to { transform: translateY(108vh) rotate(720deg); } }
+.atajos { margin-top: 12px; font-size: 12.5px; opacity: .55; text-align: center; }
+.oculto { display: none !important; }
 </style>
 </head>
 <body>
 <div class="card">
+  <button id="btnMudo" onclick="toggleMudo()" title="Sonido">🔊</button>
 
   <div id="inicio">
     <h1>🎯 Reto Tarifario</h1>
-    <p class="sub">10 preguntas · contra reloj · puntos por velocidad.<br>
-    Banco de <b id="nbanco"></b> preguntas — cada partida es distinta.</p>
+    <p class="sub">Contra reloj · puntos por velocidad · racha con bono.<br>
+    Banco de <b id="nbanco"></b> preguntas — no se repiten hasta agotar el banco.</p>
     <input type="text" id="nombre" placeholder="Tu nombre" maxlength="18">
+    <div class="modos">
+      <button class="modo" data-m="rapido" onclick="setModo('rapido')">⚡ Rápido<small>10 preguntas · 20s</small></button>
+      <button class="modo" data-m="completo" onclick="setModo('completo')">🎓 Completo<small>20 preguntas · 20s</small></button>
+      <button class="modo" data-m="practica" onclick="setModo('practica')">🧘 Práctica<small>10 preguntas · sin reloj</small></button>
+    </div>
     <button class="big" onclick="empezar()">¡JUGAR!</button>
+    <div class="atajos">Teclado: 1-4 para responder · Enter para seguir</div>
     <div id="records"></div>
   </div>
 
@@ -331,7 +381,8 @@ table.tabla th { opacity: .7; font-size: 12.5px; text-transform: uppercase; }
       <span id="rachaTxt"></span>
       <span id="puntosTxt">0 pts</span>
     </div>
-    <div class="timerbar"><div id="barra"></div></div>
+    <div class="timerbar" id="timerwrap"><div id="barra"></div></div>
+    <div><span class="chip" id="chip"></span></div>
     <div class="pregunta" id="ptexto"></div>
     <div class="ops" id="ops"></div>
     <div id="fb"></div>
@@ -340,14 +391,58 @@ table.tabla th { opacity: .7; font-size: 12.5px; text-transform: uppercase; }
   <div id="fin" class="oculto resultado"></div>
 </div>
 
+<div id="cuenta" class="oculto"></div>
+
 <script>
 const BANCO = __PREGUNTAS__;
 const FIGS = ['▲','◆','●','■'];
-const TIEMPO = 20;
-const N = 10;
+const CLASES = {'Concepto': 'c-con', 'Precio': 'c-pre', 'Excepción': 'c-exc'};
+const MODOS = {
+  rapido:   {n: 10, t: 20, emoji: '⚡'},
+  completo: {n: 20, t: 20, emoji: '🎓'},
+  practica: {n: 10, t: 0,  emoji: '🧘'}
+};
 
-let jugador = '', qs = [], idx = 0, puntos = 0, racha = 0, aciertos = 0;
-let timer = null, t0 = 0, restante = TIEMPO;
+let modo = localStorage.getItem('reto_modo') in MODOS ? localStorage.getItem('reto_modo') : 'rapido';
+let mudo = localStorage.getItem('reto_mudo') === '1';
+let jugador = '', qs = [], idx = 0, puntos = 0, racha = 0, aciertos = 0, fallos = [];
+let timer = null, t0 = 0, restante = 0, respondible = false, lastTick = null;
+
+// ── Sonidos (WebAudio, sin archivos) ─────────────────────────────
+let AC = null;
+function actx() { AC = AC || new (window.AudioContext || window.webkitAudioContext)(); return AC; }
+function tono(f, d, tipo, vol, delay) {
+  if (mudo) return;
+  try {
+    const c = actx(), o = c.createOscillator(), g = c.createGain();
+    o.type = tipo || 'sine'; o.frequency.value = f;
+    o.connect(g); g.connect(c.destination);
+    const s = c.currentTime + (delay || 0);
+    g.gain.setValueAtTime(vol || .15, s);
+    g.gain.exponentialRampToValueAtTime(.001, s + d);
+    o.start(s); o.stop(s + d);
+  } catch (e) {}
+}
+function sndOk()       { tono(660, .12); tono(880, .22, 'sine', .15, .12); }
+function sndMal()      { tono(190, .35, 'sawtooth', .1); }
+function sndTick()     { tono(1250, .05, 'square', .05); }
+function sndCuenta()   { tono(520, .12, 'square', .1); }
+function sndGo()       { tono(820, .25, 'square', .12); }
+function sndFin()      { tono(523, .15); tono(784, .3, 'sine', .15, .16); }
+function sndPerfecto() { [523, 659, 784, 1047].forEach((f, i) => tono(f, .22, 'sine', .16, i * .14)); }
+
+function toggleMudo() {
+  mudo = !mudo;
+  localStorage.setItem('reto_mudo', mudo ? '1' : '0');
+  pintarMudo();
+}
+function pintarMudo() { document.getElementById('btnMudo').textContent = mudo ? '🔇' : '🔊'; }
+
+function setModo(m) {
+  modo = m;
+  localStorage.setItem('reto_modo', m);
+  document.querySelectorAll('.modo').forEach(b => b.classList.toggle('sel', b.dataset.m === m));
+}
 
 function barajar(a) {
   for (let i = a.length - 1; i > 0; i--) {
@@ -357,26 +452,64 @@ function barajar(a) {
   return a;
 }
 
+// ── Preguntas sin repetir entre partidas ─────────────────────────
+function elegirPreguntas(n) {
+  let vistas = new Set(JSON.parse(localStorage.getItem('reto_vistas') || '[]'));
+  if (localStorage.getItem('reto_banco') !== String(BANCO.length)) vistas = new Set();
+  const ids = [...BANCO.keys()];
+  let nuevas = barajar(ids.filter(i => !vistas.has(i)));
+  if (nuevas.length < n) { vistas = new Set(); nuevas = barajar([...ids]); }
+  const sel = nuevas.slice(0, n);
+  sel.forEach(i => vistas.add(i));
+  localStorage.setItem('reto_vistas', JSON.stringify([...vistas]));
+  localStorage.setItem('reto_banco', String(BANCO.length));
+  return sel.map(i => BANCO[i]);
+}
+
 function empezar() {
   jugador = document.getElementById('nombre').value.trim() || 'Anónimo';
-  qs = barajar([...BANCO]).slice(0, N).map(q => {
+  const cfg = MODOS[modo];
+  qs = elegirPreguntas(cfg.n).map(q => {
     const orden = barajar([...Array(q.ops.length).keys()]);
-    return { q: q.q, exp: q.exp,
+    return { q: q.q, exp: q.exp, cat: q.cat,
              ops: orden.map(i => q.ops[i]),
              ok: orden.indexOf(q.ok) };
   });
-  idx = 0; puntos = 0; racha = 0; aciertos = 0;
+  idx = 0; puntos = 0; racha = 0; aciertos = 0; fallos = [];
   document.getElementById('inicio').classList.add('oculto');
   document.getElementById('fin').classList.add('oculto');
-  document.getElementById('juego').classList.remove('oculto');
-  mostrar();
+  document.getElementById('timerwrap').classList.toggle('oculto', !cfg.t);
+  cuentaRegresiva(() => {
+    document.getElementById('juego').classList.remove('oculto');
+    mostrar();
+  });
+}
+
+function cuentaRegresiva(cb) {
+  const el = document.getElementById('cuenta');
+  el.classList.remove('oculto');
+  let n = 3;
+  el.textContent = n; sndCuenta();
+  const iv = setInterval(() => {
+    n -= 1;
+    if (n > 0) { el.textContent = n; sndCuenta(); }
+    else {
+      clearInterval(iv);
+      el.classList.add('oculto');
+      sndGo();
+      cb();
+    }
+  }, 700);
 }
 
 function mostrar() {
-  const q = qs[idx];
+  const q = qs[idx], cfg = MODOS[modo];
   document.getElementById('progreso').textContent = `Pregunta ${idx+1} / ${qs.length}`;
   document.getElementById('puntosTxt').textContent = `${puntos} pts`;
   document.getElementById('rachaTxt').textContent = racha >= 2 ? `🔥 racha x${racha}` : '';
+  const chip = document.getElementById('chip');
+  chip.textContent = q.cat;
+  chip.className = 'chip ' + (CLASES[q.cat] || 'c-con');
   document.getElementById('ptexto').textContent = q.q;
   document.getElementById('fb').innerHTML = '';
   const cont = document.getElementById('ops');
@@ -388,18 +521,31 @@ function mostrar() {
     b.onclick = () => responder(i);
     cont.appendChild(b);
   });
-  restante = TIEMPO; t0 = Date.now();
+  respondible = true;
   clearInterval(timer);
-  timer = setInterval(() => {
-    restante = TIEMPO - (Date.now() - t0) / 1000;
-    document.getElementById('barra').style.width = Math.max(0, restante / TIEMPO * 100) + '%';
-    if (restante <= 0) responder(-1);
-  }, 100);
+  if (cfg.t) {
+    restante = cfg.t; t0 = Date.now(); lastTick = null;
+    const barra = document.getElementById('barra');
+    barra.classList.remove('low');
+    barra.style.width = '100%';
+    timer = setInterval(() => {
+      restante = cfg.t - (Date.now() - t0) / 1000;
+      barra.style.width = Math.max(0, restante / cfg.t * 100) + '%';
+      if (restante <= 5) {
+        barra.classList.add('low');
+        const s = Math.ceil(restante);
+        if (s > 0 && s !== lastTick) { lastTick = s; sndTick(); }
+      }
+      if (restante <= 0) responder(-1);
+    }, 100);
+  }
 }
 
 function responder(i) {
+  if (!respondible) return;
+  respondible = false;
   clearInterval(timer);
-  const q = qs[idx];
+  const q = qs[idx], cfg = MODOS[modo];
   document.querySelectorAll('.op').forEach((b, j) => {
     b.onclick = null;
     if (j === q.ok) b.classList.add('bien');
@@ -408,13 +554,17 @@ function responder(i) {
   const fb = document.getElementById('fb');
   let bloque;
   if (i === q.ok) {
-    const bono = Math.round(500 * Math.max(0, restante) / TIEMPO);
-    const extra = racha >= 2 ? 100 : 0;
-    puntos += 500 + bono + extra;
+    const bono = cfg.t ? Math.round(500 * Math.max(0, restante) / cfg.t) : 0;
+    const extra = racha >= 1 ? Math.min(racha, 5) * 50 : 0;
+    const gan = 500 + bono + extra;
+    puntos += gan;
     racha += 1; aciertos += 1;
-    bloque = `<div class="feedback ok"><b>✅ ¡Correcto! +${500 + bono + extra} pts</b>${q.exp}</div>`;
+    sndOk();
+    bloque = `<div class="feedback ok"><b>✅ ¡Correcto! +${gan} pts${extra ? ` (🔥 +${extra} por racha)` : ''}</b>${q.exp}</div>`;
   } else {
     racha = 0;
+    fallos.push(q);
+    sndMal();
     const cual = i === -1 ? '⏰ ¡Se acabó el tiempo!' : '❌ Incorrecto';
     bloque = `<div class="feedback err"><b>${cual}</b>La respuesta era: <u>${q.ops[q.ok]}</u>.<br>${q.exp}</div>`;
   }
@@ -431,21 +581,44 @@ function siguiente() {
   else terminar();
 }
 
-function medalla(p) {
-  if (aciertos === qs.length) return ['🏆', '¡PERFECTO! Dominas el tarifario.'];
-  if (p >= 7000) return ['🥇', '¡Excelente! Ya casi te lo sabes de memoria.'];
-  if (p >= 5000) return ['🥈', 'Muy bien, sigue practicando las excepciones.'];
-  if (p >= 3000) return ['🥉', 'Vas bien — repasa la guía y vuelve a intentar.'];
+function medalla(pct) {
+  if (pct === 1)   return ['🏆', '¡PERFECTO! Dominas el tarifario.'];
+  if (pct >= .8)   return ['🥇', '¡Excelente! Ya casi te lo sabes de memoria.'];
+  if (pct >= .6)   return ['🥈', 'Muy bien, sigue practicando las excepciones.'];
+  if (pct >= .4)   return ['🥉', 'Vas bien — repasa la guía y vuelve a intentar.'];
   return ['📖', 'Repasa la guía con calma y vuelve a jugar.'];
+}
+
+function confeti() {
+  const cols = ['#F8C045', '#E21B3C', '#1368CE', '#26890C', '#fff'];
+  for (let i = 0; i < 90; i++) {
+    const d = document.createElement('div');
+    d.className = 'confeti';
+    d.style.left = Math.random() * 100 + 'vw';
+    d.style.background = cols[i % cols.length];
+    d.style.animationDuration = (2 + Math.random() * 2.5) + 's';
+    d.style.animationDelay = (Math.random() * .8) + 's';
+    document.body.appendChild(d);
+    setTimeout(() => d.remove(), 6000);
+  }
+}
+
+function fallosHtml() {
+  if (!fallos.length) return '';
+  const items = fallos.map(q =>
+    `<div class="fallo"><div class="fq">${q.q}</div><div class="fa">✔ ${q.ops[q.ok]}</div><div class="fe">${q.exp}</div></div>`).join('');
+  return `<div class="fallos"><h3>📝 Para repasar (${fallos.length})</h3>${items}</div>`;
 }
 
 function terminar() {
   document.getElementById('juego').classList.add('oculto');
-  const [m, msg] = medalla(puntos);
+  const pct = aciertos / qs.length;
+  const [m, msg] = medalla(pct);
+  if (pct === 1) { confeti(); sndPerfecto(); } else sndFin();
   const tabla = JSON.parse(localStorage.getItem('reto_tarifario_records') || '[]');
-  tabla.push({ n: jugador, p: puntos, f: new Date().toLocaleDateString('es-MX') });
+  tabla.push({ n: jugador, p: puntos, f: new Date().toLocaleDateString('es-MX'), m: modo });
   tabla.sort((a, b) => b.p - a.p);
-  localStorage.setItem('reto_tarifario_records', JSON.stringify(tabla.slice(0, 8)));
+  localStorage.setItem('reto_tarifario_records', JSON.stringify(tabla.slice(0, 10)));
   const fin = document.getElementById('fin');
   fin.classList.remove('oculto');
   fin.innerHTML = `
@@ -453,6 +626,7 @@ function terminar() {
     <div class="medalla">${m}</div>
     <div class="pts">${puntos} pts</div>
     <p class="sub">${aciertos} de ${qs.length} correctas · ${msg}</p>
+    ${fallosHtml()}
     ${tablaRecords()}
     <button class="big" onclick="reiniciar()">JUGAR OTRA VEZ</button>`;
 }
@@ -461,8 +635,8 @@ function tablaRecords() {
   const tabla = JSON.parse(localStorage.getItem('reto_tarifario_records') || '[]');
   if (!tabla.length) return '';
   const filas = tabla.map((r, i) =>
-    `<tr><td>${['🥇','🥈','🥉'][i] || (i+1)}</td><td>${r.n}</td><td>${r.p} pts</td><td>${r.f}</td></tr>`).join('');
-  return `<table class="tabla"><tr><th></th><th>Nombre</th><th>Puntos</th><th>Fecha</th></tr>${filas}</table>`;
+    `<tr><td>${['🥇','🥈','🥉'][i] || (i+1)}</td><td>${r.n}</td><td>${(MODOS[r.m] || {}).emoji || ''}</td><td>${r.p} pts</td><td>${r.f}</td></tr>`).join('');
+  return `<table class="tabla"><tr><th></th><th>Nombre</th><th>Modo</th><th>Puntos</th><th>Fecha</th></tr>${filas}</table>`;
 }
 
 function reiniciar() {
@@ -471,8 +645,19 @@ function reiniciar() {
   document.getElementById('records').innerHTML = tablaRecords();
 }
 
+// ── Teclado: 1-4 responde, Enter avanza ──────────────────────────
+document.addEventListener('keydown', e => {
+  if (document.getElementById('juego').classList.contains('oculto')) return;
+  if (respondible && ['1', '2', '3', '4'].includes(e.key)) {
+    const n = +e.key - 1;
+    if (n < qs[idx].ops.length) responder(n);
+  }
+});
+
 document.getElementById('nbanco').textContent = BANCO.length;
 document.getElementById('records').innerHTML = tablaRecords();
+setModo(modo);
+pintarMudo();
 document.getElementById('nombre').addEventListener('keydown', e => {
   if (e.key === 'Enter') empezar();
 });

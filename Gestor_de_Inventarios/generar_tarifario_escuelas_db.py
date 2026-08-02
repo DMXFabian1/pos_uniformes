@@ -312,13 +312,18 @@ def con_numero(html_pagina, num):
     return html_pagina[:-6] + f'<div class="pagina-num">Página {num}</div></div>'
 
 
-def generate():
-    G.DOC_NOMBRE = "Tarifario por Escuela"
-    filas = G.cargar_filas()
-    P = paginas_escuelas(filas)
+CON_INDICE = ("Preescolar", "Primaria", "Secundaria", "Bachillerato")
 
-    # secuencia final: índice por nivel + sus hojas; genéricos al final
-    CON_INDICE = ("Preescolar", "Primaria", "Secundaria", "Bachillerato")
+
+def secuencia_numerada(filas):
+    """Secuencia de hojas numeradas del documento. Las hojas de índice
+    CUENTAN en la numeración (para no mover las páginas ya impresas) pero
+    el documento no las incluye: se imprimen aparte con
+    generar_indices_tarifario.py.
+
+    -> [(num, tipo, nivel/categoría, título, items)]
+    """
+    P = paginas_escuelas(filas)
     secuencia = []  # (tipo, nivel, titulo, items)
     # tarifario general al inicio (pedido de Daniel 2026-07-23)
     for _name, cat, tit, items_g in G.paginas(G.Filas(filas)):
@@ -333,24 +338,26 @@ def generate():
         if nivel in CON_INDICE:
             secuencia.append(("indice", nivel, f"Índice · {nivel}", None))
         secuencia += [("pagina",) + pg for pg in grupo]
+    return [(i + 1, *item) for i, item in enumerate(secuencia)]
 
-    # numeración secuencial (los índices también cuentan)
-    numerada = [(i + 1, *item) for i, item in enumerate(secuencia)]
+
+def generate():
+    G.DOC_NOMBRE = "Tarifario por Escuela"
+    filas = G.cargar_filas()
+    numerada = secuencia_numerada(filas)
 
     html_pages = []
     for num, tipo, nivel, titulo, items in numerada:
         if tipo == "indice":
-            rows = [[t2, str(n2)] for n2, tp2, nv2, t2, _ in numerada
-                    if tp2 == "pagina" and nv2 == nivel]
-            items = [("divider", "Índice"),
-                     ("grid", 2, [(f"Escuelas de {nivel}", ["Escuela", "Página"], rows)])]
+            continue  # se imprime aparte; su número queda reservado
         html_pages.append(con_numero(G.html_page(nivel, titulo, items), num))
 
     html = base.HTML_WRAPPER.format(
         title="Tarifario por Escuela 2026", css=base.CSS + G.CSS_EXTRA + CSS_LOCAL,
         body="\n".join(html_pages) + AUTOFIT_JS)
     OUT.write_text(html, encoding="utf-8")
-    print(f"Generado: {OUT} ({len(numerada)} hojas, {len(numerada) - len(P)} índices)")
+    print(f"Generado: {OUT} ({len(html_pages)} hojas; "
+          f"{len(numerada) - len(html_pages)} números reservados para índices)")
 
 
 if __name__ == "__main__":
