@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cien Mexicanos Dijeron</title>
+<style>
+:root{
+  --azul-oscuro:#061a3a; --azul:#0d2f6b; --azul-claro:#1a4fa0;
+  --oro:#f5c542; --oro-oscuro:#b8860b; --blanco:#fff; --rojo:#e02020;
+}
+*{box-sizing:border-box; margin:0; padding:0;}
+body{font-family:"Arial Black","Segoe UI",Arial,sans-serif; background:#0a1229; color:#fff;}
+
+/* ============ TABLERO (pantalla proyectada) ============ */
+body.board{overflow:hidden; background:radial-gradient(ellipse at center,#123a7e 0%,#061a3a 70%,#02091a 100%); height:100vh; display:flex; flex-direction:column; user-select:none;}
+.b-header{text-align:center; padding:10px 20px 4px;}
+.b-title{font-size:clamp(16px,2.2vw,26px); color:var(--oro); letter-spacing:3px; text-shadow:0 2px 6px #000;}
+.b-question{font-size:clamp(18px,3vw,34px); margin-top:6px; text-shadow:0 2px 8px #000; min-height:1.2em; font-weight:900;}
+.b-main{flex:1; display:flex; align-items:center; justify-content:center; gap:2vw; padding:0 2vw;}
+.b-team{width:16vw; min-width:150px; text-align:center; background:linear-gradient(180deg,#0d2f6b,#061a3a); border:4px solid var(--oro); border-radius:18px; padding:16px 8px; box-shadow:0 0 30px rgba(245,197,66,.25);}
+.b-team .tname{font-size:clamp(14px,1.6vw,22px); color:var(--oro); word-break:break-word;}
+.b-team .tscore{font-size:clamp(36px,5vw,72px); margin-top:6px; font-variant-numeric:tabular-nums; text-shadow:0 3px 10px #000;}
+.b-team.winner{animation:glow 1s infinite alternate;}
+@keyframes glow{from{box-shadow:0 0 20px rgba(245,197,66,.3)}to{box-shadow:0 0 60px rgba(245,197,66,.9)}}
+.b-board{background:linear-gradient(180deg,#0a2554,#051530); border:6px solid var(--oro); border-radius:26px; padding:2vh 1.4vw; box-shadow:inset 0 0 40px #000, 0 10px 40px rgba(0,0,0,.6);}
+.slots{display:grid; grid-auto-flow:column; gap:1.1vh 1vw;}
+.slot{width:26vw; min-width:260px; height:8.2vh; min-height:52px; border-radius:12px; position:relative; perspective:800px;}
+.slot-inner{position:absolute; inset:0; transform-style:preserve-3d; transition:transform .5s;}
+.slot.revealed .slot-inner{transform:rotateX(180deg);}
+.slot.just .slot-inner{animation:flip .55s;}
+@keyframes flip{from{transform:rotateX(0)}to{transform:rotateX(180deg)}}
+.face{position:absolute; inset:0; backface-visibility:hidden; border-radius:12px; display:flex; align-items:center; border:3px solid #7ea7e8;}
+.face.front{background:linear-gradient(180deg,#2a5db8,#123a7e); justify-content:center;}
+.face.front .num{background:radial-gradient(circle,#e8f1ff,#9db9e6); color:#0d2f6b; width:6vh; height:6vh; min-width:38px; min-height:38px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-size:clamp(18px,3vh,30px); font-weight:900; box-shadow:inset 0 -4px 8px rgba(0,0,0,.4);}
+.face.back{background:linear-gradient(180deg,#f8fbff,#c9d9f2); color:#0d2f6b; transform:rotateX(180deg); justify-content:space-between; padding:0 14px;}
+.face.back .atext{font-size:clamp(14px,2.4vh,24px); font-weight:900; text-transform:uppercase; line-height:1.05;}
+.face.back .apts{background:linear-gradient(180deg,#0d2f6b,#061a3a); color:#fff; border-radius:8px; min-width:2.6em; text-align:center; padding:6px 8px; font-size:clamp(16px,2.8vh,26px); margin-left:10px;}
+.b-footer{display:flex; align-items:center; justify-content:center; gap:3vw; padding:8px 0 16px;}
+.pot{background:linear-gradient(180deg,#123a7e,#061a3a); border:4px solid var(--oro); border-radius:14px; padding:8px 26px; text-align:center;}
+.pot .plabel{font-size:clamp(11px,1.3vw,16px); color:var(--oro);}
+.pot .pval{font-size:clamp(26px,3.6vw,48px); font-variant-numeric:tabular-nums;}
+.mult-badge{font-size:clamp(14px,1.8vw,22px); color:var(--oro);}
+.strikes-mini{display:flex; gap:10px;}
+.strikes-mini .sx{width:clamp(30px,3.4vw,46px); height:clamp(30px,3.4vw,46px); border:3px solid #555; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:clamp(20px,2.6vw,34px); color:#333; background:#111;}
+.strikes-mini .sx.on{color:var(--rojo); border-color:var(--rojo); text-shadow:0 0 12px var(--rojo); background:#200;}
+#strikeOverlay{position:fixed; inset:0; display:none; align-items:center; justify-content:center; gap:4vw; background:rgba(0,0,0,.55); z-index:50;}
+#strikeOverlay .bigx{font-size:28vh; color:var(--rojo); text-shadow:0 0 40px var(--rojo), 0 0 90px #f00; font-weight:900; animation:pop .25s;}
+@keyframes pop{from{transform:scale(3); opacity:0}to{transform:scale(1); opacity:1}}
+#soundGate{position:fixed; inset:0; background:rgba(2,9,26,.92); z-index:100; display:flex; align-items:center; justify-content:center; flex-direction:column; gap:16px; cursor:pointer;}
+#soundGate h2{color:var(--oro); font-size:32px;}
+/* dinero rápido en tablero */
+.fm-wrap{flex:1; display:flex; flex-direction:column; align-items:center; padding:0 3vw;}
+.fm-top{display:flex; align-items:center; gap:4vw; margin:1vh 0;}
+.fm-timer{font-size:clamp(40px,8vh,80px); color:var(--oro); background:#061a3a; border:4px solid var(--oro); border-radius:16px; padding:0 30px; font-variant-numeric:tabular-nums; min-width:2.2em; text-align:center;}
+.fm-timer.low{color:var(--rojo); border-color:var(--rojo); animation:glow 0.5s infinite alternate;}
+.fm-total{font-size:clamp(28px,5vh,56px);}
+.fm-total b{color:var(--oro);}
+.fm-grid{display:grid; grid-template-columns:1fr auto 1fr auto; gap:1vh 1vw; width:min(92vw,1200px); flex:1; align-content:center;}
+.fm-cell{background:linear-gradient(180deg,#2a5db8,#123a7e); border:3px solid #7ea7e8; border-radius:10px; min-height:7vh; display:flex; align-items:center; padding:4px 14px; font-size:clamp(14px,2.6vh,24px); text-transform:uppercase; font-weight:900;}
+.fm-cell.pts{justify-content:center; min-width:9vw; font-variant-numeric:tabular-nums;}
+.fm-cell.shown{background:linear-gradient(180deg,#f8fbff,#c9d9f2); color:#0d2f6b; animation:pop .3s;}
+.fm-cell.empty{opacity:.35;}
+
+/* ============ CONTROL ============ */
+body.control{background:#10162b; padding:18px; font-family:"Segoe UI",Arial,sans-serif;}
+.c-header{display:flex; align-items:center; gap:14px; flex-wrap:wrap; margin-bottom:14px;}
+.c-header h1{font-family:"Arial Black"; color:var(--oro); font-size:22px;}
+button{font-family:inherit; font-weight:700; border:none; border-radius:8px; padding:8px 14px; cursor:pointer; background:#28407a; color:#fff; font-size:14px;}
+button:hover{filter:brightness(1.2);}
+button.gold{background:var(--oro); color:#061a3a;}
+button.red{background:var(--rojo);}
+button.green{background:#1f8a3b;}
+button.small{padding:4px 9px; font-size:12px;}
+button:disabled{opacity:.35; cursor:default;}
+input,select{font-family:inherit; border-radius:6px; border:1px solid #3a4a7a; background:#0b1120; color:#fff; padding:7px 9px; font-size:14px;}
+input[type=number]{width:70px;}
+.grid{display:grid; grid-template-columns:340px 1fr; gap:14px; align-items:start;}
+.card{background:#182142; border:1px solid #2c3a6b; border-radius:12px; padding:14px; margin-bottom:14px;}
+.card h3{color:var(--oro); font-size:14px; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px;}
+.teamrow{display:flex; align-items:center; gap:8px; margin-bottom:8px;}
+.teamrow input[type=text]{flex:1;}
+.score-big{font-size:22px; font-weight:900; min-width:64px; text-align:right; font-variant-numeric:tabular-nums;}
+.rowflex{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:8px;}
+.ans-line{display:flex; align-items:center; gap:10px; padding:7px 10px; border-radius:8px; background:#0e1530; margin-bottom:6px;}
+.ans-line.rev{background:#12408a;}
+.ans-line .at{flex:1; font-weight:600;}
+.ans-line .ap{font-variant-numeric:tabular-nums; font-weight:900; color:var(--oro); min-width:34px; text-align:right;}
+.muted{color:#8fa1c7; font-size:12px;}
+.pill{background:#0e1530; border-radius:20px; padding:4px 12px; font-size:13px;}
+.pill b{color:var(--oro);}
+.tabbtns{display:flex; gap:8px; margin-bottom:14px;}
+.tabbtns button.active{background:var(--oro); color:#061a3a;}
+.fm-row{border-top:1px solid #2c3a6b; padding:10px 0;}
+.fm-q{font-weight:700; margin-bottom:6px;}
+.fm-hints{display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;}
+.fm-hints span{background:#0e1530; border:1px solid #2c3a6b; border-radius:14px; padding:2px 10px; font-size:12px; cursor:pointer;}
+.fm-hints span:hover{background:#28407a;}
+.fm-inputs{display:grid; grid-template-columns:1fr 70px auto; gap:6px; margin-bottom:5px; align-items:center;}
+.plab{font-size:11px; color:#8fa1c7; width:18px;}
+.conn{font-size:12px; padding:4px 10px; border-radius:20px;}
+.conn.on{background:#123f1f; color:#7be097;}
+.conn.off{background:#3f1212; color:#e09797;}
+kbd{background:#0e1530; border:1px solid #3a4a7a; border-radius:4px; padding:1px 6px; font-size:11px;}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="strikeOverlay"></div>
+
+<script>
+/* ================================================================
+   BANCO DE PREGUNTAS — edita libremente. Puntos = personas de 100.
+   ================================================================ */
+const QUESTIONS = [
+ {q:"Dime algo que hace la gente en cuanto se despierta",
+  a:[["Revisar el celular",38],["Ir al baño",22],["Lavarse cara/dientes",14],["Desayunar",10],["Estirarse / bostezar",8],["Apagar la alarma",5]]},
+ {q:"Dime un antojito mexicano que se come en la calle",
+  a:[["Tacos",45],["Tamales",15],["Elotes / esquites",12],["Quesadillas",10],["Tortas",8],["Churros",5]]},
+ {q:"Dime algo que la gente olvida cuando sale de casa",
+  a:[["Las llaves",32],["El celular",25],["La cartera",18],["Apagar luz / estufa",9],["El paraguas",6],["Los lentes",5]]},
+ {q:"Dime un lugar donde la gente hace fila",
+  a:[["El banco",30],["El súper",24],["La tortillería",14],["El cine",11],["Trámites de gobierno",10],["El doctor",6]]},
+ {q:"Dime algo que hay en toda fiesta mexicana",
+  a:[["Música",28],["Comida / tacos",24],["Cerveza / bebidas",20],["Piñata",13],["Baile",9],["Pastel",4]]},
+ {q:"Dime una excusa clásica para llegar tarde",
+  a:[["El tráfico",41],["Me quedé dormido",25],["No pasaba el camión",12],["Se ponchó la llanta",8],["Emergencia familiar",7]]},
+ {q:"Dime algo que hace la gente en el tráfico",
+  a:[["Escuchar música",26],["Enojarse / maldecir",22],["Usar el celular",19],["Tocar el claxon",12],["Cantar",11],["Comer",5]]},
+ {q:"Dime un animal que la gente tiene de mascota",
+  a:[["Perro",52],["Gato",28],["Pájaro / perico",8],["Pez",6],["Hámster",4]]},
+ {q:"Dime algo que se compra en la tiendita de la esquina",
+  a:[["Refresco",30],["Papitas",24],["Pan / galletas",15],["Dulces",12],["Huevos",9],["Cigarros",6]]},
+ {q:"Dime un deporte que se ve en la tele en México",
+  a:[["Futbol",55],["Box",15],["Lucha libre",10],["Beisbol",9],["Basquetbol",6]]},
+ {q:"Dime algo que hace la gente cuando se va la luz",
+  a:[["Prender velas",30],["Usar el celular",22],["Asomarse a la calle",14],["Dormirse",12],["Quejarse de la CFE",11],["Platicar / jugar",6]]},
+ {q:"Dime un regalo típico del Día de las Madres",
+  a:[["Flores",35],["Pastel",15],["Llevarla a comer",14],["Electrodomésticos",12],["Chocolates",9],["Perfume / ropa",8]]},
+ {q:"Dime algo que la gente lleva a la playa",
+  a:[["Bloqueador",26],["Traje de baño",22],["Toalla",16],["Hielera / cheves",13],["Sombrilla",10],["Lentes de sol",8]]},
+ {q:"Dime una profesión que usa uniforme",
+  a:[["Doctor / enfermera",30],["Policía",24],["Bombero",14],["Militar",11],["Estudiante",9],["Mesero / chef",7]]},
+ {q:"Dime algo que hace ruido en la madrugada",
+  a:[["Los perros",27],["El gallo",18],["Los vecinos",17],["El camión de basura",13],["El del gas",12],["Las motos",8]]},
+ {q:"Dime algo que no puede faltar en una carne asada",
+  a:[["La carne",33],["Cerveza",25],["Tortillas",15],["Salsa / guacamole",12],["Carbón",8],["Limones",4]]},
+ {q:"Dime algo que dice una mamá mexicana cuando está enojada",
+  a:[["Ya vas a ver",30],["Te habla por tu nombre completo",22],["¿A dónde crees que vas?",15],["Agarra la chancla",14],["No estoy enojada",10]]},
+ {q:"Dime un pretexto para no ir a una fiesta",
+  a:[["Estoy enfermo",32],["Tengo mucho trabajo",24],["No tengo dinero",16],["Me quedé sin ride",12],["Cuido a los niños",8]]},
+ {q:"Dime algo que se antoja cuando llueve",
+  a:[["Café / chocolate caliente",30],["Tamales y atole",20],["Un caldito / sopita",18],["Quedarse en cama",14],["Pan dulce",10]]},
+ {q:"Dime un lugar donde la gente se toma fotos",
+  a:[["La playa",26],["Monumentos",22],["El espejo del baño",18],["Restaurantes",14],["Las fiestas",11],["El coche",6]]},
+ {q:"Dime algo que hace la gente en domingo",
+  a:[["Descansar / dormir",28],["Ir a misa",20],["Comer en familia",18],["Limpiar la casa",14],["Ver futbol",12],["Ir al mercado",6]]},
+ {q:"Dime un dulce mexicano clásico",
+  a:[["Mazapán",25],["Pulparindo / tamarindo",20],["Duvalín",15],["Paleta Payaso",14],["Glorias / obleas",13],["Chamoy",8]]},
+ {q:"Dime algo que grita la gente en un partido de futbol",
+  a:[["¡Goool!",40],["El grito del portero",18],["¡Árbitro vendido!",15],["¡Vamos México!",12],["¡Fuera el técnico!",8]]},
+ {q:"Dime algo que venden afuera de las escuelas",
+  a:[["Dulces",28],["Chicharrones / papitas",24],["Helados / raspados",16],["Tacos / tortas",14],["Juguetes",10],["Útiles",5]]},
+ {q:"Dime algo que hace la gente cuando está nerviosa",
+  a:[["Comerse las uñas",30],["Sudar",20],["Caminar de un lado a otro",16],["Jugar con el pelo",12],["Tartamudear",11],["Temblar",8]]},
+ {q:"Dime una razón por la que llora un niño",
+  a:[["Se cayó",26],["No le compran algo",24],["Tiene hambre",18],["Tiene sueño",16],["Le quitaron un juguete",10]]},
+ {q:"Dime algo que no puede faltar en una posada",
+  a:[["El ponche",30],["La piñata",26],["Tamales",16],["Aguinaldos / bolsitas",12],["La letanía / villancicos",10]]},
+ {q:"Dime un personaje de la lotería mexicana",
+  a:[["El gallo",20],["La sirena",17],["El catrín",15],["La dama",13],["El borracho",12],["La muerte",10]]},
+ {q:"Dime algo que se pide en una taquería",
+  a:[["Tacos de pastor",32],["De asada",24],["De suadero",14],["Campechanos",10],["Agua de horchata",10],["Con copia",5]]},
+ {q:"Dime algo que la gente esconde en su casa",
+  a:[["Dinero",35],["Dulces / comida",20],["Regalos",15],["Documentos",12],["El celular",8]]},
+ {q:"Dime una película que todos ven en Navidad",
+  a:[["Mi pobre angelito",40],["El Grinch",22],["Coco",15],["El expreso polar",12],["Duro de matar",5]]},
+ {q:"Dime algo que hace ruido en la calle",
+  a:[["Los coches / claxon",26],["El camión de la basura",20],["El de los fierros viejos",18],["Los perros",14],["Las motos",12],["La música del vecino",8]]},
+ {q:"Dime un oficio que se aprende de los papás",
+  a:[["Cocinar",24],["Carpintería",18],["Mecánica",16],["Albañilería",14],["Coser",13],["El negocio familiar",10]]},
+ {q:"Dime un deseo de Año Nuevo",
+  a:[["Salud",32],["Dinero",26],["Amor",18],["Viajar",12],["Trabajo",8]]},
+ {q:"Dime algo que se comparte en familia",
+  a:[["La comida",30],["Los gastos",18],["La casa",15],["Los chismes",13],["El coche",12],["El Netflix",8]]},
+ {q:"Dime un motivo para no dormir bien",
+  a:[["Preocupaciones / estrés",28],["El celular",22],["El ruido",16],["El calor",12],["Un bebé llorando",11],["Café en la noche",8]]},
+ {q:"Dime algo que hace un abuelito",
+  a:[["Contar historias",26],["Consentir a los nietos",22],["Dar el domingo",16],["Dormirse en el sillón",14],["Ver las noticias",12]]},
+ {q:"Dime algo típico de un mercado mexicano",
+  a:[["Frutas y verduras",26],["¡Pásele marchanta!",20],["El regateo",16],["Las fondas / comida",14],["Piñatas",10],["Hierbas / remedios",8]]},
+ {q:"Dime una cosa que siempre se pierde",
+  a:[["Las llaves",30],["Los calcetines",22],["El control de la tele",20],["El celular",14],["Las plumas",9]]},
+ {q:"Dime algo que hace la gente en la fila del banco",
+  a:[["Ver el celular",34],["Desesperarse",22],["Platicar",16],["Quejarse",14],["Comer algo",6]]},
+ {q:"Dime un superpoder que la gente quisiera tener",
+  a:[["Volar",30],["Ser invisible",24],["Leer mentes",18],["Teletransportarse",14],["Súper fuerza",8]]},
+ {q:"Dime algo que se hereda de la familia",
+  a:[["Casas / terrenos",24],["El parecido físico",20],["Las recetas",16],["Joyas",14],["El carácter",13],["Las deudas",8]]},
+ {q:"Dime una comida que se hace cuando no hay tiempo",
+  a:[["Quesadillas",26],["Huevos",22],["Sopa instantánea",18],["Sándwich / lonche",16],["Cereal",10]]},
+ {q:"Dime algo que revisa la gente antes de salir de casa",
+  a:[["La estufa / el gas",26],["Las luces",20],["Llaves y cartera",18],["El clima",14],["Cerrar bien la puerta",12],["El espejo",8]]},
+ {q:"Dime un regalo que dan cuando no saben qué regalar",
+  a:[["Una taza",26],["Ropa / calcetines",20],["Perfume / loción",18],["Chocolates",16],["Dinero / tarjeta",12]]},
+ {q:"Dime algo que hace la gente en vacaciones sin salir de casa",
+  a:[["Dormir",30],["Ver series / tele",26],["Arreglar la casa",16],["Cocinar",12],["Videojuegos",10]]},
+ {q:"Dime un sonido que despierta a la gente",
+  a:[["La alarma",36],["Perros ladrando",16],["El gallo",14],["Ruido de coches",12],["Los niños",12],["El del gas",6]]},
+ {q:"Dime algo que se lleva a un día de campo",
+  a:[["Comida / sándwiches",28],["Mantel / lona",18],["Hielera con refrescos",18],["Pelota / juegos",14],["Bloqueador / repelente",10],["Bocina",8]]},
+ {q:"Dime una app que todos tienen en el celular",
+  a:[["WhatsApp",40],["Facebook",22],["YouTube",14],["Instagram / TikTok",12],["Maps",6]]},
+ {q:"Dime algo que hacen los niños en el recreo",
+  a:[["Jugar futbol",30],["Comerse su lunch",24],["Correr / perseguirse",18],["Platicar",14],["Comprar en la cooperativa",10]]},
+];
+
+/* Preguntas cortas para DINERO RÁPIDO (con guía de puntos para el host) */
+const FAST_BANK = [
+ {q:"Un color de coche", a:[["Blanco",35],["Negro",25],["Rojo",15],["Gris",12],["Azul",8]]},
+ {q:"Un sabor de helado", a:[["Chocolate",34],["Vainilla",28],["Fresa",20],["Limón",9],["Napolitano",5]]},
+ {q:"Algo que se sirve con frijoles", a:[["Arroz",30],["Tortillas",22],["Queso",18],["Huevos",11],["Carne",9]]},
+ {q:"Un día para salir de fiesta", a:[["Sábado",48],["Viernes",38],["Domingo",8],["Jueves",4]]},
+ {q:"Un número de la suerte", a:[["7",40],["13",18],["3",12],["8",8],["1",6]]},
+ {q:"Algo que la gente colecciona", a:[["Monedas",22],["Estampas / tazos",18],["Timbres",14],["Juguetes",12],["Zapatos",10]]},
+ {q:"Un país al que quieres viajar", a:[["Estados Unidos",20],["Francia",18],["Japón",15],["España",14],["Italia",12]]},
+ {q:"Una fruta roja", a:[["Manzana",38],["Fresa",30],["Sandía",14],["Cereza",10],["Granada",4]]},
+ {q:"Un superhéroe", a:[["Superman",30],["Spider-Man",26],["Batman",22],["Hulk",8],["Thor",6]]},
+ {q:"Algo que se rompe fácil", a:[["Un vaso",30],["El corazón",20],["Un plato",15],["El celular",14],["Una promesa",8]]},
+ {q:"Un animal de granja", a:[["Vaca",35],["Gallina",25],["Caballo",15],["Cerdo",12],["Borrego",8]]},
+ {q:"Algo que se le pone a un taco", a:[["Salsa",35],["Cebolla",25],["Cilantro",18],["Limón",12],["Guacamole",8]]},
+ {q:"Un mes de calor", a:[["Mayo",30],["Abril",22],["Junio",18],["Julio",15],["Agosto",8]]},
+ {q:"Algo que se compra en la farmacia", a:[["Medicinas",40],["Vitaminas",15],["Pañales",12],["Shampoo",10],["Termómetro",8]]},
+ {q:"Un instrumento del mariachi", a:[["Trompeta",30],["Guitarra",26],["Violín",20],["Guitarrón",14],["Vihuela",6]]},
+ {q:"Un lugar frío", a:[["El Polo Norte",28],["Alaska",20],["La sierra",15],["El refri",14],["Canadá",10]]},
+ {q:"Algo que usa un doctor", a:[["Bata",30],["Estetoscopio",26],["Guantes",16],["Jeringa",12],["Cubrebocas",8]]},
+ {q:"Un juego de la feria", a:[["Rueda de la fortuna",30],["Carrusel",20],["El martillo",15],["Tiro al blanco",14],["Casa del terror",10]]},
+ {q:"Una bebida caliente", a:[["Café",45],["Chocolate",20],["Té",18],["Atole",12]]},
+ {q:"Algo que se lleva a la escuela", a:[["Mochila",32],["Cuadernos",24],["Lápices / plumas",16],["El lunch",14],["Uniforme",8]]},
+ {q:"Un país que empieza con M", a:[["México",55],["Marruecos",12],["Mongolia",8],["Madagascar",6],["Malasia",4]]},
+ {q:"Algo de color amarillo", a:[["El sol",30],["Plátano",24],["Pollito",14],["Queso",12],["Taxi",8]]},
+ {q:"Un ritmo para bailar", a:[["Cumbia",30],["Salsa",24],["Banda",16],["Reggaetón",14],["Merengue",8]]},
+ {q:"Algo que truena", a:[["Cohetes",28],["El trueno del cielo",22],["Palomitas",16],["Globos",14],["Los dedos",10]]},
+ {q:"Un antojo de medianoche", a:[["Tacos",30],["Galletas / dulces",20],["Cereal",16],["Pan",14],["Pizza",10]]},
+ {q:"Algo que se rompe en las fiestas", a:[["La piñata",40],["Vasos",22],["Platos",14],["Globos",12],["La dieta",6]]},
+ {q:"Un nombre común de perro", a:[["Firulais",22],["Max",18],["Solovino",14],["Rocky",13],["Luna",12]]},
+ {q:"Algo que hay en una oficina", a:[["Computadora",32],["Escritorio",24],["Papeles",16],["Café",12],["Impresora",8]]},
+ {q:"Un lugar para una cita romántica", a:[["El cine",30],["Un restaurante",26],["El parque",18],["La playa",12],["Un café",8]]},
+ {q:"Algo que se hace antes de dormir", a:[["Lavarse los dientes",28],["Ver el celular",24],["Rezar",16],["Poner la alarma",14],["Leer",8]]},
+];
+
+/* ================== SONIDOS (WebAudio, sin archivos) ================== */
+let AC=null;
+function ac(){ if(!AC) AC=new (window.AudioContext||window.webkitAudioContext)(); if(AC.state==='suspended') AC.resume(); return AC; }
+function sDing(){ try{ const c=ac(),t=c.currentTime;
+  [[1318.5,.45],[1975.5,.18]].forEach(([f,v])=>{ const o=c.createOscillator(),g=c.createGain();
+    o.type='sine'; o.frequency.value=f; g.gain.setValueAtTime(.0001,t);
+    g.gain.exponentialRampToValueAtTime(v,t+.02); g.gain.exponentialRampToValueAtTime(.0001,t+1.1);
+    o.connect(g).connect(c.destination); o.start(t); o.stop(t+1.2); });
+}catch(e){} }
+function sStrike(){ try{ const c=ac(),t=c.currentTime;
+  const g=c.createGain(); g.gain.setValueAtTime(.45,t); g.gain.setValueAtTime(.45,t+.65); g.gain.exponentialRampToValueAtTime(.001,t+.8);
+  [[92,'sawtooth'],[61,'square']].forEach(([f,ty])=>{ const o=c.createOscillator(); o.type=ty; o.frequency.value=f; o.connect(g); o.start(t); o.stop(t+.85); });
+  g.connect(c.destination);
+}catch(e){} }
+function sAward(){ try{ const c=ac(),t=c.currentTime;
+  [523.25,659.25,783.99,1046.5].forEach((f,i)=>{ const o=c.createOscillator(),g=c.createGain();
+    o.type='triangle'; o.frequency.value=f; const st=t+i*.12;
+    g.gain.setValueAtTime(.0001,st); g.gain.exponentialRampToValueAtTime(.35,st+.02); g.gain.exponentialRampToValueAtTime(.0001,st+.5);
+    o.connect(g).connect(c.destination); o.start(st); o.stop(st+.55); });
+}catch(e){} }
+function sTick(){ try{ const c=ac(),t=c.currentTime; const o=c.createOscillator(),g=c.createGain();
+  o.type='square'; o.frequency.value=880; g.gain.setValueAtTime(.12,t); g.gain.exponentialRampToValueAtTime(.001,t+.09);
+  o.connect(g).connect(c.destination); o.start(t); o.stop(t+.1);
+}catch(e){} }
+function playFx(fx){ if(fx==='ding')sDing(); else if(fx==='strike'||fx==='timeup')sStrike(); else if(fx==='award')sAward(); else if(fx==='tick')sTick(); }
+
+/* ================== ESTADO COMPARTIDO ================== */
+function initialState(){ return {
+  view:'juego',                       // 'juego' | 'dinero'
+  teams:[{name:'EQUIPO A',score:0},{name:'EQUIPO B',score:0}],
+  round:1, mult:1, qIdx:-1,
+  revealed:[],                        // índices revelados de la pregunta actual
+  strikes:0,
+  fast:{ sel:[], entries:[[],[]], timer:{sec:0,running:false} },
+  winner:-1,
+}; }
+let S=initialState();
+const IS_BOARD = location.hash === '#tablero' || /[?&]modo=tablero/.test(location.search);
+
+let bc=null; try{ bc=new BroadcastChannel('cien_mexicanos'); }catch(e){}
+
+/* ================================================================
+   ============================ TABLERO ============================ */
+if(IS_BOARD){
+  document.body.classList.add('board');
+  let lastRevealed=[], lastFastShown='';
+  document.getElementById('app').innerHTML='<div id="bContent"></div>';
+
+  const gate=document.createElement('div');
+  gate.id='soundGate'; gate.innerHTML='<h2>🔊 CIEN MEXICANOS DIJERON</h2><div>Haz clic para activar el sonido</div>';
+  document.body.appendChild(gate);
+  gate.addEventListener('click',()=>{ ac(); gate.remove(); });
+
+  function handleMsg(d){ if(!d||d.type!=='state')return; S=d.state; renderBoard(d.fx); if(d.fx) playFx(d.fx); }
+  window.addEventListener('message',e=>handleMsg(e.data));
+  if(bc) bc.onmessage=e=>handleMsg(e.data);
+  function announce(){ const m={type:'ready'}; if(window.opener){try{window.opener.postMessage(m,'*');}catch(e){}} if(bc)bc.postMessage(m); }
+  announce();
+
+  function showStrikes(n){ const ov=document.getElementById('strikeOverlay');
+    ov.innerHTML=Array.from({length:n},()=>'<span class="bigx">X</span>').join('');
+    ov.style.display='flex'; setTimeout(()=>{ov.style.display='none';},1300); }
+
+  function renderBoard(fx){
+    const el=document.getElementById('bContent');
+    if(S.view==='dinero'){ renderFast(el); lastRevealed=[]; return; }
+    const q = S.qIdx>=0 ? QUESTIONS[S.qIdx] : null;
+    const n = q ? q.a.length : 0;
+    const rows = Math.ceil(Math.max(n,1)/ (n>4?2:1));
+    const slots = q ? q.a.map((ans,i)=>{
+      const rev=S.revealed.includes(i);
+      const just=rev && !lastRevealed.includes(i);
+      return `<div class="slot ${rev?'revealed':''} ${just?'just':''}">
+        <div class="slot-inner">
+          <div class="face front"><div class="num">${i+1}</div></div>
+          <div class="face back"><div class="atext">${ans[0]}</div><div class="apts">${ans[1]}</div></div>
+        </div></div>`;
+    }).join('') : '<div style="color:#5b79b8;font-size:24px;padding:40px;">Esperando pregunta…</div>';
+    const pot=S.revealed.reduce((s,i)=>s+(q?q.a[i][1]:0),0);
+    el.innerHTML=`
+      <div class="b-header">
+        <div class="b-title">★ CIEN MEXICANOS DIJERON ★ &nbsp;·&nbsp; RONDA ${S.round} <span class="mult-badge">×${S.mult}</span></div>
+        <div class="b-question">${q?q.q:''}</div>
+      </div>
+      <div class="b-main">
+        <div class="b-team ${S.winner===0?'winner':''}"><div class="tname">${S.teams[0].name}</div><div class="tscore">${S.teams[0].score}</div></div>
+        <div class="b-board"><div class="slots" style="grid-template-rows:repeat(${rows},1fr)">${slots}</div></div>
+        <div class="b-team ${S.winner===1?'winner':''}"><div class="tname">${S.teams[1].name}</div><div class="tscore">${S.teams[1].score}</div></div>
+      </div>
+      <div class="b-footer">
+        <div class="strikes-mini">${[1,2,3].map(i=>`<div class="sx ${S.strikes>=i?'on':''}">X</div>`).join('')}</div>
+        <div class="pot"><div class="plabel">ACUMULADO (×${S.mult})</div><div class="pval">${pot*S.mult}</div></div>
+      </div>`;
+    document.body.style.display='flex';
+    if(fx==='strike') showStrikes(S.strikes);
+    lastRevealed=[...S.revealed];
+  }
+
+  function renderFast(el){
+    const f=S.fast;
+    const total=[0,1].reduce((t,p)=>t+f.entries[p].reduce((s,e)=>s+(e&&e.shown?(+e.pts||0):0),0),0);
+    const shownKey=JSON.stringify(f.entries.map(col=>col.map(e=>e&&e.shown)));
+    const rows=Array.from({length:5},(_,r)=>{
+      const cell=(p)=>{ const e=f.entries[p][r];
+        if(!e||!e.shown) return `<div class="fm-cell empty">${r+1}</div><div class="fm-cell pts empty">&nbsp;</div>`;
+        return `<div class="fm-cell shown">${e.text||'—'}</div><div class="fm-cell pts shown">${+e.pts||0}</div>`; };
+      return cell(0)+cell(1);
+    }).join('');
+    el.innerHTML=`
+      <div class="b-header"><div class="b-title">★ DINERO RÁPIDO ★ &nbsp;·&nbsp; META: 200 PUNTOS</div></div>
+      <div class="fm-wrap">
+        <div class="fm-top">
+          <div class="fm-timer ${f.timer.running&&f.timer.sec<=5?'low':''}">${f.timer.sec}</div>
+          <div class="fm-total">TOTAL: <b>${total}</b> ${total>=200?'🏆':''}</div>
+        </div>
+        <div class="fm-grid">${rows}</div>
+      </div>`;
+    lastFastShown=shownKey;
+  }
+
+  renderBoard();
+}
+
+/* ================================================================
+   ============================ CONTROL ============================ */
+else {
+  document.body.classList.add('control');
+  let boardWin=null, boardConnected=false, timerInt=null;
+
+  function send(fx){ const m={type:'state',state:S,fx};
+    if(boardWin&&!boardWin.closed){ try{boardWin.postMessage(m,'*');}catch(e){} }
+    if(bc) bc.postMessage(m);
+    render(); }
+  function handleReady(){ boardConnected=true; send(); }
+  window.addEventListener('message',e=>{ if(e.data&&e.data.type==='ready') handleReady(); });
+  if(bc) bc.onmessage=e=>{ if(e.data&&e.data.type==='ready') handleReady(); };
+
+  window.openBoard=()=>{ boardWin=window.open(location.href.split('#')[0]+'#tablero','tablero_cmd','width=1280,height=720'); };
+
+  /* --- acciones del juego --- */
+  window.setName=(i,v)=>{ S.teams[i].name=v.toUpperCase()||('EQUIPO '+'AB'[i]); send(); };
+  window.setScore=(i,v)=>{ S.teams[i].score=Math.max(0,parseInt(v)||0); send(); };
+  window.pickQ=(idx)=>{ S.qIdx=+idx; S.revealed=[]; S.strikes=0; S.winner=-1; send(); };
+  window.reveal=(i)=>{ if(S.qIdx<0||S.revealed.includes(i))return; S.revealed.push(i); send('ding'); };
+  window.revealRest=()=>{ if(S.qIdx<0)return; QUESTIONS[S.qIdx].a.forEach((_,i)=>{ if(!S.revealed.includes(i))S.revealed.push(i); }); send('ding'); };
+  window.strike=()=>{ if(S.strikes>=3)return; S.strikes++; send('strike'); };
+  window.clearStrikes=()=>{ S.strikes=0; send(); };
+  window.award=(t)=>{ if(S.qIdx<0)return; const q=QUESTIONS[S.qIdx];
+    const pot=S.revealed.reduce((s,i)=>s+q.a[i][1],0)*S.mult;
+    S.teams[t].score+=pot; S.winner=t; send('award'); };
+  window.nextRound=()=>{ S.round++; S.mult=S.round<=3?1:(S.round===4?2:3); S.qIdx=-1; S.revealed=[]; S.strikes=0; S.winner=-1; send(); };
+  window.setMult=(m)=>{ S.mult=m; send(); };
+  window.resetAll=()=>{ if(!confirm('¿Reiniciar TODO el juego (marcadores incluidos)?'))return; const names=[S.teams[0].name,S.teams[1].name]; S=initialState(); S.teams[0].name=names[0]; S.teams[1].name=names[1]; send(); };
+
+  /* --- dinero rápido --- */
+  window.setView=(v)=>{ S.view=v; stopTimer(); send(); };
+  window.fmRoll=()=>{ const idxs=[...FAST_BANK.keys()];
+    for(let i=idxs.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [idxs[i],idxs[j]]=[idxs[j],idxs[i]]; }
+    S.fast.sel=idxs.slice(0,5);
+    S.fast.entries=[[],[]];
+    for(let p=0;p<2;p++) for(let r=0;r<5;r++) S.fast.entries[p][r]={text:'',pts:0,shown:false};
+    send(); };
+  window.fmSet=(p,r,field,v)=>{ const e=S.fast.entries[p][r]; if(!e)return; if(field==='text')e.text=v; else e.pts=parseInt(v)||0; send(); };
+  window.fmSetQuiet=(p,r,field,v)=>{ const e=S.fast.entries[p][r]; if(!e)return; if(field==='text')e.text=v; else e.pts=parseInt(v)||0; };
+  window.fmFill=(p,r,text,pts)=>{ const e=S.fast.entries[p][r]; if(!e)return; e.text=text; e.pts=pts; send(); };
+  window.fmShow=(p,r)=>{ const e=S.fast.entries[p][r]; if(!e)return; e.shown=!e.shown; send(e.shown?'ding':undefined); };
+  function stopTimer(){ if(timerInt){clearInterval(timerInt); timerInt=null;} S.fast.timer.running=false; }
+  window.fmTimer=(sec)=>{ stopTimer(); S.fast.timer={sec,running:true};
+    timerInt=setInterval(()=>{ S.fast.timer.sec--;
+      if(S.fast.timer.sec<=0){ S.fast.timer.sec=0; stopTimer(); send('timeup'); }
+      else send(S.fast.timer.sec<=5?'tick':undefined);
+    },1000); send(); };
+  window.fmStop=()=>{ stopTimer(); send(); };
+
+  /* --- teclado: 1-8 revela, X tache --- */
+  document.addEventListener('keydown',e=>{
+    if(['INPUT','SELECT','TEXTAREA'].includes(document.activeElement.tagName))return;
+    if(S.view!=='juego')return;
+    if(e.key>='1'&&e.key<='8') reveal(+e.key-1);
+    if(e.key.toLowerCase()==='x') strike();
+  });
+
+  function render(){
+    const app=document.getElementById('app');
+    const q=S.qIdx>=0?QUESTIONS[S.qIdx]:null;
+    const pot=q?S.revealed.reduce((s,i)=>s+q.a[i][1],0):0;
+    const opts=QUESTIONS.map((qq,i)=>`<option value="${i}" ${i===S.qIdx?'selected':''}>${i+1}. ${qq.q}</option>`).join('');
+    const ansList=q?q.a.map((a,i)=>{ const rev=S.revealed.includes(i);
+      return `<div class="ans-line ${rev?'rev':''}">
+        <button class="small ${rev?'':'gold'}" onclick="reveal(${i})" ${rev?'disabled':''}>${rev?'✔':'Revelar '+(i+1)}</button>
+        <div class="at">${a[0]}</div><div class="ap">${a[1]}</div></div>`; }).join('')
+      :'<div class="muted">Elige una pregunta arriba.</div>';
+
+    const fmRows=S.fast.sel.map((qi,r)=>{ const fq=FAST_BANK[qi];
+      const hints=fq.a.map(a=>`<span onmousedown="event.preventDefault();fmFill(window._fmP,${r},'${a[0].replace(/'/g,"\\'")}',${a[1]})">${a[0]} · ${a[1]}</span>`).join('');
+      const inp=(p)=>{ const e=S.fast.entries[p][r]||{text:'',pts:0,shown:false};
+        return `<div class="fm-inputs">
+          <input type="text" placeholder="Respuesta jugador ${p+1}" value="${e.text.replace(/"/g,'&quot;')}" onfocus="window._fmP=${p}" oninput="fmSetQuiet(${p},${r},'text',this.value)" onchange="fmSet(${p},${r},'text',this.value)">
+          <input type="number" value="${e.pts}" onfocus="window._fmP=${p}" oninput="fmSetQuiet(${p},${r},'pts',this.value)" onchange="fmSet(${p},${r},'pts',this.value)">
+          <button class="small ${e.shown?'red':'green'}" onclick="fmShow(${p},${r})">${e.shown?'Ocultar':'Mostrar'}</button>
+        </div>`; };
+      return `<div class="fm-row"><div class="fm-q">${r+1}. ${fq.q}</div><div class="fm-hints">${hints}</div>${inp(0)}${inp(1)}</div>`;
+    }).join('');
+    const fmTotal=[0,1].reduce((t,p)=>t+(S.fast.entries[p]||[]).reduce((s,e)=>s+(e&&e.shown?(+e.pts||0):0),0),0);
+
+    app.innerHTML=`
+    <div class="c-header">
+      <h1>🎮 CIEN MEXICANOS DIJERON — CONTROL</h1>
+      <button class="gold" onclick="openBoard()">📺 Abrir tablero</button>
+      <span class="conn ${boardConnected?'on':'off'}">${boardConnected?'● Tablero conectado':'○ Tablero sin abrir'}</span>
+      <button class="red" onclick="resetAll()">Reiniciar juego</button>
+    </div>
+    <div class="tabbtns">
+      <button class="${S.view==='juego'?'active':''}" onclick="setView('juego')">Juego principal</button>
+      <button class="${S.view==='dinero'?'active':''}" onclick="setView('dinero')">💰 Dinero Rápido</button>
+    </div>
+    <div class="grid">
+      <div>
+        <div class="card"><h3>Equipos</h3>
+          ${[0,1].map(i=>`<div class="teamrow">
+            <input type="text" value="${S.teams[i].name}" onchange="setName(${i},this.value)">
+            <input type="number" value="${S.teams[i].score}" onchange="setScore(${i},this.value)" title="Editar marcador">
+            <div class="score-big" style="color:var(--oro)">${S.teams[i].score}</div>
+          </div>`).join('')}
+        </div>
+        <div class="card"><h3>Ronda ${S.round}</h3>
+          <div class="rowflex">Multiplicador:
+            ${[1,2,3].map(m=>`<button class="small ${S.mult===m?'gold':''}" onclick="setMult(${m})">×${m}</button>`).join('')}
+          </div>
+          <div class="rowflex"><span class="pill">Acumulado: <b>${pot}</b> × ${S.mult} = <b>${pot*S.mult}</b> pts</span></div>
+          <div class="rowflex">
+            <button class="green" onclick="award(0)">Dar puntos a ${S.teams[0].name}</button>
+            <button class="green" onclick="award(1)">Dar puntos a ${S.teams[1].name}</button>
+          </div>
+          <div class="rowflex">
+            <button class="red" onclick="strike()">❌ ¡Tache! (${S.strikes}/3)</button>
+            <button class="small" onclick="clearStrikes()">Limpiar taches</button>
+          </div>
+          <div class="rowflex">
+            <button onclick="revealRest()">Revelar restantes</button>
+            <button onclick="nextRound()">Siguiente ronda ➜</button>
+          </div>
+          <div class="muted">Atajos: <kbd>1</kbd>–<kbd>8</kbd> revelar respuesta · <kbd>X</kbd> tache. Rondas 1-3 ×1, ronda 4 ×2, ronda 5 ×3 (auto). Meta clásica: 300 pts.</div>
+        </div>
+      </div>
+      <div>
+        ${S.view==='juego'?`
+        <div class="card"><h3>Pregunta en juego</h3>
+          <div class="rowflex"><select style="flex:1" onchange="pickQ(this.value)">
+            <option value="-1" ${S.qIdx<0?'selected':''}>— Selecciona pregunta —</option>${opts}</select></div>
+          ${ansList}
+        </div>`:`
+        <div class="card"><h3>💰 Dinero Rápido — 2 jugadores, 5 preguntas, meta 200</h3>
+          <div class="rowflex">
+            <button class="gold" onclick="fmRoll()">🎲 Elegir 5 preguntas al azar</button>
+            <button onclick="fmTimer(15)">⏱ 15 s (Jugador 1)</button>
+            <button onclick="fmTimer(20)">⏱ 20 s (Jugador 2)</button>
+            <button class="small" onclick="fmStop()">Detener</button>
+            <span class="pill">Timer: <b>${S.fast.timer.sec}</b> s</span>
+            <span class="pill">Total mostrado: <b>${fmTotal}</b> / 200 ${fmTotal>=200?'🏆':''}</span>
+          </div>
+          <div class="muted" style="margin-bottom:6px">Escribe lo que responda cada jugador. Clic en una respuesta sugerida para autollenar (primero haz clic en el campo del jugador). "Mostrar" la revela en el tablero con ding.</div>
+          ${fmRows||'<div class="muted">Presiona "Elegir 5 preguntas al azar" para empezar.</div>'}
+        </div>`}
+      </div>
+    </div>`;
+  }
+  window._fmP=0;
+  render();
+}
+</script>
+</body>
+</html>
