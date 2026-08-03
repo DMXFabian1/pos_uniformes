@@ -123,6 +123,7 @@ CLIENTES_CCT: dict[str, dict] = {
     "11DPR0892B": {"pos": "J. Guadalupe Victoria", "probable": True},
     "11DPR1288B": {"pos": "Niños Héroes", "probable": True},
     "11DPR2574C": {"pos": "Niños Héroes de Miguel Hidalgo"},
+    "11DJN2656W": {"pos": "Jean Piaget"},
     # Clientes de uniforme básico (sin escudo) — no aparecen en la carpeta,
     # pero se les surte. Confirmado por Daniel 2026-08-03.
     "11DJN0936S": {"pos": "", "nota": "Uniforme básico (sin escudo)"},
@@ -147,7 +148,6 @@ EXTRAS = [
 ]
 
 PENDIENTES = [
-    "Jean Piaget (Pre) — no aparece en el directorio SEP de San Felipe",
     "Vicente Guerrero (Pre+Pri) — 3 candidatas: San Isidro y Capellanía, La Estanzuela, La Quemada",
     "Palacio (Pri) — sin escuela ni localidad con ese nombre en el directorio",
 ]
