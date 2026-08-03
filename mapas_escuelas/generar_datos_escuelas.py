@@ -56,6 +56,7 @@ NIVEL_POR_CCT = {
     "DJN": "Pre", "EJN": "Pre", "PJN": "Pre", "KJN": "Pre",
     "DPR": "Pri", "EPR": "Pri", "PPR": "Pri", "KPR": "Pri", "DBA": "Pri",
     "DES": "Sec", "EES": "Sec", "PES": "Sec", "DST": "Sec", "ETV": "Sec", "KTV": "Sec",
+    "DTV": "Sec",
     "DCT": "Bach", "ETC": "Bach", "ETH": "Bach", "ETK": "Bach", "DPT": "Bach",
     "PBH": "Bach", "PCB": "Bach",
     "DER": "Otro",
@@ -142,7 +143,7 @@ EXTRAS = [
     {"cct": "UVEG", "nombre": "UVEG", "nivel": "Bach", "tipo": "general",
      "turno": "", "domicilio": "Prol. Aldama 925, Centro Impulso Social",
      "localidad": "San Felipe", "lat": 21.4750453, "lon": -101.2244897,
-     "cliente": True, "pos": "UVEG", "probable": True},
+     "cliente": True, "pos": "UVEG", "probable": True, "rural": False, "nota": ""},
 ]
 
 PENDIENTES = [
@@ -240,6 +241,10 @@ def parsea_ficha(html: str, cct: str) -> dict | None:
         (lineas[i + 1] for i, l in enumerate(lineas)
          if l.startswith("Domicilio") and i + 1 < len(lineas)), "")
     domicilio = re.sub(r",?\s*San Felipe, Guanajuato.*$", "", domicilio).strip()
+    if not loc and "," in domicilio:
+        # fichas CONAFE sin párrafo descriptivo: la comunidad es la última
+        # parte del domicilio ("calle X, Comunidad")
+        loc = domicilio.split(",")[-1].strip()
 
     turno = next((l for l in lineas if l in ("Matutino", "Vespertino", "Continuo",
                                              "Discontinuo", "Nocturno")), "")
@@ -254,16 +259,24 @@ def parsea_ficha(html: str, cct: str) -> dict | None:
     }
 
 
-def en_mercado(escuela: dict) -> bool:
-    tipo = escuela.get("tipo", "")
-    if tipo in ("sabes", "telebach"):
-        return True  # cobertura de media superior de todo el municipio
+def en_zona_cliente(escuela: dict) -> bool:
+    """Cabecera o comunidad donde ya hay escuelas cliente."""
     loc = normaliza(escuela.get("localidad", ""))
     if not loc:
         return False
     if loc == CABECERA or loc.startswith("san felipe"):
         return True
     return any(c in loc for c in COMUNIDADES_CLIENTE)
+
+
+def en_mercado(escuela: dict) -> bool:
+    if en_zona_cliente(escuela):
+        return True
+    # Cobertura municipal completa: media superior rural, telesecundarias
+    # y primarias (generales + CONAFE) de todas las comunidades.
+    if escuela.get("tipo", "") in ("sabes", "telebach", "telesec"):
+        return True
+    return escuela.get("nivel", "") == "Pri"
 
 
 def carga_clientes_pos() -> set[str]:
@@ -304,6 +317,7 @@ def main() -> int:
     nombres_pos = carga_clientes_pos()
     clientes = 0
     for e in mercado:
+        e["rural"] = not en_zona_cliente(e)
         info = CLIENTES_CCT.get(e["cct"])
         # El cliente SABES abarca todos los planteles SABES del municipio.
         if info is None and e["tipo"] == "sabes":

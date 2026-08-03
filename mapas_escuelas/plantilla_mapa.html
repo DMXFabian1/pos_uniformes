@@ -63,7 +63,7 @@
       <div data-m="clientes">Solo clientes</div>
       <div data-m="oportunidades">Oportunidades</div>
     </div>
-    <label class="switch"><input type="checkbox" id="swRural"> Mostrar SABES y telebachilleratos rurales</label>
+    <label class="switch"><input type="checkbox" id="swRural"> Mostrar escuelas rurales (resto del municipio)</label>
     <div class="botones">
       <button class="btn" id="btnPueblo">Ver pueblo</button>
       <button class="btn" id="btnTodo">Ver municipio</button>
@@ -87,9 +87,9 @@ const TIPO_TXT = { telesec: "Telesecundaria", sabes: "SABES", telebach: "Telebac
 const norm = s => (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 const esCabecera = e => {
   const l = norm(e.localidad);
-  return (l === "" || l === "san felipe" || l.includes("san felipe centro")) && !l.includes("estacion");
+  return (l === "san felipe" || l.includes("san felipe centro")) && !l.includes("estacion");
 };
-const esRural = e => (e.tipo === "sabes" || e.tipo === "telebach") && !esCabecera(e);
+const esRural = e => !!e.rural;
 
 const map = L.map("map");
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {

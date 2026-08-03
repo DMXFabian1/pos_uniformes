@@ -3,15 +3,16 @@
 ## Mapa principal: `mapa_escuelas_san_felipe.html`
 
 Mapa interactivo (Leaflet + clustering, necesita internet para los tiles) con
-**todas las escuelas del mercado**: la cabecera completa (todos los niveles,
-incluye CONAFE y particulares) + las comunidades donde hay clientes + los
-SABES/telebachilleratos rurales del municipio (~125 escuelas).
+**todas las escuelas del mercado** (~350): la cabecera completa (todos los
+niveles, incluye CONAFE y particulares) + las comunidades donde hay clientes +
+—bajo el switch "escuelas rurales"— el resto del municipio: primarias
+(generales y CONAFE), telesecundarias, SABES y telebachilleratos.
 
 - **Color = nivel** (colores del panel): Preescolar `#7c4dff`, Primaria `#2979ff`,
   Secundaria `#00bfa5`, Bachillerato `#ff6d00`, gris = otros (CECATI/CAM).
 - **Relleno = cliente** del POS; **anillo hueco** = sin registrar (oportunidad).
 - Controles: búsqueda por nombre/comunidad/CCT, chips por nivel, selector
-  Todas / Solo clientes / Oportunidades, switch de SABES+telebach rurales,
+  Todas / Solo clientes / Oportunidades, switch de escuelas rurales,
   Ver pueblo / Ver municipio / Imprimir.
 - Lista lateral agrupada por localidad (colapsable) y resumen de cobertura.
 - `~` = ubicación probable (nombre repetido en varias comunidades).
