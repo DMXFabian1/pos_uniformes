@@ -96,6 +96,55 @@ class QuickSaleAddSkuTests(unittest.TestCase):
         self.assertEqual(widget._items[0]["cantidad"], 1)
 
 
+class EmployeeBadgeScanTests(unittest.TestCase):
+    """El sensor relee el gafete de la empleada: se ignora sin abrir diálogos."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _make_widget(self) -> QuickSaleWidget:
+        satellite = SimpleNamespace(offline_mode=True, _kiosk_lookup_from_cache=None)
+        widget = QuickSaleWidget(satellite)
+        widget._employee_code = "VEND-1"
+        return widget
+
+    def test_detects_emp_prefix(self) -> None:
+        widget = self._make_widget()
+        self.assertTrue(widget._is_employee_badge_scan("EMP:VEND-1"))
+
+    def test_detects_emp_prefix_with_spanish_keyboard(self) -> None:
+        # El scanner HID en teclado español escribe Ñ en lugar de :
+        widget = self._make_widget()
+        self.assertTrue(widget._is_employee_badge_scan("EMPÑVEND-1"))
+
+    def test_detects_current_employee_code_without_prefix(self) -> None:
+        widget = self._make_widget()
+        widget._employee_code = "ANA-77"
+        self.assertTrue(widget._is_employee_badge_scan("ANA-77"))
+
+    def test_detects_other_vend_badge(self) -> None:
+        widget = self._make_widget()
+        self.assertTrue(widget._is_employee_badge_scan("VEND-2"))
+
+    def test_normal_sku_is_not_badge(self) -> None:
+        widget = self._make_widget()
+        self.assertFalse(widget._is_employee_badge_scan("SKU004838"))
+
+    def test_scan_and_add_ignores_badge_without_dialog(self) -> None:
+        widget = self._make_widget()
+        widget._scan_input.setText("EMPÑVEND-1")
+        with patch(
+            "pos_uniformes.ui.views.quick_sale_view.QMessageBox.warning"
+        ) as warn, patch.object(QuickSaleWidget, "add_sku") as add:
+            widget._on_scan_and_add()
+        warn.assert_not_called()
+        add.assert_not_called()
+        self.assertEqual(widget._items, [])
+        self.assertEqual(widget._scan_input.text(), "")
+        self.assertEqual(widget._scan_hint.text(), "Gafete ignorado")
+
+
 class QuickSaleLogoutTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:

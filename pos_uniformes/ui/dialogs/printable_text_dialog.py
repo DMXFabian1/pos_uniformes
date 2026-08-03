@@ -15,7 +15,15 @@ from collections.abc import Callable
 from PyQt6.QtCore import QSizeF, Qt, QTimer
 from PyQt6.QtGui import QFontDatabase, QImage, QPageLayout, QPainter, QPageSize
 from PyQt6.QtPrintSupport import QPrinter
-from PyQt6.QtWidgets import QDialog, QDialogButtonBox, QMessageBox, QTextEdit, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import (
+    QCheckBox,
+    QDialog,
+    QDialogButtonBox,
+    QMessageBox,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
 from pos_uniformes.database.connection import get_session
 from pos_uniformes.services.business_settings_service import BusinessSettingsService
@@ -23,6 +31,7 @@ from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
     TICKET_FONT_POINT_SIZE,
     TICKET_PAPER_WIDTH_MM,
 )
+from pos_uniformes.ui.helpers.scanner_enter_guard import ScannerEnterGuard
 from pos_uniformes.ui.helpers.ticket_print_queue import TicketPrintQueue
 
 # Avance extra (mm) después del contenido para que la cuchilla del autocutter
@@ -265,6 +274,8 @@ def open_tickets_print_dialog(
     *,
     unit_label: str = "ticket",
     print_fn: "Callable[[str], bool] | None" = None,
+    alt_tickets: list[str] | None = None,
+    alt_checkbox_label: str | None = None,
 ) -> None:
     """Muestra uno o varios tickets en una sola vista.
 
@@ -277,14 +288,20 @@ def open_tickets_print_dialog(
 
     print_fn permite elegir el camino de impresión: por defecto el de TICKETS
     (estética histórica); las hojas de conteo pasan `print_conteo_sheet`.
+
+    alt_tickets + alt_checkbox_label agregan un checkbox (desmarcado): al
+    marcarlo se imprime/previsualiza el juego alterno en lugar del base
+    (p.ej. copia interna con la comisión de la terminal descontada).
     """
     tickets = [t for t in tickets if t and t.strip()]
     if not tickets:
         return
+    alt_tickets = [t for t in (alt_tickets or []) if t and t.strip()]
 
     dialog = QDialog(parent)
     dialog.setWindowTitle(title)
     dialog.resize(620, 520)
+    ScannerEnterGuard(dialog)
 
     layout = QVBoxLayout()
     editor = _build_ticket_editor("\n\n".join(tickets))
@@ -307,22 +324,47 @@ def open_tickets_print_dialog(
             msg = f"Se imprimieron {ok} de {n} {unit_label}s.\n{errors} fallaron."
         QMessageBox.warning(dialog, "Error de impresion", msg)
 
-    queue = TicketPrintQueue(
-        tickets,
-        print_fn=print_fn or _print_ticket_job,
-        schedule=QTimer.singleShot,
-        on_status=_set_status,
-        on_done=_report,
-        idle_label=idle_label,
-    )
+    def _make_queue(queue_tickets: list[str]) -> TicketPrintQueue:
+        return TicketPrintQueue(
+            queue_tickets,
+            print_fn=print_fn or _print_ticket_job,
+            schedule=QTimer.singleShot,
+            on_status=_set_status,
+            on_done=_report,
+            idle_label=idle_label,
+        )
 
-    print_button.clicked.connect(queue.start)
+    queue = _make_queue(tickets)
+    alt_queue = _make_queue(alt_tickets) if alt_tickets else None
+
+    alt_checkbox: QCheckBox | None = None
+    if alt_queue is not None and alt_checkbox_label:
+        alt_checkbox = QCheckBox(alt_checkbox_label)
+        alt_checkbox.setChecked(False)
+        alt_checkbox.toggled.connect(
+            lambda checked: editor.setPlainText(
+                "\n\n".join(alt_tickets if checked else tickets)
+            )
+        )
+
+    def _start_print() -> None:
+        use_alt = alt_checkbox is not None and alt_checkbox.isChecked()
+        (alt_queue if use_alt else queue).start()
+
+    print_button.clicked.connect(_start_print)
     buttons.rejected.connect(dialog.reject)
     buttons.accepted.connect(dialog.accept)
     # Al cerrar el dialogo, la cola deja de tocar sus widgets (evita crash).
-    dialog.finished.connect(lambda _result: queue.close())
+    def _close_queues(_result: int) -> None:
+        queue.close()
+        if alt_queue is not None:
+            alt_queue.close()
+
+    dialog.finished.connect(_close_queues)
 
     layout.addWidget(editor)
+    if alt_checkbox is not None:
+        layout.addWidget(alt_checkbox)
     layout.addWidget(buttons)
     dialog.setLayout(layout)
     dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)

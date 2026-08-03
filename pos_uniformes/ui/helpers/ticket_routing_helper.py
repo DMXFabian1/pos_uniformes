@@ -18,6 +18,8 @@ def route_tickets(
     tickets: list[str],
     *,
     unit_label: str = "ticket",
+    alt_tickets: list[str] | None = None,
+    alt_checkbox_label: str | None = None,
 ) -> None:
     tickets = [t for t in tickets if t and t.strip()]
     if not tickets:
@@ -30,11 +32,19 @@ def route_tickets(
 
     modo, origen = load_print_routing()
     if modo == MODO_SATELITE:
+        # Sin diálogo no hay checkbox: al satélite siempre va el juego base.
         _enviar_al_satelite(parent, tickets, origen)
     else:
         from pos_uniformes.ui.dialogs.printable_text_dialog import open_tickets_print_dialog
 
-        open_tickets_print_dialog(parent, title, tickets, unit_label=unit_label)
+        open_tickets_print_dialog(
+            parent,
+            title,
+            tickets,
+            unit_label=unit_label,
+            alt_tickets=alt_tickets,
+            alt_checkbox_label=alt_checkbox_label,
+        )
 
 
 def _enviar_al_satelite(parent: QWidget, tickets: list[str], origen: str) -> None:

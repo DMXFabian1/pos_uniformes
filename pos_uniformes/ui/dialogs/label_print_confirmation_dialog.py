@@ -20,6 +20,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from pos_uniformes.ui.helpers.scanner_enter_guard import ScannerEnterGuard
+
 # Tipos de etiqueta ofrecidos y su paper_mode (define la impresora):
 # Normal/Split → impresora de rollo continuo; Label → troquelada DK-1221.
 _LABEL_TYPE_OPTIONS = [
@@ -70,6 +72,7 @@ def open_label_print_confirmation(
     dialog = QDialog(parent)
     dialog.setWindowTitle("Imprimir etiquetas")
     dialog.setMinimumWidth(420)
+    ScannerEnterGuard(dialog)
     layout = QVBoxLayout()
 
     count = len(entries)

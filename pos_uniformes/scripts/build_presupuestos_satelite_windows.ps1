@@ -51,6 +51,32 @@ if ($WithPrecheck) {
 }
 & $venvPython -m PyInstaller --noconfirm --clean $specPath
 
+# Genera un pos_uniformes.env listo junto al exe: una PC satelite nueva
+# funciona con solo copiar la carpeta, sin configurar nada a mano.
+$envContent = @"
+# Configuracion de base de datos — la app lee este archivo al arrancar.
+#
+# PC SATELITE (caso normal de este archivo): la base vive en la PC principal.
+#   Deja POS_UNIFORMES_DB_HOST con la IP del servidor. No hay que hacer nada mas.
+#
+# PC PRINCIPAL/SERVIDOR (donde corre PostgreSQL): cambia el host a localhost,
+#   o borra este archivo (localhost es el default sin archivo).
+#
+# Si existe %APPDATA%\PresupuestosSatelite\pos_uniformes.env, ese gana sobre este.
+POS_UNIFORMES_DB_HOST=192.168.0.10
+POS_UNIFORMES_DB_PORT=5432
+POS_UNIFORMES_DB_NAME=pos_uniformes
+POS_UNIFORMES_DB_USER=postgres
+POS_UNIFORMES_DB_PASSWORD=1234
+POS_UNIFORMES_DB_ECHO=0
+POS_UNIFORMES_AUTO_CREATE_SCHEMA=0
+"@
+[System.IO.File]::WriteAllText(
+    (Join-Path $bundleDir "pos_uniformes.env"),
+    $envContent,
+    (New-Object System.Text.UTF8Encoding($false))
+)
+
 Compress-Archive -Path (Join-Path $bundleDir "*") -DestinationPath $zipPath -Force
 
 Write-Host ""
@@ -59,7 +85,7 @@ Write-Host "  Version: $version"
 Write-Host "  Carpeta: $bundleDir"
 Write-Host "  ZIP:     $zipPath"
 Write-Host ""
-Write-Host "Configura el .env de la PC satelite para apuntar a la misma base PostgreSQL del sistema principal."
+Write-Host "El bundle ya incluye pos_uniformes.env apuntando al servidor (192.168.0.10) — una PC satelite nueva funciona con solo copiar la carpeta."
 if (-not $WithPrecheck) {
     Write-Host "Nota: el precheck de base se omitio en esta build. Usa -WithPrecheck si quieres validarlo."
 }

@@ -25,6 +25,7 @@ from PyQt6.QtWidgets import (
 )
 
 from pos_uniformes.ui.helpers.inventory_label_preview_helper import build_inventory_label_mode_hint
+from pos_uniformes.ui.helpers.scanner_enter_guard import ScannerEnterGuard
 
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
@@ -116,6 +117,7 @@ def build_inventory_label_batch_dialog(
         width=980,
     )
     dialog.resize(980, 660)
+    ScannerEnterGuard(dialog)
     layout.setSpacing(14)
 
     controls_layout = QGridLayout()

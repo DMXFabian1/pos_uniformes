@@ -29,6 +29,7 @@ from pos_uniformes.ui.helpers.inventory_label_preview_helper import (
     build_inventory_label_preview_view,
     build_inventory_label_print_confirmation,
 )
+from pos_uniformes.ui.helpers.scanner_enter_guard import ScannerEnterGuard
 
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
@@ -100,6 +101,7 @@ def build_inventory_label_dialog(
     )
     dialog.resize(860, 680)
     dialog.setStyleSheet(_build_inventory_label_dialog_styles())
+    ScannerEnterGuard(dialog)
     layout.setSpacing(14)
 
     header_row = QHBoxLayout()

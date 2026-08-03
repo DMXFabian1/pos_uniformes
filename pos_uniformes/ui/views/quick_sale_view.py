@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 import textwrap
 from datetime import datetime
 from decimal import Decimal, ROUND_FLOOR
@@ -183,6 +184,8 @@ QPushButton#btnLogout:hover {{ color: {_DANGER}; border-color: {_DANGER}; }}
 
 class QuickSaleWidget(QWidget):
     """Página de Venta Rápida para la app satélite."""
+
+    _SCAN_HINT_DEFAULT = "Enter para agregar"
 
     def __init__(self, satellite: "QuoteSatelliteWindow"):
         super().__init__()
@@ -404,9 +407,9 @@ class QuickSaleWidget(QWidget):
         )
         sb_layout.addWidget(self._qty_spin)
 
-        scan_hint = QLabel("Enter para agregar")
-        scan_hint.setObjectName("scanHint")
-        sb_layout.addWidget(scan_hint)
+        self._scan_hint = QLabel(self._SCAN_HINT_DEFAULT)
+        self._scan_hint.setObjectName("scanHint")
+        sb_layout.addWidget(self._scan_hint)
 
         scan_bar.setLayout(sb_layout)
         layout.addWidget(scan_bar)
@@ -474,9 +477,36 @@ class QuickSaleWidget(QWidget):
 
     # ─── Escaneo de producto ─────────────────────────────────────────────
 
+    def _is_employee_badge_scan(self, raw: str) -> bool:
+        """Detecta si lo escaneado es un gafete de empleada y no un SKU.
+
+        El sensor tiene mucho alcance y a veces relee el gafete colgado de la
+        empleada mientras escanea productos; eso no debe abrir ningún diálogo.
+        """
+        clean = "".join(c for c in raw if c.isprintable()).strip()
+        clean = clean.replace("Ñ", ":").replace("ñ", ":").upper()
+        if clean.startswith("EMP:"):
+            return True
+        code = self._clean_scanned_code(raw)
+        if self._employee_code and code == self._employee_code:
+            return True
+        return bool(re.fullmatch(r"VEND-\d+", code))
+
+    def _flash_scan_hint(self, message: str) -> None:
+        self._scan_hint.setText(message)
+        QTimer.singleShot(
+            1800, lambda: self._scan_hint.setText(self._SCAN_HINT_DEFAULT)
+        )
+
     def _on_scan_and_add(self) -> None:
         sku = self._scan_input.text().strip().upper()
         if not sku:
+            return
+        if self._is_employee_badge_scan(sku):
+            # Gafete releído por el sensor: se ignora sin cortar la venta.
+            self._flash_scan_hint("Gafete ignorado")
+            self._scan_input.clear()
+            self._scan_input.setFocus()
             return
         self.add_sku(sku, self._qty_spin.value())
         self._qty_spin.setValue(1)
@@ -722,6 +752,23 @@ class QuickSaleWidget(QWidget):
             return False
         return True
 
+    # Comisión que cobra la terminal bancaria; se descuenta por producto en la
+    # copia interna cuando la venta fue con tarjeta (checkbox del diálogo).
+    _TERMINAL_COMMISSION_PERCENT = Decimal("6")
+
+    def _apply_terminal_commission(self, precio: Decimal) -> Decimal:
+        factor = (Decimal("100") - self._TERMINAL_COMMISSION_PERCENT) / Decimal("100")
+        return self._round_total(
+            (Decimal(str(precio)) * factor).quantize(Decimal("0.01"))
+        )
+
+    def _commission_items(self) -> list[dict]:
+        """Items con el precio unitario ya descontado y redondeado."""
+        return [
+            {**it, "precio": self._apply_terminal_commission(it["precio"])}
+            for it in self._items
+        ]
+
     @staticmethod
     def _round_total(total: Decimal) -> Decimal:
         integer_part = total.to_integral_value(rounding=ROUND_FLOOR)
@@ -732,8 +779,9 @@ class QuickSaleWidget(QWidget):
             return (integer_part + Decimal("0.50")).quantize(Decimal("0.01"))
         return (integer_part + Decimal("1.00")).quantize(Decimal("0.01"))
 
-    def _compute_totals(self) -> tuple[Decimal, Decimal, Decimal]:
-        subtotal = Decimal(str(sum(it["precio"] * it["cantidad"] for it in self._items)))
+    def _compute_totals(self, items: list[dict] | None = None) -> tuple[Decimal, Decimal, Decimal]:
+        items = self._items if items is None else items
+        subtotal = Decimal(str(sum(it["precio"] * it["cantidad"] for it in items)))
         if self._discount_active:
             discount = (subtotal * self._DISCOUNT_PERCENT / Decimal("100")).quantize(Decimal("0.01"))
         else:
@@ -789,8 +837,22 @@ class QuickSaleWidget(QWidget):
             return
         tickets = [self._build_venta_text()]
         if self._discount_active:
+            # Venta con descuento de empleada: la copia interna es la de ella.
             tickets.append(self._build_employee_copy_text())
-        route_tickets(self, "Ticket de venta", tickets)
+            alt_copy = self._build_employee_copy_text(terminal_commission=True)
+        else:
+            # Toda venta normal lleva copia interna sin datos de cliente.
+            tickets.append(self._build_venta_text(store_copy=True))
+            alt_copy = self._build_venta_text(store_copy=True, terminal_commission=True)
+        route_tickets(
+            self,
+            "Ticket de venta",
+            tickets,
+            # Checkbox del diálogo: al marcarlo, solo la copia interna sale
+            # con la comisión de la terminal descontada; el del cliente igual.
+            alt_tickets=[tickets[0], alt_copy],
+            alt_checkbox_label="Descontar comision terminal (6%)",
+        )
         self._scan_input.setFocus()
 
     def _on_ticket_apartado(self) -> None:
@@ -952,9 +1014,9 @@ class QuickSaleWidget(QWidget):
             cached = load_business_info_cache()
             return cached if cached and cached[0] else default
 
-    def _build_items_block(self, lines: list[str]) -> None:
+    def _build_items_block(self, lines: list[str], items: list[dict] | None = None) -> None:
         first = True
-        for it in self._items:
+        for it in self._items if items is None else items:
             if not first:
                 lines.append(tk_mid())
             first = False
@@ -978,18 +1040,30 @@ class QuickSaleWidget(QWidget):
                 textwrap.wrap(term_line, width=_TW, subsequent_indent="   ") or [term_line]
             )
 
-    def _build_venta_text(self) -> str:
+    def _build_venta_text(
+        self, *, store_copy: bool = False, terminal_commission: bool = False
+    ) -> str:
+        """Ticket de venta. Con store_copy=True genera la copia interna:
+        mismo formato de articulos y totales, pero sin los datos que ve el
+        cliente (encabezado del negocio, leyendas y agradecimiento).
+
+        terminal_commission=True (solo para la copia interna) muestra cada
+        precio unitario ya con el 6% de la terminal descontado y redondeado."""
         biz_name, biz_phone, biz_addr = self._load_business_info()
         now = datetime.now().strftime("%d/%m/%Y %H:%M")
-        subtotal, discount, total = self._compute_totals()
+        items = self._commission_items() if terminal_commission else self._items
+        subtotal, discount, total = self._compute_totals(items)
 
         lines: list[str] = []
 
-        lines.append(biz_name.center(_TW))
-        if biz_addr:
-            lines.append(biz_addr.center(_TW))
-        if biz_phone:
-            lines.append(f"Tel: {biz_phone}".center(_TW))
+        if store_copy:
+            lines.append("COPIA TIENDA".center(_TW))
+        else:
+            lines.append(biz_name.center(_TW))
+            if biz_addr:
+                lines.append(biz_addr.center(_TW))
+            if biz_phone:
+                lines.append(f"Tel: {biz_phone}".center(_TW))
         lines.append("Ticket de venta".center(_TW))
 
         lines.append(tk_top())
@@ -999,7 +1073,7 @@ class QuickSaleWidget(QWidget):
         lines.append(tk_mid())
         lines.append(tk_center("ARTICULOS"))
         lines.append(tk_mid())
-        self._build_items_block(lines)
+        self._build_items_block(lines, items)
 
         lines.append(tk_mid())
         lines.append(tk_row("Subtotal:", f"${tk_fmt(subtotal)}"))
@@ -1009,10 +1083,10 @@ class QuickSaleWidget(QWidget):
         lines.append(tk_row("TOTAL A PAGAR:", f"${tk_fmt(total)}"))
         lines.append(tk_bot())
 
-        self._append_terms(lines, self._TERMS_VENTA)
-
-        lines.append("")
-        lines.append("Gracias por su compra.".center(_TW))
+        if not store_copy:
+            self._append_terms(lines, self._TERMS_VENTA)
+            lines.append("")
+            lines.append("Gracias por su compra.".center(_TW))
 
         return "\n".join(lines)
 
@@ -1088,9 +1162,15 @@ class QuickSaleWidget(QWidget):
 
         return "\n".join(lines)
 
-    def _build_employee_copy_text(self) -> str:
+    def _build_employee_copy_text(self, *, terminal_commission: bool = False) -> str:
         now = datetime.now().strftime("%d/%m/%Y %H:%M")
         factor = (Decimal("100") - self._DISCOUNT_PERCENT) / Decimal("100")
+
+        def _unit(precio) -> Decimal:
+            unit = (Decimal(str(precio)) * factor).quantize(Decimal("0.01"))
+            if terminal_commission:
+                unit = self._apply_terminal_commission(unit)
+            return unit
 
         lines: list[str] = []
         lines.append("COPIA EMPLEADA".center(_TW))
@@ -1105,7 +1185,7 @@ class QuickSaleWidget(QWidget):
             if not first:
                 lines.append(tk_mid())
             first = False
-            unit = (Decimal(str(it["precio"])) * factor).quantize(Decimal("0.01"))
+            unit = _unit(it["precio"])
             sub = (unit * it["cantidad"]).quantize(Decimal("0.01"))
             for dl in textwrap.wrap(it["nombre"], width=_TIW) or [it["nombre"]]:
                 lines.append(tk_line(dl))
@@ -1118,8 +1198,7 @@ class QuickSaleWidget(QWidget):
             )
 
         raw_total = sum(
-            (Decimal(str(it["precio"])) * factor).quantize(Decimal("0.01")) * it["cantidad"]
-            for it in self._items
+            _unit(it["precio"]) * it["cantidad"] for it in self._items
         )
         total = self._round_total(raw_total.quantize(Decimal("0.01")))
 
