@@ -43,6 +43,7 @@
       <div class="fil" data-f="Bach"><span class="dot" style="background:#ff6d00"></span>Bachillerato</div>
       <div class="fil" data-f="Gris"><span class="dot" style="background:#9aa0a6"></span>Sin registrar (cabecera)</div>
       <div class="fil" data-f="Sabes"><span class="dot" style="background:#ff6d00; border-radius:3px"></span>SABES en comunidades</div>
+      <div class="fil" data-f="Tele"><span class="dot" style="background:#ff6d00; border-radius:2px; transform:rotate(45deg)"></span>Telebachilleratos comunitarios</div>
       <div style="margin-top:4px"><span class="prob">~</span> = ubicación probable (nombre repetido en varias comunidades) · clic en un nivel para filtrar</div>
     </div>
     <button class="btn" id="btnPueblo">Ver pueblo</button>
@@ -53,6 +54,8 @@
     <div id="listaCom"></div>
     <h2>SABES en comunidades (<span id="nS"></span>)</h2>
     <div id="listaSabes"></div>
+    <h2>Telebachilleratos (<span id="nT"></span>)</h2>
+    <div id="listaTele"></div>
     <h2>En cabecera, sin registrar (<span id="nG"></span>)</h2>
     <div id="listaGris"></div>
     <div class="note">
@@ -136,6 +139,35 @@ const sabes = [
   {n:"SABES El Tepozán", nv:["Bach"], a:"El Tepozán", lat:21.295, lon:-101.35806},
   {n:"SABES Fábrica de Melchor", nv:["Bach"], a:"Reforma, Fábrica de Melchor", lat:21.67444, lon:-100.90219},
 ];
+// Telebachilleratos comunitarios (CCT 11ETK*), uno por comunidad
+const telebach = [
+  {c:"La Sauceda de la Luz", lat:21.612449, lon:-101.190574},
+  {c:"Coecillo", lat:21.40436, lon:-101.27219},
+  {c:"Jesús María", lat:21.357165, lon:-101.21283},
+  {c:"San José del Tanque", lat:21.34174, lon:-101.51025},
+  {c:"Molino de San José", lat:21.56712, lon:-101.26337},
+  {c:"Mastranto del Refugio", lat:21.60073, lon:-101.15224},
+  {c:"La Lagunita", lat:21.21732, lon:-101.32844},
+  {c:"La Estancia del Cubo", lat:21.386624, lon:-101.111248},
+  {c:"Estancia de San Francisco", lat:21.664674, lon:-101.06716},
+  {c:"San Isidro de Capellanía", lat:21.362641, lon:-101.265849},
+  {c:"Guadalupe (Lequeitio)", lat:21.71712, lon:-100.97643},
+  {c:"El Carretón", lat:21.62496, lon:-100.98221},
+  {c:"Cantera Sur", lat:21.288725, lon:-101.277868},
+  {c:"Fábrica de Guadalupe", lat:21.6889, lon:-101.37028},
+  {c:"Fuerte Viejo", lat:21.571251, lon:-101.341132},
+  {c:"La Quemada", lat:21.320345, lon:-101.105423},
+  {c:"Los Martínez", lat:21.263249, lon:-101.402854},
+  {c:"Palo Colorado", lat:21.32062, lon:-101.40705},
+  {c:"Providencia de Guadalupe (Estancia)", lat:21.81324, lon:-101.40739},
+  {c:"Rancho Nuevo del Carrizo", lat:21.3625, lon:-101.32722},
+  {c:"San Antonio del Maguey", lat:21.645777, lon:-101.329779},
+  {c:"San Francisco", lat:21.6333, lon:-101.0578},
+  {c:"San José de los Barcos", lat:21.3141, lon:-101.255},
+  {c:"San José de Rancho Nuevo (Los Arrieros)", lat:21.59265, lon:-101.00568},
+  {c:"Miguel Hidalgo (Cueritos)", lat:21.6975, lon:-101.2794},
+  {c:"San José de la Varilla", lat:21.6997, lon:-101.0414},
+].map(t => ({n:`Telebach. ${t.c}`, nv:["Bach"], a:t.c, lat:t.lat, lon:t.lon}));
 
 // Escuelas de la cabecera que NO están en la base del POS (gris)
 const grises = [
@@ -153,8 +185,8 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "&copy; OpenStreetMap", maxZoom: 19
 }).addTo(map);
 
-function makeIcon(niveles, gris, cuadrado) {
-  const size = gris ? 15 : 18;
+function makeIcon(niveles, gris, forma) {
+  const size = forma === "rombo" ? 14 : (gris ? 15 : 18);
   let bg;
   if (gris) bg = "#9aa0a6";
   else if (niveles.length === 1) bg = C[niveles[0]];
@@ -163,33 +195,37 @@ function makeIcon(niveles, gris, cuadrado) {
     const segs = niveles.map((nv, i) => `${C[nv]} ${i * step}deg ${(i + 1) * step}deg`);
     bg = `conic-gradient(${segs.join(",")})`;
   }
-  const radio = cuadrado ? "border-radius:4px;" : "";
+  let extra = "";
+  if (forma === "cuadrado") extra = "border-radius:4px;";
+  if (forma === "rombo") extra = "border-radius:2px;transform:rotate(45deg);";
   return L.divIcon({
     className: "",
-    html: `<div class="split-marker" style="width:${size}px;height:${size}px;background:${bg};${radio}"></div>`,
+    html: `<div class="split-marker" style="width:${size}px;height:${size}px;background:${bg};${extra}"></div>`,
     iconSize: [size + 4, size + 4], iconAnchor: [(size + 4) / 2, (size + 4) / 2],
   });
 }
 const todos = [];
-function add(e, gris, esSabes) {
-  const m = L.marker([e.lat, e.lon], { icon: makeIcon(e.nv, gris, esSabes) }).addTo(map);
+function add(e, gris, forma) {
+  const m = L.marker([e.lat, e.lon], { icon: makeIcon(e.nv, gris, forma) }).addTo(map);
   const nivs = e.nv.map(x => NIVEL[x]).join(" + ");
   const extra = gris ? "<br><i>sin registrar en tu base</i>" : (e.p ? "<br><i>ubicación probable</i>" : "");
   m.bindPopup(`<b>${e.n}</b><br>${nivs}<br>${e.a}${extra}`);
   m.bindTooltip(e.n, { direction: "top", offset: [0, -10] });
-  e._m = m; e._gris = gris; e._sabes = !!esSabes;
+  e._m = m; e._gris = gris; e._sabes = forma === "cuadrado"; e._tele = forma === "rombo";
   todos.push(e);
 }
-grises.forEach(e => add(e, true, false));
-[...pueblo, ...comunidades].forEach(e => add(e, false, false));
-sabes.forEach(e => add(e, false, true));
+grises.forEach(e => add(e, true, ""));
+[...pueblo, ...comunidades].forEach(e => add(e, false, ""));
+sabes.forEach(e => add(e, false, "cuadrado"));
+telebach.forEach(e => add(e, false, "rombo"));
 
 // Filtros por nivel (clic en la leyenda)
-const activos = { Pre: true, Pri: true, Sec: true, Bach: true, Gris: true, Sabes: true };
+const activos = { Pre: true, Pri: true, Sec: true, Bach: true, Gris: true, Sabes: true, Tele: true };
 function visible(e) {
-  // "Sin registrar" y "SABES comunidades" son categorías propias: no dependen de los niveles
+  // Los grupos extra son categorías propias: no dependen de los niveles
   if (e._gris) return activos.Gris;
   if (e._sabes) return activos.Sabes;
+  if (e._tele) return activos.Tele;
   return e.nv.some(nv => activos[nv]);
 }
 function aplicaFiltros() {
@@ -207,6 +243,7 @@ function actualizaContadores() {
   document.getElementById("nC").textContent = cuenta(comunidades);
   document.getElementById("nG").textContent = cuenta(grises);
   document.getElementById("nS").textContent = cuenta(sabes);
+  document.getElementById("nT").textContent = cuenta(telebach);
 }
 document.querySelectorAll("#filtros .fil").forEach(el => {
   el.onclick = () => {
@@ -224,7 +261,7 @@ function encuadra(arrs, pad) {
   map.fitBounds(L.latLngBounds(pts).pad(pad));
 }
 document.getElementById("btnPueblo").onclick = () => encuadra([pueblo, grises], 0.12);
-document.getElementById("btnTodo").onclick = () => encuadra([pueblo, grises, comunidades, sabes], 0.06);
+document.getElementById("btnTodo").onclick = () => encuadra([pueblo, grises, comunidades, sabes, telebach], 0.06);
 map.fitBounds(L.latLngBounds([...pueblo, ...grises].map(e => [e.lat, e.lon])).pad(0.12));
 
 const ordenNv = ["Pre", "Pri", "Sec", "Bach"];
@@ -248,6 +285,7 @@ function llena(idLista, arr, idN, gris) {
 llena("listaPueblo", pueblo, "nP", false);
 llena("listaCom", comunidades, "nC", false);
 llena("listaSabes", sabes, "nS", false);
+llena("listaTele", telebach, "nT", false);
 llena("listaGris", grises, "nG", true);
 actualizaContadores();
 </script>
