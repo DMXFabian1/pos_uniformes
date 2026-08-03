@@ -180,7 +180,13 @@ document.querySelectorAll("#segModo div").forEach(el => {
 });
 
 // ---- Switch rural ----
-document.getElementById("swRural").onchange = ev => { rural = ev.target.checked; aplica(); };
+document.getElementById("swRural").onchange = ev => {
+  rural = ev.target.checked;
+  aplica();
+  // los planteles rurales quedan fuera de la vista del pueblo: encuadrar
+  // el municipio al prenderlo para que el cambio se vea
+  if (rural) encuadra(() => true, 0.05);
+};
 
 // ---- Búsqueda ----
 document.getElementById("buscador").oninput = ev => {
