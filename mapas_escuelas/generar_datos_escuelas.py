@@ -16,6 +16,7 @@ corrida tarda ~2 min; después es instantáneo salvo escuelas nuevas.
 from __future__ import annotations
 
 import json
+import math
 import re
 import sys
 import time
@@ -325,6 +326,18 @@ def main() -> int:
 
     mercado.sort(key=lambda e: (normaliza(e["localidad"]) != CABECERA,
                                 normaliza(e["localidad"]), e["nivel"], normaliza(e["nombre"])))
+
+    # Separar escuelas con coordenadas idénticas (planteles compartidos
+    # matutino/vespertino): sin esto quedan apiladas y solo se puede picar una.
+    repetidas: dict[tuple, int] = {}
+    for e in mercado:
+        key = (round(e["lat"], 6), round(e["lon"], 6))
+        n = repetidas.get(key, 0)
+        repetidas[key] = n + 1
+        if n:
+            ang = 2 * math.pi * n / 6
+            e["lat"] = round(e["lat"] + 0.00025 * math.sin(ang), 6)
+            e["lon"] = round(e["lon"] + 0.00025 * math.cos(ang), 6)
 
     print(f"Escuelas en el mercado: {len(mercado)} ({clientes} clientes)")
     if sin_datos:

@@ -224,7 +224,7 @@ grupos.forEach((g, gi) => {
     d.innerHTML = `<span class="${dotCls}" style="${style}"></span>` +
       `<b>${e.probable ? '<span class="prob">~</span> ' : ""}${e.nombre}</b>` +
       `<div class="addr">${NIVEL[e.nivel]}${extraNv}${e.turno ? " · " + e.turno : ""}${e.domicilio ? " · " + e.domicilio : ""}</div>`;
-    d.onclick = () => { map.setView([e.lat, e.lon], 17); setTimeout(() => e._m.openPopup(), 250); };
+    d.onclick = () => cluster.zoomToShowLayer(e._m, () => e._m.openPopup());
     e._fila = d;
     det.appendChild(d);
   });
@@ -255,9 +255,24 @@ function encuadra(filtro, pad) {
 document.getElementById("btnPueblo").onclick = () => encuadra(esCabecera, 0.1);
 document.getElementById("btnTodo").onclick = () => encuadra(() => true, 0.05);
 document.getElementById("btnPrint").onclick = () => window.print();
+// al imprimir se oculta el panel: reajustar el mapa al nuevo ancho
+window.addEventListener("beforeprint", () => map.invalidateSize());
+window.addEventListener("afterprint", () => map.invalidateSize());
 
 aplica();
 encuadra(esCabecera, 0.1);
+
+// Si la página cargó con el contenedor sin tamaño (panel oculto/miniatura),
+// el fitBounds inicial queda en zoom mundial: reintentar cuando ya mida algo.
+const reencuadreInicial = () => {
+  map.invalidateSize();
+  if (map.getZoom() < 5) {
+    encuadra(esCabecera, 0.1);
+    aplica();  // reconstruye los clusters, que se calcularon con el mapa en 0x0
+  }
+};
+setTimeout(reencuadreInicial, 500);
+window.addEventListener("resize", reencuadreInicial);
 </script>
 </body>
 </html>
