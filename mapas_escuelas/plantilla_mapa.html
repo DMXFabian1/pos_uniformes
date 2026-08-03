@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Escuelas — San Felipe, Gto.</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css">
+<style>
+  html, body { margin: 0; height: 100%; font-family: -apple-system, "Segoe UI", sans-serif; }
+  #app { display: flex; height: 100%; }
+  #map { flex: 1; }
+  #panel { width: 350px; overflow-y: auto; background: #faf6ef; border-left: 1px solid #d8cbb8; padding: 12px 14px; box-sizing: border-box; }
+  h1 { font-size: 17px; margin: 0 0 2px; color: #4a3524; }
+  .sub { font-size: 11.5px; color: #8a7a66; margin-bottom: 8px; }
+  #buscador { width: 100%; box-sizing: border-box; padding: 8px 10px; border: 1px solid #d8cbb8; border-radius: 8px; font-size: 13px; background: #fff; margin-bottom: 8px; }
+  #cobertura { font-size: 11.5px; color: #6b543c; background: #f3ead9; border-radius: 8px; padding: 6px 9px; margin-bottom: 8px; line-height: 1.5; }
+  .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
+  .chip { font-size: 12px; padding: 4px 9px; border-radius: 20px; cursor: pointer; user-select: none; background: #fff; border: 1.5px solid transparent; color: #3d2f20; }
+  .chip .dot { width: 9px; height: 9px; }
+  .chip.off { opacity: 0.35; }
+  .seg { display: flex; margin-bottom: 6px; border: 1px solid #d8cbb8; border-radius: 8px; overflow: hidden; }
+  .seg div { flex: 1; text-align: center; font-size: 12px; padding: 6px 2px; cursor: pointer; background: #fff; color: #5c4c39; user-select: none; }
+  .seg div.on { background: #6b543c; color: #fff; }
+  .switch { font-size: 12.5px; color: #5c4c39; cursor: pointer; user-select: none; margin-bottom: 6px; display: block; }
+  .botones { display: flex; gap: 6px; margin-bottom: 10px; }
+  .btn { flex: 1; padding: 7px 0; border: none; border-radius: 8px; background: #6b543c; color: #fff; font-size: 12px; cursor: pointer; }
+  .btn:hover { background: #55432f; }
+  .dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; box-sizing: border-box; }
+  .dot.hueco { background: transparent !important; border: 2.5px solid; }
+  details { margin-bottom: 6px; }
+  summary { font-size: 12.5px; font-weight: 600; color: #6b543c; cursor: pointer; padding: 4px 2px; text-transform: uppercase; letter-spacing: .4px; }
+  summary .cnt { color: #a08f79; font-weight: 400; }
+  .item { padding: 6px 9px; border-radius: 8px; margin-bottom: 4px; cursor: pointer; background: #fff; border: 1px solid #e6dccc; font-size: 12.5px; line-height: 1.3; }
+  .item:hover { background: #f3ead9; }
+  .item b { color: #3d2f20; font-weight: 600; }
+  .item .addr { color: #857662; font-size: 11px; margin-left: 17px; }
+  .prob { color: #b06a00; font-weight: 700; }
+  .note { font-size: 11.5px; color: #8a7a66; background: #f3ead9; border-radius: 8px; padding: 8px 10px; margin-top: 8px; }
+  .marker-cliente { border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 4px #0005; box-sizing: border-box; }
+  .marker-op { border-radius: 50%; background: #fff9 !important; border: 3px solid; box-shadow: 0 1px 3px #0004; box-sizing: border-box; }
+  .cluster { background: #6b543cd9; color: #fff; border-radius: 50%; border: 2px solid #fff; display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600; box-shadow: 0 1px 4px #0005; }
+  .leaflet-popup-content { font-size: 12.5px; line-height: 1.45; }
+  .badge { display: inline-block; font-size: 10.5px; padding: 1px 7px; border-radius: 10px; background: #2e8b57; color: #fff; margin-left: 4px; }
+  .badge.no { background: #a08f79; }
+  @media print {
+    #panel, .leaflet-control-zoom { display: none !important; }
+    #map { width: 100% !important; height: 100vh !important; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="map"></div>
+  <div id="panel">
+    <h1>Escuelas de San Felipe</h1>
+    <div class="sub">Cabecera + comunidades cliente · directorio SEP · relleno = cliente, anillo = sin registrar</div>
+    <input id="buscador" type="search" placeholder="Buscar escuela, comunidad o CCT…">
+    <div id="cobertura"></div>
+    <div class="chips" id="chipsNivel"></div>
+    <div class="seg" id="segModo">
+      <div data-m="todas" class="on">Todas</div>
+      <div data-m="clientes">Solo clientes</div>
+      <div data-m="oportunidades">Oportunidades</div>
+    </div>
+    <label class="switch"><input type="checkbox" id="swRural"> Mostrar SABES y telebachilleratos rurales</label>
+    <div class="botones">
+      <button class="btn" id="btnPueblo">Ver pueblo</button>
+      <button class="btn" id="btnTodo">Ver municipio</button>
+      <button class="btn" id="btnPrint">Imprimir</button>
+    </div>
+    <div id="listas"></div>
+    <div class="note" id="pendientes"></div>
+  </div>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+<script>
+/*__DATOS__*/
+
+const C = { Pre: "#7c4dff", Pri: "#2979ff", Sec: "#00bfa5", Bach: "#ff6d00", Otro: "#9aa0a6" };
+const NIVEL = { Pre: "Preescolar", Pri: "Primaria", Sec: "Secundaria", Bach: "Bachillerato", Otro: "Otros" };
+const TIPO_TXT = { telesec: "Telesecundaria", sabes: "SABES", telebach: "Telebachillerato",
+                   conalep: "Conalep", tecnica: "Sec. Técnica", particular: "Particular",
+                   conafe: "CONAFE", capacitacion: "Capacitación" };
+
+const norm = s => (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+const esCabecera = e => {
+  const l = norm(e.localidad);
+  return (l === "" || l === "san felipe" || l.includes("san felipe centro")) && !l.includes("estacion");
+};
+const esRural = e => (e.tipo === "sabes" || e.tipo === "telebach") && !esCabecera(e);
+
+const map = L.map("map");
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "&copy; OpenStreetMap", maxZoom: 19,
+}).addTo(map);
+const cluster = L.markerClusterGroup({
+  maxClusterRadius: 28,
+  disableClusteringAtZoom: 15,
+  showCoverageOnHover: false,
+  iconCreateFunction: c => L.divIcon({
+    className: "", iconSize: [30, 30],
+    html: `<div class="cluster" style="width:30px;height:30px">${c.getChildCount()}</div>`,
+  }),
+});
+map.addLayer(cluster);
+
+function icono(e) {
+  const color = C[e.nivel] || C.Otro;
+  if (e.cliente) {
+    return L.divIcon({ className: "", iconSize: [18, 18], iconAnchor: [9, 9],
+      html: `<div class="marker-cliente" style="width:18px;height:18px;background:${color}"></div>` });
+  }
+  return L.divIcon({ className: "", iconSize: [14, 14], iconAnchor: [7, 7],
+    html: `<div class="marker-op" style="width:14px;height:14px;border-color:${color}"></div>` });
+}
+
+ESCUELAS.forEach(e => {
+  const tipoTxt = TIPO_TXT[e.tipo] ? ` · ${TIPO_TXT[e.tipo]}` : "";
+  const turno = e.turno ? ` · ${e.turno}` : "";
+  const badge = e.cliente ? '<span class="badge">cliente</span>' : '<span class="badge no">sin registrar</span>';
+  const prob = e.probable ? "<br><i>ubicación probable</i>" : "";
+  const pos = e.cliente && e.pos && norm(e.pos) !== norm(e.nombre) ? `<br>En tu POS: <b>${e.pos}</b>` : "";
+  e._m = L.marker([e.lat, e.lon], { icon: icono(e) })
+    .bindPopup(`<b>${e.nombre}</b>${badge}${pos}<br>${NIVEL[e.nivel]}${tipoTxt}${turno}` +
+               `<br>${e.domicilio || e.localidad}<br><small>${e.localidad} · CCT ${e.cct}</small>${prob}`)
+    .bindTooltip(e.nombre, { direction: "top", offset: [0, -8] });
+});
+
+// ---- Estado de filtros ----
+const niveles = { Pre: true, Pri: true, Sec: true, Bach: true, Otro: true };
+let modo = "todas";
+let rural = false;
+let textoBusqueda = "";
+
+function visible(e) {
+  if (!niveles[e.nivel]) return false;
+  if (modo === "clientes" && !e.cliente) return false;
+  if (modo === "oportunidades" && e.cliente) return false;
+  if (esRural(e) && !rural) return false;
+  if (textoBusqueda) {
+    const blob = norm(`${e.nombre} ${e.pos} ${e.localidad} ${e.cct}`);
+    if (!blob.includes(textoBusqueda)) return false;
+  }
+  return true;
+}
+
+function aplica() {
+  cluster.clearLayers();
+  cluster.addLayers(ESCUELAS.filter(visible).map(e => e._m));
+  ESCUELAS.forEach(e => { if (e._fila) e._fila.style.display = visible(e) ? "" : "none"; });
+  document.querySelectorAll("#listas details").forEach(d => {
+    const filas = [...d.querySelectorAll(".item")];
+    const vis = filas.filter(f => f.style.display !== "none").length;
+    d.style.display = vis ? "" : "none";
+    d.querySelector(".cnt").textContent = `(${vis})`;
+    if (textoBusqueda && vis) d.open = true;
+  });
+}
+
+// ---- Chips de nivel ----
+const chipsCont = document.getElementById("chipsNivel");
+Object.keys(NIVEL).forEach(nv => {
+  const ch = document.createElement("div");
+  ch.className = "chip";
+  ch.innerHTML = `<span class="dot" style="background:${C[nv]}"></span>${NIVEL[nv]}`;
+  ch.onclick = () => { niveles[nv] = !niveles[nv]; ch.classList.toggle("off", !niveles[nv]); aplica(); };
+  chipsCont.appendChild(ch);
+});
+
+// ---- Selector de modo ----
+document.querySelectorAll("#segModo div").forEach(el => {
+  el.onclick = () => {
+    modo = el.dataset.m;
+    document.querySelectorAll("#segModo div").forEach(x => x.classList.toggle("on", x === el));
+    aplica();
+  };
+});
+
+// ---- Switch rural ----
+document.getElementById("swRural").onchange = ev => { rural = ev.target.checked; aplica(); };
+
+// ---- Búsqueda ----
+document.getElementById("buscador").oninput = ev => {
+  textoBusqueda = norm(ev.target.value.trim());
+  aplica();
+};
+
+// ---- Lista agrupada por localidad ----
+const listas = document.getElementById("listas");
+const porLocalidad = new Map();   // clave normalizada -> escuelas
+const etiqueta = new Map();       // clave normalizada -> texto a mostrar
+ESCUELAS.forEach(e => {
+  const key = esCabecera(e) ? "__pueblo__" : (norm(e.localidad) || "sin localidad");
+  if (!porLocalidad.has(key)) {
+    porLocalidad.set(key, []);
+    etiqueta.set(key, esCabecera(e) ? "San Felipe (pueblo)" : (e.localidad || "Sin localidad"));
+  }
+  porLocalidad.get(key).push(e);
+});
+const grupos = [...porLocalidad.keys()].sort((a, b) =>
+  (a === "__pueblo__" ? -1 : b === "__pueblo__" ? 1 : etiqueta.get(a).localeCompare(etiqueta.get(b))));
+const ordenNv = ["Pre", "Pri", "Sec", "Bach", "Otro"];
+grupos.forEach((g, gi) => {
+  const det = document.createElement("details");
+  if (gi === 0) det.open = true;
+  const arr = porLocalidad.get(g).sort((a, b) =>
+    ordenNv.indexOf(a.nivel) - ordenNv.indexOf(b.nivel) || (b.cliente - a.cliente) || a.nombre.localeCompare(b.nombre));
+  det.innerHTML = `<summary>${etiqueta.get(g)} <span class="cnt">(${arr.length})</span></summary>`;
+  arr.forEach(e => {
+    const d = document.createElement("div");
+    d.className = "item";
+    const dotCls = e.cliente ? "dot" : "dot hueco";
+    const style = e.cliente ? `background:${C[e.nivel]}` : `border-color:${C[e.nivel]}`;
+    const extraNv = TIPO_TXT[e.tipo] ? ` · ${TIPO_TXT[e.tipo]}` : "";
+    d.innerHTML = `<span class="${dotCls}" style="${style}"></span>` +
+      `<b>${e.probable ? '<span class="prob">~</span> ' : ""}${e.nombre}</b>` +
+      `<div class="addr">${NIVEL[e.nivel]}${extraNv}${e.turno ? " · " + e.turno : ""}${e.domicilio ? " · " + e.domicilio : ""}</div>`;
+    d.onclick = () => { map.setView([e.lat, e.lon], 17); setTimeout(() => e._m.openPopup(), 250); };
+    e._fila = d;
+    det.appendChild(d);
+  });
+  listas.appendChild(det);
+});
+
+// ---- Cobertura (cabecera, fija) ----
+(() => {
+  const cab = ESCUELAS.filter(e => esCabecera(e) && e.nivel !== "Otro");
+  const partes = ["Pre", "Pri", "Sec", "Bach"].map(nv => {
+    const del = cab.filter(e => e.nivel === nv);
+    return `<span style="color:${C[nv]};font-weight:700">●</span> ${NIVEL[nv]} ${del.filter(e => e.cliente).length}/${del.length}`;
+  });
+  document.getElementById("cobertura").innerHTML = "<b>Cobertura en el pueblo:</b><br>" + partes.join(" · ");
+})();
+
+// ---- Pendientes ----
+document.getElementById("pendientes").innerHTML =
+  "<b>Pendientes de ubicar:</b><br>" + PENDIENTES.join("<br>") +
+  "<br><span class='prob'>~</span> = ubicación probable";
+
+// ---- Vistas ----
+function encuadra(filtro, pad) {
+  let pts = ESCUELAS.filter(e => visible(e) && filtro(e)).map(e => [e.lat, e.lon]);
+  if (!pts.length) pts = ESCUELAS.filter(filtro).map(e => [e.lat, e.lon]);
+  if (pts.length) map.fitBounds(L.latLngBounds(pts).pad(pad));
+}
+document.getElementById("btnPueblo").onclick = () => encuadra(esCabecera, 0.1);
+document.getElementById("btnTodo").onclick = () => encuadra(() => true, 0.05);
+document.getElementById("btnPrint").onclick = () => window.print();
+
+aplica();
+encuadra(esCabecera, 0.1);
+</script>
+</body>
+</html>

@@ -1,22 +1,52 @@
 # Mapas de escuelas — San Felipe, Gto.
 
-Mapas interactivos (Leaflet + OpenStreetMap, necesitan internet para los tiles).
+## Mapa principal: `mapa_escuelas_san_felipe.html`
 
-- `mapa_escuelas_san_felipe.html` — las 47 escuelas registradas en el POS, coloreadas por nivel
-  (colores del panel: Preescolar `#7c4dff`, Primaria `#2979ff`, Secundaria `#00bfa5`, Bachillerato `#ff6d00`).
-  En gris: escuelas de la cabecera que no están en la base. `~` = ubicación probable.
-  Grupos extra con filtro propio: 11 planteles SABES en comunidades (cuadritos naranjas)
-  y 26 telebachilleratos comunitarios (rombos naranjas).
-  La leyenda es clickeable para filtrar por nivel/grupo.
-- `mapa_preescolares_san_felipe.html` — solo preescolares (clientes vs. no clientes).
-- Los `.png` son capturas de la vista del pueblo.
+Mapa interactivo (Leaflet + clustering, necesita internet para los tiles) con
+**todas las escuelas del mercado**: la cabecera completa (todos los niveles,
+incluye CONAFE y particulares) + las comunidades donde hay clientes + los
+SABES/telebachilleratos rurales del municipio (~125 escuelas).
 
-**Ver:** doble clic en el HTML (Brave), o servir la carpeta:
+- **Color = nivel** (colores del panel): Preescolar `#7c4dff`, Primaria `#2979ff`,
+  Secundaria `#00bfa5`, Bachillerato `#ff6d00`, gris = otros (CECATI/CAM).
+- **Relleno = cliente** del POS; **anillo hueco** = sin registrar (oportunidad).
+- Controles: búsqueda por nombre/comunidad/CCT, chips por nivel, selector
+  Todas / Solo clientes / Oportunidades, switch de SABES+telebach rurales,
+  Ver pueblo / Ver municipio / Imprimir.
+- Lista lateral agrupada por localidad (colapsable) y resumen de cobertura.
+- `~` = ubicación probable (nombre repetido en varias comunidades).
+
+### Regenerar
+
+```bash
+python3 mapas_escuelas/generar_datos_escuelas.py
+```
+
+Descarga el directorio SEP (escuelasmex.com, fichas por CCT) a
+`cache_fichas/` (gitignoreado) y genera el HTML desde `plantilla_mapa.html`
+con los datos inyectados. Con caché es casi instantáneo; para buscar escuelas
+nuevas en el directorio, borrar `cache_fichas/listado_*.html` y volver a correr.
+
+Los clientes se marcan cruzando `pos_uniformes/data/catalog_cache.json` con el
+dict `CLIENTES_CCT` del script (desambiguaciones investigadas ago-2026).
+Pendientes de ubicar: Jean Piaget (Pre), Vicente Guerrero (Pre+Pri, 3
+candidatas), Palacio (Pri) — al saber cuáles son, agregarlas a `CLIENTES_CCT`.
+
+### PNG para compartir
+
+```bash
+"/Applications/Brave Browser.app/Contents/MacOS/Brave Browser" --headless --disable-gpu --hide-scrollbars --window-size=1400,900 --virtual-time-budget=15000 --screenshot=mapas_escuelas/mapa_escuelas_san_felipe.png http://localhost:8933/mapa_escuelas_san_felipe.html
+```
+
+(O el botón **Imprimir** dentro del mapa para PDF por el diálogo del navegador.)
+
+## Mapa secundario: `mapa_preescolares_san_felipe.html`
+
+Versión anterior solo-preescolares (clientes vs no clientes). Se conserva como
+referencia; el principal la reemplaza.
+
+**Servir local:** entrada `mapas-escuelas` de `.claude/launch.json` (puerto 8933), o:
 
 ```bash
 python3 -m http.server 8933 -d mapas_escuelas
 ```
-
-**Fuente de ubicaciones:** fichas por CCT de escuelasmex.com (directorio SEP), ago 2026.
-Sin ubicar: Jean Piaget (Pre), Vicente Guerrero (Pre+Pri, 3 candidatas), Palacio (Pri).
-Los datos de escuelas/niveles salieron de `pos_uniformes/data/catalog_cache.json`.
