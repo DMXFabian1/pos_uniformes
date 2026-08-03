@@ -17,15 +17,21 @@
   #cobertura { font-size: 11.5px; color: #6b543c; background: #f3ead9; border-radius: 8px; padding: 6px 9px; margin-bottom: 8px; line-height: 1.5; }
   .chips { display: flex; flex-wrap: wrap; gap: 5px; margin-bottom: 6px; }
   .chip { font-size: 12px; padding: 4px 9px; border-radius: 20px; cursor: pointer; user-select: none; background: #fff; border: 1.5px solid transparent; color: #3d2f20; }
+  .chips-tipo .chip { font-size: 11px; padding: 3px 8px; color: #5c4c39; }
   .chip .dot { width: 9px; height: 9px; }
   .chip.off { opacity: 0.35; }
   .seg { display: flex; margin-bottom: 6px; border: 1px solid #d8cbb8; border-radius: 8px; overflow: hidden; }
   .seg div { flex: 1; text-align: center; font-size: 12px; padding: 6px 2px; cursor: pointer; background: #fff; color: #5c4c39; user-select: none; }
   .seg div.on { background: #6b543c; color: #fff; }
+  #distWrap { font-size: 12px; color: #5c4c39; margin-bottom: 6px; }
   .switch { font-size: 12.5px; color: #5c4c39; cursor: pointer; user-select: none; margin-bottom: 6px; display: block; }
-  .botones { display: flex; gap: 6px; margin-bottom: 10px; }
-  .btn { flex: 1; padding: 7px 0; border: none; border-radius: 8px; background: #6b543c; color: #fff; font-size: 12px; cursor: pointer; }
+  select { font-size: 12px; padding: 4px 6px; border: 1px solid #d8cbb8; border-radius: 6px; background: #fff; color: #3d2f20; }
+  #selLoc { width: 100%; box-sizing: border-box; padding: 6px 8px; margin-bottom: 6px; }
+  #resultado { font-size: 11.5px; color: #8a7a66; margin-bottom: 6px; }
+  .botones { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .btn { flex: 1; min-width: 72px; padding: 7px 0; border: none; border-radius: 8px; background: #6b543c; color: #fff; font-size: 12px; cursor: pointer; }
   .btn:hover { background: #55432f; }
+  .btn.sec { background: #a08f79; }
   .dot { display: inline-block; width: 11px; height: 11px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; box-sizing: border-box; }
   .dot.hueco { background: transparent !important; border: 2.5px solid; }
   details { margin-bottom: 6px; }
@@ -58,16 +64,29 @@
     <input id="buscador" type="search" placeholder="Buscar escuela, comunidad o CCT…">
     <div id="cobertura"></div>
     <div class="chips" id="chipsNivel"></div>
+    <div class="chips chips-tipo" id="chipsTipo"></div>
     <div class="seg" id="segModo">
-      <div data-m="todas" class="on">Todas</div>
+      <div data-m="todas">Todas</div>
       <div data-m="clientes">Solo clientes</div>
       <div data-m="oportunidades">Oportunidades</div>
     </div>
+    <div id="distWrap" style="display:none">A menos de
+      <select id="selDist">
+        <option value="0">cualquier distancia</option>
+        <option value="1">1 km</option>
+        <option value="3">3 km</option>
+        <option value="5">5 km</option>
+        <option value="10">10 km</option>
+      </select> de un cliente tuyo
+    </div>
     <label class="switch"><input type="checkbox" id="swRural"> Mostrar escuelas rurales (resto del municipio)</label>
+    <select id="selLoc"><option value="">Todas las comunidades</option></select>
+    <div id="resultado"></div>
     <div class="botones">
       <button class="btn" id="btnPueblo">Ver pueblo</button>
       <button class="btn" id="btnTodo">Ver municipio</button>
       <button class="btn" id="btnPrint">Imprimir</button>
+      <button class="btn sec" id="btnLimpiar">Limpiar filtros</button>
     </div>
     <div id="listas"></div>
     <div class="note" id="pendientes"></div>
@@ -84,6 +103,8 @@ const NIVEL = { Pre: "Preescolar", Pri: "Primaria", Sec: "Secundaria", Bach: "Ba
 const TIPO_TXT = { telesec: "Telesecundaria", sabes: "SABES", telebach: "Telebachillerato",
                    conalep: "Conalep", tecnica: "Sec. Técnica", particular: "Particular",
                    conafe: "CONAFE", capacitacion: "Capacitación" };
+const TIPOS_CHIP = { General: "Generales", Telesec: "Telesec", Conafe: "CONAFE",
+                     Particular: "Particulares", Sabes: "SABES", Telebach: "Telebach" };
 
 const norm = s => (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
 const esCabecera = e => {
@@ -91,6 +112,8 @@ const esCabecera = e => {
   return (l === "san felipe" || l.includes("san felipe centro")) && !l.includes("estacion");
 };
 const esRural = e => !!e.rural;
+const chipTipo = e => ({ telesec: "Telesec", conafe: "Conafe", particular: "Particular",
+                         sabes: "Sabes", telebach: "Telebach" }[e.tipo] || "General");
 
 const map = L.map("map");
 L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
@@ -118,6 +141,7 @@ function icono(e) {
 }
 
 ESCUELAS.forEach(e => {
+  e._gk = esCabecera(e) ? "__pueblo__" : (norm(e.localidad) || "sin localidad");
   const tipoTxt = TIPO_TXT[e.tipo] ? ` · ${TIPO_TXT[e.tipo]}` : "";
   const turno = e.turno ? ` · ${e.turno}` : "";
   const badge = e.cliente ? '<span class="badge">cliente</span>' : '<span class="badge no">sin registrar</span>';
@@ -130,17 +154,42 @@ ESCUELAS.forEach(e => {
     .bindTooltip(e.nombre, { direction: "top", offset: [0, -8] });
 });
 
-// ---- Estado de filtros ----
-const niveles = { Pre: true, Pri: true, Sec: true, Bach: true, Otro: true };
-let modo = "todas";
-let rural = false;
+// ---- Distancia mínima de cada escuela a un cliente (para Oportunidades) ----
+const clientes = ESCUELAS.filter(e => e.cliente);
+const RAD = Math.PI / 180;
+function kmEntre(a, b) {
+  const s = Math.sin((b.lat - a.lat) * RAD / 2) ** 2 +
+    Math.cos(a.lat * RAD) * Math.cos(b.lat * RAD) * Math.sin((b.lon - a.lon) * RAD / 2) ** 2;
+  return 12742 * Math.asin(Math.sqrt(s));
+}
+ESCUELAS.forEach(e => {
+  e._dkm = e.cliente ? 0 : Math.min(...clientes.map(c => kmEntre(e, c)));
+});
+
+// ---- Estado de filtros (persistido en localStorage) ----
+const DEFAULTS = {
+  niveles: { Pre: true, Pri: true, Sec: true, Bach: true, Otro: true },
+  tipos: { General: true, Telesec: true, Conafe: true, Particular: true, Sabes: true, Telebach: true },
+  modo: "todas", rural: false, dist: 0, loc: "",
+};
+let F = JSON.parse(JSON.stringify(DEFAULTS));
+try {
+  const g = JSON.parse(localStorage.getItem("mapaEscuelasFiltros") || "null");
+  if (g) F = { ...F, ...g, niveles: { ...F.niveles, ...g.niveles }, tipos: { ...F.tipos, ...g.tipos } };
+} catch (err) { /* localStorage no disponible: sin persistencia */ }
 let textoBusqueda = "";
 
 function visible(e) {
-  if (!niveles[e.nivel]) return false;
-  if (modo === "clientes" && !e.cliente) return false;
-  if (modo === "oportunidades" && e.cliente) return false;
-  if (esRural(e) && !rural) return false;
+  if (!F.niveles[e.nivel]) return false;
+  if (!F.tipos[chipTipo(e)]) return false;
+  if (F.modo === "clientes" && !e.cliente) return false;
+  if (F.modo === "oportunidades") {
+    if (e.cliente) return false;
+    if (F.dist && e._dkm > F.dist) return false;
+  }
+  // con una comunidad elegida se ignora el switch rural (quieres ver ESA comunidad)
+  if (!F.loc && e.rural && !F.rural) return false;
+  if (F.loc && e._gk !== F.loc) return false;
   if (textoBusqueda) {
     const blob = norm(`${e.nombre} ${e.pos} ${e.localidad} ${e.cct}`);
     if (!blob.includes(textoBusqueda)) return false;
@@ -148,45 +197,59 @@ function visible(e) {
   return true;
 }
 
+function persiste() {
+  try { localStorage.setItem("mapaEscuelasFiltros", JSON.stringify(F)); } catch (err) {}
+}
+
 function aplica() {
+  const vis = ESCUELAS.filter(visible);
   cluster.clearLayers();
-  cluster.addLayers(ESCUELAS.filter(visible).map(e => e._m));
+  cluster.addLayers(vis.map(e => e._m));
   ESCUELAS.forEach(e => { if (e._fila) e._fila.style.display = visible(e) ? "" : "none"; });
   document.querySelectorAll("#listas details").forEach(d => {
     const filas = [...d.querySelectorAll(".item")];
-    const vis = filas.filter(f => f.style.display !== "none").length;
-    d.style.display = vis ? "" : "none";
-    d.querySelector(".cnt").textContent = `(${vis})`;
-    if (textoBusqueda && vis) d.open = true;
+    const nVis = filas.filter(f => f.style.display !== "none").length;
+    d.style.display = nVis ? "" : "none";
+    d.querySelector(".cnt").textContent = `(${nVis})`;
+    if (textoBusqueda && nVis) d.open = true;
   });
+  document.getElementById("distWrap").style.display = F.modo === "oportunidades" ? "" : "none";
+  document.getElementById("resultado").textContent =
+    `Mostrando ${vis.length} de ${ESCUELAS.length} escuelas`;
+  persiste();
 }
 
-// ---- Chips de nivel ----
-const chipsCont = document.getElementById("chipsNivel");
-Object.keys(NIVEL).forEach(nv => {
-  const ch = document.createElement("div");
-  ch.className = "chip";
-  ch.innerHTML = `<span class="dot" style="background:${C[nv]}"></span>${NIVEL[nv]}`;
-  ch.onclick = () => { niveles[nv] = !niveles[nv]; ch.classList.toggle("off", !niveles[nv]); aplica(); };
-  chipsCont.appendChild(ch);
-});
+// ---- Chips de nivel y tipo ----
+function creaChips(contId, claves, textos, colores, grupo) {
+  const cont = document.getElementById(contId);
+  claves.forEach(k => {
+    const ch = document.createElement("div");
+    ch.className = "chip" + (F[grupo][k] ? "" : " off");
+    ch.innerHTML = (colores ? `<span class="dot" style="background:${colores[k]}"></span>` : "") + textos[k];
+    ch.onclick = () => { F[grupo][k] = !F[grupo][k]; ch.classList.toggle("off", !F[grupo][k]); aplica(); };
+    ch.dataset.k = k; ch.dataset.g = grupo;
+    cont.appendChild(ch);
+  });
+}
+creaChips("chipsNivel", Object.keys(NIVEL), NIVEL, C, "niveles");
+creaChips("chipsTipo", Object.keys(TIPOS_CHIP), TIPOS_CHIP, null, "tipos");
 
 // ---- Selector de modo ----
+function pintaModo() {
+  document.querySelectorAll("#segModo div").forEach(x => x.classList.toggle("on", x.dataset.m === F.modo));
+}
 document.querySelectorAll("#segModo div").forEach(el => {
-  el.onclick = () => {
-    modo = el.dataset.m;
-    document.querySelectorAll("#segModo div").forEach(x => x.classList.toggle("on", x === el));
-    aplica();
-  };
+  el.onclick = () => { F.modo = el.dataset.m; pintaModo(); aplica(); };
 });
+
+// ---- Distancia (solo en Oportunidades) ----
+document.getElementById("selDist").onchange = ev => { F.dist = +ev.target.value; aplica(); };
 
 // ---- Switch rural ----
 document.getElementById("swRural").onchange = ev => {
-  rural = ev.target.checked;
+  F.rural = ev.target.checked;
   aplica();
-  // los planteles rurales quedan fuera de la vista del pueblo: encuadrar
-  // el municipio al prenderlo para que el cambio se vea
-  if (rural) encuadra(() => true, 0.05);
+  if (F.rural && !F.loc) encuadra(() => true, 0.05);
 };
 
 // ---- Búsqueda ----
@@ -195,17 +258,16 @@ document.getElementById("buscador").oninput = ev => {
   aplica();
 };
 
-// ---- Lista agrupada por localidad ----
+// ---- Lista agrupada por localidad + selector de comunidad ----
 const listas = document.getElementById("listas");
-const porLocalidad = new Map();   // clave normalizada -> escuelas
-const etiqueta = new Map();       // clave normalizada -> texto a mostrar
+const porLocalidad = new Map();
+const etiqueta = new Map();
 ESCUELAS.forEach(e => {
-  const key = esCabecera(e) ? "__pueblo__" : (norm(e.localidad) || "sin localidad");
-  if (!porLocalidad.has(key)) {
-    porLocalidad.set(key, []);
-    etiqueta.set(key, esCabecera(e) ? "San Felipe (pueblo)" : (e.localidad || "Sin localidad"));
+  if (!porLocalidad.has(e._gk)) {
+    porLocalidad.set(e._gk, []);
+    etiqueta.set(e._gk, e._gk === "__pueblo__" ? "San Felipe (pueblo)" : (e.localidad || "Sin localidad"));
   }
-  porLocalidad.get(key).push(e);
+  porLocalidad.get(e._gk).push(e);
 });
 const grupos = [...porLocalidad.keys()].sort((a, b) =>
   (a === "__pueblo__" ? -1 : b === "__pueblo__" ? 1 : etiqueta.get(a).localeCompare(etiqueta.get(b))));
@@ -232,6 +294,21 @@ grupos.forEach((g, gi) => {
   listas.appendChild(det);
 });
 
+const selLoc = document.getElementById("selLoc");
+grupos.forEach(g => {
+  const op = document.createElement("option");
+  op.value = g;
+  op.textContent = etiqueta.get(g);
+  selLoc.appendChild(op);
+});
+if (F.loc && !porLocalidad.has(F.loc)) F.loc = "";
+selLoc.onchange = () => {
+  F.loc = selLoc.value;
+  aplica();
+  if (F.loc) encuadra(e => e._gk === F.loc, 0.25);
+  else encuadra(esCabecera, 0.1);
+};
+
 // ---- Cobertura (cabecera, fija) ----
 (() => {
   const cab = ESCUELAS.filter(e => esCabecera(e) && e.nivel !== "Otro");
@@ -256,19 +333,37 @@ function encuadra(filtro, pad) {
 document.getElementById("btnPueblo").onclick = () => encuadra(esCabecera, 0.1);
 document.getElementById("btnTodo").onclick = () => encuadra(() => true, 0.05);
 document.getElementById("btnPrint").onclick = () => window.print();
-// al imprimir se oculta el panel: reajustar el mapa al nuevo ancho
 window.addEventListener("beforeprint", () => map.invalidateSize());
 window.addEventListener("afterprint", () => map.invalidateSize());
 
+// ---- Sincronizar controles con el estado (carga y Limpiar) ----
+function sincronizaUI() {
+  document.querySelectorAll(".chip").forEach(ch => ch.classList.toggle("off", !F[ch.dataset.g][ch.dataset.k]));
+  pintaModo();
+  document.getElementById("selDist").value = String(F.dist);
+  document.getElementById("swRural").checked = F.rural;
+  selLoc.value = F.loc;
+}
+document.getElementById("btnLimpiar").onclick = () => {
+  F = JSON.parse(JSON.stringify(DEFAULTS));
+  textoBusqueda = "";
+  document.getElementById("buscador").value = "";
+  sincronizaUI();
+  aplica();
+  encuadra(esCabecera, 0.1);
+};
+
+sincronizaUI();
 aplica();
-encuadra(esCabecera, 0.1);
+if (F.loc) encuadra(e => e._gk === F.loc, 0.25);
+else encuadra(esCabecera, 0.1);
 
 // Si la página cargó con el contenedor sin tamaño (panel oculto/miniatura),
 // el fitBounds inicial queda en zoom mundial: reintentar cuando ya mida algo.
 const reencuadreInicial = () => {
   map.invalidateSize();
   if (map.getZoom() < 5) {
-    encuadra(esCabecera, 0.1);
+    if (F.loc) encuadra(e => e._gk === F.loc, 0.25); else encuadra(esCabecera, 0.1);
     aplica();  // reconstruye los clusters, que se calcularon con el mapa en 0x0
   }
 };
