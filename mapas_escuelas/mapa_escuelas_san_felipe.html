@@ -168,7 +168,8 @@ grises.forEach(e => add(e, true));
 // Filtros por nivel (clic en la leyenda)
 const activos = { Pre: true, Pri: true, Sec: true, Bach: true, Gris: true };
 function visible(e) {
-  if (e._gris) return activos.Gris && e.nv.some(nv => activos[nv]);
+  // "Sin registrar" es una categoría propia: no depende de los niveles
+  if (e._gris) return activos.Gris;
   return e.nv.some(nv => activos[nv]);
 }
 function aplicaFiltros() {
@@ -178,6 +179,13 @@ function aplicaFiltros() {
     if (!v && map.hasLayer(e._m)) map.removeLayer(e._m);
     if (e._fila) e._fila.style.display = v ? "" : "none";
   });
+  actualizaContadores();
+}
+function actualizaContadores() {
+  const cuenta = (arr) => `${arr.filter(visible).length}/${arr.length}`;
+  document.getElementById("nP").textContent = cuenta(pueblo);
+  document.getElementById("nC").textContent = cuenta(comunidades);
+  document.getElementById("nG").textContent = cuenta(grises);
 }
 document.querySelectorAll("#filtros .fil").forEach(el => {
   el.onclick = () => {
@@ -188,11 +196,15 @@ document.querySelectorAll("#filtros .fil").forEach(el => {
   };
 });
 
-const boundsPueblo = L.latLngBounds(pueblo.map(e => [e.lat, e.lon])).pad(0.12);
-const boundsTodo = L.latLngBounds([...pueblo, ...comunidades].map(e => [e.lat, e.lon])).pad(0.06);
-map.fitBounds(boundsPueblo);
-document.getElementById("btnPueblo").onclick = () => map.fitBounds(boundsPueblo);
-document.getElementById("btnTodo").onclick = () => map.fitBounds(boundsTodo);
+// Encuadra solo lo visible (si no hay nada visible, usa todo el grupo)
+function encuadra(arrs, pad) {
+  let pts = arrs.flat().filter(visible).map(e => [e.lat, e.lon]);
+  if (!pts.length) pts = arrs.flat().map(e => [e.lat, e.lon]);
+  map.fitBounds(L.latLngBounds(pts).pad(pad));
+}
+document.getElementById("btnPueblo").onclick = () => encuadra([pueblo, grises], 0.12);
+document.getElementById("btnTodo").onclick = () => encuadra([pueblo, grises, comunidades], 0.06);
+map.fitBounds(L.latLngBounds([...pueblo, ...grises].map(e => [e.lat, e.lon])).pad(0.12));
 
 const ordenNv = ["Pre", "Pri", "Sec", "Bach"];
 function fila(e, gris) {
@@ -215,6 +227,7 @@ function llena(idLista, arr, idN, gris) {
 llena("listaPueblo", pueblo, "nP", false);
 llena("listaCom", comunidades, "nC", false);
 llena("listaGris", grises, "nG", true);
+actualizaContadores();
 </script>
 </body>
 </html>
