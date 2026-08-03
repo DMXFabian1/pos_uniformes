@@ -122,8 +122,9 @@ ESCUELAS.forEach(e => {
   const badge = e.cliente ? '<span class="badge">cliente</span>' : '<span class="badge no">sin registrar</span>';
   const prob = e.probable ? "<br><i>ubicación probable</i>" : "";
   const pos = e.cliente && e.pos && norm(e.pos) !== norm(e.nombre) ? `<br>En tu POS: <b>${e.pos}</b>` : "";
+  const nota = e.nota ? `<br><i>${e.nota}</i>` : "";
   e._m = L.marker([e.lat, e.lon], { icon: icono(e) })
-    .bindPopup(`<b>${e.nombre}</b>${badge}${pos}<br>${NIVEL[e.nivel]}${tipoTxt}${turno}` +
+    .bindPopup(`<b>${e.nombre}</b>${badge}${pos}${nota}<br>${NIVEL[e.nivel]}${tipoTxt}${turno}` +
                `<br>${e.domicilio || e.localidad}<br><small>${e.localidad} · CCT ${e.cct}</small>${prob}`)
     .bindTooltip(e.nombre, { direction: "top", offset: [0, -8] });
 });

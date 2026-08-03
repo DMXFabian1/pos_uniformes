@@ -121,7 +121,20 @@ CLIENTES_CCT: dict[str, dict] = {
     "11DPR0892B": {"pos": "J. Guadalupe Victoria", "probable": True},
     "11DPR1288B": {"pos": "Niños Héroes", "probable": True},
     "11DPR2574C": {"pos": "Niños Héroes de Miguel Hidalgo"},
+    # Clientes de uniforme básico (sin escudo) — no aparecen en la carpeta,
+    # pero se les surte. Confirmado por Daniel 2026-08-03.
+    "11DJN0936S": {"pos": "", "nota": "Uniforme básico (sin escudo)"},
+    "11DJN2380Z": {"pos": "", "nota": "Uniforme básico (sin escudo)"},
+    "11DJN3764K": {"pos": "", "nota": "Uniforme básico (sin escudo)"},
+    "11DJN4045J": {"pos": "", "nota": "Uniforme básico (sin escudo)"},
+    "11EJN0897F": {"pos": "", "nota": "Uniforme básico (sin escudo)"},
+    "11EPR0437L": {"pos": "", "nota": "Uniforme básico (sin escudo)"},
+    # En el directorio sale como CEBA/primaria nocturna, pero es la secundaria.
+    "11DBA0022L": {"pos": "Práxedis Guerrero", "nota": "Secundaria (el directorio la lista como CEBA)"},
 }
+
+# Correcciones a datos del directorio SEP.
+NIVEL_OVERRIDE = {"11DBA0022L": "Sec"}
 
 # Sin ficha en el directorio SEP: se agregan a mano.
 EXTRAS = [
@@ -279,7 +292,7 @@ def main() -> int:
             sin_datos.append(cct)
             continue
         letras = cct[2:5]
-        ficha["nivel"] = NIVEL_POR_CCT.get(letras, "Otro")
+        ficha["nivel"] = NIVEL_OVERRIDE.get(cct, NIVEL_POR_CCT.get(letras, "Otro"))
         ficha["tipo"] = TIPO_POR_CCT.get(letras, tipo_cat)
         if cct[2] == "P":
             ficha["tipo"] = "particular"
@@ -291,12 +304,16 @@ def main() -> int:
     clientes = 0
     for e in mercado:
         info = CLIENTES_CCT.get(e["cct"])
+        # El cliente SABES abarca todos los planteles SABES del municipio.
+        if info is None and e["tipo"] == "sabes":
+            info = {"pos": "SABES", "nota": "Cubierto por tu cliente SABES"}
         e["cliente"] = bool(info)
         e["pos"] = info["pos"] if info else ""
+        e["nota"] = info.get("nota", "") if info else ""
         e["probable"] = bool(info and info.get("probable"))
         if info:
             clientes += 1
-            if info["pos"] not in nombres_pos:
+            if info["pos"] and info["pos"] not in nombres_pos:
                 print(f"  [aviso] '{info['pos']}' no está en catalog_cache")
     mercado.extend(EXTRAS)
     clientes += sum(1 for e in EXTRAS if e["cliente"])
