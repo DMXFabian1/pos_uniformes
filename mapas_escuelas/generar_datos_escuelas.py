@@ -85,7 +85,8 @@ CLIENTES_CCT: dict[str, dict] = {
     "11DJN0004I": {"pos": "Jorge Cantor"},
     "11DJN0503E": {"pos": "Patria"},
     "11EJN0269P": {"pos": "Vidal Alcocer"},
-    "11DJN2388R": {"pos": "Álvaro Obregón", "probable": True},
+    # Confirmado por Daniel 2026-08-03: su Álvaro Obregón es el de El Carretón.
+    "11DPR0191J": {"pos": "Álvaro Obregón", "nota": "Tu cliente Pre+Pri de El Carretón"},
     "11DPR0013G": {"pos": "Ignacio Allende"},
     "11DPR3467A": {"pos": "Albino García Ramos"},
     "11DPR0110I": {"pos": "Miguel Hidalgo"},
