@@ -42,6 +42,7 @@
       <div class="fil" data-f="Sec"><span class="dot" style="background:#00bfa5"></span>Secundaria</div>
       <div class="fil" data-f="Bach"><span class="dot" style="background:#ff6d00"></span>Bachillerato</div>
       <div class="fil" data-f="Gris"><span class="dot" style="background:#9aa0a6"></span>Sin registrar (cabecera)</div>
+      <div class="fil" data-f="Sabes"><span class="dot" style="background:#ff6d00; border-radius:3px"></span>SABES en comunidades</div>
       <div style="margin-top:4px"><span class="prob">~</span> = ubicación probable (nombre repetido en varias comunidades) · clic en un nivel para filtrar</div>
     </div>
     <button class="btn" id="btnPueblo">Ver pueblo</button>
@@ -50,6 +51,8 @@
     <div id="listaPueblo"></div>
     <h2>En comunidades (<span id="nC"></span>)</h2>
     <div id="listaCom"></div>
+    <h2>SABES en comunidades (<span id="nS"></span>)</h2>
+    <div id="listaSabes"></div>
     <h2>En cabecera, sin registrar (<span id="nG"></span>)</h2>
     <div id="listaGris"></div>
     <div class="note">
@@ -119,6 +122,20 @@ const comunidades = [
   {n:"Álvaro Obregón", nv:["Pre","Pri"], a:"San Pedro de Almoloyán (primaria por confirmar)", lat:21.69089, lon:-101.23817, p:true},
   {n:"Práxedis Guerrero (primaria)", nv:["Pri"], a:"Salto del Ahogado", lat:21.39249, lon:-101.45841},
 ];
+// Planteles SABES en comunidades (mismo subsistema que tu cliente SABES)
+const sabes = [
+  {n:"SABES Jaral de Berrio", nv:["Bach"], a:"Alfonso Moreno Morán 203, Jaral de Berrios", lat:21.682824, lon:-101.01152},
+  {n:"SABES San Bartolo de Berrios", nv:["Bach"], a:"Lázaro Cárdenas, San Bartolo de Berrios", lat:21.61417, lon:-101.06361},
+  {n:"SABES Santa Rosa", nv:["Bach"], a:"Av. Colón, Santa Rosa", lat:21.55394, lon:-101.09311},
+  {n:"SABES San Pedro de Almoloyán", nv:["Bach"], a:"Calle Santa Fe, San Pedro de Almoloyán", lat:21.69889, lon:-101.24084},
+  {n:"SABES Salto del Ahogado", nv:["Bach"], a:"Salto del Ahogado", lat:21.39472, lon:-101.45889},
+  {n:"SABES San Andrés del Cubo", nv:["Bach"], a:"Obregón 100, San Andrés del Cubo", lat:21.44667, lon:-101.12527},
+  {n:"SABES La Cieneguita", nv:["Bach"], a:"Camino Buenavista–Capetillo, La Cieneguita", lat:21.345, lon:-101.06111},
+  {n:"SABES Los Barcos", nv:["Bach"], a:"San José de los Barcos", lat:21.3141, lon:-101.255},
+  {n:"SABES Laguna de Guadalupe", nv:["Bach"], a:"Cuatha 30, Laguna de Guadalupe", lat:21.80083, lon:-101.35694},
+  {n:"SABES El Tepozán", nv:["Bach"], a:"El Tepozán", lat:21.295, lon:-101.35806},
+  {n:"SABES Fábrica de Melchor", nv:["Bach"], a:"Reforma, Fábrica de Melchor", lat:21.67444, lon:-100.90219},
+];
 
 // Escuelas de la cabecera que NO están en la base del POS (gris)
 const grises = [
@@ -136,7 +153,7 @@ L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
   attribution: "&copy; OpenStreetMap", maxZoom: 19
 }).addTo(map);
 
-function makeIcon(niveles, gris) {
+function makeIcon(niveles, gris, cuadrado) {
   const size = gris ? 15 : 18;
   let bg;
   if (gris) bg = "#9aa0a6";
@@ -146,30 +163,33 @@ function makeIcon(niveles, gris) {
     const segs = niveles.map((nv, i) => `${C[nv]} ${i * step}deg ${(i + 1) * step}deg`);
     bg = `conic-gradient(${segs.join(",")})`;
   }
+  const radio = cuadrado ? "border-radius:4px;" : "";
   return L.divIcon({
     className: "",
-    html: `<div class="split-marker" style="width:${size}px;height:${size}px;background:${bg}"></div>`,
+    html: `<div class="split-marker" style="width:${size}px;height:${size}px;background:${bg};${radio}"></div>`,
     iconSize: [size + 4, size + 4], iconAnchor: [(size + 4) / 2, (size + 4) / 2],
   });
 }
 const todos = [];
-function add(e, gris) {
-  const m = L.marker([e.lat, e.lon], { icon: makeIcon(e.nv, gris) }).addTo(map);
+function add(e, gris, esSabes) {
+  const m = L.marker([e.lat, e.lon], { icon: makeIcon(e.nv, gris, esSabes) }).addTo(map);
   const nivs = e.nv.map(x => NIVEL[x]).join(" + ");
   const extra = gris ? "<br><i>sin registrar en tu base</i>" : (e.p ? "<br><i>ubicación probable</i>" : "");
   m.bindPopup(`<b>${e.n}</b><br>${nivs}<br>${e.a}${extra}`);
   m.bindTooltip(e.n, { direction: "top", offset: [0, -10] });
-  e._m = m; e._gris = gris;
+  e._m = m; e._gris = gris; e._sabes = !!esSabes;
   todos.push(e);
 }
-grises.forEach(e => add(e, true));
-[...pueblo, ...comunidades].forEach(e => add(e, false));
+grises.forEach(e => add(e, true, false));
+[...pueblo, ...comunidades].forEach(e => add(e, false, false));
+sabes.forEach(e => add(e, false, true));
 
 // Filtros por nivel (clic en la leyenda)
-const activos = { Pre: true, Pri: true, Sec: true, Bach: true, Gris: true };
+const activos = { Pre: true, Pri: true, Sec: true, Bach: true, Gris: true, Sabes: true };
 function visible(e) {
-  // "Sin registrar" es una categoría propia: no depende de los niveles
+  // "Sin registrar" y "SABES comunidades" son categorías propias: no dependen de los niveles
   if (e._gris) return activos.Gris;
+  if (e._sabes) return activos.Sabes;
   return e.nv.some(nv => activos[nv]);
 }
 function aplicaFiltros() {
@@ -186,6 +206,7 @@ function actualizaContadores() {
   document.getElementById("nP").textContent = cuenta(pueblo);
   document.getElementById("nC").textContent = cuenta(comunidades);
   document.getElementById("nG").textContent = cuenta(grises);
+  document.getElementById("nS").textContent = cuenta(sabes);
 }
 document.querySelectorAll("#filtros .fil").forEach(el => {
   el.onclick = () => {
@@ -203,7 +224,7 @@ function encuadra(arrs, pad) {
   map.fitBounds(L.latLngBounds(pts).pad(pad));
 }
 document.getElementById("btnPueblo").onclick = () => encuadra([pueblo, grises], 0.12);
-document.getElementById("btnTodo").onclick = () => encuadra([pueblo, grises, comunidades], 0.06);
+document.getElementById("btnTodo").onclick = () => encuadra([pueblo, grises, comunidades, sabes], 0.06);
 map.fitBounds(L.latLngBounds([...pueblo, ...grises].map(e => [e.lat, e.lon])).pad(0.12));
 
 const ordenNv = ["Pre", "Pri", "Sec", "Bach"];
@@ -226,6 +247,7 @@ function llena(idLista, arr, idN, gris) {
 }
 llena("listaPueblo", pueblo, "nP", false);
 llena("listaCom", comunidades, "nC", false);
+llena("listaSabes", sabes, "nS", false);
 llena("listaGris", grises, "nG", true);
 actualizaContadores();
 </script>

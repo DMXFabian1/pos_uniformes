@@ -5,6 +5,8 @@ Mapas interactivos (Leaflet + OpenStreetMap, necesitan internet para los tiles).
 - `mapa_escuelas_san_felipe.html` — las 47 escuelas registradas en el POS, coloreadas por nivel
   (colores del panel: Preescolar `#7c4dff`, Primaria `#2979ff`, Secundaria `#00bfa5`, Bachillerato `#ff6d00`).
   En gris: escuelas de la cabecera que no están en la base. `~` = ubicación probable.
+  Grupo extra con filtro propio: los 11 planteles SABES en comunidades (cuadritos naranjas).
+  La leyenda es clickeable para filtrar por nivel/grupo.
 - `mapa_preescolares_san_felipe.html` — solo preescolares (clientes vs. no clientes).
 - Los `.png` son capturas de la vista del pueblo.
 
