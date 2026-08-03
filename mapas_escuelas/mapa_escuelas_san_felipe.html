@@ -24,6 +24,9 @@
   .btn { display: inline-block; width: 48%; margin-top: 8px; padding: 7px 0; border: none; border-radius: 8px; background: #6b543c; color: #fff; font-size: 12.5px; cursor: pointer; }
   .btn:hover { background: #55432f; }
   .prob { color: #b06a00; font-weight: 600; }
+  .fil { cursor: pointer; user-select: none; padding: 2px 4px; border-radius: 6px; }
+  .fil:hover { background: #f3ead9; }
+  .fil.off { opacity: 0.35; text-decoration: line-through; }
   .split-marker { border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 4px #0005; }
 </style>
 </head>
@@ -33,13 +36,13 @@
   <div id="panel">
     <h1>Escuelas registradas en el POS</h1>
     <div class="sub">San Felipe, Gto. · 44 de 47 ubicadas · colores del panel · ago 2026</div>
-    <div class="leg">
-      <div><span class="dot" style="background:#7c4dff"></span>Preescolar</div>
-      <div><span class="dot" style="background:#2979ff"></span>Primaria</div>
-      <div><span class="dot" style="background:#00bfa5"></span>Secundaria</div>
-      <div><span class="dot" style="background:#ff6d00"></span>Bachillerato</div>
-      <div><span class="dot" style="background:#9aa0a6"></span>En cabecera, sin registrar en tu base</div>
-      <div style="margin-top:4px"><span class="prob">~</span> = ubicación probable (nombre repetido en varias comunidades)</div>
+    <div class="leg" id="filtros">
+      <div class="fil" data-f="Pre"><span class="dot" style="background:#7c4dff"></span>Preescolar</div>
+      <div class="fil" data-f="Pri"><span class="dot" style="background:#2979ff"></span>Primaria</div>
+      <div class="fil" data-f="Sec"><span class="dot" style="background:#00bfa5"></span>Secundaria</div>
+      <div class="fil" data-f="Bach"><span class="dot" style="background:#ff6d00"></span>Bachillerato</div>
+      <div class="fil" data-f="Gris"><span class="dot" style="background:#9aa0a6"></span>Sin registrar (cabecera)</div>
+      <div style="margin-top:4px"><span class="prob">~</span> = ubicación probable (nombre repetido en varias comunidades) · clic en un nivel para filtrar</div>
     </div>
     <button class="btn" id="btnPueblo">Ver pueblo</button>
     <button class="btn" id="btnTodo" style="float:right">Ver municipio</button>
@@ -50,7 +53,7 @@
     <h2>En cabecera, sin registrar (<span id="nG"></span>)</h2>
     <div id="listaGris"></div>
     <div class="note">
-      Guillermo Prieto, Omecalli, Paulo Freire y Rafael Ramírez sí están en tu lista del Gestor, pero no tienen uniformes en el catálogo del POS. Del Colegio Motolinía solo tienes la primaria — el preescolar y la secundaria van en gris.
+      Guillermo Prieto, Omecalli, Paulo Freire y Rafael Ramírez sí están en tu lista del Gestor, pero no tienen uniformes en el catálogo del POS.
     </div>
     <h2>Sin ubicar</h2>
     <div class="note">
@@ -84,8 +87,8 @@ const pueblo = [
   {n:"Ignacio Ramirez Lopez", nv:["Pri"], a:"Teresa de Calcuta 901, Los Espinos", lat:21.47291, lon:-101.20156},
   {n:"Miguel Campuzano", nv:["Pri"], a:"Centro, atrás del hospital", lat:21.47656, lon:-101.21392},
   {n:"Club Rotario", nv:["Pri"], a:"San Joaquín 101, Jardines de San Antonio", lat:21.476869, lon:-101.207661},
-  {n:"Colegio Motolinea", nv:["Pri"], a:"Jardín Aquiles Serdán 112, El Pueblito", lat:21.47525, lon:-101.21641},
-  {n:"Práxedis Guerrero", nv:["Pri","Sec"], a:"Pallán 304, Zona Centro", lat:21.47925, lon:-101.21981},
+  {n:"Colegio Motolinea", nv:["Pre","Pri","Sec"], a:"Jardín Aquiles Serdán 112, El Pueblito", lat:21.47525, lon:-101.21641},
+  {n:"Práxedis Guerrero (secundaria)", nv:["Sec"], a:"Pallán 304, Zona Centro", lat:21.47925, lon:-101.21981},
   {n:"Bicentenario", nv:["Sec"], a:"Prol. 5 de Mayo, La Florida", lat:21.490519, lon:-101.197827},
   {n:"Telesecundaria 512", nv:["Sec"], a:"Campesinos, Granjas de la Conquista", lat:21.466796, lon:-101.208778},
   {n:"CBTIS 148", nv:["Bach"], a:"Priv. de Cecati, San Miguel", lat:21.49189, lon:-101.22955},
@@ -114,6 +117,7 @@ const comunidades = [
   {n:"Niños Héroes", nv:["Pri"], a:"Aranjuez", lat:21.45782, lon:-101.23357, p:true},
   {n:"Niños Héroes de Miguel Hidalgo", nv:["Pri"], a:"Miguel Hidalgo (Cueritos)", lat:21.6988, lon:-101.27943},
   {n:"Álvaro Obregón", nv:["Pre","Pri"], a:"San Pedro de Almoloyán (primaria por confirmar)", lat:21.69089, lon:-101.23817, p:true},
+  {n:"Práxedis Guerrero (primaria)", nv:["Pri"], a:"Salto del Ahogado", lat:21.39249, lon:-101.45841},
 ];
 
 // Escuelas de la cabecera que NO están en la base del POS (gris)
@@ -123,9 +127,7 @@ const grises = [
   {n:"Paulo Freire", nv:["Pre"], a:"Congreso 408, Los Espinos", lat:21.47001, lon:-101.2057},
   {n:"Henry Wallon", nv:["Pre"], a:"Luis H. Ducoing 124, El Puertecito", lat:21.49488, lon:-101.23359},
   {n:"Omecalli (Segunda Casa)", nv:["Pre"], a:"Galeana, La Tenería", lat:21.48258, lon:-101.21128},
-  {n:"Colegio Motolinía — Preescolar", nv:["Pre"], a:"Jardín Aquiles Serdán 112 (solo tienes la primaria)", lat:21.47545, lon:-101.21621},
   {n:"Rafael Ramírez", nv:["Pri"], a:"Centro, atrás del hospital (mismo plantel que Campuzano)", lat:21.47676, lon:-101.21372},
-  {n:"Colegio Motolinía — Secundaria", nv:["Sec"], a:"Leona Vicario 101, Santuario", lat:21.483512, lon:-101.223165},
   {n:"CECATI 104 (capacitación)", nv:["Bach"], a:"El Aguaje 108, San Miguel", lat:21.49175, lon:-101.22847},
 ];
 
@@ -150,17 +152,41 @@ function makeIcon(niveles, gris) {
     iconSize: [size + 4, size + 4], iconAnchor: [(size + 4) / 2, (size + 4) / 2],
   });
 }
-const markers = [];
+const todos = [];
 function add(e, gris) {
   const m = L.marker([e.lat, e.lon], { icon: makeIcon(e.nv, gris) }).addTo(map);
   const nivs = e.nv.map(x => NIVEL[x]).join(" + ");
   const extra = gris ? "<br><i>sin registrar en tu base</i>" : (e.p ? "<br><i>ubicación probable</i>" : "");
   m.bindPopup(`<b>${e.n}</b><br>${nivs}<br>${e.a}${extra}`);
   m.bindTooltip(e.n, { direction: "top", offset: [0, -10] });
-  e._m = m;
+  e._m = m; e._gris = gris;
+  todos.push(e);
 }
 grises.forEach(e => add(e, true));
 [...pueblo, ...comunidades].forEach(e => add(e, false));
+
+// Filtros por nivel (clic en la leyenda)
+const activos = { Pre: true, Pri: true, Sec: true, Bach: true, Gris: true };
+function visible(e) {
+  if (e._gris) return activos.Gris && e.nv.some(nv => activos[nv]);
+  return e.nv.some(nv => activos[nv]);
+}
+function aplicaFiltros() {
+  todos.forEach(e => {
+    const v = visible(e);
+    if (v && !map.hasLayer(e._m)) e._m.addTo(map);
+    if (!v && map.hasLayer(e._m)) map.removeLayer(e._m);
+    if (e._fila) e._fila.style.display = v ? "" : "none";
+  });
+}
+document.querySelectorAll("#filtros .fil").forEach(el => {
+  el.onclick = () => {
+    const f = el.dataset.f;
+    activos[f] = !activos[f];
+    el.classList.toggle("off", !activos[f]);
+    aplicaFiltros();
+  };
+});
 
 const boundsPueblo = L.latLngBounds(pueblo.map(e => [e.lat, e.lon])).pad(0.12);
 const boundsTodo = L.latLngBounds([...pueblo, ...comunidades].map(e => [e.lat, e.lon])).pad(0.06);
@@ -176,6 +202,7 @@ function fila(e, gris) {
   const nivTxt = gris ? ` · ${e.nv.map(x => NIVEL[x]).join(" + ")}` : "";
   d.innerHTML = `${dots}<b>${e.p ? '<span class="prob">~</span> ' : ""}${e.n}</b><div class="addr">${e.a}${nivTxt}</div>`;
   d.onclick = () => { map.setView([e.lat, e.lon], 16); e._m.openPopup(); };
+  e._fila = d;
   return d;
 }
 function llena(idLista, arr, idN, gris) {
