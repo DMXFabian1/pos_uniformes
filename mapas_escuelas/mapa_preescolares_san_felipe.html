@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Preescolares — San Felipe, Gto.</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  html, body { margin: 0; height: 100%; font-family: -apple-system, "Segoe UI", sans-serif; }
+  #app { display: flex; height: 100%; }
+  #map { flex: 1; }
+  #panel { width: 330px; overflow-y: auto; background: #faf6ef; border-left: 1px solid #d8cbb8; padding: 14px 16px; box-sizing: border-box; }
+  h1 { font-size: 17px; margin: 0 0 2px; color: #4a3524; }
+  .sub { font-size: 12px; color: #8a7a66; margin-bottom: 12px; }
+  h2 { font-size: 13px; margin: 14px 0 6px; color: #6b543c; text-transform: uppercase; letter-spacing: .5px; }
+  .item { padding: 7px 9px; border-radius: 8px; margin-bottom: 5px; cursor: pointer; background: #fff; border: 1px solid #e6dccc; font-size: 13px; line-height: 1.35; }
+  .item:hover { background: #f3ead9; }
+  .item b { color: #3d2f20; }
+  .item .addr { color: #857662; font-size: 11.5px; }
+  .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 6px; }
+  .cli { background: #2e8b57; } .no { background: #4472c4; } .com { background: #c07830; }
+  .leg { font-size: 12px; margin-top: 10px; color: #5c4c39; }
+  .leg div { margin-bottom: 3px; }
+  .note { font-size: 11.5px; color: #8a7a66; background: #f3ead9; border-radius: 8px; padding: 8px 10px; margin-top: 10px; }
+  .btn { display: block; width: 100%; margin-top: 10px; padding: 8px; border: none; border-radius: 8px; background: #6b543c; color: #fff; font-size: 13px; cursor: pointer; }
+  .btn:hover { background: #55432f; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="map"></div>
+  <div id="panel">
+    <h1>Preescolares de San Felipe</h1>
+    <div class="sub">San Felipe, Guanajuato · directorio SEP (CCT) · ago 2026</div>
+    <div class="leg">
+      <div><span class="dot cli"></span>Cliente de la tienda (en catálogo)</div>
+      <div><span class="dot no"></span>Otro preescolar del pueblo</div>
+      <div><span class="dot com"></span>Cliente en comunidad (fuera del pueblo)</div>
+    </div>
+    <button class="btn" id="btnPueblo">Ver pueblo</button>
+    <button class="btn" id="btnTodo">Ver municipio (comunidades)</button>
+    <h2>En el pueblo</h2>
+    <div id="listaPueblo"></div>
+    <h2>En comunidades (clientes)</h2>
+    <div id="listaCom"></div>
+    <div class="note">
+      Sin ubicar en el directorio SEP: <b>Jean Piaget</b> y <b>Vicente Guerrero</b> (preescolar) — no aparecen con ese nombre en San Felipe. El "Álvaro Obregón" preescolar del directorio está en San Pedro de Almoloyán; si tu cliente es el del pueblo, dime y lo corrijo.
+    </div>
+  </div>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const pueblo = [
+  {n:"Margarita Paz Paredes", cct:"11DJN0152R", a:"Priv. Revolución, Barrio San Miguel", lat:21.490803, lon:-101.221549, cli:true},
+  {n:"Frida Kahlo Calderón", cct:"11DJN2847M", a:"Prol. Soledad, La Conchita", lat:21.47686, lon:-101.22137, cli:true},
+  {n:"Sor Juana Inés de la Cruz", cct:"11EJN0336X", a:"Fracc. Michoacán, FOVISSSTE", lat:21.47615, lon:-101.20276, cli:true},
+  {n:"Blanca Verónica Soto Martínez (Príncipes)", cct:"11EJN0093R", a:"Nigromante 8, La Tenería", lat:21.47941, lon:-101.2101, cli:true},
+  {n:"Colegio Motolinía (particular)", cct:"11PJN0546H", a:"Jardín Aquiles Serdán 112, El Pueblito", lat:21.483512, lon:-101.223165, cli:true},
+  {n:"Guillermo Prieto", cct:"11DJN0936S", a:"Calle Texas, Los Zapotes", lat:21.46975, lon:-101.2114, cli:false},
+  {n:"Narciso Mendoza", cct:"11DJN2380Z", a:"Priv. Indio Triste 107, Col. Aviación", lat:21.470902, lon:-101.219349, cli:false},
+  {n:"Paulo Freire", cct:"11DJN3764K", a:"Congreso 408, Los Espinos", lat:21.47001, lon:-101.2057, cli:false},
+  {n:"Henry Wallon", cct:"11DJN4045J", a:"Luis H. Ducoing 124, El Puertecito", lat:21.49488, lon:-101.23359, cli:false},
+  {n:"Omecalli (Segunda Casa)", cct:"11EJN0897F", a:"Galeana, La Tenería", lat:21.48258, lon:-101.21128, cli:false},
+];
+const comunidades = [
+  {n:"Jorge Cantor", cct:"11DJN0004I", a:"San Bartolo de Berrios", lat:21.61234, lon:-101.07206},
+  {n:"Patria", cct:"11DJN0503E", a:"Jaral de Berrios", lat:21.67356, lon:-101.01716},
+  {n:"Vidal Alcocer", cct:"11EJN0269P", a:"Jaral de Berrios", lat:21.68017, lon:-101.01129},
+  {n:"Álvaro Obregón", cct:"11DJN2388R", a:"San Pedro de Almoloyán", lat:21.69089, lon:-101.23817},
+];
+
+const map = L.map("map");
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "&copy; OpenStreetMap", maxZoom: 19
+}).addTo(map);
+
+function circle(color) {
+  return { radius: 9, fillColor: color, color: "#fff", weight: 2, fillOpacity: 0.95 };
+}
+const markers = {};
+function add(e, color) {
+  const m = L.circleMarker([e.lat, e.lon], circle(color)).addTo(map);
+  m.bindPopup(`<b>${e.n}</b><br>${e.a}<br><small>CCT ${e.cct}</small>`);
+  m.bindTooltip(e.n, { direction: "top", offset: [0, -8] });
+  markers[e.cct] = m;
+}
+pueblo.forEach(e => add(e, e.cli ? "#2e8b57" : "#4472c4"));
+comunidades.forEach(e => add(e, "#c07830"));
+
+const boundsPueblo = L.latLngBounds(pueblo.map(e => [e.lat, e.lon])).pad(0.15);
+const boundsTodo = L.latLngBounds([...pueblo, ...comunidades].map(e => [e.lat, e.lon])).pad(0.1);
+map.fitBounds(boundsPueblo);
+document.getElementById("btnPueblo").onclick = () => map.fitBounds(boundsPueblo);
+document.getElementById("btnTodo").onclick = () => map.fitBounds(boundsTodo);
+
+function fila(e, dotCls) {
+  const d = document.createElement("div");
+  d.className = "item";
+  d.innerHTML = `<span class="dot ${dotCls}"></span><b>${e.n}</b><div class="addr">${e.a} · CCT ${e.cct}</div>`;
+  d.onclick = () => { map.setView([e.lat, e.lon], 16); markers[e.cct].openPopup(); };
+  return d;
+}
+const lp = document.getElementById("listaPueblo");
+pueblo.forEach(e => lp.appendChild(fila(e, e.cli ? "cli" : "no")));
+const lc = document.getElementById("listaCom");
+comunidades.forEach(e => lc.appendChild(fila(e, "com")));
+</script>
+</body>
+</html>

@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Escuelas registradas — San Felipe, Gto.</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  html, body { margin: 0; height: 100%; font-family: -apple-system, "Segoe UI", sans-serif; }
+  #app { display: flex; height: 100%; }
+  #map { flex: 1; }
+  #panel { width: 340px; overflow-y: auto; background: #faf6ef; border-left: 1px solid #d8cbb8; padding: 14px 16px; box-sizing: border-box; }
+  h1 { font-size: 17px; margin: 0 0 2px; color: #4a3524; }
+  .sub { font-size: 12px; color: #8a7a66; margin-bottom: 10px; }
+  h2 { font-size: 13px; margin: 14px 0 6px; color: #6b543c; text-transform: uppercase; letter-spacing: .5px; }
+  .item { padding: 6px 9px; border-radius: 8px; margin-bottom: 4px; cursor: pointer; background: #fff; border: 1px solid #e6dccc; font-size: 12.5px; line-height: 1.3; }
+  .item:hover { background: #f3ead9; }
+  .item b { color: #3d2f20; }
+  .item .addr { color: #857662; font-size: 11px; }
+  .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 6px; vertical-align: -1px; border: 1.5px solid #fff; box-shadow: 0 0 0 1px #0002; }
+  .leg { font-size: 12.5px; margin-top: 8px; color: #5c4c39; }
+  .leg div { margin-bottom: 3px; }
+  .note { font-size: 11.5px; color: #8a7a66; background: #f3ead9; border-radius: 8px; padding: 8px 10px; margin-top: 10px; }
+  .btn { display: inline-block; width: 48%; margin-top: 8px; padding: 7px 0; border: none; border-radius: 8px; background: #6b543c; color: #fff; font-size: 12.5px; cursor: pointer; }
+  .btn:hover { background: #55432f; }
+  .prob { color: #b06a00; font-weight: 600; }
+  .split-marker { border-radius: 50%; border: 2px solid #fff; box-shadow: 0 1px 4px #0005; }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="map"></div>
+  <div id="panel">
+    <h1>Escuelas registradas en el POS</h1>
+    <div class="sub">San Felipe, Gto. · 44 de 47 ubicadas · colores del panel · ago 2026</div>
+    <div class="leg">
+      <div><span class="dot" style="background:#7c4dff"></span>Preescolar</div>
+      <div><span class="dot" style="background:#2979ff"></span>Primaria</div>
+      <div><span class="dot" style="background:#00bfa5"></span>Secundaria</div>
+      <div><span class="dot" style="background:#ff6d00"></span>Bachillerato</div>
+      <div><span class="dot" style="background:#9aa0a6"></span>En cabecera, sin registrar en tu base</div>
+      <div style="margin-top:4px"><span class="prob">~</span> = ubicación probable (nombre repetido en varias comunidades)</div>
+    </div>
+    <button class="btn" id="btnPueblo">Ver pueblo</button>
+    <button class="btn" id="btnTodo" style="float:right">Ver municipio</button>
+    <h2>En el pueblo (<span id="nP"></span>)</h2>
+    <div id="listaPueblo"></div>
+    <h2>En comunidades (<span id="nC"></span>)</h2>
+    <div id="listaCom"></div>
+    <h2>En cabecera, sin registrar (<span id="nG"></span>)</h2>
+    <div id="listaGris"></div>
+    <div class="note">
+      Guillermo Prieto, Omecalli, Paulo Freire y Rafael Ramírez sí están en tu lista del Gestor, pero no tienen uniformes en el catálogo del POS. Del Colegio Motolinía solo tienes la primaria — el preescolar y la secundaria van en gris.
+    </div>
+    <h2>Sin ubicar</h2>
+    <div class="note">
+      <b>Jean Piaget</b> (Pre) — no aparece en el directorio SEP de San Felipe.<br>
+      <b>Vicente Guerrero</b> (Pre+Pri) — hay 3 primarias con ese nombre: San Isidro y Capellanía, La Estanzuela y La Quemada.<br>
+      <b>Palacio</b> (Pri) — no encontré escuela ni localidad con ese nombre.<br>
+      Dime cuáles son y las agrego.
+    </div>
+  </div>
+</div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+const C = { Pre: "#7c4dff", Pri: "#2979ff", Sec: "#00bfa5", Bach: "#ff6d00" };
+const NIVEL = { Pre: "Preescolar", Pri: "Primaria", Sec: "Secundaria", Bach: "Bachillerato" };
+
+// n: nombre en el POS, nv: niveles, a: dirección/comunidad, p: ubicación probable
+const pueblo = [
+  {n:"Margarita Paz Paredes", nv:["Pre"], a:"Priv. Revolución, Barrio San Miguel", lat:21.490803, lon:-101.221549},
+  {n:"Frida Kahlo", nv:["Pre"], a:"Prol. Soledad, La Conchita", lat:21.47686, lon:-101.22137},
+  {n:"Sor Juana Inés de la Cruz", nv:["Pre"], a:"Fracc. Michoacán, FOVISSSTE", lat:21.47615, lon:-101.20276},
+  {n:"Blanca Verónica Soto Mtz. (Príncipes)", nv:["Pre"], a:"Nigromante 8, La Tenería", lat:21.47941, lon:-101.2101},
+  {n:"Ignacio Allende", nv:["Pri"], a:"Revolución 308, San Miguel", lat:21.49136, lon:-101.22266},
+  {n:"Albino García Ramos", nv:["Pri"], a:"Revolución 308, San Miguel (mismo plantel)", lat:21.49156, lon:-101.22246},
+  {n:"Miguel Hidalgo", nv:["Pri"], a:"Indio Triste 408, Esquipulas", lat:21.47263, lon:-101.220732},
+  {n:"Justo Sierra", nv:["Pri"], a:"16 de Septiembre 602, Santuario", lat:21.482031, lon:-101.219671},
+  {n:"Ignacio Zaragoza", nv:["Pri"], a:"16 de Septiembre 602 (mismo plantel)", lat:21.482231, lon:-101.219471},
+  {n:"Francisco Villa", nv:["Pri"], a:"Turco, Los Zapotes", lat:21.46809, lon:-101.20933},
+  {n:"Himno Nacional", nv:["Pri"], a:"Turco, Los Zapotes (mismo plantel)", lat:21.46829, lon:-101.20913},
+  {n:"Benito Juárez", nv:["Pri"], a:"Nigromante, Col. Magisterial", lat:21.48102, lon:-101.20478},
+  {n:"Lic. Benito Juárez", nv:["Pri"], a:"Nigromante, Col. Magisterial (mismo plantel)", lat:21.48122, lon:-101.20458},
+  {n:"Ignacio Ramirez Lopez", nv:["Pri"], a:"Teresa de Calcuta 901, Los Espinos", lat:21.47291, lon:-101.20156},
+  {n:"Miguel Campuzano", nv:["Pri"], a:"Centro, atrás del hospital", lat:21.47656, lon:-101.21392},
+  {n:"Club Rotario", nv:["Pri"], a:"San Joaquín 101, Jardines de San Antonio", lat:21.476869, lon:-101.207661},
+  {n:"Colegio Motolinea", nv:["Pri"], a:"Jardín Aquiles Serdán 112, El Pueblito", lat:21.47525, lon:-101.21641},
+  {n:"Práxedis Guerrero", nv:["Pri","Sec"], a:"Pallán 304, Zona Centro", lat:21.47925, lon:-101.21981},
+  {n:"Bicentenario", nv:["Sec"], a:"Prol. 5 de Mayo, La Florida", lat:21.490519, lon:-101.197827},
+  {n:"Telesecundaria 512", nv:["Sec"], a:"Campesinos, Granjas de la Conquista", lat:21.466796, lon:-101.208778},
+  {n:"CBTIS 148", nv:["Bach"], a:"Priv. de Cecati, San Miguel", lat:21.49189, lon:-101.22955},
+  {n:"CECYTE", nv:["Bach"], a:"Campesinos 113, Esquipulas", lat:21.47493, lon:-101.222152},
+  {n:"SABES", nv:["Bach"], a:"Camino Real de Zacatecas, La Joya", lat:21.46724, lon:-101.2136},
+  {n:"Conalep 303", nv:["Bach"], a:"Camino al Varal, La Florida", lat:21.489652, lon:-101.198906},
+  {n:"UVEG", nv:["Bach"], a:"Prol. Aldama 925, El Fraile (Centro Impulso Social)", lat:21.4750453, lon:-101.2244897, p:true},
+];
+const comunidades = [
+  {n:"Patria", nv:["Pre"], a:"Jaral de Berrios", lat:21.67356, lon:-101.01716},
+  {n:"Vidal Alcocer", nv:["Pre"], a:"Jaral de Berrios", lat:21.68017, lon:-101.01129},
+  {n:"Narciso Mendoza", nv:["Pri"], a:"Av. Hidalgo, Jaral de Berrios", lat:21.68326, lon:-101.0147},
+  {n:"Emiliano Zapata", nv:["Pri"], a:"Jaral de Berrios (Estación Jaral)", lat:21.69348, lon:-101.0229, p:true},
+  {n:"Técnica de San Bartolo (ST 18)", nv:["Sec"], a:"el directorio la ubica en Jaral de Berrios", lat:21.680092, lon:-101.012046, p:true},
+  {n:"Jorge Cantor", nv:["Pre"], a:"San Bartolo de Berrios", lat:21.61234, lon:-101.07206},
+  {n:"José María Morelos y Pavón", nv:["Pri"], a:"San Bartolo de Berrios", lat:21.61071, lon:-101.07153},
+  {n:"Adolfo Lopez Mateo", nv:["Pri"], a:"San Bartolo de Berrios", lat:21.61091, lon:-101.07133, p:true},
+  {n:"ESTV 154", nv:["Sec"], a:"San Bartolo de Berrios", lat:21.61233, lon:-101.07169},
+  {n:"José María Morelos", nv:["Pri"], a:"La Sauceda de la Luz", lat:21.614715, lon:-101.190736, p:true},
+  {n:"ESTV 663", nv:["Sec"], a:"La Sauceda de la Luz", lat:21.612449, lon:-101.190574},
+  {n:"Santa Rosa 238", nv:["Sec"], a:"Santa Rosa", lat:21.55178, lon:-101.09465},
+  {n:"Telesecundaria 600", nv:["Sec"], a:"La Huerta (Ex-estación Jaral)", lat:21.4231, lon:-101.19241},
+  {n:"Telesecundaria 454", nv:["Sec"], a:"San Juan de Llanos", lat:21.27394, lon:-101.31271},
+  {n:"Huizache (Prim. El Pípila)", nv:["Pri"], a:"El Huizache", lat:21.58461, lon:-101.15287, p:true},
+  {n:"J. Guadalupe Victoria", nv:["Pri"], a:"Mastranto del Refugio", lat:21.60441, lon:-101.15057, p:true},
+  {n:"Niños Héroes", nv:["Pri"], a:"Aranjuez", lat:21.45782, lon:-101.23357, p:true},
+  {n:"Niños Héroes de Miguel Hidalgo", nv:["Pri"], a:"Miguel Hidalgo (Cueritos)", lat:21.6988, lon:-101.27943},
+  {n:"Álvaro Obregón", nv:["Pre","Pri"], a:"San Pedro de Almoloyán (primaria por confirmar)", lat:21.69089, lon:-101.23817, p:true},
+];
+
+// Escuelas de la cabecera que NO están en la base del POS (gris)
+const grises = [
+  {n:"Guillermo Prieto", nv:["Pre"], a:"Calle Texas, Los Zapotes", lat:21.46975, lon:-101.2114},
+  {n:"Narciso Mendoza (preescolar)", nv:["Pre"], a:"Priv. Indio Triste 107, Col. Aviación", lat:21.470902, lon:-101.219349},
+  {n:"Paulo Freire", nv:["Pre"], a:"Congreso 408, Los Espinos", lat:21.47001, lon:-101.2057},
+  {n:"Henry Wallon", nv:["Pre"], a:"Luis H. Ducoing 124, El Puertecito", lat:21.49488, lon:-101.23359},
+  {n:"Omecalli (Segunda Casa)", nv:["Pre"], a:"Galeana, La Tenería", lat:21.48258, lon:-101.21128},
+  {n:"Colegio Motolinía — Preescolar", nv:["Pre"], a:"Jardín Aquiles Serdán 112 (solo tienes la primaria)", lat:21.47545, lon:-101.21621},
+  {n:"Rafael Ramírez", nv:["Pri"], a:"Centro, atrás del hospital (mismo plantel que Campuzano)", lat:21.47676, lon:-101.21372},
+  {n:"Colegio Motolinía — Secundaria", nv:["Sec"], a:"Leona Vicario 101, Santuario", lat:21.483512, lon:-101.223165},
+  {n:"CECATI 104 (capacitación)", nv:["Bach"], a:"El Aguaje 108, San Miguel", lat:21.49175, lon:-101.22847},
+];
+
+const map = L.map("map");
+L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+  attribution: "&copy; OpenStreetMap", maxZoom: 19
+}).addTo(map);
+
+function makeIcon(niveles, gris) {
+  const size = gris ? 15 : 18;
+  let bg;
+  if (gris) bg = "#9aa0a6";
+  else if (niveles.length === 1) bg = C[niveles[0]];
+  else {
+    const step = 360 / niveles.length;
+    const segs = niveles.map((nv, i) => `${C[nv]} ${i * step}deg ${(i + 1) * step}deg`);
+    bg = `conic-gradient(${segs.join(",")})`;
+  }
+  return L.divIcon({
+    className: "",
+    html: `<div class="split-marker" style="width:${size}px;height:${size}px;background:${bg}"></div>`,
+    iconSize: [size + 4, size + 4], iconAnchor: [(size + 4) / 2, (size + 4) / 2],
+  });
+}
+const markers = [];
+function add(e, gris) {
+  const m = L.marker([e.lat, e.lon], { icon: makeIcon(e.nv, gris) }).addTo(map);
+  const nivs = e.nv.map(x => NIVEL[x]).join(" + ");
+  const extra = gris ? "<br><i>sin registrar en tu base</i>" : (e.p ? "<br><i>ubicación probable</i>" : "");
+  m.bindPopup(`<b>${e.n}</b><br>${nivs}<br>${e.a}${extra}`);
+  m.bindTooltip(e.n, { direction: "top", offset: [0, -10] });
+  e._m = m;
+}
+grises.forEach(e => add(e, true));
+[...pueblo, ...comunidades].forEach(e => add(e, false));
+
+const boundsPueblo = L.latLngBounds(pueblo.map(e => [e.lat, e.lon])).pad(0.12);
+const boundsTodo = L.latLngBounds([...pueblo, ...comunidades].map(e => [e.lat, e.lon])).pad(0.06);
+map.fitBounds(boundsPueblo);
+document.getElementById("btnPueblo").onclick = () => map.fitBounds(boundsPueblo);
+document.getElementById("btnTodo").onclick = () => map.fitBounds(boundsTodo);
+
+const ordenNv = ["Pre", "Pri", "Sec", "Bach"];
+function fila(e, gris) {
+  const d = document.createElement("div");
+  d.className = "item";
+  const dots = e.nv.map(x => `<span class="dot" style="background:${gris ? "#9aa0a6" : C[x]}"></span>`).join("");
+  const nivTxt = gris ? ` · ${e.nv.map(x => NIVEL[x]).join(" + ")}` : "";
+  d.innerHTML = `${dots}<b>${e.p ? '<span class="prob">~</span> ' : ""}${e.n}</b><div class="addr">${e.a}${nivTxt}</div>`;
+  d.onclick = () => { map.setView([e.lat, e.lon], 16); e._m.openPopup(); };
+  return d;
+}
+function llena(idLista, arr, idN, gris) {
+  const cont = document.getElementById(idLista);
+  const orden = [...arr].sort((a, b) =>
+    ordenNv.indexOf(a.nv[0]) - ordenNv.indexOf(b.nv[0]) || a.n.localeCompare(b.n));
+  orden.forEach(e => cont.appendChild(fila(e, gris)));
+  document.getElementById(idN).textContent = arr.length;
+}
+llena("listaPueblo", pueblo, "nP", false);
+llena("listaCom", comunidades, "nC", false);
+llena("listaGris", grises, "nG", true);
+</script>
+</body>
+</html>
