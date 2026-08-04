@@ -145,7 +145,8 @@ EXTRAS = [
     {"cct": "UVEG", "nombre": "UVEG", "nivel": "Bach", "tipo": "general",
      "turno": "", "domicilio": "Prol. Aldama 925, Centro Impulso Social",
      "localidad": "San Felipe", "lat": 21.4750453, "lon": -101.2244897,
-     "cliente": True, "pos": "UVEG", "probable": True, "rural": False, "nota": ""},
+     "cliente": True, "pos": "UVEG", "probable": True, "rural": False, "nota": "",
+     "alumnos": 0, "director": "", "tel": "", "correo": ""},
 ]
 
 PENDIENTES = [
@@ -250,6 +251,25 @@ def parsea_ficha(html: str, cct: str) -> dict | None:
     turno = next((l for l in lineas if l in ("Matutino", "Vespertino", "Continuo",
                                              "Discontinuo", "Nocturno")), "")
 
+    alumnos = 0
+    for i, l in enumerate(lineas):
+        if l == "Alumnos" and i + 1 < len(lineas) and lineas[i + 1].isdigit():
+            alumnos = int(lineas[i + 1])
+            break
+    director = next((lineas[i + 1] for i, l in enumerate(lineas)
+                     if l.startswith("Director:") and i + 1 < len(lineas)
+                     and ":" not in lineas[i + 1]), "")
+    tel = ""
+    for i, l in enumerate(lineas):
+        if l.startswith("Telefono") and i + 1 < len(lineas):
+            m = re.match(r"[\d\s\-]{7,}", lineas[i + 1])
+            if m:
+                tel = m.group(0).strip()
+                break
+    correo = next((lineas[i + 1] for i, l in enumerate(lineas)
+                   if l.startswith("Email") and i + 1 < len(lineas)
+                   and "@" in lineas[i + 1]), "")
+
     lat = re.search(r"(21\.\d{2,8})", html)
     lon = re.search(r"(-10[01]\.\d{1,8})", html)
     if not (lat and lon):
@@ -257,6 +277,7 @@ def parsea_ficha(html: str, cct: str) -> dict | None:
     return {
         "cct": cct, "nombre": nombre, "turno": turno, "domicilio": domicilio,
         "localidad": loc, "lat": float(lat.group(1)), "lon": float(lon.group(1)),
+        "alumnos": alumnos, "director": director, "tel": tel, "correo": correo,
     }
 
 

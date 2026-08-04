@@ -49,6 +49,10 @@
   .leaflet-popup-content { font-size: 12.5px; line-height: 1.45; }
   .badge { display: inline-block; font-size: 10.5px; padding: 1px 7px; border-radius: 10px; background: #2e8b57; color: #fff; margin-left: 4px; }
   .badge.no { background: #a08f79; }
+  .est-fila { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .est-btn { font-size: 10.5px; padding: 3px 7px; border-radius: 8px; border: 1px solid #d8cbb8; background: #faf6ef; cursor: pointer; color: #5c4c39; }
+  .est-btn.on { background: #6b543c; color: #fff; border-color: #6b543c; }
+  .seg-tag { font-size: 12px; }
   @media print {
     #panel, .leaflet-control-zoom { display: none !important; }
     #map { width: 100% !important; height: 100vh !important; }
@@ -81,6 +85,14 @@
     </div>
     <label class="switch"><input type="checkbox" id="swRural"> Mostrar escuelas rurales (resto del municipio)</label>
     <select id="selLoc"><option value="">Todas las comunidades</option></select>
+    <select id="selSeg" style="width:100%; box-sizing:border-box; padding:6px 8px; margin-bottom:6px">
+      <option value="">Seguimiento: todas</option>
+      <option value="sin">Sin contactar</option>
+      <option value="contactada">📞 Contactadas</option>
+      <option value="platica">🤝 En plática</option>
+      <option value="ganada">⭐ Ganadas</option>
+      <option value="no">✖ No les interesa</option>
+    </select>
     <div id="resultado"></div>
     <div class="botones">
       <button class="btn" id="btnPueblo">Ver pueblo</button>
@@ -129,29 +141,70 @@ const cluster = L.markerClusterGroup({
 });
 map.addLayer(cluster);
 
+// Seguimiento de campaña por escuela (persistido aparte de los filtros)
+const ESTADOS = { contactada: "📞", platica: "🤝", ganada: "⭐", no: "✖" };
+const ESTADOS_TXT = { contactada: "Contactada", platica: "En plática", ganada: "Ganada", no: "No le interesa" };
+let SEG = {};
+try { SEG = JSON.parse(localStorage.getItem("mapaEscuelasSeguimiento") || "{}"); } catch (err) {}
+
 function icono(e) {
   const color = C[e.nivel] || C.Otro;
+  // tamaño proporcional a la matrícula
+  const extra = Math.min(9, Math.sqrt(e.alumnos || 0) / 3);
+  const est = SEG[e.cct];
+  const badge = est ? `<span style="position:absolute;top:-9px;right:-9px;font-size:11px">${ESTADOS[est]}</span>` : "";
   if (e.cliente) {
-    return L.divIcon({ className: "", iconSize: [18, 18], iconAnchor: [9, 9],
-      html: `<div class="marker-cliente" style="width:18px;height:18px;background:${color}"></div>` });
+    const s = Math.round(14 + extra);
+    return L.divIcon({ className: "", iconSize: [s, s], iconAnchor: [s / 2, s / 2],
+      html: `<div class="marker-cliente" style="position:relative;width:${s}px;height:${s}px;background:${color}">${badge}</div>` });
   }
-  return L.divIcon({ className: "", iconSize: [14, 14], iconAnchor: [7, 7],
-    html: `<div class="marker-op" style="width:14px;height:14px;border-color:${color}"></div>` });
+  const s = Math.round(10 + extra);
+  return L.divIcon({ className: "", iconSize: [s, s], iconAnchor: [s / 2, s / 2],
+    html: `<div class="marker-op" style="position:relative;width:${s}px;height:${s}px;border-color:${color}">${badge}</div>` });
 }
 
-ESCUELAS.forEach(e => {
-  e._gk = esCabecera(e) ? "__pueblo__" : (norm(e.localidad) || "sin localidad");
+function popupHtml(e) {
   const tipoTxt = TIPO_TXT[e.tipo] ? ` · ${TIPO_TXT[e.tipo]}` : "";
   const turno = e.turno ? ` · ${e.turno}` : "";
   const badge = e.cliente ? '<span class="badge">cliente</span>' : '<span class="badge no">sin registrar</span>';
   const prob = e.probable ? "<br><i>ubicación probable</i>" : "";
   const pos = e.cliente && e.pos && norm(e.pos) !== norm(e.nombre) ? `<br>En tu POS: <b>${e.pos}</b>` : "";
   const nota = e.nota ? `<br><i>${e.nota}</i>` : "";
+  const al = e.alumnos ? `<br><b>${e.alumnos} alumnos</b>` : "";
+  const contacto = [
+    e.director ? `Dir. ${e.director}` : "",
+    e.tel ? `<a href="tel:${e.tel.replace(/\D/g, "")}">${e.tel}</a>` : "",
+    e.correo || "",
+  ].filter(Boolean).join(" · ");
+  const cont = contacto ? `<br><small>${contacto}</small>` : "";
+  const est = SEG[e.cct] || "";
+  const botones = Object.keys(ESTADOS).map(k =>
+    `<button class="est-btn${est === k ? " on" : ""}" onclick="setEstado('${e.cct}','${k}')">${ESTADOS[k]} ${ESTADOS_TXT[k]}</button>`
+  ).join("");
+  return `<b>${e.nombre}</b>${badge}${pos}${nota}${al}<br>${NIVEL[e.nivel]}${tipoTxt}${turno}` +
+         `<br>${e.domicilio || e.localidad}${cont}<br><small>${e.localidad} · CCT ${e.cct}</small>${prob}` +
+         `<div class="est-fila">${botones}</div>`;
+}
+
+ESCUELAS.forEach(e => {
+  e._gk = esCabecera(e) ? "__pueblo__" : (norm(e.localidad) || "sin localidad");
   e._m = L.marker([e.lat, e.lon], { icon: icono(e) })
-    .bindPopup(`<b>${e.nombre}</b>${badge}${pos}${nota}<br>${NIVEL[e.nivel]}${tipoTxt}${turno}` +
-               `<br>${e.domicilio || e.localidad}<br><small>${e.localidad} · CCT ${e.cct}</small>${prob}`)
+    .bindPopup(() => popupHtml(e))
     .bindTooltip(e.nombre, { direction: "top", offset: [0, -8] });
 });
+const porCct = Object.fromEntries(ESCUELAS.map(e => [e.cct, e]));
+
+window.setEstado = (cct, estado) => {
+  SEG[cct] = SEG[cct] === estado ? "" : estado;  // segundo clic lo quita
+  if (!SEG[cct]) delete SEG[cct];
+  try { localStorage.setItem("mapaEscuelasSeguimiento", JSON.stringify(SEG)); } catch (err) {}
+  const e = porCct[cct];
+  e._m.setIcon(icono(e));
+  if (e._m.isPopupOpen()) e._m.setPopupContent(popupHtml(e));
+  if (e._tag) e._tag.textContent = SEG[cct] ? ` ${ESTADOS[SEG[cct]]}` : "";
+  // solo refiltrar si hay filtro de seguimiento activo (aplica() cierra el popup)
+  if (F.seg) aplica();
+};
 
 // ---- Distancia mínima de cada escuela a un cliente (para Oportunidades) ----
 const clientes = ESCUELAS.filter(e => e.cliente);
@@ -169,7 +222,7 @@ ESCUELAS.forEach(e => {
 const DEFAULTS = {
   niveles: { Pre: true, Pri: true, Sec: true, Bach: true, Otro: true },
   tipos: { General: true, Telesec: true, Conafe: true, Particular: true, Sabes: true, Telebach: true },
-  modo: "todas", rural: false, dist: 0, loc: "",
+  modo: "todas", rural: false, dist: 0, loc: "", seg: "",
 };
 let F = JSON.parse(JSON.stringify(DEFAULTS));
 try {
@@ -189,6 +242,8 @@ function visible(e) {
   // con una comunidad elegida se ignora el switch rural (quieres ver ESA comunidad)
   if (!F.loc && e.rural && !F.rural) return false;
   if (F.loc && e._gk !== F.loc) return false;
+  if (F.seg === "sin" && SEG[e.cct]) return false;
+  if (F.seg && F.seg !== "sin" && SEG[e.cct] !== F.seg) return false;
   if (textoBusqueda) {
     const blob = norm(`${e.nombre} ${e.pos} ${e.localidad} ${e.cct}`);
     if (!blob.includes(textoBusqueda)) return false;
@@ -283,11 +338,14 @@ grupos.forEach((g, gi) => {
     const dotCls = e.cliente ? "dot" : "dot hueco";
     const style = e.cliente ? `background:${C[e.nivel]}` : `border-color:${C[e.nivel]}`;
     const extraNv = TIPO_TXT[e.tipo] ? ` · ${TIPO_TXT[e.tipo]}` : "";
+    const al = e.alumnos ? `${e.alumnos} al. · ` : "";
     d.innerHTML = `<span class="${dotCls}" style="${style}"></span>` +
       `<b>${e.probable ? '<span class="prob">~</span> ' : ""}${e.nombre}</b>` +
-      `<div class="addr">${NIVEL[e.nivel]}${extraNv}${e.turno ? " · " + e.turno : ""}${e.domicilio ? " · " + e.domicilio : ""}</div>`;
+      `<span class="seg-tag">${SEG[e.cct] ? " " + ESTADOS[SEG[e.cct]] : ""}</span>` +
+      `<div class="addr">${al}${NIVEL[e.nivel]}${extraNv}${e.turno ? " · " + e.turno : ""}${e.domicilio ? " · " + e.domicilio : ""}</div>`;
     d.onclick = () => cluster.zoomToShowLayer(e._m, () => e._m.openPopup());
     e._fila = d;
+    e._tag = d.querySelector(".seg-tag");
     det.appendChild(d);
   });
   listas.appendChild(det);
@@ -307,6 +365,7 @@ selLoc.onchange = () => {
   if (F.loc) encuadra(e => e._gk === F.loc, 0.25);
   else encuadra(esCabecera, 0.1);
 };
+document.getElementById("selSeg").onchange = ev => { F.seg = ev.target.value; aplica(); };
 
 // ---- Cobertura (cabecera, fija) ----
 (() => {
@@ -342,6 +401,7 @@ function sincronizaUI() {
   document.getElementById("selDist").value = String(F.dist);
   document.getElementById("swRural").checked = F.rural;
   selLoc.value = F.loc;
+  document.getElementById("selSeg").value = F.seg || "";
 }
 document.getElementById("btnLimpiar").onclick = () => {
   F = JSON.parse(JSON.stringify(DEFAULTS));
@@ -367,6 +427,7 @@ const reencuadreInicial = () => {
   }
 };
 setTimeout(reencuadreInicial, 500);
+setTimeout(reencuadreInicial, 1600);
 window.addEventListener("resize", reencuadreInicial);
 </script>
 </body>
