@@ -239,8 +239,9 @@ function visible(e) {
     if (e.cliente) return false;
     if (F.dist && e._dkm > F.dist) return false;
   }
-  // con una comunidad elegida se ignora el switch rural (quieres ver ESA comunidad)
-  if (!F.loc && e.rural && !F.rural) return false;
+  // con comunidad elegida o búsqueda activa se ignora el switch rural:
+  // si lo estás buscando, lo quieres ver
+  if (!F.loc && !textoBusqueda && e.rural && !F.rural) return false;
   if (F.loc && e._gk !== F.loc) return false;
   if (F.seg === "sin" && SEG[e.cct]) return false;
   if (F.seg && F.seg !== "sin" && SEG[e.cct] !== F.seg) return false;
