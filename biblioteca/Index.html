@@ -166,6 +166,20 @@
   .stars button{font-size:30px;color:var(--text-3)}
   .stars button.on{color:var(--warn)}
 
+  .pline{display:block;width:100%;height:4px;border-radius:99px;background:var(--surface-2);overflow:hidden;margin-top:5px}
+  .pline span{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--accent),var(--accent-2))}
+  .playbtn{flex:0 0 auto;width:40px;height:40px;border-radius:14px;background:color-mix(in srgb,var(--accent) 14%,transparent);color:var(--accent);display:flex;align-items:center;justify-content:center}
+  .playbtn:active{transform:scale(.92)}
+  .timerwrap{display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 0 4px}
+  .timerbig{font-size:56px;font-weight:800;letter-spacing:-2px;font-variant-numeric:tabular-nums}
+  .timerlab{font-size:11.5px;font-weight:800;color:var(--text-3);letter-spacing:.4px;text-transform:uppercase}
+  .bars{display:flex;align-items:flex-end;gap:10px;height:150px;margin-top:18px}
+  .bar{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:7px}
+  .bar .fill2{width:100%;max-width:34px;min-height:6px;border-radius:9px 9px 5px 5px;background:linear-gradient(180deg,var(--accent),var(--accent-2))}
+  .bar .v{font-size:10px;font-weight:800;color:var(--text-2)} .bar .l{font-size:10.5px;font-weight:700;color:var(--text-3)}
+  .bar.hoy .l{color:var(--accent);font-weight:800}
+  .schip{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(78px + env(safe-area-inset-bottom));z-index:25;display:flex;align-items:center;gap:9px;padding:10px 16px;border-radius:999px;background:var(--accent);color:var(--on-accent);font-size:13px;font-weight:800;box-shadow:0 10px 24px -8px var(--accent);animation:up .3s ease;max-width:88%;white-space:nowrap;overflow:hidden}
+
   .drow{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:13px 16px;border-bottom:1px solid var(--border)}
   .drow:last-child{border-bottom:none}
   .drow .dk{font-size:12.5px;font-weight:600;color:var(--text-2)} .drow .dv{font-size:12.5px;font-weight:700;text-align:right;word-break:break-word}
@@ -201,9 +215,9 @@
           <span style="font-size:13px;font-weight:700;opacity:.92" id="hero-hint"></span>
           <span class="pill"><span class="msr" style="font-size:14px">menu_book</span><span id="hero-app"></span></span>
         </div>
-        <div class="hero-title">Libros en tu biblioteca</div>
-        <div class="hero-amount tnum" id="hero-total">0</div>
-        <div class="hero-sub"><span class="msr" style="font-size:15px">local_library</span><span id="hero-sub"></span></div>
+        <div class="hero-title">Tiempo de lectura hoy</div>
+        <div class="hero-amount tnum" id="hero-total">0 min</div>
+        <div class="hero-sub"><span class="msr" style="font-size:15px">local_fire_department</span><span id="hero-sub"></span></div>
       </div>
 
       <div class="actions">
@@ -223,6 +237,9 @@
         </button>
       </div>
 
+      <div class="section-h hidden" id="leyendo-h"><b>Sigue leyendo</b></div>
+      <div class="list" id="leyendo-list"></div>
+
       <div class="section-h"><b>Agregados recientemente</b><button class="link" id="link-bib">Ver todos</button></div>
       <div class="list" id="recent-list"></div>
     </section>
@@ -240,7 +257,8 @@
     </section>
 
     <section class="screen hidden" id="scr-stats">
-      <div class="page-h"><h1>Estadísticas</h1><p>Tu biblioteca en números</p></div>
+      <div class="page-h"><h1>Estadísticas</h1><p>Tu lectura en números</p></div>
+      <div class="card chartcard"><div style="display:flex;align-items:baseline;justify-content:space-between"><b style="font-size:13.5px">Minutos leídos</b><span style="font-size:11.5px;font-weight:600;color:var(--text-2)">últimos 7 días</span></div><div class="bars" id="chart-week"></div></div>
       <div class="stats" id="stats-grid"></div>
       <div class="card chartcard"><b style="font-size:13.5px">Categorías</b><div id="chart-cats"></div></div>
       <div class="card chartcard" style="margin-bottom:6px"><b style="font-size:13.5px">Autores frecuentes</b><div id="chart-auth"></div></div>
@@ -299,7 +317,44 @@
   function esIsbnDeLibro(ean) { return /^97[89]/.test(ean); }
 
   // ── estado ──
-  var ST = { libros: [], tab: 'inicio', q: '', cat: null };
+  var ST = { libros: [], sesiones: [], metas: { minutosDia: 30, librosAnio: 12 }, tab: 'inicio', q: '', cat: null };
+
+  // ── tiempo, rachas y velocidad ──
+  function fechaLocal(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function diaDeSesion(s) { return fechaLocal(new Date(s.inicio)); }
+  function segEnDia(fecha) { return ST.sesiones.filter(function (s) { return diaDeSesion(s) === fecha; }).reduce(function (a, s) { return a + s.duracionSeg; }, 0); }
+  function fmtMin(seg) {
+    var m = Math.round(seg / 60);
+    if (m < 60) return m + ' min';
+    var h = Math.floor(m / 60);
+    return h + ' h' + (m % 60 ? ' ' + (m % 60) + ' min' : '');
+  }
+  function fmtTimer(seg) {
+    seg = Math.floor(seg);
+    var h = Math.floor(seg / 3600), m = Math.floor((seg % 3600) / 60), s = seg % 60;
+    var mm = String(m).padStart(2, '0'), ss = String(s).padStart(2, '0');
+    return h ? h + ':' + mm + ':' + ss : m + ':' + ss;
+  }
+  function racha() {
+    var dias = {};
+    ST.sesiones.forEach(function (s) { dias[diaDeSesion(s)] = true; });
+    var n = 0, d = new Date();
+    if (!dias[fechaLocal(d)]) d.setDate(d.getDate() - 1); // hoy aún puede salvarse
+    while (dias[fechaLocal(d)]) { n++; d.setDate(d.getDate() - 1); }
+    return n;
+  }
+  function sesionesDeLibro(uuid) { return ST.sesiones.filter(function (s) { return s.libroUuid === uuid; }); }
+  function velocidadDeLibro(uuid) {
+    var pags = 0, seg = 0;
+    sesionesDeLibro(uuid).forEach(function (s) { if (s.paginaFin > s.paginaInicio) { pags += s.paginaFin - s.paginaInicio; seg += s.duracionSeg; } });
+    return seg > 0 && pags > 0 ? pags / (seg / 3600) : 0;
+  }
+
+  // ── cronómetro persistente (sobrevive si cierras la app) ──
+  var TMR_KEY = 'bib_timer';
+  function tmrLoad() { try { return JSON.parse(localStorage.getItem(TMR_KEY) || 'null'); } catch (e) { return null; } }
+  function tmrSave(t) { try { if (t) localStorage.setItem(TMR_KEY, JSON.stringify(t)); else localStorage.removeItem(TMR_KEY); } catch (e) {} }
+  function tmrSeg(t) { if (!t) return 0; var s = t.acumSeg || 0; if (t.corriendo) s += Math.max(0, (Date.now() - t.ultimoTs) / 1000); return Math.floor(s); }
 
   function hasBackend() { return typeof google !== 'undefined' && google.script && google.script.run; }
 
@@ -316,6 +371,8 @@
 
   function onState(s) {
     ST.libros = (s && s.libros) || [];
+    ST.sesiones = (s && s.sesiones) || [];
+    if (s && s.metas) ST.metas = s.metas;
     $('#loader').classList.add('hidden');
     renderAll();
   }
@@ -329,7 +386,10 @@
     if (!hasBackend() || overlayOpen()) return;
     google.script.run.withSuccessHandler(function (s) {
       if (overlayOpen()) return;
-      ST.libros = (s && s.libros) || []; renderAll();
+      ST.libros = (s && s.libros) || [];
+      ST.sesiones = (s && s.sesiones) || [];
+      if (s && s.metas) ST.metas = s.metas;
+      renderAll();
     }).withFailureHandler(function () {}).api_getEstado();
   }
   function startSync() {
@@ -356,11 +416,17 @@
     var h = new Date().getHours();
     $('#me-greet').textContent = h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches';
     var bib = enBiblioteca();
-    $('#hero-total').textContent = bib.length;
-    var leidos = bib.filter(function (l) { return l.estadoLectura === 'Leído'; }).length;
-    var leyendo = bib.filter(function (l) { return l.estadoLectura === 'Leyendo'; }).length;
-    $('#hero-sub').textContent = bib.length === 0 ? 'Escanea tu primer libro' : (leidos + ' leídos · ' + leyendo + ' leyendo · ' + (bib.length - leidos - leyendo) + ' por leer');
-    $('#hero-hint').textContent = porComprar().length ? porComprar().length + ' en tu lista de compras' : 'Lista de compras vacía';
+    var hoy = segEnDia(fechaLocal(new Date()));
+    $('#hero-total').textContent = fmtMin(hoy);
+    var metaSeg = ST.metas.minutosDia * 60;
+    var r = racha();
+    $('#hero-sub').textContent = (hoy >= metaSeg ? '¡Meta diaria cumplida!' : 'Meta: ' + ST.metas.minutosDia + ' min · faltan ' + fmtMin(metaSeg - hoy)) + (r > 0 ? ' · 🔥 ' + r + (r === 1 ? ' día' : ' días') : '');
+    $('#hero-hint').textContent = bib.length + (bib.length === 1 ? ' libro' : ' libros') + (porComprar().length ? ' · ' + porComprar().length + ' por comprar' : '');
+
+    var leyendo = bib.filter(function (l) { return l.estadoLectura === 'Leyendo'; })
+      .sort(function (a, b) { return String(a.actualizadoEn) < String(b.actualizadoEn) ? 1 : -1; }).slice(0, 3);
+    $('#leyendo-h').classList.toggle('hidden', !leyendo.length);
+    $('#leyendo-list').innerHTML = leyendo.map(rowLeyendoHtml).join('');
 
     var recientes = ST.libros.slice().sort(recientesPrimero).slice(0, 4);
     var box = $('#recent-list');
@@ -369,6 +435,15 @@
       return;
     }
     box.innerHTML = recientes.map(function (l) { return rowHtml(l, false); }).join('');
+  }
+
+  function rowLeyendoHtml(l) {
+    var pct = l.paginas > 0 ? Math.min(100, Math.round(l.paginaActual / l.paginas * 100)) : 0;
+    return '<div class="brow" data-uuid="' + l.uuid + '" role="button" tabindex="0">' + coverHtml(l, '') +
+      '<span class="mid"><span class="t">' + esc(l.titulo) + '</span>' +
+      '<span class="a">' + (l.paginas > 0 ? 'Pág. ' + l.paginaActual + ' de ' + l.paginas + ' · ' + pct + '%' : 'Toca ▶ para leer') + '</span>' +
+      '<span class="pline"><span style="width:' + pct + '%"></span></span></span>' +
+      '<button class="playbtn" data-leer="' + l.uuid + '" aria-label="Leer ahora"><span class="msr fill" style="font-size:22px">play_arrow</span></button></div>';
   }
 
   function rowHtml(l, conBoton) {
@@ -433,15 +508,34 @@
   function renderStats() {
     var bib = enBiblioteca();
     var leidos = bib.filter(function (l) { return l.estadoLectura === 'Leído'; }).length;
-    var leyendo = bib.filter(function (l) { return l.estadoLectura === 'Leyendo'; }).length;
-    var paginas = bib.filter(function (l) { return l.estadoLectura === 'Leído'; }).reduce(function (a, l) { return a + (l.paginas || 0); }, 0);
+    var anio = String(new Date().getFullYear());
+    var terminadosAnio = bib.filter(function (l) { return l.estadoLectura === 'Leído' && String(l.terminadoEn).slice(0, 4) === anio; }).length;
+    var totalSeg = ST.sesiones.reduce(function (a, s) { return a + s.duracionSeg; }, 0);
+    var pagsLeidas = ST.sesiones.reduce(function (a, s) { return a + Math.max(0, s.paginaFin - s.paginaInicio); }, 0);
+    var vel = totalSeg > 0 && pagsLeidas > 0 ? Math.round(pagsLeidas / (totalSeg / 3600)) : 0;
+    var r = racha();
     $('#stats-grid').innerHTML =
+      stat('Racha', '🔥 ' + r + (r === 1 ? ' día' : ' días'), r > 0 ? 'var(--warn)' : null) +
+      stat('Tiempo total', totalSeg ? fmtMin(totalSeg) : '—') +
+      stat('Páginas leídas', pagsLeidas ? pagsLeidas.toLocaleString('es-MX') : '—') +
+      stat('Velocidad media', vel ? vel + ' pág/h' : '—') +
+      stat('Meta ' + anio, terminadosAnio + ' / ' + ST.metas.librosAnio + ' libros', terminadosAnio >= ST.metas.librosAnio ? 'var(--ok)' : null) +
       stat('En biblioteca', bib.length) +
-      stat('Por comprar', porComprar().length, 'var(--warn)') +
       stat('Leídos', leidos, 'var(--ok)') +
-      stat('Leyendo', leyendo) +
-      stat('Por leer', bib.length - leidos - leyendo) +
-      stat('Páginas leídas', paginas.toLocaleString('es-MX'));
+      stat('Por comprar', porComprar().length, 'var(--warn)');
+
+    var barsHtml = '', maxSeg = 1, dias = [];
+    for (var i = 6; i >= 0; i--) {
+      var d = new Date(); d.setDate(d.getDate() - i);
+      var seg = segEnDia(fechaLocal(d));
+      dias.push({ seg: seg, d: d });
+      if (seg > maxSeg) maxSeg = seg;
+    }
+    var nombres = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb'];
+    dias.forEach(function (x, i2) {
+      barsHtml += '<div class="bar' + (i2 === 6 ? ' hoy' : '') + '"><span class="v tnum">' + (x.seg ? Math.round(x.seg / 60) : '') + '</span><div class="fill2" style="height:' + Math.max(6, Math.round(x.seg / maxSeg * 100)) + '%"></div><span class="l">' + nombres[x.d.getDay()] + '</span></div>';
+    });
+    $('#chart-week').innerHTML = barsHtml;
 
     $('#chart-cats').innerHTML = barras(conteoPor(bib, 'categoria'), 'Sin categorías aún.');
     $('#chart-auth').innerHTML = barras(conteoPor(bib, 'autores'), 'Sin autores aún.');
@@ -757,6 +851,26 @@
   }
 
   // ── detalle ──
+  function progresoHtml(l) {
+    var pct = l.paginas > 0 ? Math.min(100, Math.round(l.paginaActual / l.paginas * 100)) : 0;
+    var vel = velocidadDeLibro(l.uuid);
+    var linea = '';
+    if (l.estadoLectura !== 'Leído' && vel > 0 && l.paginas > 0 && l.paginaActual < l.paginas) {
+      linea = 'Lees ~' + Math.round(vel) + ' pág/h · te faltan ' + fmtMin((l.paginas - l.paginaActual) / vel * 3600) + ' para terminarlo';
+    } else if (vel > 0) {
+      linea = 'Lees ~' + Math.round(vel) + ' pág/h en este libro';
+    }
+    return '<div class="card" style="margin-top:14px;padding:14px 16px;text-align:left">' +
+      '<div style="display:flex;align-items:baseline;justify-content:space-between"><b style="font-size:13px">Progreso</b><span class="tnum" style="font-size:12px;font-weight:700;color:var(--text-2)">' + (l.paginas > 0 ? 'pág. ' + l.paginaActual + ' de ' + l.paginas + ' · ' + pct + '%' : 'define las páginas ↓') + '</span></div>' +
+      '<span class="pline" style="height:6px;margin-top:10px"><span style="width:' + pct + '%"></span></span>' +
+      (linea ? '<div style="margin-top:9px;font-size:11.5px;font-weight:700;color:var(--accent)">' + linea + '</div>' : '') +
+      '<div style="display:flex;gap:8px;margin-top:11px;align-items:flex-end">' +
+      '<div style="flex:1"><div class="flabel" style="margin:0 0 6px">Voy en la pág.</div><input class="input" id="d-pag" inputmode="numeric" value="' + (l.paginaActual || '') + '" placeholder="0"></div>' +
+      '<div style="flex:1"><div class="flabel" style="margin:0 0 6px">Páginas totales</div><input class="input" id="d-pags" inputmode="numeric" value="' + (l.paginas || '') + '" placeholder="?"></div>' +
+      '<button class="cta ghost" id="d-pag-save" style="flex:0 0 auto;width:52px;padding:13px"><span class="msr" style="font-size:20px">save</span></button>' +
+      '</div></div>';
+  }
+
   function openDetail(uuid) {
     var l = ST.libros.filter(function (x) { return x.uuid === uuid; })[0]; if (!l) return;
     var esCompra = l.lista === 'compras';
@@ -779,6 +893,8 @@
       (esCompra ? '<span class="chip warn" style="font-size:12px;padding:5px 12px"><span class="msr fill" style="font-size:14px">shopping_bag</span>En tu lista de compras</span>' : '') +
       '</div>' +
       (esCompra ? '' :
+        '<button class="cta" id="d-leer" style="margin-top:16px"><span class="msr fill" style="font-size:20px">play_arrow</span>Leer ahora</button>' +
+        progresoHtml(l) +
         '<div class="flabel">Estado de lectura</div><div class="seg" id="d-estados">' + seg + '</div>' +
         '<div class="flabel">Tu calificación</div><div class="stars" id="d-stars">' + estrellas + '</div>') +
       '<div class="flabel">Notas</div><textarea class="input" id="d-notas" placeholder="Dónde está, quién te lo prestó, qué te pareció…">' + esc(l.notas || '') + '</textarea>' +
@@ -799,6 +915,10 @@
       }, function (e) { toast(errMsg(e), 'error', 'var(--bad)'); });
     }
     if (!esCompra) {
+      $('#d-leer', ov).addEventListener('click', function () { closeOverlay(ov); openSession(uuid); });
+      $('#d-pag-save', ov).addEventListener('click', function () {
+        aplicar({ paginaActual: Number($('#d-pag', ov).value) || 0, paginas: Number($('#d-pags', ov).value) || 0 }, 'Progreso guardado');
+      });
       $('#d-estados', ov).addEventListener('click', function (e) {
         var b = e.target.closest('[data-estado]'); if (b) aplicar({ estadoLectura: b.getAttribute('data-estado') }, 'Marcado como ' + b.getAttribute('data-estado').toLowerCase());
       });
@@ -821,14 +941,132 @@
     });
   }
 
+  // ── sesión de lectura (cronómetro) ──
+  var sesInt = null;
+  function openSession(uuid) {
+    var t = tmrLoad();
+    if (t && t.libroUuid !== uuid) uuid = t.libroUuid; // ya hay una sesión activa: se retoma esa
+    var l = ST.libros.filter(function (x) { return x.uuid === uuid; })[0];
+    if (!l) { tmrSave(null); return; }
+    if (!t || t.libroUuid !== uuid) {
+      t = { libroUuid: uuid, inicioIso: new Date().toISOString(), acumSeg: 0, corriendo: true, ultimoTs: Date.now() };
+      tmrSave(t);
+    }
+
+    var ov = sheet(
+      '<div class="sheet-body" style="text-align:center">' +
+      '<div style="display:flex;flex-direction:column;align-items:center;gap:8px;margin-top:4px">' + coverHtml(l, 'big') +
+      '<span style="font-size:16px;font-weight:800">' + esc(l.titulo) + '</span>' +
+      '<span style="font-size:12.5px;font-weight:600;color:var(--text-2)">' + esc(l.autores || '') + '</span></div>' +
+      '<div class="timerwrap"><span class="timerlab">Sesión de lectura</span><span class="timerbig" id="ses-timer">0:00</span></div>' +
+      '<div style="display:flex;gap:10px;margin-top:6px">' +
+      '<button class="cta ghost" id="ses-pausa" style="flex:1"></button>' +
+      '<button class="cta" id="ses-fin" style="flex:1"><span class="msr" style="font-size:20px">check_circle</span>Terminar</button></div>' +
+      '<button class="link" id="ses-desc" style="margin-top:16px;font-size:12.5px;color:var(--text-3)">Descartar sesión</button>' +
+      '<div style="height:8px"></div>' +
+      '</div>');
+
+    function pintar() {
+      var t2 = tmrLoad();
+      var elTimer = $('#ses-timer', ov);
+      if (!elTimer || !ov.parentNode) { clearInterval(sesInt); sesInt = null; return; }
+      if (!t2) { clearInterval(sesInt); sesInt = null; closeOverlay(ov); return; }
+      elTimer.textContent = fmtTimer(tmrSeg(t2));
+      $('#ses-pausa', ov).innerHTML = t2.corriendo
+        ? '<span class="msr" style="font-size:20px">pause</span>Pausar'
+        : '<span class="msr" style="font-size:20px">play_arrow</span>Continuar';
+    }
+    clearInterval(sesInt); sesInt = setInterval(pintar, 500); pintar();
+
+    $('#ses-pausa', ov).addEventListener('click', function () {
+      var t2 = tmrLoad(); if (!t2) return;
+      if (t2.corriendo) { t2.acumSeg = tmrSeg(t2); t2.corriendo = false; } else { t2.corriendo = true; }
+      t2.ultimoTs = Date.now(); tmrSave(t2); pintar();
+    });
+    var descartar = false;
+    $('#ses-desc', ov).addEventListener('click', function () {
+      if (!descartar) { descartar = true; $('#ses-desc', ov).textContent = '¿Seguro? El tiempo se pierde — toca otra vez'; return; }
+      tmrSave(null); closeOverlay(ov); toast('Sesión descartada', 'delete', 'var(--bad)');
+    });
+    $('#ses-fin', ov).addEventListener('click', function () {
+      var t2 = tmrLoad(); if (!t2) return;
+      if (tmrSeg(t2) < 10) { toast('Lee al menos unos segundos más 😄', 'info', 'var(--warn)'); return; }
+      if (t2.corriendo) { t2.acumSeg = tmrSeg(t2); t2.corriendo = false; t2.ultimoTs = Date.now(); tmrSave(t2); }
+      closeOverlay(ov); openSessionEnd(l);
+    });
+  }
+
+  function openSessionEnd(l) {
+    var t = tmrLoad(); if (!t) return;
+    var dur = tmrSeg(t);
+    var ov = sheet(
+      '<div class="sheet-h"><b>Fin de la sesión</b><button class="x" data-close><span class="msr" style="font-size:20px">close</span></button></div>' +
+      '<div class="sheet-body">' +
+      '<div style="text-align:center;margin:4px 0;font-size:13px;font-weight:700;color:var(--text-2)">Leíste <b style="color:var(--accent)">' + fmtMin(dur) + '</b> de<br><b>' + esc(l.titulo) + '</b></div>' +
+      '<div class="flabel">¿En qué página te quedaste?</div>' +
+      '<input class="input" id="fin-pag" inputmode="numeric" value="' + (l.paginaActual || '') + '" placeholder="Número de página (opcional)">' +
+      '<button class="cta ghost" id="fin-termine" style="margin-top:12px"><span class="msr" style="font-size:20px">celebration</span>¡Terminé el libro!</button>' +
+      '</div>' +
+      '<div class="sheet-foot"><button class="cta" id="fin-guardar"><span class="msr" style="font-size:20px">check_circle</span>Guardar sesión</button></div>');
+    var termine = false;
+    $('#fin-termine', ov).addEventListener('click', function () {
+      termine = !termine;
+      $('#fin-termine', ov).classList.toggle('ghost', !termine);
+      if (termine && l.paginas) $('#fin-pag', ov).value = l.paginas;
+    });
+    $('#fin-guardar', ov).addEventListener('click', function () {
+      var payload = {
+        libroUuid: l.uuid, inicio: t.inicioIso, duracionSeg: dur,
+        paginaInicio: l.paginaActual || 0,
+        paginaFin: Number($('#fin-pag', ov).value) || 0,
+        termine: termine
+      };
+      closeOverlay(ov);
+      toast('Guardando sesión…', 'sync', 'var(--accent)');
+      call('api_registrarSesion', payload).then(function (s) {
+        tmrSave(null); onState(s);
+        toast(termine ? '¡Libro terminado! 🎉 +' + fmtMin(dur) : '+' + fmtMin(dur) + ' de lectura', 'check_circle', 'var(--ok)');
+      }, function (e) { toast(errMsg(e), 'error', 'var(--bad)'); openSessionEnd(l); });
+    });
+  }
+
+  // chip flotante cuando hay sesión activa y la hoja está cerrada
+  setInterval(function () {
+    var t = tmrLoad();
+    var chip = document.getElementById('session-chip');
+    var enSheet = !!document.querySelector('#overlays .sheet');
+    if (t && !enSheet) {
+      if (!chip) {
+        chip = el('<button class="schip" id="session-chip"><span class="msr fill" style="font-size:17px">menu_book</span><span id="schip-t"></span></button>');
+        document.body.appendChild(chip);
+        chip.addEventListener('click', function () { var t2 = tmrLoad(); if (t2) openSession(t2.libroUuid); });
+      }
+      var l = ST.libros.filter(function (x) { return x.uuid === t.libroUuid; })[0];
+      document.getElementById('schip-t').textContent = (t.corriendo ? '' : '⏸ ') + fmtTimer(tmrSeg(t)) + (l ? ' · ' + l.titulo.slice(0, 18) : '');
+    } else if (chip) { chip.parentNode.removeChild(chip); }
+  }, 1000);
+
   // ── ajustes ──
   function openSettings() {
     var ov = sheet(
       '<div class="sheet-body" style="padding-bottom:24px">' +
       '<div style="display:flex;align-items:center;gap:13px;padding:2px 4px 16px"><span class="avatar" style="width:48px;height:48px"><span class="msr fill" style="font-size:24px">auto_stories</span></span><span><span class="greet">Tu biblioteca virtual</span><br><b style="font-size:18px">' + esc(APP_TITLE) + '</b></span></div>' +
+      '<div class="flabel" style="margin-top:4px">Tus metas de lectura</div>' +
+      '<div style="display:flex;gap:8px;align-items:flex-end">' +
+      '<div style="flex:1"><div class="flabel" style="margin:0 0 6px;text-transform:none;letter-spacing:0">Minutos al día</div><input class="input" id="m-min" inputmode="numeric" value="' + ST.metas.minutosDia + '"></div>' +
+      '<div style="flex:1"><div class="flabel" style="margin:0 0 6px;text-transform:none;letter-spacing:0">Libros al año</div><input class="input" id="m-lib" inputmode="numeric" value="' + ST.metas.librosAnio + '"></div>' +
+      '<button class="cta ghost" id="m-save" style="flex:0 0 auto;width:52px;padding:13px"><span class="msr" style="font-size:20px">save</span></button>' +
+      '</div>' +
+      '<div style="height:14px"></div>' +
       '<button class="set-row" id="s-refresh"><span class="msr" style="color:var(--text-2)">refresh</span><span style="flex:1;font-size:14.5px;font-weight:700">Recargar datos</span></button>' +
       '<div style="margin-top:10px;font-size:11px;color:var(--text-3);text-align:center;line-height:1.5;font-weight:600">Los datos viven en tu hoja de cálculo de Google.<br>El tema (claro/oscuro) sigue la configuración de tu teléfono.</div>' +
       '</div>');
+    $('#m-save', ov).addEventListener('click', function () {
+      var metas = { minutosDia: Number($('#m-min', ov).value) || 0, librosAnio: Number($('#m-lib', ov).value) || 0 };
+      toast('Guardando metas…', 'sync', 'var(--accent)');
+      call('api_setMetas', metas).then(function (s) { onState(s); closeOverlay(ov); toast('Metas guardadas', 'check_circle', 'var(--ok)'); },
+        function (e) { toast(errMsg(e), 'error', 'var(--bad)'); });
+    });
     $('#s-refresh', ov).addEventListener('click', function () { closeOverlay(ov); $('#loader').classList.remove('hidden'); fetchState(); });
   }
 
@@ -845,35 +1083,61 @@
   var DEMO = null;
   function demoData() {
     if (DEMO) return DEMO;
-    DEMO = [
-      dm(1, '9786073807128', 'Cien años de soledad', 'Gabriel García Márquez', 'Novela', 'biblioteca', 'Leído', 5),
-      dm(2, '9788478884452', 'Harry Potter y la piedra filosofal', 'J.K. Rowling', 'Fantasía', 'biblioteca', 'Leyendo', 0),
-      dm(3, '9786075570577', 'El principito', 'Antoine de Saint-Exupéry', 'Fábula', 'compras', 'Pendiente', 0)
-    ];
+    var hoy = new Date(), ayer = new Date(); ayer.setDate(ayer.getDate() - 1);
+    DEMO = {
+      libros: [
+        dm(1, '9786073807128', 'Cien años de soledad', 'Gabriel García Márquez', 'Novela', 'biblioteca', 'Leído', 5, 300, 300),
+        dm(2, '9788478884452', 'Harry Potter y la piedra filosofal', 'J.K. Rowling', 'Fantasía', 'biblioteca', 'Leyendo', 0, 350, 120),
+        dm(3, '9786075570577', 'El principito', 'Antoine de Saint-Exupéry', 'Fábula', 'compras', 'Pendiente', 0, 96, 0)
+      ],
+      sesiones: [
+        { id: 1, uuid: 'ds-1', libroUuid: 'demo-2', inicio: fechaLocal(ayer) + 'T20:00:00', fin: '', duracionSeg: 2400, paginaInicio: 80, paginaFin: 110 },
+        { id: 2, uuid: 'ds-2', libroUuid: 'demo-2', inicio: fechaLocal(hoy) + 'T08:00:00', fin: '', duracionSeg: 900, paginaInicio: 110, paginaFin: 120 }
+      ],
+      metas: { minutosDia: 30, librosAnio: 12 }
+    };
     return DEMO;
   }
-  function dm(id, isbn, titulo, autores, cat, lista, est, cal) {
-    return { id: id, uuid: 'demo-' + id, agregadoEn: '2026-08-0' + id + 'T10:00:00Z', actualizadoEn: '', isbn: isbn, titulo: titulo, autores: autores, editorial: '', anio: '2015', paginas: 300, categoria: cat, portadaUrl: '', lista: lista, estadoLectura: est, calificacion: cal, notas: '' };
+  function dm(id, isbn, titulo, autores, cat, lista, est, cal, pags, pagActual) {
+    return { id: id, uuid: 'demo-' + id, agregadoEn: '2026-08-0' + id + 'T10:00:00Z', actualizadoEn: '', isbn: isbn, titulo: titulo, autores: autores, editorial: '', anio: '2015', paginas: pags, categoria: cat, portadaUrl: '', lista: lista, estadoLectura: est, calificacion: cal, notas: '', paginaActual: pagActual, terminadoEn: est === 'Leído' ? new Date().toISOString() : '' };
   }
+  function demoSnap() { var d = demoData(); return { libros: d.libros.slice(), sesiones: d.sesiones.slice(), metas: d.metas }; }
   function demoCall(fn, args) {
     return new Promise(function (resolve, reject) {
-      var libros = demoData();
-      if (fn === 'api_getEstado') return resolve({ libros: libros.slice() });
+      var d = demoData(), libros = d.libros;
+      if (fn === 'api_getEstado') return resolve(demoSnap());
       if (fn === 'api_buscarIsbn') return resolve({ encontrado: false, libro: { isbn: args[0], titulo: '', autores: '', editorial: '', anio: '', paginas: 0, categoria: '', portadaUrl: '' } });
       if (fn === 'api_buscarTitulo') return resolve([]);
       if (fn === 'api_agregarLibro') {
         var p = args[0];
-        libros.push({ id: libros.length + 1, uuid: 'demo-' + (libros.length + 1), agregadoEn: new Date().toISOString(), actualizadoEn: '', isbn: p.isbn, titulo: p.titulo, autores: p.autores, editorial: p.editorial, anio: p.anio, paginas: p.paginas, categoria: p.categoria, portadaUrl: p.portadaUrl, lista: p.lista, estadoLectura: 'Pendiente', calificacion: 0, notas: '' });
-        return resolve({ libros: libros.slice() });
+        libros.push({ id: libros.length + 1, uuid: 'demo-' + (libros.length + 1), agregadoEn: new Date().toISOString(), actualizadoEn: '', isbn: p.isbn, titulo: p.titulo, autores: p.autores, editorial: p.editorial, anio: p.anio, paginas: p.paginas, categoria: p.categoria, portadaUrl: p.portadaUrl, lista: p.lista, estadoLectura: 'Pendiente', calificacion: 0, notas: '', paginaActual: 0, terminadoEn: '' });
+        return resolve(demoSnap());
       }
       if (fn === 'api_actualizarLibro') {
-        libros.forEach(function (l) { if (l.uuid === args[0]) Object.keys(args[1]).forEach(function (k) { l[k] = args[1][k]; }); });
-        return resolve({ libros: libros.slice() });
+        libros.forEach(function (l) {
+          if (l.uuid !== args[0]) return;
+          Object.keys(args[1]).forEach(function (k) { l[k] = args[1][k]; });
+          if (args[1].estadoLectura === 'Leído') l.terminadoEn = new Date().toISOString();
+        });
+        return resolve(demoSnap());
       }
       if (fn === 'api_eliminarLibro') {
-        DEMO = libros.filter(function (l) { return l.uuid !== args[0]; });
-        return resolve({ libros: DEMO.slice() });
+        d.libros = libros.filter(function (l) { return l.uuid !== args[0]; });
+        d.sesiones = d.sesiones.filter(function (s) { return s.libroUuid !== args[0]; });
+        return resolve(demoSnap());
       }
+      if (fn === 'api_registrarSesion') {
+        var q = args[0];
+        d.sesiones.push({ id: d.sesiones.length + 1, uuid: 'ds-' + (d.sesiones.length + 1), libroUuid: q.libroUuid, inicio: q.inicio || new Date().toISOString(), fin: new Date().toISOString(), duracionSeg: q.duracionSeg, paginaInicio: q.paginaInicio || 0, paginaFin: q.paginaFin || 0 });
+        libros.forEach(function (l) {
+          if (l.uuid !== q.libroUuid) return;
+          if (q.paginaFin > 0) l.paginaActual = q.paginaFin;
+          if (l.estadoLectura === 'Pendiente') l.estadoLectura = 'Leyendo';
+          if (q.termine === true) { l.estadoLectura = 'Leído'; l.terminadoEn = new Date().toISOString(); if (l.paginas > 0) l.paginaActual = l.paginas; }
+        });
+        return resolve(demoSnap());
+      }
+      if (fn === 'api_setMetas') { d.metas = args[0]; return resolve(demoSnap()); }
       reject(new Error('Función desconocida: ' + fn));
     });
   }
@@ -890,6 +1154,8 @@
     if (t.closest && t.closest('#link-bib')) { showTab('biblioteca'); return; }
     var chip = t.closest && t.closest('#bib-chips [data-cat]');
     if (chip) { var c = chip.getAttribute('data-cat'); ST.cat = c === '' ? null : c; renderBiblioteca(); return; }
+    var leer = t.closest && t.closest('[data-leer]');
+    if (leer) { openSession(leer.getAttribute('data-leer')); return; }
     var buy = t.closest && t.closest('[data-buy]');
     if (buy) {
       e.stopPropagation();

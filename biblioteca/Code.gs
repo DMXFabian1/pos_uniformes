@@ -1,17 +1,24 @@
 /**
- * MI BIBLIOTECA — catálogo personal de libros con escáner de ISBN.
+ * MI BIBLIOTECA — catálogo personal de libros con escáner de ISBN y
+ * rastreador de lectura (sesiones con cronómetro, progreso, metas y rachas).
  *
  * Cada libro vive en una de dos listas: "biblioteca" (los que tienes) o
  * "compras" (los que quieres comprar). Al escanear o escribir un ISBN, el
  * servidor busca los datos del libro en Google Books y, si no aparece,
- * en Open Library. Los datos se guardan en la hoja "Libros" de la hoja de
+ * en Open Library. Cada sesión de lectura guarda su duración y el avance
+ * de páginas; de ahí salen la velocidad, las rachas y las estadísticas.
+ *
+ * Los datos se guardan en las hojas "Libros" y "Sesiones" de la hoja de
  * cálculo a la que está vinculado este proyecto de Apps Script.
  */
 
 // ═══════════════════ CONFIGURACIÓN — edita solo esto ═══════════════════
 var CONFIG = {
   TITULO: 'Mi Biblioteca',
-  NOMBRE_HOJA: 'Libros'
+  NOMBRE_HOJA_LIBROS: 'Libros',
+  NOMBRE_HOJA_SESIONES: 'Sesiones',
+  // Metas iniciales (después se cambian desde Ajustes en la app).
+  METAS_DEFAULT: { minutosDia: 30, librosAnio: 12 }
 };
 // ═══════════════════════════════════════════════════════════════════════
 
@@ -21,7 +28,11 @@ var ESTADOS_LECTURA = ['Pendiente', 'Leyendo', 'Leído'];
 var COLUMNAS = [
   'id', 'uuid', 'agregadoEn', 'actualizadoEn', 'isbn', 'titulo', 'autores',
   'editorial', 'anio', 'paginas', 'categoria', 'portadaUrl', 'lista',
-  'estadoLectura', 'calificacion', 'notas'
+  'estadoLectura', 'calificacion', 'notas', 'paginaActual', 'terminadoEn'
+];
+
+var COLUMNAS_SESIONES = [
+  'id', 'uuid', 'libroUuid', 'inicio', 'fin', 'duracionSeg', 'paginaInicio', 'paginaFin'
 ];
 
 // ─────────────────────────── Web app ───────────────────────────
@@ -45,12 +56,12 @@ function clientConfigJson() {
 function onOpen() {
   try {
     SpreadsheetApp.getUi().createMenu(CONFIG.TITULO)
-      .addItem('Preparar hoja de libros', 'prepararHoja')
+      .addItem('Preparar hojas de datos', 'prepararHoja')
       .addToUi();
   } catch (e) { /* no hay UI cuando corre como web app */ }
 }
 
-function prepararHoja() { obtenerHoja_(); }
+function prepararHoja() { obtenerHojaLibros_(); obtenerHojaSesiones_(); }
 
 // ─────────────────────────── Utilidades ───────────────────────────
 
@@ -100,9 +111,9 @@ function digitoEan13_(doce) {
   return String((10 - (suma % 10)) % 10);
 }
 
-// ─────────────────────────── Hoja de datos ───────────────────────────
+// ─────────────────────────── Hojas de datos ───────────────────────────
 
-function obtenerHoja_() {
+function obtenerLibroSs_() {
   var ss = SpreadsheetApp.getActiveSpreadsheet();
   if (!ss) {
     var props = PropertiesService.getScriptProperties();
@@ -114,14 +125,22 @@ function obtenerHoja_() {
       props.setProperty('SPREADSHEET_ID', ss.getId());
     }
   }
-  var hoja = ss.getSheetByName(CONFIG.NOMBRE_HOJA);
+  return ss;
+}
+
+function obtenerHoja_(nombre, columnas) {
+  var ss = obtenerLibroSs_();
+  var hoja = ss.getSheetByName(nombre);
   if (!hoja) {
-    hoja = ss.insertSheet(CONFIG.NOMBRE_HOJA);
-    hoja.getRange(1, 1, 1, COLUMNAS.length).setValues([COLUMNAS]).setFontWeight('bold');
+    hoja = ss.insertSheet(nombre);
+    hoja.getRange(1, 1, 1, columnas.length).setValues([columnas]).setFontWeight('bold');
     hoja.setFrozenRows(1);
   }
   return hoja;
 }
+
+function obtenerHojaLibros_() { return obtenerHoja_(CONFIG.NOMBRE_HOJA_LIBROS, COLUMNAS); }
+function obtenerHojaSesiones_() { return obtenerHoja_(CONFIG.NOMBRE_HOJA_SESIONES, COLUMNAS_SESIONES); }
 
 function leerLibros_(hoja) {
   var ultima = hoja.getLastRow();
@@ -134,10 +153,29 @@ function leerLibros_(hoja) {
     l.isbn = String(l.isbn || '');
     l.anio = l.anio ? String(l.anio).slice(0, 4) : '';
     l.paginas = Number(l.paginas) || 0;
+    l.paginaActual = Number(l.paginaActual) || 0;
     l.calificacion = Number(l.calificacion) || 0;
     l.agregadoEn = normalizarStamp_(l.agregadoEn);
     l.actualizadoEn = normalizarStamp_(l.actualizadoEn);
+    l.terminadoEn = normalizarStamp_(l.terminadoEn);
     return l;
+  });
+}
+
+function leerSesiones_(hoja) {
+  var ultima = hoja.getLastRow();
+  if (ultima < 2) return [];
+  var valores = hoja.getRange(2, 1, ultima - 1, COLUMNAS_SESIONES.length).getValues();
+  return valores.map(function (fila) {
+    var s = {};
+    COLUMNAS_SESIONES.forEach(function (col, i) { s[col] = fila[i]; });
+    s.id = Number(s.id);
+    s.duracionSeg = Number(s.duracionSeg) || 0;
+    s.paginaInicio = Number(s.paginaInicio) || 0;
+    s.paginaFin = Number(s.paginaFin) || 0;
+    s.inicio = normalizarStamp_(s.inicio);
+    s.fin = normalizarStamp_(s.fin);
+    return s;
   });
 }
 
@@ -146,11 +184,22 @@ function normalizarStamp_(v) {
   return String(v || '');
 }
 
-function filaDeUuid_(libros, uuid) {
-  for (var i = 0; i < libros.length; i++) {
-    if (String(libros[i].uuid) === String(uuid)) return i;
+function filaDeUuid_(items, uuid) {
+  for (var i = 0; i < items.length; i++) {
+    if (String(items[i].uuid) === String(uuid)) return i;
   }
   return -1;
+}
+
+function leerMetas_() {
+  try {
+    var crudo = PropertiesService.getScriptProperties().getProperty('METAS');
+    if (crudo) {
+      var m = JSON.parse(crudo);
+      if (m && m.minutosDia > 0 && m.librosAnio > 0) return m;
+    }
+  } catch (e) {}
+  return { minutosDia: CONFIG.METAS_DEFAULT.minutosDia, librosAnio: CONFIG.METAS_DEFAULT.librosAnio };
 }
 
 // ─────────────────────────── Búsqueda de metadatos ───────────────────────────
@@ -234,7 +283,11 @@ function buscarOpenLibrary_(isbn13) {
 // ─────────────────────────── API para la app ───────────────────────────
 
 function api_getEstado() {
-  return { libros: leerLibros_(obtenerHoja_()) };
+  return {
+    libros: leerLibros_(obtenerHojaLibros_()),
+    sesiones: leerSesiones_(obtenerHojaSesiones_()),
+    metas: leerMetas_()
+  };
 }
 
 function api_agregarLibro(payload) {
@@ -246,7 +299,7 @@ function api_agregarLibro(payload) {
     if (!titulo) throw new Error('El libro necesita un título');
     var isbn = payload.isbn ? normalizarIsbn(payload.isbn) : '';
 
-    var hoja = obtenerHoja_();
+    var hoja = obtenerHojaLibros_();
     var libros = leerLibros_(hoja);
 
     // Duplicados por ISBN: si ya lo tienes avisa; si estaba "por comprar"
@@ -279,7 +332,9 @@ function api_agregarLibro(payload) {
       lista: lista,
       estadoLectura: 'Pendiente',
       calificacion: 0,
-      notas: limpiarTexto(payload.notas, 1000)
+      notas: limpiarTexto(payload.notas, 1000),
+      paginaActual: 0,
+      terminadoEn: ''
     };
     hoja.appendRow(COLUMNAS.map(function (c) { return fila[c]; }));
     return api_getEstado();
@@ -292,18 +347,40 @@ function api_actualizarLibro(uuid, cambios) {
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
-    var hoja = obtenerHoja_();
+    var hoja = obtenerHojaLibros_();
     var libros = leerLibros_(hoja);
     var idx = filaDeUuid_(libros, uuid);
     if (idx === -1) throw new Error('Libro no encontrado');
+    var libro = libros[idx];
 
     var limpios = {};
     if (cambios.lista != null) limpios.lista = validarEnLista(String(cambios.lista), LISTAS, 'lista');
-    if (cambios.estadoLectura != null) limpios.estadoLectura = validarEnLista(String(cambios.estadoLectura), ESTADOS_LECTURA, 'estado de lectura');
+    if (cambios.estadoLectura != null) {
+      var est = validarEnLista(String(cambios.estadoLectura), ESTADOS_LECTURA, 'estado de lectura');
+      limpios.estadoLectura = est;
+      // Al marcar "Leído" queda la fecha (para la meta anual) y el avance completo.
+      if (est === 'Leído') {
+        limpios.terminadoEn = libro.terminadoEn || ahoraIso();
+        if (libro.paginas > 0) limpios.paginaActual = libro.paginas;
+      } else {
+        limpios.terminadoEn = '';
+      }
+    }
     if (cambios.calificacion != null) {
       var cal = Math.round(Number(cambios.calificacion));
       if (isNaN(cal) || cal < 0 || cal > 5) throw new Error('La calificación va de 0 a 5');
       limpios.calificacion = cal;
+    }
+    if (cambios.paginaActual != null) {
+      var pag = Math.round(Number(cambios.paginaActual));
+      if (isNaN(pag) || pag < 0) throw new Error('Página inválida');
+      if (libro.paginas > 0 && pag > libro.paginas) pag = libro.paginas;
+      limpios.paginaActual = pag;
+    }
+    if (cambios.paginas != null) {
+      var tot = Math.round(Number(cambios.paginas));
+      if (isNaN(tot) || tot < 0) throw new Error('Número de páginas inválido');
+      limpios.paginas = tot;
     }
     if (cambios.notas != null) limpios.notas = limpiarTexto(cambios.notas, 1000);
     if (cambios.categoria != null) limpios.categoria = limpiarTexto(cambios.categoria, 60);
@@ -335,13 +412,84 @@ function api_eliminarLibro(uuid) {
   var lock = LockService.getScriptLock();
   lock.waitLock(20000);
   try {
-    var hoja = obtenerHoja_();
+    var hoja = obtenerHojaLibros_();
     var libros = leerLibros_(hoja);
     var idx = filaDeUuid_(libros, uuid);
     if (idx === -1) throw new Error('Libro no encontrado');
     hoja.deleteRow(idx + 2);
+    // Sus sesiones también se van, para no distorsionar las estadísticas.
+    var hojaSes = obtenerHojaSesiones_();
+    var sesiones = leerSesiones_(hojaSes);
+    for (var i = sesiones.length - 1; i >= 0; i--) {
+      if (String(sesiones[i].libroUuid) === String(uuid)) hojaSes.deleteRow(i + 2);
+    }
     return api_getEstado();
   } finally {
     lock.releaseLock();
   }
+}
+
+// ─────────────────────────── Sesiones de lectura ───────────────────────────
+
+function api_registrarSesion(payload) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var hojaLibros = obtenerHojaLibros_();
+    var libros = leerLibros_(hojaLibros);
+    var idx = filaDeUuid_(libros, payload.libroUuid);
+    if (idx === -1) throw new Error('Libro no encontrado');
+    var libro = libros[idx];
+
+    var dur = Math.round(Number(payload.duracionSeg));
+    if (isNaN(dur) || dur < 10) throw new Error('La sesión es demasiado corta para guardarse');
+    if (dur > 12 * 3600) dur = 12 * 3600;
+
+    var pagInicio = Math.max(0, Math.round(Number(payload.paginaInicio)) || 0);
+    var pagFin = Math.max(0, Math.round(Number(payload.paginaFin)) || 0);
+    if (libro.paginas > 0 && pagFin > libro.paginas) pagFin = libro.paginas;
+    if (pagFin && pagInicio > pagFin) pagInicio = pagFin;
+
+    var inicio = String(payload.inicio || '');
+    if (!/^\d{4}-\d{2}-\d{2}T/.test(inicio)) inicio = new Date(Date.now() - dur * 1000).toISOString();
+
+    var hojaSes = obtenerHojaSesiones_();
+    var sesiones = leerSesiones_(hojaSes);
+    var maxId = sesiones.reduce(function (a, s) { return Math.max(a, s.id || 0); }, 0);
+    var fila = {
+      id: maxId + 1,
+      uuid: generarUuid(),
+      libroUuid: libro.uuid,
+      inicio: inicio,
+      fin: ahoraIso(),
+      duracionSeg: dur,
+      paginaInicio: pagInicio,
+      paginaFin: pagFin
+    };
+    hojaSes.appendRow(COLUMNAS_SESIONES.map(function (c) { return fila[c]; }));
+
+    // El libro avanza: página actual y, si estaba pendiente, pasa a "Leyendo".
+    var cambios = {};
+    if (pagFin > 0) cambios.paginaActual = pagFin;
+    if (libro.estadoLectura === 'Pendiente') cambios.estadoLectura = 'Leyendo';
+    if (payload.termine === true) {
+      cambios.estadoLectura = 'Leído';
+      cambios.terminadoEn = ahoraIso();
+      if (libro.paginas > 0) cambios.paginaActual = libro.paginas;
+    }
+    if (Object.keys(cambios).length) actualizarFila_(hojaLibros, libros, idx, cambios);
+
+    return api_getEstado();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function api_setMetas(metas) {
+  var minutos = Math.round(Number(metas && metas.minutosDia));
+  var librosAnio = Math.round(Number(metas && metas.librosAnio));
+  if (isNaN(minutos) || minutos < 5 || minutos > 600) throw new Error('La meta diaria va de 5 a 600 minutos');
+  if (isNaN(librosAnio) || librosAnio < 1 || librosAnio > 365) throw new Error('La meta anual va de 1 a 365 libros');
+  PropertiesService.getScriptProperties().setProperty('METAS', JSON.stringify({ minutosDia: minutos, librosAnio: librosAnio }));
+  return api_getEstado();
 }

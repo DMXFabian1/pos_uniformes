@@ -1,31 +1,39 @@
 # Mi Biblioteca
 
-Tu biblioteca virtual: catálogo personal de libros con escáner de ISBN,
-alojado como web app de Google Apps Script con los datos en una hoja de
-cálculo de Google (igual que el Libro Mayor).
+Tu biblioteca virtual personal, estilo **Bookly pero gratis y tuya**:
+catálogo con escáner de ISBN, rastreador de lectura con cronómetro, metas,
+rachas y estadísticas. Alojada como web app de Google Apps Script con los
+datos en una hoja de cálculo de Google, para uso de una sola persona.
 
 ## Qué hace
 
-- **Escanear el ISBN** con la cámara del teléfono. El servidor busca los
-  datos del libro (título, autor, portada, año, páginas, categoría) en
-  **Google Books** y, si no aparece, en **Open Library**. También puedes
-  buscar por título o escribir el ISBN a mano.
-- **Dos listas**: *Mi biblioteca* (los que tienes) y *Por comprar* (los que
-  quieres). Si escaneas en la librería un libro que ya tienes, te avisa al
-  instante — y cuando compras uno deseado, un toque en ✓ lo pasa a tu
-  biblioteca.
-- **Organización**: búsqueda por título/autor/ISBN, filtros por categoría,
-  estado de lectura (pendiente / leyendo / leído), calificación con
-  estrellas y notas libres (dónde está, quién te lo prestó…).
-- **Estadísticas**: totales, leídos, páginas leídas, categorías y autores
-  más frecuentes.
+**Catálogo**
+- **Escanear el ISBN** con la cámara. El servidor busca los datos del libro
+  (título, autor, portada, año, páginas, categoría) en **Google Books** y,
+  si no aparece, en **Open Library**. También puedes buscar por título o
+  escribir el ISBN a mano.
+- **Dos listas**: *Mi biblioteca* y *Por comprar*. Si escaneas en la
+  librería un libro que ya tienes, te avisa al instante; cuando compras uno
+  deseado, un toque en ✓ lo pasa a tu biblioteca.
+- Búsqueda, filtros por categoría, calificación con estrellas y notas.
+
+**Rastreador de lectura (lo de Bookly)**
+- **Cronómetro de sesiones**: toca ▶ en el libro y lee. Se puede pausar, y
+  sobrevive aunque cierres la app (aparece un chip flotante para volver).
+- Al terminar te pregunta **en qué página vas**: de ahí salen el avance
+  (barra y %), tu **velocidad** (pág/h) y el estimado de **cuánto te falta**
+  para terminar cada libro.
+- **Metas**: minutos de lectura al día y libros al año (se ajustan en ⚙️).
+- **Racha** de días leyendo, minutos de hoy en el inicio, y estadísticas:
+  gráfica de los últimos 7 días, tiempo total, páginas leídas reales,
+  velocidad media, terminados este año contra tu meta, categorías y autores.
 
 ## Archivos
 
 | Archivo | Qué es |
 |---|---|
-| `Code.gs` | Servidor: API, validación de ISBN, búsqueda de metadatos y hoja de cálculo |
-| `Index.html` | Toda la interfaz (pantallas, escáner, estilos y lógica del cliente) |
+| `Code.gs` | Servidor: API, ISBN, metadatos, sesiones, metas y hojas de cálculo |
+| `Index.html` | Toda la interfaz (pantallas, escáner, cronómetro, estilos y lógica) |
 | `appsscript.json` | Manifiesto del proyecto (opcional) |
 
 ## Cómo publicarla (5–10 minutos)
@@ -36,30 +44,31 @@ cálculo de Google (igual que el Libro Mayor).
 3. Pega el contenido de **`Code.gs`** en el archivo `Código.gs`.
 4. **+ → HTML**, nómbralo exactamente `Index` y pega el contenido de
    **`Index.html`** completo.
-5. *(Opcional)* Cambia el título en el bloque `CONFIG` de `Code.gs`.
-6. **Implementar → Nueva implementación → Aplicación web**:
+5. **Implementar → Nueva implementación → Aplicación web**:
    - *Ejecutar como*: **Yo**
-   - *Quién tiene acceso*: **Cualquier usuario**
-   - Autoriza los permisos (pedirá acceso a hojas de cálculo y a servicios
-     externos: son las búsquedas en Google Books / Open Library).
-7. Copia la **URL `/exec`**: esa es la app. En el teléfono, ábrela y usa
-   **Añadir a pantalla de inicio** para instalarla con su icono.
+   - *Quién tiene acceso*: **Solo yo** (la app es personal; queda protegida
+     con tu cuenta de Google)
+   - Autoriza los permisos (hojas de cálculo y servicios externos — esto
+     último son las búsquedas en Google Books / Open Library).
+6. Copia la **URL `/exec`**: esa es la app. En el teléfono (con tu sesión
+   de Google iniciada), ábrela y usa **Añadir a pantalla de inicio**.
 
-La pestaña `Libros` de la hoja se crea sola la primera vez.
+Las pestañas `Libros` y `Sesiones` de la hoja se crean solas la primera vez.
+
+> Si con "Solo yo" la app no carga desde el icono de pantalla de inicio
+> (pasa en algunos navegadores), cámbiala a "Cualquier usuario": la URL es
+> imposible de adivinar y nadie más la conoce.
 
 ## Sobre la cámara
 
 Las web apps de Apps Script corren dentro de un marco aislado de Google y
-en algunos teléfonos/navegadores ese marco **no permite la cámara en vivo**.
-La app lo resuelve con tres caminos, en este orden:
+en algunos teléfonos ese marco no permite la cámara en vivo. La app tiene
+tres caminos, en este orden:
 
 1. **Cámara en vivo** con detección continua (si el navegador la permite).
-2. **Tomar foto**: abre la cámara nativa del teléfono, tomas una foto del
-   código de barras y la app lo lee de la imagen. Funciona prácticamente
-   siempre.
+2. **Tomar foto**: abre la cámara nativa, tomas una foto del código de
+   barras y la app lo lee de la imagen. Funciona prácticamente siempre.
 3. **Escribir el ISBN** a mano (valida el dígito de control).
-
-Si la cámara en vivo no abre, usa "Tomar foto" — el resultado es el mismo.
 
 ## Si luego cambias el código
 
