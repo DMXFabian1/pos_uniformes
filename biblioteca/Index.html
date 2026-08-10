@@ -51,6 +51,59 @@
   @keyframes sheet{from{transform:translateY(101%)}to{transform:translateY(0)}}
   @keyframes toastin{from{opacity:0;transform:translateY(16px) scale(.96)}to{opacity:1;transform:none}}
   @keyframes scanline{0%,100%{top:12%}50%{top:84%}}
+  @keyframes rowin{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+  @keyframes heroin{from{opacity:0;transform:translateY(12px) scale(.97)}to{opacity:1;transform:none}}
+  @keyframes popin{0%{opacity:0;transform:scale(.4)}65%{transform:scale(1.18)}100%{opacity:1;transform:scale(1)}}
+  @keyframes starpop{0%{transform:scale(1)}40%{transform:scale(1.35) rotate(8deg)}100%{transform:scale(1)}}
+  @keyframes sheetout{to{transform:translateY(103%)}}
+  @keyframes fadeout{to{opacity:0}}
+  @keyframes toastout{to{opacity:0;transform:translateY(12px) scale(.95)}}
+  @keyframes growx{from{width:0}}
+  @keyframes growy{from{height:6px}}
+
+  /* presión suave y cambios de color fluidos en todo lo tocable */
+  .cta,.tile,.action-main,.brow,.buy,.playbtn,.opt,.set-row,.icon-btn,.nav .fab,.nav button,.cchip,.seg button,.x,.link,.stars button{transition:transform .18s cubic-bezier(.2,.9,.3,1),background-color .18s ease,color .18s ease,border-color .18s ease,box-shadow .18s ease,opacity .18s ease}
+
+  /* entrada escalonada al cambiar de pantalla */
+  .entering .hero{animation:heroin .5s cubic-bezier(.2,.9,.3,1) backwards}
+  .entering .actions>*{animation:rowin .45s cubic-bezier(.16,.84,.3,1) backwards}
+  .entering .actions>*:nth-child(1){animation-delay:.05s}
+  .entering .actions>*:nth-child(2){animation-delay:.1s}
+  .entering .actions>*:nth-child(3){animation-delay:.15s}
+  .entering .section-h{animation:rowin .45s .12s cubic-bezier(.16,.84,.3,1) backwards}
+  .entering .page-h,.entering .searchbar,.entering .chips{animation:rowin .4s cubic-bezier(.16,.84,.3,1) backwards}
+  .entering .brow{animation:rowin .45s cubic-bezier(.16,.84,.3,1) backwards}
+  .entering .brow:nth-child(1){animation-delay:.06s}
+  .entering .brow:nth-child(2){animation-delay:.1s}
+  .entering .brow:nth-child(3){animation-delay:.14s}
+  .entering .brow:nth-child(4){animation-delay:.18s}
+  .entering .brow:nth-child(5){animation-delay:.22s}
+  .entering .brow:nth-child(6){animation-delay:.26s}
+  .entering .brow:nth-child(7){animation-delay:.3s}
+  .entering .brow:nth-child(8){animation-delay:.34s}
+  .entering .brow:nth-child(n+9){animation-delay:.38s}
+  .entering .stat{animation:rowin .45s cubic-bezier(.16,.84,.3,1) backwards}
+  .entering .stat:nth-child(1){animation-delay:.04s}
+  .entering .stat:nth-child(2){animation-delay:.08s}
+  .entering .stat:nth-child(3){animation-delay:.12s}
+  .entering .stat:nth-child(4){animation-delay:.16s}
+  .entering .stat:nth-child(5){animation-delay:.2s}
+  .entering .stat:nth-child(6){animation-delay:.24s}
+  .entering .stat:nth-child(7){animation-delay:.28s}
+  .entering .stat:nth-child(8){animation-delay:.32s}
+  .entering .chartcard{animation:rowin .5s .1s cubic-bezier(.16,.84,.3,1) backwards}
+  .entering .empty{animation:rowin .45s .1s cubic-bezier(.16,.84,.3,1) backwards}
+  .entering .pline span{animation:growx .8s .25s cubic-bezier(.22,.9,.3,1) backwards}
+  .entering .bar .fill2{animation:growy .7s .15s cubic-bezier(.22,.9,.3,1) backwards}
+  .entering .hbar .fillb{animation:growx .7s .2s cubic-bezier(.22,.9,.3,1) backwards}
+
+  /* detalles que cobran vida */
+  .nav button.on .msr{animation:popin .35s cubic-bezier(.2,.9,.3,1)}
+  .stars button.on .msr{animation:starpop .35s ease}
+  .badge,.nbadge,.schip{animation:popin .35s cubic-bezier(.2,.9,.3,1)}
+  .chip{animation:fade .3s ease}
+
+  @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-delay:0ms!important;transition-duration:.001ms!important}}
 
   .topbar{display:flex;align-items:center;justify-content:space-between;padding:20px 20px 12px}
   .who{display:flex;align-items:center;gap:11px}
@@ -134,7 +187,7 @@
   .nav .nbadge{position:absolute;top:-5px;right:-10px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;background:var(--bad);color:#fff;font-size:9.5px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg)}
 
   .backdrop{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.45);animation:fade .25s ease}
-  .sheet{position:fixed;left:0;right:0;bottom:0;max-width:480px;margin:0 auto;z-index:31;background:var(--bg);border-radius:30px 30px 0 0;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;overflow:hidden;animation:sheet .34s cubic-bezier(.2,1,.32,1)}
+  .sheet{position:fixed;left:0;right:0;bottom:0;max-width:480px;margin:0 auto;z-index:31;background:var(--bg);border-radius:30px 30px 0 0;box-shadow:var(--shadow-lg);display:flex;flex-direction:column;overflow:hidden;animation:sheet .42s cubic-bezier(.18,1.14,.34,1)}
   .grab{width:40px;height:5px;border-radius:999px;background:var(--border-2);margin:12px auto 10px}
   .sheet-h{display:flex;align-items:center;justify-content:space-between;padding:0 20px 8px}
   .sheet-h b{font-size:18px;font-weight:800}
@@ -383,6 +436,7 @@
     });
   }
 
+  var primeraCarga = true;
   function onState(s) {
     ST.libros = (s && s.libros) || [];
     ST.sesiones = (s && s.sesiones) || [];
@@ -391,6 +445,7 @@
     $('#loader').classList.add('hidden');
     cacheSave();
     renderAll();
+    if (primeraCarga) { primeraCarga = false; animarPantalla(ST.tab); }
   }
   function fetchState() {
     call('api_getEstado').then(onState, function (e) {
@@ -627,14 +682,32 @@
 
   // ── navegación ──
   function showTab(tab) {
+    var cambio = ST.tab !== tab;
     ST.tab = tab;
     ['inicio', 'biblioteca', 'compras', 'stats'].forEach(function (t) { $('#scr-' + t).classList.toggle('hidden', t !== tab); });
     [].forEach.call(document.querySelectorAll('#nav button[data-tab]'), function (b) { b.classList.toggle('on', b.getAttribute('data-tab') === tab); });
     var sc = $('#scr-' + tab); if (sc) sc.scrollTop = 0;
+    if (cambio) animarPantalla(tab);
+  }
+  function animarPantalla(tab) {
+    var sc = $('#scr-' + tab); if (!sc) return;
+    sc.classList.remove('entering');
+    void sc.offsetWidth; // reinicia las animaciones CSS
+    sc.classList.add('entering');
+    clearTimeout(sc._animT);
+    sc._animT = setTimeout(function () { sc.classList.remove('entering'); }, 900);
   }
 
   // ── overlays ──
-  function closeOverlay(ov) { if (ov && ov.parentNode) ov.parentNode.removeChild(ov); }
+  function closeOverlay(ov) {
+    if (!ov || !ov.parentNode) return;
+    if (ov.getAttribute('data-cerrando')) return;
+    ov.setAttribute('data-cerrando', '1');
+    var sh = ov.querySelector('.sheet'), bd = ov.querySelector('.backdrop');
+    if (sh) sh.style.animation = 'sheetout .3s cubic-bezier(.45,.03,.7,.4) forwards';
+    if (bd) bd.style.animation = 'fadeout .3s ease forwards';
+    setTimeout(function () { if (ov.parentNode) ov.parentNode.removeChild(ov); }, (sh || bd) ? 290 : 0);
+  }
   function sheet(inner, alto) {
     var ov = el('<div><div class="backdrop" data-close></div><div class="sheet"' + (alto ? ' style="height:' + alto + '"' : '') + '><div class="grab"></div>' + inner + '</div></div>');
     $('#overlays').appendChild(ov);
@@ -1231,7 +1304,11 @@
     var old = $('#toast-c'); if (old) old.parentNode.removeChild(old);
     var c = el('<div id="toast-c" class="toast"><div class="bubble"><span class="msr fill" style="font-size:18px;color:' + (color || 'var(--ok)') + '">' + (icon || 'check_circle') + '</span>' + esc(text) + '</div></div>');
     $('#overlays').appendChild(c);
-    clearTimeout(toastTimer); toastTimer = setTimeout(function () { if (c.parentNode) c.parentNode.removeChild(c); }, 2600);
+    clearTimeout(toastTimer); toastTimer = setTimeout(function () {
+      var b = c.querySelector('.bubble');
+      if (b) b.style.animation = 'toastout .25s ease forwards';
+      setTimeout(function () { if (c.parentNode) c.parentNode.removeChild(c); }, 240);
+    }, 2400);
   }
 
   // ── demo (solo cuando no hay backend, p. ej. pruebas locales) ──
@@ -1333,6 +1410,8 @@
     var buy = t.closest && t.closest('[data-buy]');
     if (buy) {
       e.stopPropagation();
+      var filaBuy = buy.closest('.brow');
+      if (filaBuy) { filaBuy.style.opacity = '0'; filaBuy.style.transform = 'translateX(46px)'; }
       var u = buy.getAttribute('data-buy');
       toast('Moviendo a tu biblioteca…', 'sync', 'var(--accent)');
       call('api_actualizarLibro', u, { lista: 'biblioteca' }).then(function (s) { onState(s); toast('¡A tu biblioteca! 🎉', 'check_circle', 'var(--ok)'); },
