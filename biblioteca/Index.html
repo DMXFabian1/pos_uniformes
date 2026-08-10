@@ -157,6 +157,8 @@
   .chip.ok{color:var(--ok);background:var(--ok-bg)} .chip.warn{color:var(--warn);background:var(--warn-bg)}
   .chip.acc{color:var(--accent);background:color-mix(in srgb,var(--accent) 13%,transparent)}
   .chip.bad{color:var(--bad);background:var(--bad-bg)}
+  .pricecard{display:flex;align-items:center;gap:9px;background:var(--surface);border-radius:16px;padding:11px 12px;box-shadow:var(--shadow);margin-bottom:8px;text-align:left}
+  .pricecard .abrirlink{width:38px;height:38px;flex:0 0 auto;padding:0;display:flex;align-items:center;justify-content:center;border-radius:12px;text-decoration:none}
   .quote{background:var(--surface);border-left:3px solid var(--accent);border-radius:12px;padding:11px 13px;margin-bottom:8px;box-shadow:var(--shadow)}
   .quote .qt{font-size:13px;font-weight:600;line-height:1.5;font-style:italic}
   .quote .qm{display:flex;align-items:center;justify-content:space-between;margin-top:6px;font-size:11px;font-weight:700;color:var(--text-3)}
@@ -1078,11 +1080,57 @@
   }
 
   function compraExtraHtml(l) {
-    return '<div class="flabel">Precio y librería</div>' +
+    return '<button class="cta" id="d-comparar" style="margin-top:14px"><span class="msr" style="font-size:20px">travel_explore</span>Comparar precios en línea</button>' +
+      '<div class="flabel">Precio y librería</div>' +
       '<div style="display:flex;gap:8px;align-items:center">' +
       '<input class="input" id="d-precio" inputmode="decimal" value="' + (l.precio > 0 ? l.precio : '') + '" placeholder="$" style="flex:1">' +
       '<input class="input" id="d-tienda" value="' + esc(l.tienda || '') + '" placeholder="¿Dónde lo viste?" style="flex:1.6">' +
       '<button class="cta ghost" id="d-compra-save" style="flex:0 0 auto;width:52px;padding:13px"><span class="msr" style="font-size:20px">save</span></button></div>';
+  }
+
+  function openComparador(l) {
+    var ov = sheet(
+      '<div class="sheet-h"><b>Comparar precios</b><button class="x" data-close><span class="msr" style="font-size:20px">close</span></button></div>' +
+      '<div class="sheet-body">' +
+      '<div style="font-size:12.5px;font-weight:700;color:var(--text-2);margin:2px 0 10px;text-align:center">' + esc(l.titulo) + '</div>' +
+      '<div id="cp-res"><div style="padding:30px;text-align:center;font-size:12.5px;color:var(--text-3);font-weight:600"><span class="msr" style="font-size:28px;display:inline-block;animation:pulse 1.2s infinite">travel_explore</span><br><br>Buscando precios en línea…</div></div>' +
+      '</div>', '94%');
+    call('api_compararPrecios', { isbn: l.isbn || '', titulo: l.titulo }).then(function (r) {
+      if (!ov.parentNode) return;
+      var html = '';
+      if (r.resultados && r.resultados.length) {
+        html += '<div class="subhead" style="padding-left:2px">Precios encontrados</div>';
+        r.resultados.forEach(function (it, i) {
+          var nota = it.coincideIsbn ? 'mismo ISBN ✓' : (it.isbn && l.isbn && it.isbn !== l.isbn ? 'otra edición' : '');
+          html += '<div class="pricecard">' +
+            '<span style="flex:1;min-width:0"><b style="font-size:13px;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + esc(it.titulo) + '</b>' +
+            '<span style="font-size:11px;font-weight:700;color:' + (it.coincideIsbn ? 'var(--ok)' : 'var(--text-3)') + '">' + esc(it.tienda) + (nota ? ' · ' + nota : '') + '</span></span>' +
+            '<b class="tnum" style="font-size:15px;flex:0 0 auto">$' + it.precio.toLocaleString('es-MX') + '</b>' +
+            '<a class="cta ghost abrirlink" href="' + esc(it.url) + '" target="_blank" rel="noopener"><span class="msr" style="font-size:17px">open_in_new</span></a>' +
+            '<button class="cta ghost abrirlink" data-usar="' + i + '" style="color:var(--ok);background:var(--ok-bg)"><span class="msr" style="font-size:17px">check</span></button>' +
+            '</div>';
+        });
+        html += '<div style="font-size:10.5px;color:var(--text-3);font-weight:600;margin:4px 2px 0;text-align:center">✓ guarda ese precio en tu lista &nbsp;·&nbsp; ⧉ abre la tienda</div>';
+      } else {
+        html += '<div class="empty" style="margin:8px 0;padding:22px"><div style="font-size:13px;font-weight:600;color:var(--text-2)">Buscalibre no lo tiene en línea ahora.<br>Prueba las tiendas de abajo.</div></div>';
+      }
+      html += '<div class="subhead" style="padding-left:2px">Buscar en las tiendas</div>';
+      (r.enlaces || []).forEach(function (e2) {
+        html += '<a class="set-row" style="text-decoration:none;color:inherit" href="' + esc(e2.url) + '" target="_blank" rel="noopener"><span class="msr" style="color:var(--accent)">' + esc(e2.icono || 'storefront') + '</span><span style="flex:1;font-size:14px;font-weight:700">' + esc(e2.tienda) + '</span><span class="msr" style="color:var(--text-3)">open_in_new</span></a>';
+      });
+      $('#cp-res', ov).innerHTML = html;
+      $('#cp-res', ov).addEventListener('click', function (e) {
+        var b = e.target.closest('[data-usar]'); if (!b) return;
+        var it = r.resultados[Number(b.getAttribute('data-usar'))];
+        toast('Guardando precio…', 'sync', 'var(--accent)');
+        call('api_actualizarLibro', l.uuid, { precio: it.precio, tienda: it.tienda }).then(function (s) {
+          onState(s); closeOverlay(ov);
+          toast('$' + it.precio.toLocaleString('es-MX') + ' guardado — ' + it.tienda, 'check_circle', 'var(--ok)');
+        }, function (e3) { toast(errMsg(e3), 'error', 'var(--bad)'); });
+      });
+    }, function (e2) {
+      if (ov.parentNode) $('#cp-res', ov).innerHTML = '<div class="empty" style="margin:8px 0;padding:22px"><div style="font-size:13px;font-weight:700;color:var(--bad)">' + esc(errMsg(e2)) + '</div></div>';
+    });
   }
   function prestamoHtml(l) {
     if (l.prestadoA) {
@@ -1190,6 +1238,7 @@
       $('#d-compra-save', ov).addEventListener('click', function () {
         aplicar({ precio: parseFloat($('#d-precio', ov).value) || 0, tienda: $('#d-tienda', ov).value }, 'Precio guardado');
       });
+      $('#d-comparar', ov).addEventListener('click', function () { openComparador(l); });
     } else {
       if ($('#d-prestar', ov)) $('#d-prestar', ov).addEventListener('click', function () {
         var a = $('#d-prestar-a', ov).value.trim();
@@ -1457,6 +1506,20 @@
       }
       if (fn === 'api_setMetas') { d.metas = args[0]; return resolve(demoSnap()); }
       if (fn === 'api_enriquecerLibro') return resolve({ encontrado: false, estado: demoSnap() });
+      if (fn === 'api_compararPrecios') {
+        return resolve({
+          resultados: [
+            { tienda: 'Buscalibre', titulo: args[0].titulo, isbn: args[0].isbn || '', precio: 279, url: 'https://www.buscalibre.com.mx', coincideIsbn: !!args[0].isbn },
+            { tienda: 'Buscalibre', titulo: args[0].titulo + ' (en inglés)', isbn: '', precio: 542.5, url: 'https://www.buscalibre.com.mx', coincideIsbn: false }
+          ],
+          enlaces: [
+            { tienda: 'Amazon México', url: 'https://www.amazon.com.mx', icono: 'shopping_cart' },
+            { tienda: 'Google Shopping', url: 'https://www.google.com', icono: 'storefront' },
+            { tienda: 'Gandhi', url: 'https://www.gandhi.com.mx', icono: 'store' },
+            { tienda: 'MercadoLibre', url: 'https://www.mercadolibre.com.mx', icono: 'sell' }
+          ]
+        });
+      }
       reject(new Error('Función desconocida: ' + fn));
     });
   }

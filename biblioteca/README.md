@@ -19,6 +19,10 @@ datos en una hoja de cálculo de Google, para uso de una sola persona.
 - **Rescate de portadas y páginas** para ediciones con ficha pobre (mangas
   en español, por ejemplo): busca en varias fuentes al agregar, y los libros
   ya guardados tienen un botón "Buscar portada y páginas" en su detalle.
+- **Comparador de precios** en la lista de compras: consulta Buscalibre
+  automáticamente (precio real, marcando la coincidencia exacta de ISBN) y
+  abre con un toque la búsqueda en Amazon México, Google Shopping, Gandhi y
+  MercadoLibre; el precio elegido se guarda en la lista con ✓.
 - **Precio y librería** en la lista de compras (con total anotado), registro
   de **préstamos** ("se lo presté a X el día tal"), y **citas favoritas**
   por libro (tus frases subrayadas, con su página).

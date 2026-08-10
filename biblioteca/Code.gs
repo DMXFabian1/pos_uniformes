@@ -671,6 +671,68 @@ function api_eliminarCita(uuid) {
   }
 }
 
+// ─────────────────────────── Comparador de precios ───────────────────────────
+
+/**
+ * Busca precios para un libro de la lista de compras.
+ * Buscalibre se consulta automáticamente (precio real); para las tiendas
+ * que bloquean consultas automatizadas (Amazon, Google Shopping…) se
+ * devuelven enlaces directos a la búsqueda exacta.
+ */
+function api_compararPrecios(consulta) {
+  var isbn = '';
+  try { isbn = consulta && consulta.isbn ? normalizarIsbn(consulta.isbn) : ''; } catch (e) {}
+  var titulo = limpiarTexto(consulta && consulta.titulo, 120);
+  if (!isbn && !titulo) throw new Error('Falta el ISBN o el título');
+
+  var resultados = buscarBuscalibre_(isbn, titulo);
+  var q = encodeURIComponent(isbn || titulo);
+  var enlaces = [
+    { tienda: 'Amazon México', url: 'https://www.amazon.com.mx/s?k=' + q, icono: 'shopping_cart' },
+    { tienda: 'Google Shopping', url: 'https://www.google.com/search?tbm=shop&q=' + q, icono: 'storefront' },
+    { tienda: 'Gandhi', url: 'https://www.gandhi.com.mx/busqueda?query=' + q, icono: 'store' },
+    { tienda: 'MercadoLibre', url: 'https://listado.mercadolibre.com.mx/' + (isbn || q), icono: 'sell' }
+  ];
+  return { resultados: resultados, enlaces: enlaces };
+}
+
+function buscarBuscalibre_(isbn, titulo) {
+  var items = fetchBuscalibre_(isbn || titulo);
+  if (!items.length && isbn && titulo) items = fetchBuscalibre_(titulo);
+  // Se conserva el orden de relevancia de Buscalibre; solo la coincidencia
+  // exacta de ISBN sube al frente (ordenar por precio metía relleno barato).
+  if (isbn) {
+    items.forEach(function (it) { it.coincideIsbn = it.isbn === isbn; });
+    items.sort(function (a, b) { return (b.coincideIsbn ? 1 : 0) - (a.coincideIsbn ? 1 : 0); });
+  }
+  return items.slice(0, 5);
+}
+
+function fetchBuscalibre_(q) {
+  try {
+    var resp = UrlFetchApp.fetch('https://www.buscalibre.com.mx/libros/search?q=' + encodeURIComponent(q), {
+      muteHttpExceptions: true,
+      followRedirects: true,
+      headers: { 'User-Agent': 'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Mobile Safari/537.36' }
+    });
+    if (resp.getResponseCode() !== 200) return [];
+    var html = resp.getContentText();
+    var bloques = html.split('class="box-producto').slice(1, 9);
+    var items = [];
+    bloques.forEach(function (b) {
+      var isbnM = (b.match(/data-isbn="(\d{10,13})"/) || [])[1] || '';
+      var urlM = (b.match(/href="(https:\/\/www\.buscalibre\.com\.mx\/[^"]+)"/) || [])[1] || '';
+      var titM = (b.match(/<h3 class="title">([^<]+)<\/h3>/) || [])[1] || '';
+      var precioM = (b.match(/class="precioAhora[^"]*">\s*\$?\s*([\d.,]+)/) || [])[1] || '';
+      var precio = Number(String(precioM).replace(/,/g, ''));
+      if (titM && precio > 0 && urlM) {
+        items.push({ tienda: 'Buscalibre', titulo: limpiarTexto(titM, 120), isbn: isbnM, precio: Math.round(precio * 100) / 100, url: urlM, coincideIsbn: false });
+      }
+    });
+    return items;
+  } catch (e) { return []; }
+}
+
 function api_setMetas(metas) {
   var minutos = Math.round(Number(metas && metas.minutosDia));
   var librosAnio = Math.round(Number(metas && metas.librosAnio));
