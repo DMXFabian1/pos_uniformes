@@ -233,15 +233,93 @@ function leerMetas_() {
 function api_buscarIsbn(isbn) {
   var limpio = normalizarIsbn(isbn);
   if (!limpio) throw new Error('Escribe un ISBN');
-  var meta = buscarGoogleBooks_('isbn:' + limpio);
-  if (meta && meta.length) {
-    var m = meta[0];
-    m.isbn = m.isbn || limpio;
-    return { encontrado: true, libro: m };
+  var libro = null;
+  var g = buscarGoogleBooks_('isbn:' + limpio);
+  if (g && g.length) libro = g[0];
+  // Completa lo que falte con Open Library (mangas y ediciones en español
+  // suelen tener ficha incompleta en Google Books).
+  if (!libro || !libro.portadaUrl || !libro.paginas || !libro.titulo) {
+    var ol = buscarOpenLibrary_(limpio);
+    if (!libro) libro = ol;
+    else if (ol) {
+      if (!libro.titulo) libro.titulo = ol.titulo;
+      if (!libro.autores) libro.autores = ol.autores;
+      if (!libro.editorial) libro.editorial = ol.editorial;
+      if (!libro.anio) libro.anio = ol.anio;
+      if (!libro.paginas) libro.paginas = ol.paginas;
+      if (!libro.portadaUrl) libro.portadaUrl = ol.portadaUrl;
+    }
   }
-  var ol = buscarOpenLibrary_(limpio);
-  if (ol) return { encontrado: true, libro: ol };
+  if (libro) {
+    libro.isbn = libro.isbn || limpio;
+    enriquecer_(libro);
+    return { encontrado: true, libro: libro };
+  }
   return { encontrado: false, libro: { isbn: limpio, titulo: '', autores: '', editorial: '', anio: '', paginas: 0, categoria: '', portadaUrl: '' } };
+}
+
+/**
+ * Rellena portada y páginas faltantes probando más fuentes:
+ * 1) archivo de portadas de Open Library por ISBN,
+ * 2) buscador de Open Library por título+autor,
+ * 3) otras ediciones en Google Books por título.
+ */
+function enriquecer_(libro) {
+  if (!libro.portadaUrl && libro.isbn) {
+    var urlPortada = 'https://covers.openlibrary.org/b/isbn/' + libro.isbn + '-L.jpg';
+    if (urlExiste_(urlPortada + '?default=false')) libro.portadaUrl = urlPortada;
+  }
+  if ((!libro.portadaUrl || !libro.paginas) && libro.titulo) {
+    try {
+      var q = libro.titulo + (libro.autores ? ' ' + libro.autores.split(',')[0] : '');
+      var resp = UrlFetchApp.fetch('https://openlibrary.org/search.json?limit=5&fields=cover_i,number_of_pages_median&q=' + encodeURIComponent(q), { muteHttpExceptions: true });
+      if (resp.getResponseCode() === 200) {
+        var docs = (JSON.parse(resp.getContentText()).docs) || [];
+        for (var i = 0; i < docs.length; i++) {
+          if (!libro.portadaUrl && docs[i].cover_i) libro.portadaUrl = 'https://covers.openlibrary.org/b/id/' + docs[i].cover_i + '-L.jpg';
+          if (!libro.paginas && docs[i].number_of_pages_median) libro.paginas = Number(docs[i].number_of_pages_median) || 0;
+          if (libro.portadaUrl && libro.paginas) break;
+        }
+      }
+    } catch (e) {}
+  }
+  if ((!libro.portadaUrl || !libro.paginas) && libro.titulo) {
+    var otras = buscarGoogleBooks_('intitle:' + libro.titulo) || [];
+    for (var j = 0; j < otras.length; j++) {
+      if (!libro.portadaUrl && otras[j].portadaUrl) libro.portadaUrl = otras[j].portadaUrl;
+      if (!libro.paginas && otras[j].paginas) libro.paginas = otras[j].paginas;
+      if (libro.portadaUrl && libro.paginas) break;
+    }
+  }
+}
+
+function urlExiste_(url) {
+  try {
+    return UrlFetchApp.fetch(url, { muteHttpExceptions: true }).getResponseCode() === 200;
+  } catch (e) { return false; }
+}
+
+/** Reintenta portada/páginas para un libro ya guardado. */
+function api_enriquecerLibro(uuid) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var hoja = obtenerHojaLibros_();
+    var libros = leerLibros_(hoja);
+    var idx = filaDeUuid_(libros, uuid);
+    if (idx === -1) throw new Error('Libro no encontrado');
+    var l = libros[idx];
+    var meta = { isbn: l.isbn, titulo: l.titulo, autores: l.autores, paginas: l.paginas, portadaUrl: l.portadaUrl };
+    enriquecer_(meta);
+    var cambios = {};
+    if (meta.portadaUrl && !l.portadaUrl) cambios.portadaUrl = meta.portadaUrl;
+    if (meta.paginas && !l.paginas) cambios.paginas = meta.paginas;
+    var encontrado = Object.keys(cambios).length > 0;
+    if (encontrado) actualizarFila_(hoja, libros, idx, cambios);
+    return { encontrado: encontrado, estado: api_getEstado() };
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 function api_buscarTitulo(consulta) {
@@ -421,6 +499,7 @@ function api_actualizarLibro(uuid, cambios) {
       limpios.precio = Math.round(pr * 100) / 100;
     }
     if (cambios.tienda != null) limpios.tienda = limpiarTexto(cambios.tienda, 80);
+    if (cambios.portadaUrl != null) limpios.portadaUrl = limpiarTexto(cambios.portadaUrl, 500);
     if (cambios.prestadoA != null) {
       var pa = limpiarTexto(cambios.prestadoA, 60);
       limpios.prestadoA = pa;

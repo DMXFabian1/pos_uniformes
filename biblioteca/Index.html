@@ -739,10 +739,10 @@
       '<div class="sheet-body">' +
       '<div class="scanbox" id="scanbox"><video id="scan-video" muted playsinline></video><div class="frame"></div><div class="line"></div><div class="scanmsg" id="scan-msg">Iniciando cámara…</div></div>' +
       '<div style="display:flex;gap:10px;margin-top:14px">' +
-      '<button class="cta ghost" id="scan-photo" style="flex:1"><span class="msr" style="font-size:20px">photo_camera</span>Tomar foto</button>' +
+      '<button class="cta" id="scan-photo" style="flex:1.4"><span class="msr" style="font-size:20px">photo_camera</span>Tomar foto</button>' +
       '<button class="cta ghost" id="scan-manual" style="flex:1"><span class="msr" style="font-size:20px">pin</span>Escribir ISBN</button>' +
       '</div>' +
-      '<div style="margin-top:12px;font-size:11.5px;color:var(--text-3);text-align:center;font-weight:600;line-height:1.5">Si la cámara en vivo no abre aquí dentro,<br>usa <b>Tomar foto</b>: funciona igual de bien.</div>' +
+      '<div style="margin-top:12px;font-size:11.5px;color:var(--text-3);text-align:center;font-weight:600;line-height:1.5">Google no permite la cámara en vivo aquí dentro en muchos teléfonos.<br><b>Tomar foto</b> es el camino seguro: acércate a que el código llene la foto.</div>' +
       '</div>', '94%');
     $('#scan-photo', ov).addEventListener('click', function () { $('#photo-input').click(); });
     $('#scan-manual', ov).addEventListener('click', function () { cerrarConLimpieza(ov); openManualIsbn(); });
@@ -824,37 +824,94 @@
     procesarIsbn(isbn);
   }
 
-  // foto → decodificar
+  // foto → decodificar (prueba varias variantes: escalas, recorte central y rotación,
+  // con el detector nativo y ZXing como respaldo en cada una)
   function decodificarFoto(archivo) {
     toast('Leyendo la foto…', 'photo_camera', 'var(--accent)');
-    var conBD = typeof window.BarcodeDetector !== 'undefined';
-    if (conBD) {
-      createImageBitmap(archivo).then(function (bmp) {
-        var detector = new window.BarcodeDetector({ formats: ['ean_13'] });
-        return detector.detect(bmp);
-      }).then(function (codigos) {
-        var isbn = null;
-        (codigos || []).forEach(function (c) { var n = normalizarIsbn(c.rawValue); if (n && esIsbnDeLibro(n)) isbn = n; });
-        if (isbn) { cerrarTodoYProcesar(isbn); } else { toast('No se detectó un ISBN en la foto', 'error', 'var(--bad)'); }
-      }).catch(function () { decodificarFotoZxing(archivo); });
-    } else {
-      decodificarFotoZxing(archivo);
-    }
+    cargarImagen(archivo).then(function (img) {
+      var variantes = generarVariantes(img);
+      return probarVariantes(variantes, 0);
+    }).then(function (isbn) {
+      if (isbn) { cerrarTodoYProcesar(isbn); return; }
+      toast('No pude leer el código. Acércate a que llene la foto y quede nítido.', 'error', 'var(--bad)');
+    }).catch(function () {
+      toast('No pude abrir esa foto', 'error', 'var(--bad)');
+    });
   }
-  function decodificarFotoZxing(archivo) {
-    loadZxing(function () {
+  function cargarImagen(archivo) {
+    return new Promise(function (resolve, reject) {
       var url = URL.createObjectURL(archivo);
-      var lector = new ZXing.BrowserMultiFormatReader();
-      lector.decodeFromImageUrl(url).then(function (result) {
-        URL.revokeObjectURL(url);
-        var isbn = normalizarIsbn(result.getText());
-        if (isbn && esIsbnDeLibro(isbn)) cerrarTodoYProcesar(isbn);
-        else toast('El código de la foto no es un ISBN', 'error', 'var(--bad)');
-      }).catch(function () {
-        URL.revokeObjectURL(url);
-        toast('No se detectó un ISBN en la foto', 'error', 'var(--bad)');
-      });
-    }, function () { toast('Sin conexión para leer la foto', 'error', 'var(--bad)'); });
+      var img = new Image();
+      img.onload = function () { resolve(img); };
+      img.onerror = function () { URL.revokeObjectURL(url); reject(new Error('imagen')); };
+      img.src = url;
+    });
+  }
+  function hacerCanvas(img, escala, rotar90, soloCentro) {
+    var sx = 0, sy = 0, sw = img.naturalWidth, sh = img.naturalHeight;
+    if (soloCentro) { sy = Math.round(sh * 0.22); sh = Math.round(img.naturalHeight * 0.56); }
+    var w = Math.max(1, Math.round(sw * escala)), h = Math.max(1, Math.round(sh * escala));
+    var c = document.createElement('canvas');
+    if (rotar90) {
+      c.width = h; c.height = w;
+      var ctx = c.getContext('2d');
+      ctx.translate(h / 2, w / 2); ctx.rotate(Math.PI / 2);
+      ctx.drawImage(img, sx, sy, sw, sh, -w / 2, -h / 2, w, h);
+    } else {
+      c.width = w; c.height = h;
+      c.getContext('2d').drawImage(img, sx, sy, sw, sh, 0, 0, w, h);
+    }
+    return c;
+  }
+  function generarVariantes(img) {
+    var lado = Math.max(img.naturalWidth, img.naturalHeight);
+    var completa = Math.min(1, 2600 / lado);          // resolución (casi) completa primero
+    var banda = Math.min(2.5, 1300 / img.naturalWidth); // franja central, ampliada si el código quedó chico
+    return [
+      hacerCanvas(img, completa, false, false),
+      hacerCanvas(img, banda, false, true),
+      hacerCanvas(img, completa, true, false),        // rotada 90°
+      hacerCanvas(img, Math.min(1, 1100 / lado), false, false),
+      hacerCanvas(img, banda, true, true)
+    ];
+  }
+  function probarVariantes(variantes, i) {
+    if (i >= variantes.length) return Promise.resolve(null);
+    return detectarEnCanvas(variantes[i]).then(function (isbn) {
+      return isbn || probarVariantes(variantes, i + 1);
+    });
+  }
+  function detectarEnCanvas(canvas) {
+    return new Promise(function (resolve) {
+      var fin = function (raw) {
+        var isbn = raw ? normalizarIsbn(raw) : null;
+        resolve(isbn && esIsbnDeLibro(isbn) ? isbn : null);
+      };
+      if (typeof window.BarcodeDetector !== 'undefined') {
+        try {
+          new window.BarcodeDetector({ formats: ['ean_13'] }).detect(canvas).then(function (codigos) {
+            if (codigos && codigos.length) { fin(codigos[0].rawValue); return; }
+            zxingEnCanvas(canvas, fin);
+          }).catch(function () { zxingEnCanvas(canvas, fin); });
+          return;
+        } catch (e) {}
+      }
+      zxingEnCanvas(canvas, fin);
+    });
+  }
+  function zxingEnCanvas(canvas, fin) {
+    loadZxing(function () {
+      try {
+        var hints;
+        try {
+          hints = new Map();
+          hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+          hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.EAN_13]);
+        } catch (e) { hints = undefined; }
+        var lector = new ZXing.BrowserMultiFormatReader(hints);
+        lector.decodeFromImageUrl(canvas.toDataURL('image/jpeg', 0.92)).then(function (r) { fin(r.getText()); }).catch(function () { fin(null); });
+      } catch (e2) { fin(null); }
+    }, function () { fin(null); });
   }
   function cerrarTodoYProcesar(isbn) { stopScan(); $('#overlays').innerHTML = ''; procesarIsbn(isbn); }
 
@@ -943,7 +1000,8 @@
       '<div class="flabel">Autor(es)</div><input class="input" id="pv-autores" value="' + esc(meta.autores) + '" placeholder="Autor">' +
       '</div></div>' +
       '<div style="display:flex;gap:10px"><div style="flex:1"><div class="flabel">Año</div><input class="input" id="pv-anio" inputmode="numeric" value="' + esc(meta.anio) + '" placeholder="Año"></div>' +
-      '<div style="flex:2"><div class="flabel">Categoría</div><input class="input" id="pv-cat" value="' + esc(meta.categoria) + '" placeholder="Novela, historia…"></div></div>' +
+      '<div style="flex:1"><div class="flabel">Páginas</div><input class="input" id="pv-paginas" inputmode="numeric" value="' + (meta.paginas || '') + '" placeholder="—"></div>' +
+      '<div style="flex:1.4"><div class="flabel">Categoría</div><input class="input" id="pv-cat" value="' + esc(meta.categoria) + '" placeholder="Manga, novela…"></div></div>' +
       '<div class="chips" id="pv-cats" style="padding-left:0;padding-right:0"></div>' +
       (meta.isbn ? '<div style="margin-top:8px;font-size:11.5px;color:var(--text-3);font-weight:600">ISBN ' + esc(meta.isbn) + '</div>' : '') +
       '<div class="flabel">¿A qué lista va?</div>' +
@@ -974,7 +1032,7 @@
       var payload = {
         lista: ADD.lista, isbn: ADD.meta.isbn || '', titulo: titulo,
         autores: $('#pv-autores', ov).value.trim(), editorial: ADD.meta.editorial || '',
-        anio: $('#pv-anio', ov).value.trim(), paginas: ADD.meta.paginas || 0,
+        anio: $('#pv-anio', ov).value.trim(), paginas: Number($('#pv-paginas', ov).value) || 0,
         categoria: $('#pv-cat', ov).value.trim(), portadaUrl: ADD.meta.portadaUrl || '',
         precio: ADD.lista === 'compras' ? (parseFloat($('#pv-precio', ov).value) || 0) : 0,
         tienda: ADD.lista === 'compras' ? $('#pv-tienda', ov).value.trim() : ''
@@ -1080,6 +1138,7 @@
       '<span style="font-size:13px;font-weight:600;color:var(--text-2)">' + esc(l.autores || 'Autor desconocido') + '</span>' +
       (esCompra ? '<span class="chip warn" style="font-size:12px;padding:5px 12px"><span class="msr fill" style="font-size:14px">shopping_bag</span>En tu lista de compras</span>' : '') +
       '</div>' +
+      ((!l.portadaUrl || !l.paginas) ? '<button class="cta ghost" id="d-enriquecer" style="margin-top:14px;padding:11px"><span class="msr" style="font-size:18px">image_search</span>Buscar portada y páginas</button>' : '') +
       (esCompra ? '' :
         '<button class="cta" id="d-leer" style="margin-top:16px"><span class="msr fill" style="font-size:20px">play_arrow</span>Leer ahora</button>' +
         progresoHtml(l) +
@@ -1119,6 +1178,14 @@
       });
     }
     $('#d-notas-save', ov).addEventListener('click', function () { aplicar({ notas: $('#d-notas', ov).value }, 'Notas guardadas'); });
+    if ($('#d-enriquecer', ov)) $('#d-enriquecer', ov).addEventListener('click', function () {
+      toast('Buscando portada y páginas…', 'image_search', 'var(--accent)');
+      call('api_enriquecerLibro', uuid).then(function (r) {
+        onState(r.estado);
+        closeOverlay(ov); openDetail(uuid);
+        toast(r.encontrado ? '¡Encontrados! Datos actualizados' : 'No encontré más datos por ahora — puedes escribir las páginas a mano', r.encontrado ? 'check_circle' : 'info', r.encontrado ? 'var(--ok)' : 'var(--warn)');
+      }, function (e) { toast(errMsg(e), 'error', 'var(--bad)'); });
+    });
     if (esCompra) {
       $('#d-compra-save', ov).addEventListener('click', function () {
         aplicar({ precio: parseFloat($('#d-precio', ov).value) || 0, tienda: $('#d-tienda', ov).value }, 'Precio guardado');
@@ -1389,6 +1456,7 @@
         return resolve(demoSnap());
       }
       if (fn === 'api_setMetas') { d.metas = args[0]; return resolve(demoSnap()); }
+      if (fn === 'api_enriquecerLibro') return resolve({ encontrado: false, estado: demoSnap() });
       reject(new Error('Función desconocida: ' + fn));
     });
   }

@@ -16,6 +16,9 @@ datos en una hoja de cálculo de Google, para uso de una sola persona.
   librería un libro que ya tienes, te avisa al instante; cuando compras uno
   deseado, un toque en ✓ lo pasa a tu biblioteca.
 - Búsqueda, filtros por categoría, calificación con estrellas y notas.
+- **Rescate de portadas y páginas** para ediciones con ficha pobre (mangas
+  en español, por ejemplo): busca en varias fuentes al agregar, y los libros
+  ya guardados tienen un botón "Buscar portada y páginas" en su detalle.
 - **Precio y librería** en la lista de compras (con total anotado), registro
   de **préstamos** ("se lo presté a X el día tal"), y **citas favoritas**
   por libro (tus frases subrayadas, con su página).
