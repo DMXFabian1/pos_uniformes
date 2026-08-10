@@ -103,6 +103,10 @@
   .chip{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;font-weight:800;padding:2px 8px;border-radius:999px;background:var(--surface-2);color:var(--text-2)}
   .chip.ok{color:var(--ok);background:var(--ok-bg)} .chip.warn{color:var(--warn);background:var(--warn-bg)}
   .chip.acc{color:var(--accent);background:color-mix(in srgb,var(--accent) 13%,transparent)}
+  .chip.bad{color:var(--bad);background:var(--bad-bg)}
+  .quote{background:var(--surface);border-left:3px solid var(--accent);border-radius:12px;padding:11px 13px;margin-bottom:8px;box-shadow:var(--shadow)}
+  .quote .qt{font-size:13px;font-weight:600;line-height:1.5;font-style:italic}
+  .quote .qm{display:flex;align-items:center;justify-content:space-between;margin-top:6px;font-size:11px;font-weight:700;color:var(--text-3)}
   .stars-sm{display:inline-flex;color:var(--warn);font-size:12px}
   .buy{flex:0 0 auto;width:40px;height:40px;border-radius:14px;background:var(--ok-bg);color:var(--ok);display:flex;align-items:center;justify-content:center}
   .buy:active{transform:scale(.92)}
@@ -261,7 +265,8 @@
       <div class="card chartcard"><div style="display:flex;align-items:baseline;justify-content:space-between"><b style="font-size:13.5px">Minutos leídos</b><span style="font-size:11.5px;font-weight:600;color:var(--text-2)">últimos 7 días</span></div><div class="bars" id="chart-week"></div></div>
       <div class="stats" id="stats-grid"></div>
       <div class="card chartcard"><b style="font-size:13.5px">Categorías</b><div id="chart-cats"></div></div>
-      <div class="card chartcard" style="margin-bottom:6px"><b style="font-size:13.5px">Autores frecuentes</b><div id="chart-auth"></div></div>
+      <div class="card chartcard"><b style="font-size:13.5px">Autores frecuentes</b><div id="chart-auth"></div></div>
+      <div class="card chartcard" id="year-card" style="margin-bottom:6px"></div>
     </section>
 
     <nav class="nav" id="nav">
@@ -317,7 +322,16 @@
   function esIsbnDeLibro(ean) { return /^97[89]/.test(ean); }
 
   // ── estado ──
-  var ST = { libros: [], sesiones: [], metas: { minutosDia: 30, librosAnio: 12 }, tab: 'inicio', q: '', cat: null };
+  var ST = { libros: [], sesiones: [], citas: [], metas: { minutosDia: 30, librosAnio: 12 }, tab: 'inicio', q: '', cat: null };
+
+  // ── copia local (para abrir sin señal) ──
+  var CACHE_KEY = 'bib_cache';
+  function cacheSave() {
+    try { localStorage.setItem(CACHE_KEY, JSON.stringify({ libros: ST.libros, sesiones: ST.sesiones, citas: ST.citas, metas: ST.metas })); } catch (e) {}
+  }
+  function cacheLoad() {
+    try { return JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); } catch (e) { return null; }
+  }
 
   // ── tiempo, rachas y velocidad ──
   function fechaLocal(d) { return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
@@ -372,12 +386,21 @@
   function onState(s) {
     ST.libros = (s && s.libros) || [];
     ST.sesiones = (s && s.sesiones) || [];
+    ST.citas = (s && s.citas) || [];
     if (s && s.metas) ST.metas = s.metas;
     $('#loader').classList.add('hidden');
+    cacheSave();
     renderAll();
   }
   function fetchState() {
-    call('api_getEstado').then(onState, function (e) { toast(errMsg(e), 'error', 'var(--bad)'); });
+    call('api_getEstado').then(onState, function (e) {
+      if (cacheLoad()) {
+        $('#loader').classList.add('hidden');
+        toast('Sin conexión — mostrando tu copia local', 'cloud_off', 'var(--warn)');
+      } else {
+        toast(errMsg(e), 'error', 'var(--bad)');
+      }
+    });
   }
   function errMsg(e) { return (e && e.message) ? String(e.message).replace(/^Error:\s*/, '') : 'Error de conexión'; }
 
@@ -388,7 +411,9 @@
       if (overlayOpen()) return;
       ST.libros = (s && s.libros) || [];
       ST.sesiones = (s && s.sesiones) || [];
+      ST.citas = (s && s.citas) || [];
       if (s && s.metas) ST.metas = s.metas;
+      cacheSave();
       renderAll();
     }).withFailureHandler(function () {}).api_getEstado();
   }
@@ -454,6 +479,10 @@
       chips += '<span class="chip ' + stCls + '">' + esc(l.estadoLectura || 'Pendiente') + '</span>';
     }
     if (l.categoria) chips += '<span class="chip acc">' + esc(l.categoria) + '</span>';
+    if (l.prestadoA) chips += '<span class="chip bad"><span class="msr fill" style="font-size:11px">person</span>' + esc(l.prestadoA) + '</span>';
+    if (l.lista === 'compras' && (l.precio > 0 || l.tienda)) {
+      chips += '<span class="chip">' + (l.precio > 0 ? '$' + l.precio : '') + (l.precio > 0 && l.tienda ? ' · ' : '') + esc(l.tienda || '') + '</span>';
+    }
     var estrellas = '';
     if (l.calificacion > 0) {
       estrellas = '<span class="stars-sm">';
@@ -502,7 +531,15 @@
       box.innerHTML = '<div class="empty"><span class="big"><span class="msr fill" style="font-size:36px">task_alt</span></span><div style="margin-top:14px;font-size:16px;font-weight:800">Nada pendiente</div><div style="margin-top:4px;font-size:13px;color:var(--text-2);font-weight:600">Cuando veas un libro que quieras,<br>escanéalo y guárdalo como "Por comprar".</div></div>';
       return;
     }
-    box.innerHTML = '<div class="list">' + lista.map(function (l) { return rowHtml(l, true); }).join('') + '</div>';
+    var html = '<div class="list">' + lista.map(function (l) { return rowHtml(l, true); }).join('') + '</div>';
+    var conPrecio = lista.filter(function (l) { return l.precio > 0; });
+    if (conPrecio.length) {
+      var total = conPrecio.reduce(function (a, l) { return a + l.precio; }, 0);
+      html += '<div class="card" style="margin:10px 18px 0;padding:14px 16px;display:flex;align-items:center;justify-content:space-between">' +
+        '<span style="font-size:12.5px;font-weight:700;color:var(--text-2)">Total anotado (' + conPrecio.length + ' de ' + lista.length + ')</span>' +
+        '<b class="tnum" style="font-size:17px">$' + total.toLocaleString('es-MX', { minimumFractionDigits: 2 }) + '</b></div>';
+    }
+    box.innerHTML = html;
   }
 
   function renderStats() {
@@ -539,6 +576,27 @@
 
     $('#chart-cats').innerHTML = barras(conteoPor(bib, 'categoria'), 'Sin categorías aún.');
     $('#chart-auth').innerHTML = barras(conteoPor(bib, 'autores'), 'Sin autores aún.');
+
+    // resumen del año
+    var sesAnio = ST.sesiones.filter(function (s) { return diaDeSesion(s).slice(0, 4) === anio; });
+    var segAnio = sesAnio.reduce(function (a, s) { return a + s.duracionSeg; }, 0);
+    var pagsAnio = sesAnio.reduce(function (a, s) { return a + Math.max(0, s.paginaFin - s.paginaInicio); }, 0);
+    var porMes = {};
+    sesAnio.forEach(function (s) { var m = diaDeSesion(s).slice(0, 7); porMes[m] = (porMes[m] || 0) + s.duracionSeg; });
+    var mejorMes = Object.keys(porMes).sort(function (a, b) { return porMes[b] - porMes[a]; })[0];
+    var meses = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+    var favorito = bib.filter(function (l) { return l.estadoLectura === 'Leído' && String(l.terminadoEn).slice(0, 4) === anio && l.calificacion > 0; })
+      .sort(function (a, b) { return b.calificacion - a.calificacion; })[0];
+    var yr = [
+      ['Libros terminados', terminadosAnio + ' de ' + ST.metas.librosAnio],
+      ['Tiempo de lectura', segAnio ? fmtMin(segAnio) : '—'],
+      ['Páginas leídas', pagsAnio ? pagsAnio.toLocaleString('es-MX') : '—'],
+      ['Mejor mes', mejorMes ? meses[+mejorMes.slice(5, 7) - 1] + ' (' + fmtMin(porMes[mejorMes]) + ')' : '—'],
+      ['Citas guardadas', ST.citas.length || '—'],
+      ['Tu favorito', favorito ? favorito.titulo + ' ' + '★★★★★'.slice(0, favorito.calificacion) : '—']
+    ];
+    $('#year-card').innerHTML = '<b style="font-size:13.5px">Tu ' + anio + ' lector 📖</b><div style="margin-top:4px">' +
+      yr.map(function (r) { return '<div class="drow" style="padding:10px 0"><span class="dk">' + r[0] + '</span><span class="dv">' + esc(String(r[1])) + '</span></div>'; }).join('') + '</div>';
   }
   function conteoPor(lista, campo) {
     var conteo = {};
@@ -819,7 +877,11 @@
       '<div class="seg" id="pv-listas">' +
       '<button data-lista="biblioteca" class="sel"><span class="msr" style="font-size:18px">auto_stories</span>Mi biblioteca</button>' +
       '<button data-lista="compras"><span class="msr" style="font-size:18px">shopping_bag</span>Por comprar</button>' +
-      '</div></div>' +
+      '</div>' +
+      '<div id="pv-compra" style="display:none"><div style="display:flex;gap:10px">' +
+      '<div style="flex:1"><div class="flabel">Precio</div><input class="input" id="pv-precio" inputmode="decimal" placeholder="$ (opcional)"></div>' +
+      '<div style="flex:1.6"><div class="flabel">¿Dónde lo viste?</div><input class="input" id="pv-tienda" placeholder="Librería (opcional)"></div>' +
+      '</div></div></div>' +
       '<div class="sheet-foot"><button class="cta" id="pv-guardar"><span class="msr" style="font-size:20px">check_circle</span>Guardar libro</button></div>', '94%');
 
     var cats = categorias().slice(0, 8);
@@ -831,6 +893,7 @@
       var b = e.target.closest('[data-lista]'); if (!b) return;
       ADD.lista = b.getAttribute('data-lista');
       [].forEach.call(ov.querySelectorAll('#pv-listas button'), function (x) { x.classList.toggle('sel', x === b); });
+      $('#pv-compra', ov).style.display = ADD.lista === 'compras' ? '' : 'none';
     });
     $('#pv-guardar', ov).addEventListener('click', function () {
       var titulo = $('#pv-titulo', ov).value.trim();
@@ -839,7 +902,9 @@
         lista: ADD.lista, isbn: ADD.meta.isbn || '', titulo: titulo,
         autores: $('#pv-autores', ov).value.trim(), editorial: ADD.meta.editorial || '',
         anio: $('#pv-anio', ov).value.trim(), paginas: ADD.meta.paginas || 0,
-        categoria: $('#pv-cat', ov).value.trim(), portadaUrl: ADD.meta.portadaUrl || ''
+        categoria: $('#pv-cat', ov).value.trim(), portadaUrl: ADD.meta.portadaUrl || '',
+        precio: ADD.lista === 'compras' ? (parseFloat($('#pv-precio', ov).value) || 0) : 0,
+        tienda: ADD.lista === 'compras' ? $('#pv-tienda', ov).value.trim() : ''
       };
       closeOverlay(ov);
       toast('Guardando…', 'sync', 'var(--accent)');
@@ -871,6 +936,56 @@
       '</div></div>';
   }
 
+  function fmtFecha(iso) { if (!iso) return ''; try { return new Date(iso).toLocaleDateString('es-MX', { day: 'numeric', month: 'short' }); } catch (e) { return ''; } }
+  function citasDeLibro(uuid) { return ST.citas.filter(function (c) { return c.libroUuid === uuid; }); }
+
+  function confirmarBorrado(btn, fn) {
+    if (btn.getAttribute('data-conf') === '1') { fn(); return; }
+    btn.setAttribute('data-conf', '1');
+    btn.innerHTML = '<span class="msr" style="font-size:15px;color:var(--bad)">warning</span>';
+    setTimeout(function () { if (btn.isConnected) { btn.removeAttribute('data-conf'); btn.innerHTML = '<span class="msr" style="font-size:15px">close</span>'; } }, 2500);
+  }
+
+  function compraExtraHtml(l) {
+    return '<div class="flabel">Precio y librería</div>' +
+      '<div style="display:flex;gap:8px;align-items:center">' +
+      '<input class="input" id="d-precio" inputmode="decimal" value="' + (l.precio > 0 ? l.precio : '') + '" placeholder="$" style="flex:1">' +
+      '<input class="input" id="d-tienda" value="' + esc(l.tienda || '') + '" placeholder="¿Dónde lo viste?" style="flex:1.6">' +
+      '<button class="cta ghost" id="d-compra-save" style="flex:0 0 auto;width:52px;padding:13px"><span class="msr" style="font-size:20px">save</span></button></div>';
+  }
+  function prestamoHtml(l) {
+    if (l.prestadoA) {
+      return '<div class="flabel">Préstamo</div><div class="card" style="padding:13px 16px;display:flex;align-items:center;gap:11px;text-align:left">' +
+        '<span class="msr fill" style="color:var(--warn);font-size:22px">person</span>' +
+        '<span style="flex:1;font-size:12.5px;font-weight:700">Prestado a ' + esc(l.prestadoA) + (l.prestadoEn ? '<br><span style="font-weight:600;color:var(--text-2);font-size:11px">desde el ' + fmtFecha(l.prestadoEn) + '</span>' : '') + '</span>' +
+        '<button class="cta ghost" id="d-devuelto" style="width:auto;flex:0 0 auto;padding:9px 12px;font-size:12px">Me lo devolvieron</button></div>';
+    }
+    return '<div class="flabel">Préstamo</div><div style="display:flex;gap:8px">' +
+      '<input class="input" id="d-prestar-a" placeholder="¿A quién se lo prestas?" style="flex:1">' +
+      '<button class="cta ghost" id="d-prestar" style="flex:0 0 auto;width:52px;padding:13px"><span class="msr" style="font-size:20px">person_add</span></button></div>';
+  }
+  function sesionesHtml(uuid) {
+    var ses = sesionesDeLibro(uuid).slice().sort(function (a, b) { return String(a.inicio) < String(b.inicio) ? 1 : -1; }).slice(0, 8);
+    if (!ses.length) return '';
+    return '<div class="flabel">Sesiones de este libro</div><div class="card" style="overflow:hidden;text-align:left">' +
+      ses.map(function (s) {
+        var pags = s.paginaFin > s.paginaInicio ? (s.paginaFin - s.paginaInicio) + ' págs (' + s.paginaInicio + '→' + s.paginaFin + ')' : '';
+        return '<div class="drow" style="align-items:center"><span class="dk">' + fmtFecha(s.inicio) + ' · <b style="color:var(--text)">' + fmtMin(s.duracionSeg) + '</b>' + (pags ? ' · ' + pags : '') + '</span>' +
+          '<button class="x" data-delses="' + s.uuid + '" style="width:28px;height:28px;flex:0 0 auto"><span class="msr" style="font-size:15px">close</span></button></div>';
+      }).join('') + '</div>';
+  }
+  function citasHtml(uuid) {
+    var citas = citasDeLibro(uuid).slice().sort(function (a, b) { return String(a.creadoEn) < String(b.creadoEn) ? 1 : -1; });
+    var html = '<div class="flabel">Citas favoritas</div><div style="text-align:left">';
+    html += citas.map(function (c) {
+      return '<div class="quote"><div class="qt">“' + esc(c.texto) + '”</div><div class="qm"><span>' + (c.pagina ? 'pág. ' + c.pagina : '') + '</span>' +
+        '<button data-delcita="' + c.uuid + '" style="color:var(--text-3)"><span class="msr" style="font-size:15px">close</span></button></div></div>';
+    }).join('');
+    html += '<textarea class="input" id="d-cita" placeholder="Escribe una frase que te gustó…" style="min-height:54px"></textarea>' +
+      '<div style="display:flex;gap:8px;margin-top:8px"><input class="input" id="d-cita-pag" inputmode="numeric" placeholder="Pág." style="flex:0 0 84px"><button class="cta ghost" id="d-cita-add" style="flex:1;padding:12px"><span class="msr" style="font-size:18px">format_quote</span>Guardar cita</button></div></div>';
+    return html;
+  }
+
   function openDetail(uuid) {
     var l = ST.libros.filter(function (x) { return x.uuid === uuid; })[0]; if (!l) return;
     var esCompra = l.lista === 'compras';
@@ -897,8 +1012,10 @@
         progresoHtml(l) +
         '<div class="flabel">Estado de lectura</div><div class="seg" id="d-estados">' + seg + '</div>' +
         '<div class="flabel">Tu calificación</div><div class="stars" id="d-stars">' + estrellas + '</div>') +
-      '<div class="flabel">Notas</div><textarea class="input" id="d-notas" placeholder="Dónde está, quién te lo prestó, qué te pareció…">' + esc(l.notas || '') + '</textarea>' +
+      '<div class="flabel">Notas</div><textarea class="input" id="d-notas" placeholder="Dónde está, qué te pareció…">' + esc(l.notas || '') + '</textarea>' +
       '<button class="cta ghost" id="d-notas-save" style="margin-top:8px;padding:11px"><span class="msr" style="font-size:18px">save</span>Guardar notas</button>' +
+      (esCompra ? compraExtraHtml(l) : prestamoHtml(l) + sesionesHtml(uuid)) +
+      citasHtml(uuid) +
       '<div class="card" style="margin-top:16px;overflow:hidden">' + rows.map(function (r) { return '<div class="drow"><span class="dk">' + r[0] + '</span><span class="dv">' + esc(r[1]) + '</span></div>'; }).join('') + '</div>' +
       '<div style="display:flex;gap:10px;margin-top:14px;margin-bottom:8px">' +
       (esCompra
@@ -929,6 +1046,44 @@
       });
     }
     $('#d-notas-save', ov).addEventListener('click', function () { aplicar({ notas: $('#d-notas', ov).value }, 'Notas guardadas'); });
+    if (esCompra) {
+      $('#d-compra-save', ov).addEventListener('click', function () {
+        aplicar({ precio: parseFloat($('#d-precio', ov).value) || 0, tienda: $('#d-tienda', ov).value }, 'Precio guardado');
+      });
+    } else {
+      if ($('#d-prestar', ov)) $('#d-prestar', ov).addEventListener('click', function () {
+        var a = $('#d-prestar-a', ov).value.trim();
+        if (!a) { toast('Escribe a quién se lo prestas', 'error', 'var(--bad)'); return; }
+        aplicar({ prestadoA: a }, 'Prestado a ' + a);
+      });
+      if ($('#d-devuelto', ov)) $('#d-devuelto', ov).addEventListener('click', function () { aplicar({ prestadoA: '' }, 'De vuelta en tu biblioteca ✓'); });
+    }
+    $('#d-cita-add', ov).addEventListener('click', function () {
+      var texto = $('#d-cita', ov).value.trim();
+      if (!texto) { toast('Escribe la cita', 'error', 'var(--bad)'); return; }
+      toast('Guardando cita…', 'sync', 'var(--accent)');
+      call('api_agregarCita', { libroUuid: uuid, texto: texto, pagina: Number($('#d-cita-pag', ov).value) || 0 }).then(function (s) {
+        onState(s); closeOverlay(ov); openDetail(uuid); toast('Cita guardada', 'format_quote', 'var(--ok)');
+      }, function (e) { toast(errMsg(e), 'error', 'var(--bad)'); });
+    });
+    ov.addEventListener('click', function (e) {
+      var dc = e.target.closest && e.target.closest('[data-delcita]');
+      if (dc) {
+        confirmarBorrado(dc, function () {
+          call('api_eliminarCita', dc.getAttribute('data-delcita')).then(function (s) { onState(s); closeOverlay(ov); openDetail(uuid); toast('Cita eliminada', 'delete', 'var(--bad)'); },
+            function (e2) { toast(errMsg(e2), 'error', 'var(--bad)'); });
+        });
+        return;
+      }
+      var ds = e.target.closest && e.target.closest('[data-delses]');
+      if (ds) {
+        confirmarBorrado(ds, function () {
+          call('api_eliminarSesion', ds.getAttribute('data-delses')).then(function (s) { onState(s); closeOverlay(ov); openDetail(uuid); toast('Sesión eliminada', 'delete', 'var(--bad)'); },
+            function (e2) { toast(errMsg(e2), 'error', 'var(--bad)'); });
+        });
+        return;
+      }
+    });
     $('#d-mover', ov).addEventListener('click', function () {
       aplicar({ lista: esCompra ? 'biblioteca' : 'compras' }, esCompra ? '¡A tu biblioteca! 🎉' : 'Movido a tu lista de compras');
     });
@@ -1094,14 +1249,19 @@
         { id: 1, uuid: 'ds-1', libroUuid: 'demo-2', inicio: fechaLocal(ayer) + 'T20:00:00', fin: '', duracionSeg: 2400, paginaInicio: 80, paginaFin: 110 },
         { id: 2, uuid: 'ds-2', libroUuid: 'demo-2', inicio: fechaLocal(hoy) + 'T08:00:00', fin: '', duracionSeg: 900, paginaInicio: 110, paginaFin: 120 }
       ],
+      citas: [
+        { id: 1, uuid: 'dc-1', libroUuid: 'demo-1', texto: 'La vida no es la que uno vivió, sino la que uno recuerda y cómo la recuerda para contarla.', pagina: 7, creadoEn: '2026-08-01T10:00:00Z' }
+      ],
       metas: { minutosDia: 30, librosAnio: 12 }
     };
+    DEMO.libros[2].precio = 249;
+    DEMO.libros[2].tienda = 'Librería Gandhi';
     return DEMO;
   }
   function dm(id, isbn, titulo, autores, cat, lista, est, cal, pags, pagActual) {
-    return { id: id, uuid: 'demo-' + id, agregadoEn: '2026-08-0' + id + 'T10:00:00Z', actualizadoEn: '', isbn: isbn, titulo: titulo, autores: autores, editorial: '', anio: '2015', paginas: pags, categoria: cat, portadaUrl: '', lista: lista, estadoLectura: est, calificacion: cal, notas: '', paginaActual: pagActual, terminadoEn: est === 'Leído' ? new Date().toISOString() : '' };
+    return { id: id, uuid: 'demo-' + id, agregadoEn: '2026-08-0' + id + 'T10:00:00Z', actualizadoEn: '', isbn: isbn, titulo: titulo, autores: autores, editorial: '', anio: '2015', paginas: pags, categoria: cat, portadaUrl: '', lista: lista, estadoLectura: est, calificacion: cal, notas: '', paginaActual: pagActual, terminadoEn: est === 'Leído' ? new Date().toISOString() : '', precio: 0, tienda: '', prestadoA: '', prestadoEn: '' };
   }
-  function demoSnap() { var d = demoData(); return { libros: d.libros.slice(), sesiones: d.sesiones.slice(), metas: d.metas }; }
+  function demoSnap() { var d = demoData(); return { libros: d.libros.slice(), sesiones: d.sesiones.slice(), citas: d.citas.slice(), metas: d.metas }; }
   function demoCall(fn, args) {
     return new Promise(function (resolve, reject) {
       var d = demoData(), libros = d.libros;
@@ -1110,7 +1270,7 @@
       if (fn === 'api_buscarTitulo') return resolve([]);
       if (fn === 'api_agregarLibro') {
         var p = args[0];
-        libros.push({ id: libros.length + 1, uuid: 'demo-' + (libros.length + 1), agregadoEn: new Date().toISOString(), actualizadoEn: '', isbn: p.isbn, titulo: p.titulo, autores: p.autores, editorial: p.editorial, anio: p.anio, paginas: p.paginas, categoria: p.categoria, portadaUrl: p.portadaUrl, lista: p.lista, estadoLectura: 'Pendiente', calificacion: 0, notas: '', paginaActual: 0, terminadoEn: '' });
+        libros.push({ id: libros.length + 1, uuid: 'demo-' + (libros.length + 1), agregadoEn: new Date().toISOString(), actualizadoEn: '', isbn: p.isbn, titulo: p.titulo, autores: p.autores, editorial: p.editorial, anio: p.anio, paginas: p.paginas, categoria: p.categoria, portadaUrl: p.portadaUrl, lista: p.lista, estadoLectura: 'Pendiente', calificacion: 0, notas: '', paginaActual: 0, terminadoEn: '', precio: p.precio || 0, tienda: p.tienda || '', prestadoA: '', prestadoEn: '' });
         return resolve(demoSnap());
       }
       if (fn === 'api_actualizarLibro') {
@@ -1118,7 +1278,21 @@
           if (l.uuid !== args[0]) return;
           Object.keys(args[1]).forEach(function (k) { l[k] = args[1][k]; });
           if (args[1].estadoLectura === 'Leído') l.terminadoEn = new Date().toISOString();
+          if (args[1].prestadoA != null) l.prestadoEn = args[1].prestadoA ? new Date().toISOString() : '';
         });
+        return resolve(demoSnap());
+      }
+      if (fn === 'api_agregarCita') {
+        var c = args[0];
+        d.citas.push({ id: d.citas.length + 1, uuid: 'dc-' + (d.citas.length + 1), libroUuid: c.libroUuid, texto: c.texto, pagina: c.pagina || 0, creadoEn: new Date().toISOString() });
+        return resolve(demoSnap());
+      }
+      if (fn === 'api_eliminarCita') {
+        d.citas = d.citas.filter(function (c2) { return c2.uuid !== args[0]; });
+        return resolve(demoSnap());
+      }
+      if (fn === 'api_eliminarSesion') {
+        d.sesiones = d.sesiones.filter(function (s2) { return s2.uuid !== args[0]; });
         return resolve(demoSnap());
       }
       if (fn === 'api_eliminarLibro') {
@@ -1180,6 +1354,8 @@
   $('#hero-app').textContent = APP_TITLE;
   document.title = APP_TITLE;
   showTab('inicio');
+  var enCache = cacheLoad();
+  if (enCache) { onState(enCache); } // pinta al instante con la copia local
   fetchState();
   startSync();
 })();

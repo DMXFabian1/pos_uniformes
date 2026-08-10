@@ -16,6 +16,9 @@ datos en una hoja de cálculo de Google, para uso de una sola persona.
   librería un libro que ya tienes, te avisa al instante; cuando compras uno
   deseado, un toque en ✓ lo pasa a tu biblioteca.
 - Búsqueda, filtros por categoría, calificación con estrellas y notas.
+- **Precio y librería** en la lista de compras (con total anotado), registro
+  de **préstamos** ("se lo presté a X el día tal"), y **citas favoritas**
+  por libro (tus frases subrayadas, con su página).
 
 **Rastreador de lectura (lo de Bookly)**
 - **Cronómetro de sesiones**: toca ▶ en el libro y lee. Se puede pausar, y
@@ -26,7 +29,13 @@ datos en una hoja de cálculo de Google, para uso de una sola persona.
 - **Metas**: minutos de lectura al día y libros al año (se ajustan en ⚙️).
 - **Racha** de días leyendo, minutos de hoy en el inicio, y estadísticas:
   gráfica de los últimos 7 días, tiempo total, páginas leídas reales,
-  velocidad media, terminados este año contra tu meta, categorías y autores.
+  velocidad media, terminados este año contra tu meta, categorías, autores
+  y un **resumen del año** (tu mejor mes, tu libro favorito…).
+- **Historial de sesiones** por libro con opción de borrar una equivocada
+  (p. ej. si el cronómetro quedó corriendo).
+- **Memoria local**: la app guarda una copia de tu biblioteca en el
+  teléfono; sin señal abre al instante con esa copia (ideal para el
+  "¿ya tengo este libro?" dentro de una librería).
 
 ## Archivos
 
@@ -53,7 +62,7 @@ datos en una hoja de cálculo de Google, para uso de una sola persona.
 6. Copia la **URL `/exec`**: esa es la app. En el teléfono (con tu sesión
    de Google iniciada), ábrela y usa **Añadir a pantalla de inicio**.
 
-Las pestañas `Libros` y `Sesiones` de la hoja se crean solas la primera vez.
+Las pestañas `Libros`, `Sesiones` y `Citas` de la hoja se crean solas la primera vez.
 
 > Si con "Solo yo" la app no carga desde el icono de pantalla de inicio
 > (pasa en algunos navegadores), cámbiala a "Cualquier usuario": la URL es

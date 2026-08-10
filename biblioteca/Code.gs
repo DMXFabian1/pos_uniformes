@@ -17,6 +17,7 @@ var CONFIG = {
   TITULO: 'Mi Biblioteca',
   NOMBRE_HOJA_LIBROS: 'Libros',
   NOMBRE_HOJA_SESIONES: 'Sesiones',
+  NOMBRE_HOJA_CITAS: 'Citas',
   // Metas iniciales (después se cambian desde Ajustes en la app).
   METAS_DEFAULT: { minutosDia: 30, librosAnio: 12 }
 };
@@ -28,11 +29,16 @@ var ESTADOS_LECTURA = ['Pendiente', 'Leyendo', 'Leído'];
 var COLUMNAS = [
   'id', 'uuid', 'agregadoEn', 'actualizadoEn', 'isbn', 'titulo', 'autores',
   'editorial', 'anio', 'paginas', 'categoria', 'portadaUrl', 'lista',
-  'estadoLectura', 'calificacion', 'notas', 'paginaActual', 'terminadoEn'
+  'estadoLectura', 'calificacion', 'notas', 'paginaActual', 'terminadoEn',
+  'precio', 'tienda', 'prestadoA', 'prestadoEn'
 ];
 
 var COLUMNAS_SESIONES = [
   'id', 'uuid', 'libroUuid', 'inicio', 'fin', 'duracionSeg', 'paginaInicio', 'paginaFin'
+];
+
+var COLUMNAS_CITAS = [
+  'id', 'uuid', 'libroUuid', 'texto', 'pagina', 'creadoEn'
 ];
 
 // ─────────────────────────── Web app ───────────────────────────
@@ -61,7 +67,7 @@ function onOpen() {
   } catch (e) { /* no hay UI cuando corre como web app */ }
 }
 
-function prepararHoja() { obtenerHojaLibros_(); obtenerHojaSesiones_(); }
+function prepararHoja() { obtenerHojaLibros_(); obtenerHojaSesiones_(); obtenerHojaCitas_(); }
 
 // ─────────────────────────── Utilidades ───────────────────────────
 
@@ -141,6 +147,7 @@ function obtenerHoja_(nombre, columnas) {
 
 function obtenerHojaLibros_() { return obtenerHoja_(CONFIG.NOMBRE_HOJA_LIBROS, COLUMNAS); }
 function obtenerHojaSesiones_() { return obtenerHoja_(CONFIG.NOMBRE_HOJA_SESIONES, COLUMNAS_SESIONES); }
+function obtenerHojaCitas_() { return obtenerHoja_(CONFIG.NOMBRE_HOJA_CITAS, COLUMNAS_CITAS); }
 
 function leerLibros_(hoja) {
   var ultima = hoja.getLastRow();
@@ -158,7 +165,26 @@ function leerLibros_(hoja) {
     l.agregadoEn = normalizarStamp_(l.agregadoEn);
     l.actualizadoEn = normalizarStamp_(l.actualizadoEn);
     l.terminadoEn = normalizarStamp_(l.terminadoEn);
+    l.precio = Number(l.precio) || 0;
+    l.tienda = String(l.tienda || '');
+    l.prestadoA = String(l.prestadoA || '');
+    l.prestadoEn = normalizarStamp_(l.prestadoEn);
     return l;
+  });
+}
+
+function leerCitas_(hoja) {
+  var ultima = hoja.getLastRow();
+  if (ultima < 2) return [];
+  var valores = hoja.getRange(2, 1, ultima - 1, COLUMNAS_CITAS.length).getValues();
+  return valores.map(function (fila) {
+    var c = {};
+    COLUMNAS_CITAS.forEach(function (col, i) { c[col] = fila[i]; });
+    c.id = Number(c.id);
+    c.pagina = Number(c.pagina) || 0;
+    c.texto = String(c.texto || '');
+    c.creadoEn = normalizarStamp_(c.creadoEn);
+    return c;
   });
 }
 
@@ -286,6 +312,7 @@ function api_getEstado() {
   return {
     libros: leerLibros_(obtenerHojaLibros_()),
     sesiones: leerSesiones_(obtenerHojaSesiones_()),
+    citas: leerCitas_(obtenerHojaCitas_()),
     metas: leerMetas_()
   };
 }
@@ -334,7 +361,11 @@ function api_agregarLibro(payload) {
       calificacion: 0,
       notas: limpiarTexto(payload.notas, 1000),
       paginaActual: 0,
-      terminadoEn: ''
+      terminadoEn: '',
+      precio: Math.max(0, Math.round((Number(payload.precio) || 0) * 100) / 100),
+      tienda: limpiarTexto(payload.tienda, 80),
+      prestadoA: '',
+      prestadoEn: ''
     };
     hoja.appendRow(COLUMNAS.map(function (c) { return fila[c]; }));
     return api_getEstado();
@@ -384,6 +415,17 @@ function api_actualizarLibro(uuid, cambios) {
     }
     if (cambios.notas != null) limpios.notas = limpiarTexto(cambios.notas, 1000);
     if (cambios.categoria != null) limpios.categoria = limpiarTexto(cambios.categoria, 60);
+    if (cambios.precio != null) {
+      var pr = Number(cambios.precio);
+      if (isNaN(pr) || pr < 0) throw new Error('Precio inválido');
+      limpios.precio = Math.round(pr * 100) / 100;
+    }
+    if (cambios.tienda != null) limpios.tienda = limpiarTexto(cambios.tienda, 80);
+    if (cambios.prestadoA != null) {
+      var pa = limpiarTexto(cambios.prestadoA, 60);
+      limpios.prestadoA = pa;
+      limpios.prestadoEn = pa ? ahoraIso() : '';
+    }
     if (cambios.titulo != null) {
       var t = limpiarTexto(cambios.titulo, 200);
       if (!t) throw new Error('El título no puede quedar vacío');
@@ -417,11 +459,16 @@ function api_eliminarLibro(uuid) {
     var idx = filaDeUuid_(libros, uuid);
     if (idx === -1) throw new Error('Libro no encontrado');
     hoja.deleteRow(idx + 2);
-    // Sus sesiones también se van, para no distorsionar las estadísticas.
+    // Sus sesiones y citas también se van, para no dejar datos huérfanos.
     var hojaSes = obtenerHojaSesiones_();
     var sesiones = leerSesiones_(hojaSes);
     for (var i = sesiones.length - 1; i >= 0; i--) {
       if (String(sesiones[i].libroUuid) === String(uuid)) hojaSes.deleteRow(i + 2);
+    }
+    var hojaCitas = obtenerHojaCitas_();
+    var citas = leerCitas_(hojaCitas);
+    for (var j = citas.length - 1; j >= 0; j--) {
+      if (String(citas[j].libroUuid) === String(uuid)) hojaCitas.deleteRow(j + 2);
     }
     return api_getEstado();
   } finally {
@@ -479,6 +526,66 @@ function api_registrarSesion(payload) {
     }
     if (Object.keys(cambios).length) actualizarFila_(hojaLibros, libros, idx, cambios);
 
+    return api_getEstado();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function api_eliminarSesion(uuid) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var hoja = obtenerHojaSesiones_();
+    var sesiones = leerSesiones_(hoja);
+    var idx = filaDeUuid_(sesiones, uuid);
+    if (idx === -1) throw new Error('Sesión no encontrada');
+    hoja.deleteRow(idx + 2);
+    return api_getEstado();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+// ─────────────────────────── Citas favoritas ───────────────────────────
+
+function api_agregarCita(payload) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var libros = leerLibros_(obtenerHojaLibros_());
+    if (filaDeUuid_(libros, payload.libroUuid) === -1) throw new Error('Libro no encontrado');
+    var texto = String(payload.texto == null ? '' : payload.texto).trim().slice(0, 500);
+    if (!texto) throw new Error('Escribe la cita');
+    var pagina = Math.max(0, Math.round(Number(payload.pagina)) || 0);
+
+    var hoja = obtenerHojaCitas_();
+    var citas = leerCitas_(hoja);
+    var maxId = citas.reduce(function (a, c) { return Math.max(a, c.id || 0); }, 0);
+    var fila = {
+      id: maxId + 1,
+      uuid: generarUuid(),
+      libroUuid: String(payload.libroUuid),
+      texto: texto,
+      pagina: pagina,
+      creadoEn: ahoraIso()
+    };
+    hoja.appendRow(COLUMNAS_CITAS.map(function (c) { return fila[c]; }));
+    return api_getEstado();
+  } finally {
+    lock.releaseLock();
+  }
+}
+
+function api_eliminarCita(uuid) {
+  var lock = LockService.getScriptLock();
+  lock.waitLock(20000);
+  try {
+    var hoja = obtenerHojaCitas_();
+    var citas = leerCitas_(hoja);
+    var idx = filaDeUuid_(citas, uuid);
+    if (idx === -1) throw new Error('Cita no encontrada');
+    hoja.deleteRow(idx + 2);
     return api_getEstado();
   } finally {
     lock.releaseLock();
