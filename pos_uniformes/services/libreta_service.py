@@ -271,6 +271,16 @@ def resumir_por_dia(rows: list[LibretaVenta]) -> list[CorteDia]:
     ]
 
 
+def eliminar_operacion(session, operacion_id: int) -> bool:
+    """Borra un registro de la Libreta (corrección del dueño: se imprimió
+    por error, venta que no se concretó). Devuelve True si existía."""
+    entry = session.get(LibretaVenta, int(operacion_id))
+    if entry is None:
+        return False
+    session.delete(entry)
+    return True
+
+
 def filtrar_de_hoy(rows: list, reference: date | None = None) -> list:
     """Deja solo las operaciones del día local dado (default: hoy).
 

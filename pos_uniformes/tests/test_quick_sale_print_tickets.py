@@ -80,6 +80,9 @@ class QuickSaleTicketDialogTests(unittest.TestCase):
                 patch.object(widget, "_registrar_en_libreta") as registrar, \
                 patch(f"{_MOD}.route_tickets") as opd:
             widget._on_ticket_venta()
+            # El registro en la Libreta espera a que la impresión arranque.
+            registrar.assert_not_called()
+            opd.call_args.kwargs["on_printed"]()
         tickets = opd.call_args.args[2]
         self.assertEqual(len(tickets), 2)
         # 515.00 - 4.5% = 491.82 -> regla de redondeo -> 492.00

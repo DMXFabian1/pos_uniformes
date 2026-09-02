@@ -20,6 +20,7 @@ def route_tickets(
     unit_label: str = "ticket",
     alt_tickets: list[str] | None = None,
     alt_checkbox_label: str | None = None,
+    on_printed=None,
 ) -> None:
     tickets = [t for t in tickets if t and t.strip()]
     if not tickets:
@@ -33,7 +34,12 @@ def route_tickets(
     modo, origen = load_print_routing()
     if modo == MODO_SATELITE:
         # Sin diálogo no hay checkbox: al satélite siempre va el juego base.
-        _enviar_al_satelite(parent, tickets, origen)
+        # Encolar exitosamente cuenta como "impreso" para on_printed.
+        if _enviar_al_satelite(parent, tickets, origen) and on_printed is not None:
+            try:
+                on_printed()
+            except Exception:  # noqa: BLE001
+                pass
     else:
         from pos_uniformes.ui.dialogs.printable_text_dialog import open_tickets_print_dialog
 
@@ -44,10 +50,11 @@ def route_tickets(
             unit_label=unit_label,
             alt_tickets=alt_tickets,
             alt_checkbox_label=alt_checkbox_label,
+            on_printed=on_printed,
         )
 
 
-def _enviar_al_satelite(parent: QWidget, tickets: list[str], origen: str) -> None:
+def _enviar_al_satelite(parent: QWidget, tickets: list[str], origen: str) -> bool:
     from PyQt6.QtWidgets import QMessageBox
 
     from pos_uniformes.database.connection import get_session
@@ -63,6 +70,7 @@ def _enviar_al_satelite(parent: QWidget, tickets: list[str], origen: str) -> Non
             "Enviado al satélite",
             f"{n} {'ticket' if n == 1 else 'tickets'} en cola para imprimir en el satélite.",
         )
+        return True
     except Exception as exc:  # noqa: BLE001
         QMessageBox.warning(
             parent,
@@ -70,3 +78,4 @@ def _enviar_al_satelite(parent: QWidget, tickets: list[str], origen: str) -> Non
             "No se pudo encolar el ticket para el satélite.\n\n"
             f"{exc}\n\nRevisa la conexión con la PC principal.",
         )
+        return False

@@ -108,6 +108,25 @@ class AltTicketsDialogTests(unittest.TestCase):
         self._print_button(dialog).click()
         self.assertEqual(self.printed, ["ALT"])
 
+    def test_on_printed_solo_cuando_arranca_la_impresion(self) -> None:
+        from unittest.mock import MagicMock
+
+        on_printed = MagicMock()
+        created: list[QDialog] = []
+        with patch.object(QDialog, "exec", new=lambda dlg: created.append(dlg) or 0):
+            open_tickets_print_dialog(
+                None,
+                _TITLE,
+                ["BASE"],
+                print_fn=lambda t: self.printed.append(t) or True,
+                on_printed=on_printed,
+            )
+        self._dialog = created[0]
+        # Abrir (y cerrar) sin imprimir NO dispara el efecto.
+        on_printed.assert_not_called()
+        self._print_button(self._dialog).click()
+        on_printed.assert_called_once()
+
     def test_second_click_while_printing_does_not_start_other_queue(self) -> None:
         # Con 2 tickets, la cola queda imprimiendo (delay entre jobs); un
         # segundo clic con el checkbox cambiado NO debe arrancar la otra cola

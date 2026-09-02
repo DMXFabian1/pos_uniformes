@@ -276,6 +276,7 @@ def open_tickets_print_dialog(
     print_fn: "Callable[[str], bool] | None" = None,
     alt_tickets: list[str] | None = None,
     alt_checkbox_label: str | None = None,
+    on_printed: "Callable[[], None] | None" = None,
 ) -> None:
     """Muestra uno o varios tickets en una sola vista.
 
@@ -292,6 +293,10 @@ def open_tickets_print_dialog(
     alt_tickets + alt_checkbox_label agregan un checkbox (desmarcado): al
     marcarlo se imprime/previsualiza el juego alterno en lugar del base
     (p.ej. copia interna con la comisión de la terminal descontada).
+
+    on_printed se invoca UNA vez, cuando la impresión realmente arranca
+    (clic en Imprimir) — para efectos que solo deben ocurrir si se imprimió,
+    como registrar la venta en la Libreta. Cerrar sin imprimir no lo llama.
     """
     tickets = [t for t in tickets if t and t.strip()]
     if not tickets:
@@ -349,13 +354,22 @@ def open_tickets_print_dialog(
             )
         )
 
+    printed_notified = False
+
     def _start_print() -> None:
+        nonlocal printed_notified
         # Candado entre AMBAS colas: un segundo clic con el checkbox cambiado
         # arrancaba la otra cola en paralelo (tickets duplicados intercalados).
         if queue.is_printing() or (alt_queue is not None and alt_queue.is_printing()):
             return
         use_alt = alt_checkbox is not None and alt_checkbox.isChecked()
         (alt_queue if use_alt else queue).start()
+        if on_printed is not None and not printed_notified:
+            printed_notified = True
+            try:
+                on_printed()
+            except Exception:  # noqa: BLE001 — el efecto no debe romper la impresión
+                pass
 
     print_button.clicked.connect(_start_print)
     buttons.rejected.connect(dialog.reject)

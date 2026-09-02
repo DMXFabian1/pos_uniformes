@@ -1257,6 +1257,11 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_print_button.setAutoDefault(False)
         self.libreta_print_button.clicked.connect(self._imprimir_corte_libreta)
         owner_bar_ly.addWidget(self.libreta_print_button)
+        self.libreta_delete_button = QPushButton("🗑 Borrar registro")
+        self.libreta_delete_button.setObjectName("secondaryButton")
+        self.libreta_delete_button.setAutoDefault(False)
+        self.libreta_delete_button.clicked.connect(self._borrar_registro_libreta)
+        owner_bar_ly.addWidget(self.libreta_delete_button)
         owner_bar_ly.addStretch()
         owner_bar_ly.addWidget(QLabel("Meta semanal (comisiones):"))
         self.libreta_meta_spin = QSpinBox()
@@ -1494,6 +1499,62 @@ class QuoteSatelliteWindow(QMainWindow):
         save_meta_semanal(int(self.libreta_meta_spin.value()))
         self._set_status("Meta semanal de la Libreta guardada.")
 
+    def _borrar_registro_libreta(self) -> None:
+        """Borra el registro seleccionado en MOVIMIENTOS (solo dueño).
+
+        Para corregir cuando se imprimió por error o la venta no se
+        concretó; con confirmación y refresco inmediato del corte."""
+        if not self._libreta_is_owner:
+            return
+        rows = list(getattr(self, "_libreta_rows_pintadas", []) or [])
+        idx = self.libreta_table.currentRow()
+        if idx < 0 or idx >= len(rows):
+            QMessageBox.information(
+                self, "Sin selección",
+                "Selecciona en MOVIMIENTOS el registro que quieres borrar.",
+            )
+            return
+        row = rows[idx]
+        entry_id = getattr(row, "id", None)
+        if entry_id is None:
+            QMessageBox.information(
+                self, "Aún sin sincronizar",
+                "Ese registro todavía no sube al servidor; presiona "
+                "Actualizar en un momento e inténtalo de nuevo.",
+            )
+            return
+        local_dt = (
+            row.created_at.astimezone() if row.created_at.tzinfo else row.created_at
+        )
+        detalle = (
+            f"{local_dt.strftime('%d/%m %H:%M')} · {str(row.tipo).capitalize()} · "
+            f"{row.employee_name or row.employee_code} · "
+            f"${Decimal(str(row.monto_total or 0)):,.2f}"
+        )
+        confirmacion = QMessageBox.question(
+            self,
+            "Borrar registro",
+            f"¿Borrar este registro de la Libreta?\n\n{detalle}\n\n"
+            "Esto no se puede deshacer.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if confirmacion != QMessageBox.StandardButton.Yes:
+            return
+        from pos_uniformes.services.libreta_service import eliminar_operacion
+
+        try:
+            with get_session() as session:
+                existia = eliminar_operacion(session, int(entry_id))
+                session.commit()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "No se pudo borrar", str(exc))
+            return
+        self._set_status(
+            "Registro borrado de la Libreta." if existia else "El registro ya no existía."
+        )
+        self._refresh_libreta_view()
+
     def _imprimir_corte_libreta(self) -> None:
         """Imprime el corte del periodo visible (solo vista dueño)."""
         if not self._libreta_is_owner:
@@ -1612,6 +1673,9 @@ class QuoteSatelliteWindow(QMainWindow):
             resumir_por_dia,
             resumir_por_empleada,
         )
+
+        # Alineadas con las filas de la tabla MOVIMIENTOS (para poder borrar).
+        self._libreta_rows_pintadas = list(rows)
 
         total_ops = len(rows)
         total_piezas = sum(int(r.piezas or 0) for r in rows)

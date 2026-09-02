@@ -246,16 +246,24 @@ class QuickSaleLibretaHookTests(unittest.TestCase):
         ]
         return widget
 
+    def _run_venta(self, widget, encolar, *, card: bool = False) -> None:
+        """Dispara Ticket Venta y simula que la impresión SÍ arrancó."""
+        llamadas_previas = encolar.call_count
+        with patch.object(widget, "_load_business_info", return_value=("M", "", "")), \
+                patch.object(widget, "_ask_venta_options", return_value=(False, card)), \
+                patch.object(widget, "_drenar_libreta_en_background"), \
+                patch("pos_uniformes.ui.views.quick_sale_view.route_tickets") as route:
+            widget._on_ticket_venta()
+            # Nada se registra hasta que la impresión arranca de verdad.
+            self.assertEqual(encolar.call_count, llamadas_previas)
+            route.call_args.kwargs["on_printed"]()
+
     def test_venta_registra_en_libreta(self) -> None:
         widget = self._make_widget()
-        with patch.object(widget, "_load_business_info", return_value=("M", "", "")), \
-                patch.object(widget, "_ask_venta_options", return_value=(False, False)), \
-                patch.object(widget, "_drenar_libreta_en_background"), \
-                patch(
-                    "pos_uniformes.services.libreta_local_queue_service.encolar_operacion"
-                ) as encolar, \
-                patch("pos_uniformes.ui.views.quick_sale_view.route_tickets"):
-            widget._on_ticket_venta()
+        with patch(
+            "pos_uniformes.services.libreta_local_queue_service.encolar_operacion"
+        ) as encolar:
+            self._run_venta(widget, encolar)
         encolar.assert_called_once()
         entry = encolar.call_args.args[0]
         self.assertEqual(entry["employee_code"], "VEND-2")
@@ -268,14 +276,10 @@ class QuickSaleLibretaHookTests(unittest.TestCase):
 
     def test_venta_con_tarjeta_registra_neto(self) -> None:
         widget = self._make_widget()
-        with patch.object(widget, "_load_business_info", return_value=("M", "", "")), \
-                patch.object(widget, "_ask_venta_options", return_value=(False, True)), \
-                patch.object(widget, "_drenar_libreta_en_background"), \
-                patch(
-                    "pos_uniformes.services.libreta_local_queue_service.encolar_operacion"
-                ) as encolar, \
-                patch("pos_uniformes.ui.views.quick_sale_view.route_tickets"):
-            widget._on_ticket_venta()
+        with patch(
+            "pos_uniformes.services.libreta_local_queue_service.encolar_operacion"
+        ) as encolar:
+            self._run_venta(widget, encolar, card=True)
         entry = encolar.call_args.args[0]
         self.assertTrue(entry["pago_tarjeta"])
         self.assertEqual(entry["monto_total"], "1030.00")
@@ -284,16 +288,24 @@ class QuickSaleLibretaHookTests(unittest.TestCase):
 
     def test_reimpresion_no_duplica_registro(self) -> None:
         widget = self._make_widget()
+        with patch(
+            "pos_uniformes.services.libreta_local_queue_service.encolar_operacion"
+        ) as encolar:
+            self._run_venta(widget, encolar)
+            self._run_venta(widget, encolar)  # reimpresión del mismo carrito
+        encolar.assert_called_once()
+
+    def test_cerrar_sin_imprimir_no_registra(self) -> None:
+        # Se contesta el diálogo pero NUNCA se imprime: cero registro.
+        widget = self._make_widget()
         with patch.object(widget, "_load_business_info", return_value=("M", "", "")), \
-                patch.object(widget, "_ask_venta_options", return_value=(False, False)), \
-                patch.object(widget, "_drenar_libreta_en_background"), \
+                patch.object(widget, "_ask_venta_options", return_value=(True, False)), \
                 patch(
                     "pos_uniformes.services.libreta_local_queue_service.encolar_operacion"
                 ) as encolar, \
                 patch("pos_uniformes.ui.views.quick_sale_view.route_tickets"):
             widget._on_ticket_venta()
-            widget._on_ticket_venta()  # reimpresión del mismo carrito
-        encolar.assert_called_once()
+        encolar.assert_not_called()
 
     def test_registro_fallido_no_rompe_tickets(self) -> None:
         widget = self._make_widget()
@@ -305,7 +317,9 @@ class QuickSaleLibretaHookTests(unittest.TestCase):
                 ), \
                 patch("pos_uniformes.ui.views.quick_sale_view.route_tickets") as routed:
             widget._on_ticket_venta()
-        routed.assert_called_once()  # el ticket sale aunque la libreta falle
+            # La impresión arrancó y la libreta falló: no debe tronar nada.
+            routed.call_args.kwargs["on_printed"]()
+        routed.assert_called_once()
 
     def test_abono_se_registra_sin_comision(self) -> None:
         widget = self._make_widget()
@@ -478,6 +492,103 @@ class LibretaListaAmigableTests(unittest.TestCase):
             self.assertNotIn("$", texto)
             self.assertNotIn("1030", texto)
             self.assertNotIn("200", texto)
+
+
+class EliminarOperacionTests(unittest.TestCase):
+    def test_elimina_existente(self) -> None:
+        from pos_uniformes.services.libreta_service import eliminar_operacion
+
+        session = MagicMock()
+        entry = object()
+        session.get.return_value = entry
+        self.assertTrue(eliminar_operacion(session, 5))
+        session.delete.assert_called_once_with(entry)
+
+    def test_inexistente_devuelve_false(self) -> None:
+        from pos_uniformes.services.libreta_service import eliminar_operacion
+
+        session = MagicMock()
+        session.get.return_value = None
+        self.assertFalse(eliminar_operacion(session, 99))
+        session.delete.assert_not_called()
+
+
+class BorrarRegistroLibretaTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        from PyQt6.QtWidgets import QApplication
+
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _fake_owner(self, rows, current_row: int):
+        fake = SimpleNamespace(
+            _libreta_is_owner=True,
+            _libreta_rows_pintadas=rows,
+            libreta_table=MagicMock(),
+            _set_status=MagicMock(),
+            _refresh_libreta_view=MagicMock(),
+        )
+        fake.libreta_table.currentRow.return_value = current_row
+        return fake
+
+    def _row(self, entry_id):
+        return SimpleNamespace(
+            id=entry_id,
+            created_at=datetime(2026, 9, 2, 10, 0, tzinfo=timezone.utc),
+            tipo="venta",
+            employee_name="Ana",
+            employee_code="VEND-2",
+            monto_total=Decimal("500.00"),
+        )
+
+    def test_borra_con_confirmacion(self) -> None:
+        from PyQt6.QtWidgets import QMessageBox
+
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        fake = self._fake_owner([self._row(7)], current_row=0)
+        ctx = MagicMock()
+        ctx.__enter__.return_value = MagicMock()
+        with patch(
+            "pos_uniformes.ui.quote_satellite_window.QMessageBox.question",
+            return_value=QMessageBox.StandardButton.Yes,
+        ), patch(
+            "pos_uniformes.ui.quote_satellite_window.get_session", return_value=ctx
+        ), patch(
+            "pos_uniformes.services.libreta_service.eliminar_operacion",
+            return_value=True,
+        ) as eliminar:
+            QuoteSatelliteWindow._borrar_registro_libreta(fake)
+        eliminar.assert_called_once()
+        self.assertEqual(eliminar.call_args.args[1], 7)
+        fake._refresh_libreta_view.assert_called_once()
+
+    def test_cancelar_no_borra(self) -> None:
+        from PyQt6.QtWidgets import QMessageBox
+
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        fake = self._fake_owner([self._row(7)], current_row=0)
+        with patch(
+            "pos_uniformes.ui.quote_satellite_window.QMessageBox.question",
+            return_value=QMessageBox.StandardButton.No,
+        ), patch(
+            "pos_uniformes.services.libreta_service.eliminar_operacion"
+        ) as eliminar:
+            QuoteSatelliteWindow._borrar_registro_libreta(fake)
+        eliminar.assert_not_called()
+        fake._refresh_libreta_view.assert_not_called()
+
+    def test_empleada_no_puede_borrar(self) -> None:
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        fake = self._fake_owner([self._row(7)], current_row=0)
+        fake._libreta_is_owner = False
+        with patch(
+            "pos_uniformes.services.libreta_service.eliminar_operacion"
+        ) as eliminar:
+            QuoteSatelliteWindow._borrar_registro_libreta(fake)
+        eliminar.assert_not_called()
 
 
 class LibretaAutoLogoutTests(unittest.TestCase):

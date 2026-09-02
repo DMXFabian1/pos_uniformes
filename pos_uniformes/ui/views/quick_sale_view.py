@@ -1055,13 +1055,19 @@ class QuickSaleWidget(QWidget):
             card = self._ask_card_payment()
         else:
             wants_copy, card = self._ask_venta_options()
-        self._registrar_en_libreta("venta", pago_tarjeta=card)
         tickets = [self._build_venta_text()]
         if self._discount_active:
             tickets.append(self._build_employee_copy_text(terminal_commission=card))
         elif wants_copy:
             tickets.append(self._build_venta_text(store_copy=True, terminal_commission=card))
-        route_tickets(self, "Ticket de venta", tickets)
+        # La Libreta registra HASTA que la impresión realmente arranca:
+        # cerrar el diálogo sin imprimir no anota nada.
+        route_tickets(
+            self,
+            "Ticket de venta",
+            tickets,
+            on_printed=lambda: self._registrar_en_libreta("venta", pago_tarjeta=card),
+        )
         self._scan_input.setFocus()
 
     def _on_abono(self) -> None:
@@ -1259,14 +1265,18 @@ class QuickSaleWidget(QWidget):
         nombre = name_input.text().strip()
         if not nombre:
             return
-        self._registrar_en_libreta("apartado", cliente=nombre)
         cliente_text = self._build_apartado_text(
             nombre, copy_label="CLIENTE", include_terms=True
         )
         tienda_text = self._build_apartado_text(
             nombre, copy_label="COPIA TIENDA", include_terms=False
         )
-        route_tickets(self, "Apartado", [cliente_text, tienda_text])
+        route_tickets(
+            self,
+            "Apartado",
+            [cliente_text, tienda_text],
+            on_printed=lambda: self._registrar_en_libreta("apartado", cliente=nombre),
+        )
         self._scan_input.setFocus()
 
     def _on_enviar_pedido(self) -> None:
