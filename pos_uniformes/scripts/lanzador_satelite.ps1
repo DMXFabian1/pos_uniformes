@@ -1,22 +1,22 @@
-# Lanzador del satélite con AUTO-ACTUALIZACIÓN por red (sin USB).
+# Lanzador del satelite con AUTO-ACTUALIZACION por red (sin USB).
 #
-# Cómo funciona: al abrirlo, compara la versión instalada en este kiosko
+# Como funciona: al abrirlo, compara la version instalada en este kiosko
 # contra la publicada por la PC principal en \\<servidor>\pos_updates.
-# Si hay versión nueva la copia (la app aún no corre, así que nada está
-# bloqueado) y arranca el exe local. Si la PC principal está apagada,
-# simplemente arranca la versión que ya tiene — nunca deja al kiosko tirado.
+# Si hay version nueva la copia (la app aun no corre, asi que nada esta
+# bloqueado) y arranca el exe local. Si la PC principal esta apagada,
+# simplemente arranca la version que ya tiene - nunca deja al kiosko tirado.
 #
-# Instalación en un kiosko (UNA sola vez):
+# Instalacion en un kiosko (UNA sola vez):
 #   1. Copiar lanzador_satelite.bat y lanzador_satelite.ps1 desde
 #      \\<servidor>\pos_updates a una carpeta local (p.ej. C:\PresupuestosSatelite).
 #   2. Crear acceso directo al .bat en el Escritorio (y/o en la carpeta de
 #      Inicio para que abra solo al prender la PC).
-#   Después de eso, las actualizaciones llegan solas.
+#   Despues de eso, las actualizaciones llegan solas.
 
 $ErrorActionPreference = "SilentlyContinue"
 
 # El servidor se lee del .env de la app instalada (misma fuente que usa la
-# app); 192.168.0.10 solo como default de primera instalación.
+# app); 192.168.0.10 solo como default de primera instalacion.
 $serverHost = "192.168.0.10"
 $appDir = Join-Path $env:LOCALAPPDATA "PresupuestosSatelite\app"
 $envFile = Join-Path $appDir "pos_uniformes.env"

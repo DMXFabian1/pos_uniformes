@@ -61,9 +61,9 @@ Copy-Item (Join-Path $projectRoot "pos_uniformes.env.example") `
 
 Compress-Archive -Path (Join-Path $bundleDir "*") -DestinationPath $zipPath -Force
 
-# ── Publicación para kioskos (auto-update por red, sin USB) ──────────────
+# -- Publicacion para kioskos (auto-update por red, sin USB) --------------
 # Si existe C:\pos_updates (compartida en red como \\<servidor>\pos_updates),
-# la build se copia ahí y el lanzador de cada kiosko se actualiza solo al
+# la build se copia ahi y el lanzador de cada kiosko se actualiza solo al
 # arrancar. Sin la carpeta, este paso simplemente se omite.
 $updatesDir = $env:POS_UNIFORMES_UPDATES_DIR
 if (-not $updatesDir) { $updatesDir = "C:\pos_updates" }
@@ -86,7 +86,7 @@ Write-Host "  Version: $version"
 Write-Host "  Carpeta: $bundleDir"
 Write-Host "  ZIP:     $zipPath"
 Write-Host ""
-Write-Host "El bundle ya incluye pos_uniformes.env (copiado del .example, apunta al servidor) — una PC satelite nueva funciona con solo copiar la carpeta."
+Write-Host "El bundle ya incluye pos_uniformes.env (copiado del .example, apunta al servidor) - una PC satelite nueva funciona con solo copiar la carpeta."
 if (-not $WithPrecheck) {
     Write-Host "Nota: el precheck de base se omitio en esta build. Usa -WithPrecheck si quieres validarlo."
 }
