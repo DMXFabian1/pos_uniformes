@@ -833,6 +833,85 @@ class QuickSaleWidget(QWidget):
         "  4.1. La entrega se hara solo con el pago total, sin liquidaciones parciales."
     )
 
+    def _registrar_en_libreta(self, tipo: str, *, cliente: str | None = None) -> None:
+        """Anota la operación en la Libreta: local primero (nunca bloquea el
+        mostrador ni pierde el registro), y un hilo la sube a la base.
+
+        Sustituye la libreta física y la copia de ticket que solo servía
+        para registrar."""
+        try:
+            from datetime import timezone as _tz
+
+            from pos_uniformes.services import libreta_local_queue_service as cola
+
+            _subtotal, _descuento, total = self._compute_totals()
+            total = Decimal(str(total)).quantize(Decimal("0.01"))
+            # Reimprimir el mismo ticket no debe anotar la venta dos veces.
+            key = (
+                tipo,
+                cliente,
+                str(total),
+                tuple((it["sku"], int(it["cantidad"])) for it in self._items),
+            )
+            if key == getattr(self, "_last_libreta_key", None):
+                return
+            self._last_libreta_key = key
+
+            origen: str | None = None
+            try:
+                from pos_uniformes.services.satellite_identity_service import get_satellite_id
+
+                origen = get_satellite_id()
+            except Exception:  # noqa: BLE001
+                pass
+
+            cola.encolar_operacion(
+                {
+                    "employee_code": str(self._employee_code or ""),
+                    "employee_name": str(self._employee_name or self._employee_code or ""),
+                    "tipo": tipo,
+                    "cliente": cliente,
+                    "items": [
+                        {
+                            "sku": it["sku"],
+                            "nombre": it["nombre"],
+                            "talla": it["talla"],
+                            "cantidad": int(it["cantidad"]),
+                            "precio": str(it["precio"]),
+                        }
+                        for it in self._items
+                    ],
+                    "monto_total": str(total),
+                    "descuento_empleada": bool(self._discount_active),
+                    "origen": origen,
+                    "created_at": datetime.now(_tz.utc).astimezone().isoformat(),
+                }
+            )
+            self._drenar_libreta_en_background()
+        except Exception:  # noqa: BLE001 — la Libreta nunca rompe el flujo de tickets
+            _logger.exception("No se pudo registrar la operacion en la Libreta")
+
+    def _drenar_libreta_en_background(self) -> None:
+        """Sube las operaciones pendientes a la base sin tocar el hilo de UI."""
+        import threading
+
+        def _worker() -> None:
+            try:
+                from pos_uniformes.services.satellite_startup_service import (
+                    probe_database_host,
+                )
+
+                if not probe_database_host():
+                    return
+                from pos_uniformes.services import libreta_local_queue_service as cola
+
+                with get_session() as session:
+                    cola.drenar_pendientes(session)
+            except Exception:  # noqa: BLE001
+                _logger.debug("Drenado de libreta pospuesto", exc_info=True)
+
+        threading.Thread(target=_worker, daemon=True, name="libreta-drain").start()
+
     def _scan_confirms_copy(self, raw: str) -> bool:
         """True solo si lo escaneado es el gafete de LA empleada en sesión."""
         code = self._clean_scanned_code(raw)
@@ -913,6 +992,9 @@ class QuickSaleWidget(QWidget):
         if not self._items:
             QMessageBox.information(self, "Sin piezas", "Agrega piezas antes de generar ticket.")
             return
+        # La Libreta registra la venta al generar el ticket (sea con copia o
+        # sin ella): ya no hace falta ticket extra ni apuntarla a mano.
+        self._registrar_en_libreta("venta")
         tickets = [self._build_venta_text()]
         alt_copy: str | None = None
         if self._discount_active:
@@ -1021,6 +1103,7 @@ class QuickSaleWidget(QWidget):
         nombre = name_input.text().strip()
         if not nombre:
             return
+        self._registrar_en_libreta("apartado", cliente=nombre)
         cliente_text = self._build_apartado_text(
             nombre, copy_label="CLIENTE", include_terms=True
         )

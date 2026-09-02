@@ -730,7 +730,12 @@ class QuoteSatelliteWindow(QMainWindow):
         self.nav_share_button = QPushButton("Compartir")
         self.nav_search_button = QPushButton("Buscar")
         self.nav_tariff_button = QPushButton("Tarifarios")
+        self.nav_libreta_button = QPushButton("Libreta")
         self.nav_conteos_button = QPushButton("Calendario")
+        # "Tarifarios" oculto (decisión de Daniel, 2026-09-02): su lugar lo
+        # toma "Libreta". La página y su código siguen vivos; para restaurarla
+        # basta quitar esta línea.
+        self.nav_tariff_button.setVisible(False)
         # Ocultos temporalmente (2026-07-05, decisión de Daniel): "Presupuesto"
         # y "Buscar" no se usan en piso por ahora — las páginas siguen vivas y
         # se retomarán después; para restaurarlas basta quitar estas 2 líneas.
@@ -914,6 +919,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self.nav_share_button: _icon_from_asset("kiosk_icons/share_send.svg"),
             self.nav_search_button: _icon_from_asset("kiosk_icons/search_quote.svg"),
             self.nav_tariff_button: _icon_from_asset("kiosk_icons/catalog_grid.svg"),
+            self.nav_libreta_button: _icon_from_asset("kiosk_icons/quote_stack.svg"),
             self.nav_conteos_button: _icon_from_asset("kiosk_icons/calendar.svg"),
         }
         for button, icon in nav_icons.items():
@@ -1026,6 +1032,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self.nav_quote_button,
             self.nav_search_button,
             self.nav_tariff_button,
+            self.nav_libreta_button,
             self.nav_conteos_button,
         ):
             button.setObjectName("navButton")
@@ -1123,7 +1130,279 @@ class QuoteSatelliteWindow(QMainWindow):
         # "search" va al final del stack para no mover los indices existentes
         self.page_stack.addWidget(self._scrollable(self._build_search_page()))
         self.page_stack.addWidget(self._scrollable(self._build_conteos_page()))
+        self.page_stack.addWidget(self._scrollable(self._build_libreta_page()))
         return self.page_stack
+
+    def _build_libreta_page(self) -> QWidget:
+        """Página "Libreta" — registro digital de ventas por empleada.
+
+        Gate por gafete: cada empleada ve SUS operaciones (piezas, sin
+        montos); el gafete del dueño abre la vista completa con montos.
+        Reemplaza a Tarifarios en el sidebar (esa página sigue viva, oculta).
+        """
+        page = QWidget()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(10)
+
+        titulo = QLabel("Libreta")
+        titulo.setObjectName("guidedStepTitle")
+        layout.addWidget(titulo)
+
+        # ── Gate: escanear gafete ────────────────────────────────────────
+        self.libreta_gate = QWidget()
+        gate_ly = QVBoxLayout()
+        gate_ly.setContentsMargins(40, 60, 40, 60)
+        gate_ly.setSpacing(12)
+        gate_hint = QLabel("Escanea tu gafete para abrir tu libreta")
+        gate_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        gate_hint.setStyleSheet("font-size: 16px; font-weight: 600;")
+        gate_ly.addWidget(gate_hint)
+        self.libreta_gate_input = QLineEdit()
+        self.libreta_gate_input.setPlaceholderText("Gafete...")
+        self.libreta_gate_input.returnPressed.connect(self._on_libreta_gate_scan)
+        gate_ly.addWidget(self.libreta_gate_input)
+        self.libreta_gate_error = QLabel("")
+        self.libreta_gate_error.setStyleSheet("font-size: 12px; color: #c0392b;")
+        self.libreta_gate_error.setVisible(False)
+        gate_ly.addWidget(self.libreta_gate_error)
+        gate_ly.addStretch()
+        self.libreta_gate.setLayout(gate_ly)
+        layout.addWidget(self.libreta_gate)
+
+        # ── Vista (empleada o dueño) ─────────────────────────────────────
+        self.libreta_view = QWidget()
+        view_ly = QVBoxLayout()
+        view_ly.setContentsMargins(0, 0, 0, 0)
+        view_ly.setSpacing(8)
+
+        header = QHBoxLayout()
+        self.libreta_titular_label = QLabel("")
+        self.libreta_titular_label.setStyleSheet("font-size: 15px; font-weight: 600;")
+        header.addWidget(self.libreta_titular_label)
+        header.addStretch()
+        self.libreta_hoy_button = QPushButton("Hoy")
+        self.libreta_semana_button = QPushButton("Semana")
+        for button in (self.libreta_hoy_button, self.libreta_semana_button):
+            button.setCheckable(True)
+            button.setAutoDefault(False)
+        self.libreta_hoy_button.setChecked(True)
+        self.libreta_hoy_button.clicked.connect(lambda: self._set_libreta_periodo(week=False))
+        self.libreta_semana_button.clicked.connect(lambda: self._set_libreta_periodo(week=True))
+        header.addWidget(self.libreta_hoy_button)
+        header.addWidget(self.libreta_semana_button)
+        self.libreta_refresh_button = QPushButton("Actualizar")
+        self.libreta_refresh_button.setAutoDefault(False)
+        self.libreta_refresh_button.clicked.connect(self._refresh_libreta_view)
+        header.addWidget(self.libreta_refresh_button)
+        self.libreta_salir_button = QPushButton("Salir")
+        self.libreta_salir_button.setAutoDefault(False)
+        self.libreta_salir_button.clicked.connect(self._libreta_logout)
+        header.addWidget(self.libreta_salir_button)
+        view_ly.addLayout(header)
+
+        self.libreta_resumen_label = QLabel("")
+        self.libreta_resumen_label.setStyleSheet("font-size: 13px; color: #555;")
+        view_ly.addWidget(self.libreta_resumen_label)
+
+        self.libreta_status_label = QLabel("")
+        self.libreta_status_label.setStyleSheet("font-size: 12px; color: #b9770e;")
+        self.libreta_status_label.setVisible(False)
+        view_ly.addWidget(self.libreta_status_label)
+
+        # Resumen por empleada (solo vista dueño)
+        self.libreta_summary_table = QTableWidget(0, 4)
+        self.libreta_summary_table.setHorizontalHeaderLabels(
+            ["Empleada", "Operaciones", "Piezas", "Monto"]
+        )
+        self.libreta_summary_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
+        self.libreta_summary_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.libreta_summary_table.setMaximumHeight(180)
+        view_ly.addWidget(self.libreta_summary_table)
+
+        # Operaciones una por una
+        self.libreta_table = QTableWidget(0, 6)
+        self.libreta_table.setHorizontalHeaderLabels(
+            ["Fecha", "Hora", "Tipo", "Piezas", "Prendas", "Monto"]
+        )
+        self.libreta_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
+        self.libreta_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        view_ly.addWidget(self.libreta_table, 1)
+
+        self.libreta_view.setLayout(view_ly)
+        self.libreta_view.setVisible(False)
+        layout.addWidget(self.libreta_view, 1)
+
+        self._libreta_code: str | None = None
+        self._libreta_is_owner = False
+        self._libreta_week = False
+
+        page.setLayout(layout)
+        return page
+
+    def _on_libreta_gate_scan(self) -> None:
+        code = QuickSaleWidget._clean_scanned_code(self.libreta_gate_input.text())
+        self.libreta_gate_input.clear()
+        if not code:
+            return
+        self._libreta_code = code
+        self._libreta_is_owner = code == QuickSaleWidget._OWNER_CODE
+        self._libreta_week = False
+        self.libreta_hoy_button.setChecked(True)
+        self.libreta_semana_button.setChecked(False)
+        self.libreta_gate_error.setVisible(False)
+        self.libreta_gate.setVisible(False)
+        self.libreta_view.setVisible(True)
+        # La columna de dinero y el resumen por empleada son solo del dueño.
+        self.libreta_summary_table.setVisible(self._libreta_is_owner)
+        self.libreta_table.setColumnHidden(5, not self._libreta_is_owner)
+        self.libreta_titular_label.setText(
+            "Libreta de la tienda (todas las empleadas)"
+            if self._libreta_is_owner
+            else f"Libreta de {code}"
+        )
+        self._refresh_libreta_view()
+
+    def _libreta_logout(self) -> None:
+        self._libreta_code = None
+        self._libreta_is_owner = False
+        self.libreta_view.setVisible(False)
+        self.libreta_gate.setVisible(True)
+        QTimer.singleShot(0, self.libreta_gate_input.setFocus)
+
+    def _set_libreta_periodo(self, *, week: bool) -> None:
+        self._libreta_week = week
+        self.libreta_hoy_button.setChecked(not week)
+        self.libreta_semana_button.setChecked(week)
+        self._refresh_libreta_view()
+
+    def _refresh_libreta_view(self) -> None:
+        if not self._libreta_code:
+            return
+        from pos_uniformes.services import libreta_local_queue_service as libreta_cola
+        from pos_uniformes.services.libreta_service import (
+            listar_operaciones,
+            ventana_hoy,
+            ventana_semana,
+        )
+        from pos_uniformes.services.satellite_startup_service import probe_database_host
+
+        desde, hasta = ventana_semana() if self._libreta_week else ventana_hoy()
+        employee_filter = None if self._libreta_is_owner else self._libreta_code
+
+        rows: list = []
+        fuente_db = False
+        if probe_database_host(0.5):
+            try:
+                with get_session() as session:
+                    # Fold: lo pendiente local se sube antes de consultar.
+                    try:
+                        libreta_cola.drenar_pendientes(session)
+                    except Exception:  # noqa: BLE001
+                        session.rollback()
+                    rows = listar_operaciones(
+                        session, desde=desde, hasta=hasta, employee_code=employee_filter
+                    )
+                fuente_db = True
+            except Exception:  # noqa: BLE001
+                logger.exception("Libreta: fallo la consulta a la base")
+
+        if not fuente_db:
+            rows = self._libreta_rows_locales(desde, hasta, employee_filter)
+        self.libreta_status_label.setVisible(not fuente_db)
+        self.libreta_status_label.setText(
+            "Sin conexion con la PC principal: mostrando solo lo registrado en esta terminal."
+        )
+
+        self._pintar_libreta(rows)
+
+    @staticmethod
+    def _libreta_rows_locales(desde, hasta, employee_filter):
+        """Fallback offline: las operaciones pendientes de ESTA terminal."""
+        from datetime import datetime as _dt
+        from decimal import Decimal as _Dec
+        from types import SimpleNamespace
+
+        from pos_uniformes.services import libreta_local_queue_service as libreta_cola
+
+        rows = []
+        for entry in libreta_cola.pendientes():
+            try:
+                created = _dt.fromisoformat(str(entry.get("created_at", "")))
+            except (TypeError, ValueError):
+                continue
+            code = str(entry.get("employee_code", "")).upper()
+            if employee_filter and code != str(employee_filter).upper():
+                continue
+            if not (desde <= created <= hasta):
+                continue
+            items = list(entry.get("items", []))
+            rows.append(
+                SimpleNamespace(
+                    created_at=created,
+                    employee_code=code,
+                    employee_name=str(entry.get("employee_name", "")),
+                    tipo=str(entry.get("tipo", "venta")),
+                    piezas=sum(int(it.get("cantidad", 0) or 0) for it in items),
+                    monto_total=_Dec(str(entry.get("monto_total", "0"))),
+                    detalle=items,
+                )
+            )
+        rows.sort(key=lambda r: r.created_at, reverse=True)
+        return rows
+
+    def _pintar_libreta(self, rows: list) -> None:
+        from pos_uniformes.services.libreta_service import (
+            describir_detalle,
+            resumir_por_empleada,
+        )
+
+        total_ops = len(rows)
+        total_piezas = sum(int(r.piezas or 0) for r in rows)
+        periodo = "esta semana" if self._libreta_week else "hoy"
+        resumen = f"{total_ops} operacion(es) · {total_piezas} pieza(s) {periodo}"
+        if self._libreta_is_owner:
+            total_monto = sum(Decimal(str(r.monto_total or 0)) for r in rows)
+            resumen += f" · ${total_monto:,.2f}"
+        self.libreta_resumen_label.setText(resumen)
+
+        if self._libreta_is_owner:
+            por_empleada = resumir_por_empleada(rows)
+            self.libreta_summary_table.setRowCount(len(por_empleada))
+            for i, r in enumerate(por_empleada):
+                nombre = r.employee_name or r.employee_code
+                self.libreta_summary_table.setItem(i, 0, QTableWidgetItem(nombre))
+                self.libreta_summary_table.setItem(i, 1, QTableWidgetItem(str(r.operaciones)))
+                self.libreta_summary_table.setItem(i, 2, QTableWidgetItem(str(r.piezas)))
+                self.libreta_summary_table.setItem(
+                    i, 3, QTableWidgetItem(f"${r.monto_total:,.2f}")
+                )
+
+        self.libreta_table.setRowCount(len(rows))
+        for i, row in enumerate(rows):
+            local_dt = (
+                row.created_at.astimezone()
+                if row.created_at.tzinfo is not None
+                else row.created_at
+            )
+            tipo_txt = str(row.tipo).capitalize()
+            if self._libreta_is_owner:
+                nombre = row.employee_name or row.employee_code
+                tipo_txt = f"{tipo_txt} — {nombre}"
+            self.libreta_table.setItem(i, 0, QTableWidgetItem(local_dt.strftime("%d/%m")))
+            self.libreta_table.setItem(i, 1, QTableWidgetItem(local_dt.strftime("%H:%M")))
+            self.libreta_table.setItem(i, 2, QTableWidgetItem(tipo_txt))
+            self.libreta_table.setItem(i, 3, QTableWidgetItem(str(row.piezas)))
+            self.libreta_table.setItem(
+                i, 4, QTableWidgetItem(describir_detalle(list(row.detalle or [])))
+            )
+            self.libreta_table.setItem(
+                i, 5, QTableWidgetItem(f"${Decimal(str(row.monto_total or 0)):,.2f}")
+            )
 
     def _build_conteos_page(self) -> QWidget:
         """Página "Calendario" del kiosko (después de Tarifarios).
@@ -2331,6 +2610,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.nav_share_button.clicked.connect(lambda: self._set_page("share"))
         self.nav_search_button.clicked.connect(lambda: self._set_page("search"))
         self.nav_tariff_button.clicked.connect(lambda: self._set_page("tariff"))
+        self.nav_libreta_button.clicked.connect(lambda: self._set_page("libreta"))
         self.nav_conteos_button.clicked.connect(lambda: self._set_page("conteos"))
         self.tariff_generate_button.clicked.connect(self._handle_generate_tariff)
         self.tariff_print_button.clicked.connect(self._handle_print_tariff)
@@ -2475,6 +2755,7 @@ class QuoteSatelliteWindow(QMainWindow):
             "tariff": 6,
             "search": 7,
             "conteos": 8,
+            "libreta": 9,
         }
         button_map = {
             "kiosk": self.nav_kiosk_button,
@@ -2486,6 +2767,7 @@ class QuoteSatelliteWindow(QMainWindow):
             "tariff": self.nav_tariff_button,
             "search": self.nav_search_button,
             "conteos": self.nav_conteos_button,
+            "libreta": self.nav_libreta_button,
         }
         page_title_map = {
             "kiosk": "Kiosko listo para escaneo rapido.",
@@ -2497,6 +2779,7 @@ class QuoteSatelliteWindow(QMainWindow):
             "tariff": "Tarifario de precios por escuela.",
             "search": "Busqueda y seguimiento de presupuestos.",
             "conteos": "Calendario de conteos por escuela.",
+            "libreta": "Libreta de la tienda.",
         }
         self.current_page_key = page_key
         self.page_stack.setCurrentIndex(page_index_map[page_key])
@@ -2514,7 +2797,8 @@ class QuoteSatelliteWindow(QMainWindow):
     # Orden de las secciones tal como aparecen en el sidebar. Las ocultas
     # (Catálogo, Presupuesto, Buscar) se saltan solas al navegar.
     _SECCIONES_NAV = (
-        "kiosk", "quicksale", "catalog", "guided", "quote", "search", "tariff", "conteos",
+        "kiosk", "quicksale", "catalog", "guided", "quote", "search", "tariff",
+        "libreta", "conteos",
     )
 
     def _secciones_visibles(self) -> list[str]:
@@ -2527,6 +2811,7 @@ class QuoteSatelliteWindow(QMainWindow):
             "quote": self.nav_quote_button,
             "search": self.nav_search_button,
             "tariff": self.nav_tariff_button,
+            "libreta": self.nav_libreta_button,
             "conteos": self.nav_conteos_button,
         }
         return [k for k in self._SECCIONES_NAV if not botones[k].isHidden()]

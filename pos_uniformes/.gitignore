@@ -31,6 +31,7 @@ backups/database/.automatic_backup_status.json
 data/catalog_cache.json
 data/school_links_cache.json
 data/business_info.json
+data/libreta_pendiente.json
 data/label_printer_settings.json
 data/satellite_errors.log
 data/pos_errors.log

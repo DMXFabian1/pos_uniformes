@@ -1906,3 +1906,39 @@ class Satelite(Base):
         server_default=func.now(),
         nullable=False,
     )
+
+
+class LibretaVenta(Base):
+    """Registro digital de operaciones del mostrador (la "Libreta").
+
+    Cada venta/apartado de venta rápida se anota aquí automáticamente, ligado
+    al gafete de la empleada en sesión. Sustituye la libreta física y la copia
+    de ticket que se imprimía solo para registrar. Las empleadas ven sus
+    piezas (sin montos); los montos son para la vista del dueño.
+    """
+
+    __tablename__ = "libreta_venta"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employee_code: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    employee_name: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    # "venta" | "apartado"
+    tipo: Mapped[str] = mapped_column(String(20), nullable=False, default="venta", index=True)
+    cliente: Mapped[str | None] = mapped_column(String(120))
+    piezas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    monto_total: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    descuento_empleada: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    # Líneas de la operación: [{sku, nombre, talla, cantidad, precio, subtotal}]
+    detalle: Mapped[list] = mapped_column(
+        JSON().with_variant(JSONB(), "postgresql"),
+        nullable=False,
+        default=list,
+    )
+    # Identificador del satélite/PC donde se registró (presencia/auditoría).
+    origen: Mapped[str | None] = mapped_column(String(60), index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+        index=True,
+    )
