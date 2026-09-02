@@ -480,6 +480,37 @@ class LibretaListaAmigableTests(unittest.TestCase):
             self.assertNotIn("200", texto)
 
 
+class LibretaAutoLogoutTests(unittest.TestCase):
+    """Salir de la página Libreta cierra la sesión (no queda abierta la
+    vista del dueño con dinero en el kiosko)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        from PyQt6.QtWidgets import QApplication
+
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_navegar_a_otra_pagina_cierra_libreta(self) -> None:
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        fake = SimpleNamespace(_libreta_code="VEND-1", _libreta_logout=MagicMock())
+        try:
+            QuoteSatelliteWindow._set_page(fake, "kiosk")
+        except AttributeError:
+            pass  # el resto del método necesita widgets reales; no importa aquí
+        fake._libreta_logout.assert_called_once()
+
+    def test_quedarse_en_libreta_no_cierra(self) -> None:
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        fake = SimpleNamespace(_libreta_code="VEND-1", _libreta_logout=MagicMock())
+        try:
+            QuoteSatelliteWindow._set_page(fake, "libreta")
+        except AttributeError:
+            pass
+        fake._libreta_logout.assert_not_called()
+
+
 class LibretaPagePrivacyTests(unittest.TestCase):
     """El gate decide qué se ve: empleada sin montos, dueño con todo."""
 

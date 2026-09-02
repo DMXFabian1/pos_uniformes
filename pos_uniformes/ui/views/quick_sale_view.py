@@ -954,7 +954,7 @@ class QuickSaleWidget(QWidget):
         box.setWindowTitle("Forma de pago")
         box.setText("¿El pago fue con tarjeta?")
         card_button = box.addButton(
-            f"Tarjeta (−{self._TERMINAL_COMMISSION_PERCENT}%)",
+            "Tarjeta",
             QMessageBox.ButtonRole.YesRole,
         )
         cash_button = box.addButton("Efectivo", QMessageBox.ButtonRole.NoRole)
@@ -994,9 +994,7 @@ class QuickSaleWidget(QWidget):
         error_label.setVisible(False)
         ly.addWidget(error_label)
 
-        card_check = QCheckBox(
-            f"Pagó con tarjeta (se descuenta {self._TERMINAL_COMMISSION_PERCENT}%)"
-        )
+        card_check = QCheckBox("Pagó con tarjeta")
         ly.addWidget(card_check)
 
         wants_copy = False
@@ -1091,9 +1089,7 @@ class QuickSaleWidget(QWidget):
         monto_input.setPlaceholderText("$")
         ly.addWidget(monto_input)
 
-        card_check = QCheckBox(
-            f"Pagó con tarjeta (se descuenta {self._TERMINAL_COMMISSION_PERCENT}%)"
-        )
+        card_check = QCheckBox("Pagó con tarjeta")
         ly.addWidget(card_check)
 
         error_label = QLabel("")

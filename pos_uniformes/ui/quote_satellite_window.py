@@ -3077,6 +3077,10 @@ class QuoteSatelliteWindow(QMainWindow):
         )
 
     def _set_page(self, page_key: str) -> None:
+        # Al salir de la Libreta se cierra la sesión sola: la vista del dueño
+        # (con dinero) no debe quedar abierta en el kiosko.
+        if page_key != "libreta" and getattr(self, "_libreta_code", None):
+            self._libreta_logout()
         page_index_map = {
             "kiosk": 0,
             "quicksale": 1,
