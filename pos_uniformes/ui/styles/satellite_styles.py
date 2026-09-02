@@ -679,4 +679,41 @@ QProgressBar#libretaMetaProgress::chunk {
     background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
         stop:0 #a84f2d, stop:1 #c96a35);
 }
+
+QLabel#libretaCardSub {
+    font-size: 11px;
+    font-weight: 600;
+    color: #8a8177;
+}
+QLabel#libretaCardSubClaro {
+    font-size: 11px;
+    font-weight: 600;
+    color: #f6ddca;
+}
+QLabel#libretaSeccion {
+    font-size: 12px;
+    font-weight: 800;
+    color: #8a8177;
+    letter-spacing: 2px;
+    margin-top: 6px;
+}
+QTableWidget#libretaTabla {
+    background: #fffdf8;
+    border: 1px solid #ddd0c0;
+    border-radius: 14px;
+    gridline-color: #efe5d8;
+    font-size: 13px;
+    color: #2c2a27;
+    selection-background-color: #f4d4bb;
+    selection-color: #73341c;
+}
+QTableWidget#libretaTabla QHeaderView::section {
+    background: #f8f2e9;
+    color: #73341c;
+    font-weight: 800;
+    font-size: 12px;
+    border: none;
+    border-bottom: 1px solid #ddd0c0;
+    padding: 8px 6px;
+}
 """

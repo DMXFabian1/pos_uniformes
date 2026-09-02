@@ -1219,7 +1219,7 @@ class QuoteSatelliteWindow(QMainWindow):
         # empleada, EN CAJA para el dueño.
         cards_row = QHBoxLayout()
         cards_row.setSpacing(10)
-        self._libreta_cards: list[tuple[QFrame, QLabel, QLabel]] = []
+        self._libreta_cards: list[tuple[QFrame, QLabel, QLabel, QLabel]] = []
         for index in range(4):
             card = QFrame()
             card.setObjectName("libretaCardDestacada" if index == 0 else "libretaCard")
@@ -1234,11 +1234,17 @@ class QuoteSatelliteWindow(QMainWindow):
             valor_card.setObjectName(
                 "libretaCardValorClaro" if index == 0 else "libretaCardValor"
             )
+            sub_card = QLabel("")
+            sub_card.setObjectName(
+                "libretaCardSubClaro" if index == 0 else "libretaCardSub"
+            )
+            sub_card.setVisible(False)
             card_ly.addWidget(titulo_card)
             card_ly.addWidget(valor_card)
+            card_ly.addWidget(sub_card)
             card.setLayout(card_ly)
             cards_row.addWidget(card, 1)
-            self._libreta_cards.append((card, titulo_card, valor_card))
+            self._libreta_cards.append((card, titulo_card, valor_card, sub_card))
         view_ly.addLayout(cards_row)
 
         # Barra del dueño: imprimir corte + meta semanal de comisiones
@@ -1295,9 +1301,26 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_pendientes_label.setVisible(False)
         view_ly.addWidget(self.libreta_pendientes_label)
 
-        # Corte por día (solo vista dueño): cuánto se vendió y cuánto
-        # efectivo debe haber en el cajón cada día.
+        # Lista amigable de la empleada: sus movimientos en lenguaje simple,
+        # sin columnas técnicas ni dinero.
+        self.libreta_emp_list = QListWidget()
+        self.libreta_emp_list.setObjectName("libretaLista")
+        view_ly.addWidget(self.libreta_emp_list, 1)
+
+        # ── Panel del dueño: corte por día, ranking de empleadas y detalle ──
+        self.libreta_owner_panel = QWidget()
+        owner_panel_ly = QVBoxLayout()
+        owner_panel_ly.setContentsMargins(0, 0, 0, 0)
+        owner_panel_ly.setSpacing(8)
+
+        def _seccion(texto: str) -> QLabel:
+            etiqueta = QLabel(texto)
+            etiqueta.setObjectName("libretaSeccion")
+            return etiqueta
+
+        owner_panel_ly.addWidget(_seccion("CORTE POR DÍA"))
         self.libreta_daily_table = QTableWidget(0, 8)
+        self.libreta_daily_table.setObjectName("libretaTabla")
         self.libreta_daily_table.setHorizontalHeaderLabels(
             ["Día", "En caja $", "Operaciones", "Piezas",
              "Ventas $", "Neto $", "Apartados $", "Abonos $"]
@@ -1306,29 +1329,20 @@ class QuoteSatelliteWindow(QMainWindow):
             QHeaderView.ResizeMode.Stretch
         )
         self.libreta_daily_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.libreta_daily_table.setMaximumHeight(200)
-        view_ly.addWidget(self.libreta_daily_table)
+        self.libreta_daily_table.verticalHeader().setVisible(False)
+        self.libreta_daily_table.setAlternatingRowColors(True)
+        self.libreta_daily_table.setMaximumHeight(190)
+        owner_panel_ly.addWidget(self.libreta_daily_table)
 
-        # Resumen por empleada (solo vista dueño)
-        self.libreta_summary_table = QTableWidget(0, 5)
-        self.libreta_summary_table.setHorizontalHeaderLabels(
-            ["Empleada", "Operaciones", "Piezas", "Comisiones", "Monto"]
-        )
-        self.libreta_summary_table.horizontalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.Stretch
-        )
-        self.libreta_summary_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        self.libreta_summary_table.setMaximumHeight(180)
-        view_ly.addWidget(self.libreta_summary_table)
+        owner_panel_ly.addWidget(_seccion("TUS EMPLEADAS"))
+        self.libreta_ranking_list = QListWidget()
+        self.libreta_ranking_list.setObjectName("libretaLista")
+        self.libreta_ranking_list.setMaximumHeight(170)
+        owner_panel_ly.addWidget(self.libreta_ranking_list)
 
-        # Lista amigable de la empleada: sus movimientos en lenguaje simple,
-        # sin columnas técnicas ni dinero.
-        self.libreta_emp_list = QListWidget()
-        self.libreta_emp_list.setObjectName("libretaLista")
-        view_ly.addWidget(self.libreta_emp_list, 1)
-
-        # Operaciones una por una (tabla detallada — solo vista dueño)
+        owner_panel_ly.addWidget(_seccion("MOVIMIENTOS"))
         self.libreta_table = QTableWidget(0, 7)
+        self.libreta_table.setObjectName("libretaTabla")
         self.libreta_table.setHorizontalHeaderLabels(
             ["Fecha", "Hora", "Tipo", "Piezas", "Comisiones", "Prendas", "Monto"]
         )
@@ -1336,7 +1350,12 @@ class QuoteSatelliteWindow(QMainWindow):
             QHeaderView.ResizeMode.Stretch
         )
         self.libreta_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
-        view_ly.addWidget(self.libreta_table, 1)
+        self.libreta_table.verticalHeader().setVisible(False)
+        self.libreta_table.setAlternatingRowColors(True)
+        owner_panel_ly.addWidget(self.libreta_table, 1)
+
+        self.libreta_owner_panel.setLayout(owner_panel_ly)
+        view_ly.addWidget(self.libreta_owner_panel, 1)
 
         self.libreta_view.setLayout(view_ly)
         self.libreta_view.setVisible(False)
@@ -1368,12 +1387,10 @@ class QuoteSatelliteWindow(QMainWindow):
         # La columna de dinero, el corte diario, el resumen por empleada y
         # los controles de corte/meta son solo del dueño; la barra de
         # progreso de meta es de la empleada.
-        self.libreta_daily_table.setVisible(self._libreta_is_owner)
-        self.libreta_summary_table.setVisible(self._libreta_is_owner)
+        self.libreta_owner_panel.setVisible(self._libreta_is_owner)
         self.libreta_owner_bar.setVisible(self._libreta_is_owner)
         self.libreta_meta_bar.setVisible(False)  # se muestra al refrescar si hay meta
-        # La empleada ve su lista amigable; la tabla técnica es del dueño.
-        self.libreta_table.setVisible(self._libreta_is_owner)
+        # La empleada ve su lista amigable; el panel técnico es del dueño.
         self.libreta_emp_list.setVisible(not self._libreta_is_owner)
         self.libreta_table.setColumnHidden(6, not self._libreta_is_owner)
         if self._libreta_is_owner:
@@ -1546,12 +1563,14 @@ class QuoteSatelliteWindow(QMainWindow):
         rows.sort(key=lambda r: r.created_at, reverse=True)
         return rows
 
-    def _llenar_libreta_cards(self, valores: list[tuple[str, str]]) -> None:
-        for (card, titulo, valor), (texto_titulo, texto_valor) in zip(
-            self._libreta_cards, valores
-        ):
-            titulo.setText(texto_titulo)
-            valor.setText(texto_valor)
+    def _llenar_libreta_cards(self, valores: list[tuple]) -> None:
+        """Rellena las 4 tarjetas; cada valor es (titulo, valor[, subtitulo])."""
+        for (card, titulo, valor, sub), datos in zip(self._libreta_cards, valores):
+            titulo.setText(str(datos[0]))
+            valor.setText(str(datos[1]))
+            texto_sub = str(datos[2]) if len(datos) > 2 and datos[2] else ""
+            sub.setText(texto_sub)
+            sub.setVisible(bool(texto_sub))
 
     def _llenar_libreta_lista(self, rows: list) -> None:
         """Movimientos de la empleada en lenguaje simple, sin dinero."""
@@ -1606,17 +1625,18 @@ class QuoteSatelliteWindow(QMainWindow):
         if self._libreta_is_owner:
             total_monto = sum(Decimal(str(r.monto_total or 0)) for r in rows)
             total_en_caja = sum((c.monto_en_caja for c in cortes), Decimal("0.00"))
+            total_neto = sum((c.monto_neto_ventas for c in cortes), Decimal("0.00"))
+            total_abonos = sum((c.monto_abonos for c in cortes), Decimal("0.00"))
             self._llenar_libreta_cards(
                 [
-                    ("EN CAJA", f"${total_en_caja:,.0f}"),
-                    ("VENTAS", f"${total_monto:,.0f}"),
-                    ("PIEZAS", str(total_piezas)),
-                    ("COMISIONES", str(total_comisiones)),
+                    ("EN CAJA", f"${total_en_caja:,.0f}", "efectivo esperado en el cajón"),
+                    ("VENTAS", f"${total_monto:,.0f}", f"neto tras tarjeta: ${total_neto:,.0f}"),
+                    ("ABONOS", f"${total_abonos:,.0f}", f"{apartados_count} apartado(s) nuevos"),
+                    ("PIEZAS", str(total_piezas), f"{total_comisiones} comisiones · {ventas_count} ventas"),
                 ]
             )
             self.libreta_resumen_label.setText(
-                f"{total_ops} operacion(es) · {total_piezas} pieza(s) · "
-                f"{total_comisiones} comision(es) {periodo}"
+                f"{total_ops} operacion(es) {periodo}"
             )
         else:
             # Saludo con el nombre real en cuanto lo conocemos por sus filas.
@@ -1667,15 +1687,20 @@ class QuoteSatelliteWindow(QMainWindow):
         if self._libreta_is_owner:
             por_empleada = resumir_por_empleada(rows)
             self._libreta_last_por_empleada = por_empleada
-            self.libreta_summary_table.setRowCount(len(por_empleada))
+            self.libreta_ranking_list.clear()
+            medallas = ("🥇", "🥈", "🥉")
+            if not por_empleada:
+                self.libreta_ranking_list.addItem(
+                    QListWidgetItem("Sin movimientos de empleadas en el periodo.")
+                )
             for i, r in enumerate(por_empleada):
                 nombre = r.employee_name or r.employee_code
-                self.libreta_summary_table.setItem(i, 0, QTableWidgetItem(nombre))
-                self.libreta_summary_table.setItem(i, 1, QTableWidgetItem(str(r.operaciones)))
-                self.libreta_summary_table.setItem(i, 2, QTableWidgetItem(str(r.piezas)))
-                self.libreta_summary_table.setItem(i, 3, QTableWidgetItem(str(r.comisiones)))
-                self.libreta_summary_table.setItem(
-                    i, 4, QTableWidgetItem(f"${r.monto_total:,.2f}")
+                lugar = medallas[i] if i < len(medallas) else f" {i + 1}."
+                self.libreta_ranking_list.addItem(
+                    QListWidgetItem(
+                        f"{lugar}  {nombre} — {r.comisiones} comisiones · "
+                        f"{r.piezas} piezas · ${r.monto_total:,.2f} ({r.operaciones} ops)"
+                    )
                 )
 
         if not self._libreta_is_owner:

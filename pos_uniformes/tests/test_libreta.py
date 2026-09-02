@@ -497,8 +497,7 @@ class LibretaPagePrivacyTests(unittest.TestCase):
             libreta_gate_error=MagicMock(),
             libreta_gate=MagicMock(),
             libreta_view=MagicMock(),
-            libreta_summary_table=MagicMock(),
-            libreta_daily_table=MagicMock(),
+            libreta_owner_panel=MagicMock(),
             libreta_owner_bar=MagicMock(),
             libreta_meta_bar=MagicMock(),
             libreta_meta_spin=MagicMock(),
@@ -518,24 +517,21 @@ class LibretaPagePrivacyTests(unittest.TestCase):
         self.assertFalse(fake._libreta_is_owner)
         # Columna de monto oculta y sin resumen por empleada
         fake.libreta_table.setColumnHidden.assert_called_once_with(6, True)
-        fake.libreta_summary_table.setVisible.assert_called_once_with(False)
-        fake.libreta_daily_table.setVisible.assert_called_once_with(False)
-        # Los controles de corte/meta son del dueño, no de la empleada.
+        # El panel técnico completo (corte, ranking, movimientos) y los
+        # controles de corte/meta son del dueño, no de la empleada.
+        fake.libreta_owner_panel.setVisible.assert_called_once_with(False)
         fake.libreta_owner_bar.setVisible.assert_called_once_with(False)
-        # Ella ve su lista amigable, no la tabla técnica.
+        # Ella ve su lista amigable.
         fake.libreta_emp_list.setVisible.assert_called_once_with(True)
-        fake.libreta_table.setVisible.assert_called_once_with(False)
         fake._refresh_libreta_view.assert_called_once()
 
     def test_dueno_ve_todo(self) -> None:
         fake = self._gate_scan("EMP:VEND-1")  # gafete del dueño
         self.assertTrue(fake._libreta_is_owner)
         fake.libreta_table.setColumnHidden.assert_called_once_with(6, False)
-        fake.libreta_summary_table.setVisible.assert_called_once_with(True)
-        fake.libreta_daily_table.setVisible.assert_called_once_with(True)
+        fake.libreta_owner_panel.setVisible.assert_called_once_with(True)
         fake.libreta_owner_bar.setVisible.assert_called_once_with(True)
         fake.libreta_emp_list.setVisible.assert_called_once_with(False)
-        fake.libreta_table.setVisible.assert_called_once_with(True)
 
 
 if __name__ == "__main__":
