@@ -345,6 +345,96 @@ class QuickSaleLibretaHookTests(unittest.TestCase):
         self.assertEqual(entry["monto_neto"], "477.50")
 
 
+class LibretaMetaServiceTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self._tmp = Path(
+            os.environ.get("TMPDIR", "/tmp")
+        ) / f"libreta_meta_test_{os.getpid()}_{id(self)}"
+        self._patcher = patch(
+            "pos_uniformes.services.libreta_meta_service.satellite_data_dir",
+            return_value=self._tmp,
+        )
+        self._patcher.start()
+
+    def tearDown(self) -> None:
+        self._patcher.stop()
+
+    def test_default_sin_meta(self) -> None:
+        from pos_uniformes.services.libreta_meta_service import load_meta_semanal
+
+        self.assertEqual(load_meta_semanal(), 0)
+
+    def test_guardar_y_leer(self) -> None:
+        from pos_uniformes.services.libreta_meta_service import (
+            load_meta_semanal,
+            save_meta_semanal,
+        )
+
+        save_meta_semanal(50)
+        self.assertEqual(load_meta_semanal(), 50)
+        save_meta_semanal(-5)  # negativo se normaliza a 0
+        self.assertEqual(load_meta_semanal(), 0)
+
+    def test_archivo_corrupto_sin_meta(self) -> None:
+        from pos_uniformes.services.libreta_meta_service import load_meta_semanal
+
+        path = self._tmp / "data" / "libreta_meta.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("{corrupto", encoding="utf-8")
+        self.assertEqual(load_meta_semanal(), 0)
+
+
+class FiltrarDeHoyTests(unittest.TestCase):
+    def test_solo_deja_el_dia_pedido(self) -> None:
+        from pos_uniformes.services.libreta_service import filtrar_de_hoy
+
+        lunes = datetime(2026, 8, 31, 10, 0, tzinfo=timezone.utc).astimezone()
+        martes = datetime(2026, 9, 1, 16, 0, tzinfo=timezone.utc).astimezone()
+        rows = [
+            SimpleNamespace(created_at=lunes, tipo="venta"),
+            SimpleNamespace(created_at=martes, tipo="venta"),
+        ]
+        hoy = filtrar_de_hoy(rows, reference=martes.date())
+        self.assertEqual(len(hoy), 1)
+        self.assertEqual(hoy[0].created_at, martes)
+
+
+class CorteTicketTests(unittest.TestCase):
+    def test_ticket_incluye_en_caja_y_empleadas(self) -> None:
+        from pos_uniformes.services.libreta_service import CorteDia, ResumenEmpleada
+        from pos_uniformes.ui.helpers.libreta_corte_ticket_helper import (
+            build_corte_ticket_text,
+        )
+        from pos_uniformes.ui.helpers.ticket_print_layout_helper import TICKET_CHAR_WIDTH
+
+        cortes = [
+            CorteDia(
+                dia=date(2026, 9, 2), dia_label="Mié 02/09", operaciones=3, piezas=5,
+                monto_ventas=Decimal("800.00"), monto_neto_ventas=Decimal("777.50"),
+                monto_apartados=Decimal("900.00"), monto_abonos=Decimal("200.00"),
+                monto_en_caja=Decimal("500.00"),
+            ),
+        ]
+        por_empleada = [
+            ResumenEmpleada(
+                employee_code="VEND-2", employee_name="Ana", operaciones=2,
+                piezas=4, comisiones=6, monto_total=Decimal("700.00"),
+            ),
+        ]
+        texto = build_corte_ticket_text(
+            periodo_label="HOY", cortes=cortes, por_empleada=por_empleada,
+            generado_por="VEND-1",
+        )
+        self.assertIn("CORTE DE LIBRETA", texto)
+        self.assertIn("EN CAJA:", texto)
+        self.assertIn("$500.00", texto)
+        self.assertIn("Ana", texto)
+        self.assertIn("6 com.", texto)
+        # Ninguna línea se pasa del ancho del ticket térmico.
+        for line in texto.splitlines():
+            self.assertLessEqual(len(line), TICKET_CHAR_WIDTH)
+
+
 class LibretaPagePrivacyTests(unittest.TestCase):
     """El gate decide qué se ve: empleada sin montos, dueño con todo."""
 
@@ -364,6 +454,9 @@ class LibretaPagePrivacyTests(unittest.TestCase):
             libreta_view=MagicMock(),
             libreta_summary_table=MagicMock(),
             libreta_daily_table=MagicMock(),
+            libreta_owner_bar=MagicMock(),
+            libreta_meta_bar=MagicMock(),
+            libreta_meta_spin=MagicMock(),
             libreta_table=MagicMock(),
             libreta_titular_label=MagicMock(),
             libreta_hoy_button=MagicMock(),
@@ -381,6 +474,8 @@ class LibretaPagePrivacyTests(unittest.TestCase):
         fake.libreta_table.setColumnHidden.assert_called_once_with(6, True)
         fake.libreta_summary_table.setVisible.assert_called_once_with(False)
         fake.libreta_daily_table.setVisible.assert_called_once_with(False)
+        # Los controles de corte/meta son del dueño, no de la empleada.
+        fake.libreta_owner_bar.setVisible.assert_called_once_with(False)
         fake._refresh_libreta_view.assert_called_once()
 
     def test_dueno_ve_todo(self) -> None:
@@ -389,6 +484,7 @@ class LibretaPagePrivacyTests(unittest.TestCase):
         fake.libreta_table.setColumnHidden.assert_called_once_with(6, False)
         fake.libreta_summary_table.setVisible.assert_called_once_with(True)
         fake.libreta_daily_table.setVisible.assert_called_once_with(True)
+        fake.libreta_owner_bar.setVisible.assert_called_once_with(True)
 
 
 if __name__ == "__main__":

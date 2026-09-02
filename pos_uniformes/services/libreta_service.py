@@ -271,6 +271,21 @@ def resumir_por_dia(rows: list[LibretaVenta]) -> list[CorteDia]:
     ]
 
 
+def filtrar_de_hoy(rows: list, reference: date | None = None) -> list:
+    """Deja solo las operaciones del día local dado (default: hoy).
+
+    Permite consultar UNA vez la ventana de la semana y derivar la vista
+    'Hoy' en memoria (la meta semanal necesita la semana completa)."""
+    reference = reference or date.today()
+    result = []
+    for row in rows:
+        created = row.created_at
+        local_dt = created.astimezone() if created.tzinfo is not None else created
+        if local_dt.date() == reference:
+            result.append(row)
+    return result
+
+
 def describir_detalle(detalle: list[dict]) -> str:
     """'Pants T:6 x2 · Playera T:M x1' — resumen legible de las líneas."""
     parts = []

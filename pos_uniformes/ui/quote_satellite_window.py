@@ -1201,6 +1201,42 @@ class QuoteSatelliteWindow(QMainWindow):
         header.addWidget(self.libreta_salir_button)
         view_ly.addLayout(header)
 
+        # Barra del dueño: imprimir corte + meta semanal de comisiones
+        self.libreta_owner_bar = QWidget()
+        owner_bar_ly = QHBoxLayout()
+        owner_bar_ly.setContentsMargins(0, 0, 0, 0)
+        owner_bar_ly.setSpacing(8)
+        self.libreta_print_button = QPushButton("Imprimir corte")
+        self.libreta_print_button.setObjectName("primaryButton")
+        self.libreta_print_button.setAutoDefault(False)
+        self.libreta_print_button.clicked.connect(self._imprimir_corte_libreta)
+        owner_bar_ly.addWidget(self.libreta_print_button)
+        owner_bar_ly.addStretch()
+        owner_bar_ly.addWidget(QLabel("Meta semanal (comisiones):"))
+        self.libreta_meta_spin = QSpinBox()
+        self.libreta_meta_spin.setRange(0, 9999)
+        self.libreta_meta_spin.setSpecialValueText("Sin meta")
+        owner_bar_ly.addWidget(self.libreta_meta_spin)
+        self.libreta_meta_save_button = QPushButton("Guardar meta")
+        self.libreta_meta_save_button.setAutoDefault(False)
+        self.libreta_meta_save_button.clicked.connect(self._guardar_meta_libreta)
+        owner_bar_ly.addWidget(self.libreta_meta_save_button)
+        self.libreta_owner_bar.setLayout(owner_bar_ly)
+        view_ly.addWidget(self.libreta_owner_bar)
+
+        # Barra de progreso de la empleada contra la meta semanal
+        self.libreta_meta_bar = QWidget()
+        meta_bar_ly = QHBoxLayout()
+        meta_bar_ly.setContentsMargins(0, 0, 0, 0)
+        meta_bar_ly.setSpacing(8)
+        self.libreta_meta_label = QLabel("")
+        meta_bar_ly.addWidget(self.libreta_meta_label)
+        self.libreta_meta_progress = QProgressBar()
+        self.libreta_meta_progress.setTextVisible(True)
+        meta_bar_ly.addWidget(self.libreta_meta_progress, 1)
+        self.libreta_meta_bar.setLayout(meta_bar_ly)
+        view_ly.addWidget(self.libreta_meta_bar)
+
         self.libreta_resumen_label = QLabel("")
         self.libreta_resumen_label.setStyleSheet("font-size: 13px; color: #555;")
         view_ly.addWidget(self.libreta_resumen_label)
@@ -1209,6 +1245,12 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_status_label.setStyleSheet("font-size: 12px; color: #b9770e;")
         self.libreta_status_label.setVisible(False)
         view_ly.addWidget(self.libreta_status_label)
+
+        # Registros locales que aún no suben al servidor
+        self.libreta_pendientes_label = QLabel("")
+        self.libreta_pendientes_label.setStyleSheet("font-size: 12px; color: #b9770e;")
+        self.libreta_pendientes_label.setVisible(False)
+        view_ly.addWidget(self.libreta_pendientes_label)
 
         # Corte por día (solo vista dueño): cuánto se vendió y cuánto
         # efectivo debe haber en el cajón cada día.
@@ -1254,6 +1296,9 @@ class QuoteSatelliteWindow(QMainWindow):
         self._libreta_code: str | None = None
         self._libreta_is_owner = False
         self._libreta_week = False
+        # Últimos agregados pintados (para el ticket de corte)
+        self._libreta_last_cortes: list = []
+        self._libreta_last_por_empleada: list = []
 
         page.setLayout(layout)
         return page
@@ -1271,11 +1316,18 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_gate_error.setVisible(False)
         self.libreta_gate.setVisible(False)
         self.libreta_view.setVisible(True)
-        # La columna de dinero, el corte diario y el resumen por empleada
-        # son solo del dueño.
+        # La columna de dinero, el corte diario, el resumen por empleada y
+        # los controles de corte/meta son solo del dueño; la barra de
+        # progreso de meta es de la empleada.
         self.libreta_daily_table.setVisible(self._libreta_is_owner)
         self.libreta_summary_table.setVisible(self._libreta_is_owner)
+        self.libreta_owner_bar.setVisible(self._libreta_is_owner)
+        self.libreta_meta_bar.setVisible(False)  # se muestra al refrescar si hay meta
         self.libreta_table.setColumnHidden(6, not self._libreta_is_owner)
+        if self._libreta_is_owner:
+            from pos_uniformes.services.libreta_meta_service import load_meta_semanal
+
+            self.libreta_meta_spin.setValue(load_meta_semanal())
         self.libreta_titular_label.setText(
             "Libreta de la tienda (todas las empleadas)"
             if self._libreta_is_owner
@@ -1301,16 +1353,18 @@ class QuoteSatelliteWindow(QMainWindow):
             return
         from pos_uniformes.services import libreta_local_queue_service as libreta_cola
         from pos_uniformes.services.libreta_service import (
+            filtrar_de_hoy,
             listar_operaciones,
-            ventana_hoy,
             ventana_semana,
         )
         from pos_uniformes.services.satellite_startup_service import probe_database_host
 
-        desde, hasta = ventana_semana() if self._libreta_week else ventana_hoy()
+        # SIEMPRE se consulta la semana: la vista "Hoy" se filtra en memoria
+        # y la meta semanal necesita la semana completa de todos modos.
+        desde, hasta = ventana_semana()
         employee_filter = None if self._libreta_is_owner else self._libreta_code
 
-        rows: list = []
+        week_rows: list = []
         fuente_db = False
         if probe_database_host(0.5):
             try:
@@ -1320,7 +1374,7 @@ class QuoteSatelliteWindow(QMainWindow):
                         libreta_cola.drenar_pendientes(session)
                     except Exception:  # noqa: BLE001
                         session.rollback()
-                    rows = listar_operaciones(
+                    week_rows = listar_operaciones(
                         session, desde=desde, hasta=hasta, employee_code=employee_filter
                     )
                 fuente_db = True
@@ -1328,13 +1382,71 @@ class QuoteSatelliteWindow(QMainWindow):
                 logger.exception("Libreta: fallo la consulta a la base")
 
         if not fuente_db:
-            rows = self._libreta_rows_locales(desde, hasta, employee_filter)
+            week_rows = self._libreta_rows_locales(desde, hasta, employee_filter)
         self.libreta_status_label.setVisible(not fuente_db)
         self.libreta_status_label.setText(
             "Sin conexion con la PC principal: mostrando solo lo registrado en esta terminal."
         )
 
+        pendientes = len(libreta_cola.pendientes())
+        self.libreta_pendientes_label.setVisible(pendientes > 0)
+        self.libreta_pendientes_label.setText(
+            f"{pendientes} registro(s) de esta terminal aun sin subir al servidor."
+        )
+
+        self._actualizar_meta_libreta(week_rows)
+        rows = week_rows if self._libreta_week else filtrar_de_hoy(week_rows)
         self._pintar_libreta(rows)
+
+    def _actualizar_meta_libreta(self, week_rows: list) -> None:
+        """Barra de progreso de la empleada contra la meta semanal."""
+        if self._libreta_is_owner:
+            return
+        from pos_uniformes.services.libreta_meta_service import load_meta_semanal
+
+        meta = load_meta_semanal()
+        if meta <= 0:
+            self.libreta_meta_bar.setVisible(False)
+            return
+        comisiones_semana = sum(int(getattr(r, "comisiones", 0) or 0) for r in week_rows)
+        self.libreta_meta_progress.setRange(0, meta)
+        self.libreta_meta_progress.setValue(min(comisiones_semana, meta))
+        self.libreta_meta_progress.setFormat(f"{comisiones_semana} / {meta}")
+        if comisiones_semana >= meta:
+            self.libreta_meta_label.setText("¡Meta semanal cumplida! 🎉")
+        else:
+            self.libreta_meta_label.setText("Meta de la semana:")
+        self.libreta_meta_bar.setVisible(True)
+
+    def _guardar_meta_libreta(self) -> None:
+        from pos_uniformes.services.libreta_meta_service import save_meta_semanal
+
+        save_meta_semanal(int(self.libreta_meta_spin.value()))
+        self._set_status("Meta semanal de la Libreta guardada.")
+
+    def _imprimir_corte_libreta(self) -> None:
+        """Imprime el corte del periodo visible (solo vista dueño)."""
+        if not self._libreta_is_owner:
+            return
+        from pos_uniformes.ui.helpers.libreta_corte_ticket_helper import (
+            build_corte_ticket_text,
+        )
+        from pos_uniformes.ui.helpers.ticket_routing_helper import route_tickets
+
+        cortes = list(self._libreta_last_cortes or [])
+        if not cortes:
+            QMessageBox.information(
+                self, "Sin datos", "No hay operaciones en el periodo para imprimir."
+            )
+            return
+        periodo = "SEMANA" if self._libreta_week else "HOY"
+        texto = build_corte_ticket_text(
+            periodo_label=periodo,
+            cortes=cortes,
+            por_empleada=list(self._libreta_last_por_empleada or []),
+            generado_por=str(self._libreta_code or ""),
+        )
+        route_tickets(self, "Corte de Libreta", [texto])
 
     @staticmethod
     def _libreta_rows_locales(desde, hasta, employee_filter):
@@ -1397,6 +1509,7 @@ class QuoteSatelliteWindow(QMainWindow):
             f"{total_comisiones} comision(es) {periodo}"
         )
         cortes = resumir_por_dia(rows) if self._libreta_is_owner else []
+        self._libreta_last_cortes = cortes
         if self._libreta_is_owner:
             total_monto = sum(Decimal(str(r.monto_total or 0)) for r in rows)
             total_en_caja = sum((c.monto_en_caja for c in cortes), Decimal("0.00"))
@@ -1427,6 +1540,7 @@ class QuoteSatelliteWindow(QMainWindow):
 
         if self._libreta_is_owner:
             por_empleada = resumir_por_empleada(rows)
+            self._libreta_last_por_empleada = por_empleada
             self.libreta_summary_table.setRowCount(len(por_empleada))
             for i, r in enumerate(por_empleada):
                 nombre = r.employee_name or r.employee_code
