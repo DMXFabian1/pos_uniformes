@@ -61,6 +61,25 @@ Copy-Item (Join-Path $projectRoot "pos_uniformes.env.example") `
 
 Compress-Archive -Path (Join-Path $bundleDir "*") -DestinationPath $zipPath -Force
 
+# ── Publicación para kioskos (auto-update por red, sin USB) ──────────────
+# Si existe C:\pos_updates (compartida en red como \\<servidor>\pos_updates),
+# la build se copia ahí y el lanzador de cada kiosko se actualiza solo al
+# arrancar. Sin la carpeta, este paso simplemente se omite.
+$updatesDir = $env:POS_UNIFORMES_UPDATES_DIR
+if (-not $updatesDir) { $updatesDir = "C:\pos_updates" }
+if (Test-Path $updatesDir) {
+    $publishDir = Join-Path $updatesDir "PresupuestosSatelite"
+    robocopy $bundleDir $publishDir /MIR /R:2 /W:2 | Out-Null
+    Set-Content -Path (Join-Path $publishDir "VERSION.txt") -Value $version
+    # El lanzador tambien se publica: instalar un kiosko nuevo = copiar
+    # lanzador_satelite.bat + .ps1 desde la carpeta compartida.
+    Copy-Item (Join-Path $PSScriptRoot "lanzador_satelite.ps1") $updatesDir -Force
+    Copy-Item (Join-Path $PSScriptRoot "lanzador_satelite.bat") $updatesDir -Force
+    Write-Host "  Publicado para kioskos en: $publishDir (v$version)"
+} else {
+    Write-Host "  (No existe $updatesDir - no se publico para kioskos)"
+}
+
 Write-Host ""
 Write-Host "Build satelite lista:"
 Write-Host "  Version: $version"
