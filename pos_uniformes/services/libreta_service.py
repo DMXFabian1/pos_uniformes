@@ -10,6 +10,7 @@ Ventanas: "hoy" (día local) y "semana" (calendario, lunes a domingo).
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
@@ -33,6 +34,38 @@ def ventana_semana(reference: date | None = None) -> tuple[datetime, datetime]:
     return inicio, fin
 
 
+# Comisión de la terminal bancaria (pagos con tarjeta): única fuente del
+# porcentaje para venta rápida, abonos y la Libreta.
+TERMINAL_COMMISSION_PERCENT = Decimal("4.5")
+
+
+def aplicar_comision_terminal(monto: Decimal) -> Decimal:
+    """Monto tras descontar la comisión de terminal, con la regla de
+    redondeo de la tienda (sale_rounding_service)."""
+    from pos_uniformes.services.sale_rounding_service import resolve_sale_rounding
+
+    factor = (Decimal("100") - TERMINAL_COMMISSION_PERCENT) / Decimal("100")
+    con_comision = (Decimal(str(monto)) * factor).quantize(Decimal("0.01"))
+    return resolve_sale_rounding(con_comision).collected_total
+
+
+# Regla de comisiones de Daniel: el conjunto 3pz vale 3 comisiones por
+# unidad; TODO lo demás (2pz incluido, prendas sueltas) vale 1 por unidad.
+_RE_3PZ = re.compile(r"3\s*pz", re.IGNORECASE)
+
+
+def comisiones_de_linea(nombre: str, cantidad: int) -> int:
+    factor = 3 if _RE_3PZ.search(str(nombre or "")) else 1
+    return factor * int(cantidad or 0)
+
+
+def comisiones_de_items(items: list[dict]) -> int:
+    return sum(
+        comisiones_de_linea(it.get("nombre", ""), int(it.get("cantidad", 0) or 0))
+        for it in items or []
+    )
+
+
 def registrar_operacion(
     session,
     *,
@@ -45,11 +78,17 @@ def registrar_operacion(
     cliente: str | None = None,
     origen: str | None = None,
     created_at: datetime | None = None,
+    pago_tarjeta: bool = False,
+    monto_neto: Decimal | None = None,
+    comisiones: int | None = None,
 ) -> LibretaVenta:
     """Anota una operación. `items` = líneas del carrito de venta rápida.
 
     created_at explícito: las operaciones encoladas offline conservan la hora
-    en que se hicieron, no la del drenado."""
+    en que se hicieron, no la del drenado.
+    comisiones None → se calculan de los items (3pz=3, resto 1/unidad); los
+    abonos deben pasar comisiones=0 explícito.
+    monto_neto None → igual a monto_total (efectivo)."""
     detalle = [
         {
             "sku": str(it.get("sku", "")),
@@ -65,13 +104,19 @@ def registrar_operacion(
         }
         for it in items
     ]
+    monto_total = Decimal(str(monto_total)).quantize(Decimal("0.01"))
     entry = LibretaVenta(
         employee_code=str(employee_code).upper(),
         employee_name=employee_name or "",
         tipo=tipo,
         cliente=cliente,
         piezas=sum(line["cantidad"] for line in detalle),
-        monto_total=Decimal(str(monto_total)).quantize(Decimal("0.01")),
+        comisiones=comisiones_de_items(items) if comisiones is None else int(comisiones),
+        monto_total=monto_total,
+        monto_neto=(
+            monto_total if monto_neto is None else Decimal(str(monto_neto)).quantize(Decimal("0.01"))
+        ),
+        pago_tarjeta=pago_tarjeta,
         descuento_empleada=descuento_empleada,
         detalle=detalle,
         origen=origen,
@@ -105,11 +150,12 @@ class ResumenEmpleada:
     employee_name: str
     operaciones: int
     piezas: int
+    comisiones: int
     monto_total: Decimal
 
 
 def resumir_por_empleada(rows: list[LibretaVenta]) -> list[ResumenEmpleada]:
-    """Agregado para la vista del dueño, ordenado por piezas desc."""
+    """Agregado para la vista del dueño, ordenado por comisiones desc."""
     acc: dict[str, dict] = {}
     for row in rows:
         bucket = acc.setdefault(
@@ -118,11 +164,13 @@ def resumir_por_empleada(rows: list[LibretaVenta]) -> list[ResumenEmpleada]:
                 "name": row.employee_name,
                 "operaciones": 0,
                 "piezas": 0,
+                "comisiones": 0,
                 "monto": Decimal("0.00"),
             },
         )
         bucket["operaciones"] += 1
         bucket["piezas"] += int(row.piezas or 0)
+        bucket["comisiones"] += int(getattr(row, "comisiones", 0) or 0)
         bucket["monto"] = (bucket["monto"] + Decimal(str(row.monto_total or 0))).quantize(
             Decimal("0.01")
         )
@@ -135,11 +183,12 @@ def resumir_por_empleada(rows: list[LibretaVenta]) -> list[ResumenEmpleada]:
                 employee_name=data["name"],
                 operaciones=data["operaciones"],
                 piezas=data["piezas"],
+                comisiones=data["comisiones"],
                 monto_total=data["monto"],
             )
             for code, data in acc.items()
         ),
-        key=lambda r: r.piezas,
+        key=lambda r: (r.comisiones, r.piezas),
         reverse=True,
     )
 
@@ -155,14 +204,19 @@ class CorteDia:
     operaciones: int
     piezas: int
     monto_ventas: Decimal
+    monto_neto_ventas: Decimal
     monto_apartados: Decimal
+    monto_abonos: Decimal
 
 
 def resumir_por_dia(rows: list[LibretaVenta]) -> list[CorteDia]:
     """Corte diario para la vista del dueño: cuánto se vendió cada día.
 
-    Ventas y apartados se separan: el apartado todavía no es dinero cobrado
-    completo. Días ordenados del más reciente al más viejo (hora local)."""
+    - Ventas: lo cobrado, y el neto tras la comisión de terminal (4.5% en
+      pagos con tarjeta; igual al cobrado en efectivo).
+    - Apartados: comprometido, no cobrado completo.
+    - Abonos: dinero cobrado de apartados.
+    Días ordenados del más reciente al más viejo (hora local)."""
     acc: dict[date, dict] = {}
     for row in rows:
         created = row.created_at
@@ -174,14 +228,23 @@ def resumir_por_dia(rows: list[LibretaVenta]) -> list[CorteDia]:
                 "operaciones": 0,
                 "piezas": 0,
                 "ventas": Decimal("0.00"),
+                "neto": Decimal("0.00"),
                 "apartados": Decimal("0.00"),
+                "abonos": Decimal("0.00"),
             },
         )
         bucket["operaciones"] += 1
         bucket["piezas"] += int(row.piezas or 0)
         monto = Decimal(str(row.monto_total or 0))
-        key = "apartados" if str(row.tipo) == "apartado" else "ventas"
-        bucket[key] = (bucket[key] + monto).quantize(Decimal("0.01"))
+        neto = Decimal(str(getattr(row, "monto_neto", None) or monto))
+        tipo = str(row.tipo)
+        if tipo == "apartado":
+            bucket["apartados"] = (bucket["apartados"] + monto).quantize(Decimal("0.01"))
+        elif tipo == "abono":
+            bucket["abonos"] = (bucket["abonos"] + neto).quantize(Decimal("0.01"))
+        else:
+            bucket["ventas"] = (bucket["ventas"] + monto).quantize(Decimal("0.01"))
+            bucket["neto"] = (bucket["neto"] + neto).quantize(Decimal("0.01"))
     return [
         CorteDia(
             dia=dia,
@@ -189,7 +252,9 @@ def resumir_por_dia(rows: list[LibretaVenta]) -> list[CorteDia]:
             operaciones=data["operaciones"],
             piezas=data["piezas"],
             monto_ventas=data["ventas"],
+            monto_neto_ventas=data["neto"],
             monto_apartados=data["apartados"],
+            monto_abonos=data["abonos"],
         )
         for dia, data in sorted(acc.items(), key=lambda kv: kv[0], reverse=True)
     ]

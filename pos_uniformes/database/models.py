@@ -1922,11 +1922,18 @@ class LibretaVenta(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     employee_code: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     employee_name: Mapped[str] = mapped_column(String(120), nullable=False, default="")
-    # "venta" | "apartado"
+    # "venta" | "apartado" | "abono"
     tipo: Mapped[str] = mapped_column(String(20), nullable=False, default="venta", index=True)
     cliente: Mapped[str | None] = mapped_column(String(120))
     piezas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    # Comisiones para la empleada: 3pz vale 3, lo demás 1 por unidad;
+    # los abonos no dan comisión (0).
+    comisiones: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     monto_total: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    # Lo que realmente entra tras la comisión de terminal (4.5% por producto
+    # si fue pago con tarjeta); igual a monto_total en efectivo.
+    monto_neto: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    pago_tarjeta: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     descuento_empleada: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # Líneas de la operación: [{sku, nombre, talla, cantidad, precio, subtotal}]
     detalle: Mapped[list] = mapped_column(

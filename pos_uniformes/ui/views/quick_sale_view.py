@@ -30,6 +30,9 @@ from PyQt6.QtWidgets import (
 
 from pos_uniformes.database.connection import get_session
 from pos_uniformes.database.models import Empleada
+from pos_uniformes.services.libreta_service import (
+    TERMINAL_COMMISSION_PERCENT as _TERMINAL_COMMISSION,
+)
 from pos_uniformes.services.quote_kiosk_lookup_service import (
     QuoteKioskLookupSnapshot,
     load_quote_kiosk_lookup_snapshot,
@@ -377,6 +380,11 @@ class QuickSaleWidget(QWidget):
         btn_apartado.setObjectName("btnSecondary")
         btn_apartado.clicked.connect(self._on_ticket_apartado)
         tb_layout.addWidget(btn_apartado)
+
+        btn_abono = QPushButton("Abono")
+        btn_abono.setObjectName("btnSecondary")
+        btn_abono.clicked.connect(self._on_abono)
+        tb_layout.addWidget(btn_abono)
 
         btn_pedido = QPushButton("Enviar a preparar")
         btn_pedido.setObjectName("btnGhost")
@@ -757,14 +765,14 @@ class QuickSaleWidget(QWidget):
         return True
 
     # Comisión que cobra la terminal bancaria; se descuenta por producto en la
-    # copia interna cuando la venta fue con tarjeta (checkbox del diálogo).
-    _TERMINAL_COMMISSION_PERCENT = Decimal("6")
+    # copia interna y en el neto de la Libreta cuando la venta fue con tarjeta.
+    # El porcentaje vive en libreta_service (única fuente).
+    _TERMINAL_COMMISSION_PERCENT = _TERMINAL_COMMISSION
 
     def _apply_terminal_commission(self, precio: Decimal) -> Decimal:
-        factor = (Decimal("100") - self._TERMINAL_COMMISSION_PERCENT) / Decimal("100")
-        return self._round_total(
-            (Decimal(str(precio)) * factor).quantize(Decimal("0.01"))
-        )
+        from pos_uniformes.services.libreta_service import aplicar_comision_terminal
+
+        return aplicar_comision_terminal(Decimal(str(precio)))
 
     def _commission_items(self) -> list[dict]:
         """Items con el precio unitario ya descontado y redondeado."""
@@ -833,7 +841,26 @@ class QuickSaleWidget(QWidget):
         "  4.1. La entrega se hara solo con el pago total, sin liquidaciones parciales."
     )
 
-    def _registrar_en_libreta(self, tipo: str, *, cliente: str | None = None) -> None:
+    def _monto_neto_actual(self, total: Decimal, *, pago_tarjeta: bool) -> Decimal:
+        """Neto tras la comisión de terminal: 4.5% por producto (redondeado
+        con la regla de la tienda) sobre el precio efectivamente cobrado —
+        con descuento de empleada, sobre el precio ya descontado. En
+        efectivo, igual al total."""
+        if not pago_tarjeta:
+            return total
+        discount_factor = (Decimal("100") - self._DISCOUNT_PERCENT) / Decimal("100")
+        neto = Decimal("0.00")
+        for it in self._items:
+            unit = Decimal(str(it["precio"]))
+            if self._discount_active:
+                unit = (unit * discount_factor).quantize(Decimal("0.01"))
+            unit = self._apply_terminal_commission(unit)
+            neto += unit * int(it["cantidad"])
+        return neto.quantize(Decimal("0.01"))
+
+    def _registrar_en_libreta(
+        self, tipo: str, *, cliente: str | None = None, pago_tarjeta: bool = False
+    ) -> None:
         """Anota la operación en la Libreta: local primero (nunca bloquea el
         mostrador ni pierde el registro), y un hilo la sube a la base.
 
@@ -846,6 +873,7 @@ class QuickSaleWidget(QWidget):
 
             _subtotal, _descuento, total = self._compute_totals()
             total = Decimal(str(total)).quantize(Decimal("0.01"))
+            neto = self._monto_neto_actual(total, pago_tarjeta=pago_tarjeta)
             # Reimprimir el mismo ticket no debe anotar la venta dos veces.
             key = (
                 tipo,
@@ -882,6 +910,8 @@ class QuickSaleWidget(QWidget):
                         for it in self._items
                     ],
                     "monto_total": str(total),
+                    "monto_neto": str(neto),
+                    "pago_tarjeta": bool(pago_tarjeta),
                     "descuento_empleada": bool(self._discount_active),
                     "origen": origen,
                     "created_at": datetime.now(_tz.utc).astimezone().isoformat(),
@@ -917,13 +947,29 @@ class QuickSaleWidget(QWidget):
         code = self._clean_scanned_code(raw)
         return bool(code) and code == str(self._employee_code or "").upper()
 
-    def _ask_store_copy(self) -> bool:
-        """Pregunta a la empleada si quiere la copia interna del ticket.
+    def _ask_card_payment(self) -> bool:
+        """Pregunta si el pago fue con tarjeta (ventas con descuento de
+        empleada, donde no aparece el diálogo de copia)."""
+        box = QMessageBox(self)
+        box.setWindowTitle("Forma de pago")
+        box.setText("¿El pago fue con tarjeta?")
+        card_button = box.addButton(
+            f"Tarjeta (−{self._TERMINAL_COMMISSION_PERCENT}%)",
+            QMessageBox.ButtonRole.YesRole,
+        )
+        cash_button = box.addButton("Efectivo", QMessageBox.ButtonRole.NoRole)
+        box.setDefaultButton(cash_button)
+        box.exec()
+        return box.clickedButton() is card_button
 
-        Default: sin copia. Escanear el gafete de la empleada en sesión
-        equivale a "sí, con copia"; cualquier otro código se rechaza. Aquí NO
-        va el ScannerEnterGuard: el escaneo es entrada legítima y el Enter
-        del escáner cae en el input (los botones no son default, así que un
+    def _ask_venta_options(self) -> tuple[bool, bool]:
+        """Pregunta copia interna y forma de pago en un solo diálogo.
+
+        Devuelve (con_copia, pago_tarjeta). Default: sin copia, efectivo.
+        Escanear el gafete de la empleada en sesión equivale a "sí, con
+        copia"; cualquier otro código se rechaza. Aquí NO va el
+        ScannerEnterGuard: el escaneo es entrada legítima y el Enter del
+        escáner cae en el input (los botones no son default, así que un
         Enter suelto no contesta nada)."""
         dlg = QDialog(self)
         dlg.setWindowTitle("Copia tienda")
@@ -947,6 +993,11 @@ class QuickSaleWidget(QWidget):
         error_label.setStyleSheet(f"font-size: 12px; color: {_DANGER};")
         error_label.setVisible(False)
         ly.addWidget(error_label)
+
+        card_check = QCheckBox(
+            f"Pagó con tarjeta (se descuenta {self._TERMINAL_COMMISSION_PERCENT}%)"
+        )
+        ly.addWidget(card_check)
 
         wants_copy = False
 
@@ -986,39 +1037,142 @@ class QuickSaleWidget(QWidget):
         dlg.setLayout(ly)
         QTimer.singleShot(0, scan_input.setFocus)
         dlg.exec()
-        return wants_copy
+        # La forma de pago vale aunque conteste "solo ticket del cliente".
+        return wants_copy, card_check.isChecked()
 
     def _on_ticket_venta(self) -> None:
         if not self._items:
             QMessageBox.information(self, "Sin piezas", "Agrega piezas antes de generar ticket.")
             return
-        # La Libreta registra la venta al generar el ticket (sea con copia o
-        # sin ella): ya no hace falta ticket extra ni apuntarla a mano.
-        self._registrar_en_libreta("venta")
-        tickets = [self._build_venta_text()]
-        alt_copy: str | None = None
+        # Una sola pregunta al imprimir: ¿copia? ¿pago con tarjeta? Con eso
+        # la copia interna sale con la comisión descontada automáticamente y
+        # la Libreta registra el neto — ya no hay checkbox en el diálogo de
+        # impresión ni nada que apuntar a mano.
         if self._discount_active:
-            # Venta con descuento de empleada: la copia interna es la de ella.
-            tickets.append(self._build_employee_copy_text())
-            alt_copy = self._build_employee_copy_text(terminal_commission=True)
-        elif self._ask_store_copy():
-            # La copia interna es OPCIONAL: por default sale solo el ticket
-            # del cliente; la empleada decide si necesita la copia.
-            tickets.append(self._build_venta_text(store_copy=True))
-            alt_copy = self._build_venta_text(store_copy=True, terminal_commission=True)
-        route_tickets(
-            self,
-            "Ticket de venta",
-            tickets,
-            # Checkbox del diálogo: al marcarlo, solo la copia interna sale
-            # con la comisión de la terminal descontada; el del cliente igual.
-            # Sin copia interna no hay checkbox (no habría a qué aplicarlo).
-            alt_tickets=[tickets[0], alt_copy] if alt_copy is not None else None,
-            alt_checkbox_label=(
-                "Descontar comision terminal (6%)" if alt_copy is not None else None
-            ),
-        )
+            wants_copy = True  # la COPIA EMPLEADA es automática
+            card = self._ask_card_payment()
+        else:
+            wants_copy, card = self._ask_venta_options()
+        self._registrar_en_libreta("venta", pago_tarjeta=card)
+        tickets = [self._build_venta_text()]
+        if self._discount_active:
+            tickets.append(self._build_employee_copy_text(terminal_commission=card))
+        elif wants_copy:
+            tickets.append(self._build_venta_text(store_copy=True, terminal_commission=card))
+        route_tickets(self, "Ticket de venta", tickets)
         self._scan_input.setFocus()
+
+    def _on_abono(self) -> None:
+        """Registra en la Libreta un abono a un apartado (sin comisión).
+
+        No requiere carrito: la empleada anota cliente y monto — sustituye
+        la anotación a mano en el ticket físico del apartado."""
+        if not self._employee_code:
+            QMessageBox.warning(self, "Sin autorizar", "Escanea primero tu QR de empleada.")
+            return
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Registrar abono")
+        ly = QVBoxLayout()
+        ly.setContentsMargins(24, 20, 24, 20)
+        ly.setSpacing(10)
+
+        titulo = QLabel("Abono a apartado")
+        titulo.setStyleSheet("font-size: 15px; font-weight: 600;")
+        ly.addWidget(titulo)
+
+        ly.addWidget(QLabel("Nombre del cliente"))
+        cliente_input = QLineEdit()
+        cliente_input.setPlaceholderText("Nombre y apellidos...")
+        ly.addWidget(cliente_input)
+
+        ly.addWidget(QLabel("Monto del abono"))
+        monto_input = QLineEdit()
+        monto_input.setPlaceholderText("$")
+        ly.addWidget(monto_input)
+
+        card_check = QCheckBox(
+            f"Pagó con tarjeta (se descuenta {self._TERMINAL_COMMISSION_PERCENT}%)"
+        )
+        ly.addWidget(card_check)
+
+        error_label = QLabel("")
+        error_label.setStyleSheet(f"font-size: 12px; color: {_DANGER};")
+        error_label.setVisible(False)
+        ly.addWidget(error_label)
+
+        btn_row = QHBoxLayout()
+        btn_cancel = QPushButton("Cancelar")
+        btn_ok = QPushButton("Registrar abono")
+        for button in (btn_cancel, btn_ok):
+            button.setAutoDefault(False)
+            button.setDefault(False)
+        btn_cancel.clicked.connect(dlg.reject)
+
+        def _confirmar() -> None:
+            nombre = cliente_input.text().strip()
+            raw_monto = monto_input.text().strip().replace("$", "").replace(",", "")
+            try:
+                monto = Decimal(raw_monto).quantize(Decimal("0.01"))
+            except Exception:  # noqa: BLE001
+                monto = Decimal("0.00")
+            if not nombre or monto <= 0:
+                error_label.setText("Falta el nombre del cliente o un monto válido.")
+                error_label.setVisible(True)
+                return
+            dlg.accept()
+            self._registrar_abono(nombre, monto, pago_tarjeta=card_check.isChecked())
+
+        btn_ok.clicked.connect(_confirmar)
+        btn_row.addWidget(btn_cancel)
+        btn_row.addWidget(btn_ok)
+        ly.addLayout(btn_row)
+
+        dlg.setLayout(ly)
+        QTimer.singleShot(0, cliente_input.setFocus)
+        dlg.exec()
+        self._scan_input.setFocus()
+
+    def _registrar_abono(self, cliente: str, monto: Decimal, *, pago_tarjeta: bool) -> None:
+        try:
+            from datetime import timezone as _tz
+
+            from pos_uniformes.services import libreta_local_queue_service as cola
+
+            neto = monto
+            if pago_tarjeta:
+                neto = self._apply_terminal_commission(monto)
+            origen: str | None = None
+            try:
+                from pos_uniformes.services.satellite_identity_service import get_satellite_id
+
+                origen = get_satellite_id()
+            except Exception:  # noqa: BLE001
+                pass
+            cola.encolar_operacion(
+                {
+                    "employee_code": str(self._employee_code or ""),
+                    "employee_name": str(self._employee_name or self._employee_code or ""),
+                    "tipo": "abono",
+                    "cliente": cliente,
+                    "items": [],
+                    "monto_total": str(monto),
+                    "monto_neto": str(neto),
+                    "pago_tarjeta": bool(pago_tarjeta),
+                    # Los abonos NO dan comisión — pero sí quedan registrados.
+                    "comisiones": 0,
+                    "descuento_empleada": False,
+                    "origen": origen,
+                    "created_at": datetime.now(_tz.utc).astimezone().isoformat(),
+                }
+            )
+            self._drenar_libreta_en_background()
+            self._flash_scan_hint("Abono registrado")
+        except Exception:  # noqa: BLE001
+            _logger.exception("No se pudo registrar el abono en la Libreta")
+            QMessageBox.warning(
+                self, "Abono no registrado", "No se pudo guardar el abono; intentalo de nuevo."
+            )
 
     def _on_ticket_apartado(self) -> None:
         if not self._items:

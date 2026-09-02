@@ -1211,9 +1211,9 @@ class QuoteSatelliteWindow(QMainWindow):
         view_ly.addWidget(self.libreta_status_label)
 
         # Corte por día (solo vista dueño): cuánto se vendió cada día
-        self.libreta_daily_table = QTableWidget(0, 5)
+        self.libreta_daily_table = QTableWidget(0, 7)
         self.libreta_daily_table.setHorizontalHeaderLabels(
-            ["Día", "Operaciones", "Piezas", "Ventas $", "Apartados $"]
+            ["Día", "Operaciones", "Piezas", "Ventas $", "Neto $", "Apartados $", "Abonos $"]
         )
         self.libreta_daily_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
@@ -1223,9 +1223,9 @@ class QuoteSatelliteWindow(QMainWindow):
         view_ly.addWidget(self.libreta_daily_table)
 
         # Resumen por empleada (solo vista dueño)
-        self.libreta_summary_table = QTableWidget(0, 4)
+        self.libreta_summary_table = QTableWidget(0, 5)
         self.libreta_summary_table.setHorizontalHeaderLabels(
-            ["Empleada", "Operaciones", "Piezas", "Monto"]
+            ["Empleada", "Operaciones", "Piezas", "Comisiones", "Monto"]
         )
         self.libreta_summary_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
@@ -1235,9 +1235,9 @@ class QuoteSatelliteWindow(QMainWindow):
         view_ly.addWidget(self.libreta_summary_table)
 
         # Operaciones una por una
-        self.libreta_table = QTableWidget(0, 6)
+        self.libreta_table = QTableWidget(0, 7)
         self.libreta_table.setHorizontalHeaderLabels(
-            ["Fecha", "Hora", "Tipo", "Piezas", "Prendas", "Monto"]
+            ["Fecha", "Hora", "Tipo", "Piezas", "Comisiones", "Prendas", "Monto"]
         )
         self.libreta_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
@@ -1273,7 +1273,7 @@ class QuoteSatelliteWindow(QMainWindow):
         # son solo del dueño.
         self.libreta_daily_table.setVisible(self._libreta_is_owner)
         self.libreta_summary_table.setVisible(self._libreta_is_owner)
-        self.libreta_table.setColumnHidden(5, not self._libreta_is_owner)
+        self.libreta_table.setColumnHidden(6, not self._libreta_is_owner)
         self.libreta_titular_label.setText(
             "Libreta de la tienda (todas las empleadas)"
             if self._libreta_is_owner
@@ -1355,14 +1355,23 @@ class QuoteSatelliteWindow(QMainWindow):
             if not (desde <= created <= hasta):
                 continue
             items = list(entry.get("items", []))
+            from pos_uniformes.services.libreta_service import comisiones_de_items
+
+            monto = _Dec(str(entry.get("monto_total", "0")))
+            comisiones = entry.get("comisiones")
             rows.append(
                 SimpleNamespace(
                     created_at=created,
                     employee_code=code,
                     employee_name=str(entry.get("employee_name", "")),
                     tipo=str(entry.get("tipo", "venta")),
+                    cliente=entry.get("cliente"),
                     piezas=sum(int(it.get("cantidad", 0) or 0) for it in items),
-                    monto_total=_Dec(str(entry.get("monto_total", "0"))),
+                    comisiones=(
+                        int(comisiones) if comisiones is not None else comisiones_de_items(items)
+                    ),
+                    monto_total=monto,
+                    monto_neto=_Dec(str(entry.get("monto_neto") or monto)),
                     detalle=items,
                 )
             )
@@ -1378,8 +1387,12 @@ class QuoteSatelliteWindow(QMainWindow):
 
         total_ops = len(rows)
         total_piezas = sum(int(r.piezas or 0) for r in rows)
+        total_comisiones = sum(int(getattr(r, "comisiones", 0) or 0) for r in rows)
         periodo = "esta semana" if self._libreta_week else "hoy"
-        resumen = f"{total_ops} operacion(es) · {total_piezas} pieza(s) {periodo}"
+        resumen = (
+            f"{total_ops} operacion(es) · {total_piezas} pieza(s) · "
+            f"{total_comisiones} comision(es) {periodo}"
+        )
         if self._libreta_is_owner:
             total_monto = sum(Decimal(str(r.monto_total or 0)) for r in rows)
             resumen += f" · ${total_monto:,.2f}"
@@ -1396,7 +1409,13 @@ class QuoteSatelliteWindow(QMainWindow):
                     i, 3, QTableWidgetItem(f"${corte.monto_ventas:,.2f}")
                 )
                 self.libreta_daily_table.setItem(
-                    i, 4, QTableWidgetItem(f"${corte.monto_apartados:,.2f}")
+                    i, 4, QTableWidgetItem(f"${corte.monto_neto_ventas:,.2f}")
+                )
+                self.libreta_daily_table.setItem(
+                    i, 5, QTableWidgetItem(f"${corte.monto_apartados:,.2f}")
+                )
+                self.libreta_daily_table.setItem(
+                    i, 6, QTableWidgetItem(f"${corte.monto_abonos:,.2f}")
                 )
 
         if self._libreta_is_owner:
@@ -1407,8 +1426,9 @@ class QuoteSatelliteWindow(QMainWindow):
                 self.libreta_summary_table.setItem(i, 0, QTableWidgetItem(nombre))
                 self.libreta_summary_table.setItem(i, 1, QTableWidgetItem(str(r.operaciones)))
                 self.libreta_summary_table.setItem(i, 2, QTableWidgetItem(str(r.piezas)))
+                self.libreta_summary_table.setItem(i, 3, QTableWidgetItem(str(r.comisiones)))
                 self.libreta_summary_table.setItem(
-                    i, 3, QTableWidgetItem(f"${r.monto_total:,.2f}")
+                    i, 4, QTableWidgetItem(f"${r.monto_total:,.2f}")
                 )
 
         self.libreta_table.setRowCount(len(rows))
@@ -1419,18 +1439,25 @@ class QuoteSatelliteWindow(QMainWindow):
                 else row.created_at
             )
             tipo_txt = str(row.tipo).capitalize()
+            if getattr(row, "pago_tarjeta", False):
+                tipo_txt += " (tarjeta)"
             if self._libreta_is_owner:
                 nombre = row.employee_name or row.employee_code
                 tipo_txt = f"{tipo_txt} — {nombre}"
+            if str(row.tipo) == "abono":
+                prendas_txt = f"Abono — {getattr(row, 'cliente', None) or 'cliente'}"
+            else:
+                prendas_txt = describir_detalle(list(row.detalle or []))
             self.libreta_table.setItem(i, 0, QTableWidgetItem(local_dt.strftime("%d/%m")))
             self.libreta_table.setItem(i, 1, QTableWidgetItem(local_dt.strftime("%H:%M")))
             self.libreta_table.setItem(i, 2, QTableWidgetItem(tipo_txt))
             self.libreta_table.setItem(i, 3, QTableWidgetItem(str(row.piezas)))
             self.libreta_table.setItem(
-                i, 4, QTableWidgetItem(describir_detalle(list(row.detalle or [])))
+                i, 4, QTableWidgetItem(str(getattr(row, "comisiones", 0) or 0))
             )
+            self.libreta_table.setItem(i, 5, QTableWidgetItem(prendas_txt))
             self.libreta_table.setItem(
-                i, 5, QTableWidgetItem(f"${Decimal(str(row.monto_total or 0)):,.2f}")
+                i, 6, QTableWidgetItem(f"${Decimal(str(row.monto_total or 0)):,.2f}")
             )
 
     def _build_conteos_page(self) -> QWidget:

@@ -84,6 +84,15 @@ def drenar_pendientes(session) -> int:
                 cliente=entry.get("cliente"),
                 origen=entry.get("origen"),
                 created_at=created_at,
+                pago_tarjeta=bool(entry.get("pago_tarjeta", False)),
+                monto_neto=(
+                    Decimal(str(entry["monto_neto"]))
+                    if entry.get("monto_neto") is not None
+                    else None
+                ),
+                comisiones=(
+                    int(entry["comisiones"]) if entry.get("comisiones") is not None else None
+                ),
             )
         session.commit()
         _save_raw([])

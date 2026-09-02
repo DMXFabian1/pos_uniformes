@@ -79,36 +79,77 @@ class LibretaServiceTests(unittest.TestCase):
 
     def test_resumir_por_empleada(self) -> None:
         rows = [
-            SimpleNamespace(employee_code="VEND-2", employee_name="Ana", piezas=3, monto_total=Decimal("100")),
-            SimpleNamespace(employee_code="VEND-3", employee_name="Bere", piezas=5, monto_total=Decimal("200")),
-            SimpleNamespace(employee_code="VEND-2", employee_name="Ana", piezas=1, monto_total=Decimal("50")),
+            SimpleNamespace(employee_code="VEND-2", employee_name="Ana", piezas=3, comisiones=3, monto_total=Decimal("100")),
+            SimpleNamespace(employee_code="VEND-3", employee_name="Bere", piezas=5, comisiones=7, monto_total=Decimal("200")),
+            SimpleNamespace(employee_code="VEND-2", employee_name="Ana", piezas=1, comisiones=1, monto_total=Decimal("50")),
         ]
         resumen = resumir_por_empleada(rows)
-        self.assertEqual(resumen[0].employee_code, "VEND-3")  # más piezas primero
+        self.assertEqual(resumen[0].employee_code, "VEND-3")  # más comisiones primero
         ana = next(r for r in resumen if r.employee_code == "VEND-2")
         self.assertEqual(ana.operaciones, 2)
         self.assertEqual(ana.piezas, 4)
+        self.assertEqual(ana.comisiones, 4)
         self.assertEqual(ana.monto_total, Decimal("150.00"))
 
-    def test_resumir_por_dia_separa_ventas_y_apartados(self) -> None:
+    def test_resumir_por_dia_separa_ventas_apartados_y_abonos(self) -> None:
         from pos_uniformes.services.libreta_service import resumir_por_dia
 
         lunes = datetime(2026, 8, 31, 10, 0, tzinfo=timezone.utc).astimezone()
         martes = datetime(2026, 9, 1, 16, 0, tzinfo=timezone.utc).astimezone()
         rows = [
-            SimpleNamespace(created_at=lunes, tipo="venta", piezas=2, monto_total=Decimal("500")),
-            SimpleNamespace(created_at=lunes, tipo="apartado", piezas=3, monto_total=Decimal("900")),
-            SimpleNamespace(created_at=martes, tipo="venta", piezas=1, monto_total=Decimal("100")),
+            SimpleNamespace(created_at=lunes, tipo="venta", piezas=2,
+                            monto_total=Decimal("500"), monto_neto=Decimal("477.50")),
+            SimpleNamespace(created_at=lunes, tipo="apartado", piezas=3,
+                            monto_total=Decimal("900"), monto_neto=Decimal("900")),
+            SimpleNamespace(created_at=lunes, tipo="abono", piezas=0,
+                            monto_total=Decimal("200"), monto_neto=Decimal("200")),
+            SimpleNamespace(created_at=martes, tipo="venta", piezas=1,
+                            monto_total=Decimal("100"), monto_neto=Decimal("100")),
         ]
         cortes = resumir_por_dia(rows)
         self.assertEqual(len(cortes), 2)
         self.assertEqual(cortes[0].dia, martes.date())  # más reciente primero
         lunes_corte = cortes[1]
-        self.assertEqual(lunes_corte.operaciones, 2)
+        self.assertEqual(lunes_corte.operaciones, 3)
         self.assertEqual(lunes_corte.piezas, 5)
-        # El apartado NO se mezcla con el dinero de ventas
+        # Ventas, neto (tras tarjeta), apartados y abonos, cada uno aparte
         self.assertEqual(lunes_corte.monto_ventas, Decimal("500.00"))
+        self.assertEqual(lunes_corte.monto_neto_ventas, Decimal("477.50"))
         self.assertEqual(lunes_corte.monto_apartados, Decimal("900.00"))
+        self.assertEqual(lunes_corte.monto_abonos, Decimal("200.00"))
+
+    def test_comisiones_regla_3pz(self) -> None:
+        from pos_uniformes.services.libreta_service import comisiones_de_items
+
+        items = [
+            {"nombre": "Pants 3pz Deportivo", "cantidad": 2},  # 3 × 2 = 6
+            {"nombre": "Pants 2pz Deportivo", "cantidad": 2},  # 1 × 2 = 2
+            {"nombre": "Sueter Escolar", "cantidad": 1},       # 1
+        ]
+        self.assertEqual(comisiones_de_items(items), 9)
+
+    def test_registrar_calcula_comisiones_y_abono_cero(self) -> None:
+        session = MagicMock()
+        entry = registrar_operacion(
+            session,
+            employee_code="VEND-2",
+            employee_name="Ana",
+            tipo="apartado",
+            items=[{"sku": "S", "nombre": "Pants 3pz", "talla": "6", "cantidad": 2, "precio": "600"}],
+            monto_total=Decimal("1200"),
+        )
+        self.assertEqual(entry.comisiones, 6)  # apartado SÍ da comisiones
+        abono = registrar_operacion(
+            session,
+            employee_code="VEND-2",
+            employee_name="Ana",
+            tipo="abono",
+            items=[],
+            monto_total=Decimal("200"),
+            comisiones=0,
+        )
+        self.assertEqual(abono.comisiones, 0)
+        self.assertEqual(abono.monto_neto, Decimal("200.00"))  # default = total
 
     def test_describir_detalle(self) -> None:
         texto = describir_detalle(
@@ -195,7 +236,7 @@ class QuickSaleLibretaHookTests(unittest.TestCase):
     def test_venta_registra_en_libreta(self) -> None:
         widget = self._make_widget()
         with patch.object(widget, "_load_business_info", return_value=("M", "", "")), \
-                patch.object(widget, "_ask_store_copy", return_value=False), \
+                patch.object(widget, "_ask_venta_options", return_value=(False, False)), \
                 patch.object(widget, "_drenar_libreta_en_background"), \
                 patch(
                     "pos_uniformes.services.libreta_local_queue_service.encolar_operacion"
@@ -208,11 +249,30 @@ class QuickSaleLibretaHookTests(unittest.TestCase):
         self.assertEqual(entry["tipo"], "venta")
         self.assertEqual(entry["items"][0]["cantidad"], 2)
         self.assertEqual(entry["monto_total"], "1030.00")
+        # Efectivo: neto = total, sin bandera de tarjeta.
+        self.assertEqual(entry["monto_neto"], "1030.00")
+        self.assertFalse(entry["pago_tarjeta"])
+
+    def test_venta_con_tarjeta_registra_neto(self) -> None:
+        widget = self._make_widget()
+        with patch.object(widget, "_load_business_info", return_value=("M", "", "")), \
+                patch.object(widget, "_ask_venta_options", return_value=(False, True)), \
+                patch.object(widget, "_drenar_libreta_en_background"), \
+                patch(
+                    "pos_uniformes.services.libreta_local_queue_service.encolar_operacion"
+                ) as encolar, \
+                patch("pos_uniformes.ui.views.quick_sale_view.route_tickets"):
+            widget._on_ticket_venta()
+        entry = encolar.call_args.args[0]
+        self.assertTrue(entry["pago_tarjeta"])
+        self.assertEqual(entry["monto_total"], "1030.00")
+        # 515 - 4.5% = 492.00 por pieza (regla de redondeo) × 2 = 984.00
+        self.assertEqual(entry["monto_neto"], "984.00")
 
     def test_reimpresion_no_duplica_registro(self) -> None:
         widget = self._make_widget()
         with patch.object(widget, "_load_business_info", return_value=("M", "", "")), \
-                patch.object(widget, "_ask_store_copy", return_value=False), \
+                patch.object(widget, "_ask_venta_options", return_value=(False, False)), \
                 patch.object(widget, "_drenar_libreta_en_background"), \
                 patch(
                     "pos_uniformes.services.libreta_local_queue_service.encolar_operacion"
@@ -225,7 +285,7 @@ class QuickSaleLibretaHookTests(unittest.TestCase):
     def test_registro_fallido_no_rompe_tickets(self) -> None:
         widget = self._make_widget()
         with patch.object(widget, "_load_business_info", return_value=("M", "", "")), \
-                patch.object(widget, "_ask_store_copy", return_value=False), \
+                patch.object(widget, "_ask_venta_options", return_value=(False, False)), \
                 patch(
                     "pos_uniformes.services.libreta_local_queue_service.encolar_operacion",
                     side_effect=OSError("disco lleno"),
@@ -233,6 +293,31 @@ class QuickSaleLibretaHookTests(unittest.TestCase):
                 patch("pos_uniformes.ui.views.quick_sale_view.route_tickets") as routed:
             widget._on_ticket_venta()
         routed.assert_called_once()  # el ticket sale aunque la libreta falle
+
+    def test_abono_se_registra_sin_comision(self) -> None:
+        widget = self._make_widget()
+        with patch.object(widget, "_drenar_libreta_en_background"), \
+                patch(
+                    "pos_uniformes.services.libreta_local_queue_service.encolar_operacion"
+                ) as encolar:
+            widget._registrar_abono("Ana Lopez", Decimal("200.00"), pago_tarjeta=False)
+        entry = encolar.call_args.args[0]
+        self.assertEqual(entry["tipo"], "abono")
+        self.assertEqual(entry["cliente"], "Ana Lopez")
+        self.assertEqual(entry["monto_total"], "200.00")
+        self.assertEqual(entry["comisiones"], 0)  # abonos no dan comisión
+
+    def test_abono_con_tarjeta_calcula_neto(self) -> None:
+        widget = self._make_widget()
+        with patch.object(widget, "_drenar_libreta_en_background"), \
+                patch(
+                    "pos_uniformes.services.libreta_local_queue_service.encolar_operacion"
+                ) as encolar:
+            widget._registrar_abono("Ana", Decimal("500.00"), pago_tarjeta=True)
+        entry = encolar.call_args.args[0]
+        self.assertTrue(entry["pago_tarjeta"])
+        # 500 - 4.5% = 477.50 con la regla de redondeo
+        self.assertEqual(entry["monto_neto"], "477.50")
 
 
 class LibretaPagePrivacyTests(unittest.TestCase):
@@ -268,7 +353,7 @@ class LibretaPagePrivacyTests(unittest.TestCase):
         fake = self._gate_scan("EMP:VEND-2")
         self.assertFalse(fake._libreta_is_owner)
         # Columna de monto oculta y sin resumen por empleada
-        fake.libreta_table.setColumnHidden.assert_called_once_with(5, True)
+        fake.libreta_table.setColumnHidden.assert_called_once_with(6, True)
         fake.libreta_summary_table.setVisible.assert_called_once_with(False)
         fake.libreta_daily_table.setVisible.assert_called_once_with(False)
         fake._refresh_libreta_view.assert_called_once()
@@ -276,7 +361,7 @@ class LibretaPagePrivacyTests(unittest.TestCase):
     def test_dueno_ve_todo(self) -> None:
         fake = self._gate_scan("EMP:VEND-1")  # gafete del dueño
         self.assertTrue(fake._libreta_is_owner)
-        fake.libreta_table.setColumnHidden.assert_called_once_with(5, False)
+        fake.libreta_table.setColumnHidden.assert_called_once_with(6, False)
         fake.libreta_summary_table.setVisible.assert_called_once_with(True)
         fake.libreta_daily_table.setVisible.assert_called_once_with(True)
 

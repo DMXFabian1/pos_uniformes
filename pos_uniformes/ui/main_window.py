@@ -11320,6 +11320,36 @@ class MainWindow(QMainWindow):
             f"El carrito actual se convirtio en el apartado {apartado_folio}.",
         )
 
+    def _registrar_abono_en_libreta(self, session, payload, apartado_id: int) -> None:
+        """Todo abono queda en la Libreta (registrado, pero sin comisión).
+
+        Un fallo aquí no debe tumbar el abono real: se loguea y sigue."""
+        import logging
+
+        from pos_uniformes.services.libreta_service import (
+            aplicar_comision_terminal,
+            registrar_operacion,
+        )
+
+        try:
+            monto = Decimal(str(payload.amount))
+            pago_tarjeta = "tarjeta" in str(getattr(payload, "payment_method", "")).lower()
+            registrar_operacion(
+                session,
+                employee_code=str(payload.seller_employee_code or "SIN-QR"),
+                employee_name=str(payload.seller_employee_display_name or ""),
+                tipo="abono",
+                items=[],
+                monto_total=monto,
+                cliente=f"Apartado #{apartado_id}",
+                origen="principal",
+                pago_tarjeta=pago_tarjeta,
+                monto_neto=aplicar_comision_terminal(monto) if pago_tarjeta else None,
+                comisiones=0,
+            )
+        except Exception:  # noqa: BLE001
+            logging.getLogger(__name__).exception("Abono sin registrar en la Libreta")
+
     def _handle_register_layaway_payment(self) -> None:
         apartado_id = self._selected_layaway_id()
         if apartado_id is None:
@@ -11340,6 +11370,7 @@ class MainWindow(QMainWindow):
                     seller_employee_code=payload.seller_employee_code,
                     seller_employee_display_name=payload.seller_employee_display_name,
                 )
+                self._registrar_abono_en_libreta(session, payload, apartado_id)
                 session.commit()
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Abono no registrado", str(exc))
@@ -11412,6 +11443,7 @@ class MainWindow(QMainWindow):
                         delivery_employee_code=payment_payload.seller_employee_code,
                         delivery_employee_display_name=payment_payload.seller_employee_display_name,
                     )
+                    self._registrar_abono_en_libreta(session, payment_payload, apartado_id)
                 session.commit()
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "No se pudo entregar", str(exc))
