@@ -667,6 +667,49 @@ class BodegaService:
         return list(por_producto.values())
 
     @staticmethod
+    def desglose_contenido_cajas(
+        session: Session, caja_ids: list[int]
+    ) -> dict[int, list[dict]]:
+        """Como desglose_contenido_caja pero para varias cajas en UNA query.
+
+        Llamar el desglose por caja dentro de un loop era un N+1 que pagaba
+        una query de red por cada caja al pintar la tabla de bodega."""
+        if not caja_ids:
+            return {}
+        stmt = (
+            select(BodegaContenido)
+            .options(
+                joinedload(BodegaContenido.variante).joinedload(Variante.producto),
+            )
+            .where(BodegaContenido.caja_id.in_(caja_ids))
+        )
+        por_caja: dict[int, dict[int, dict]] = {}
+        for c in session.scalars(stmt).unique().all():
+            por_producto = por_caja.setdefault(int(c.caja_id), {})
+            prod = c.variante.producto
+            if prod.id not in por_producto:
+                por_producto[prod.id] = {
+                    "producto_id": prod.id,
+                    "producto": prod.nombre,
+                    "tallas": [],
+                    "total": 0,
+                }
+            por_producto[prod.id]["tallas"].append({
+                "talla": c.variante.talla,
+                "color": c.variante.color,
+                "cantidad": c.cantidad,
+                "variante_id": c.variante_id,
+            })
+            por_producto[prod.id]["total"] += c.cantidad
+        result: dict[int, list[dict]] = {}
+        for caja_id in caja_ids:
+            grupos = por_caja.get(int(caja_id), {})
+            for grupo in grupos.values():
+                grupo["tallas"].sort(key=lambda t: _talla_sort_key(t["talla"]))
+            result[int(caja_id)] = list(grupos.values())
+        return result
+
+    @staticmethod
     def buscar_por_texto_agrupado(session: Session, query: str) -> list[dict]:
         """Búsqueda agrupada por producto con tallas y stock en tienda."""
         pattern = f"%{query}%"

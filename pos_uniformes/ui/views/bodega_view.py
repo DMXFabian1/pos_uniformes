@@ -219,8 +219,15 @@ class BodegaWidget(QWidget):
         self.window = window
         self._selected_caja_id: int | None = None
         self._categoria_filter: CategoriaCaja | None = None
+        self._cajas_loaded = False
         self._init_ui()
-        self._refresh_cajas()
+        # La carga inicial se difiere a showEvent: construir la pestaña en el
+        # arranque pagaba las queries de cajas aunque nadie abriera Bodega.
+
+    def showEvent(self, event) -> None:  # noqa: ANN001
+        super().showEvent(event)
+        if not self._cajas_loaded:
+            self._refresh_cajas()
 
     def _init_ui(self) -> None:
         main_layout = QVBoxLayout()
@@ -528,6 +535,7 @@ class BodegaWidget(QWidget):
     # ─── Data loading ────────────────────────────────────────────────────
 
     def _refresh_cajas(self) -> None:
+        self._cajas_loaded = True
         with get_session() as session:
             estado_text = self.filtro_estado.currentText()
             estado = EstadoCaja(estado_text) if estado_text != "Todas" else None
@@ -540,6 +548,12 @@ class BodegaWidget(QWidget):
                 estado=estado,
                 ubicacion_id=ubicacion_id,
                 categoria=self._categoria_filter,
+            )
+
+            # Una sola query para el contenido de TODAS las cajas (antes era
+            # una por caja dentro del loop).
+            desgloses = BodegaService.desglose_contenido_cajas(
+                session, [caja.id for caja in cajas]
             )
 
             self.tabla_cajas.setRowCount(len(cajas))
@@ -564,7 +578,7 @@ class BodegaWidget(QWidget):
                 self.tabla_cajas.setItem(row, 3, QTableWidgetItem(caja.estado))
 
                 # Contenido — desglose de tallas
-                desglose = BodegaService.desglose_contenido_caja(session, caja.id)
+                desglose = desgloses.get(int(caja.id), [])
                 if desglose:
                     parts = []
                     for grupo in desglose:

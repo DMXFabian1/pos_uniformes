@@ -60,6 +60,7 @@ from pos_uniformes.services.active_filter_service import build_active_filter_tok
 from pos_uniformes.services.catalog_local_cache_service import (
     catalog_cache_saved_at,
     format_cache_age_label,
+    load_catalog_cache,
     save_catalog_cache,
 )
 from pos_uniformes.services.catalog_school_link_service import list_all_active_links
@@ -380,7 +381,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self._apply_catalog_detail(None)
             self._apply_guided_detail(None)
             self._refresh_recent_lookup_table()
-            self.refresh_all()
+            self.refresh_all(catalog_from_cache=True)
 
         QTimer.singleShot(0, self.kiosk_scan_input.setFocus)
 
@@ -2530,7 +2531,7 @@ class QuoteSatelliteWindow(QMainWindow):
         if 0 <= destino < len(secciones):
             self._set_page(secciones[destino])
 
-    def refresh_all(self) -> None:
+    def refresh_all(self, *, catalog_from_cache: bool = False) -> None:
         if self.offline_mode:
             self._refresh_catalog_browser()
             self._refresh_guided_browser()
@@ -2541,18 +2542,46 @@ class QuoteSatelliteWindow(QMainWindow):
             self._set_status("Vista refrescada (modo local).")
             return
         try:
+            # Arranque: el catálogo se pinta desde el cache local (~35ms) en
+            # vez de esperar la query de ~4,800 filas por red; el watchdog en
+            # background trae el fresco sin congelar el splash.
+            catalog_ready = catalog_from_cache and self._load_catalog_from_disk_cache()
             with get_session() as session:
                 self._refresh_client_combo(session)
-                self._refresh_catalog_snapshot(session)
+                if not catalog_ready:
+                    self._refresh_catalog_snapshot(session)
                 self._refresh_quotes(session)
                 self._refresh_tariff_schools(session)
             self._refresh_catalog_browser()
             self._refresh_guided_browser()
             self._refresh_quote_cart_table()
             self._refresh_recent_lookup_table()
-            self._set_status("Datos actualizados.")
+            if catalog_ready:
+                self._start_background_db_refresh()
+                self._set_status("Catalogo del cache local; actualizando en segundo plano...")
+            else:
+                self._set_status("Datos actualizados.")
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "No se pudo actualizar", str(exc))
+
+    def _load_catalog_from_disk_cache(self) -> bool:
+        """Carga catalog_cache.json en memoria. True si el cache sirvió;
+        False para caer a la query completa contra la base."""
+        try:
+            rows = load_catalog_cache()
+        except Exception:  # noqa: BLE001
+            return False
+        if not rows:
+            return False
+        self.catalog_snapshot_rows = rows
+        self._rebuild_sku_index()
+        self._rebuild_catalog_level_combo()
+        # El próximo _refresh_catalog_snapshot (refresh manual) sí debe
+        # re-indexar Meilisearch en background: trae filas nuevas.
+        self._catalog_snapshot_loaded_once = True
+        self._update_meilisearch_status()
+        QTimer.singleShot(10_000, self._update_meilisearch_status)
+        return True
 
     def _rebuild_sku_index(self) -> None:
         """Reconstruye el indice por SKU para busquedas O(1) en el catalogo."""

@@ -507,13 +507,24 @@ class PanelUniformesWidget(QWidget):
         toolbar_widget.setStyleSheet("background: #f5f5f5; border-bottom: 1px solid #ddd;")
         layout.addWidget(toolbar_widget)
 
-        # WebEngineView (lazy import to avoid crash if not installed)
+        # El QWebEngineView NO se crea aquí: instanciarlo arranca el proceso
+        # de Chromium (cientos de ms + ~100MB) en el arranque aunque nadie
+        # abra el panel. Se crea perezoso en showEvent.
+        self._web_view = None
+        self._web_layout = layout
+        self._web_view_attempted = False
+
+    def _ensure_web_view(self) -> None:
+        """Crea el QWebEngineView + bridge la primera vez que se necesita."""
+        if self._web_view_attempted:
+            return
+        self._web_view_attempted = True
         try:
             from PyQt6.QtWebEngineWidgets import QWebEngineView
             from PyQt6.QtWebChannel import QWebChannel
 
             self._web_view = QWebEngineView()
-            layout.addWidget(self._web_view, 1)
+            self._web_layout.addWidget(self._web_view, 1)
 
             # Setup QWebChannel bridge
             channel = QWebChannel(self._web_view.page())
@@ -526,10 +537,11 @@ class PanelUniformesWidget(QWidget):
             fallback = QLabel(f"PyQt6-WebEngine no disponible:\n{exc}")
             fallback.setAlignment(Qt.AlignmentFlag.AlignCenter)
             fallback.setStyleSheet("font-size: 16px; color: #999; padding: 40px;")
-            layout.addWidget(fallback, 1)
+            self._web_layout.addWidget(fallback, 1)
 
     def showEvent(self, event) -> None:  # noqa: ANN001
         super().showEvent(event)
+        self._ensure_web_view()
         if not self._loaded and self._web_view is not None:
             self._loaded = True
             # If HTML exists and is recent (< 5 min), load directly; else regenerate

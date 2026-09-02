@@ -9205,23 +9205,42 @@ class MainWindow(QMainWindow):
         self.layaway_quick_alerts_label.setText(self.layaway_quick_alerts_label.text())
 
     def _refresh_summary(self, session) -> None:
-        usuarios = session.scalar(select(func.count(Usuario.id))) or 0
-        proveedores = session.scalar(select(func.count(Proveedor.id))) or 0
-        productos = session.scalar(select(func.count(Producto.id))) or 0
-        variantes = session.scalar(select(func.count(Variante.id))) or 0
-        stock_total = session.scalar(select(func.coalesce(func.sum(Variante.stock_actual), 0))) or 0
-        compras = session.scalar(select(func.count(Compra.id))) or 0
-        ventas = session.scalar(select(func.count(Venta.id))) or 0
-        ventas_confirmadas = session.scalar(
-            select(func.count(Venta.id)).where(Venta.estado == EstadoVenta.CONFIRMADA)
-        ) or 0
-        ingresos = session.scalar(
-            select(func.coalesce(func.sum(Venta.total), 0)).where(Venta.estado == EstadoVenta.CONFIRMADA)
-        ) or Decimal("0.00")
-        compras_confirmadas = session.scalar(
-            select(func.coalesce(func.sum(Compra.total), 0)).where(Compra.estado == EstadoCompra.CONFIRMADA)
-        ) or Decimal("0.00")
-        stock_bajo = session.scalar(select(func.count(Variante.id)).where(Variante.stock_actual <= 3)) or 0
+        # Un solo round-trip: antes eran 11 queries escalares secuenciales,
+        # cada una pagando latencia de red completa.
+        summary_row = session.execute(
+            select(
+                select(func.count(Usuario.id)).scalar_subquery(),
+                select(func.count(Proveedor.id)).scalar_subquery(),
+                select(func.count(Producto.id)).scalar_subquery(),
+                select(func.count(Variante.id)).scalar_subquery(),
+                select(func.coalesce(func.sum(Variante.stock_actual), 0)).scalar_subquery(),
+                select(func.count(Compra.id)).scalar_subquery(),
+                select(func.count(Venta.id)).scalar_subquery(),
+                select(func.count(Venta.id))
+                .where(Venta.estado == EstadoVenta.CONFIRMADA)
+                .scalar_subquery(),
+                select(func.coalesce(func.sum(Venta.total), 0))
+                .where(Venta.estado == EstadoVenta.CONFIRMADA)
+                .scalar_subquery(),
+                select(func.coalesce(func.sum(Compra.total), 0))
+                .where(Compra.estado == EstadoCompra.CONFIRMADA)
+                .scalar_subquery(),
+                select(func.count(Variante.id))
+                .where(Variante.stock_actual <= 3)
+                .scalar_subquery(),
+            )
+        ).one()
+        usuarios = summary_row[0] or 0
+        proveedores = summary_row[1] or 0
+        productos = summary_row[2] or 0
+        variantes = summary_row[3] or 0
+        stock_total = summary_row[4] or 0
+        compras = summary_row[5] or 0
+        ventas = summary_row[6] or 0
+        ventas_confirmadas = summary_row[7] or 0
+        ingresos = summary_row[8] or Decimal("0.00")
+        compras_confirmadas = summary_row[9] or Decimal("0.00")
+        stock_bajo = summary_row[10] or 0
         layaway_alerts_snapshot = load_layaway_alerts_snapshot(session, today=date.today())
         manual_promo_summary = ManualPromoService.summarize_today(session, limit=4)
 
@@ -9759,10 +9778,15 @@ class MainWindow(QMainWindow):
         productos = session.scalars(select(Producto).where(Producto.activo.is_(True)).order_by(Producto.nombre)).all()
         proveedores = session.scalars(select(Proveedor).where(Proveedor.activo.is_(True)).order_by(Proveedor.nombre)).all()
         clientes = session.scalars(select(Cliente).where(Cliente.activo.is_(True)).order_by(Cliente.nombre)).all()
-        variantes_activas = session.scalars(
-            select(Variante).where(Variante.activo.is_(True)).order_by(Variante.sku)
+        # Una sola pasada por las ~4,800 variantes (antes se hidrataban dos
+        # veces) y con el producto precargado para no disparar un lazy-load
+        # por fila al armar las etiquetas de los combos.
+        from sqlalchemy.orm import joinedload
+
+        variantes_inventario = session.scalars(
+            select(Variante).options(joinedload(Variante.producto)).order_by(Variante.sku)
         ).all()
-        variantes_inventario = session.scalars(select(Variante).order_by(Variante.sku)).all()
+        variantes_activas = [v for v in variantes_inventario if v.activo]
 
         self._populate_combo(self.product_category_combo, [(categoria.nombre, categoria.id) for categoria in categorias])
         self._populate_combo(self.product_brand_combo, [(marca.nombre, marca.id) for marca in marcas])
