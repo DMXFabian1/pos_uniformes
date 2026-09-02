@@ -207,6 +207,10 @@ class CorteDia:
     monto_neto_ventas: Decimal
     monto_apartados: Decimal
     monto_abonos: Decimal
+    # Efectivo que debe haber en el cajón: ventas + abonos pagados en
+    # efectivo. Lo de tarjeta no está en caja (llega por la terminal) y el
+    # apartado no es dinero recibido (su dinero entra vía abonos).
+    monto_en_caja: Decimal
 
 
 def resumir_por_dia(rows: list[LibretaVenta]) -> list[CorteDia]:
@@ -231,6 +235,7 @@ def resumir_por_dia(rows: list[LibretaVenta]) -> list[CorteDia]:
                 "neto": Decimal("0.00"),
                 "apartados": Decimal("0.00"),
                 "abonos": Decimal("0.00"),
+                "en_caja": Decimal("0.00"),
             },
         )
         bucket["operaciones"] += 1
@@ -238,13 +243,18 @@ def resumir_por_dia(rows: list[LibretaVenta]) -> list[CorteDia]:
         monto = Decimal(str(row.monto_total or 0))
         neto = Decimal(str(getattr(row, "monto_neto", None) or monto))
         tipo = str(row.tipo)
+        pago_tarjeta = bool(getattr(row, "pago_tarjeta", False))
         if tipo == "apartado":
             bucket["apartados"] = (bucket["apartados"] + monto).quantize(Decimal("0.01"))
         elif tipo == "abono":
             bucket["abonos"] = (bucket["abonos"] + neto).quantize(Decimal("0.01"))
+            if not pago_tarjeta:
+                bucket["en_caja"] = (bucket["en_caja"] + monto).quantize(Decimal("0.01"))
         else:
             bucket["ventas"] = (bucket["ventas"] + monto).quantize(Decimal("0.01"))
             bucket["neto"] = (bucket["neto"] + neto).quantize(Decimal("0.01"))
+            if not pago_tarjeta:
+                bucket["en_caja"] = (bucket["en_caja"] + monto).quantize(Decimal("0.01"))
     return [
         CorteDia(
             dia=dia,
@@ -255,6 +265,7 @@ def resumir_por_dia(rows: list[LibretaVenta]) -> list[CorteDia]:
             monto_neto_ventas=data["neto"],
             monto_apartados=data["apartados"],
             monto_abonos=data["abonos"],
+            monto_en_caja=data["en_caja"],
         )
         for dia, data in sorted(acc.items(), key=lambda kv: kv[0], reverse=True)
     ]

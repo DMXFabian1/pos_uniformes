@@ -1081,9 +1081,9 @@ class QuickSaleWidget(QWidget):
         titulo.setStyleSheet("font-size: 15px; font-weight: 600;")
         ly.addWidget(titulo)
 
-        ly.addWidget(QLabel("Nombre del cliente"))
+        ly.addWidget(QLabel("Cliente (opcional)"))
         cliente_input = QLineEdit()
-        cliente_input.setPlaceholderText("Nombre y apellidos...")
+        cliente_input.setPlaceholderText("Nombre del cliente (opcional)...")
         ly.addWidget(cliente_input)
 
         ly.addWidget(QLabel("Monto del abono"))
@@ -1110,14 +1110,14 @@ class QuickSaleWidget(QWidget):
         btn_cancel.clicked.connect(dlg.reject)
 
         def _confirmar() -> None:
-            nombre = cliente_input.text().strip()
+            nombre = cliente_input.text().strip() or None
             raw_monto = monto_input.text().strip().replace("$", "").replace(",", "")
             try:
                 monto = Decimal(raw_monto).quantize(Decimal("0.01"))
             except Exception:  # noqa: BLE001
                 monto = Decimal("0.00")
-            if not nombre or monto <= 0:
-                error_label.setText("Falta el nombre del cliente o un monto válido.")
+            if monto <= 0:
+                error_label.setText("Captura un monto válido.")
                 error_label.setVisible(True)
                 return
             dlg.accept()
@@ -1133,7 +1133,9 @@ class QuickSaleWidget(QWidget):
         dlg.exec()
         self._scan_input.setFocus()
 
-    def _registrar_abono(self, cliente: str, monto: Decimal, *, pago_tarjeta: bool) -> None:
+    def _registrar_abono(
+        self, cliente: str | None, monto: Decimal, *, pago_tarjeta: bool
+    ) -> None:
         try:
             from datetime import timezone as _tz
 

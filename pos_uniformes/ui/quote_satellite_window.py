@@ -1210,10 +1210,12 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_status_label.setVisible(False)
         view_ly.addWidget(self.libreta_status_label)
 
-        # Corte por día (solo vista dueño): cuánto se vendió cada día
-        self.libreta_daily_table = QTableWidget(0, 7)
+        # Corte por día (solo vista dueño): cuánto se vendió y cuánto
+        # efectivo debe haber en el cajón cada día.
+        self.libreta_daily_table = QTableWidget(0, 8)
         self.libreta_daily_table.setHorizontalHeaderLabels(
-            ["Día", "Operaciones", "Piezas", "Ventas $", "Neto $", "Apartados $", "Abonos $"]
+            ["Día", "En caja $", "Operaciones", "Piezas",
+             "Ventas $", "Neto $", "Apartados $", "Abonos $"]
         )
         self.libreta_daily_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
@@ -1372,6 +1374,7 @@ class QuoteSatelliteWindow(QMainWindow):
                     ),
                     monto_total=monto,
                     monto_neto=_Dec(str(entry.get("monto_neto") or monto)),
+                    pago_tarjeta=bool(entry.get("pago_tarjeta", False)),
                     detalle=items,
                 )
             )
@@ -1393,29 +1396,33 @@ class QuoteSatelliteWindow(QMainWindow):
             f"{total_ops} operacion(es) · {total_piezas} pieza(s) · "
             f"{total_comisiones} comision(es) {periodo}"
         )
+        cortes = resumir_por_dia(rows) if self._libreta_is_owner else []
         if self._libreta_is_owner:
             total_monto = sum(Decimal(str(r.monto_total or 0)) for r in rows)
-            resumen += f" · ${total_monto:,.2f}"
+            total_en_caja = sum((c.monto_en_caja for c in cortes), Decimal("0.00"))
+            resumen += f" · ${total_monto:,.2f} · EN CAJA: ${total_en_caja:,.2f}"
         self.libreta_resumen_label.setText(resumen)
 
         if self._libreta_is_owner:
-            cortes = resumir_por_dia(rows)
             self.libreta_daily_table.setRowCount(len(cortes))
             for i, corte in enumerate(cortes):
                 self.libreta_daily_table.setItem(i, 0, QTableWidgetItem(corte.dia_label))
-                self.libreta_daily_table.setItem(i, 1, QTableWidgetItem(str(corte.operaciones)))
-                self.libreta_daily_table.setItem(i, 2, QTableWidgetItem(str(corte.piezas)))
                 self.libreta_daily_table.setItem(
-                    i, 3, QTableWidgetItem(f"${corte.monto_ventas:,.2f}")
+                    i, 1, QTableWidgetItem(f"${corte.monto_en_caja:,.2f}")
+                )
+                self.libreta_daily_table.setItem(i, 2, QTableWidgetItem(str(corte.operaciones)))
+                self.libreta_daily_table.setItem(i, 3, QTableWidgetItem(str(corte.piezas)))
+                self.libreta_daily_table.setItem(
+                    i, 4, QTableWidgetItem(f"${corte.monto_ventas:,.2f}")
                 )
                 self.libreta_daily_table.setItem(
-                    i, 4, QTableWidgetItem(f"${corte.monto_neto_ventas:,.2f}")
+                    i, 5, QTableWidgetItem(f"${corte.monto_neto_ventas:,.2f}")
                 )
                 self.libreta_daily_table.setItem(
-                    i, 5, QTableWidgetItem(f"${corte.monto_apartados:,.2f}")
+                    i, 6, QTableWidgetItem(f"${corte.monto_apartados:,.2f}")
                 )
                 self.libreta_daily_table.setItem(
-                    i, 6, QTableWidgetItem(f"${corte.monto_abonos:,.2f}")
+                    i, 7, QTableWidgetItem(f"${corte.monto_abonos:,.2f}")
                 )
 
         if self._libreta_is_owner:

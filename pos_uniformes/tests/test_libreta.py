@@ -97,26 +97,39 @@ class LibretaServiceTests(unittest.TestCase):
         lunes = datetime(2026, 8, 31, 10, 0, tzinfo=timezone.utc).astimezone()
         martes = datetime(2026, 9, 1, 16, 0, tzinfo=timezone.utc).astimezone()
         rows = [
+            # Venta con TARJETA: cuenta en ventas/neto pero NO en caja
             SimpleNamespace(created_at=lunes, tipo="venta", piezas=2,
-                            monto_total=Decimal("500"), monto_neto=Decimal("477.50")),
+                            monto_total=Decimal("500"), monto_neto=Decimal("477.50"),
+                            pago_tarjeta=True),
             SimpleNamespace(created_at=lunes, tipo="apartado", piezas=3,
-                            monto_total=Decimal("900"), monto_neto=Decimal("900")),
+                            monto_total=Decimal("900"), monto_neto=Decimal("900"),
+                            pago_tarjeta=False),
+            # Abono en efectivo: SÍ está en caja
             SimpleNamespace(created_at=lunes, tipo="abono", piezas=0,
-                            monto_total=Decimal("200"), monto_neto=Decimal("200")),
+                            monto_total=Decimal("200"), monto_neto=Decimal("200"),
+                            pago_tarjeta=False),
+            # Venta en efectivo: SÍ está en caja
+            SimpleNamespace(created_at=lunes, tipo="venta", piezas=1,
+                            monto_total=Decimal("300"), monto_neto=Decimal("300"),
+                            pago_tarjeta=False),
             SimpleNamespace(created_at=martes, tipo="venta", piezas=1,
-                            monto_total=Decimal("100"), monto_neto=Decimal("100")),
+                            monto_total=Decimal("100"), monto_neto=Decimal("100"),
+                            pago_tarjeta=False),
         ]
         cortes = resumir_por_dia(rows)
         self.assertEqual(len(cortes), 2)
         self.assertEqual(cortes[0].dia, martes.date())  # más reciente primero
         lunes_corte = cortes[1]
-        self.assertEqual(lunes_corte.operaciones, 3)
-        self.assertEqual(lunes_corte.piezas, 5)
+        self.assertEqual(lunes_corte.operaciones, 4)
+        self.assertEqual(lunes_corte.piezas, 6)
         # Ventas, neto (tras tarjeta), apartados y abonos, cada uno aparte
-        self.assertEqual(lunes_corte.monto_ventas, Decimal("500.00"))
-        self.assertEqual(lunes_corte.monto_neto_ventas, Decimal("477.50"))
+        self.assertEqual(lunes_corte.monto_ventas, Decimal("800.00"))
+        self.assertEqual(lunes_corte.monto_neto_ventas, Decimal("777.50"))
         self.assertEqual(lunes_corte.monto_apartados, Decimal("900.00"))
         self.assertEqual(lunes_corte.monto_abonos, Decimal("200.00"))
+        # EN CAJA: venta efectivo 300 + abono efectivo 200 (la venta con
+        # tarjeta no está en el cajón; el apartado no es dinero recibido)
+        self.assertEqual(lunes_corte.monto_en_caja, Decimal("500.00"))
 
     def test_comisiones_regla_3pz(self) -> None:
         from pos_uniformes.services.libreta_service import comisiones_de_items
@@ -306,6 +319,18 @@ class QuickSaleLibretaHookTests(unittest.TestCase):
         self.assertEqual(entry["cliente"], "Ana Lopez")
         self.assertEqual(entry["monto_total"], "200.00")
         self.assertEqual(entry["comisiones"], 0)  # abonos no dan comisión
+
+    def test_abono_sin_cliente_es_valido(self) -> None:
+        # El nombre del cliente es opcional (petición de Daniel).
+        widget = self._make_widget()
+        with patch.object(widget, "_drenar_libreta_en_background"), \
+                patch(
+                    "pos_uniformes.services.libreta_local_queue_service.encolar_operacion"
+                ) as encolar:
+            widget._registrar_abono(None, Decimal("150.00"), pago_tarjeta=False)
+        entry = encolar.call_args.args[0]
+        self.assertIsNone(entry["cliente"])
+        self.assertEqual(entry["monto_total"], "150.00")
 
     def test_abono_con_tarjeta_calcula_neto(self) -> None:
         widget = self._make_widget()
