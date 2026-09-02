@@ -604,4 +604,79 @@ QLineEdit#guidedSearchInput:focus {
     border: 2px solid #c76b39;
     background: #fffaf4;
 }
+
+/* ── Libreta ─────────────────────────────────────────────── */
+QLabel#libretaSaludo {
+    font-size: 22px;
+    font-weight: 800;
+    color: #2c2a27;
+}
+QFrame#libretaCard {
+    background: #fbf8f2;
+    border: 1px solid #ddd0c0;
+    border-radius: 18px;
+}
+QFrame#libretaCardDestacada {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:1,
+        stop:0 #6f331d, stop:0.55 #a84f2d, stop:1 #c96a35);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 18px;
+}
+QLabel#libretaCardTitulo {
+    font-size: 11px;
+    font-weight: 800;
+    color: #8a8177;
+    letter-spacing: 1px;
+}
+QLabel#libretaCardTituloClaro {
+    font-size: 11px;
+    font-weight: 800;
+    color: #f6ddca;
+    letter-spacing: 1px;
+}
+QLabel#libretaCardValor {
+    font-size: 32px;
+    font-weight: 900;
+    color: #2c2a27;
+}
+QLabel#libretaCardValorClaro {
+    font-size: 32px;
+    font-weight: 900;
+    color: #f9f4ea;
+}
+QListWidget#libretaLista {
+    background: #fffdf8;
+    border: 1px solid #ddd0c0;
+    border-radius: 14px;
+    font-size: 14px;
+    color: #2c2a27;
+    padding: 6px;
+}
+QListWidget#libretaLista::item {
+    padding: 10px 12px;
+    border-bottom: 1px solid #efe5d8;
+}
+QListWidget#libretaLista::item:selected {
+    background: #f4d4bb;
+    color: #73341c;
+    border-radius: 8px;
+}
+QFrame#libretaMetaCard {
+    background: #fbf8f2;
+    border: 1px solid #ddd0c0;
+    border-radius: 18px;
+}
+QProgressBar#libretaMetaProgress {
+    min-height: 24px;
+    border-radius: 12px;
+    background: #efe5d8;
+    font-weight: 800;
+    color: #2c2a27;
+    text-align: center;
+}
+QProgressBar#libretaMetaProgress::chunk {
+    border-radius: 12px;
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #a84f2d, stop:1 #c96a35);
+}
 """

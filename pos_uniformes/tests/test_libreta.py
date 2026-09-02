@@ -435,6 +435,51 @@ class CorteTicketTests(unittest.TestCase):
             self.assertLessEqual(len(line), TICKET_CHAR_WIDTH)
 
 
+class LibretaListaAmigableTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        from PyQt6.QtWidgets import QApplication
+
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_lista_habla_simple_y_sin_dinero(self) -> None:
+        from PyQt6.QtWidgets import QListWidget
+
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        fake = SimpleNamespace(
+            libreta_emp_list=QListWidget(),
+            _libreta_week=False,
+        )
+        ahora = datetime(2026, 9, 2, 10, 32, tzinfo=timezone.utc).astimezone()
+        rows = [
+            SimpleNamespace(
+                created_at=ahora, tipo="venta", piezas=2, comisiones=2,
+                monto_total=Decimal("1030.00"), cliente=None,
+                detalle=[{"nombre": "Pants", "talla": "6", "cantidad": 2}],
+            ),
+            SimpleNamespace(
+                created_at=ahora, tipo="abono", piezas=0, comisiones=0,
+                monto_total=Decimal("200.00"), cliente="Ana",
+                detalle=[],
+            ),
+        ]
+        QuoteSatelliteWindow._llenar_libreta_lista(fake, rows)
+        textos = [
+            fake.libreta_emp_list.item(i).text()
+            for i in range(fake.libreta_emp_list.count())
+        ]
+        self.assertIn("Vendiste 2 pieza(s)", textos[0])
+        self.assertIn("Pants T:6 x2", textos[0])
+        self.assertIn("+2 com.", textos[0])
+        self.assertIn("Recibiste un abono de Ana", textos[1])
+        # Privacidad: NINGÚN monto en la vista de la empleada.
+        for texto in textos:
+            self.assertNotIn("$", texto)
+            self.assertNotIn("1030", texto)
+            self.assertNotIn("200", texto)
+
+
 class LibretaPagePrivacyTests(unittest.TestCase):
     """El gate decide qué se ve: empleada sin montos, dueño con todo."""
 
@@ -457,6 +502,7 @@ class LibretaPagePrivacyTests(unittest.TestCase):
             libreta_owner_bar=MagicMock(),
             libreta_meta_bar=MagicMock(),
             libreta_meta_spin=MagicMock(),
+            libreta_emp_list=MagicMock(),
             libreta_table=MagicMock(),
             libreta_titular_label=MagicMock(),
             libreta_hoy_button=MagicMock(),
@@ -476,6 +522,9 @@ class LibretaPagePrivacyTests(unittest.TestCase):
         fake.libreta_daily_table.setVisible.assert_called_once_with(False)
         # Los controles de corte/meta son del dueño, no de la empleada.
         fake.libreta_owner_bar.setVisible.assert_called_once_with(False)
+        # Ella ve su lista amigable, no la tabla técnica.
+        fake.libreta_emp_list.setVisible.assert_called_once_with(True)
+        fake.libreta_table.setVisible.assert_called_once_with(False)
         fake._refresh_libreta_view.assert_called_once()
 
     def test_dueno_ve_todo(self) -> None:
@@ -485,6 +534,8 @@ class LibretaPagePrivacyTests(unittest.TestCase):
         fake.libreta_summary_table.setVisible.assert_called_once_with(True)
         fake.libreta_daily_table.setVisible.assert_called_once_with(True)
         fake.libreta_owner_bar.setVisible.assert_called_once_with(True)
+        fake.libreta_emp_list.setVisible.assert_called_once_with(False)
+        fake.libreta_table.setVisible.assert_called_once_with(True)
 
 
 if __name__ == "__main__":

@@ -30,6 +30,8 @@ from PyQt6.QtWidgets import (
     QHeaderView,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMainWindow,
     QMessageBox,
     QPushButton,
@@ -310,6 +312,9 @@ def _paginate(options: list, page: int, per_page: int) -> tuple[list, int, int]:
     page = max(0, min(page, total_pages - 1))
     start = page * per_page
     return options[start : start + per_page], page, total_pages
+
+
+_DIA_CORTO = ("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
 
 
 class QuoteSatelliteWindow(QMainWindow):
@@ -1154,10 +1159,18 @@ class QuoteSatelliteWindow(QMainWindow):
         gate_ly = QVBoxLayout()
         gate_ly.setContentsMargins(40, 60, 40, 60)
         gate_ly.setSpacing(12)
+        gate_icon = QLabel("📒")
+        gate_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        gate_icon.setStyleSheet("font-size: 52px;")
+        gate_ly.addWidget(gate_icon)
         gate_hint = QLabel("Escanea tu gafete para abrir tu libreta")
         gate_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        gate_hint.setStyleSheet("font-size: 16px; font-weight: 600;")
+        gate_hint.setStyleSheet("font-size: 17px; font-weight: 700;")
         gate_ly.addWidget(gate_hint)
+        gate_sub = QLabel("Aquí ves tus ventas, piezas y comisiones — sin apuntar nada.")
+        gate_sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        gate_sub.setStyleSheet("font-size: 13px; color: #8a8177;")
+        gate_ly.addWidget(gate_sub)
         self.libreta_gate_input = QLineEdit()
         self.libreta_gate_input.setPlaceholderText("Gafete...")
         self.libreta_gate_input.returnPressed.connect(self._on_libreta_gate_scan)
@@ -1178,7 +1191,7 @@ class QuoteSatelliteWindow(QMainWindow):
 
         header = QHBoxLayout()
         self.libreta_titular_label = QLabel("")
-        self.libreta_titular_label.setStyleSheet("font-size: 15px; font-weight: 600;")
+        self.libreta_titular_label.setObjectName("libretaSaludo")
         header.addWidget(self.libreta_titular_label)
         header.addStretch()
         self.libreta_hoy_button = QPushButton("Hoy")
@@ -1200,6 +1213,33 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_salir_button.clicked.connect(self._libreta_logout)
         header.addWidget(self.libreta_salir_button)
         view_ly.addLayout(header)
+
+        # Tarjetas de métricas: números grandes y amigables, sin tecnicismos.
+        # La primera (destacada) cambia según quién mira: comisiones para la
+        # empleada, EN CAJA para el dueño.
+        cards_row = QHBoxLayout()
+        cards_row.setSpacing(10)
+        self._libreta_cards: list[tuple[QFrame, QLabel, QLabel]] = []
+        for index in range(4):
+            card = QFrame()
+            card.setObjectName("libretaCardDestacada" if index == 0 else "libretaCard")
+            card_ly = QVBoxLayout()
+            card_ly.setContentsMargins(16, 12, 16, 12)
+            card_ly.setSpacing(2)
+            titulo_card = QLabel("")
+            titulo_card.setObjectName(
+                "libretaCardTituloClaro" if index == 0 else "libretaCardTitulo"
+            )
+            valor_card = QLabel("—")
+            valor_card.setObjectName(
+                "libretaCardValorClaro" if index == 0 else "libretaCardValor"
+            )
+            card_ly.addWidget(titulo_card)
+            card_ly.addWidget(valor_card)
+            card.setLayout(card_ly)
+            cards_row.addWidget(card, 1)
+            self._libreta_cards.append((card, titulo_card, valor_card))
+        view_ly.addLayout(cards_row)
 
         # Barra del dueño: imprimir corte + meta semanal de comisiones
         self.libreta_owner_bar = QWidget()
@@ -1224,14 +1264,17 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_owner_bar.setLayout(owner_bar_ly)
         view_ly.addWidget(self.libreta_owner_bar)
 
-        # Barra de progreso de la empleada contra la meta semanal
-        self.libreta_meta_bar = QWidget()
+        # Tarjeta de la meta semanal de la empleada, con barra de progreso
+        self.libreta_meta_bar = QFrame()
+        self.libreta_meta_bar.setObjectName("libretaMetaCard")
         meta_bar_ly = QHBoxLayout()
-        meta_bar_ly.setContentsMargins(0, 0, 0, 0)
-        meta_bar_ly.setSpacing(8)
+        meta_bar_ly.setContentsMargins(16, 12, 16, 12)
+        meta_bar_ly.setSpacing(12)
         self.libreta_meta_label = QLabel("")
+        self.libreta_meta_label.setStyleSheet("font-size: 14px; font-weight: 700;")
         meta_bar_ly.addWidget(self.libreta_meta_label)
         self.libreta_meta_progress = QProgressBar()
+        self.libreta_meta_progress.setObjectName("libretaMetaProgress")
         self.libreta_meta_progress.setTextVisible(True)
         meta_bar_ly.addWidget(self.libreta_meta_progress, 1)
         self.libreta_meta_bar.setLayout(meta_bar_ly)
@@ -1278,7 +1321,13 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_summary_table.setMaximumHeight(180)
         view_ly.addWidget(self.libreta_summary_table)
 
-        # Operaciones una por una
+        # Lista amigable de la empleada: sus movimientos en lenguaje simple,
+        # sin columnas técnicas ni dinero.
+        self.libreta_emp_list = QListWidget()
+        self.libreta_emp_list.setObjectName("libretaLista")
+        view_ly.addWidget(self.libreta_emp_list, 1)
+
+        # Operaciones una por una (tabla detallada — solo vista dueño)
         self.libreta_table = QTableWidget(0, 7)
         self.libreta_table.setHorizontalHeaderLabels(
             ["Fecha", "Hora", "Tipo", "Piezas", "Comisiones", "Prendas", "Monto"]
@@ -1323,15 +1372,18 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_summary_table.setVisible(self._libreta_is_owner)
         self.libreta_owner_bar.setVisible(self._libreta_is_owner)
         self.libreta_meta_bar.setVisible(False)  # se muestra al refrescar si hay meta
+        # La empleada ve su lista amigable; la tabla técnica es del dueño.
+        self.libreta_table.setVisible(self._libreta_is_owner)
+        self.libreta_emp_list.setVisible(not self._libreta_is_owner)
         self.libreta_table.setColumnHidden(6, not self._libreta_is_owner)
         if self._libreta_is_owner:
             from pos_uniformes.services.libreta_meta_service import load_meta_semanal
 
             self.libreta_meta_spin.setValue(load_meta_semanal())
         self.libreta_titular_label.setText(
-            "Libreta de la tienda (todas las empleadas)"
+            "📒 Libreta de la tienda"
             if self._libreta_is_owner
-            else f"Libreta de {code}"
+            else f"Hola, {code} 👋"
         )
         self._refresh_libreta_view()
 
@@ -1413,9 +1465,10 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_meta_progress.setValue(min(comisiones_semana, meta))
         self.libreta_meta_progress.setFormat(f"{comisiones_semana} / {meta}")
         if comisiones_semana >= meta:
-            self.libreta_meta_label.setText("¡Meta semanal cumplida! 🎉")
+            self.libreta_meta_label.setText("¡Meta de la semana cumplida! 🎉")
         else:
-            self.libreta_meta_label.setText("Meta de la semana:")
+            faltan = meta - comisiones_semana
+            self.libreta_meta_label.setText(f"🎯 Meta de la semana — te faltan {faltan}")
         self.libreta_meta_bar.setVisible(True)
 
     def _guardar_meta_libreta(self) -> None:
@@ -1493,6 +1546,47 @@ class QuoteSatelliteWindow(QMainWindow):
         rows.sort(key=lambda r: r.created_at, reverse=True)
         return rows
 
+    def _llenar_libreta_cards(self, valores: list[tuple[str, str]]) -> None:
+        for (card, titulo, valor), (texto_titulo, texto_valor) in zip(
+            self._libreta_cards, valores
+        ):
+            titulo.setText(texto_titulo)
+            valor.setText(texto_valor)
+
+    def _llenar_libreta_lista(self, rows: list) -> None:
+        """Movimientos de la empleada en lenguaje simple, sin dinero."""
+        from pos_uniformes.services.libreta_service import describir_detalle
+
+        self.libreta_emp_list.clear()
+        if not rows:
+            item = QListWidgetItem("Aquí van a aparecer tus ventas del día. 🌱")
+            self.libreta_emp_list.addItem(item)
+            return
+        for row in rows:
+            local_dt = (
+                row.created_at.astimezone()
+                if row.created_at.tzinfo is not None
+                else row.created_at
+            )
+            hora = local_dt.strftime("%H:%M")
+            dia = f"{_DIA_CORTO[local_dt.weekday()]} · " if self._libreta_week else ""
+            comisiones = int(getattr(row, "comisiones", 0) or 0)
+            tipo = str(row.tipo)
+            if tipo == "abono":
+                cliente = getattr(row, "cliente", None)
+                texto = f"💵  {dia}{hora} · Recibiste un abono"
+                if cliente:
+                    texto += f" de {cliente}"
+            else:
+                piezas = int(row.piezas or 0)
+                verbo = "Apartaste" if tipo == "apartado" else "Vendiste"
+                icono = "📦" if tipo == "apartado" else "🛍️"
+                prendas = describir_detalle(list(row.detalle or []))
+                texto = f"{icono}  {dia}{hora} · {verbo} {piezas} pieza(s): {prendas}"
+                if comisiones:
+                    texto += f"  (+{comisiones} com.)"
+            self.libreta_emp_list.addItem(QListWidgetItem(texto))
+
     def _pintar_libreta(self, rows: list) -> None:
         from pos_uniformes.services.libreta_service import (
             describir_detalle,
@@ -1503,18 +1597,50 @@ class QuoteSatelliteWindow(QMainWindow):
         total_ops = len(rows)
         total_piezas = sum(int(r.piezas or 0) for r in rows)
         total_comisiones = sum(int(getattr(r, "comisiones", 0) or 0) for r in rows)
+        ventas_count = sum(1 for r in rows if str(r.tipo) == "venta")
+        apartados_count = sum(1 for r in rows if str(r.tipo) == "apartado")
         periodo = "esta semana" if self._libreta_week else "hoy"
-        resumen = (
-            f"{total_ops} operacion(es) · {total_piezas} pieza(s) · "
-            f"{total_comisiones} comision(es) {periodo}"
-        )
         cortes = resumir_por_dia(rows) if self._libreta_is_owner else []
         self._libreta_last_cortes = cortes
+
         if self._libreta_is_owner:
             total_monto = sum(Decimal(str(r.monto_total or 0)) for r in rows)
             total_en_caja = sum((c.monto_en_caja for c in cortes), Decimal("0.00"))
-            resumen += f" · ${total_monto:,.2f} · EN CAJA: ${total_en_caja:,.2f}"
-        self.libreta_resumen_label.setText(resumen)
+            self._llenar_libreta_cards(
+                [
+                    ("EN CAJA", f"${total_en_caja:,.0f}"),
+                    ("VENTAS", f"${total_monto:,.0f}"),
+                    ("PIEZAS", str(total_piezas)),
+                    ("COMISIONES", str(total_comisiones)),
+                ]
+            )
+            self.libreta_resumen_label.setText(
+                f"{total_ops} operacion(es) · {total_piezas} pieza(s) · "
+                f"{total_comisiones} comision(es) {periodo}"
+            )
+        else:
+            # Saludo con el nombre real en cuanto lo conocemos por sus filas.
+            for row in rows:
+                if getattr(row, "employee_name", ""):
+                    nombre_pila = str(row.employee_name).split()[0].capitalize()
+                    self.libreta_titular_label.setText(f"Hola, {nombre_pila} 👋")
+                    break
+            self._llenar_libreta_cards(
+                [
+                    ("COMISIONES", str(total_comisiones)),
+                    ("PIEZAS VENDIDAS", str(total_piezas)),
+                    ("VENTAS", str(ventas_count)),
+                    ("APARTADOS", str(apartados_count)),
+                ]
+            )
+            if total_ops == 0:
+                mensaje = f"Aún no tienes movimientos {periodo}. ¡Tú puedes! 💪"
+            else:
+                mensaje = (
+                    f"Llevas {total_piezas} pieza(s) y "
+                    f"{total_comisiones} comision(es) {periodo}. ¡Bien! ✨"
+                )
+            self.libreta_resumen_label.setText(mensaje)
 
         if self._libreta_is_owner:
             self.libreta_daily_table.setRowCount(len(cortes))
@@ -1551,6 +1677,10 @@ class QuoteSatelliteWindow(QMainWindow):
                 self.libreta_summary_table.setItem(
                     i, 4, QTableWidgetItem(f"${r.monto_total:,.2f}")
                 )
+
+        if not self._libreta_is_owner:
+            self._llenar_libreta_lista(rows)
+            return
 
         self.libreta_table.setRowCount(len(rows))
         for i, row in enumerate(rows):
