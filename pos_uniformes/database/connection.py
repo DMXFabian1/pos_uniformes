@@ -22,6 +22,26 @@ class Base(DeclarativeBase):
     metadata = MetaData(naming_convention=NAMING_CONVENTION)
 
 
+def build_connect_args(statement_timeout_ms: int) -> dict:
+    connect_args = {
+        # 2s: en LAN el connect es <100ms; solo importa cuando el host está
+        # apagado, y ahí acota cuánto puede bloquear un intento de conexión.
+        "connect_timeout": 2,
+        # TCP keepalives: mantienen viva la conexión inactiva y detectan
+        # cortes de red rápido en vez de colgarse.
+        "keepalives": 1,
+        "keepalives_idle": 30,
+        "keepalives_interval": 10,
+        "keepalives_count": 3,
+    }
+    if statement_timeout_ms > 0:
+        # connect_timeout solo acota la fase TCP/auth; una query ya en vuelo
+        # no tenía límite y podía congelar la UI hasta que los keepalives
+        # mataran la conexión (~60s). Esto la acota del lado del servidor.
+        connect_args["options"] = f"-c statement_timeout={statement_timeout_ms}"
+    return connect_args
+
+
 engine: Engine = create_engine(
     settings.database_url,
     echo=settings.db_echo,
@@ -32,17 +52,7 @@ engine: Engine = create_engine(
     # (crítico en el satélite, que va por Wi-Fi a la PC principal).
     pool_pre_ping=True,
     pool_recycle=1800,  # recicla conexiones > 30 min (NAT/firewall las cortan)
-    connect_args={
-        # 2s: en LAN el connect es <100ms; solo importa cuando el host está
-        # apagado, y ahí acota cuánto puede bloquear un intento de conexión.
-        "connect_timeout": 2,
-        # TCP keepalives: mantienen viva la conexión inactiva y detectan
-        # cortes de red rápido en vez de colgarse.
-        "keepalives": 1,
-        "keepalives_idle": 30,
-        "keepalives_interval": 10,
-        "keepalives_count": 3,
-    },
+    connect_args=build_connect_args(settings.db_statement_timeout_ms),
 )
 
 SessionLocal = sessionmaker(

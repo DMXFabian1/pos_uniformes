@@ -73,6 +73,15 @@ def load_runtime_env_overrides(base_dir: Path | None = None) -> dict[str, str]:
     return overrides
 
 
+def _to_timeout_ms(value: str, default: int = 15_000) -> int:
+    """Milisegundos no negativos; valores inválidos caen al default."""
+    try:
+        parsed = int(str(value).strip())
+    except (TypeError, ValueError):
+        return default
+    return parsed if parsed >= 0 else default
+
+
 def server_db_host(default: str | None = None) -> str | None:
     """IP del servidor (PC principal) leida del .env — nunca se codifica en el codigo.
 
@@ -110,6 +119,9 @@ class Settings:
     backup_external_dir: str | None
     api_secret_key: str = "dev-secret-key-cambiar-en-produccion"
     api_token_expire_hours: int = 8
+    # Techo por query en el servidor (ms). Sin esto, una query colgada congela
+    # la UI hasta que los TCP keepalives maten la conexión (~60s). 0 = sin límite.
+    db_statement_timeout_ms: int = 15_000
 
     @property
     def database_url(self) -> str:
@@ -147,6 +159,9 @@ class Settings:
                 default=False,
             ),
             backup_external_dir=optional_env_value("POS_UNIFORMES_BACKUP_EXTERNAL_DIR"),
+            db_statement_timeout_ms=_to_timeout_ms(
+                env_value("POS_UNIFORMES_DB_STATEMENT_TIMEOUT_MS", "15000")
+            ),
         )
 
 

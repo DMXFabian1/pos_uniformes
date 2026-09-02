@@ -218,6 +218,66 @@ def load_employee_activity_snapshot(
     )
 
 
+def load_employee_activity_snapshots(
+    session,
+    employees,
+    *,
+    reference_date: date | None = None,
+    history_days: int = 7,
+    summary_days: int = 1,
+) -> dict[int, EmployeeActivitySnapshot]:
+    """Versión batch de load_employee_activity_snapshot: UNA sola query de
+    ventas para todas las empleadas. La versión por-empleada dentro de un
+    loop era un N+1 que congelaba la pestaña de Configuración."""
+    from pos_uniformes.services.employee_card_service import EmployeeCardService
+    from pos_uniformes.services.employee_identity_service import EmployeeIdentityService
+    from pos_uniformes.utils.qr_generator import QrGenerator
+
+    employees = list(employees)
+    if not employees:
+        return {}
+
+    if reference_date is None:
+        reference_date = date.today()
+    history_days = max(int(history_days or 7), 1)
+    summary_days = max(int(summary_days or 1), 1)
+    lookback_days = max(history_days, summary_days)
+    window_start, _ = local_day_window(reference_date - timedelta(days=lookback_days - 1))
+
+    codes = {str(employee.codigo).upper() for employee in employees}
+    sales_by_code: dict[str, list[Venta]] = {code: [] for code in codes}
+    ventas = session.scalars(
+        select(Venta)
+        .options(selectinload(Venta.detalles))
+        .where(
+            Venta.estado == EstadoVenta.CONFIRMADA,
+            Venta.credit_mode == ModoOrigenVenta.EMPLOYEE,
+            func.upper(Venta.seller_employee_code).in_(codes),
+            Venta.confirmada_at >= window_start,
+        )
+        .order_by(Venta.confirmada_at.desc())
+    ).all()
+    for venta in ventas:
+        code = str(venta.seller_employee_code or "").upper()
+        if code in sales_by_code:
+            sales_by_code[code].append(venta)
+
+    return {
+        int(employee.id): build_employee_activity_snapshot(
+            employee,
+            pin_ready=EmployeeIdentityService.has_pin(employee),
+            qr_ready=QrGenerator.exists_for_employee(employee),
+            card_ready=EmployeeCardService.exists_for_employee(employee),
+            sales=sales_by_code.get(str(employee.codigo).upper(), ()),
+            reference_date=reference_date,
+            history_days=history_days,
+            summary_days=summary_days,
+            visible_name_builder=EmployeeIdentityService.build_visible_employee_name,
+        )
+        for employee in employees
+    }
+
+
 def build_employee_activity_empty_snapshot() -> EmployeeActivitySnapshot:
     return build_employee_activity_snapshot(
         SimpleNamespace(id=0, codigo="", nombre_completo="", activo=False),

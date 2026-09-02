@@ -317,6 +317,9 @@ class QuoteSatelliteWindow(QMainWindow):
     _db_refresh_ready = pyqtSignal(object, object)
     # Avisa (en hilo de UI) que el cache de anuncios se refrescó desde la DB.
     _anuncios_ready = pyqtSignal()
+    # False hasta el primer _refresh_catalog_snapshot: el reindex de arranque
+    # ya corre en background, solo los refresh posteriores notifican de nuevo.
+    _catalog_snapshot_loaded_once = False
 
     def __init__(
         self,
@@ -2576,7 +2579,15 @@ class QuoteSatelliteWindow(QMainWindow):
         except Exception:  # noqa: BLE001
             pass
         self._rebuild_catalog_level_combo()
-        self._try_index_meilisearch(session)
+        # Antes aquí se indexaba Meilisearch SÍNCRONO en el hilo de UI (hasta
+        # 40s con ~4,800 variantes). El arranque ya reindexa en background
+        # (autostart_and_reindex en presupuestos_satelite_main); solo los
+        # refresh posteriores re-indexan, y también en background.
+        if self._catalog_snapshot_loaded_once:
+            from pos_uniformes.services import meilisearch_service
+
+            meilisearch_service.notify_catalog_changed()
+        self._catalog_snapshot_loaded_once = True
         self._update_meilisearch_status()
         # El auto-arranque de Meilisearch corre en background al abrir la app;
         # re-checar el indicador cuando ya haya tenido tiempo de levantar.
@@ -2937,18 +2948,6 @@ class QuoteSatelliteWindow(QMainWindow):
         )
         self._ms_worker.start()
         dlg.exec()
-
-    def _try_index_meilisearch(self, session) -> None:
-        try:
-            from pos_uniformes.services import meilisearch_service
-            if not meilisearch_service.is_available():
-                logger.info("Meilisearch no disponible — búsqueda usará filtro local")
-                return
-            meilisearch_service.configure_index()
-            count = meilisearch_service.index_from_db(session)
-            logger.info("Meilisearch: %d variantes indexadas", count)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Error indexando Meilisearch: %s", exc)
 
     def _on_guided_search_text_changed(self, text: str) -> None:
         if self._guided_search_input_submitted:

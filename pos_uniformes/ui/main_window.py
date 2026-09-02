@@ -122,6 +122,7 @@ from pos_uniformes.services.employee_activity_service import (
     build_employee_activity_state,
     build_employee_activity_sort_key,
     load_employee_activity_snapshot,
+    load_employee_activity_snapshots,
 )
 from pos_uniformes.services.employee_sales_history_service import (
     list_employee_day_sale_rows,
@@ -1269,6 +1270,20 @@ class MainWindow(QMainWindow):
         self.inventory_filter_debounce_timer.setSingleShot(True)
         self.inventory_filter_debounce_timer.setInterval(LISTING_SEARCH_DEBOUNCE_MS)
         self.inventory_filter_debounce_timer.timeout.connect(lambda: self._run_inventory_filter_refresh())
+        # Debounce de las búsquedas de Configuración: sin esto, cada tecla
+        # disparaba una query (empleadas además con N+1) congelando la UI.
+        self.settings_suppliers_debounce_timer = QTimer(self)
+        self.settings_suppliers_debounce_timer.setSingleShot(True)
+        self.settings_suppliers_debounce_timer.setInterval(LISTING_SEARCH_DEBOUNCE_MS)
+        self.settings_suppliers_debounce_timer.timeout.connect(lambda: self._refresh_settings_suppliers())
+        self.settings_clients_debounce_timer = QTimer(self)
+        self.settings_clients_debounce_timer.setSingleShot(True)
+        self.settings_clients_debounce_timer.setInterval(LISTING_SEARCH_DEBOUNCE_MS)
+        self.settings_clients_debounce_timer.timeout.connect(lambda: self._refresh_settings_clients())
+        self.settings_employees_debounce_timer = QTimer(self)
+        self.settings_employees_debounce_timer.setSingleShot(True)
+        self.settings_employees_debounce_timer.setInterval(LISTING_SEARCH_DEBOUNCE_MS)
+        self.settings_employees_debounce_timer.timeout.connect(lambda: self._refresh_settings_employees())
         self.sale_cart: list[dict[str, object]] = []
         self.layaway_rows: list[dict[str, object]] = []
         self.history_rows: list[dict[str, object]] = []
@@ -2300,6 +2315,13 @@ class MainWindow(QMainWindow):
     def _run_operational_checks(self) -> None:
         if self.active_cash_session_id is None or self.cash_session_requires_cut:
             return
+        # Probe TCP corto antes de tocar SQLAlchemy: este chequeo corre cada
+        # 60s en el hilo de UI, y sin probe congelaba la app cada minuto
+        # cuando la PC de la base no respondía.
+        from pos_uniformes.services.satellite_startup_service import probe_database_host
+
+        if not probe_database_host(0.5):
+            return
         try:
             with get_session() as session:
                 active_session = session.get(SesionCaja, self.active_cash_session_id)
@@ -3266,16 +3288,21 @@ class MainWindow(QMainWindow):
         try:
             with get_session() as session:
                 employees = EmployeeIdentityService.list_employees(session, search_text)
+                # Batch: una sola query de ventas para todas (antes era un
+                # N+1 por empleada que congelaba la pestaña al teclear).
+                try:
+                    employee_activity_snapshots = dict(
+                        load_employee_activity_snapshots(session, employees)
+                    )
+                except Exception:  # noqa: BLE001
+                    employee_activity_snapshots = {}
                 employee_activity_states: dict[int, tuple[str, str]] = {}
-                employee_activity_snapshots: dict[int, object] = {}
                 for employee in employees:
-                    try:
-                        activity_snapshot = load_employee_activity_snapshot(session, employee_id=int(employee.id))
-                        activity_state = build_employee_activity_state(activity_snapshot)
-                    except Exception:  # noqa: BLE001
+                    activity_snapshot = employee_activity_snapshots.get(int(employee.id))
+                    if activity_snapshot is None:
                         activity_snapshot = build_employee_activity_empty_snapshot()
-                        activity_state = build_employee_activity_state(activity_snapshot)
-                    employee_activity_snapshots[int(employee.id)] = activity_snapshot
+                        employee_activity_snapshots[int(employee.id)] = activity_snapshot
+                    activity_state = build_employee_activity_state(activity_snapshot)
                     employee_activity_states[int(employee.id)] = (activity_state.label, activity_state.tone)
             self._employee_activity_snapshots_cache = employee_activity_snapshots
         except Exception as exc:  # noqa: BLE001
@@ -8961,6 +8988,21 @@ class MainWindow(QMainWindow):
             self._refresh_settings_clients(settings_session)
         self._refresh_settings_employees()
         self.status_label.setText("Estado: datos sincronizados con PostgreSQL.")
+
+    def refresh_after_cash_session(self) -> None:
+        """Refresco dirigido tras resolver la caja en el arranque.
+
+        El __init__ ya corrió refresh_all() completa; volver a llamarla desde
+        main.py duplicaba las ~45 queries del arranque. Aquí solo se repinta
+        lo que depende de la sesión de caja recién abierta/confirmada.
+        """
+        try:
+            with get_session() as session:
+                self._refresh_cash_session(session)
+                self._refresh_summary(session)
+            self._refresh_permissions()
+        except Exception as exc:  # noqa: BLE001
+            self.status_label.setText(f"Estado: error al cargar datos - {exc}")
 
     def _refresh_current_user(self, session) -> None:
         user = session.get(Usuario, self.user_id)

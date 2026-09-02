@@ -117,7 +117,10 @@ def build_suppliers_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_create_supplier_button.setObjectName("toolbarPrimaryButton")
     window.settings_update_supplier_button.setObjectName("toolbarSecondaryButton")
     window.settings_toggle_supplier_button.setObjectName("toolbarGhostButton")
-    window.settings_suppliers_search_input.textChanged.connect(window._refresh_settings_suppliers)
+    # Debounce: el texto NO viaja al refresh (antes llegaba como `session`).
+    window.settings_suppliers_search_input.textChanged.connect(
+        lambda _text: window.settings_suppliers_debounce_timer.start()
+    )
     window.settings_create_supplier_button.clicked.connect(window._handle_create_supplier)
     window.settings_update_supplier_button.clicked.connect(window._handle_update_supplier)
     window.settings_toggle_supplier_button.clicked.connect(window._handle_toggle_supplier)
@@ -169,7 +172,9 @@ def build_clients_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_generate_client_qr_button.setObjectName("toolbarSecondaryButton")
     window.settings_client_whatsapp_button.setObjectName("toolbarGhostButton")
     window.settings_client_whatsapp_button.setText("WhatsApp + credencial")
-    window.settings_clients_search_input.textChanged.connect(window._refresh_settings_clients)
+    window.settings_clients_search_input.textChanged.connect(
+        lambda _text: window.settings_clients_debounce_timer.start()
+    )
     window.settings_create_client_button.clicked.connect(window._handle_create_client)
     window.settings_update_client_button.clicked.connect(window._handle_update_client)
     window.settings_toggle_client_button.clicked.connect(window._handle_toggle_client)
@@ -228,8 +233,12 @@ def build_employees_settings_dialog(window: "MainWindow") -> QDialog:
     window.settings_set_employee_pin_button.setObjectName("toolbarSecondaryButton")
     window.settings_generate_employee_qr_button.setObjectName("toolbarSecondaryButton")
     window.settings_generate_employee_card_button.setObjectName("toolbarGhostButton")
-    window.settings_employees_search_input.textChanged.connect(window._refresh_settings_employees)
-    window.settings_employees_activity_filter_combo.currentTextChanged.connect(window._refresh_settings_employees)
+    window.settings_employees_search_input.textChanged.connect(
+        lambda _text: window.settings_employees_debounce_timer.start()
+    )
+    window.settings_employees_activity_filter_combo.currentTextChanged.connect(
+        lambda _text: window.settings_employees_debounce_timer.start()
+    )
     window.settings_create_employee_button.clicked.connect(window._handle_create_employee)
     window.settings_update_employee_button.clicked.connect(window._handle_update_employee)
     window.settings_toggle_employee_button.clicked.connect(window._handle_toggle_employee)

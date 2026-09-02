@@ -643,8 +643,8 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             "pos_uniformes.ui.main_window.EmployeeIdentityService.list_employees",
             return_value=[employee_today, employee_recent],
         ), patch(
-            "pos_uniformes.ui.main_window.load_employee_activity_snapshot",
-            side_effect=[today_snapshot, recent_snapshot],
+            "pos_uniformes.ui.main_window.load_employee_activity_snapshots",
+            return_value={4: today_snapshot, 5: recent_snapshot},
         ), patch(
             "pos_uniformes.ui.main_window.EmployeeIdentityService.has_pin",
             side_effect=[True, False],
@@ -706,8 +706,8 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             "pos_uniformes.ui.main_window.EmployeeIdentityService.list_employees",
             return_value=[employee_today, employee_inactive],
         ), patch(
-            "pos_uniformes.ui.main_window.load_employee_activity_snapshot",
-            side_effect=[today_snapshot, inactive_snapshot],
+            "pos_uniformes.ui.main_window.load_employee_activity_snapshots",
+            return_value={4: today_snapshot, 5: inactive_snapshot},
         ), patch(
             "pos_uniformes.ui.main_window.EmployeeIdentityService.has_pin",
             side_effect=[True, False],
@@ -793,8 +793,8 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
             "pos_uniformes.ui.main_window.EmployeeIdentityService.list_employees",
             return_value=[employee_inactive, employee_recent, employee_today],
         ), patch(
-            "pos_uniformes.ui.main_window.load_employee_activity_snapshot",
-            side_effect=[inactive_snapshot, recent_snapshot, today_snapshot],
+            "pos_uniformes.ui.main_window.load_employee_activity_snapshots",
+            return_value={6: inactive_snapshot, 5: recent_snapshot, 4: today_snapshot},
         ), patch(
             "pos_uniformes.ui.main_window.EmployeeIdentityService.has_pin",
             return_value=False,

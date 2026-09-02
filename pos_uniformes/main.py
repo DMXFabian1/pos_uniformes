@@ -12,13 +12,6 @@ from pos_uniformes.utils.venv_bootstrap import ensure_local_venv_site_packages
 
 ensure_local_venv_site_packages(Path(__file__))
 
-# QtWebEngineWidgets debe importarse ANTES de crear QApplication
-try:
-    from PyQt6.QtWebEngineWidgets import QWebEngineView  # noqa: F401
-    print("[main] QtWebEngineWidgets cargado OK")
-except Exception as _webengine_exc:
-    print(f"[main] QtWebEngineWidgets no disponible: {_webengine_exc}")
-
 # ---------------------------------------------------------------------------
 # Auto-detección de DB — debe correr ANTES de importar connection.py
 # Windows (LAN) → usa DB de producción directo
@@ -49,6 +42,7 @@ def _detect_db_mode() -> str:
 _DB_MODE = _detect_db_mode()
 # ---------------------------------------------------------------------------
 
+from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QIcon
 from PyQt6.QtWidgets import QApplication, QMessageBox
 from sqlalchemy.exc import SQLAlchemyError
@@ -87,6 +81,10 @@ def main() -> int:
 
     bootstrap_schema()
 
+    # QtWebEngineWidgets ya NO se importa al arranque (costaba ~1.7s): se carga
+    # perezoso cuando se abre el Panel Uniformes. Qt lo permite solo si este
+    # atributo queda puesto ANTES de crear la QApplication.
+    QApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True)
     app = QApplication(sys.argv)
     app.setApplicationName(APP_DISPLAY_NAME)
     app.setApplicationDisplayName(APP_DISPLAY_NAME)
@@ -143,7 +141,9 @@ def main() -> int:
                 login_dialog.raise_()
                 login_dialog.activateWindow()
                 return
-            startup_window.refresh_all()
+            # Dirigido: MainWindow.__init__ ya corrió refresh_all() completa;
+            # aquí solo se repinta lo que depende de la caja recién resuelta.
+            startup_window.refresh_after_cash_session()
             startup_window._focus_default_tab_for_role()
         except Exception as exc:  # noqa: BLE001
             if startup_window is not None:
