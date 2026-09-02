@@ -315,16 +315,18 @@ def open_tickets_print_dialog(
         print_button.setText(text)
         print_button.setEnabled(text == idle_label)
 
-    def _report(ok: int, errors: int) -> None:
-        if not errors:
-            return
-        if ok == 0:
-            msg = "No se pudo imprimir.\nVerifica que la impresora este conectada."
-        else:
-            msg = f"Se imprimieron {ok} de {n} {unit_label}s.\n{errors} fallaron."
-        QMessageBox.warning(dialog, "Error de impresion", msg)
-
     def _make_queue(queue_tickets: list[str]) -> TicketPrintQueue:
+        total = len(queue_tickets)
+
+        def _report(ok: int, errors: int) -> None:
+            if not errors:
+                return
+            if ok == 0:
+                msg = "No se pudo imprimir.\nVerifica que la impresora este conectada."
+            else:
+                msg = f"Se imprimieron {ok} de {total} {unit_label}s.\n{errors} fallaron."
+            QMessageBox.warning(dialog, "Error de impresion", msg)
+
         return TicketPrintQueue(
             queue_tickets,
             print_fn=print_fn or _print_ticket_job,
@@ -348,6 +350,10 @@ def open_tickets_print_dialog(
         )
 
     def _start_print() -> None:
+        # Candado entre AMBAS colas: un segundo clic con el checkbox cambiado
+        # arrancaba la otra cola en paralelo (tickets duplicados intercalados).
+        if queue.is_printing() or (alt_queue is not None and alt_queue.is_printing()):
+            return
         use_alt = alt_checkbox is not None and alt_checkbox.isChecked()
         (alt_queue if use_alt else queue).start()
 

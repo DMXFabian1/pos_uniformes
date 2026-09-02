@@ -56,6 +56,7 @@ class SingleStartupRefreshTests(unittest.TestCase):
             _refresh_summary=MagicMock(),
             _refresh_permissions=MagicMock(),
             _refresh_catalog=MagicMock(),
+            _invalidate_listing_snapshot_caches=MagicMock(),
             status_label=MagicMock(),
         )
         session = MagicMock()
@@ -67,6 +68,41 @@ class SingleStartupRefreshTests(unittest.TestCase):
         fake._refresh_summary.assert_called_once_with(session)
         fake._refresh_permissions.assert_called_once()
         fake._refresh_catalog.assert_not_called()
+
+
+class DetectDbModeSettingsTests(unittest.TestCase):
+    """La detección de host debe RECONSTRUIR el singleton settings.
+
+    Importar config dentro de _detect_db_mode congela settings con el host
+    previo; sin el rebind, la app diría 'Tienda' pero el engine conectaría a
+    localhost (ventas en la base equivocada)."""
+
+    def test_detected_host_lands_in_settings(self) -> None:
+        import pos_uniformes.main as main_module
+        import pos_uniformes.utils.config as config
+
+        old_settings = config.settings
+        old_env = os.environ.get("POS_UNIFORMES_DB_HOST")
+        try:
+            os.environ.pop("POS_UNIFORMES_DB_HOST", None)
+            with patch(
+                "pos_uniformes.utils.config.load_runtime_env_overrides",
+                return_value={"POS_UNIFORMES_SERVER_HOST": "10.9.9.9"},
+            ), patch.object(main_module._socket, "create_connection") as conn:
+                conn.return_value = MagicMock()
+                mode = main_module._detect_db_mode()
+            self.assertEqual(mode, "windows")
+            self.assertEqual(
+                config.settings.db_host,
+                "10.9.9.9",
+                "settings quedó congelado con el host previo a la detección",
+            )
+        finally:
+            config.settings = old_settings
+            if old_env is None:
+                os.environ.pop("POS_UNIFORMES_DB_HOST", None)
+            else:
+                os.environ["POS_UNIFORMES_DB_HOST"] = old_env
 
 
 class OperationalChecksProbeTests(unittest.TestCase):

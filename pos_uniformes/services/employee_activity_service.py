@@ -178,44 +178,18 @@ def load_employee_activity_snapshot(
     history_days: int = 7,
     summary_days: int = 1,
 ) -> EmployeeActivitySnapshot:
-    from pos_uniformes.services.employee_card_service import EmployeeCardService
-    from pos_uniformes.services.employee_identity_service import EmployeeIdentityService
-    from pos_uniformes.utils.qr_generator import QrGenerator
-
+    """Snapshot de UNA empleada. Delegado a la versión batch para que la
+    ventana de fechas y los filtros de venta vivan en un solo lugar."""
     employee = session.get(Empleada, employee_id)
     if employee is None:
         raise ValueError("No se encontro la empleada seleccionada.")
-
-    if reference_date is None:
-        reference_date = date.today()
-    history_days = max(int(history_days or 7), 1)
-    summary_days = max(int(summary_days or 1), 1)
-    lookback_days = max(history_days, summary_days)
-    window_start, _ = local_day_window(reference_date - timedelta(days=lookback_days - 1))
-    sales = (
-        session.scalars(
-            select(Venta)
-            .options(selectinload(Venta.detalles))
-            .where(
-                Venta.estado == EstadoVenta.CONFIRMADA,
-                Venta.credit_mode == ModoOrigenVenta.EMPLOYEE,
-                func.upper(Venta.seller_employee_code) == str(employee.codigo).upper(),
-                Venta.confirmada_at >= window_start,
-            )
-            .order_by(Venta.confirmada_at.desc())
-        ).all()
-    )
-    return build_employee_activity_snapshot(
-        employee,
-        pin_ready=EmployeeIdentityService.has_pin(employee),
-        qr_ready=QrGenerator.exists_for_employee(employee),
-        card_ready=EmployeeCardService.exists_for_employee(employee),
-        sales=sales,
+    return load_employee_activity_snapshots(
+        session,
+        [employee],
         reference_date=reference_date,
         history_days=history_days,
         summary_days=summary_days,
-        visible_name_builder=EmployeeIdentityService.build_visible_employee_name,
-    )
+    )[int(employee.id)]
 
 
 def load_employee_activity_snapshots(

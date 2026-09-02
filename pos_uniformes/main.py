@@ -34,6 +34,14 @@ def _detect_db_mode() -> str:
         _s = _socket.create_connection((_win, server_db_port()), timeout=1)
         _s.close()
         _os.environ["POS_UNIFORMES_DB_HOST"] = _win
+        # El import de config de arriba ya congeló el singleton `settings`
+        # (con el DB_HOST que hubiera ANTES de esta detección). Se reconstruye
+        # aquí — antes de que connection.py cree el engine — para que apunte
+        # al host recién detectado; si no, la app diría "Tienda" pero el
+        # engine conectaría a localhost.
+        import pos_uniformes.utils.config as _config
+
+        _config.settings = _config.Settings.from_env()
         return "windows"
     except OSError:
         return "local"

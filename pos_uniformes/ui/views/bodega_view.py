@@ -228,6 +228,9 @@ class BodegaWidget(QWidget):
         super().showEvent(event)
         if not self._cajas_loaded:
             self._refresh_cajas()
+            # Marcar DESPUÉS del refresh: si la primera carga truena (DB
+            # caída), el próximo show reintenta en vez de quedar vacía.
+            self._cajas_loaded = True
 
     def _init_ui(self) -> None:
         main_layout = QVBoxLayout()
@@ -535,7 +538,6 @@ class BodegaWidget(QWidget):
     # ─── Data loading ────────────────────────────────────────────────────
 
     def _refresh_cajas(self) -> None:
-        self._cajas_loaded = True
         with get_session() as session:
             estado_text = self.filtro_estado.currentText()
             estado = EstadoCaja(estado_text) if estado_text != "Todas" else None

@@ -108,6 +108,18 @@ class AltTicketsDialogTests(unittest.TestCase):
         self._print_button(dialog).click()
         self.assertEqual(self.printed, ["ALT"])
 
+    def test_second_click_while_printing_does_not_start_other_queue(self) -> None:
+        # Con 2 tickets, la cola queda imprimiendo (delay entre jobs); un
+        # segundo clic con el checkbox cambiado NO debe arrancar la otra cola
+        # (imprimía ambos juegos intercalados).
+        dialog = self._open(["A", "B"], ["A", "B6"])
+        button = self._print_button(dialog)  # su texto cambia al imprimir
+        button.click()
+        self.assertEqual(self.printed, ["A"])  # primer job síncrono
+        self._checkbox(dialog).setChecked(True)
+        button.click()
+        self.assertEqual(self.printed, ["A"])  # la otra cola no arrancó
+
 
 if __name__ == "__main__":
     unittest.main()

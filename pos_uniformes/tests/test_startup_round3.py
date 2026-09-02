@@ -196,7 +196,9 @@ class RefreshAllInternalsTests(unittest.TestCase):
         source = inspect.getsource(MainWindow._refresh_combos)
         # Una sola query de variantes; las activas se derivan en memoria.
         self.assertIn("variantes_activas = [v for v in variantes_inventario", source)
-        self.assertIn("joinedload(Variante.producto)", source)
+        # selectinload, no joinedload: el JOIN repetiría las columnas de
+        # Producto en cada una de las ~4,800 filas por la red.
+        self.assertIn("selectinload(Variante.producto)", source)
 
 
 if __name__ == "__main__":

@@ -33,6 +33,7 @@ def _get_connection():
         try:
             s = _sock.create_connection(("127.0.0.1", _port), timeout=1)
             s.close()
+            os.environ["POS_UNIFORMES_DB_HOST"] = "localhost"
             print("DB: local (Mac)")
         except OSError:
             connected = False
@@ -46,7 +47,14 @@ def _get_connection():
                 except OSError:
                     pass
             if not connected:
+                os.environ["POS_UNIFORMES_DB_HOST"] = "localhost"
                 print("DB: local (sin red, usando localhost por defecto)")
+    # El import de config de arriba ya congeló `settings` (posiblemente con
+    # otro host, p.ej. el del .env). Se reconstruye ANTES de crear el engine
+    # para que el destino real coincida con el que este script imprimió.
+    import pos_uniformes.utils.config as _config  # noqa: PLC0415
+
+    _config.settings = _config.Settings.from_env()
     from pos_uniformes.database.connection import engine  # noqa: PLC0415
     return engine.raw_connection()
 

@@ -637,34 +637,12 @@ class BodegaService:
 
     @staticmethod
     def desglose_contenido_caja(session: Session, caja_id: int) -> list[dict]:
-        """Contenido agrupado por producto con desglose de tallas."""
-        stmt = (
-            select(BodegaContenido)
-            .options(
-                joinedload(BodegaContenido.variante).joinedload(Variante.producto),
-            )
-            .where(BodegaContenido.caja_id == caja_id)
+        """Contenido agrupado por producto con desglose de tallas.
+
+        Delegado a la versión batch: el agrupado vive en un solo lugar."""
+        return BodegaService.desglose_contenido_cajas(session, [caja_id]).get(
+            int(caja_id), []
         )
-        por_producto: dict[int, dict] = {}
-        for c in session.scalars(stmt).unique().all():
-            prod = c.variante.producto
-            if prod.id not in por_producto:
-                por_producto[prod.id] = {
-                    "producto_id": prod.id,
-                    "producto": prod.nombre,
-                    "tallas": [],
-                    "total": 0,
-                }
-            por_producto[prod.id]["tallas"].append({
-                "talla": c.variante.talla,
-                "color": c.variante.color,
-                "cantidad": c.cantidad,
-                "variante_id": c.variante_id,
-            })
-            por_producto[prod.id]["total"] += c.cantidad
-        for grupo in por_producto.values():
-            grupo["tallas"].sort(key=lambda t: _talla_sort_key(t["talla"]))
-        return list(por_producto.values())
 
     @staticmethod
     def desglose_contenido_cajas(

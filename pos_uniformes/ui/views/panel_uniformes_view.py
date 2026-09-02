@@ -511,7 +511,6 @@ class PanelUniformesWidget(QWidget):
         # de Chromium (cientos de ms + ~100MB) en el arranque aunque nadie
         # abra el panel. Se crea perezoso en showEvent.
         self._web_view = None
-        self._web_layout = layout
         self._web_view_attempted = False
 
     def _ensure_web_view(self) -> None:
@@ -524,7 +523,7 @@ class PanelUniformesWidget(QWidget):
             from PyQt6.QtWebChannel import QWebChannel
 
             self._web_view = QWebEngineView()
-            self._web_layout.addWidget(self._web_view, 1)
+            self.layout().addWidget(self._web_view, 1)
 
             # Setup QWebChannel bridge
             channel = QWebChannel(self._web_view.page())
@@ -537,7 +536,7 @@ class PanelUniformesWidget(QWidget):
             fallback = QLabel(f"PyQt6-WebEngine no disponible:\n{exc}")
             fallback.setAlignment(Qt.AlignmentFlag.AlignCenter)
             fallback.setStyleSheet("font-size: 16px; color: #999; padding: 40px;")
-            self._web_layout.addWidget(fallback, 1)
+            self.layout().addWidget(fallback, 1)
 
     def showEvent(self, event) -> None:  # noqa: ANN001
         super().showEvent(event)

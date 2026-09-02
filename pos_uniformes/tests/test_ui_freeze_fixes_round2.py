@@ -31,8 +31,8 @@ class StatementTimeoutConfigTests(unittest.TestCase):
     def test_to_timeout_ms_parses_and_defaults(self) -> None:
         self.assertEqual(_to_timeout_ms("20000"), 20_000)
         self.assertEqual(_to_timeout_ms("0"), 0)
-        self.assertEqual(_to_timeout_ms("abc"), 15_000)
-        self.assertEqual(_to_timeout_ms("-5"), 15_000)
+        self.assertEqual(_to_timeout_ms("abc"), 30_000)
+        self.assertEqual(_to_timeout_ms("-5"), 30_000)
 
     def test_settings_default_and_env_override(self) -> None:
         with patch(
@@ -40,7 +40,9 @@ class StatementTimeoutConfigTests(unittest.TestCase):
         ):
             with patch.dict(os.environ, {}, clear=False):
                 os.environ.pop("POS_UNIFORMES_DB_STATEMENT_TIMEOUT_MS", None)
-                self.assertEqual(Settings.from_env().db_statement_timeout_ms, 15_000)
+                # 30s: margen para queries legítimamente lentas (historial,
+                # snapshot por Wi-Fi), sin dejar colgada la UI ~60s.
+                self.assertEqual(Settings.from_env().db_statement_timeout_ms, 30_000)
             with patch.dict(
                 os.environ, {"POS_UNIFORMES_DB_STATEMENT_TIMEOUT_MS": "30000"}
             ):

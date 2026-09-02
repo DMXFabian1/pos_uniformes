@@ -1262,28 +1262,23 @@ class MainWindow(QMainWindow):
         self.inventory_page_index = 0
         self.catalog_snapshot_cache: SnapshotCache[list[dict[str, object]]] = SnapshotCache()
         self.inventory_snapshot_cache: SnapshotCache[list[dict[str, object]]] = SnapshotCache()
-        self.catalog_filter_debounce_timer = QTimer(self)
-        self.catalog_filter_debounce_timer.setSingleShot(True)
-        self.catalog_filter_debounce_timer.setInterval(LISTING_SEARCH_DEBOUNCE_MS)
-        self.catalog_filter_debounce_timer.timeout.connect(lambda: self._run_catalog_filter_refresh())
-        self.inventory_filter_debounce_timer = QTimer(self)
-        self.inventory_filter_debounce_timer.setSingleShot(True)
-        self.inventory_filter_debounce_timer.setInterval(LISTING_SEARCH_DEBOUNCE_MS)
-        self.inventory_filter_debounce_timer.timeout.connect(lambda: self._run_inventory_filter_refresh())
+        self.catalog_filter_debounce_timer = self._make_search_debounce_timer(
+            lambda: self._run_catalog_filter_refresh()
+        )
+        self.inventory_filter_debounce_timer = self._make_search_debounce_timer(
+            lambda: self._run_inventory_filter_refresh()
+        )
         # Debounce de las búsquedas de Configuración: sin esto, cada tecla
         # disparaba una query (empleadas además con N+1) congelando la UI.
-        self.settings_suppliers_debounce_timer = QTimer(self)
-        self.settings_suppliers_debounce_timer.setSingleShot(True)
-        self.settings_suppliers_debounce_timer.setInterval(LISTING_SEARCH_DEBOUNCE_MS)
-        self.settings_suppliers_debounce_timer.timeout.connect(lambda: self._refresh_settings_suppliers())
-        self.settings_clients_debounce_timer = QTimer(self)
-        self.settings_clients_debounce_timer.setSingleShot(True)
-        self.settings_clients_debounce_timer.setInterval(LISTING_SEARCH_DEBOUNCE_MS)
-        self.settings_clients_debounce_timer.timeout.connect(lambda: self._refresh_settings_clients())
-        self.settings_employees_debounce_timer = QTimer(self)
-        self.settings_employees_debounce_timer.setSingleShot(True)
-        self.settings_employees_debounce_timer.setInterval(LISTING_SEARCH_DEBOUNCE_MS)
-        self.settings_employees_debounce_timer.timeout.connect(lambda: self._refresh_settings_employees())
+        self.settings_suppliers_debounce_timer = self._make_search_debounce_timer(
+            lambda: self._refresh_settings_suppliers()
+        )
+        self.settings_clients_debounce_timer = self._make_search_debounce_timer(
+            lambda: self._refresh_settings_clients()
+        )
+        self.settings_employees_debounce_timer = self._make_search_debounce_timer(
+            lambda: self._refresh_settings_employees()
+        )
         self.sale_cart: list[dict[str, object]] = []
         self.layaway_rows: list[dict[str, object]] = []
         self.history_rows: list[dict[str, object]] = []
@@ -1775,6 +1770,14 @@ class MainWindow(QMainWindow):
         self.operational_check_timer.timeout.connect(self._run_operational_checks)
         self.operational_check_timer.start()
         self.refresh_all()
+
+    def _make_search_debounce_timer(self, slot) -> QTimer:
+        """Timer estándar de debounce para búsquedas de listados."""
+        timer = QTimer(self)
+        timer.setSingleShot(True)
+        timer.setInterval(LISTING_SEARCH_DEBOUNCE_MS)
+        timer.timeout.connect(slot)
+        return timer
 
     def _busy_scope(self, message: str, *, status_label: QLabel | None = None):
         return self._busy_feedback.scope(
@@ -3183,7 +3186,9 @@ class MainWindow(QMainWindow):
         self.settings_users_table.resizeColumnsToContents()
         self.settings_users_status_label.setText(users_view.status_label)
 
-    def _refresh_settings_suppliers(self, session=None) -> None:
+    def _refresh_settings_suppliers(self, *, session=None) -> None:
+        # session keyword-only: conectar este método directo a textChanged
+        # metía el TEXTO tecleado como session y caía a la vista de error.
         search_text = self.settings_suppliers_search_input.text().strip()
         try:
             if session is not None:
@@ -3223,7 +3228,7 @@ class MainWindow(QMainWindow):
         self.settings_suppliers_table.resizeColumnsToContents()
         self.settings_suppliers_status_label.setText(suppliers_view.status_label)
 
-    def _refresh_settings_clients(self, session=None) -> None:
+    def _refresh_settings_clients(self, *, session=None) -> None:
         search_text = self.settings_clients_search_input.text().strip()
         try:
             if session is not None:
@@ -8984,8 +8989,8 @@ class MainWindow(QMainWindow):
         self._refresh_settings_backups()
         with get_session() as settings_session:
             self._refresh_settings_users(settings_session)
-            self._refresh_settings_suppliers(settings_session)
-            self._refresh_settings_clients(settings_session)
+            self._refresh_settings_suppliers(session=settings_session)
+            self._refresh_settings_clients(session=settings_session)
         self._refresh_settings_employees()
         self.status_label.setText("Estado: datos sincronizados con PostgreSQL.")
 
@@ -8996,6 +9001,10 @@ class MainWindow(QMainWindow):
         main.py duplicaba las ~45 queries del arranque. Aquí solo se repinta
         lo que depende de la sesión de caja recién abierta/confirmada.
         """
+        # Mientras la cajera contaba el fondo pudieron entrar ventas desde
+        # otras estaciones: invalidar los cachés de listados para que el
+        # próximo refresh de cada pestaña traiga datos frescos.
+        self._invalidate_listing_snapshot_caches()
         try:
             with get_session() as session:
                 self._refresh_cash_session(session)
@@ -9780,11 +9789,12 @@ class MainWindow(QMainWindow):
         clientes = session.scalars(select(Cliente).where(Cliente.activo.is_(True)).order_by(Cliente.nombre)).all()
         # Una sola pasada por las ~4,800 variantes (antes se hidrataban dos
         # veces) y con el producto precargado para no disparar un lazy-load
-        # por fila al armar las etiquetas de los combos.
-        from sqlalchemy.orm import joinedload
+        # por fila. selectinload (no joinedload): el JOIN repetiría todas las
+        # columnas de Producto en cada una de las ~4,800 filas por la red.
+        from sqlalchemy.orm import selectinload
 
         variantes_inventario = session.scalars(
-            select(Variante).options(joinedload(Variante.producto)).order_by(Variante.sku)
+            select(Variante).options(selectinload(Variante.producto)).order_by(Variante.sku)
         ).all()
         variantes_activas = [v for v in variantes_inventario if v.activo]
 

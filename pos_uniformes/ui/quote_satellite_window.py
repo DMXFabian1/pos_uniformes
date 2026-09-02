@@ -372,6 +372,13 @@ class QuoteSatelliteWindow(QMainWindow):
         self._build_ui()
         self._bind_events()
 
+        # Conectar ANTES de cualquier refresh: el arranque cache-first lanza
+        # _start_background_db_refresh dentro de refresh_all, y si el worker
+        # termina antes de este connect (PC principal apagada: el probe falla
+        # en ~1ms) la señal se perdería y _db_refresh_running quedaría
+        # atorado en True — watchdog muerto hasta reiniciar.
+        self._db_refresh_ready.connect(self._on_db_refresh_ready)
+
         if self.offline_mode:
             self._init_offline(offline_catalog_cache or [])
         else:
@@ -390,7 +397,7 @@ class QuoteSatelliteWindow(QMainWindow):
         # revisa la DB en segundo plano y refresca el catálogo cuando está
         # disponible — así el orden de encendido deja de importar y el satélite
         # nunca se queda con precios viejos ni se cae si la PC se apaga.
-        self._db_refresh_ready.connect(self._on_db_refresh_ready)
+        # (la señal _db_refresh_ready se conecta arriba, antes del refresh)
         self._reconnect_timer = QTimer(self)
         self._reconnect_timer.setInterval(300_000)  # cada 5 min
         self._reconnect_timer.timeout.connect(self._start_background_db_refresh)
@@ -598,6 +605,9 @@ class QuoteSatelliteWindow(QMainWindow):
                 rows = None
                 links = None
             finally:
+                # Resetear ANTES de emitir: si la emisión se perdiera por
+                # cualquier razón, el watchdog no debe quedar atorado.
+                self._db_refresh_running = False
                 self._db_refresh_ready.emit(rows, links)
                 if anuncios_ok:
                     self._anuncios_ready.emit()
@@ -629,6 +639,12 @@ class QuoteSatelliteWindow(QMainWindow):
                 save_school_links_cache(links)
             except Exception:  # noqa: BLE001
                 pass
+        # Repintar lo que muestra el catálogo: con el arranque cache-first,
+        # este es el camino por el que llegan las filas frescas — sin esto,
+        # el navegador y el combo de niveles se quedan con el cache de disco.
+        self._rebuild_catalog_level_combo()
+        self._refresh_catalog_browser()
+        self._refresh_guided_browser()
         self._set_db_connectivity_banner(online=True)
 
     def _set_db_connectivity_banner(self, *, online: bool) -> None:

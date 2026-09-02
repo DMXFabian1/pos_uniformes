@@ -50,18 +50,25 @@ class ScannerBurstDetectorTests(unittest.TestCase):
         detector.feed_char(1010.0)
         self.assertFalse(detector.should_swallow_enter(1020.0))
 
-    def test_state_resets_after_enter(self) -> None:
+    def test_crlf_second_enter_also_swallowed(self) -> None:
         detector = ScannerBurstDetector()
         for i in range(10):
             detector.feed_char(1000.0 + i * 15.0)
         self.assertTrue(detector.should_swallow_enter(1150.0))
-        # Un segundo Enter inmediato ya no se traga (estado limpio)
-        self.assertFalse(detector.should_swallow_enter(1160.0))
+        # Escáner con terminador CR+LF: el segundo Enter llega pegado al
+        # primero y también debe tragarse (antes pasaba y activaba el botón).
+        self.assertTrue(detector.should_swallow_enter(1160.0))
+        # Un Enter humano posterior, fuera de la ventana, pasa normal.
+        self.assertFalse(detector.should_swallow_enter(1600.0))
 
 
-def _char_event(char: str) -> QKeyEvent:
+def _char_event(char: str, *, autorep: bool = False) -> QKeyEvent:
     return QKeyEvent(
-        QEvent.Type.KeyPress, ord(char.upper()), Qt.KeyboardModifier.NoModifier, char
+        QEvent.Type.KeyPress,
+        ord(char.upper()),
+        Qt.KeyboardModifier.NoModifier,
+        char,
+        autorep,
     )
 
 
@@ -101,6 +108,36 @@ class ScannerEnterGuardQtTests(unittest.TestCase):
     def test_enter_alone_passes_through(self) -> None:
         dialog, field, guard = self._make_dialog()
         self.assertFalse(guard.eventFilter(field, _enter_event()))
+        dialog.deleteLater()
+
+    def test_auto_repeat_does_not_count_as_burst(self) -> None:
+        # Tecla sostenida (auto-repeat ~30Hz) no es ráfaga de escáner: el
+        # Enter humano inmediato debe pasar.
+        dialog, field, guard = self._make_dialog()
+        for _ in range(10):
+            self.assertFalse(guard.eventFilter(field, _char_event("9", autorep=True)))
+        self.assertFalse(guard.eventFilter(field, _enter_event()))
+        dialog.deleteLater()
+
+    def test_same_event_propagating_counts_once(self) -> None:
+        # El mismo QKeyEvent se entrega varias veces al propagarse
+        # foco→padre→diálogo; no debe contar como varias teclas.
+        dialog, field, guard = self._make_dialog()
+        for char in "AB":  # 2 teclas reales, cada una "propagada" 3 veces
+            event = _char_event(char)
+            for _ in range(3):
+                guard.eventFilter(field, event)
+        # 2 teclas reales < min_chars=4: el Enter humano pasa.
+        self.assertFalse(guard.eventFilter(field, _enter_event()))
+        dialog.deleteLater()
+
+    def test_guard_uninstalls_when_dialog_finishes(self) -> None:
+        # Varios diálogos de impresión no se destruyen al cerrarse; el guard
+        # debe desinstalarse en finished para no acumular filtros app-wide.
+        dialog, _field, guard = self._make_dialog()
+        self.assertTrue(guard._installed)
+        dialog.reject()  # emite finished
+        self.assertFalse(guard._installed)
         dialog.deleteLater()
 
     def test_foreign_widget_is_ignored(self) -> None:

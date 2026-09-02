@@ -6,7 +6,7 @@ import logging
 import re
 import textwrap
 from datetime import datetime
-from decimal import Decimal, ROUND_FLOOR
+from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from PyQt6.QtCore import Qt, QTimer
@@ -263,11 +263,17 @@ class QuickSaleWidget(QWidget):
         return wrapper
 
     @staticmethod
-    def _clean_scanned_code(raw: str) -> str:
+    def _normalize_scan(raw: str) -> str:
+        """Única normalización del escáner: printable + mapeo del teclado
+        español HID (: → Ñ, - → ') + mayúsculas. Todo lo que interprete
+        escaneos debe pasar por aquí para no divergir."""
         clean = "".join(c for c in raw if c.isprintable()).strip()
-        # QR scanner sends HID keycodes; Spanish keyboard maps : → Ñ, - → '
         clean = clean.replace("Ñ", ":").replace("ñ", ":").replace("'", "-")
-        clean = clean.upper()
+        return clean.upper()
+
+    @staticmethod
+    def _clean_scanned_code(raw: str) -> str:
+        clean = QuickSaleWidget._normalize_scan(raw)
         if clean.startswith("EMP:"):
             clean = clean[4:]
         return clean
@@ -483,9 +489,7 @@ class QuickSaleWidget(QWidget):
         El sensor tiene mucho alcance y a veces relee el gafete colgado de la
         empleada mientras escanea productos; eso no debe abrir ningún diálogo.
         """
-        clean = "".join(c for c in raw if c.isprintable()).strip()
-        clean = clean.replace("Ñ", ":").replace("ñ", ":").upper()
-        if clean.startswith("EMP:"):
+        if self._normalize_scan(raw).startswith("EMP:"):
             return True
         code = self._clean_scanned_code(raw)
         if self._employee_code and code == self._employee_code:
@@ -771,13 +775,11 @@ class QuickSaleWidget(QWidget):
 
     @staticmethod
     def _round_total(total: Decimal) -> Decimal:
-        integer_part = total.to_integral_value(rounding=ROUND_FLOOR)
-        cents = (total - integer_part).quantize(Decimal("0.01"))
-        if cents <= Decimal("0.19"):
-            return integer_part
-        if cents <= Decimal("0.69"):
-            return (integer_part + Decimal("0.50")).quantize(Decimal("0.01"))
-        return (integer_part + Decimal("1.00")).quantize(Decimal("0.01"))
+        # Delegado al servicio compartido: la regla de redondeo de la tienda
+        # vive en UN solo lugar (antes esto era una copia que podía divergir).
+        from pos_uniformes.services.sale_rounding_service import resolve_sale_rounding
+
+        return resolve_sale_rounding(total).collected_total
 
     def _compute_totals(self, items: list[dict] | None = None) -> tuple[Decimal, Decimal, Decimal]:
         items = self._items if items is None else items
@@ -831,17 +833,95 @@ class QuickSaleWidget(QWidget):
         "  4.1. La entrega se hara solo con el pago total, sin liquidaciones parciales."
     )
 
+    def _scan_confirms_copy(self, raw: str) -> bool:
+        """True solo si lo escaneado es el gafete de LA empleada en sesión."""
+        code = self._clean_scanned_code(raw)
+        return bool(code) and code == str(self._employee_code or "").upper()
+
+    def _ask_store_copy(self) -> bool:
+        """Pregunta a la empleada si quiere la copia interna del ticket.
+
+        Default: sin copia. Escanear el gafete de la empleada en sesión
+        equivale a "sí, con copia"; cualquier otro código se rechaza. Aquí NO
+        va el ScannerEnterGuard: el escaneo es entrada legítima y el Enter
+        del escáner cae en el input (los botones no son default, así que un
+        Enter suelto no contesta nada)."""
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Copia tienda")
+        ly = QVBoxLayout()
+        ly.setContentsMargins(24, 20, 24, 20)
+        ly.setSpacing(10)
+
+        title = QLabel("¿Imprimir también la copia para la tienda?")
+        title.setStyleSheet("font-size: 15px; font-weight: 600;")
+        ly.addWidget(title)
+
+        hint = QLabel("Escanea tu gafete para imprimir con copia, o elige:")
+        hint.setStyleSheet(f"font-size: 12px; color: {_MUTED};")
+        ly.addWidget(hint)
+
+        scan_input = QLineEdit()
+        scan_input.setPlaceholderText("Escanea tu gafete...")
+        ly.addWidget(scan_input)
+
+        error_label = QLabel("")
+        error_label.setStyleSheet(f"font-size: 12px; color: {_DANGER};")
+        error_label.setVisible(False)
+        ly.addWidget(error_label)
+
+        wants_copy = False
+
+        def _accept_with_copy() -> None:
+            nonlocal wants_copy
+            wants_copy = True
+            dlg.accept()
+
+        def _on_scan() -> None:
+            raw = scan_input.text()
+            scan_input.clear()
+            if not raw.strip():
+                return
+            if self._scan_confirms_copy(raw):
+                _accept_with_copy()
+            else:
+                error_label.setText("Solo el gafete de la empleada en sesión autoriza la copia.")
+                error_label.setVisible(True)
+                scan_input.setFocus()
+
+        scan_input.returnPressed.connect(_on_scan)
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(8)
+        no_button = QPushButton("Solo ticket del cliente")
+        yes_button = QPushButton("Sí, con copia")
+        for button in (no_button, yes_button):
+            # Sin botón default: un Enter suelto no debe contestar el diálogo.
+            button.setAutoDefault(False)
+            button.setDefault(False)
+        no_button.clicked.connect(dlg.reject)
+        yes_button.clicked.connect(_accept_with_copy)
+        btn_row.addWidget(no_button)
+        btn_row.addWidget(yes_button)
+        ly.addLayout(btn_row)
+
+        dlg.setLayout(ly)
+        QTimer.singleShot(0, scan_input.setFocus)
+        dlg.exec()
+        return wants_copy
+
     def _on_ticket_venta(self) -> None:
         if not self._items:
             QMessageBox.information(self, "Sin piezas", "Agrega piezas antes de generar ticket.")
             return
         tickets = [self._build_venta_text()]
+        alt_copy: str | None = None
         if self._discount_active:
             # Venta con descuento de empleada: la copia interna es la de ella.
             tickets.append(self._build_employee_copy_text())
             alt_copy = self._build_employee_copy_text(terminal_commission=True)
-        else:
-            # Toda venta normal lleva copia interna sin datos de cliente.
+        elif self._ask_store_copy():
+            # La copia interna es OPCIONAL: por default sale solo el ticket
+            # del cliente; la empleada decide si necesita la copia.
             tickets.append(self._build_venta_text(store_copy=True))
             alt_copy = self._build_venta_text(store_copy=True, terminal_commission=True)
         route_tickets(
@@ -850,8 +930,11 @@ class QuickSaleWidget(QWidget):
             tickets,
             # Checkbox del diálogo: al marcarlo, solo la copia interna sale
             # con la comisión de la terminal descontada; el del cliente igual.
-            alt_tickets=[tickets[0], alt_copy],
-            alt_checkbox_label="Descontar comision terminal (6%)",
+            # Sin copia interna no hay checkbox (no habría a qué aplicarlo).
+            alt_tickets=[tickets[0], alt_copy] if alt_copy is not None else None,
+            alt_checkbox_label=(
+                "Descontar comision terminal (6%)" if alt_copy is not None else None
+            ),
         )
         self._scan_input.setFocus()
 

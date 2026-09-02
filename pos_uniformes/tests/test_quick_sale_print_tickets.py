@@ -44,10 +44,26 @@ class QuickSaleTicketDialogTests(unittest.TestCase):
         widget._items = _items()
         return widget
 
-    def test_venta_no_discount_prints_ticket_plus_store_copy(self) -> None:
+    def test_venta_default_prints_only_customer_ticket(self) -> None:
+        # Default: sin copia — la empleada contestó "Solo ticket del cliente".
         widget = self._make_widget()
         widget._discount_active = False
         with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")), \
+                patch.object(widget, "_ask_store_copy", return_value=False), \
+                patch(f"{_MOD}.route_tickets") as opd:
+            widget._on_ticket_venta()
+        opd.assert_called_once()
+        tickets = opd.call_args.args[2]
+        self.assertEqual(len(tickets), 1)
+        # Sin copia tampoco hay checkbox de comisión (no habría a qué aplicarlo).
+        self.assertIsNone(opd.call_args.kwargs["alt_tickets"])
+        self.assertIsNone(opd.call_args.kwargs["alt_checkbox_label"])
+
+    def test_venta_with_copy_confirmed_prints_store_copy(self) -> None:
+        widget = self._make_widget()
+        widget._discount_active = False
+        with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")), \
+                patch.object(widget, "_ask_store_copy", return_value=True), \
                 patch(f"{_MOD}.route_tickets") as opd:
             widget._on_ticket_venta()
         opd.assert_called_once()
@@ -59,14 +75,17 @@ class QuickSaleTicketDialogTests(unittest.TestCase):
         widget = self._make_widget()
         widget._discount_active = True
         with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")), \
+                patch.object(widget, "_ask_store_copy") as ask, \
                 patch(f"{_MOD}.route_tickets") as opd:
             widget._on_ticket_venta()
         # Un solo dialogo, dos tickets -> un solo clic en Imprimir.
         opd.assert_called_once()
         tickets = opd.call_args.args[2]
         self.assertEqual(len(tickets), 2)
-        # Con descuento, la copia interna sigue siendo la de la empleada.
+        # Con descuento, la copia interna sigue siendo la de la empleada
+        # (automática — no se pregunta).
         self.assertIn("COPIA EMPLEADA", tickets[1])
+        ask.assert_not_called()
 
     def test_store_copy_hides_customer_facing_data(self) -> None:
         widget = self._make_widget()
@@ -114,6 +133,7 @@ class QuickSaleTicketDialogTests(unittest.TestCase):
         widget = self._make_widget()
         widget._discount_active = False
         with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")), \
+                patch.object(widget, "_ask_store_copy", return_value=True), \
                 patch(f"{_MOD}.route_tickets") as opd:
             widget._on_ticket_venta()
         kwargs = opd.call_args.kwargs
@@ -143,6 +163,49 @@ class QuickSaleTicketDialogTests(unittest.TestCase):
             widget._on_ticket_venta()
         opd.assert_not_called()
         info.assert_called_once()
+
+
+class AskStoreCopyScanTests(unittest.TestCase):
+    """El gafete de LA empleada en sesión equivale a 'sí, con copia'."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _make_widget(self) -> QuickSaleWidget:
+        satellite = SimpleNamespace(offline_mode=True, _kiosk_lookup_from_cache=None)
+        widget = QuickSaleWidget(satellite)
+        widget._employee_code = "VEND-1"
+        return widget
+
+    def test_scan_confirms_copy_only_for_session_employee(self) -> None:
+        widget = self._make_widget()
+        # Gafete propio, incluso con el mapeo del teclado español (Ñ por :)
+        self.assertTrue(widget._scan_confirms_copy("EMP:VEND-1"))
+        self.assertTrue(widget._scan_confirms_copy("EMPÑVEND-1"))
+        # Gafete de OTRA empleada, un producto o vacío: no autorizan
+        self.assertFalse(widget._scan_confirms_copy("EMP:VEND-2"))
+        self.assertFalse(widget._scan_confirms_copy("SKU004838"))
+        self.assertFalse(widget._scan_confirms_copy("   "))
+
+    def _fake_exec_scanning(self, text: str):
+        def _exec(dlg):
+            field = dlg.findChildren(QLineEdit)[0]
+            field.setText(text)
+            field.returnPressed.emit()
+            return 0
+
+        return _exec
+
+    def test_own_badge_scan_answers_yes(self) -> None:
+        widget = self._make_widget()
+        with patch.object(QDialog, "exec", self._fake_exec_scanning("EMPÑVEND-1")):
+            self.assertTrue(widget._ask_store_copy())
+
+    def test_foreign_scan_does_not_answer(self) -> None:
+        widget = self._make_widget()
+        with patch.object(QDialog, "exec", self._fake_exec_scanning("EMP:VEND-2")):
+            self.assertFalse(widget._ask_store_copy())
 
 
 class QuickSaleBusinessInfoTests(unittest.TestCase):
