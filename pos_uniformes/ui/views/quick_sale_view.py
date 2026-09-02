@@ -391,6 +391,10 @@ class QuickSaleWidget(QWidget):
         btn_pedido.setToolTip("Manda las piezas al tablero de pedidos del satélite para prepararlas")
         btn_pedido.clicked.connect(self._on_enviar_pedido)
         tb_layout.addWidget(btn_pedido)
+        # "Enviar a preparar" oculto (decisión de Daniel, 2026-09-02): no lo
+        # usa en su operación. El flujo y el tablero de pedidos siguen vivos;
+        # para restaurarlo basta quitar esta línea.
+        btn_pedido.setVisible(False)
 
         total_bar.setLayout(tb_layout)
         layout.addWidget(total_bar)
