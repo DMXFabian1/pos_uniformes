@@ -3770,6 +3770,11 @@ class QuoteSatelliteWindow(QMainWindow):
         if self.current_page_key == "quicksale" and self.quick_sale_widget.is_session_active():
             self.quick_sale_widget.logout()
             return
+        if self.current_page_key == "libreta" and getattr(self, "_libreta_code", None):
+            # Privacidad rápida: Esc cierra la sesión de la Libreta (igual
+            # que el cambio de página) y regresa al gate del gafete.
+            self._libreta_logout()
+            return
         if self.current_page_key == "tariff":
             self.tariff_school_combo.setCurrentIndex(-1)
             self.tariff_preview.clear()

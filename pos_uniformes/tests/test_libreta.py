@@ -500,6 +500,33 @@ class LibretaAutoLogoutTests(unittest.TestCase):
             pass  # el resto del método necesita widgets reales; no importa aquí
         fake._libreta_logout.assert_called_once()
 
+    def test_esc_en_libreta_cierra_sesion(self) -> None:
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        fake = SimpleNamespace(
+            _search_results_widget=None,
+            current_page_key="libreta",
+            _libreta_code="VEND-1",
+            _libreta_logout=MagicMock(),
+        )
+        QuoteSatelliteWindow._handle_escape_key(fake)
+        fake._libreta_logout.assert_called_once()
+
+    def test_esc_sin_sesion_libreta_no_hace_nada(self) -> None:
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        fake = SimpleNamespace(
+            _search_results_widget=None,
+            current_page_key="libreta",
+            _libreta_code=None,
+            _libreta_logout=MagicMock(),
+        )
+        try:
+            QuoteSatelliteWindow._handle_escape_key(fake)
+        except AttributeError:
+            pass  # cae a las ramas de otras páginas, que usan widgets reales
+        fake._libreta_logout.assert_not_called()
+
     def test_quedarse_en_libreta_no_cierra(self) -> None:
         from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
 
