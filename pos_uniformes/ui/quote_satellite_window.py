@@ -1210,6 +1210,18 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_status_label.setVisible(False)
         view_ly.addWidget(self.libreta_status_label)
 
+        # Corte por día (solo vista dueño): cuánto se vendió cada día
+        self.libreta_daily_table = QTableWidget(0, 5)
+        self.libreta_daily_table.setHorizontalHeaderLabels(
+            ["Día", "Operaciones", "Piezas", "Ventas $", "Apartados $"]
+        )
+        self.libreta_daily_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
+        self.libreta_daily_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.libreta_daily_table.setMaximumHeight(200)
+        view_ly.addWidget(self.libreta_daily_table)
+
         # Resumen por empleada (solo vista dueño)
         self.libreta_summary_table = QTableWidget(0, 4)
         self.libreta_summary_table.setHorizontalHeaderLabels(
@@ -1257,7 +1269,9 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_gate_error.setVisible(False)
         self.libreta_gate.setVisible(False)
         self.libreta_view.setVisible(True)
-        # La columna de dinero y el resumen por empleada son solo del dueño.
+        # La columna de dinero, el corte diario y el resumen por empleada
+        # son solo del dueño.
+        self.libreta_daily_table.setVisible(self._libreta_is_owner)
         self.libreta_summary_table.setVisible(self._libreta_is_owner)
         self.libreta_table.setColumnHidden(5, not self._libreta_is_owner)
         self.libreta_titular_label.setText(
@@ -1358,6 +1372,7 @@ class QuoteSatelliteWindow(QMainWindow):
     def _pintar_libreta(self, rows: list) -> None:
         from pos_uniformes.services.libreta_service import (
             describir_detalle,
+            resumir_por_dia,
             resumir_por_empleada,
         )
 
@@ -1369,6 +1384,20 @@ class QuoteSatelliteWindow(QMainWindow):
             total_monto = sum(Decimal(str(r.monto_total or 0)) for r in rows)
             resumen += f" · ${total_monto:,.2f}"
         self.libreta_resumen_label.setText(resumen)
+
+        if self._libreta_is_owner:
+            cortes = resumir_por_dia(rows)
+            self.libreta_daily_table.setRowCount(len(cortes))
+            for i, corte in enumerate(cortes):
+                self.libreta_daily_table.setItem(i, 0, QTableWidgetItem(corte.dia_label))
+                self.libreta_daily_table.setItem(i, 1, QTableWidgetItem(str(corte.operaciones)))
+                self.libreta_daily_table.setItem(i, 2, QTableWidgetItem(str(corte.piezas)))
+                self.libreta_daily_table.setItem(
+                    i, 3, QTableWidgetItem(f"${corte.monto_ventas:,.2f}")
+                )
+                self.libreta_daily_table.setItem(
+                    i, 4, QTableWidgetItem(f"${corte.monto_apartados:,.2f}")
+                )
 
         if self._libreta_is_owner:
             por_empleada = resumir_por_empleada(rows)

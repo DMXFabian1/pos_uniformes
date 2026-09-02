@@ -144,6 +144,57 @@ def resumir_por_empleada(rows: list[LibretaVenta]) -> list[ResumenEmpleada]:
     )
 
 
+# %a depende del locale (daría "Mon"); nombres propios en español.
+_DIAS_SEMANA = ("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
+
+
+@dataclass(frozen=True)
+class CorteDia:
+    dia: date
+    dia_label: str
+    operaciones: int
+    piezas: int
+    monto_ventas: Decimal
+    monto_apartados: Decimal
+
+
+def resumir_por_dia(rows: list[LibretaVenta]) -> list[CorteDia]:
+    """Corte diario para la vista del dueño: cuánto se vendió cada día.
+
+    Ventas y apartados se separan: el apartado todavía no es dinero cobrado
+    completo. Días ordenados del más reciente al más viejo (hora local)."""
+    acc: dict[date, dict] = {}
+    for row in rows:
+        created = row.created_at
+        local_dt = created.astimezone() if created.tzinfo is not None else created
+        dia = local_dt.date()
+        bucket = acc.setdefault(
+            dia,
+            {
+                "operaciones": 0,
+                "piezas": 0,
+                "ventas": Decimal("0.00"),
+                "apartados": Decimal("0.00"),
+            },
+        )
+        bucket["operaciones"] += 1
+        bucket["piezas"] += int(row.piezas or 0)
+        monto = Decimal(str(row.monto_total or 0))
+        key = "apartados" if str(row.tipo) == "apartado" else "ventas"
+        bucket[key] = (bucket[key] + monto).quantize(Decimal("0.01"))
+    return [
+        CorteDia(
+            dia=dia,
+            dia_label=f"{_DIAS_SEMANA[dia.weekday()]} {dia.strftime('%d/%m')}",
+            operaciones=data["operaciones"],
+            piezas=data["piezas"],
+            monto_ventas=data["ventas"],
+            monto_apartados=data["apartados"],
+        )
+        for dia, data in sorted(acc.items(), key=lambda kv: kv[0], reverse=True)
+    ]
+
+
 def describir_detalle(detalle: list[dict]) -> str:
     """'Pants T:6 x2 · Playera T:M x1' — resumen legible de las líneas."""
     parts = []

@@ -90,6 +90,26 @@ class LibretaServiceTests(unittest.TestCase):
         self.assertEqual(ana.piezas, 4)
         self.assertEqual(ana.monto_total, Decimal("150.00"))
 
+    def test_resumir_por_dia_separa_ventas_y_apartados(self) -> None:
+        from pos_uniformes.services.libreta_service import resumir_por_dia
+
+        lunes = datetime(2026, 8, 31, 10, 0, tzinfo=timezone.utc).astimezone()
+        martes = datetime(2026, 9, 1, 16, 0, tzinfo=timezone.utc).astimezone()
+        rows = [
+            SimpleNamespace(created_at=lunes, tipo="venta", piezas=2, monto_total=Decimal("500")),
+            SimpleNamespace(created_at=lunes, tipo="apartado", piezas=3, monto_total=Decimal("900")),
+            SimpleNamespace(created_at=martes, tipo="venta", piezas=1, monto_total=Decimal("100")),
+        ]
+        cortes = resumir_por_dia(rows)
+        self.assertEqual(len(cortes), 2)
+        self.assertEqual(cortes[0].dia, martes.date())  # más reciente primero
+        lunes_corte = cortes[1]
+        self.assertEqual(lunes_corte.operaciones, 2)
+        self.assertEqual(lunes_corte.piezas, 5)
+        # El apartado NO se mezcla con el dinero de ventas
+        self.assertEqual(lunes_corte.monto_ventas, Decimal("500.00"))
+        self.assertEqual(lunes_corte.monto_apartados, Decimal("900.00"))
+
     def test_describir_detalle(self) -> None:
         texto = describir_detalle(
             [
@@ -233,6 +253,7 @@ class LibretaPagePrivacyTests(unittest.TestCase):
             libreta_gate=MagicMock(),
             libreta_view=MagicMock(),
             libreta_summary_table=MagicMock(),
+            libreta_daily_table=MagicMock(),
             libreta_table=MagicMock(),
             libreta_titular_label=MagicMock(),
             libreta_hoy_button=MagicMock(),
@@ -249,6 +270,7 @@ class LibretaPagePrivacyTests(unittest.TestCase):
         # Columna de monto oculta y sin resumen por empleada
         fake.libreta_table.setColumnHidden.assert_called_once_with(5, True)
         fake.libreta_summary_table.setVisible.assert_called_once_with(False)
+        fake.libreta_daily_table.setVisible.assert_called_once_with(False)
         fake._refresh_libreta_view.assert_called_once()
 
     def test_dueno_ve_todo(self) -> None:
@@ -256,6 +278,7 @@ class LibretaPagePrivacyTests(unittest.TestCase):
         self.assertTrue(fake._libreta_is_owner)
         fake.libreta_table.setColumnHidden.assert_called_once_with(5, False)
         fake.libreta_summary_table.setVisible.assert_called_once_with(True)
+        fake.libreta_daily_table.setVisible.assert_called_once_with(True)
 
 
 if __name__ == "__main__":
