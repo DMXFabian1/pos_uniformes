@@ -29,11 +29,16 @@ import socket as _socket
 
 
 def _detect_db_mode() -> str:
-    _win = "192.168.0.10"
     if _os.getenv("POS_UNIFORMES_DB_HOST"):
         return "configured"
+
+    from pos_uniformes.utils.config import server_db_host, server_db_port
+
+    _win = server_db_host()
+    if not _win:
+        return "local"
     try:
-        _s = _socket.create_connection((_win, 5432), timeout=1)
+        _s = _socket.create_connection((_win, server_db_port()), timeout=1)
         _s.close()
         _os.environ["POS_UNIFORMES_DB_HOST"] = _win
         return "windows"

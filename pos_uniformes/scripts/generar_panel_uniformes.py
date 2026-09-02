@@ -23,22 +23,30 @@ from pathlib import Path
 
 def _get_connection():
     import os, socket as _sock
-    _win = "192.168.0.10"
+    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+    from pos_uniformes.utils.config import server_db_host, server_db_port  # noqa: PLC0415
+
+    _win = server_db_host()
+    _port = server_db_port()
     if not os.getenv("POS_UNIFORMES_DB_HOST"):
         # Primero intentamos localhost; solo si no responde usamos la red (Windows/remoto).
         try:
-            s = _sock.create_connection(("127.0.0.1", 5432), timeout=1)
+            s = _sock.create_connection(("127.0.0.1", _port), timeout=1)
             s.close()
             print("DB: local (Mac)")
         except OSError:
-            try:
-                s = _sock.create_connection((_win, 5432), timeout=1)
-                s.close()
-                os.environ["POS_UNIFORMES_DB_HOST"] = _win
-                print(f"DB: red ({_win})")
-            except OSError:
+            connected = False
+            if _win:
+                try:
+                    s = _sock.create_connection((_win, _port), timeout=1)
+                    s.close()
+                    os.environ["POS_UNIFORMES_DB_HOST"] = _win
+                    print(f"DB: red ({_win})")
+                    connected = True
+                except OSError:
+                    pass
+            if not connected:
                 print("DB: local (sin red, usando localhost por defecto)")
-    sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
     from pos_uniformes.database.connection import engine  # noqa: PLC0415
     return engine.raw_connection()
 

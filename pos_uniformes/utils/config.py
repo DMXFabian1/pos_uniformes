@@ -73,6 +73,31 @@ def load_runtime_env_overrides(base_dir: Path | None = None) -> dict[str, str]:
     return overrides
 
 
+def server_db_host(default: str | None = None) -> str | None:
+    """IP del servidor (PC principal) leida del .env — nunca se codifica en el codigo.
+
+    Busca `POS_UNIFORMES_SERVER_HOST` y, si no existe, cae a
+    `POS_UNIFORMES_DB_HOST`. Devuelve `default` (None) cuando no hay ninguna
+    configurada, para que quien llame decida que hacer en vez de asumir una IP.
+    """
+    file_overrides = load_runtime_env_overrides()
+    for name in ("POS_UNIFORMES_SERVER_HOST", "POS_UNIFORMES_DB_HOST"):
+        raw_value = os.getenv(name, file_overrides.get(name))
+        if raw_value and raw_value.strip():
+            return raw_value.strip()
+    return default
+
+
+def server_db_port(default: int = 5432) -> int:
+    """Puerto del servidor, leido del .env igual que `server_db_host`."""
+    file_overrides = load_runtime_env_overrides()
+    raw_value = os.getenv("POS_UNIFORMES_DB_PORT", file_overrides.get("POS_UNIFORMES_DB_PORT"))
+    try:
+        return int(str(raw_value).strip())
+    except (TypeError, ValueError):
+        return default
+
+
 @dataclass
 class Settings:
     db_host: str

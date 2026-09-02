@@ -23,8 +23,10 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from sqlalchemy import create_engine, text
 
-WINDOWS_HOST = "192.168.0.10"
-WINDOWS_PORT = 5432
+from pos_uniformes.utils.config import server_db_host, server_db_port
+
+WINDOWS_HOST = server_db_host()
+WINDOWS_PORT = server_db_port()
 
 
 def _build_urls() -> tuple[str, str]:
@@ -48,6 +50,8 @@ def _build_urls() -> tuple[str, str]:
 
 
 def _check_windows_reachable() -> bool:
+    if not WINDOWS_HOST:
+        return False
     try:
         s = socket.create_connection((WINDOWS_HOST, WINDOWS_PORT), timeout=2)
         s.close()
@@ -99,8 +103,13 @@ def _sync_new_rows(local_conn, win_conn, table: str) -> int:
 
 
 def main() -> int:
+    if not WINDOWS_HOST:
+        print("❌  No hay servidor configurado.")
+        print("    Define POS_UNIFORMES_SERVER_HOST (o POS_UNIFORMES_DB_HOST) en pos_uniformes.env.")
+        return 1
+
     if not _check_windows_reachable():
-        print("❌  Windows DB no disponible (192.168.0.10:5432).")
+        print(f"❌  Windows DB no disponible ({WINDOWS_HOST}:{WINDOWS_PORT}).")
         print("    Conéctate a la red de la tienda y vuelve a intentarlo.")
         return 1
 

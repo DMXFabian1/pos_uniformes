@@ -5,7 +5,12 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from pos_uniformes.utils.config import Settings, load_runtime_env_overrides
+from pos_uniformes.utils.config import (
+    Settings,
+    load_runtime_env_overrides,
+    server_db_host,
+    server_db_port,
+)
 
 
 class ConfigTests(unittest.TestCase):
@@ -78,6 +83,61 @@ class ConfigTests(unittest.TestCase):
 
         self.assertEqual(settings.db_host, "entorno")
         self.assertIsNone(settings.backup_external_dir)
+
+
+class ServerHostTests(unittest.TestCase):
+    """La IP del servidor vive solo en el .env — nunca codificada en el codigo."""
+
+    def test_prefers_server_host_over_db_host(self) -> None:
+        with patch(
+            "pos_uniformes.utils.config.load_runtime_env_overrides",
+            return_value={
+                "POS_UNIFORMES_SERVER_HOST": "192.168.0.10",
+                "POS_UNIFORMES_DB_HOST": "localhost",
+            },
+        ), patch.dict("os.environ", {}, clear=True):
+            self.assertEqual(server_db_host(), "192.168.0.10")
+
+    def test_falls_back_to_db_host(self) -> None:
+        with patch(
+            "pos_uniformes.utils.config.load_runtime_env_overrides",
+            return_value={"POS_UNIFORMES_DB_HOST": "192.168.0.10"},
+        ), patch.dict("os.environ", {}, clear=True):
+            self.assertEqual(server_db_host(), "192.168.0.10")
+
+    def test_real_environment_wins_over_file(self) -> None:
+        with patch(
+            "pos_uniformes.utils.config.load_runtime_env_overrides",
+            return_value={"POS_UNIFORMES_SERVER_HOST": "archivo"},
+        ), patch.dict("os.environ", {"POS_UNIFORMES_SERVER_HOST": "entorno"}, clear=True):
+            self.assertEqual(server_db_host(), "entorno")
+
+    def test_returns_none_when_nothing_configured(self) -> None:
+        with patch(
+            "pos_uniformes.utils.config.load_runtime_env_overrides",
+            return_value={},
+        ), patch.dict("os.environ", {}, clear=True):
+            self.assertIsNone(server_db_host())
+
+    def test_ignores_blank_value(self) -> None:
+        with patch(
+            "pos_uniformes.utils.config.load_runtime_env_overrides",
+            return_value={"POS_UNIFORMES_SERVER_HOST": "   ", "POS_UNIFORMES_DB_HOST": "192.168.0.10"},
+        ), patch.dict("os.environ", {}, clear=True):
+            self.assertEqual(server_db_host(), "192.168.0.10")
+
+    def test_port_read_from_file_and_defaults_when_invalid(self) -> None:
+        with patch(
+            "pos_uniformes.utils.config.load_runtime_env_overrides",
+            return_value={"POS_UNIFORMES_DB_PORT": "5544"},
+        ), patch.dict("os.environ", {}, clear=True):
+            self.assertEqual(server_db_port(), 5544)
+
+        with patch(
+            "pos_uniformes.utils.config.load_runtime_env_overrides",
+            return_value={"POS_UNIFORMES_DB_PORT": "no-es-numero"},
+        ), patch.dict("os.environ", {}, clear=True):
+            self.assertEqual(server_db_port(), 5432)
 
 
 if __name__ == "__main__":
