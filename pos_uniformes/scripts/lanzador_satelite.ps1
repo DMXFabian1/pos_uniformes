@@ -29,6 +29,11 @@ if (Test-Path $envFile) {
 }
 $share = "\\$serverHost\pos_updates\PresupuestosSatelite"
 
+# Autenticarse al share en CADA arranque: Windows 11 bloquea el acceso como
+# invitado y la credencial guardada con /persistent no siempre se reconecta
+# a tiempo tras reiniciar. Si ya hay sesion, el error se ignora.
+net use "\\$serverHost\pos_updates" pos2026 /user:kiosko /persistent:no 2>$null | Out-Null
+
 function Get-VersionDe($dir) {
     $file = Join-Path $dir "VERSION.txt"
     if (Test-Path $file) { (Get-Content $file -Raw).Trim() } else { "" }
@@ -42,6 +47,15 @@ if ($versionRemota -and ($versionRemota -ne $versionLocal)) {
     Write-Host "Actualizando satelite: '$versionLocal' -> '$versionRemota' ..."
     robocopy $share $appDir /MIR /R:2 /W:2 | Out-Null
     Write-Host "Actualizado."
+}
+
+# El lanzador tambien se refresca a si mismo desde el share (aplica en el
+# SIGUIENTE arranque): instalar mejoras del lanzador ya no requiere USB.
+if (Test-Path $share) {
+    $updatesRoot = "\\$serverHost\pos_updates"
+    foreach ($f in @("lanzador_satelite.ps1", "lanzador_satelite.bat")) {
+        Copy-Item (Join-Path $updatesRoot $f) $PSScriptRoot -Force -ErrorAction SilentlyContinue
+    }
 }
 
 $exe = Get-ChildItem $appDir -Filter "*.exe" -ErrorAction SilentlyContinue |
