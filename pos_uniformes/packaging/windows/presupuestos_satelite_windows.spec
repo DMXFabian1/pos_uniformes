@@ -59,6 +59,12 @@ hiddenimports += [
     "pos_uniformes.services.anuncio_image_service",
     "pos_uniformes.services.satellite_identity_service",
     "pos_uniformes.services.satelite_registry_service",
+    # pywin32: TODOS sus imports en el código son lazy (dentro de funciones),
+    # así que PyInstaller no los detecta — sin esto el kiosko no imprime
+    # etiquetas/tickets RAW ("falta pywin32").
+    "win32print",
+    "win32ui",
+    "pywintypes",
 ]
 
 
