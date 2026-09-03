@@ -45,7 +45,9 @@ if (Test-Path $share) { $versionRemota = Get-VersionDe $share }
 
 if ($versionRemota -and ($versionRemota -ne $versionLocal)) {
     Write-Host "Actualizando satelite: '$versionLocal' -> '$versionRemota' ..."
-    robocopy $share $appDir /MIR /R:2 /W:2 | Out-Null
+    Write-Host "(la primera vez copia ~300 MB y tarda unos minutos; se ve avanzar)"
+    # /NDL /NP: muestra cada archivo copiado (progreso visible) sin spam.
+    robocopy $share $appDir /MIR /R:2 /W:2 /NDL /NP
     Write-Host "Actualizado."
 }
 
