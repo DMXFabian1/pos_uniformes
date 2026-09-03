@@ -7,6 +7,16 @@ rem =====================================================
 setlocal
 cd /d "%~dp0.."
 
+rem Auto-log: todo lo que salga en pantalla queda tambien en
+rem reportes\ultimo_update.log (para mandarlo con enviar_reporte.bat)
+if not exist reportes mkdir reportes
+if not defined POS_UPDATE_LOGGING (
+    set POS_UPDATE_LOGGING=1
+    call "%~f0" 2>&1 | powershell -NoProfile -Command "$input | Tee-Object -FilePath 'reportes\ultimo_update.log'"
+    exit /b %ERRORLEVEL%
+)
+
+echo === Actualizacion del %date% %time% ===
 echo === 1/3 Trayendo lo nuevo del repositorio ===
 git pull
 if errorlevel 1 goto :error

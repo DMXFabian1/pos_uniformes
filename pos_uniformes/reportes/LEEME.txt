@@ -1,0 +1,3 @@
+# Carpeta de reportes: la PC principal sube aqui su consola (logs de
+# actualizacion, errores, mensajes) con scripts\enviar_reporte.bat, y
+# Claude los lee del repo en la Mac. Mensajeria por git, sin red local.
