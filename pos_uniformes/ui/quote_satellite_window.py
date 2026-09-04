@@ -1962,11 +1962,54 @@ class QuoteSatelliteWindow(QMainWindow):
         periodo = self._libreta_periodo_texto().upper()
         if self._libreta_emp_filtro:
             periodo += f" - {self._libreta_emp_filtro}"
+
+        # Cierre formal: el dueño cuenta el cajón y captura el efectivo REAL
+        # (precargado con el esperado, editable solo aquí — la barra es suya);
+        # el ticket sale con esperado vs real y la diferencia.
+        from decimal import Decimal as _Dec
+
+        from PyQt6.QtWidgets import QDoubleSpinBox, QLineEdit
+
+        esperado = sum((c.monto_en_caja for c in cortes), _Dec("0.00"))
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Hacer corte")
+        dlg_ly = QVBoxLayout()
+        dlg_ly.setContentsMargins(20, 18, 20, 18)
+        dlg_ly.setSpacing(10)
+        dlg_ly.addWidget(QLabel(f"Efectivo ESPERADO en caja: ${esperado:,.2f}"))
+        dlg_ly.addWidget(QLabel("Efectivo REAL contado:"))
+        spin_real = QDoubleSpinBox()
+        spin_real.setRange(0.0, 9_999_999.0)
+        spin_real.setDecimals(2)
+        spin_real.setPrefix("$ ")
+        spin_real.setValue(float(esperado))
+        spin_real.setStyleSheet("font-size: 18px; font-weight: 700; padding: 6px;")
+        dlg_ly.addWidget(spin_real)
+        dlg_ly.addWidget(QLabel("Nota (opcional):"))
+        nota_input = QLineEdit()
+        nota_input.setPlaceholderText("Ej. faltante por cambio, billete roto...")
+        dlg_ly.addWidget(nota_input)
+        botones_ly = QHBoxLayout()
+        btn_cancelar = QPushButton("Cancelar")
+        btn_cancelar.setAutoDefault(False)
+        btn_cancelar.clicked.connect(dlg.reject)
+        botones_ly.addWidget(btn_cancelar)
+        btn_imprimir = QPushButton("🖨 Imprimir corte")
+        btn_imprimir.setObjectName("primaryButton")
+        btn_imprimir.clicked.connect(dlg.accept)
+        botones_ly.addWidget(btn_imprimir, 1)
+        dlg_ly.addLayout(botones_ly)
+        dlg.setLayout(dlg_ly)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+
         texto = build_corte_ticket_text(
             periodo_label=periodo,
             cortes=cortes,
             por_empleada=list(self._libreta_last_por_empleada or []),
             generado_por=str(self._libreta_code or ""),
+            efectivo_real=_Dec(str(spin_real.value())).quantize(_Dec("0.01")),
+            nota=nota_input.text().strip(),
         )
         route_tickets(self, "Corte de Libreta", [texto])
 

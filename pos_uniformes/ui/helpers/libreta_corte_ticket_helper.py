@@ -28,6 +28,8 @@ def build_corte_ticket_text(
     cortes: list,
     por_empleada: list,
     generado_por: str = "",
+    efectivo_real: Decimal | None = None,
+    nota: str = "",
 ) -> str:
     """Arma el texto del ticket de corte con los agregados ya calculados
     (CorteDia y ResumenEmpleada de libreta_service)."""
@@ -57,7 +59,20 @@ def build_corte_ticket_text(
     lines.append(tk_row("Apartados:", f"${total_apartados:,.2f}"))
     lines.append(tk_row("Abonos:", f"${total_abonos:,.2f}"))
     lines.append(tk_dbl())
-    lines.append(tk_row("EN CAJA:", f"${total_en_caja:,.2f}"))
+    lines.append(tk_row("EN CAJA (esperado):", f"${total_en_caja:,.2f}"))
+    if efectivo_real is not None:
+        # El cierre formal: lo contado de verdad y la diferencia — solo el
+        # dueño puede capturar/editar este número (la barra es suya).
+        lines.append(tk_row("CONTADO REAL:", f"${efectivo_real:,.2f}"))
+        diferencia = efectivo_real - total_en_caja
+        if diferencia == 0:
+            lines.append(tk_row("DIFERENCIA:", "$0.00 OK"))
+        elif diferencia > 0:
+            lines.append(tk_row("SOBRANTE:", f"${diferencia:,.2f}"))
+        else:
+            lines.append(tk_row("FALTANTE:", f"${-diferencia:,.2f}"))
+    if nota:
+        tk_field("Nota:", nota, lines)
     lines.append(tk_bot())
 
     if len(cortes) > 1:

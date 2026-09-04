@@ -450,13 +450,38 @@ class CorteTicketTests(unittest.TestCase):
             generado_por="VEND-1",
         )
         self.assertIn("CORTE DE LIBRETA", texto)
-        self.assertIn("EN CAJA:", texto)
+        self.assertIn("EN CAJA (esperado):", texto)
         self.assertIn("$500.00", texto)
         self.assertIn("Ana", texto)
         self.assertIn("6 com.", texto)
         # Ninguna línea se pasa del ancho del ticket térmico.
         for line in texto.splitlines():
             self.assertLessEqual(len(line), TICKET_CHAR_WIDTH)
+
+        # Cierre formal: contado real editado por el dueño → diferencia.
+        con_real = build_corte_ticket_text(
+            periodo_label="HOY", cortes=cortes, por_empleada=por_empleada,
+            generado_por="VEND-1", efectivo_real=Decimal("480.00"),
+            nota="faltó cambio",
+        )
+        self.assertIn("CONTADO REAL:", con_real)
+        self.assertIn("$480.00", con_real)
+        self.assertIn("FALTANTE:", con_real)
+        self.assertIn("$20.00", con_real)
+        self.assertIn("faltó cambio", con_real)
+        sobrante = build_corte_ticket_text(
+            periodo_label="HOY", cortes=cortes, por_empleada=por_empleada,
+            efectivo_real=Decimal("510.00"),
+        )
+        self.assertIn("SOBRANTE:", sobrante)
+        exacto = build_corte_ticket_text(
+            periodo_label="HOY", cortes=cortes, por_empleada=por_empleada,
+            efectivo_real=Decimal("500.00"),
+        )
+        self.assertIn("$0.00 OK", exacto)
+        for variante in (con_real, sobrante, exacto):
+            for line in variante.splitlines():
+                self.assertLessEqual(len(line), TICKET_CHAR_WIDTH)
 
 
 class LibretaListaAmigableTests(unittest.TestCase):
