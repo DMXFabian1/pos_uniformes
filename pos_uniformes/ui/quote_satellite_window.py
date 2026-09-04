@@ -1156,9 +1156,8 @@ class QuoteSatelliteWindow(QMainWindow):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(10)
 
-        titulo = QLabel("Libreta")
-        titulo.setObjectName("guidedStepTitle")
-        layout.addWidget(titulo)
+        # Sin banner de título: el sidebar ya dice "Libreta" y la franja
+        # solo quitaba espacio vertical (pedido de Daniel 2026-09-04).
 
         # ── Gate: escanear gafete ────────────────────────────────────────
         # Réplica exacta del login de Venta Rápida (mismo _GATE_STYLE
