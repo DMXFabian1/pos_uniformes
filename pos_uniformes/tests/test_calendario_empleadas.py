@@ -234,5 +234,58 @@ class AccesoDatosTests(unittest.TestCase):
         )
 
 
+class ChipsCalendarioCompartidoTests(unittest.TestCase):
+    """Sincronía con la página Calendario del kiosko: descansos y pagos de
+    empleadas salen como chips; las faltas NO (privadas de la Libreta)."""
+
+    def setUp(self) -> None:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from pos_uniformes.database.models import (
+            Empleada,
+            EmpleadaEvento,
+            EmpleadaHorario,
+        )
+
+        engine = create_engine("sqlite://")
+        for tabla in (Empleada, EmpleadaHorario, EmpleadaEvento):
+            tabla.__table__.create(engine)
+        self.session = sessionmaker(bind=engine)()
+        self.session.add(
+            Empleada(codigo="VEND-2", nombre_completo="Ana López", activo=True)
+        )
+        self.session.commit()
+
+    def tearDown(self) -> None:
+        self.session.close()
+
+    def test_descansos_y_pagos_si_faltas_no(self) -> None:
+        from pos_uniformes.services.calendario_empleadas_service import (
+            chips_calendario_mes,
+            guardar_horario,
+            marcar_dia,
+            registrar_pago,
+        )
+
+        guardar_horario(
+            self.session, "VEND-2", descanso_weekday=_JUEVES, ciclo_dias_pago=6
+        )
+        registrar_pago(self.session, "VEND-2", date(2026, 9, 6))
+        marcar_dia(self.session, "VEND-2", date(2026, 9, 8), FALTA)
+
+        chips = chips_calendario_mes(self.session, 2026, 9, date(2026, 9, 7))
+
+        # Descanso fijo (jueves 10) con el primer nombre de la empleada.
+        self.assertIn(("descanso", "Ana"), chips[date(2026, 9, 10)])
+        # Pago hecho (dom 6) y próximo pago proyectado: la falta del martes
+        # lo recorre del dom 13 al lun 14 — también sincronizado.
+        self.assertIn(("pago", "Ana"), chips[date(2026, 9, 6)])
+        self.assertIn(("pago", "Ana"), chips[date(2026, 9, 14)])
+        self.assertNotIn(date(2026, 9, 13), chips)
+        # La falta del 8 NO aparece en el calendario compartido.
+        self.assertNotIn(date(2026, 9, 8), chips)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -249,3 +249,43 @@ def comisiones_desde_ultimo_pago(session, employee_code: str, horario: HorarioEm
         ).astimezone()
         query = query.filter(LibretaVenta.created_at >= corte)
     return int(query.scalar() or 0)
+
+
+def chips_calendario_mes(session, year: int, month: int, hoy: date) -> dict[date, list[tuple[str, str]]]:
+    """Chips del calendario COMPARTIDO (página Calendario del kiosko):
+    {fecha: [(tipo, texto)]} con los descansos y pagos de las empleadas.
+
+    Se pintan: descansos (fijos y movidos), pagos ya hechos y el PRÓXIMO
+    pago proyectado de cada una. Las faltas NO salen aquí — son del
+    calendario privado de la Libreta.
+    """
+    from pos_uniformes.database.models import Empleada, EmpleadaHorario
+
+    nombres: dict[str, str] = {}
+    try:
+        for emp in session.query(Empleada).filter(Empleada.activo.is_(True)).all():
+            nombres[str(emp.codigo).upper()] = (emp.nombre_completo or emp.codigo).split()[0]
+    except Exception:  # noqa: BLE001 — sin nombres, se usa el código
+        pass
+
+    resultado: dict[date, list[tuple[str, str]]] = {}
+
+    def _agregar(fecha: date, tipo: str, code: str) -> None:
+        if fecha.year == year and fecha.month == month:
+            nombre = nombres.get(code, code)
+            resultado.setdefault(fecha, []).append((tipo, nombre))
+
+    codigos = [
+        fila.employee_code for fila in session.query(EmpleadaHorario).all()
+    ]
+    for code in codigos:
+        horario = cargar_horario(session, code)
+        for fecha, estado in pintar_mes(horario, year, month).items():
+            if estado == DESCANSO:
+                _agregar(fecha, DESCANSO, code)
+            elif estado == PAGO:
+                _agregar(fecha, PAGO, code)
+        proximo = fecha_proximo_pago(horario, hoy)
+        if proximo is not None and proximo not in horario.eventos:
+            _agregar(proximo, PAGO, code)
+    return resultado

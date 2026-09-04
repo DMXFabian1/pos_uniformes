@@ -27,7 +27,9 @@ from pos_uniformes.database.models import (
 from pos_uniformes.services.conteo_service import obtener_estado_conteo_escuela
 from pos_uniformes.ui.dialogs.conteo_calendario_panel import ConteoCalendarioPanel
 
-_AHORA = datetime(2026, 7, 12, tzinfo=timezone.utc)
+# Relativo al hoy REAL: el servicio calcula "vencida" contra now(), así que
+# una fecha congelada pudre el test con el paso de los días (pasó el 2026-09-04).
+_AHORA = datetime.now(timezone.utc)
 
 
 def _seed(session: Session, nombre: str, *, dias_vigencia=None, ultimo_hace=None) -> Escuela:

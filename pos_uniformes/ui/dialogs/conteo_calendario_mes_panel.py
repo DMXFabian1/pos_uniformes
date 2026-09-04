@@ -91,6 +91,7 @@ class ConteoCalendarioMesPanel(QWidget):
         self._estados: list = []
         self._recordatorios: list = []
         self._completados: set = set()  # (recordatorio_id, fecha) marcados como hechos
+        self._emp_chips: dict = {}  # {fecha: [(tipo, nombre)]} sincronizado de la Libreta
         self._build_ui()
         if refresh_on_init:
             self.refresh()
@@ -185,12 +186,26 @@ class ConteoCalendarioMesPanel(QWidget):
 
                 self._recordatorios = listar_recordatorios(session)
                 self._completados = completados_todos(session)
+                # Sincronía con el calendario de la Libreta: descansos y
+                # pagos de las empleadas se pintan aquí solos (faltas no —
+                # esas son del calendario privado).
+                try:
+                    from pos_uniformes.services.calendario_empleadas_service import (
+                        chips_calendario_mes,
+                    )
+
+                    self._emp_chips = chips_calendario_mes(
+                        session, self._anio, self._mes, self._hoy
+                    )
+                except Exception:  # noqa: BLE001
+                    self._emp_chips = {}
             finally:
                 session.close()
         except Exception:  # noqa: BLE001 — sin conexión: calendario vacío, no crashear
             self._estados = []
             self._recordatorios = []
             self._completados = set()
+            self._emp_chips = {}
         self._render()
 
     def _abrir_recordatorios(self, fecha_inicial: date | None = None) -> None:
@@ -298,10 +313,16 @@ class ConteoCalendarioMesPanel(QWidget):
                 f" color: {'#b3a08a' if es_finde else '#8a7358'};"
             )
             v.addWidget(num)
-        # Recordatorios primero (pagos/descansos/notas), luego conteos.
+        # Recordatorios primero (pagos/descansos/notas), luego lo que viene
+        # del calendario de la Libreta (descansos/pagos de empleadas) y al
+        # final los conteos.
         chips = [
             self._chip_recordatorio(r, fecha_celda, (r.id, fecha_celda) in self._completados)
             for r in recordatorios
+        ]
+        chips += [
+            self._chip_empleada(tipo, nombre)
+            for tipo, nombre in getattr(self, "_emp_chips", {}).get(fecha_celda, [])
         ]
         chips += [self._chip(e) for e in escuelas]
         for w in chips[:3]:
@@ -319,6 +340,21 @@ class ConteoCalendarioMesPanel(QWidget):
         "descanso": ("#e7dcff", "#5b3a99"),
         "nota": ("#eee7dc", "#6b5a45"),
     }
+
+    def _chip_empleada(self, tipo: str, nombre: str) -> QLabel:
+        """Chip auto-sincronizado desde el calendario de la Libreta."""
+        icono = "🛌" if tipo == "descanso" else "💵"
+        bg, fg = self._REC_COLORS.get(tipo, ("#eee", "#444"))
+        chip = QLabel(f"{icono} {nombre}")
+        chip.setToolTip(
+            f"{'Descansa' if tipo == 'descanso' else 'Día de pago de'} {nombre}"
+            " (viene del calendario de la Libreta)"
+        )
+        chip.setStyleSheet(
+            f"background: {bg}; color: {fg}; border: none; border-radius: 7px;"
+            " padding: 2px 7px; font-size: 11px; font-weight: 700;"
+        )
+        return chip
 
     def _chip_recordatorio(self, r, fecha, completado: bool) -> QLabel:
         from pos_uniformes.services.recordatorio_service import TIPO_ICONO
