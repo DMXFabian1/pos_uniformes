@@ -444,10 +444,33 @@ QLineEdit#satScanInput {
     padding: 8px 10px;
     min-height: 0px;
 }
+/* Colores EXPLÍCITOS también aquí: en modo oscuro del sistema los botones
+   sin estilo propio (periodos de la Libreta, Yes/No de los QMessageBox,
+   etc.) heredaban letra blanca sobre fondo claro y se perdían. */
 QPushButton {
     border-radius: 12px;
     padding: 9px 14px;
     font-weight: 800;
+    background: #f8f2e9;
+    color: #73341c;
+    border: 1px solid #ddd0c0;
+}
+QPushButton:hover {
+    background: #f1e6d6;
+    border-color: #cdbda8;
+}
+QPushButton:pressed {
+    background: #e8dbc7;
+}
+QPushButton:checked {
+    background: #a84f2d;
+    color: #f9f4ea;
+    border-color: #8a4326;
+}
+QPushButton:disabled {
+    background: #efe9de;
+    color: #b3a794;
+    border-color: #e2d8c9;
 }
 QPushButton#chipButton {
     background: #eef3f7;
