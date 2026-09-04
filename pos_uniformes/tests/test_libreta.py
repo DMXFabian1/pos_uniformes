@@ -729,6 +729,78 @@ class GafeteEncargadoTests(unittest.TestCase):
         self.assertIsNone(fake._libreta_code)  # la Libreta no se abrió
 
 
+class CalendarioEncargadoSimpleTests(unittest.TestCase):
+    """El modo de León: botones por empleada (sin Daniel ni él mismo) y
+    marca con nota de auditoría."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        from PyQt6.QtWidgets import QApplication
+
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _fake_session(self, emps):
+        class FakeQuery:
+            def __init__(self, items):
+                self.items = items
+
+            def filter(self, *a):
+                return self
+
+            def order_by(self, *a):
+                return self
+
+            def all(self):
+                return self.items
+
+        sesion = MagicMock()
+        sesion.query.return_value = FakeQuery(emps)
+        cm = MagicMock()
+        cm.__enter__ = lambda s: sesion
+        cm.__exit__ = lambda s, *a: False
+        return cm
+
+    def test_botones_sin_daniel_ni_leon_y_marca_con_nota(self) -> None:
+        from datetime import date
+
+        from PyQt6.QtWidgets import QPushButton
+
+        emps = [
+            SimpleNamespace(codigo=c, nombre_completo=n, activo=True)
+            for c, n in (
+                ("VEND-4", "Fanny Ruiz"),
+                ("ENC-1", "León Fabian"),
+                ("VEND-1", "Daniel"),
+            )
+        ]
+        with patch(
+            "pos_uniformes.database.connection.get_session",
+            return_value=self._fake_session(emps),
+        ):
+            from pos_uniformes.ui.dialogs.calendario_empleadas_dialog import (
+                CalendarioEncargadoDialog,
+            )
+
+            dlg = CalendarioEncargadoDialog(None)
+            textos = [
+                dlg._quien_botones.itemAt(i).widget().text()
+                for i in range(dlg._quien_botones.count())
+                if isinstance(dlg._quien_botones.itemAt(i).widget(), QPushButton)
+            ]
+            self.assertEqual(textos, ["👤  Fanny"])
+
+            dlg._elegir_empleada("VEND-4", "Fanny")
+            dlg._sel_tipo = "falta"
+            with patch(
+                "pos_uniformes.ui.dialogs.calendario_empleadas_dialog.marcar_dia"
+            ) as marcar:
+                dlg._aplicar(date(2026, 9, 4))
+            marcar.assert_called_once()
+            self.assertEqual(marcar.call_args.args[1:], ("VEND-4", date(2026, 9, 4), "falta"))
+            self.assertIn("ENC-1", marcar.call_args.kwargs["nota"])
+            self.assertIn("Fanny faltó", dlg._listo_texto.text())
+
+
 class LibretaAutoLogoutTests(unittest.TestCase):
     """Salir de la página Libreta cierra la sesión (no queda abierta la
     vista del dueño con dinero en el kiosko)."""

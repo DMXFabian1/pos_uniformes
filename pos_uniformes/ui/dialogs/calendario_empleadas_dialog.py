@@ -594,3 +594,279 @@ class CalendarioEmpleadasDialog(QDialog):
             )
         ):
             self._recargar()
+
+
+_MESES_ES = (
+    "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+)
+
+
+def _fecha_en_palabras(fecha: date) -> str:
+    return f"{WEEKDAY_NAMES[fecha.weekday()]} {fecha.day} de {_MESES_ES[fecha.month - 1]}"
+
+
+class CalendarioEncargadoDialog(QDialog):
+    """Modo ultra-simple para el encargado (León, papá de Daniel — no le
+    gusta la tecnología): tres preguntas con botones GRANDES, confirmación
+    en palabras llanas y botón de "me equivoqué". Nada de combos, tablas
+    ni configuración."""
+
+    _BTN = (
+        "QPushButton { background: #ffffff; color: #2c2a27;"
+        " border: 2px solid #ddd0c0; border-radius: 16px;"
+        " font-size: 22px; font-weight: 700; min-height: 68px; }"
+        "QPushButton:pressed { background: #f1e6d6; }"
+    )
+    _BTN_ACENTO = (
+        "QPushButton { background: #a84f2d; color: #ffffff; border: none;"
+        " border-radius: 16px; font-size: 22px; font-weight: 800; min-height: 68px; }"
+        "QPushButton:pressed { background: #8a4326; }"
+    )
+    _BTN_SUAVE = (
+        "QPushButton { background: #f4ede2; color: #73341c;"
+        " border: 1px solid #ddd0c0; border-radius: 12px;"
+        " font-size: 17px; font-weight: 700; min-height: 52px; }"
+    )
+
+    def __init__(self, parent: QWidget | None = None):
+        super().__init__(parent)
+        self.setWindowTitle("Calendario")
+        self.resize(560, 660)
+        self.setStyleSheet(
+            "QDialog { background: #f4ede2; }"
+            "QLabel { color: #2c2a27; background: transparent; }"
+        )
+        self._sel_code: str | None = None
+        self._sel_nombre: str = ""
+        self._sel_tipo: str | None = None
+        self._ultima_marca: tuple[str, date] | None = None
+
+        from PyQt6.QtWidgets import QStackedWidget
+
+        self._pila = QStackedWidget()
+        raiz = QVBoxLayout()
+        raiz.setContentsMargins(22, 20, 22, 20)
+        raiz.addWidget(self._pila, 1)
+        self.setLayout(raiz)
+
+        self._pg_quien = self._pagina_quien()
+        self._pg_que = self._pagina_que()
+        self._pg_cuando = self._pagina_cuando()
+        self._pg_listo = self._pagina_listo()
+        for p in (self._pg_quien, self._pg_que, self._pg_cuando, self._pg_listo):
+            self._pila.addWidget(p)
+        self._ir_a_quien()
+
+    # ── Páginas ──────────────────────────────────────────────────────────
+
+    def _titulo(self, texto: str) -> QLabel:
+        lbl = QLabel(texto)
+        lbl.setWordWrap(True)
+        lbl.setStyleSheet("font-size: 26px; font-weight: 800; color: #73341c;")
+        return lbl
+
+    def _pagina_quien(self) -> QWidget:
+        pagina = QWidget()
+        ly = QVBoxLayout()
+        ly.setSpacing(12)
+        ly.addWidget(self._titulo("¿De quién quieres apuntar algo?"))
+        self._quien_botones = QVBoxLayout()
+        self._quien_botones.setSpacing(12)
+        ly.addLayout(self._quien_botones)
+        ly.addStretch()
+        salir = QPushButton("Salir")
+        salir.setStyleSheet(self._BTN_SUAVE)
+        salir.clicked.connect(self.accept)
+        ly.addWidget(salir)
+        pagina.setLayout(ly)
+        return pagina
+
+    def _pagina_que(self) -> QWidget:
+        pagina = QWidget()
+        ly = QVBoxLayout()
+        ly.setSpacing(12)
+        self._que_titulo = self._titulo("")
+        ly.addWidget(self._que_titulo)
+        for texto, tipo in (
+            ("🚫  Faltó", FALTA),
+            ("🛌  Le doy descanso", DESCANSO),
+            ("💪  Sí trabajó (era su descanso)", TRABAJO),
+        ):
+            btn = QPushButton(texto)
+            btn.setStyleSheet(self._BTN)
+            btn.clicked.connect(lambda _=False, t=tipo: self._elegir_tipo(t))
+            ly.addWidget(btn)
+        ly.addStretch()
+        regresar = QPushButton("← Regresar")
+        regresar.setStyleSheet(self._BTN_SUAVE)
+        regresar.clicked.connect(self._ir_a_quien)
+        ly.addWidget(regresar)
+        pagina.setLayout(ly)
+        return pagina
+
+    def _pagina_cuando(self) -> QWidget:
+        pagina = QWidget()
+        ly = QVBoxLayout()
+        ly.setSpacing(12)
+        self._cuando_titulo = self._titulo("¿Qué día?")
+        ly.addWidget(self._cuando_titulo)
+        self._btn_hoy = QPushButton("")
+        self._btn_hoy.setStyleSheet(self._BTN_ACENTO)
+        self._btn_hoy.clicked.connect(lambda: self._aplicar(date.today()))
+        ly.addWidget(self._btn_hoy)
+        self._btn_manana = QPushButton("")
+        self._btn_manana.setStyleSheet(self._BTN)
+        self._btn_manana.clicked.connect(
+            lambda: self._aplicar(date.today() + __import__("datetime").timedelta(days=1))
+        )
+        ly.addWidget(self._btn_manana)
+        otro = QPushButton("📅  Otro día")
+        otro.setStyleSheet(self._BTN)
+        otro.clicked.connect(lambda: self._cal.setVisible(True))
+        ly.addWidget(otro)
+        self._cal = _CalendarioPintado()
+        self._cal.setVisible(False)
+        self._cal.clicked.connect(
+            lambda q: self._aplicar(date(q.year(), q.month(), q.day()))
+        )
+        ly.addWidget(self._cal, 1)
+        ly.addStretch()
+        regresar = QPushButton("← Regresar")
+        regresar.setStyleSheet(self._BTN_SUAVE)
+        regresar.clicked.connect(lambda: self._pila.setCurrentWidget(self._pg_que))
+        ly.addWidget(regresar)
+        pagina.setLayout(ly)
+        return pagina
+
+    def _pagina_listo(self) -> QWidget:
+        pagina = QWidget()
+        ly = QVBoxLayout()
+        ly.setSpacing(14)
+        ly.addStretch()
+        self._listo_texto = QLabel("")
+        self._listo_texto.setWordWrap(True)
+        self._listo_texto.setStyleSheet(
+            "font-size: 28px; font-weight: 800; color: #2c2a27;"
+        )
+        ly.addWidget(self._listo_texto)
+        ly.addStretch()
+        listo = QPushButton("✅  Listo")
+        listo.setStyleSheet(self._BTN_ACENTO)
+        listo.clicked.connect(self._ir_a_quien)
+        ly.addWidget(listo)
+        deshacer = QPushButton("❌  Me equivoqué (borrar)")
+        deshacer.setStyleSheet(self._BTN_SUAVE)
+        deshacer.clicked.connect(self._deshacer)
+        ly.addWidget(deshacer)
+        pagina.setLayout(ly)
+        return pagina
+
+    # ── Flujo ────────────────────────────────────────────────────────────
+
+    def _ir_a_quien(self) -> None:
+        while self._quien_botones.count():
+            item = self._quien_botones.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+        try:
+            from pos_uniformes.database.connection import get_session
+            from pos_uniformes.database.models import Empleada
+
+            with get_session() as session:
+                filas = (
+                    session.query(Empleada)
+                    .filter(Empleada.activo.is_(True))
+                    .order_by(Empleada.nombre_completo)
+                    .all()
+                )
+        except Exception:  # noqa: BLE001
+            logger.exception("Encargado: no se pudo listar empleadas")
+            filas = []
+        if not filas:
+            aviso = QLabel("No hay conexión.\nCierra e intenta otra vez.")
+            aviso.setStyleSheet("font-size: 22px; font-weight: 700; color: #a33b25;")
+            self._quien_botones.addWidget(aviso)
+        for emp in filas:
+            code = str(emp.codigo).upper()
+            if code in ("VEND-1", "ENC-1"):
+                continue  # Daniel y el propio León no se apuntan aquí
+            nombre = (emp.nombre_completo or emp.codigo).split()[0]
+            btn = QPushButton(f"👤  {nombre}")
+            btn.setStyleSheet(self._BTN)
+            btn.clicked.connect(
+                lambda _=False, c=code, n=nombre: self._elegir_empleada(c, n)
+            )
+            self._quien_botones.addWidget(btn)
+        self._pila.setCurrentWidget(self._pg_quien)
+
+    def _elegir_empleada(self, code: str, nombre: str) -> None:
+        self._sel_code, self._sel_nombre = code, nombre
+        self._que_titulo.setText(f"¿Qué pasó con {nombre}?")
+        self._pila.setCurrentWidget(self._pg_que)
+
+    def _elegir_tipo(self, tipo: str) -> None:
+        self._sel_tipo = tipo
+        hoy = date.today()
+        from datetime import timedelta
+
+        self._btn_hoy.setText(f"Hoy ({_fecha_en_palabras(hoy)})")
+        self._btn_manana.setText(f"Mañana ({_fecha_en_palabras(hoy + timedelta(days=1))})")
+        self._cal.setVisible(False)
+        try:
+            from pos_uniformes.database.connection import get_session
+            from pos_uniformes.services.calendario_empleadas_service import cargar_horario
+
+            with get_session() as session:
+                self._cal.set_horario(cargar_horario(session, self._sel_code))
+        except Exception:  # noqa: BLE001
+            self._cal.set_horario(None)
+        self._pila.setCurrentWidget(self._pg_cuando)
+
+    def _aplicar(self, fecha: date) -> None:
+        if not self._sel_code or not self._sel_tipo:
+            return
+        try:
+            from pos_uniformes.database.connection import get_session
+
+            with get_session() as session:
+                marcar_dia(
+                    session,
+                    self._sel_code,
+                    fecha,
+                    self._sel_tipo,
+                    nota="apuntado por León (ENC-1)",
+                )
+        except Exception:  # noqa: BLE001
+            logger.exception("Encargado: no se pudo apuntar")
+            QMessageBox.warning(self, "No se guardó", "Inténtalo otra vez.")
+            return
+        self._ultima_marca = (self._sel_code, fecha)
+        verbo = {
+            FALTA: "faltó",
+            DESCANSO: "descansa",
+            TRABAJO: "sí trabajó",
+        }[self._sel_tipo]
+        self._listo_texto.setText(
+            f"✅ Apuntado:\n\n{self._sel_nombre} {verbo} el {_fecha_en_palabras(fecha)}."
+        )
+        self._pila.setCurrentWidget(self._pg_listo)
+
+    def _deshacer(self) -> None:
+        if self._ultima_marca is None:
+            self._ir_a_quien()
+            return
+        code, fecha = self._ultima_marca
+        try:
+            from pos_uniformes.database.connection import get_session
+
+            with get_session() as session:
+                quitar_marca(session, code, fecha)
+        except Exception:  # noqa: BLE001
+            logger.exception("Encargado: no se pudo deshacer")
+            QMessageBox.warning(self, "No se borró", "Inténtalo otra vez.")
+            return
+        self._ultima_marca = None
+        self._listo_texto.setText("Borrado. Como si nada. 👍")
+        self._pila.setCurrentWidget(self._pg_listo)

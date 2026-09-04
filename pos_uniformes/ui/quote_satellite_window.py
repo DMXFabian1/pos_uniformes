@@ -1563,18 +1563,13 @@ class QuoteSatelliteWindow(QMainWindow):
             return None
 
     def _abrir_calendario_encargado(self) -> None:
-        from pos_uniformes.services.calendario_empleadas_service import ENCARGADO_CODE
+        # Modo ultra-simple para León: tres preguntas con botones grandes
+        # (¿quién? → ¿qué pasó? → ¿cuándo?), sin combos ni configuración.
         from pos_uniformes.ui.dialogs.calendario_empleadas_dialog import (
-            CalendarioEmpleadasDialog,
+            CalendarioEncargadoDialog,
         )
 
-        dialog = CalendarioEmpleadasDialog(
-            self,
-            employee_code=ENCARGADO_CODE,
-            employee_name="Encargado",
-            is_owner=False,
-            is_encargado=True,
-        )
+        dialog = CalendarioEncargadoDialog(self)
         dialog.exec()
         QTimer.singleShot(0, self.libreta_gate_input.setFocus)
 
