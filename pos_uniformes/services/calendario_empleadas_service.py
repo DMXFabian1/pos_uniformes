@@ -2,8 +2,9 @@
 
 Reglas del negocio (definidas por Daniel):
 - Descanso: un día FIJO de la semana por empleada (excepciones por evento).
-- Pago: cada N días TRABAJADOS desde el último pago — una falta o un
-  descanso extra recorren la fecha del próximo pago automáticamente.
+- Pago: cada 7 días DE CALENDARIO desde el último pago — así cada semana
+  cobran el MISMO día. Una falta NO mueve la fecha (se descuenta al pagar);
+  queda registrada para el control del dueño.
 - Un evento explícito del día ("falta", "descanso", "trabajo") le gana al
   patrón fijo del horario.
 
@@ -24,16 +25,12 @@ DESCANSO = "descanso"
 FALTA = "falta"
 PAGO = "pago"
 
-# Tope de búsqueda del próximo pago: si en 90 días no se junta el ciclo,
-# algo está mal configurado y devolvemos None en vez de ciclar.
-_MAX_DIAS_BUSQUEDA = 90
-
-
 @dataclass
 class HorarioEmpleada:
     employee_code: str
     descanso_weekday: int | None = None  # 0=lunes .. 6=domingo
-    ciclo_dias_pago: int = 6
+    # Días de CALENDARIO entre pagos (7 = semanal, mismo día cada semana).
+    ciclo_dias_pago: int = 7
     fecha_ultimo_pago: date | None = None
     # {fecha: tipo_evento} — el evento del día le gana al patrón fijo.
     eventos: dict[date, str] = field(default_factory=dict)
@@ -73,32 +70,23 @@ def dias_trabajados_desde_ultimo_pago(horario: HorarioEmpleada, hoy: date) -> in
 
 
 def fecha_proximo_pago(horario: HorarioEmpleada, hoy: date) -> date | None:
-    """El día en que se completa el ciclo de días trabajados.
+    """Último pago + ciclo de CALENDARIO (7 = mismo día cada semana).
 
-    Camina desde el día siguiente al último pago contando días trabajados
-    (los futuros se asumen trabajados salvo descanso fijo o evento ya
-    capturado): el día que junta `ciclo_dias_pago` es el día de pago. Una
-    falta simplemente no cuenta, así que la fecha se recorre sola.
+    La falta no mueve la fecha: el pago cae siempre el mismo día de la
+    semana y lo faltado se descuenta a la hora de pagar. Si el pago quedó
+    atrasado (Daniel no lo ha registrado), se sigue mostrando el vencido.
     """
     if horario.fecha_ultimo_pago is None or horario.ciclo_dias_pago <= 0:
         return None
-    dia = horario.fecha_ultimo_pago + timedelta(days=1)
-    contados = 0
-    for _ in range(_MAX_DIAS_BUSQUEDA):
-        if es_dia_trabajado(horario, dia):
-            contados += 1
-            if contados >= horario.ciclo_dias_pago:
-                return dia
-        dia += timedelta(days=1)
-    return None
+    return horario.fecha_ultimo_pago + timedelta(days=horario.ciclo_dias_pago)
 
 
 def dias_para_pago(horario: HorarioEmpleada, hoy: date) -> int | None:
-    """Días trabajados que FALTAN para completar el ciclo (0 = ya toca)."""
-    if horario.fecha_ultimo_pago is None or horario.ciclo_dias_pago <= 0:
+    """Días de calendario que faltan para el próximo pago (0 = ya toca)."""
+    proximo = fecha_proximo_pago(horario, hoy)
+    if proximo is None:
         return None
-    trabajados = dias_trabajados_desde_ultimo_pago(horario, hoy)
-    return max(horario.ciclo_dias_pago - trabajados, 0)
+    return max((proximo - hoy).days, 0)
 
 
 def pintar_mes(horario: HorarioEmpleada, year: int, month: int) -> dict[date, str]:
@@ -144,7 +132,7 @@ def cargar_horario(session, employee_code: str) -> HorarioEmpleada:
     horario = HorarioEmpleada(
         employee_code=code,
         descanso_weekday=fila.descanso_weekday if fila else None,
-        ciclo_dias_pago=fila.ciclo_dias_pago if fila else 6,
+        ciclo_dias_pago=fila.ciclo_dias_pago if fila else 7,
         fecha_ultimo_pago=fila.fecha_ultimo_pago if fila else None,
     )
     filas = (

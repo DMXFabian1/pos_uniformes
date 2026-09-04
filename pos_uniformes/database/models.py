@@ -1954,8 +1954,9 @@ class LibretaVenta(Base):
 class EmpleadaHorario(Base):
     """Reglas de calendario de una empleada (Libreta → Calendario).
 
-    El descanso es un día fijo de la semana; el pago es cada N días
-    TRABAJADOS desde el último pago (una falta recorre la fecha sola).
+    El descanso es un día fijo de la semana; el pago es cada N días de
+    CALENDARIO (7 = semanal, cobran siempre el mismo día; la falta no
+    mueve la fecha — se descuenta al pagar).
     """
 
     __tablename__ = "empleada_horario"
@@ -1963,7 +1964,7 @@ class EmpleadaHorario(Base):
     employee_code: Mapped[str] = mapped_column(String(40), primary_key=True)
     # 0=lunes .. 6=domingo; None = sin descanso fijo configurado.
     descanso_weekday: Mapped[int | None] = mapped_column(Integer)
-    ciclo_dias_pago: Mapped[int] = mapped_column(Integer, nullable=False, default=6, server_default="6")
+    ciclo_dias_pago: Mapped[int] = mapped_column(Integer, nullable=False, default=7, server_default="7")
     fecha_ultimo_pago: Mapped[date | None] = mapped_column(Date)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

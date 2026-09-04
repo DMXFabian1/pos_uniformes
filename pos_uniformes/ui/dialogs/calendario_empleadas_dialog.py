@@ -222,9 +222,9 @@ class CalendarioEmpleadasDialog(QDialog):
             config.addWidget(self.combo_descanso)
             config.addWidget(QLabel("Pago cada"))
             self.spin_ciclo = QSpinBox()
-            self.spin_ciclo.setRange(1, 30)
-            self.spin_ciclo.setValue(6)
-            self.spin_ciclo.setSuffix(" días trab.")
+            self.spin_ciclo.setRange(1, 31)
+            self.spin_ciclo.setValue(7)  # semanal: cobran el mismo día cada semana
+            self.spin_ciclo.setSuffix(" días")
             config.addWidget(self.spin_ciclo)
             self.btn_guardar = QPushButton("Guardar horario")
             self.btn_guardar.clicked.connect(self._guardar_config)

@@ -1,8 +1,8 @@
 """calendario_empleadas
 
 Calendario de empleadas en la Libreta:
-- empleada_horario: descanso fijo semanal + ciclo de pago (cada N días
-  TRABAJADOS) + fecha del último pago.
+- empleada_horario: descanso fijo semanal + ciclo de pago (cada N días de
+  CALENDARIO; 7 = semanal, mismo día cada semana) + fecha del último pago.
 - empleada_evento: excepciones y hechos por día (falta, descanso extra,
   trabajó en su descanso, pago), que le ganan al patrón fijo.
 """
@@ -21,7 +21,7 @@ def upgrade() -> None:
         'empleada_horario',
         sa.Column('employee_code', sa.String(40), primary_key=True),
         sa.Column('descanso_weekday', sa.Integer(), nullable=True),
-        sa.Column('ciclo_dias_pago', sa.Integer(), nullable=False, server_default='6'),
+        sa.Column('ciclo_dias_pago', sa.Integer(), nullable=False, server_default='7'),
         sa.Column('fecha_ultimo_pago', sa.Date(), nullable=True),
         sa.Column(
             'updated_at',

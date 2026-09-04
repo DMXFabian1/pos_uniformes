@@ -33,7 +33,7 @@ def _horario(**kwargs) -> HorarioEmpleada:
     base = dict(
         employee_code="VEND-2",
         descanso_weekday=_JUEVES,
-        ciclo_dias_pago=6,
+        ciclo_dias_pago=7,  # semanal: cobran el mismo día cada semana
         fecha_ultimo_pago=date(2026, 9, 6),  # domingo
     )
     base.update(kwargs)
@@ -61,44 +61,44 @@ class EstadoDelDiaTests(unittest.TestCase):
 
 
 class ProximoPagoTests(unittest.TestCase):
-    def test_ciclo_normal_brinca_el_descanso(self) -> None:
-        # Último pago dom 6; trabaja lun 7, mar 8, mié 9, (jue 10 descansa),
-        # vie 11, sáb 12, dom 13 → el 6º día trabajado es el domingo 13.
+    """Regla de Daniel: pago cada 7 días de CALENDARIO — cobran siempre el
+    mismo día de la semana; la falta NO mueve la fecha (se descuenta)."""
+
+    def test_ciclo_semanal_mismo_dia_de_la_semana(self) -> None:
+        # Último pago dom 6 → próximo dom 13, siempre domingo.
         h = _horario()
         self.assertEqual(fecha_proximo_pago(h, date(2026, 9, 7)), date(2026, 9, 13))
+        self.assertEqual(fecha_proximo_pago(h, date(2026, 9, 7)).weekday(), 6)
 
-    def test_falta_recorre_el_pago_un_dia(self) -> None:
-        # La regla que pidió Daniel: la falta no cuenta como trabajado,
-        # así que el pago se recorre solo — del dom 13 al lun 14.
+    def test_falta_no_mueve_la_fecha_de_pago(self) -> None:
         h = _horario()
         h.eventos[date(2026, 9, 8)] = FALTA  # faltó el martes
-        self.assertEqual(fecha_proximo_pago(h, date(2026, 9, 9)), date(2026, 9, 14))
+        self.assertEqual(fecha_proximo_pago(h, date(2026, 9, 9)), date(2026, 9, 13))
 
-    def test_descanso_extra_tambien_recorre(self) -> None:
+    def test_descanso_extra_tampoco_mueve_la_fecha(self) -> None:
         h = _horario()
-        h.eventos[date(2026, 9, 12)] = DESCANSO  # descanso extra el sábado
-        self.assertEqual(fecha_proximo_pago(h, date(2026, 9, 7)), date(2026, 9, 14))
-
-    def test_trabajar_su_descanso_adelanta_el_pago(self) -> None:
-        h = _horario()
-        h.eventos[date(2026, 9, 10)] = TRABAJO  # trabajó su jueves
-        self.assertEqual(fecha_proximo_pago(h, date(2026, 9, 7)), date(2026, 9, 12))
+        h.eventos[date(2026, 9, 12)] = DESCANSO
+        self.assertEqual(fecha_proximo_pago(h, date(2026, 9, 7)), date(2026, 9, 13))
 
     def test_sin_ultimo_pago_no_hay_fecha(self) -> None:
         h = _horario(fecha_ultimo_pago=None)
         self.assertIsNone(fecha_proximo_pago(h, date(2026, 9, 7)))
         self.assertIsNone(dias_para_pago(h, date(2026, 9, 7)))
 
-    def test_dias_trabajados_y_faltantes(self) -> None:
+    def test_dias_trabajados_para_control_del_dueno(self) -> None:
+        # La falta sí cuenta para el CONTROL (cuántos días trabajó de
+        # verdad), aunque no mueva la fecha del pago.
         h = _horario()
         h.eventos[date(2026, 9, 8)] = FALTA
         # Al miércoles 9: trabajó lun 7 y mié 9 (el martes faltó) = 2.
         self.assertEqual(dias_trabajados_desde_ultimo_pago(h, date(2026, 9, 9)), 2)
+        # Días de calendario al pago: del mié 9 al dom 13 = 4.
         self.assertEqual(dias_para_pago(h, date(2026, 9, 9)), 4)
 
-    def test_faltan_cero_cuando_ya_toca(self) -> None:
+    def test_faltan_cero_cuando_ya_toca_o_esta_vencido(self) -> None:
         h = _horario()
         self.assertEqual(dias_para_pago(h, date(2026, 9, 13)), 0)
+        self.assertEqual(dias_para_pago(h, date(2026, 9, 20)), 0)  # atrasado
 
 
 class PintarMesTests(unittest.TestCase):
@@ -129,7 +129,7 @@ class ResumenTests(unittest.TestCase):
         texto = resumen_empleada(h, date(2026, 9, 9))
         self.assertIn("jueves", texto)
         self.assertIn("Próximo pago", texto)
-        self.assertIn("faltan 3 días", texto)  # trabajó 3 de 6 al mié 9
+        self.assertIn("faltan 4 días", texto)  # del mié 9 al dom 13
 
     def test_resumen_hoy_toca_pago(self) -> None:
         h = _horario()
@@ -167,7 +167,7 @@ class AccesoDatosTests(unittest.TestCase):
         h = cargar_horario(self.session, "vend-2")
         self.assertEqual(h.employee_code, "VEND-2")
         self.assertIsNone(h.descanso_weekday)
-        self.assertEqual(h.ciclo_dias_pago, 6)
+        self.assertEqual(h.ciclo_dias_pago, 7)
         self.assertEqual(h.eventos, {})
 
     def test_guardar_marcar_y_pagar(self) -> None:
@@ -269,7 +269,7 @@ class ChipsCalendarioCompartidoTests(unittest.TestCase):
         )
 
         guardar_horario(
-            self.session, "VEND-2", descanso_weekday=_JUEVES, ciclo_dias_pago=6
+            self.session, "VEND-2", descanso_weekday=_JUEVES, ciclo_dias_pago=7
         )
         registrar_pago(self.session, "VEND-2", date(2026, 9, 6))
         marcar_dia(self.session, "VEND-2", date(2026, 9, 8), FALTA)
@@ -278,11 +278,10 @@ class ChipsCalendarioCompartidoTests(unittest.TestCase):
 
         # Descanso fijo (jueves 10) con el primer nombre de la empleada.
         self.assertIn(("descanso", "Ana"), chips[date(2026, 9, 10)])
-        # Pago hecho (dom 6) y próximo pago proyectado: la falta del martes
-        # lo recorre del dom 13 al lun 14 — también sincronizado.
+        # Pago hecho (dom 6) y el próximo proyectado el MISMO día de la
+        # semana (dom 13) — la falta del martes no lo mueve.
         self.assertIn(("pago", "Ana"), chips[date(2026, 9, 6)])
-        self.assertIn(("pago", "Ana"), chips[date(2026, 9, 14)])
-        self.assertNotIn(date(2026, 9, 13), chips)
+        self.assertIn(("pago", "Ana"), chips[date(2026, 9, 13)])
         # La falta del 8 NO aparece en el calendario compartido.
         self.assertNotIn(date(2026, 9, 8), chips)
 
