@@ -669,6 +669,49 @@ class LibretaPeriodosYFiltrosTests(unittest.TestCase):
         self.assertIsNone(fake._libreta_emp_filtro)
 
 
+class LibretaCicloBannerTests(unittest.TestCase):
+    """Banner "Comisiones desde tu último pago" en la vista de la empleada."""
+
+    def test_sin_ciclo_configurado_devuelve_none(self) -> None:
+        from datetime import date as _date
+
+        from pos_uniformes.services.calendario_empleadas_service import HorarioEmpleada
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        vacio = HorarioEmpleada(employee_code="VEND-2")
+        fake = SimpleNamespace(_libreta_code="VEND-2")
+        with patch(
+            "pos_uniformes.services.calendario_empleadas_service.cargar_horario",
+            return_value=vacio,
+        ):
+            texto = QuoteSatelliteWindow._texto_ciclo_libreta(fake, session=MagicMock())
+        self.assertIsNone(texto)
+
+    def test_con_ciclo_arma_el_banner(self) -> None:
+        from datetime import date as _date
+
+        from pos_uniformes.services.calendario_empleadas_service import HorarioEmpleada
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        horario = HorarioEmpleada(
+            employee_code="VEND-2",
+            descanso_weekday=3,
+            ciclo_dias_pago=6,
+            fecha_ultimo_pago=_date.today(),
+        )
+        fake = SimpleNamespace(_libreta_code="VEND-2")
+        with patch(
+            "pos_uniformes.services.calendario_empleadas_service.cargar_horario",
+            return_value=horario,
+        ), patch(
+            "pos_uniformes.services.calendario_empleadas_service.comisiones_desde_ultimo_pago",
+            return_value=47,
+        ):
+            texto = QuoteSatelliteWindow._texto_ciclo_libreta(fake, session=MagicMock())
+        self.assertIn("Comisiones desde tu último pago: 47", texto)
+        self.assertIn("jueves", texto)
+
+
 class LibretaAutoLogoutTests(unittest.TestCase):
     """Salir de la página Libreta cierra la sesión (no queda abierta la
     vista del dueño con dinero en el kiosko)."""

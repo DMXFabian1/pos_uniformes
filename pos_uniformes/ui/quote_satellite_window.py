@@ -1246,6 +1246,10 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_refresh_button.setAutoDefault(False)
         self.libreta_refresh_button.clicked.connect(self._refresh_libreta_view)
         header.addWidget(self.libreta_refresh_button)
+        self.libreta_calendario_button = QPushButton("📅 Calendario")
+        self.libreta_calendario_button.setAutoDefault(False)
+        self.libreta_calendario_button.clicked.connect(self._abrir_calendario_libreta)
+        header.addWidget(self.libreta_calendario_button)
         self.libreta_salir_button = QPushButton("Salir")
         self.libreta_salir_button.setAutoDefault(False)
         self.libreta_salir_button.clicked.connect(self._libreta_logout)
@@ -1284,6 +1288,18 @@ class QuoteSatelliteWindow(QMainWindow):
             cards_row.addWidget(card, 1)
             self._libreta_cards.append((card, titulo_card, valor_card, sub_card))
         view_ly.addLayout(cards_row)
+
+        # Banner del ciclo de pago (empleada): comisiones acumuladas desde su
+        # último pago + cuándo le toca el siguiente. Se llena al refrescar.
+        self.libreta_ciclo_banner = QLabel("")
+        self.libreta_ciclo_banner.setObjectName("libretaCicloBanner")
+        self.libreta_ciclo_banner.setWordWrap(True)
+        self.libreta_ciclo_banner.setStyleSheet(
+            "background: #a84f2d; color: #ffffff; border-radius: 10px;"
+            "padding: 10px 14px; font-size: 15px; font-weight: 700;"
+        )
+        self.libreta_ciclo_banner.setVisible(False)
+        view_ly.addWidget(self.libreta_ciclo_banner)
 
         # Barra del dueño: imprimir corte + meta semanal de comisiones
         self.libreta_owner_bar = QWidget()
@@ -1512,6 +1528,50 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_gate.setVisible(True)
         QTimer.singleShot(0, self.libreta_gate_input.setFocus)
 
+    def _texto_ciclo_libreta(self, session) -> str | None:
+        """Banner de la empleada: comisiones desde su último pago + resumen
+        de su próximo pago/descanso. None si aún no tiene ciclo iniciado."""
+        try:
+            from pos_uniformes.services.calendario_empleadas_service import (
+                cargar_horario,
+                comisiones_desde_ultimo_pago,
+                resumen_empleada,
+            )
+
+            horario = cargar_horario(session, self._libreta_code)
+            if horario.fecha_ultimo_pago is None and horario.descanso_weekday is None:
+                return None  # sin ciclo configurado: no ensuciar la vista
+            comisiones = comisiones_desde_ultimo_pago(
+                session, self._libreta_code, horario
+            )
+            from datetime import date as _date
+
+            partes = [f"⭐ Comisiones desde tu último pago: {comisiones}"]
+            resumen = resumen_empleada(horario, _date.today())
+            if resumen and "Sin horario" not in resumen:
+                partes.append(resumen)
+            return "   ·   ".join(partes)
+        except Exception:  # noqa: BLE001
+            logger.exception("Libreta: fallo el banner del ciclo")
+            return None
+
+    def _abrir_calendario_libreta(self) -> None:
+        """Calendario de descansos/faltas/pagos; la empleada ve el suyo y el
+        dueño gestiona el de todas."""
+        if not self._libreta_code:
+            return
+        from pos_uniformes.ui.dialogs.calendario_empleadas_dialog import (
+            CalendarioEmpleadasDialog,
+        )
+
+        dialog = CalendarioEmpleadasDialog(
+            self,
+            employee_code=self._libreta_code,
+            employee_name=self._libreta_code,
+            is_owner=self._libreta_is_owner,
+        )
+        dialog.exec()
+
     def _set_libreta_periodo(self, periodo: str) -> None:
         self._libreta_periodo = periodo
         self._sync_libreta_filtros()
@@ -1596,6 +1656,7 @@ class QuoteSatelliteWindow(QMainWindow):
 
         week_rows: list = []
         fuente_db = False
+        ciclo_texto: str | None = None
         if probe_database_host(0.5):
             try:
                 with get_session() as session:
@@ -1607,9 +1668,14 @@ class QuoteSatelliteWindow(QMainWindow):
                     week_rows = listar_operaciones(
                         session, desde=desde, hasta=hasta, employee_code=employee_filter
                     )
+                    if not self._libreta_is_owner:
+                        ciclo_texto = self._texto_ciclo_libreta(session)
                 fuente_db = True
             except Exception:  # noqa: BLE001
                 logger.exception("Libreta: fallo la consulta a la base")
+        self.libreta_ciclo_banner.setVisible(bool(ciclo_texto))
+        if ciclo_texto:
+            self.libreta_ciclo_banner.setText(ciclo_texto)
 
         if not fuente_db:
             week_rows = self._libreta_rows_locales(desde, hasta, employee_filter)

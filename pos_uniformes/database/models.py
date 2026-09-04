@@ -1949,3 +1949,50 @@ class LibretaVenta(Base):
         nullable=False,
         index=True,
     )
+
+
+class EmpleadaHorario(Base):
+    """Reglas de calendario de una empleada (Libreta → Calendario).
+
+    El descanso es un día fijo de la semana; el pago es cada N días
+    TRABAJADOS desde el último pago (una falta recorre la fecha sola).
+    """
+
+    __tablename__ = "empleada_horario"
+
+    employee_code: Mapped[str] = mapped_column(String(40), primary_key=True)
+    # 0=lunes .. 6=domingo; None = sin descanso fijo configurado.
+    descanso_weekday: Mapped[int | None] = mapped_column(Integer)
+    ciclo_dias_pago: Mapped[int] = mapped_column(Integer, nullable=False, default=6, server_default="6")
+    fecha_ultimo_pago: Mapped[date | None] = mapped_column(Date)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class EmpleadaEvento(Base):
+    """Excepciones y hechos del calendario de empleadas.
+
+    tipo: "falta" | "descanso" (descanso extra o movido) | "trabajo"
+    (trabajó en su día de descanso fijo) | "pago" (se le pagó ese día).
+    Un evento explícito le gana al patrón fijo del horario.
+    """
+
+    __tablename__ = "empleada_evento"
+    __table_args__ = (
+        UniqueConstraint("employee_code", "fecha", "tipo", name="uq_empleada_evento_dia"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employee_code: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    fecha: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    tipo: Mapped[str] = mapped_column(String(20), nullable=False)
+    nota: Mapped[str | None] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )
