@@ -3443,6 +3443,11 @@ class QuoteSatelliteWindow(QMainWindow):
             QTimer.singleShot(0, self.kiosk_scan_input.setFocus)
         if page_key == "quicksale":
             self.quick_sale_widget.focus_input()
+        if page_key == "libreta":
+            # Igual que venta rápida: el cursor cae solo en el campo del
+            # gafete al entrar (la página siempre abre en el gate, porque
+            # salir de ella cierra la sesión).
+            QTimer.singleShot(0, self.libreta_gate_input.setFocus)
         if page_key == "search" and self.offline_mode:
             self._refresh_offline_quotes()
 

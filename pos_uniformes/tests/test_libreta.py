@@ -706,6 +706,16 @@ class LibretaAutoLogoutTests(unittest.TestCase):
             pass  # cae a las ramas de otras páginas, que usan widgets reales
         fake._libreta_logout.assert_not_called()
 
+    def test_entrar_a_libreta_enfoca_el_gafete(self) -> None:
+        # Réplica del comportamiento de venta rápida: al entrar a la página,
+        # el cursor cae solo en el campo del gafete.
+        import inspect
+
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        source = inspect.getsource(QuoteSatelliteWindow._set_page)
+        self.assertIn("libreta_gate_input.setFocus", source)
+
     def test_quedarse_en_libreta_no_cierra(self) -> None:
         from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
 
