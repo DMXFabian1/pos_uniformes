@@ -1228,10 +1228,15 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_hoy_button = QPushButton("Hoy")
         self.libreta_semana_button = QPushButton("Semana")
         self.libreta_sem_pasada_button = QPushButton("Sem. pasada")
+        # "Mi ciclo"/"Su ciclo": desde el último pago — el respaldo del
+        # banner de comisiones (la semana calendario ya no coincide con el
+        # ciclo de nadie, cada quien cobra en su día).
+        self.libreta_ciclo_button = QPushButton("Mi ciclo")
         self._libreta_periodo_buttons = {
             "hoy": self.libreta_hoy_button,
             "semana": self.libreta_semana_button,
             "semana_pasada": self.libreta_sem_pasada_button,
+            "ciclo": self.libreta_ciclo_button,
         }
         for periodo_key, button in self._libreta_periodo_buttons.items():
             button.setCheckable(True)
@@ -1525,6 +1530,9 @@ class QuoteSatelliteWindow(QMainWindow):
             if self._libreta_is_owner
             else f"Hola, {code} 👋"
         )
+        self.libreta_ciclo_button.setText(
+            "Su ciclo" if self._libreta_is_owner else "Mi ciclo"
+        )
         self._refresh_libreta_view()
 
     def _libreta_logout(self) -> None:
@@ -1590,6 +1598,20 @@ class QuoteSatelliteWindow(QMainWindow):
         dialog.exec()
 
     def _set_libreta_periodo(self, periodo: str) -> None:
+        if (
+            periodo == "ciclo"
+            and self._libreta_is_owner
+            and not self._libreta_emp_filtro
+        ):
+            # El ciclo es POR empleada: el dueño primero elige a quién.
+            QMessageBox.information(
+                self,
+                "Elige empleada",
+                "Primero elige a la empleada (clic en su nombre en el ranking)\n"
+                "y luego 'Su ciclo' te muestra lo que va desde su último pago.",
+            )
+            self._sync_libreta_filtros()  # el botón no se queda prendido
+            return
         self._libreta_periodo = periodo
         self._sync_libreta_filtros()
         self._refresh_libreta_view()
@@ -1607,6 +1629,8 @@ class QuoteSatelliteWindow(QMainWindow):
             return
         code = self._libreta_ranking_codes[idx]
         self._libreta_emp_filtro = None if self._libreta_emp_filtro == code else code
+        if self._libreta_emp_filtro is None and self._libreta_periodo == "ciclo":
+            self._libreta_periodo = "hoy"  # el ciclo era DE esa empleada
         self._sync_libreta_filtros()
         self._refresh_libreta_view()
 
@@ -1633,6 +1657,8 @@ class QuoteSatelliteWindow(QMainWindow):
             ventana_semana_anterior,
         )
 
+        if self._libreta_periodo == "ciclo":
+            return self._ventana_ciclo_actual()
         if self._libreta_periodo == "semana_pasada":
             return ventana_semana_anterior()
         if self._libreta_periodo == "rango":
@@ -1644,7 +1670,35 @@ class QuoteSatelliteWindow(QMainWindow):
         # memoria; la meta semanal necesita la semana completa).
         return ventana_semana()
 
+    def _ventana_ciclo_actual(self):
+        """Ventana "desde el último pago" de la empleada en contexto:
+        la propia en modo empleada; la filtrada en el ranking, para el dueño."""
+        from pos_uniformes.services.libreta_service import ventana_ciclo, ventana_semana
+
+        code = (
+            self._libreta_emp_filtro if self._libreta_is_owner else self._libreta_code
+        )
+        if not code:
+            return ventana_semana()
+        try:
+            from pos_uniformes.services.calendario_empleadas_service import (
+                cargar_horario,
+            )
+
+            with get_session() as session:
+                horario = cargar_horario(session, code)
+            return ventana_ciclo(horario.fecha_ultimo_pago)
+        except Exception:  # noqa: BLE001 — sin conexión: mejor semana que nada
+            logger.exception("Libreta: no se pudo cargar el ciclo de %s", code)
+            return ventana_semana()
+
     def _libreta_periodo_texto(self) -> str:
+        if self._libreta_periodo == "ciclo":
+            return (
+                f"desde el último pago de {self._libreta_emp_filtro}"
+                if self._libreta_is_owner
+                else "desde tu último pago"
+            )
         if self._libreta_periodo == "semana":
             return "esta semana"
         if self._libreta_periodo == "semana_pasada":

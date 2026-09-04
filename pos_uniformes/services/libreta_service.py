@@ -41,6 +41,21 @@ def ventana_semana_anterior(reference: date | None = None) -> tuple[datetime, da
     return ventana_semana(reference - timedelta(days=7))
 
 
+def ventana_ciclo(fecha_ultimo_pago: date | None) -> tuple[datetime, datetime]:
+    """Del día SIGUIENTE al último pago hasta hoy: el desglose que respalda
+    el banner "Comisiones desde tu último pago" (la vista para pagar).
+    Sin pago registrado aún: los últimos 90 días."""
+    hoy = date.today()
+    inicio_dia = (
+        fecha_ultimo_pago + timedelta(days=1)
+        if fecha_ultimo_pago is not None
+        else hoy - timedelta(days=90)
+    )
+    inicio, _ = local_day_window(inicio_dia)
+    _, fin = local_day_window(hoy)
+    return inicio, fin
+
+
 def ventana_rango(desde: date, hasta: date) -> tuple[datetime, datetime]:
     """Rango libre de fechas (inclusive); si vienen volteadas, se corrigen."""
     if hasta < desde:

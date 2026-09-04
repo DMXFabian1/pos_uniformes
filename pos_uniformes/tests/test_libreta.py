@@ -712,6 +712,61 @@ class LibretaCicloBannerTests(unittest.TestCase):
         self.assertIn("jueves", texto)
 
 
+class VentanaCicloTests(unittest.TestCase):
+    """El periodo "Mi ciclo"/"Su ciclo": desde el último pago hasta hoy —
+    el desglose que respalda el banner de comisiones."""
+
+    def test_ventana_arranca_el_dia_despues_del_pago(self) -> None:
+        from datetime import date, timedelta
+
+        from pos_uniformes.services.libreta_service import ventana_ciclo
+
+        ultimo_pago = date.today() - timedelta(days=5)
+        inicio, fin = ventana_ciclo(ultimo_pago)
+        self.assertEqual(inicio.date(), ultimo_pago + timedelta(days=1))
+        self.assertEqual(fin.date(), date.today())
+
+    def test_sin_pago_registrado_cubre_90_dias(self) -> None:
+        from datetime import date, timedelta
+
+        from pos_uniformes.services.libreta_service import ventana_ciclo
+
+        inicio, _fin = ventana_ciclo(None)
+        self.assertEqual(inicio.date(), date.today() - timedelta(days=90))
+
+    def test_dueno_sin_empleada_elegida_no_activa_el_ciclo(self) -> None:
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        fake = SimpleNamespace(
+            _libreta_is_owner=True,
+            _libreta_emp_filtro=None,
+            _libreta_periodo="hoy",
+            _sync_libreta_filtros=MagicMock(),
+            _refresh_libreta_view=MagicMock(),
+        )
+        from PyQt6.QtWidgets import QMessageBox
+
+        with patch.object(QMessageBox, "information") as aviso:
+            QuoteSatelliteWindow._set_libreta_periodo(fake, "ciclo")
+        aviso.assert_called_once()
+        self.assertEqual(fake._libreta_periodo, "hoy")  # no cambió
+        fake._refresh_libreta_view.assert_not_called()
+
+    def test_empleada_activa_su_ciclo_directo(self) -> None:
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        fake = SimpleNamespace(
+            _libreta_is_owner=False,
+            _libreta_emp_filtro=None,
+            _libreta_periodo="hoy",
+            _sync_libreta_filtros=MagicMock(),
+            _refresh_libreta_view=MagicMock(),
+        )
+        QuoteSatelliteWindow._set_libreta_periodo(fake, "ciclo")
+        self.assertEqual(fake._libreta_periodo, "ciclo")
+        fake._refresh_libreta_view.assert_called_once()
+
+
 class GafeteEncargadoTests(unittest.TestCase):
     """El gafete ENC-1 abre el calendario en modo encargado, sin entrar a
     la Libreta (no ve dinero)."""
