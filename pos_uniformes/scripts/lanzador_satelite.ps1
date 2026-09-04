@@ -62,6 +62,26 @@ if (Test-Path $share) {
 
 $exe = Get-ChildItem $appDir -Filter "*.exe" -ErrorAction SilentlyContinue |
     Select-Object -First 1
+
+# Acceso directo en el Escritorio (se crea solo la primera vez, con el
+# icono de la app): el kiosko queda auto-instalado sin pasos manuales.
+try {
+    $desktop = [Environment]::GetFolderPath("Desktop")
+    $lnkPath = Join-Path $desktop "Presupuestos Satelite.lnk"
+    if ($desktop -and -not (Test-Path $lnkPath)) {
+        $shell = New-Object -ComObject WScript.Shell
+        $lnk = $shell.CreateShortcut($lnkPath)
+        $lnk.TargetPath = Join-Path $PSScriptRoot "lanzador_satelite.bat"
+        $lnk.WorkingDirectory = $PSScriptRoot
+        $lnk.Description = "Abre el satelite (se actualiza solo)"
+        if ($exe) { $lnk.IconLocation = "$($exe.FullName),0" }
+        $lnk.Save()
+        Write-Host "Acceso directo creado en el Escritorio."
+    }
+} catch {
+    # Sin acceso directo no pasa nada: la app abre igual.
+}
+
 if ($exe) {
     Start-Process $exe.FullName -WorkingDirectory $appDir
 } else {
