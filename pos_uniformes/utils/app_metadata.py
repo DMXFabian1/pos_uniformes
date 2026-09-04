@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 
 APP_DISPLAY_NAME = "POS Uniformes"
@@ -14,13 +15,24 @@ def project_root() -> Path:
     return Path(__file__).resolve().parents[1]
 
 
+def _version_file_candidates() -> tuple[Path, ...]:
+    # En el exe empaquetado (PyInstaller) el archivo VERSION vive en la raiz
+    # del bundle (_MEIPASS), no junto al paquete: sin esto la app caia al
+    # DEFAULT y creia por siempre que habia actualizacion disponible.
+    meipass = getattr(sys, "_MEIPASS", "")
+    frozen = (Path(meipass) / "VERSION",) if meipass else ()
+    return (*frozen, project_root() / "VERSION")
+
+
 def app_version() -> str:
-    version_file = project_root() / "VERSION"
-    try:
-        version_text = version_file.read_text(encoding="utf-8").strip()
-    except OSError:
-        version_text = ""
-    return version_text or DEFAULT_APP_VERSION
+    for version_file in _version_file_candidates():
+        try:
+            version_text = version_file.read_text(encoding="utf-8").strip()
+        except OSError:
+            continue
+        if version_text:
+            return version_text
+    return DEFAULT_APP_VERSION
 
 
 def app_build_label() -> str:
