@@ -688,10 +688,11 @@ class CalendarioEncargadoDialog(QDialog):
         ly.setSpacing(12)
         self._que_titulo = self._titulo("")
         ly.addWidget(self._que_titulo)
+        # Solo dos opciones: "sí trabajó" confundía a León — si algo sale
+        # mal, para eso está "Me equivoqué"; lo fino lo ajusta Daniel.
         for texto, tipo in (
             ("🚫  Faltó", FALTA),
             ("🛌  Le doy descanso", DESCANSO),
-            ("💪  Sí trabajó (era su descanso)", TRABAJO),
         ):
             btn = QPushButton(texto)
             btn.setStyleSheet(self._BTN)
