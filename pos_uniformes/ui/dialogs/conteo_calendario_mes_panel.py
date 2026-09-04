@@ -120,6 +120,11 @@ class ConteoCalendarioMesPanel(QWidget):
         self._recordatorio_btn.setObjectName("mesNavBtn")
         self._recordatorio_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._recordatorio_btn.clicked.connect(self._abrir_recordatorios)
+        # Recordatorios RETIRADOS del calendario (pedido de Daniel 2026-09-04):
+        # los descansos/pagos ya llegan solos desde el calendario de la
+        # Libreta y esto quedaba redundante. Para revivirlos: borrar esta
+        # línea y el early-return de refresh()/_agregar_recordatorio_en.
+        self._recordatorio_btn.setVisible(False)
         nav.addWidget(prev_btn)
         nav.addStretch()
         nav.addWidget(self._mes_label)
@@ -179,13 +184,9 @@ class ConteoCalendarioMesPanel(QWidget):
             session = self._session_factory()
             try:
                 self._estados = obtener_calendario_conteo(session)
-                from pos_uniformes.services.recordatorio_service import (
-                    completados_todos,
-                    listar_recordatorios,
-                )
-
-                self._recordatorios = listar_recordatorios(session)
-                self._completados = completados_todos(session)
+                # Recordatorios retirados de este calendario: no se cargan.
+                self._recordatorios = []
+                self._completados = set()
                 # Sincronía con el calendario de la Libreta: descansos y
                 # pagos de las empleadas se pintan aquí solos (faltas no —
                 # esas son del calendario privado).
@@ -218,7 +219,7 @@ class ConteoCalendarioMesPanel(QWidget):
 
     def _agregar_recordatorio_en(self, fecha: date) -> None:
         """Clic en un día del calendario: abre alta con esa fecha precargada."""
-        self._abrir_recordatorios(fecha_inicial=fecha)
+        return  # recordatorios retirados: el clic en el día ya no abre nada
 
     def _render(self) -> None:
         self._mes_label.setText(f"{_MESES[self._mes]} {self._anio}")
@@ -274,7 +275,7 @@ class ConteoCalendarioMesPanel(QWidget):
     def _celda(self, dia: int, escuelas: list, recordatorios: list | None = None, col: int = 0) -> QWidget:
         recordatorios = recordatorios or []
         celda = _DiaCelda()
-        celda.setCursor(Qt.CursorShape.PointingHandCursor)
+        # Sin recordatorios, el día ya no es clicable: cursor normal.
         fecha_celda = date(self._anio, self._mes, dia)
         celda.clicked.connect(lambda f=fecha_celda: self._agregar_recordatorio_en(f))
         es_hoy = fecha_celda == self._hoy
