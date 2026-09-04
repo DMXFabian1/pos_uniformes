@@ -1245,6 +1245,11 @@ class QuoteSatelliteWindow(QMainWindow):
                 lambda _checked=False, k=periodo_key: self._set_libreta_periodo(k)
             )
             header.addWidget(button)
+        # Menos métricas (pedido de Daniel 2026-09-04): quedan Hoy y Ciclo.
+        # Semana/Sem. pasada eran de cuando el pago iba por semana calendario;
+        # el ciclo las sustituye. Código vivo: setVisible(True) las revive.
+        self.libreta_semana_button.setVisible(False)
+        self.libreta_sem_pasada_button.setVisible(False)
         self.libreta_hoy_button.setChecked(True)
         self.libreta_refresh_button = QPushButton("Actualizar")
         self.libreta_refresh_button.setAutoDefault(False)
