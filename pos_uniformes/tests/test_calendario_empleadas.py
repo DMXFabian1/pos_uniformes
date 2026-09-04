@@ -127,9 +127,20 @@ class ResumenTests(unittest.TestCase):
     def test_resumen_con_todo(self) -> None:
         h = _horario()
         texto = resumen_empleada(h, date(2026, 9, 9))
-        self.assertIn("jueves", texto)
+        # Su jueves fijo más cercano es el 10 — con fecha concreta.
+        self.assertIn("Tu siguiente descanso: jueves 10/Sep", texto)
         self.assertIn("Próximo pago", texto)
         self.assertIn("faltan 4 días", texto)  # del mié 9 al dom 13
+
+    def test_resumen_respeta_descanso_movido(self) -> None:
+        from pos_uniformes.services.calendario_empleadas_service import proximo_descanso
+
+        h = _horario()
+        # Movió su jueves 10 al sábado 12 (intercambio o solicitud).
+        h.eventos[date(2026, 9, 10)] = TRABAJO
+        h.eventos[date(2026, 9, 12)] = DESCANSO
+        self.assertEqual(proximo_descanso(h, date(2026, 9, 9)), date(2026, 9, 12))
+        self.assertIn("sábado 12/Sep", resumen_empleada(h, date(2026, 9, 9)))
 
     def test_resumen_hoy_toca_pago(self) -> None:
         h = _horario()

@@ -105,11 +105,25 @@ def faltas_en_rango(horario: HorarioEmpleada, desde: date, hasta: date) -> int:
     )
 
 
+def proximo_descanso(horario: HorarioEmpleada, hoy: date) -> date | None:
+    """El siguiente día de descanso a partir de mañana (fijo o movido)."""
+    dia = hoy + timedelta(days=1)
+    for _ in range(28):
+        if estado_del_dia(horario, dia) == DESCANSO:
+            return dia
+        dia += timedelta(days=1)
+    return None
+
+
 def resumen_empleada(horario: HorarioEmpleada, hoy: date) -> str:
-    """Línea humana para el encabezado del calendario."""
+    """Línea humana para el encabezado del calendario y el banner."""
     partes: list[str] = []
-    if horario.descanso_weekday is not None:
-        partes.append(f"Descansas los {WEEKDAY_NAMES[horario.descanso_weekday]}")
+    descanso = proximo_descanso(horario, hoy)
+    if descanso is not None:
+        partes.append(
+            "Tu siguiente descanso: "
+            f"{WEEKDAY_NAMES[descanso.weekday()]} {descanso.strftime('%d/%b')}"
+        )
     proximo = fecha_proximo_pago(horario, hoy)
     if proximo is not None:
         faltan = dias_para_pago(horario, hoy) or 0
