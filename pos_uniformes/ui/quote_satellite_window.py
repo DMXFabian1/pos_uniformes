@@ -1155,32 +1155,58 @@ class QuoteSatelliteWindow(QMainWindow):
         layout.addWidget(titulo)
 
         # ── Gate: escanear gafete ────────────────────────────────────────
+        # Réplica exacta del login de Venta Rápida (mismo _GATE_STYLE
+        # importado de quick_sale_view: una sola fuente del look).
+        from pos_uniformes.ui.views.quick_sale_view import _GATE_STYLE
+
         self.libreta_gate = QWidget()
-        gate_ly = QVBoxLayout()
-        gate_ly.setContentsMargins(40, 60, 40, 60)
-        gate_ly.setSpacing(12)
+        self.libreta_gate.setObjectName("gateRoot")
+        self.libreta_gate.setStyleSheet(_GATE_STYLE)
+        gate_outer = QVBoxLayout()
+        gate_outer.setContentsMargins(40, 40, 40, 40)
+
+        gate_card = QFrame()
+        gate_card.setObjectName("gateCard")
+        gate_cl = QVBoxLayout()
+        gate_cl.setContentsMargins(48, 40, 48, 40)
+        gate_cl.setSpacing(12)
+        gate_cl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
         gate_icon = QLabel("📒")
+        gate_icon.setObjectName("gateEmoji")
         gate_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        gate_icon.setStyleSheet("font-size: 52px;")
-        gate_ly.addWidget(gate_icon)
+        gate_cl.addWidget(gate_icon)
+
+        gate_title = QLabel("Libreta")
+        gate_title.setObjectName("gateTitle")
+        gate_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        gate_cl.addWidget(gate_title)
+
         gate_hint = QLabel("Escanea tu gafete para abrir tu libreta")
+        gate_hint.setObjectName("gateHint")
         gate_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        gate_hint.setStyleSheet("font-size: 17px; font-weight: 700;")
-        gate_ly.addWidget(gate_hint)
-        gate_sub = QLabel("Aquí ves tus ventas, piezas y comisiones — sin apuntar nada.")
-        gate_sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        gate_sub.setStyleSheet("font-size: 13px; color: #8a8177;")
-        gate_ly.addWidget(gate_sub)
+        gate_cl.addWidget(gate_hint)
+
+        gate_cl.addSpacing(8)
+
         self.libreta_gate_input = QLineEdit()
+        self.libreta_gate_input.setObjectName("gateInput")
         self.libreta_gate_input.setPlaceholderText("Gafete...")
+        self.libreta_gate_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.libreta_gate_input.returnPressed.connect(self._on_libreta_gate_scan)
-        gate_ly.addWidget(self.libreta_gate_input)
+        gate_cl.addWidget(self.libreta_gate_input, 0, Qt.AlignmentFlag.AlignCenter)
+
         self.libreta_gate_error = QLabel("")
-        self.libreta_gate_error.setStyleSheet("font-size: 12px; color: #c0392b;")
+        self.libreta_gate_error.setObjectName("gateError")
+        self.libreta_gate_error.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.libreta_gate_error.setVisible(False)
-        gate_ly.addWidget(self.libreta_gate_error)
-        gate_ly.addStretch()
-        self.libreta_gate.setLayout(gate_ly)
+        gate_cl.addWidget(self.libreta_gate_error)
+
+        gate_card.setLayout(gate_cl)
+        gate_outer.addStretch()
+        gate_outer.addWidget(gate_card, 0, Qt.AlignmentFlag.AlignHCenter)
+        gate_outer.addStretch()
+        self.libreta_gate.setLayout(gate_outer)
         layout.addWidget(self.libreta_gate)
 
         # ── Vista (empleada o dueño) ─────────────────────────────────────
