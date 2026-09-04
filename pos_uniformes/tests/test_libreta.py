@@ -463,7 +463,7 @@ class LibretaListaAmigableTests(unittest.TestCase):
 
         fake = SimpleNamespace(
             libreta_emp_list=QListWidget(),
-            _libreta_week=False,
+            _libreta_periodo="hoy",
         )
         ahora = datetime(2026, 9, 2, 10, 32, tzinfo=timezone.utc).astimezone()
         rows = [
@@ -591,6 +591,74 @@ class BorrarRegistroLibretaTests(unittest.TestCase):
         eliminar.assert_not_called()
 
 
+class LibretaPeriodosYFiltrosTests(unittest.TestCase):
+    """Semana pasada, rango por calendario y filtros de la vista del dueño."""
+
+    def test_ventana_semana_anterior_es_lunes_a_domingo_previos(self) -> None:
+        from pos_uniformes.services.libreta_service import ventana_semana_anterior
+
+        # 2026-09-02 es miércoles → semana pasada: lun 24/ago a dom 30/ago
+        inicio, fin = ventana_semana_anterior(date(2026, 9, 2))
+        self.assertEqual(inicio.date(), date(2026, 8, 24))
+        self.assertEqual(fin.date(), date(2026, 8, 30))
+        self.assertEqual(inicio.weekday(), 0)
+
+    def test_ventana_rango_corrige_fechas_volteadas(self) -> None:
+        from pos_uniformes.services.libreta_service import ventana_rango
+
+        inicio, fin = ventana_rango(date(2026, 9, 10), date(2026, 9, 1))
+        self.assertEqual(inicio.date(), date(2026, 9, 1))
+        self.assertEqual(fin.date(), date(2026, 9, 10))
+
+    def test_filtrar_operaciones(self) -> None:
+        from pos_uniformes.services.libreta_service import filtrar_operaciones
+
+        rows = [
+            SimpleNamespace(tipo="venta", employee_code="VEND-2", pago_tarjeta=True),
+            SimpleNamespace(tipo="venta", employee_code="VEND-3", pago_tarjeta=False),
+            SimpleNamespace(tipo="abono", employee_code="VEND-2", pago_tarjeta=False),
+        ]
+        self.assertEqual(len(filtrar_operaciones(rows, tipo="venta")), 2)
+        self.assertEqual(len(filtrar_operaciones(rows, employee_code="vend-2")), 2)
+        self.assertEqual(len(filtrar_operaciones(rows, solo_tarjeta=True)), 1)
+        combinado = filtrar_operaciones(rows, tipo="venta", employee_code="VEND-2")
+        self.assertEqual(len(combinado), 1)
+
+    def test_lineas_detalle_respeta_privacidad(self) -> None:
+        from pos_uniformes.services.libreta_service import lineas_detalle
+
+        detalle = [
+            {"nombre": "Pants", "talla": "6", "cantidad": 2,
+             "precio": "515.00", "subtotal": "1030.00"},
+        ]
+        con = lineas_detalle(detalle, con_precios=True)
+        sin = lineas_detalle(detalle, con_precios=False)
+        self.assertEqual(con[0], ["Pants", "6", "2", "$515.00", "$1,030.00"])
+        self.assertEqual(sin[0], ["Pants", "6", "2"])  # ni un peso para empleadas
+
+    def test_set_periodo_y_toggle_de_empleada(self) -> None:
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        fake = SimpleNamespace(
+            _libreta_periodo="hoy",
+            _libreta_emp_filtro=None,
+            _libreta_ranking_codes=["VEND-2", "VEND-3"],
+            libreta_ranking_list=MagicMock(),
+            _sync_libreta_filtros=MagicMock(),
+            _refresh_libreta_view=MagicMock(),
+        )
+        QuoteSatelliteWindow._set_libreta_periodo(fake, "semana_pasada")
+        self.assertEqual(fake._libreta_periodo, "semana_pasada")
+        fake._refresh_libreta_view.assert_called_once()
+
+        # Clic en una empleada filtra; clic en la misma quita el filtro.
+        fake.libreta_ranking_list.row.return_value = 0
+        QuoteSatelliteWindow._on_libreta_ranking_click(fake, MagicMock())
+        self.assertEqual(fake._libreta_emp_filtro, "VEND-2")
+        QuoteSatelliteWindow._on_libreta_ranking_click(fake, MagicMock())
+        self.assertIsNone(fake._libreta_emp_filtro)
+
+
 class LibretaAutoLogoutTests(unittest.TestCase):
     """Salir de la página Libreta cierra la sesión (no queda abierta la
     vista del dueño con dinero en el kiosko)."""
@@ -673,8 +741,7 @@ class LibretaPagePrivacyTests(unittest.TestCase):
             libreta_emp_list=MagicMock(),
             libreta_table=MagicMock(),
             libreta_titular_label=MagicMock(),
-            libreta_hoy_button=MagicMock(),
-            libreta_semana_button=MagicMock(),
+            _sync_libreta_filtros=MagicMock(),
             _refresh_libreta_view=MagicMock(),
         )
         fake.libreta_gate_input.text.return_value = code

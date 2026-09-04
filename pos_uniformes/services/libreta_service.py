@@ -34,6 +34,58 @@ def ventana_semana(reference: date | None = None) -> tuple[datetime, datetime]:
     return inicio, fin
 
 
+def ventana_semana_anterior(reference: date | None = None) -> tuple[datetime, datetime]:
+    """La semana calendario ANTERIOR completa (para verificar comisiones el
+    día de pago, cuando la semana actual ya se reinició)."""
+    reference = reference or date.today()
+    return ventana_semana(reference - timedelta(days=7))
+
+
+def ventana_rango(desde: date, hasta: date) -> tuple[datetime, datetime]:
+    """Rango libre de fechas (inclusive); si vienen volteadas, se corrigen."""
+    if hasta < desde:
+        desde, hasta = hasta, desde
+    inicio, _ = local_day_window(desde)
+    _, fin = local_day_window(hasta)
+    return inicio, fin
+
+
+def filtrar_operaciones(
+    rows: list,
+    *,
+    tipo: str | None = None,
+    employee_code: str | None = None,
+    solo_tarjeta: bool = False,
+) -> list:
+    """Filtros en memoria para la vista del dueño (tipo, empleada, tarjeta)."""
+    result = list(rows)
+    if tipo:
+        result = [r for r in result if str(r.tipo) == tipo]
+    if employee_code:
+        code = str(employee_code).upper()
+        result = [r for r in result if str(r.employee_code).upper() == code]
+    if solo_tarjeta:
+        result = [r for r in result if bool(getattr(r, "pago_tarjeta", False))]
+    return result
+
+
+def lineas_detalle(detalle: list[dict], *, con_precios: bool) -> list[list[str]]:
+    """Filas [producto, talla, cantidad(, precio, subtotal)] para el diálogo
+    de detalle de una operación. Sin precios para la vista de empleada."""
+    filas: list[list[str]] = []
+    for line in detalle or []:
+        nombre = str(line.get("nombre", "")).strip() or str(line.get("sku", ""))
+        talla = str(line.get("talla", "")).strip() or "-"
+        cantidad = str(int(line.get("cantidad", 0) or 0))
+        if con_precios:
+            precio = Decimal(str(line.get("precio", 0) or 0)).quantize(Decimal("0.01"))
+            subtotal = Decimal(str(line.get("subtotal", 0) or 0)).quantize(Decimal("0.01"))
+            filas.append([nombre, talla, cantidad, f"${precio:,.2f}", f"${subtotal:,.2f}"])
+        else:
+            filas.append([nombre, talla, cantidad])
+    return filas
+
+
 # Comisión de la terminal bancaria (pagos con tarjeta): única fuente del
 # porcentaje para venta rápida, abonos y la Libreta.
 TERMINAL_COMMISSION_PERCENT = Decimal("4.5")
