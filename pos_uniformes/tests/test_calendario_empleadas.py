@@ -286,5 +286,129 @@ class ChipsCalendarioCompartidoTests(unittest.TestCase):
         self.assertNotIn(date(2026, 9, 8), chips)
 
 
+class AutoservicioDescansosTests(unittest.TestCase):
+    """Las reglas negocian por Daniel: cupo 1/día, 7 días de anticipación,
+    intercambios directos entre compañeras."""
+
+    def _horarios(self) -> dict:
+        ana = _horario(employee_code="VEND-2", descanso_weekday=_JUEVES)
+        bere = _horario(employee_code="VEND-3", descanso_weekday=_LUNES)
+        return {"VEND-2": ana, "VEND-3": bere}
+
+    def test_sin_anticipacion_se_rechaza(self) -> None:
+        from pos_uniformes.services.calendario_empleadas_service import (
+            validar_solicitud_descanso,
+        )
+
+        ok, motivo = validar_solicitud_descanso(
+            self._horarios(), "VEND-2", date(2026, 9, 8), hoy=date(2026, 9, 4)
+        )
+        self.assertFalse(ok)
+        self.assertIn("7 días", motivo)
+
+    def test_cupo_ocupado_se_rechaza_y_sugiere(self) -> None:
+        from pos_uniformes.services.calendario_empleadas_service import (
+            dias_libres_cercanos,
+            validar_solicitud_descanso,
+        )
+
+        horarios = self._horarios()
+        # Pide el lunes 14... pero los lunes descansa VEND-3.
+        ok, motivo = validar_solicitud_descanso(
+            horarios, "VEND-2", date(2026, 9, 14), hoy=date(2026, 9, 4)
+        )
+        self.assertFalse(ok)
+        self.assertIn("VEND-3", motivo)
+        # Y hay sugerencias que sí cumplen todas las reglas.
+        libres = dias_libres_cercanos(horarios, "VEND-2", date(2026, 9, 4))
+        self.assertTrue(libres)
+        for f in libres:
+            self.assertTrue(
+                validar_solicitud_descanso(horarios, "VEND-2", f, date(2026, 9, 4))[0]
+            )
+
+    def test_pedir_mueve_el_descanso_de_su_semana(self) -> None:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from pos_uniformes.database.models import EmpleadaEvento, EmpleadaHorario
+        from pos_uniformes.services.calendario_empleadas_service import (
+            aplicar_solicitud_descanso,
+            cargar_horario,
+        )
+
+        engine = create_engine("sqlite://")
+        for t in (EmpleadaHorario, EmpleadaEvento):
+            t.__table__.create(engine)
+        session = sessionmaker(bind=engine)()
+
+        horarios = self._horarios()
+        # Pide el martes 15 (semana lun 14 - dom 20; su jueves fijo es el 17).
+        ok, msg = aplicar_solicitud_descanso(
+            session, horarios, "VEND-2", date(2026, 9, 15), hoy=date(2026, 9, 4)
+        )
+        self.assertTrue(ok, msg)
+        h = cargar_horario(session, "VEND-2")
+        self.assertEqual(h.eventos[date(2026, 9, 15)], DESCANSO)
+        self.assertEqual(h.eventos[date(2026, 9, 17)], TRABAJO)  # su jueves se movió
+        session.close()
+
+    def test_intercambio_valida_y_aplica(self) -> None:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from pos_uniformes.database.models import EmpleadaEvento, EmpleadaHorario
+        from pos_uniformes.services.calendario_empleadas_service import (
+            aplicar_intercambio,
+            cargar_horario,
+            validar_intercambio,
+        )
+
+        engine = create_engine("sqlite://")
+        for t in (EmpleadaHorario, EmpleadaEvento):
+            t.__table__.create(engine)
+        session = sessionmaker(bind=engine)()
+
+        horarios = self._horarios()
+        hoy = date(2026, 9, 4)
+        jueves_ana = date(2026, 9, 17)
+        lunes_bere = date(2026, 9, 14)
+
+        # Un día que no es descanso de Ana: rechazado.
+        ok, motivo = validar_intercambio(
+            horarios, "VEND-2", date(2026, 9, 16), "VEND-3", lunes_bere, hoy
+        )
+        self.assertFalse(ok)
+
+        # Jueves de Ana por lunes de Bere: hecho, sin Daniel.
+        ok, msg = aplicar_intercambio(
+            session, horarios, "VEND-2", jueves_ana, "VEND-3", lunes_bere, hoy
+        )
+        self.assertTrue(ok, msg)
+        ana = cargar_horario(session, "VEND-2")
+        bere = cargar_horario(session, "VEND-3")
+        self.assertEqual(ana.eventos[jueves_ana], TRABAJO)
+        self.assertEqual(ana.eventos[lunes_bere], DESCANSO)
+        self.assertEqual(bere.eventos[lunes_bere], TRABAJO)
+        self.assertEqual(bere.eventos[jueves_ana], DESCANSO)
+        session.close()
+
+    def test_intercambio_sin_anticipacion_se_rechaza(self) -> None:
+        from pos_uniformes.services.calendario_empleadas_service import (
+            validar_intercambio,
+        )
+
+        ok, motivo = validar_intercambio(
+            self._horarios(),
+            "VEND-2",
+            date(2026, 9, 10),  # su jueves, pero a 3 días
+            "VEND-3",
+            date(2026, 9, 14),
+            hoy=date(2026, 9, 7),
+        )
+        self.assertFalse(ok)
+        self.assertIn("7 días", motivo)
+
+
 if __name__ == "__main__":
     unittest.main()

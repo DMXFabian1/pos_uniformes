@@ -277,3 +277,164 @@ def chips_calendario_mes(session, year: int, month: int, hoy: date) -> dict[date
         if proximo is not None and proximo not in horario.eventos:
             _agregar(proximo, PAGO, code)
     return resultado
+
+
+# ─── Autoservicio de descansos (reglas de Daniel, sin negociación) ───────
+# 1) Cupo: máximo 1 empleada descansando por día.
+# 2) Anticipación: descansos y cambios se piden con 7 días.
+# 3) Intercambios: si ambas aceptan con gafete, quedan hechos solos.
+
+ANTICIPACION_DIAS = 7
+CUPO_DESCANSOS_POR_DIA = 1
+
+
+def _semana_de(fecha: date) -> tuple[date, date]:
+    lunes = fecha - timedelta(days=fecha.weekday())
+    return lunes, lunes + timedelta(days=6)
+
+
+def descanso_en_semana(horario: HorarioEmpleada, fecha: date) -> date | None:
+    """El día que descansa la empleada en la semana de `fecha` (o None)."""
+    lunes, domingo = _semana_de(fecha)
+    dia = lunes
+    while dia <= domingo:
+        if estado_del_dia(horario, dia) == DESCANSO:
+            return dia
+        dia += timedelta(days=1)
+    return None
+
+
+def quienes_descansan(horarios: dict[str, HorarioEmpleada], fecha: date) -> list[str]:
+    return [
+        code
+        for code, h in horarios.items()
+        if estado_del_dia(h, fecha) == DESCANSO
+    ]
+
+
+def validar_solicitud_descanso(
+    horarios: dict[str, HorarioEmpleada], code: str, fecha: date, hoy: date
+) -> tuple[bool, str]:
+    """(ok, motivo). Reglas duras — si pasan, se aprueba sin preguntar."""
+    code = str(code).strip().upper()
+    if (fecha - hoy).days < ANTICIPACION_DIAS:
+        return False, (
+            f"Los descansos se piden con {ANTICIPACION_DIAS} días de anticipación."
+        )
+    propio = horarios.get(code)
+    if propio is not None and estado_del_dia(propio, fecha) == DESCANSO:
+        return False, "Ese día ya es tu descanso."
+    ocupantes = [c for c in quienes_descansan(horarios, fecha) if c != code]
+    if len(ocupantes) >= CUPO_DESCANSOS_POR_DIA:
+        return False, f"Ese día ya descansa {', '.join(ocupantes)}."
+    return True, ""
+
+
+def dias_libres_cercanos(
+    horarios: dict[str, HorarioEmpleada],
+    code: str,
+    hoy: date,
+    *,
+    cuantos: int = 3,
+) -> list[date]:
+    """Días que SÍ se pueden pedir, para sugerir en vez de negociar."""
+    libres: list[date] = []
+    dia = hoy + timedelta(days=ANTICIPACION_DIAS)
+    for _ in range(21):
+        ok, _motivo = validar_solicitud_descanso(horarios, code, dia, hoy)
+        if ok:
+            libres.append(dia)
+            if len(libres) >= cuantos:
+                break
+        dia += timedelta(days=1)
+    return libres
+
+
+def aplicar_solicitud_descanso(
+    session,
+    horarios: dict[str, HorarioEmpleada],
+    code: str,
+    fecha: date,
+    hoy: date,
+) -> tuple[bool, str]:
+    """Valida y aplica: el descanso de esa semana se MUEVE al día pedido
+    (cuota de 1 por semana se cumple sola); si esa semana no tenía, se
+    otorga. Devuelve (ok, mensaje para la empleada)."""
+    code = str(code).strip().upper()
+    ok, motivo = validar_solicitud_descanso(horarios, code, fecha, hoy)
+    if not ok:
+        return False, motivo
+    propio = horarios.get(code) or HorarioEmpleada(employee_code=code)
+    viejo = descanso_en_semana(propio, fecha)
+    if viejo is not None and viejo != fecha:
+        marcar_dia(session, code, viejo, TRABAJO, nota="movió su descanso")
+    marcar_dia(session, code, fecha, DESCANSO, nota="pedido desde la Libreta")
+    if viejo is not None and viejo != fecha:
+        return True, (
+            f"Listo: descansas el {fecha.strftime('%d/%b')} y trabajas el "
+            f"{viejo.strftime('%d/%b')} (tu descanso de esa semana se movió)."
+        )
+    return True, f"Listo: descansas el {fecha.strftime('%d/%b')}."
+
+
+def validar_intercambio(
+    horarios: dict[str, HorarioEmpleada],
+    code_a: str,
+    fecha_a: date,
+    code_b: str,
+    fecha_b: date,
+    hoy: date,
+) -> tuple[bool, str]:
+    """A cede su descanso de fecha_a y toma el de B en fecha_b (y viceversa)."""
+    code_a = str(code_a).strip().upper()
+    code_b = str(code_b).strip().upper()
+    if code_a == code_b:
+        return False, "El intercambio es entre dos compañeras distintas."
+    if fecha_a == fecha_b:
+        return False, "Son el mismo día: no hay nada que intercambiar."
+    for fecha in (fecha_a, fecha_b):
+        if (fecha - hoy).days < ANTICIPACION_DIAS:
+            return False, (
+                f"Los cambios se piden con {ANTICIPACION_DIAS} días de anticipación."
+            )
+    ha, hb = horarios.get(code_a), horarios.get(code_b)
+    if ha is None or estado_del_dia(ha, fecha_a) != DESCANSO:
+        return False, f"El {fecha_a.strftime('%d/%b')} no es descanso de {code_a}."
+    if hb is None or estado_del_dia(hb, fecha_b) != DESCANSO:
+        return False, f"El {fecha_b.strftime('%d/%b')} no es descanso de {code_b}."
+    return True, ""
+
+
+def aplicar_intercambio(
+    session,
+    horarios: dict[str, HorarioEmpleada],
+    code_a: str,
+    fecha_a: date,
+    code_b: str,
+    fecha_b: date,
+    hoy: date,
+) -> tuple[bool, str]:
+    """Intercambio directo (suma cero: el cupo por día no cambia)."""
+    ok, motivo = validar_intercambio(horarios, code_a, fecha_a, code_b, fecha_b, hoy)
+    if not ok:
+        return False, motivo
+    code_a = str(code_a).strip().upper()
+    code_b = str(code_b).strip().upper()
+    marcar_dia(session, code_a, fecha_a, TRABAJO, nota=f"intercambio con {code_b}")
+    marcar_dia(session, code_a, fecha_b, DESCANSO, nota=f"intercambio con {code_b}")
+    marcar_dia(session, code_b, fecha_b, TRABAJO, nota=f"intercambio con {code_a}")
+    marcar_dia(session, code_b, fecha_a, DESCANSO, nota=f"intercambio con {code_a}")
+    return True, (
+        f"Hecho: {code_a} descansa el {fecha_b.strftime('%d/%b')} y "
+        f"{code_b} el {fecha_a.strftime('%d/%b')}."
+    )
+
+
+def cargar_horarios_todos(session) -> dict[str, HorarioEmpleada]:
+    """Todos los horarios (para validar cupo e intercambios)."""
+    from pos_uniformes.database.models import EmpleadaHorario
+
+    return {
+        fila.employee_code: cargar_horario(session, fila.employee_code)
+        for fila in session.query(EmpleadaHorario).all()
+    }

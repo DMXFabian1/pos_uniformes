@@ -30,13 +30,18 @@ from PyQt6.QtWidgets import (
 )
 
 from pos_uniformes.services.calendario_empleadas_service import (
+    ANTICIPACION_DIAS,
     DESCANSO,
     FALTA,
     PAGO,
     TRABAJO,
     WEEKDAY_NAMES,
     HorarioEmpleada,
+    aplicar_intercambio,
+    aplicar_solicitud_descanso,
+    cargar_horarios_todos,
     comisiones_desde_ultimo_pago,
+    dias_libres_cercanos,
     estado_del_dia,
     guardar_horario,
     marcar_dia,
@@ -181,6 +186,28 @@ class CalendarioEmpleadasDialog(QDialog):
         leyenda.setStyleSheet("font-size: 12px;")
         ly.addWidget(leyenda)
 
+        # ── Autoservicio de la empleada: pedir/cambiar SIN pasar por Daniel.
+        # Las reglas (cupo 1 por día, 7 días de anticipación) deciden solas.
+        if not is_owner:
+            autoservicio = QHBoxLayout()
+            autoservicio.setSpacing(10)
+            self.btn_pedir = QPushButton("🙋 Pedir descanso este día")
+            self.btn_pedir.setStyleSheet(
+                "background: #a84f2d; color: #ffffff; font-weight: 700;"
+                "border-radius: 12px; min-height: 48px; font-size: 15px;"
+            )
+            self.btn_pedir.clicked.connect(self._pedir_descanso)
+            autoservicio.addWidget(self.btn_pedir, 1)
+            self.btn_cambiar = QPushButton("🔄 Cambiar con compañera")
+            self.btn_cambiar.setStyleSheet(
+                "background: #f8f2e9; color: #73341c; font-weight: 700;"
+                "border: 1px solid #ddd0c0;"
+                "border-radius: 12px; min-height: 48px; font-size: 15px;"
+            )
+            self.btn_cambiar.clicked.connect(self._abrir_intercambio)
+            autoservicio.addWidget(self.btn_cambiar, 1)
+            ly.addLayout(autoservicio)
+
         # ── Acciones del dueño sobre el día seleccionado ──
         if is_owner:
             acciones = QHBoxLayout()
@@ -311,6 +338,8 @@ class CalendarioEmpleadasDialog(QDialog):
 
     def _habilitar_acciones(self, on: bool) -> None:
         if not self._is_owner:
+            self.btn_pedir.setEnabled(on)
+            self.btn_cambiar.setEnabled(on)
             return
         for btn in (
             self.btn_falta,
@@ -368,6 +397,173 @@ class CalendarioEmpleadasDialog(QDialog):
             return
         if self._con_sesion(lambda s: registrar_pago(s, code, fecha)):
             self._recargar()
+
+    # ── Autoservicio (empleada) ──────────────────────────────────────────
+
+    def _pedir_descanso(self) -> None:
+        """Aprueba o rechaza SOLO, con las reglas — sin pasar por Daniel."""
+        fecha = self._fecha_seleccionada()
+        hoy = date.today()
+        try:
+            from pos_uniformes.database.connection import get_session
+
+            with get_session() as session:
+                horarios = cargar_horarios_todos(session)
+                ok, msg = aplicar_solicitud_descanso(
+                    session, horarios, self._code, fecha, hoy
+                )
+                if not ok:
+                    libres = dias_libres_cercanos(horarios, self._code, hoy)
+                    if libres:
+                        msg += "\n\nDías que SÍ puedes pedir: " + ", ".join(
+                            f.strftime("%a %d/%b") for f in libres
+                        )
+        except Exception:  # noqa: BLE001
+            logger.exception("Calendario: fallo la solicitud de descanso")
+            QMessageBox.warning(self, "Sin conexión", "No se pudo pedir. Intenta de nuevo.")
+            return
+        if ok:
+            QMessageBox.information(self, "Descanso aprobado ✅", msg)
+            self._recargar()
+        else:
+            QMessageBox.warning(self, "No se pudo", msg)
+
+    def _proximos_descansos(self, horario: HorarioEmpleada, hoy: date) -> list[date]:
+        """Descansos futuros elegibles para intercambio (respetando la
+        anticipación), en las próximas 5 semanas."""
+        from datetime import timedelta
+
+        dias = []
+        dia = hoy + timedelta(days=ANTICIPACION_DIAS)
+        for _ in range(35):
+            if estado_del_dia(horario, dia) == DESCANSO:
+                dias.append(dia)
+            dia += timedelta(days=1)
+        return dias
+
+    def _abrir_intercambio(self) -> None:
+        """A elige compañera y días; B acepta pasando su gafete. Sin Daniel."""
+        try:
+            from pos_uniformes.database.connection import get_session
+            from pos_uniformes.database.models import Empleada
+
+            with get_session() as session:
+                horarios = cargar_horarios_todos(session)
+                nombres = {
+                    str(e.codigo).upper(): (e.nombre_completo or e.codigo).split()[0]
+                    for e in session.query(Empleada).filter(Empleada.activo.is_(True))
+                }
+        except Exception:  # noqa: BLE001
+            logger.exception("Calendario: no se pudo cargar para intercambio")
+            QMessageBox.warning(self, "Sin conexión", "No se pudo abrir. Intenta de nuevo.")
+            return
+
+        hoy = date.today()
+        mios = self._proximos_descansos(
+            horarios.get(self._code, HorarioEmpleada(employee_code=self._code)), hoy
+        )
+        if not mios:
+            QMessageBox.information(
+                self,
+                "Sin descansos que cambiar",
+                "No tienes descansos programados (con anticipación) para intercambiar.",
+            )
+            return
+
+        from PyQt6.QtWidgets import QLineEdit
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Cambiar descanso con compañera")
+        dlg.setStyleSheet(self.styleSheet())
+        dlg.resize(460, 360)
+        ly = QVBoxLayout()
+        ly.setContentsMargins(18, 16, 18, 16)
+        ly.setSpacing(10)
+
+        ly.addWidget(QLabel("Doy mi descanso del:"))
+        combo_mio = QComboBox()
+        for f in mios:
+            combo_mio.addItem(f.strftime("%A %d/%b"), f)
+        ly.addWidget(combo_mio)
+
+        ly.addWidget(QLabel("Compañera:"))
+        combo_b = QComboBox()
+        ly.addWidget(combo_b)
+        ly.addWidget(QLabel("Y tomo su descanso del:"))
+        combo_suyo = QComboBox()
+        ly.addWidget(combo_suyo)
+
+        for code in sorted(horarios):
+            if code != self._code and code != "VEND-1":
+                combo_b.addItem(f"{nombres.get(code, code)} ({code})", code)
+
+        def _rellenar_suyos() -> None:
+            combo_suyo.clear()
+            code_b = combo_b.currentData()
+            if not code_b:
+                return
+            for f in self._proximos_descansos(horarios[code_b], hoy):
+                combo_suyo.addItem(f.strftime("%A %d/%b"), f)
+
+        combo_b.currentIndexChanged.connect(lambda _i: _rellenar_suyos())
+        _rellenar_suyos()
+
+        ly.addWidget(QLabel("Para aceptar, tu compañera pasa SU gafete:"))
+        gafete = QLineEdit()
+        gafete.setEchoMode(QLineEdit.EchoMode.Password)
+        gafete.setPlaceholderText("Escanear gafete de la compañera...")
+        ly.addWidget(gafete)
+
+        estado = QLabel("")
+        estado.setStyleSheet("color: #a33b25; font-weight: 600;")
+        ly.addWidget(estado)
+
+        botones = QHBoxLayout()
+        btn_cancelar = QPushButton("Cancelar")
+        btn_cancelar.clicked.connect(dlg.reject)
+        botones.addWidget(btn_cancelar)
+        btn_ok = QPushButton("🔄 Confirmar cambio")
+        btn_ok.setStyleSheet(
+            "background: #a84f2d; color: #ffffff; font-weight: 700;"
+            "border-radius: 10px; min-height: 44px;"
+        )
+        botones.addWidget(btn_ok, 1)
+        ly.addLayout(botones)
+        dlg.setLayout(ly)
+
+        def _confirmar() -> None:
+            code_b = combo_b.currentData()
+            fecha_a, fecha_b = combo_mio.currentData(), combo_suyo.currentData()
+            escaneado = gafete.text().strip().upper()
+            gafete.clear()
+            if not code_b or fecha_a is None or fecha_b is None:
+                estado.setText("Elige compañera y los dos días.")
+                return
+            if escaneado != code_b:
+                estado.setText("Ese gafete no es de la compañera elegida.")
+                return
+            try:
+                from pos_uniformes.database.connection import get_session
+
+                with get_session() as session:
+                    horarios_frescos = cargar_horarios_todos(session)
+                    ok, msg = aplicar_intercambio(
+                        session, horarios_frescos, self._code, fecha_a, code_b, fecha_b, hoy
+                    )
+            except Exception:  # noqa: BLE001
+                logger.exception("Calendario: fallo el intercambio")
+                estado.setText("No se pudo guardar. Intenta de nuevo.")
+                return
+            if ok:
+                QMessageBox.information(dlg, "Cambio hecho ✅", msg)
+                dlg.accept()
+                self._recargar()
+            else:
+                estado.setText(msg)
+
+        btn_ok.clicked.connect(_confirmar)
+        gafete.returnPressed.connect(_confirmar)
+        dlg.exec()
 
     def _guardar_config(self) -> None:
         descanso = self.combo_descanso.currentData()
