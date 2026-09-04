@@ -124,15 +124,27 @@ class CalendarioEmpleadasDialog(QDialog):
         employee_code: str,
         employee_name: str,
         is_owner: bool,
+        is_encargado: bool = False,
     ):
         super().__init__(parent)
         self._code = str(employee_code).strip().upper()
         self._is_owner = bool(is_owner)
+        # Encargado (el papá): marca faltas/descansos de cualquier empleada,
+        # pero sin pagos, sin config de horarios y sin banner de comisiones.
+        self._es_encargado = bool(is_encargado) and not self._is_owner
+        self._gestiona = self._is_owner or self._es_encargado
         self._horario: HorarioEmpleada | None = None
         self._online = False
 
-        self.setWindowTitle("Calendario" if not is_owner else "Calendario de empleadas")
-        self.resize(560, 640 if is_owner else 540)
+        if self._is_owner:
+            titulo_ventana = "Calendario de empleadas"
+        elif self._es_encargado:
+            titulo_ventana = "Calendario — encargado"
+        else:
+            titulo_ventana = "Calendario"
+        self.setWindowTitle(titulo_ventana)
+        self.resize(560, 640 if self._gestiona else 540)
+        is_owner = self._is_owner  # el resto del constructor decide con esto
         self.setStyleSheet(
             "QDialog { background: #f4ede2; }"
             "QLabel { color: #2c2a27; background: transparent; }"
@@ -142,9 +154,9 @@ class CalendarioEmpleadasDialog(QDialog):
         ly.setContentsMargins(18, 16, 18, 16)
         ly.setSpacing(10)
 
-        # ── Selector de empleada (solo dueño) ──
+        # ── Selector de empleada (dueño y encargado) ──
         self._combo: QComboBox | None = None
-        if is_owner:
+        if self._gestiona:
             fila = QHBoxLayout()
             fila.addWidget(QLabel("Empleada:"))
             self._combo = QComboBox()
@@ -188,7 +200,7 @@ class CalendarioEmpleadasDialog(QDialog):
 
         # ── Autoservicio de la empleada: pedir/cambiar SIN pasar por Daniel.
         # Las reglas (cupo 1 por día, 7 días de anticipación) deciden solas.
-        if not is_owner:
+        if not self._gestiona:
             autoservicio = QHBoxLayout()
             autoservicio.setSpacing(10)
             self.btn_pedir = QPushButton("🙋 Pedir descanso este día")
@@ -208,8 +220,8 @@ class CalendarioEmpleadasDialog(QDialog):
             autoservicio.addWidget(self.btn_cambiar, 1)
             ly.addLayout(autoservicio)
 
-        # ── Acciones del dueño sobre el día seleccionado ──
-        if is_owner:
+        # ── Marcar días: dueño Y encargado ──
+        if self._gestiona:
             acciones = QHBoxLayout()
             acciones.setSpacing(8)
             self.btn_falta = QPushButton("Marcar falta")
@@ -227,6 +239,8 @@ class CalendarioEmpleadasDialog(QDialog):
             acciones.addWidget(self.btn_quitar)
             ly.addLayout(acciones)
 
+        # ── Pagos y configuración: SOLO dueño ──
+        if is_owner:
             fila_pago = QHBoxLayout()
             self.btn_pago = QPushButton("💵 Le pagué este día")
             self.btn_pago.setStyleSheet(
@@ -324,7 +338,8 @@ class CalendarioEmpleadasDialog(QDialog):
             self._habilitar_acciones(False)
             return
         self.cal.set_horario(self._horario)
-        self.banner.setVisible(True)
+        # El encargado gestiona días, no ve productividad ni pagos.
+        self.banner.setVisible(not self._es_encargado)
         self.banner.setText(f"⭐ Comisiones desde el último pago: {comisiones}")
         self.resumen.setText(resumen_empleada(self._horario, date.today()))
         self._habilitar_acciones(True)
@@ -337,19 +352,21 @@ class CalendarioEmpleadasDialog(QDialog):
             self.spin_ciclo.setValue(self._horario.ciclo_dias_pago)
 
     def _habilitar_acciones(self, on: bool) -> None:
-        if not self._is_owner:
-            self.btn_pedir.setEnabled(on)
-            self.btn_cambiar.setEnabled(on)
-            return
-        for btn in (
-            self.btn_falta,
-            self.btn_descanso,
-            self.btn_trabajo,
-            self.btn_quitar,
-            self.btn_pago,
-            self.btn_guardar,
+        # Cada modo (empleada/encargado/dueño) tiene su propio juego de
+        # botones; se habilitan los que existan.
+        for nombre in (
+            "btn_pedir",
+            "btn_cambiar",
+            "btn_falta",
+            "btn_descanso",
+            "btn_trabajo",
+            "btn_quitar",
+            "btn_pago",
+            "btn_guardar",
         ):
-            btn.setEnabled(on)
+            btn = getattr(self, nombre, None)
+            if btn is not None:
+                btn.setEnabled(on)
 
     # ── Acciones del dueño ───────────────────────────────────────────────
 

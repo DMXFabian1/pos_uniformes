@@ -410,5 +410,80 @@ class AutoservicioDescansosTests(unittest.TestCase):
         self.assertIn("7 días", motivo)
 
 
+class LimiteMensualTests(unittest.TestCase):
+    """2 movimientos al mes por empleada (pedidos + intercambios juntos)."""
+
+    def setUp(self) -> None:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from pos_uniformes.database.models import EmpleadaEvento, EmpleadaHorario
+
+        engine = create_engine("sqlite://")
+        for t in (EmpleadaHorario, EmpleadaEvento):
+            t.__table__.create(engine)
+        self.session = sessionmaker(bind=engine)()
+
+    def tearDown(self) -> None:
+        self.session.close()
+
+    def test_tercer_movimiento_del_mes_se_rechaza(self) -> None:
+        from datetime import timedelta
+
+        from pos_uniformes.services.calendario_empleadas_service import (
+            aplicar_solicitud_descanso,
+            cambios_del_mes,
+        )
+
+        hoy = date.today()
+        horarios = {"VEND-2": HorarioEmpleada(employee_code="VEND-2")}
+        f1 = hoy + timedelta(days=8)
+        f2 = hoy + timedelta(days=15)
+        f3 = hoy + timedelta(days=22)
+
+        ok1, _ = aplicar_solicitud_descanso(self.session, horarios, "VEND-2", f1, hoy)
+        ok2, _ = aplicar_solicitud_descanso(self.session, horarios, "VEND-2", f2, hoy)
+        self.assertTrue(ok1 and ok2)
+        self.assertEqual(cambios_del_mes(self.session, "VEND-2", hoy), 2)
+
+        ok3, motivo = aplicar_solicitud_descanso(self.session, horarios, "VEND-2", f3, hoy)
+        self.assertFalse(ok3)
+        self.assertIn("2 cambios", motivo)
+
+    def test_intercambio_tambien_gasta_cuota(self) -> None:
+        from datetime import timedelta
+
+        from pos_uniformes.services.calendario_empleadas_service import (
+            aplicar_intercambio,
+            cambios_del_mes,
+        )
+
+        hoy = date.today()
+        f_a = hoy + timedelta(days=10)
+        f_b = hoy + timedelta(days=11)
+        horarios = {
+            "VEND-2": HorarioEmpleada(employee_code="VEND-2", eventos={f_a: DESCANSO}),
+            "VEND-3": HorarioEmpleada(employee_code="VEND-3", eventos={f_b: DESCANSO}),
+        }
+        ok, msg = aplicar_intercambio(
+            self.session, horarios, "VEND-2", f_a, "VEND-3", f_b, hoy
+        )
+        self.assertTrue(ok, msg)
+        # A cada una le cuenta 1 de sus 2 del mes.
+        self.assertEqual(cambios_del_mes(self.session, "VEND-2", hoy), 1)
+        self.assertEqual(cambios_del_mes(self.session, "VEND-3", hoy), 1)
+
+    def test_marcas_del_dueno_no_gastan_cuota(self) -> None:
+        from pos_uniformes.services.calendario_empleadas_service import (
+            cambios_del_mes,
+            marcar_dia,
+        )
+
+        hoy = date.today()
+        marcar_dia(self.session, "VEND-2", hoy, DESCANSO)  # sin nota de autoservicio
+        marcar_dia(self.session, "VEND-2", hoy, FALTA)
+        self.assertEqual(cambios_del_mes(self.session, "VEND-2", hoy), 0)
+
+
 if __name__ == "__main__":
     unittest.main()

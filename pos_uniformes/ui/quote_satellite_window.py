@@ -1492,6 +1492,13 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_gate_input.clear()
         if not code:
             return
+        from pos_uniformes.services.calendario_empleadas_service import ENCARGADO_CODE
+
+        if code == ENCARGADO_CODE:
+            # Gafete del encargado: directo al calendario en su modo (marca
+            # faltas/descansos, sin dinero) — la Libreta no se abre.
+            self._abrir_calendario_encargado()
+            return
         self._libreta_code = code
         self._libreta_is_owner = code == QuickSaleWidget._OWNER_CODE
         self._libreta_periodo = "hoy"
@@ -1554,6 +1561,22 @@ class QuoteSatelliteWindow(QMainWindow):
         except Exception:  # noqa: BLE001
             logger.exception("Libreta: fallo el banner del ciclo")
             return None
+
+    def _abrir_calendario_encargado(self) -> None:
+        from pos_uniformes.services.calendario_empleadas_service import ENCARGADO_CODE
+        from pos_uniformes.ui.dialogs.calendario_empleadas_dialog import (
+            CalendarioEmpleadasDialog,
+        )
+
+        dialog = CalendarioEmpleadasDialog(
+            self,
+            employee_code=ENCARGADO_CODE,
+            employee_name="Encargado",
+            is_owner=False,
+            is_encargado=True,
+        )
+        dialog.exec()
+        QTimer.singleShot(0, self.libreta_gate_input.setFocus)
 
     def _abrir_calendario_libreta(self) -> None:
         """Calendario de descansos/faltas/pagos; la empleada ve el suyo y el

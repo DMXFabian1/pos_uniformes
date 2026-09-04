@@ -364,11 +364,14 @@ def aplicar_solicitud_descanso(
     ok, motivo = validar_solicitud_descanso(horarios, code, fecha, hoy)
     if not ok:
         return False, motivo
+    tope = _valida_cuota_mensual(session, code, hoy)
+    if tope is not None:
+        return False, tope
     propio = horarios.get(code) or HorarioEmpleada(employee_code=code)
     viejo = descanso_en_semana(propio, fecha)
     if viejo is not None and viejo != fecha:
         marcar_dia(session, code, viejo, TRABAJO, nota="movió su descanso")
-    marcar_dia(session, code, fecha, DESCANSO, nota="pedido desde la Libreta")
+    marcar_dia(session, code, fecha, DESCANSO, nota=_NOTA_PEDIDO)
     if viejo is not None and viejo != fecha:
         return True, (
             f"Listo: descansas el {fecha.strftime('%d/%b')} y trabajas el "
@@ -420,6 +423,10 @@ def aplicar_intercambio(
         return False, motivo
     code_a = str(code_a).strip().upper()
     code_b = str(code_b).strip().upper()
+    for code in (code_a, code_b):
+        tope = _valida_cuota_mensual(session, code, hoy)
+        if tope is not None:
+            return False, f"{code}: {tope}"
     marcar_dia(session, code_a, fecha_a, TRABAJO, nota=f"intercambio con {code_b}")
     marcar_dia(session, code_a, fecha_b, DESCANSO, nota=f"intercambio con {code_b}")
     marcar_dia(session, code_b, fecha_b, TRABAJO, nota=f"intercambio con {code_a}")
@@ -438,3 +445,51 @@ def cargar_horarios_todos(session) -> dict[str, HorarioEmpleada]:
         fila.employee_code: cargar_horario(session, fila.employee_code)
         for fila in session.query(EmpleadaHorario).all()
     }
+
+
+# ─── Encargado y límite mensual de movimientos ───────────────────────────
+
+# Gafete del encargado (el papá de Daniel): puede marcar faltas/descansos
+# en el calendario de cualquier empleada, pero NO ve dinero ni registra
+# pagos ni cambia horarios. "Si no está en el calendario, no existe."
+ENCARGADO_CODE = "ENC-1"
+
+# Cada empleada puede hacer 2 movimientos al mes (pedidos + intercambios
+# juntos, para que no se brinque la regla pidiendo en vez de cambiar).
+CAMBIOS_POR_MES = 2
+
+_NOTA_PEDIDO = "pedido desde la Libreta"
+_NOTA_INTERCAMBIO = "intercambio con "
+
+
+def cambios_del_mes(session, employee_code: str, hoy: date) -> int:
+    """Movimientos de autoservicio hechos este mes (pedidos + intercambios)."""
+    from datetime import datetime
+
+    from pos_uniformes.database.models import EmpleadaEvento
+
+    inicio_mes = datetime(hoy.year, hoy.month, 1)
+    filas = (
+        session.query(EmpleadaEvento)
+        .filter(
+            EmpleadaEvento.employee_code == str(employee_code).strip().upper(),
+            EmpleadaEvento.tipo == DESCANSO,
+            EmpleadaEvento.created_at >= inicio_mes,
+        )
+        .all()
+    )
+    return sum(
+        1
+        for f in filas
+        if f.nota and (f.nota == _NOTA_PEDIDO or f.nota.startswith(_NOTA_INTERCAMBIO))
+    )
+
+
+def _valida_cuota_mensual(session, employee_code: str, hoy: date) -> str | None:
+    usados = cambios_del_mes(session, employee_code, hoy)
+    if usados >= CAMBIOS_POR_MES:
+        return (
+            f"Ya usaste tus {CAMBIOS_POR_MES} cambios de este mes. "
+            "El siguiente mes puedes volver a pedir."
+        )
+    return None

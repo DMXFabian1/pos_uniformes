@@ -712,6 +712,23 @@ class LibretaCicloBannerTests(unittest.TestCase):
         self.assertIn("jueves", texto)
 
 
+class GafeteEncargadoTests(unittest.TestCase):
+    """El gafete ENC-1 abre el calendario en modo encargado, sin entrar a
+    la Libreta (no ve dinero)."""
+
+    def test_enc1_va_directo_al_calendario(self) -> None:
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        fake = SimpleNamespace(
+            libreta_gate_input=SimpleNamespace(text=lambda: "ENC-1", clear=MagicMock()),
+            _abrir_calendario_encargado=MagicMock(),
+            _libreta_code=None,
+        )
+        QuoteSatelliteWindow._on_libreta_gate_scan(fake)
+        fake._abrir_calendario_encargado.assert_called_once()
+        self.assertIsNone(fake._libreta_code)  # la Libreta no se abrió
+
+
 class LibretaAutoLogoutTests(unittest.TestCase):
     """Salir de la página Libreta cierra la sesión (no queda abierta la
     vista del dueño con dinero en el kiosko)."""
