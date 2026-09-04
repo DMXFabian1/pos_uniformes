@@ -44,6 +44,16 @@ $versionRemota = ""
 if (Test-Path $share) { $versionRemota = Get-VersionDe $share }
 
 if ($versionRemota -and ($versionRemota -ne $versionLocal)) {
+    # Si la app vieja sigue viva (su boton Actualizar cerraba la ventana
+    # pero no el proceso), aqui se cierra de verdad: con el proceso vivo
+    # robocopy no puede copiar y la instancia nueva choca con el candado
+    # ("ya se esta ejecutando el satelite").
+    $viva = Get-Process "PresupuestosSatelite*" -ErrorAction SilentlyContinue
+    if ($viva) {
+        Write-Host "Cerrando el satelite abierto para poder actualizar..."
+        $viva | Stop-Process -Force
+        Start-Sleep -Seconds 3
+    }
     Write-Host "Actualizando satelite: '$versionLocal' -> '$versionRemota' ..."
     Write-Host "(la primera vez copia ~300 MB y tarda unos minutos; se ve avanzar)"
     # /NDL /NP: muestra cada archivo copiado (progreso visible) sin spam.
