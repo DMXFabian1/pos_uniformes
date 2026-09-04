@@ -1036,6 +1036,12 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
         page_scroll.setWidgetResizable(True)
         page_scroll.setWidget(page)
         page_scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+        # Sin esto, el viewport pinta el color del SISTEMA (negro en modo
+        # oscuro) detrás de las tarjetas crema.
+        page_scroll.setStyleSheet(
+            "QScrollArea { background: #f4ede2; }"
+            "QScrollArea > QWidget > QWidget { background: #f4ede2; }"
+        )
         return page_scroll
 
     # — Conteos (calendario admin) —

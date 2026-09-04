@@ -125,6 +125,38 @@ QGroupBox::title {
     padding: 0 6px;
     color: #87492c;
 }
+/* Colores base explícitos: sin esto, en modo oscuro del sistema (macOS o
+   Windows) los textos heredan blanco sobre las tarjetas crema y se pierden. */
+QDialog {
+    background: #f4ede2;
+}
+QLabel {
+    color: #2c2a27;
+    background: transparent;
+}
+QCheckBox, QRadioButton {
+    color: #2c2a27;
+}
+QTabWidget::pane {
+    border: 1px solid #ddd0c0;
+    border-radius: 12px;
+    background: #f4ede2;
+}
+QTabBar::tab {
+    background: #f8f2e9;
+    color: #73341c;
+    font-weight: 700;
+    padding: 8px 18px;
+    border: 1px solid #ddd0c0;
+    border-bottom: none;
+    border-top-left-radius: 10px;
+    border-top-right-radius: 10px;
+    margin-right: 2px;
+}
+QTabBar::tab:selected {
+    background: #a84f2d;
+    color: #f9f4ea;
+}
 QFrame#guidedStepsCard {
     border: 1px solid #ddd0c0;
     border-radius: 20px;
