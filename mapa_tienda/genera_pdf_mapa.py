@@ -2,9 +2,12 @@
 """Genera un HTML imprimible bonito del mapa de la tienda: una página por piso."""
 import json, sys, html, re
 
-ENTRADA = "/Users/danielfabian/Downloads/mapa-tienda-8.json"
+ENTRADA = "/Users/danielfabian/Downloads/mapa-tienda-9.json"
 SALIDA = sys.argv[1] if len(sys.argv) > 1 else "mapa_print.html"
-FECHA = "24 de julio de 2026"
+import datetime
+MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"]
+_h = datetime.date.today()
+FECHA = f"{_h.day} de {MESES[_h.month-1]} de {_h.year}"
 
 COLORES = {
     "gondola": ("#4F46E5", "Góndola"), "rack": ("#0D9488", "Rack"),
