@@ -323,6 +323,8 @@ class QuoteSatelliteWindow(QMainWindow):
     _db_refresh_ready = pyqtSignal(object, object)
     # Avisa (en hilo de UI) que el cache de anuncios se refrescó desde la DB.
     _anuncios_ready = pyqtSignal()
+    # Hay versión nueva publicada en la PC principal (payload: la versión).
+    _update_disponible = pyqtSignal(str)
     # False hasta el primer _refresh_catalog_snapshot: el reindex de arranque
     # ya corre en background, solo los refresh posteriores notifican de nuevo.
     _catalog_snapshot_loaded_once = False
@@ -383,6 +385,10 @@ class QuoteSatelliteWindow(QMainWindow):
         # en ~1ms) la señal se perdería y _db_refresh_running quedaría
         # atorado en True — watchdog muerto hasta reiniciar.
         self._db_refresh_ready.connect(self._on_db_refresh_ready)
+        self._update_disponible.connect(self._ofrecer_actualizacion)
+        # Buscar actualizaciones en background poco después de arrancar
+        # (también hay botón manual en el admin Ctrl+Shift+A).
+        QTimer.singleShot(20_000, self._buscar_actualizacion_en_background)
 
         if self.offline_mode:
             self._init_offline(offline_catalog_cache or [])
@@ -3391,6 +3397,92 @@ class QuoteSatelliteWindow(QMainWindow):
         self.operator_label.setText(
             f"{self.current_full_name}"
         )
+
+    # ── Actualizaciones (buscar y aplicar vía el lanzador) ───────────────
+
+    def _buscar_actualizacion_en_background(self) -> None:
+        """Chequeo silencioso post-arranque; si hay versión nueva, la ofrece."""
+        import threading
+
+        def _worker() -> None:
+            try:
+                from pos_uniformes.services.satellite_startup_service import (
+                    probe_database_host,
+                )
+
+                if not probe_database_host():
+                    return
+                from pos_uniformes.services.satellite_update_service import (
+                    estado_actualizacion,
+                )
+
+                _local, remota, hay = estado_actualizacion()
+                if hay and remota:
+                    self._update_disponible.emit(remota)
+            except Exception:  # noqa: BLE001
+                logger.debug("Chequeo de actualización pospuesto", exc_info=True)
+
+        threading.Thread(target=_worker, daemon=True, name="update-check").start()
+
+    def buscar_actualizaciones_interactivo(self, parent=None) -> None:
+        """Botón del admin: busca ahora y reporta el resultado con diálogos."""
+        from pos_uniformes.services.satellite_startup_service import probe_database_host
+        from pos_uniformes.services.satellite_update_service import estado_actualizacion
+
+        parent = parent or self
+        if not probe_database_host():
+            QMessageBox.warning(
+                parent, "Sin conexión",
+                "No se alcanzó la PC principal. Revisa que esté encendida y en red.",
+            )
+            return
+        local, remota, hay = estado_actualizacion()
+        if remota is None:
+            QMessageBox.warning(
+                parent, "Carpeta de updates no disponible",
+                "La PC principal responde pero no se pudo leer "
+                "\\\\servidor\\pos_updates. Revisa el share o corre la build.",
+            )
+            return
+        if not hay:
+            QMessageBox.information(
+                parent, "Al día", f"Ya tienes la versión más reciente ({local})."
+            )
+            return
+        self._ofrecer_actualizacion(remota, parent=parent)
+
+    def _ofrecer_actualizacion(self, remota: str, parent=None) -> None:
+        from pos_uniformes.services.satellite_update_service import version_local
+
+        parent = parent or self
+        box = QMessageBox(parent)
+        box.setWindowTitle("Actualización disponible")
+        box.setText(
+            "Hay una versión nueva del satélite:\n\n"
+            f"    Instalada:  {version_local()}\n"
+            f"    Disponible: {remota}\n\n"
+            "Al actualizar, la app se cierra unos segundos y el lanzador "
+            "la reabre ya actualizada."
+        )
+        actualizar = box.addButton("Actualizar ahora", QMessageBox.ButtonRole.YesRole)
+        box.addButton("Ahora no", QMessageBox.ButtonRole.NoRole)
+        box.exec()
+        if box.clickedButton() is actualizar:
+            self._aplicar_actualizacion(parent)
+
+    def _aplicar_actualizacion(self, parent=None) -> None:
+        from pos_uniformes.services.satellite_update_service import lanzar_actualizador
+
+        if not lanzar_actualizador():
+            QMessageBox.warning(
+                parent or self, "No se encontró el lanzador",
+                "No se encontró lanzador_satelite.bat en este equipo.\n"
+                "Cierra la app y ábrela con el acceso directo del lanzador "
+                "para que se actualice.",
+            )
+            return
+        # Cerrar ya: el lanzador espera poder copiar sobre los archivos.
+        self.close()
 
     def _set_page(self, page_key: str) -> None:
         # Al salir de la Libreta se cierra la sesión sola: la vista del dueño

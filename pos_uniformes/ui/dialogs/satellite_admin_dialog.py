@@ -1080,8 +1080,36 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     except Exception:  # noqa: BLE001
         anuncios_boxes = []
 
+    # — Actualizaciones (buscar y aplicar vía el lanzador) —
+    update_box = QGroupBox("Actualizaciones")
+    update_layout = QVBoxLayout()
+    try:
+        from pos_uniformes.services.satellite_update_service import version_local
+
+        _version_txt = version_local()
+    except Exception:  # noqa: BLE001
+        _version_txt = "?"
+    update_hint = QLabel(
+        f"Versión instalada: {_version_txt}. Al actualizar, la app se cierra y "
+        "el lanzador copia la versión nueva desde la PC principal y la reabre."
+    )
+    update_hint.setWordWrap(True)
+    buscar_updates_btn = QPushButton("🔄 Buscar actualizaciones")
+    buscar_updates_btn.setObjectName("secondaryButton")
+
+    def _buscar_updates() -> None:
+        handler = getattr(parent, "buscar_actualizaciones_interactivo", None)
+        if handler is not None:
+            handler(dialog)
+
+    buscar_updates_btn.clicked.connect(_buscar_updates)
+    update_layout.addWidget(update_hint)
+    update_layout.addWidget(buscar_updates_btn)
+    update_layout.addStretch()
+    update_box.setLayout(update_layout)
+
     tabs = QTabWidget()
-    tabs.addTab(_make_tab(status_box, config_box), "🔌  Conexión")
+    tabs.addTab(_make_tab(status_box, config_box, update_box), "🔌  Conexión")
     tabs.addTab(
         _make_tab(routing_box, estacion_hint, printer_box, label_box, escpos_box),
         "🖨  Impresoras",
