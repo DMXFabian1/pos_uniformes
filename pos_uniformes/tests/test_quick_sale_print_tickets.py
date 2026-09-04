@@ -90,7 +90,7 @@ class QuickSaleTicketDialogTests(unittest.TestCase):
         self.assertNotIn("515.00", tickets[1])
         # El del cliente NO cambia.
         self.assertIn("$515.00", tickets[0])
-        registrar.assert_called_once_with("venta", pago_tarjeta=True)
+        registrar.assert_called_once_with("venta", cliente=None, pago_tarjeta=True)
 
     def test_venta_with_discount_prints_two_tickets_one_dialog(self) -> None:
         widget = self._make_widget()
@@ -267,6 +267,73 @@ class QuickSaleBusinessInfoTests(unittest.TestCase):
             info = widget._load_business_info()
         self.assertEqual(info, ("DBNAME", "111", "Av"))
         save_cache.assert_called_once_with("DBNAME", "111", "Av")
+
+
+class LibretaCarritoTests(unittest.TestCase):
+    """Al arrancar la impresión, el carrito se vacía en el mismo acto.
+
+    El hueco real: imprimir 3 pzs, agregar una más al MISMO carrito y
+    reimprimir anotaba 3 y luego 4 en la Libreta (7 pzs de 4 reales), y la
+    siguiente clienta heredaba piezas ajenas."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _make_widget(self) -> QuickSaleWidget:
+        satellite = SimpleNamespace(offline_mode=True, _kiosk_lookup_from_cache=None)
+        widget = QuickSaleWidget(satellite)
+        widget._employee_code = "VEND-1"
+        widget._employee_name = "Daniel Fabian"
+        widget._items = _items()
+        return widget
+
+    def _vender(self, widget: QuickSaleWidget, registros: list) -> None:
+        """Corre el flujo de venta y simula que la impresión arrancó."""
+        with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")), \
+                patch.object(widget, "_ask_venta_options", return_value=(False, False)), \
+                patch.object(widget, "_drenar_libreta_en_background"), \
+                patch("pos_uniformes.services.libreta_local_queue_service.encolar_operacion",
+                      side_effect=lambda op: registros.append(op)), \
+                patch(f"{_MOD}.route_tickets") as route:
+            widget._on_ticket_venta()
+            route.assert_called_once()
+            route.call_args.kwargs["on_printed"]()  # la impresión arrancó
+
+    def test_imprimir_vacia_el_carrito_y_no_duplica_piezas(self) -> None:
+        widget = self._make_widget()
+        widget._discount_active = False
+        registros: list = []
+
+        self._vender(widget, registros)
+        self.assertEqual(len(registros), 1)
+        self.assertEqual(len(registros[0]["items"]), 1)  # anotó ANTES de vaciar
+        self.assertEqual(widget._items, [])  # carrito vacío tras imprimir
+        self.assertFalse(widget._discount_active)
+
+        # "Cierra, añade otro producto y vuelve a imprimir": es una venta
+        # nueva con SOLO la pieza nueva — ya no arrastra las anteriores.
+        widget._items = [
+            {"sku": "SKU000001", "nombre": "Playera", "talla": "8", "color": "",
+             "precio": Decimal("120.00"), "cantidad": 1},
+        ]
+        self._vender(widget, registros)
+        self.assertEqual(len(registros), 2)
+        self.assertEqual(
+            [it["sku"] for it in registros[1]["items"]], ["SKU000001"]
+        )
+        self.assertEqual(widget._items, [])
+
+    def test_cerrar_sin_imprimir_conserva_el_carrito(self) -> None:
+        # Si NO se imprime (on_printed nunca dispara), el carrito sigue ahí:
+        # cancelar la impresión no le borra la captura a la empleada.
+        widget = self._make_widget()
+        widget._discount_active = False
+        with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")), \
+                patch.object(widget, "_ask_venta_options", return_value=(False, False)), \
+                patch(f"{_MOD}.route_tickets"):
+            widget._on_ticket_venta()
+        self.assertEqual(len(widget._items), 1)
 
 
 if __name__ == "__main__":

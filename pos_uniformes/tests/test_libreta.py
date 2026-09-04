@@ -287,12 +287,22 @@ class QuickSaleLibretaHookTests(unittest.TestCase):
         self.assertEqual(entry["monto_neto"], "984.00")
 
     def test_reimpresion_no_duplica_registro(self) -> None:
+        # Al arrancar la impresión el carrito se vacía, así que "volver a
+        # imprimir" ya ni siquiera es posible: el segundo intento topa con
+        # "Sin piezas" y no imprime ni registra nada.
         widget = self._make_widget()
         with patch(
             "pos_uniformes.services.libreta_local_queue_service.encolar_operacion"
         ) as encolar:
             self._run_venta(widget, encolar)
-            self._run_venta(widget, encolar)  # reimpresión del mismo carrito
+            self.assertEqual(widget._items, [])  # carrito vacío tras imprimir
+            from PyQt6.QtWidgets import QMessageBox
+
+            with patch.object(QMessageBox, "information") as aviso, \
+                    patch("pos_uniformes.ui.views.quick_sale_view.route_tickets") as route:
+                widget._on_ticket_venta()  # reintento con el carrito ya vacío
+            aviso.assert_called_once()
+            route.assert_not_called()
         encolar.assert_called_once()
 
     def test_cerrar_sin_imprimir_no_registra(self) -> None:

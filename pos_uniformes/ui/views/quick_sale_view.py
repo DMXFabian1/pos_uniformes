@@ -925,6 +925,23 @@ class QuickSaleWidget(QWidget):
         except Exception:  # noqa: BLE001 — la Libreta nunca rompe el flujo de tickets
             _logger.exception("No se pudo registrar la operacion en la Libreta")
 
+    def _registrar_y_vaciar(
+        self, tipo: str, *, cliente: str | None = None, pago_tarjeta: bool = False
+    ) -> None:
+        """Anota en la Libreta y vacía el carrito en el mismo acto.
+
+        Si el carrito sobreviviera a la impresión, agregar una pieza más y
+        reimprimir anotaría la venta dos veces (3 pzs y luego 4 = 7), y la
+        siguiente clienta heredaría piezas ajenas. Los tickets ya quedaron
+        armados como texto, así que reimprimir en la misma ventana sigue
+        funcionando."""
+        self._registrar_en_libreta(tipo, cliente=cliente, pago_tarjeta=pago_tarjeta)
+        self._items.clear()
+        self._discount_active = False
+        self._discount_check.setChecked(False)
+        self._refresh_items_table()
+        self._refresh_totals()
+
     def _drenar_libreta_en_background(self) -> None:
         """Sube las operaciones pendientes a la base sin tocar el hilo de UI."""
         import threading
@@ -1066,7 +1083,7 @@ class QuickSaleWidget(QWidget):
             self,
             "Ticket de venta",
             tickets,
-            on_printed=lambda: self._registrar_en_libreta("venta", pago_tarjeta=card),
+            on_printed=lambda: self._registrar_y_vaciar("venta", pago_tarjeta=card),
         )
         self._scan_input.setFocus()
 
@@ -1275,7 +1292,7 @@ class QuickSaleWidget(QWidget):
             self,
             "Apartado",
             [cliente_text, tienda_text],
-            on_printed=lambda: self._registrar_en_libreta("apartado", cliente=nombre),
+            on_printed=lambda: self._registrar_y_vaciar("apartado", cliente=nombre),
         )
         self._scan_input.setFocus()
 
