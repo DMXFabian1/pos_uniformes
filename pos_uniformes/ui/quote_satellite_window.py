@@ -1976,8 +1976,12 @@ class QuoteSatelliteWindow(QMainWindow):
         dlg_ly = QVBoxLayout()
         dlg_ly.setContentsMargins(20, 18, 20, 18)
         dlg_ly.setSpacing(10)
-        dlg_ly.addWidget(QLabel(f"Efectivo ESPERADO en caja: ${esperado:,.2f}"))
-        dlg_ly.addWidget(QLabel("Efectivo REAL contado:"))
+        referencia = QLabel(
+            f"Esperado según la Libreta: ${esperado:,.2f}\n"
+            "(solo para que compares — esto NO se imprime)"
+        )
+        dlg_ly.addWidget(referencia)
+        dlg_ly.addWidget(QLabel("Cantidad FINAL que saldrá en el ticket:"))
         spin_real = QDoubleSpinBox()
         spin_real.setRange(0.0, 9_999_999.0)
         spin_real.setDecimals(2)
@@ -2131,7 +2135,7 @@ class QuoteSatelliteWindow(QMainWindow):
             total_abonos = sum((c.monto_abonos for c in cortes), Decimal("0.00"))
             self._llenar_libreta_cards(
                 [
-                    ("EN CAJA", f"${total_en_caja:,.0f}", "efectivo esperado en el cajón"),
+                    ("VENTA DE HOY", f"${total_en_caja:,.0f}", "efectivo esperado en el cajón"),
                     ("VENTAS", f"${total_monto:,.0f}", f"neto tras tarjeta: ${total_neto:,.0f}"),
                     ("ABONOS", f"${total_abonos:,.0f}", f"{apartados_count} apartado(s) nuevos"),
                     ("PIEZAS", str(total_piezas), f"{total_comisiones} comisiones · {ventas_count} ventas"),
