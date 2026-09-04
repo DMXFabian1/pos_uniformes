@@ -18,8 +18,10 @@ from PyQt6.QtPrintSupport import QPrinter
 from PyQt6.QtWidgets import (
     QCheckBox,
     QDialog,
-    QDialogButtonBox,
+    QHBoxLayout,
+    QLabel,
     QMessageBox,
+    QPushButton,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -305,16 +307,54 @@ def open_tickets_print_dialog(
 
     dialog = QDialog(parent)
     dialog.setWindowTitle(title)
-    dialog.resize(620, 520)
+    # Pensado para pantalla táctil: botones grandes abajo, vista previa
+    # limpia en medio, nada pequeño que atinarle con el dedo.
+    dialog.resize(660, 680)
+    dialog.setStyleSheet(
+        "QDialog { background: #f4ede2; }"
+        "QLabel { color: #2c2a27; background: transparent; }"
+        "QTextEdit { background: #ffffff; color: #2c2a27;"
+        "  border: 1px solid #ddd0c0; border-radius: 12px; padding: 14px; }"
+        "QCheckBox { color: #2c2a27; font-size: 15px; font-weight: 600;"
+        "  padding: 10px 4px; spacing: 10px; }"
+        "QCheckBox::indicator { width: 26px; height: 26px; }"
+        "QPushButton#ticketCerrar { background: #f8f2e9; color: #73341c;"
+        "  border: 1px solid #ddd0c0; border-radius: 14px;"
+        "  font-size: 16px; font-weight: 700; min-height: 56px; padding: 0 28px; }"
+        "QPushButton#ticketCerrar:pressed { background: #e8dbc7; }"
+        "QPushButton#ticketImprimir { background: #a84f2d; color: #ffffff;"
+        "  border: none; border-radius: 14px;"
+        "  font-size: 18px; font-weight: 800; min-height: 56px; padding: 0 28px; }"
+        "QPushButton#ticketImprimir:pressed { background: #8a4326; }"
+        "QPushButton#ticketImprimir:disabled { background: #c9a996; color: #f4ede2; }"
+    )
     ScannerEnterGuard(dialog)
 
     layout = QVBoxLayout()
-    editor = _build_ticket_editor("\n\n".join(tickets))
+    layout.setContentsMargins(18, 16, 18, 16)
+    layout.setSpacing(12)
 
     n = len(tickets)
-    idle_label = "Imprimir" if n == 1 else f"Imprimir {n} {unit_label}s"
-    buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
-    print_button = buttons.addButton(idle_label, QDialogButtonBox.ButtonRole.ActionRole)
+    titulo = QLabel(title)
+    titulo.setStyleSheet("font-size: 19px; font-weight: 800; color: #73341c;")
+    subtitulo = QLabel(
+        f"Para imprimir: 1 {unit_label}"
+        if n == 1
+        else f"Para imprimir: {n} {unit_label}s — salen en un solo toque"
+    )
+    subtitulo.setStyleSheet("font-size: 13px; color: #5f594f;")
+    layout.addWidget(titulo)
+    layout.addWidget(subtitulo)
+
+    editor = _build_ticket_editor("\n\n".join(tickets))
+
+    idle_label = "🖨  Imprimir" if n == 1 else f"🖨  Imprimir {n} {unit_label}s"
+    print_button = QPushButton(idle_label)
+    print_button.setObjectName("ticketImprimir")
+    print_button.setAutoDefault(False)
+    close_button = QPushButton("Cerrar")
+    close_button.setObjectName("ticketCerrar")
+    close_button.setAutoDefault(False)
 
     def _set_status(text: str) -> None:
         print_button.setText(text)
@@ -372,8 +412,7 @@ def open_tickets_print_dialog(
                 pass
 
     print_button.clicked.connect(_start_print)
-    buttons.rejected.connect(dialog.reject)
-    buttons.accepted.connect(dialog.accept)
+    close_button.clicked.connect(dialog.reject)
     # Al cerrar el dialogo, la cola deja de tocar sus widgets (evita crash).
     def _close_queues(_result: int) -> None:
         queue.close()
@@ -382,10 +421,14 @@ def open_tickets_print_dialog(
 
     dialog.finished.connect(_close_queues)
 
-    layout.addWidget(editor)
+    layout.addWidget(editor, 1)
     if alt_checkbox is not None:
         layout.addWidget(alt_checkbox)
-    layout.addWidget(buttons)
+    botones_ly = QHBoxLayout()
+    botones_ly.setSpacing(12)
+    botones_ly.addWidget(close_button, 1)
+    botones_ly.addWidget(print_button, 2)  # el botón principal, bien grande
+    layout.addLayout(botones_ly)
     dialog.setLayout(layout)
     dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
     dialog.exec()
