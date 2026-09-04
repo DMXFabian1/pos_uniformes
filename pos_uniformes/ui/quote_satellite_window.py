@@ -3481,8 +3481,12 @@ class QuoteSatelliteWindow(QMainWindow):
                 "para que se actualice.",
             )
             return
-        # Cerrar ya: el lanzador espera poder copiar sobre los archivos.
+        # Cerrar el PROCESO completo, no solo la ventana: la cartelera u
+        # otros widgets pueden mantener vivo el exe y entonces el lanzador
+        # no puede copiar (archivos bloqueados) ni reabrir (candado de
+        # instancia única) — se veía como "abre el cmd y no hace nada".
         self.close()
+        QApplication.quit()
 
     def _set_page(self, page_key: str) -> None:
         # Al salir de la Libreta se cierra la sesión sola: la vista del dueño
