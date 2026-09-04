@@ -948,6 +948,7 @@ class LibretaPagePrivacyTests(unittest.TestCase):
             libreta_emp_list=MagicMock(),
             libreta_table=MagicMock(),
             libreta_titular_label=MagicMock(),
+            libreta_ciclo_button=MagicMock(),
             _sync_libreta_filtros=MagicMock(),
             _refresh_libreta_view=MagicMock(),
         )
