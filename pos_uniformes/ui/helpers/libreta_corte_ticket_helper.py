@@ -35,10 +35,6 @@ def build_corte_ticket_text(
     (CorteDia y ResumenEmpleada de libreta_service)."""
     now = datetime.now().strftime("%d/%m/%Y %H:%M")
     total_en_caja = sum((c.monto_en_caja for c in cortes), Decimal("0.00"))
-    total_ventas = sum((c.monto_ventas for c in cortes), Decimal("0.00"))
-    total_neto = sum((c.monto_neto_ventas for c in cortes), Decimal("0.00"))
-    total_apartados = sum((c.monto_apartados for c in cortes), Decimal("0.00"))
-    total_abonos = sum((c.monto_abonos for c in cortes), Decimal("0.00"))
     total_piezas = sum(c.piezas for c in cortes)
     total_ops = sum(c.operaciones for c in cortes)
 
@@ -53,11 +49,8 @@ def build_corte_ticket_text(
     lines.append(tk_mid())
     lines.append(tk_row("Operaciones:", str(total_ops)))
     lines.append(tk_row("Piezas:", str(total_piezas)))
-    lines.append(tk_mid())
-    lines.append(tk_row("Ventas:", f"${total_ventas:,.2f}"))
-    lines.append(tk_row("Neto (tras tarjeta):", f"${total_neto:,.2f}"))
-    lines.append(tk_row("Apartados:", f"${total_apartados:,.2f}"))
-    lines.append(tk_row("Abonos:", f"${total_abonos:,.2f}"))
+    # Sin desglose de ventas/neto/apartados/abonos: Daniel quiere el corte
+    # minimalista — operaciones, piezas y la cifra final, punto.
     lines.append(tk_dbl())
     # Una sola cifra final: la que el dueño confirma (editable solo en su
     # vista). El ticket NO imprime esperado ni diferencia — la comparación
@@ -96,7 +89,7 @@ def build_corte_ticket_text(
                     f"{resumen.comisiones} com.",
                 )
             )
-            lines.append(tk_row("Monto:", f"${resumen.monto_total:,.2f}"))
+            # Sin monto por empleada (pedido de Daniel): piezas y comisiones.
         lines.append(tk_bot())
 
     lines.append("")

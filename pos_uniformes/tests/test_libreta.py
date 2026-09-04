@@ -454,6 +454,9 @@ class CorteTicketTests(unittest.TestCase):
         self.assertIn("$500.00", texto)
         self.assertIn("Ana", texto)
         self.assertIn("6 com.", texto)
+        # Corte minimalista: sin desglose de dinero ni montos por empleada.
+        for palabra in ("Ventas:", "Neto", "Apartados:", "Abonos:", "Monto:", "$700.00"):
+            self.assertNotIn(palabra, texto)
         # Ninguna línea se pasa del ancho del ticket térmico.
         for line in texto.splitlines():
             self.assertLessEqual(len(line), TICKET_CHAR_WIDTH)
