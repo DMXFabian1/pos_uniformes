@@ -94,6 +94,9 @@ def main() -> int:
     # atributo queda puesto ANTES de crear la QApplication.
     QApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts, True)
     app = QApplication(sys.argv)
+    from pos_uniformes.utils.qt_spanish import instalar_espanol_qt
+
+    instalar_espanol_qt(app)  # Sí/No/Cancelar en vez de Yes/No/Cancel
     app.setApplicationName(APP_DISPLAY_NAME)
     app.setApplicationDisplayName(APP_DISPLAY_NAME)
     app.setOrganizationName(APP_ORGANIZATION_NAME)

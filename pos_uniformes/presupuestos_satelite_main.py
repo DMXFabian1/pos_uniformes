@@ -110,6 +110,9 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName(satellite_display_name())
     app.setOrganizationName("POSUniformes")
+    from pos_uniformes.utils.qt_spanish import instalar_espanol_qt
+
+    instalar_espanol_qt(app)  # Sí/No/Cancelar en vez de Yes/No/Cancel
     icon_path = satellite_windows_icon_path()
     if icon_path is not None:
         app.setWindowIcon(QIcon(str(icon_path)))

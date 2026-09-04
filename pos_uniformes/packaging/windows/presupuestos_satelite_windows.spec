@@ -39,6 +39,15 @@ datas += [
     (str(PROJECT_ROOT / "scripts" / "setup_satelite.ps1"), "."),
 ]
 
+# Traducción de Qt al español: sin este .qm los QMessageBox del exe salen
+# con Yes/No/Cancel aunque en desarrollo se vean en español.
+import PyQt6
+
+_qt_translations = Path(PyQt6.__file__).parent / "Qt6" / "translations"
+_qtbase_es = _qt_translations / "qtbase_es.qm"
+if _qtbase_es.exists():
+    datas += [(str(_qtbase_es), "PyQt6/Qt6/translations")]
+
 hiddenimports = []
 hiddenimports += collect_submodules("psycopg")
 hiddenimports += collect_submodules("alembic")
