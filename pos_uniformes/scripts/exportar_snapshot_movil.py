@@ -15,14 +15,22 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# Tablas que la Fase 1 (solo lectura) necesita. Empleada incluye pin_hash:
-# el login de la PWA se valida contra el snapshot.
+# Tablas que la PWA necesita. Empleada incluye pin_hash: el login se
+# valida contra el snapshot. El catálogo va completo para que también
+# desde casa se puedan consultar precios y tallas.
 _TABLAS = (
     "empleada",
     "empleada_horario",
     "empleada_evento",
     "libreta_corte",
     "libreta_venta",
+    "categoria",
+    "marca",
+    "tipo_pieza",
+    "escuela",
+    "nivel_educativo",
+    "producto",
+    "variante",
 )
 # libreta_venta se recorta a los últimos N días (los ciclos y "hoy" no
 # necesitan más, y el archivo se mantiene chico).
@@ -46,6 +54,13 @@ def exportar(destino: Path) -> dict[str, int]:
         "empleada_evento": models.EmpleadaEvento,
         "libreta_corte": models.LibretaCorte,
         "libreta_venta": models.LibretaVenta,
+        "categoria": models.Categoria,
+        "marca": models.Marca,
+        "tipo_pieza": models.TipoPieza,
+        "escuela": models.Escuela,
+        "nivel_educativo": models.NivelEducativo,
+        "producto": models.Producto,
+        "variante": models.Variante,
     }
     conteos: dict[str, int] = {}
     corte_ventas = datetime.now().astimezone() - timedelta(days=_DIAS_VENTAS)

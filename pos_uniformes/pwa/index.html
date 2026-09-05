@@ -57,6 +57,24 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
 .salir{margin-top:16px}
 .pill{font-size:12px; background:var(--crema); border:1px solid var(--borde);
   border-radius:99px; padding:3px 10px; color:var(--tenue)}
+.nav{position:fixed; bottom:0; left:0; right:0; display:flex; gap:8px;
+  background:var(--carta); border-top:1px solid var(--borde); padding:8px 12px
+  calc(8px + env(safe-area-inset-bottom)); max-width:520px; margin:0 auto}
+.nav button{min-height:48px; font-size:15px; background:transparent;
+  color:var(--tenue); border-radius:12px}
+.nav button.activa{background:var(--crema); color:var(--acento-osc)}
+.con-nav{padding-bottom:84px}
+.fila-busca{display:flex; gap:8px}
+.fila-busca input{flex:1; margin-bottom:0}
+.fila-busca button{width:56px; min-height:52px; font-size:22px}
+#lector{border-radius:16px; overflow:hidden; margin-top:12px}
+.precio-grande{font-size:38px; font-weight:800; color:var(--acento-osc); margin:4px 0}
+.talla-chip{display:inline-block; background:var(--crema); border:1px solid var(--borde);
+  border-radius:10px; padding:8px 12px; margin:4px 6px 0 0; font-weight:700}
+.stock-ok{color:var(--verde)} .stock-mal{color:var(--rojo)}
+.copias{display:flex; align-items:center; gap:12px; margin:10px 0}
+.copias button{width:52px; min-height:48px; font-size:22px}
+.copias span{font-size:22px; font-weight:800; min-width:36px; text-align:center}
 </style>
 </head>
 <body>
@@ -129,13 +147,35 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
     <button class="btn-suave salir" onclick="salir()">Salir</button>
   </div>
 
+  <!-- BUSCAR (todos los roles) -->
+  <div id="vista-buscar" class="oculto con-nav">
+    <h1>🔍 Buscar precio</h1>
+    <p class="sub" id="buscar-modo"></p>
+    <div class="fila-busca">
+      <input id="buscar-texto" placeholder="Nombre, escuela o código..."
+             onkeydown="if(event.key==='Enter')buscarTexto()">
+      <button class="btn-suave" onclick="buscarTexto()">🔎</button>
+      <button class="btn-acento" onclick="abrirEscaner()">📷</button>
+    </div>
+    <div id="lector" class="oculto"></div>
+    <div id="buscar-resultado"></div>
+  </div>
+
+  <div id="nav" class="nav oculto">
+    <button id="nav-inicio" class="activa" onclick="irInicio()">🏠 Inicio</button>
+    <button id="nav-buscar" onclick="irBuscar()">🔍 Buscar</button>
+  </div>
+
 </div>
+<script src="html5-qrcode.min.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const DIAS = ["lun","mar","mié","jue","vie","sáb","dom"];
 let token = localStorage.getItem("pos_token") || "";
 let calY = 0, calM = 0;
+let rolActual = "", vistaInicio = "", modoServidor = "casa";
+let escaner = null;
 
 const pesos = s => "$" + Number(s).toLocaleString("es-MX", {minimumFractionDigits: 2});
 // Fecha LOCAL (toISOString es UTC y por la tarde ya marca "manana")
@@ -153,8 +193,22 @@ async function api(ruta) {
 }
 
 function mostrar(vista) {
-  for (const v of ["login","empleada","encargado","dueno"]) $("vista-"+v).classList.add("oculto");
+  for (const v of ["login","empleada","encargado","dueno","buscar"]) $("vista-"+v).classList.add("oculto");
   $("vista-"+vista).classList.remove("oculto");
+  const logueado = vista !== "login";
+  $("nav").classList.toggle("oculto", !logueado);
+  $("nav-inicio").classList.toggle("activa", vista !== "buscar");
+  $("nav-buscar").classList.toggle("activa", vista === "buscar");
+  if (logueado && vista !== "buscar") vistaInicio = vista;
+  if (vista !== "buscar") cerrarEscaner();
+}
+
+function irInicio() { mostrar(vistaInicio || "login"); }
+function irBuscar() {
+  $("buscar-modo").textContent = modoServidor === "tienda"
+    ? "Conectado a la tienda — puedes mandar etiquetas a imprimir"
+    : "Modo consulta (fuera de la tienda)";
+  mostrar("buscar");
 }
 
 async function cargarLogin() {
@@ -193,9 +247,100 @@ function salir() { token = ""; localStorage.removeItem("pos_token"); cargarLogin
 
 async function cargarInicio() {
   const data = await api("/api/v1/movil/inicio");
+  rolActual = data.rol; modoServidor = data.modo || "casa";
   if (data.rol === "empleada") pintarEmpleada(data);
   else if (data.rol === "encargado") pintarEncargado(data);
   else pintarDueno(data);
+}
+
+// ── Buscador + escáner ─────────────────────────────────────────────
+async function buscarTexto() {
+  const q = $("buscar-texto").value.trim();
+  if (!q) return;
+  cerrarEscaner();
+  $("buscar-resultado").innerHTML = "<div class='card'>Buscando...</div>";
+  try {
+    const data = await api("/api/v1/search?q=" + encodeURIComponent(q));
+    const fams = data.families || [];
+    if (!fams.length) { $("buscar-resultado").innerHTML = "<div class='card'>Nada con ese nombre. 🤷</div>"; return; }
+    $("buscar-resultado").innerHTML = fams.slice(0, 8).map(f => {
+      const tallas = f.variantes.map(v =>
+        `<span class="talla-chip" onclick="buscarSku('${v.sku}')">${v.talla}${v.color ? " · " + v.color : ""}</span>`).join("");
+      return `<div class="card"><strong>${f.nombre_base}</strong>` +
+        `<div class="sub">${f.tipo_pieza} · desde ${pesos(f.precio_desde)}</div>` +
+        `<div>${tallas}</div></div>`;
+    }).join("");
+  } catch (e) { $("buscar-resultado").innerHTML = "<div class='card'>No se pudo buscar. Revisa la conexión.</div>"; }
+}
+
+async function buscarSku(codigo) {
+  cerrarEscaner();
+  $("buscar-resultado").innerHTML = "<div class='card'>Buscando...</div>";
+  try {
+    const v = await api("/api/v1/catalog/sku/" + encodeURIComponent(codigo.trim()));
+    const stockCls = v.stock_actual > 0 ? "stock-ok" : "stock-mal";
+    const stockTxt = v.stock_actual > 0 ? `${v.stock_actual} en stock` : "AGOTADO";
+    let botones = "";
+    if (modoServidor === "tienda") {
+      botones = `<div class="copias">
+          <button class="btn-suave" onclick="cambiarCopias(-1)">−</button>
+          <span id="et-copias">1</span>
+          <button class="btn-suave" onclick="cambiarCopias(1)">+</button>
+          <button class="btn-acento" style="flex:1" onclick="mandarEtiqueta('${v.sku}')">🏷 Imprimir etiqueta</button>
+        </div><div id="et-aviso" class="sub"></div>`;
+    }
+    $("buscar-resultado").innerHTML = `<div class="card">
+        <strong>${v.nombre}</strong>
+        <div class="sub">${v.categoria} · ${v.marca} · Talla ${v.talla}${v.color ? " · " + v.color : ""} · ${v.sku}</div>
+        <div class="precio-grande">${pesos(v.precio_venta)}</div>
+        <div class="${stockCls}" style="font-weight:800">${stockTxt}</div>
+        ${botones}</div>`;
+  } catch (e) {
+    $("buscar-resultado").innerHTML = "<div class='card'>No encontré ese código. Prueba buscar por nombre.</div>";
+  }
+}
+
+function cambiarCopias(d) {
+  const el = $("et-copias");
+  el.textContent = Math.min(20, Math.max(1, Number(el.textContent) + d));
+}
+
+async function mandarEtiqueta(sku) {
+  const aviso = $("et-aviso");
+  aviso.textContent = "Enviando a la impresora...";
+  try {
+    const r = await fetch("/api/v1/movil/etiqueta", {
+      method: "POST",
+      headers: {"Content-Type": "application/json", "Authorization": "Bearer " + token},
+      body: JSON.stringify({sku, copies: Number($("et-copias").textContent)}),
+    });
+    if (!r.ok) throw new Error();
+    const data = await r.json();
+    aviso.textContent = `✅ En cola: ${data.copias} etiqueta(s) saliendo en la impresora de la tienda.`;
+  } catch (e) { aviso.textContent = "❌ No se pudo encolar. Intenta otra vez."; }
+}
+
+async function abrirEscaner() {
+  if (escaner) { cerrarEscaner(); return; }
+  $("lector").classList.remove("oculto");
+  escaner = new Html5Qrcode("lector");
+  try {
+    await escaner.start(
+      {facingMode: "environment"},
+      {fps: 10, qrbox: {width: 230, height: 230}},
+      (codigo) => { $("buscar-texto").value = codigo; buscarSku(codigo); },
+      () => {},
+    );
+  } catch (e) {
+    cerrarEscaner();
+    $("buscar-resultado").innerHTML = "<div class='card'>No se pudo abrir la cámara. Da permiso de cámara al navegador.</div>";
+  }
+}
+
+function cerrarEscaner() {
+  if (escaner) { try { escaner.stop().catch(()=>{}); } catch(e){} escaner = null; }
+  const l = $("lector");
+  if (l) { l.classList.add("oculto"); l.innerHTML = ""; }
 }
 
 function pintarEmpleada(data) {

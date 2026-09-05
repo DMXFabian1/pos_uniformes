@@ -14,6 +14,7 @@ from unittest.mock import patch
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 from pos_uniformes.api.dependencies import get_current_employee, get_db
 from pos_uniformes.api.main import app
@@ -30,9 +31,12 @@ _TABLAS = (Empleada, EmpleadaHorario, EmpleadaEvento, LibretaCorte, LibretaVenta
 
 class ApiMovilTests(unittest.TestCase):
     def setUp(self) -> None:
-        # TestClient corre la app en otro hilo: sqlite necesita permitirlo.
+        # TestClient corre la app en otro hilo y sqlite :memory: vive POR
+        # conexión: StaticPool fuerza una sola conexión compartida.
         engine = create_engine(
-            "sqlite://", connect_args={"check_same_thread": False}
+            "sqlite://",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
         )
         for t in _TABLAS:
             t.__table__.create(engine)
@@ -128,6 +132,115 @@ class ApiMovilTests(unittest.TestCase):
         self.assertIn(r.status_code, (401, 403))
 
 
+class EtiquetaMovilTests(unittest.TestCase):
+    """POST /movil/etiqueta: encola a la Brother en modo tienda; en modo
+    casa (snapshot) se niega con un mensaje claro."""
+
+    def setUp(self) -> None:
+        from pos_uniformes.database.models import (
+            Categoria,
+            Marca,
+            Producto,
+            Trabajo,
+            Variante,
+        )
+
+        engine = create_engine(
+            "sqlite://",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        for t in (*_TABLAS, Categoria, Marca, Producto, Variante, Trabajo):
+            t.__table__.create(engine)
+        self.session = sessionmaker(bind=engine)()
+        cat = Categoria(nombre="Deportivo")
+        marca = Marca(nombre="Genérica")
+        self.session.add_all([cat, marca])
+        self.session.flush()
+        prod = Producto(
+            nombre="Pants Sec Tec", nombre_base="Pants Sec Tec",
+            categoria_id=cat.id, marca_id=marca.id,
+        )
+        self.session.add(prod)
+        self.session.flush()
+        self.session.add(
+            Variante(
+                producto_id=prod.id, sku="SKU777", talla="6", color="Marino",
+                precio_venta=Decimal("515.00"), stock_actual=4, activo=True,
+            )
+        )
+        self.session.add(
+            Empleada(codigo="VEND-4", nombre_completo="Fanny Ortiz", activo=True)
+        )
+        self.session.commit()
+        app.dependency_overrides[get_db] = lambda: self.session
+        emp = self.session.query(Empleada).first()
+        app.dependency_overrides[get_current_employee] = lambda: (emp, None)
+        self.client = TestClient(app)
+
+    def tearDown(self) -> None:
+        app.dependency_overrides.clear()
+        self.session.close()
+
+    def test_en_modo_casa_se_niega(self) -> None:
+        with patch(
+            "pos_uniformes.api.routers.movil._modo_servidor", return_value="casa"
+        ):
+            r = self.client.post(
+                "/api/v1/movil/etiqueta", json={"sku": "SKU777", "copies": 2}
+            )
+        self.assertEqual(r.status_code, 409)
+        self.assertIn("tienda", r.json()["detail"]["error"]["message"])
+
+    def test_en_tienda_renderiza_y_encola(self) -> None:
+        import tempfile
+        from pathlib import Path
+        from types import SimpleNamespace
+
+        from pos_uniformes.database.models import EstadoTrabajo, Trabajo, TipoTrabajo
+
+        with tempfile.NamedTemporaryFile(suffix=".png", delete=False) as f:
+            f.write(b"png-falso")
+            ruta = Path(f.name)
+        try:
+            with patch(
+                "pos_uniformes.api.routers.movil._modo_servidor",
+                return_value="tienda",
+            ), patch(
+                "pos_uniformes.services.inventory_label_service.render_inventory_label",
+                return_value=SimpleNamespace(
+                    image_path=ruta, effective_copies=3, mode="standard"
+                ),
+            ) as render:
+                r = self.client.post(
+                    "/api/v1/movil/etiqueta", json={"sku": "sku777", "copies": 3}
+                )
+            self.assertEqual(r.status_code, 200, r.text)
+            data = r.json()
+            self.assertTrue(data["encolada"])
+            self.assertEqual(data["copias"], 3)
+            render.assert_called_once()
+
+            trabajo = self.session.query(Trabajo).one()
+            self.assertEqual(trabajo.tipo, TipoTrabajo.ETIQUETA)
+            self.assertEqual(trabajo.estado, EstadoTrabajo.PENDIENTE)
+            self.assertEqual(trabajo.origen, "pwa")
+            self.assertEqual(trabajo.creado_por, "VEND-4")
+            self.assertEqual(trabajo.contenido["sku"], "SKU777")
+            self.assertEqual(trabajo.contenido["copies"], 3)
+        finally:
+            ruta.unlink(missing_ok=True)
+
+    def test_sku_inexistente_da_404(self) -> None:
+        with patch(
+            "pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"
+        ):
+            r = self.client.post(
+                "/api/v1/movil/etiqueta", json={"sku": "NOEXISTE"}
+            )
+        self.assertEqual(r.status_code, 404)
+
+
 class SnapshotTests(unittest.TestCase):
     def test_exporta_y_el_snapshot_sirve_para_leer(self) -> None:
         import tempfile
@@ -136,9 +249,29 @@ class SnapshotTests(unittest.TestCase):
         from sqlalchemy import create_engine as _ce
         from sqlalchemy.orm import sessionmaker as _sm
 
-        # Origen simulado: un sqlite con las tablas y algo de datos.
+        # Origen simulado: un sqlite con TODAS las tablas que exporta el
+        # snapshot (incluye el catálogo para consultar precios desde casa).
+        from pos_uniformes.database.models import (
+            Categoria,
+            Escuela,
+            Marca,
+            NivelEducativo,
+            Producto,
+            TipoPieza,
+            Variante,
+        )
+
         origen = _ce("sqlite://")
-        for t in _TABLAS:
+        for t in (
+            *_TABLAS,
+            Categoria,
+            Marca,
+            TipoPieza,
+            Escuela,
+            NivelEducativo,
+            Producto,
+            Variante,
+        ):
             t.__table__.create(origen)
         ses = _sm(bind=origen)()
         ses.add(Empleada(codigo="VEND-4", nombre_completo="Fanny", activo=True))

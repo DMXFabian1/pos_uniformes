@@ -14,7 +14,8 @@ from __future__ import annotations
 
 from datetime import date
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from pos_uniformes.api.dependencies import get_current_employee, get_db
@@ -23,6 +24,14 @@ router = APIRouter(prefix="/api/v1/movil", tags=["movil"])
 
 _OWNER_CODE = "VEND-1"
 _ENCARGADO_CODE = "ENC-1"
+
+
+def _modo_servidor() -> str:
+    """"tienda" = PC principal con la base viva (puede encolar impresiones);
+    "casa" = snapshot SQLite de solo lectura (consulta 24/7)."""
+    from pos_uniformes.database.connection import engine
+
+    return "casa" if engine.url.get_backend_name() == "sqlite" else "tienda"
 
 
 def _rol(codigo: str) -> str:
@@ -165,6 +174,7 @@ def inicio(
         "rol": rol,
         "codigo": str(empleada.codigo).upper(),
         "nombre": (empleada.nombre_completo or empleada.codigo).split()[0],
+        "modo": _modo_servidor(),
     }
     if rol == "dueno":
         base["dueno"] = _payload_dueno(db)
@@ -187,3 +197,76 @@ def calendario(
     year = max(2020, min(year, 2100))
     month = max(1, min(month, 12))
     return _calendario_mes(db, str(empleada.codigo), year, month)
+
+
+class EtiquetaRequest(BaseModel):
+    sku: str = Field(min_length=1, max_length=60)
+    copies: int = Field(default=1, ge=1, le=20)
+
+
+@router.post("/etiqueta")
+def imprimir_etiqueta(
+    body: EtiquetaRequest,
+    current: tuple = Depends(get_current_employee),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Encola la etiqueta del SKU para que la imprima la Brother de la
+    tienda (vía la cola `trabajo` que ya procesa el despachador del
+    satélite). Solo disponible en modo tienda: el servidor de la casa lee
+    un snapshot y no puede encolar nada."""
+    if _modo_servidor() != "tienda":
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "error": {
+                    "code": "solo_en_tienda",
+                    "message": "Imprimir etiquetas solo funciona conectado a la tienda.",
+                }
+            },
+        )
+    empleada, _payload = current
+
+    from pathlib import Path
+
+    from sqlalchemy import func as sa_func, select
+
+    from pos_uniformes.database.models import Variante
+    from pos_uniformes.services import trabajos_service
+    from pos_uniformes.services.inventory_label_service import render_inventory_label
+
+    sku = body.sku.strip().upper()
+    variante = db.scalar(
+        select(Variante).where(
+            sa_func.upper(Variante.sku) == sku, Variante.activo.is_(True)
+        )
+    )
+    if variante is None:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "error": {
+                    "code": "sku_no_encontrado",
+                    "message": f"No se encontró producto con SKU '{sku}'.",
+                }
+            },
+        )
+
+    resultado = render_inventory_label(
+        db, variante.id, mode="standard", requested_copies=body.copies
+    )
+    imagen = Path(resultado.image_path).read_bytes()
+    trabajo = trabajos_service.enviar_etiqueta(
+        db,
+        imagen,
+        sku=sku,
+        copies=resultado.effective_copies,
+        paper_mode=resultado.mode,
+        origen="pwa",
+        creado_por=str(empleada.codigo).upper(),
+    )
+    db.commit()
+    return {
+        "encolada": True,
+        "trabajo_id": trabajo.id,
+        "copias": resultado.effective_copies,
+    }
