@@ -713,10 +713,11 @@ class QuickSaleWidget(QWidget):
 
         holder = QWidget()
         ly = QHBoxLayout(holder)
-        ly.setContentsMargins(0, 0, 0, 0)
+        # Margen inferior de 8px: corrige el centro ÓPTICO (el texto de la
+        # fila pinta unos px arriba del centro geométrico por el borde
+        # inferior del renglón; sin esto los botones se ven "caídos").
+        ly.setContentsMargins(0, 0, 0, 8)
         ly.setSpacing(5)
-        # El holder llena la celda y el grupo se AUTO-centra (H y V): así no
-        # se ven "caídos" aunque el alto real de la fila cambie con el DPI.
         ly.setAlignment(Qt.AlignmentFlag.AlignCenter)
         for btn in (btn_minus, btn_plus, btn_trash):
             btn.setFixedSize(48, 42)  # tamaño exacto: nunca se corta
