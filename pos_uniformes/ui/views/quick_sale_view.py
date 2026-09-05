@@ -1112,19 +1112,21 @@ class QuickSaleWidget(QWidget):
 
         btn_row = QHBoxLayout()
         btn_row.setSpacing(10)
-        no_button = QPushButton("Solo ticket\ndel cliente")
+        # "Solo ticket" es la respuesta de todos los días: ese lleva el
+        # terracota protagonista (pedido de Daniel).
+        no_button = QPushButton("🧾  Solo ticket\ndel cliente")
         no_button.setStyleSheet(
-            "QPushButton { background: #f8f2e9; color: #73341c;"
-            "  border: 1px solid #ddd0c0; border-radius: 14px;"
-            "  min-height: 60px; font-size: 16px; font-weight: 700; }"
-            "QPushButton:pressed { background: #e8dbc7; }"
-        )
-        yes_button = QPushButton("🖨  Sí, con copia")
-        yes_button.setStyleSheet(
             "QPushButton { background: #a84f2d; color: #ffffff; border: none;"
             "  border-radius: 14px; min-height: 60px;"
             "  font-size: 17px; font-weight: 800; }"
             "QPushButton:pressed { background: #8a4326; }"
+        )
+        yes_button = QPushButton("🖨  Sí, con copia")
+        yes_button.setStyleSheet(
+            "QPushButton { background: #f8f2e9; color: #73341c;"
+            "  border: 1px solid #ddd0c0; border-radius: 14px;"
+            "  min-height: 60px; font-size: 16px; font-weight: 700; }"
+            "QPushButton:pressed { background: #e8dbc7; }"
         )
         for button in (no_button, yes_button):
             # Sin botón default: un Enter suelto no debe contestar el diálogo.
