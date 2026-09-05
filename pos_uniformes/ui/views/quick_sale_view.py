@@ -1370,13 +1370,20 @@ class QuickSaleWidget(QWidget):
         et2.setStyleSheet(f"font-size: 13px; color: {_MUTED}; font-weight: 700;")
         ly.addWidget(et2)
         precio_input = QLineEdit()
-        precio_input.setPlaceholderText("$ 0.00")
+        precio_input.setPlaceholderText("0.00")
+        precio_input.setAlignment(Qt.AlignmentFlag.AlignRight)
         precio_input.setStyleSheet(
             "QLineEdit { background: #ffffff; color: #73341c;"
             "  border: 2px solid #a84f2d; border-radius: 12px;"
             "  min-height: 56px; padding: 0 14px; font-size: 26px; font-weight: 800; }"
         )
-        ly.addWidget(precio_input)
+        precio_row = QHBoxLayout()
+        precio_row.setSpacing(8)
+        signo = QLabel("$")
+        signo.setStyleSheet("font-size: 28px; font-weight: 800; color: #73341c;")
+        precio_row.addWidget(signo)
+        precio_row.addWidget(precio_input, 1)
+        ly.addLayout(precio_row)
 
         # Teclado numérico en pantalla (táctil): 7 8 9 / 4 5 6 / 1 2 3 / . 0 ⌫
         from PyQt6.QtWidgets import QGridLayout
@@ -1403,30 +1410,46 @@ class QuickSaleWidget(QWidget):
             b = QPushButton(txt)
             b.setAutoDefault(False)
             b.setStyleSheet(_TECLA)
+            b.setFixedHeight(56)  # alto fijo: el teclado no se estira
             b.clicked.connect(lambda _=False, t=txt: _tecla(t))
             teclado.addWidget(b, i // 3, i % 3)
         ly.addLayout(teclado)
 
-        et3 = QLabel("Cantidad")
-        et3.setStyleSheet(f"font-size: 13px; color: {_MUTED}; font-weight: 700;")
-        ly.addWidget(et3)
+        # Cantidad en una sola fila, con el TOTAL en vivo a la derecha
         cant_row = QHBoxLayout()
         cant_row.setSpacing(10)
+        et3 = QLabel("Cantidad")
+        et3.setStyleSheet(f"font-size: 13px; color: {_MUTED}; font-weight: 700;")
+        cant_row.addWidget(et3)
         cantidad = {"n": 1}
         cant_label = QLabel("1")
         cant_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        cant_label.setStyleSheet("font-size: 24px; font-weight: 800;")
-        cant_label.setFixedWidth(60)
+        cant_label.setStyleSheet("font-size: 26px; font-weight: 800; color: #73341c;")
+        cant_label.setFixedWidth(56)
+        total_label = QLabel("Total: $0.00")
+        total_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
+        total_label.setStyleSheet("font-size: 20px; font-weight: 800; color: #73341c;")
+
+        def _precio_actual() -> Decimal:
+            raw = precio_input.text().strip().replace("$", "").replace(",", "")
+            try:
+                return Decimal(raw).quantize(Decimal("0.01"))
+            except Exception:  # noqa: BLE001
+                return Decimal("0.00")
+
+        def _actualizar_total() -> None:
+            total_label.setText(f"Total: ${_precio_actual() * cantidad['n']:,.2f}")
 
         def _cambiar_cant(d: int) -> None:
             cantidad["n"] = max(1, min(99, cantidad["n"] + d))
             cant_label.setText(str(cantidad["n"]))
+            _actualizar_total()
 
         for txt, d in (("−", -1), ("+", 1)):
             b = QPushButton(txt)
             b.setAutoDefault(False)
             b.setStyleSheet(_TECLA)
-            b.setFixedSize(64, 48)
+            b.setFixedSize(60, 52)
             b.clicked.connect(lambda _=False, dd=d: _cambiar_cant(dd))
             if txt == "−":
                 cant_row.addWidget(b)
@@ -1434,7 +1457,9 @@ class QuickSaleWidget(QWidget):
             else:
                 cant_row.addWidget(b)
         cant_row.addStretch()
+        cant_row.addWidget(total_label)
         ly.addLayout(cant_row)
+        precio_input.textChanged.connect(lambda _t: _actualizar_total())
 
         error_label = QLabel("")
         error_label.setStyleSheet(f"font-size: 13px; color: {_DANGER}; font-weight: 700;")
