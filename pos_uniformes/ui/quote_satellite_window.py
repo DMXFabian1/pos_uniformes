@@ -7148,37 +7148,42 @@ QLabel#favDialogPriceLabel {
             meta_label = QLabel(" · ".join(meta_parts))
             meta_label.setObjectName("satSidebarItemMeta")
 
-        # Fila inferior: precio + ±cantidad
-        price_label = QLabel(f"${subtotal}" + (f"  (${unit_price} c/u)" if quantity > 1 else ""))
+        # Precio en SU PROPIA fila: con "c/u" ensanchaba la tarjeta y
+        # empujaba los botones ± fuera del sidebar (bug de 2 piezas).
+        price_label = QLabel(
+            f"${subtotal}" + (f"  (${unit_price} c/u)" if quantity > 1 else "")
+        )
         price_label.setObjectName("satSidebarItemQty")
+        price_label.setWordWrap(True)
 
         minus_btn = QPushButton("−")
         minus_btn.setObjectName("sidebarItemRemoveButton")
-        minus_btn.setFixedSize(26, 26)
+        minus_btn.setFixedSize(34, 34)
         minus_btn.clicked.connect(lambda checked=False, index=row_index: self._change_sidebar_item_quantity(index, -1))
 
         qty_label = QLabel(str(quantity))
         qty_label.setObjectName("satSidebarItemQty")
         qty_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        qty_label.setFixedWidth(22)
+        qty_label.setFixedWidth(28)
 
         plus_btn = QPushButton("+")
         plus_btn.setObjectName("sidebarItemRemoveButton")
-        plus_btn.setFixedSize(26, 26)
+        plus_btn.setFixedSize(34, 34)
         plus_btn.clicked.connect(lambda checked=False, index=row_index: self._change_sidebar_item_quantity(index, 1))
 
-        footer_row = QHBoxLayout()
-        footer_row.setContentsMargins(0, 0, 0, 0)
-        footer_row.setSpacing(4)
-        footer_row.addWidget(price_label, 1)
-        footer_row.addWidget(minus_btn)
-        footer_row.addWidget(qty_label)
-        footer_row.addWidget(plus_btn)
+        qty_row = QHBoxLayout()
+        qty_row.setContentsMargins(0, 0, 0, 0)
+        qty_row.setSpacing(6)
+        qty_row.addStretch()
+        qty_row.addWidget(minus_btn)
+        qty_row.addWidget(qty_label)
+        qty_row.addWidget(plus_btn)
 
         layout.addLayout(name_row)
         if meta_parts:
             layout.addWidget(meta_label)
-        layout.addLayout(footer_row)
+        layout.addWidget(price_label)
+        layout.addLayout(qty_row)
         card.setLayout(layout)
 
         card.double_clicked.connect(self._show_cart_popup)
