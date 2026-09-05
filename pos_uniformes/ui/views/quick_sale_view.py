@@ -9,7 +9,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import QSize, Qt, QTimer
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
     QCheckBox,
@@ -675,36 +675,53 @@ class QuickSaleWidget(QWidget):
         self._total_meta.setText(meta)
 
     def _build_row_actions(self, row: int) -> QWidget:
-        """[−] [+] [🗑] por renglón, tamaño dedo (pedido de Daniel)."""
+        """[−] [+] [🗑] por renglón, tamaño dedo (pedido de Daniel).
+
+        Estética: crema/terracota como el resto del kiosko, y el bote usa
+        el MISMO icono SVG del sidebar (el emoji 🗑 se ve alambrado en
+        Windows)."""
         _BASE = (
-            "QPushButton {{ background: #ffffff; border: 1.5px solid {borde};"
-            "  border-radius: 10px; font-size: 17px; font-weight: 800;"
+            "QPushButton {{ background: {bg}; border: 1.5px solid {borde};"
+            "  border-radius: 12px; font-size: 20px; font-weight: 800;"
             "  color: {color}; }}"
             "QPushButton:pressed {{ background: {press}; }}"
         )
         btn_minus = QPushButton("−")
         btn_minus.setToolTip("Quitar 1 pieza")
-        btn_minus.setStyleSheet(_BASE.format(borde=_BORDER, color=_TEXT, press="#f1e6d6"))
+        btn_minus.setStyleSheet(_BASE.format(
+            bg="#f8f2e9", borde="#ddd0c0", color="#73341c", press="#e8dbc7"))
         btn_minus.clicked.connect(lambda checked=False, r=row: self._on_remove(r))
 
         btn_plus = QPushButton("+")
         btn_plus.setToolTip("Agregar 1 pieza")
-        btn_plus.setStyleSheet(_BASE.format(borde=_BORDER, color=_TEXT, press="#f1e6d6"))
+        btn_plus.setStyleSheet(_BASE.format(
+            bg="#f8f2e9", borde="#ddd0c0", color="#73341c", press="#e8dbc7"))
         btn_plus.clicked.connect(lambda checked=False, r=row: self._on_add_one(r))
 
-        btn_trash = QPushButton("🗑")
+        btn_trash = QPushButton("")
         btn_trash.setToolTip("Eliminar la línea completa")
-        btn_trash.setStyleSheet(_BASE.format(borde="#e2b7ad", color=_DANGER, press="#fde3dd"))
+        btn_trash.setStyleSheet(_BASE.format(
+            bg="#fdf0ee", borde="#e8c0b6", color=_DANGER, press="#f9ddd6"))
+        try:
+            from pos_uniformes.ui.quote_satellite_window import _icon_from_asset
+
+            btn_trash.setIcon(_icon_from_asset("kiosk_icons/trash.svg"))
+            btn_trash.setIconSize(QSize(20, 20))
+        except Exception:  # noqa: BLE001 — sin icono, cae al texto
+            btn_trash.setText("🗑")
         btn_trash.clicked.connect(lambda checked=False, r=row: self._on_delete_line(r))
 
         holder = QWidget()
         holder.setFixedHeight(52)
         ly = QHBoxLayout(holder)
-        ly.setContentsMargins(0, 0, 6, 0)
+        ly.setContentsMargins(0, 0, 0, 0)
         ly.setSpacing(5)
+        # Centrados como grupo en la columna y a media altura del renglón.
+        ly.addStretch(1)
         for btn in (btn_minus, btn_plus, btn_trash):
             btn.setFixedSize(48, 42)  # tamaño exacto: nunca se corta
             ly.addWidget(btn, 0, Qt.AlignmentFlag.AlignVCenter)
+        ly.addStretch(1)
         return holder
 
     def _on_add_one(self, row: int) -> None:

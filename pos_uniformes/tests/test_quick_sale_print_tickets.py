@@ -378,4 +378,9 @@ class BotonesCarritoTests(unittest.TestCase):
         acciones = w._items_table.cellWidget(0, 4)
         botones = acciones.findChildren(QPushButton)
         self.assertEqual(len(botones), 3)
-        self.assertEqual({b.text() for b in botones}, {"−", "+", "🗑"})
+        textos = {b.text() for b in botones}
+        self.assertIn("−", textos)
+        self.assertIn("+", textos)
+        # El bote lleva icono SVG (o el emoji de respaldo si el asset falta).
+        trash = next(b for b in botones if b.text() in ("", "🗑"))
+        self.assertTrue(trash.text() == "🗑" or not trash.icon().isNull())
