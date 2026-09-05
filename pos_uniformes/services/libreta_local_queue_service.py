@@ -97,3 +97,78 @@ def drenar_pendientes(session) -> int:
         session.commit()
         _save_raw([])
         return len(entries)
+
+
+# ─── Cola local de CORTES ────────────────────────────────────────────────
+# Mismo espíritu que las operaciones: si al confirmar el corte la PC
+# principal no responde, la cifra se guarda aquí y se sube sola en el
+# siguiente refresh con conexión. Un corte jamás se pierde.
+
+_CORTES_FILENAME = "libreta_cortes_pendientes.json"
+
+
+def _cortes_path() -> Path:
+    return satellite_data_dir() / _DATA_SUBDIR / _CORTES_FILENAME
+
+
+def _load_cortes() -> list[dict]:
+    path = _cortes_path()
+    if not path.exists():
+        return []
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except Exception:  # noqa: BLE001
+        return []
+    return payload if isinstance(payload, list) else []
+
+
+def _save_cortes(entries: list[dict]) -> None:
+    path = _cortes_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path = path.with_suffix(".tmp")
+    tmp_path.write_text(json.dumps(entries, ensure_ascii=False), encoding="utf-8")
+    tmp_path.replace(path)
+
+
+def encolar_corte(entry: dict) -> None:
+    with _LOCK:
+        entries = _load_cortes()
+        entries.append(entry)
+        _save_cortes(entries)
+
+
+def cortes_pendientes() -> list[dict]:
+    return _load_cortes()
+
+
+def drenar_cortes(session) -> int:
+    """Sube los cortes pendientes a la base (conserva su fecha original)."""
+    from datetime import date as _date
+    from decimal import Decimal as _Dec
+
+    from pos_uniformes.services.libreta_service import guardar_corte
+
+    with _LOCK:
+        entries = _load_cortes()
+        if not entries:
+            return 0
+        subidos = 0
+        restantes: list[dict] = []
+        for entry in entries:
+            try:
+                guardar_corte(
+                    session,
+                    fecha=_date.fromisoformat(entry["fecha"]),
+                    monto_final=_Dec(str(entry["monto_final"])),
+                    operaciones=int(entry.get("operaciones", 0)),
+                    piezas=int(entry.get("piezas", 0)),
+                    periodo_label=str(entry.get("periodo_label", "HOY")),
+                    nota=str(entry.get("nota", "") or ""),
+                    creado_por=str(entry.get("creado_por", "")),
+                )
+                subidos += 1
+            except Exception:  # noqa: BLE001 — el que falle se reintenta luego
+                session.rollback()
+                restantes.append(entry)
+        _save_cortes(restantes)
+        return subidos

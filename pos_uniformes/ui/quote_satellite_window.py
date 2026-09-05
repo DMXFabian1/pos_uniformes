@@ -1508,6 +1508,16 @@ class QuoteSatelliteWindow(QMainWindow):
             # faltas/descansos, sin dinero) — la Libreta no se abre.
             self._abrir_calendario_encargado()
             return
+        # Validar el gafete (mismo criterio que el gate de venta rápida):
+        # un código inventado NO abre la Libreta. Offline o con la DB caída
+        # se exige al menos el formato VEND-N para no dejar fuera al equipo.
+        if not self._gafete_libreta_valido(code):
+            self.libreta_gate_error.setText(
+                f"Gafete '{code}' no encontrado o inactivo."
+            )
+            self.libreta_gate_error.setVisible(True)
+            QTimer.singleShot(0, self.libreta_gate_input.setFocus)
+            return
         self._libreta_code = code
         self._libreta_is_owner = code == QuickSaleWidget._OWNER_CODE
         self._libreta_periodo = "hoy"
@@ -1539,6 +1549,25 @@ class QuoteSatelliteWindow(QMainWindow):
             "Su ciclo" if self._libreta_is_owner else "Mi ciclo"
         )
         self._refresh_libreta_view()
+
+    def _gafete_libreta_valido(self, code: str) -> bool:
+        if getattr(self, "offline_mode", False):
+            return code.startswith("VEND-")
+        try:
+            from sqlalchemy import select as _select
+
+            from pos_uniformes.database.models import Empleada
+
+            with get_session() as session:
+                emp = session.scalar(
+                    _select(Empleada).where(
+                        Empleada.codigo == code, Empleada.activo.is_(True)
+                    )
+                )
+            return emp is not None
+        except Exception:  # noqa: BLE001 — DB caída ≠ gafete falso
+            logger.exception("Libreta: error de DB validando gafete '%s'", code)
+            return code.startswith("VEND-")
 
     def _libreta_logout(self) -> None:
         self._libreta_code = None
@@ -1739,6 +1768,10 @@ class QuoteSatelliteWindow(QMainWindow):
                     # Fold: lo pendiente local se sube antes de consultar.
                     try:
                         libreta_cola.drenar_pendientes(session)
+                    except Exception:  # noqa: BLE001
+                        session.rollback()
+                    try:
+                        libreta_cola.drenar_cortes(session)
                     except Exception:  # noqa: BLE001
                         session.rollback()
                     week_rows = listar_operaciones(
@@ -2012,9 +2045,19 @@ class QuoteSatelliteWindow(QMainWindow):
 
         # El corte se guarda con SOLO la cifra final (nunca la esperada):
         # es el número oficial y lo que León consulta en "Ver cortes".
-        try:
-            from datetime import date as _date
+        # Sin conexión NO se pierde: cae a la cola local y sube al reconectar.
+        from datetime import date as _date
 
+        corte_entry = {
+            "fecha": _date.today().isoformat(),
+            "monto_final": str(monto_final),
+            "operaciones": sum(c.operaciones for c in cortes),
+            "piezas": sum(c.piezas for c in cortes),
+            "periodo_label": periodo,
+            "nota": nota,
+            "creado_por": str(self._libreta_code or ""),
+        }
+        try:
             from pos_uniformes.services.libreta_service import guardar_corte
 
             with get_session() as session:
@@ -2022,14 +2065,20 @@ class QuoteSatelliteWindow(QMainWindow):
                     session,
                     fecha=_date.today(),
                     monto_final=monto_final,
-                    operaciones=sum(c.operaciones for c in cortes),
-                    piezas=sum(c.piezas for c in cortes),
+                    operaciones=corte_entry["operaciones"],
+                    piezas=corte_entry["piezas"],
                     periodo_label=periodo,
                     nota=nota,
-                    creado_por=str(self._libreta_code or ""),
+                    creado_por=corte_entry["creado_por"],
                 )
-        except Exception:  # noqa: BLE001 — sin conexión el corte igual se imprime
-            logger.exception("Libreta: no se pudo guardar el corte")
+        except Exception:  # noqa: BLE001 — sin conexión: a la cola local
+            logger.exception("Libreta: corte a cola local (sin conexión)")
+            try:
+                from pos_uniformes.services import libreta_local_queue_service as cola
+
+                cola.encolar_corte(corte_entry)
+            except Exception:  # noqa: BLE001
+                logger.exception("Libreta: tampoco se pudo encolar el corte")
 
         texto = build_corte_ticket_text(
             periodo_label=periodo,

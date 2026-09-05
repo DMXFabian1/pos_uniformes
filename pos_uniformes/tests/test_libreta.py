@@ -909,6 +909,129 @@ class VentanaCicloTests(unittest.TestCase):
         fake._refresh_libreta_view.assert_called_once()
 
 
+class GateLibretaValidaTests(unittest.TestCase):
+    """Un código inventado NO abre la Libreta; los reales sí."""
+
+    def _fake(self, valido: bool):
+        fake = SimpleNamespace(
+            libreta_gate_input=SimpleNamespace(
+                text=lambda: "CUALQUIERA", clear=MagicMock(), setFocus=MagicMock()
+            ),
+            libreta_gate_error=MagicMock(),
+            _gafete_libreta_valido=lambda code: valido,
+            _libreta_code=None,
+        )
+        return fake
+
+    def test_codigo_invalido_no_abre_y_muestra_error(self) -> None:
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        fake = self._fake(valido=False)
+        QuoteSatelliteWindow._on_libreta_gate_scan(fake)
+        self.assertIsNone(fake._libreta_code)
+        fake.libreta_gate_error.setVisible.assert_called_with(True)
+
+    def test_validador_offline_exige_formato_vend(self) -> None:
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        fake = SimpleNamespace(offline_mode=True)
+        valido = QuoteSatelliteWindow._gafete_libreta_valido
+        self.assertTrue(valido(fake, "VEND-2"))
+        self.assertFalse(valido(fake, "PATITO"))
+
+    def test_validador_online_consulta_empleada(self) -> None:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from pos_uniformes.database.models import Empleada
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        engine = create_engine("sqlite://")
+        Empleada.__table__.create(engine)
+        session = sessionmaker(bind=engine)()
+        session.add(Empleada(codigo="VEND-2", nombre_completo="Ana", activo=True))
+        session.add(Empleada(codigo="VEND-9", nombre_completo="Baja", activo=False))
+        session.commit()
+
+        cm = MagicMock()
+        cm.__enter__ = lambda s: session
+        cm.__exit__ = lambda s, *a: False
+        fake = SimpleNamespace(offline_mode=False)
+        with patch(
+            "pos_uniformes.ui.quote_satellite_window.get_session", return_value=cm
+        ):
+            valido = QuoteSatelliteWindow._gafete_libreta_valido
+            self.assertTrue(valido(fake, "VEND-2"))
+            self.assertFalse(valido(fake, "VEND-9"))  # inactiva
+            self.assertFalse(valido(fake, "NOEXISTE"))
+        session.close()
+
+
+class ColaCortesOfflineTests(unittest.TestCase):
+    """Un corte sin conexión cae a la cola local y sube al reconectar."""
+
+    def test_encolar_y_drenar_corte(self) -> None:
+        import tempfile
+        from pathlib import Path
+
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from pos_uniformes.database.models import LibretaCorte
+
+        engine = create_engine("sqlite://")
+        LibretaCorte.__table__.create(engine)
+        session = sessionmaker(bind=engine)()
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch(
+                "pos_uniformes.services.libreta_local_queue_service.satellite_data_dir",
+                return_value=Path(tmp),
+            ):
+                cola.encolar_corte(
+                    {
+                        "fecha": "2026-09-04",
+                        "monto_final": "17180.00",
+                        "operaciones": 29,
+                        "piezas": 76,
+                        "periodo_label": "HOY",
+                        "nota": "",
+                        "creado_por": "VEND-1",
+                    }
+                )
+                self.assertEqual(len(cola.cortes_pendientes()), 1)
+                subidos = cola.drenar_cortes(session)
+                self.assertEqual(subidos, 1)
+                self.assertEqual(cola.cortes_pendientes(), [])
+
+        guardado = session.query(LibretaCorte).one()
+        self.assertEqual(str(guardado.monto_final), "17180.00")
+        self.assertEqual(guardado.fecha, date(2026, 9, 4))  # conserva su fecha
+        self.assertEqual(guardado.creado_por, "VEND-1")
+        session.close()
+
+    def test_drenado_fallido_conserva_el_corte(self) -> None:
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmp:
+            with patch(
+                "pos_uniformes.services.libreta_local_queue_service.satellite_data_dir",
+                return_value=Path(tmp),
+            ):
+                cola.encolar_corte(
+                    {"fecha": "2026-09-04", "monto_final": "100.00", "creado_por": "VEND-1"}
+                )
+                sesion_rota = MagicMock()
+                with patch(
+                    "pos_uniformes.services.libreta_service.guardar_corte",
+                    side_effect=OSError("sin red"),
+                ):
+                    subidos = cola.drenar_cortes(sesion_rota)
+                self.assertEqual(subidos, 0)
+                self.assertEqual(len(cola.cortes_pendientes()), 1)  # sigue ahí
+
+
 class GafeteEncargadoTests(unittest.TestCase):
     """El gafete ENC-1 abre el calendario en modo encargado, sin entrar a
     la Libreta (no ve dinero)."""
@@ -1092,6 +1215,7 @@ class LibretaPagePrivacyTests(unittest.TestCase):
             libreta_table=MagicMock(),
             libreta_titular_label=MagicMock(),
             libreta_ciclo_button=MagicMock(),
+            _gafete_libreta_valido=lambda code: True,
             _sync_libreta_filtros=MagicMock(),
             _refresh_libreta_view=MagicMock(),
         )
