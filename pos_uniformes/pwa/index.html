@@ -357,7 +357,8 @@ function pintarEmpleada(data) {
   let partes = [`⭐ Comisiones desde tu último pago: ${e.comisiones_ciclo}`];
   if (e.siguiente_descanso) partes.push(`🛌 Descansas el ${fechaLarga(e.siguiente_descanso)}`);
   if (e.proximo_pago) partes.push(`💵 Próximo pago: ${fechaLarga(e.proximo_pago)}` +
-    (e.dias_para_pago === 0 ? " — ¡hoy!" : ` (faltan ${e.dias_para_pago} días)`));
+    (e.dias_para_pago === 0 ? " — ¡hoy!" :
+      e.dias_para_pago === 1 ? " (falta 1 día)" : ` (faltan ${e.dias_para_pago} días)`));
   $("emp-banner").innerHTML = partes.join("<br>");
   calY = e.calendario.year; calM = e.calendario.month;
   pintarCalendario(e.calendario);
