@@ -453,8 +453,11 @@ class QuickSaleWidget(QWidget):
         self._items_table.setColumnWidth(2, 60)
         self._items_table.setColumnWidth(3, 100)
         self._items_table.setColumnWidth(4, 172)
-        # Filas altas: los botones +/−/eliminar se tocan con el dedo.
-        self._items_table.verticalHeader().setDefaultSectionSize(52)
+        # La FILA se mide sola del contenido (incluye los botones +/−/🗑):
+        # imposible que desborden o queden chuecos, en cualquier pantalla.
+        self._items_table.verticalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.ResizeToContents
+        )
         self._items_table.setStyleSheet(f"""
             QTableWidget {{
                 background: white; border: none; font-size: 13px; color: {_TEXT};
@@ -653,7 +656,6 @@ class QuickSaleWidget(QWidget):
             self._items_table.setItem(row, 3, price_item)
 
             self._items_table.setCellWidget(row, 4, self._build_row_actions(row))
-            self._items_table.setRowHeight(row, 52)
 
         self._items_table.setRowCount(max(len(self._items), 1))
         if not self._items:
@@ -713,10 +715,9 @@ class QuickSaleWidget(QWidget):
 
         holder = QWidget()
         ly = QHBoxLayout(holder)
-        # Margen inferior de 8px: corrige el centro ÓPTICO (el texto de la
-        # fila pinta unos px arriba del centro geométrico por el borde
-        # inferior del renglón; sin esto los botones se ven "caídos").
-        ly.setContentsMargins(0, 0, 0, 8)
+        # Márgenes SIMÉTRICOS: la fila toma su alto de este widget (6+42+6)
+        # y los botones quedan centrados por construcción, no por cálculo.
+        ly.setContentsMargins(0, 6, 0, 6)
         ly.setSpacing(5)
         ly.setAlignment(Qt.AlignmentFlag.AlignCenter)
         for btn in (btn_minus, btn_plus, btn_trash):
