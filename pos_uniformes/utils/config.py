@@ -127,6 +127,11 @@ class Settings:
 
     @property
     def database_url(self) -> str:
+        # Override completo de la URL (p.ej. el servidor PWA de la casa lee
+        # un snapshot SQLite: POS_UNIFORMES_DB_URL=sqlite:///C:/pos_movil/snapshot.sqlite)
+        override = os.getenv("POS_UNIFORMES_DB_URL", "").strip()
+        if override:
+            return override
         return (
             f"postgresql+psycopg://{self.db_user}:{self.db_password}"
             f"@{self.db_host}:{self.db_port}/{self.db_name}"

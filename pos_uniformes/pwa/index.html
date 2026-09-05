@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#a84f2d">
+<title>MAXIMODA</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+:root{
+  --crema:#f4ede2; --carta:#fffdf8; --tinta:#2c2a27; --tenue:#5f594f;
+  --acento:#a84f2d; --acento-osc:#8a4326; --borde:#ddd0c0;
+  --azul-bg:#dce8f7; --azul:#2b5c8a; --rojo-bg:#f6d3cb; --rojo:#a33b25;
+  --verde-bg:#d9ecd0; --verde:#3d6b2f;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+body{margin:0; background:var(--crema); color:var(--tinta);
+  font-family:-apple-system,"Segoe UI",Roboto,sans-serif; font-size:16px;
+  padding-bottom:env(safe-area-inset-bottom)}
+.app{max-width:520px; margin:0 auto; padding:16px}
+h1{font-size:22px; color:var(--acento-osc); margin:10px 0 2px}
+.sub{color:var(--tenue); font-size:13px; margin:0 0 14px}
+.card{background:var(--carta); border:1px solid var(--borde); border-radius:16px;
+  padding:16px; margin-bottom:12px}
+.banner{background:var(--acento); color:#fff; border:none; font-weight:700;
+  font-size:17px; line-height:1.5}
+.big{font-size:34px; font-weight:800; margin:2px 0}
+.fila{display:flex; justify-content:space-between; align-items:center; padding:10px 0;
+  border-bottom:1px solid var(--borde); font-weight:600}
+.fila:last-child{border-bottom:none}
+.fila .monto{font-weight:800; font-size:18px}
+button{width:100%; border:none; border-radius:14px; min-height:54px; font-size:17px;
+  font-weight:800; cursor:pointer}
+.btn-acento{background:var(--acento); color:#fff}
+.btn-suave{background:var(--carta); color:var(--acento-osc); border:1px solid var(--borde)}
+input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
+  min-height:52px; font-size:17px; padding:0 14px; background:var(--carta);
+  color:var(--tinta); margin-bottom:12px}
+.error{color:var(--rojo); font-weight:700; margin:8px 0}
+.oculto{display:none}
+/* calendario */
+.cal{display:grid; grid-template-columns:repeat(7,1fr); gap:4px; margin-top:8px}
+.cal .cab{font-size:11px; color:var(--tenue); text-align:center; font-weight:700}
+.cal .dia{aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+  border-radius:10px; font-weight:700; font-size:14px; background:var(--carta);
+  border:1px solid var(--borde)}
+.cal .vacio{background:transparent; border:none}
+.cal .descanso{background:var(--azul-bg); color:var(--azul); border-color:transparent}
+.cal .falta{background:var(--rojo-bg); color:var(--rojo); border-color:transparent}
+.cal .pago{background:var(--verde-bg); color:var(--verde); border-color:transparent}
+.cal .hoy{outline:2px solid var(--acento)}
+.cal-nav{display:flex; align-items:center; justify-content:space-between; margin-top:4px}
+.cal-nav button{width:44px; min-height:44px; font-size:18px}
+.leyenda{font-size:12px; color:var(--tenue); margin-top:8px}
+.leyenda span{padding:2px 8px; border-radius:8px; margin-right:6px}
+.salir{margin-top:16px}
+.pill{font-size:12px; background:var(--crema); border:1px solid var(--borde);
+  border-radius:99px; padding:3px 10px; color:var(--tenue)}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- LOGIN -->
+  <div id="vista-login">
+    <h1>MAXIMODA</h1>
+    <p class="sub">Libreta móvil</p>
+    <div class="card">
+      <label>¿Quién eres?</label>
+      <select id="login-quien"></select>
+      <label>Tu PIN</label>
+      <input id="login-pin" type="password" inputmode="numeric" placeholder="••••">
+      <div id="login-error" class="error oculto"></div>
+      <button class="btn-acento" onclick="entrar()">Entrar</button>
+    </div>
+  </div>
+
+  <!-- EMPLEADA -->
+  <div id="vista-empleada" class="oculto">
+    <h1 id="emp-hola"></h1>
+    <p class="sub" id="emp-fecha"></p>
+    <div class="card banner" id="emp-banner"></div>
+    <div class="card">
+      <div class="cal-nav">
+        <button class="btn-suave" onclick="moverMes(-1)">◀</button>
+        <strong id="cal-titulo"></strong>
+        <button class="btn-suave" onclick="moverMes(1)">▶</button>
+      </div>
+      <div class="cal" id="cal-grid"></div>
+      <div class="leyenda">
+        <span style="background:var(--azul-bg);color:var(--azul)">Descanso</span>
+        <span style="background:var(--rojo-bg);color:var(--rojo)">Falta</span>
+        <span style="background:var(--verde-bg);color:var(--verde)">Pago</span>
+      </div>
+    </div>
+    <button class="btn-suave salir" onclick="salir()">Salir</button>
+  </div>
+
+  <!-- ENCARGADO (León) -->
+  <div id="vista-encargado" class="oculto">
+    <h1>Cortes</h1>
+    <p class="sub">Los más recientes primero</p>
+    <div id="cortes-lista"></div>
+    <button class="btn-suave salir" onclick="salir()">Salir</button>
+  </div>
+
+  <!-- DUEÑO -->
+  <div id="vista-dueno" class="oculto">
+    <h1>📒 Tu tienda</h1>
+    <p class="sub" id="dueno-fecha"></p>
+    <div class="card banner">
+      <div>VENTA DE HOY</div>
+      <div class="big" id="d-venta"></div>
+      <div id="d-detalle"></div>
+    </div>
+    <div class="card">
+      <strong>Hoy por empleada</strong>
+      <div id="d-ranking"></div>
+    </div>
+    <div class="card">
+      <strong>Ciclos (comisiones desde su último pago)</strong>
+      <div id="d-ciclos"></div>
+    </div>
+    <div class="card">
+      <strong>Últimos cortes</strong>
+      <div id="d-cortes"></div>
+    </div>
+    <button class="btn-suave salir" onclick="salir()">Salir</button>
+  </div>
+
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+const DIAS = ["lun","mar","mié","jue","vie","sáb","dom"];
+let token = localStorage.getItem("pos_token") || "";
+let calY = 0, calM = 0;
+
+const pesos = s => "$" + Number(s).toLocaleString("es-MX", {minimumFractionDigits: 2});
+// Fecha LOCAL (toISOString es UTC y por la tarde ya marca "manana")
+const hoyISO = () => { const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; };
+const fechaLarga = iso => { const [y,m,d] = iso.split("-").map(Number);
+  const f = new Date(y, m-1, d);
+  return ["domingo","lunes","martes","miércoles","jueves","viernes","sábado"][f.getDay()] + ` ${d} de ${MESES[m-1]}`; };
+
+async function api(ruta) {
+  const r = await fetch(ruta, {headers: {"Authorization": "Bearer " + token}});
+  if (r.status === 401) { salir(); throw new Error("sesion"); }
+  if (!r.ok) throw new Error("api");
+  return r.json();
+}
+
+function mostrar(vista) {
+  for (const v of ["login","empleada","encargado","dueno"]) $("vista-"+v).classList.add("oculto");
+  $("vista-"+vista).classList.remove("oculto");
+}
+
+async function cargarLogin() {
+  mostrar("login");
+  try {
+    const emps = await (await fetch("/api/v1/auth/employees")).json();
+    $("login-quien").innerHTML = emps.map(e =>
+      `<option value="${e.id}">${e.nombre_visible || e.nombre_completo}</option>`).join("");
+  } catch (e) {
+    $("login-error").textContent = "No se pudo conectar. Revisa tu conexión.";
+    $("login-error").classList.remove("oculto");
+  }
+}
+
+async function entrar() {
+  $("login-error").classList.add("oculto");
+  try {
+    const r = await fetch("/api/v1/auth/login", {
+      method: "POST", headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({employee_id: Number($("login-quien").value),
+                            pin: $("login-pin").value, device_id: "pwa"}),
+    });
+    if (!r.ok) throw new Error();
+    const data = await r.json();
+    token = data.access_token || data.token;
+    localStorage.setItem("pos_token", token);
+    $("login-pin").value = "";
+    await cargarInicio();
+  } catch (e) {
+    $("login-error").textContent = "PIN incorrecto o sin conexión.";
+    $("login-error").classList.remove("oculto");
+  }
+}
+
+function salir() { token = ""; localStorage.removeItem("pos_token"); cargarLogin(); }
+
+async function cargarInicio() {
+  const data = await api("/api/v1/movil/inicio");
+  if (data.rol === "empleada") pintarEmpleada(data);
+  else if (data.rol === "encargado") pintarEncargado(data);
+  else pintarDueno(data);
+}
+
+function pintarEmpleada(data) {
+  const e = data.empleada;
+  $("emp-hola").textContent = `Hola, ${data.nombre} 👋`;
+  $("emp-fecha").textContent = fechaLarga(hoyISO());
+  let partes = [`⭐ Comisiones desde tu último pago: ${e.comisiones_ciclo}`];
+  if (e.siguiente_descanso) partes.push(`🛌 Descansas el ${fechaLarga(e.siguiente_descanso)}`);
+  if (e.proximo_pago) partes.push(`💵 Próximo pago: ${fechaLarga(e.proximo_pago)}` +
+    (e.dias_para_pago === 0 ? " — ¡hoy!" : ` (faltan ${e.dias_para_pago} días)`));
+  $("emp-banner").innerHTML = partes.join("<br>");
+  calY = e.calendario.year; calM = e.calendario.month;
+  pintarCalendario(e.calendario);
+  mostrar("empleada");
+}
+
+function pintarCalendario(cal) {
+  $("cal-titulo").textContent = `${MESES[cal.month-1]} ${cal.year}`;
+  const hoy = hoyISO();
+  let html = DIAS.map(d => `<div class="cab">${d}</div>`).join("");
+  const primero = new Date(cal.year, cal.month-1, 1);
+  const offset = (primero.getDay() + 6) % 7;  // lunes primero
+  html += '<div class="vacio dia"></div>'.repeat(offset);
+  const fechas = Object.keys(cal.dias).sort();
+  for (const iso of fechas) {
+    const estado = cal.dias[iso];
+    const clase = estado === "trabajo" ? "" : estado;
+    const esHoy = iso === hoy ? " hoy" : "";
+    html += `<div class="dia ${clase}${esHoy}">${Number(iso.slice(8))}</div>`;
+  }
+  $("cal-grid").innerHTML = html;
+}
+
+async function moverMes(delta) {
+  calM += delta;
+  if (calM < 1) { calM = 12; calY--; }
+  if (calM > 12) { calM = 1; calY++; }
+  pintarCalendario(await api(`/api/v1/movil/calendario?year=${calY}&month=${calM}`));
+}
+
+function filaCorte(c) {
+  return `<div class="fila"><span>${fechaLarga(c.fecha)}</span>` +
+         `<span class="monto">${pesos(c.monto)}</span></div>`;
+}
+
+function pintarEncargado(data) {
+  $("cortes-lista").innerHTML = data.cortes.length
+    ? `<div class="card">${data.cortes.map(filaCorte).join("")}</div>`
+    : '<div class="card">Todavía no hay cortes guardados.</div>';
+  mostrar("encargado");
+}
+
+function pintarDueno(data) {
+  const d = data.dueno;
+  $("dueno-fecha").textContent = fechaLarga(hoyISO());
+  $("d-venta").textContent = pesos(d.hoy.venta);
+  $("d-detalle").textContent = `${d.hoy.operaciones} operaciones · ${d.hoy.piezas} piezas`;
+  $("d-ranking").innerHTML = d.ranking.length ? d.ranking.map(r =>
+    `<div class="fila"><span>${r.nombre.split(" ")[0]} <span class="pill">${r.comisiones} com · ${r.piezas} pz</span></span>` +
+    `<span class="monto">${pesos(r.monto)}</span></div>`).join("")
+    : "<div class='fila'>Sin movimientos hoy.</div>";
+  $("d-ciclos").innerHTML = d.ciclos.map(c =>
+    `<div class="fila"><span>${c.nombre.split(" ")[0]}` +
+    (c.proximo_pago ? ` <span class="pill">paga ${fechaLarga(c.proximo_pago).split(" ")[0]} ${c.proximo_pago.slice(8)}</span>` : "") +
+    `</span><span class="monto">${c.comisiones_ciclo} com.</span></div>`).join("") || "<div class='fila'>Sin ciclos aún.</div>";
+  $("d-cortes").innerHTML = d.cortes.map(filaCorte).join("") || "<div class='fila'>Aún no hay cortes.</div>";
+  mostrar("dueno");
+}
+
+if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
+(token ? cargarInicio().catch(cargarLogin) : cargarLogin());
+</script>
+</body>
+</html>

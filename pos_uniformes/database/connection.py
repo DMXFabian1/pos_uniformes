@@ -42,18 +42,25 @@ def build_connect_args(statement_timeout_ms: int) -> dict:
     return connect_args
 
 
-engine: Engine = create_engine(
-    settings.database_url,
-    echo=settings.db_echo,
-    future=True,
-    # pool_pre_ping: prueba la conexión (SELECT 1) antes de reutilizarla y
-    # reconecta sola si murió — evita el "server closed the connection
-    # unexpectedly" cuando la red LAN parpadea o Postgres se reinicia
-    # (crítico en el satélite, que va por Wi-Fi a la PC principal).
-    pool_pre_ping=True,
-    pool_recycle=1800,  # recicla conexiones > 30 min (NAT/firewall las cortan)
-    connect_args=build_connect_args(settings.db_statement_timeout_ms),
-)
+_DB_URL = settings.database_url
+
+if _DB_URL.startswith("sqlite"):
+    # Modo snapshot (servidor PWA de la casa): SQLite no entiende los
+    # keepalives/timeouts de psycopg — engine simple.
+    engine: Engine = create_engine(_DB_URL, echo=settings.db_echo, future=True)
+else:
+    engine = create_engine(
+        _DB_URL,
+        echo=settings.db_echo,
+        future=True,
+        # pool_pre_ping: prueba la conexión (SELECT 1) antes de reutilizarla y
+        # reconecta sola si murió — evita el "server closed the connection
+        # unexpectedly" cuando la red LAN parpadea o Postgres se reinicia
+        # (crítico en el satélite, que va por Wi-Fi a la PC principal).
+        pool_pre_ping=True,
+        pool_recycle=1800,  # recicla conexiones > 30 min (NAT/firewall las cortan)
+        connect_args=build_connect_args(settings.db_statement_timeout_ms),
+    )
 
 SessionLocal = sessionmaker(
     bind=engine,

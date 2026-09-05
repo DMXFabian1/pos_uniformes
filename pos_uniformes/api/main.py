@@ -10,7 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from pos_uniformes.api.routers import health, auth, catalog, clients, favorites, quotes, sales, search
+from pos_uniformes.api.routers import health, auth, catalog, clients, favorites, movil, quotes, sales, search
 
 
 @asynccontextmanager
@@ -82,6 +82,21 @@ app.include_router(auth.router)
 app.include_router(catalog.router)
 app.include_router(clients.router)
 app.include_router(favorites.router)
+app.include_router(movil.router)
 app.include_router(quotes.router)
 app.include_router(sales.router)
 app.include_router(search.router)
+
+# PWA (Libreta móvil): estáticos en /app, y la raíz redirige ahí.
+from pathlib import Path as _Path
+
+from fastapi.responses import RedirectResponse
+from fastapi.staticfiles import StaticFiles
+
+_PWA_DIR = _Path(__file__).resolve().parents[1] / "pwa"
+if _PWA_DIR.exists():
+    app.mount("/app", StaticFiles(directory=str(_PWA_DIR), html=True), name="pwa")
+
+    @app.get("/", include_in_schema=False)
+    def _raiz() -> RedirectResponse:
+        return RedirectResponse("/app/")
