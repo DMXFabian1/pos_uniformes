@@ -1065,6 +1065,10 @@ class QuoteSatelliteWindow(QMainWindow):
         budget_layout.addWidget(budget_title)
         budget_layout.addWidget(self.sidebar_total_label)
         budget_layout.addWidget(self.sidebar_summary_label)
+        # Cuadro de resumen RETIRADO (pedido de Daniel 2026-09-05): repetía
+        # el total y robaba espacio a "Piezas agregadas" — las líneas/piezas
+        # ya se ven en el contador de esa sección. setVisible(True) lo revive.
+        self.sidebar_summary_label.setVisible(False)
         budget_card.setLayout(budget_layout)
 
         items_card = QFrame()
