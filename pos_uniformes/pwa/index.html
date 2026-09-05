@@ -17,7 +17,14 @@
 *{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
 body{margin:0; background:var(--crema); color:var(--tinta);
   font-family:-apple-system,"Segoe UI",Roboto,sans-serif; font-size:16px;
-  padding-bottom:env(safe-area-inset-bottom)}
+  padding-bottom:env(safe-area-inset-bottom); overscroll-behavior-y:contain}
+#ptr{position:fixed; top:-56px; left:50%; margin-left:-22px; width:44px; height:44px;
+  border-radius:50%; background:var(--carta); border:1px solid var(--borde);
+  display:flex; align-items:center; justify-content:center; font-size:22px;
+  color:var(--acento-osc); font-weight:800; z-index:60;
+  box-shadow:0 3px 10px rgba(0,0,0,.15); transition:top .18s}
+#ptr.girando{animation:ptr-spin .7s linear infinite}
+@keyframes ptr-spin{to{transform:rotate(360deg)}}
 .app{max-width:520px; margin:0 auto; padding:16px}
 h1{font-size:22px; color:var(--acento-osc); margin:10px 0 2px}
 .sub{color:var(--tenue); font-size:13px; margin:0 0 14px}
@@ -409,6 +416,47 @@ function pintarDueno(data) {
   $("d-cortes").innerHTML = d.cortes.map(filaCorte).join("") || "<div class='fila'>Aún no hay cortes.</div>";
   mostrar("dueno");
 }
+
+// ── Jalar hacia abajo para actualizar ──────────────────────────────
+const ptr = document.createElement("div");
+ptr.id = "ptr"; ptr.textContent = "↓";
+document.body.appendChild(ptr);
+let ptrY0 = null, ptrDist = 0, ptrOcupado = false;
+const PTR_UMBRAL = 48;
+
+function ptrElegible() {
+  if (!token || ptrOcupado || window.scrollY > 0) return false;
+  const vista = ["empleada", "encargado", "dueno"].find(
+    v => !$("vista-" + v).classList.contains("oculto"));
+  return Boolean(vista);
+}
+
+document.addEventListener("touchstart", (e) => {
+  ptrY0 = ptrElegible() ? e.touches[0].clientY : null;
+  ptrDist = 0;
+}, {passive: true});
+
+document.addEventListener("touchmove", (e) => {
+  if (ptrY0 === null) return;
+  ptrDist = Math.min((e.touches[0].clientY - ptrY0) * 0.5, 90);
+  if (ptrDist > 6 && window.scrollY === 0) {
+    ptr.style.top = (ptrDist - 50) + "px";
+    ptr.textContent = ptrDist >= PTR_UMBRAL ? "↻" : "↓";
+  }
+}, {passive: true});
+
+document.addEventListener("touchend", async () => {
+  if (ptrY0 === null) return;
+  const suelto = ptrDist; ptrY0 = null;
+  if (suelto >= PTR_UMBRAL) {
+    ptrOcupado = true;
+    ptr.style.top = "16px"; ptr.textContent = "↻"; ptr.classList.add("girando");
+    try { await cargarInicio(); } catch (e) {}
+    ptr.classList.remove("girando");
+    ptrOcupado = false;
+  }
+  ptr.style.top = "-56px"; ptrDist = 0;
+});
 
 if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js");
 (token ? cargarInicio().catch(cargarLogin) : cargarLogin());
