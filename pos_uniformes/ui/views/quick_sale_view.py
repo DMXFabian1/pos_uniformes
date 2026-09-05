@@ -460,7 +460,7 @@ class QuickSaleWidget(QWidget):
         )
         self._items_table.setStyleSheet(f"""
             QTableWidget {{
-                background: white; border: none; font-size: 13px; color: {_TEXT};
+                background: white; border: none; font-size: 16px; color: {_TEXT};
             }}
             QTableWidget::item {{
                 padding: 8px 10px; border-bottom: 1px solid #f0e6db;
@@ -469,7 +469,7 @@ class QuickSaleWidget(QWidget):
             QTableWidget::item:selected {{ background: {_BRAND_LIGHT}; color: {_TEXT}; }}
             QHeaderView::section {{
                 background: {_WARM_BG}; color: {_MUTED}; font-weight: 600;
-                font-size: 11px; padding: 8px 10px; border: none;
+                font-size: 12px; padding: 8px 10px; border: none;
                 border-bottom: 1.5px solid {_BORDER};
                 text-transform: uppercase;
             }}
