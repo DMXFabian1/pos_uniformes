@@ -478,6 +478,80 @@ class CorteTicketTests(unittest.TestCase):
             self.assertLessEqual(len(line), TICKET_CHAR_WIDTH)
 
 
+class HistorialCortesTests(unittest.TestCase):
+    """El corte guarda SOLO la cifra final del dueño; León ve fecha y cifra."""
+
+    def setUp(self) -> None:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from pos_uniformes.database.models import LibretaCorte
+
+        engine = create_engine("sqlite://")
+        LibretaCorte.__table__.create(engine)
+        self.session = sessionmaker(bind=engine)()
+
+    def tearDown(self) -> None:
+        self.session.close()
+
+    def test_guardar_y_listar_solo_cifra_final(self) -> None:
+        from pos_uniformes.services.libreta_service import guardar_corte, listar_cortes
+
+        guardar_corte(
+            self.session, fecha=date(2026, 9, 3), monto_final=Decimal("15000.00"),
+            operaciones=20, piezas=50, creado_por="VEND-1",
+        )
+        guardar_corte(
+            self.session, fecha=date(2026, 9, 4), monto_final=Decimal("17180.00"),
+            operaciones=29, piezas=76, nota="cierre normal", creado_por="VEND-1",
+        )
+        cortes = listar_cortes(self.session)
+        self.assertEqual(len(cortes), 2)
+        self.assertEqual(cortes[0].fecha, date(2026, 9, 4))  # más reciente primero
+        self.assertEqual(cortes[0].monto_final, Decimal("17180.00"))
+        # La tabla NO tiene columnas de esperado/diferencia: sin rastro.
+        columnas = {c.name for c in cortes[0].__table__.columns}
+        self.assertNotIn("monto_esperado", columnas)
+        self.assertNotIn("diferencia", columnas)
+
+    def test_leon_ve_fecha_y_cifra(self) -> None:
+        import os as _os
+
+        _os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from PyQt6.QtWidgets import QApplication, QLabel
+
+        QApplication.instance() or QApplication([])
+        from pos_uniformes.services.libreta_service import guardar_corte
+
+        guardar_corte(
+            self.session, fecha=date(2026, 9, 4), monto_final=Decimal("17180.00"),
+            operaciones=29, piezas=76, creado_por="VEND-1",
+        )
+        cm = MagicMock()
+        cm.__enter__ = lambda s: self.session
+        cm.__exit__ = lambda s, *a: False
+        with patch(
+            "pos_uniformes.database.connection.get_session", return_value=cm
+        ):
+            from pos_uniformes.ui.dialogs.calendario_empleadas_dialog import (
+                CalendarioEncargadoDialog,
+            )
+
+            dlg = CalendarioEncargadoDialog(None)
+            dlg._ir_a_cortes()
+            textos = [
+                dlg._cortes_lista.itemAt(i).widget().text()
+                for i in range(dlg._cortes_lista.count())
+                if isinstance(dlg._cortes_lista.itemAt(i).widget(), QLabel)
+            ]
+        self.assertEqual(len(textos), 1)
+        self.assertIn("viernes 4 de septiembre", textos[0])
+        self.assertIn("$17,180.00", textos[0])
+        # Solo cifras: sin operaciones, piezas ni notas en su vista.
+        self.assertNotIn("29", textos[0])
+        self.assertNotIn("76", textos[0])
+
+
 class LibretaListaAmigableTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -856,6 +930,7 @@ class CalendarioEncargadoSimpleTests(unittest.TestCase):
             )
 
             dlg = CalendarioEncargadoDialog(None)
+            dlg._ir_a_quien()  # el inicio ahora es el menú; esto entra a Apuntar
             textos = [
                 dlg._quien_botones.itemAt(i).widget().text()
                 for i in range(dlg._quien_botones.count())

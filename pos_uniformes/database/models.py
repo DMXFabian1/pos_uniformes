@@ -1997,3 +1997,28 @@ class EmpleadaEvento(Base):
         server_default=func.now(),
         nullable=False,
     )
+
+
+class LibretaCorte(Base):
+    """Cortes hechos por el dueño (Libreta → Imprimir corte).
+
+    Guarda SOLO la cifra final que el dueño confirmó/editó — nunca la
+    esperada ni la diferencia: el número oficial es este y no hay rastro
+    de edición ni aquí. Es lo que consulta el encargado en "Ver cortes".
+    """
+
+    __tablename__ = "libreta_corte"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    fecha: Mapped[date] = mapped_column(Date, nullable=False, index=True)
+    periodo_label: Mapped[str] = mapped_column(String(80), nullable=False, default="HOY")
+    monto_final: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    operaciones: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    piezas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    nota: Mapped[str | None] = mapped_column(String(200))
+    creado_por: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        nullable=False,
+    )

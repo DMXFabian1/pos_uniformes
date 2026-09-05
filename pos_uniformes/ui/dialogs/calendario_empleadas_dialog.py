@@ -650,13 +650,22 @@ class CalendarioEncargadoDialog(QDialog):
         raiz.addWidget(self._pila, 1)
         self.setLayout(raiz)
 
+        self._pg_menu = self._pagina_menu()
         self._pg_quien = self._pagina_quien()
         self._pg_que = self._pagina_que()
         self._pg_cuando = self._pagina_cuando()
         self._pg_listo = self._pagina_listo()
-        for p in (self._pg_quien, self._pg_que, self._pg_cuando, self._pg_listo):
+        self._pg_cortes = self._pagina_cortes()
+        for p in (
+            self._pg_menu,
+            self._pg_quien,
+            self._pg_que,
+            self._pg_cuando,
+            self._pg_listo,
+            self._pg_cortes,
+        ):
             self._pila.addWidget(p)
-        self._ir_a_quien()
+        self._pila.setCurrentWidget(self._pg_menu)
 
     # ── Páginas ──────────────────────────────────────────────────────────
 
@@ -665,6 +674,82 @@ class CalendarioEncargadoDialog(QDialog):
         lbl.setWordWrap(True)
         lbl.setStyleSheet("font-size: 26px; font-weight: 800; color: #73341c;")
         return lbl
+
+    def _pagina_menu(self) -> QWidget:
+        """Pantalla de inicio de León: dos cosas, en grande."""
+        pagina = QWidget()
+        ly = QVBoxLayout()
+        ly.setSpacing(14)
+        ly.addWidget(self._titulo("¿Qué quieres hacer?"))
+        btn_apuntar = QPushButton("🗓  Apuntar falta o descanso")
+        btn_apuntar.setStyleSheet(self._BTN)
+        btn_apuntar.clicked.connect(self._ir_a_quien)
+        ly.addWidget(btn_apuntar)
+        btn_cortes = QPushButton("💵  Ver cortes")
+        btn_cortes.setStyleSheet(self._BTN)
+        btn_cortes.clicked.connect(self._ir_a_cortes)
+        ly.addWidget(btn_cortes)
+        ly.addStretch()
+        salir = QPushButton("Salir")
+        salir.setStyleSheet(self._BTN_SUAVE)
+        salir.clicked.connect(self.accept)
+        ly.addWidget(salir)
+        pagina.setLayout(ly)
+        return pagina
+
+    def _pagina_cortes(self) -> QWidget:
+        """Cortes anteriores: SOLO fecha y cifra — lo que Daniel entregó."""
+        pagina = QWidget()
+        ly = QVBoxLayout()
+        ly.setSpacing(10)
+        ly.addWidget(self._titulo("Cortes"))
+        self._cortes_lista = QVBoxLayout()
+        self._cortes_lista.setSpacing(8)
+        ly.addLayout(self._cortes_lista)
+        ly.addStretch()
+        regresar = QPushButton("← Regresar")
+        regresar.setStyleSheet(self._BTN_SUAVE)
+        regresar.clicked.connect(lambda: self._pila.setCurrentWidget(self._pg_menu))
+        ly.addWidget(regresar)
+        pagina.setLayout(ly)
+        return pagina
+
+    def _ir_a_cortes(self) -> None:
+        while self._cortes_lista.count():
+            item = self._cortes_lista.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+        try:
+            from pos_uniformes.database.connection import get_session
+            from pos_uniformes.services.libreta_service import listar_cortes
+
+            with get_session() as session:
+                cortes = listar_cortes(session, limit=10)
+        except Exception:  # noqa: BLE001
+            logger.exception("Encargado: no se pudieron cargar los cortes")
+            cortes = None
+        if cortes is None:
+            aviso = QLabel("No hay conexión.\nCierra e intenta otra vez.")
+            aviso.setStyleSheet("font-size: 22px; font-weight: 700; color: #a33b25;")
+            self._cortes_lista.addWidget(aviso)
+        elif not cortes:
+            vacio = QLabel("Todavía no hay cortes guardados.")
+            vacio.setStyleSheet("font-size: 20px; font-weight: 600;")
+            self._cortes_lista.addWidget(vacio)
+        else:
+            for corte in cortes:
+                fila = QLabel(
+                    f"{_fecha_en_palabras(corte.fecha)}   —   "
+                    f"${corte.monto_final:,.2f}"
+                )
+                fila.setStyleSheet(
+                    "background: #ffffff; border: 2px solid #ddd0c0;"
+                    " border-radius: 14px; padding: 14px 16px;"
+                    " font-size: 21px; font-weight: 700; color: #2c2a27;"
+                )
+                self._cortes_lista.addWidget(fila)
+        self._pila.setCurrentWidget(self._pg_cortes)
 
     def _pagina_quien(self) -> QWidget:
         pagina = QWidget()
@@ -675,10 +760,10 @@ class CalendarioEncargadoDialog(QDialog):
         self._quien_botones.setSpacing(12)
         ly.addLayout(self._quien_botones)
         ly.addStretch()
-        salir = QPushButton("Salir")
-        salir.setStyleSheet(self._BTN_SUAVE)
-        salir.clicked.connect(self.accept)
-        ly.addWidget(salir)
+        regresar = QPushButton("← Regresar")
+        regresar.setStyleSheet(self._BTN_SUAVE)
+        regresar.clicked.connect(lambda: self._pila.setCurrentWidget(self._pg_menu))
+        ly.addWidget(regresar)
         pagina.setLayout(ly)
         return pagina
 

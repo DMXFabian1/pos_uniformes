@@ -2007,13 +2007,37 @@ class QuoteSatelliteWindow(QMainWindow):
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
 
+        monto_final = _Dec(str(spin_real.value())).quantize(_Dec("0.01"))
+        nota = nota_input.text().strip()
+
+        # El corte se guarda con SOLO la cifra final (nunca la esperada):
+        # es el número oficial y lo que León consulta en "Ver cortes".
+        try:
+            from datetime import date as _date
+
+            from pos_uniformes.services.libreta_service import guardar_corte
+
+            with get_session() as session:
+                guardar_corte(
+                    session,
+                    fecha=_date.today(),
+                    monto_final=monto_final,
+                    operaciones=sum(c.operaciones for c in cortes),
+                    piezas=sum(c.piezas for c in cortes),
+                    periodo_label=periodo,
+                    nota=nota,
+                    creado_por=str(self._libreta_code or ""),
+                )
+        except Exception:  # noqa: BLE001 — sin conexión el corte igual se imprime
+            logger.exception("Libreta: no se pudo guardar el corte")
+
         texto = build_corte_ticket_text(
             periodo_label=periodo,
             cortes=cortes,
             por_empleada=list(self._libreta_last_por_empleada or []),
             generado_por=str(self._libreta_code or ""),
-            efectivo_real=_Dec(str(spin_real.value())).quantize(_Dec("0.01")),
-            nota=nota_input.text().strip(),
+            efectivo_real=monto_final,
+            nota=nota,
         )
         route_tickets(self, "Corte de Libreta", [texto])
 

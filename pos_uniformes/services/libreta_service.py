@@ -373,3 +373,44 @@ def describir_detalle(detalle: list[dict]) -> str:
         talla_txt = f" T:{talla}" if talla and talla != "-" else ""
         parts.append(f"{nombre}{talla_txt} x{cantidad}")
     return " · ".join(parts)
+
+
+def guardar_corte(
+    session,
+    *,
+    fecha: date,
+    monto_final: Decimal,
+    operaciones: int,
+    piezas: int,
+    periodo_label: str = "HOY",
+    nota: str = "",
+    creado_por: str = "",
+):
+    """Registra el corte con SOLO la cifra final del dueño (sin esperado ni
+    diferencia): el número oficial. Es lo que ve el encargado."""
+    from pos_uniformes.database.models import LibretaCorte
+
+    fila = LibretaCorte(
+        fecha=fecha,
+        periodo_label=periodo_label[:80],
+        monto_final=monto_final,
+        operaciones=int(operaciones),
+        piezas=int(piezas),
+        nota=(nota or None),
+        creado_por=creado_por,
+    )
+    session.add(fila)
+    session.commit()
+    return fila
+
+
+def listar_cortes(session, *, limit: int = 15):
+    """Últimos cortes, el más reciente primero (vista del encargado)."""
+    from pos_uniformes.database.models import LibretaCorte
+
+    return (
+        session.query(LibretaCorte)
+        .order_by(LibretaCorte.fecha.desc(), LibretaCorte.id.desc())
+        .limit(limit)
+        .all()
+    )
