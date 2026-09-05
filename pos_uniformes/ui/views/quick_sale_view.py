@@ -188,7 +188,7 @@ QPushButton#btnLogout:hover {{ color: {_DANGER}; border-color: {_DANGER}; }}
 class QuickSaleWidget(QWidget):
     """Página de Venta Rápida para la app satélite."""
 
-    _SCAN_HINT_DEFAULT = "Enter para agregar"
+    _SCAN_HINT_DEFAULT = ""  # el hint solo muestra avisos breves (flash)
 
     def __init__(self, satellite: "QuoteSatelliteWindow"):
         super().__init__()
@@ -428,6 +428,19 @@ class QuickSaleWidget(QWidget):
         self._scan_hint = QLabel(self._SCAN_HINT_DEFAULT)
         self._scan_hint.setObjectName("scanHint")
         sb_layout.addWidget(self._scan_hint)
+        # Venta de productos SIN código (listones, parches, arreglos...):
+        # abre un diálogo táctil con teclado numérico para el precio.
+        self._btn_sin_codigo = QPushButton("➕  Sin código")
+        self._btn_sin_codigo.setToolTip("Vender un producto que no tiene código de barras")
+        self._btn_sin_codigo.setAutoDefault(False)
+        self._btn_sin_codigo.setStyleSheet(
+            "QPushButton { background: #f8f2e9; color: #73341c;"
+            "  border: 1.5px solid #ddd0c0; border-radius: 12px;"
+            "  min-height: 48px; padding: 0 18px; font-size: 15px; font-weight: 800; }"
+            "QPushButton:pressed { background: #e8dbc7; }"
+        )
+        self._btn_sin_codigo.clicked.connect(self._on_producto_sin_codigo)
+        sb_layout.addWidget(self._btn_sin_codigo)
 
         scan_bar.setLayout(sb_layout)
         layout.addWidget(scan_bar)
@@ -1275,6 +1288,210 @@ class QuickSaleWidget(QWidget):
             (
                 self._items, self._discount_active, self._employee_name, self._employee_code
             ) = respaldo
+
+    # ─── Producto sin código ─────────────────────────────────────────────
+
+    _SKU_SIN_CODIGO = "SIN-CODIGO"
+
+    def _on_producto_sin_codigo(self) -> None:
+        if not self._employee_code:
+            QMessageBox.warning(self, "Sin autorizar", "Escanea primero tu QR de empleada.")
+            return
+        datos = self._ask_producto_sin_codigo()
+        if datos is None:
+            self._scan_input.setFocus()
+            return
+        self._agregar_sin_codigo(datos["nombre"], datos["precio"], datos["cantidad"])
+        self._flash_scan_hint("Agregado")
+        self._scan_input.setFocus()
+
+    def _agregar_sin_codigo(self, nombre: str, precio: Decimal, cantidad: int) -> None:
+        """Línea manual del carrito. Misma descripción y precio → se suma a
+        la línea existente. Va al ticket y a la Libreta como cualquier
+        prenda (1 comisión por pieza; no toca inventario)."""
+        nombre = " ".join(str(nombre).split())
+        precio = Decimal(str(precio)).quantize(Decimal("0.01"))
+        cantidad = max(1, int(cantidad))
+        existente = next(
+            (
+                it for it in self._items
+                if it["sku"] == self._SKU_SIN_CODIGO
+                and it["nombre"].lower() == nombre.lower()
+                and it["precio"] == precio
+            ),
+            None,
+        )
+        if existente:
+            existente["cantidad"] += cantidad
+        else:
+            self._items.append(
+                {
+                    "sku": self._SKU_SIN_CODIGO,
+                    "nombre": nombre,
+                    "talla": "",
+                    "color": "",
+                    "precio": precio,
+                    "cantidad": cantidad,
+                }
+            )
+        self._refresh_items_table()
+        self._refresh_totals()
+
+    def _ask_producto_sin_codigo(self) -> dict | None:
+        """Diálogo táctil: descripción, precio con teclado numérico en
+        pantalla (no depende del teclado físico) y cantidad con −/+.
+        Devuelve {nombre, precio, cantidad} o None si canceló."""
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Producto sin código")
+        dlg.setMinimumWidth(520)
+        dlg.setStyleSheet(
+            "QDialog { background: #f4ede2; }"
+            "QLabel { color: #2c2a27; background: transparent; }"
+            "QLineEdit { background: #ffffff; color: #2c2a27;"
+            "  border: 2px solid #ddd0c0; border-radius: 12px;"
+            "  min-height: 50px; padding: 0 14px; font-size: 18px; }"
+        )
+        ly = QVBoxLayout()
+        ly.setContentsMargins(22, 20, 22, 18)
+        ly.setSpacing(10)
+
+        titulo = QLabel("Producto sin código")
+        titulo.setStyleSheet("font-size: 19px; font-weight: 800; color: #73341c;")
+        ly.addWidget(titulo)
+
+        et = QLabel("¿Qué es?")
+        et.setStyleSheet(f"font-size: 13px; color: {_MUTED}; font-weight: 700;")
+        ly.addWidget(et)
+        nombre_input = QLineEdit()
+        nombre_input.setPlaceholderText("Ej. Listón, parche, arreglo de bastilla...")
+        ly.addWidget(nombre_input)
+
+        et2 = QLabel("Precio por pieza")
+        et2.setStyleSheet(f"font-size: 13px; color: {_MUTED}; font-weight: 700;")
+        ly.addWidget(et2)
+        precio_input = QLineEdit()
+        precio_input.setPlaceholderText("$ 0.00")
+        precio_input.setStyleSheet(
+            "QLineEdit { background: #ffffff; color: #73341c;"
+            "  border: 2px solid #a84f2d; border-radius: 12px;"
+            "  min-height: 56px; padding: 0 14px; font-size: 26px; font-weight: 800; }"
+        )
+        ly.addWidget(precio_input)
+
+        # Teclado numérico en pantalla (táctil): 7 8 9 / 4 5 6 / 1 2 3 / . 0 ⌫
+        from PyQt6.QtWidgets import QGridLayout
+
+        teclado = QGridLayout()
+        teclado.setSpacing(6)
+        _TECLA = (
+            "QPushButton { background: #ffffff; color: #2c2a27;"
+            "  border: 1.5px solid #ddd0c0; border-radius: 12px;"
+            "  min-height: 48px; font-size: 20px; font-weight: 700; }"
+            "QPushButton:pressed { background: #f1e6d6; }"
+        )
+
+        def _tecla(txt: str) -> None:
+            actual = precio_input.text()
+            if txt == "⌫":
+                precio_input.setText(actual[:-1])
+            elif txt == "." and "." in actual:
+                return
+            else:
+                precio_input.setText(actual + txt)
+
+        for i, txt in enumerate(("7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0", "⌫")):
+            b = QPushButton(txt)
+            b.setAutoDefault(False)
+            b.setStyleSheet(_TECLA)
+            b.clicked.connect(lambda _=False, t=txt: _tecla(t))
+            teclado.addWidget(b, i // 3, i % 3)
+        ly.addLayout(teclado)
+
+        et3 = QLabel("Cantidad")
+        et3.setStyleSheet(f"font-size: 13px; color: {_MUTED}; font-weight: 700;")
+        ly.addWidget(et3)
+        cant_row = QHBoxLayout()
+        cant_row.setSpacing(10)
+        cantidad = {"n": 1}
+        cant_label = QLabel("1")
+        cant_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        cant_label.setStyleSheet("font-size: 24px; font-weight: 800;")
+        cant_label.setFixedWidth(60)
+
+        def _cambiar_cant(d: int) -> None:
+            cantidad["n"] = max(1, min(99, cantidad["n"] + d))
+            cant_label.setText(str(cantidad["n"]))
+
+        for txt, d in (("−", -1), ("+", 1)):
+            b = QPushButton(txt)
+            b.setAutoDefault(False)
+            b.setStyleSheet(_TECLA)
+            b.setFixedSize(64, 48)
+            b.clicked.connect(lambda _=False, dd=d: _cambiar_cant(dd))
+            if txt == "−":
+                cant_row.addWidget(b)
+                cant_row.addWidget(cant_label)
+            else:
+                cant_row.addWidget(b)
+        cant_row.addStretch()
+        ly.addLayout(cant_row)
+
+        error_label = QLabel("")
+        error_label.setStyleSheet(f"font-size: 13px; color: {_DANGER}; font-weight: 700;")
+        error_label.setVisible(False)
+        ly.addWidget(error_label)
+
+        resultado: dict = {}
+
+        def _confirmar() -> None:
+            nombre = " ".join(nombre_input.text().split())
+            raw = precio_input.text().strip().replace("$", "").replace(",", "")
+            try:
+                precio = Decimal(raw).quantize(Decimal("0.01"))
+            except Exception:  # noqa: BLE001
+                precio = Decimal("0.00")
+            if not nombre:
+                error_label.setText("Escribe qué es el producto.")
+                error_label.setVisible(True)
+                nombre_input.setFocus()
+                return
+            if precio <= 0:
+                error_label.setText("Captura un precio válido.")
+                error_label.setVisible(True)
+                return
+            resultado.update({"nombre": nombre, "precio": precio, "cantidad": cantidad["n"]})
+            dlg.accept()
+
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
+        btn_cancel = QPushButton("Cancelar")
+        btn_cancel.setStyleSheet(
+            "QPushButton { background: #f8f2e9; color: #73341c;"
+            "  border: 1px solid #ddd0c0; border-radius: 14px;"
+            "  min-height: 60px; font-size: 16px; font-weight: 700; }"
+            "QPushButton:pressed { background: #e8dbc7; }"
+        )
+        btn_ok = QPushButton("🛒  Agregar al carrito")
+        btn_ok.setStyleSheet(
+            "QPushButton { background: #a84f2d; color: #ffffff; border: none;"
+            "  border-radius: 14px; min-height: 60px;"
+            "  font-size: 17px; font-weight: 800; }"
+            "QPushButton:pressed { background: #8a4326; }"
+        )
+        for button in (btn_cancel, btn_ok):
+            button.setAutoDefault(False)
+            button.setDefault(False)
+        btn_cancel.clicked.connect(dlg.reject)
+        btn_ok.clicked.connect(_confirmar)
+        btn_row.addWidget(btn_cancel, 1)
+        btn_row.addWidget(btn_ok, 2)
+        ly.addLayout(btn_row)
+
+        dlg.setLayout(ly)
+        QTimer.singleShot(0, nombre_input.setFocus)
+        if dlg.exec() != QDialog.DialogCode.Accepted or not resultado:
+            return None
+        return resultado
 
     def _on_ticket_venta(self) -> None:
         if not self._items:

@@ -441,3 +441,61 @@ class ReimpresionTicketTests(unittest.TestCase):
         self.assertIn("Ana Lopez", apartado)
         self.assertIn("REIMPRESION", apartado)
         self.assertIsNone(abono)
+
+
+
+class ProductoSinCodigoTests(unittest.TestCase):
+    """Venta de productos sin código: línea manual que se suma, imprime y
+    registra como cualquier prenda; el hint "Enter para agregar" ya no existe."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _widget(self) -> QuickSaleWidget:
+        satellite = SimpleNamespace(offline_mode=True, _kiosk_lookup_from_cache=None)
+        w = QuickSaleWidget(satellite)
+        w._employee_code = "VEND-2"
+        w._employee_name = "Ana"
+        return w
+
+    def test_agrega_suma_y_va_al_ticket(self) -> None:
+        w = self._widget()
+        w._agregar_sin_codigo("Listón rojo", Decimal("15"), 2)
+        w._agregar_sin_codigo("  listón   ROJO ", "15.00", 1)  # misma línea → suma
+        w._agregar_sin_codigo("Parche", Decimal("40"), 1)
+        self.assertEqual(len(w._items), 2)
+        self.assertEqual(w._items[0]["sku"], "SIN-CODIGO")
+        self.assertEqual(w._items[0]["cantidad"], 3)
+        self.assertEqual(w._items[0]["talla"], "")
+        with patch.object(w, "_load_business_info", return_value=("MAXIMODA", "", "")):
+            texto = w._build_venta_text()
+        self.assertIn("Listón rojo", texto)
+        self.assertIn("3 x $15.00", texto)
+        self.assertIn("$85.00", texto)  # 45 + 40
+        self.assertNotIn("Talla:", texto)  # sin talla, sin renglón vacío
+
+    def test_hint_enter_ya_no_existe_y_hay_boton(self) -> None:
+        w = self._widget()
+        self.assertEqual(w._SCAN_HINT_DEFAULT, "")
+        self.assertIn("Sin código", w._btn_sin_codigo.text())
+
+    def test_dialogo_valida_y_devuelve_datos(self) -> None:
+        from PyQt6.QtWidgets import QLineEdit as _QLE, QPushButton as _QPB
+
+        w = self._widget()
+
+        def _exec(dlg):
+            campos = dlg.findChildren(_QLE)
+            campos[0].setText("Arreglo de bastilla")
+            # precio tecleado con el teclado en pantalla: 8, 0, ., 5, 0
+            botones = {b.text(): b for b in dlg.findChildren(_QPB)}
+            for k in ("8", "0", ".", "5", "0"):
+                botones[k].click()
+            botones["+"].click()  # cantidad 2
+            botones["🛒  Agregar al carrito"].click()
+            return QDialog.DialogCode.Accepted
+
+        with patch.object(QDialog, "exec", _exec):
+            datos = w._ask_producto_sin_codigo()
+        self.assertEqual(datos, {"nombre": "Arreglo de bastilla", "precio": Decimal("80.50"), "cantidad": 2})
