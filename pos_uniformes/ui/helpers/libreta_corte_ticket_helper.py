@@ -35,7 +35,6 @@ def build_corte_ticket_text(
     (CorteDia y ResumenEmpleada de libreta_service)."""
     now = datetime.now().strftime("%d/%m/%Y %H:%M")
     total_en_caja = sum((c.monto_en_caja for c in cortes), Decimal("0.00"))
-    total_piezas = sum(c.piezas for c in cortes)
     total_ops = sum(c.operaciones for c in cortes)
 
     lines: list[str] = []
@@ -48,7 +47,8 @@ def build_corte_ticket_text(
         tk_field("Por:", generado_por, lines)
     lines.append(tk_mid())
     lines.append(tk_row("Operaciones:", str(total_ops)))
-    lines.append(tk_row("Piezas:", str(total_piezas)))
+    # Sin "Piezas" (pedido de Daniel): al corte le importan operaciones,
+    # cifra final y comisiones.
     # Sin desglose de ventas/neto/apartados/abonos: Daniel quiere el corte
     # minimalista — operaciones, piezas y la cifra final, punto.
     lines.append(tk_dbl())
@@ -84,10 +84,7 @@ def build_corte_ticket_text(
             nombre = resumen.employee_name or resumen.employee_code
             lines.append(tk_line(nombre[: _TW - 4]))
             lines.append(
-                tk_row(
-                    f"{resumen.operaciones} ops · {resumen.piezas} pzas:",
-                    f"{resumen.comisiones} com.",
-                )
+                tk_row(f"{resumen.operaciones} ops:", f"{resumen.comisiones} com.")
             )
             # Sin monto por empleada (pedido de Daniel): piezas y comisiones.
         lines.append(tk_bot())
