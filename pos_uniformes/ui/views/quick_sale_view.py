@@ -970,18 +970,50 @@ class QuickSaleWidget(QWidget):
 
     def _ask_card_payment(self) -> bool:
         """Pregunta si el pago fue con tarjeta (ventas con descuento de
-        empleada, donde no aparece el diálogo de copia)."""
-        box = QMessageBox(self)
-        box.setWindowTitle("Forma de pago")
-        box.setText("¿El pago fue con tarjeta?")
-        card_button = box.addButton(
-            "Tarjeta",
-            QMessageBox.ButtonRole.YesRole,
+        empleada, donde no aparece el diálogo de copia). Táctil: dos
+        botones grandes, un toque responde."""
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Forma de pago")
+        dlg.setMinimumWidth(420)
+        dlg.setStyleSheet(
+            "QDialog { background: #f4ede2; }"
+            "QLabel { color: #2c2a27; background: transparent; }"
         )
-        cash_button = box.addButton("Efectivo", QMessageBox.ButtonRole.NoRole)
-        box.setDefaultButton(cash_button)
-        box.exec()
-        return box.clickedButton() is card_button
+        ly = QVBoxLayout()
+        ly.setContentsMargins(22, 20, 22, 20)
+        ly.setSpacing(14)
+        title = QLabel("¿Cómo pagó?")
+        title.setStyleSheet("font-size: 19px; font-weight: 800; color: #73341c;")
+        ly.addWidget(title)
+
+        respuesta = {"tarjeta": False}
+        fila = QHBoxLayout()
+        fila.setSpacing(10)
+        _BTN = (
+            "QPushButton {{ background: {bg}; color: {fg};"
+            "  border: {borde}; border-radius: 14px;"
+            "  min-height: 64px; font-size: 18px; font-weight: 800; }}"
+            "QPushButton:pressed {{ background: {press}; }}"
+        )
+        btn_efectivo = QPushButton("💵  Efectivo")
+        btn_efectivo.setStyleSheet(_BTN.format(
+            bg="#f8f2e9", fg="#73341c", borde="1px solid #ddd0c0", press="#e8dbc7"))
+        btn_tarjeta = QPushButton("💳  Tarjeta")
+        btn_tarjeta.setStyleSheet(_BTN.format(
+            bg="#a84f2d", fg="#ffffff", borde="none", press="#8a4326"))
+
+        def _responder(tarjeta: bool) -> None:
+            respuesta["tarjeta"] = tarjeta
+            dlg.accept()
+
+        for btn, es_tarjeta in ((btn_efectivo, False), (btn_tarjeta, True)):
+            btn.setAutoDefault(False)
+            btn.clicked.connect(lambda _=False, t=es_tarjeta: _responder(t))
+            fila.addWidget(btn, 1)
+        ly.addLayout(fila)
+        dlg.setLayout(ly)
+        dlg.exec()
+        return respuesta["tarjeta"]
 
     def _ask_venta_options(self) -> tuple[bool, bool]:
         """Pregunta copia interna y forma de pago en un solo diálogo.
@@ -992,31 +1024,70 @@ class QuickSaleWidget(QWidget):
         ScannerEnterGuard: el escaneo es entrada legítima y el Enter del
         escáner cae en el input (los botones no son default, así que un
         Enter suelto no contesta nada)."""
+        # Rediseño táctil (2026-09-05): botones grandes en vez de checkbox
+        # chiquito — pensado para el dedo, no para el mouse.
         dlg = QDialog(self)
         dlg.setWindowTitle("Copia tienda")
+        dlg.setMinimumWidth(480)
+        dlg.setStyleSheet(
+            "QDialog { background: #f4ede2; }"
+            "QLabel { color: #2c2a27; background: transparent; }"
+            "QLineEdit { background: #ffffff; color: #2c2a27;"
+            "  border: 2px solid #ddd0c0; border-radius: 12px;"
+            "  min-height: 44px; padding: 0 12px; font-size: 15px; }"
+        )
         ly = QVBoxLayout()
-        ly.setContentsMargins(24, 20, 24, 20)
-        ly.setSpacing(10)
+        ly.setContentsMargins(22, 20, 22, 18)
+        ly.setSpacing(12)
 
-        title = QLabel("¿Imprimir también la copia para la tienda?")
-        title.setStyleSheet("font-size: 15px; font-weight: 600;")
+        title = QLabel("¿Imprimir copia para la tienda?")
+        title.setStyleSheet("font-size: 19px; font-weight: 800; color: #73341c;")
         ly.addWidget(title)
 
-        hint = QLabel("Escanea tu gafete para imprimir con copia, o elige:")
+        # ¿Cómo pagó? — dos toggles grandes y exclusivos (default: efectivo)
+        pago_label = QLabel("¿Cómo pagó?")
+        pago_label.setStyleSheet(f"font-size: 13px; color: {_MUTED}; font-weight: 700;")
+        ly.addWidget(pago_label)
+        # Seleccionado = tinte claro con borde grueso (distinto del botón de
+        # acción sólido, para que no se confundan a golpe de vista).
+        _TOGGLE = (
+            "QPushButton { background: #ffffff; color: #2c2a27;"
+            "  border: 2px solid #ddd0c0; border-radius: 14px;"
+            "  min-height: 56px; font-size: 17px; font-weight: 700; }"
+            "QPushButton:checked { background: #f7e3d8; color: #73341c;"
+            "  border: 3px solid #a84f2d; }"
+        )
+        pago_row = QHBoxLayout()
+        pago_row.setSpacing(10)
+        btn_efectivo = QPushButton("💵  Efectivo")
+        btn_tarjeta = QPushButton("💳  Tarjeta")
+        for btn in (btn_efectivo, btn_tarjeta):
+            btn.setCheckable(True)
+            btn.setAutoDefault(False)
+            btn.setStyleSheet(_TOGGLE)
+            pago_row.addWidget(btn)
+        btn_efectivo.setChecked(True)
+        btn_efectivo.setText("✓ 💵  Efectivo")
+
+        def _set_pago(tarjeta: bool) -> None:
+            btn_tarjeta.setChecked(tarjeta)
+            btn_efectivo.setChecked(not tarjeta)
+            btn_efectivo.setText("✓ 💵  Efectivo" if not tarjeta else "💵  Efectivo")
+            btn_tarjeta.setText("✓ 💳  Tarjeta" if tarjeta else "💳  Tarjeta")
+
+        btn_efectivo.clicked.connect(lambda: _set_pago(False))
+        btn_tarjeta.clicked.connect(lambda: _set_pago(True))
+        ly.addLayout(pago_row)
+
+        hint = QLabel("O escanea tu gafete: eso responde \"Sí, con copia\".")
         hint.setStyleSheet(f"font-size: 12px; color: {_MUTED};")
-        ly.addWidget(hint)
 
         scan_input = QLineEdit()
         scan_input.setPlaceholderText("Escanea tu gafete...")
-        ly.addWidget(scan_input)
 
         error_label = QLabel("")
-        error_label.setStyleSheet(f"font-size: 12px; color: {_DANGER};")
+        error_label.setStyleSheet(f"font-size: 12px; color: {_DANGER}; font-weight: 700;")
         error_label.setVisible(False)
-        ly.addWidget(error_label)
-
-        card_check = QCheckBox("Pagó con tarjeta")
-        ly.addWidget(card_check)
 
         wants_copy = False
 
@@ -1040,24 +1111,41 @@ class QuickSaleWidget(QWidget):
         scan_input.returnPressed.connect(_on_scan)
 
         btn_row = QHBoxLayout()
-        btn_row.setSpacing(8)
-        no_button = QPushButton("Solo ticket del cliente")
-        yes_button = QPushButton("Sí, con copia")
+        btn_row.setSpacing(10)
+        no_button = QPushButton("Solo ticket\ndel cliente")
+        no_button.setStyleSheet(
+            "QPushButton { background: #f8f2e9; color: #73341c;"
+            "  border: 1px solid #ddd0c0; border-radius: 14px;"
+            "  min-height: 60px; font-size: 16px; font-weight: 700; }"
+            "QPushButton:pressed { background: #e8dbc7; }"
+        )
+        yes_button = QPushButton("🖨  Sí, con copia")
+        yes_button.setStyleSheet(
+            "QPushButton { background: #a84f2d; color: #ffffff; border: none;"
+            "  border-radius: 14px; min-height: 60px;"
+            "  font-size: 17px; font-weight: 800; }"
+            "QPushButton:pressed { background: #8a4326; }"
+        )
         for button in (no_button, yes_button):
             # Sin botón default: un Enter suelto no debe contestar el diálogo.
             button.setAutoDefault(False)
             button.setDefault(False)
         no_button.clicked.connect(dlg.reject)
         yes_button.clicked.connect(_accept_with_copy)
-        btn_row.addWidget(no_button)
-        btn_row.addWidget(yes_button)
+        btn_row.addWidget(no_button, 1)
+        btn_row.addWidget(yes_button, 1)
         ly.addLayout(btn_row)
+
+        ly.addSpacing(2)
+        ly.addWidget(hint)
+        ly.addWidget(scan_input)
+        ly.addWidget(error_label)
 
         dlg.setLayout(ly)
         QTimer.singleShot(0, scan_input.setFocus)
         dlg.exec()
         # La forma de pago vale aunque conteste "solo ticket del cliente".
-        return wants_copy, card_check.isChecked()
+        return wants_copy, btn_tarjeta.isChecked()
 
     def _on_ticket_venta(self) -> None:
         if not self._items:
