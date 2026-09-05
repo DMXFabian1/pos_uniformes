@@ -5837,9 +5837,21 @@ QLabel#favDialogPriceLabel {
             )
 
     def _handle_lookup_scan(self) -> None:
-        sku = self.kiosk_scan_input.text().strip().upper()
+        raw = self.kiosk_scan_input.text()
+        sku = raw.strip().upper()
         if not sku:
             QMessageBox.warning(self, "SKU faltante", "Escanea o captura un SKU para consultarlo.")
+            return
+        # El gafete de una empleada (QR EMP:VEND-N) no es un producto: en
+        # esta pestaña se ignora sin buscarlo (pedido de Daniel 2026-09-05).
+        from pos_uniformes.services.employee_identity_service import (
+            EmployeeIdentityService,
+        )
+
+        if EmployeeIdentityService.looks_like_employee_qr(raw):
+            self.kiosk_scan_input.clear()
+            self._set_status("Gafete ignorado — aquí se escanean productos.")
+            QTimer.singleShot(0, self.kiosk_scan_input.setFocus)
             return
         fell_back_to_cache = False
         try:

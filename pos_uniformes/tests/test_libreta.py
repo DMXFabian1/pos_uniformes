@@ -1307,3 +1307,38 @@ class PaginacionLibretaTests(unittest.TestCase):
         fake = SimpleNamespace(_libreta_pagina=0)
         QuoteSatelliteWindow._cambiar_pagina_libreta(fake, 1)  # no explota
         self.assertEqual(fake._libreta_pagina, 1)
+
+
+class KioskoIgnoraGafeteTests(unittest.TestCase):
+    """En la pestaña Kiosko (consulta de precios) el gafete de una empleada
+    NO se busca como producto: se ignora con aviso y se limpia el input."""
+
+    def test_gafete_se_ignora_sin_buscar(self) -> None:
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        entrada = MagicMock()
+        entrada.text.return_value = "EMP:VEND-2"
+        fake = SimpleNamespace(
+            kiosk_scan_input=entrada,
+            _set_status=MagicMock(),
+            offline_mode=True,
+            _kiosk_lookup_from_cache=MagicMock(),
+        )
+        QuoteSatelliteWindow._handle_lookup_scan(fake)
+        entrada.clear.assert_called_once()
+        fake._kiosk_lookup_from_cache.assert_not_called()  # no lo buscó
+        self.assertIn("Gafete ignorado", fake._set_status.call_args.args[0])
+
+    def test_gafete_con_teclado_espanol_tambien_se_ignora(self) -> None:
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        entrada = MagicMock()
+        entrada.text.return_value = "EMPÑVEND-2"  # el escáner manda Ñ por :
+        fake = SimpleNamespace(
+            kiosk_scan_input=entrada,
+            _set_status=MagicMock(),
+            offline_mode=True,
+            _kiosk_lookup_from_cache=MagicMock(),
+        )
+        QuoteSatelliteWindow._handle_lookup_scan(fake)
+        fake._kiosk_lookup_from_cache.assert_not_called()
