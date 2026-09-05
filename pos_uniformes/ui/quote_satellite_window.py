@@ -1127,6 +1127,16 @@ class QuoteSatelliteWindow(QMainWindow):
         # (oscura en Windows) en los huecos entre tarjetas.
         widget.setAutoFillBackground(False)
         scroll.viewport().setAutoFillBackground(False)
+        # Pantalla táctil: arrastrar con el dedo scrollea la página (gesto
+        # touch puro — el mouse y los clics no cambian).
+        try:
+            from PyQt6.QtWidgets import QScroller
+
+            QScroller.grabGesture(
+                scroll.viewport(), QScroller.ScrollerGestureType.TouchGesture
+            )
+        except Exception:  # noqa: BLE001 — sin gesto, el scrollbar sigue ahí
+            pass
         return scroll
 
     def _build_page_stack(self) -> QWidget:
@@ -1390,6 +1400,9 @@ class QuoteSatelliteWindow(QMainWindow):
         # Lista amigable de la empleada: sus movimientos en lenguaje simple,
         # sin columnas técnicas ni dinero.
         self.libreta_emp_list = QListWidget()
+        self.libreta_emp_list.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         self.libreta_emp_list.setObjectName("libretaLista")
         self.libreta_emp_list.itemDoubleClicked.connect(
             lambda item: self._mostrar_detalle_libreta(self.libreta_emp_list.row(item))
@@ -1468,6 +1481,11 @@ class QuoteSatelliteWindow(QMainWindow):
             QHeaderView.ResizeMode.Stretch
         )
         self.libreta_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        # En táctil, tabla-con-scroll-dentro-de-página-con-scroll es una
+        # trampa: la tabla crece con sus filas y la página entera scrollea.
+        self.libreta_table.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         self.libreta_table.verticalHeader().setVisible(False)
         self.libreta_table.setAlternatingRowColors(True)
         self.libreta_table.cellDoubleClicked.connect(
@@ -2181,6 +2199,11 @@ class QuoteSatelliteWindow(QMainWindow):
                 if comisiones:
                     texto += f"  (+{comisiones} com.)"
             self.libreta_emp_list.addItem(QListWidgetItem(texto))
+        # Igual que la tabla del dueño: la lista crece y scrollea la página.
+        alto = 2 * self.libreta_emp_list.frameWidth() + 8
+        for i in range(self.libreta_emp_list.count()):
+            alto += self.libreta_emp_list.sizeHintForRow(i)
+        self.libreta_emp_list.setFixedHeight(max(alto, 120))
 
     def _pintar_libreta(self, rows: list, ranking_rows: list | None = None) -> None:
         from pos_uniformes.services.libreta_service import (
@@ -2319,6 +2342,15 @@ class QuoteSatelliteWindow(QMainWindow):
             self.libreta_table.setItem(
                 i, 6, QTableWidgetItem(f"${Decimal(str(row.monto_total or 0)):,.2f}")
             )
+        self._ajustar_alto_tabla_libreta()
+
+    def _ajustar_alto_tabla_libreta(self) -> None:
+        """Alto exacto al contenido para que scrollee la PÁGINA, no la tabla."""
+        tabla = self.libreta_table
+        alto = tabla.horizontalHeader().height() + 2 * tabla.frameWidth()
+        for fila in range(tabla.rowCount()):
+            alto += tabla.rowHeight(fila)
+        tabla.setFixedHeight(max(alto + 6, 120))
 
     def _build_conteos_page(self) -> QWidget:
         """Página "Calendario" del kiosko (después de Tarifarios).

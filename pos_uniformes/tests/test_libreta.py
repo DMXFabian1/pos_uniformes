@@ -1247,3 +1247,34 @@ class LibretaPagePrivacyTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ScrollLibretaTests(unittest.TestCase):
+    """En táctil la página scrollea completa: la tabla de movimientos crece
+    con sus filas (sin scroll interno) para alcanzar la info de abajo."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        from PyQt6.QtWidgets import QApplication
+
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_tabla_crece_con_las_filas(self) -> None:
+        from PyQt6.QtCore import Qt
+        from PyQt6.QtWidgets import QTableWidget
+
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        tabla = QTableWidget(0, 7)
+        fake = SimpleNamespace(libreta_table=tabla)
+
+        tabla.setRowCount(3)
+        QuoteSatelliteWindow._ajustar_alto_tabla_libreta(fake)
+        alto_3 = tabla.height()
+
+        tabla.setRowCount(30)
+        QuoteSatelliteWindow._ajustar_alto_tabla_libreta(fake)
+        alto_30 = tabla.height()
+
+        self.assertGreater(alto_30, alto_3 + 20 * tabla.rowHeight(0) - 1)
+        self.assertGreaterEqual(alto_3, 120)
