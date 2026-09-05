@@ -50,7 +50,7 @@ def build_corte_ticket_text(
     # Sin "Piezas" (pedido de Daniel): al corte le importan operaciones,
     # cifra final y comisiones.
     # Sin desglose de ventas/neto/apartados/abonos: Daniel quiere el corte
-    # minimalista — operaciones, piezas y la cifra final, punto.
+    # minimalista — operaciones, la cifra final y comisiones, punto.
     lines.append(tk_dbl())
     # Una sola cifra final: la que el dueño confirma (editable solo en su
     # vista). El ticket NO imprime esperado ni diferencia — la comparación
@@ -86,7 +86,7 @@ def build_corte_ticket_text(
             lines.append(
                 tk_row(f"{resumen.operaciones} ops:", f"{resumen.comisiones} com.")
             )
-            # Sin monto por empleada (pedido de Daniel): piezas y comisiones.
+            # Sin monto ni piezas por empleada (pedido de Daniel): solo comisiones.
         lines.append(tk_bot())
 
     lines.append("")
