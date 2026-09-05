@@ -452,7 +452,7 @@ class QuickSaleWidget(QWidget):
         self._items_table.setColumnWidth(1, 70)
         self._items_table.setColumnWidth(2, 60)
         self._items_table.setColumnWidth(3, 100)
-        self._items_table.setColumnWidth(4, 156)
+        self._items_table.setColumnWidth(4, 172)
         # Filas altas: los botones +/−/eliminar se tocan con el dedo.
         self._items_table.verticalHeader().setDefaultSectionSize(52)
         self._items_table.setStyleSheet(f"""
@@ -653,6 +653,7 @@ class QuickSaleWidget(QWidget):
             self._items_table.setItem(row, 3, price_item)
 
             self._items_table.setCellWidget(row, 4, self._build_row_actions(row))
+            self._items_table.setRowHeight(row, 52)
 
         self._items_table.setRowCount(max(len(self._items), 1))
         if not self._items:
@@ -677,9 +678,8 @@ class QuickSaleWidget(QWidget):
         """[−] [+] [🗑] por renglón, tamaño dedo (pedido de Daniel)."""
         _BASE = (
             "QPushButton {{ background: #ffffff; border: 1.5px solid {borde};"
-            "  border-radius: 10px; font-size: 18px; font-weight: 800;"
-            "  color: {color}; min-width: 42px; max-width: 42px;"
-            "  min-height: 40px; }}"
+            "  border-radius: 10px; font-size: 17px; font-weight: 800;"
+            "  color: {color}; }}"
             "QPushButton:pressed {{ background: {press}; }}"
         )
         btn_minus = QPushButton("−")
@@ -698,11 +698,13 @@ class QuickSaleWidget(QWidget):
         btn_trash.clicked.connect(lambda checked=False, r=row: self._on_delete_line(r))
 
         holder = QWidget()
+        holder.setFixedHeight(52)
         ly = QHBoxLayout(holder)
-        ly.setContentsMargins(2, 2, 2, 2)
-        ly.setSpacing(6)
+        ly.setContentsMargins(0, 0, 6, 0)
+        ly.setSpacing(5)
         for btn in (btn_minus, btn_plus, btn_trash):
-            ly.addWidget(btn)
+            btn.setFixedSize(48, 42)  # tamaño exacto: nunca se corta
+            ly.addWidget(btn, 0, Qt.AlignmentFlag.AlignVCenter)
         return holder
 
     def _on_add_one(self, row: int) -> None:
