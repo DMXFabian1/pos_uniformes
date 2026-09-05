@@ -657,6 +657,23 @@ class QuickSaleWidget(QWidget):
 
             self._items_table.setCellWidget(row, 4, self._build_row_actions(row))
 
+        # Cinturón y tirantes: además del ResizeToContents, se fuerza la
+        # fila al alto real del widget de botones (por si el recálculo
+        # automático no corre en alguna pantalla), y se anota el diagnóstico.
+        self._items_table.resizeRowsToContents()
+        self._diag_carrito = ""
+        for row in range(len(self._items)):
+            holder = self._items_table.cellWidget(row, 4)
+            if holder is None:
+                continue
+            alto_botones = holder.sizeHint().height()
+            if self._items_table.rowHeight(row) < alto_botones:
+                self._items_table.setRowHeight(row, alto_botones)
+            if row == 0:
+                self._diag_carrito = (
+                    f"f{self._items_table.rowHeight(0)}/b{alto_botones}"
+                )
+
         self._items_table.setRowCount(max(len(self._items), 1))
         if not self._items:
             placeholder = QTableWidgetItem("Escanea productos para agregarlos aqui...")
@@ -672,6 +689,17 @@ class QuickSaleWidget(QWidget):
         pzas_text = f"{total_pzas} pieza{'s' if total_pzas != 1 else ''}"
         lineas_text = f"{len(self._items)} linea{'s' if len(self._items) != 1 else ''}"
         meta = f"{lineas_text}  ·  {pzas_text}" if self._items else "Sin piezas"
+        # Sensor temporal (2026-09-05): medidas reales de la fila/botones
+        # para diagnosticar el desfase en la pantalla de la tienda.
+        diag = getattr(self, "_diag_carrito", "")
+        if diag and self._items:
+            try:
+                from pos_uniformes.utils.app_metadata import app_version
+
+                diag += f"/v{app_version()[-5:]}"
+            except Exception:  # noqa: BLE001
+                pass
+            meta += f"  ·  {diag}"
         if self._discount_active and self._items:
             meta += f"  ·  Desc. (-${discount:,.2f})"
         self._total_meta.setText(meta)
