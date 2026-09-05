@@ -453,10 +453,10 @@ class QuickSaleWidget(QWidget):
         self._items_table.setColumnWidth(2, 60)
         self._items_table.setColumnWidth(3, 100)
         self._items_table.setColumnWidth(4, 172)
-        # La FILA se mide sola del contenido (incluye los botones +/−/🗑):
-        # imposible que desborden o queden chuecos, en cualquier pantalla.
-        self._items_table.verticalHeader().setSectionResizeMode(
-            QHeaderView.ResizeMode.ResizeToContents
+        # El alto de fila se fija al pintar (ver _refresh_items_table): el
+        # auto-medido solo considera el texto, no el widget de botones.
+        self._items_table.verticalHeader().setDefaultSectionSize(
+            self._ALTO_BOTON_CARRITO + 2 * self._PAD_ITEM_CARRITO + 2
         )
         self._items_table.setStyleSheet(f"""
             QTableWidget {{
@@ -657,22 +657,13 @@ class QuickSaleWidget(QWidget):
 
             self._items_table.setCellWidget(row, 4, self._build_row_actions(row))
 
-        # Cinturón y tirantes: además del ResizeToContents, se fuerza la
-        # fila al alto real del widget de botones (por si el recálculo
-        # automático no corre en alguna pantalla), y se anota el diagnóstico.
-        self._items_table.resizeRowsToContents()
-        self._diag_carrito = ""
+        # Medido en estilo nativo (macOS) y Fusion: la fila se mide por el
+        # TEXTO y el widget de la celda recibe fila − 16 (el padding 8+8 del
+        # ::item). Por eso la fila se fija explícita: botones + 16 + 2 de
+        # holgura → el widget recibe 38 y los botones de 36 quedan centrados.
+        alto_fila = self._ALTO_BOTON_CARRITO + 2 * self._PAD_ITEM_CARRITO + 2
         for row in range(len(self._items)):
-            holder = self._items_table.cellWidget(row, 4)
-            if holder is None:
-                continue
-            alto_botones = holder.sizeHint().height()
-            if self._items_table.rowHeight(row) < alto_botones:
-                self._items_table.setRowHeight(row, alto_botones)
-            if row == 0:
-                self._diag_carrito = (
-                    f"f{self._items_table.rowHeight(0)}/b{alto_botones}"
-                )
+            self._items_table.setRowHeight(row, alto_fila)
 
         self._items_table.setRowCount(max(len(self._items), 1))
         if not self._items:
@@ -689,20 +680,14 @@ class QuickSaleWidget(QWidget):
         pzas_text = f"{total_pzas} pieza{'s' if total_pzas != 1 else ''}"
         lineas_text = f"{len(self._items)} linea{'s' if len(self._items) != 1 else ''}"
         meta = f"{lineas_text}  ·  {pzas_text}" if self._items else "Sin piezas"
-        # Sensor temporal (2026-09-05): medidas reales de la fila/botones
-        # para diagnosticar el desfase en la pantalla de la tienda.
-        diag = getattr(self, "_diag_carrito", "")
-        if diag and self._items:
-            try:
-                from pos_uniformes.utils.app_metadata import app_version
 
-                diag += f"/v{app_version()[-5:]}"
-            except Exception:  # noqa: BLE001
-                pass
-            meta += f"  ·  {diag}"
         if self._discount_active and self._items:
             meta += f"  ·  Desc. (-${discount:,.2f})"
         self._total_meta.setText(meta)
+
+    # Geometría del carrito: padding del ::item (stylesheet) y alto de botón.
+    _PAD_ITEM_CARRITO = 8
+    _ALTO_BOTON_CARRITO = 36
 
     def _build_row_actions(self, row: int) -> QWidget:
         """[−] [+] [🗑] por renglón, tamaño dedo (pedido de Daniel).
@@ -743,13 +728,16 @@ class QuickSaleWidget(QWidget):
 
         holder = QWidget()
         ly = QHBoxLayout(holder)
-        # Márgenes SIMÉTRICOS: la fila toma su alto de este widget (6+42+6)
-        # y los botones quedan centrados por construcción, no por cálculo.
-        ly.setContentsMargins(0, 6, 0, 6)
+        # OJO: el estilo nativo (macOS/Windows) descuenta el padding del
+        # ::item (8px arriba/abajo, 10px a los lados) del rectángulo que le
+        # da al widget — los márgenes van en CERO y los botones deben caber
+        # en ese rectángulo (36 de alto, 3×46+2×5=148 de ancho). En nativo
+        # centra el padding; en Fusion centra el AlignCenter.
+        ly.setContentsMargins(0, 0, 0, 0)
         ly.setSpacing(5)
         ly.setAlignment(Qt.AlignmentFlag.AlignCenter)
         for btn in (btn_minus, btn_plus, btn_trash):
-            btn.setFixedSize(48, 42)  # tamaño exacto: nunca se corta
+            btn.setFixedSize(46, self._ALTO_BOTON_CARRITO)
             ly.addWidget(btn)
         return holder
 
