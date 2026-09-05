@@ -130,6 +130,17 @@ def _build_inventory_label_dialog_styles() -> str:
             border-radius: 14px;
             padding: 0 26px;
         }
+        /* Colores explícitos (a prueba de modo oscuro y de hojas de estilo ajenas) */
+        QPushButton#primaryButton { background: #a84f2d; color: #ffffff; border: none; }
+        QPushButton#primaryButton:pressed { background: #8a4326; }
+        QPushButton#primaryButton:disabled { background: #c9a996; color: #f4ede2; }
+        QPushButton#secondaryButton, QPushButton#inventoryLabelNavButton {
+            background: #f8f2e9; color: #73341c; border: 1px solid #ddd0c0;
+        }
+        QPushButton#secondaryButton:pressed, QPushButton#inventoryLabelNavButton:pressed {
+            background: #e8dbc7;
+        }
+        QPushButton#inventoryLabelNavButton:disabled { color: #b3a794; background: #efe9de; }
     """
 
 
