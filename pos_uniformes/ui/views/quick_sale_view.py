@@ -689,19 +689,19 @@ class QuickSaleWidget(QWidget):
         btn_minus = QPushButton("−")
         btn_minus.setToolTip("Quitar 1 pieza")
         btn_minus.setStyleSheet(_BASE.format(
-            bg="#f8f2e9", borde="#ddd0c0", color="#73341c", press="#e8dbc7"))
+            bg="#ffffff", borde=_BORDER, color=_TEXT, press="#f1e6d6"))
         btn_minus.clicked.connect(lambda checked=False, r=row: self._on_remove(r))
 
         btn_plus = QPushButton("+")
         btn_plus.setToolTip("Agregar 1 pieza")
         btn_plus.setStyleSheet(_BASE.format(
-            bg="#f8f2e9", borde="#ddd0c0", color="#73341c", press="#e8dbc7"))
+            bg="#ffffff", borde=_BORDER, color=_TEXT, press="#f1e6d6"))
         btn_plus.clicked.connect(lambda checked=False, r=row: self._on_add_one(r))
 
         btn_trash = QPushButton("")
         btn_trash.setToolTip("Eliminar la línea completa")
         btn_trash.setStyleSheet(_BASE.format(
-            bg="#fdf0ee", borde="#e8c0b6", color=_DANGER, press="#f9ddd6"))
+            bg="#ffffff", borde="#e2b7ad", color=_DANGER, press="#fde3dd"))
         try:
             from pos_uniformes.ui.quote_satellite_window import _icon_from_asset
 
@@ -712,16 +712,15 @@ class QuickSaleWidget(QWidget):
         btn_trash.clicked.connect(lambda checked=False, r=row: self._on_delete_line(r))
 
         holder = QWidget()
-        holder.setFixedHeight(52)
         ly = QHBoxLayout(holder)
         ly.setContentsMargins(0, 0, 0, 0)
         ly.setSpacing(5)
-        # Centrados como grupo en la columna y a media altura del renglón.
-        ly.addStretch(1)
+        # El holder llena la celda y el grupo se AUTO-centra (H y V): así no
+        # se ven "caídos" aunque el alto real de la fila cambie con el DPI.
+        ly.setAlignment(Qt.AlignmentFlag.AlignCenter)
         for btn in (btn_minus, btn_plus, btn_trash):
             btn.setFixedSize(48, 42)  # tamaño exacto: nunca se corta
-            ly.addWidget(btn, 0, Qt.AlignmentFlag.AlignVCenter)
-        ly.addStretch(1)
+            ly.addWidget(btn)
         return holder
 
     def _on_add_one(self, row: int) -> None:
