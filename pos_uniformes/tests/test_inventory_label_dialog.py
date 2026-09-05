@@ -110,3 +110,49 @@ class InventoryLabelDialogTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class InventoryLabelDialogTouchTests(unittest.TestCase):
+    """Rediseño táctil: modo por toggles, copias con −/+, precio como toggle."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_toggles_alimentan_el_render(self) -> None:
+        host = _DialogHost()
+        render_calls: list[tuple[str, int, bool | None]] = []
+        captured: dict[str, QDialog] = {}
+        contexto = SimpleNamespace(variant_id=1, sku="SKU-001", product_name="Pants", talla="14", color="Azul")
+        with tempfile.TemporaryDirectory() as temp_dir:
+            image_path = Path(temp_dir) / "label.png"
+            image_path.write_bytes(b"x")
+
+            def render_label(mode, copies, show_price=None):
+                render_calls.append((mode, copies, show_price))
+                return LabelRenderResult(mode=mode, image_path=image_path,
+                                         effective_copies=copies, requested_copies=copies)
+
+            def fake_exec(dialog):
+                captured["dialog"] = dialog
+                return int(QDialog.DialogCode.Rejected)
+
+            with patch("pos_uniformes.ui.dialogs.inventory_label_dialog.QDialog.exec", new=fake_exec):
+                build_inventory_label_dialog(
+                    host, initial_context=contexto, variant_ids=[1], current_index=0,
+                    load_context=lambda _i: contexto, render_label=render_label,
+                    print_label=lambda *_a: True,
+                )
+            dialog = captured["dialog"]
+            botones = {b.text(): b for b in dialog.findChildren(QPushButton)}
+            botones["Split"].click()
+            botones["+"].click()
+            botones["+"].click()
+            botones["−"].click()
+            botones["✓  💲 Mostrar precio"].click()  # apaga el precio
+
+        self.assertEqual(render_calls[0], ("standard", 1, True))
+        self.assertEqual(render_calls[1][0], "split")
+        self.assertEqual(render_calls[-1], ("split", 2, False))
+        self.assertTrue(botones["Split"].isChecked())
+        self.assertFalse(botones["Normal"].isChecked())

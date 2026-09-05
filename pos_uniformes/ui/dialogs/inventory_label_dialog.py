@@ -9,8 +9,6 @@ from typing import TYPE_CHECKING
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import (
-    QCheckBox,
-    QComboBox,
     QDialog,
     QGridLayout,
     QHBoxLayout,
@@ -18,7 +16,6 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QSizePolicy,
-    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
@@ -76,10 +73,62 @@ def _build_inventory_label_dialog_styles() -> str:
             font-weight: 600;
         }
         QPushButton#inventoryLabelNavButton {
-            min-width: 110px;
-            min-height: 34px;
-            border-radius: 10px;
-            padding: 6px 12px;
+            min-width: 130px;
+            min-height: 52px;
+            border-radius: 14px;
+            padding: 6px 16px;
+            font-size: 16px;
+            font-weight: 800;
+        }
+        /* Toggles de modo / precio: seleccionado = tinte claro + borde grueso */
+        QPushButton#inventoryLabelToggle {
+            background: #ffffff;
+            color: #2c2a27;
+            border: 2px solid #ddd0c0;
+            border-radius: 14px;
+            min-height: 54px;
+            padding: 0 18px;
+            font-size: 16px;
+            font-weight: 700;
+        }
+        QPushButton#inventoryLabelToggle:checked {
+            background: #f7e3d8;
+            color: #73341c;
+            border: 3px solid #a84f2d;
+        }
+        QPushButton#inventoryLabelStep {
+            background: #ffffff;
+            color: #2c2a27;
+            border: 2px solid #ddd0c0;
+            border-radius: 14px;
+            min-width: 64px;
+            max-width: 64px;
+            min-height: 54px;
+            font-size: 24px;
+            font-weight: 800;
+        }
+        QPushButton#inventoryLabelStep:pressed { background: #f1e6d6; }
+        QLabel#inventoryLabelCopies {
+            font-size: 28px;
+            font-weight: 800;
+            color: #73341c;
+            min-width: 64px;
+            background: transparent;
+            border: none;
+        }
+        QLabel#inventoryLabelFieldTitle {
+            color: #7a6d60;
+            font-size: 13px;
+            font-weight: 700;
+            background: transparent;
+            border: none;
+        }
+        QPushButton#primaryButton, QPushButton#secondaryButton {
+            min-height: 60px;
+            font-size: 17px;
+            font-weight: 800;
+            border-radius: 14px;
+            padding: 0 26px;
         }
     """
 
@@ -130,28 +179,69 @@ def build_inventory_label_dialog(
     controls_title.setObjectName("inventoryLabelSectionTitle")
     controls_layout.addWidget(controls_title)
 
+    # Rediseño táctil (2026-09-05): toggles grandes en vez de combo,
+    # stepper −/+ en vez de spinbox y toggle en vez de checkbox.
+    estado: dict[str, object] = {"mode": "standard", "copies": 1, "price": True}
+
     controls = QGridLayout()
-    controls.setHorizontalSpacing(14)
-    controls.setVerticalSpacing(10)
-    mode_combo = QComboBox()
-    mode_combo.addItem("Normal", "standard")
-    mode_combo.addItem("Split", "split")
-    mode_combo.addItem("Label", "dk1221")
-    copies_spin = QSpinBox()
-    copies_spin.setRange(1, 500)
-    copies_spin.setValue(1)
-    price_check = QCheckBox("Mostrar precio")
-    price_check.setChecked(True)
-    price_check.setToolTip("Incluir o quitar el precio de venta en la etiqueta impresa")
+    controls.setHorizontalSpacing(18)
+    controls.setVerticalSpacing(8)
+
+    modo_title = QLabel("Modo")
+    modo_title.setObjectName("inventoryLabelFieldTitle")
+    mode_row = QHBoxLayout()
+    mode_row.setSpacing(8)
+    mode_buttons: dict[str, QPushButton] = {}
+    for texto, valor in (("Normal", "standard"), ("Split", "split"), ("Label", "dk1221")):
+        btn = QPushButton(texto)
+        btn.setObjectName("inventoryLabelToggle")
+        btn.setCheckable(True)
+        btn.setAutoDefault(False)
+        mode_buttons[valor] = btn
+        mode_row.addWidget(btn, 1)
+    mode_buttons["standard"].setChecked(True)
+
+    copias_title = QLabel("Piezas / copias")
+    copias_title.setObjectName("inventoryLabelFieldTitle")
+    copies_row = QHBoxLayout()
+    copies_row.setSpacing(8)
+    copies_minus = QPushButton("−")
+    copies_minus.setObjectName("inventoryLabelStep")
+    copies_minus.setAutoDefault(False)
+    copies_label = QLabel("1")
+    copies_label.setObjectName("inventoryLabelCopies")
+    copies_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+    copies_plus = QPushButton("+")
+    copies_plus.setObjectName("inventoryLabelStep")
+    copies_plus.setAutoDefault(False)
+    copies_row.addWidget(copies_minus)
+    copies_row.addWidget(copies_label)
+    copies_row.addWidget(copies_plus)
+    copies_row.addStretch(1)
+
+    precio_title = QLabel("Precio en la etiqueta")
+    precio_title.setObjectName("inventoryLabelFieldTitle")
+    price_button = QPushButton("✓  💲 Mostrar precio")
+    price_button.setObjectName("inventoryLabelToggle")
+    price_button.setCheckable(True)
+    price_button.setChecked(True)
+    price_button.setAutoDefault(False)
+    price_button.setToolTip("Incluir o quitar el precio de venta en la etiqueta impresa")
+
     mode_hint = QLabel(build_inventory_label_mode_hint("standard"))
     mode_hint.setWordWrap(True)
     mode_hint.setObjectName("inventoryLabelModeHint")
-    controls.addWidget(QLabel("Modo"), 0, 0)
-    controls.addWidget(mode_combo, 0, 1)
-    controls.addWidget(QLabel("Piezas / copias"), 0, 2)
-    controls.addWidget(copies_spin, 0, 3)
-    controls.addWidget(price_check, 0, 4)
-    controls.addWidget(mode_hint, 1, 0, 1, 5)
+
+    controls.addWidget(modo_title, 0, 0)
+    controls.addLayout(mode_row, 1, 0)
+    controls.addWidget(copias_title, 0, 1)
+    controls.addLayout(copies_row, 1, 1)
+    controls.addWidget(precio_title, 0, 2)
+    controls.addWidget(price_button, 1, 2)
+    controls.addWidget(mode_hint, 2, 0, 1, 3)
+    controls.setColumnStretch(0, 3)
+    controls.setColumnStretch(1, 2)
+    controls.setColumnStretch(2, 2)
     controls_layout.addLayout(controls)
     layout.addWidget(controls_card)
 
@@ -215,12 +305,12 @@ def build_inventory_label_dialog(
         next_button.setEnabled(current_position < total - 1)
 
     def refresh_preview() -> None:
-        mode_hint.setText(build_inventory_label_mode_hint(str(mode_combo.currentData() or "standard")))
-        show_price = True if price_check.isChecked() else False
+        mode_hint.setText(build_inventory_label_mode_hint(str(estado["mode"])))
+        show_price = bool(estado["price"])
         try:
             result = render_label(
-                str(mode_combo.currentData() or "standard"),
-                int(copies_spin.value()),
+                str(estado["mode"]),
+                int(estado["copies"]),
                 show_price,
             )
         except Exception as exc:  # noqa: BLE001
@@ -291,9 +381,27 @@ def build_inventory_label_dialog(
                 build_inventory_label_print_confirmation(sku=str(context.sku), result=result),
             )
 
-    mode_combo.currentIndexChanged.connect(lambda _: refresh_preview())
-    copies_spin.valueChanged.connect(lambda _: refresh_preview())
-    price_check.stateChanged.connect(lambda _: refresh_preview())
+    def set_mode(valor: str) -> None:
+        estado["mode"] = valor
+        for v, btn in mode_buttons.items():
+            btn.setChecked(v == valor)
+        refresh_preview()
+
+    def set_copies(delta: int) -> None:
+        estado["copies"] = max(1, min(500, int(estado["copies"]) + delta))
+        copies_label.setText(str(estado["copies"]))
+        refresh_preview()
+
+    def toggle_price() -> None:
+        estado["price"] = price_button.isChecked()
+        price_button.setText("✓  💲 Mostrar precio" if estado["price"] else "💲 Mostrar precio")
+        refresh_preview()
+
+    for valor, btn in mode_buttons.items():
+        btn.clicked.connect(lambda _=False, v=valor: set_mode(v))
+    copies_minus.clicked.connect(lambda: set_copies(-1))
+    copies_plus.clicked.connect(lambda: set_copies(1))
+    price_button.clicked.connect(toggle_price)
     previous_button.clicked.connect(lambda: navigate_variant(-1))
     next_button.clicked.connect(lambda: navigate_variant(1))
     print_button.clicked.connect(handle_print)
