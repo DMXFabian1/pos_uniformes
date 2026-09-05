@@ -452,7 +452,9 @@ class QuickSaleWidget(QWidget):
         self._items_table.setColumnWidth(1, 70)
         self._items_table.setColumnWidth(2, 60)
         self._items_table.setColumnWidth(3, 100)
-        self._items_table.setColumnWidth(4, 50)
+        self._items_table.setColumnWidth(4, 156)
+        # Filas altas: los botones +/−/eliminar se tocan con el dedo.
+        self._items_table.verticalHeader().setDefaultSectionSize(52)
         self._items_table.setStyleSheet(f"""
             QTableWidget {{
                 background: white; border: none; font-size: 13px; color: {_TEXT};
@@ -650,15 +652,7 @@ class QuickSaleWidget(QWidget):
             price_item.setFont(QFont("", -1, QFont.Weight.Bold))
             self._items_table.setItem(row, 3, price_item)
 
-            btn_del = QPushButton("✕")
-            btn_del.setToolTip("Quitar 1 pieza (o eliminar si solo queda 1)")
-            btn_del.setStyleSheet(
-                f"QPushButton {{ background: transparent; border: 1.5px solid {_BORDER}; "
-                f"border-radius: 6px; font-size: 14px; font-weight: 600; color: {_MUTED}; }}"
-                f"QPushButton:hover {{ color: {_DANGER}; border-color: {_DANGER}; background: #fef0ee; }}"
-            )
-            btn_del.clicked.connect(lambda checked, r=row: self._on_remove(r))
-            self._items_table.setCellWidget(row, 4, btn_del)
+            self._items_table.setCellWidget(row, 4, self._build_row_actions(row))
 
         self._items_table.setRowCount(max(len(self._items), 1))
         if not self._items:
@@ -678,6 +672,54 @@ class QuickSaleWidget(QWidget):
         if self._discount_active and self._items:
             meta += f"  ·  Desc. (-${discount:,.2f})"
         self._total_meta.setText(meta)
+
+    def _build_row_actions(self, row: int) -> QWidget:
+        """[−] [+] [🗑] por renglón, tamaño dedo (pedido de Daniel)."""
+        _BASE = (
+            "QPushButton {{ background: #ffffff; border: 1.5px solid {borde};"
+            "  border-radius: 10px; font-size: 18px; font-weight: 800;"
+            "  color: {color}; min-width: 42px; max-width: 42px;"
+            "  min-height: 40px; }}"
+            "QPushButton:pressed {{ background: {press}; }}"
+        )
+        btn_minus = QPushButton("−")
+        btn_minus.setToolTip("Quitar 1 pieza")
+        btn_minus.setStyleSheet(_BASE.format(borde=_BORDER, color=_TEXT, press="#f1e6d6"))
+        btn_minus.clicked.connect(lambda checked=False, r=row: self._on_remove(r))
+
+        btn_plus = QPushButton("+")
+        btn_plus.setToolTip("Agregar 1 pieza")
+        btn_plus.setStyleSheet(_BASE.format(borde=_BORDER, color=_TEXT, press="#f1e6d6"))
+        btn_plus.clicked.connect(lambda checked=False, r=row: self._on_add_one(r))
+
+        btn_trash = QPushButton("🗑")
+        btn_trash.setToolTip("Eliminar la línea completa")
+        btn_trash.setStyleSheet(_BASE.format(borde="#e2b7ad", color=_DANGER, press="#fde3dd"))
+        btn_trash.clicked.connect(lambda checked=False, r=row: self._on_delete_line(r))
+
+        holder = QWidget()
+        ly = QHBoxLayout(holder)
+        ly.setContentsMargins(2, 2, 2, 2)
+        ly.setSpacing(6)
+        for btn in (btn_minus, btn_plus, btn_trash):
+            ly.addWidget(btn)
+        return holder
+
+    def _on_add_one(self, row: int) -> None:
+        if 0 <= row < len(self._items):
+            self._items[row]["cantidad"] += 1
+            self._refresh_items_table()
+            self._refresh_totals()
+
+    def _on_delete_line(self, row: int) -> None:
+        """Elimina la línea completa (todas sus piezas de un golpe)."""
+        if 0 <= row < len(self._items):
+            removed = self._items.pop(row)
+            message = restore_promo_playera_after_base_removed(self._items, removed)
+            if message:
+                QMessageBox.information(self, "Promo 3pz", message)
+            self._refresh_items_table()
+            self._refresh_totals()
 
     def _on_remove(self, row: int) -> None:
         if 0 <= row < len(self._items):

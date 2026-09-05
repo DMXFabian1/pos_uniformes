@@ -338,3 +338,44 @@ class LibretaCarritoTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class BotonesCarritoTests(unittest.TestCase):
+    """Cada renglón del carrito trae − / + / 🗑 (táctil): restar quita 1,
+    sumar agrega 1 y el bote elimina la línea completa."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _widget(self):
+        satellite = SimpleNamespace(offline_mode=True, _kiosk_lookup_from_cache=None)
+        w = QuickSaleWidget(satellite)
+        w._employee_code = "VEND-2"
+        w._items = [
+            {"sku": "S1", "nombre": "Chamarra", "talla": "2", "color": "",
+             "precio": Decimal("175.00"), "cantidad": 2},
+            {"sku": "S2", "nombre": "Playera", "talla": "10", "color": "",
+             "precio": Decimal("145.00"), "cantidad": 1},
+        ]
+        w._refresh_items_table()
+        return w
+
+    def test_sumar_restar_y_eliminar_linea(self) -> None:
+        w = self._widget()
+        w._on_add_one(0)
+        self.assertEqual(w._items[0]["cantidad"], 3)
+        w._on_remove(0)
+        self.assertEqual(w._items[0]["cantidad"], 2)
+        w._on_delete_line(0)  # elimina la línea aunque tenga 2 piezas
+        self.assertEqual(len(w._items), 1)
+        self.assertEqual(w._items[0]["sku"], "S2")
+
+    def test_cada_renglon_trae_sus_tres_botones(self) -> None:
+        from PyQt6.QtWidgets import QPushButton
+
+        w = self._widget()
+        acciones = w._items_table.cellWidget(0, 4)
+        botones = acciones.findChildren(QPushButton)
+        self.assertEqual(len(botones), 3)
+        self.assertEqual({b.text() for b in botones}, {"−", "+", "🗑"})
