@@ -270,3 +270,189 @@ def imprimir_etiqueta(
         "trabajo_id": trabajo.id,
         "copias": resultado.effective_copies,
     }
+
+
+# ─── Encargado (León) desde el celular — espejo de su modo del kiosko ────
+# Lectura siempre; las ACCIONES (apuntar, hacer corte) solo en modo tienda
+# (base viva). El ticket del corte se encola a la impresora del satélite.
+
+
+def _es_gestor(codigo: str) -> bool:
+    return _rol(codigo) in ("dueno", "encargado")
+
+
+def _solo_gestor(empleada) -> None:
+    if not _es_gestor(empleada.codigo):
+        raise HTTPException(status_code=403, detail={"error": {
+            "code": "solo_gestor", "message": "Solo el dueño o el encargado."}})
+
+
+def _solo_tienda() -> None:
+    if _modo_servidor() != "tienda":
+        raise HTTPException(status_code=409, detail={"error": {
+            "code": "solo_en_tienda",
+            "message": "Esta acción solo funciona conectado a la tienda."}})
+
+
+def _equipo(db: Session) -> list[dict]:
+    from pos_uniformes.database.models import Empleada
+
+    return [
+        {"codigo": str(e.codigo).upper(),
+         "nombre": (e.nombre_completo or e.codigo).split()[0]}
+        for e in db.query(Empleada).filter(Empleada.activo.is_(True))
+        .order_by(Empleada.nombre_completo).all()
+        if str(e.codigo).upper() not in (_OWNER_CODE, _ENCARGADO_CODE)
+    ]
+
+
+def _descansos_semana(db: Session) -> list[dict]:
+    """Quién descansa en los próximos 7 días (hoy incluido)."""
+    from datetime import timedelta
+
+    from pos_uniformes.services.calendario_empleadas_service import (
+        cargar_horarios_todos,
+        quienes_descansan,
+    )
+
+    horarios = cargar_horarios_todos(db)
+    nombres = {e["codigo"]: e["nombre"] for e in _equipo(db)}
+    hoy = date.today()
+    filas = []
+    for i in range(7):
+        dia = hoy + timedelta(days=i)
+        codes = [c for c in quienes_descansan(horarios, dia) if c in nombres]
+        if codes:
+            filas.append({
+                "fecha": dia.isoformat(),
+                "nombres": [nombres[c] for c in codes],
+            })
+    return filas
+
+
+@router.get("/encargado")
+def encargado_inicio(
+    current: tuple = Depends(get_current_employee),
+    db: Session = Depends(get_db),
+) -> dict:
+    empleada, _p = current
+    _solo_gestor(empleada)
+    return {
+        "modo": _modo_servidor(),
+        "cortes": _payload_cortes(db),
+        "equipo": _equipo(db),
+        "descansos_semana": _descansos_semana(db),
+    }
+
+
+class MarcarRequest(BaseModel):
+    employee_code: str = Field(min_length=1, max_length=40)
+    fecha: date
+    tipo: str = Field(pattern="^(falta|descanso|quitar)$")
+
+
+@router.post("/encargado/marcar")
+def encargado_marcar(
+    body: MarcarRequest,
+    current: tuple = Depends(get_current_employee),
+    db: Session = Depends(get_db),
+) -> dict:
+    empleada, _p = current
+    _solo_gestor(empleada)
+    _solo_tienda()
+    from pos_uniformes.services.calendario_empleadas_service import (
+        marcar_dia,
+        quitar_marca,
+    )
+
+    quien = str(empleada.codigo).upper()
+    if body.tipo == "quitar":
+        quitar_marca(db, body.employee_code, body.fecha)
+    else:
+        marcar_dia(
+            db, body.employee_code, body.fecha, body.tipo,
+            nota=f"apuntado por {quien} (celular)",
+        )
+    db.commit()
+    return {"ok": True}
+
+
+@router.get("/encargado/corte_hoy")
+def encargado_corte_hoy(
+    current: tuple = Depends(get_current_employee),
+    db: Session = Depends(get_db),
+) -> dict:
+    """La cifra calculada de hoy (para confirmarla — SIN poder editarla)."""
+    from decimal import Decimal
+
+    from pos_uniformes.services.libreta_service import (
+        listar_operaciones,
+        resumir_por_dia,
+        ventana_hoy,
+    )
+
+    empleada, _p = current
+    _solo_gestor(empleada)
+    desde, hasta = ventana_hoy()
+    cortes = resumir_por_dia(listar_operaciones(db, desde=desde, hasta=hasta))
+    return {
+        "venta": str(sum((c.monto_en_caja for c in cortes), Decimal("0.00"))),
+        "operaciones": sum(c.operaciones for c in cortes),
+        "piezas": sum(c.piezas for c in cortes),
+        "hay_ventas": bool(cortes),
+    }
+
+
+@router.post("/encargado/corte")
+def encargado_hacer_corte(
+    current: tuple = Depends(get_current_employee),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Guarda el corte de hoy con la cifra CALCULADA (el encargado no puede
+    editarla) y encola el ticket a la impresora de la tienda."""
+    from decimal import Decimal
+
+    from pos_uniformes.services import trabajos_service
+    from pos_uniformes.services.libreta_service import (
+        guardar_corte,
+        listar_operaciones,
+        resumir_por_dia,
+        resumir_por_empleada,
+        ventana_hoy,
+    )
+    from pos_uniformes.ui.helpers.libreta_corte_ticket_helper import (
+        build_corte_ticket_text,
+    )
+
+    empleada, _p = current
+    _solo_gestor(empleada)
+    _solo_tienda()
+    desde, hasta = ventana_hoy()
+    rows = listar_operaciones(db, desde=desde, hasta=hasta)
+    cortes = resumir_por_dia(rows)
+    if not cortes:
+        raise HTTPException(status_code=409, detail={"error": {
+            "code": "sin_ventas", "message": "Hoy todavía no hay ventas."}})
+    monto = sum((c.monto_en_caja for c in cortes), Decimal("0.00"))
+    quien = str(empleada.codigo).upper()
+    guardar_corte(
+        db,
+        fecha=date.today(),
+        monto_final=monto,
+        operaciones=sum(c.operaciones for c in cortes),
+        piezas=sum(c.piezas for c in cortes),
+        periodo_label="HOY",
+        creado_por=quien,
+    )
+    ticket_encolado = False
+    try:
+        texto = build_corte_ticket_text(
+            periodo_label="HOY", cortes=cortes,
+            por_empleada=resumir_por_empleada(rows), generado_por=quien,
+        )
+        trabajos_service.enviar_ticket(db, texto, origen="pwa", creado_por=quien)
+        ticket_encolado = True
+    except Exception:  # noqa: BLE001 — el corte ya quedó; el ticket es extra
+        pass
+    db.commit()
+    return {"ok": True, "monto": str(monto), "ticket_encolado": ticket_encolado}

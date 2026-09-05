@@ -305,3 +305,116 @@ class SnapshotTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class EncargadoMovilTests(unittest.TestCase):
+    """El modo de León en el celular: espejo del kiosko (apuntar, cortes)."""
+
+    def setUp(self) -> None:
+        from pos_uniformes.database.models import Trabajo
+
+        engine = create_engine(
+            "sqlite://",
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+        for t in (*_TABLAS, Trabajo):
+            t.__table__.create(engine)
+        self.session = sessionmaker(bind=engine)()
+        self.session.add_all(
+            [
+                Empleada(codigo="ENC-1", nombre_completo="León Fabian", activo=True),
+                Empleada(codigo="VEND-1", nombre_completo="Daniel", activo=True),
+                Empleada(codigo="VEND-4", nombre_completo="Fanny Ortiz", activo=True),
+            ]
+        )
+        self.session.add(
+            EmpleadaHorario(employee_code="VEND-4", descanso_weekday=date.today().weekday())
+        )
+        self.session.add(
+            LibretaVenta(
+                employee_code="VEND-4", employee_name="Fanny", tipo="venta",
+                piezas=2, comisiones=2, monto_total=Decimal("500.00"),
+                monto_neto=Decimal("500.00"), detalle=[], created_at=datetime.now(),
+            )
+        )
+        self.session.commit()
+        app.dependency_overrides[get_db] = lambda: self.session
+        leon = self.session.query(Empleada).filter(Empleada.codigo == "ENC-1").one()
+        app.dependency_overrides[get_current_employee] = lambda: (leon, None)
+        self.client = TestClient(app)
+
+    def tearDown(self) -> None:
+        app.dependency_overrides.clear()
+        self.session.close()
+
+    def test_payload_encargado_equipo_y_descansos(self) -> None:
+        with patch(
+            "pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"
+        ):
+            data = self.client.get("/api/v1/movil/encargado").json()
+        self.assertEqual([e["nombre"] for e in data["equipo"]], ["Fanny"])
+        # Su descanso fijo cae hoy → aparece en la semana.
+        self.assertTrue(
+            any("Fanny" in d["nombres"] for d in data["descansos_semana"])
+        )
+
+    def test_marcar_falta_y_quitar(self) -> None:
+        from pos_uniformes.database.models import EmpleadaEvento
+
+        hoy = date.today().isoformat()
+        with patch(
+            "pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"
+        ):
+            r = self.client.post(
+                "/api/v1/movil/encargado/marcar",
+                json={"employee_code": "VEND-4", "fecha": hoy, "tipo": "falta"},
+            )
+            self.assertEqual(r.status_code, 200, r.text)
+            evento = self.session.query(EmpleadaEvento).one()
+            self.assertEqual(evento.tipo, "falta")
+            self.assertIn("ENC-1", evento.nota)
+            self.client.post(
+                "/api/v1/movil/encargado/marcar",
+                json={"employee_code": "VEND-4", "fecha": hoy, "tipo": "quitar"},
+            )
+            self.assertEqual(self.session.query(EmpleadaEvento).count(), 0)
+
+    def test_marcar_en_modo_casa_se_niega(self) -> None:
+        with patch(
+            "pos_uniformes.api.routers.movil._modo_servidor", return_value="casa"
+        ):
+            r = self.client.post(
+                "/api/v1/movil/encargado/marcar",
+                json={
+                    "employee_code": "VEND-4",
+                    "fecha": date.today().isoformat(),
+                    "tipo": "falta",
+                },
+            )
+        self.assertEqual(r.status_code, 409)
+
+    def test_corte_guarda_y_encola_ticket(self) -> None:
+        from pos_uniformes.database.models import LibretaCorte, TipoTrabajo, Trabajo
+
+        with patch(
+            "pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"
+        ):
+            datos = self.client.get("/api/v1/movil/encargado/corte_hoy").json()
+            self.assertTrue(datos["hay_ventas"])
+            self.assertEqual(datos["venta"], "500.00")
+            r = self.client.post("/api/v1/movil/encargado/corte", json={})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json()["monto"], "500.00")
+        self.assertTrue(r.json()["ticket_encolado"])
+        corte = self.session.query(LibretaCorte).one()
+        self.assertEqual(corte.creado_por, "ENC-1")
+        trabajo = self.session.query(Trabajo).one()
+        self.assertEqual(trabajo.tipo, TipoTrabajo.TICKET)
+        self.assertIn("VENTA DE HOY", trabajo.contenido["texto"])
+
+    def test_empleada_no_puede_usar_encargado(self) -> None:
+        fanny = self.session.query(Empleada).filter(Empleada.codigo == "VEND-4").one()
+        app.dependency_overrides[get_current_employee] = lambda: (fanny, None)
+        r = self.client.get("/api/v1/movil/encargado")
+        self.assertEqual(r.status_code, 403)

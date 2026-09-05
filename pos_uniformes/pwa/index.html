@@ -82,6 +82,10 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
 .copias{display:flex; align-items:center; gap:12px; margin:10px 0}
 .copias button{width:52px; min-height:48px; font-size:22px}
 .copias span{font-size:22px; font-weight:800; min-width:36px; text-align:center}
+.btn-grande{background:var(--carta); color:var(--tinta); border:2px solid var(--borde);
+  border-radius:16px; min-height:64px; font-size:19px; font-weight:700; margin-bottom:12px}
+.btn-grande:active{background:#f1e6d6}
+.listo-texto{font-size:26px; font-weight:800; margin:24px 0; line-height:1.4}
 </style>
 </head>
 <body>
@@ -122,12 +126,18 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
     <button class="btn-suave salir" onclick="salir()">Salir</button>
   </div>
 
-  <!-- ENCARGADO (León) -->
-  <div id="vista-encargado" class="oculto">
-    <h1>Cortes</h1>
-    <p class="sub">Los más recientes primero</p>
-    <div id="cortes-lista"></div>
-    <button class="btn-suave salir" onclick="salir()">Salir</button>
+  <!-- ENCARGADO (León) — espejo de su modo del kiosko -->
+  <div id="vista-encargado" class="oculto con-nav">
+    <div id="enc-menu">
+      <h1>¿Qué quieres hacer?</h1>
+      <p class="sub" id="enc-modo"></p>
+      <button class="btn-grande" onclick="encApuntar()">🗓  Apuntar falta o descanso</button>
+      <button class="btn-grande" onclick="encVerCortes()">💵  Ver cortes</button>
+      <button class="btn-grande" onclick="encCorteHoy()">🧾  Hacer corte de hoy</button>
+      <div class="card" id="enc-descansos"></div>
+      <button class="btn-suave" onclick="salir()">Salir</button>
+    </div>
+    <div id="enc-sub"></div>
   </div>
 
   <!-- DUEÑO -->
@@ -394,11 +404,141 @@ function filaCorte(c) {
          `<span class="monto">${pesos(c.monto)}</span></div>`;
 }
 
-function pintarEncargado(data) {
-  $("cortes-lista").innerHTML = data.cortes.length
-    ? `<div class="card">${data.cortes.map(filaCorte).join("")}</div>`
-    : '<div class="card">Todavía no hay cortes guardados.</div>';
+// ── Encargado (León): espejo de su modo del kiosko ────────────────
+let encData = null, encSel = {};
+
+async function pintarEncargado(_data) {
   mostrar("encargado");
+  encMenu();
+  try { encData = await api("/api/v1/movil/encargado"); } catch (e) { encData = null; }
+  const enTienda = encData && encData.modo === "tienda";
+  $("enc-modo").textContent = enTienda
+    ? "Conectado a la tienda" : "Fuera de la tienda: solo puedes consultar";
+  const desc = (encData && encData.descansos_semana) || [];
+  $("enc-descansos").innerHTML = "<strong>🛌 Descansos estos días</strong>" +
+    (desc.length ? desc.map(d =>
+      `<div class="fila"><span>${fechaLarga(d.fecha)}</span><span>${d.nombres.join(", ")}</span></div>`).join("")
+     : "<div class='fila'>Nadie tiene descanso programado.</div>");
+}
+
+function encMenu() {
+  $("enc-menu").classList.remove("oculto");
+  $("enc-sub").innerHTML = "";
+}
+
+function encSub(html) {
+  $("enc-menu").classList.add("oculto");
+  $("enc-sub").innerHTML = html;
+}
+
+function encVerCortes() {
+  const cortes = (encData && encData.cortes) || [];
+  encSub(`<h1>Cortes</h1><p class="sub">Los más recientes primero</p>` +
+    (cortes.length ? `<div class="card">${cortes.map(filaCorte).join("")}</div>`
+                   : `<div class="card">Todavía no hay cortes guardados.</div>`) +
+    `<button class="btn-suave" onclick="encMenu()">← Regresar</button>`);
+}
+
+function encRequiereTienda() {
+  if (encData && encData.modo === "tienda") return true;
+  encSub(`<div class="listo-texto">Esto solo funciona<br>estando en la tienda. 🏬</div>` +
+    `<button class="btn-suave" onclick="encMenu()">← Regresar</button>`);
+  return false;
+}
+
+function encApuntar() {
+  if (!encRequiereTienda()) return;
+  const eq = (encData && encData.equipo) || [];
+  encSub(`<h1>¿De quién quieres apuntar algo?</h1>` +
+    eq.map(e => `<button class="btn-grande" onclick="encElegir('${e.codigo}','${e.nombre}')">👤  ${e.nombre}</button>`).join("") +
+    `<button class="btn-suave" onclick="encMenu()">← Regresar</button>`);
+}
+
+function encElegir(codigo, nombre) {
+  encSel = {codigo, nombre};
+  encSub(`<h1>¿Qué pasó con ${nombre}?</h1>` +
+    `<button class="btn-grande" onclick="encTipo('falta')">🚫  Faltó</button>` +
+    `<button class="btn-grande" onclick="encTipo('descanso')">🛌  Le doy descanso</button>` +
+    `<button class="btn-suave" onclick="encApuntar()">← Regresar</button>`);
+}
+
+function encTipo(tipo) {
+  encSel.tipo = tipo;
+  const hoy = new Date(), man = new Date(Date.now() + 86400000);
+  const iso = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  encSub(`<h1>¿Qué día?</h1>` +
+    `<button class="btn-grande" style="background:var(--acento);color:#fff;border:none" onclick="encMarcar('${iso(hoy)}')">Hoy (${fechaLarga(iso(hoy))})</button>` +
+    `<button class="btn-grande" onclick="encMarcar('${iso(man)}')">Mañana (${fechaLarga(iso(man))})</button>` +
+    `<input type="date" id="enc-fecha" style="margin-top:4px">` +
+    `<button class="btn-grande" onclick="encMarcar(document.getElementById('enc-fecha').value)">📅  Ese otro día</button>` +
+    `<button class="btn-suave" onclick="encElegir('${encSel.codigo}','${encSel.nombre}')">← Regresar</button>`);
+}
+
+async function encPost(ruta, body) {
+  const r = await fetch(ruta, {method: "POST",
+    headers: {"Content-Type": "application/json", "Authorization": "Bearer " + token},
+    body: JSON.stringify(body)});
+  if (!r.ok) throw new Error("post");
+  return r.json();
+}
+
+async function encMarcar(fecha) {
+  if (!fecha) return;
+  try {
+    await encPost("/api/v1/movil/encargado/marcar",
+      {employee_code: encSel.codigo, fecha, tipo: encSel.tipo});
+  } catch (e) {
+    encSub(`<div class="listo-texto">No se guardó. 😕<br>Inténtalo otra vez.</div>` +
+      `<button class="btn-suave" onclick="encMenu()">← Regresar</button>`);
+    return;
+  }
+  encSel.fecha = fecha;
+  const verbo = encSel.tipo === "falta" ? "faltó" : "descansa";
+  encSub(`<div class="listo-texto">✅ Apuntado:<br><br>${encSel.nombre} ${verbo} el ${fechaLarga(fecha)}.</div>` +
+    `<button class="btn-grande" style="background:var(--acento);color:#fff;border:none" onclick="encListo()">✅  Listo</button>` +
+    `<button class="btn-suave" onclick="encDeshacer()">❌  Me equivoqué (borrar)</button>`);
+}
+
+async function encListo() { await pintarEncargado(); }
+
+async function encDeshacer() {
+  try {
+    await encPost("/api/v1/movil/encargado/marcar",
+      {employee_code: encSel.codigo, fecha: encSel.fecha, tipo: "quitar"});
+    encSub(`<div class="listo-texto">Borrado. Como si nada. 👍</div>` +
+      `<button class="btn-grande" onclick="encListo()">✅  Listo</button>`);
+  } catch (e) {
+    encSub(`<div class="listo-texto">No se borró. 😕</div>` +
+      `<button class="btn-suave" onclick="encMenu()">← Regresar</button>`);
+  }
+}
+
+async function encCorteHoy() {
+  if (!encRequiereTienda()) return;
+  let datos;
+  try { datos = await api("/api/v1/movil/encargado/corte_hoy"); }
+  catch (e) { encMenu(); return; }
+  if (!datos.hay_ventas) {
+    encSub(`<div class="listo-texto">Hoy todavía no hay ventas.</div>` +
+      `<button class="btn-suave" onclick="encMenu()">← Regresar</button>`);
+    return;
+  }
+  encSub(`<h1>Corte de hoy</h1>` +
+    `<div class="listo-texto">VENTA DE HOY:<br><br>${pesos(datos.venta)}</div>` +
+    `<button class="btn-grande" style="background:var(--acento);color:#fff;border:none" onclick="encHacerCorte()">🖨  Imprimir corte</button>` +
+    `<button class="btn-suave" onclick="encMenu()">← Regresar</button>`);
+}
+
+async function encHacerCorte() {
+  try {
+    const r = await encPost("/api/v1/movil/encargado/corte", {});
+    encSub(`<div class="listo-texto">✅ Corte hecho:<br><br>${pesos(r.monto)}` +
+      (r.ticket_encolado ? "<br><br>🖨 El ticket está saliendo en la impresora de la tienda." : "") +
+      `</div><button class="btn-grande" onclick="encListo()">✅  Listo</button>`);
+  } catch (e) {
+    encSub(`<div class="listo-texto">No se pudo hacer el corte. 😕</div>` +
+      `<button class="btn-suave" onclick="encMenu()">← Regresar</button>`);
+  }
 }
 
 function pintarDueno(data) {
