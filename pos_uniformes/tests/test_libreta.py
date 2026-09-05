@@ -1342,3 +1342,42 @@ class KioskoIgnoraGafeteTests(unittest.TestCase):
         )
         QuoteSatelliteWindow._handle_lookup_scan(fake)
         fake._kiosk_lookup_from_cache.assert_not_called()
+
+
+class ReimprimirDesdeLibretaTests(unittest.TestCase):
+    """El botón del dueño reimprime SIN on_printed (no re-registra)."""
+
+    def _fake(self, row, owner=True, idx=0):
+        widget = MagicMock()
+        widget.build_reprint_ticket.return_value = "TEXTO DEL TICKET"
+        return SimpleNamespace(
+            _libreta_is_owner=owner,
+            _libreta_rows_pintadas=[row],
+            libreta_table=SimpleNamespace(currentRow=lambda: idx),
+            quick_sale_widget=widget,
+        )
+
+    def test_reimprime_sin_registrar(self) -> None:
+        from datetime import datetime
+
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        row = SimpleNamespace(
+            tipo="venta", detalle=[{"sku": "S"}], cliente=None, employee_name="Fanny",
+            employee_code="VEND-4", descuento_empleada=False, created_at=datetime(2026, 9, 5, 12, 0),
+        )
+        fake = self._fake(row)
+        with patch("pos_uniformes.ui.helpers.ticket_routing_helper.route_tickets") as ruta:
+            QuoteSatelliteWindow._reimprimir_ticket_libreta(fake)
+        ruta.assert_called_once()
+        self.assertEqual(ruta.call_args.args[2], ["TEXTO DEL TICKET"])
+        self.assertNotIn("on_printed", ruta.call_args.kwargs)  # jamás re-registra
+
+    def test_empleada_no_puede_reimprimir(self) -> None:
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        fake = self._fake(SimpleNamespace(), owner=False)
+        with patch("pos_uniformes.ui.helpers.ticket_routing_helper.route_tickets") as ruta:
+            QuoteSatelliteWindow._reimprimir_ticket_libreta(fake)
+        ruta.assert_not_called()
+        fake.quick_sale_widget.build_reprint_ticket.assert_not_called()

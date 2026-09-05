@@ -1343,6 +1343,13 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_delete_button.setAutoDefault(False)
         self.libreta_delete_button.clicked.connect(self._borrar_registro_libreta)
         owner_bar_ly.addWidget(self.libreta_delete_button)
+        # Reimpresión de un ticket pasado (solo dueño): para cuando la
+        # impresora se quedó sin papel — NO registra otra venta.
+        self.libreta_reprint_button = QPushButton("🖨 Reimprimir ticket")
+        self.libreta_reprint_button.setObjectName("secondaryButton")
+        self.libreta_reprint_button.setAutoDefault(False)
+        self.libreta_reprint_button.clicked.connect(self._reimprimir_ticket_libreta)
+        owner_bar_ly.addWidget(self.libreta_reprint_button)
         # Rango libre de fechas (calendario): "cuántas comisiones hizo Ana
         # del día X al día Y" — se combina con el filtro por empleada.
         owner_bar_ly.addWidget(QLabel("Del:"))
@@ -1973,6 +1980,39 @@ class QuoteSatelliteWindow(QMainWindow):
         ly.addWidget(cerrar)
         dlg.setLayout(ly)
         dlg.exec()
+
+    def _reimprimir_ticket_libreta(self) -> None:
+        """Reimprime el ticket del registro seleccionado en MOVIMIENTOS
+        (solo dueño). Es una copia del ticket original — con la fecha de
+        entonces y la leyenda REIMPRESION — y NO registra nada en la Libreta."""
+        if not self._libreta_is_owner:
+            return
+        rows = list(getattr(self, "_libreta_rows_pintadas", []) or [])
+        idx = self.libreta_table.currentRow()
+        if idx < 0 or idx >= len(rows):
+            QMessageBox.information(
+                self, "Sin selección",
+                "Selecciona en MOVIMIENTOS el ticket que quieres reimprimir.",
+            )
+            return
+        row = rows[idx]
+        texto = self.quick_sale_widget.build_reprint_ticket(
+            tipo=str(row.tipo),
+            detalle=list(row.detalle or []),
+            cliente=getattr(row, "cliente", None),
+            employee_name=str(row.employee_name or row.employee_code or ""),
+            descuento_empleada=bool(getattr(row, "descuento_empleada", False)),
+            created_at=row.created_at,
+        )
+        if not texto:
+            QMessageBox.information(
+                self, "Sin ticket", "Los abonos no generan ticket para reimprimir."
+            )
+            return
+        from pos_uniformes.ui.helpers.ticket_routing_helper import route_tickets
+
+        # Sin on_printed: reimprimir jamás vuelve a registrar la venta.
+        route_tickets(self, "Reimpresión de ticket", [texto])
 
     def _borrar_registro_libreta(self) -> None:
         """Borra el registro seleccionado en MOVIMIENTOS (solo dueño).

@@ -384,3 +384,60 @@ class BotonesCarritoTests(unittest.TestCase):
         # El bote lleva icono SVG (o el emoji de respaldo si el asset falta).
         trash = next(b for b in botones if b.text() in ("", "🗑"))
         self.assertTrue(trash.text() == "🗑" or not trash.icon().isNull())
+
+
+class ReimpresionTicketTests(unittest.TestCase):
+    """Reimprimir un ticket pasado (solo dueño): copia fiel con la fecha
+    original y leyenda REIMPRESION, sin tocar el carrito ni registrar."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _widget(self) -> QuickSaleWidget:
+        satellite = SimpleNamespace(offline_mode=True, _kiosk_lookup_from_cache=None)
+        w = QuickSaleWidget(satellite)
+        w._employee_code = "VEND-1"
+        w._employee_name = "Daniel"
+        w._items = _items()  # carrito en curso que NO debe alterarse
+        return w
+
+    def test_venta_reimpresa_fiel_y_sin_tocar_carrito(self) -> None:
+        from datetime import datetime
+
+        w = self._widget()
+        detalle = [{"sku": "SKU9", "nombre": "Sueter Claudia", "talla": "M",
+                    "cantidad": 2, "precio": "299.00", "subtotal": "598.00"}]
+        with patch.object(w, "_load_business_info", return_value=("MAXIMODA", "", "")):
+            texto = w.build_reprint_ticket(
+                tipo="venta", detalle=detalle, cliente=None, employee_name="Fanny Ortiz",
+                descuento_empleada=False, created_at=datetime(2026, 9, 5, 12, 24),
+            )
+        self.assertIn("REIMPRESION", texto)
+        self.assertIn("05/09/2026 12:24", texto)   # fecha ORIGINAL, no la de hoy
+        self.assertIn("Fanny Ortiz", texto)
+        self.assertIn("Sueter Claudia", texto)
+        self.assertIn("$598.00", texto)
+        # El carrito y la sesión quedan intactos.
+        self.assertEqual(w._items, _items())
+        self.assertEqual(w._employee_name, "Daniel")
+
+    def test_apartado_reimpreso_y_abono_sin_ticket(self) -> None:
+        from datetime import datetime
+
+        w = self._widget()
+        detalle = [{"sku": "SKU9", "nombre": "Pants", "talla": "6",
+                    "cantidad": 1, "precio": "515.00"}]
+        with patch.object(w, "_load_business_info", return_value=("MAXIMODA", "", "")):
+            apartado = w.build_reprint_ticket(
+                tipo="apartado", detalle=detalle, cliente="Ana Lopez", employee_name="Fanny",
+                descuento_empleada=False, created_at=datetime(2026, 9, 5, 12, 0),
+            )
+            abono = w.build_reprint_ticket(
+                tipo="abono", detalle=[], cliente="Ana", employee_name="Fanny",
+                descuento_empleada=False, created_at=datetime(2026, 9, 5, 12, 0),
+            )
+        self.assertIn("apartado", apartado.lower())
+        self.assertIn("Ana Lopez", apartado)
+        self.assertIn("REIMPRESION", apartado)
+        self.assertIsNone(abono)

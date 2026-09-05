@@ -1227,6 +1227,55 @@ class QuickSaleWidget(QWidget):
         # La forma de pago vale aunque conteste "solo ticket del cliente".
         return wants_copy, btn_tarjeta.isChecked()
 
+    def build_reprint_ticket(
+        self,
+        *,
+        tipo: str,
+        detalle: list[dict],
+        cliente: str | None,
+        employee_name: str,
+        descuento_empleada: bool,
+        created_at,
+    ) -> str | None:
+        """Reconstruye el ticket de una operación YA registrada en la Libreta
+        (para reimprimir si la impresora falló). No registra nada ni toca el
+        carrito: presta el estado, arma el texto y lo devuelve todo como
+        estaba. Abonos no tienen ticket → None."""
+        if tipo not in ("venta", "apartado"):
+            return None
+        items = [
+            {
+                "sku": str(line.get("sku", "")),
+                "nombre": str(line.get("nombre", "")),
+                "talla": str(line.get("talla", "")),
+                "color": "",
+                "precio": Decimal(str(line.get("precio", 0) or 0)),
+                "cantidad": int(line.get("cantidad", 0) or 0),
+            }
+            for line in (detalle or [])
+        ]
+        try:
+            local_dt = created_at.astimezone() if created_at.tzinfo else created_at
+            fecha_str = local_dt.strftime("%d/%m/%Y %H:%M")
+        except Exception:  # noqa: BLE001
+            fecha_str = None
+        respaldo = (
+            self._items, self._discount_active, self._employee_name, self._employee_code
+        )
+        try:
+            self._items = items
+            self._discount_active = bool(descuento_empleada)
+            self._employee_name = employee_name or self._employee_name
+            if tipo == "venta":
+                return self._build_venta_text(fecha_str=fecha_str, reimpresion=True)
+            return self._build_apartado_text(
+                cliente or "", copy_label="CLIENTE", fecha_str=fecha_str, reimpresion=True
+            )
+        finally:
+            (
+                self._items, self._discount_active, self._employee_name, self._employee_code
+            ) = respaldo
+
     def _on_ticket_venta(self) -> None:
         if not self._items:
             QMessageBox.information(self, "Sin piezas", "Agrega piezas antes de generar ticket.")
@@ -1619,7 +1668,12 @@ class QuickSaleWidget(QWidget):
             )
 
     def _build_venta_text(
-        self, *, store_copy: bool = False, terminal_commission: bool = False
+        self,
+        *,
+        store_copy: bool = False,
+        terminal_commission: bool = False,
+        fecha_str: str | None = None,
+        reimpresion: bool = False,
     ) -> str:
         """Ticket de venta. Con store_copy=True genera la copia interna:
         mismo formato de articulos y totales, pero sin los datos que ve el
@@ -1628,7 +1682,7 @@ class QuickSaleWidget(QWidget):
         terminal_commission=True (solo para la copia interna) muestra cada
         precio unitario ya con el 6% de la terminal descontado y redondeado."""
         biz_name, biz_phone, biz_addr = self._load_business_info()
-        now = datetime.now().strftime("%d/%m/%Y %H:%M")
+        now = fecha_str or datetime.now().strftime("%d/%m/%Y %H:%M")
         items = self._commission_items() if terminal_commission else self._items
         subtotal, discount, total = self._compute_totals(items)
 
@@ -1643,6 +1697,8 @@ class QuickSaleWidget(QWidget):
             if biz_phone:
                 lines.append(f"Tel: {biz_phone}".center(_TW))
         lines.append("Ticket de venta".center(_TW))
+        if reimpresion:
+            lines.append("*** REIMPRESION ***".center(_TW))
 
         lines.append(tk_top())
         tk_field("Fecha:", now, lines)
@@ -1674,9 +1730,11 @@ class QuickSaleWidget(QWidget):
         *,
         copy_label: str = "",
         include_terms: bool = True,
+        fecha_str: str | None = None,
+        reimpresion: bool = False,
     ) -> str:
         biz_name, biz_phone, biz_addr = self._load_business_info()
-        now = datetime.now().strftime("%d/%m/%Y %H:%M")
+        now = fecha_str or datetime.now().strftime("%d/%m/%Y %H:%M")
         subtotal, discount, total = self._compute_totals()
         minimo = self._round_total(
             (total * self._MIN_LAYAWAY_PERCENT / Decimal("100")).quantize(Decimal("0.01"))
@@ -1690,6 +1748,8 @@ class QuickSaleWidget(QWidget):
         if biz_phone:
             lines.append(f"Tel: {biz_phone}".center(_TW))
         lines.append("Ticket de apartado".center(_TW))
+        if reimpresion:
+            lines.append("*** REIMPRESION ***".center(_TW))
         if copy_label:
             lines.append(f"- {copy_label} -".center(_TW))
 
