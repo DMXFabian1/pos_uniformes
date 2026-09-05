@@ -485,10 +485,11 @@ class HistorialCortesTests(unittest.TestCase):
         from sqlalchemy import create_engine
         from sqlalchemy.orm import sessionmaker
 
-        from pos_uniformes.database.models import LibretaCorte
+        from pos_uniformes.database.models import LibretaCorte, LibretaVenta
 
         engine = create_engine("sqlite://")
         LibretaCorte.__table__.create(engine)
+        LibretaVenta.__table__.create(engine)
         self.session = sessionmaker(bind=engine)()
 
     def tearDown(self) -> None:
@@ -550,6 +551,54 @@ class HistorialCortesTests(unittest.TestCase):
         # Solo cifras: sin operaciones, piezas ni notas en su vista.
         self.assertNotIn("29", textos[0])
         self.assertNotIn("76", textos[0])
+
+    def test_leon_hace_corte_sin_poder_editar(self) -> None:
+        import os as _os
+
+        _os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from datetime import datetime
+
+        from PyQt6.QtWidgets import QApplication
+
+        QApplication.instance() or QApplication([])
+        from pos_uniformes.database.models import LibretaCorte, LibretaVenta
+
+        self.session.add(
+            LibretaVenta(
+                employee_code="VEND-4", employee_name="Fanny", tipo="venta",
+                piezas=2, comisiones=2, monto_total=Decimal("500.00"),
+                monto_neto=Decimal("500.00"), detalle=[],
+                # naive local: sqlite compara fechas como texto y un offset
+                # de zona rompería la ventana de hoy
+                created_at=datetime.now(),
+            )
+        )
+        self.session.commit()
+
+        cm = MagicMock()
+        cm.__enter__ = lambda s: self.session
+        cm.__exit__ = lambda s, *a: False
+        with patch(
+            "pos_uniformes.database.connection.get_session", return_value=cm
+        ), patch(
+            "pos_uniformes.ui.helpers.ticket_routing_helper.route_tickets"
+        ) as imprimir:
+            from pos_uniformes.ui.dialogs.calendario_empleadas_dialog import (
+                CalendarioEncargadoDialog,
+            )
+
+            dlg = CalendarioEncargadoDialog(None)
+            dlg._ir_a_corte_hoy()
+            # La cifra mostrada es la CALCULADA — no hay campo para editarla.
+            self.assertIn("$500.00", dlg._corte_texto.text())
+            dlg._hacer_corte()
+            imprimir.assert_called_once()
+
+        guardado = self.session.query(LibretaCorte).one()
+        self.assertEqual(guardado.monto_final, Decimal("500.00"))
+        self.assertEqual(guardado.creado_por, "ENC-1")
+        self.assertIn("Corte hecho", dlg._listo_texto.text())
+        self.assertFalse(dlg._btn_deshacer.isVisible())  # un corte no se deshace
 
 
 class LibretaListaAmigableTests(unittest.TestCase):

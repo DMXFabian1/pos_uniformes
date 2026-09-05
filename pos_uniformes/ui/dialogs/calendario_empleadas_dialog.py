@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 from datetime import date
+from decimal import Decimal
 
 from PyQt6.QtCore import QDate, Qt
 from PyQt6.QtGui import QColor, QFont
@@ -656,6 +657,7 @@ class CalendarioEncargadoDialog(QDialog):
         self._pg_cuando = self._pagina_cuando()
         self._pg_listo = self._pagina_listo()
         self._pg_cortes = self._pagina_cortes()
+        self._pg_corte = self._pagina_corte_hoy()
         for p in (
             self._pg_menu,
             self._pg_quien,
@@ -663,6 +665,7 @@ class CalendarioEncargadoDialog(QDialog):
             self._pg_cuando,
             self._pg_listo,
             self._pg_cortes,
+            self._pg_corte,
         ):
             self._pila.addWidget(p)
         self._pila.setCurrentWidget(self._pg_menu)
@@ -689,6 +692,10 @@ class CalendarioEncargadoDialog(QDialog):
         btn_cortes.setStyleSheet(self._BTN)
         btn_cortes.clicked.connect(self._ir_a_cortes)
         ly.addWidget(btn_cortes)
+        btn_hacer = QPushButton("🧾  Hacer corte de hoy")
+        btn_hacer.setStyleSheet(self._BTN)
+        btn_hacer.clicked.connect(self._ir_a_corte_hoy)
+        ly.addWidget(btn_hacer)
         ly.addStretch()
         salir = QPushButton("Salir")
         salir.setStyleSheet(self._BTN_SUAVE)
@@ -750,6 +757,103 @@ class CalendarioEncargadoDialog(QDialog):
                 )
                 self._cortes_lista.addWidget(fila)
         self._pila.setCurrentWidget(self._pg_cortes)
+
+    def _pagina_corte_hoy(self) -> QWidget:
+        """Confirmación del corte de León: la cifra CALCULADA, sin editar."""
+        pagina = QWidget()
+        ly = QVBoxLayout()
+        ly.setSpacing(14)
+        ly.addWidget(self._titulo("Corte de hoy"))
+        ly.addStretch()
+        self._corte_texto = QLabel("")
+        self._corte_texto.setWordWrap(True)
+        self._corte_texto.setStyleSheet(
+            "font-size: 30px; font-weight: 800; color: #2c2a27;"
+        )
+        ly.addWidget(self._corte_texto)
+        ly.addStretch()
+        self._btn_corte_ok = QPushButton("🖨  Imprimir corte")
+        self._btn_corte_ok.setStyleSheet(self._BTN_ACENTO)
+        self._btn_corte_ok.clicked.connect(self._hacer_corte)
+        ly.addWidget(self._btn_corte_ok)
+        regresar = QPushButton("← Regresar")
+        regresar.setStyleSheet(self._BTN_SUAVE)
+        regresar.clicked.connect(lambda: self._pila.setCurrentWidget(self._pg_menu))
+        ly.addWidget(regresar)
+        pagina.setLayout(ly)
+        return pagina
+
+    def _datos_corte_hoy(self):
+        """(cortes, por_empleada, monto) de las operaciones de hoy."""
+        from pos_uniformes.database.connection import get_session
+        from pos_uniformes.services.libreta_service import (
+            listar_operaciones,
+            resumir_por_dia,
+            resumir_por_empleada,
+            ventana_hoy,
+        )
+
+        desde, hasta = ventana_hoy()
+        with get_session() as session:
+            rows = listar_operaciones(session, desde=desde, hasta=hasta)
+        cortes = resumir_por_dia(rows)
+        monto = sum((c.monto_en_caja for c in cortes), Decimal("0.00"))
+        return cortes, resumir_por_empleada(rows), monto
+
+    def _ir_a_corte_hoy(self) -> None:
+        try:
+            self._corte_datos = self._datos_corte_hoy()
+        except Exception:  # noqa: BLE001
+            logger.exception("Encargado: no se pudo calcular el corte")
+            QMessageBox.warning(self, "Sin conexión", "Inténtalo otra vez.")
+            return
+        cortes, _por_emp, monto = self._corte_datos
+        if not cortes:
+            self._mostrar_listo("Hoy todavía no hay ventas.", con_deshacer=False)
+            return
+        self._corte_texto.setText(f"VENTA DE HOY:\n\n${monto:,.2f}")
+        self._btn_corte_ok.setEnabled(True)
+        self._pila.setCurrentWidget(self._pg_corte)
+
+    def _hacer_corte(self) -> None:
+        """Guarda la cifra calculada (León no puede editarla) e imprime."""
+        cortes, por_empleada, monto = self._corte_datos
+        try:
+            from datetime import date as _date
+
+            from pos_uniformes.database.connection import get_session
+            from pos_uniformes.services.libreta_service import guardar_corte
+
+            with get_session() as session:
+                guardar_corte(
+                    session,
+                    fecha=_date.today(),
+                    monto_final=monto,
+                    operaciones=sum(c.operaciones for c in cortes),
+                    piezas=sum(c.piezas for c in cortes),
+                    periodo_label="HOY",
+                    creado_por="ENC-1",
+                )
+        except Exception:  # noqa: BLE001
+            logger.exception("Encargado: no se pudo guardar el corte")
+            QMessageBox.warning(self, "No se guardó", "Inténtalo otra vez.")
+            return
+        try:
+            from pos_uniformes.ui.helpers.libreta_corte_ticket_helper import (
+                build_corte_ticket_text,
+            )
+            from pos_uniformes.ui.helpers.ticket_routing_helper import route_tickets
+
+            texto = build_corte_ticket_text(
+                periodo_label="HOY",
+                cortes=cortes,
+                por_empleada=por_empleada,
+                generado_por="ENC-1",
+            )
+            route_tickets(self, "Corte de Libreta", [texto])
+        except Exception:  # noqa: BLE001 — guardado ya quedó; la impresión no lo tira
+            logger.exception("Encargado: fallo la impresión del corte")
+        self._mostrar_listo(f"✅ Corte hecho:\n\n${monto:,.2f}", con_deshacer=False)
 
     def _pagina_quien(self) -> QWidget:
         pagina = QWidget()
@@ -839,14 +943,21 @@ class CalendarioEncargadoDialog(QDialog):
         ly.addStretch()
         listo = QPushButton("✅  Listo")
         listo.setStyleSheet(self._BTN_ACENTO)
-        listo.clicked.connect(self._ir_a_quien)
+        listo.clicked.connect(lambda: self._pila.setCurrentWidget(self._pg_menu))
         ly.addWidget(listo)
-        deshacer = QPushButton("❌  Me equivoqué (borrar)")
-        deshacer.setStyleSheet(self._BTN_SUAVE)
-        deshacer.clicked.connect(self._deshacer)
-        ly.addWidget(deshacer)
+        self._btn_deshacer = QPushButton("❌  Me equivoqué (borrar)")
+        self._btn_deshacer.setStyleSheet(self._BTN_SUAVE)
+        self._btn_deshacer.clicked.connect(self._deshacer)
+        ly.addWidget(self._btn_deshacer)
         pagina.setLayout(ly)
         return pagina
+
+    def _mostrar_listo(self, texto: str, *, con_deshacer: bool) -> None:
+        self._listo_texto.setText(texto)
+        # Un corte no se "des-hace" con un botón: el deshacer es solo para
+        # las marcas de falta/descanso recién apuntadas.
+        self._btn_deshacer.setVisible(con_deshacer)
+        self._pila.setCurrentWidget(self._pg_listo)
 
     # ── Flujo ────────────────────────────────────────────────────────────
 
@@ -934,10 +1045,10 @@ class CalendarioEncargadoDialog(QDialog):
             DESCANSO: "descansa",
             TRABAJO: "sí trabajó",
         }[self._sel_tipo]
-        self._listo_texto.setText(
-            f"✅ Apuntado:\n\n{self._sel_nombre} {verbo} el {_fecha_en_palabras(fecha)}."
+        self._mostrar_listo(
+            f"✅ Apuntado:\n\n{self._sel_nombre} {verbo} el {_fecha_en_palabras(fecha)}.",
+            con_deshacer=True,
         )
-        self._pila.setCurrentWidget(self._pg_listo)
 
     def _deshacer(self) -> None:
         if self._ultima_marca is None:
@@ -954,5 +1065,4 @@ class CalendarioEncargadoDialog(QDialog):
             QMessageBox.warning(self, "No se borró", "Inténtalo otra vez.")
             return
         self._ultima_marca = None
-        self._listo_texto.setText("Borrado. Como si nada. 👍")
-        self._pila.setCurrentWidget(self._pg_listo)
+        self._mostrar_listo("Borrado. Como si nada. 👍", con_deshacer=False)
