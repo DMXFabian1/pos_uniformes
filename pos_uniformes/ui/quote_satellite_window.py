@@ -1070,6 +1070,10 @@ class QuoteSatelliteWindow(QMainWindow):
         # ya se ven en el contador de esa sección. setVisible(True) lo revive.
         self.sidebar_summary_label.setVisible(False)
         budget_card.setLayout(budget_layout)
+        # Tarjeta "Tu presupuesto" RETIRADA completa (pedido de Daniel
+        # 2026-09-05): todo el sidebar es para "Piezas agregadas".
+        # setVisible(True) la revive.
+        budget_card.setVisible(False)
 
         items_card = QFrame()
         items_card.setObjectName("satTotalsCard")
