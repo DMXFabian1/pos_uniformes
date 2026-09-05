@@ -1381,3 +1381,96 @@ class ReimprimirDesdeLibretaTests(unittest.TestCase):
             QuoteSatelliteWindow._reimprimir_ticket_libreta(fake)
         ruta.assert_not_called()
         fake.quick_sale_widget.build_reprint_ticket.assert_not_called()
+
+
+
+class CambiarPagoTarjetaTests(unittest.TestCase):
+    """El dueño corrige tarjeta/efectivo de un registro y el neto se recalcula."""
+
+    def setUp(self) -> None:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from pos_uniformes.database.models import LibretaVenta
+
+        engine = create_engine("sqlite://")
+        LibretaVenta.__table__.create(engine)
+        self.session = sessionmaker(bind=engine)()
+
+    def tearDown(self) -> None:
+        self.session.close()
+
+    def test_a_tarjeta_recalcula_neto_y_de_regreso(self) -> None:
+        from datetime import datetime
+
+        from pos_uniformes.database.models import LibretaVenta
+        from pos_uniformes.services.libreta_service import cambiar_pago_tarjeta
+
+        venta = LibretaVenta(
+            employee_code="VEND-4", employee_name="Fanny", tipo="venta", piezas=1,
+            comisiones=1, monto_total=Decimal("515.00"), monto_neto=Decimal("515.00"),
+            pago_tarjeta=False, descuento_empleada=False,
+            detalle=[{"sku": "S", "nombre": "Pants", "talla": "6", "cantidad": 1,
+                      "precio": "515.00", "subtotal": "515.00"}],
+            created_at=datetime.now(),
+        )
+        self.session.add(venta); self.session.commit()
+
+        cambiar_pago_tarjeta(self.session, venta.id, True)
+        self.assertTrue(venta.pago_tarjeta)
+        # 515 − 4.5% = 491.82 → regla de redondeo de la tienda → 492.00
+        self.assertEqual(venta.monto_neto, Decimal("492.00"))
+
+        cambiar_pago_tarjeta(self.session, venta.id, False)
+        self.assertFalse(venta.pago_tarjeta)
+        self.assertEqual(venta.monto_neto, Decimal("515.00"))
+
+    def test_abono_sin_detalle_usa_el_monto(self) -> None:
+        from datetime import datetime
+
+        from pos_uniformes.database.models import LibretaVenta
+        from pos_uniformes.services.libreta_service import (
+            aplicar_comision_terminal,
+            cambiar_pago_tarjeta,
+        )
+
+        abono = LibretaVenta(
+            employee_code="VEND-4", employee_name="Fanny", tipo="abono", piezas=0,
+            comisiones=0, monto_total=Decimal("200.00"), monto_neto=Decimal("200.00"),
+            detalle=[], created_at=datetime.now(),
+        )
+        self.session.add(abono); self.session.commit()
+        cambiar_pago_tarjeta(self.session, abono.id, True)
+        self.assertEqual(abono.monto_neto, aplicar_comision_terminal(Decimal("200.00")))
+
+    def test_inexistente_devuelve_none(self) -> None:
+        from pos_uniformes.services.libreta_service import cambiar_pago_tarjeta
+
+        self.assertIsNone(cambiar_pago_tarjeta(self.session, 999, True))
+
+    def test_boton_del_dueno_alterna_con_confirmacion(self) -> None:
+        from PyQt6.QtWidgets import QMessageBox
+
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        row = SimpleNamespace(id=7, pago_tarjeta=False)
+        fake = SimpleNamespace(
+            _libreta_is_owner=True,
+            _libreta_rows_pintadas=[row],
+            libreta_table=SimpleNamespace(currentRow=lambda: 0),
+            _set_status=MagicMock(),
+            _refresh_libreta_view=MagicMock(),
+        )
+        cm = MagicMock(); cm.__enter__ = lambda s: "sesion"; cm.__exit__ = lambda s, *a: False
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes), \
+                patch("pos_uniformes.ui.quote_satellite_window.get_session", return_value=cm), \
+                patch("pos_uniformes.services.libreta_service.cambiar_pago_tarjeta") as cambiar:
+            QuoteSatelliteWindow._cambiar_pago_libreta(fake)
+        cambiar.assert_called_once_with("sesion", 7, True)  # efectivo → tarjeta
+        fake._refresh_libreta_view.assert_called_once()
+
+        # Una empleada no puede.
+        fake._libreta_is_owner = False
+        with patch("pos_uniformes.services.libreta_service.cambiar_pago_tarjeta") as cambiar:
+            QuoteSatelliteWindow._cambiar_pago_libreta(fake)
+        cambiar.assert_not_called()

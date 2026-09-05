@@ -348,6 +348,38 @@ def eliminar_operacion(session, operacion_id: int) -> bool:
     return True
 
 
+def cambiar_pago_tarjeta(session, operacion_id: int, tarjeta: bool):
+    """Corrección del dueño: la empleada olvidó marcar "pagó con tarjeta"
+    (o lo marcó de más). Cambia la bandera y RECALCULA el neto con la
+    misma regla que la venta: 4.5% por producto sobre el precio cobrado
+    (ya con descuento de empleada si lo hubo), redondeado; efectivo → neto
+    = total. Devuelve el registro o None si no existe."""
+    entry = session.get(LibretaVenta, int(operacion_id))
+    if entry is None:
+        return None
+    total = Decimal(str(entry.monto_total or 0)).quantize(Decimal("0.01"))
+    if not tarjeta:
+        neto = total
+    else:
+        detalle = list(entry.detalle or [])
+        if detalle:
+            factor_desc = (
+                Decimal("0.95") if entry.descuento_empleada else Decimal("1")
+            )
+            neto = Decimal("0.00")
+            for line in detalle:
+                unit = Decimal(str(line.get("precio", 0) or 0))
+                unit = (unit * factor_desc).quantize(Decimal("0.01"))
+                neto += aplicar_comision_terminal(unit) * int(line.get("cantidad", 0) or 0)
+            neto = neto.quantize(Decimal("0.01"))
+        else:
+            neto = aplicar_comision_terminal(total)  # abonos: sobre el monto
+    entry.pago_tarjeta = bool(tarjeta)
+    entry.monto_neto = neto
+    session.commit()
+    return entry
+
+
 def filtrar_de_hoy(rows: list, reference: date | None = None) -> list:
     """Deja solo las operaciones del día local dado (default: hoy).
 

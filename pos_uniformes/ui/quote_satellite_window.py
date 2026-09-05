@@ -1350,6 +1350,13 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_reprint_button.setAutoDefault(False)
         self.libreta_reprint_button.clicked.connect(self._reimprimir_ticket_libreta)
         owner_bar_ly.addWidget(self.libreta_reprint_button)
+        # Corregir la forma de pago de un registro (solo dueño): la empleada
+        # olvidó marcar tarjeta — cambia la bandera y recalcula el neto.
+        self.libreta_pago_button = QPushButton("💳 Cambiar pago")
+        self.libreta_pago_button.setObjectName("secondaryButton")
+        self.libreta_pago_button.setAutoDefault(False)
+        self.libreta_pago_button.clicked.connect(self._cambiar_pago_libreta)
+        owner_bar_ly.addWidget(self.libreta_pago_button)
         # Rango libre de fechas (calendario): "cuántas comisiones hizo Ana
         # del día X al día Y" — se combina con el filtro por empleada.
         owner_bar_ly.addWidget(QLabel("Del:"))
@@ -1980,6 +1987,53 @@ class QuoteSatelliteWindow(QMainWindow):
         ly.addWidget(cerrar)
         dlg.setLayout(ly)
         dlg.exec()
+
+    def _cambiar_pago_libreta(self) -> None:
+        """Alterna tarjeta/efectivo del registro seleccionado (solo dueño)
+        y recalcula el neto. Para cuando la empleada olvidó marcarlo."""
+        if not self._libreta_is_owner:
+            return
+        rows = list(getattr(self, "_libreta_rows_pintadas", []) or [])
+        idx = self.libreta_table.currentRow()
+        if idx < 0 or idx >= len(rows):
+            QMessageBox.information(
+                self, "Sin selección",
+                "Selecciona en MOVIMIENTOS el registro cuyo pago quieres corregir.",
+            )
+            return
+        row = rows[idx]
+        entry_id = getattr(row, "id", None)
+        if entry_id is None:
+            QMessageBox.information(
+                self, "Aún sin sincronizar",
+                "Ese registro todavía no sube al servidor; presiona "
+                "Actualizar en un momento e inténtalo de nuevo.",
+            )
+            return
+        era_tarjeta = bool(getattr(row, "pago_tarjeta", False))
+        nuevo_modo = "EFECTIVO" if era_tarjeta else "TARJETA"
+        confirmacion = QMessageBox.question(
+            self,
+            "Cambiar forma de pago",
+            f"Este registro está como {'TARJETA' if era_tarjeta else 'EFECTIVO'}.\n"
+            f"¿Cambiarlo a {nuevo_modo}?\n\n"
+            "El neto se recalcula solo (4.5% de terminal si es tarjeta).",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if confirmacion != QMessageBox.StandardButton.Yes:
+            return
+        from pos_uniformes.services.libreta_service import cambiar_pago_tarjeta
+
+        try:
+            with get_session() as session:
+                cambiar_pago_tarjeta(session, int(entry_id), not era_tarjeta)
+        except Exception:  # noqa: BLE001
+            logger.exception("Libreta: no se pudo cambiar la forma de pago")
+            QMessageBox.warning(self, "Sin conexión", "No se pudo guardar. Intenta de nuevo.")
+            return
+        self._set_status(f"Pago cambiado a {nuevo_modo}.")
+        self._refresh_libreta_view()
 
     def _reimprimir_ticket_libreta(self) -> None:
         """Reimprime el ticket del registro seleccionado en MOVIMIENTOS
