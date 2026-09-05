@@ -1186,37 +1186,98 @@ class QuickSaleWidget(QWidget):
             QMessageBox.warning(self, "Sin autorizar", "Escanea primero tu QR de empleada.")
             return
 
+        # Rediseño táctil (2026-09-05): toggles grandes de pago en vez del
+        # checkbox chiquito; el botón de registrar es el protagonista.
         dlg = QDialog(self)
         dlg.setWindowTitle("Registrar abono")
+        dlg.setMinimumWidth(480)
+        dlg.setStyleSheet(
+            "QDialog { background: #f4ede2; }"
+            "QLabel { color: #2c2a27; background: transparent; }"
+            "QLineEdit { background: #ffffff; color: #2c2a27;"
+            "  border: 2px solid #ddd0c0; border-radius: 12px;"
+            "  min-height: 48px; padding: 0 14px; font-size: 17px; }"
+        )
         ly = QVBoxLayout()
-        ly.setContentsMargins(24, 20, 24, 20)
-        ly.setSpacing(10)
+        ly.setContentsMargins(22, 20, 22, 18)
+        ly.setSpacing(12)
 
         titulo = QLabel("Abono a apartado")
-        titulo.setStyleSheet("font-size: 15px; font-weight: 600;")
+        titulo.setStyleSheet("font-size: 19px; font-weight: 800; color: #73341c;")
         ly.addWidget(titulo)
 
-        ly.addWidget(QLabel("Cliente (opcional)"))
+        etiqueta_cliente = QLabel("Cliente (opcional)")
+        etiqueta_cliente.setStyleSheet(f"font-size: 13px; color: {_MUTED}; font-weight: 700;")
+        ly.addWidget(etiqueta_cliente)
         cliente_input = QLineEdit()
-        cliente_input.setPlaceholderText("Nombre del cliente (opcional)...")
+        cliente_input.setPlaceholderText("Nombre del cliente...")
         ly.addWidget(cliente_input)
 
-        ly.addWidget(QLabel("Monto del abono"))
+        etiqueta_monto = QLabel("Monto del abono")
+        etiqueta_monto.setStyleSheet(f"font-size: 13px; color: {_MUTED}; font-weight: 700;")
+        ly.addWidget(etiqueta_monto)
         monto_input = QLineEdit()
-        monto_input.setPlaceholderText("$")
+        monto_input.setPlaceholderText("$ 0.00")
+        monto_input.setStyleSheet(
+            "QLineEdit { background: #ffffff; color: #2c2a27;"
+            "  border: 2px solid #ddd0c0; border-radius: 12px;"
+            "  min-height: 52px; padding: 0 14px;"
+            "  font-size: 22px; font-weight: 800; }"
+        )
         ly.addWidget(monto_input)
 
-        card_check = QCheckBox("Pagó con tarjeta")
-        ly.addWidget(card_check)
+        etiqueta_pago = QLabel("¿Cómo pagó?")
+        etiqueta_pago.setStyleSheet(f"font-size: 13px; color: {_MUTED}; font-weight: 700;")
+        ly.addWidget(etiqueta_pago)
+        _TOGGLE = (
+            "QPushButton { background: #ffffff; color: #2c2a27;"
+            "  border: 2px solid #ddd0c0; border-radius: 14px;"
+            "  min-height: 54px; font-size: 17px; font-weight: 700; }"
+            "QPushButton:checked { background: #f7e3d8; color: #73341c;"
+            "  border: 3px solid #a84f2d; }"
+        )
+        pago_row = QHBoxLayout()
+        pago_row.setSpacing(10)
+        btn_efectivo = QPushButton("✓ 💵  Efectivo")
+        btn_tarjeta = QPushButton("💳  Tarjeta")
+        for btn in (btn_efectivo, btn_tarjeta):
+            btn.setCheckable(True)
+            btn.setAutoDefault(False)
+            btn.setStyleSheet(_TOGGLE)
+            pago_row.addWidget(btn)
+        btn_efectivo.setChecked(True)
+
+        def _set_pago(tarjeta: bool) -> None:
+            btn_tarjeta.setChecked(tarjeta)
+            btn_efectivo.setChecked(not tarjeta)
+            btn_efectivo.setText("✓ 💵  Efectivo" if not tarjeta else "💵  Efectivo")
+            btn_tarjeta.setText("✓ 💳  Tarjeta" if tarjeta else "💳  Tarjeta")
+
+        btn_efectivo.clicked.connect(lambda: _set_pago(False))
+        btn_tarjeta.clicked.connect(lambda: _set_pago(True))
+        ly.addLayout(pago_row)
 
         error_label = QLabel("")
-        error_label.setStyleSheet(f"font-size: 12px; color: {_DANGER};")
+        error_label.setStyleSheet(f"font-size: 13px; color: {_DANGER}; font-weight: 700;")
         error_label.setVisible(False)
         ly.addWidget(error_label)
 
         btn_row = QHBoxLayout()
+        btn_row.setSpacing(10)
         btn_cancel = QPushButton("Cancelar")
-        btn_ok = QPushButton("Registrar abono")
+        btn_cancel.setStyleSheet(
+            "QPushButton { background: #f8f2e9; color: #73341c;"
+            "  border: 1px solid #ddd0c0; border-radius: 14px;"
+            "  min-height: 60px; font-size: 16px; font-weight: 700; }"
+            "QPushButton:pressed { background: #e8dbc7; }"
+        )
+        btn_ok = QPushButton("💰  Registrar abono")
+        btn_ok.setStyleSheet(
+            "QPushButton { background: #a84f2d; color: #ffffff; border: none;"
+            "  border-radius: 14px; min-height: 60px;"
+            "  font-size: 17px; font-weight: 800; }"
+            "QPushButton:pressed { background: #8a4326; }"
+        )
         for button in (btn_cancel, btn_ok):
             button.setAutoDefault(False)
             button.setDefault(False)
@@ -1234,11 +1295,11 @@ class QuickSaleWidget(QWidget):
                 error_label.setVisible(True)
                 return
             dlg.accept()
-            self._registrar_abono(nombre, monto, pago_tarjeta=card_check.isChecked())
+            self._registrar_abono(nombre, monto, pago_tarjeta=btn_tarjeta.isChecked())
 
         btn_ok.clicked.connect(_confirmar)
-        btn_row.addWidget(btn_cancel)
-        btn_row.addWidget(btn_ok)
+        btn_row.addWidget(btn_cancel, 1)
+        btn_row.addWidget(btn_ok, 2)
         ly.addLayout(btn_row)
 
         dlg.setLayout(ly)
