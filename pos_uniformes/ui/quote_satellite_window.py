@@ -1492,6 +1492,29 @@ class QuoteSatelliteWindow(QMainWindow):
             lambda fila, _col: self._mostrar_detalle_libreta(fila)
         )
         owner_panel_ly.addWidget(self.libreta_table, 1)
+        # Paginación de movimientos: 25 por página (días grandes no hacen
+        # la página kilométrica). Botones tamaño dedo.
+        self.libreta_pag_prev = QPushButton("◀  Anteriores")
+        self.libreta_pag_next = QPushButton("Siguientes  ▶")
+        self.libreta_pag_label = QLabel("")
+        self.libreta_pag_label.setStyleSheet("font-weight: 700; color: #5f594f;")
+        for btn in (self.libreta_pag_prev, self.libreta_pag_next):
+            btn.setAutoDefault(False)
+            btn.setMinimumHeight(44)
+        self.libreta_pag_prev.clicked.connect(lambda: self._cambiar_pagina_libreta(-1))
+        self.libreta_pag_next.clicked.connect(lambda: self._cambiar_pagina_libreta(1))
+        self.libreta_pag_bar = QWidget()
+        pag_ly = QHBoxLayout()
+        pag_ly.setContentsMargins(0, 4, 0, 0)
+        pag_ly.setSpacing(10)
+        pag_ly.addWidget(self.libreta_pag_prev)
+        pag_ly.addStretch()
+        pag_ly.addWidget(self.libreta_pag_label)
+        pag_ly.addStretch()
+        pag_ly.addWidget(self.libreta_pag_next)
+        self.libreta_pag_bar.setLayout(pag_ly)
+        self.libreta_pag_bar.setVisible(False)
+        owner_panel_ly.addWidget(self.libreta_pag_bar)
 
         self.libreta_owner_panel.setLayout(owner_panel_ly)
         view_ly.addWidget(self.libreta_owner_panel, 1)
@@ -1541,6 +1564,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self._libreta_periodo = "hoy"
         self._libreta_tipo_filtro = "todo"
         self._libreta_emp_filtro = None
+        self._libreta_pagina = 0
         self._sync_libreta_filtros()
         self.libreta_gate_error.setVisible(False)
         self.libreta_gate.setVisible(False)
@@ -1650,6 +1674,7 @@ class QuoteSatelliteWindow(QMainWindow):
         dialog.exec()
 
     def _set_libreta_periodo(self, periodo: str) -> None:
+        self._libreta_pagina = 0
         if (
             periodo == "ciclo"
             and self._libreta_is_owner
@@ -1669,6 +1694,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self._refresh_libreta_view()
 
     def _set_libreta_tipo_filtro(self, filtro: str) -> None:
+        self._libreta_pagina = 0
         self._libreta_tipo_filtro = filtro
         self._sync_libreta_filtros()
         self._refresh_libreta_view()
@@ -1681,6 +1707,7 @@ class QuoteSatelliteWindow(QMainWindow):
             return
         code = self._libreta_ranking_codes[idx]
         self._libreta_emp_filtro = None if self._libreta_emp_filtro == code else code
+        self._libreta_pagina = 0
         if self._libreta_emp_filtro is None and self._libreta_periodo == "ciclo":
             self._libreta_periodo = "hoy"  # el ciclo era DE esa empleada
         self._sync_libreta_filtros()
@@ -2206,6 +2233,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_emp_list.setFixedHeight(max(alto, 120))
 
     def _pintar_libreta(self, rows: list, ranking_rows: list | None = None) -> None:
+        self._libreta_last_pintura = (list(rows), ranking_rows)
         from pos_uniformes.services.libreta_service import (
             describir_detalle,
             resumir_por_dia,
@@ -2314,6 +2342,25 @@ class QuoteSatelliteWindow(QMainWindow):
             self._llenar_libreta_lista(rows)
             return
 
+        # ── Paginación: 25 movimientos por página ──
+        _POR_PAGINA = 25
+        self._libreta_rows_completas = list(rows)
+        total_paginas = max(1, -(-len(rows) // _POR_PAGINA))
+        self._libreta_pagina = min(
+            max(getattr(self, "_libreta_pagina", 0), 0), total_paginas - 1
+        )
+        inicio = self._libreta_pagina * _POR_PAGINA
+        rows = rows[inicio : inicio + _POR_PAGINA]
+        # Realineadas con la tabla visible (borrar/detalle van por índice).
+        self._libreta_rows_pintadas = list(rows)
+        self.libreta_pag_bar.setVisible(total_paginas > 1)
+        self.libreta_pag_label.setText(
+            f"Página {self._libreta_pagina + 1} de {total_paginas}"
+            f"  ·  {len(self._libreta_rows_completas)} movimientos"
+        )
+        self.libreta_pag_prev.setEnabled(self._libreta_pagina > 0)
+        self.libreta_pag_next.setEnabled(self._libreta_pagina < total_paginas - 1)
+
         self.libreta_table.setRowCount(len(rows))
         for i, row in enumerate(rows):
             local_dt = (
@@ -2343,6 +2390,12 @@ class QuoteSatelliteWindow(QMainWindow):
                 i, 6, QTableWidgetItem(f"${Decimal(str(row.monto_total or 0)):,.2f}")
             )
         self._ajustar_alto_tabla_libreta()
+
+    def _cambiar_pagina_libreta(self, delta: int) -> None:
+        self._libreta_pagina = max(0, getattr(self, "_libreta_pagina", 0) + delta)
+        rows, ranking = getattr(self, "_libreta_last_pintura", (None, None))
+        if rows is not None:
+            self._pintar_libreta(rows, ranking_rows=ranking)
 
     def _ajustar_alto_tabla_libreta(self) -> None:
         """Alto exacto al contenido para que scrollee la PÁGINA, no la tabla."""

@@ -1278,3 +1278,32 @@ class ScrollLibretaTests(unittest.TestCase):
 
         self.assertGreater(alto_30, alto_3 + 20 * tabla.rowHeight(0) - 1)
         self.assertGreaterEqual(alto_3, 120)
+
+
+class PaginacionLibretaTests(unittest.TestCase):
+    """Movimientos del dueño: 25 por página, con ◀ ▶ desde el caché."""
+
+    def test_cambiar_pagina_repinta_del_cache(self) -> None:
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        rows = ["r"] * 60
+        fake = SimpleNamespace(
+            _libreta_pagina=0,
+            _libreta_last_pintura=(rows, None),
+            _pintar_libreta=MagicMock(),
+        )
+        QuoteSatelliteWindow._cambiar_pagina_libreta(fake, 1)
+        self.assertEqual(fake._libreta_pagina, 1)
+        fake._pintar_libreta.assert_called_once_with(rows, ranking_rows=None)
+
+        # Nunca por debajo de cero.
+        fake._libreta_pagina = 0
+        QuoteSatelliteWindow._cambiar_pagina_libreta(fake, -1)
+        self.assertEqual(fake._libreta_pagina, 0)
+
+    def test_sin_pintura_previa_no_truena(self) -> None:
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        fake = SimpleNamespace(_libreta_pagina=0)
+        QuoteSatelliteWindow._cambiar_pagina_libreta(fake, 1)  # no explota
+        self.assertEqual(fake._libreta_pagina, 1)
