@@ -108,6 +108,21 @@ def _build_inventory_label_dialog_styles() -> str:
             font-weight: 800;
         }
         QPushButton#inventoryLabelStep:pressed { background: #f1e6d6; }
+        QPushButton#inventoryLabelChip {
+            background: #ffffff;
+            color: #73341c;
+            border: 1.5px solid #ddd0c0;
+            border-radius: 12px;
+            min-width: 44px;
+            max-width: 44px;
+            min-height: 40px;
+            font-size: 15px;
+            font-weight: 800;
+        }
+        QPushButton#inventoryLabelChip:checked {
+            background: #f7e3d8;
+            border: 2px solid #a84f2d;
+        }
         QLabel#inventoryLabelCopies {
             font-size: 28px;
             font-weight: 800;
@@ -225,9 +240,23 @@ def build_inventory_label_dialog(
     copies_plus = QPushButton("+")
     copies_plus.setObjectName("inventoryLabelStep")
     copies_plus.setAutoDefault(False)
+    # Mantener presionado cuenta solo (sin 20 taps)
+    for btn in (copies_minus, copies_plus):
+        btn.setAutoRepeat(True)
+        btn.setAutoRepeatDelay(350)
+        btn.setAutoRepeatInterval(70)
     copies_row.addWidget(copies_minus)
     copies_row.addWidget(copies_label)
     copies_row.addWidget(copies_plus)
+    # Chips rápidos: un toque fija la cantidad
+    chip_buttons: dict[int, QPushButton] = {}
+    for n in (5, 10, 20, 50):
+        chip = QPushButton(str(n))
+        chip.setObjectName("inventoryLabelChip")
+        chip.setAutoDefault(False)
+        chip.setCheckable(True)
+        chip_buttons[n] = chip
+        copies_row.addWidget(chip)
     copies_row.addStretch(1)
 
     precio_title = QLabel("Precio en la etiqueta")
@@ -398,10 +427,27 @@ def build_inventory_label_dialog(
             btn.setChecked(v == valor)
         refresh_preview()
 
-    def set_copies(delta: int) -> None:
-        estado["copies"] = max(1, min(500, int(estado["copies"]) + delta))
+    # La vista previa se regenera 250 ms después del último cambio de
+    # cantidad: mantener + presionado no re-renderiza la etiqueta 20 veces.
+    from PyQt6.QtCore import QTimer
+
+    preview_timer = QTimer(dialog)
+    preview_timer.setSingleShot(True)
+    preview_timer.setInterval(250)
+    preview_timer.timeout.connect(refresh_preview)
+
+    def _sync_chips() -> None:
+        for n, chip in chip_buttons.items():
+            chip.setChecked(int(estado["copies"]) == n)
+
+    def set_copies_abs(valor: int) -> None:
+        estado["copies"] = max(1, min(500, int(valor)))
         copies_label.setText(str(estado["copies"]))
-        refresh_preview()
+        _sync_chips()
+        preview_timer.start()
+
+    def set_copies(delta: int) -> None:
+        set_copies_abs(int(estado["copies"]) + delta)
 
     def toggle_price() -> None:
         estado["price"] = price_button.isChecked()
@@ -412,6 +458,8 @@ def build_inventory_label_dialog(
         btn.clicked.connect(lambda _=False, v=valor: set_mode(v))
     copies_minus.clicked.connect(lambda: set_copies(-1))
     copies_plus.clicked.connect(lambda: set_copies(1))
+    for n, chip in chip_buttons.items():
+        chip.clicked.connect(lambda _=False, v=n: set_copies_abs(v))
     price_button.clicked.connect(toggle_price)
     previous_button.clicked.connect(lambda: navigate_variant(-1))
     next_button.clicked.connect(lambda: navigate_variant(1))

@@ -145,14 +145,25 @@ class InventoryLabelDialogTouchTests(unittest.TestCase):
                 )
             dialog = captured["dialog"]
             botones = {b.text(): b for b in dialog.findChildren(QPushButton)}
+            from PyQt6.QtTest import QTest
+
             botones["Split"].click()
             botones["+"].click()
             botones["+"].click()
             botones["−"].click()
+            QTest.qWait(400)  # el render de copias va con retraso (debounce)
             botones["✓  💲 Mostrar precio"].click()  # apaga el precio
 
-        self.assertEqual(render_calls[0], ("standard", 1, True))
-        self.assertEqual(render_calls[1][0], "split")
-        self.assertEqual(render_calls[-1], ("split", 2, False))
-        self.assertTrue(botones["Split"].isChecked())
-        self.assertFalse(botones["Normal"].isChecked())
+            self.assertEqual(render_calls[0], ("standard", 1, True))
+            self.assertEqual(render_calls[1][0], "split")
+            self.assertEqual(render_calls[-1], ("split", 2, False))
+            self.assertTrue(botones["Split"].isChecked())
+            self.assertFalse(botones["Normal"].isChecked())
+
+            # Chip rápido: un toque fija 20 copias (y el chip queda marcado)
+            botones["20"].click()
+            QTest.qWait(400)
+            self.assertEqual(render_calls[-1], ("split", 20, False))
+            self.assertTrue(botones["20"].isChecked())
+            # Mantener presionado: los botones cuentan solos
+            self.assertTrue(botones["+"].autoRepeat())
