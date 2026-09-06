@@ -248,7 +248,10 @@ def build_inventory_label_dialog(
     copies_row.addWidget(copies_minus)
     copies_row.addWidget(copies_label)
     copies_row.addWidget(copies_plus)
-    # Chips rápidos: un toque fija la cantidad
+    copies_row.addStretch(1)
+    # Chips rápidos en SU renglón (debajo del stepper): un toque fija la cantidad
+    chips_row = QHBoxLayout()
+    chips_row.setSpacing(6)
     chip_buttons: dict[int, QPushButton] = {}
     for n in (5, 10, 20, 50):
         chip = QPushButton(str(n))
@@ -256,8 +259,8 @@ def build_inventory_label_dialog(
         chip.setAutoDefault(False)
         chip.setCheckable(True)
         chip_buttons[n] = chip
-        copies_row.addWidget(chip)
-    copies_row.addStretch(1)
+        chips_row.addWidget(chip)
+    chips_row.addStretch(1)
 
     precio_title = QLabel("Precio en la etiqueta")
     precio_title.setObjectName("inventoryLabelFieldTitle")
@@ -278,7 +281,8 @@ def build_inventory_label_dialog(
     controls.addLayout(copies_row, 1, 1)
     controls.addWidget(precio_title, 0, 2)
     controls.addWidget(price_button, 1, 2)
-    controls.addWidget(mode_hint, 2, 0, 1, 3)
+    controls.addLayout(chips_row, 2, 1)
+    controls.addWidget(mode_hint, 3, 0, 1, 3)
     controls.setColumnStretch(0, 3)
     controls.setColumnStretch(1, 2)
     controls.setColumnStretch(2, 2)
