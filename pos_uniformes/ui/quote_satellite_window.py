@@ -1328,63 +1328,70 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_ciclo_banner.setVisible(False)
         view_ly.addWidget(self.libreta_ciclo_banner)
 
-        # Barra del dueño: imprimir corte + meta semanal de comisiones
+        # Barra del dueño: lo de todos los días (imprimir corte) a la vista;
+        # lo ocasional (rango de fechas, meta semanal) plegado bajo "Más
+        # opciones". Las correcciones de un movimiento (reimprimir, cambiar
+        # pago, borrar) viven junto a la tabla de movimientos, no aquí.
         self.libreta_owner_bar = QWidget()
-        owner_bar_ly = QHBoxLayout()
+        owner_bar_ly = QVBoxLayout()
         owner_bar_ly.setContentsMargins(0, 0, 0, 0)
-        owner_bar_ly.setSpacing(8)
-        self.libreta_print_button = QPushButton("Imprimir corte")
+        owner_bar_ly.setSpacing(6)
+        owner_row = QHBoxLayout()
+        owner_row.setSpacing(8)
+        self.libreta_print_button = QPushButton("🧾 Imprimir corte")
         self.libreta_print_button.setObjectName("primaryButton")
         self.libreta_print_button.setAutoDefault(False)
+        self.libreta_print_button.setMinimumHeight(44)
         self.libreta_print_button.clicked.connect(self._imprimir_corte_libreta)
-        owner_bar_ly.addWidget(self.libreta_print_button)
-        self.libreta_delete_button = QPushButton("🗑 Borrar registro")
-        self.libreta_delete_button.setObjectName("secondaryButton")
-        self.libreta_delete_button.setAutoDefault(False)
-        self.libreta_delete_button.clicked.connect(self._borrar_registro_libreta)
-        owner_bar_ly.addWidget(self.libreta_delete_button)
-        # Reimpresión de un ticket pasado (solo dueño): para cuando la
-        # impresora se quedó sin papel — NO registra otra venta.
-        self.libreta_reprint_button = QPushButton("🖨 Reimprimir ticket")
-        self.libreta_reprint_button.setObjectName("secondaryButton")
-        self.libreta_reprint_button.setAutoDefault(False)
-        self.libreta_reprint_button.clicked.connect(self._reimprimir_ticket_libreta)
-        owner_bar_ly.addWidget(self.libreta_reprint_button)
-        # Corregir la forma de pago de un registro (solo dueño): la empleada
-        # olvidó marcar tarjeta — cambia la bandera y recalcula el neto.
-        self.libreta_pago_button = QPushButton("💳 Cambiar pago")
-        self.libreta_pago_button.setObjectName("secondaryButton")
-        self.libreta_pago_button.setAutoDefault(False)
-        self.libreta_pago_button.clicked.connect(self._cambiar_pago_libreta)
-        owner_bar_ly.addWidget(self.libreta_pago_button)
+        owner_row.addWidget(self.libreta_print_button)
+        owner_row.addStretch()
+        self.libreta_opciones_button = QPushButton("⚙ Más opciones")
+        self.libreta_opciones_button.setObjectName("secondaryButton")
+        self.libreta_opciones_button.setCheckable(True)
+        self.libreta_opciones_button.setAutoDefault(False)
+        self.libreta_opciones_button.setMinimumHeight(44)
+        self.libreta_opciones_button.toggled.connect(
+            lambda on: self.libreta_opciones_panel.setVisible(on)
+        )
+        owner_row.addWidget(self.libreta_opciones_button)
+        owner_bar_ly.addLayout(owner_row)
+
+        self.libreta_opciones_panel = QFrame()
+        self.libreta_opciones_panel.setObjectName("libretaCard")
+        opciones_ly = QHBoxLayout()
+        opciones_ly.setContentsMargins(14, 10, 14, 10)
+        opciones_ly.setSpacing(8)
         # Rango libre de fechas (calendario): "cuántas comisiones hizo Ana
         # del día X al día Y" — se combina con el filtro por empleada.
-        owner_bar_ly.addWidget(QLabel("Del:"))
+        opciones_ly.addWidget(QLabel("Ver del:"))
         self.libreta_rango_desde = QDateEdit(QDate.currentDate().addDays(-7))
         self.libreta_rango_hasta = QDateEdit(QDate.currentDate())
         for date_edit in (self.libreta_rango_desde, self.libreta_rango_hasta):
             date_edit.setCalendarPopup(True)
             date_edit.setDisplayFormat("dd/MM/yyyy")
-        owner_bar_ly.addWidget(self.libreta_rango_desde)
-        owner_bar_ly.addWidget(QLabel("al:"))
-        owner_bar_ly.addWidget(self.libreta_rango_hasta)
+        opciones_ly.addWidget(self.libreta_rango_desde)
+        opciones_ly.addWidget(QLabel("al:"))
+        opciones_ly.addWidget(self.libreta_rango_hasta)
         self.libreta_rango_button = QPushButton("Ver rango")
         self.libreta_rango_button.setCheckable(True)
         self.libreta_rango_button.setAutoDefault(False)
         self.libreta_rango_button.clicked.connect(
             lambda: self._set_libreta_periodo("rango")
         )
-        owner_bar_ly.addWidget(self.libreta_rango_button)
-        owner_bar_ly.addStretch()
-        owner_bar_ly.addWidget(QLabel("Meta semanal (comisiones):"))
+        opciones_ly.addWidget(self.libreta_rango_button)
+        opciones_ly.addStretch()
+        opciones_ly.addWidget(QLabel("Meta semanal (comisiones):"))
         self.libreta_meta_spin = QSpinBox()
         self.libreta_meta_spin.setRange(0, 9999)
         self.libreta_meta_spin.setSpecialValueText("Sin meta")
-        owner_bar_ly.addWidget(self.libreta_meta_spin)
+        opciones_ly.addWidget(self.libreta_meta_spin)
         self.libreta_meta_save_button = QPushButton("Guardar meta")
         self.libreta_meta_save_button.setAutoDefault(False)
         self.libreta_meta_save_button.clicked.connect(self._guardar_meta_libreta)
-        owner_bar_ly.addWidget(self.libreta_meta_save_button)
+        opciones_ly.addWidget(self.libreta_meta_save_button)
+        self.libreta_opciones_panel.setLayout(opciones_ly)
+        self.libreta_opciones_panel.setVisible(False)
+        owner_bar_ly.addWidget(self.libreta_opciones_panel)
         self.libreta_owner_bar.setLayout(owner_bar_ly)
         view_ly.addWidget(self.libreta_owner_bar)
 
@@ -1442,12 +1449,14 @@ class QuoteSatelliteWindow(QMainWindow):
             etiqueta.setObjectName("libretaSeccion")
             return etiqueta
 
-        owner_panel_ly.addWidget(_seccion("CORTE POR DÍA"))
-        self.libreta_daily_table = QTableWidget(0, 8)
+        # Desglose por día: solo tiene sentido en periodos de varios días
+        # (ciclo, rango). En "Hoy" repetiría las tarjetas → se oculta.
+        self.libreta_daily_seccion = _seccion("POR DÍA")
+        owner_panel_ly.addWidget(self.libreta_daily_seccion)
+        self.libreta_daily_table = QTableWidget(0, 6)
         self.libreta_daily_table.setObjectName("libretaTabla")
         self.libreta_daily_table.setHorizontalHeaderLabels(
-            ["Día", "En caja $", "Operaciones", "Piezas",
-             "Ventas $", "Neto $", "Apartados $", "Abonos $"]
+            ["Día", "En el cajón $", "Vendido $", "Neto $", "Abonos $", "Operaciones"]
         )
         self.libreta_daily_table.horizontalHeader().setSectionResizeMode(
             QHeaderView.ResizeMode.Stretch
@@ -1455,10 +1464,13 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_daily_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.libreta_daily_table.verticalHeader().setVisible(False)
         self.libreta_daily_table.setAlternatingRowColors(True)
-        self.libreta_daily_table.setMaximumHeight(190)
+        # Crece con sus días y scrollea la página (sin scroll interno).
+        self.libreta_daily_table.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
         owner_panel_ly.addWidget(self.libreta_daily_table)
 
-        owner_panel_ly.addWidget(_seccion("TUS EMPLEADAS  (clic en una para filtrar)"))
+        owner_panel_ly.addWidget(_seccion("EQUIPO  ·  toca un nombre para ver solo sus movimientos"))
         self.libreta_ranking_list = QListWidget()
         self.libreta_ranking_list.setObjectName("libretaLista")
         self.libreta_ranking_list.setMaximumHeight(170)
@@ -1494,6 +1506,30 @@ class QuoteSatelliteWindow(QMainWindow):
         filtros_ly.addWidget(self.libreta_filtro_emp_label)
         filtros_ly.addStretch()
         owner_panel_ly.addLayout(filtros_ly)
+        # Correcciones sobre UN movimiento (se elige en la tabla). Solo
+        # dueño: reimprimir NO registra otra venta; cambiar pago recalcula
+        # el neto; borrar deja el registro fuera del corte.
+        acciones_ly = QHBoxLayout()
+        acciones_ly.setSpacing(6)
+        acciones_label = QLabel("Con el movimiento seleccionado:")
+        acciones_label.setStyleSheet("font-size: 12px; color: #8a8177;")
+        acciones_ly.addWidget(acciones_label)
+        self.libreta_reprint_button = QPushButton("🖨 Reimprimir ticket")
+        self.libreta_reprint_button.clicked.connect(self._reimprimir_ticket_libreta)
+        self.libreta_pago_button = QPushButton("💳 Cambiar pago")
+        self.libreta_pago_button.clicked.connect(self._cambiar_pago_libreta)
+        self.libreta_delete_button = QPushButton("🗑 Borrar")
+        self.libreta_delete_button.clicked.connect(self._borrar_registro_libreta)
+        for accion_btn in (
+            self.libreta_reprint_button,
+            self.libreta_pago_button,
+            self.libreta_delete_button,
+        ):
+            accion_btn.setObjectName("secondaryButton")
+            accion_btn.setAutoDefault(False)
+            acciones_ly.addWidget(accion_btn)
+        acciones_ly.addStretch()
+        owner_panel_ly.addLayout(acciones_ly)
         self.libreta_table = QTableWidget(0, 7)
         self.libreta_table.setObjectName("libretaTabla")
         self.libreta_table.setHorizontalHeaderLabels(
@@ -1740,6 +1776,10 @@ class QuoteSatelliteWindow(QMainWindow):
         for key, button in self._libreta_periodo_buttons.items():
             button.setChecked(key == self._libreta_periodo)
         self.libreta_rango_button.setChecked(self._libreta_periodo == "rango")
+        if self._libreta_periodo == "rango":
+            # El rango vive plegado bajo "Más opciones": si está activo,
+            # que se vea de dónde sale.
+            self.libreta_opciones_button.setChecked(True)
         for key, button in self._libreta_tipo_buttons.items():
             button.setChecked(key == self._libreta_tipo_filtro)
         if self._libreta_emp_filtro:
@@ -2359,12 +2399,40 @@ class QuoteSatelliteWindow(QMainWindow):
             total_en_caja = sum((c.monto_en_caja for c in cortes), Decimal("0.00"))
             total_neto = sum((c.monto_neto_ventas for c in cortes), Decimal("0.00"))
             total_abonos = sum((c.monto_abonos for c in cortes), Decimal("0.00"))
+            total_tarjeta = sum(
+                (
+                    Decimal(str(r.monto_total or 0))
+                    for r in rows
+                    if bool(getattr(r, "pago_tarjeta", False))
+                ),
+                Decimal("0.00"),
+            )
+            # Cuatro cifras que no se confunden entre sí: lo que hay en el
+            # cajón (la del corte), lo vendido en total (efectivo + tarjeta),
+            # lo abonado a apartados, y las comisiones del equipo.
             self._llenar_libreta_cards(
                 [
-                    ("VENTA DE HOY", f"${total_en_caja:,.0f}", "efectivo esperado en el cajón"),
-                    ("VENTAS", f"${total_monto:,.0f}", f"neto tras tarjeta: ${total_neto:,.0f}"),
-                    ("ABONOS", f"${total_abonos:,.0f}", f"{apartados_count} apartado(s) nuevos"),
-                    ("PIEZAS", str(total_piezas), f"{total_comisiones} comisiones · {ventas_count} ventas"),
+                    (
+                        "EN EL CAJÓN (EFECTIVO)",
+                        f"${total_en_caja:,.0f}",
+                        "ventas + abonos en efectivo · es la cifra del corte",
+                    ),
+                    (
+                        "VENDIDO EN TOTAL",
+                        f"${total_monto:,.0f}",
+                        f"efectivo + tarjeta · con tarjeta: ${total_tarjeta:,.0f}"
+                        f" · neto: ${total_neto:,.0f}",
+                    ),
+                    (
+                        "ABONOS A APARTADOS",
+                        f"${total_abonos:,.0f}",
+                        f"{apartados_count} apartado(s) nuevos",
+                    ),
+                    (
+                        "COMISIONES",
+                        str(total_comisiones),
+                        f"{ventas_count} ventas · {total_piezas} piezas",
+                    ),
                 ]
             )
             self.libreta_resumen_label.setText(
@@ -2395,26 +2463,28 @@ class QuoteSatelliteWindow(QMainWindow):
             self.libreta_resumen_label.setText(mensaje)
 
         if self._libreta_is_owner:
+            # En "Hoy" el desglose por día es una sola fila que repite las
+            # tarjetas: se oculta para no saturar. Aparece en ciclo y rango.
+            mostrar_dias = self._libreta_periodo != "hoy"
+            self.libreta_daily_seccion.setVisible(mostrar_dias)
+            self.libreta_daily_table.setVisible(mostrar_dias)
             self.libreta_daily_table.setRowCount(len(cortes))
             for i, corte in enumerate(cortes):
                 self.libreta_daily_table.setItem(i, 0, QTableWidgetItem(corte.dia_label))
                 self.libreta_daily_table.setItem(
                     i, 1, QTableWidgetItem(f"${corte.monto_en_caja:,.2f}")
                 )
-                self.libreta_daily_table.setItem(i, 2, QTableWidgetItem(str(corte.operaciones)))
-                self.libreta_daily_table.setItem(i, 3, QTableWidgetItem(str(corte.piezas)))
                 self.libreta_daily_table.setItem(
-                    i, 4, QTableWidgetItem(f"${corte.monto_ventas:,.2f}")
+                    i, 2, QTableWidgetItem(f"${corte.monto_ventas:,.2f}")
                 )
                 self.libreta_daily_table.setItem(
-                    i, 5, QTableWidgetItem(f"${corte.monto_neto_ventas:,.2f}")
+                    i, 3, QTableWidgetItem(f"${corte.monto_neto_ventas:,.2f}")
                 )
                 self.libreta_daily_table.setItem(
-                    i, 6, QTableWidgetItem(f"${corte.monto_apartados:,.2f}")
+                    i, 4, QTableWidgetItem(f"${corte.monto_abonos:,.2f}")
                 )
-                self.libreta_daily_table.setItem(
-                    i, 7, QTableWidgetItem(f"${corte.monto_abonos:,.2f}")
-                )
+                self.libreta_daily_table.setItem(i, 5, QTableWidgetItem(str(corte.operaciones)))
+            self._ajustar_alto_tabla_libreta(self.libreta_daily_table)
 
         if self._libreta_is_owner:
             # El ranking se pinta sin el filtro de empleada: es el selector.
@@ -2436,7 +2506,7 @@ class QuoteSatelliteWindow(QMainWindow):
                 self.libreta_ranking_list.addItem(
                     QListWidgetItem(
                         f"{lugar}  {nombre} — {r.comisiones} comisiones · "
-                        f"{r.piezas} piezas · ${r.monto_total:,.2f} ({r.operaciones} ops){marca}"
+                        f"${r.monto_total:,.0f} vendidos · {r.operaciones} operaciones{marca}"
                     )
                 )
 
@@ -2499,9 +2569,9 @@ class QuoteSatelliteWindow(QMainWindow):
         if rows is not None:
             self._pintar_libreta(rows, ranking_rows=ranking)
 
-    def _ajustar_alto_tabla_libreta(self) -> None:
+    def _ajustar_alto_tabla_libreta(self, tabla=None) -> None:
         """Alto exacto al contenido para que scrollee la PÁGINA, no la tabla."""
-        tabla = self.libreta_table
+        tabla = tabla if tabla is not None else self.libreta_table
         alto = tabla.horizontalHeader().height() + 2 * tabla.frameWidth()
         for fila in range(tabla.rowCount()):
             alto += tabla.rowHeight(fila)

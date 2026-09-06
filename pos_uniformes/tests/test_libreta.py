@@ -1477,3 +1477,79 @@ class CambiarPagoTarjetaTests(unittest.TestCase):
         with patch("pos_uniformes.services.libreta_service.cambiar_pago_tarjeta") as cambiar:
             QuoteSatelliteWindow._cambiar_pago_libreta(fake)
         cambiar.assert_not_called()
+
+
+class LibretaDuenoRedisenoTests(unittest.TestCase):
+    """Vista del dueño sin saturar: tarjetas que no se confunden entre sí,
+    desglose por día solo en periodos de varios días, y lo ocasional
+    (rango/meta) plegado bajo "Más opciones"."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        from PyQt6.QtWidgets import QApplication
+
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _ventana_dueno(self):
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        win = QuoteSatelliteWindow(user_id=1, offline_mode=True)
+        win._libreta_is_owner = True
+        win._libreta_emp_filtro = "VEND-2"
+        return win
+
+    @staticmethod
+    def _fila(i: int, tarjeta: bool, dias_atras: int = 0):
+        from datetime import timedelta
+
+        return SimpleNamespace(
+            id=i, tipo="venta", piezas=2, comisiones=2,
+            monto_total=Decimal("500.00"), monto_neto=Decimal("500.00"),
+            pago_tarjeta=tarjeta, employee_code="VEND-2", employee_name="Ana",
+            created_at=datetime.now() - timedelta(days=dias_atras), cliente=None,
+            descuento_empleada=False, detalle=[],
+        )
+
+    def test_hoy_oculta_por_dia_y_tarjetas_son_especificas(self) -> None:
+        win = self._ventana_dueno()
+        win._libreta_periodo = "hoy"
+        win._pintar_libreta([self._fila(1, False), self._fila(2, True)])
+        self.assertTrue(win.libreta_daily_table.isHidden())
+        self.assertTrue(win.libreta_daily_seccion.isHidden())
+        titulos = [t.text() for _c, t, _v, _s in win._libreta_cards]
+        self.assertEqual(
+            titulos,
+            ["EN EL CAJÓN (EFECTIVO)", "VENDIDO EN TOTAL",
+             "ABONOS A APARTADOS", "COMISIONES"],
+        )
+        # Tarjeta 1 = solo efectivo ($500); tarjeta 2 = todo ($1,000) y
+        # dice cuánto fue con tarjeta.
+        self.assertEqual(win._libreta_cards[0][2].text(), "$500")
+        self.assertEqual(win._libreta_cards[1][2].text(), "$1,000")
+        self.assertIn("con tarjeta: $500", win._libreta_cards[1][3].text())
+
+    def test_ciclo_muestra_por_dia_con_todos_los_dias(self) -> None:
+        win = self._ventana_dueno()
+        win._libreta_periodo = "ciclo"
+        win._pintar_libreta([self._fila(i, False, dias_atras=i) for i in range(4)])
+        self.assertFalse(win.libreta_daily_table.isHidden())
+        self.assertEqual(win.libreta_daily_table.rowCount(), 4)
+        # Sin scroll interno: la tabla mide lo que sus filas.
+        alto_filas = sum(
+            win.libreta_daily_table.rowHeight(i)
+            for i in range(win.libreta_daily_table.rowCount())
+        )
+        self.assertGreaterEqual(win.libreta_daily_table.height(), alto_filas)
+
+    def test_opciones_plegadas_y_rango_las_despliega(self) -> None:
+        win = self._ventana_dueno()
+        self.assertTrue(win.libreta_opciones_panel.isHidden())
+        win.libreta_opciones_button.setChecked(True)
+        self.assertFalse(win.libreta_opciones_panel.isHidden())
+        win.libreta_opciones_button.setChecked(False)
+        self.assertTrue(win.libreta_opciones_panel.isHidden())
+        # Activar el rango deja el panel a la vista (ahí está el "Ver rango").
+        win._libreta_periodo = "rango"
+        win._sync_libreta_filtros()
+        self.assertTrue(win.libreta_opciones_button.isChecked())
+        self.assertFalse(win.libreta_opciones_panel.isHidden())

@@ -189,7 +189,10 @@ class QuoteSatelliteWindowTests(unittest.TestCase):
         self.assertTrue(window.kiosk_open_quote_button.isHidden())
         self.assertFalse(window.nav_kiosk_button.isHidden())
         self.assertFalse(window.nav_quicksale_button.isHidden())
-        self.assertFalse(window.nav_tariff_button.isHidden())
+        # 2026-09-02: la Libreta tomó el lugar de Tarifarios en el sidebar
+        # (la página de tarifarios sigue viva, oculta).
+        self.assertTrue(window.nav_tariff_button.isHidden())
+        self.assertFalse(window.nav_libreta_button.isHidden())
 
     def test_stylesheet_includes_combo_hover_feedback(self) -> None:
         window = QuoteSatelliteWindow(user_id=1)
