@@ -2169,15 +2169,11 @@ class QuickSaleWidget(QWidget):
                 f"${tk_fmt(minimo)}",
             )
         )
+        # El anticipo NO se repite aquí (pedido de Daniel 2026-09-06): va
+        # una sola vez, como primer renglón del registro de abonos.
         restante: Decimal | None = None
         if anticipo is not None:
-            # El anticipo es lo que la clienta dejó HOY; el restante es lo
-            # que le falta para liquidar y llevarse las piezas.
             restante = (Decimal(str(total)) - anticipo).quantize(Decimal("0.01"))
-            forma = "tarjeta" if anticipo_tarjeta else "efectivo"
-            lines.append(tk_mid())
-            lines.append(tk_row(f"Anticipo ({forma}):", f"${tk_fmt(anticipo)}"))
-            lines.append(tk_row("RESTANTE:", f"${tk_fmt(restante)}"))
         lines.append(tk_bot())
 
         lines.append("")
@@ -2186,10 +2182,14 @@ class QuickSaleWidget(QWidget):
         lines.append(tk_line("Fecha     Monto     Restante"))
         renglones = 5
         if anticipo is not None and restante is not None:
-            # El anticipo ocupa el primer renglón del registro.
+            # El anticipo (lo que dejó HOY) ocupa el primer renglón del
+            # registro; marca la forma de pago si fue con tarjeta.
+            forma = " (tarjeta)" if anticipo_tarjeta else ""
             lines.append(tk_mid())
             lines.append(
-                tk_line(f"{now[:5]:<9} ${tk_fmt(anticipo):<8} ${tk_fmt(restante)}")
+                tk_line(
+                    f"{now[:5]:<9} ${tk_fmt(anticipo):<8} ${tk_fmt(restante)}{forma}"
+                )
             )
             renglones = 4
         for _ in range(renglones):

@@ -525,14 +525,14 @@ class AnticipoApartadoTests(unittest.TestCase):
                 "Blanca Hernandez", anticipo=Decimal("200"), anticipo_tarjeta=False
             )
             sin = w._build_apartado_text("Blanca Hernandez")
-        self.assertIn("Anticipo (efectivo):", texto)
-        self.assertIn("$200.00", texto)
+        # Una sola vez, en el primer renglón del registro de abonos (nada de
+        # repetirlo bajo el total — pedido de Daniel).
         restante = (Decimal(str(total)) - Decimal("200")).quantize(Decimal("0.01"))
-        self.assertIn(f"RESTANTE:", texto)
-        self.assertIn(f"${restante:,.2f}", texto)
-        # Sin anticipo (reimpresión vieja) el ticket sigue igual que antes.
-        self.assertNotIn("Anticipo (", sin)
-        self.assertNotIn("RESTANTE", sin)
+        self.assertIn(f"$200.00   ${restante:,.2f}", texto)
+        self.assertNotIn("Anticipo (", texto)
+        self.assertNotIn("RESTANTE:", texto)
+        # Sin anticipo (reimpresión vieja) el registro queda en blanco.
+        self.assertNotIn("$200.00", sin)
 
     def test_apartado_con_anticipo_anota_abono_en_libreta(self) -> None:
         w = self._make_widget()
