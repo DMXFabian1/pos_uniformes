@@ -2400,7 +2400,6 @@ class QuoteSatelliteWindow(QMainWindow):
             total_neto = sum((c.monto_neto_ventas for c in cortes), Decimal("0.00"))
             total_abonos = sum((c.monto_abonos for c in cortes), Decimal("0.00"))
             total_ventas = sum((c.monto_ventas for c in cortes), Decimal("0.00"))
-            total_apartados = sum((c.monto_apartados for c in cortes), Decimal("0.00"))
             total_tarjeta = sum(
                 (
                     Decimal(str(r.monto_total or 0))
@@ -2414,12 +2413,10 @@ class QuoteSatelliteWindow(QMainWindow):
             # tarjeta — el valor de un apartado NO es venta ni dinero
             # recibido, por eso no entra aquí), lo abonado a apartados, y las
             # comisiones del equipo. Así cajón = ventas efectivo + abonos.
-            apartados_txt = (
-                f"{apartados_count} apartado(s) nuevos por ${total_apartados:,.0f}"
-                " (no es dinero recibido)"
-                if apartados_count
-                else "sin apartados nuevos"
-            )
+            # Tarjeta de abonos: solo el dinero que SÍ entró al cajón por
+            # apartados. Sin conteo ni valor de apartados nuevos (pedido de
+            # Daniel 2026-09-06: "solo deja abono, es lo que realmente está
+            # en caja") — el valor apartado sigue en el corte por día.
             self._llenar_libreta_cards(
                 [
                     (
@@ -2434,9 +2431,9 @@ class QuoteSatelliteWindow(QMainWindow):
                         f" · neto: ${total_neto:,.0f}",
                     ),
                     (
-                        "ABONOS A APARTADOS",
+                        "ABONOS",
                         f"${total_abonos:,.0f}",
-                        apartados_txt,
+                        "dinero de apartados que sí entró al cajón",
                     ),
                     (
                         "COMISIONES",

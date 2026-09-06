@@ -1527,8 +1527,7 @@ class LibretaDuenoRedisenoTests(unittest.TestCase):
         titulos = [t.text() for _c, t, _v, _s in win._libreta_cards]
         self.assertEqual(
             titulos,
-            ["EN EL CAJÓN (EFECTIVO)", "VENDIDO EN TOTAL",
-             "ABONOS A APARTADOS", "COMISIONES"],
+            ["EN EL CAJÓN (EFECTIVO)", "VENDIDO EN TOTAL", "ABONOS", "COMISIONES"],
         )
         # Tarjeta 1 = solo efectivo de ventas ($500); tarjeta 2 = ventas
         # efectivo + tarjeta ($1,000) SIN el apartado, y dice cuánto fue con
@@ -1536,8 +1535,9 @@ class LibretaDuenoRedisenoTests(unittest.TestCase):
         self.assertEqual(win._libreta_cards[0][2].text(), "$500")
         self.assertEqual(win._libreta_cards[1][2].text(), "$1,000")
         self.assertIn("con tarjeta: $500", win._libreta_cards[1][3].text())
+        # Abonos: solo dinero que entró; el apartado no se menciona.
         self.assertEqual(win._libreta_cards[2][2].text(), "$0")
-        self.assertIn("1 apartado(s) nuevos por $500", win._libreta_cards[2][3].text())
+        self.assertNotIn("apartado(s)", win._libreta_cards[2][3].text())
 
     def test_ciclo_muestra_por_dia_con_todos_los_dias(self) -> None:
         win = self._ventana_dueno()
