@@ -2408,15 +2408,14 @@ class QuoteSatelliteWindow(QMainWindow):
                 ),
                 Decimal("0.00"),
             )
-            # Cuatro cifras que no se confunden entre sí: lo que hay en el
-            # cajón (la del corte), lo VENDIDO (solo ventas, efectivo +
-            # tarjeta — el valor de un apartado NO es venta ni dinero
-            # recibido, por eso no entra aquí), lo abonado a apartados, y las
-            # comisiones del equipo. Así cajón = ventas efectivo + abonos.
-            # Tarjeta de abonos: solo el dinero que SÍ entró al cajón por
-            # apartados. Sin conteo ni valor de apartados nuevos (pedido de
-            # Daniel 2026-09-06: "solo deja abono, es lo que realmente está
-            # en caja") — el valor apartado sigue en el corte por día.
+            # Principio de Daniel (2026-09-06): la Libreta habla de dinero
+            # REAL, sin falsas expectativas. Nada de "vendido en total" (el
+            # valor de un apartado no es dinero recibido). Solo:
+            #   · lo que hay en el cajón (la cifra del corte),
+            #   · lo que llega por la terminal (tarjeta, ya neto del 4.5%),
+            #   · los abonos (parte del cajón, se muestran para explicarlo),
+            #   · las comisiones del equipo.
+            neto_tarjeta = total_neto - (total_ventas - total_tarjeta)
             self._llenar_libreta_cards(
                 [
                     (
@@ -2425,10 +2424,13 @@ class QuoteSatelliteWindow(QMainWindow):
                         "ventas + abonos en efectivo · es la cifra del corte",
                     ),
                     (
-                        "VENDIDO EN TOTAL",
-                        f"${total_ventas:,.0f}",
-                        f"solo ventas, efectivo + tarjeta · con tarjeta: ${total_tarjeta:,.0f}"
-                        f" · neto: ${total_neto:,.0f}",
+                        "CON TARJETA",
+                        f"${total_tarjeta:,.0f}",
+                        (
+                            f"llega por la terminal · neto tras 4.5%: ${neto_tarjeta:,.0f}"
+                            if total_tarjeta
+                            else "sin cobros con tarjeta"
+                        ),
                     ),
                     (
                         "ABONOS",

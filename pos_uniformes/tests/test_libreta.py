@@ -1527,14 +1527,19 @@ class LibretaDuenoRedisenoTests(unittest.TestCase):
         titulos = [t.text() for _c, t, _v, _s in win._libreta_cards]
         self.assertEqual(
             titulos,
-            ["EN EL CAJÓN (EFECTIVO)", "VENDIDO EN TOTAL", "ABONOS", "COMISIONES"],
+            ["EN EL CAJÓN (EFECTIVO)", "CON TARJETA", "ABONOS", "COMISIONES"],
         )
-        # Tarjeta 1 = solo efectivo de ventas ($500); tarjeta 2 = ventas
-        # efectivo + tarjeta ($1,000) SIN el apartado, y dice cuánto fue con
-        # tarjeta; el apartado se explica en la tarjeta 3.
+        # Solo dinero real: tarjeta 1 = efectivo en el cajón ($500); tarjeta 2
+        # = lo que llega por la terminal ($500, neto tras 4.5%). El valor del
+        # apartado ($500) no aparece en ninguna: no es dinero recibido.
         self.assertEqual(win._libreta_cards[0][2].text(), "$500")
-        self.assertEqual(win._libreta_cards[1][2].text(), "$1,000")
-        self.assertIn("con tarjeta: $500", win._libreta_cards[1][3].text())
+        self.assertEqual(win._libreta_cards[1][2].text(), "$500")
+        self.assertIn("neto tras 4.5%", win._libreta_cards[1][3].text())
+        textos = " ".join(
+            w.text() for card in win._libreta_cards for w in card[1:]
+        )
+        self.assertNotIn("1,000", textos)
+        self.assertNotIn("1,500", textos)
         # Abonos: solo dinero que entró; el apartado no se menciona.
         self.assertEqual(win._libreta_cards[2][2].text(), "$0")
         self.assertNotIn("apartado(s)", win._libreta_cards[2][3].text())
