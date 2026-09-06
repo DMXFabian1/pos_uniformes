@@ -954,13 +954,20 @@ class QuickSaleWidget(QWidget):
         return neto.quantize(Decimal("0.01"))
 
     def _registrar_en_libreta(
-        self, tipo: str, *, cliente: str | None = None, pago_tarjeta: bool = False
+        self,
+        tipo: str,
+        *,
+        cliente: str | None = None,
+        pago_tarjeta: bool = False,
+        anticipo: Decimal | None = None,
+        anticipo_tarjeta: bool = False,
     ) -> None:
         """Anota la operación en la Libreta: local primero (nunca bloquea el
         mostrador ni pierde el registro), y un hilo la sube a la base.
 
         Sustituye la libreta física y la copia de ticket que solo servía
-        para registrar."""
+        para registrar. Un apartado con `anticipo` anota además un abono por
+        ese monto: es el dinero que sí entró al cajón hoy."""
         try:
             from datetime import timezone as _tz
 
@@ -1015,9 +1022,23 @@ class QuickSaleWidget(QWidget):
             self._drenar_libreta_en_background()
         except Exception:  # noqa: BLE001 — la Libreta nunca rompe el flujo de tickets
             _logger.exception("No se pudo registrar la operacion en la Libreta")
+            return
+        if tipo == "apartado" and anticipo is not None and anticipo > 0:
+            self._registrar_abono(
+                f"{cliente} · anticipo" if cliente else "anticipo",
+                Decimal(str(anticipo)).quantize(Decimal("0.01")),
+                pago_tarjeta=anticipo_tarjeta,
+                aviso="Apartado y anticipo registrados",
+            )
 
     def _registrar_y_vaciar(
-        self, tipo: str, *, cliente: str | None = None, pago_tarjeta: bool = False
+        self,
+        tipo: str,
+        *,
+        cliente: str | None = None,
+        pago_tarjeta: bool = False,
+        anticipo: Decimal | None = None,
+        anticipo_tarjeta: bool = False,
     ) -> None:
         """Anota en la Libreta y vacía el carrito en el mismo acto.
 
@@ -1026,7 +1047,12 @@ class QuickSaleWidget(QWidget):
         siguiente clienta heredaría piezas ajenas. Los tickets ya quedaron
         armados como texto, así que reimprimir en la misma ventana sigue
         funcionando."""
-        self._registrar_en_libreta(tipo, cliente=cliente, pago_tarjeta=pago_tarjeta)
+        extra = (
+            {"anticipo": anticipo, "anticipo_tarjeta": anticipo_tarjeta}
+            if tipo == "apartado"
+            else {}
+        )
+        self._registrar_en_libreta(tipo, cliente=cliente, pago_tarjeta=pago_tarjeta, **extra)
         self._items.clear()
         self._discount_active = False
         self._discount_check.setChecked(False)
@@ -1337,6 +1363,56 @@ class QuickSaleWidget(QWidget):
         self._refresh_items_table()
         self._refresh_totals()
 
+    _ESTILO_TECLA = (
+        "QPushButton { background: #ffffff; color: #2c2a27;"
+        "  border: 1.5px solid #ddd0c0; border-radius: 12px;"
+        "  min-height: 48px; font-size: 20px; font-weight: 700; }"
+        "QPushButton:pressed { background: #f1e6d6; }"
+    )
+    _ESTILO_MONTO_INPUT = (
+        "QLineEdit { background: #ffffff; color: #73341c;"
+        "  border: 2px solid #a84f2d; border-radius: 12px;"
+        "  min-height: 56px; padding: 0 14px; font-size: 26px; font-weight: 800; }"
+    )
+
+    @staticmethod
+    def _teclado_numerico(destino: QLineEdit):
+        """Teclado numérico en pantalla (táctil): 7 8 9 / 4 5 6 / 1 2 3 / . 0 ⌫.
+        Escribe en `destino`; lo comparten 'producto sin código' y el
+        anticipo del apartado."""
+        from PyQt6.QtWidgets import QGridLayout
+
+        teclado = QGridLayout()
+        teclado.setSpacing(6)
+        _TECLA = QuickSaleWidget._ESTILO_TECLA
+
+        def _tecla(txt: str) -> None:
+            actual = destino.text()
+            if txt == "⌫":
+                destino.setText(actual[:-1])
+            elif txt == "." and "." in actual:
+                return
+            else:
+                destino.setText(actual + txt)
+
+        for i, txt in enumerate(("7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0", "⌫")):
+            b = QPushButton(txt)
+            b.setAutoDefault(False)
+            b.setStyleSheet(_TECLA)
+            b.setFixedHeight(56)  # alto fijo: el teclado no se estira
+            b.clicked.connect(lambda _=False, t=txt: _tecla(t))
+            teclado.addWidget(b, i // 3, i % 3)
+        return teclado
+
+    @staticmethod
+    def _monto_de_texto(texto: str) -> Decimal | None:
+        """'1,250.50' → Decimal; None si no es un monto."""
+        raw = str(texto or "").strip().replace("$", "").replace(",", "")
+        try:
+            return Decimal(raw).quantize(Decimal("0.01"))
+        except Exception:  # noqa: BLE001
+            return None
+
     def _ask_producto_sin_codigo(self) -> dict | None:
         """Diálogo táctil: descripción, precio con teclado numérico en
         pantalla (no depende del teclado físico) y cantidad con −/+.
@@ -1385,35 +1461,7 @@ class QuickSaleWidget(QWidget):
         precio_row.addWidget(precio_input, 1)
         ly.addLayout(precio_row)
 
-        # Teclado numérico en pantalla (táctil): 7 8 9 / 4 5 6 / 1 2 3 / . 0 ⌫
-        from PyQt6.QtWidgets import QGridLayout
-
-        teclado = QGridLayout()
-        teclado.setSpacing(6)
-        _TECLA = (
-            "QPushButton { background: #ffffff; color: #2c2a27;"
-            "  border: 1.5px solid #ddd0c0; border-radius: 12px;"
-            "  min-height: 48px; font-size: 20px; font-weight: 700; }"
-            "QPushButton:pressed { background: #f1e6d6; }"
-        )
-
-        def _tecla(txt: str) -> None:
-            actual = precio_input.text()
-            if txt == "⌫":
-                precio_input.setText(actual[:-1])
-            elif txt == "." and "." in actual:
-                return
-            else:
-                precio_input.setText(actual + txt)
-
-        for i, txt in enumerate(("7", "8", "9", "4", "5", "6", "1", "2", "3", ".", "0", "⌫")):
-            b = QPushButton(txt)
-            b.setAutoDefault(False)
-            b.setStyleSheet(_TECLA)
-            b.setFixedHeight(56)  # alto fijo: el teclado no se estira
-            b.clicked.connect(lambda _=False, t=txt: _tecla(t))
-            teclado.addWidget(b, i // 3, i % 3)
-        ly.addLayout(teclado)
+        ly.addLayout(self._teclado_numerico(precio_input))
 
         # Cantidad en una sola fila, con el TOTAL en vivo a la derecha
         cant_row = QHBoxLayout()
@@ -1448,7 +1496,7 @@ class QuickSaleWidget(QWidget):
         for txt, d in (("−", -1), ("+", 1)):
             b = QPushButton(txt)
             b.setAutoDefault(False)
-            b.setStyleSheet(_TECLA)
+            b.setStyleSheet(self._ESTILO_TECLA)
             b.setFixedSize(60, 52)
             b.clicked.connect(lambda _=False, dd=d: _cambiar_cant(dd))
             if txt == "−":
@@ -1677,7 +1725,12 @@ class QuickSaleWidget(QWidget):
         self._scan_input.setFocus()
 
     def _registrar_abono(
-        self, cliente: str | None, monto: Decimal, *, pago_tarjeta: bool
+        self,
+        cliente: str | None,
+        monto: Decimal,
+        *,
+        pago_tarjeta: bool,
+        aviso: str = "Abono registrado",
     ) -> None:
         try:
             from datetime import timezone as _tz
@@ -1712,7 +1765,7 @@ class QuickSaleWidget(QWidget):
                 }
             )
             self._drenar_libreta_en_background()
-            self._flash_scan_hint("Abono registrado")
+            self._flash_scan_hint(aviso)
         except Exception:  # noqa: BLE001
             _logger.exception("No se pudo registrar el abono en la Libreta")
             QMessageBox.warning(
@@ -1778,41 +1831,137 @@ class QuickSaleWidget(QWidget):
         name_input.setPlaceholderText("Nombre y apellidos...")
         ly.addWidget(name_input)
 
+        # Anticipo: lo que la clienta deja HOY para apartar. Es dinero que
+        # entra al cajón, así que se anota en la Libreta como abono (pedido
+        # de Daniel 2026-09-06). Mínimo = 25% del total (regla del ticket).
+        _sub, _desc, total_cobrar = self._compute_totals()
+        minimo = self._round_total(
+            (total_cobrar * self._MIN_LAYAWAY_PERCENT / Decimal("100")).quantize(
+                Decimal("0.01")
+            )
+        )
+        ly.addSpacing(4)
+        anticipo_label = QLabel(
+            f"Anticipo que deja hoy  (mínimo {self._MIN_LAYAWAY_PERCENT:.0f}%: ${minimo:,.2f})"
+        )
+        anticipo_label.setObjectName("dlgField")
+        ly.addWidget(anticipo_label)
+        anticipo_input = QLineEdit(f"{minimo:.2f}")
+        anticipo_input.setAlignment(Qt.AlignmentFlag.AlignRight)
+        anticipo_input.setStyleSheet(self._ESTILO_MONTO_INPUT)
+        anticipo_row = QHBoxLayout()
+        anticipo_row.setSpacing(8)
+        signo = QLabel("$")
+        signo.setStyleSheet("font-size: 28px; font-weight: 800; color: #73341c;")
+        anticipo_row.addWidget(signo)
+        anticipo_row.addWidget(anticipo_input, 1)
+        ly.addLayout(anticipo_row)
+        ly.addLayout(self._teclado_numerico(anticipo_input))
+
+        _TOGGLE = (
+            "QPushButton { background: #ffffff; color: #2c2a27;"
+            "  border: 2px solid #ddd0c0; border-radius: 14px;"
+            "  min-height: 54px; font-size: 17px; font-weight: 700; }"
+            "QPushButton:checked { background: #f7e3d8; color: #73341c;"
+            "  border: 3px solid #a84f2d; }"
+        )
+        pago_row = QHBoxLayout()
+        pago_row.setSpacing(10)
+        btn_efectivo = QPushButton("✓ 💵  Efectivo")
+        btn_tarjeta = QPushButton("💳  Tarjeta")
+        for btn in (btn_efectivo, btn_tarjeta):
+            btn.setCheckable(True)
+            btn.setAutoDefault(False)
+            btn.setStyleSheet(_TOGGLE)
+            pago_row.addWidget(btn)
+        btn_efectivo.setChecked(True)
+
+        def _set_pago(tarjeta: bool) -> None:
+            btn_tarjeta.setChecked(tarjeta)
+            btn_efectivo.setChecked(not tarjeta)
+            btn_efectivo.setText("✓ 💵  Efectivo" if not tarjeta else "💵  Efectivo")
+            btn_tarjeta.setText("✓ 💳  Tarjeta" if tarjeta else "💳  Tarjeta")
+
+        btn_efectivo.clicked.connect(lambda: _set_pago(False))
+        btn_tarjeta.clicked.connect(lambda: _set_pago(True))
+        ly.addLayout(pago_row)
+
+        error_label = QLabel("")
+        error_label.setStyleSheet(f"font-size: 13px; color: {_DANGER}; font-weight: 700;")
+        error_label.setVisible(False)
+        ly.addWidget(error_label)
+
         ly.addSpacing(8)
 
         btn_row = QHBoxLayout()
         btn_row.setSpacing(10)
         btn_cancel = QPushButton("Cancelar")
         btn_cancel.setObjectName("dlgCancel")
+        btn_cancel.setAutoDefault(False)
         btn_cancel.clicked.connect(dlg.reject)
         btn_row.addWidget(btn_cancel)
         btn_row.addStretch()
         btn_ok = QPushButton("Generar ticket")
         btn_ok.setObjectName("dlgOk")
-        btn_ok.clicked.connect(dlg.accept)
+        btn_ok.setAutoDefault(False)
+
+        def _validar_y_aceptar() -> None:
+            if not name_input.text().strip():
+                error_label.setText("Escribe el nombre completo de la clienta.")
+                error_label.setVisible(True)
+                return
+            monto = self._monto_de_texto(anticipo_input.text())
+            if monto is None or monto <= 0:
+                error_label.setText("Captura el anticipo que deja hoy.")
+                error_label.setVisible(True)
+                return
+            if monto < minimo:
+                error_label.setText(
+                    f"El anticipo mínimo es ${minimo:,.2f} ({self._MIN_LAYAWAY_PERCENT:.0f}%)."
+                )
+                error_label.setVisible(True)
+                return
+            if monto > total_cobrar:
+                error_label.setText(
+                    f"El anticipo no puede pasar del total (${total_cobrar:,.2f})."
+                )
+                error_label.setVisible(True)
+                return
+            dlg.accept()
+
+        btn_ok.clicked.connect(_validar_y_aceptar)
         btn_row.addWidget(btn_ok)
         ly.addLayout(btn_row)
 
         dlg.setLayout(ly)
         name_input.setFocus()
-        name_input.returnPressed.connect(dlg.accept)
+        name_input.returnPressed.connect(_validar_y_aceptar)
 
         if dlg.exec() != QDialog.DialogCode.Accepted:
             return
         nombre = name_input.text().strip()
         if not nombre:
             return
+        anticipo = self._monto_de_texto(anticipo_input.text())
+        if anticipo is not None and anticipo <= 0:
+            anticipo = None
+        anticipo_tarjeta = btn_tarjeta.isChecked()
         cliente_text = self._build_apartado_text(
-            nombre, copy_label="CLIENTE", include_terms=True
+            nombre, copy_label="CLIENTE", include_terms=True,
+            anticipo=anticipo, anticipo_tarjeta=anticipo_tarjeta,
         )
         tienda_text = self._build_apartado_text(
-            nombre, copy_label="COPIA TIENDA", include_terms=False
+            nombre, copy_label="COPIA TIENDA", include_terms=False,
+            anticipo=anticipo, anticipo_tarjeta=anticipo_tarjeta,
         )
         route_tickets(
             self,
             "Apartado",
             [cliente_text, tienda_text],
-            on_printed=lambda: self._registrar_y_vaciar("apartado", cliente=nombre),
+            on_printed=lambda: self._registrar_y_vaciar(
+                "apartado", cliente=nombre,
+                anticipo=anticipo, anticipo_tarjeta=anticipo_tarjeta,
+            ),
         )
         self._scan_input.setFocus()
 
@@ -1974,6 +2123,8 @@ class QuickSaleWidget(QWidget):
         include_terms: bool = True,
         fecha_str: str | None = None,
         reimpresion: bool = False,
+        anticipo: Decimal | None = None,
+        anticipo_tarjeta: bool = False,
     ) -> str:
         biz_name, biz_phone, biz_addr = self._load_business_info()
         now = fecha_str or datetime.now().strftime("%d/%m/%Y %H:%M")
@@ -2018,13 +2169,30 @@ class QuickSaleWidget(QWidget):
                 f"${tk_fmt(minimo)}",
             )
         )
+        restante: Decimal | None = None
+        if anticipo is not None:
+            # El anticipo es lo que la clienta dejó HOY; el restante es lo
+            # que le falta para liquidar y llevarse las piezas.
+            restante = (Decimal(str(total)) - anticipo).quantize(Decimal("0.01"))
+            forma = "tarjeta" if anticipo_tarjeta else "efectivo"
+            lines.append(tk_mid())
+            lines.append(tk_row(f"Anticipo ({forma}):", f"${tk_fmt(anticipo)}"))
+            lines.append(tk_row("RESTANTE:", f"${tk_fmt(restante)}"))
         lines.append(tk_bot())
 
         lines.append("")
         lines.append("Registro de abonos".center(_TW))
         lines.append(tk_top())
         lines.append(tk_line("Fecha     Monto     Restante"))
-        for _ in range(5):
+        renglones = 5
+        if anticipo is not None and restante is not None:
+            # El anticipo ocupa el primer renglón del registro.
+            lines.append(tk_mid())
+            lines.append(
+                tk_line(f"{now[:5]:<9} ${tk_fmt(anticipo):<8} ${tk_fmt(restante)}")
+            )
+            renglones = 4
+        for _ in range(renglones):
             lines.append(tk_mid())
             lines.append(tk_line(""))
         lines.append(tk_bot())

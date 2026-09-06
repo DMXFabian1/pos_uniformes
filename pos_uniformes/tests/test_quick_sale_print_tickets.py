@@ -499,3 +499,69 @@ class ProductoSinCodigoTests(unittest.TestCase):
         with patch.object(QDialog, "exec", _exec):
             datos = w._ask_producto_sin_codigo()
         self.assertEqual(datos, {"nombre": "Arreglo de bastilla", "precio": Decimal("80.50"), "cantidad": 2})
+
+
+class AnticipoApartadoTests(unittest.TestCase):
+    """El anticipo del apartado es dinero que SÍ entró al cajón: va en el
+    ticket (anticipo + restante) y se anota en la Libreta como abono."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _make_widget(self) -> QuickSaleWidget:
+        satellite = SimpleNamespace(offline_mode=True, _kiosk_lookup_from_cache=None)
+        widget = QuickSaleWidget(satellite)
+        widget._employee_code = "VEND-2"
+        widget._employee_name = "Ana"
+        widget._items = _items()
+        return widget
+
+    def test_ticket_imprime_anticipo_y_restante(self) -> None:
+        w = self._make_widget()
+        _s, _d, total = w._compute_totals()
+        with patch.object(w, "_load_business_info", return_value=("MAXIMODA", "", "")):
+            texto = w._build_apartado_text(
+                "Blanca Hernandez", anticipo=Decimal("200"), anticipo_tarjeta=False
+            )
+            sin = w._build_apartado_text("Blanca Hernandez")
+        self.assertIn("Anticipo (efectivo):", texto)
+        self.assertIn("$200.00", texto)
+        restante = (Decimal(str(total)) - Decimal("200")).quantize(Decimal("0.01"))
+        self.assertIn(f"RESTANTE:", texto)
+        self.assertIn(f"${restante:,.2f}", texto)
+        # Sin anticipo (reimpresión vieja) el ticket sigue igual que antes.
+        self.assertNotIn("Anticipo (", sin)
+        self.assertNotIn("RESTANTE", sin)
+
+    def test_apartado_con_anticipo_anota_abono_en_libreta(self) -> None:
+        w = self._make_widget()
+        with patch.object(w, "_drenar_libreta_en_background"), \
+                patch.object(w, "_flash_scan_hint"), \
+                patch("pos_uniformes.services.libreta_local_queue_service.encolar_operacion") as enc:
+            w._registrar_en_libreta(
+                "apartado", cliente="Blanca", anticipo=Decimal("200"), anticipo_tarjeta=False
+            )
+        self.assertEqual(enc.call_count, 2)
+        apartado = enc.call_args_list[0].args[0]
+        abono = enc.call_args_list[1].args[0]
+        self.assertEqual(apartado["tipo"], "apartado")
+        self.assertEqual(abono["tipo"], "abono")
+        self.assertEqual(abono["monto_total"], "200.00")
+        self.assertEqual(abono["comisiones"], 0)  # el anticipo no comisiona
+        self.assertIn("Blanca", abono["cliente"])
+        self.assertIn("anticipo", abono["cliente"])
+        self.assertFalse(abono["pago_tarjeta"])
+
+    def test_apartado_sin_anticipo_no_anota_abono(self) -> None:
+        w = self._make_widget()
+        with patch.object(w, "_drenar_libreta_en_background"), \
+                patch("pos_uniformes.services.libreta_local_queue_service.encolar_operacion") as enc:
+            w._registrar_en_libreta("apartado", cliente="Blanca")
+        self.assertEqual(enc.call_count, 1)
+
+    def test_venta_no_pasa_anticipo(self) -> None:
+        w = self._make_widget()
+        with patch.object(w, "_registrar_en_libreta") as reg:
+            w._registrar_y_vaciar("venta", pago_tarjeta=True)
+        reg.assert_called_once_with("venta", cliente=None, pago_tarjeta=True)
