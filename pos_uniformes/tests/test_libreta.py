@@ -1500,11 +1500,11 @@ class LibretaDuenoRedisenoTests(unittest.TestCase):
         return win
 
     @staticmethod
-    def _fila(i: int, tarjeta: bool, dias_atras: int = 0):
+    def _fila(i: int, tarjeta: bool, dias_atras: int = 0, tipo: str = "venta"):
         from datetime import timedelta
 
         return SimpleNamespace(
-            id=i, tipo="venta", piezas=2, comisiones=2,
+            id=i, tipo=tipo, piezas=2, comisiones=2,
             monto_total=Decimal("500.00"), monto_neto=Decimal("500.00"),
             pago_tarjeta=tarjeta, employee_code="VEND-2", employee_name="Ana",
             created_at=datetime.now() - timedelta(days=dias_atras), cliente=None,
@@ -1514,7 +1514,14 @@ class LibretaDuenoRedisenoTests(unittest.TestCase):
     def test_hoy_oculta_por_dia_y_tarjetas_son_especificas(self) -> None:
         win = self._ventana_dueno()
         win._libreta_periodo = "hoy"
-        win._pintar_libreta([self._fila(1, False), self._fila(2, True)])
+        win._pintar_libreta(
+            [
+                self._fila(1, False),
+                self._fila(2, True),
+                # Un apartado de $500: NO es venta ni dinero recibido.
+                self._fila(3, False, tipo="apartado"),
+            ]
+        )
         self.assertTrue(win.libreta_daily_table.isHidden())
         self.assertTrue(win.libreta_daily_seccion.isHidden())
         titulos = [t.text() for _c, t, _v, _s in win._libreta_cards]
@@ -1523,11 +1530,14 @@ class LibretaDuenoRedisenoTests(unittest.TestCase):
             ["EN EL CAJÓN (EFECTIVO)", "VENDIDO EN TOTAL",
              "ABONOS A APARTADOS", "COMISIONES"],
         )
-        # Tarjeta 1 = solo efectivo ($500); tarjeta 2 = todo ($1,000) y
-        # dice cuánto fue con tarjeta.
+        # Tarjeta 1 = solo efectivo de ventas ($500); tarjeta 2 = ventas
+        # efectivo + tarjeta ($1,000) SIN el apartado, y dice cuánto fue con
+        # tarjeta; el apartado se explica en la tarjeta 3.
         self.assertEqual(win._libreta_cards[0][2].text(), "$500")
         self.assertEqual(win._libreta_cards[1][2].text(), "$1,000")
         self.assertIn("con tarjeta: $500", win._libreta_cards[1][3].text())
+        self.assertEqual(win._libreta_cards[2][2].text(), "$0")
+        self.assertIn("1 apartado(s) nuevos por $500", win._libreta_cards[2][3].text())
 
     def test_ciclo_muestra_por_dia_con_todos_los_dias(self) -> None:
         win = self._ventana_dueno()

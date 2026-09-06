@@ -2399,17 +2399,27 @@ class QuoteSatelliteWindow(QMainWindow):
             total_en_caja = sum((c.monto_en_caja for c in cortes), Decimal("0.00"))
             total_neto = sum((c.monto_neto_ventas for c in cortes), Decimal("0.00"))
             total_abonos = sum((c.monto_abonos for c in cortes), Decimal("0.00"))
+            total_ventas = sum((c.monto_ventas for c in cortes), Decimal("0.00"))
+            total_apartados = sum((c.monto_apartados for c in cortes), Decimal("0.00"))
             total_tarjeta = sum(
                 (
                     Decimal(str(r.monto_total or 0))
                     for r in rows
-                    if bool(getattr(r, "pago_tarjeta", False))
+                    if str(r.tipo) == "venta" and bool(getattr(r, "pago_tarjeta", False))
                 ),
                 Decimal("0.00"),
             )
             # Cuatro cifras que no se confunden entre sí: lo que hay en el
-            # cajón (la del corte), lo vendido en total (efectivo + tarjeta),
-            # lo abonado a apartados, y las comisiones del equipo.
+            # cajón (la del corte), lo VENDIDO (solo ventas, efectivo +
+            # tarjeta — el valor de un apartado NO es venta ni dinero
+            # recibido, por eso no entra aquí), lo abonado a apartados, y las
+            # comisiones del equipo. Así cajón = ventas efectivo + abonos.
+            apartados_txt = (
+                f"{apartados_count} apartado(s) nuevos por ${total_apartados:,.0f}"
+                " (no es dinero recibido)"
+                if apartados_count
+                else "sin apartados nuevos"
+            )
             self._llenar_libreta_cards(
                 [
                     (
@@ -2419,14 +2429,14 @@ class QuoteSatelliteWindow(QMainWindow):
                     ),
                     (
                         "VENDIDO EN TOTAL",
-                        f"${total_monto:,.0f}",
-                        f"efectivo + tarjeta · con tarjeta: ${total_tarjeta:,.0f}"
+                        f"${total_ventas:,.0f}",
+                        f"solo ventas, efectivo + tarjeta · con tarjeta: ${total_tarjeta:,.0f}"
                         f" · neto: ${total_neto:,.0f}",
                     ),
                     (
                         "ABONOS A APARTADOS",
                         f"${total_abonos:,.0f}",
-                        f"{apartados_count} apartado(s) nuevos",
+                        apartados_txt,
                     ),
                     (
                         "COMISIONES",
