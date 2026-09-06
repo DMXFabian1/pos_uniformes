@@ -135,11 +135,12 @@ class LibretaServiceTests(unittest.TestCase):
         from pos_uniformes.services.libreta_service import comisiones_de_items
 
         items = [
-            {"nombre": "Pants 3pz Deportivo", "cantidad": 2},  # 3 × 2 = 6
+            {"nombre": "Pants 3pz Deportivo", "cantidad": 2},  # 2 × 2 = 4
             {"nombre": "Pants 2pz Deportivo", "cantidad": 2},  # 1 × 2 = 2
             {"nombre": "Sueter Escolar", "cantidad": 1},       # 1
         ]
-        self.assertEqual(comisiones_de_items(items), 9)
+        # Regla de Daniel (2026-09-06): el 3pz vale 2 comisiones, no 3.
+        self.assertEqual(comisiones_de_items(items), 7)
 
     def test_registrar_calcula_comisiones_y_abono_cero(self) -> None:
         session = MagicMock()
@@ -151,7 +152,7 @@ class LibretaServiceTests(unittest.TestCase):
             items=[{"sku": "S", "nombre": "Pants 3pz", "talla": "6", "cantidad": 2, "precio": "600"}],
             monto_total=Decimal("1200"),
         )
-        self.assertEqual(entry.comisiones, 6)  # apartado SÍ da comisiones
+        self.assertEqual(entry.comisiones, 4)  # apartado SÍ da comisiones (3pz=2)
         abono = registrar_operacion(
             session,
             employee_code="VEND-2",

@@ -116,13 +116,15 @@ def aplicar_comision_terminal(monto: Decimal) -> Decimal:
     return resolve_sale_rounding(con_comision).collected_total
 
 
-# Regla de comisiones de Daniel: el conjunto 3pz vale 3 comisiones por
-# unidad; TODO lo demás (2pz incluido, prendas sueltas) vale 1 por unidad.
+# Regla de comisiones de Daniel: el conjunto 3pz vale 2 comisiones por
+# unidad (corregido 2026-09-06: antes contaba 3); TODO lo demás (2pz
+# incluido, prendas sueltas) vale 1 por unidad.
+COMISIONES_3PZ = 2
 _RE_3PZ = re.compile(r"3\s*pz", re.IGNORECASE)
 
 
 def comisiones_de_linea(nombre: str, cantidad: int) -> int:
-    factor = 3 if _RE_3PZ.search(str(nombre or "")) else 1
+    factor = COMISIONES_3PZ if _RE_3PZ.search(str(nombre or "")) else 1
     return factor * int(cantidad or 0)
 
 
@@ -153,7 +155,7 @@ def registrar_operacion(
 
     created_at explícito: las operaciones encoladas offline conservan la hora
     en que se hicieron, no la del drenado.
-    comisiones None → se calculan de los items (3pz=3, resto 1/unidad); los
+    comisiones None → se calculan de los items (3pz=2, resto 1/unidad); los
     abonos deben pasar comisiones=0 explícito.
     monto_neto None → igual a monto_total (efectivo)."""
     detalle = [
