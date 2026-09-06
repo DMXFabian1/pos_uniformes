@@ -1518,11 +1518,16 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_reprint_button.clicked.connect(self._reimprimir_ticket_libreta)
         self.libreta_pago_button = QPushButton("💳 Cambiar pago")
         self.libreta_pago_button.clicked.connect(self._cambiar_pago_libreta)
+        # Reasignar: la venta quedó con el gafete de otra (una puso su
+        # código y la otra la hizo) — mueve el registro y sus comisiones.
+        self.libreta_reasignar_button = QPushButton("👤 Reasignar")
+        self.libreta_reasignar_button.clicked.connect(self._reasignar_libreta)
         self.libreta_delete_button = QPushButton("🗑 Borrar")
         self.libreta_delete_button.clicked.connect(self._borrar_registro_libreta)
         for accion_btn in (
             self.libreta_reprint_button,
             self.libreta_pago_button,
+            self.libreta_reasignar_button,
             self.libreta_delete_button,
         ):
             accion_btn.setObjectName("secondaryButton")
@@ -2074,6 +2079,124 @@ class QuoteSatelliteWindow(QMainWindow):
             return
         self._set_status(f"Pago cambiado a {nuevo_modo}.")
         self._refresh_libreta_view()
+
+    def _reasignar_libreta(self) -> None:
+        """Mueve el registro seleccionado a otra empleada (solo dueño).
+        Caso real: una puso su gafete y otra hizo la venta — las comisiones
+        deben irse con quien vendió. Montos, piezas y hora no cambian."""
+        if not self._libreta_is_owner:
+            return
+        rows = list(getattr(self, "_libreta_rows_pintadas", []) or [])
+        idx = self.libreta_table.currentRow()
+        if idx < 0 or idx >= len(rows):
+            QMessageBox.information(
+                self, "Sin selección",
+                "Selecciona en MOVIMIENTOS el registro que quieres reasignar.",
+            )
+            return
+        row = rows[idx]
+        entry_id = getattr(row, "id", None)
+        if entry_id is None:
+            QMessageBox.information(
+                self, "Aún sin sincronizar",
+                "Ese registro todavía no sube al servidor; presiona "
+                "Actualizar en un momento e inténtalo de nuevo.",
+            )
+            return
+        actual_code = str(row.employee_code or "")
+        eleccion = self._elegir_empleada_libreta(actual_code)
+        if not eleccion:
+            return
+        nuevo_code, nuevo_nombre = eleccion
+        from pos_uniformes.services.libreta_service import reasignar_empleada
+
+        try:
+            with get_session() as session:
+                reasignar_empleada(session, int(entry_id), nuevo_code, nuevo_nombre)
+        except Exception:  # noqa: BLE001
+            logger.exception("Libreta: no se pudo reasignar el registro")
+            QMessageBox.warning(self, "Sin conexión", "No se pudo guardar. Intenta de nuevo.")
+            return
+        comisiones = int(getattr(row, "comisiones", 0) or 0)
+        self._set_status(
+            f"Registro reasignado a {nuevo_nombre} ({comisiones} comisiones)."
+        )
+        self._refresh_libreta_view()
+
+    def _elegir_empleada_libreta(self, actual_code: str) -> tuple[str, str] | None:
+        """Diálogo táctil: ¿a quién le corresponde? Un botón grande por
+        empleada activa (menos la actual). Devuelve (código, nombre)."""
+        from pos_uniformes.database.models import Empleada
+
+        try:
+            with get_session() as session:
+                empleadas = [
+                    (str(e.codigo).upper(), str(e.nombre_completo or e.codigo))
+                    for e in session.query(Empleada)
+                    .filter(Empleada.activo.is_(True))
+                    .order_by(Empleada.codigo)
+                ]
+        except Exception:  # noqa: BLE001
+            logger.exception("Libreta: no se pudo cargar la lista de empleadas")
+            QMessageBox.warning(self, "Sin conexión", "No se pudo abrir. Intenta de nuevo.")
+            return None
+        opciones = [
+            (code, nombre)
+            for code, nombre in empleadas
+            if code != actual_code.upper() and not code.startswith("ENC-")
+        ]
+        if not opciones:
+            QMessageBox.information(self, "Sin empleadas", "No hay otra empleada activa.")
+            return None
+
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Reasignar movimiento")
+        dlg.setMinimumWidth(420)
+        dlg.setStyleSheet("QDialog { background: #fbf6ef; }")
+        ly = QVBoxLayout()
+        ly.setContentsMargins(24, 20, 24, 20)
+        ly.setSpacing(10)
+        titulo = QLabel("¿A quién le corresponde esta venta?")
+        titulo.setStyleSheet("font-size: 18px; font-weight: 800; color: #2c2a27;")
+        ly.addWidget(titulo)
+        sub = QLabel(
+            f"Ahora está a nombre de {actual_code}. Las comisiones se van con quien elijas."
+        )
+        sub.setWordWrap(True)
+        sub.setStyleSheet("font-size: 13px; color: #8a8177;")
+        ly.addWidget(sub)
+        elegido: dict = {}
+        _BTN = (
+            "QPushButton { background: #ffffff; color: #2c2a27; text-align: left;"
+            "  border: 2px solid #ddd0c0; border-radius: 14px; padding: 0 18px;"
+            "  min-height: 56px; font-size: 17px; font-weight: 700; }"
+            "QPushButton:pressed { background: #f7e3d8; border-color: #a84f2d; }"
+        )
+        for code, nombre in opciones:
+            btn = QPushButton(f"👤  {nombre}    ·  {code}")
+            btn.setAutoDefault(False)
+            btn.setStyleSheet(_BTN)
+
+            def _pick(_=False, c=code, n=nombre) -> None:
+                elegido["code"], elegido["nombre"] = c, n
+                dlg.accept()
+
+            btn.clicked.connect(_pick)
+            ly.addWidget(btn)
+        cancelar = QPushButton("Cancelar")
+        cancelar.setAutoDefault(False)
+        cancelar.setStyleSheet(
+            "QPushButton { background: #f8f2e9; color: #73341c;"
+            "  border: 1px solid #ddd0c0; border-radius: 14px;"
+            "  min-height: 52px; font-size: 15px; font-weight: 700; }"
+        )
+        cancelar.clicked.connect(dlg.reject)
+        ly.addSpacing(6)
+        ly.addWidget(cancelar)
+        dlg.setLayout(ly)
+        if dlg.exec() != QDialog.DialogCode.Accepted or "code" not in elegido:
+            return None
+        return elegido["code"], elegido["nombre"]
 
     def _reimprimir_ticket_libreta(self) -> None:
         """Reimprime el ticket del registro seleccionado en MOVIMIENTOS

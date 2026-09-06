@@ -1569,3 +1569,89 @@ class LibretaDuenoRedisenoTests(unittest.TestCase):
         win._sync_libreta_filtros()
         self.assertTrue(win.libreta_opciones_button.isChecked())
         self.assertFalse(win.libreta_opciones_panel.isHidden())
+
+
+class ReasignarEmpleadaTests(unittest.TestCase):
+    """Una puso su gafete y otra hizo la venta: el dueño mueve el registro
+    (y sus comisiones) a la empleada correcta sin tocar montos ni hora."""
+
+    def setUp(self) -> None:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from pos_uniformes.database.models import LibretaVenta
+
+        engine = create_engine("sqlite://")
+        LibretaVenta.__table__.create(engine)
+        self.session = sessionmaker(bind=engine)()
+
+    def tearDown(self) -> None:
+        self.session.close()
+
+    def test_mueve_codigo_y_nombre_sin_tocar_lo_demas(self) -> None:
+        from pos_uniformes.database.models import LibretaVenta
+        from pos_uniformes.services.libreta_service import reasignar_empleada
+
+        cuando = datetime(2026, 9, 6, 11, 38)
+        venta = LibretaVenta(
+            employee_code="VEND-3", employee_name="Evelyn", tipo="venta", piezas=2,
+            comisiones=4, monto_total=Decimal("1180.00"), monto_neto=Decimal("1180.00"),
+            detalle=[{"nombre": "Pants 3pz", "cantidad": 2, "precio": "590.00"}],
+            created_at=cuando,
+        )
+        self.session.add(venta); self.session.commit()
+
+        out = reasignar_empleada(self.session, venta.id, "vend-5", "Nayeli Herrera")
+        self.assertIs(out, venta)
+        self.assertEqual(venta.employee_code, "VEND-5")
+        self.assertEqual(venta.employee_name, "Nayeli Herrera")
+        self.assertEqual(venta.comisiones, 4)
+        self.assertEqual(venta.monto_total, Decimal("1180.00"))
+        self.assertEqual(venta.created_at, cuando)
+
+    def test_inexistente_o_sin_codigo(self) -> None:
+        from pos_uniformes.services.libreta_service import reasignar_empleada
+
+        from pos_uniformes.database.models import LibretaVenta
+
+        self.assertIsNone(reasignar_empleada(self.session, 999, "VEND-5", "N"))
+        venta = LibretaVenta(
+            employee_code="VEND-3", employee_name="Evelyn", tipo="venta", piezas=1,
+            comisiones=1, monto_total=Decimal("100.00"), monto_neto=Decimal("100.00"),
+            detalle=[], created_at=datetime.now(),
+        )
+        self.session.add(venta); self.session.commit()
+        with self.assertRaises(ValueError):
+            reasignar_empleada(self.session, venta.id, "  ", "N")
+        self.assertEqual(venta.employee_code, "VEND-3")  # intacto
+
+    def test_boton_del_dueno_pide_empleada_y_guarda(self) -> None:
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        row = SimpleNamespace(id=7, employee_code="VEND-3", comisiones=4)
+        tabla = MagicMock(); tabla.currentRow.return_value = 0
+        fake = SimpleNamespace(
+            _libreta_is_owner=True,
+            _libreta_rows_pintadas=[row],
+            libreta_table=tabla,
+            _elegir_empleada_libreta=MagicMock(return_value=("VEND-5", "Nayeli Herrera")),
+            _set_status=MagicMock(),
+            _refresh_libreta_view=MagicMock(),
+        )
+        with patch("pos_uniformes.ui.quote_satellite_window.get_session") as gs, \
+                patch("pos_uniformes.services.libreta_service.reasignar_empleada") as reas:
+            gs.return_value.__enter__.return_value = "sesion"
+            QuoteSatelliteWindow._reasignar_libreta(fake)
+        fake._elegir_empleada_libreta.assert_called_once_with("VEND-3")
+        reas.assert_called_once_with("sesion", 7, "VEND-5", "Nayeli Herrera")
+        fake._refresh_libreta_view.assert_called_once()
+
+        # Cancelar el diálogo no guarda nada; una empleada no puede.
+        fake._elegir_empleada_libreta = MagicMock(return_value=None)
+        with patch("pos_uniformes.services.libreta_service.reasignar_empleada") as reas:
+            QuoteSatelliteWindow._reasignar_libreta(fake)
+        reas.assert_not_called()
+        fake._libreta_is_owner = False
+        fake._elegir_empleada_libreta = MagicMock(return_value=("VEND-5", "N"))
+        QuoteSatelliteWindow._reasignar_libreta(fake)
+        fake._elegir_empleada_libreta.assert_not_called()

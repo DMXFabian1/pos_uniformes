@@ -382,6 +382,23 @@ def cambiar_pago_tarjeta(session, operacion_id: int, tarjeta: bool):
     return entry
 
 
+def reasignar_empleada(session, operacion_id: int, employee_code: str, employee_name: str):
+    """Corrección del dueño: la venta se registró con el gafete de OTRA
+    empleada (una puso su código y la otra hizo la venta). Mueve el
+    registro completo — y con él sus comisiones — a la empleada correcta.
+    No toca montos, piezas ni fecha. Devuelve el registro o None."""
+    entry = session.get(LibretaVenta, int(operacion_id))
+    if entry is None:
+        return None
+    code = str(employee_code or "").strip().upper()
+    if not code:
+        raise ValueError("Falta el código de la empleada")
+    entry.employee_code = code
+    entry.employee_name = str(employee_name or code).strip()
+    session.commit()
+    return entry
+
+
 def filtrar_de_hoy(rows: list, reference: date | None = None) -> list:
     """Deja solo las operaciones del día local dado (default: hoy).
 
