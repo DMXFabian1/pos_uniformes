@@ -142,3 +142,44 @@ class AltTicketsDialogTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TotalBadgeTests(unittest.TestCase):
+    """Recuadro con el TOTAL arriba a la derecha del diálogo de impresión."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_extrae_total_de_venta_y_apartado(self) -> None:
+        from pos_uniformes.ui.dialogs.printable_text_dialog import total_del_ticket
+
+        venta = "│ Subtotal:      $285.00 │\n│ TOTAL A PAGAR:   $285.00 │"
+        apartado = "│ TOTAL:        $1,180.00 │\n│ Apartado minimo (25%): $295.00 │"
+        self.assertEqual(total_del_ticket(venta), "$285.00")
+        self.assertEqual(total_del_ticket(apartado), "$1,180.00")
+        self.assertIsNone(total_del_ticket("hoja de conteo sin totales"))
+        self.assertIsNone(total_del_ticket("│ Subtotal:      $285.00 │"))
+
+    def test_dialogo_muestra_recuadro_solo_si_hay_total(self) -> None:
+        from PyQt6.QtWidgets import QLabel
+
+        creados: list[QDialog] = []
+        with patch.object(QDialog, "exec", new=lambda dlg: creados.append(dlg) or 0):
+            open_tickets_print_dialog(
+                None, "Ticket de venta", ["│ TOTAL A PAGAR:   $285.00 │"],
+                print_fn=lambda t: True,
+            )
+            open_tickets_print_dialog(
+                None, "Hojas de conteo", ["hoja 1"], print_fn=lambda t: True,
+            )
+        con, sin = creados
+        badges = [l for l in con.findChildren(QLabel) if l.objectName() == "ticketTotal"]
+        self.assertEqual(len(badges), 1)
+        self.assertIn("$285.00", badges[0].text())
+        self.assertFalse(
+            [l for l in sin.findChildren(QLabel) if l.objectName() == "ticketTotal"]
+        )
+        for d in creados:
+            d.reject(); d.deleteLater()
+        QApplication.processEvents()

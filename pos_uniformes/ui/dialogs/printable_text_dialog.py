@@ -246,6 +246,28 @@ print_ticket_text = _print_ticket_job
 print_conteo_sheet = _print_conteo_job
 
 
+_RE_TOTAL_LINEA = None
+
+
+def total_del_ticket(content: str) -> str | None:
+    """Saca el total de un ticket ("TOTAL A PAGAR: $285.00", "TOTAL: $617.00")
+    para mostrarlo grande en el diálogo. Ignora "Subtotal". None si no hay."""
+    global _RE_TOTAL_LINEA
+    if _RE_TOTAL_LINEA is None:
+        import re
+
+        _RE_TOTAL_LINEA = re.compile(
+            r"^\s*TOTAL(?:\s+A\s+PAGAR)?\s*:\s*\$?\s*([\d,]+(?:\.\d{1,2})?)\s*$",
+            re.IGNORECASE,
+        )
+    for raw in (content or "").splitlines():
+        linea = raw.replace("│", " ").replace("|", " ").strip()
+        match = _RE_TOTAL_LINEA.match(linea)
+        if match:
+            return f"${match.group(1)}"
+    return None
+
+
 def _build_ticket_editor(content: str) -> QTextEdit:
     editor = QTextEdit()
     editor.setReadOnly(True)
@@ -343,8 +365,28 @@ def open_tickets_print_dialog(
         else f"Para imprimir: {n} {unit_label}s — salen en un solo toque"
     )
     subtitulo.setStyleSheet("font-size: 13px; color: #5f594f;")
-    layout.addWidget(titulo)
-    layout.addWidget(subtitulo)
+    encabezado = QHBoxLayout()
+    encabezado.setSpacing(12)
+    textos_ly = QVBoxLayout()
+    textos_ly.setSpacing(2)
+    textos_ly.addWidget(titulo)
+    textos_ly.addWidget(subtitulo)
+    encabezado.addLayout(textos_ly, 1)
+    # Recuadro con el TOTAL arriba a la derecha (pedido de Daniel
+    # 2026-09-07): la cajera lo ve sin leer el ticket. Sale del primer
+    # ticket (el del cliente); si el documento no trae total, no aparece.
+    total_txt = total_del_ticket(tickets[0])
+    if total_txt:
+        total_box = QLabel(f"Total\n{total_txt}")
+        total_box.setObjectName("ticketTotal")
+        total_box.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        total_box.setStyleSheet(
+            "QLabel#ticketTotal { background: #a84f2d; color: #ffffff;"
+            "  border-radius: 14px; padding: 8px 22px;"
+            "  font-size: 26px; font-weight: 900; }"
+        )
+        encabezado.addWidget(total_box, 0, Qt.AlignmentFlag.AlignTop)
+    layout.addLayout(encabezado)
 
     editor = _build_ticket_editor("\n\n".join(tickets))
 
