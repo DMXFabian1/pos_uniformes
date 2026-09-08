@@ -425,9 +425,20 @@ def texto_ticket_corte_encargado(corte, venta_efectivo, pagos: list, por_emplead
     lines.append("")
     lines.append(tk_top())
     if pagos:
-        for p in pagos:
+        for idx, p in enumerate(pagos):
+            if idx:
+                lines.append(tk_mid())
             nombre = (p.employee_name or p.employee_code).split()[0].upper()
             lines.append(tk_row(f"PAGAR A {nombre}:"[: _TW - 14], f"${Decimal(p.total):,.2f}"))
+            # Desglose: que sepa por qué es esa cantidad.
+            lines.append(tk_row("  Sueldo:", f"${Decimal(p.sueldo_base):,.2f}"))
+            com = int(p.comisiones or 0)
+            tarifa = Decimal(p.tarifa_comision or 0)
+            tarifa_txt = f"${tarifa:,.0f}" if tarifa == tarifa.to_integral() else f"${tarifa:,.2f}"
+            lines.append(tk_row(f"  {com} comisiones x {tarifa_txt}:", f"+${Decimal(p.monto_comisiones):,.2f}"))
+            faltas = int(p.faltas or 0)
+            if faltas:
+                lines.append(tk_row(f"  {faltas} falta(s):", f"-${Decimal(p.descuento_faltas):,.2f}"))
         if len(pagos) > 1:
             lines.append(tk_mid())
             lines.append(tk_row("Total pagos:", f"${total_pagos:,.2f}"))

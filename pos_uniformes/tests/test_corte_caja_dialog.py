@@ -102,8 +102,18 @@ class TicketPagarHoyTests(unittest.TestCase):
 class TicketEncargadoTests(unittest.TestCase):
     def test_solo_vendido_pagar_y_sacar(self) -> None:
         corte = _corte(monto_final=Decimal("16628.67"), retiros_pagos=Decimal("1191.33"))
-        pagos = [SimpleNamespace(employee_name="Evelyn Ramírez", employee_code="VEND-2", total=Decimal("1191.33"))]
+        pagos = [SimpleNamespace(
+            employee_name="Evelyn Ramírez", employee_code="VEND-2", total=Decimal("1191.33"),
+            sueldo_base=Decimal("1300.00"), comisiones=54, tarifa_comision=Decimal("2.00"),
+            monto_comisiones=Decimal("108.00"), faltas=1, descuento_faltas=Decimal("216.67"),
+        )]
         texto = texto_ticket_corte_encargado(corte, Decimal("6660.00"), pagos)
+        self.assertIn("Sueldo:", texto)
+        self.assertIn("$1,300.00", texto)
+        self.assertIn("54 comisiones x $2:", texto)
+        self.assertIn("+$108.00", texto)
+        self.assertIn("1 falta(s):", texto)
+        self.assertIn("-$216.67", texto)
         self.assertIn("SE VENDIO:", texto)
         self.assertIn("$6,660.00", texto)
         self.assertIn("PAGAR A EVELYN:", texto)
