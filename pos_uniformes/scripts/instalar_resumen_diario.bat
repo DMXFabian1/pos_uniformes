@@ -20,6 +20,11 @@ if errorlevel 1 goto :error
 echo   Listo. Cada dia a las %HORA% llega el resumen a tu Telegram.
 schtasks /Create /F /TN "POS Pendientes" /SC DAILY /ST 13:30 /TR "\"%~dp0resumen_diario_telegram.bat\" --pendientes" >nul
 if not errorlevel 1 echo   Y a las 13:30 un recordatorio con lo que falta por registrar (pagos, faltas).
+echo.
+echo === Corte automatico 30 min antes de cerrar (17:30; jueves y domingo 16:30) ===
+schtasks /Create /F /TN "POS Corte 16:30" /SC DAILY /ST 16:30 /TR "\"%~dp0corte_automatico.bat\"" >nul
+schtasks /Create /F /TN "POS Corte 17:30" /SC DAILY /ST 17:30 /TR "\"%~dp0corte_automatico.bat\"" >nul
+if not errorlevel 1 echo   Tareas "POS Corte 16:30" y "POS Corte 17:30" creadas; el script decide cual toca cada dia.
 echo   Para mandarlo ahora mismo: scripts\resumen_diario_telegram.bat
 exit /b 0
 

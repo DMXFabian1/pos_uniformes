@@ -32,7 +32,8 @@ DIAS_POR_SEMANA = 6  # tarifa por día = sueldo_base / 6
 
 _CENT = Decimal("0.01")
 OWNER_CODE = "VEND-1"
-QUIEN_PUEDE_PAGAR = frozenset({OWNER_CODE, ENCARGADO_CODE})
+AUTO_CODE = "AUTO"  # el corte automático (tarea programada) también registra pagos
+QUIEN_PUEDE_PAGAR = frozenset({OWNER_CODE, ENCARGADO_CODE, AUTO_CODE})
 
 
 def puede_pagar(employee_code: str | None) -> bool:

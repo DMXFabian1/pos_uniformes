@@ -859,6 +859,12 @@ class CalendarioEncargadoDialog(QDialog):
                     session.rollback()
         except Exception:  # noqa: BLE001
             logger.exception("Encargado: sin sesión para el resumen")
+        try:
+            from pos_uniformes.services.horario_tienda_service import texto_horario_corte
+
+            texto = f"{texto}\n\n🧾 {texto_horario_corte()} Si necesitas hacerlo antes, usa el botón."
+        except Exception:  # noqa: BLE001
+            pass
         self._resumen_menu.setText(texto)
 
     def _ir_a_pagar(self) -> None:
