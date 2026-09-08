@@ -199,3 +199,49 @@ def _sin_hilos_ni_dialogos_modales(monkeypatch: pytest.MonkeyPatch) -> None:
             staticmethod(lambda *a, **k: QMessageBox.StandardButton.Ok),
             raising=False,
         )
+
+
+# ---------------------------------------------------------------------------
+# Semilla minima de la base de prueba.
+#
+# Las ventanas resuelven su operador con `user_id=1` en el __init__. Contra la
+# base de prueba vacia eso reventaba con "Usuario no encontrado." — 53 fallos
+# de un solo origen. No es un bug de la app: es que la base limpia no trae con
+# que arrancar.
+#
+# Se siembra lo minimo y solo si falta. Es idempotente, asi que no estorba si
+# la base ya tiene datos.
+# ---------------------------------------------------------------------------
+
+_USUARIO_DE_PRUEBA_ID = 1
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _usuario_de_prueba() -> None:
+    if "PyQt6.QtCore" not in sys.modules and "sqlalchemy" not in sys.modules:
+        return  # test rapido: no hay base de por medio
+
+    try:
+        from pos_uniformes.database.connection import get_session
+        from pos_uniformes.database.models import RolUsuario, Usuario
+    except Exception:  # noqa: BLE001 — sin base disponible no hay nada que sembrar
+        return
+
+    try:
+        with get_session() as session:
+            existente = session.get(Usuario, _USUARIO_DE_PRUEBA_ID)
+            if existente is not None:
+                return
+            session.add(
+                Usuario(
+                    id=_USUARIO_DE_PRUEBA_ID,
+                    username="test_admin",
+                    nombre_completo="Admin de pruebas",
+                    password_hash="x",  # no se autentica: solo se resuelve el operador
+                    rol=RolUsuario.ADMIN,
+                    activo=True,
+                )
+            )
+            session.commit()
+    except Exception:  # noqa: BLE001 — que la falta de base no tumbe la colecta
+        return
