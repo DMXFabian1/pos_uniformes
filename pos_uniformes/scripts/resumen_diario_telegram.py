@@ -18,10 +18,26 @@ import sys
 from datetime import date
 
 
+def _escribir_env(nombre: str, valor: str) -> None:
+    """Agrega o reemplaza NOMBRE=valor en el pos_uniformes.env de esta máquina."""
+    from pathlib import Path
+
+    from pos_uniformes.utils.config import _appdata_config_dir, runtime_base_dir
+
+    base = _appdata_config_dir() or runtime_base_dir()
+    ruta = base / "pos_uniformes.env"
+    lineas = ruta.read_text(encoding="utf-8").splitlines() if ruta.exists() else []
+    nuevas = [l for l in lineas if not l.strip().startswith(f"{nombre}=")]
+    nuevas.append(f"{nombre}={valor}")
+    ruta.write_text("\n".join(nuevas) + "\n", encoding="utf-8")
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Resumen diario del negocio por Telegram")
     parser.add_argument("--imprimir", action="store_true", help="mostrar en pantalla sin enviar")
     parser.add_argument("--chat-ids", action="store_true", help="listar chats que le han escrito al bot")
+    parser.add_argument("--guardar-chat", action="store_true", help="con --chat-ids: escribe el chat id en pos_uniformes.env si es uno solo")
+    parser.add_argument("--guardar-token", default="", help="escribe el token en pos_uniformes.env y sale")
     parser.add_argument("--fecha", default="", help="AAAA-MM-DD (default: hoy)")
     parser.add_argument("--pendientes", action="store_true", help="solo el recordatorio de pendientes (mediodía)")
     parser.add_argument(
@@ -43,6 +59,11 @@ def main(argv: list[str] | None = None) -> int:
 
     from pos_uniformes.services import telegram_service
 
+    if args.guardar_token:
+        _escribir_env("POS_UNIFORMES_TELEGRAM_BOT_TOKEN", args.guardar_token.strip())
+        print("Token guardado en pos_uniformes.env.")
+        return 0
+
     if args.chat_ids:
         try:
             chats = telegram_service.obtener_chat_ids()
@@ -54,6 +75,12 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         for chat_id, nombre in chats:
             print(f"POS_UNIFORMES_TELEGRAM_CHAT_ID={chat_id}    # {nombre}")
+        if args.guardar_chat:
+            if len(chats) != 1:
+                print("Hay más de un chat: copia a mano el tuyo al pos_uniformes.env.")
+                return 1
+            _escribir_env("POS_UNIFORMES_TELEGRAM_CHAT_ID", chats[0][0])
+            print(f"Chat id guardado en pos_uniformes.env ({chats[0][1]}).")
         return 0
 
     hoy = date.fromisoformat(args.fecha) if args.fecha else date.today()
