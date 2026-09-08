@@ -74,6 +74,8 @@ hiddenimports += [
     # Caja con reactivo y nómina (imports lazy desde Libreta y calendario):
     "pos_uniformes.ui.dialogs.corte_caja_dialog",
     "pos_uniformes.ui.dialogs.historial_pagos_dialog",
+    "pos_uniformes.ui.dialogs.equipo_dialog",
+    "pos_uniformes.services.equipo_service",
     "pos_uniformes.services.corte_caja_service",
     "pos_uniformes.services.nomina_service",
     "pos_uniformes.services.pendientes_service",
