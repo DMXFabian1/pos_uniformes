@@ -435,7 +435,8 @@ def encargado_corte_hoy(
             {"codigo": a.employee_code, "nombre": a.employee_name, "total": str(a.total_estimado), "comisiones": a.comisiones}
             for a in avisos
         ],
-        "retiro": str((r.efectivo - estado.pagos - total_pagos).quantize(Decimal("0.01"))),
+        "retiro": str((r.efectivo - estado.pagos - total_pagos - estado.total_retiros).quantize(Decimal("0.01"))),
+        "retiros_apuntados": str(estado.total_retiros),
         "desde": estado.desde.isoformat() if estado.desde else None,
         "hasta": estado.hasta.isoformat(),
         "reactivo": str(estado.reactivo),
@@ -471,8 +472,15 @@ def encargado_hacer_corte(
     rows = operaciones_del_periodo(db, auto.estado.desde, auto.estado.hasta)
     ticket_encolado = False
     try:
+        from pos_uniformes.services.retiros_service import retiros_del_periodo
+
+        try:
+            retiros = retiros_del_periodo(db, auto.estado.desde, auto.estado.hasta)
+        except Exception:  # noqa: BLE001 — base sin la tabla todavía
+            db.rollback()
+            retiros = []
         texto = texto_ticket_corte_encargado(
-            auto.corte, auto.estado.resumen.efectivo, auto.pagos, resumir_por_empleada(rows)
+            auto.corte, auto.estado.resumen.efectivo, auto.pagos, resumir_por_empleada(rows), retiros=retiros
         )
         trabajos_service.enviar_ticket(db, texto, origen="pwa", creado_por=quien)
         ticket_encolado = True
@@ -539,3 +547,27 @@ def encargado_pagar(
     except PermissionError as exc:
         raise HTTPException(status_code=403, detail={"error": {"code": "sin_permiso", "message": str(exc)}})
     return {"ok": True, "total": str(pago.total), "comisiones": pago.comisiones, "faltas": pago.faltas}
+
+
+class RetiroRequest(BaseModel):
+    monto: Decimal = Field(gt=0)
+    motivo: str = Field(min_length=1, max_length=120)
+
+
+@router.post("/encargado/retiro")
+def encargado_retiro(
+    body: RetiroRequest,
+    current: tuple = Depends(get_current_employee),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Saqué dinero del cajón (proveedor, renta...). El corte lo descuenta."""
+    from pos_uniformes.services.retiros_service import registrar_retiro
+
+    empleada, _p = current
+    _solo_gestor(empleada)
+    _solo_tienda()
+    try:
+        retiro = registrar_retiro(db, monto=body.monto, motivo=body.motivo, creado_por=str(empleada.codigo).upper())
+    except (ValueError, PermissionError) as exc:
+        raise HTTPException(status_code=422, detail={"error": {"code": "retiro_invalido", "message": str(exc)}})
+    return {"ok": True, "id": retiro.id, "monto": str(retiro.monto), "motivo": retiro.motivo}

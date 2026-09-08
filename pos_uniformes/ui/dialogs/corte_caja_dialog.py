@@ -41,7 +41,21 @@ def _spin(valor: Decimal, grande: bool) -> QDoubleSpinBox:
     return s
 
 
-def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list | None = None, venta_efectivo=None) -> str:
+def _seccion_retiros(retiros: list, lines: list[str], tk_top, tk_mid, tk_row, tk_dbl, tk_bot, _TW) -> None:
+    if not retiros:
+        return
+    lines.append("")
+    lines.append("RETIROS DEL CAJON".center(_TW))
+    lines.append(tk_top())
+    for r in retiros:
+        lines.append(tk_row(f"{str(r.motivo)[: _TW - 16]}:", f"${Decimal(r.monto):,.2f}"))
+    if len(retiros) > 1:
+        lines.append(tk_dbl())
+        lines.append(tk_row("Total retiros:", f"${sum((Decimal(r.monto) for r in retiros), Decimal('0.00')):,.2f}"))
+    lines.append(tk_bot())
+
+
+def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list | None = None, venta_efectivo=None, retiros: list | None = None) -> str:
     """Ticket térmico del corte por periodo: cifra final, fondo, pagos y
     comisiones por empleada. Sin esperado ni diferencia (solo en pantalla).
 
@@ -98,6 +112,7 @@ def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list |
         total = sum((Decimal(p.total) for p in pagos), Decimal("0.00"))
         lines.append(tk_row("TOTAL PAGOS:", f"${total:,.2f}"))
         lines.append(tk_bot())
+    _seccion_retiros(retiros or [], lines, tk_top, tk_mid, tk_row, tk_dbl, tk_bot, _TW)
     if por_empleada:
         lines.append("")
         lines.append("POR EMPLEADA".center(_TW))
@@ -142,6 +157,8 @@ def texto_estado_caja(estado: EstadoCaja) -> str:
         partes.append(f"Con tarjeta (no está en el cajón): ${r.tarjeta:,.2f}")
     if estado.pagos:
         partes.append(f"Pagos a empleadas ya hechos: -${estado.pagos:,.2f}")
+    if estado.retiros:
+        partes.append(f"Retiros apuntados (proveedor, renta...): -${estado.retiros:,.2f}")
     partes.append(f"DEBE HABER EN EL CAJÓN: ${estado.esperado:,.2f}")
     return "\n".join(partes)
 
@@ -244,7 +261,12 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
                 ahora=estado.hasta,
             )
             pagos_periodo = pagos_registrados_del_periodo(session, estado.desde, estado.hasta)
-            texto = texto_ticket_corte(corte, por_empleada, pagos=pagos_periodo, venta_efectivo=estado.resumen.efectivo)
+            from pos_uniformes.services.retiros_service import retiros_del_periodo
+
+            retiros_periodo = retiros_del_periodo(session, estado.desde, estado.hasta)
+            texto = texto_ticket_corte(
+                corte, por_empleada, pagos=pagos_periodo, venta_efectivo=estado.resumen.efectivo, retiros=retiros_periodo
+            )
     except ValueError as exc:
         QMessageBox.warning(parent, "Corte", str(exc))
         return None
@@ -380,7 +402,7 @@ def confirmar_pago(parent: QWidget | None, *, employee_code: str, employee_name:
 def texto_previa_corte_encargado(estado: EstadoCaja, avisos: list) -> str:
     """Lo que ve el encargado antes de imprimir: venta, a quién pagar, retiro."""
     total_pagos = sum((a.total_estimado for a in avisos), Decimal("0.00"))
-    retiro = (estado.resumen.efectivo - estado.pagos - total_pagos).quantize(Decimal("0.01"))
+    retiro = (estado.resumen.efectivo - estado.pagos - total_pagos - estado.total_retiros).quantize(Decimal("0.01"))
     lineas = [f"VENTA: ${estado.resumen.efectivo:,.2f}"]
     if avisos:
         lineas.append("")
@@ -389,6 +411,8 @@ def texto_previa_corte_encargado(estado: EstadoCaja, avisos: list) -> str:
             lineas.append(f"  {a.employee_name.split()[0]}  ${a.total_estimado:,.2f}")
     if estado.pagos:
         lineas.append(f"Pagos ya hechos: -${estado.pagos:,.2f}")
+    if estado.total_retiros:
+        lineas.append(f"Ya salió del cajón: -${estado.total_retiros:,.2f}")
     lineas.append("")
     lineas.append(f"SE RETIRA: ${retiro:,.2f}")
     lineas.append(f"Se queda de fondo: ${estado.reactivo:,.2f}")
@@ -405,11 +429,14 @@ def hacer_corte_automatico(parent: QWidget | None, *, creado_por: str):
         with get_session() as session:
             resultado = cerrar_corte_automatico(session, creado_por=creado_por)
             rows = operaciones_del_periodo(session, resultado.estado.desde, resultado.estado.hasta)
+            from pos_uniformes.services.retiros_service import retiros_del_periodo
+
             texto = texto_ticket_corte_encargado(
                 resultado.corte,
                 resultado.estado.resumen.efectivo,
                 resultado.pagos,
                 resumir_por_empleada(rows),
+                retiros=retiros_del_periodo(session, resultado.estado.desde, resultado.estado.hasta),
             )
     except Exception:  # noqa: BLE001
         logger.exception("Corte automático: no se pudo guardar")
@@ -424,7 +451,7 @@ def hacer_corte_automatico(parent: QWidget | None, *, creado_por: str):
     return resultado, texto
 
 
-def texto_ticket_corte_encargado(corte, venta_efectivo, pagos: list, por_empleada: list | None = None) -> str:
+def texto_ticket_corte_encargado(corte, venta_efectivo, pagos: list, por_empleada: list | None = None, retiros: list | None = None) -> str:
     """Ticket simple para León: cuánto se vendió, a quién pagar y cuánto sacar.
 
     Sin fondo, sin "en caja", sin operaciones: solo lo que él hace con el
@@ -469,6 +496,10 @@ def texto_ticket_corte_encargado(corte, venta_efectivo, pagos: list, por_emplead
             lines.append(tk_row("Total pagos:", f"${total_pagos:,.2f}"))
     else:
         lines.append(tk_line("Hoy no se paga a nadie."))
+    if retiros:
+        lines.append(tk_mid())
+        for r in retiros:
+            lines.append(tk_row(f"YA SALIO ({str(r.motivo)[: _TW - 24]}):", f"${Decimal(r.monto):,.2f}"))
     lines.append(tk_dbl())
     lines.append(tk_row("SACAR DE LA VENTA:", f"${sacar:,.2f}"))
     lines.append(tk_bot())
@@ -493,3 +524,68 @@ def texto_ticket_corte_encargado(corte, venta_efectivo, pagos: list, por_emplead
             lines.append(tk_row(f"{(r.employee_name or r.employee_code).split()[0]}:", f"{r.comisiones} com."))
         lines.append(tk_bot())
     return "\n".join(lines)
+
+
+def apuntar_retiro(parent: QWidget | None, *, creado_por: str, grande: bool = False):
+    """Saqué dinero del cajón: monto + motivo. Devuelve CajaRetiro o None."""
+    from pos_uniformes.database.connection import get_session
+    from pos_uniformes.services.retiros_service import MOTIVOS_RAPIDOS, registrar_retiro
+
+    dlg = QDialog(parent)
+    dlg.setWindowTitle("Saqué dinero del cajón")
+    ly = QVBoxLayout()
+    ly.setContentsMargins(20, 18, 20, 18)
+    ly.setSpacing(10)
+    if grande:
+        dlg.setStyleSheet("QDialog { background: #f4ede2; } QLabel { color: #2c2a27; font-size: 18px; }")
+    ly.addWidget(QLabel("¿Cuánto sacaste?"))
+    monto = _spin(Decimal("0.00"), grande)
+    ly.addWidget(monto)
+    ly.addWidget(QLabel("¿Para qué?"))
+    motivo = QLineEdit()
+    motivo.setPlaceholderText("Ej. Proveedor de playeras, renta, cambio...")
+    if grande:
+        motivo.setStyleSheet(_GRANDE)
+    fila = QHBoxLayout()
+    for m in MOTIVOS_RAPIDOS:
+        b = QPushButton(m)
+        b.setAutoDefault(False)
+        b.clicked.connect(lambda _c=False, t=m: motivo.setText(t))
+        if grande:
+            b.setMinimumHeight(44)
+            b.setStyleSheet("font-size: 16px; font-weight: 700;")
+        fila.addWidget(b)
+    ly.addLayout(fila)
+    ly.addWidget(motivo)
+    botones = QHBoxLayout()
+    cancelar = QPushButton("Cancelar")
+    cancelar.setAutoDefault(False)
+    cancelar.clicked.connect(dlg.reject)
+    ok = QPushButton("💸 Apuntar retiro")
+    ok.setObjectName("primaryButton")
+    ok.clicked.connect(dlg.accept)
+    if grande:
+        for b in (cancelar, ok):
+            b.setMinimumHeight(52)
+            b.setStyleSheet("font-size: 18px; font-weight: 700;")
+    botones.addWidget(cancelar)
+    botones.addWidget(ok, 1)
+    ly.addLayout(botones)
+    dlg.setLayout(ly)
+    if grande:
+        dlg.resize(560, 360)
+    if dlg.exec() != QDialog.DialogCode.Accepted:
+        return None
+    try:
+        with get_session() as session:
+            retiro = registrar_retiro(session, monto=Decimal(str(monto.value())), motivo=motivo.text(), creado_por=creado_por)
+            session.refresh(retiro)
+            session.expunge(retiro)
+    except (ValueError, PermissionError) as exc:
+        QMessageBox.warning(parent, "Retiro", str(exc))
+        return None
+    except Exception:  # noqa: BLE001
+        logger.exception("Retiro: no se pudo guardar")
+        QMessageBox.warning(parent, "No se guardó", "Inténtalo otra vez.")
+        return None
+    return retiro

@@ -55,11 +55,16 @@ class EstadoCaja:
     reactivo: Decimal
     resumen: ResumenPeriodo
     pagos: Decimal           # pagos a empleadas registrados en el periodo
-    otros_retiros: Decimal = Decimal("0.00")
+    otros_retiros: Decimal = Decimal("0.00")   # capturado a mano al cerrar (dueño)
+    retiros: Decimal = Decimal("0.00")         # apuntados con motivo (caja_retiro)
+
+    @property
+    def total_retiros(self) -> Decimal:
+        return (self.retiros + self.otros_retiros).quantize(_CENT)
 
     @property
     def esperado(self) -> Decimal:
-        return (self.reactivo + self.resumen.efectivo - self.pagos - self.otros_retiros).quantize(_CENT)
+        return (self.reactivo + self.resumen.efectivo - self.pagos - self.total_retiros).quantize(_CENT)
 
 
 # ─── Lógica pura ─────────────────────────────────────────────────────────
@@ -189,6 +194,13 @@ def estado_caja(session, ahora: datetime | None = None, otros_retiros=Decimal("0
     desde = inicio_periodo(session)
     params = cargar_parametros(session)
     rows = operaciones_del_periodo(session, desde, ahora)
+    try:
+        from pos_uniformes.services.retiros_service import total_retiros
+
+        retiros = total_retiros(session, desde, ahora)
+    except Exception:  # noqa: BLE001 — base sin la tabla todavía
+        session.rollback()
+        retiros = Decimal("0.00")
     return EstadoCaja(
         desde=desde,
         hasta=ahora,
@@ -196,6 +208,7 @@ def estado_caja(session, ahora: datetime | None = None, otros_retiros=Decimal("0
         resumen=resumir_periodo(rows),
         pagos=pagos_del_periodo(session, desde, ahora),
         otros_retiros=_d(otros_retiros),
+        retiros=retiros,
     )
 
 
@@ -235,7 +248,7 @@ def cerrar_corte(
         reactivo_inicial=estado.reactivo,
         monto_esperado=estado.esperado,
         retiros_pagos=estado.pagos,
-        otros_retiros=_d(otros_retiros),
+        otros_retiros=estado.total_retiros,
         reactivo_final=reactivo_final,
     )
     session.add(corte)

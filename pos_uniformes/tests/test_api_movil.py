@@ -26,10 +26,11 @@ from pos_uniformes.database.models import (
     LibretaCorte,
     LibretaVenta,
     CajaParametros,
+    CajaRetiro,
     EmpleadaPago,
 )
 
-_TABLAS = (Empleada, EmpleadaHorario, EmpleadaEvento, LibretaCorte, LibretaVenta, CajaParametros, EmpleadaPago)
+_TABLAS = (Empleada, EmpleadaHorario, EmpleadaEvento, LibretaCorte, LibretaVenta, CajaParametros, EmpleadaPago, CajaRetiro)
 
 
 class ApiMovilTests(unittest.TestCase):

@@ -135,6 +135,7 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
       <button class="btn-grande" onclick="encApuntar()">🗓  Apuntar falta o descanso</button>
       <button class="btn-grande" onclick="encVerCortes()">💵  Ver cortes</button>
       <button class="btn-grande" onclick="encCorteHoy()">🧾  Hacer corte</button>
+      <button class="btn-grande" onclick="encRetiro()">💸  Saqué dinero del cajón</button>
       <div class="card" id="enc-resumen"></div>
       <div class="card" id="enc-descansos"></div>
       <button class="btn-suave" onclick="salir()">Salir</button>
@@ -534,6 +535,7 @@ async function encCorteHoy() {
     `<div class="card">` +
     `<div class="fila"><strong>VENTA</strong><strong>${pesos(datos.efectivo)}</strong></div>` +
     pagos +
+    (Number(datos.retiros_apuntados) > 0 ? `<div class="fila"><span>Ya salió del cajón</span><span>-${pesos(datos.retiros_apuntados)}</span></div>` : "") +
     `<div class="fila"><strong>SE RETIRA</strong><strong>${pesos(datos.retiro)}</strong></div>` +
     `<div class="fila"><span>Se queda de fondo</span><span>${pesos(datos.reactivo)}</span></div>` +
     `</div>` +
@@ -551,6 +553,33 @@ async function encHacerCorte() {
   } catch (e) {
     encSub(`<div class="listo-texto">No se pudo hacer el corte. 😕</div>` +
       `<button class="btn-suave" onclick="encMenu()">← Regresar</button>`);
+  }
+}
+
+function encRetiro() {
+  if (!encRequiereTienda()) return;
+  const motivos = ["Proveedor", "Renta", "Cambio", "Comida", "Luz / agua", "Otro"];
+  encSub(`<h1>Saqué dinero</h1>` +
+    `<label class="sub">¿Cuánto sacaste?</label>` +
+    `<input id="retiro-monto" type="number" inputmode="decimal" step="0.01" class="input-grande" placeholder="0.00">` +
+    `<label class="sub">¿Para qué?</label>` +
+    `<div style="display:flex;flex-wrap:wrap;gap:6px;margin:6px 0">` +
+    motivos.map(m => `<button class="btn-suave" style="flex:1 1 30%" onclick="document.getElementById('retiro-motivo').value='${m}'">${m}</button>`).join("") +
+    `</div>` +
+    `<input id="retiro-motivo" type="text" class="input-grande" placeholder="Ej. Proveedor de playeras">` +
+    `<button class="btn-grande" style="background:var(--acento);color:#fff;border:none" onclick="encGuardarRetiro()">💸  Apuntar retiro</button>` +
+    `<button class="btn-suave" onclick="encMenu()">← Regresar</button>`);
+}
+
+async function encGuardarRetiro() {
+  const monto = $("retiro-monto").value, motivo = $("retiro-motivo").value;
+  try {
+    const r = await encPost("/api/v1/movil/encargado/retiro", { monto: monto, motivo: motivo });
+    encSub(`<div class="listo-texto">✅ Apuntado:<br><br>${pesos(r.monto)} para ${r.motivo}<br><br>El corte lo descuenta solo.</div>` +
+      `<button class="btn-grande" onclick="encListo()">✅  Listo</button>`);
+  } catch (e) {
+    encSub(`<div class="listo-texto">No se pudo apuntar. 😕<br><small>Revisa el monto y el motivo.</small></div>` +
+      `<button class="btn-suave" onclick="encRetiro()">← Regresar</button>`);
   }
 }
 

@@ -2114,3 +2114,19 @@ class AfluenciaHora(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
+
+
+class CajaRetiro(Base):
+    """Dinero que salió del cajón por algo que no es pago a empleada
+    (proveedor, renta, cambio, comida...). Lo apuntan Daniel o León; el corte
+    del periodo lo descuenta del efectivo esperado y el ticket lo lista."""
+
+    __tablename__ = "caja_retiro"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    monto: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    motivo: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    creado_por: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )

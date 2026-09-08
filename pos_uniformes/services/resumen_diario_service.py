@@ -61,6 +61,7 @@ class DatosResumen:
     descansan_manana: list[str] = field(default_factory=list)
     pagos_proximos: list[tuple[str, str, Decimal]] = field(default_factory=list)  # (nombre, cuándo, total)
     pendientes: str = ""  # bloque de pendientes_service.texto_pendientes (ya formateado)
+    retiros: list[tuple[str, Decimal, str]] = field(default_factory=list)  # (motivo, monto, quién)
 
 
 def _pesos(v: Decimal) -> str:
@@ -112,6 +113,13 @@ def formatear(d: DatosResumen) -> str:
         else:
             lineas.append("• Sin corte hoy.")
     lineas.append("")
+
+    if d.retiros:
+        lineas.append("💸 RETIROS DEL CAJÓN")
+        for motivo, monto, quien in d.retiros:
+            lineas.append(f"• {motivo}: {_pesos(monto)} ({quien})")
+        lineas.append(f"• Total: {_pesos(sum((m for _, m, _ in d.retiros), Decimal('0.00')))}")
+        lineas.append("")
 
     if d.pagos or d.faltaron:
         lineas.append("👥 EMPLEADAS")
@@ -171,7 +179,14 @@ def recolectar(session, hoy: date | None = None) -> DatosResumen:
     _bloque(session, lambda: _afluencia(session, d, desde, hasta))
     _bloque(session, lambda: _manana(session, d, hoy))
     _bloque(session, lambda: _pendientes(session, d, hoy))
+    _bloque(session, lambda: _retiros(session, d, desde, hasta))
     return d
+
+
+def _retiros(session, d: DatosResumen, desde: datetime, hasta: datetime) -> None:
+    from pos_uniformes.services.retiros_service import retiros_del_periodo
+
+    d.retiros = [(r.motivo, Decimal(r.monto), r.creado_por) for r in retiros_del_periodo(session, desde - timedelta(seconds=1), hasta)]
 
 
 def _pendientes(session, d: DatosResumen, hoy: date) -> None:

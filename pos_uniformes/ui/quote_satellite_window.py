@@ -1585,6 +1585,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_pagos_button.clicked.connect(self._abrir_historial_pagos)
         self.libreta_equipo_button = QPushButton("👥 Equipo")
         self.libreta_equipo_button.clicked.connect(self._abrir_equipo)
+        self.libreta_retiro_button = QPushButton("💸 Retiro")
+        self.libreta_retiro_button.clicked.connect(self._apuntar_retiro_libreta)
         for accion_btn in (
             self.libreta_reprint_button,
             self.libreta_pago_button,
@@ -1594,6 +1596,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self.libreta_caja_button,
             self.libreta_pagos_button,
             self.libreta_equipo_button,
+            self.libreta_retiro_button,
         ):
             accion_btn.setObjectName("secondaryButton")
             accion_btn.setAutoDefault(False)
@@ -2583,6 +2586,16 @@ class QuoteSatelliteWindow(QMainWindow):
         if corte is not None:
             self._set_status(f"Corte guardado: ${Decimal(corte.monto_final):,.2f} en caja.")
             self._refresh_libreta_view()
+
+    def _apuntar_retiro_libreta(self) -> None:
+        """Saqué dinero del cajón (proveedor, renta...). Solo dueño."""
+        if not self._libreta_is_owner:
+            return
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import apuntar_retiro
+
+        retiro = apuntar_retiro(self, creado_por=str(self._libreta_code or "VEND-1"))
+        if retiro is not None:
+            self._set_status(f"Retiro apuntado: ${Decimal(retiro.monto):,.2f} para {retiro.motivo}.")
 
     def _abrir_equipo(self) -> None:
         """Baja por temporada / reactivar empleadas (solo dueño)."""

@@ -76,6 +76,7 @@ hiddenimports += [
     "pos_uniformes.ui.dialogs.historial_pagos_dialog",
     "pos_uniformes.ui.dialogs.equipo_dialog",
     "pos_uniformes.services.equipo_service",
+    "pos_uniformes.services.retiros_service",
     "pos_uniformes.services.corte_caja_service",
     "pos_uniformes.services.nomina_service",
     "pos_uniformes.services.pendientes_service",

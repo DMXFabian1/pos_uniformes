@@ -707,6 +707,10 @@ class CalendarioEncargadoDialog(QDialog):
         btn_hacer.setStyleSheet(self._BTN)
         btn_hacer.clicked.connect(self._ir_a_corte_hoy)
         ly.addWidget(btn_hacer)
+        btn_retiro = QPushButton("💸  Saqué dinero del cajón")
+        btn_retiro.setStyleSheet(self._BTN)
+        btn_retiro.clicked.connect(self._apuntar_retiro)
+        ly.addWidget(btn_retiro)
         ly.addStretch()
         salir = QPushButton("Salir")
         salir.setStyleSheet(self._BTN_SUAVE)
@@ -828,6 +832,17 @@ class CalendarioEncargadoDialog(QDialog):
         retiro = Decimal(auto.corte.monto_final) - Decimal(auto.corte.reactivo_final)
         lineas.append(f"\nSe retira ${retiro:,.2f}")
         self._mostrar_listo("\n".join(lineas), con_deshacer=False)
+
+    def _apuntar_retiro(self) -> None:
+        """Proveedor, renta, cambio...: se descuenta solo en el corte."""
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import apuntar_retiro
+
+        retiro = apuntar_retiro(self, creado_por="ENC-1", grande=True)
+        if retiro is not None:
+            self._mostrar_listo(
+                f"✅ Apuntado:\n\n${Decimal(retiro.monto):,.2f} para {retiro.motivo}\n\nEl corte lo descuenta solo.",
+                con_deshacer=False,
+            )
 
     def _cargar_resumen_menu(self) -> None:
         """Quién descansa hoy/mañana y pagos de la semana, en palabras llanas."""
