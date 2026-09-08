@@ -1566,12 +1566,15 @@ class QuoteSatelliteWindow(QMainWindow):
         # CAJA por defecto). No guarda nada; el DVR sirve el clip por RTSP.
         self.libreta_momento_button = QPushButton("📹 Ver momento")
         self.libreta_momento_button.clicked.connect(lambda: self._ver_momento_libreta())
+        self.libreta_caja_button = QPushButton("⚙ Caja y nómina")
+        self.libreta_caja_button.clicked.connect(self._editar_caja_nomina)
         for accion_btn in (
             self.libreta_reprint_button,
             self.libreta_pago_button,
             self.libreta_reasignar_button,
             self.libreta_delete_button,
             self.libreta_momento_button,
+            self.libreta_caja_button,
         ):
             accion_btn.setObjectName("secondaryButton")
             accion_btn.setAutoDefault(False)
@@ -2454,117 +2457,24 @@ class QuoteSatelliteWindow(QMainWindow):
         self._refresh_libreta_view()
 
     def _imprimir_corte_libreta(self) -> None:
-        """Imprime el corte del periodo visible (solo vista dueño)."""
+        """Corte de caja por periodo (solo dueño): reactivo + efectivo − pagos."""
         if not self._libreta_is_owner:
             return
-        from pos_uniformes.ui.helpers.libreta_corte_ticket_helper import (
-            build_corte_ticket_text,
-        )
-        from pos_uniformes.ui.helpers.ticket_routing_helper import route_tickets
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import hacer_corte_caja
 
-        cortes = list(self._libreta_last_cortes or [])
-        if not cortes:
-            QMessageBox.information(
-                self, "Sin datos", "No hay operaciones en el periodo para imprimir."
-            )
+        corte = hacer_corte_caja(self, creado_por=str(self._libreta_code or "VEND-1"))
+        if corte is not None:
+            self._set_status(f"Corte guardado: ${Decimal(corte.monto_final):,.2f} en caja.")
+            self._refresh_libreta_view()
+
+    def _editar_caja_nomina(self) -> None:
+        """Fondo de caja y reglas de pago (solo dueño)."""
+        if not self._libreta_is_owner:
             return
-        periodo = self._libreta_periodo_texto().upper()
-        if self._libreta_emp_filtro:
-            periodo += f" - {self._libreta_emp_filtro}"
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import editar_parametros_caja
 
-        # Cierre formal: el dueño cuenta el cajón y captura el efectivo REAL
-        # (precargado con el esperado, editable solo aquí — la barra es suya);
-        # el ticket sale con esperado vs real y la diferencia.
-        from decimal import Decimal as _Dec
-
-        from PyQt6.QtWidgets import QDoubleSpinBox, QLineEdit
-
-        esperado = sum((c.monto_en_caja for c in cortes), _Dec("0.00"))
-        dlg = QDialog(self)
-        dlg.setWindowTitle("Hacer corte")
-        dlg_ly = QVBoxLayout()
-        dlg_ly.setContentsMargins(20, 18, 20, 18)
-        dlg_ly.setSpacing(10)
-        referencia = QLabel(
-            f"Esperado según la Libreta: ${esperado:,.2f}\n"
-            "(solo para que compares — esto NO se imprime)"
-        )
-        dlg_ly.addWidget(referencia)
-        dlg_ly.addWidget(QLabel("Cantidad FINAL que saldrá en el ticket:"))
-        spin_real = QDoubleSpinBox()
-        spin_real.setRange(0.0, 9_999_999.0)
-        spin_real.setDecimals(2)
-        spin_real.setPrefix("$ ")
-        spin_real.setValue(float(esperado))
-        spin_real.setStyleSheet("font-size: 18px; font-weight: 700; padding: 6px;")
-        dlg_ly.addWidget(spin_real)
-        dlg_ly.addWidget(QLabel("Nota (opcional):"))
-        nota_input = QLineEdit()
-        nota_input.setPlaceholderText("Ej. faltante por cambio, billete roto...")
-        dlg_ly.addWidget(nota_input)
-        botones_ly = QHBoxLayout()
-        btn_cancelar = QPushButton("Cancelar")
-        btn_cancelar.setAutoDefault(False)
-        btn_cancelar.clicked.connect(dlg.reject)
-        botones_ly.addWidget(btn_cancelar)
-        btn_imprimir = QPushButton("🖨 Imprimir corte")
-        btn_imprimir.setObjectName("primaryButton")
-        btn_imprimir.clicked.connect(dlg.accept)
-        botones_ly.addWidget(btn_imprimir, 1)
-        dlg_ly.addLayout(botones_ly)
-        dlg.setLayout(dlg_ly)
-        if dlg.exec() != QDialog.DialogCode.Accepted:
-            return
-
-        monto_final = _Dec(str(spin_real.value())).quantize(_Dec("0.01"))
-        nota = nota_input.text().strip()
-
-        # El corte se guarda con SOLO la cifra final (nunca la esperada):
-        # es el número oficial y lo que León consulta en "Ver cortes".
-        # Sin conexión NO se pierde: cae a la cola local y sube al reconectar.
-        from datetime import date as _date
-
-        corte_entry = {
-            "fecha": _date.today().isoformat(),
-            "monto_final": str(monto_final),
-            "operaciones": sum(c.operaciones for c in cortes),
-            "piezas": sum(c.piezas for c in cortes),
-            "periodo_label": periodo,
-            "nota": nota,
-            "creado_por": str(self._libreta_code or ""),
-        }
-        try:
-            from pos_uniformes.services.libreta_service import guardar_corte
-
-            with get_session() as session:
-                guardar_corte(
-                    session,
-                    fecha=_date.today(),
-                    monto_final=monto_final,
-                    operaciones=corte_entry["operaciones"],
-                    piezas=corte_entry["piezas"],
-                    periodo_label=periodo,
-                    nota=nota,
-                    creado_por=corte_entry["creado_por"],
-                )
-        except Exception:  # noqa: BLE001 — sin conexión: a la cola local
-            logger.exception("Libreta: corte a cola local (sin conexión)")
-            try:
-                from pos_uniformes.services import libreta_local_queue_service as cola
-
-                cola.encolar_corte(corte_entry)
-            except Exception:  # noqa: BLE001
-                logger.exception("Libreta: tampoco se pudo encolar el corte")
-
-        texto = build_corte_ticket_text(
-            periodo_label=periodo,
-            cortes=cortes,
-            por_empleada=list(self._libreta_last_por_empleada or []),
-            generado_por=str(self._libreta_code or ""),
-            efectivo_real=monto_final,
-            nota=nota,
-        )
-        route_tickets(self, "Corte de Libreta", [texto])
+        if editar_parametros_caja(self):
+            self._set_status("Caja y nómina actualizadas.")
 
     @staticmethod
     def _libreta_rows_locales(desde, hasta, employee_filter):

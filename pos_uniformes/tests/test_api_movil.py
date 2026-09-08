@@ -24,9 +24,11 @@ from pos_uniformes.database.models import (
     EmpleadaHorario,
     LibretaCorte,
     LibretaVenta,
+    CajaParametros,
+    EmpleadaPago,
 )
 
-_TABLAS = (Empleada, EmpleadaHorario, EmpleadaEvento, LibretaCorte, LibretaVenta)
+_TABLAS = (Empleada, EmpleadaHorario, EmpleadaEvento, LibretaCorte, LibretaVenta, CajaParametros, EmpleadaPago)
 
 
 class ApiMovilTests(unittest.TestCase):
@@ -395,23 +397,67 @@ class EncargadoMovilTests(unittest.TestCase):
         self.assertEqual(r.status_code, 409)
 
     def test_corte_guarda_y_encola_ticket(self) -> None:
-        from pos_uniformes.database.models import LibretaCorte, TipoTrabajo, Trabajo
+        """Corte por periodo: León captura lo contado; el fondo queda para el
+        siguiente y el ticket sale a la impresora de la tienda."""
+        from pos_uniformes.database.models import CajaParametros, LibretaCorte, TipoTrabajo, Trabajo
 
+        self.session.add(CajaParametros(id=1, reactivo_actual=Decimal("11160.00")))
+        self.session.commit()
         with patch(
             "pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"
         ):
             datos = self.client.get("/api/v1/movil/encargado/corte_hoy").json()
             self.assertTrue(datos["hay_ventas"])
-            self.assertEqual(datos["venta"], "500.00")
-            r = self.client.post("/api/v1/movil/encargado/corte", json={})
+            self.assertEqual(datos["efectivo"], "500.00")
+            self.assertEqual(datos["reactivo"], "11160.00")
+            self.assertEqual(datos["esperado"], "11660.00")
+            r = self.client.post(
+                "/api/v1/movil/encargado/corte",
+                json={"contado": "11650.00", "reactivo_final": "11160.00"},
+            )
         self.assertEqual(r.status_code, 200, r.text)
-        self.assertEqual(r.json()["monto"], "500.00")
+        self.assertEqual(r.json()["monto"], "11650.00")
+        self.assertEqual(r.json()["esperado"], "11660.00")
         self.assertTrue(r.json()["ticket_encolado"])
         corte = self.session.query(LibretaCorte).one()
         self.assertEqual(corte.creado_por, "ENC-1")
+        self.assertEqual(corte.reactivo_final, Decimal("11160.00"))
+        self.assertEqual(self.session.get(CajaParametros, 1).reactivo_actual, Decimal("11160.00"))
         trabajo = self.session.query(Trabajo).one()
         self.assertEqual(trabajo.tipo, TipoTrabajo.TICKET)
-        self.assertIn("VENTA DE HOY", trabajo.contenido["texto"])
+        self.assertIn("EN CAJA", trabajo.contenido["texto"])
+
+    def test_corte_con_fondo_mayor_a_lo_contado_se_rechaza(self) -> None:
+        with patch(
+            "pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"
+        ):
+            r = self.client.post(
+                "/api/v1/movil/encargado/corte",
+                json={"contado": "100.00", "reactivo_final": "500.00"},
+            )
+        self.assertEqual(r.status_code, 422)
+
+    def test_pagar_registra_desglose(self) -> None:
+        from pos_uniformes.database.models import CajaParametros, EmpleadaPago
+
+        self.session.add(
+            CajaParametros(id=1, sueldo_base=Decimal("1300.00"), tarifa_comision=Decimal("2.00"), descuento_falta=Decimal("216.67"))
+        )
+        self.session.commit()
+        with patch(
+            "pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"
+        ):
+            pend = self.client.get("/api/v1/movil/encargado/pago_pendiente/VEND-4").json()
+            self.assertEqual(pend["comisiones"], 2)
+            self.assertEqual(pend["total"], "1304.00")
+            r = self.client.post("/api/v1/movil/encargado/pagar", json={"employee_code": "VEND-4"})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json()["total"], "1304.00")
+        pago = self.session.query(EmpleadaPago).one()
+        self.assertEqual(pago.creado_por, "ENC-1")
+        self.assertEqual(pago.employee_code, "VEND-4")
+        inicio = self.client.get("/api/v1/movil/encargado").json()
+        self.assertIn("descansa", inicio["resumen"])
 
     def test_empleada_no_puede_usar_encargado(self) -> None:
         fanny = self.session.query(Empleada).filter(Empleada.codigo == "VEND-4").one()

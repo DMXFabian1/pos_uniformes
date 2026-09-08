@@ -86,6 +86,7 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
   border-radius:16px; min-height:64px; font-size:19px; font-weight:700; margin-bottom:12px}
 .btn-grande:active{background:#f1e6d6}
 .listo-texto{font-size:26px; font-weight:800; margin:24px 0; line-height:1.4}
+  .input-grande { width: 100%; box-sizing: border-box; font-size: 26px; font-weight: 800; padding: 12px; border: 2px solid #ddd0c0; border-radius: 12px; margin: 6px 0 10px; }
 </style>
 </head>
 <body>
@@ -133,7 +134,9 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
       <p class="sub" id="enc-modo"></p>
       <button class="btn-grande" onclick="encApuntar()">🗓  Apuntar falta o descanso</button>
       <button class="btn-grande" onclick="encVerCortes()">💵  Ver cortes</button>
-      <button class="btn-grande" onclick="encCorteHoy()">🧾  Hacer corte de hoy</button>
+      <button class="btn-grande" onclick="encCorteHoy()">🧾  Hacer corte</button>
+      <button class="btn-grande" onclick="encPagar()">💰  Pagar a una empleada</button>
+      <div class="card" id="enc-resumen"></div>
       <div class="card" id="enc-descansos"></div>
       <button class="btn-suave" onclick="salir()">Salir</button>
     </div>
@@ -414,6 +417,10 @@ async function pintarEncargado(_data) {
   const enTienda = encData && encData.modo === "tienda";
   $("enc-modo").textContent = enTienda
     ? "Conectado a la tienda" : "Fuera de la tienda: solo puedes consultar";
+  const resumen = (encData && encData.resumen) || "";
+  $("enc-resumen").innerHTML = resumen
+    ? "<strong>📌 Hoy</strong>" + resumen.split("\n").map(l => `<div class="fila">${l}</div>`).join("")
+    : "";
   const desc = (encData && encData.descansos_semana) || [];
   $("enc-descansos").innerHTML = "<strong>🛌 Descansos estos días</strong>" +
     (desc.length ? desc.map(d =>
@@ -518,25 +525,85 @@ async function encCorteHoy() {
   let datos;
   try { datos = await api("/api/v1/movil/encargado/corte_hoy"); }
   catch (e) { encMenu(); return; }
-  if (!datos.hay_ventas) {
-    encSub(`<div class="listo-texto">Hoy todavía no hay ventas.</div>` +
-      `<button class="btn-suave" onclick="encMenu()">← Regresar</button>`);
-    return;
-  }
-  encSub(`<h1>Corte de hoy</h1>` +
-    `<div class="listo-texto">VENTA DE HOY:<br><br>${pesos(datos.venta)}</div>` +
-    `<button class="btn-grande" style="background:var(--acento);color:#fff;border:none" onclick="encHacerCorte()">🖨  Imprimir corte</button>` +
+  const periodo = datos.desde ? `del ${fechaHora(datos.desde)} al ${fechaHora(datos.hasta)}` : `hasta ${fechaHora(datos.hasta)}`;
+  encSub(`<h1>Hacer corte</h1><p class="sub">${periodo}</p>` +
+    `<div class="card">` +
+    `<div class="fila"><span>Fondo con que abrió</span><span>${pesos(datos.reactivo)}</span></div>` +
+    `<div class="fila"><span>Efectivo de ventas y abonos</span><span>${pesos(datos.efectivo)}</span></div>` +
+    (Number(datos.pagos) > 0 ? `<div class="fila"><span>Pagos a empleadas</span><span>-${pesos(datos.pagos)}</span></div>` : "") +
+    `<div class="fila"><strong>Debe haber en el cajón</strong><strong>${pesos(datos.esperado)}</strong></div>` +
+    `</div>` +
+    `<label class="sub">Cuenta el cajón. ¿Cuánto hay?</label>` +
+    `<input id="corte-contado" type="number" inputmode="decimal" step="0.01" value="${datos.esperado}" class="input-grande" oninput="encCorteDif(${datos.esperado})">` +
+    `<div id="corte-dif" class="sub"></div>` +
+    `<label class="sub">¿Cuánto se queda de fondo?</label>` +
+    `<input id="corte-fondo" type="number" inputmode="decimal" step="0.01" value="${datos.reactivo}" class="input-grande">` +
+    `<button class="btn-grande" style="background:var(--acento);color:#fff;border:none" onclick="encHacerCorte()">🖨  Guardar e imprimir corte</button>` +
     `<button class="btn-suave" onclick="encMenu()">← Regresar</button>`);
+  encCorteDif(datos.esperado);
+}
+
+function encCorteDif(esperado) {
+  const contado = Number($("corte-contado").value || 0);
+  const d = Math.round((contado - Number(esperado)) * 100) / 100;
+  $("corte-dif").textContent = d === 0 ? "✅ Cuadra exacto." : (d > 0 ? `Sobran ${pesos(d)}` : `Faltan ${pesos(-d)}`);
 }
 
 async function encHacerCorte() {
+  const contado = $("corte-contado").value;
+  const fondo = $("corte-fondo").value;
   try {
-    const r = await encPost("/api/v1/movil/encargado/corte", {});
-    encSub(`<div class="listo-texto">✅ Corte hecho:<br><br>${pesos(r.monto)}` +
+    const r = await encPost("/api/v1/movil/encargado/corte", { contado: contado, reactivo_final: fondo });
+    encSub(`<div class="listo-texto">✅ Corte hecho:<br><br>${pesos(r.monto)} en caja<br>Se queda ${pesos(r.reactivo_final)} de fondo` +
       (r.ticket_encolado ? "<br><br>🖨 El ticket está saliendo en la impresora de la tienda." : "") +
       `</div><button class="btn-grande" onclick="encListo()">✅  Listo</button>`);
   } catch (e) {
-    encSub(`<div class="listo-texto">No se pudo hacer el corte. 😕</div>` +
+    encSub(`<div class="listo-texto">No se pudo hacer el corte. 😕<br><small>${(e && e.message) || ""}</small></div>` +
+      `<button class="btn-suave" onclick="encMenu()">← Regresar</button>`);
+  }
+}
+
+function fechaHora(iso) {
+  const d = new Date(iso);
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+
+function encPagar() {
+  if (!encRequiereTienda()) return;
+  const pagos = (encData && encData.pagos) || [];
+  if (!pagos.length) {
+    encSub(`<div class="listo-texto">No hay empleadas con horario configurado.</div>` +
+      `<button class="btn-suave" onclick="encMenu()">← Regresar</button>`);
+    return;
+  }
+  const cuando = p => p.dias === null ? "sin fecha" : (p.dias < 0 ? `atrasado ${-p.dias} día(s)` : (p.dias === 0 ? "HOY" : `en ${p.dias} día(s)`));
+  encSub(`<h1>¿A quién le pagas?</h1>` +
+    pagos.map(p => `<button class="btn-grande" onclick="encPagarA('${p.codigo}', '${p.nombre.replace(/'/g, "")}')">${p.nombre}<br><small>${cuando(p)} · ${pesos(p.total)}</small></button>`).join("") +
+    `<button class="btn-suave" onclick="encMenu()">← Regresar</button>`);
+}
+
+async function encPagarA(codigo, nombre) {
+  let d;
+  try { d = await api(`/api/v1/movil/encargado/pago_pendiente/${encodeURIComponent(codigo)}`); }
+  catch (e) { encMenu(); return; }
+  encSub(`<h1>${nombre}</h1><p class="sub">${d.desde ? fechaLarga(d.desde) + " → " : ""}${fechaLarga(d.hasta)}</p>` +
+    `<div class="card">` +
+    `<div class="fila"><span>Sueldo base</span><span>${pesos(d.sueldo_base)}</span></div>` +
+    `<div class="fila"><span>${d.comisiones} comisiones × ${pesos(d.tarifa_comision)}</span><span>+${pesos(d.monto_comisiones)}</span></div>` +
+    (d.faltas ? `<div class="fila"><span>${d.faltas} falta(s)</span><span>-${pesos(d.descuento_faltas)}</span></div>` : "") +
+    `<div class="fila"><strong>A PAGAR</strong><strong>${pesos(d.total)}</strong></div>` +
+    `</div>` +
+    `<button class="btn-grande" style="background:var(--acento);color:#fff;border:none" onclick="encConfirmarPago('${codigo}', '${nombre}')">💵  Ya le pagué</button>` +
+    `<button class="btn-suave" onclick="encPagar()">← Regresar</button>`);
+}
+
+async function encConfirmarPago(codigo, nombre) {
+  try {
+    const r = await encPost("/api/v1/movil/encargado/pagar", { employee_code: codigo });
+    encSub(`<div class="listo-texto">✅ Pagado a ${nombre}:<br><br>${pesos(r.total)}<br><br>Sale del cajón; el corte lo descuenta solo.</div>` +
+      `<button class="btn-grande" onclick="encListo()">✅  Listo</button>`);
+  } catch (e) {
+    encSub(`<div class="listo-texto">No se pudo registrar el pago. 😕</div>` +
       `<button class="btn-suave" onclick="encMenu()">← Regresar</button>`);
   }
 }

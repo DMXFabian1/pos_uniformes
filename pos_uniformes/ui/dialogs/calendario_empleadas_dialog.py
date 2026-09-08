@@ -402,18 +402,13 @@ class CalendarioEmpleadasDialog(QDialog):
             self._recargar()
 
     def _pagar(self) -> None:
-        fecha = self._fecha_seleccionada()
+        """Pago con monto calculado (1300 + 2/comisión − faltas) y desglose."""
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import confirmar_pago
+
         code = self._codigo_activo()
-        confirmar = QMessageBox.question(
-            self,
-            "Registrar pago",
-            f"¿Registrar que a {code} se le pagó el {fecha.strftime('%d/%b/%Y')}?\n"
-            "Esto reinicia su ciclo y su contador de comisiones.",
-            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-        )
-        if confirmar != QMessageBox.StandardButton.Yes:
-            return
-        if self._con_sesion(lambda s: registrar_pago(s, code, fecha)):
+        nombre = self._combo.currentText() if self._combo is not None else code
+        pago = confirmar_pago(self, employee_code=code, employee_name=nombre, creado_por="VEND-1")
+        if pago is not None:
             self._recargar()
 
     # ── Autoservicio (empleada) ──────────────────────────────────────────
@@ -657,7 +652,7 @@ class CalendarioEncargadoDialog(QDialog):
         self._pg_cuando = self._pagina_cuando()
         self._pg_listo = self._pagina_listo()
         self._pg_cortes = self._pagina_cortes()
-        self._pg_corte = self._pagina_corte_hoy()
+        self._pg_pagar = self._pagina_pagar()
         for p in (
             self._pg_menu,
             self._pg_quien,
@@ -665,10 +660,11 @@ class CalendarioEncargadoDialog(QDialog):
             self._pg_cuando,
             self._pg_listo,
             self._pg_cortes,
-            self._pg_corte,
+            self._pg_pagar,
         ):
             self._pila.addWidget(p)
         self._pila.setCurrentWidget(self._pg_menu)
+        self._cargar_resumen_menu()
 
     # ── Páginas ──────────────────────────────────────────────────────────
 
@@ -684,6 +680,15 @@ class CalendarioEncargadoDialog(QDialog):
         ly = QVBoxLayout()
         ly.setSpacing(14)
         ly.addWidget(self._titulo("¿Qué quieres hacer?"))
+        # Resumen del día para León: quién descansa hoy/mañana y a quién le
+        # toca pago esta semana (se llena en _cargar_resumen_menu).
+        self._resumen_menu = QLabel("")
+        self._resumen_menu.setWordWrap(True)
+        self._resumen_menu.setStyleSheet(
+            "font-size: 17px; font-weight: 600; color: #2c2a27; background: #ffffff;"
+            " border: 2px solid #ddd0c0; border-radius: 12px; padding: 10px;"
+        )
+        ly.addWidget(self._resumen_menu)
         btn_apuntar = QPushButton("🗓  Apuntar falta o descanso")
         btn_apuntar.setStyleSheet(self._BTN)
         btn_apuntar.clicked.connect(self._ir_a_quien)
@@ -692,10 +697,14 @@ class CalendarioEncargadoDialog(QDialog):
         btn_cortes.setStyleSheet(self._BTN)
         btn_cortes.clicked.connect(self._ir_a_cortes)
         ly.addWidget(btn_cortes)
-        btn_hacer = QPushButton("🧾  Hacer corte de hoy")
+        btn_hacer = QPushButton("🧾  Hacer corte")
         btn_hacer.setStyleSheet(self._BTN)
         btn_hacer.clicked.connect(self._ir_a_corte_hoy)
         ly.addWidget(btn_hacer)
+        btn_pagar = QPushButton("💰  Pagar a una empleada")
+        btn_pagar.setStyleSheet(self._BTN)
+        btn_pagar.clicked.connect(self._ir_a_pagar)
+        ly.addWidget(btn_pagar)
         ly.addStretch()
         salir = QPushButton("Salir")
         salir.setStyleSheet(self._BTN_SUAVE)
@@ -758,102 +767,97 @@ class CalendarioEncargadoDialog(QDialog):
                 self._cortes_lista.addWidget(fila)
         self._pila.setCurrentWidget(self._pg_cortes)
 
-    def _pagina_corte_hoy(self) -> QWidget:
-        """Confirmación del corte de León: la cifra CALCULADA, sin editar."""
+    def _ir_a_corte_hoy(self) -> None:
+        """Corte por periodo: León cuenta el cajón y captura lo que hay."""
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import hacer_corte_caja
+
+        corte = hacer_corte_caja(self, creado_por="ENC-1", grande=True)
+        if corte is not None:
+            self._mostrar_listo(
+                f"✅ Corte hecho:\n\n${Decimal(corte.monto_final):,.2f} en caja\n"
+                f"Se queda ${Decimal(corte.reactivo_final):,.2f} de fondo",
+                con_deshacer=False,
+            )
+
+    def _cargar_resumen_menu(self) -> None:
+        """Quién descansa hoy/mañana y pagos de la semana, en palabras llanas."""
+        texto = "Sin conexión con la PC principal."
+        try:
+            from pos_uniformes.database.connection import get_session
+            from pos_uniformes.services.nomina_service import resumen_para_encargado, texto_resumen_encargado
+
+            with get_session() as session:
+                try:
+                    texto = texto_resumen_encargado(resumen_para_encargado(session))
+                except Exception:  # noqa: BLE001 — base sin migrar: no dejar la sesión rota
+                    logger.exception("Encargado: no se pudo cargar el resumen")
+                    session.rollback()
+        except Exception:  # noqa: BLE001
+            logger.exception("Encargado: sin sesión para el resumen")
+        self._resumen_menu.setText(texto)
+
+    def _ir_a_pagar(self) -> None:
+        """Lista a las empleadas con lo que se les pagaría hoy; un toque paga."""
+        while self._pagar_botones.count():
+            item = self._pagar_botones.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+        try:
+            from pos_uniformes.database.connection import get_session
+            from pos_uniformes.services.nomina_service import avisos_de_pago
+
+            with get_session() as session:
+                avisos = avisos_de_pago(session, dias=365)
+        except Exception:  # noqa: BLE001
+            logger.exception("Encargado: no se pudieron cargar los pagos")
+            QMessageBox.warning(self, "Sin conexión", "Inténtalo otra vez.")
+            return
+        if not avisos:
+            self._mostrar_listo("No hay empleadas con horario configurado.", con_deshacer=False)
+            return
+        for a in avisos:
+            if a.dias_para_pago is None:
+                cuando = "sin fecha"
+            elif a.dias_para_pago < 0:
+                cuando = f"atrasado {-a.dias_para_pago} día(s)"
+            elif a.dias_para_pago == 0:
+                cuando = "HOY"
+            else:
+                cuando = f"en {a.dias_para_pago} día(s)"
+            btn = QPushButton(f"{a.employee_name}\n{cuando} · ${a.total_estimado:,.2f}")
+            btn.setStyleSheet(self._BTN)
+            btn.clicked.connect(
+                lambda _c=False, code=a.employee_code, nombre=a.employee_name: self._pagar_a(code, nombre)
+            )
+            self._pagar_botones.addWidget(btn)
+        self._pila.setCurrentWidget(self._pg_pagar)
+
+    def _pagar_a(self, code: str, nombre: str) -> None:
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import confirmar_pago
+
+        pago = confirmar_pago(self, employee_code=code, employee_name=nombre, creado_por="ENC-1", grande=True)
+        if pago is not None:
+            self._mostrar_listo(
+                f"✅ Pagado a {nombre}:\n\n${Decimal(pago.total):,.2f}\n\nSale del cajón; el corte lo descuenta solo.",
+                con_deshacer=False,
+            )
+
+    def _pagina_pagar(self) -> QWidget:
         pagina = QWidget()
         ly = QVBoxLayout()
-        ly.setSpacing(14)
-        ly.addWidget(self._titulo("Corte de hoy"))
+        ly.setSpacing(12)
+        ly.addWidget(self._titulo("¿A quién le pagas?"))
+        self._pagar_botones = QVBoxLayout()
+        self._pagar_botones.setSpacing(10)
+        ly.addLayout(self._pagar_botones)
         ly.addStretch()
-        self._corte_texto = QLabel("")
-        self._corte_texto.setWordWrap(True)
-        self._corte_texto.setStyleSheet(
-            "font-size: 30px; font-weight: 800; color: #2c2a27;"
-        )
-        ly.addWidget(self._corte_texto)
-        ly.addStretch()
-        self._btn_corte_ok = QPushButton("🖨  Imprimir corte")
-        self._btn_corte_ok.setStyleSheet(self._BTN_ACENTO)
-        self._btn_corte_ok.clicked.connect(self._hacer_corte)
-        ly.addWidget(self._btn_corte_ok)
         regresar = QPushButton("← Regresar")
         regresar.setStyleSheet(self._BTN_SUAVE)
         regresar.clicked.connect(lambda: self._pila.setCurrentWidget(self._pg_menu))
         ly.addWidget(regresar)
         pagina.setLayout(ly)
         return pagina
-
-    def _datos_corte_hoy(self):
-        """(cortes, por_empleada, monto) de las operaciones de hoy."""
-        from pos_uniformes.database.connection import get_session
-        from pos_uniformes.services.libreta_service import (
-            listar_operaciones,
-            resumir_por_dia,
-            resumir_por_empleada,
-            ventana_hoy,
-        )
-
-        desde, hasta = ventana_hoy()
-        with get_session() as session:
-            rows = listar_operaciones(session, desde=desde, hasta=hasta)
-        cortes = resumir_por_dia(rows)
-        monto = sum((c.monto_en_caja for c in cortes), Decimal("0.00"))
-        return cortes, resumir_por_empleada(rows), monto
-
-    def _ir_a_corte_hoy(self) -> None:
-        try:
-            self._corte_datos = self._datos_corte_hoy()
-        except Exception:  # noqa: BLE001
-            logger.exception("Encargado: no se pudo calcular el corte")
-            QMessageBox.warning(self, "Sin conexión", "Inténtalo otra vez.")
-            return
-        cortes, _por_emp, monto = self._corte_datos
-        if not cortes:
-            self._mostrar_listo("Hoy todavía no hay ventas.", con_deshacer=False)
-            return
-        self._corte_texto.setText(f"VENTA DE HOY:\n\n${monto:,.2f}")
-        self._btn_corte_ok.setEnabled(True)
-        self._pila.setCurrentWidget(self._pg_corte)
-
-    def _hacer_corte(self) -> None:
-        """Guarda la cifra calculada (León no puede editarla) e imprime."""
-        cortes, por_empleada, monto = self._corte_datos
-        try:
-            from datetime import date as _date
-
-            from pos_uniformes.database.connection import get_session
-            from pos_uniformes.services.libreta_service import guardar_corte
-
-            with get_session() as session:
-                guardar_corte(
-                    session,
-                    fecha=_date.today(),
-                    monto_final=monto,
-                    operaciones=sum(c.operaciones for c in cortes),
-                    piezas=sum(c.piezas for c in cortes),
-                    periodo_label="HOY",
-                    creado_por="ENC-1",
-                )
-        except Exception:  # noqa: BLE001
-            logger.exception("Encargado: no se pudo guardar el corte")
-            QMessageBox.warning(self, "No se guardó", "Inténtalo otra vez.")
-            return
-        try:
-            from pos_uniformes.ui.helpers.libreta_corte_ticket_helper import (
-                build_corte_ticket_text,
-            )
-            from pos_uniformes.ui.helpers.ticket_routing_helper import route_tickets
-
-            texto = build_corte_ticket_text(
-                periodo_label="HOY",
-                cortes=cortes,
-                por_empleada=por_empleada,
-                generado_por="ENC-1",
-            )
-            route_tickets(self, "Corte de Libreta", [texto])
-        except Exception:  # noqa: BLE001 — guardado ya quedó; la impresión no lo tira
-            logger.exception("Encargado: fallo la impresión del corte")
-        self._mostrar_listo(f"✅ Corte hecho:\n\n${monto:,.2f}", con_deshacer=False)
 
     def _pagina_quien(self) -> QWidget:
         pagina = QWidget()

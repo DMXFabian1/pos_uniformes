@@ -514,9 +514,12 @@ class HistorialCortesTests(unittest.TestCase):
         self.assertEqual(len(cortes), 2)
         self.assertEqual(cortes[0].fecha, date(2026, 9, 4))  # más reciente primero
         self.assertEqual(cortes[0].monto_final, Decimal("17180.00"))
-        # La tabla NO tiene columnas de esperado/diferencia: sin rastro.
+        # Desde el corte por periodo (2026-09-08) sí se guarda el esperado y
+        # el fondo, pero nunca una "diferencia" precalculada: el ticket solo
+        # imprime la cifra final.
         columnas = {c.name for c in cortes[0].__table__.columns}
-        self.assertNotIn("monto_esperado", columnas)
+        self.assertIn("monto_esperado", columnas)
+        self.assertIn("reactivo_final", columnas)
         self.assertNotIn("diferencia", columnas)
 
     def test_leon_ve_fecha_y_cifra(self) -> None:
@@ -556,52 +559,36 @@ class HistorialCortesTests(unittest.TestCase):
         self.assertNotIn("29", textos[0])
         self.assertNotIn("76", textos[0])
 
-    def test_leon_hace_corte_sin_poder_editar(self) -> None:
+    def test_leon_hace_corte_capturando_lo_contado(self) -> None:
+        """Desde el corte por periodo, León cuenta el cajón: el diálogo de
+        caja es el mismo del dueño (en grande) y firma como ENC-1."""
         import os as _os
 
         _os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-        from datetime import datetime
-
         from PyQt6.QtWidgets import QApplication
 
         QApplication.instance() or QApplication([])
-        from pos_uniformes.database.models import LibretaCorte, LibretaVenta
-
-        self.session.add(
-            LibretaVenta(
-                employee_code="VEND-4", employee_name="Fanny", tipo="venta",
-                piezas=2, comisiones=2, monto_total=Decimal("500.00"),
-                monto_neto=Decimal("500.00"), detalle=[],
-                # naive local: sqlite compara fechas como texto y un offset
-                # de zona rompería la ventana de hoy
-                created_at=datetime.now(),
-            )
-        )
-        self.session.commit()
-
         cm = MagicMock()
         cm.__enter__ = lambda s: self.session
         cm.__exit__ = lambda s, *a: False
+        corte_fake = SimpleNamespace(monto_final=Decimal("13000.00"), reactivo_final=Decimal("11160.00"))
         with patch(
             "pos_uniformes.database.connection.get_session", return_value=cm
         ), patch(
-            "pos_uniformes.ui.helpers.ticket_routing_helper.route_tickets"
-        ) as imprimir:
+            "pos_uniformes.ui.dialogs.corte_caja_dialog.hacer_corte_caja", return_value=corte_fake
+        ) as hacer:
             from pos_uniformes.ui.dialogs.calendario_empleadas_dialog import (
                 CalendarioEncargadoDialog,
             )
 
             dlg = CalendarioEncargadoDialog(None)
             dlg._ir_a_corte_hoy()
-            # La cifra mostrada es la CALCULADA — no hay campo para editarla.
-            self.assertIn("$500.00", dlg._corte_texto.text())
-            dlg._hacer_corte()
-            imprimir.assert_called_once()
-
-        guardado = self.session.query(LibretaCorte).one()
-        self.assertEqual(guardado.monto_final, Decimal("500.00"))
-        self.assertEqual(guardado.creado_por, "ENC-1")
+        hacer.assert_called_once()
+        self.assertEqual(hacer.call_args.kwargs["creado_por"], "ENC-1")
+        self.assertTrue(hacer.call_args.kwargs["grande"])
         self.assertIn("Corte hecho", dlg._listo_texto.text())
+        self.assertIn("$13,000.00", dlg._listo_texto.text())
+        self.assertIn("$11,160.00", dlg._listo_texto.text())
         self.assertFalse(dlg._btn_deshacer.isVisible())  # un corte no se deshace
 
 

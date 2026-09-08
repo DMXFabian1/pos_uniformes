@@ -71,6 +71,10 @@ hiddenimports += [
     # Cámaras del DVR (imports lazy + QtMultimedia, que PyInstaller no ve):
     "pos_uniformes.ui.dialogs.camera_wall_dialog",
     "pos_uniformes.ui.dialogs.camera_playback_dialog",
+    # Caja con reactivo y nómina (imports lazy desde Libreta y calendario):
+    "pos_uniformes.ui.dialogs.corte_caja_dialog",
+    "pos_uniformes.services.corte_caja_service",
+    "pos_uniformes.services.nomina_service",
     "pos_uniformes.services.dvr_settings_cache_service",
     "PyQt6.QtMultimedia",
     "PyQt6.QtMultimediaWidgets",

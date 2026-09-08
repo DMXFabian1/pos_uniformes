@@ -13,6 +13,7 @@ Un endpoint principal (/inicio) devuelve el payload según el rol:
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
@@ -342,7 +343,42 @@ def encargado_inicio(
         "cortes": _payload_cortes(db),
         "equipo": _equipo(db),
         "descansos_semana": _descansos_semana(db),
+        "resumen": _resumen_encargado(db),
+        "pagos": _payload_pagos(db),
     }
+
+
+def _resumen_encargado(db: Session) -> str:
+    """Quién descansa hoy/mañana y pagos de la semana (texto llano)."""
+    try:
+        from pos_uniformes.services.nomina_service import (
+            resumen_para_encargado,
+            texto_resumen_encargado,
+        )
+
+        return texto_resumen_encargado(resumen_para_encargado(db))
+    except Exception:  # noqa: BLE001 — base sin migrar o snapshot viejo
+        return ""
+
+
+def _payload_pagos(db: Session) -> list[dict]:
+    try:
+        from pos_uniformes.services.nomina_service import avisos_de_pago
+
+        avisos = avisos_de_pago(db, dias=365)
+    except Exception:  # noqa: BLE001
+        return []
+    return [
+        {
+            "codigo": a.employee_code,
+            "nombre": a.employee_name,
+            "fecha_pago": a.fecha_pago.isoformat() if a.fecha_pago else None,
+            "dias": a.dias_para_pago,
+            "comisiones": a.comisiones,
+            "total": str(a.total_estimado),
+        }
+        for a in avisos
+    ]
 
 
 class MarcarRequest(BaseModel):
@@ -382,77 +418,130 @@ def encargado_corte_hoy(
     current: tuple = Depends(get_current_employee),
     db: Session = Depends(get_db),
 ) -> dict:
-    """La cifra calculada de hoy (para confirmarla — SIN poder editarla)."""
-    from decimal import Decimal
-
-    from pos_uniformes.services.libreta_service import (
-        listar_operaciones,
-        resumir_por_dia,
-        ventana_hoy,
-    )
+    """Estado de la caja del periodo (desde el corte anterior): lo que debe
+    haber en el cajón. El encargado captura lo contado en /encargado/corte."""
+    from pos_uniformes.services.corte_caja_service import estado_caja
 
     empleada, _p = current
     _solo_gestor(empleada)
-    desde, hasta = ventana_hoy()
-    cortes = resumir_por_dia(listar_operaciones(db, desde=desde, hasta=hasta))
+    estado = estado_caja(db)
+    r = estado.resumen
     return {
-        "venta": str(sum((c.monto_en_caja for c in cortes), Decimal("0.00"))),
-        "operaciones": sum(c.operaciones for c in cortes),
-        "piezas": sum(c.piezas for c in cortes),
-        "hay_ventas": bool(cortes),
+        "desde": estado.desde.isoformat() if estado.desde else None,
+        "hasta": estado.hasta.isoformat(),
+        "reactivo": str(estado.reactivo),
+        "efectivo": str(r.efectivo),
+        "tarjeta": str(r.tarjeta),
+        "pagos": str(estado.pagos),
+        "esperado": str(estado.esperado),
+        "operaciones": r.operaciones,
+        "piezas": r.piezas,
+        "hay_ventas": r.operaciones > 0,
+        # Compatibilidad con la PWA anterior.
+        "venta": str(r.efectivo),
     }
+
+
+class CorteRequest(BaseModel):
+    contado: Decimal = Field(ge=0)
+    reactivo_final: Decimal | None = Field(default=None, ge=0)
+    otros_retiros: Decimal = Field(default=Decimal("0"), ge=0)
+    nota: str = Field(default="", max_length=200)
 
 
 @router.post("/encargado/corte")
 def encargado_hacer_corte(
+    body: CorteRequest,
     current: tuple = Depends(get_current_employee),
     db: Session = Depends(get_db),
 ) -> dict:
-    """Guarda el corte de hoy con la cifra CALCULADA (el encargado no puede
-    editarla) y encola el ticket a la impresora de la tienda."""
-    from decimal import Decimal
-
+    """Cierra el periodo con lo contado por el encargado, deja el fondo para el
+    siguiente y encola el ticket a la impresora de la tienda."""
     from pos_uniformes.services import trabajos_service
-    from pos_uniformes.services.libreta_service import (
-        guardar_corte,
-        listar_operaciones,
-        resumir_por_dia,
-        resumir_por_empleada,
-        ventana_hoy,
-    )
-    from pos_uniformes.ui.helpers.libreta_corte_ticket_helper import (
-        build_corte_ticket_text,
-    )
+    from pos_uniformes.services.corte_caja_service import cerrar_corte, estado_caja, operaciones_del_periodo
+    from pos_uniformes.services.libreta_service import resumir_por_empleada
+    from pos_uniformes.ui.dialogs.corte_caja_dialog import texto_ticket_corte
 
     empleada, _p = current
     _solo_gestor(empleada)
     _solo_tienda()
-    desde, hasta = ventana_hoy()
-    rows = listar_operaciones(db, desde=desde, hasta=hasta)
-    cortes = resumir_por_dia(rows)
-    if not cortes:
-        raise HTTPException(status_code=409, detail={"error": {
-            "code": "sin_ventas", "message": "Hoy todavía no hay ventas."}})
-    monto = sum((c.monto_en_caja for c in cortes), Decimal("0.00"))
     quien = str(empleada.codigo).upper()
-    guardar_corte(
-        db,
-        fecha=date.today(),
-        monto_final=monto,
-        operaciones=sum(c.operaciones for c in cortes),
-        piezas=sum(c.piezas for c in cortes),
-        periodo_label="HOY",
-        creado_por=quien,
-    )
+    estado = estado_caja(db)
+    rows = operaciones_del_periodo(db, estado.desde, estado.hasta)
+    try:
+        corte = cerrar_corte(
+            db,
+            contado=body.contado,
+            reactivo_final=body.reactivo_final,
+            otros_retiros=body.otros_retiros,
+            nota=body.nota,
+            creado_por=quien,
+            ahora=estado.hasta,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={"error": {"code": "corte_invalido", "message": str(exc)}})
     ticket_encolado = False
     try:
-        texto = build_corte_ticket_text(
-            periodo_label="HOY", cortes=cortes,
-            por_empleada=resumir_por_empleada(rows), generado_por=quien,
-        )
+        texto = texto_ticket_corte(corte, resumir_por_empleada(rows))
         trabajos_service.enviar_ticket(db, texto, origen="pwa", creado_por=quien)
         ticket_encolado = True
+        db.commit()
     except Exception:  # noqa: BLE001 — el corte ya quedó; el ticket es extra
         pass
-    db.commit()
-    return {"ok": True, "monto": str(monto), "ticket_encolado": ticket_encolado}
+    return {
+        "ok": True,
+        "monto": str(corte.monto_final),
+        "esperado": str(corte.monto_esperado),
+        "reactivo_final": str(corte.reactivo_final),
+        "ticket_encolado": ticket_encolado,
+    }
+
+
+class PagarRequest(BaseModel):
+    employee_code: str = Field(min_length=1, max_length=40)
+
+
+@router.get("/encargado/pago_pendiente/{employee_code}")
+def encargado_pago_pendiente(
+    employee_code: str,
+    current: tuple = Depends(get_current_employee),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Desglose de lo que se le pagaría hoy a la empleada (sin registrar)."""
+    from pos_uniformes.services.nomina_service import pago_pendiente
+
+    empleada, _p = current
+    _solo_gestor(empleada)
+    d = pago_pendiente(db, employee_code)
+    return {
+        "codigo": d.employee_code,
+        "desde": d.desde.isoformat() if d.desde else None,
+        "hasta": d.hasta.isoformat(),
+        "comisiones": d.comisiones,
+        "sueldo_base": str(d.sueldo_base),
+        "tarifa_comision": str(d.tarifa_comision),
+        "monto_comisiones": str(d.monto_comisiones),
+        "faltas": d.faltas,
+        "descuento_faltas": str(d.descuento_faltas),
+        "total": str(d.total),
+    }
+
+
+@router.post("/encargado/pagar")
+def encargado_pagar(
+    body: PagarRequest,
+    current: tuple = Depends(get_current_employee),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Registra el pago con su desglose; el corte lo descuenta del cajón."""
+    from pos_uniformes.services.nomina_service import registrar_pago_con_monto
+
+    empleada, _p = current
+    _solo_gestor(empleada)
+    _solo_tienda()
+    quien = str(empleada.codigo).upper()
+    try:
+        pago = registrar_pago_con_monto(db, body.employee_code, creado_por=quien)
+    except PermissionError as exc:
+        raise HTTPException(status_code=403, detail={"error": {"code": "sin_permiso", "message": str(exc)}})
+    return {"ok": True, "total": str(pago.total), "comisiones": pago.comisiones, "faltas": pago.faltas}

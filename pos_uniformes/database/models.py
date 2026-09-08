@@ -1926,7 +1926,7 @@ class LibretaVenta(Base):
     tipo: Mapped[str] = mapped_column(String(20), nullable=False, default="venta", index=True)
     cliente: Mapped[str | None] = mapped_column(String(120))
     piezas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    # Comisiones para la empleada: 3pz vale 3, lo demás 1 por unidad;
+    # Comisiones para la empleada: 3pz vale 2, lo demás 1 por unidad;
     # los abonos no dan comisión (0).
     comisiones: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     monto_total: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
@@ -2021,6 +2021,66 @@ class LibretaCorte(Base):
         DateTime(timezone=True),
         server_default=func.now(),
         nullable=False,
+    )
+    # Corte POR PERIODO (desde 2026-09-08): del corte anterior (`desde`) a
+    # este (`hasta`). Lo vendido después de `hasta` cae en el siguiente.
+    desde: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    hasta: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Fondo con el que abrió el periodo, efectivo esperado al cerrar, lo que
+    # salió del cajón (pagos a empleadas y otros retiros) y el fondo que
+    # queda para el siguiente periodo.
+    reactivo_inicial: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"), server_default="0")
+    monto_esperado: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"), server_default="0")
+    retiros_pagos: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"), server_default="0")
+    otros_retiros: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"), server_default="0")
+    reactivo_final: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"), server_default="0")
+
+
+class CajaParametros(Base):
+    """Una sola fila: fondo de caja vigente (reactivo) y reglas de pago.
+
+    reactivo_actual: efectivo que se queda en el cajón entre cortes.
+    sueldo_base: por ciclo de pago (7 días). tarifa_comision: pesos por
+    comisión. descuento_falta: pesos que se restan por cada falta del ciclo.
+    """
+
+    __tablename__ = "caja_parametros"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    reactivo_actual: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"), server_default="0")
+    sueldo_base: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"), server_default="0")
+    tarifa_comision: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"), server_default="0")
+    descuento_falta: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"), server_default="0")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+
+class EmpleadaPago(Base):
+    """Pago registrado a una empleada con su desglose.
+
+    total = sueldo_base + comisiones * tarifa_comision - faltas * descuento.
+    El corte del periodo lo descuenta del efectivo esperado en el cajón.
+    """
+
+    __tablename__ = "empleada_pago"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    employee_code: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    employee_name: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    fecha: Mapped[date] = mapped_column(Date, nullable=False)
+    desde: Mapped[date | None] = mapped_column(Date)
+    hasta: Mapped[date] = mapped_column(Date, nullable=False)
+    comisiones: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    sueldo_base: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    tarifa_comision: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    monto_comisiones: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    faltas: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    descuento_faltas: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    total: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
+    creado_por: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
 
 

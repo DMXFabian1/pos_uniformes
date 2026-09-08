@@ -463,9 +463,10 @@ def cargar_horarios_todos(session) -> dict[str, HorarioEmpleada]:
 
 # ─── Encargado y límite mensual de movimientos ───────────────────────────
 
-# Gafete del encargado (el papá de Daniel): puede marcar faltas/descansos
-# en el calendario de cualquier empleada, pero NO ve dinero ni registra
-# pagos ni cambia horarios. "Si no está en el calendario, no existe."
+# Gafete del encargado (el papá de Daniel): marca faltas/descansos de
+# cualquier empleada y, desde 2026-09-08, también hace el corte de caja y
+# registra los pagos (con el monto calculado por nomina_service). No cambia
+# horarios. "Si no está en el calendario, no existe."
 ENCARGADO_CODE = "ENC-1"
 
 # Cada empleada puede hacer 2 movimientos al mes (pedidos + intercambios
