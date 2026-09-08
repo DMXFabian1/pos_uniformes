@@ -27,7 +27,7 @@ Despues de CADA cambio (rapido, ~4s, sin base ni Qt):
 python -m pytest pos_uniformes/tests --fast -q
 ```
 
-Antes de subir a produccion (todo, incluye base y Qt):
+Antes de subir a produccion (todo, incluye base y Qt) — 1,681 tests, ~74s:
 
 ```
 python -m pytest pos_uniformes/tests -q
