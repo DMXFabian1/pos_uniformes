@@ -65,16 +65,26 @@ def credenciales_dvr() -> tuple[str, int, str, str]:
     user = _env("POS_UNIFORMES_DVR_USER")
     password = _env("POS_UNIFORMES_DVR_PASSWORD")
     puerto = 554
-    ajustes = RAIZ_POS / "data" / "dvr_settings.json"
-    if ajustes.exists():
+    # El kiosko instalado (exe) guarda su config en %APPDATA%\PresupuestosSatelite;
+    # en desarrollo (Mac) queda junto al código. Se toma la primera que exista.
+    candidatos = []
+    appdata = os.environ.get("APPDATA")
+    if appdata:
+        candidatos.append(Path(appdata) / "PresupuestosSatelite" / "data" / "dvr_settings.json")
+    candidatos.append(RAIZ_POS / "data" / "dvr_settings.json")
+    for ajustes in candidatos:
+        if not ajustes.exists():
+            continue
         try:
             data = json.loads(ajustes.read_text(encoding="utf-8"))
             host = data.get("host") or host
             user = data.get("user") or user
             password = data.get("password") or password
             puerto = int(data.get("rtsp_port") or puerto)
+            log.info("DVR tomado de %s", ajustes)
+            break
         except Exception as exc:  # noqa: BLE001
-            log.warning("dvr_settings.json ilegible: %s", exc)
+            log.warning("%s ilegible: %s", ajustes, exc)
     if not host or not user:
         raise SystemExit("Falta la configuración del DVR (data/dvr_settings.json o POS_UNIFORMES_DVR_*).")
     return host, puerto, user, password
