@@ -23,6 +23,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--imprimir", action="store_true", help="mostrar en pantalla sin enviar")
     parser.add_argument("--chat-ids", action="store_true", help="listar chats que le han escrito al bot")
     parser.add_argument("--fecha", default="", help="AAAA-MM-DD (default: hoy)")
+    parser.add_argument("--pendientes", action="store_true", help="solo el recordatorio de pendientes (mediodía)")
     args = parser.parse_args(argv)
 
     from pos_uniformes.services import telegram_service
@@ -45,7 +46,15 @@ def main(argv: list[str] | None = None) -> int:
     from pos_uniformes.services.resumen_diario_service import formatear, recolectar
 
     with get_session() as session:
-        texto = formatear(recolectar(session, hoy))
+        if args.pendientes:
+            from pos_uniformes.services.resumen_diario_service import texto_solo_pendientes
+
+            texto = texto_solo_pendientes(session, hoy)
+            if not texto:
+                print("Sin pendientes: no se envía nada.")
+                return 0
+        else:
+            texto = formatear(recolectar(session, hoy))
     if args.imprimir:
         print(texto)
         return 0

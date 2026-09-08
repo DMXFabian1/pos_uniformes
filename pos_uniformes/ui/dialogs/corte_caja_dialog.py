@@ -314,21 +314,29 @@ def editar_parametros_caja(parent: QWidget | None) -> bool:
     return True
 
 
-def confirmar_pago(parent: QWidget | None, *, employee_code: str, employee_name: str, creado_por: str, grande: bool = False):
-    """Muestra el desglose del pago y, si confirma, lo registra. Devuelve EmpleadaPago o None."""
+def confirmar_pago(parent: QWidget | None, *, employee_code: str, employee_name: str, creado_por: str, grande: bool = False, fecha=None):
+    """Muestra el desglose del pago y, si confirma, lo registra. Devuelve EmpleadaPago o None.
+
+    `fecha` permite pagar adelantado o registrar un pago que se hizo otro día:
+    el ciclo se reinicia desde esa fecha y las comisiones se cuentan hasta ella."""
+    from datetime import date as _date
+
     from pos_uniformes.database.connection import get_session
     from pos_uniformes.services.nomina_service import pago_pendiente, registrar_pago_con_monto
 
+    fecha = fecha or _date.today()
     try:
         with get_session() as session:
-            d = pago_pendiente(session, employee_code)
+            d = pago_pendiente(session, employee_code, fecha)
     except Exception:  # noqa: BLE001
         logger.exception("Pago: no se pudo calcular")
         QMessageBox.warning(parent, "Sin conexión", "No se alcanzó la base. Inténtalo otra vez.")
         return None
     desde = d.desde.strftime("%d/%m") if d.desde else "inicio"
+    cuando = "" if fecha == _date.today() else f"Fecha del pago: {fecha:%d/%m/%Y}\n"
     texto = (
         f"{employee_name}\n"
+        f"{cuando}"
         f"Periodo: {desde} → {d.hasta:%d/%m}\n\n"
         f"Sueldo base:        ${d.sueldo_base:,.2f}\n"
         f"{d.comisiones} comisiones × ${d.tarifa_comision:,.2f}:  +${d.monto_comisiones:,.2f}\n"
@@ -347,7 +355,7 @@ def confirmar_pago(parent: QWidget | None, *, employee_code: str, employee_name:
         return None
     try:
         with get_session() as session:
-            pago = registrar_pago_con_monto(session, employee_code, creado_por=creado_por)
+            pago = registrar_pago_con_monto(session, employee_code, creado_por=creado_por, fecha=fecha)
             session.refresh(pago)
             session.expunge(pago)
     except PermissionError as exc:

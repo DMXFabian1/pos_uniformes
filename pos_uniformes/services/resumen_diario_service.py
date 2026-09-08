@@ -60,6 +60,7 @@ class DatosResumen:
     afluencia_ventas: int | None = None
     descansan_manana: list[str] = field(default_factory=list)
     pagos_proximos: list[tuple[str, str, Decimal]] = field(default_factory=list)  # (nombre, cuándo, total)
+    pendientes: str = ""  # bloque de pendientes_service.texto_pendientes (ya formateado)
 
 
 def _pesos(v: Decimal) -> str:
@@ -132,6 +133,10 @@ def formatear(d: DatosResumen) -> str:
         lineas.append(f"• Compraron {ventas} → conversión {conv}")
         lineas.append("")
 
+    if d.pendientes:
+        lineas.append(d.pendientes)
+        lineas.append("")
+
     lineas.append("📅 MAÑANA")
     lineas.append("• Descansa: " + (", ".join(d.descansan_manana) or "nadie"))
     if d.pagos_proximos:
@@ -165,7 +170,25 @@ def recolectar(session, hoy: date | None = None) -> DatosResumen:
     _bloque(session, lambda: _faltas(session, d, hoy))
     _bloque(session, lambda: _afluencia(session, d, desde, hasta))
     _bloque(session, lambda: _manana(session, d, hoy))
+    _bloque(session, lambda: _pendientes(session, d, hoy))
     return d
+
+
+def _pendientes(session, d: DatosResumen, hoy: date) -> None:
+    from pos_uniformes.services.pendientes_service import pendientes_del_dia, texto_pendientes
+
+    d.pendientes = texto_pendientes(pendientes_del_dia(session, hoy))
+
+
+def texto_solo_pendientes(session, hoy: date | None = None) -> str:
+    """Recordatorio de mediodía: solo lo que falta por registrar."""
+    from pos_uniformes.services.pendientes_service import pendientes_del_dia, texto_pendientes
+
+    hoy = hoy or date.today()
+    texto = texto_pendientes(pendientes_del_dia(session, hoy))
+    if not texto:
+        return ""
+    return f"{_DIAS[hoy.weekday()]} {hoy:%d/%m}\n{texto}"
 
 
 def _bloque(session, fn) -> None:

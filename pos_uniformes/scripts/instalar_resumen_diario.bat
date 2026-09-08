@@ -18,6 +18,8 @@ echo === Tarea de Windows "POS Resumen diario" a las %HORA% ===
 schtasks /Create /F /TN "POS Resumen diario" /SC DAILY /ST %HORA% /TR "\"%~dp0resumen_diario_telegram.bat\"" >nul
 if errorlevel 1 goto :error
 echo   Listo. Cada dia a las %HORA% llega el resumen a tu Telegram.
+schtasks /Create /F /TN "POS Pendientes" /SC DAILY /ST 13:30 /TR "\"%~dp0resumen_diario_telegram.bat\" --pendientes" >nul
+if not errorlevel 1 echo   Y a las 13:30 un recordatorio con lo que falta por registrar (pagos, faltas).
 echo   Para mandarlo ahora mismo: scripts\resumen_diario_telegram.bat
 exit /b 0
 

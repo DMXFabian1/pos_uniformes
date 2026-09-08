@@ -1508,6 +1508,19 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_afluencia_seccion.setVisible(False)
         self.libreta_afluencia_table.setVisible(False)
 
+        # Pendientes de hoy (solo dueño): pagos que tocan, posibles faltas,
+        # descansos y horarios sin configurar, con botón de un toque.
+        self.libreta_pendientes_seccion = _seccion("PENDIENTES DE HOY  ·  lo que falta por registrar")
+        owner_panel_ly.addWidget(self.libreta_pendientes_seccion)
+        self.libreta_pendientes_box = QWidget()
+        self.libreta_pendientes_ly = QVBoxLayout()
+        self.libreta_pendientes_ly.setContentsMargins(0, 0, 0, 0)
+        self.libreta_pendientes_ly.setSpacing(4)
+        self.libreta_pendientes_box.setLayout(self.libreta_pendientes_ly)
+        owner_panel_ly.addWidget(self.libreta_pendientes_box)
+        self.libreta_pendientes_seccion.setVisible(False)
+        self.libreta_pendientes_box.setVisible(False)
+
         owner_panel_ly.addWidget(_seccion("EQUIPO  ·  toca un nombre para ver solo sus movimientos"))
         self.libreta_ranking_list = QListWidget()
         self.libreta_ranking_list.setObjectName("libretaLista")
@@ -1924,6 +1937,7 @@ class QuoteSatelliteWindow(QMainWindow):
         fuente_db = False
         ciclo_texto: str | None = None
         afluencia_filas: list = []
+        pendientes: list = []
         if probe_database_host(0.5):
             try:
                 with get_session() as session:
@@ -1943,6 +1957,7 @@ class QuoteSatelliteWindow(QMainWindow):
                         ciclo_texto = self._texto_ciclo_libreta(session)
                     else:
                         afluencia_filas = self._cargar_afluencia_libreta(session, desde, hasta)
+                        pendientes = self._cargar_pendientes_libreta(session)
                 fuente_db = True
             except Exception:  # noqa: BLE001
                 logger.exception("Libreta: fallo la consulta a la base")
@@ -1989,6 +2004,102 @@ class QuoteSatelliteWindow(QMainWindow):
             )
         self._pintar_libreta(rows, ranking_rows=ranking_rows)
         self._pintar_afluencia_libreta(afluencia_filas)
+        self._pintar_pendientes_libreta(pendientes)
+
+    @staticmethod
+    def _cargar_pendientes_libreta(session) -> list:
+        try:
+            from pos_uniformes.services.pendientes_service import pendientes_del_dia
+
+            return pendientes_del_dia(session)
+        except Exception:  # noqa: BLE001
+            try:
+                session.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+            return []
+
+    def _pintar_pendientes_libreta(self, pendientes: list) -> None:
+        """Una fila por pendiente con su botón de acción. Oculto si no hay nada."""
+        from pos_uniformes.services.pendientes_service import (
+            DESCANSO_HOY,
+            PAGO_ATRASADO,
+            PAGO_HOY,
+            POSIBLE_FALTA,
+            SIN_HORARIO,
+        )
+
+        while self.libreta_pendientes_ly.count():
+            item = self.libreta_pendientes_ly.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.deleteLater()
+        if not getattr(self, "_libreta_is_owner", False):
+            pendientes = []
+        visible = bool(pendientes)
+        self.libreta_pendientes_seccion.setVisible(visible)
+        self.libreta_pendientes_box.setVisible(visible)
+        if not visible:
+            return
+        iconos = {PAGO_ATRASADO: "❗", PAGO_HOY: "💵", POSIBLE_FALTA: "❓", SIN_HORARIO: "⚙️", DESCANSO_HOY: "🛌"}
+        for p in pendientes:
+            fila = QWidget()
+            fila_ly = QHBoxLayout()
+            fila_ly.setContentsMargins(0, 0, 0, 0)
+            fila_ly.setSpacing(8)
+            texto = QLabel(f"{iconos.get(p.tipo, '•')} {p.texto}")
+            texto.setWordWrap(True)
+            texto.setObjectName("libretaPendiente")
+            fila_ly.addWidget(texto, 1)
+            if p.tipo in (PAGO_HOY, PAGO_ATRASADO):
+                btn = QPushButton("💵 Ya le pagué")
+                btn.clicked.connect(lambda _c=False, code=p.employee_code, nombre=p.employee_name: self._pagar_pendiente(code, nombre))
+                fila_ly.addWidget(btn)
+            elif p.tipo == POSIBLE_FALTA:
+                btn_falta = QPushButton("🚫 Faltó")
+                btn_falta.clicked.connect(lambda _c=False, code=p.employee_code: self._marcar_pendiente(code, "falta"))
+                fila_ly.addWidget(btn_falta)
+                btn_desc = QPushButton("🛌 Descansó")
+                btn_desc.clicked.connect(lambda _c=False, code=p.employee_code: self._marcar_pendiente(code, "descanso"))
+                fila_ly.addWidget(btn_desc)
+            elif p.tipo == SIN_HORARIO:
+                btn = QPushButton("📅 Configurar")
+                btn.clicked.connect(lambda _c=False, code=p.employee_code, nombre=p.employee_name: self._configurar_pendiente(code, nombre))
+                fila_ly.addWidget(btn)
+            for b in fila.findChildren(QPushButton):
+                b.setObjectName("secondaryButton")
+                b.setAutoDefault(False)
+            fila.setLayout(fila_ly)
+            self.libreta_pendientes_ly.addWidget(fila)
+
+    def _pagar_pendiente(self, code: str, nombre: str) -> None:
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import confirmar_pago
+
+        pago = confirmar_pago(self, employee_code=code, employee_name=nombre, creado_por=str(self._libreta_code or "VEND-1"))
+        if pago is not None:
+            self._set_status(f"Pago registrado a {nombre.split()[0]}: ${Decimal(pago.total):,.2f}")
+            self._refresh_libreta_view()
+
+    def _marcar_pendiente(self, code: str, tipo: str) -> None:
+        from datetime import date as _date
+
+        from pos_uniformes.services.calendario_empleadas_service import marcar_dia
+
+        try:
+            with get_session() as session:
+                marcar_dia(session, code, _date.today(), tipo, nota=f"apuntado por {self._libreta_code or 'VEND-1'} desde Pendientes")
+        except Exception:  # noqa: BLE001
+            logger.exception("Pendientes: no se pudo marcar %s", tipo)
+            self._set_status("No se pudo guardar. Inténtalo otra vez.")
+            return
+        self._set_status(("Falta" if tipo == "falta" else "Descanso") + " apuntado para hoy.")
+        self._refresh_libreta_view()
+
+    def _configurar_pendiente(self, code: str, nombre: str) -> None:
+        from pos_uniformes.ui.dialogs.calendario_empleadas_dialog import CalendarioEmpleadasDialog
+
+        CalendarioEmpleadasDialog(self, employee_code=code, employee_name=nombre, is_owner=True).exec()
+        self._refresh_libreta_view()
 
     @staticmethod
     def _cargar_afluencia_libreta(session, desde, hasta) -> list:

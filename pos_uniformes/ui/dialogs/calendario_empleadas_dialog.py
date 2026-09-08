@@ -407,7 +407,11 @@ class CalendarioEmpleadasDialog(QDialog):
 
         code = self._codigo_activo()
         nombre = self._combo.currentText() if self._combo is not None else code
-        pago = confirmar_pago(self, employee_code=code, employee_name=nombre, creado_por="VEND-1")
+        # La fecha seleccionada en el calendario: sirve para pagar adelantado
+        # o para apuntar un pago que se hizo otro día y se olvidó registrar.
+        pago = confirmar_pago(
+            self, employee_code=code, employee_name=nombre, creado_por="VEND-1", fecha=self._fecha_seleccionada()
+        )
         if pago is not None:
             self._recargar()
 
