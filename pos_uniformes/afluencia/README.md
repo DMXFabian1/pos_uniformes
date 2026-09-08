@@ -7,7 +7,15 @@ lo cruza con las ventas de la Libreta para mostrar la conversión por hora.
 Corre como un proceso aparte en la PC servidor. **No usa el venv del POS**:
 YOLO y OpenCV son pesados y no deben entrar al ejecutable del kiosko.
 
-## Instalación (PC servidor, Windows)
+## Instalación (PC servidor, Windows): un solo paso
+
+```bat
+C:\Users\Pc\pos_uniformes\pos_uniformes\afluencia\instalar_afluencia.bat
+```
+
+Crea el entorno, copia la configuración, prueba el DVR, registra la tarea
+"POS Afluencia" (arranca al iniciar sesión) y deja el contador corriendo.
+A mano, equivale a:
 
 ```bat
 cd C:\Users\Pc\pos_uniformes\pos_uniformes\afluencia
