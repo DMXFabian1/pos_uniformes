@@ -68,6 +68,11 @@ hiddenimports += [
     "pos_uniformes.services.anuncio_image_service",
     "pos_uniformes.services.satellite_identity_service",
     "pos_uniformes.services.satelite_registry_service",
+    # Cámaras del DVR (imports lazy + QtMultimedia, que PyInstaller no ve):
+    "pos_uniformes.ui.dialogs.camera_wall_dialog",
+    "pos_uniformes.services.dvr_settings_cache_service",
+    "PyQt6.QtMultimedia",
+    "PyQt6.QtMultimediaWidgets",
     # pywin32: TODOS sus imports en el código son lazy (dentro de funciones),
     # así que PyInstaller no los detecta — sin esto el kiosko no imprime
     # etiquetas/tickets RAW ("falta pywin32").

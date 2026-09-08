@@ -569,6 +569,12 @@ class QuoteSatelliteWindow(QMainWindow):
                     listener.wait(1000)
                 except Exception:  # noqa: BLE001
                     pass
+        camaras = getattr(self, "_camera_wall_dialog", None)
+        if camaras is not None:
+            try:
+                camaras.close()
+            except Exception:  # noqa: BLE001
+                pass
         super().closeEvent(event)
 
     def _start_background_db_refresh(self) -> None:
@@ -743,6 +749,9 @@ class QuoteSatelliteWindow(QMainWindow):
         self.nav_tariff_button = QPushButton("Tarifarios")
         self.nav_libreta_button = QPushButton("Libreta")
         self.nav_conteos_button = QPushButton("Calendario")
+        # "Cámaras" abre el visor del DVR en ventana aparte (no es una página
+        # del stack): empleadas ven solo entradas, admin con PIN ve todas.
+        self.nav_camaras_button = QPushButton("Cámaras")
         # "Tarifarios" oculto (decisión de Daniel, 2026-09-02): su lugar lo
         # toma "Libreta". La página y su código siguen vivos; para restaurarla
         # basta quitar esta línea.
@@ -932,6 +941,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self.nav_tariff_button: _icon_from_asset("kiosk_icons/catalog_grid.svg"),
             self.nav_libreta_button: _icon_from_asset("kiosk_icons/quote_stack.svg"),
             self.nav_conteos_button: _icon_from_asset("kiosk_icons/calendar.svg"),
+            self.nav_camaras_button: _icon_from_asset("kiosk_icons/search_quote.svg"),
         }
         for button, icon in nav_icons.items():
             button.setIcon(icon)
@@ -1051,6 +1061,10 @@ class QuoteSatelliteWindow(QMainWindow):
             button.setAutoExclusive(True)
             self.nav_button_group.addButton(button)
             layout.addWidget(button)
+        # Cámaras: mismo estilo de nav pero sin ser checkable ni entrar al
+        # grupo (abre un diálogo, no cambia de página).
+        self.nav_camaras_button.setObjectName("navButton")
+        layout.addWidget(self.nav_camaras_button)
 
         budget_card = QFrame()
         budget_card.setObjectName("satTotalsCard")
@@ -3917,6 +3931,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.nav_tariff_button.clicked.connect(lambda: self._set_page("tariff"))
         self.nav_libreta_button.clicked.connect(lambda: self._set_page("libreta"))
         self.nav_conteos_button.clicked.connect(lambda: self._set_page("conteos"))
+        self.nav_camaras_button.clicked.connect(self._open_camera_wall)
         self.tariff_generate_button.clicked.connect(self._handle_generate_tariff)
         self.tariff_print_button.clicked.connect(self._handle_print_tariff)
         self.quick_scan_button.clicked.connect(self._handle_quick_scan)
@@ -3956,6 +3971,8 @@ class QuoteSatelliteWindow(QMainWindow):
         _cola_shortcut.activated.connect(self._open_dispatcher_panel)
         _pedidos_shortcut = QShortcut(QKeySequence("Ctrl+Shift+P"), self)
         _pedidos_shortcut.activated.connect(self._open_pedido_board)
+        _camaras_shortcut = QShortcut(QKeySequence("Ctrl+Shift+C"), self)
+        _camaras_shortcut.activated.connect(self._open_camera_wall)
         # Navegación de secciones con Ctrl+←/→. Se usa Ctrl (no flechas peladas)
         # porque el campo de escaneo y los buscadores tienen el foco casi siempre
         # y se quedarían con las flechas.
@@ -5412,6 +5429,18 @@ class QuoteSatelliteWindow(QMainWindow):
     def _open_satellite_admin(self) -> None:
         from pos_uniformes.ui.dialogs.satellite_admin_dialog import open_satellite_admin_dialog
         open_satellite_admin_dialog(self)
+
+    def _open_camera_wall(self) -> None:
+        """Visor de cámaras del DVR (Ctrl+Shift+C / botón Cámaras). No modal."""
+        from pos_uniformes.ui.dialogs.camera_wall_dialog import CameraWallDialog
+
+        dialog = getattr(self, "_camera_wall_dialog", None)
+        if dialog is None:
+            dialog = CameraWallDialog(self)
+            self._camera_wall_dialog = dialog
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
 
     def _open_dispatcher_panel(self) -> None:
         """Abre el panel de la cola del satélite (Ctrl+Shift+Q)."""

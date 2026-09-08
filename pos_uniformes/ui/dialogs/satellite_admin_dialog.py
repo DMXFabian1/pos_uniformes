@@ -435,6 +435,127 @@ def _build_anuncios_boxes(dialog: QWidget) -> list[QGroupBox]:
     return [este_box, satelites_box, crear_box, lista_box]
 
 
+def _build_camaras_box(dialog: QWidget) -> QGroupBox:
+    """Pestaña Cámaras: cómo llegar al DVR y qué canales son de entrada.
+
+    Marcar un canal = las empleadas lo ven sin PIN (cámaras de entrada). Los
+    demás solo se ven en modo administrador dentro del visor.
+    """
+    from pos_uniformes.services.dvr_settings_cache_service import (
+        CanalDVR,
+        DVRSettings,
+        detectar_canales,
+        load_dvr_settings,
+        save_dvr_settings,
+    )
+
+    actual = load_dvr_settings()
+    box = QGroupBox("DVR de cámaras")
+    layout = QVBoxLayout()
+    hint = QLabel(
+        "El kiosko reproduce las cámaras del DVR por la red local (Ctrl+Shift+C o botón "
+        "Cámaras). Marca las cámaras de ENTRADA: son las únicas que ven las empleadas; "
+        "el resto solo con PIN de administrador."
+    )
+    hint.setWordWrap(True)
+    layout.addWidget(hint)
+
+    form = QFormLayout()
+    host_input = QLineEdit(actual.host)
+    host_input.setPlaceholderText("192.168.0.11")
+    user_input = QLineEdit(actual.user)
+    user_input.setPlaceholderText("usuario del DVR")
+    pass_input = QLineEdit(actual.password)
+    pass_input.setEchoMode(QLineEdit.EchoMode.Password)
+    http_port = QSpinBox()
+    http_port.setRange(1, 65535)
+    http_port.setValue(actual.http_port)
+    rtsp_port = QSpinBox()
+    rtsp_port.setRange(1, 65535)
+    rtsp_port.setValue(actual.rtsp_port)
+    form.addRow("IP del DVR", host_input)
+    form.addRow("Usuario", user_input)
+    form.addRow("Contraseña", pass_input)
+    form.addRow("Puerto web (HTTP)", http_port)
+    form.addRow("Puerto video (RTSP)", rtsp_port)
+    layout.addLayout(form)
+
+    canales_label = QLabel("Canales (marca los de entrada):")
+    layout.addWidget(canales_label)
+    canales_list = QListWidget()
+    canales_list.setObjectName("dvrCanalesList")
+    canales_list.setMinimumHeight(180)
+    layout.addWidget(canales_list)
+
+    def _poblar(canales: list[CanalDVR]) -> None:
+        canales_list.clear()
+        for c in canales:
+            item = QListWidgetItem(f"Canal {c.canal} · {c.nombre}")
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Checked if c.entrada else Qt.CheckState.Unchecked)
+            item.setData(Qt.ItemDataRole.UserRole, (c.canal, c.nombre))
+            canales_list.addItem(item)
+
+    def _leer_canales() -> list[CanalDVR]:
+        out: list[CanalDVR] = []
+        for i in range(canales_list.count()):
+            item = canales_list.item(i)
+            canal, nombre = item.data(Qt.ItemDataRole.UserRole)
+            out.append(CanalDVR(canal=int(canal), nombre=str(nombre), entrada=item.checkState() == Qt.CheckState.Checked))
+        return out
+
+    def _leer_settings() -> DVRSettings:
+        return DVRSettings(
+            host=host_input.text().strip(),
+            user=user_input.text().strip(),
+            password=pass_input.text(),
+            http_port=int(http_port.value()),
+            rtsp_port=int(rtsp_port.value()),
+            canales=_leer_canales(),
+        )
+
+    _poblar(actual.canales)
+
+    status = QLabel("")
+    status.setWordWrap(True)
+
+    def _detectar() -> None:
+        try:
+            canales = detectar_canales(_leer_settings())
+        except RuntimeError as exc:
+            QMessageBox.warning(dialog, "DVR", str(exc))
+            return
+        # Conserva las marcas que ya tenía el usuario; los nuevos se marcan
+        # solos si el nombre dice ENTRADA.
+        marcados = {c.canal: c.entrada for c in _leer_canales()}
+        for c in canales:
+            if c.canal in marcados:
+                c.entrada = marcados[c.canal]
+        _poblar(canales)
+        status.setText(f"{len(canales)} canales detectados. Revisa las marcas y pulsa Guardar.")
+
+    def _guardar() -> None:
+        settings_nuevos = _leer_settings()
+        if not settings_nuevos.configurado():
+            QMessageBox.warning(dialog, "DVR", "Falta la IP o el usuario del DVR.")
+            return
+        save_dvr_settings(settings_nuevos)
+        status.setText("Configuración de cámaras guardada.")
+
+    detect_button = QPushButton("Detectar canales")
+    detect_button.clicked.connect(_detectar)
+    save_button = QPushButton("Guardar cámaras")
+    save_button.clicked.connect(_guardar)
+    buttons = QHBoxLayout()
+    buttons.addWidget(detect_button)
+    buttons.addWidget(save_button)
+    buttons.addStretch()
+    layout.addLayout(buttons)
+    layout.addWidget(status)
+    box.setLayout(layout)
+    return box
+
+
 def open_satellite_admin_dialog(parent: QWidget) -> None:
     if not _prompt_pin(parent):
         QMessageBox.warning(parent, "PIN incorrecto", "PIN incorrecto.")
@@ -1124,6 +1245,7 @@ def open_satellite_admin_dialog(parent: QWidget) -> None:
     tabs.addTab(_make_tab(conteo_box), "📋  Conteos")
     if anuncios_boxes:
         tabs.addTab(_make_tab(*anuncios_boxes), "📣  Anuncios")
+    tabs.addTab(_make_tab(_build_camaras_box(dialog)), "📹  Cámaras")
 
     outer = QVBoxLayout()
     outer.setContentsMargins(12, 12, 12, 12)

@@ -71,9 +71,9 @@ class AdminDialogTabsTests(unittest.TestCase):
         tabs = dialog.findChild(QTabWidget)
         self.assertIsNotNone(tabs)
         labels = [tabs.tabText(i) for i in range(tabs.count())]
-        self.assertEqual(len(labels), 5)
+        self.assertEqual(len(labels), 6)
         joined = " ".join(labels)
-        for esperado in ("Conexión", "Impresoras", "Búsqueda", "Conteos", "Anuncios"):
+        for esperado in ("Conexión", "Impresoras", "Búsqueda", "Conteos", "Anuncios", "Cámaras"):
             self.assertIn(esperado, joined)
 
     def test_all_sections_survive_the_redesign(self) -> None:
@@ -88,6 +88,7 @@ class AdminDialogTabsTests(unittest.TestCase):
         self.assertIn("Anuncios activos", titles)
         self.assertIn("Este satélite", titles)
         self.assertIn("Satélites", titles)
+        self.assertIn("DVR de cámaras", titles)
 
     def test_selector_de_destinos_arranca_en_todos(self) -> None:
         from PyQt6.QtWidgets import QCheckBox

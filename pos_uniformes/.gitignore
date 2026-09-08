@@ -36,5 +36,6 @@ data/print_routing.json
 data/ticket_print_settings.json
 data/anuncios/
 data/label_printer_settings.json
+data/dvr_settings.json
 data/satellite_errors.log
 data/pos_errors.log
