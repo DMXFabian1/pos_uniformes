@@ -462,9 +462,9 @@ def _build_camaras_box(dialog: QWidget) -> QGroupBox:
 
     form = QFormLayout()
     host_input = QLineEdit(actual.host)
-    host_input.setPlaceholderText("192.168.0.11")
+    host_input.setPlaceholderText("escribe la IP, ej. 192.168.0.11")
     user_input = QLineEdit(actual.user)
-    user_input.setPlaceholderText("usuario del DVR")
+    user_input.setPlaceholderText("escribe el usuario del DVR")
     pass_input = QLineEdit(actual.password)
     pass_input.setEchoMode(QLineEdit.EchoMode.Password)
     http_port = QSpinBox()
@@ -530,7 +530,20 @@ def _build_camaras_box(dialog: QWidget) -> QGroupBox:
     status = QLabel("")
     status.setWordWrap(True)
 
+    def _faltantes() -> str:
+        faltan = []
+        if not host_input.text().strip():
+            faltan.append("la IP del DVR")
+        if not user_input.text().strip():
+            faltan.append("el usuario")
+        if not pass_input.text():
+            faltan.append("la contraseña")
+        return " y ".join(faltan)
+
     def _detectar() -> None:
+        if _faltantes():
+            QMessageBox.warning(dialog, "DVR", f"Falta {_faltantes()}. El texto gris es solo un ejemplo: escríbelo en el campo.")
+            return
         try:
             canales = detectar_canales(_leer_settings())
         except RuntimeError as exc:
@@ -554,7 +567,7 @@ def _build_camaras_box(dialog: QWidget) -> QGroupBox:
     def _guardar() -> None:
         settings_nuevos = _leer_settings()
         if not settings_nuevos.configurado():
-            QMessageBox.warning(dialog, "DVR", "Falta la IP o el usuario del DVR.")
+            QMessageBox.warning(dialog, "DVR", f"Falta {_faltantes() or 'la IP o el usuario del DVR'}.")
             return
         save_dvr_settings(settings_nuevos)
         status.setText("Configuración de cámaras guardada.")
