@@ -110,11 +110,11 @@ def pendientes_del_dia(session, hoy: date | None = None, ahora: datetime | None 
         code = e.codigo.upper()
         h = horarios[code]
         nombre = e.nombre_completo.split()[0]
-        if h.descanso_weekday is None or h.fecha_ultimo_pago is None:
+        if not h.configurado or (not h.por_dia and h.fecha_ultimo_pago is None):
             que = []
-            if h.descanso_weekday is None:
-                que.append("descanso fijo")
-            if h.fecha_ultimo_pago is None:
+            if not h.configurado:
+                que.append("días de trabajo" if h.por_dia else "descanso fijo")
+            if not h.por_dia and h.fecha_ultimo_pago is None:
                 que.append("fecha del último pago")
             salida.append(Pendiente(SIN_HORARIO, code, e.nombre_completo, f"{nombre} no tiene {' ni '.join(que)} configurado"))
         estado = estado_del_dia(h, hoy)
@@ -122,7 +122,7 @@ def pendientes_del_dia(session, hoy: date | None = None, ahora: datetime | None 
             salida.append(Pendiente(DESCANSO_HOY, code, e.nombre_completo, f"{nombre} descansa hoy"))
         elif (
             estado == TRABAJO
-            and h.descanso_weekday is not None  # sin horario no se adivina nada
+            and h.configurado  # sin horario no se adivina nada
             and sugerir_faltas
             and code not in con_movimientos
             and hoy not in h.eventos

@@ -931,11 +931,12 @@ class CalendarioEncargadoDialog(QDialog):
         ly.setSpacing(12)
         self._que_titulo = self._titulo("")
         ly.addWidget(self._que_titulo)
-        # Solo dos opciones: "sí trabajó" confundía a León — si algo sale
-        # mal, para eso está "Me equivoqué"; lo fino lo ajusta Daniel.
+        # "Vino a trabajar" es para las que van por días (p.ej. Naye, fines
+        # de semana): cuando ayuda un día extra se apunta y se le paga.
         for texto, tipo in (
             ("🚫  Faltó", FALTA),
             ("🛌  Le doy descanso", DESCANSO),
+            ("✅  Vino a trabajar (día extra)", TRABAJO),
         ):
             btn = QPushButton(texto)
             btn.setStyleSheet(self._BTN)
@@ -1097,7 +1098,7 @@ class CalendarioEncargadoDialog(QDialog):
         verbo = {
             FALTA: "faltó",
             DESCANSO: "descansa",
-            TRABAJO: "sí trabajó",
+            TRABAJO: "vino a trabajar",
         }[self._sel_tipo]
         self._mostrar_listo(
             f"✅ Apuntado:\n\n{self._sel_nombre} {verbo} el {_fecha_en_palabras(fecha)}.",

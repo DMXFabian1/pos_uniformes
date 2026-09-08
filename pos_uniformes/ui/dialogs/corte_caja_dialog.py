@@ -117,7 +117,11 @@ def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list |
 
 def _desglose_pago(p, lines: list[str], tk_row) -> None:
     """Sueldo + comisiones × tarifa − faltas, para que se sepa por qué es esa cantidad."""
-    lines.append(tk_row("  Sueldo:", f"${Decimal(p.sueldo_base):,.2f}"))
+    dias = getattr(p, "dias_trabajados", None)
+    if dias is not None:
+        lines.append(tk_row(f"  {int(dias)} dia(s) x ${Decimal(p.tarifa_dia or 0):,.2f}:", f"${Decimal(p.sueldo_base):,.2f}"))
+    else:
+        lines.append(tk_row("  Sueldo:", f"${Decimal(p.sueldo_base):,.2f}"))
     com = int(p.comisiones or 0)
     tarifa = Decimal(p.tarifa_comision or 0)
     tarifa_txt = f"${tarifa:,.0f}" if tarifa == tarifa.to_integral() else f"${tarifa:,.2f}"
@@ -334,11 +338,16 @@ def confirmar_pago(parent: QWidget | None, *, employee_code: str, employee_name:
         return None
     desde = d.desde.strftime("%d/%m") if d.desde else "inicio"
     cuando = "" if fecha == _date.today() else f"Fecha del pago: {fecha:%d/%m/%Y}\n"
+    base_txt = (
+        f"{d.dias_trabajados} día(s) × ${d.tarifa_dia:,.2f}:  ${d.sueldo_base:,.2f}\n"
+        if d.por_dia
+        else f"Sueldo base:        ${d.sueldo_base:,.2f}\n"
+    )
     texto = (
         f"{employee_name}\n"
         f"{cuando}"
         f"Periodo: {desde} → {d.hasta:%d/%m}\n\n"
-        f"Sueldo base:        ${d.sueldo_base:,.2f}\n"
+        f"{base_txt}"
         f"{d.comisiones} comisiones × ${d.tarifa_comision:,.2f}:  +${d.monto_comisiones:,.2f}\n"
         + (f"{d.faltas} falta(s):        -${d.descuento_faltas:,.2f}\n" if d.faltas else "")
         + f"\nA PAGAR:  ${d.total:,.2f}"

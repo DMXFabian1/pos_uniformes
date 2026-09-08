@@ -25,6 +25,10 @@ DESCANSO = "descanso"
 FALTA = "falta"
 PAGO = "pago"
 
+MODO_SEMANA = "semana"     # sueldo fijo, un descanso a la semana
+MODO_POR_DIA = "por_dia"   # solo ciertos días; cobra por día trabajado
+
+
 @dataclass
 class HorarioEmpleada:
     employee_code: str
@@ -34,6 +38,26 @@ class HorarioEmpleada:
     fecha_ultimo_pago: date | None = None
     # {fecha: tipo_evento} — el evento del día le gana al patrón fijo.
     eventos: dict[date, str] = field(default_factory=dict)
+    modo_pago: str = MODO_SEMANA
+    # Modo por_dia: weekdays que trabaja (p.ej. [5, 6] = sábado y domingo).
+    dias_trabajo: list[int] = field(default_factory=list)
+
+    @property
+    def por_dia(self) -> bool:
+        return self.modo_pago == MODO_POR_DIA
+
+    @property
+    def configurado(self) -> bool:
+        """Tiene lo mínimo para calcular pagos y descansos."""
+        if self.por_dia:
+            return bool(self.dias_trabajo)
+        return self.descanso_weekday is not None
+
+
+def dias_trabajo_texto(horario: HorarioEmpleada) -> str:
+    """'sáb, dom' para modo por_dia."""
+    cortos = ("lun", "mar", "mié", "jue", "vie", "sáb", "dom")
+    return ", ".join(cortos[d] for d in sorted(set(horario.dias_trabajo)) if 0 <= d <= 6)
 
 
 # ─── Lógica pura ─────────────────────────────────────────────────────────
@@ -47,6 +71,8 @@ def estado_del_dia(horario: HorarioEmpleada, dia: date) -> str:
         return PAGO
     if evento in (FALTA, DESCANSO, TRABAJO):
         return evento
+    if horario.por_dia:
+        return TRABAJO if dia.weekday() in horario.dias_trabajo else DESCANSO
     if horario.descanso_weekday is not None and dia.weekday() == horario.descanso_weekday:
         return DESCANSO
     return TRABAJO
@@ -76,6 +102,19 @@ def fecha_proximo_pago(horario: HorarioEmpleada, hoy: date) -> date | None:
     semana y lo faltado se descuenta a la hora de pagar. Si el pago quedó
     atrasado (Daniel no lo ha registrado), se sigue mostrando el vencido.
     """
+    if horario.por_dia:
+        # Cobra al terminar sus días: el último día de trabajo de la semana
+        # (p.ej. domingo si trabaja sáb y dom). Sin último pago: el próximo
+        # a partir de hoy. Si ya venció y no se registró, se sigue mostrando.
+        if not horario.dias_trabajo:
+            return None
+        ultimo_wd = max(horario.dias_trabajo)
+        dia = (horario.fecha_ultimo_pago + timedelta(days=1)) if horario.fecha_ultimo_pago else hoy
+        for _ in range(8):
+            if dia.weekday() == ultimo_wd:
+                return dia
+            dia += timedelta(days=1)
+        return None
     if horario.fecha_ultimo_pago is None or horario.ciclo_dias_pago <= 0:
         return None
     return horario.fecha_ultimo_pago + timedelta(days=horario.ciclo_dias_pago)
@@ -148,6 +187,8 @@ def cargar_horario(session, employee_code: str) -> HorarioEmpleada:
         descanso_weekday=fila.descanso_weekday if fila else None,
         ciclo_dias_pago=fila.ciclo_dias_pago if fila else 7,
         fecha_ultimo_pago=fila.fecha_ultimo_pago if fila else None,
+        modo_pago=(getattr(fila, "modo_pago", None) or MODO_SEMANA) if fila else MODO_SEMANA,
+        dias_trabajo=[int(d) for d in (getattr(fila, "dias_trabajo", None) or [])] if fila else [],
     )
     filas = (
         session.query(EmpleadaEvento)
@@ -165,7 +206,13 @@ def guardar_horario(
     *,
     descanso_weekday: int | None,
     ciclo_dias_pago: int,
+    modo_pago: str | None = None,
+    dias_trabajo: list[int] | None = None,
+    fecha_ultimo_pago: date | None = None,
+    actualizar_ultimo_pago: bool = False,
 ) -> None:
+    """Guarda el patrón. `modo_pago`/`dias_trabajo` solo cambian si se pasan;
+    `fecha_ultimo_pago` solo si `actualizar_ultimo_pago=True` (puede ser None)."""
     from pos_uniformes.database.models import EmpleadaHorario
 
     code = str(employee_code).strip().upper()
@@ -175,6 +222,14 @@ def guardar_horario(
         session.add(fila)
     fila.descanso_weekday = descanso_weekday
     fila.ciclo_dias_pago = int(ciclo_dias_pago)
+    if modo_pago is not None:
+        if modo_pago not in (MODO_SEMANA, MODO_POR_DIA):
+            raise ValueError(f"modo_pago inválido: {modo_pago!r}")
+        fila.modo_pago = modo_pago
+    if dias_trabajo is not None:
+        fila.dias_trabajo = sorted({int(d) for d in dias_trabajo if 0 <= int(d) <= 6})
+    if actualizar_ultimo_pago:
+        fila.fecha_ultimo_pago = fecha_ultimo_pago
     session.commit()
 
 
@@ -319,11 +374,13 @@ def descanso_en_semana(horario: HorarioEmpleada, fecha: date) -> date | None:
 
 
 def quienes_descansan(horarios: dict[str, HorarioEmpleada], fecha: date) -> list[str]:
-    return [
+    """Códigos con descanso ese día. Las de modo por_dia no cuentan: un día
+    que no les toca no es "descanso" (avisarlo solo mete ruido)."""
+    return sorted(
         code
         for code, h in horarios.items()
-        if estado_del_dia(h, fecha) == DESCANSO
-    ]
+        if not h.por_dia and estado_del_dia(h, fecha) == DESCANSO
+    )
 
 
 def validar_solicitud_descanso(

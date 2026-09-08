@@ -1966,6 +1966,12 @@ class EmpleadaHorario(Base):
     descanso_weekday: Mapped[int | None] = mapped_column(Integer)
     ciclo_dias_pago: Mapped[int] = mapped_column(Integer, nullable=False, default=7, server_default="7")
     fecha_ultimo_pago: Mapped[date | None] = mapped_column(Date)
+    # "semana" = sueldo fijo con un descanso a la semana (las de siempre).
+    # "por_dia" = solo ciertos días (p.ej. fines de semana): cobra por día
+    # trabajado (sueldo_base/6) al terminar sus días; sin faltas.
+    modo_pago: Mapped[str] = mapped_column(String(20), nullable=False, default="semana", server_default="semana")
+    # Días de la semana que trabaja en modo por_dia: [5, 6] = sábado y domingo.
+    dias_trabajo: Mapped[list | None] = mapped_column(JSON().with_variant(JSONB(), "postgresql"))
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
@@ -2079,6 +2085,9 @@ class EmpleadaPago(Base):
     descuento_faltas: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     creado_por: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    # Modo por día: cuántos días trabajó y a cuánto (sueldo_base = días × tarifa).
+    dias_trabajados: Mapped[int | None] = mapped_column(Integer)
+    tarifa_dia: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )

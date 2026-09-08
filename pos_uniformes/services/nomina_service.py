@@ -21,11 +21,14 @@ from pos_uniformes.services.calendario_empleadas_service import (
     HorarioEmpleada,
     cargar_horario,
     comisiones_desde_ultimo_pago,
+    es_dia_trabajado,
     faltas_en_rango,
     fecha_proximo_pago,
     quienes_descansan,
     registrar_pago,
 )
+
+DIAS_POR_SEMANA = 6  # tarifa por día = sueldo_base / 6
 
 _CENT = Decimal("0.01")
 OWNER_CODE = "VEND-1"
@@ -42,10 +45,16 @@ class DetallePago:
     desde: date | None      # primer día que cubre (día siguiente al último pago)
     hasta: date             # último día que cubre (el día del pago)
     comisiones: int
-    sueldo_base: Decimal
+    sueldo_base: Decimal    # modo por_dia: días × tarifa_dia
     tarifa_comision: Decimal
     faltas: int
     descuento_falta: Decimal
+    dias_trabajados: int | None = None   # solo modo por_dia
+    tarifa_dia: Decimal | None = None    # solo modo por_dia
+
+    @property
+    def por_dia(self) -> bool:
+        return self.dias_trabajados is not None
 
     @property
     def monto_comisiones(self) -> Decimal:
@@ -81,7 +90,30 @@ def calcular_pago(
     hasta: date,
 ) -> DetallePago:
     desde = horario.fecha_ultimo_pago + timedelta(days=1) if horario.fecha_ultimo_pago else None
-    faltas = faltas_en_rango(horario, desde or (hasta - timedelta(days=horario.ciclo_dias_pago - 1)), hasta)
+    inicio = desde or (hasta - timedelta(days=horario.ciclo_dias_pago - 1))
+    if horario.por_dia:
+        # Cobra solo los días que trabajó (marcados en su patrón o apuntados
+        # como "trabajó"); no hay faltas: el día que no vino no se paga.
+        tarifa_dia = (params.sueldo_base / DIAS_POR_SEMANA).quantize(_CENT)
+        dias = 0
+        dia = inicio
+        while dia <= hasta:
+            if es_dia_trabajado(horario, dia):
+                dias += 1
+            dia += timedelta(days=1)
+        return DetallePago(
+            employee_code=horario.employee_code,
+            desde=desde,
+            hasta=hasta,
+            comisiones=int(comisiones or 0),
+            sueldo_base=(tarifa_dia * dias).quantize(_CENT),
+            tarifa_comision=params.tarifa_comision,
+            faltas=0,
+            descuento_falta=Decimal("0.00"),
+            dias_trabajados=dias,
+            tarifa_dia=tarifa_dia,
+        )
+    faltas = faltas_en_rango(horario, inicio, hasta)
     return DetallePago(
         employee_code=horario.employee_code,
         desde=desde,
@@ -131,6 +163,8 @@ def registrar_pago_con_monto(session, employee_code: str, *, creado_por: str, fe
         descuento_faltas=detalle.descuento_faltas,
         total=detalle.total,
         creado_por=str(creado_por).strip().upper(),
+        dias_trabajados=detalle.dias_trabajados,
+        tarifa_dia=detalle.tarifa_dia,
         # Explícito (no server_default): el corte automático lo registra y
         # cierra en el mismo instante, y así queda dentro del periodo.
         created_at=datetime.now().astimezone(),

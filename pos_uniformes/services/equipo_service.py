@@ -20,9 +20,10 @@ class FichaEmpleada:
     codigo: str
     nombre: str
     activa: bool
-    descanso: str  # "lunes".."domingo" o "sin configurar"
+    descanso: str  # "descansa lunes", "trabaja sáb, dom" o "sin configurar"
     ultimo_pago: date | None
     ultimo_movimiento: date | None
+    modo_pago: str = "semana"
 
 
 def listar_equipo(session) -> list[FichaEmpleada]:
@@ -30,7 +31,7 @@ def listar_equipo(session) -> list[FichaEmpleada]:
     from sqlalchemy import func
 
     from pos_uniformes.database.models import Empleada, EmpleadaHorario, LibretaVenta
-    from pos_uniformes.services.calendario_empleadas_service import WEEKDAY_NAMES
+    from pos_uniformes.services.calendario_empleadas_service import MODO_POR_DIA, WEEKDAY_NAMES
 
     horarios = {h.employee_code.upper(): h for h in session.scalars(select(EmpleadaHorario)).all()}
     ultimos = {
@@ -46,8 +47,13 @@ def listar_equipo(session) -> list[FichaEmpleada]:
             continue
         h = horarios.get(code)
         descanso = "sin configurar"
-        if h is not None and h.descanso_weekday is not None:
-            descanso = WEEKDAY_NAMES[h.descanso_weekday]
+        modo = (getattr(h, "modo_pago", None) or "semana") if h is not None else "semana"
+        if h is not None and modo == MODO_POR_DIA:
+            dias = sorted({int(d) for d in (h.dias_trabajo or [])})
+            cortos = ("lun", "mar", "mié", "jue", "vie", "sáb", "dom")
+            descanso = ("trabaja " + ", ".join(cortos[d] for d in dias if 0 <= d <= 6)) if dias else "sin configurar"
+        elif h is not None and h.descanso_weekday is not None:
+            descanso = "descansa " + WEEKDAY_NAMES[h.descanso_weekday]
         ult = ultimos.get(code)
         if ult is not None and ult.tzinfo is not None:
             ult = ult.astimezone()
@@ -57,6 +63,7 @@ def listar_equipo(session) -> list[FichaEmpleada]:
                 nombre=e.nombre_completo,
                 activa=bool(e.activo),
                 descanso=descanso,
+                modo_pago=modo,
                 ultimo_pago=h.fecha_ultimo_pago if h is not None else None,
                 ultimo_movimiento=ult.date() if ult is not None else None,
             )

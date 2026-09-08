@@ -39,7 +39,7 @@ class EquipoServiceTests(unittest.TestCase):
         fichas = listar_equipo(self.session)
         self.assertEqual([f.codigo for f in fichas], ["VEND-2", "VEND-9"])
         ana = fichas[0]
-        self.assertEqual(ana.descanso, "miércoles")
+        self.assertEqual(ana.descanso, "descansa miércoles")
         self.assertEqual(ana.ultimo_pago, date(2026, 9, 2))
         self.assertEqual(ana.ultimo_movimiento, date(2026, 9, 7))
         self.assertEqual(fichas[1].descanso, "sin configurar")
@@ -51,6 +51,14 @@ class EquipoServiceTests(unittest.TestCase):
         cambiar_estado(self.session, "VEND-9", activa=True)
         self.assertTrue(self.session.query(Empleada).filter_by(codigo="VEND-9").one().activo)
         self.assertEqual(self.session.query(LibretaVenta).count(), 1)
+
+    def test_por_dias_muestra_los_dias(self) -> None:
+        from pos_uniformes.services.calendario_empleadas_service import guardar_horario
+
+        guardar_horario(self.session, "VEND-9", descanso_weekday=None, ciclo_dias_pago=7, modo_pago="por_dia", dias_trabajo=[6, 5])
+        naye = [f for f in listar_equipo(self.session) if f.codigo == "VEND-9"][0]
+        self.assertEqual(naye.descanso, "trabaja sáb, dom")
+        self.assertEqual(naye.modo_pago, "por_dia")
 
     def test_no_se_puede_dar_de_baja_al_dueno_ni_al_encargado(self) -> None:
         with self.assertRaises(ValueError):
@@ -76,15 +84,16 @@ class EquipoDialogTests(unittest.TestCase):
         with patch.object(EquipoDialog, "recargar"):
             dlg = EquipoDialog(None)
         dlg.pintar([
-            FichaEmpleada("VEND-2", "Ana López", True, "miércoles", date(2026, 9, 2), date(2026, 9, 7)),
+            FichaEmpleada("VEND-2", "Ana López", True, "descansa miércoles", date(2026, 9, 2), date(2026, 9, 7)),
             FichaEmpleada("VEND-9", "Lupita Mora", False, "sin configurar", None, None),
         ])
         self.assertEqual(dlg.tabla.rowCount(), 2)
         self.assertEqual(dlg.tabla.item(0, 2).text(), "Activa")
         self.assertEqual(dlg.tabla.item(1, 2).text(), "De baja")
         self.assertEqual(dlg.tabla.item(1, 4).text(), "—")
-        b0 = dlg.tabla.cellWidget(0, 6)
-        b1 = dlg.tabla.cellWidget(1, 6)
+        b0 = dlg.tabla.cellWidget(0, 7)
+        b1 = dlg.tabla.cellWidget(1, 7)
+        self.assertIn("Horario", dlg.tabla.cellWidget(0, 6).text())
         self.assertIsInstance(b0, QPushButton)
         self.assertIn("Dar de baja", b0.text())
         self.assertIn("Reactivar", b1.text())
