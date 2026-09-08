@@ -1568,6 +1568,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_momento_button.clicked.connect(lambda: self._ver_momento_libreta())
         self.libreta_caja_button = QPushButton("⚙ Caja y nómina")
         self.libreta_caja_button.clicked.connect(self._editar_caja_nomina)
+        self.libreta_pagos_button = QPushButton("💵 Pagos")
+        self.libreta_pagos_button.clicked.connect(self._abrir_historial_pagos)
         for accion_btn in (
             self.libreta_reprint_button,
             self.libreta_pago_button,
@@ -1575,6 +1577,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self.libreta_delete_button,
             self.libreta_momento_button,
             self.libreta_caja_button,
+            self.libreta_pagos_button,
         ):
             accion_btn.setObjectName("secondaryButton")
             accion_btn.setAutoDefault(False)
@@ -2466,6 +2469,14 @@ class QuoteSatelliteWindow(QMainWindow):
         if corte is not None:
             self._set_status(f"Corte guardado: ${Decimal(corte.monto_final):,.2f} en caja.")
             self._refresh_libreta_view()
+
+    def _abrir_historial_pagos(self) -> None:
+        """Historial de pagos a empleadas con desglose y totales (solo dueño)."""
+        if not self._libreta_is_owner:
+            return
+        from pos_uniformes.ui.dialogs.historial_pagos_dialog import HistorialPagosDialog
+
+        HistorialPagosDialog(self).exec()
 
     def _editar_caja_nomina(self) -> None:
         """Fondo de caja y reglas de pago (solo dueño)."""

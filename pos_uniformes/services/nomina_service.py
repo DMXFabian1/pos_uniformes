@@ -238,3 +238,66 @@ def texto_resumen_encargado(resumen: ResumenEncargado, hoy: date | None = None) 
     else:
         partes.append("Pagos: ninguno en los próximos 7 días")
     return "\n".join(partes)
+
+
+# ─── Historial de pagos (vista del dueño) ────────────────────────────────
+
+@dataclass(frozen=True)
+class TotalEmpleada:
+    employee_code: str
+    employee_name: str
+    pagos: int
+    comisiones: int
+    faltas: int
+    monto_comisiones: Decimal
+    descuento_faltas: Decimal
+    total: Decimal
+
+
+def listar_pagos(session, *, desde: date, hasta: date, employee_code: str | None = None) -> list:
+    """Pagos registrados con fecha entre `desde` y `hasta` (inclusive), del
+    más reciente al más viejo."""
+    from pos_uniformes.database.models import EmpleadaPago
+
+    q = session.query(EmpleadaPago).filter(EmpleadaPago.fecha >= desde, EmpleadaPago.fecha <= hasta)
+    if employee_code:
+        q = q.filter(EmpleadaPago.employee_code == str(employee_code).strip().upper())
+    return list(q.order_by(EmpleadaPago.fecha.desc(), EmpleadaPago.id.desc()).all())
+
+
+def resumir_pagos_por_empleada(pagos: list) -> list[TotalEmpleada]:
+    """Totales por empleada (puro). Ordenado por total pagado, mayor primero."""
+    acc: dict[str, dict] = {}
+    for p in pagos:
+        code = str(p.employee_code).upper()
+        a = acc.setdefault(code, {
+            "nombre": p.employee_name or code, "pagos": 0, "comisiones": 0, "faltas": 0,
+            "monto_comisiones": Decimal("0.00"), "descuento_faltas": Decimal("0.00"), "total": Decimal("0.00"),
+        })
+        a["pagos"] += 1
+        a["comisiones"] += int(p.comisiones or 0)
+        a["faltas"] += int(p.faltas or 0)
+        a["monto_comisiones"] += Decimal(str(p.monto_comisiones or 0))
+        a["descuento_faltas"] += Decimal(str(p.descuento_faltas or 0))
+        a["total"] += Decimal(str(p.total or 0))
+    filas = [
+        TotalEmpleada(
+            employee_code=code,
+            employee_name=a["nombre"],
+            pagos=a["pagos"],
+            comisiones=a["comisiones"],
+            faltas=a["faltas"],
+            monto_comisiones=a["monto_comisiones"].quantize(_CENT),
+            descuento_faltas=a["descuento_faltas"].quantize(_CENT),
+            total=a["total"].quantize(_CENT),
+        )
+        for code, a in acc.items()
+    ]
+    filas.sort(key=lambda t: (t.total, t.employee_name), reverse=True)
+    return filas
+
+
+def rango_mes(year: int, month: int) -> tuple[date, date]:
+    primero = date(year, month, 1)
+    siguiente = date(year + 1, 1, 1) if month == 12 else date(year, month + 1, 1)
+    return primero, siguiente - timedelta(days=1)
