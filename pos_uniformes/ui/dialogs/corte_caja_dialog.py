@@ -86,15 +86,14 @@ def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list |
     lines.append(tk_bot())
     if pagos:
         lines.append("")
-        lines.append("PAGAR HOY".center(_TW))
+        lines.append("PAGOS A EMPLEADAS".center(_TW))
         lines.append(tk_top())
-        for p in pagos:
+        for idx, p in enumerate(pagos):
+            if idx:
+                lines.append(tk_mid())
             nombre = (p.employee_name or p.employee_code)[: _TW - 16]
             lines.append(tk_row(f"{nombre}:", f"${Decimal(p.total):,.2f}"))
-            detalle = f"{int(p.comisiones or 0)} com."
-            if int(p.faltas or 0):
-                detalle += f" - {int(p.faltas)} falta(s)"
-            lines.append(tk_line(f"  {detalle}"))
+            _desglose_pago(p, lines, tk_row)
         lines.append(tk_dbl())
         total = sum((Decimal(p.total) for p in pagos), Decimal("0.00"))
         lines.append(tk_row("TOTAL PAGOS:", f"${total:,.2f}"))
@@ -114,6 +113,18 @@ def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list |
     lines.append("")
     lines.append("Corte generado por la Libreta.".center(_TW))
     return "\n".join(lines)
+
+
+def _desglose_pago(p, lines: list[str], tk_row) -> None:
+    """Sueldo + comisiones × tarifa − faltas, para que se sepa por qué es esa cantidad."""
+    lines.append(tk_row("  Sueldo:", f"${Decimal(p.sueldo_base):,.2f}"))
+    com = int(p.comisiones or 0)
+    tarifa = Decimal(p.tarifa_comision or 0)
+    tarifa_txt = f"${tarifa:,.0f}" if tarifa == tarifa.to_integral() else f"${tarifa:,.2f}"
+    lines.append(tk_row(f"  {com} comisiones x {tarifa_txt}:", f"+${Decimal(p.monto_comisiones):,.2f}"))
+    faltas = int(p.faltas or 0)
+    if faltas:
+        lines.append(tk_row(f"  {faltas} falta(s):", f"-${Decimal(p.descuento_faltas):,.2f}"))
 
 
 def texto_estado_caja(estado: EstadoCaja) -> str:
@@ -142,9 +153,13 @@ def _periodo(estado: EstadoCaja) -> str:
 def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = False):
     """Flujo completo: estado → captura → guarda → imprime. Devuelve el corte o None."""
     from pos_uniformes.database.connection import get_session
-    from pos_uniformes.services.corte_caja_service import cerrar_corte, estado_caja
+    from pos_uniformes.services.corte_caja_service import (
+        cerrar_corte,
+        estado_caja,
+        operaciones_del_periodo,
+        pagos_registrados_del_periodo,
+    )
     from pos_uniformes.services.libreta_service import resumir_por_empleada
-    from pos_uniformes.services.corte_caja_service import operaciones_del_periodo
 
     try:
         with get_session() as session:
@@ -224,7 +239,8 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
                 creado_por=creado_por,
                 ahora=estado.hasta,
             )
-            texto = texto_ticket_corte(corte, por_empleada, venta_efectivo=estado.resumen.efectivo)
+            pagos_periodo = pagos_registrados_del_periodo(session, estado.desde, estado.hasta)
+            texto = texto_ticket_corte(corte, por_empleada, pagos=pagos_periodo, venta_efectivo=estado.resumen.efectivo)
     except ValueError as exc:
         QMessageBox.warning(parent, "Corte", str(exc))
         return None
@@ -430,15 +446,7 @@ def texto_ticket_corte_encargado(corte, venta_efectivo, pagos: list, por_emplead
                 lines.append(tk_mid())
             nombre = (p.employee_name or p.employee_code).split()[0].upper()
             lines.append(tk_row(f"PAGAR A {nombre}:"[: _TW - 14], f"${Decimal(p.total):,.2f}"))
-            # Desglose: que sepa por qué es esa cantidad.
-            lines.append(tk_row("  Sueldo:", f"${Decimal(p.sueldo_base):,.2f}"))
-            com = int(p.comisiones or 0)
-            tarifa = Decimal(p.tarifa_comision or 0)
-            tarifa_txt = f"${tarifa:,.0f}" if tarifa == tarifa.to_integral() else f"${tarifa:,.2f}"
-            lines.append(tk_row(f"  {com} comisiones x {tarifa_txt}:", f"+${Decimal(p.monto_comisiones):,.2f}"))
-            faltas = int(p.faltas or 0)
-            if faltas:
-                lines.append(tk_row(f"  {faltas} falta(s):", f"-${Decimal(p.descuento_faltas):,.2f}"))
+            _desglose_pago(p, lines, tk_row)
         if len(pagos) > 1:
             lines.append(tk_mid())
             lines.append(tk_row("Total pagos:", f"${total_pagos:,.2f}"))

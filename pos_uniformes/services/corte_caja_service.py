@@ -173,6 +173,16 @@ def pagos_del_periodo(session, desde: datetime | None, hasta: datetime) -> Decim
     return _d(session.scalar(stmt))
 
 
+def pagos_registrados_del_periodo(session, desde: datetime | None, hasta: datetime) -> list:
+    """Filas EmpleadaPago del periodo (para desglosarlas en el ticket)."""
+    from pos_uniformes.database.models import EmpleadaPago
+
+    stmt = select(EmpleadaPago).where(EmpleadaPago.created_at <= hasta)
+    if desde is not None:
+        stmt = stmt.where(EmpleadaPago.created_at > desde)
+    return list(session.scalars(stmt.order_by(EmpleadaPago.id)).all())
+
+
 def estado_caja(session, ahora: datetime | None = None, otros_retiros=Decimal("0.00")) -> EstadoCaja:
     """Lo que debería haber en el cajón ahora mismo."""
     ahora = ahora or datetime.now().astimezone()

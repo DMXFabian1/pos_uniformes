@@ -72,16 +72,20 @@ if __name__ == "__main__":
 class TicketPagarHoyTests(unittest.TestCase):
     def test_seccion_pagar_hoy_y_venta(self) -> None:
         pagos = [
-            SimpleNamespace(employee_name="Evelyn Ramírez", employee_code="VEND-2", total=Decimal("1191.33"), comisiones=54, faltas=1),
-            SimpleNamespace(employee_name="Cristal", employee_code="VEND-3", total=Decimal("1320.00"), comisiones=10, faltas=0),
+            SimpleNamespace(employee_name="Evelyn Ramírez", employee_code="VEND-2", total=Decimal("1191.33"), comisiones=54, faltas=1,
+                            sueldo_base=Decimal("1300.00"), tarifa_comision=Decimal("2.00"), monto_comisiones=Decimal("108.00"), descuento_faltas=Decimal("216.67")),
+            SimpleNamespace(employee_name="Cristal", employee_code="VEND-3", total=Decimal("1320.00"), comisiones=10, faltas=0,
+                            sueldo_base=Decimal("1300.00"), tarifa_comision=Decimal("2.00"), monto_comisiones=Decimal("20.00"), descuento_faltas=Decimal("0.00")),
         ]
         texto = texto_ticket_corte(_corte(retiros_pagos=Decimal("2511.33")), pagos=pagos, venta_efectivo=Decimal("6660.00"))
         self.assertIn("VENTA (efectivo):", texto)
         self.assertIn("$6,660.00", texto)
-        self.assertIn("PAGAR HOY", texto)
+        self.assertIn("PAGOS A EMPLEADAS", texto)
         self.assertIn("Evelyn Ramírez:", texto)
         self.assertIn("$1,191.33", texto)
-        self.assertIn("54 com. - 1 falta(s)", texto)
+        self.assertIn("54 comisiones x $2:", texto)
+        self.assertIn("1 falta(s):", texto)
+        self.assertIn("-$216.67", texto)
         self.assertIn("TOTAL PAGOS:", texto)
         self.assertIn("$2,511.33", texto)
 
