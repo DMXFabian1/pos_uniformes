@@ -25,10 +25,27 @@ def _share_dir() -> Path | None:
     return Path(rf"\\{host}\{_SHARE_NAME}")
 
 
+def _version_txt_instalada() -> str | None:
+    """VERSION.txt que el lanzador copia junto al exe (lleva versión+commit).
+
+    Es la misma cadena que se publica en el share: si coinciden, no hay nada
+    nuevo. Sin este archivo (dev, o bundle sin lanzador) se usa VERSION.
+    """
+    import sys
+
+    if not getattr(sys, "frozen", False):
+        return None
+    try:
+        texto = (Path(sys.executable).resolve().parent / "VERSION.txt").read_text(encoding="utf-8").strip()
+    except OSError:
+        return None
+    return texto or None
+
+
 def version_local() -> str:
     from pos_uniformes.utils.app_metadata import app_version
 
-    return str(app_version()).strip()
+    return _version_txt_instalada() or str(app_version()).strip()
 
 
 def version_remota() -> str | None:

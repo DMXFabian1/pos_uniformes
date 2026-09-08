@@ -59,6 +59,15 @@ if ($WithPrecheck) {
 Copy-Item (Join-Path $projectRoot "pos_uniformes.env.example") `
     (Join-Path $bundleDir "pos_uniformes.env") -Force
 
+# VERSION.txt (version+commit) va DENTRO del bundle: la app lo lee como su
+# version instalada y lo compara contra el publicado en el share. Si la build
+# no lo trajera, la app compararia "2026.11.11" contra "2026.11.11+abc123" y
+# avisaria de una actualizacion que ya tiene, en cada arranque.
+$commit = ""
+try { $commit = (& git -C $projectRoot rev-parse --short HEAD 2>$null).Trim() } catch {}
+$publishedVersion = if ($commit) { "$version+$commit" } else { $version }
+Set-Content -Path (Join-Path $bundleDir "VERSION.txt") -Value $publishedVersion
+
 Compress-Archive -Path (Join-Path $bundleDir "*") -DestinationPath $zipPath -Force
 
 # -- Publicacion para kioskos (auto-update por red, sin USB) --------------
@@ -73,9 +82,6 @@ if (Test-Path $updatesDir) {
     # VERSION.txt lleva version + commit: los kioskos se actualizan solos en
     # CADA build publicada, aunque nadie haya subido el archivo VERSION. Sin
     # esto, una base migrada + kioskos con exe viejo = "Base de datos no lista".
-    $commit = ""
-    try { $commit = (& git -C $projectRoot rev-parse --short HEAD 2>$null).Trim() } catch {}
-    $publishedVersion = if ($commit) { "$version+$commit" } else { $version }
     Set-Content -Path (Join-Path $publishDir "VERSION.txt") -Value $publishedVersion
     # El lanzador tambien se publica: instalar un kiosko nuevo = copiar
     # lanzador_satelite.bat + .ps1 desde la carpeta compartida.
