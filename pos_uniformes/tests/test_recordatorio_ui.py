@@ -140,7 +140,17 @@ class CalendarioRecordatoriosTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
 
-    def test_panel_carga_recordatorios_y_banner(self) -> None:
+    def test_panel_no_carga_recordatorios_ni_banner(self) -> None:
+        """Los recordatorios se retiraron del calendario del kiosko a propósito.
+
+        El panel ya no los carga ni muestra el banner de próximos (ver
+        `refresh()` en conteo_calendario_mes_panel). Este test fija esa decisión
+        para que no vuelvan por accidente; antes exigía lo contrario y llevaba
+        fallando desde que se hizo el cambio.
+
+        Los recordatorios siguen vivos en su propio diálogo — eso lo cubren los
+        demás tests de este archivo.
+        """
         from pos_uniformes.ui.dialogs.conteo_calendario_mes_panel import ConteoCalendarioMesPanel
 
         eng = _make_engine()
@@ -150,10 +160,8 @@ class CalendarioRecordatoriosTests(unittest.TestCase):
         panel = ConteoCalendarioMesPanel(
             session_factory=lambda: Session(eng), hoy=date(2026, 6, 16)
         )
-        # Cargó el recordatorio y el banner muestra "Renta" (mañana, día 17).
-        self.assertEqual(len(panel._recordatorios), 1)
-        self.assertFalse(panel._proximos_label.isHidden())
-        self.assertIn("Renta", panel._proximos_label.text())
+        self.assertEqual(panel._recordatorios, [])
+        self.assertTrue(panel._proximos_label.isHidden())
 
     def test_toggle_completado_en_el_panel(self) -> None:
         from pos_uniformes.ui.dialogs.conteo_calendario_mes_panel import ConteoCalendarioMesPanel

@@ -81,6 +81,12 @@ class ReconnectWatchdogTests(unittest.TestCase):
 
     def test_worker_emits_none_when_probe_fails(self) -> None:
         window = self._window()
+        # La ventana ya lanzo su refresh de arranque y dejo _db_refresh_running
+        # en True, asi que _start_background_db_refresh salia por el guard de
+        # reentrada y nunca creaba el Thread: call_args quedaba en None. Se
+        # limpia la bandera para probar el worker, que es lo que este test cubre
+        # (el guard tiene el suyo abajo).
+        window._db_refresh_running = False
         window._db_refresh_ready = Mock()
         with patch(
             "pos_uniformes.services.satellite_startup_service.probe_database_host",
@@ -93,6 +99,16 @@ class ReconnectWatchdogTests(unittest.TestCase):
                 target = thread_cls.call_args.kwargs["target"]
                 target()
         window._db_refresh_ready.emit.assert_called_once_with(None, None)
+
+    def test_no_lanza_dos_refrescos_a_la_vez(self) -> None:
+        """Con un refresh en vuelo, no se lanza otro hilo."""
+        window = self._window()
+        window._db_refresh_running = True
+        import threading
+
+        with patch.object(threading, "Thread") as thread_cls:
+            window._start_background_db_refresh()
+        thread_cls.assert_not_called()
 
 
 if __name__ == "__main__":
