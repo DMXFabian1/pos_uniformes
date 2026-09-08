@@ -569,12 +569,13 @@ class QuoteSatelliteWindow(QMainWindow):
                     listener.wait(1000)
                 except Exception:  # noqa: BLE001
                     pass
-        camaras = getattr(self, "_camera_wall_dialog", None)
-        if camaras is not None:
-            try:
-                camaras.close()
-            except Exception:  # noqa: BLE001
-                pass
+        for attr in ("_camera_wall_dialog", "_camera_playback_dialog"):
+            camaras = getattr(self, attr, None)
+            if camaras is not None:
+                try:
+                    camaras.close()
+                except Exception:  # noqa: BLE001
+                    pass
         super().closeEvent(event)
 
     def _start_background_db_refresh(self) -> None:
@@ -1538,11 +1539,16 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_reasignar_button.clicked.connect(self._reasignar_libreta)
         self.libreta_delete_button = QPushButton("🗑 Borrar")
         self.libreta_delete_button.clicked.connect(self._borrar_registro_libreta)
+        # Ver momento: grabación del DVR a la hora del movimiento (cámara
+        # CAJA por defecto). No guarda nada; el DVR sirve el clip por RTSP.
+        self.libreta_momento_button = QPushButton("📹 Ver momento")
+        self.libreta_momento_button.clicked.connect(lambda: self._ver_momento_libreta())
         for accion_btn in (
             self.libreta_reprint_button,
             self.libreta_pago_button,
             self.libreta_reasignar_button,
             self.libreta_delete_button,
+            self.libreta_momento_button,
         ):
             accion_btn.setObjectName("secondaryButton")
             accion_btn.setAutoDefault(False)
@@ -2040,12 +2046,67 @@ class QuoteSatelliteWindow(QMainWindow):
         pie.setStyleSheet("font-size: 13px; font-weight: 700; color: #73341c;")
         ly.addWidget(pie)
 
+        botones = QHBoxLayout()
+        # Ver momento también para la empleada: ve la grabación de su venta
+        # en las cámaras de entrada (las demás piden PIN dentro del visor).
+        momento_btn = QPushButton("📹 Ver momento")
+        momento_btn.setObjectName("secondaryButton")
+        momento_btn.setAutoDefault(False)
+        momento_btn.clicked.connect(lambda: self._ver_momento_libreta(row))
+        botones.addWidget(momento_btn)
+        botones.addStretch()
         cerrar = QPushButton("Cerrar")
         cerrar.setAutoDefault(False)
         cerrar.clicked.connect(dlg.accept)
-        ly.addWidget(cerrar)
+        botones.addWidget(cerrar)
+        ly.addLayout(botones)
         dlg.setLayout(ly)
         dlg.exec()
+
+    @staticmethod
+    def _momento_local_libreta(row) -> datetime:
+        """Fecha/hora del movimiento en hora local naive, que es la que espera el DVR."""
+        created = row.created_at
+        if created.tzinfo is not None:
+            created = created.astimezone().replace(tzinfo=None)
+        return created
+
+    def _ver_momento_libreta(self, row=None) -> None:
+        """Abre la grabación del DVR alrededor de un movimiento de la Libreta.
+
+        Sin `row` usa el movimiento seleccionado en la tabla del dueño. El
+        dueño (gafete VEND-1) entra directo en modo admin (todas las cámaras);
+        la empleada ve solo las de entrada, como en el visor en vivo.
+        """
+        if row is None:
+            rows = list(getattr(self, "_libreta_rows_pintadas", []) or [])
+            idx = self.libreta_table.currentRow()
+            if idx < 0 or idx >= len(rows):
+                self._set_status("Selecciona un movimiento en la tabla para ver su momento.")
+                return
+            row = rows[idx]
+        from pos_uniformes.ui.dialogs.camera_playback_dialog import CameraPlaybackDialog
+
+        momento = self._momento_local_libreta(row)
+        nombre = row.employee_name or row.employee_code or ""
+        titulo = f"{str(row.tipo).capitalize()} · {nombre}".strip(" ·")
+        dialog = CameraPlaybackDialog(
+            momento,
+            self,
+            titulo=titulo,
+            admin=bool(getattr(self, "_libreta_is_owner", False)),
+        )
+        # Referencia viva para que el reproductor no muera al salir del método.
+        anterior = getattr(self, "_camera_playback_dialog", None)
+        if anterior is not None:
+            try:
+                anterior.close()
+            except Exception:  # noqa: BLE001
+                pass
+        self._camera_playback_dialog = dialog
+        dialog.show()
+        dialog.raise_()
+        dialog.activateWindow()
 
     def _cambiar_pago_libreta(self) -> None:
         """Alterna tarjeta/efectivo del registro seleccionado (solo dueño)

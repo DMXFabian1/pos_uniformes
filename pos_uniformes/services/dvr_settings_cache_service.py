@@ -19,6 +19,7 @@ import json
 import os
 import re
 from dataclasses import asdict, dataclass, field
+from datetime import datetime
 from pathlib import Path
 from urllib.parse import quote
 
@@ -58,14 +59,39 @@ class DVRSettings:
             return list(self.canales)
         return [c for c in self.canales if c.entrada]
 
+    def _rtsp_base(self) -> str:
+        auth = f"{quote(self.user, safe='')}:{quote(self.password, safe='')}@" if self.user else ""
+        return f"rtsp://{auth}{self.host}:{self.rtsp_port}"
+
     def rtsp_url(self, canal: int, substream: bool = True) -> str:
         """URL RTSP Dahua. `substream` = resolución baja (mosaico); False = principal."""
         subtype = 1 if substream else 0
-        auth = f"{quote(self.user, safe='')}:{quote(self.password, safe='')}@" if self.user else ""
+        return f"{self._rtsp_base()}/cam/realmonitor?channel={int(canal)}&subtype={subtype}"
+
+    def playback_url(self, canal: int, inicio: datetime, fin: datetime) -> str:
+        """Grabación del DVR entre `inicio` y `fin` (hora local del DVR, stream principal).
+
+        Dahua acepta `cam/playback` con `starttime`/`endtime` en formato
+        `AAAA_MM_DD_HH_MM_SS`. El DVR reporta la duración del clip y permite
+        buscar posición, así que QMediaPlayer lo trata como un archivo.
+        """
+        if fin <= inicio:
+            raise ValueError("fin debe ser posterior a inicio")
+        fmt = "%Y_%m_%d_%H_%M_%S"
         return (
-            f"rtsp://{auth}{self.host}:{self.rtsp_port}"
-            f"/cam/realmonitor?channel={int(canal)}&subtype={subtype}"
+            f"{self._rtsp_base()}/cam/playback?channel={int(canal)}&subtype=0"
+            f"&starttime={inicio.strftime(fmt)}&endtime={fin.strftime(fmt)}"
         )
+
+    def canal_por_nombre(self, nombre: str, admin: bool) -> CanalDVR | None:
+        """Primer canal visible cuyo nombre contiene `nombre` (sin distinguir mayúsculas)."""
+        clave = (nombre or "").strip().upper()
+        if not clave:
+            return None
+        for c in self.canales_visibles(admin):
+            if clave in c.nombre.upper():
+                return c
+        return None
 
 
 def _cache_path() -> Path:

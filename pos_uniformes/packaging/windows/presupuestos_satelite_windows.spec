@@ -70,6 +70,7 @@ hiddenimports += [
     "pos_uniformes.services.satelite_registry_service",
     # Cámaras del DVR (imports lazy + QtMultimedia, que PyInstaller no ve):
     "pos_uniformes.ui.dialogs.camera_wall_dialog",
+    "pos_uniformes.ui.dialogs.camera_playback_dialog",
     "pos_uniformes.services.dvr_settings_cache_service",
     "PyQt6.QtMultimedia",
     "PyQt6.QtMultimediaWidgets",
