@@ -433,8 +433,8 @@ class EncargadoMovilTests(unittest.TestCase):
         self.assertEqual(self.session.query(EmpleadaPago).one().creado_por, "ENC-1")
         trabajo = self.session.query(Trabajo).one()
         self.assertEqual(trabajo.tipo, TipoTrabajo.TICKET)
-        self.assertIn("PAGAR HOY", trabajo.contenido["texto"])
-        self.assertIn("Fanny Ortiz", trabajo.contenido["texto"])
+        self.assertIn("PAGAR A FANNY", trabajo.contenido["texto"])
+        self.assertIn("SACAR DE LA VENTA", trabajo.contenido["texto"])
 
     def test_pagar_registra_desglose(self) -> None:
         from pos_uniformes.database.models import CajaParametros, EmpleadaPago

@@ -11,7 +11,7 @@ from types import SimpleNamespace
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from pos_uniformes.services.corte_caja_service import EstadoCaja, ResumenPeriodo
-from pos_uniformes.ui.dialogs.corte_caja_dialog import texto_estado_caja, texto_previa_corte_encargado, texto_ticket_corte
+from pos_uniformes.ui.dialogs.corte_caja_dialog import texto_estado_caja, texto_previa_corte_encargado, texto_ticket_corte, texto_ticket_corte_encargado
 
 
 def _corte(**extra):
@@ -97,3 +97,28 @@ class TicketPagarHoyTests(unittest.TestCase):
         self.assertIn("Evelyn  $1,191.33", texto)
         self.assertIn("SE RETIRA: $5,468.67", texto)
         self.assertIn("Se queda de fondo: $11,160.00", texto)
+
+
+class TicketEncargadoTests(unittest.TestCase):
+    def test_solo_vendido_pagar_y_sacar(self) -> None:
+        corte = _corte(monto_final=Decimal("16628.67"), retiros_pagos=Decimal("1191.33"))
+        pagos = [SimpleNamespace(employee_name="Evelyn Ramírez", employee_code="VEND-2", total=Decimal("1191.33"))]
+        texto = texto_ticket_corte_encargado(corte, Decimal("6660.00"), pagos)
+        self.assertIn("SE VENDIO:", texto)
+        self.assertIn("$6,660.00", texto)
+        self.assertIn("PAGAR A EVELYN:", texto)
+        self.assertIn("$1,191.33", texto)
+        self.assertIn("SACAR DE LA VENTA:", texto)
+        self.assertIn("$5,468.67", texto)
+        self.assertIn("El fondo del cajon se queda igual.", texto)
+        for prohibido in ("EN CAJA", "Fondo inicial", "Operaciones", "11,160"):
+            self.assertNotIn(prohibido, texto)
+
+    def test_sin_pagos_y_fondo_que_baja(self) -> None:
+        corte = _corte(monto_final=Decimal("10356.00"), reactivo_final=Decimal("10356.00"))
+        texto = texto_ticket_corte_encargado(corte, Decimal("500.00"), [])
+        self.assertIn("Hoy no se paga a nadie.", texto)
+        self.assertIn("SACAR DE LA VENTA:", texto)
+        self.assertIn("$0.00", texto)
+        self.assertIn("Se tomo del fondo.", texto)
+        self.assertIn("Fondo que queda:", texto)

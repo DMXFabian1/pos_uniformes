@@ -461,7 +461,7 @@ def encargado_hacer_corte(
     from pos_uniformes.services import trabajos_service
     from pos_uniformes.services.corte_caja_service import cerrar_corte_automatico, operaciones_del_periodo
     from pos_uniformes.services.libreta_service import resumir_por_empleada
-    from pos_uniformes.ui.dialogs.corte_caja_dialog import texto_ticket_corte
+    from pos_uniformes.ui.dialogs.corte_caja_dialog import texto_ticket_corte_encargado
 
     empleada, _p = current
     _solo_gestor(empleada)
@@ -471,8 +471,8 @@ def encargado_hacer_corte(
     rows = operaciones_del_periodo(db, auto.estado.desde, auto.estado.hasta)
     ticket_encolado = False
     try:
-        texto = texto_ticket_corte(
-            auto.corte, resumir_por_empleada(rows), pagos=auto.pagos, venta_efectivo=auto.estado.resumen.efectivo
+        texto = texto_ticket_corte_encargado(
+            auto.corte, auto.estado.resumen.efectivo, auto.pagos, resumir_por_empleada(rows)
         )
         trabajos_service.enviar_ticket(db, texto, origen="pwa", creado_por=quien)
         ticket_encolado = True

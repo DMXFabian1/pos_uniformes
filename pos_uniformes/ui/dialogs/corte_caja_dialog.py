@@ -372,11 +372,11 @@ def hacer_corte_automatico(parent: QWidget | None, *, creado_por: str):
         with get_session() as session:
             resultado = cerrar_corte_automatico(session, creado_por=creado_por)
             rows = operaciones_del_periodo(session, resultado.estado.desde, resultado.estado.hasta)
-            texto = texto_ticket_corte(
+            texto = texto_ticket_corte_encargado(
                 resultado.corte,
+                resultado.estado.resumen.efectivo,
+                resultado.pagos,
                 resumir_por_empleada(rows),
-                pagos=resultado.pagos,
-                venta_efectivo=resultado.estado.resumen.efectivo,
             )
     except Exception:  # noqa: BLE001
         logger.exception("Corte automático: no se pudo guardar")
@@ -389,3 +389,71 @@ def hacer_corte_automatico(parent: QWidget | None, *, creado_por: str):
     except Exception:  # noqa: BLE001 — el corte ya quedó guardado
         logger.exception("Corte automático: falló la impresión")
     return resultado, texto
+
+
+def texto_ticket_corte_encargado(corte, venta_efectivo, pagos: list, por_empleada: list | None = None) -> str:
+    """Ticket simple para León: cuánto se vendió, a quién pagar y cuánto sacar.
+
+    Sin fondo, sin "en caja", sin operaciones: solo lo que él hace con el
+    dinero. El fondo del cajón no se toca (salvo que los pagos superen la
+    venta, y entonces se avisa)."""
+    from datetime import datetime
+
+    from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
+        TICKET_CHAR_WIDTH as _TW,
+        tk_bot,
+        tk_dbl,
+        tk_line,
+        tk_mid,
+        tk_row,
+        tk_top,
+    )
+
+    venta = Decimal(venta_efectivo).quantize(Decimal("0.01"))
+    total_pagos = sum((Decimal(p.total) for p in pagos), Decimal("0.00")).quantize(Decimal("0.01"))
+    sacar = (Decimal(corte.monto_final) - Decimal(corte.reactivo_final)).quantize(Decimal("0.01"))
+    fondo_bajo = Decimal(corte.reactivo_final) < Decimal(corte.reactivo_inicial)
+
+    lines: list[str] = []
+    lines.append("CORTE".center(_TW))
+    lines.append(str(corte.periodo_label or "").center(_TW))
+    lines.append(datetime.now().strftime("%d/%m/%Y %H:%M").center(_TW))
+    lines.append("")
+    lines.append(tk_top())
+    lines.append(tk_row("SE VENDIO:", f"${venta:,.2f}"))
+    lines.append(tk_bot())
+    lines.append("")
+    lines.append(tk_top())
+    if pagos:
+        for p in pagos:
+            nombre = (p.employee_name or p.employee_code).split()[0].upper()
+            lines.append(tk_row(f"PAGAR A {nombre}:"[: _TW - 14], f"${Decimal(p.total):,.2f}"))
+        if len(pagos) > 1:
+            lines.append(tk_mid())
+            lines.append(tk_row("Total pagos:", f"${total_pagos:,.2f}"))
+    else:
+        lines.append(tk_line("Hoy no se paga a nadie."))
+    lines.append(tk_dbl())
+    lines.append(tk_row("SACAR DE LA VENTA:", f"${sacar:,.2f}"))
+    lines.append(tk_bot())
+    if fondo_bajo:
+        lines.append("")
+        lines.append(tk_top())
+        lines.append(tk_line("OJO: los pagos fueron mas que"))
+        lines.append(tk_line("la venta. Se tomo del fondo."))
+        lines.append(tk_row("Fondo que queda:", f"${Decimal(corte.reactivo_final):,.2f}"))
+        lines.append(tk_bot())
+    else:
+        lines.append("El fondo del cajon se queda igual.".center(_TW))
+    if por_empleada:
+        lines.append("")
+        lines.append("COMISIONES".center(_TW))
+        lines.append(tk_top())
+        first = True
+        for r in por_empleada:
+            if not first:
+                lines.append(tk_mid())
+            first = False
+            lines.append(tk_row(f"{(r.employee_name or r.employee_code).split()[0]}:", f"{r.comisiones} com."))
+        lines.append(tk_bot())
+    return "\n".join(lines)
