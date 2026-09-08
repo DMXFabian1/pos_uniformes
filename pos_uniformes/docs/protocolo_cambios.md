@@ -46,6 +46,30 @@ python -m pytest pos_uniformes/tests -m "not qt" -q
 Nota: `--fast` omite los tests que necesitan PostgreSQL real o PyQt6. Son los
 lentos y los que fallan fuera de la tienda; no los sustituye, los aplaza.
 
+### Base de datos de pruebas
+
+Los tests NUNCA tocan produccion: `tests/conftest.py` fuerza la conexion a
+`127.0.0.1/pos_uniformes_test` y aborta la corrida si detecta que quedaron
+apuntando a otra cosa. Antes de esto, correr la suite desde la Mac escribia en
+la base real de la tienda.
+
+Preparar esa base una vez por maquina:
+
+```
+psql -h 127.0.0.1 -U postgres -c "CREATE DATABASE pos_uniformes_test"
+POS_UNIFORMES_DB_HOST=127.0.0.1 POS_UNIFORMES_DB_NAME=pos_uniformes_test \
+    ./.venv/bin/python -m alembic upgrade head
+```
+
+Y despues de cada migracion nueva, repetir el `alembic upgrade head` sobre
+`pos_uniformes_test` para que no se quede atras.
+
+Para diagnosticar contra una base real (en la tienda, con cuidado):
+
+```
+python -m pytest pos_uniformes/tests --db-real -q
+```
+
 ## Verificacion manual sugerida por dominio
 
 ### Caja
