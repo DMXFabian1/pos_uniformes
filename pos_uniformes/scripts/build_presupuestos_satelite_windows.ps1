@@ -70,12 +70,18 @@ if (-not $updatesDir) { $updatesDir = "C:\pos_updates" }
 if (Test-Path $updatesDir) {
     $publishDir = Join-Path $updatesDir "PresupuestosSatelite"
     robocopy $bundleDir $publishDir /MIR /R:2 /W:2 | Out-Null
-    Set-Content -Path (Join-Path $publishDir "VERSION.txt") -Value $version
+    # VERSION.txt lleva version + commit: los kioskos se actualizan solos en
+    # CADA build publicada, aunque nadie haya subido el archivo VERSION. Sin
+    # esto, una base migrada + kioskos con exe viejo = "Base de datos no lista".
+    $commit = ""
+    try { $commit = (& git -C $projectRoot rev-parse --short HEAD 2>$null).Trim() } catch {}
+    $publishedVersion = if ($commit) { "$version+$commit" } else { $version }
+    Set-Content -Path (Join-Path $publishDir "VERSION.txt") -Value $publishedVersion
     # El lanzador tambien se publica: instalar un kiosko nuevo = copiar
     # lanzador_satelite.bat + .ps1 desde la carpeta compartida.
     Copy-Item (Join-Path $PSScriptRoot "lanzador_satelite.ps1") $updatesDir -Force
     Copy-Item (Join-Path $PSScriptRoot "lanzador_satelite.bat") $updatesDir -Force
-    Write-Host "  Publicado para kioskos en: $publishDir (v$version)"
+    Write-Host "  Publicado para kioskos en: $publishDir ($publishedVersion)"
 } else {
     Write-Host "  (No existe $updatesDir - no se publico para kioskos)"
 }
