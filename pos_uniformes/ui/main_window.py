@@ -13,6 +13,7 @@ from time import monotonic
 import unicodedata
 from urllib.parse import quote
 from uuid import uuid4
+import weakref
 import webbrowser
 
 if __package__ in {None, ""}:
@@ -1242,6 +1243,43 @@ def _build_bulk_selection_label(selected_ids: list[int], matched_rows: list[dict
     return f"Filas seleccionadas ({matched})"
 
 
+class _KioskKeyFilter(QObject):
+    """Ctrl+K global: funciona incluso con un diálogo modal encima.
+
+    Vive a nivel de módulo a propósito. Definida dentro de `__init__` creaba una
+    clase NUEVA por cada ventana; al recolectar una de esas clases con una
+    instancia todavía instalada en el QApplication, el siguiente evento entraba
+    a memoria liberada y el proceso moría con un segfault dentro de eventFilter
+    (con la línea sin resolver, `line ???`, porque el code object ya no existía).
+    Se veía al construir muchas ventanas seguidas, que es justo lo que hacen los
+    tests.
+
+    Guarda al dueño con una referencia débil: el filtro se instala en el
+    QApplication, que vive toda la sesión, y una referencia fuerte mantendría
+    viva la ventana para siempre.
+    """
+
+    def __init__(self, owner: "MainWindow") -> None:
+        super().__init__(owner)
+        self._owner_ref = weakref.ref(owner)
+
+    def eventFilter(self, obj, event):  # noqa: N802 — API de Qt
+        if event.type() == QEvent.Type.KeyPress:
+            mods = event.modifiers()
+            key = event.key()
+            ctrl = (
+                mods & Qt.KeyboardModifier.ControlModifier
+                or mods & Qt.KeyboardModifier.MetaModifier
+            )
+            if ctrl and key == Qt.Key.Key_K:
+                owner = self._owner_ref()
+                if owner is None:
+                    return False
+                owner._open_quick_kiosk()
+                return True
+        return False
+
+
 class MainWindow(QMainWindow):
     def __init__(self, user_id: int) -> None:
         super().__init__()
@@ -2185,23 +2223,6 @@ class MainWindow(QMainWindow):
         quick_search_shortcut_mac.activated.connect(self._open_quick_product_search)
         # Ctrl+K global via event filter (funciona incluso en diálogos modales)
         from PyQt6.QtWidgets import QApplication
-        from PyQt6.QtCore import QEvent
-
-        class _KioskKeyFilter(QObject):
-            def __init__(self, owner):
-                super().__init__(owner)
-                self._owner = owner
-
-            def eventFilter(self, obj, event):
-                if event.type() == QEvent.Type.KeyPress:
-                    from PyQt6.QtCore import Qt as _Qt
-                    mods = event.modifiers()
-                    key = event.key()
-                    ctrl = mods & _Qt.KeyboardModifier.ControlModifier or mods & _Qt.KeyboardModifier.MetaModifier
-                    if ctrl and key == _Qt.Key.Key_K:
-                        self._owner._open_quick_kiosk()
-                        return True
-                return False
 
         self._kiosk_filter = _KioskKeyFilter(self)
         QApplication.instance().installEventFilter(self._kiosk_filter)
