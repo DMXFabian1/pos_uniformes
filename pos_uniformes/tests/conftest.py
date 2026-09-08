@@ -138,3 +138,64 @@ def pytest_collection_modifyitems(
     for item in items:
         for marker in _classify(str(item.path)):
             item.add_marker(getattr(pytest.mark, marker))
+
+
+# ---------------------------------------------------------------------------
+# Ningun test levanta hilos de Postgres ni se queda esperando un clic.
+#
+# Las ventanas (MainWindow, QuoteSatelliteWindow) hacen trabajo real en su
+# __init__: arrancan hilos QThread con LISTEN de Postgres y, si algo falla,
+# abren un QMessageBox modal. Bajo test eso daba tres sintomas distintos con
+# una sola causa:
+#
+#   - CUELGUE: QMessageBox.critical esperando un clic que nunca llega. La base
+#     de prueba esta vacia, _load_operator_context revienta, y la corrida se
+#     queda ahi para siempre (se vieron procesos colgados 19 horas).
+#   - ABORT:   un QMessageBox sin QApplication → qFatal.
+#   - SEGFAULT: el GC corriendo mientras un hilo psycopg sigue bloqueado en
+#     notifies(); los hilos nunca se detienen entre tests y se acumulan.
+#
+# Esto NO arregla el diseño — eso es sacar el trabajo pesado del __init__. Es
+# la red que permite volver a correr y medir la suite sin tocar produccion.
+# ---------------------------------------------------------------------------
+
+_LISTENERS = (
+    ("pos_uniformes.ui.helpers.anuncio_listener", "AnuncioNotifyListener"),
+    ("pos_uniformes.ui.helpers.trabajo_listener", "TrabajoNotifyListener"),
+)
+
+# Dialogos que solo informan: su valor de retorno no decide nada, unicamente
+# bloquean. `question` NO se toca a proposito — ahi la respuesta cambia el flujo
+# y debe elegirla cada test.
+_DIALOGOS_BLOQUEANTES = ("information", "warning", "critical", "about")
+
+
+@pytest.fixture(autouse=True)
+def _sin_hilos_ni_dialogos_modales(monkeypatch: pytest.MonkeyPatch) -> None:
+    if "PyQt6.QtCore" not in sys.modules:
+        # Test rapido: no hay Qt cargado, no hay nada que neutralizar (y no
+        # queremos importarlo justo aqui, que es lo que cuesta tiempo).
+        return
+
+    import importlib
+
+    for nombre_modulo, nombre_clase in _LISTENERS:
+        try:
+            modulo = importlib.import_module(nombre_modulo)
+        except Exception:  # noqa: BLE001 — si no se puede importar, no aplica
+            continue
+        clase = getattr(modulo, nombre_clase, None)
+        if clase is None:
+            continue
+        monkeypatch.setattr(clase, "start", lambda self, *a, **k: None, raising=False)
+        monkeypatch.setattr(clase, "run", lambda self, *a, **k: None, raising=False)
+
+    from PyQt6.QtWidgets import QMessageBox
+
+    for nombre in _DIALOGOS_BLOQUEANTES:
+        monkeypatch.setattr(
+            QMessageBox,
+            nombre,
+            staticmethod(lambda *a, **k: QMessageBox.StandardButton.Ok),
+            raising=False,
+        )
