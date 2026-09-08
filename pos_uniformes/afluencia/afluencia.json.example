@@ -9,14 +9,24 @@
       "nombre": "ENTRADA1.1",
       "canal": 5,
       "modo": "linea",
-      "linea": [0.30, 0.62, 0.62, 0.62],
+      "linea": [
+        0.3,
+        0.62,
+        0.62,
+        0.62
+      ],
       "lado_dentro": "abajo"
     },
     {
       "nombre": "ENTRADA2.2",
       "canal": 3,
       "modo": "linea",
-      "linea": [0.55, 0.45, 0.92, 0.45],
+      "linea": [
+        0.58,
+        0.38,
+        0.92,
+        0.5
+      ],
       "lado_dentro": "abajo"
     },
     {
