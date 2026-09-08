@@ -12,7 +12,7 @@ Solo Daniel (VEND-1) y su papá (ENC-1) registran pagos.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 
 from pos_uniformes.services.corte_caja_service import ParametrosCaja, cargar_parametros
@@ -131,6 +131,9 @@ def registrar_pago_con_monto(session, employee_code: str, *, creado_por: str, fe
         descuento_faltas=detalle.descuento_faltas,
         total=detalle.total,
         creado_por=str(creado_por).strip().upper(),
+        # Explícito (no server_default): el corte automático lo registra y
+        # cierra en el mismo instante, y así queda dentro del periodo.
+        created_at=datetime.now().astimezone(),
     )
     session.add(pago)
     registrar_pago(session, code, fecha)  # commit incluido

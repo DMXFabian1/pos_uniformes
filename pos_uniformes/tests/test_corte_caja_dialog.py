@@ -11,7 +11,7 @@ from types import SimpleNamespace
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from pos_uniformes.services.corte_caja_service import EstadoCaja, ResumenPeriodo
-from pos_uniformes.ui.dialogs.corte_caja_dialog import texto_estado_caja, texto_ticket_corte
+from pos_uniformes.ui.dialogs.corte_caja_dialog import texto_estado_caja, texto_previa_corte_encargado, texto_ticket_corte
 
 
 def _corte(**extra):
@@ -67,3 +67,33 @@ class TextoEstadoTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TicketPagarHoyTests(unittest.TestCase):
+    def test_seccion_pagar_hoy_y_venta(self) -> None:
+        pagos = [
+            SimpleNamespace(employee_name="Evelyn Ramírez", employee_code="VEND-2", total=Decimal("1191.33"), comisiones=54, faltas=1),
+            SimpleNamespace(employee_name="Cristal", employee_code="VEND-3", total=Decimal("1320.00"), comisiones=10, faltas=0),
+        ]
+        texto = texto_ticket_corte(_corte(retiros_pagos=Decimal("2511.33")), pagos=pagos, venta_efectivo=Decimal("6660.00"))
+        self.assertIn("VENTA (efectivo):", texto)
+        self.assertIn("$6,660.00", texto)
+        self.assertIn("PAGAR HOY", texto)
+        self.assertIn("Evelyn Ramírez:", texto)
+        self.assertIn("$1,191.33", texto)
+        self.assertIn("54 com. - 1 falta(s)", texto)
+        self.assertIn("TOTAL PAGOS:", texto)
+        self.assertIn("$2,511.33", texto)
+
+    def test_previa_encargado(self) -> None:
+        estado = EstadoCaja(
+            desde=None, hasta=datetime(2026, 9, 9, 20, 20), reactivo=Decimal("11160.00"),
+            resumen=ResumenPeriodo(19, 27, Decimal("6660"), Decimal("0"), Decimal("0"), Decimal("0"), Decimal("6660.00")),
+            pagos=Decimal("0.00"),
+        )
+        avisos = [SimpleNamespace(employee_name="Evelyn Ramírez", total_estimado=Decimal("1191.33"))]
+        texto = texto_previa_corte_encargado(estado, avisos)
+        self.assertEqual(texto.split("\n")[0], "VENTA: $6,660.00")
+        self.assertIn("Evelyn  $1,191.33", texto)
+        self.assertIn("SE RETIRA: $5,468.67", texto)
+        self.assertIn("Se queda de fondo: $11,160.00", texto)

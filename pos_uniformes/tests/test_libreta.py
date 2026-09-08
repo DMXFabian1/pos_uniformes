@@ -559,23 +559,39 @@ class HistorialCortesTests(unittest.TestCase):
         self.assertNotIn("29", textos[0])
         self.assertNotIn("76", textos[0])
 
-    def test_leon_hace_corte_capturando_lo_contado(self) -> None:
-        """Desde el corte por periodo, León cuenta el cajón: el diálogo de
-        caja es el mismo del dueño (en grande) y firma como ENC-1."""
+    def test_leon_hace_corte_de_un_boton(self) -> None:
+        """León no cuenta ni captura: ve venta / a quién pagar / se retira y
+        aprieta Imprimir. Los pagos del día se registran solos."""
         import os as _os
 
         _os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+        from datetime import datetime as _dt
+
         from PyQt6.QtWidgets import QApplication
 
         QApplication.instance() or QApplication([])
+        from pos_uniformes.services.corte_caja_service import CorteAutomatico, EstadoCaja, ResumenPeriodo
+
         cm = MagicMock()
         cm.__enter__ = lambda s: self.session
         cm.__exit__ = lambda s, *a: False
-        corte_fake = SimpleNamespace(monto_final=Decimal("13000.00"), reactivo_final=Decimal("11160.00"))
+        estado = EstadoCaja(
+            desde=None, hasta=_dt(2026, 9, 9, 20, 20), reactivo=Decimal("11160.00"),
+            resumen=ResumenPeriodo(19, 27, Decimal("6660"), Decimal("0"), Decimal("0"), Decimal("0"), Decimal("6660.00")),
+            pagos=Decimal("0.00"),
+        )
+        aviso = SimpleNamespace(employee_code="VEND-2", employee_name="Evelyn Ramírez", total_estimado=Decimal("1191.33"))
+        pago = SimpleNamespace(employee_name="Evelyn Ramírez", employee_code="VEND-2", total=Decimal("1191.33"), comisiones=54, faltas=1)
+        corte = SimpleNamespace(monto_final=Decimal("16628.67"), reactivo_final=Decimal("11160.00"))
         with patch(
             "pos_uniformes.database.connection.get_session", return_value=cm
         ), patch(
-            "pos_uniformes.ui.dialogs.corte_caja_dialog.hacer_corte_caja", return_value=corte_fake
+            "pos_uniformes.services.corte_caja_service.estado_caja", return_value=estado
+        ), patch(
+            "pos_uniformes.services.corte_caja_service.pagos_que_tocan_hoy", return_value=[aviso]
+        ), patch(
+            "pos_uniformes.ui.dialogs.corte_caja_dialog.hacer_corte_automatico",
+            return_value=(CorteAutomatico(corte=corte, estado=estado, pagos=[pago]), "ticket"),
         ) as hacer:
             from pos_uniformes.ui.dialogs.calendario_empleadas_dialog import (
                 CalendarioEncargadoDialog,
@@ -583,13 +599,16 @@ class HistorialCortesTests(unittest.TestCase):
 
             dlg = CalendarioEncargadoDialog(None)
             dlg._ir_a_corte_hoy()
-        hacer.assert_called_once()
+            previa = dlg._corte_texto.text()
+            self.assertIn("VENTA: $6,660.00", previa)
+            self.assertIn("Evelyn  $1,191.33", previa)
+            self.assertIn("SE RETIRA: $5,468.67", previa)
+            dlg._hacer_corte()
         self.assertEqual(hacer.call_args.kwargs["creado_por"], "ENC-1")
-        self.assertTrue(hacer.call_args.kwargs["grande"])
         self.assertIn("Corte hecho", dlg._listo_texto.text())
-        self.assertIn("$13,000.00", dlg._listo_texto.text())
-        self.assertIn("$11,160.00", dlg._listo_texto.text())
-        self.assertFalse(dlg._btn_deshacer.isVisible())  # un corte no se deshace
+        self.assertIn("Pagar a Evelyn: $1,191.33", dlg._listo_texto.text())
+        self.assertIn("Se retira $5,468.67", dlg._listo_texto.text())
+        self.assertFalse(dlg._btn_deshacer.isVisible())
 
 
 class LibretaListaAmigableTests(unittest.TestCase):

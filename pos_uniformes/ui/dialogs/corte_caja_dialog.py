@@ -41,9 +41,12 @@ def _spin(valor: Decimal, grande: bool) -> QDoubleSpinBox:
     return s
 
 
-def texto_ticket_corte(corte, por_empleada: list | None = None) -> str:
+def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list | None = None, venta_efectivo=None) -> str:
     """Ticket térmico del corte por periodo: cifra final, fondo, pagos y
-    comisiones por empleada. Sin esperado ni diferencia (solo en pantalla)."""
+    comisiones por empleada. Sin esperado ni diferencia (solo en pantalla).
+
+    `pagos` (EmpleadaPago) imprime la sección PAGAR HOY con nombre y monto:
+    es lo que el encargado toma del cajón para cada una."""
     from datetime import datetime
 
     from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
@@ -66,6 +69,8 @@ def texto_ticket_corte(corte, por_empleada: list | None = None) -> str:
         tk_field("Por:", str(corte.creado_por), lines)
     lines.append(tk_mid())
     lines.append(tk_row("Operaciones:", str(corte.operaciones)))
+    if venta_efectivo is not None:
+        lines.append(tk_row("VENTA (efectivo):", f"${Decimal(venta_efectivo):,.2f}"))
     lines.append(tk_row("Fondo inicial:", f"${Decimal(corte.reactivo_inicial):,.2f}"))
     if Decimal(corte.retiros_pagos or 0) > 0:
         lines.append(tk_row("Pagos empleadas:", f"-${Decimal(corte.retiros_pagos):,.2f}"))
@@ -79,6 +84,21 @@ def texto_ticket_corte(corte, por_empleada: list | None = None) -> str:
     if corte.nota:
         tk_field("Nota:", str(corte.nota), lines)
     lines.append(tk_bot())
+    if pagos:
+        lines.append("")
+        lines.append("PAGAR HOY".center(_TW))
+        lines.append(tk_top())
+        for p in pagos:
+            nombre = (p.employee_name or p.employee_code)[: _TW - 16]
+            lines.append(tk_row(f"{nombre}:", f"${Decimal(p.total):,.2f}"))
+            detalle = f"{int(p.comisiones or 0)} com."
+            if int(p.faltas or 0):
+                detalle += f" - {int(p.faltas)} falta(s)"
+            lines.append(tk_line(f"  {detalle}"))
+        lines.append(tk_dbl())
+        total = sum((Decimal(p.total) for p in pagos), Decimal("0.00"))
+        lines.append(tk_row("TOTAL PAGOS:", f"${total:,.2f}"))
+        lines.append(tk_bot())
     if por_empleada:
         lines.append("")
         lines.append("POR EMPLEADA".center(_TW))
@@ -322,3 +342,50 @@ def confirmar_pago(parent: QWidget | None, *, employee_code: str, employee_name:
         QMessageBox.warning(parent, "No se guardó", "Inténtalo otra vez.")
         return None
     return pago
+
+
+def texto_previa_corte_encargado(estado: EstadoCaja, avisos: list) -> str:
+    """Lo que ve el encargado antes de imprimir: venta, a quién pagar, retiro."""
+    total_pagos = sum((a.total_estimado for a in avisos), Decimal("0.00"))
+    retiro = (estado.resumen.efectivo - estado.pagos - total_pagos).quantize(Decimal("0.01"))
+    lineas = [f"VENTA: ${estado.resumen.efectivo:,.2f}"]
+    if avisos:
+        lineas.append("")
+        lineas.append("PAGAR HOY:")
+        for a in avisos:
+            lineas.append(f"  {a.employee_name.split()[0]}  ${a.total_estimado:,.2f}")
+    if estado.pagos:
+        lineas.append(f"Pagos ya hechos: -${estado.pagos:,.2f}")
+    lineas.append("")
+    lineas.append(f"SE RETIRA: ${retiro:,.2f}")
+    lineas.append(f"Se queda de fondo: ${estado.reactivo:,.2f}")
+    return "\n".join(lineas)
+
+
+def hacer_corte_automatico(parent: QWidget | None, *, creado_por: str):
+    """Corte de un botón para el encargado. Devuelve (CorteAutomatico, texto_ticket) o None."""
+    from pos_uniformes.database.connection import get_session
+    from pos_uniformes.services.corte_caja_service import cerrar_corte_automatico, operaciones_del_periodo
+    from pos_uniformes.services.libreta_service import resumir_por_empleada
+
+    try:
+        with get_session() as session:
+            resultado = cerrar_corte_automatico(session, creado_por=creado_por)
+            rows = operaciones_del_periodo(session, resultado.estado.desde, resultado.estado.hasta)
+            texto = texto_ticket_corte(
+                resultado.corte,
+                resumir_por_empleada(rows),
+                pagos=resultado.pagos,
+                venta_efectivo=resultado.estado.resumen.efectivo,
+            )
+    except Exception:  # noqa: BLE001
+        logger.exception("Corte automático: no se pudo guardar")
+        QMessageBox.warning(parent, "No se guardó", "Inténtalo otra vez.")
+        return None
+    try:
+        from pos_uniformes.ui.helpers.ticket_routing_helper import route_tickets
+
+        route_tickets(parent, "Corte de caja", [texto])
+    except Exception:  # noqa: BLE001 — el corte ya quedó guardado
+        logger.exception("Corte automático: falló la impresión")
+    return resultado, texto

@@ -7,6 +7,7 @@ dependency_overrides — sin tocar Postgres.
 from __future__ import annotations
 
 import unittest
+from datetime import timedelta
 from datetime import date, datetime
 from decimal import Decimal
 from unittest.mock import patch
@@ -397,11 +398,16 @@ class EncargadoMovilTests(unittest.TestCase):
         self.assertEqual(r.status_code, 409)
 
     def test_corte_guarda_y_encola_ticket(self) -> None:
-        """Corte por periodo: León captura lo contado; el fondo queda para el
-        siguiente y el ticket sale a la impresora de la tienda."""
-        from pos_uniformes.database.models import CajaParametros, LibretaCorte, TipoTrabajo, Trabajo
+        """Corte de un botón: cifra calculada, pagos del día registrados solos,
+        fondo intacto y ticket a la impresora de la tienda."""
+        from pos_uniformes.database.models import CajaParametros, EmpleadaPago, LibretaCorte, TipoTrabajo, Trabajo
 
-        self.session.add(CajaParametros(id=1, reactivo_actual=Decimal("11160.00")))
+        self.session.add(
+            CajaParametros(id=1, reactivo_actual=Decimal("11160.00"), sueldo_base=Decimal("1300.00"), tarifa_comision=Decimal("2.00"))
+        )
+        # A Fanny le toca pago hoy (último pago hace 7 días).
+        horario = self.session.query(EmpleadaHorario).filter(EmpleadaHorario.employee_code == "VEND-4").one()
+        horario.fecha_ultimo_pago = date.today() - timedelta(days=7)
         self.session.commit()
         with patch(
             "pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"
@@ -409,33 +415,26 @@ class EncargadoMovilTests(unittest.TestCase):
             datos = self.client.get("/api/v1/movil/encargado/corte_hoy").json()
             self.assertTrue(datos["hay_ventas"])
             self.assertEqual(datos["efectivo"], "500.00")
-            self.assertEqual(datos["reactivo"], "11160.00")
-            self.assertEqual(datos["esperado"], "11660.00")
-            r = self.client.post(
-                "/api/v1/movil/encargado/corte",
-                json={"contado": "11650.00", "reactivo_final": "11160.00"},
-            )
+            self.assertEqual([p["nombre"] for p in datos["pagos_hoy"]], ["Fanny Ortiz"])
+            self.assertEqual(datos["pagos_hoy"][0]["total"], "1304.00")
+            self.assertEqual(datos["retiro"], "-804.00")
+            r = self.client.post("/api/v1/movil/encargado/corte", json={})
         self.assertEqual(r.status_code, 200, r.text)
-        self.assertEqual(r.json()["monto"], "11650.00")
-        self.assertEqual(r.json()["esperado"], "11660.00")
+        self.assertEqual(r.json()["venta"], "500.00")
+        self.assertEqual(r.json()["pagos"][0]["total"], "1304.00")
+        self.assertEqual(r.json()["monto"], "10356.00")  # 11160 + 500 - 1304
+        # El pago superó la venta: el fondo baja a lo que quedó y no se retira nada.
+        self.assertEqual(r.json()["reactivo_final"], "10356.00")
+        self.assertEqual(r.json()["retiro"], "0.00")
         self.assertTrue(r.json()["ticket_encolado"])
         corte = self.session.query(LibretaCorte).one()
         self.assertEqual(corte.creado_por, "ENC-1")
-        self.assertEqual(corte.reactivo_final, Decimal("11160.00"))
-        self.assertEqual(self.session.get(CajaParametros, 1).reactivo_actual, Decimal("11160.00"))
+        self.assertEqual(corte.retiros_pagos, Decimal("1304.00"))
+        self.assertEqual(self.session.query(EmpleadaPago).one().creado_por, "ENC-1")
         trabajo = self.session.query(Trabajo).one()
         self.assertEqual(trabajo.tipo, TipoTrabajo.TICKET)
-        self.assertIn("EN CAJA", trabajo.contenido["texto"])
-
-    def test_corte_con_fondo_mayor_a_lo_contado_se_rechaza(self) -> None:
-        with patch(
-            "pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"
-        ):
-            r = self.client.post(
-                "/api/v1/movil/encargado/corte",
-                json={"contado": "100.00", "reactivo_final": "500.00"},
-            )
-        self.assertEqual(r.status_code, 422)
+        self.assertIn("PAGAR HOY", trabajo.contenido["texto"])
+        self.assertIn("Fanny Ortiz", trabajo.contenido["texto"])
 
     def test_pagar_registra_desglose(self) -> None:
         from pos_uniformes.database.models import CajaParametros, EmpleadaPago

@@ -652,6 +652,7 @@ class CalendarioEncargadoDialog(QDialog):
         self._pg_cuando = self._pagina_cuando()
         self._pg_listo = self._pagina_listo()
         self._pg_cortes = self._pagina_cortes()
+        self._pg_corte = self._pagina_corte()
         self._pg_pagar = self._pagina_pagar()
         for p in (
             self._pg_menu,
@@ -660,6 +661,7 @@ class CalendarioEncargadoDialog(QDialog):
             self._pg_cuando,
             self._pg_listo,
             self._pg_cortes,
+            self._pg_corte,
             self._pg_pagar,
         ):
             self._pila.addWidget(p)
@@ -701,10 +703,6 @@ class CalendarioEncargadoDialog(QDialog):
         btn_hacer.setStyleSheet(self._BTN)
         btn_hacer.clicked.connect(self._ir_a_corte_hoy)
         ly.addWidget(btn_hacer)
-        btn_pagar = QPushButton("💰  Pagar a una empleada")
-        btn_pagar.setStyleSheet(self._BTN)
-        btn_pagar.clicked.connect(self._ir_a_pagar)
-        ly.addWidget(btn_pagar)
         ly.addStretch()
         salir = QPushButton("Salir")
         salir.setStyleSheet(self._BTN_SUAVE)
@@ -767,17 +765,65 @@ class CalendarioEncargadoDialog(QDialog):
                 self._cortes_lista.addWidget(fila)
         self._pila.setCurrentWidget(self._pg_cortes)
 
-    def _ir_a_corte_hoy(self) -> None:
-        """Corte por periodo: León cuenta el cajón y captura lo que hay."""
-        from pos_uniformes.ui.dialogs.corte_caja_dialog import hacer_corte_caja
+    def _pagina_corte(self) -> QWidget:
+        """Previa del corte de León: venta, a quién pagar, cuánto se retira.
+        Un solo botón; nada que contar ni capturar."""
+        pagina = QWidget()
+        ly = QVBoxLayout()
+        ly.setSpacing(14)
+        ly.addWidget(self._titulo("Corte"))
+        ly.addStretch()
+        self._corte_texto = QLabel("")
+        self._corte_texto.setWordWrap(True)
+        self._corte_texto.setStyleSheet("font-size: 26px; font-weight: 800; color: #2c2a27;")
+        ly.addWidget(self._corte_texto)
+        ly.addStretch()
+        self._btn_corte_ok = QPushButton("🖨  Imprimir corte")
+        self._btn_corte_ok.setStyleSheet(self._BTN_ACENTO)
+        self._btn_corte_ok.clicked.connect(self._hacer_corte)
+        ly.addWidget(self._btn_corte_ok)
+        regresar = QPushButton("← Regresar")
+        regresar.setStyleSheet(self._BTN_SUAVE)
+        regresar.clicked.connect(lambda: self._pila.setCurrentWidget(self._pg_menu))
+        ly.addWidget(regresar)
+        pagina.setLayout(ly)
+        return pagina
 
-        corte = hacer_corte_caja(self, creado_por="ENC-1", grande=True)
-        if corte is not None:
-            self._mostrar_listo(
-                f"✅ Corte hecho:\n\n${Decimal(corte.monto_final):,.2f} en caja\n"
-                f"Se queda ${Decimal(corte.reactivo_final):,.2f} de fondo",
-                con_deshacer=False,
-            )
+    def _ir_a_corte_hoy(self) -> None:
+        """Muestra la previa (venta, pagos de hoy, retiro) antes de imprimir."""
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import texto_previa_corte_encargado
+
+        try:
+            from pos_uniformes.database.connection import get_session
+            from pos_uniformes.services.corte_caja_service import estado_caja, pagos_que_tocan_hoy
+
+            with get_session() as session:
+                estado = estado_caja(session)
+                avisos = pagos_que_tocan_hoy(session)
+        except Exception:  # noqa: BLE001
+            logger.exception("Encargado: no se pudo calcular el corte")
+            QMessageBox.warning(self, "Sin conexión", "Inténtalo otra vez.")
+            return
+        if not estado.resumen.operaciones and not avisos:
+            self._mostrar_listo("Todavía no hay ventas desde el último corte.", con_deshacer=False)
+            return
+        self._corte_texto.setText(texto_previa_corte_encargado(estado, avisos))
+        self._pila.setCurrentWidget(self._pg_corte)
+
+    def _hacer_corte(self) -> None:
+        """Guarda el corte con la cifra calculada, registra los pagos del día e imprime."""
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import hacer_corte_automatico
+
+        resultado = hacer_corte_automatico(self, creado_por="ENC-1")
+        if resultado is None:
+            return
+        auto, _texto = resultado
+        lineas = [f"✅ Corte hecho:\n\nVenta ${Decimal(auto.estado.resumen.efectivo):,.2f}"]
+        for p in auto.pagos:
+            lineas.append(f"Pagar a {(p.employee_name or p.employee_code).split()[0]}: ${Decimal(p.total):,.2f}")
+        retiro = Decimal(auto.corte.monto_final) - Decimal(auto.corte.reactivo_final)
+        lineas.append(f"\nSe retira ${retiro:,.2f}")
+        self._mostrar_listo("\n".join(lineas), con_deshacer=False)
 
     def _cargar_resumen_menu(self) -> None:
         """Quién descansa hoy/mañana y pagos de la semana, en palabras llanas."""

@@ -135,7 +135,6 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
       <button class="btn-grande" onclick="encApuntar()">🗓  Apuntar falta o descanso</button>
       <button class="btn-grande" onclick="encVerCortes()">💵  Ver cortes</button>
       <button class="btn-grande" onclick="encCorteHoy()">🧾  Hacer corte</button>
-      <button class="btn-grande" onclick="encPagar()">💰  Pagar a una empleada</button>
       <div class="card" id="enc-resumen"></div>
       <div class="card" id="enc-descansos"></div>
       <button class="btn-suave" onclick="salir()">Salir</button>
@@ -525,40 +524,32 @@ async function encCorteHoy() {
   let datos;
   try { datos = await api("/api/v1/movil/encargado/corte_hoy"); }
   catch (e) { encMenu(); return; }
-  const periodo = datos.desde ? `del ${fechaHora(datos.desde)} al ${fechaHora(datos.hasta)}` : `hasta ${fechaHora(datos.hasta)}`;
-  encSub(`<h1>Hacer corte</h1><p class="sub">${periodo}</p>` +
+  if (!datos.hay_ventas && !(datos.pagos_hoy || []).length) {
+    encSub(`<div class="listo-texto">Todavía no hay ventas desde el último corte.</div>` +
+      `<button class="btn-suave" onclick="encMenu()">← Regresar</button>`);
+    return;
+  }
+  const pagos = (datos.pagos_hoy || []).map(p => `<div class="fila"><span>Pagar a ${p.nombre.split(" ")[0]}</span><span>${pesos(p.total)}</span></div>`).join("");
+  encSub(`<h1>Corte</h1>` +
     `<div class="card">` +
-    `<div class="fila"><span>Fondo con que abrió</span><span>${pesos(datos.reactivo)}</span></div>` +
-    `<div class="fila"><span>Efectivo de ventas y abonos</span><span>${pesos(datos.efectivo)}</span></div>` +
-    (Number(datos.pagos) > 0 ? `<div class="fila"><span>Pagos a empleadas</span><span>-${pesos(datos.pagos)}</span></div>` : "") +
-    `<div class="fila"><strong>Debe haber en el cajón</strong><strong>${pesos(datos.esperado)}</strong></div>` +
+    `<div class="fila"><strong>VENTA</strong><strong>${pesos(datos.efectivo)}</strong></div>` +
+    pagos +
+    `<div class="fila"><strong>SE RETIRA</strong><strong>${pesos(datos.retiro)}</strong></div>` +
+    `<div class="fila"><span>Se queda de fondo</span><span>${pesos(datos.reactivo)}</span></div>` +
     `</div>` +
-    `<label class="sub">Cuenta el cajón. ¿Cuánto hay?</label>` +
-    `<input id="corte-contado" type="number" inputmode="decimal" step="0.01" value="${datos.esperado}" class="input-grande" oninput="encCorteDif(${datos.esperado})">` +
-    `<div id="corte-dif" class="sub"></div>` +
-    `<label class="sub">¿Cuánto se queda de fondo?</label>` +
-    `<input id="corte-fondo" type="number" inputmode="decimal" step="0.01" value="${datos.reactivo}" class="input-grande">` +
-    `<button class="btn-grande" style="background:var(--acento);color:#fff;border:none" onclick="encHacerCorte()">🖨  Guardar e imprimir corte</button>` +
+    `<button class="btn-grande" style="background:var(--acento);color:#fff;border:none" onclick="encHacerCorte()">🖨  Imprimir corte</button>` +
     `<button class="btn-suave" onclick="encMenu()">← Regresar</button>`);
-  encCorteDif(datos.esperado);
-}
-
-function encCorteDif(esperado) {
-  const contado = Number($("corte-contado").value || 0);
-  const d = Math.round((contado - Number(esperado)) * 100) / 100;
-  $("corte-dif").textContent = d === 0 ? "✅ Cuadra exacto." : (d > 0 ? `Sobran ${pesos(d)}` : `Faltan ${pesos(-d)}`);
 }
 
 async function encHacerCorte() {
-  const contado = $("corte-contado").value;
-  const fondo = $("corte-fondo").value;
   try {
-    const r = await encPost("/api/v1/movil/encargado/corte", { contado: contado, reactivo_final: fondo });
-    encSub(`<div class="listo-texto">✅ Corte hecho:<br><br>${pesos(r.monto)} en caja<br>Se queda ${pesos(r.reactivo_final)} de fondo` +
+    const r = await encPost("/api/v1/movil/encargado/corte", {});
+    const pagos = (r.pagos || []).map(p => `<br>Pagar a ${p.nombre.split(" ")[0]}: ${pesos(p.total)}`).join("");
+    encSub(`<div class="listo-texto">✅ Corte hecho:<br><br>Venta ${pesos(r.venta)}${pagos}<br><br>Se retira ${pesos(r.retiro)}` +
       (r.ticket_encolado ? "<br><br>🖨 El ticket está saliendo en la impresora de la tienda." : "") +
       `</div><button class="btn-grande" onclick="encListo()">✅  Listo</button>`);
   } catch (e) {
-    encSub(`<div class="listo-texto">No se pudo hacer el corte. 😕<br><small>${(e && e.message) || ""}</small></div>` +
+    encSub(`<div class="listo-texto">No se pudo hacer el corte. 😕</div>` +
       `<button class="btn-suave" onclick="encMenu()">← Regresar</button>`);
   }
 }

@@ -118,3 +118,65 @@ class CerrarCorteTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class CorteAutomaticoTests(unittest.TestCase):
+    def test_registra_pagos_de_hoy_y_cierra_con_el_esperado(self) -> None:
+        from datetime import date as _date
+
+        session = MagicMock()
+        aviso = SimpleNamespace(employee_code="VEND-2", employee_name="Evelyn")
+        pago = SimpleNamespace(total=Decimal("1191.33"))
+        estado = EstadoCaja(
+            desde=datetime(2026, 9, 8, 20, tzinfo=timezone.utc),
+            hasta=datetime(2026, 9, 9, 20, tzinfo=timezone.utc),
+            reactivo=Decimal("11160.00"),
+            resumen=ResumenPeriodo(19, 27, Decimal("6660"), Decimal("0"), Decimal("0"), Decimal("0"), Decimal("6660.00")),
+            pagos=Decimal("1191.33"),
+        )
+        with patch.object(caja, "pagos_que_tocan_hoy", return_value=[aviso]), patch(
+            "pos_uniformes.services.nomina_service.registrar_pago_con_monto", return_value=pago
+        ) as reg, patch.object(caja, "estado_caja", return_value=estado), patch.object(
+            caja, "cerrar_corte", return_value="CORTE"
+        ) as cerrar:
+            auto = caja.cerrar_corte_automatico(session, creado_por="ENC-1", ahora=estado.hasta)
+        reg.assert_called_once()
+        self.assertEqual(reg.call_args.args[1], "VEND-2")
+        self.assertEqual(reg.call_args.kwargs["creado_por"], "ENC-1")
+        self.assertEqual(cerrar.call_args.kwargs["contado"], Decimal("16628.67"))  # 11160 + 6660 − 1191.33
+        self.assertEqual(cerrar.call_args.kwargs["reactivo_final"], Decimal("11160.00"))
+        self.assertEqual(auto.corte, "CORTE")
+        self.assertEqual(auto.pagos, [pago])
+
+    def test_pagos_que_tocan_hoy_filtra(self) -> None:
+        from datetime import date as _date
+
+        hoy = _date(2026, 9, 9)
+        avisos = [
+            SimpleNamespace(employee_code="A", dias_para_pago=0),
+            SimpleNamespace(employee_code="B", dias_para_pago=-3),
+            SimpleNamespace(employee_code="C", dias_para_pago=2),
+            SimpleNamespace(employee_code="D", dias_para_pago=None),
+            SimpleNamespace(employee_code="E", dias_para_pago=0),  # ya cobró hoy
+        ]
+        horarios = {c: SimpleNamespace(fecha_ultimo_pago=(hoy if c == "E" else None)) for c in "ABCDE"}
+        with patch("pos_uniformes.services.nomina_service.avisos_de_pago", return_value=avisos), patch(
+            "pos_uniformes.services.calendario_empleadas_service.cargar_horario",
+            side_effect=lambda _s, code: horarios[code],
+        ):
+            pendientes = caja.pagos_que_tocan_hoy(MagicMock(), hoy)
+        self.assertEqual([a.employee_code for a in pendientes], ["A", "B"])
+
+    def test_si_los_pagos_superan_la_venta_el_fondo_baja(self) -> None:
+        session = MagicMock()
+        estado = EstadoCaja(
+            desde=None, hasta=datetime(2026, 9, 9, 20, tzinfo=timezone.utc), reactivo=Decimal("11160.00"),
+            resumen=ResumenPeriodo(2, 2, Decimal("500"), Decimal("0"), Decimal("0"), Decimal("0"), Decimal("500.00")),
+            pagos=Decimal("1304.00"),
+        )
+        with patch.object(caja, "pagos_que_tocan_hoy", return_value=[]), patch.object(
+            caja, "estado_caja", return_value=estado
+        ), patch.object(caja, "cerrar_corte", return_value="CORTE") as cerrar:
+            caja.cerrar_corte_automatico(session, creado_por="ENC-1", ahora=estado.hasta)
+        self.assertEqual(cerrar.call_args.kwargs["contado"], Decimal("10356.00"))
+        self.assertEqual(cerrar.call_args.kwargs["reactivo_final"], Decimal("10356.00"))

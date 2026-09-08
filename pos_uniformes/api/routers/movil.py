@@ -422,11 +422,20 @@ def encargado_corte_hoy(
     haber en el cajón. El encargado captura lo contado en /encargado/corte."""
     from pos_uniformes.services.corte_caja_service import estado_caja
 
+    from pos_uniformes.services.corte_caja_service import pagos_que_tocan_hoy
+
     empleada, _p = current
     _solo_gestor(empleada)
     estado = estado_caja(db)
     r = estado.resumen
+    avisos = pagos_que_tocan_hoy(db)
+    total_pagos = sum((a.total_estimado for a in avisos), Decimal("0"))
     return {
+        "pagos_hoy": [
+            {"codigo": a.employee_code, "nombre": a.employee_name, "total": str(a.total_estimado), "comisiones": a.comisiones}
+            for a in avisos
+        ],
+        "retiro": str((r.efectivo - estado.pagos - total_pagos).quantize(Decimal("0.01"))),
         "desde": estado.desde.isoformat() if estado.desde else None,
         "hasta": estado.hasta.isoformat(),
         "reactivo": str(estado.reactivo),
@@ -442,23 +451,15 @@ def encargado_corte_hoy(
     }
 
 
-class CorteRequest(BaseModel):
-    contado: Decimal = Field(ge=0)
-    reactivo_final: Decimal | None = Field(default=None, ge=0)
-    otros_retiros: Decimal = Field(default=Decimal("0"), ge=0)
-    nota: str = Field(default="", max_length=200)
-
-
 @router.post("/encargado/corte")
 def encargado_hacer_corte(
-    body: CorteRequest,
     current: tuple = Depends(get_current_employee),
     db: Session = Depends(get_db),
 ) -> dict:
-    """Cierra el periodo con lo contado por el encargado, deja el fondo para el
-    siguiente y encola el ticket a la impresora de la tienda."""
+    """Corte de un botón: registra los pagos que tocan hoy, cierra con la
+    cifra calculada (el encargado no cuenta ni captura) y encola el ticket."""
     from pos_uniformes.services import trabajos_service
-    from pos_uniformes.services.corte_caja_service import cerrar_corte, estado_caja, operaciones_del_periodo
+    from pos_uniformes.services.corte_caja_service import cerrar_corte_automatico, operaciones_del_periodo
     from pos_uniformes.services.libreta_service import resumir_por_empleada
     from pos_uniformes.ui.dialogs.corte_caja_dialog import texto_ticket_corte
 
@@ -466,33 +467,26 @@ def encargado_hacer_corte(
     _solo_gestor(empleada)
     _solo_tienda()
     quien = str(empleada.codigo).upper()
-    estado = estado_caja(db)
-    rows = operaciones_del_periodo(db, estado.desde, estado.hasta)
-    try:
-        corte = cerrar_corte(
-            db,
-            contado=body.contado,
-            reactivo_final=body.reactivo_final,
-            otros_retiros=body.otros_retiros,
-            nota=body.nota,
-            creado_por=quien,
-            ahora=estado.hasta,
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=422, detail={"error": {"code": "corte_invalido", "message": str(exc)}})
+    auto = cerrar_corte_automatico(db, creado_por=quien)
+    rows = operaciones_del_periodo(db, auto.estado.desde, auto.estado.hasta)
     ticket_encolado = False
     try:
-        texto = texto_ticket_corte(corte, resumir_por_empleada(rows))
+        texto = texto_ticket_corte(
+            auto.corte, resumir_por_empleada(rows), pagos=auto.pagos, venta_efectivo=auto.estado.resumen.efectivo
+        )
         trabajos_service.enviar_ticket(db, texto, origen="pwa", creado_por=quien)
         ticket_encolado = True
         db.commit()
     except Exception:  # noqa: BLE001 — el corte ya quedó; el ticket es extra
         pass
+    retiro = (Decimal(auto.corte.monto_final) - Decimal(auto.corte.reactivo_final)).quantize(Decimal("0.01"))
     return {
         "ok": True,
-        "monto": str(corte.monto_final),
-        "esperado": str(corte.monto_esperado),
-        "reactivo_final": str(corte.reactivo_final),
+        "monto": str(auto.corte.monto_final),
+        "venta": str(auto.estado.resumen.efectivo),
+        "retiro": str(retiro),
+        "reactivo_final": str(auto.corte.reactivo_final),
+        "pagos": [{"nombre": p.employee_name, "total": str(p.total)} for p in auto.pagos],
         "ticket_encolado": ticket_encolado,
     }
 

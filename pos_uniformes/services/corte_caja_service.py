@@ -239,3 +239,59 @@ def _etiqueta_periodo(desde: datetime | None, hasta: datetime) -> str:
         return f"hasta {h}"
     d = (desde.astimezone() if desde.tzinfo else desde).strftime("%d/%m %H:%M")
     return f"{d} → {h}"
+
+
+# ─── Corte automático del encargado ──────────────────────────────────────
+
+@dataclass(frozen=True)
+class CorteAutomatico:
+    corte: object            # LibretaCorte guardado
+    estado: EstadoCaja       # estado con el que se cerró (ya incluye los pagos)
+    pagos: list              # EmpleadaPago registrados en este corte
+
+
+def pagos_que_tocan_hoy(session, hoy=None) -> list:
+    """Empleadas cuyo pago cae hoy o ya se pasó y que no han cobrado hoy."""
+    from datetime import date as _date
+
+    from pos_uniformes.services.calendario_empleadas_service import cargar_horario
+    from pos_uniformes.services.nomina_service import avisos_de_pago
+
+    hoy = hoy or _date.today()
+    pendientes = []
+    for a in avisos_de_pago(session, hoy, dias=0):
+        if a.dias_para_pago is None or a.dias_para_pago > 0:
+            continue
+        if cargar_horario(session, a.employee_code).fecha_ultimo_pago == hoy:
+            continue  # ya cobró hoy
+        pendientes.append(a)
+    return pendientes
+
+
+def cerrar_corte_automatico(session, *, creado_por: str, ahora: datetime | None = None, nota: str | None = None) -> CorteAutomatico:
+    """Corte de un botón (encargado): registra los pagos que tocan hoy, cierra
+    con el esperado como cifra final y deja el mismo fondo. Nadie cuenta ni
+    captura nada; el ticket dice cuánto se vendió, a quién pagar y cuánto
+    se retira."""
+    from pos_uniformes.services.nomina_service import registrar_pago_con_monto
+
+    hoy = (ahora.astimezone() if ahora and ahora.tzinfo else ahora or datetime.now()).date()
+    pagos = []
+    for aviso in pagos_que_tocan_hoy(session, hoy):
+        pagos.append(registrar_pago_con_monto(session, aviso.employee_code, creado_por=creado_por, fecha=hoy))
+    # El cierre se fecha DESPUÉS de registrar los pagos para que queden
+    # dentro del periodo que se está cerrando.
+    ahora = ahora or datetime.now().astimezone()
+    estado = estado_caja(session, ahora)
+    # Si los pagos superaron la venta, el fondo baja (no hay de dónde más
+    # sacar); si no, se queda igual y el resto se retira.
+    fondo = min(estado.reactivo, max(estado.esperado, Decimal("0.00")))
+    corte = cerrar_corte(
+        session,
+        contado=max(estado.esperado, Decimal("0.00")),
+        creado_por=creado_por,
+        reactivo_final=fondo,
+        nota=nota,
+        ahora=ahora,
+    )
+    return CorteAutomatico(corte=corte, estado=estado, pagos=pagos)
