@@ -27,6 +27,13 @@ from pos_uniformes.database.models import (
 )
 from pos_uniformes.ui.dialogs.conteo_orden_dialog import ConteoOrdenDialog
 
+# Reloj congelado. Los tests siembran conteos relativos a esta fecha
+# ("hace 1 día", "hace 60 días"), asi que produccion tiene que ver la misma o
+# los offsets dejan de significar lo que dicen.
+#
+# Antes solo se usaba para sembrar, mientras el servicio leia el reloj real:
+# la escuela "al dia" (contada el 2026-07-11) se volvio vencida sola al pasar
+# 30 dias, y estos tests empezaron a fallar sin que nadie tocara nada.
 _AHORA = datetime(2026, 7, 12, tzinfo=timezone.utc)
 
 
@@ -65,6 +72,13 @@ class ConteoOrdenDialogTests(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
 
     def setUp(self) -> None:
+        reloj = patch(
+            "pos_uniformes.services.conteo_calendario_service._ahora_utc",
+            return_value=_AHORA,
+        )
+        reloj.start()
+        self.addCleanup(reloj.stop)
+
         self.engine = create_engine("sqlite:///:memory:")
         Base.metadata.create_all(self.engine)
         self.factory = lambda: Session(self.engine)
