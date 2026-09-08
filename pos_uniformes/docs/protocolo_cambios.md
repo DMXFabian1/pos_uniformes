@@ -21,8 +21,30 @@
 
 ## Verificaciones minimas
 
-- `./.venv/bin/python scripts/check_startup_health.py`
-- `./.venv/bin/python -m unittest discover -s tests -p 'test_*.py'`
+Despues de CADA cambio (rapido, ~4s, sin base ni Qt):
+
+```
+python -m pytest pos_uniformes/tests --fast -q
+```
+
+Antes de subir a produccion (todo, incluye base y Qt):
+
+```
+python -m pytest pos_uniformes/tests -q
+python pos_uniformes/scripts/check_startup_health.py
+```
+
+Los grupos `db` y `qt` se marcan solos — no hay que decorar tests a mano. La
+clasificacion vive en `tests/conftest.py` y se hace leyendo el fuente, sin
+importar el modulo. Para correr un grupo suelto:
+
+```
+python -m pytest pos_uniformes/tests -m db -q
+python -m pytest pos_uniformes/tests -m "not qt" -q
+```
+
+Nota: `--fast` omite los tests que necesitan PostgreSQL real o PyQt6. Son los
+lentos y los que fallan fuera de la tienda; no los sustituye, los aplaza.
 
 ## Verificacion manual sugerida por dominio
 
