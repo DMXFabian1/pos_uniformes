@@ -110,7 +110,7 @@ class TicketEncargadoTests(unittest.TestCase):
         self.assertIn("$1,191.33", texto)
         self.assertIn("SACAR DE LA VENTA:", texto)
         self.assertIn("$5,468.67", texto)
-        self.assertIn("El fondo del cajon se queda igual.", texto)
+        self.assertIn("El reactivo de la caja se queda igual.", texto)
         for prohibido in ("EN CAJA", "Fondo inicial", "Operaciones", "11,160"):
             self.assertNotIn(prohibido, texto)
 
@@ -120,5 +120,5 @@ class TicketEncargadoTests(unittest.TestCase):
         self.assertIn("Hoy no se paga a nadie.", texto)
         self.assertIn("SACAR DE LA VENTA:", texto)
         self.assertIn("$0.00", texto)
-        self.assertIn("Se tomo del fondo.", texto)
-        self.assertIn("Fondo que queda:", texto)
+        self.assertIn("Se tomo del reactivo.", texto)
+        self.assertIn("Reactivo que queda:", texto)

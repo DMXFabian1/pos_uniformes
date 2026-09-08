@@ -440,11 +440,11 @@ def texto_ticket_corte_encargado(corte, venta_efectivo, pagos: list, por_emplead
         lines.append("")
         lines.append(tk_top())
         lines.append(tk_line("OJO: los pagos fueron mas que"))
-        lines.append(tk_line("la venta. Se tomo del fondo."))
-        lines.append(tk_row("Fondo que queda:", f"${Decimal(corte.reactivo_final):,.2f}"))
+        lines.append(tk_line("la venta. Se tomo del reactivo."))
+        lines.append(tk_row("Reactivo que queda:", f"${Decimal(corte.reactivo_final):,.2f}"))
         lines.append(tk_bot())
     else:
-        lines.append("El fondo del cajon se queda igual.".center(_TW))
+        lines.append("El reactivo de la caja se queda igual.".center(_TW))
     if por_empleada:
         lines.append("")
         lines.append("COMISIONES".center(_TW))
