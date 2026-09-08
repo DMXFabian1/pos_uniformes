@@ -39,3 +39,9 @@ data/label_printer_settings.json
 data/dvr_settings.json
 data/satellite_errors.log
 data/pos_errors.log
+# Afluencia (contador con YOLO): entorno, modelo, config por máquina y salidas
+afluencia/.venv/
+afluencia/afluencia.json
+afluencia/calibracion/
+afluencia/eventos/
+afluencia/*.pt

@@ -1,0 +1,33 @@
+{
+  "fps_proceso": 4,
+  "modelo": "yolov8n.pt",
+  "imgsz": 416,
+  "conf": 0.35,
+  "intervalo_guardado_s": 60,
+  "camaras": [
+    {
+      "nombre": "ENTRADA1.1",
+      "canal": 5,
+      "modo": "linea",
+      "linea": [0.30, 0.62, 0.62, 0.62],
+      "lado_dentro": "abajo"
+    },
+    {
+      "nombre": "ENTRADA2.2",
+      "canal": 3,
+      "modo": "linea",
+      "linea": [0.55, 0.45, 0.92, 0.45],
+      "lado_dentro": "abajo"
+    },
+    {
+      "nombre": "ENTRADA1",
+      "canal": 4,
+      "modo": "paso"
+    },
+    {
+      "nombre": "ENTRADA2",
+      "canal": 6,
+      "modo": "paso"
+    }
+  ]
+}

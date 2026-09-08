@@ -1485,6 +1485,29 @@ class QuoteSatelliteWindow(QMainWindow):
         )
         owner_panel_ly.addWidget(self.libreta_daily_table)
 
+        # Afluencia: lo que contaron las cámaras (afluencia/contador_afluencia.py)
+        # contra las ventas de la misma hora. Oculto si no hay datos (el
+        # contador no corre o la tabla aún no existe en esta base).
+        self.libreta_afluencia_seccion = _seccion("AFLUENCIA  ·  quién entra vs quién compra, por hora")
+        owner_panel_ly.addWidget(self.libreta_afluencia_seccion)
+        self.libreta_afluencia_table = QTableWidget(0, 5)
+        self.libreta_afluencia_table.setObjectName("libretaTabla")
+        self.libreta_afluencia_table.setHorizontalHeaderLabels(
+            ["Hora", "Entran", "Pasan por fuera", "Ventas", "Conversión"]
+        )
+        self.libreta_afluencia_table.horizontalHeader().setSectionResizeMode(
+            QHeaderView.ResizeMode.Stretch
+        )
+        self.libreta_afluencia_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.libreta_afluencia_table.verticalHeader().setVisible(False)
+        self.libreta_afluencia_table.setAlternatingRowColors(True)
+        self.libreta_afluencia_table.setVerticalScrollBarPolicy(
+            Qt.ScrollBarPolicy.ScrollBarAlwaysOff
+        )
+        owner_panel_ly.addWidget(self.libreta_afluencia_table)
+        self.libreta_afluencia_seccion.setVisible(False)
+        self.libreta_afluencia_table.setVisible(False)
+
         owner_panel_ly.addWidget(_seccion("EQUIPO  ·  toca un nombre para ver solo sus movimientos"))
         self.libreta_ranking_list = QListWidget()
         self.libreta_ranking_list.setObjectName("libretaLista")
@@ -1894,6 +1917,7 @@ class QuoteSatelliteWindow(QMainWindow):
         week_rows: list = []
         fuente_db = False
         ciclo_texto: str | None = None
+        afluencia_filas: list = []
         if probe_database_host(0.5):
             try:
                 with get_session() as session:
@@ -1911,6 +1935,8 @@ class QuoteSatelliteWindow(QMainWindow):
                     )
                     if not self._libreta_is_owner:
                         ciclo_texto = self._texto_ciclo_libreta(session)
+                    else:
+                        afluencia_filas = self._cargar_afluencia_libreta(session, desde, hasta)
                 fuente_db = True
             except Exception:  # noqa: BLE001
                 logger.exception("Libreta: fallo la consulta a la base")
@@ -1956,6 +1982,71 @@ class QuoteSatelliteWindow(QMainWindow):
                 ranking_rows, employee_code=self._libreta_emp_filtro
             )
         self._pintar_libreta(rows, ranking_rows=ranking_rows)
+        self._pintar_afluencia_libreta(afluencia_filas)
+
+    @staticmethod
+    def _cargar_afluencia_libreta(session, desde, hasta) -> list:
+        """Filas afluencia-vs-ventas del periodo; [] si la tabla no existe o falla."""
+        try:
+            from pos_uniformes.services.afluencia_service import resumen_afluencia
+
+            return resumen_afluencia(session, desde=desde, hasta=hasta)
+        except Exception:  # noqa: BLE001
+            try:
+                session.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+            return []
+
+    def _pintar_afluencia_libreta(self, filas: list) -> None:
+        """Tabla por hora: entran, pasan por fuera, ventas y conversión. Oculta sin datos."""
+        from pos_uniformes.services.afluencia_service import totales
+
+        if not getattr(self, "_libreta_is_owner", False):
+            filas = []
+        if getattr(self, "_libreta_periodo", "hoy") == "hoy":
+            hoy = datetime.now().date()
+            filas = [f for f in filas if f.hora.date() == hoy]
+        # Horas sin nadie y sin ventas no aportan nada.
+        filas = [f for f in filas if f.entradas or f.pasan or f.ventas]
+        visible = bool(filas)
+        self.libreta_afluencia_seccion.setVisible(visible)
+        self.libreta_afluencia_table.setVisible(visible)
+        if not visible:
+            self.libreta_afluencia_table.setRowCount(0)
+            return
+        varios_dias = len({f.hora.date() for f in filas}) > 1
+        total = totales(filas)
+        self.libreta_afluencia_table.setRowCount(len(filas) + 1)
+
+        def _conv(valor) -> str:
+            return "—" if valor is None else f"{valor:.0f}%"
+
+        for i, fila in enumerate(filas):
+            hora_txt = fila.hora.strftime("%d/%m %H:00") if varios_dias else fila.hora.strftime("%H:00")
+            for j, texto in enumerate(
+                (hora_txt, str(fila.entradas), str(fila.pasan), str(fila.ventas), _conv(fila.conversion))
+            ):
+                item = QTableWidgetItem(texto)
+                if j:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                self.libreta_afluencia_table.setItem(i, j, item)
+        ultima = len(filas)
+        for j, texto in enumerate(
+            ("Total", str(total.entradas), str(total.pasan), str(total.ventas), _conv(total.conversion))
+        ):
+            item = QTableWidgetItem(texto)
+            fuente = item.font()
+            fuente.setBold(True)
+            item.setFont(fuente)
+            if j:
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            self.libreta_afluencia_table.setItem(ultima, j, item)
+        self.libreta_afluencia_table.resizeRowsToContents()
+        alto = self.libreta_afluencia_table.horizontalHeader().height() + 4
+        for r in range(self.libreta_afluencia_table.rowCount()):
+            alto += self.libreta_afluencia_table.rowHeight(r)
+        self.libreta_afluencia_table.setFixedHeight(alto)
 
     def _actualizar_meta_libreta(self, week_rows: list) -> None:
         """Barra de progreso de la empleada contra la meta semanal."""
