@@ -485,10 +485,21 @@ def _build_camaras_box(dialog: QWidget) -> QGroupBox:
     canales_list = QListWidget()
     canales_list.setObjectName("dvrCanalesList")
     canales_list.setMinimumHeight(180)
+    # Colores explícitos: en Windows con tema oscuro el QListWidget salía
+    # negro y los canales detectados no se veían.
+    canales_list.setStyleSheet(
+        "QListWidget { background: #ffffff; color: #2b2b2b; border: 1px solid #cfc6b8; }"
+        "QListWidget::item { padding: 6px 4px; }"
+        "QListWidget::item:selected { background: #e8dcc6; color: #2b2b2b; }"
+    )
+    canales_vacio = QLabel("Sin canales todavía. Pulsa 'Detectar canales' con el DVR encendido.")
+    canales_vacio.setStyleSheet("color: #8a8177; font-size: 12px;")
     layout.addWidget(canales_list)
+    layout.addWidget(canales_vacio)
 
     def _poblar(canales: list[CanalDVR]) -> None:
         canales_list.clear()
+        canales_vacio.setVisible(not canales)
         for c in canales:
             item = QListWidgetItem(f"Canal {c.canal} · {c.nombre}")
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
@@ -523,7 +534,13 @@ def _build_camaras_box(dialog: QWidget) -> QGroupBox:
         try:
             canales = detectar_canales(_leer_settings())
         except RuntimeError as exc:
-            QMessageBox.warning(dialog, "DVR", str(exc))
+            s = _leer_settings()
+            QMessageBox.warning(
+                dialog,
+                "DVR",
+                f"{exc}\n\nSe intentó: http://{s.host}:{s.http_port} con el usuario '{s.user}'.\n"
+                "Revisa que este equipo vea al DVR (misma red, no invitados) y que la contraseña sea la de la app DMSS.",
+            )
             return
         # Conserva las marcas que ya tenía el usuario; los nuevos se marcan
         # solos si el nombre dice ENTRADA.
