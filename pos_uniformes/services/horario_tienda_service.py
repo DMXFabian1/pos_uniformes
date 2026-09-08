@@ -14,6 +14,8 @@ CIERRE_NORMAL = time(18, 0)
 CIERRE_TEMPRANO = time(17, 0)
 DIAS_CIERRE_TEMPRANO = (3, 6)  # jueves, domingo
 MINUTOS_ANTES_DEL_CIERRE = 30
+# El resumen de Telegram sale 15 min antes de cerrar (17:45; jue/dom 16:45).
+MINUTOS_ANTES_RESUMEN = 15
 # Ventana en la que la tarea programada acepta que "es la hora" (por si
 # Windows la dispara con unos minutos de retraso).
 TOLERANCIA_MIN = 20
@@ -32,6 +34,21 @@ def hora_corte(dia: date) -> time:
 
 def momento_corte(dia: date) -> datetime:
     return datetime.combine(dia, hora_corte(dia))
+
+
+def hora_resumen(dia: date) -> time:
+    cierre = datetime.combine(dia, hora_cierre(dia))
+    return (cierre - timedelta(minutes=MINUTOS_ANTES_RESUMEN)).time()
+
+
+def es_momento_de_resumen(ahora: datetime, tolerancia_min: int = TOLERANCIA_MIN) -> bool:
+    """True si `ahora` cae en la ventana del resumen de hoy (cierre − 15 min)."""
+    objetivo = datetime.combine(ahora.date(), hora_resumen(ahora.date()))
+    return objetivo <= ahora.replace(tzinfo=None) <= objetivo + timedelta(minutes=tolerancia_min)
+
+
+def horas_de_resumen_posibles() -> list[time]:
+    return sorted({hora_resumen(date(2026, 9, 7) + timedelta(days=i)) for i in range(7)})
 
 
 def es_momento_de_corte(ahora: datetime, tolerancia_min: int = TOLERANCIA_MIN) -> bool:

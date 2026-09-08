@@ -24,7 +24,22 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--chat-ids", action="store_true", help="listar chats que le han escrito al bot")
     parser.add_argument("--fecha", default="", help="AAAA-MM-DD (default: hoy)")
     parser.add_argument("--pendientes", action="store_true", help="solo el recordatorio de pendientes (mediodía)")
+    parser.add_argument(
+        "--si-toca",
+        action="store_true",
+        help="solo enviar si es la hora del resumen de hoy (cierre − 15 min); para programarlo a 16:45 y 17:45",
+    )
     args = parser.parse_args(argv)
+
+    if args.si_toca:
+        from datetime import datetime
+
+        from pos_uniformes.services.horario_tienda_service import es_momento_de_resumen, hora_resumen
+
+        ahora = datetime.now()
+        if not es_momento_de_resumen(ahora):
+            print(f"No es la hora del resumen de hoy ({hora_resumen(ahora.date()):%H:%M}); no se envía.")
+            return 0
 
     from pos_uniformes.services import telegram_service
 

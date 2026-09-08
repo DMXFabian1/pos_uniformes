@@ -2,11 +2,11 @@
 rem =====================================================
 rem  Deja programado el resumen diario por Telegram en ESTA PC
 rem  (servidor): todos los dias a la hora indicada.
-rem  Uso: scripts\instalar_resumen_diario.bat [HH:MM] [auto]   (default 20:30; "auto" activa el corte por hora)
+rem  Uso: scripts\instalar_resumen_diario.bat [HH:MM] [auto]
+rem  Sin hora: resumen 15 min antes de cerrar (17:45; jue/dom 16:45). Con HH:MM: hora fija. "auto" activa el corte por hora.
 rem =====================================================
 setlocal
 set "HORA=%~1"
-if "%HORA%"=="" set "HORA=20:30"
 cd /d "%~dp0.."
 
 echo === Probando el resumen (sin enviar) ===
@@ -14,10 +14,20 @@ call "%~dp0resumen_diario_telegram.bat" --imprimir
 if errorlevel 1 goto :error
 
 echo.
-echo === Tarea de Windows "POS Resumen diario" a las %HORA% ===
-schtasks /Create /F /TN "POS Resumen diario" /SC DAILY /ST %HORA% /TR "\"%~dp0resumen_diario_telegram.bat\"" >nul
-if errorlevel 1 goto :error
-echo   Listo. Cada dia a las %HORA% llega el resumen a tu Telegram.
+if "%~1"=="" (
+    echo === Resumen 15 min antes de cerrar: 17:45, jueves y domingo 16:45 ===
+    schtasks /Create /F /TN "POS Resumen 16:45" /SC DAILY /ST 16:45 /TR "\"%~dp0resumen_diario_telegram.bat\" --si-toca" >nul
+    if errorlevel 1 goto :error
+    schtasks /Create /F /TN "POS Resumen 17:45" /SC DAILY /ST 17:45 /TR "\"%~dp0resumen_diario_telegram.bat\" --si-toca" >nul
+    if errorlevel 1 goto :error
+    schtasks /Delete /F /TN "POS Resumen diario" >nul 2>&1
+    echo   Listo. El script decide cada dia cual de las dos toca segun el horario de la tienda.
+) else (
+    echo === Tarea de Windows "POS Resumen diario" a las %HORA% (hora fija) ===
+    schtasks /Create /F /TN "POS Resumen diario" /SC DAILY /ST %HORA% /TR "\"%~dp0resumen_diario_telegram.bat\"" >nul
+    if errorlevel 1 goto :error
+    echo   Listo. Cada dia a las %HORA% llega el resumen a tu Telegram.
+)
 schtasks /Create /F /TN "POS Pendientes" /SC DAILY /ST 13:30 /TR "\"%~dp0resumen_diario_telegram.bat\" --pendientes" >nul
 if not errorlevel 1 echo   Y a las 13:30 un recordatorio con lo que falta por registrar (pagos, faltas).
 echo.

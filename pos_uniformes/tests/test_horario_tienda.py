@@ -8,9 +8,12 @@ from datetime import date, datetime, time
 from pos_uniformes.services.horario_tienda_service import (
     decidir_corte_automatico,
     es_momento_de_corte,
+    es_momento_de_resumen,
     hora_cierre,
     hora_corte,
+    hora_resumen,
     horas_de_corte_posibles,
+    horas_de_resumen_posibles,
     texto_horario_corte,
 )
 from pos_uniformes.services.nomina_service import puede_pagar
@@ -27,6 +30,16 @@ class HorarioTests(unittest.TestCase):
         self.assertEqual(hora_corte(LUNES), time(17, 30))
         self.assertEqual(hora_corte(JUEVES), time(16, 30))
         self.assertEqual(hora_corte(DOMINGO), time(16, 30))
+
+    def test_resumen_15_min_antes_de_cerrar(self) -> None:
+        self.assertEqual(hora_resumen(LUNES), time(17, 45))
+        self.assertEqual(hora_resumen(JUEVES), time(16, 45))
+        self.assertEqual(hora_resumen(DOMINGO), time(16, 45))
+        self.assertEqual(horas_de_resumen_posibles(), [time(16, 45), time(17, 45)])
+        self.assertTrue(es_momento_de_resumen(datetime(2026, 9, 7, 17, 46)))
+        self.assertFalse(es_momento_de_resumen(datetime(2026, 9, 7, 16, 46)))
+        self.assertTrue(es_momento_de_resumen(datetime(2026, 9, 10, 16, 45)))
+        self.assertFalse(es_momento_de_resumen(datetime(2026, 9, 10, 17, 45)))
 
     def test_horas_posibles_y_texto(self) -> None:
         self.assertEqual(horas_de_corte_posibles(), [time(16, 30), time(17, 30)])
