@@ -17,15 +17,11 @@ from PyQt6.QtWidgets import QApplication, QPushButton, QWidget
 
 from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
 
-_BOTONES = (
-    ("kiosk", "nav_kiosk_button"),
-    ("quicksale", "nav_quicksale_button"),
-    ("catalog", "nav_catalog_button"),
-    ("guided", "nav_guided_button"),
-    ("quote", "nav_quote_button"),
-    ("search", "nav_search_button"),
-    ("tariff", "nav_tariff_button"),
-    ("conteos", "nav_conteos_button"),
+# La lista se deriva de la ventana real en vez de copiarse a mano: cuando entró
+# la sección "libreta" al sidebar, esta lista se quedó atrás y los 5 tests de
+# este archivo reventaban con AttributeError. Derivándola, no se puede desfasar.
+_BOTONES = tuple(
+    (key, f"nav_{key}_button") for key in QuoteSatelliteWindow._SECCIONES_NAV
 )
 # Las que hoy están ocultas en el sidebar real.
 _OCULTAS = ("catalog", "quote", "search")
@@ -55,7 +51,21 @@ class SeccionNavTests(unittest.TestCase):
     def test_secciones_visibles_saltan_las_ocultas(self) -> None:
         s = self._stub()
         self.assertEqual(
-            s._secciones_visibles(), ["kiosk", "quicksale", "guided", "tariff", "conteos"]
+            s._secciones_visibles(),
+            ["kiosk", "quicksale", "guided", "tariff", "libreta", "conteos"],
+        )
+
+    def test_sin_ocultas_devuelve_exactamente_las_secciones_declaradas(self) -> None:
+        """Contrato entre _SECCIONES_NAV y el diccionario de botones real.
+
+        Con nada oculto, la lista debe ser _SECCIONES_NAV completa. Falla si
+        una sección declarada no tiene entrada en el diccionario (KeyError) o si
+        su botón no sigue la convención nav_<key>_button (AttributeError), que
+        es justo como se desfasó este archivo cuando entró la Libreta.
+        """
+        s = self._stub(ocultas=())
+        self.assertEqual(
+            s._secciones_visibles(), list(QuoteSatelliteWindow._SECCIONES_NAV)
         )
 
     def test_avanza_y_retrocede_saltando_ocultas(self) -> None:
