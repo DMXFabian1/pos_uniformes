@@ -71,14 +71,14 @@ def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list |
     lines.append(tk_row("Operaciones:", str(corte.operaciones)))
     if venta_efectivo is not None:
         lines.append(tk_row("VENTA (efectivo):", f"${Decimal(venta_efectivo):,.2f}"))
-    lines.append(tk_row("Fondo inicial:", f"${Decimal(corte.reactivo_inicial):,.2f}"))
+    lines.append(tk_row("Reactivo inicial:", f"${Decimal(corte.reactivo_inicial):,.2f}"))
     if Decimal(corte.retiros_pagos or 0) > 0:
         lines.append(tk_row("Pagos empleadas:", f"-${Decimal(corte.retiros_pagos):,.2f}"))
     if Decimal(corte.otros_retiros or 0) > 0:
         lines.append(tk_row("Otros retiros:", f"-${Decimal(corte.otros_retiros):,.2f}"))
     lines.append(tk_dbl())
     lines.append(tk_row("EN CAJA:", f"${Decimal(corte.monto_final):,.2f}"))
-    lines.append(tk_row("Se queda (fondo):", f"${Decimal(corte.reactivo_final):,.2f}"))
+    lines.append(tk_row("Se queda (reactivo):", f"${Decimal(corte.reactivo_final):,.2f}"))
     retirado = (Decimal(corte.monto_final) - Decimal(corte.reactivo_final)).quantize(Decimal("0.01"))
     lines.append(tk_row("Se retira:", f"${retirado:,.2f}"))
     if corte.nota:
@@ -224,7 +224,7 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
                 creado_por=creado_por,
                 ahora=estado.hasta,
             )
-            texto = texto_ticket_corte(corte, por_empleada)
+            texto = texto_ticket_corte(corte, por_empleada, venta_efectivo=estado.resumen.efectivo)
     except ValueError as exc:
         QMessageBox.warning(parent, "Corte", str(exc))
         return None
