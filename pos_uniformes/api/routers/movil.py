@@ -416,7 +416,7 @@ def encargado_inicio(
         "descansos_semana": _descansos_semana(db),
         "resumen": _resumen_encargado(db),
         "tarjetas": _tarjetas_encargado(db),
-        "pagos": _payload_pagos(db),
+        "pagos": _payload_pagos(db, str(empleada.codigo).upper()),
     }
 
 
@@ -466,11 +466,11 @@ def _resumen_encargado(db: Session) -> str:
         return ""
 
 
-def _payload_pagos(db: Session) -> list[dict]:
+def _payload_pagos(db: Session, para: str | None = None) -> list[dict]:
     try:
         from pos_uniformes.services.nomina_service import avisos_de_pago
 
-        avisos = avisos_de_pago(db, dias=365)
+        avisos = avisos_de_pago(db, dias=365, para=para)
     except Exception:  # noqa: BLE001
         return []
     return [
@@ -525,16 +525,28 @@ def encargado_corte_hoy(
 ) -> dict:
     """Estado de la caja del periodo (desde el corte anterior): lo que debe
     haber en el cajón. El encargado captura lo contado en /encargado/corte."""
-    from pos_uniformes.services.corte_caja_service import estado_caja
-
-    from pos_uniformes.services.corte_caja_service import pagos_que_tocan_hoy
+    from pos_uniformes.services.corte_caja_service import (
+        datos_ticket_encargado,
+        estado_caja,
+        pagos_que_tocan_hoy,
+    )
 
     empleada, _p = current
     _solo_gestor(empleada)
+    quien = str(empleada.codigo).upper()
     estado = estado_caja(db)
     r = estado.resumen
-    avisos = pagos_que_tocan_hoy(db)
+    avisos = pagos_que_tocan_hoy(db, para=quien)
     total_pagos = sum((a.total_estimado for a in avisos), Decimal("0"))
+    # Los movimientos privados del dueño no existen para el encargado.
+    from pos_uniformes.services.nomina_service import ve_privados
+
+    tarjeta = r.tarjeta
+    piezas = r.piezas
+    if not ve_privados(quien):
+        datos = datos_ticket_encargado(db, estado.desde, estado.hasta)
+        tarjeta = datos.tarjeta
+        piezas = sum(int(e.piezas or 0) for e in datos.por_empleada)
     return {
         "pagos_hoy": [
             {"codigo": a.employee_code, "nombre": a.employee_name, "total": str(a.total_estimado), "comisiones": a.comisiones}
@@ -546,11 +558,11 @@ def encargado_corte_hoy(
         "hasta": estado.hasta.isoformat(),
         "reactivo": str(estado.reactivo),
         "efectivo": str(r.efectivo),
-        "tarjeta": str(r.tarjeta),
+        "tarjeta": str(tarjeta),
         "pagos": str(estado.pagos),
         "esperado": str(estado.esperado),
         "operaciones": r.operaciones,
-        "piezas": r.piezas,
+        "piezas": piezas,
         "hay_ventas": r.operaciones > 0,
         # Compatibilidad con la PWA anterior.
         "venta": str(r.efectivo),
@@ -565,8 +577,10 @@ def encargado_hacer_corte(
     """Corte de un botón: registra los pagos que tocan hoy, cierra con la
     cifra calculada (el encargado no cuenta ni captura) y encola el ticket."""
     from pos_uniformes.services import trabajos_service
-    from pos_uniformes.services.corte_caja_service import cerrar_corte_automatico, operaciones_del_periodo
-    from pos_uniformes.services.libreta_service import resumir_por_empleada
+    from pos_uniformes.services.corte_caja_service import (
+        cerrar_corte_automatico,
+        datos_ticket_encargado,
+    )
     from pos_uniformes.ui.dialogs.corte_caja_dialog import texto_ticket_corte_encargado
 
     empleada, _p = current
@@ -574,18 +588,13 @@ def encargado_hacer_corte(
     _solo_tienda()
     quien = str(empleada.codigo).upper()
     auto = cerrar_corte_automatico(db, creado_por=quien)
-    rows = operaciones_del_periodo(db, auto.estado.desde, auto.estado.hasta)
     ticket_encolado = False
     try:
-        from pos_uniformes.services.retiros_service import retiros_del_periodo
-
-        try:
-            retiros = retiros_del_periodo(db, auto.estado.desde, auto.estado.hasta)
-        except Exception:  # noqa: BLE001 — base sin la tabla todavía
-            db.rollback()
-            retiros = []
+        # Ese papel se queda en la tienda: sin los movimientos privados.
+        datos = datos_ticket_encargado(db, auto.estado.desde, auto.estado.hasta)
         texto = texto_ticket_corte_encargado(
-            auto.corte, auto.estado.resumen.efectivo, auto.pagos, resumir_por_empleada(rows), retiros=retiros
+            auto.corte, auto.estado.resumen.efectivo, auto.pagos, datos.por_empleada,
+            retiros=datos.retiros, tarjeta=datos.tarjeta, tarjeta_ops=datos.tarjeta_ops,
         )
         trabajos_service.enviar_ticket(db, texto, origen="pwa", creado_por=quien)
         ticket_encolado = True
@@ -619,7 +628,7 @@ def encargado_pago_pendiente(
 
     empleada, _p = current
     _solo_gestor(empleada)
-    d = pago_pendiente(db, employee_code)
+    d = pago_pendiente(db, employee_code, para=str(empleada.codigo).upper())
     return {
         "codigo": d.employee_code,
         "desde": d.desde.isoformat() if d.desde else None,
@@ -762,6 +771,16 @@ def dueno_hacer_corte(
         raise HTTPException(status_code=422, detail={"error": {
             "code": "corte_invalido", "message": str(exc)}})
 
+    ocultos = 0
+    if body.ocultar_tarjeta:
+        # Privados: desaparecen de todo lo que ve el encargado, no solo de
+        # este papel.
+        from pos_uniformes.services.libreta_service import marcar_privadas_del_periodo
+
+        ocultos = marcar_privadas_del_periodo(
+            db, estado.desde, estado.hasta, creado_por=quien
+        )
+
     ticket_encolado = False
     try:
         try:
@@ -794,4 +813,5 @@ def dueno_hacer_corte(
         "retiro": str(retiro),
         "reactivo_final": str(corte.reactivo_final),
         "ticket_encolado": ticket_encolado,
+        "ocultos": ocultos,
     }

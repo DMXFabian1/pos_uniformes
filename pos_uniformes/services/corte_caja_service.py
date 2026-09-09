@@ -295,7 +295,7 @@ class CorteAutomatico:
     pagos: list              # EmpleadaPago registrados en este corte
 
 
-def pagos_que_tocan_hoy(session, hoy=None) -> list:
+def pagos_que_tocan_hoy(session, hoy=None, *, para: str | None = None) -> list:
     """Empleadas cuyo pago cae hoy o ya se pasó y que no han cobrado hoy."""
     from datetime import date as _date
 
@@ -304,13 +304,56 @@ def pagos_que_tocan_hoy(session, hoy=None) -> list:
 
     hoy = hoy or _date.today()
     pendientes = []
-    for a in avisos_de_pago(session, hoy, dias=0):
+    for a in avisos_de_pago(session, hoy, dias=0, para=para):
         if a.dias_para_pago is None or a.dias_para_pago > 0:
             continue
         if cargar_horario(session, a.employee_code).fecha_ultimo_pago == hoy:
             continue  # ya cobró hoy
         pendientes.append(a)
     return pendientes
+
+
+@dataclass(frozen=True)
+class DatosTicketEncargado:
+    """Lo que lleva el ticket del encargado, ya SIN los movimientos privados.
+
+    Ese papel se queda en la tienda y lo lee el encargado, así que nunca
+    incluye lo que el dueño marcó como privado: ni el dinero de tarjeta, ni
+    las piezas, ni las comisiones de esas ventas."""
+
+    por_empleada: list
+    tarjeta: Decimal
+    tarjeta_ops: int
+    retiros: list
+
+
+def datos_ticket_encargado(session, desde: datetime | None, hasta: datetime) -> DatosTicketEncargado:
+    from pos_uniformes.services.libreta_service import resumir_por_empleada, sin_privados
+
+    rows = sin_privados(operaciones_del_periodo(session, desde, hasta))
+    tarjeta = sum(
+        (
+            _d(r.monto_total)
+            for r in rows
+            if str(r.tipo) in ("venta", "abono") and bool(getattr(r, "pago_tarjeta", False))
+        ),
+        Decimal("0.00"),
+    )
+    ops = sum(
+        1
+        for r in rows
+        if str(r.tipo) in ("venta", "abono") and bool(getattr(r, "pago_tarjeta", False))
+    )
+    try:
+        from pos_uniformes.services.retiros_service import retiros_del_periodo
+
+        retiros = retiros_del_periodo(session, desde, hasta)
+    except Exception:  # noqa: BLE001 — base sin la tabla todavía
+        session.rollback()
+        retiros = []
+    return DatosTicketEncargado(
+        por_empleada=resumir_por_empleada(rows), tarjeta=tarjeta, tarjeta_ops=ops, retiros=retiros
+    )
 
 
 def cerrar_corte_automatico(session, *, creado_por: str, ahora: datetime | None = None, nota: str | None = None) -> CorteAutomatico:
@@ -323,7 +366,7 @@ def cerrar_corte_automatico(session, *, creado_por: str, ahora: datetime | None 
     ahora = ahora or datetime.now().astimezone()
     hoy = (ahora.astimezone() if ahora.tzinfo else ahora).date()
     pagos = []
-    for aviso in pagos_que_tocan_hoy(session, hoy):
+    for aviso in pagos_que_tocan_hoy(session, hoy, para=creado_por):
         # Fechados EXACTAMENTE a la hora del corte: así caen dentro del
         # periodo que se cierra (<= hasta) aunque `ahora` venga del caller.
         pagos.append(registrar_pago_con_monto(session, aviso.employee_code, creado_por=creado_por, fecha=hoy, momento=ahora))

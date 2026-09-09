@@ -1668,6 +1668,10 @@ class QuoteSatelliteWindow(QMainWindow):
         # código y la otra la hizo) — mueve el registro y sus comisiones.
         self.libreta_reasignar_button = QPushButton("👤 Reasignar")
         self.libreta_reasignar_button.clicked.connect(self._reasignar_libreta)
+        # Privado: ese cobro con tarjeta deja de existir para el encargado
+        # (su ticket, su pantalla y su celular) — dinero, piezas y comisiones.
+        self.libreta_privado_button = QPushButton("🔒 Ocultar a mi papá")
+        self.libreta_privado_button.clicked.connect(self._alternar_privado_libreta)
         self.libreta_delete_button = QPushButton("🗑 Borrar")
         self.libreta_delete_button.clicked.connect(self._borrar_registro_libreta)
         # Ver momento: grabación del DVR a la hora del movimiento (cámara
@@ -1678,6 +1682,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self.libreta_reprint_button,
             self.libreta_pago_button,
             self.libreta_reasignar_button,
+            self.libreta_privado_button,
             self.libreta_delete_button,
             self.libreta_momento_button,
         ):
@@ -2299,7 +2304,18 @@ class QuoteSatelliteWindow(QMainWindow):
         if bar is None:
             return
         tabla = self.libreta_table
-        bar.setVisible(bool(tabla.selectionModel() and tabla.selectionModel().hasSelection()))
+        hay = bool(tabla.selectionModel() and tabla.selectionModel().hasSelection())
+        bar.setVisible(hay)
+        boton = getattr(self, "libreta_privado_button", None)
+        if boton is None:
+            return
+        rows = list(getattr(self, "_libreta_rows_pintadas", []) or [])
+        idx = tabla.currentRow()
+        row = rows[idx] if hay and 0 <= idx < len(rows) else None
+        oculto = bool(getattr(row, "privado", False)) if row is not None else False
+        boton.setText("👁 Mostrar a mi papá" if oculto else "🔒 Ocultar a mi papá")
+        # Solo tiene sentido en cobros con tarjeta (el efectivo descuadraría).
+        boton.setEnabled(row is None or oculto or bool(getattr(row, "pago_tarjeta", False)))
 
     def _pintar_afluencia_libreta(self, filas: list) -> None:
         """Tabla por hora: entran, pasan por fuera, ventas y conversión. Oculta sin datos."""
@@ -2559,6 +2575,75 @@ class QuoteSatelliteWindow(QMainWindow):
             QMessageBox.warning(self, "Sin conexión", "No se pudo guardar. Intenta de nuevo.")
             return
         self._set_status(f"Pago cambiado a {nuevo_modo}.")
+        self._refresh_libreta_view()
+
+    def _alternar_privado_libreta(self) -> None:
+        """Oculta (o vuelve a mostrar) al encargado el movimiento seleccionado.
+
+        Solo cobros con TARJETA: el efectivo está en el cajón y esconderlo
+        descuadraría el corte."""
+        if not self._libreta_is_owner:
+            return
+        rows = list(getattr(self, "_libreta_rows_pintadas", []) or [])
+        idx = self.libreta_table.currentRow()
+        if idx < 0 or idx >= len(rows):
+            QMessageBox.information(
+                self, "Sin selección",
+                "Selecciona en MOVIMIENTOS el registro que quieres ocultar.",
+            )
+            return
+        row = rows[idx]
+        entry_id = getattr(row, "id", None)
+        if entry_id is None:
+            QMessageBox.information(
+                self, "Aún sin sincronizar",
+                "Ese registro todavía no sube al servidor; presiona "
+                "Actualizar en un momento e inténtalo de nuevo.",
+            )
+            return
+        ya_privado = bool(getattr(row, "privado", False))
+        comisiones = int(getattr(row, "comisiones", 0) or 0)
+        if ya_privado:
+            pregunta = "Este movimiento está oculto para tu papá.\n¿Volver a mostrárselo?"
+        else:
+            pregunta = (
+                "Tu papá dejará de ver este movimiento por completo: ni el "
+                "monto, ni las piezas, ni las comisiones.\n\n"
+                + (
+                    f"Ojo: trae {comisiones} comisión(es); el pago que él calcule "
+                    "para esa empleada saldrá más bajo.\n\n"
+                    if comisiones
+                    else ""
+                )
+                + "¿Ocultarlo?"
+            )
+        if QMessageBox.question(
+            self, "Movimiento privado", pregunta,
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        ) != QMessageBox.StandardButton.Yes:
+            return
+        from pos_uniformes.services.libreta_service import SoloElDueno, marcar_privado
+
+        try:
+            with get_session() as session:
+                marcar_privado(
+                    session, int(entry_id), privado=not ya_privado,
+                    creado_por=self._libreta_code or "",
+                )
+        except ValueError as exc:
+            QMessageBox.information(self, "Solo con tarjeta", str(exc))
+            return
+        except SoloElDueno as exc:
+            QMessageBox.warning(self, "Movimiento privado", str(exc))
+            return
+        except Exception:  # noqa: BLE001
+            logger.exception("Libreta: no se pudo cambiar el movimiento privado")
+            QMessageBox.warning(self, "Sin conexión", "No se pudo guardar. Intenta de nuevo.")
+            return
+        self._set_status(
+            "Movimiento visible otra vez." if ya_privado else "Movimiento oculto para el encargado."
+        )
         self._refresh_libreta_view()
 
     def _reasignar_libreta(self) -> None:
@@ -3086,6 +3171,8 @@ class QuoteSatelliteWindow(QMainWindow):
             tipo_txt = str(row.tipo).capitalize()
             if getattr(row, "pago_tarjeta", False):
                 tipo_txt += " (tarjeta)"
+            if getattr(row, "privado", False):
+                tipo_txt = f"🔒 {tipo_txt}"  # tu papá no ve este movimiento
             if self._libreta_is_owner:
                 nombre = row.employee_name or row.employee_code
                 tipo_txt = f"{tipo_txt} — {nombre}"

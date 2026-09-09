@@ -263,7 +263,7 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
     # (arranca apagada); en pantalla la sigue viendo.
     from PyQt6.QtWidgets import QCheckBox
 
-    sin_tarjeta = QCheckBox("Ocultar los pagos con tarjeta en el ticket")
+    sin_tarjeta = QCheckBox("Ocultar los cobros con tarjeta (tu papá no los verá)")
     sin_tarjeta.setVisible(str(creado_por or "").strip().upper() == OWNER_CODE)
     if grande:
         sin_tarjeta.setStyleSheet("font-size: 17px;")
@@ -314,6 +314,16 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
                 creado_por=creado_por,
                 ahora=estado.hasta,
             )
+            if sin_tarjeta.isChecked():
+                # Privados: desaparecen de TODO lo que ve el encargado (su
+                # ticket, su pantalla y su celular), no solo de este papel.
+                from pos_uniformes.services.libreta_service import marcar_privadas_del_periodo
+
+                ocultos = marcar_privadas_del_periodo(
+                    session, estado.desde, estado.hasta, creado_por=creado_por
+                )
+            else:
+                ocultos = 0
             pagos_periodo = pagos_registrados_del_periodo(session, estado.desde, estado.hasta)
             from pos_uniformes.services.retiros_service import retiros_del_periodo
 
@@ -330,6 +340,15 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
         logger.exception("Corte: no se pudo guardar")
         QMessageBox.warning(parent, "No se guardó", "Inténtalo otra vez.")
         return None
+    if ocultos:
+        QMessageBox.information(
+            parent,
+            "Movimientos ocultos",
+            f"{ocultos} cobro(s) con tarjeta quedaron ocultos para el encargado: "
+            "no los verá en su ticket, su pantalla ni su celular.\n\n"
+            "Ojo: sus comisiones tampoco las cuenta él, así que el pago que "
+            "calcule saldrá más bajo.",
+        )
     try:
         from pos_uniformes.ui.helpers.ticket_routing_helper import route_tickets
 
@@ -409,7 +428,7 @@ def confirmar_pago(parent: QWidget | None, *, employee_code: str, employee_name:
     fecha = fecha or _date.today()
     try:
         with get_session() as session:
-            d = pago_pendiente(session, employee_code, fecha)
+            d = pago_pendiente(session, employee_code, fecha, para=creado_por)
     except Exception:  # noqa: BLE001
         logger.exception("Pago: no se pudo calcular")
         QMessageBox.warning(parent, "Sin conexión", "No se alcanzó la base. Inténtalo otra vez.")
@@ -478,23 +497,21 @@ def texto_previa_corte_encargado(estado: EstadoCaja, avisos: list) -> str:
 def hacer_corte_automatico(parent: QWidget | None, *, creado_por: str):
     """Corte de un botón para el encargado. Devuelve (CorteAutomatico, texto_ticket) o None."""
     from pos_uniformes.database.connection import get_session
-    from pos_uniformes.services.corte_caja_service import cerrar_corte_automatico, operaciones_del_periodo
-    from pos_uniformes.services.libreta_service import resumir_por_empleada
+    from pos_uniformes.services.corte_caja_service import cerrar_corte_automatico, datos_ticket_encargado
 
     try:
         with get_session() as session:
             resultado = cerrar_corte_automatico(session, creado_por=creado_por)
-            rows = operaciones_del_periodo(session, resultado.estado.desde, resultado.estado.hasta)
-            from pos_uniformes.services.retiros_service import retiros_del_periodo
-
+            # Sin los movimientos privados del dueño (dinero, piezas y comisiones).
+            datos = datos_ticket_encargado(session, resultado.estado.desde, resultado.estado.hasta)
             texto = texto_ticket_corte_encargado(
                 resultado.corte,
                 resultado.estado.resumen.efectivo,
                 resultado.pagos,
-                resumir_por_empleada(rows),
-                retiros=retiros_del_periodo(session, resultado.estado.desde, resultado.estado.hasta),
-                tarjeta=resultado.estado.resumen.tarjeta,
-                tarjeta_ops=contar_tarjeta(rows),
+                datos.por_empleada,
+                retiros=datos.retiros,
+                tarjeta=datos.tarjeta,
+                tarjeta_ops=datos.tarjeta_ops,
                 ya_pagados=pagos_previos_del_periodo(session, resultado),
             )
     except Exception:  # noqa: BLE001

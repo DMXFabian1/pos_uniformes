@@ -287,9 +287,14 @@ def registrar_pago(session, employee_code: str, fecha: date) -> None:
     session.commit()
 
 
-def comisiones_desde_ultimo_pago(session, employee_code: str, horario: HorarioEmpleada) -> int:
+def comisiones_desde_ultimo_pago(
+    session, employee_code: str, horario: HorarioEmpleada, *, incluir_privadas: bool = True
+) -> int:
     """Comisiones acumuladas en la Libreta desde el último pago (para el
-    banner "Comisiones desde tu último pago")."""
+    banner "Comisiones desde tu último pago").
+
+    `incluir_privadas=False` deja fuera los movimientos que el dueño marcó
+    como privados: es lo que ve el encargado."""
     from sqlalchemy import func as sa_func
 
     from pos_uniformes.database.models import LibretaVenta
@@ -297,6 +302,8 @@ def comisiones_desde_ultimo_pago(session, employee_code: str, horario: HorarioEm
     query = session.query(sa_func.coalesce(sa_func.sum(LibretaVenta.comisiones), 0)).filter(
         LibretaVenta.employee_code == str(employee_code).strip().upper()
     )
+    if not incluir_privadas:
+        query = query.filter(LibretaVenta.privado.is_(False))
     if horario.fecha_ultimo_pago is not None:
         # El pago cubre hasta ese día completo: cuenta desde el siguiente.
         from datetime import datetime, time, timedelta as _td

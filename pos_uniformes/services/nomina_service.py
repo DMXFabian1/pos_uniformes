@@ -129,11 +129,22 @@ def calcular_pago(
 
 # ─── Acceso a datos ──────────────────────────────────────────────────────
 
-def pago_pendiente(session, employee_code: str, hoy: date | None = None) -> DetallePago:
-    """Lo que se le pagaría hoy a la empleada (sin registrar nada)."""
+def ve_privados(quien: str | None) -> bool:
+    """Solo Daniel ve los movimientos que él marcó como privados. Para el
+    encargado esas ventas no existen: ni su dinero ni sus comisiones."""
+    return quien is None or str(quien).strip().upper() == OWNER_CODE
+
+
+def pago_pendiente(session, employee_code: str, hoy: date | None = None, *, para: str | None = None) -> DetallePago:
+    """Lo que se le pagaría hoy a la empleada (sin registrar nada).
+
+    `para` = quién está mirando/pagando: si es el encargado, las comisiones
+    de los movimientos privados no se cuentan."""
     hoy = hoy or date.today()
     horario = cargar_horario(session, employee_code)
-    comisiones = comisiones_desde_ultimo_pago(session, employee_code, horario)
+    comisiones = comisiones_desde_ultimo_pago(
+        session, employee_code, horario, incluir_privadas=ve_privados(para)
+    )
     return calcular_pago(horario, comisiones=comisiones, params=cargar_parametros(session), hasta=hoy)
 
 
@@ -148,7 +159,7 @@ def registrar_pago_con_monto(session, employee_code: str, *, creado_por: str, fe
         raise PermissionError("Solo el dueño o el encargado registran pagos.")
     fecha = fecha or date.today()
     code = str(employee_code).strip().upper()
-    detalle = pago_pendiente(session, code, fecha)
+    detalle = pago_pendiente(session, code, fecha, para=creado_por)
     emp = session.query(Empleada).filter(Empleada.codigo == code).first()
     pago = EmpleadaPago(
         employee_code=code,
@@ -238,7 +249,7 @@ def _empleadas_activas(session) -> list:
     )
 
 
-def avisos_de_pago(session, hoy: date | None = None, dias: int = 7) -> list[AvisoPago]:
+def avisos_de_pago(session, hoy: date | None = None, dias: int = 7, *, para: str | None = None) -> list[AvisoPago]:
     """Empleadas a las que les toca pago en los próximos `dias` (incluye hoy y
     atrasados), con lo que llevan acumulado. Ordenado por fecha de pago."""
     hoy = hoy or date.today()
@@ -251,7 +262,9 @@ def avisos_de_pago(session, hoy: date | None = None, dias: int = 7) -> list[Avis
         proximo = fecha_proximo_pago(horario, hoy)
         if proximo is not None and (proximo - hoy).days > dias:
             continue
-        comisiones = comisiones_desde_ultimo_pago(session, emp.codigo, horario)
+        comisiones = comisiones_desde_ultimo_pago(
+            session, emp.codigo, horario, incluir_privadas=ve_privados(para)
+        )
         detalle = calcular_pago(horario, comisiones=comisiones, params=params, hasta=max(hoy, proximo or hoy))
         avisos.append(
             AvisoPago(
@@ -289,7 +302,7 @@ def resumen_para_encargado(session, hoy: date | None = None) -> ResumenEncargado
     return ResumenEncargado(
         descansan_hoy=_nombres(quienes_descansan(horarios, hoy)),
         descansan_manana=_nombres(quienes_descansan(horarios, hoy + timedelta(days=1))),
-        pagos=avisos_de_pago(session, hoy),
+        pagos=avisos_de_pago(session, hoy, para=ENCARGADO_CODE),
     )
 
 

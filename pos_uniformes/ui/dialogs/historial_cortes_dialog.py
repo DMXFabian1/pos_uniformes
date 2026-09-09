@@ -123,7 +123,7 @@ class HistorialCortesDialog(QDialog):
         self._hoy = hoy or date.today()
         self._creado_por = str(creado_por or "").strip().upper()
         self._cortes: list = []
-        self._datos_cache: dict[int, object] = {}
+        self._datos_cache: dict[tuple[int, bool], object] = {}
         self.resize(1080, 680)
 
         self.mes_combo = QComboBox()
@@ -260,18 +260,22 @@ class HistorialCortesDialog(QDialog):
         return self._cortes[fila]
 
     def _datos(self, corte):
-        if corte.id in self._datos_cache:
-            return self._datos_cache[corte.id]
+        # El ticket del encargado se queda en la tienda: sin los movimientos
+        # privados. La cache va por formato porque el papel cambia.
+        para_encargado = self._formato() == FORMATO_ENCARGADO
+        clave = (corte.id, para_encargado)
+        if clave in self._datos_cache:
+            return self._datos_cache[clave]
         from pos_uniformes.database.connection import get_session
         from pos_uniformes.services.historial_cortes_service import datos_para_reimprimir
 
         with get_session() as session:
-            datos = datos_para_reimprimir(session, corte)
+            datos = datos_para_reimprimir(session, corte, para_encargado=para_encargado)
             for p in datos.pagos:
                 session.expunge(p)
             for r in datos.retiros:
                 session.expunge(r)
-        self._datos_cache[corte.id] = datos
+        self._datos_cache[clave] = datos
         return datos
 
     def _formato(self) -> str:

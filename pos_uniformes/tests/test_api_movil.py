@@ -632,6 +632,65 @@ class EncargadoMovilTests(unittest.TestCase):
         texto = self.session.query(Trabajo).one().contenido["texto"]
         self.assertIn("Con tarjeta", texto)
 
+    def test_ocultar_deja_el_movimiento_fuera_de_lo_que_ve_el_encargado(self) -> None:
+        """No es solo el papel: para León ese cobro no existe."""
+        from pos_uniformes.database.models import EmpleadaPago, LibretaVenta, Trabajo
+
+        self.session.add(CajaParametros(
+            id=1, reactivo_actual=Decimal("1000.00"), sueldo_base=Decimal("1300.00"),
+            tarifa_comision=Decimal("2.00"),
+        ))
+        # Además de la venta en efectivo del setUp (2 comisiones), una con tarjeta.
+        con_tarjeta = LibretaVenta(
+            employee_code="VEND-4", employee_name="Fanny Ortiz", tipo="venta",
+            piezas=3, comisiones=2, monto_total=Decimal("705.00"),
+            monto_neto=Decimal("673.00"), pago_tarjeta=True, detalle=[],
+            created_at=datetime.now(),
+        )
+        self.session.add(con_tarjeta)
+        horario = self.session.query(EmpleadaHorario).filter(
+            EmpleadaHorario.employee_code == "VEND-4"
+        ).one()
+        horario.fecha_ultimo_pago = date.today() - timedelta(days=7)
+        self.session.commit()
+
+        # Daniel cierra el periodo ocultando la tarjeta.
+        self._como_dueno()
+        with patch(
+            "pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"
+        ):
+            r = self.client.post("/api/v1/movil/dueno/corte", json={
+                "contado": "1500", "reactivo_final": "1000", "ocultar_tarjeta": True,
+            })
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json()["ocultos"], 1)
+        self.assertTrue(self.session.get(LibretaVenta, con_tarjeta.id).privado)
+
+        # A partir de aquí, León: ni el dinero ni las comisiones de esa venta.
+        leon = self.session.query(Empleada).filter(Empleada.codigo == "ENC-1").one()
+        app.dependency_overrides[get_current_employee] = lambda: (leon, None)
+        with patch(
+            "pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"
+        ):
+            estado = self.client.get("/api/v1/movil/encargado/corte_hoy").json()
+            pend = self.client.get("/api/v1/movil/encargado/pago_pendiente/VEND-4").json()
+        self.assertEqual(estado["tarjeta"], "0.00")
+        self.assertEqual(pend["comisiones"], 2)  # solo las de la venta en efectivo
+        self.assertEqual(pend["total"], "1304.00")
+
+        # Y su ticket de corte tampoco lo lleva.
+        self.session.query(Trabajo).delete()
+        self.session.commit()
+        with patch(
+            "pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"
+        ):
+            self.client.post("/api/v1/movil/encargado/corte", json={})
+        texto = self.session.query(Trabajo).order_by(Trabajo.id.desc()).first().contenido["texto"]
+        self.assertNotIn("Con tarjeta", texto)
+        self.assertNotIn("705", texto)
+        pago = self.session.query(EmpleadaPago).order_by(EmpleadaPago.id.desc()).first()
+        self.assertEqual(pago.comisiones, 2)
+
     def test_corte_del_dueno_rechaza_fondo_mayor_a_lo_contado(self) -> None:
         self.session.add(CajaParametros(id=1, reactivo_actual=Decimal("1000.00")))
         self.session.commit()

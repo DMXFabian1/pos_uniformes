@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
-from sqlalchemy import select
+from sqlalchemy import select, true as sa_true
 
 from pos_uniformes.database.models import LibretaVenta
 from pos_uniformes.utils.date_format import local_day_window
@@ -348,6 +348,72 @@ def eliminar_operacion(session, operacion_id: int) -> bool:
         return False
     session.delete(entry)
     return True
+
+
+# ─── Movimientos privados del dueño ──────────────────────────────────────
+# Un cobro con tarjeta que Daniel marca como privado desaparece por completo
+# de lo que ve el encargado: su ticket de corte, su pantalla y su modo del
+# celular — monto, piezas y comisiones. Solo tarjeta: el efectivo está en el
+# cajón y esconderlo descuadraría el corte.
+
+
+class SoloElDueno(PermissionError):
+    pass
+
+
+def sin_privados(rows: list) -> list:
+    """Las operaciones tal como las ve el encargado (sin las privadas)."""
+    return [r for r in rows if not getattr(r, "privado", False)]
+
+
+def hay_privados(rows: list) -> bool:
+    return any(getattr(r, "privado", False) for r in rows)
+
+
+def marcar_privado(session, operacion_id: int, *, privado: bool, creado_por: str):
+    """Oculta (o vuelve a mostrar) un movimiento al encargado. Devuelve el
+    registro; None si no existe."""
+    from pos_uniformes.services.nomina_service import OWNER_CODE
+
+    if str(creado_por or "").strip().upper() != OWNER_CODE:
+        raise SoloElDueno("Solo el dueño puede ocultar movimientos.")
+    entry = session.get(LibretaVenta, int(operacion_id))
+    if entry is None:
+        return None
+    if privado and not bool(entry.pago_tarjeta):
+        raise ValueError(
+            "Solo se pueden ocultar cobros con tarjeta: el efectivo está en el "
+            "cajón y esconderlo descuadraría el corte."
+        )
+    entry.privado = bool(privado)
+    session.commit()
+    return entry
+
+
+def marcar_privadas_del_periodo(session, desde, hasta, *, creado_por: str) -> int:
+    """Oculta de un golpe todos los cobros con tarjeta del periodo (la casilla
+    del corte). Devuelve cuántos quedaron ocultos."""
+    from pos_uniformes.services.nomina_service import OWNER_CODE
+
+    if str(creado_por or "").strip().upper() != OWNER_CODE:
+        raise SoloElDueno("Solo el dueño puede ocultar movimientos.")
+    stmt = select(LibretaVenta).where(
+        LibretaVenta.created_at > desde if desde is not None else sa_true(),
+        LibretaVenta.created_at <= hasta,
+        LibretaVenta.pago_tarjeta.is_(True),
+    )
+    cuantos = 0
+    for entry in session.scalars(stmt).all():
+        if not entry.privado:
+            entry.privado = True
+            cuantos += 1
+    session.commit()
+    return cuantos
+
+
+def comisiones_ocultas(rows: list) -> int:
+    """Comisiones que el encargado dejaría de ver (para avisar al ocultar)."""
+    return sum(int(getattr(r, "comisiones", 0) or 0) for r in rows if getattr(r, "privado", False))
 
 
 def cambiar_pago_tarjeta(session, operacion_id: int, tarjeta: bool):

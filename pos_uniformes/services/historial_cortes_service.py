@@ -65,17 +65,22 @@ class DatosReimpresion:
     tarjeta_ops: int = 0
 
 
-def datos_para_reimprimir(session, corte) -> DatosReimpresion:
-    """Vuelve a consultar lo del periodo del corte para armar el ticket."""
+def datos_para_reimprimir(session, corte, *, para_encargado: bool = False) -> DatosReimpresion:
+    """Vuelve a consultar lo del periodo del corte para armar el ticket.
+
+    `para_encargado=True` deja fuera los movimientos privados del dueño: ese
+    papel se queda en la tienda."""
     from pos_uniformes.services.corte_caja_service import (
         operaciones_del_periodo,
         pagos_registrados_del_periodo,
         resumir_periodo,
     )
-    from pos_uniformes.services.libreta_service import resumir_por_empleada
+    from pos_uniformes.services.libreta_service import resumir_por_empleada, sin_privados
 
     desde, hasta = periodo_del_corte(session, corte)
     rows = operaciones_del_periodo(session, desde, hasta)
+    if para_encargado:
+        rows = sin_privados(rows)
     try:
         from pos_uniformes.services.retiros_service import retiros_del_periodo
 

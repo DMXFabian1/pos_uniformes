@@ -69,9 +69,15 @@ def hacer_corte_y_avisar(session, *, creado_por: str, ahora: datetime | None = N
         session.rollback()
         retiros = []
     ya_pagados = pagos_previos_del_periodo(session, auto)
+    # El PAPEL se queda en la tienda: va sin los movimientos privados.
+    # El mensaje de Telegram (más abajo) llega solo al celular de Daniel y
+    # sí lleva todo.
+    from pos_uniformes.services.corte_caja_service import datos_ticket_encargado
+
+    datos = datos_ticket_encargado(session, auto.estado.desde, auto.estado.hasta)
     texto = texto_ticket_corte_encargado(
-        auto.corte, auto.estado.resumen.efectivo, auto.pagos, resumir_por_empleada(rows), retiros=retiros,
-        tarjeta=auto.estado.resumen.tarjeta, tarjeta_ops=contar_tarjeta(rows), ya_pagados=ya_pagados,
+        auto.corte, auto.estado.resumen.efectivo, auto.pagos, datos.por_empleada, retiros=datos.retiros,
+        tarjeta=datos.tarjeta, tarjeta_ops=datos.tarjeta_ops, ya_pagados=ya_pagados,
     )
     impreso = False
     try:
