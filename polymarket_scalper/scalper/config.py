@@ -65,9 +65,38 @@ class MultiOutcomeCfg(BaseModel):
 class SpreadCfg(BaseModel):
     enabled: bool = True
     min_spread_ticks: int = 3
+    max_spread_ticks: int = 8         # más ancho que esto no es oportunidad, es falta de liquidez
     min_trades_per_minute: float = 0.3
     trade_window_seconds: int = 300
     vol_window_seconds: int = 300
+
+
+class ModelDeviationCfg(BaseModel):
+    enabled: bool = True
+    min_edge_net: float = 0.02
+    min_deviation: float = 0.04
+    max_deviation: float = 0.35
+    stop_fraction: float = 1.5
+    min_tau: float = 0.02
+    require_pregame: bool = False
+
+
+class SmartMoneyCfg(BaseModel):
+    enabled: bool = True
+    min_edge_net: float = 0.01
+    min_score: float = 0.65
+    min_closed: int = 20
+    min_usd: float = 1000
+    max_chase_ticks: int = 3
+    edge_fraction_of_roi: float = 0.5
+    max_price: float = 0.9
+
+
+class ModelsCfg(BaseModel):
+    sigma_basketball: float = 16.2   # calibrado con NBA 2023-24 (1230 partidos)
+    sigma_by_league: dict[str, float] = Field(default_factory=dict)
+    soccer_total_goals: float = 2.7
+    pregame_proxy_max_progress: float = 0.15   # si el partido ya avanzó más que esto sin precio previo, no se modela
 
 
 class SignalsCfg(BaseModel):
@@ -78,6 +107,8 @@ class SignalsCfg(BaseModel):
     complement: ComplementCfg = Field(default_factory=ComplementCfg)
     multi_outcome: MultiOutcomeCfg = Field(default_factory=MultiOutcomeCfg)
     spread: SpreadCfg = Field(default_factory=SpreadCfg)
+    model_deviation: ModelDeviationCfg = Field(default_factory=ModelDeviationCfg)
+    smart_money: SmartMoneyCfg = Field(default_factory=SmartMoneyCfg)
 
 
 class SimCfg(BaseModel):
@@ -85,6 +116,8 @@ class SimCfg(BaseModel):
     slippage_ticks: int = 1
     maker_fill_prob: float = 0.6
     max_hold_seconds: int = 600
+    max_hold_directional_seconds: int = 4 * 3600
+    max_entry_slip_ticks: int = 3
     start_cash: float = 1000
     max_position_usd: float = 60
     max_open_positions: int = 15
@@ -98,6 +131,7 @@ class Config(BaseModel):
     collector: CollectorCfg = Field(default_factory=CollectorCfg)
     sports_feed: SportsFeedCfg = Field(default_factory=SportsFeedCfg)
     flow: FlowCfg = Field(default_factory=FlowCfg)
+    models: ModelsCfg = Field(default_factory=ModelsCfg)
     signals: SignalsCfg = Field(default_factory=SignalsCfg)
     sim: SimCfg = Field(default_factory=SimCfg)
 

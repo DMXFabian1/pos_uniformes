@@ -11,7 +11,8 @@ import polars as pl
 
 from ..config import Config
 from ..discovery import MarketInfo
-from ..storage import ParquetWriter, latest_markets, scan
+from ..storage import ParquetWriter, latest_markets, latest_profiles, scan
+from ..wallets import WalletProfile
 from .engine import Engine
 
 log = logging.getLogger(__name__)
@@ -53,11 +54,23 @@ def run_replay(cfg: Config, start: str | None = None, end: str | None = None, co
     trades = _in_range(scan(data_dir, "trades"), t0, t1, tokens)
     res_lf = scan(data_dir, "resolutions")
     resolutions = res_lf.filter((pl.col("ts_ms") >= t0) & (pl.col("ts_ms") <= t1)).collect() if res_lf is not None else None
+    games_lf = scan(data_dir, "games")
+    # los partidos se cargan desde antes del rango para tener el estado previo y el precio pregame
+    games = games_lf.filter(pl.col("ts_ms") <= t1).sort("ts_ms").collect() if games_lf is not None else None
+    flow_lf = scan(data_dir, "flow_trades")
+    flows = flow_lf.filter((pl.col("ts_ms") >= t0) & (pl.col("ts_ms") <= t1)).sort("ts_ms").collect() if flow_lf is not None else None
+    if conditions and flows is not None:
+        flows = flows.filter(pl.col("condition_id").is_in(list(conditions)))
 
     run_id = run_id or f"replay-{int(time.time())}"
     writer = ParquetWriter(data_dir, flush_seconds=10**9, flush_rows=10**9, subdir=f"run={run_id}") if persist else None
     eng = Engine(cfg, run_id, "replay", writer)
     eng.set_markets(markets)
+    prof = latest_profiles(data_dir)
+    if prof is not None:
+        fields = set(WalletProfile.__dataclass_fields__)
+        eng.attach_wallets({r["wallet"]: WalletProfile(**{k: v for k, v in r.items() if k in fields and v is not None})
+                            for r in prof.to_dicts()})
 
     # corriente unificada: (ts, prioridad, tipo, fila)
     stream: list[tuple[int, int, str, dict]] = []
@@ -73,6 +86,11 @@ def run_replay(cfg: Config, start: str | None = None, end: str | None = None, co
             by_cid.setdefault(r["condition_id"], []).append(r)
         for cid, rows in by_cid.items():
             stream.append((rows[0]["ts_ms"], 3, "resolution", {"condition_id": cid, "tokens": rows}))
+    if games is not None:
+        # estados anteriores al rango se aplican primero (prioridad -1) para arrancar con contexto
+        stream += [(max(r["ts_ms"], t0), -1 if r["ts_ms"] < t0 else 4, "game", r) for r in games.to_dicts()]
+    if flows is not None:
+        stream += [(r["ts_ms"], 5, "flow", r) for r in flows.to_dicts()]
     stream.sort(key=lambda x: (x[0], x[1]))
     log.info("replay %s: %d mercados, %d eventos (%s → %s)", run_id, len(markets), len(stream),
              datetime.fromtimestamp(t0 / 1000, tz=timezone.utc) if t0 else "inicio", datetime.fromtimestamp(t1 / 1000, tz=timezone.utc))
@@ -97,6 +115,10 @@ def run_replay(cfg: Config, start: str | None = None, end: str | None = None, co
             eng.on_trade(ts, r["token_id"], r)
         elif kind == "resolution":
             eng.on_resolution(ts, r["condition_id"], r)
+        elif kind == "game":
+            eng.on_game(ts, r["game_id"], r)
+        elif kind == "flow":
+            eng.on_flow(ts, r["condition_id"], r)
         if ts - last_tick > 1000:
             eng.tick(ts)
             last_tick = ts

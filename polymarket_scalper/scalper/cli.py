@@ -167,6 +167,90 @@ def cmd_games(args: argparse.Namespace) -> None:
         print(f"{t} {r['league']:14} {r['home'][:22]:22} vs {r['away'][:22]:22} {r['score']:18} {r['period']:6} {r['status']}")
 
 
+def cmd_model(args: argparse.Namespace) -> None:
+    """Diagnóstico: partidos en vivo enlazados, lado de cada token, mid del mercado y salida del modelo."""
+    import polars as pl
+    from .discovery import MarketInfo
+    from .models import ModelRegistry, WinProb, match_outcome, parse_game
+    from .storage import latest_markets, scan
+
+    cfg = load_config(args.config)
+    mk = latest_markets(cfg.data_dir)
+    glf, qlf = scan(cfg.data_dir, "games"), scan(cfg.data_dir, "quotes")
+    if mk is None or glf is None or qlf is None:
+        print("faltan tablas (markets, games, quotes)")
+        return
+    games = glf.sort("ts_ms").group_by("game_id").last().collect()
+    if not args.all:
+        games = games.filter(pl.col("live") & ~pl.col("ended"))
+    quotes = qlf.sort("ts_ms").group_by("token_id").agg(pl.col("mid").last().alias("mid"), pl.col("mid").first().alias("mid_first"),
+                                                       pl.col("best_bid").last(), pl.col("best_ask").last()).collect()
+    qmap = {r["token_id"]: r for r in quotes.to_dicts()}
+    markets = [MarketInfo.from_row(r) for r in mk.to_dicts()]
+    by_game: dict[str, list[MarketInfo]] = {}
+    for m in markets:
+        if m.event_game_id:
+            by_game.setdefault(m.event_game_id, []).append(m)
+    reg = ModelRegistry(cfg.models.sigma_basketball, cfg.models.sigma_by_league, cfg.models.soccer_total_goals)
+    for r in games.sort("ts_ms", descending=True).to_dicts():
+        ms = by_game.get(r["game_id"])
+        if not ms:
+            continue
+        g = parse_game(r)
+        print(f"\n[{g.league}/{g.sport}] {g.home} vs {g.away}  score={r['score']} period={r['period']} live={g.live}")
+        mls = [m for m in ms if m.sports_market_type in ("", "moneyline", "child_moneyline")]
+        # proxy de precio previo: primer mid visto por lado, agregando los mercados del partido (en fútbol el
+        # visitante y el empate viven en mercados hermanos). El motor solo lo acepta al inicio del partido.
+        first: dict[str, list[float]] = {}
+        for m in mls:
+            for t in m.tokens:
+                side = match_outcome(t.outcome, g.home, g.away, m.question)
+                q = qmap.get(t.token_id)
+                if side and q and q["mid_first"] is not None:
+                    first.setdefault(side, []).append(q["mid_first"])
+        pre = None
+        if "home" in first and "away" in first:
+            ph, pa = sum(first["home"]) / len(first["home"]), sum(first["away"]) / len(first["away"])
+            pd = sum(first["draw"]) / len(first["draw"]) if "draw" in first else 0.0
+            tot = ph + pa + pd
+            pre = WinProb(ph / tot, pa / tot, pd / tot)
+        wp = reg.prob(g, pre) if g.sport in ("basketball", "tennis", "soccer") else None
+        if pre is not None:
+            print(f"  previo(proxy)= local {pre.home:.3f} visitante {pre.away:.3f} empate {pre.draw:.3f}")
+        for m in mls:
+            sides = {t.token_id: match_outcome(t.outcome, g.home, g.away, m.question) for t in m.tokens}
+            mids = {t.token_id: qmap.get(t.token_id) for t in m.tokens}
+            print(f"  {m.question[:60]}  fee={m.fee_rate}")
+            for t in m.tokens:
+                q = mids[t.token_id]
+                side = sides[t.token_id]
+                pm = wp.for_side(side) if (wp is not None and side) else None
+                mid = q["mid"] if q else None
+                dev = f"{pm - mid:+.3f}" if (pm is not None and mid is not None) else "   -  "
+                print(f"     {t.outcome[:24]:24} lado={str(side):5} mid={mid if mid is None else round(mid, 3)!s:6} "
+                      f"modelo={'-' if pm is None else round(pm, 3)!s:6} desvío={dev}")
+
+
+def cmd_calibrate(args: argparse.Namespace) -> None:
+    from .models.calibrate import (calibrate_from_trajectories, format_report, load_nba_pbp,
+                                   trajectories_from_games_table)
+    from .storage import scan
+
+    cfg = load_config(args.config)
+    if args.nba_csv:
+        games = load_nba_pbp(args.nba_csv)
+        print(f"play-by-play: {len(games)} partidos")
+        print(format_report(calibrate_from_trajectories(games.values())))
+        return
+    lf = scan(cfg.data_dir, "games")
+    if lf is None:
+        print("sin tabla games. Pasa --nba-csv <archivo> para calibrar con histórico.")
+        return
+    trajs = trajectories_from_games_table(lf.collect().to_dicts(), league=args.league)
+    print(f"tabla games: {len(trajs)} partidos terminados de {args.league}")
+    print(format_report(calibrate_from_trajectories(trajs)))
+
+
 def cmd_status(args: argparse.Namespace) -> None:
     from .storage import scan
 
@@ -231,6 +315,15 @@ def main(argv: list[str] | None = None) -> None:
 
     s = sub.add_parser("status", help="qué datos hay en data/")
     s.set_defaults(fn=cmd_status)
+
+    s = sub.add_parser("model", help="diagnóstico: partidos en vivo, lado de cada token, mid vs modelo")
+    s.add_argument("--all", action="store_true")
+    s.set_defaults(fn=cmd_model)
+
+    s = sub.add_parser("calibrate", help="calibrar σ del modelo de básquet (tabla games o play-by-play NBA)")
+    s.add_argument("--nba-csv", help="CSV de stats.nba.com (dataset shufinskiy/nba_data, nbastats_<año>.csv)")
+    s.add_argument("--league", default="nba")
+    s.set_defaults(fn=cmd_calibrate)
 
     s = sub.add_parser("wallets", help="ranking de wallets perfiladas (dinero inteligente)")
     s.add_argument("--top", type=int, default=30)

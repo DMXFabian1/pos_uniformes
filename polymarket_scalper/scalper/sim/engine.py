@@ -13,8 +13,9 @@ from typing import Any
 from ..book import OrderBook
 from ..config import Config
 from ..discovery import MarketInfo
+from ..models import GameState, ModelRegistry, WinProb, match_outcome, parse_game
 from ..signals import MarketContext, Signal, build_detectors
-from ..signals.base import TokenHistory
+from ..signals.base import Leg, TokenHistory
 from ..storage import ParquetWriter
 from .fill_model import FillModel
 from .ledger import Position, signal_row
@@ -41,6 +42,13 @@ class Engine:
         self.last_detect: dict[str, int] = {}
         self.stats: dict[str, int] = defaultdict(int)
         self.now_ms = 0
+        # in-play
+        self.models = ModelRegistry(cfg.models.sigma_basketball, cfg.models.sigma_by_league, cfg.models.soccer_total_goals)
+        self.games: dict[str, GameState] = {}                 # game_id -> último estado
+        self.game_to_cids: dict[str, list[str]] = defaultdict(list)
+        self.pregame: dict[str, WinProb] = {}                 # game_id -> prob previa (del mercado)
+        self.outcome_side: dict[str, dict[str, str]] = {}    # cid -> token -> home|away|draw
+        self.wallets: dict[str, Any] = {}                     # wallet -> WalletProfile
 
     # ------------------------------------------------------------ mercados
     def set_markets(self, markets: list[MarketInfo]) -> None:
@@ -49,6 +57,10 @@ class Engine:
         self.event_index = defaultdict(list)
         for m in markets:
             self.event_index[m.event_id].append(m.condition_id)
+        self.game_to_cids = defaultdict(list)
+        for m in markets:
+            if m.event_game_id:
+                self.game_to_cids[m.event_game_id].append(m.condition_id)
         for m in markets:
             for t in m.tokens:
                 b = self.books.get(t.token_id)
@@ -56,6 +68,10 @@ class Engine:
                     self.books[t.token_id] = OrderBook(t.token_id, m.condition_id, m.tick_size)
                 else:
                     b.tick_size = m.tick_size
+
+    def attach_wallets(self, profiles: dict[str, Any]) -> None:
+        """Comparte el diccionario de perfiles del WalletTracker (paper) o uno cargado (replay)."""
+        self.wallets = profiles
 
     def attach_books(self, books: dict[str, OrderBook]) -> None:
         """Comparte los libros del recolector (paper trading) en vez de mantener copias."""
@@ -73,6 +89,138 @@ class Engine:
             self.on_trade(event[1], event[2], event[3])
         elif kind == "resolution":
             self.on_resolution(event[1], event[2], event[3])
+        elif kind == "game":
+            self.on_game(event[1], event[2], event[3])
+        elif kind == "flow":
+            self.on_flow(event[1], event[2], event[3])
+
+    def on_game(self, ts_ms: int, game_id: str, row: dict[str, Any]) -> None:
+        self.now_ms = max(self.now_ms, ts_ms)
+        g = parse_game({**row, "ts_ms": ts_ms})
+        prev = self.games.get(game_id)
+        self.games[game_id] = g
+        cids = self.game_to_cids.get(game_id, [])
+        if not cids:
+            return
+        for cid in cids:
+            self._ensure_sides(cid, g)
+        if not g.live and not g.ended:
+            self._capture_pregame(game_id, cids)
+        elif g.live and game_id not in self.pregame and prev is not None and not prev.live:
+            self._capture_pregame(game_id, cids)          # último precio antes de arrancar
+        if g.ended:
+            self._settle_game(ts_ms, game_id, g, cids)
+            return
+        self._process_pending(ts_ms)
+        self._check_directional(ts_ms)
+        for cid in cids:
+            self.last_detect.pop(cid, None)              # un cambio de marcador siempre se evalúa
+            self._maybe_detect(cid, ts_ms)
+
+    def on_flow(self, ts_ms: int, condition_id: str, flow: dict[str, Any]) -> None:
+        self.now_ms = max(self.now_ms, ts_ms)
+        m = self.markets.get(condition_id)
+        if m is None:
+            return
+        ctx = self._context(m)
+        for det in self.detectors:
+            fn = getattr(det, "on_flow", None)
+            if fn is None:
+                continue
+            try:
+                for sig in fn(ctx, flow, ts_ms):
+                    self._on_signal(sig)
+            except Exception:  # noqa: BLE001
+                log.exception("detector %s falló en flow", det.kind)
+
+    def _ensure_sides(self, cid: str, g: GameState) -> None:
+        if cid in self.outcome_side:
+            return
+        m = self.markets.get(cid)
+        if m is None:
+            return
+        sides: dict[str, str] = {}
+        for t in m.tokens:
+            side = match_outcome(t.outcome, g.home, g.away, m.question)
+            if side is None and m.is_binary and t.outcome.lower() == "no":
+                other = match_outcome(m.tokens[0].outcome, g.home, g.away, m.question)
+                if other in ("home", "away") and not (m.event_neg_risk and len(self.event_index.get(m.event_id, [])) > 2):
+                    side = "away" if other == "home" else "home"
+            if side is not None:
+                sides[t.token_id] = side
+        self.outcome_side[cid] = sides
+
+    def _market_probs(self, cids: list[str]) -> WinProb | None:
+        """Prob. implícita por lado a partir de los mids de los mercados enlazados al partido."""
+        acc: dict[str, list[float]] = defaultdict(list)
+        for cid in cids:
+            m = self.markets.get(cid)
+            if m is None or (m.sports_market_type and m.sports_market_type not in ("moneyline", "child_moneyline")):
+                continue
+            for tid, side in self.outcome_side.get(cid, {}).items():
+                b = self.books.get(tid)
+                if b is not None and b.is_valid:
+                    acc[side].append(b.mid)
+        if "home" not in acc or "away" not in acc:
+            return None
+        ph = sum(acc["home"]) / len(acc["home"])
+        pa = sum(acc["away"]) / len(acc["away"])
+        pd = sum(acc["draw"]) / len(acc["draw"]) if acc.get("draw") else 0.0
+        tot = ph + pa + pd
+        if tot <= 0:
+            return None
+        return WinProb(home=ph / tot, away=pa / tot, draw=pd / tot, model="market")
+
+    def _capture_pregame(self, game_id: str, cids: list[str]) -> None:
+        wp = self._market_probs(cids)
+        if wp is not None:
+            self.pregame[game_id] = wp
+
+    def _model_for(self, cid: str) -> tuple[GameState | None, WinProb | None, WinProb | None]:
+        m = self.markets.get(cid)
+        if m is None or not m.event_game_id:
+            return None, None, None
+        g = self.games.get(m.event_game_id)
+        if g is None:
+            return None, None, None
+        pre = self.pregame.get(m.event_game_id)
+        if pre is None and g.live:
+            # sin precio previo: solo se acepta el mercado actual como proxy si el partido recién empieza
+            model = self.models.get(g.sport)
+            tau = getattr(model, "remaining_fraction", lambda _g: None)(g) if model else None
+            early = (tau is not None and tau >= 1 - self.cfg.models.pregame_proxy_max_progress) or                     (g.sport == "tennis" and g.extra.get("sets_home", 0) + g.extra.get("sets_away", 0) == 0
+                     and g.extra.get("games_home", 0) + g.extra.get("games_away", 0) <= 2)
+            if early:
+                self._capture_pregame(m.event_game_id, self.game_to_cids.get(m.event_game_id, []))
+                pre = self.pregame.get(m.event_game_id)
+            if pre is None:
+                return g, None, None
+        try:
+            wp = self.models.prob(g, pre)
+        except Exception:  # noqa: BLE001
+            log.exception("modelo falló para %s", g.game_id)
+            wp = None
+        return g, wp, pre
+
+    def _settle_game(self, ts_ms: int, game_id: str, g: GameState, cids: list[str]) -> None:
+        """Partido terminado: liquida posiciones direccionales con el marcador final."""
+        if g.home_score == g.away_score and g.sport != "tennis":
+            winner = "draw"
+        else:
+            winner = "home" if g.home_score > g.away_score else "away"
+        for pos in list(self.positions):
+            if pos.status != "open" or pos.signal.condition_id not in cids:
+                continue
+            sides = self.outcome_side.get(pos.signal.condition_id, {})
+            payout = 0.0
+            for tid, sh in pos.inventory.items():
+                side = sides.get(tid)
+                if side is None:
+                    continue
+                payout += sh * (1.0 if side == winner else 0.0)
+            pos.payout += payout
+            pos.inventory = {t: s for t, s in pos.inventory.items() if sides.get(t) is None}
+            self._close(pos, ts_ms, "game_end")
 
     def on_book(self, ts_ms: int, token_id: str, book: OrderBook) -> None:
         self.now_ms = max(self.now_ms, ts_ms)
@@ -85,6 +233,7 @@ class Engine:
                     if o.token_id == token_id and self.fill_model.maker_on_book(o, book, ts_ms) > 0:
                         self._after_maker_fill(pos, ts_ms)
         self._expire(ts_ms)
+        self._check_directional(ts_ms, token_id)
         cid = self.token_to_cid.get(token_id)
         if cid:
             self._maybe_detect(cid, ts_ms)
@@ -120,6 +269,7 @@ class Engine:
         self.now_ms = max(self.now_ms, ts_ms)
         self._process_pending(ts_ms)
         self._expire(ts_ms)
+        self._check_directional(ts_ms)
 
     # ------------------------------------------------------------ detección
     def _maybe_detect(self, cid: str, ts_ms: int) -> None:
@@ -144,7 +294,9 @@ class Engine:
         books = {t.token_id: self.books[t.token_id] for t in m.tokens if t.token_id in self.books}
         sibs = [self.markets[c] for c in self.event_index.get(m.event_id, []) if c in self.markets]
         ebooks = {t.token_id: self.books[t.token_id] for s in sibs for t in s.tokens if t.token_id in self.books}
-        return MarketContext(m, books, self.history, sibs, ebooks)
+        g, wp, pre = self._model_for(m.condition_id)
+        return MarketContext(m, books, self.history, sibs, ebooks, game=g, model_prob=wp, pregame=pre,
+                            outcome_side=self.outcome_side.get(m.condition_id, {}), wallets=self.wallets)
 
     def _on_signal(self, s: Signal) -> None:
         self.stats["signals"] += 1
@@ -157,7 +309,9 @@ class Engine:
                 return
         if self.writer is not None:
             self.writer.append("signals", signal_row(s, self.run_id))
-        if s.edge_net > self.cfg.signals.max_edge_net:
+        # el tope de plausibilidad es para arbitrajes (un libro roto parece dinero gratis); las señales
+        # direccionales tienen su propio tope de desvío en el detector
+        if s.horizon != "directional" and s.edge_net > self.cfg.signals.max_edge_net:
             self.stats["skipped_implausible"] += 1
             return
         # riesgo: tope de posiciones, tope de USD por posición
@@ -205,6 +359,15 @@ class Engine:
     def _execute_taker(self, pos: Position, ts_ms: int) -> None:
         s = pos.signal
         m = self.markets.get(s.condition_id)
+        if s.horizon == "directional":
+            leg = s.legs[0]
+            book = self.books.get(leg.token_id)
+            if book is None or not book.is_valid:
+                self._close(pos, ts_ms, "no_book")
+                return
+            if book.best_ask > leg.price + self.cfg.sim.max_entry_slip_ticks * book.tick_size + 1e-9:
+                self._close(pos, ts_ms, "price_moved")
+                return
         fills = []
         for leg in s.legs:
             book = self.books.get(leg.token_id)
@@ -264,6 +427,7 @@ class Engine:
             pos.payout += got * (s.meta.get("n", len(s.legs)) - 1)
             pos.inventory = {}
             self._close(pos, ts_ms, "guaranteed")
+        # horizon == "directional": queda abierta; sale por target/stop/tiempo/fin de partido
 
     @staticmethod
     def _adjust_unwind(pos: Position, side: str, paid_or_received: float, undo_notional: float, undo_fee: float) -> None:
@@ -308,6 +472,29 @@ class Engine:
             pos.inventory = {}
             self._close(pos, ts_ms, "both_filled")
 
+    def _check_directional(self, ts_ms: int, token_id: str | None = None) -> None:
+        max_hold = self.cfg.sim.max_hold_directional_seconds * 1000
+        for pos in [p for p in self.positions if p.status == "open" and p.signal.horizon == "directional"]:
+            tid = pos.signal.legs[0].token_id
+            if token_id is not None and tid != token_id:
+                continue
+            book = self.books.get(tid)
+            if book is None or not book.is_valid:
+                continue
+            mid = book.mid
+            target, stop = pos.signal.meta.get("target"), pos.signal.meta.get("stop")
+            reason = None
+            if target is not None and book.best_bid >= target - 1e-9:
+                reason = "target"
+            elif stop is not None and mid <= stop + 1e-9:
+                reason = "stop"
+            elif ts_ms - pos.ts_fill >= max_hold:
+                reason = "max_hold"
+            if reason is None:
+                continue
+            self._unwind_inventory(pos, ts_ms)
+            self._close(pos, ts_ms, reason)
+
     def _expire(self, ts_ms: int) -> None:
         max_hold = self.cfg.sim.max_hold_seconds * 1000
         for pos in [p for p in self.positions if p.status == "open" and p.maker_orders]:
@@ -324,7 +511,6 @@ class Engine:
             if book is None or not book.is_valid:
                 continue
             rate = self.markets[self.token_to_cid[tid]].fee_rate
-            from ..signals.base import Leg
             leg = Leg(tid, "SELL" if sh > 0 else "BUY", 0.0, abs(sh), "taker")
             f = self.fill_model.fill_taker(leg, book, rate, ts_ms)
             pos.fills.append(f)
@@ -364,7 +550,7 @@ class Engine:
         self.stats[f"closed_{reason}"] += 1
         if self.writer is not None:
             self.writer.append("ledger", pos.to_row(self.run_id, self.mode))
-        if reason not in ("unfilled", "expired_unfilled", "spread_gone", "no_book"):
+        if reason not in ("unfilled", "expired_unfilled", "spread_gone", "no_book", "price_moved"):
             log.info("cierre %s %s size=%.1f pred=%.4f real=%.4f err=%.4f (%s)", pos.signal.kind,
                      pos.signal.condition_id[:10], pos.size_filled, pos.predicted_pnl, pos.realized_pnl,
                      pos.realized_pnl - pos.predicted_pnl, reason)

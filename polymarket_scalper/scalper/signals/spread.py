@@ -14,10 +14,12 @@ class SpreadCaptureDetector:
     kind = "spread_capture"
 
     def __init__(self, min_edge_net: float, target_size: float, min_spread_ticks: int = 3,
-                 min_trades_per_minute: float = 0.3, trade_window_seconds: int = 300, vol_window_seconds: int = 300):
+                 min_trades_per_minute: float = 0.3, trade_window_seconds: int = 300, vol_window_seconds: int = 300,
+                 max_spread_ticks: int = 8):
         self.min_edge_net = min_edge_net
         self.target_size = target_size
         self.min_spread_ticks = min_spread_ticks
+        self.max_spread_ticks = max_spread_ticks
         self.min_tpm = min_trades_per_minute
         self.trade_window_ms = trade_window_seconds * 1000
         self.vol_window_ms = vol_window_seconds * 1000
@@ -30,7 +32,7 @@ class SpreadCaptureDetector:
             if b is None or not b.is_valid:
                 continue
             st = b.spread_ticks or 0
-            if st < self.min_spread_ticks:
+            if st < self.min_spread_ticks or st > self.max_spread_ticks:
                 continue
             hist = ctx.history.get(tok.token_id) or TokenHistory()
             trades = hist.trades_in(ts_ms, self.trade_window_ms)

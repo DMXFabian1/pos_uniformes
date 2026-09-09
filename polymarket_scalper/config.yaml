@@ -46,6 +46,12 @@ flow:
   smart_min_score: 0.65         # umbral para considerar una wallet "dinero inteligente"
   smart_min_closed: 20
 
+models:
+  sigma_basketball: 16.2        # desviación del margen final a partido completo. NBA 2023-24: 16.2 (`scalper calibrate`)
+  sigma_by_league: {nba: 16.2}  # por liga; otras usan sigma_basketball
+  soccer_total_goals: 2.7
+  pregame_proxy_max_progress: 0.15   # sin precio previo, solo se modela si el partido lleva < 15 %
+
 signals:
   min_edge_net: 0.004           # ganancia mínima neta por share (USD) para emitir señal
   max_edge_net: 0.25            # por encima de esto se descarta: casi siempre es un libro roto
@@ -59,15 +65,35 @@ signals:
   spread:
     enabled: true
     min_spread_ticks: 3         # spread mínimo (en ticks) para postear dentro
+    max_spread_ticks: 8         # más ancho es falta de liquidez: salir después cuesta más que el spread
     min_trades_per_minute: 0.3  # actividad mínima reciente
     trade_window_seconds: 300
     vol_window_seconds: 300
+  model_deviation:              # in-play: modelo vs mercado
+    enabled: true
+    min_edge_net: 0.02          # USD por share tras fees de entrada y salida
+    min_deviation: 0.04         # p_modelo - precio mínimo para mirar siquiera
+    max_deviation: 0.35         # más que esto casi siempre es un marcador mal leído
+    stop_fraction: 1.5          # stop = entrada - 1.5 × edge
+    min_tau: 0.02               # no entrar con menos del 2 % del partido por jugar
+    require_pregame: false
+  smart_money:                  # seguir wallets con historial
+    enabled: true
+    min_edge_net: 0.01
+    min_score: 0.65
+    min_closed: 20
+    min_usd: 1000               # tamaño mínimo del trade de la wallet
+    max_chase_ticks: 3          # no perseguir si el ask ya subió más que esto sobre su precio
+    edge_fraction_of_roi: 0.5   # hipótesis: capturamos la mitad de su ROI histórico
+    max_price: 0.9
 
 sim:
   latency_ms: 400               # retraso entre señal y ejecución
   slippage_ticks: 1             # ticks adicionales de penalización en órdenes taker
   maker_fill_prob: 0.6          # probabilidad de que un trade que cruza nuestro precio nos llene
   max_hold_seconds: 600         # tiempo máximo con una posición de spread abierta
+  max_hold_directional_seconds: 14400   # posiciones direccionales (modelo, dinero inteligente): 4 h
+  max_entry_slip_ticks: 3       # si el precio se movió más que esto entre señal y ejecución, no entrar
   start_cash: 1000
   max_position_usd: 60
   max_open_positions: 15

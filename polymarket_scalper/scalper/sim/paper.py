@@ -20,6 +20,8 @@ async def run_paper(cfg: Config, duration_seconds: int | None = None, run_id: st
     writer = ParquetWriter(cfg.data_dir, cfg.collector.flush_seconds, cfg.collector.flush_rows, subdir=f"run={run_id}")
     eng = Engine(cfg, run_id, "paper", writer)
     eng.attach_books(col.books)
+    if col.wallets is not None:
+        eng.attach_wallets(col.wallets.profiles)
     col.add_listener(eng.on_event)
 
     async def ticker() -> None:

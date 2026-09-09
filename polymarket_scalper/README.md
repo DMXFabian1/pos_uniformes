@@ -31,6 +31,7 @@ scalper games                    # partidos en vivo enlazados a mercados
 scalper flow --min-usd 5000      # trades grandes recientes, con score de la wallet
 scalper wallets --top 30         # ranking de wallets perfiladas
 scalper profile 0x2a69660046d7acc4ab204d7cc5ba78b0776cd2f7
+scalper calibrate --nba-csv nbastats_2023.csv   # σ del modelo de básquet con play-by-play real
 ```
 
 Todo se configura en `config.yaml`. Nada de esto toca una wallet ni firma órdenes.
@@ -90,9 +91,34 @@ Cada señal lleva `edge_net` (USD por share después de fees), `confidence` (heu
 - **Retraso**: el flujo con identidad llega 2 a 3 minutos después que el websocket del CLOB. Sirve
   para perfilar y para señales de "entró dinero inteligente"; no para competir en latencia.
 
-### Lo que viene (fase 4)
-Con el ledger y las tablas `quotes`/`trades`, se entrena un modelo (gradient boosting) que
-predice, por señal, la probabilidad de que termine en ganancia y el tamaño del error. Se
+### Modelos de probabilidad en vivo (`scalper/models/`)
+Todos parten del precio previo al partido (capturado del propio mercado antes de que arranque)
+y lo actualizan con el marcador. Sin precio previo, solo se modela si el partido acaba de empezar.
+
+- **Básquet** (`basketball.py`): modelo de Stern. El margen es un movimiento browniano:
+  `P(local) = Φ((ventaja + deriva·τ) / (σ·√τ))`. σ calibrado con 1.230 partidos de la NBA
+  2023-24: **16,2 puntos** (la literatura clásica decía 11-12; el ritmo actual es mayor). La
+  varianza real escala con √τ casi exactamente. `scalper calibrate --nba-csv <archivo>` lo
+  recalcula con cualquier temporada del dataset público `shufinskiy/nba_data`; sin argumento,
+  usa los partidos terminados de la tabla `games` propia.
+- **Tenis** (`tennis.py`): cadena de Markov por puntos (O'Malley). Las probabilidades de punto
+  al saque se infieren del precio previo y se propaga desde sets, juegos y tiebreak actuales.
+- **Fútbol** (`soccer.py`): goles restantes como Poisson por equipo; las tasas salen del precio
+  previo de local/empate/visitante. Devuelve las tres probabilidades para los mercados de 3 salidas.
+
+### Detectores in-play y de dinero inteligente
+- **model_deviation**: para cada token enlazado a un partido en vivo, si
+  `p_modelo − ask − fee(entrada) − costo de salida > umbral`, compra como taker. Sale cuando el
+  bid alcanza el target (el modelo), en el stop, por tiempo máximo o al terminar el partido
+  (liquidación con el marcador final). Desvíos mayores a `max_deviation` se descartan: casi
+  siempre son un marcador mal leído, no una oportunidad.
+- **smart_money**: cuando el flujo con identidad muestra un trade de una wallet con perfil
+  (score y muestra mínimos) en un mercado seguido, sigue el mismo lado si el ask no se ha alejado.
+  La ganancia esperada es una hipótesis (fracción de su ROI histórico); el ledger la contrasta.
+
+### Lo que viene (fase 5)
+Con el ledger y las tablas `quotes`/`trades`/`games`, se entrena un modelo (gradient boosting)
+que predice, por señal, la probabilidad de que termine en ganancia y el tamaño del error. Se
 sustituye la heurística de `confidence` por la salida del modelo y se reentrena por ventana,
 comparando siempre contra la versión anterior en replay antes de reemplazarla.
 

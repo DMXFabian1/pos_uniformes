@@ -8,6 +8,7 @@ from typing import Any, Protocol
 
 from ..book import OrderBook
 from ..discovery import MarketInfo
+from ..models.base import GameState, WinProb
 
 _counter = itertools.count(1)
 
@@ -77,12 +78,26 @@ class MarketContext:
     history: dict[str, TokenHistory]                 # token_id -> historia
     event_markets: list[MarketInfo] = field(default_factory=list)   # hermanos del mismo evento
     event_books: dict[str, OrderBook] = field(default_factory=dict)  # libros de todos los tokens del evento
+    game: GameState | None = None                    # partido enlazado (si hay)
+    model_prob: WinProb | None = None                # salida del modelo para ese partido
+    pregame: WinProb | None = None                   # probabilidad previa al partido (del mercado)
+    outcome_side: dict[str, str] = field(default_factory=dict)      # token_id -> home | away | draw
+    wallets: dict[str, Any] = field(default_factory=dict)           # wallet -> WalletProfile
 
     def book(self, token_id: str) -> OrderBook | None:
         return self.books.get(token_id) or self.event_books.get(token_id)
+
+    def wallet_profile(self, wallet: str) -> Any | None:
+        return self.wallets.get((wallet or "").lower())
 
 
 class Detector(Protocol):
     kind: str
 
     def detect(self, ctx: MarketContext, ts_ms: int) -> list[Signal]: ...
+
+
+class FlowDetector(Protocol):
+    kind: str
+
+    def on_flow(self, ctx: MarketContext, flow: dict[str, Any], ts_ms: int) -> list[Signal]: ...

@@ -178,8 +178,10 @@ async def discover_markets(cfg: Config, gamma: GammaClient) -> list[MarketInfo]:
                 break
             for ev in events:
                 # en eventos negRisk hacen falta TODOS los mercados abiertos para cubrir el espacio de
-                # resultados; el filtro de volumen se aplica al evento, no a cada mercado
-                whole_event = bool(ev.get("negRisk")) and _f(ev.get("volume24hr")) >= dcfg.min_volume_24h
+                # resultados, y en partidos (gameId) hacen falta local/empate/visitante para el modelo;
+                # en ambos casos el filtro de volumen se aplica al evento, no a cada mercado
+                whole_event = (bool(ev.get("negRisk")) or bool(ev.get("gameId"))) and \
+                    _f(ev.get("volume24hr")) >= dcfg.min_volume_24h
                 for m in ev.get("markets") or []:
                     if not m.get("enableOrderBook") or m.get("closed") or not m.get("acceptingOrders"):
                         continue
