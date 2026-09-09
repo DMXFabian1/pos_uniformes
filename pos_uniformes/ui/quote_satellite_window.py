@@ -314,7 +314,6 @@ def _paginate(options: list, page: int, per_page: int) -> tuple[list, int, int]:
     return options[start : start + per_page], page, total_pages
 
 
-_DIA_CORTO = ("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
 
 
 def _ajustar_alto_lista(lista) -> None:
@@ -1900,28 +1899,10 @@ class QuoteSatelliteWindow(QMainWindow):
 
     @staticmethod
     def _tiles_ciclo(datos: dict) -> list[tuple[str, str]]:
-        """(valor, leyenda) por tile — puro, testeable."""
-        from pos_uniformes.services.dia_calendario_service import DIAS_ES, MESES_ES
+        """(valor, leyenda) por tile — el mismo texto que ve en el celular."""
+        from pos_uniformes.services.libreta_presentacion_service import tiles_ciclo
 
-        def _fecha(d):
-            return f"{DIAS_ES[d.weekday()][:3]} {d.day} {MESES_ES[d.month - 1][:3]}"
-
-        hoy = datos.get("hoy")
-        tiles = [(f"⭐ {int(datos.get('comisiones') or 0)}", "comisiones desde tu último pago")]
-        pago = datos.get("proximo_pago")
-        if pago is not None:
-            faltan = datos.get("faltan")
-            if hoy is not None and pago <= hoy:
-                leyenda = "próximo pago · ¡hoy!" if pago == hoy else "pago pendiente de registrar"
-            elif faltan is not None:
-                leyenda = f"próximo pago · faltan {faltan} día{'s' if faltan != 1 else ''}"
-            else:
-                leyenda = "próximo pago"
-            tiles.append((f"💵 {_fecha(pago)}", leyenda))
-        descanso = datos.get("descanso")
-        if descanso is not None:
-            tiles.append((f"🛌 {_fecha(descanso)}", "tu siguiente descanso"))
-        return tiles
+        return tiles_ciclo(datos)
 
     def _pintar_ciclo_libreta(self, datos: dict) -> None:
         tiles = self._tiles_ciclo(datos)
@@ -2905,43 +2886,18 @@ class QuoteSatelliteWindow(QMainWindow):
 
     def _llenar_libreta_lista(self, rows: list) -> None:
         """Movimientos de la empleada en lenguaje simple, sin dinero."""
-        from pos_uniformes.services.libreta_service import describir_detalle
+        from pos_uniformes.services.libreta_presentacion_service import texto_movimiento
 
         self.libreta_emp_list.clear()
         if not rows:
             item = QListWidgetItem("Aquí van a aparecer tus ventas del día. 🌱")
             self.libreta_emp_list.addItem(item)
             return
+        con_dia = self._libreta_periodo != "hoy"
         for row in rows:
-            local_dt = (
-                row.created_at.astimezone()
-                if row.created_at.tzinfo is not None
-                else row.created_at
+            self.libreta_emp_list.addItem(
+                QListWidgetItem(texto_movimiento(row, con_dia=con_dia))
             )
-            hora = local_dt.strftime("%H:%M")
-            dia = (
-                f"{_DIA_CORTO[local_dt.weekday()]} {local_dt.strftime('%d/%m')} · "
-                if self._libreta_periodo != "hoy"
-                else ""
-            )
-            comisiones = int(getattr(row, "comisiones", 0) or 0)
-            tipo = str(row.tipo)
-            if tipo == "abono":
-                cliente = getattr(row, "cliente", None)
-                texto = f"💵  {dia}{hora} · Recibiste un abono"
-                if cliente:
-                    texto += f" de {cliente}"
-            else:
-                piezas = int(row.piezas or 0)
-                verbo = "Apartaste" if tipo == "apartado" else "Vendiste"
-                icono = "📦" if tipo == "apartado" else "🛍️"
-                prendas = describir_detalle(list(row.detalle or []))
-                texto = f"{icono}  {dia}{hora} · {verbo} {piezas} pieza(s)"
-                if comisiones:
-                    texto += f"  (+{comisiones} com.)"
-                # Las prendas en su propio renglón: se envuelven, no se cortan.
-                texto += f"\n      {prendas}"
-            self.libreta_emp_list.addItem(QListWidgetItem(texto))
         # Igual que la tabla del dueño: la lista crece y scrollea la página.
         _ajustar_alto_lista(self.libreta_emp_list)
 

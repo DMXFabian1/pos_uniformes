@@ -102,6 +102,21 @@ class ApiMovilTests(unittest.TestCase):
         # Su jueves fijo aparece pintado como descanso en el mes.
         self.assertIn("descanso", set(emp["calendario"]["dias"].values()))
 
+    def test_empleada_ve_su_tarjeta_de_ciclo_y_movimientos(self) -> None:
+        """Mismo texto que su Libreta del kiosko y sin un solo peso."""
+        self._como("VEND-4")
+        emp = self.client.get("/api/v1/movil/inicio").json()["empleada"]
+        valores = [t["valor"] for t in emp["tiles"]]
+        leyendas = [t["leyenda"] for t in emp["tiles"]]
+        self.assertEqual(valores[0], "⭐ 0")  # pagada hoy: ciclo en ceros
+        self.assertEqual(leyendas[0], "comisiones desde tu último pago")
+        self.assertTrue(any(l == "tu siguiente descanso" for l in leyendas))
+        movs = emp["movimientos"]
+        self.assertEqual(len(movs), 1)
+        self.assertIn("Vendiste 2 pieza(s)", movs[0]["texto"])
+        self.assertIn("(+2 com.)", movs[0]["texto"])
+        self.assertNotIn("$", movs[0]["texto"])  # privacidad: sin montos
+
     def test_encargado_ve_solo_cortes(self) -> None:
         self._como("ENC-1")
         data = self.client.get("/api/v1/movil/inicio").json()

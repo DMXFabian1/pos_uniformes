@@ -96,6 +96,8 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
   .pago-linea{font-size:19px; font-weight:700; color:var(--tinta); margin-top:4px;
     overflow-wrap:anywhere}
   .pago-linea.urgente{color:var(--acento)}
+  .fila.mov{display:block; font-weight:700; line-height:1.4}
+  .fila.mov .sub{display:block; margin:2px 0 0; font-weight:600}
   .fila-corte .sub{display:block; margin:2px 0 0; font-weight:600}
   .btn-grande.btn-acento{background:var(--acento); color:#fff; border-color:var(--acento)}
   .btn-grande.btn-acento:active{background:var(--acento-osc)}
@@ -123,7 +125,11 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
   <div id="vista-empleada" class="oculto">
     <h1 id="emp-hola"></h1>
     <p class="sub" id="emp-fecha"></p>
-    <div class="card banner" id="emp-banner"></div>
+    <div id="emp-ciclo"></div>
+    <div class="card">
+      <strong>Tus movimientos</strong>
+      <div id="emp-movs"></div>
+    </div>
     <div class="card">
       <div class="cal-nav">
         <button class="btn-suave" onclick="moverMes(-1)">◀</button>
@@ -215,6 +221,7 @@ let calY = 0, calM = 0;
 let rolActual = "", vistaInicio = "", modoServidor = "casa";
 let escaner = null;
 
+const escapar = t => String(t).replace(/[&<>]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));
 const pesos = s => "$" + Number(s).toLocaleString("es-MX", {minimumFractionDigits: 2});
 // Fecha LOCAL (toISOString es UTC y por la tarde ya marca "manana")
 const hoyISO = () => { const d = new Date();
@@ -385,12 +392,16 @@ function pintarEmpleada(data) {
   const e = data.empleada;
   $("emp-hola").textContent = `Hola, ${data.nombre} 👋`;
   $("emp-fecha").textContent = fechaLarga(hoyISO());
-  let partes = [`⭐ Comisiones desde tu último pago: ${e.comisiones_ciclo}`];
-  if (e.siguiente_descanso) partes.push(`🛌 Descansas el ${fechaLarga(e.siguiente_descanso)}`);
-  if (e.proximo_pago) partes.push(`💵 Próximo pago: ${fechaLarga(e.proximo_pago)}` +
-    (e.dias_para_pago === 0 ? " — ¡hoy!" :
-      e.dias_para_pago === 1 ? " (falta 1 día)" : ` (faltan ${e.dias_para_pago} días)`));
-  $("emp-banner").innerHTML = partes.join("<br>");
+  // Tarjeta del ciclo con el mismo texto que su Libreta del kiosko.
+  const tiles = e.tiles || [];
+  $("emp-ciclo").innerHTML = `<div class="tarjetas">` + tiles.map((t, i) =>
+    `<div class="tarjeta${tiles.length % 2 && i === tiles.length - 1 ? " ancha" : ""}">` +
+    `<div class="valor">${t.valor}</div>` +
+    `<div class="sub" style="margin:2px 0 0">${t.leyenda}</div></div>`).join("") + `</div>`;
+  const movs = e.movimientos || [];
+  $("emp-movs").innerHTML = movs.length
+    ? movs.map(m => `<div class="fila mov">${escapar(m.texto).replace(/\n\s+/, "<br><span class='sub'>") }</span></div>`).join("")
+    : "<div class='fila'>Aquí van a aparecer tus ventas del día. 🌱</div>";
   calY = e.calendario.year; calM = e.calendario.month;
   pintarCalendario(e.calendario);
   mostrar("empleada");

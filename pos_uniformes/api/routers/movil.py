@@ -54,18 +54,56 @@ def _payload_empleada(db: Session, codigo: str) -> dict:
         resumen_empleada,
     )
 
+    from pos_uniformes.services.libreta_presentacion_service import tiles_ciclo
+
     hoy = date.today()
     horario = cargar_horario(db, codigo)
     descanso = proximo_descanso(horario, hoy)
     proximo = fecha_proximo_pago(horario, hoy)
+    comisiones = comisiones_desde_ultimo_pago(db, codigo, horario)
+    # La misma tarjeta del ciclo que ve en el kiosko (mismo texto).
+    tiles = tiles_ciclo({
+        "comisiones": comisiones,
+        "proximo_pago": proximo,
+        "faltan": dias_para_pago(horario, hoy),
+        "descanso": descanso,
+        "hoy": hoy,
+    })
     return {
-        "comisiones_ciclo": comisiones_desde_ultimo_pago(db, codigo, horario),
+        "comisiones_ciclo": comisiones,
         "siguiente_descanso": descanso.isoformat() if descanso else None,
         "proximo_pago": proximo.isoformat() if proximo else None,
         "dias_para_pago": dias_para_pago(horario, hoy),
         "resumen": resumen_empleada(horario, hoy),
+        "tiles": [{"valor": v, "leyenda": leyenda} for v, leyenda in tiles],
+        "movimientos": _movimientos_empleada(db, codigo, horario),
         "calendario": _calendario_mes(db, codigo, hoy.year, hoy.month),
     }
+
+
+def _movimientos_empleada(db: Session, codigo: str, horario) -> list[dict]:
+    """Sus movimientos del ciclo, en el mismo lenguaje del kiosko y SIN
+    dinero (regla de privacidad de la Libreta)."""
+    from datetime import datetime, time, timedelta
+
+    from pos_uniformes.services.libreta_presentacion_service import texto_movimiento
+    from pos_uniformes.services.libreta_service import listar_operaciones
+
+    ahora = datetime.now().astimezone()
+    hoy_cero = datetime.combine(date.today(), time.min).astimezone()
+    desde = hoy_cero
+    if getattr(horario, "fecha_ultimo_pago", None) is not None:
+        # Desde su último pago, pero lo de HOY siempre se ve (si le pagaron
+        # hoy, el ciclo nuevo empieza mañana y se quedaría sin nada).
+        desde = min(
+            datetime.combine(horario.fecha_ultimo_pago + timedelta(days=1), time.min).astimezone(),
+            hoy_cero,
+        )
+    rows = listar_operaciones(db, desde=desde, hasta=ahora, employee_code=codigo)
+    return [
+        {"texto": texto_movimiento(row, con_dia=True), "tipo": str(row.tipo)}
+        for row in rows[:50]
+    ]
 
 
 def _calendario_mes(db: Session, codigo: str, year: int, month: int) -> dict:
