@@ -1,0 +1,89 @@
+"""Carga y validación de config.yaml."""
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+import yaml
+from pydantic import BaseModel, Field
+
+
+class CategoryCfg(BaseModel):
+    tag_id: int
+    default_fee_rate: float = 0.0
+
+
+class DiscoveryCfg(BaseModel):
+    refresh_seconds: int = 300
+    events_per_category: int = 300
+    min_volume_24h: float = 2000
+    max_markets: int = 400
+    exclude_sports_market_types: list[str] = Field(default_factory=list)
+
+
+class CollectorCfg(BaseModel):
+    gamma_url: str = "https://gamma-api.polymarket.com"
+    clob_url: str = "https://clob.polymarket.com"
+    ws_url: str = "wss://ws-subscriptions-clob.polymarket.com/ws/market"
+    assets_per_connection: int = 150
+    flush_seconds: int = 30
+    flush_rows: int = 5000
+    quote_sample_seconds: int = 5
+    rest_resync_seconds: int = 900
+    resolution_poll_seconds: int = 600
+
+
+class ComplementCfg(BaseModel):
+    enabled: bool = True
+
+
+class MultiOutcomeCfg(BaseModel):
+    enabled: bool = True
+    max_legs: int = 12
+
+
+class SpreadCfg(BaseModel):
+    enabled: bool = True
+    min_spread_ticks: int = 3
+    min_trades_per_minute: float = 0.3
+    trade_window_seconds: int = 300
+    vol_window_seconds: int = 300
+
+
+class SignalsCfg(BaseModel):
+    min_edge_net: float = 0.004
+    max_edge_net: float = 0.25          # más que esto casi siempre es un dato roto, no una oportunidad
+    target_size: float = 50
+    detect_interval_ms: int = 250
+    complement: ComplementCfg = Field(default_factory=ComplementCfg)
+    multi_outcome: MultiOutcomeCfg = Field(default_factory=MultiOutcomeCfg)
+    spread: SpreadCfg = Field(default_factory=SpreadCfg)
+
+
+class SimCfg(BaseModel):
+    latency_ms: int = 400
+    slippage_ticks: int = 1
+    maker_fill_prob: float = 0.6
+    max_hold_seconds: int = 600
+    start_cash: float = 1000
+    max_position_usd: float = 60
+    max_open_positions: int = 15
+    seed: int = 7
+
+
+class Config(BaseModel):
+    data_dir: str = "data"
+    categories: dict[str, CategoryCfg]
+    discovery: DiscoveryCfg = Field(default_factory=DiscoveryCfg)
+    collector: CollectorCfg = Field(default_factory=CollectorCfg)
+    signals: SignalsCfg = Field(default_factory=SignalsCfg)
+    sim: SimCfg = Field(default_factory=SimCfg)
+
+    @property
+    def data_path(self) -> Path:
+        return Path(self.data_dir)
+
+
+def load_config(path: str | Path = "config.yaml") -> Config:
+    raw: dict[str, Any] = yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}
+    return Config.model_validate(raw)

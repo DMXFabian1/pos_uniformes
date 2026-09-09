@@ -1,0 +1,56 @@
+# Configuración del bot. Todo lo que afecta al comportamiento vive aquí.
+data_dir: data
+
+# Categorías a seguir. tag_id viene de https://gamma-api.polymarket.com/tags/slug/<slug>
+categories:
+  sports:
+    tag_id: 1
+    default_fee_rate: 0.05      # se usa solo si el mercado no trae feeSchedule
+  politics:
+    tag_id: 2
+    default_fee_rate: 0.04
+
+discovery:
+  refresh_seconds: 300          # cada cuánto se vuelven a buscar mercados
+  events_per_category: 300      # cuántos eventos (ordenados por volumen 24h) revisar por categoría
+  min_volume_24h: 2000          # USD. Por debajo de esto no hay con quién operar
+  max_markets: 400              # tope de mercados suscritos a la vez
+  exclude_sports_market_types: []  # p.ej. ["child_moneyline"]
+
+collector:
+  gamma_url: https://gamma-api.polymarket.com
+  clob_url: https://clob.polymarket.com
+  ws_url: wss://ws-subscriptions-clob.polymarket.com/ws/market
+  assets_per_connection: 150    # tokens por conexión websocket
+  flush_seconds: 30             # cada cuánto se escriben los buffers a Parquet
+  flush_rows: 5000
+  quote_sample_seconds: 5       # muestreo regular del top-of-book (tabla quotes)
+  rest_resync_seconds: 900      # re-sincronizar cada libro por REST (protege contra deltas perdidos)
+  resolution_poll_seconds: 600  # cada cuánto se revisan resoluciones de mercados ya vistos
+
+signals:
+  min_edge_net: 0.004           # ganancia mínima neta por share (USD) para emitir señal
+  max_edge_net: 0.25            # por encima de esto se descarta: casi siempre es un libro roto
+  target_size: 50               # shares objetivo por señal
+  detect_interval_ms: 250       # no evaluar el mismo mercado más seguido que esto
+  complement:
+    enabled: true
+  multi_outcome:
+    enabled: true
+    max_legs: 12
+  spread:
+    enabled: true
+    min_spread_ticks: 3         # spread mínimo (en ticks) para postear dentro
+    min_trades_per_minute: 0.3  # actividad mínima reciente
+    trade_window_seconds: 300
+    vol_window_seconds: 300
+
+sim:
+  latency_ms: 400               # retraso entre señal y ejecución
+  slippage_ticks: 1             # ticks adicionales de penalización en órdenes taker
+  maker_fill_prob: 0.6          # probabilidad de que un trade que cruza nuestro precio nos llene
+  max_hold_seconds: 600         # tiempo máximo con una posición de spread abierta
+  start_cash: 1000
+  max_position_usd: 60
+  max_open_positions: 15
+  seed: 7
