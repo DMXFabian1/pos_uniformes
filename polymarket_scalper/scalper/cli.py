@@ -167,6 +167,18 @@ def cmd_games(args: argparse.Namespace) -> None:
         print(f"{t} {r['league']:14} {r['home'][:22]:22} vs {r['away'][:22]:22} {r['score']:18} {r['period']:6} {r['status']}")
 
 
+def cmd_dashboard(args: argparse.Namespace) -> None:
+    cfg = load_config(args.config)
+    if args.snapshot:
+        from .dashboard.data import snapshot_html
+        from pathlib import Path
+        Path(args.snapshot).write_text(snapshot_html(cfg, args.run_id), encoding="utf-8")
+        print(f"panel guardado en {args.snapshot}")
+        return
+    from .dashboard.server import serve
+    serve(cfg, args.host, args.port, args.refresh)
+
+
 def cmd_train(args: argparse.Namespace) -> None:
     from .learn.train import format_reports, train_all
 
@@ -345,6 +357,14 @@ def main(argv: list[str] | None = None) -> None:
 
     s = sub.add_parser("status", help="qué datos hay en data/")
     s.set_defaults(fn=cmd_status)
+
+    s = sub.add_parser("dashboard", help="panel web local (http://127.0.0.1:8787) que lee data/ en vivo")
+    s.add_argument("--host", default="127.0.0.1")
+    s.add_argument("--port", type=int, default=8787)
+    s.add_argument("--refresh", type=float, default=10, help="segundos entre recálculos de datos")
+    s.add_argument("--snapshot", help="en vez de servir, guardar una página autónoma con los datos actuales")
+    s.add_argument("--run-id")
+    s.set_defaults(fn=cmd_dashboard)
 
     s = sub.add_parser("train", help="fase 5: entrenar P(ganancia) por tipo de señal desde el ledger")
     s.add_argument("--kind", action="append")

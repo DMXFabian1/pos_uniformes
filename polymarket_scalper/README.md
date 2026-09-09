@@ -34,6 +34,8 @@ scalper profile 0x2a69660046d7acc4ab204d7cc5ba78b0776cd2f7
 scalper calibrate --nba-csv nbastats_2023.csv   # σ del modelo de básquet con play-by-play real
 scalper train                    # fase 5: entrenar P(ganancia) por señal desde el ledger
 scalper models                   # versiones, métricas y cuál está en uso
+scalper dashboard                # panel web en http://127.0.0.1:8787 (lee data/ en vivo)
+scalper dashboard --snapshot panel.html   # página autónoma con los datos actuales, para compartir
 ```
 
 Todo se configura en `config.yaml`. Nada de esto toca una wallet ni firma órdenes.
@@ -140,6 +142,13 @@ y lo actualizan con el marcador. Sin precio previo, solo se modela si el partido
 
 Con pocos datos el sistema se comporta como antes (heurística); el aprendizaje entra a medida que
 el ledger crece. Ese es el mecanismo por el que "el margen de error se va reduciendo".
+
+## Panel web (`scalper dashboard`)
+Un servidor local sin dependencias externas sirve una página que lee las tablas Parquet cada
+10 segundos: resumen con PnL válido y salud de datos, señales y resultados con calibración,
+partidos en vivo con precio de mercado contra modelo, ranking de wallets, flujo grande, versiones
+de modelos aprendidos y estado de las tablas. Cada sección trae un "Cómo leer esto" en lenguaje
+llano. Con `--snapshot` genera una página autónoma con los datos embebidos.
 
 ## Advertencias honestas
 - Los arbitrajes puros aparecen poco y duran milisegundos; los bots existentes compiten por ellos.

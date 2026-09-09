@@ -1,0 +1,472 @@
+<title>Scalper Polymarket</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  color-scheme:dark;
+  --bg:#0f141a; --bg-2:#141b23; --surface:#1a222c; --surface-2:#202a35; --line:#2a3542; --line-2:#344252;
+  --ink:#e8edf3; --ink-2:#aab6c4; --muted:#7c8a9a; --accent:#8fc7ff; --accent-ink:#0f141a;
+  --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --crit:#d03b3b;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181;
+  --grid:#232d38; --shadow:0 1px 0 rgba(0,0,0,.35);
+}
+@media (prefers-color-scheme: light){
+  :root:not([data-theme="dark"]){
+    color-scheme:light;
+    --bg:#f3f5f8; --bg-2:#eaeef3; --surface:#ffffff; --surface-2:#f6f8fb; --line:#d9e0e8; --line-2:#c5cfda;
+    --ink:#101720; --ink-2:#3d4b5a; --muted:#6a7888; --accent:#1e5fb3; --accent-ink:#ffffff;
+    --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4;
+    --grid:#e6ebf1; --shadow:0 1px 2px rgba(16,23,32,.06);
+  }
+}
+:root[data-theme="light"]{
+  color-scheme:light;
+  --bg:#f3f5f8; --bg-2:#eaeef3; --surface:#ffffff; --surface-2:#f6f8fb; --line:#d9e0e8; --line-2:#c5cfda;
+  --ink:#101720; --ink-2:#3d4b5a; --muted:#6a7888; --accent:#1e5fb3; --accent-ink:#ffffff;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4;
+  --grid:#e6ebf1; --shadow:0 1px 2px rgba(16,23,32,.06);
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+@media (prefers-reduced-motion: reduce){html{scroll-behavior:auto}}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+a{color:var(--accent)}
+.mono,.num,td.num,th.num{font-family:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-variant-numeric:tabular-nums}
+h1,h2,h3{margin:0;text-wrap:balance;font-weight:600}
+h2{font-size:18px;letter-spacing:-.01em}
+h3{font-size:13px;color:var(--ink-2);font-weight:500;text-transform:uppercase;letter-spacing:.06em}
+p{margin:0}
+.app{display:grid;grid-template-columns:232px minmax(0,1fr);min-height:100vh}
+.rail{position:sticky;top:0;height:100vh;background:var(--bg-2);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:20px 14px;gap:22px}
+.brand{display:flex;align-items:center;gap:10px;padding:0 6px}
+.brand .mark{width:28px;height:28px;border-radius:6px;background:linear-gradient(135deg,var(--s1),var(--s3));display:grid;place-items:center;color:#fff;font-family:"IBM Plex Mono",monospace;font-weight:500;font-size:12px}
+.brand b{display:block;font-size:14px;font-weight:600}
+.brand small{display:block;color:var(--muted);font-size:11px;letter-spacing:.04em;text-transform:uppercase}
+.nav{display:flex;flex-direction:column;gap:2px}
+.nav a{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 10px;border-radius:6px;color:var(--ink-2);text-decoration:none;font-size:13px}
+.nav a:hover{background:var(--surface);color:var(--ink)}
+.nav a.active{background:var(--surface);color:var(--ink);box-shadow:inset 3px 0 0 var(--accent)}
+.nav a:focus-visible,button:focus-visible,details summary:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.nav .count{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted);background:var(--surface-2);padding:1px 6px;border-radius:10px}
+.rail .foot{margin-top:auto;display:flex;flex-direction:column;gap:8px;font-size:11px;color:var(--muted);padding:0 6px}
+.btn{appearance:none;border:1px solid var(--line-2);background:var(--surface);color:var(--ink);border-radius:6px;padding:6px 10px;font:inherit;font-size:12px;cursor:pointer}
+.btn:hover{border-color:var(--accent)}
+main{padding:22px 28px 60px;display:flex;flex-direction:column;gap:34px;min-width:0}
+.topbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding-bottom:14px;border-bottom:1px solid var(--line)}
+.topbar h1{font-size:20px;letter-spacing:-.01em;margin-right:6px}
+.pill{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:12px;color:var(--ink-2);white-space:nowrap}
+.pill .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+.pill.good .dot{background:var(--good)} .pill.warn .dot{background:var(--warn)} .pill.crit .dot{background:var(--crit)}
+.pill b{color:var(--ink);font-weight:500}
+section{scroll-margin-top:12px;display:flex;flex-direction:column;gap:14px}
+.sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.sec-head p{color:var(--muted);font-size:13px;max-width:70ch}
+.help{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:0 14px;max-width:96ch}
+.help summary{cursor:pointer;padding:9px 0;color:var(--ink-2);font-size:12.5px;font-weight:500;letter-spacing:.02em;list-style:none;display:flex;align-items:center;gap:8px}
+.help summary::before{content:"?";display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--surface);border:1px solid var(--line-2);font-family:"IBM Plex Mono",monospace;font-size:11px}
+.help summary::-webkit-details-marker{display:none}
+.help .body{padding:0 0 12px;color:var(--ink-2);font-size:13px;line-height:1.55;display:flex;flex-direction:column;gap:6px;max-width:72ch}
+.help .body b{color:var(--ink);font-weight:500}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:10px}
+.tile{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;box-shadow:var(--shadow);min-height:86px}
+.tile .lbl{font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.tile .val{font-family:"IBM Plex Mono",monospace;font-size:24px;font-weight:500;line-height:1.15;font-variant-numeric:tabular-nums;color:var(--ink)}
+.tile .sub{font-size:12px;color:var(--ink-2)}
+.tile .val.good{color:var(--good)} .tile .val.crit{color:var(--crit)}
+.tile.key{border-color:var(--accent)}
+.grid-2{display:grid;grid-template-columns:repeat(auto-fit,minmax(360px,1fr));gap:14px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 16px;display:flex;flex-direction:column;gap:10px;box-shadow:var(--shadow);min-width:0}
+.card .card-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.card .card-head span{font-size:12px;color:var(--muted)}
+.chart{position:relative;width:100%;min-height:200px}
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart .tip{position:absolute;pointer-events:none;background:var(--surface-2);border:1px solid var(--line-2);border-radius:6px;padding:6px 9px;font-size:12px;color:var(--ink);box-shadow:0 4px 14px rgba(0,0,0,.25);white-space:nowrap;transform:translate(-50%,-110%);opacity:0;transition:opacity .08s}
+.chart .tip.on{opacity:1}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--ink-2)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+table{border-collapse:collapse;width:100%;font-size:13px}
+th,td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:middle}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:500;background:var(--surface-2);position:sticky;top:0}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right}
+td.pos{color:var(--good)} td.neg{color:var(--crit)}
+.kind{display:inline-flex;align-items:center;gap:7px}
+.kind i{width:9px;height:9px;border-radius:2px;display:inline-block;flex:none}
+.bar{position:relative;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden;min-width:80px}
+.bar > i{position:absolute;left:0;top:0;bottom:0;background:var(--s1);border-radius:3px}
+.chip{display:inline-block;padding:1px 7px;border-radius:4px;font-size:11px;font-weight:500;letter-spacing:.02em;background:var(--surface-2);border:1px solid var(--line);color:var(--ink-2)}
+.chip.good{color:var(--good);border-color:color-mix(in srgb,var(--good) 40%,var(--line))}
+.chip.warn{color:var(--warn);border-color:color-mix(in srgb,var(--warn) 40%,var(--line))}
+.chip.crit{color:var(--crit);border-color:color-mix(in srgb,var(--crit) 40%,var(--line))}
+.chip.live{color:var(--good)}
+.empty{padding:22px;color:var(--muted);font-size:13px;text-align:center;border:1px dashed var(--line-2);border-radius:8px;background:var(--surface-2)}
+.empty code{font-family:"IBM Plex Mono",monospace;color:var(--ink-2)}
+.games{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
+.game{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow)}
+.game .gh{display:flex;justify-content:space-between;gap:8px;align-items:center}
+.game .teams{font-weight:500}
+.game .meta{font-size:12px;color:var(--muted);display:flex;gap:10px;flex-wrap:wrap}
+.game .score{font-family:"IBM Plex Mono",monospace;font-size:13px;color:var(--ink)}
+.game .q{font-size:12px;color:var(--ink-2);margin-top:4px;border-top:1px solid var(--line);padding-top:8px}
+.tok{display:grid;grid-template-columns:minmax(90px,1.2fr) 1fr 44px 44px 52px;gap:8px;align-items:center;font-size:12px}
+.tok .name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tok .num{text-align:right;color:var(--ink-2)}
+.track{position:relative;height:10px;background:var(--surface-2);border-radius:5px;border:1px solid var(--line)}
+.track i{position:absolute;top:-3px;width:3px;height:14px;border-radius:2px}
+.track i.m{background:var(--ink-2)} .track i.p{background:var(--s4)}
+.track .band{position:absolute;top:2px;height:4px;border-radius:2px;background:color-mix(in srgb,var(--s4) 45%,transparent)}
+.small{font-size:12px;color:var(--muted)}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 14px;font-size:12.5px}
+.kv dt{color:var(--muted)} .kv dd{margin:0;font-family:"IBM Plex Mono",monospace}
+.score-bar{display:inline-flex;align-items:center;gap:8px}
+.score-bar .bar{width:70px}
+footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);padding-top:14px;max-width:80ch}
+@media (max-width: 880px){
+  .app{grid-template-columns:1fr}
+  .rail{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;border-right:0;border-bottom:1px solid var(--line);padding:12px 14px;gap:12px}
+  .nav{flex-direction:row;flex-wrap:wrap} .rail .foot{margin-top:0;flex-direction:row;align-items:center;width:100%}
+  main{padding:16px}
+}
+</style>
+<!--SNAPSHOT-->
+<div class="app">
+  <aside class="rail">
+    <div class="brand"><div class="mark">PM</div><div><b>Scalper Polymarket</b><small>panel de operación</small></div></div>
+    <nav class="nav" id="nav">
+      <a href="#resumen" class="active">Resumen</a>
+      <a href="#senales">Señales y resultados <span class="count" id="n-senales">–</span></a>
+      <a href="#partidos">Partidos en vivo <span class="count" id="n-partidos">–</span></a>
+      <a href="#ballenas">Ballenas <span class="count" id="n-ballenas">–</span></a>
+      <a href="#flujo">Flujo grande <span class="count" id="n-flujo">–</span></a>
+      <a href="#modelos">Aprendizaje <span class="count" id="n-modelos">–</span></a>
+      <a href="#datos">Datos y configuración</a>
+    </nav>
+    <div class="foot">
+      <div id="gen">–</div>
+      <div id="src">–</div>
+      <button class="btn" id="theme" type="button">Cambiar tema</button>
+    </div>
+  </aside>
+  <main>
+    <header class="topbar">
+      <h1>Estado del bot</h1>
+      <span class="pill" id="p-data"><span class="dot"></span>Datos <b>–</b></span>
+      <span class="pill" id="p-mode"><span class="dot"></span>Modo <b>–</b></span>
+      <span class="pill" id="p-markets"><span class="dot"></span>Mercados seguidos <b>–</b></span>
+      <span class="pill" id="p-games"><span class="dot"></span>Partidos en vivo <b>–</b></span>
+      <span class="pill" id="p-wallets"><span class="dot"></span>Wallets perfiladas <b>–</b></span>
+      <span class="pill" id="p-models"><span class="dot"></span>Modelos en uso <b>–</b></span>
+    </header>
+
+    <section id="resumen">
+      <div class="sec-head"><h2>Resumen</h2><p>Lo que el bot ha hecho con dinero simulado y qué tan sano está el flujo de datos.</p></div>
+      <div class="tiles" id="tiles"></div>
+      <details class="help" open><summary>Cómo leer esto</summary><div class="body">
+        <p><b>Nada de esto es dinero real.</b> El bot recolecta el mercado, detecta oportunidades y las ejecuta contra un simulador con latencia, deslizamiento y comisiones. El ledger guarda cada posición con la ganancia que predijo y la que obtuvo.</p>
+        <p><b>PnL válido</b> es la cifra que importa. Excluye las posiciones liquidadas a la fuerza al terminar una corrida corta (motivo "fin de corrida"), que no dicen nada de la estrategia. <b>PnL total</b> las incluye y por eso suele ser peor en corridas de minutos.</p>
+        <p><b>Datos hace N s</b> indica cuándo llegó el último cambio de libro. Si supera unos minutos, el recolector no está corriendo.</p>
+      </div></details>
+      <div class="grid-2">
+        <div class="card"><div class="card-head"><h3>Equity simulado</h3><span>USD, acumulado al cerrar cada posición</span></div><div class="chart" id="c-equity"></div></div>
+        <div class="card"><div class="card-head"><h3>Señales detectadas</h3><span>por tipo, en bloques de 15 min</span></div><div class="chart" id="c-signals"></div><div class="legend" id="l-signals"></div></div>
+      </div>
+    </section>
+
+    <section id="senales">
+      <div class="sec-head"><h2>Señales y resultados</h2><p>Cada tipo de oportunidad, cuánto prometía y cuánto dio. La diferencia es el error que el bot aprende a reducir.</p></div>
+      <details class="help"><summary>Cómo leer esto</summary><div class="body">
+        <p><b>Complemento</b>: comprar SÍ y NO del mismo mercado por menos de 1 USD y fusionarlos por 1. <b>Multi-resultado</b>: lo mismo con todos los candidatos de un evento donde solo uno gana. Son deterministas: si se llenan, ganan. El riesgo es que el precio se mueva antes de ejecutar.</p>
+        <p><b>Captura de spread</b>: poner órdenes dentro de un spread ancho como maker (sin comisión) y cobrar la diferencia. Pierde cuando solo se llena un lado y hay que deshacer pagando comisión.</p>
+        <p><b>Modelo vs mercado</b>: en partidos en vivo, comprar cuando el modelo de probabilidad supera al precio. <b>Dinero inteligente</b>: seguir a wallets con buen historial.</p>
+        <p><b>Error medio</b> negativo significa que el bot fue optimista. <b>Calibración</b>: si dice 70 % de confianza, debería acertar 70 % de las veces; los puntos deberían caer sobre la diagonal.</p>
+      </div></details>
+      <div class="tablewrap"><table id="t-kind"></table></div>
+      <div class="grid-2">
+        <div class="card"><div class="card-head"><h3>Motivos de cierre</h3><span>posiciones y USD</span></div><div class="chart" id="c-exits"></div></div>
+        <div class="card"><div class="card-head"><h3>Calibración de la confianza</h3><span>confianza declarada vs acierto real</span></div><div class="chart" id="c-calib"></div><div class="small" id="calib-note"></div></div>
+      </div>
+      <div class="card"><div class="card-head"><h3>Últimas posiciones</h3><span>las 60 más recientes</span></div><div class="tablewrap" style="border:0"><table id="t-recent"></table></div></div>
+    </section>
+
+    <section id="partidos">
+      <div class="sec-head"><h2>Partidos en vivo</h2><p>Partidos del feed enlazados a mercados, con el precio del mercado y lo que dice el modelo de probabilidad.</p></div>
+      <details class="help"><summary>Cómo leer esto</summary><div class="body">
+        <p>Cada fila es un resultado del mercado. La barra va de 0 a 1: la marca gris es el <b>precio del mercado</b> (mid) y la marca ámbar es la <b>probabilidad del modelo</b>. Cuando el modelo está claramente a la derecha del mercado, ese resultado está barato según el modelo.</p>
+        <p>Los modelos existen para básquet (Stern, σ calibrada con la NBA), tenis (cadena de Markov por puntos) y fútbol (Poisson). Esports no tiene modelo. Sin precio previo al partido, el modelo se apoya en el primer precio visto y es menos confiable; el motor solo opera si el partido acaba de empezar.</p>
+      </div></details>
+      <div class="games" id="games"></div>
+    </section>
+
+    <section id="ballenas">
+      <div class="sec-head"><h2>Ballenas y dinero inteligente</h2><p>Wallets que hicieron trades grandes, perfiladas por su historial real, no por su tamaño.</p></div>
+      <details class="help"><summary>Cómo leer esto</summary><div class="body">
+        <p>El <b>score</b> va de 0 a 1 y 0,5 es neutral. Combina tasa de acierto y ROI de las últimas posiciones cerradas, con encogimiento: pocas operaciones o retornos menores al 2 % no cuentan como evidencia. Una wallet que compra a 0,999 en mercados decididos gana casi siempre y aun así queda en 0,5.</p>
+        <p>El bot sigue a una wallet solo si tiene score ≥ <span class="mono" id="cfg-smart">–</span> y suficientes posiciones cerradas. El signo <b>+</b> junto a N indica que el historial es más largo que la muestra.</p>
+      </div></details>
+      <div class="tablewrap"><table id="t-wallets"></table></div>
+    </section>
+
+    <section id="flujo">
+      <div class="sec-head"><h2>Flujo grande</h2><p>Trades recientes de gran tamaño en toda la plataforma, con quién los hizo y su score si ya está perfilado.</p></div>
+      <details class="help"><summary>Cómo leer esto</summary><div class="body">
+        <p>Viene de la API de datos de Polymarket, que identifica la wallet de cada trade. Llega con 2 a 3 minutos de retraso respecto al libro, así que sirve para saber quién es quién, no para competir en velocidad.</p>
+      </div></details>
+      <div class="tablewrap"><table id="t-flow"></table></div>
+    </section>
+
+    <section id="modelos">
+      <div class="sec-head"><h2>Aprendizaje</h2><p>El modelo que aprende del ledger: qué versiones existen, cuál está en uso y si le gana a la heurística.</p></div>
+      <details class="help"><summary>Cómo leer esto</summary><div class="body">
+        <p>Por cada tipo de señal se entrena un modelo que predice la probabilidad de ganar a partir de lo que se sabía al emitirla. <b>Brier</b> mide el error de esa probabilidad (0 es perfecto, 0,25 es tirar una moneda). Una versión nueva se <b>promueve</b> solo si en validación tiene mejor Brier que la versión actual y que la heurística.</p>
+        <p>Con menos de <span class="mono" id="cfg-mintrain">–</span> ejemplos el modelo solo informa; con más, descarta señales con probabilidad de ganar menor a 0,5 y reduce el tamaño de las dudosas. Para entrenar hacen falta <span class="mono" id="cfg-minex">–</span> posiciones válidas por tipo.</p>
+      </div></details>
+      <div class="grid-2">
+        <div class="card"><div class="card-head"><h3>Modelo vs heurística</h3><span>Brier por tipo de señal, menor es mejor</span></div><div id="mv"></div></div>
+        <div class="card"><div class="card-head"><h3>Versiones entrenadas</h3><span>campeón marcado con ★</span></div><div id="models"></div></div>
+      </div>
+    </section>
+
+    <section id="datos">
+      <div class="sec-head"><h2>Datos y configuración</h2><p>Qué hay guardado en disco y con qué parámetros corre el bot.</p></div>
+      <div class="grid-2">
+        <div class="card"><div class="card-head"><h3>Tablas</h3><span>filas y rango de tiempo</span></div><div class="tablewrap" style="border:0"><table id="t-tables"></table></div></div>
+        <div class="card"><div class="card-head"><h3>Mercados seguidos</h3><span>por categoría y los de mayor volumen</span></div><div id="markets"></div></div>
+      </div>
+      <div class="card"><div class="card-head"><h3>Parámetros activos</h3><span>config.yaml</span></div><dl class="kv" id="cfg"></dl></div>
+      <footer>Panel del bot de scalping para Polymarket. Los datos provienen de los archivos Parquet en <span class="mono">data/</span>. Todo el PnL es simulado: el programa no firma órdenes ni maneja una wallet.</footer>
+    </section>
+  </main>
+</div>
+<script>
+(function(){
+"use strict";
+const KIND = {
+  complement_buy:{label:"Complemento (comprar SÍ+NO)",color:"var(--s1)"},
+  complement_sell:{label:"Complemento (vender SÍ+NO)",color:"var(--s1)"},
+  multi_buy_all_yes:{label:"Multi-resultado (todos los SÍ)",color:"var(--s2)"},
+  multi_buy_all_no:{label:"Multi-resultado (todos los NO)",color:"var(--s2)"},
+  spread_capture:{label:"Captura de spread",color:"var(--s3)"},
+  model_deviation:{label:"Modelo vs mercado",color:"var(--s4)"},
+  smart_money:{label:"Dinero inteligente",color:"var(--s5)"},
+};
+const EXIT = {merge:"fusión SÍ+NO",mint:"mint y venta",guaranteed:"garantizado",both_filled:"ambos lados llenos",expired:"expiró (un lado)",
+  expired_unfilled:"expiró sin llenar",end:"fin de corrida",end_stuck:"fin de corrida (atascado)",unfilled:"sin llenar",spread_gone:"spread desapareció",
+  no_book:"sin libro",price_moved:"precio se movió",target:"objetivo alcanzado",stop:"stop",max_hold:"tiempo máximo",game_end:"fin del partido",resolution:"resolución"};
+const FORCED = new Set(["end","end_stuck","unfilled","expired_unfilled","spread_gone","no_book","price_moved"]);
+const kindOf = k => KIND[k] || {label:k, color:"var(--muted)"};
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const usd = (v, d=2) => v == null ? "–" : (v < 0 ? "−" : "") + Math.abs(v).toLocaleString("es", {minimumFractionDigits:d, maximumFractionDigits:d}) + " USD";
+const num = (v, d=2) => v == null ? "–" : Number(v).toLocaleString("es", {minimumFractionDigits:d, maximumFractionDigits:d});
+const pct = (v, d=0) => v == null ? "–" : num(v*100, d) + " %";
+const ago = ms => { if (!ms) return "–"; const s = Math.max(0, Math.round((Date.now()-ms)/1000)); if (s < 90) return `hace ${s} s`; if (s < 5400) return `hace ${Math.round(s/60)} min`; if (s < 172800) return `hace ${(s/3600).toFixed(1)} h`; return `hace ${Math.round(s/86400)} d`; };
+const tm = ms => ms ? new Date(ms).toLocaleString("es", {day:"2-digit",month:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit"}) : "–";
+const hm = ms => ms ? new Date(ms).toLocaleTimeString("es", {hour:"2-digit",minute:"2-digit"}) : "–";
+const sgn = v => v > 0 ? "pos" : v < 0 ? "neg" : "";
+
+// ------------------------------------------------------------ tema
+const themeBtn = $("theme");
+themeBtn.addEventListener("click", () => {
+  const root = document.documentElement;
+  const dark = root.getAttribute("data-theme") === "dark" || (!root.getAttribute("data-theme") && matchMedia("(prefers-color-scheme: dark)").matches);
+  root.setAttribute("data-theme", dark ? "light" : "dark");
+  try { localStorage.setItem("theme", dark ? "light" : "dark"); } catch (e) {}
+  render(lastData);
+});
+try { const t = localStorage.getItem("theme"); if (t) document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+
+// ------------------------------------------------------------ gráficos SVG
+const NS = "http://www.w3.org/2000/svg";
+function el(tag, attrs, parent){ const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function tip(container){ let t = container.querySelector(".tip"); if (!t){ t = document.createElement("div"); t.className = "tip"; container.appendChild(t);} return t; }
+function niceTicks(min, max, n=4){ if (min === max){ min -= 1; max += 1; } const span = max-min, step0 = span/n, mag = Math.pow(10, Math.floor(Math.log10(step0))), norm = step0/mag; const step = (norm<1.5?1:norm<3?2:norm<7?5:10)*mag; const lo = Math.floor(min/step)*step, hi = Math.ceil(max/step)*step; const out=[]; for (let v=lo; v<=hi+step/2; v+=step) out.push(+v.toFixed(10)); return out; }
+
+function lineChart(container, pts, opts={}){
+  container.innerHTML = "";
+  if (!pts.length){ container.innerHTML = `<div class="empty">Sin posiciones cerradas todavía. Corre <code>scalper paper</code> y vuelve en unos minutos.</div>`; return; }
+  const W = 640, H = 220, m = {l:56, r:16, t:14, b:30};
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs) || x0+1;
+  const base = opts.baseline;
+  const ticks = niceTicks(Math.min(...ys, base ?? Infinity), Math.max(...ys, base ?? -Infinity));
+  const y0 = ticks[0], y1 = ticks[ticks.length-1];
+  const X = x => m.l + (x1 === x0 ? 0.5 : (x-x0)/(x1-x0)) * (W-m.l-m.r), Y = y => m.t + (1-(y-y0)/(y1-y0)) * (H-m.t-m.b);
+  const svg = el("svg", {viewBox:`0 0 ${W} ${H}`, role:"img", "aria-label": opts.label || ""}, container);
+  ticks.forEach(v => { el("line", {x1:m.l, x2:W-m.r, y1:Y(v), y2:Y(v), stroke:"var(--grid)", "stroke-width":1}, svg);
+    el("text", {x:m.l-8, y:Y(v)+4, "text-anchor":"end", "font-size":11, fill:"var(--muted)", "font-family":"IBM Plex Mono, monospace"}, svg).textContent = num(v, 0); });
+  if (base != null && base >= y0 && base <= y1) el("line", {x1:m.l, x2:W-m.r, y1:Y(base), y2:Y(base), stroke:"var(--line-2)", "stroke-width":1}, svg);
+  const xt = [x0, x0+(x1-x0)/2, x1];
+  xt.forEach(v => el("text", {x:X(v), y:H-8, "text-anchor":"middle", "font-size":11, fill:"var(--muted)", "font-family":"IBM Plex Mono, monospace"}, svg).textContent = hm(v));
+  const d = pts.map((p,i) => (i?"L":"M") + X(p.x).toFixed(1) + " " + Y(p.y).toFixed(1)).join(" ");
+  const area = d + ` L${X(x1).toFixed(1)} ${Y(base ?? y0).toFixed(1)} L${X(x0).toFixed(1)} ${Y(base ?? y0).toFixed(1)} Z`;
+  el("path", {d:area, fill:opts.color || "var(--s1)", opacity:.12}, svg);
+  el("path", {d, fill:"none", stroke:opts.color || "var(--s1)", "stroke-width":2, "stroke-linejoin":"round"}, svg);
+  const last = pts[pts.length-1];
+  el("circle", {cx:X(last.x), cy:Y(last.y), r:4, fill:opts.color || "var(--s1)", stroke:"var(--surface)", "stroke-width":2}, svg);
+  el("text", {x:X(last.x)-8, y:Y(last.y)-10, "text-anchor":"end", "font-size":12, fill:"var(--ink)", "font-family":"IBM Plex Mono, monospace"}, svg).textContent = num(last.y, 1);
+  const cross = el("line", {x1:0, x2:0, y1:m.t, y2:H-m.b, stroke:"var(--line-2)", "stroke-width":1, opacity:0}, svg);
+  const dot = el("circle", {r:4, fill:"var(--surface)", stroke:opts.color || "var(--s1)", "stroke-width":2, opacity:0}, svg);
+  const t = tip(container);
+  svg.addEventListener("mousemove", ev => { const r = svg.getBoundingClientRect(); const x = (ev.clientX-r.left)/r.width*W; let best = pts[0], bd = Infinity; pts.forEach(p => { const d = Math.abs(X(p.x)-x); if (d < bd){ bd = d; best = p; } });
+    cross.setAttribute("x1", X(best.x)); cross.setAttribute("x2", X(best.x)); cross.setAttribute("opacity", 1); dot.setAttribute("cx", X(best.x)); dot.setAttribute("cy", Y(best.y)); dot.setAttribute("opacity", 1);
+    t.innerHTML = `<b>${esc(num(best.y, 2))}</b> ${esc(opts.unit||"")}<br><span style="color:var(--muted)">${esc(tm(best.x))}</span>`; t.style.left = (X(best.x)/W*100)+"%"; t.style.top = (Y(best.y)/H*100)+"%"; t.classList.add("on"); });
+  svg.addEventListener("mouseleave", () => { cross.setAttribute("opacity", 0); dot.setAttribute("opacity", 0); t.classList.remove("on"); });
+}
+
+function stackedBars(container, legendEl, rows, kinds){
+  container.innerHTML = ""; legendEl.innerHTML = "";
+  if (!rows.length){ container.innerHTML = `<div class="empty">Sin señales registradas todavía.</div>`; return; }
+  const times = [...new Set(rows.map(r => r.t))].sort((a,b) => a-b);
+  const byT = {}; rows.forEach(r => { (byT[r.t] = byT[r.t] || {})[r.kind] = r.n; });
+  const totals = times.map(t => kinds.reduce((s,k) => s + (byT[t][k]||0), 0));
+  const W = 640, H = 220, m = {l:44, r:12, t:14, b:30};
+  const ticks = niceTicks(0, Math.max(...totals));
+  const y1 = ticks[ticks.length-1];
+  const Y = v => m.t + (1-v/y1)*(H-m.t-m.b);
+  const bw = (W-m.l-m.r)/times.length, gap = Math.min(2, bw*0.2);
+  const svg = el("svg", {viewBox:`0 0 ${W} ${H}`, role:"img", "aria-label":"señales por bloque de 15 minutos"}, container);
+  ticks.forEach(v => { el("line", {x1:m.l, x2:W-m.r, y1:Y(v), y2:Y(v), stroke:"var(--grid)"}, svg); el("text", {x:m.l-8, y:Y(v)+4, "text-anchor":"end", "font-size":11, fill:"var(--muted)", "font-family":"IBM Plex Mono, monospace"}, svg).textContent = num(v,0); });
+  const t = tip(container);
+  times.forEach((tt, i) => { let acc = 0; const x = m.l + i*bw + gap/2;
+    kinds.forEach(k => { const n = byT[tt][k] || 0; if (!n) return; const r = el("rect", {x, y:Y(acc+n), width:Math.max(bw-gap, 1), height:Math.max(Y(acc)-Y(acc+n)-1, 0), fill:kindOf(k).color, rx:1.5}, svg);
+      r.addEventListener("mousemove", ev => { t.innerHTML = `<b>${n}</b> ${esc(kindOf(k).label)}<br><span style="color:var(--muted)">${esc(hm(tt))} · total ${totals[i]}</span>`; t.style.left = ((x+bw/2)/W*100)+"%"; t.style.top = (Y(acc+n)/H*100)+"%"; t.classList.add("on"); });
+      r.addEventListener("mouseleave", () => t.classList.remove("on")); acc += n; }); });
+  const lab = times.length > 6 ? [0, Math.floor(times.length/2), times.length-1] : times.map((_,i)=>i);
+  lab.forEach(i => el("text", {x:m.l+i*bw+bw/2, y:H-8, "text-anchor":"middle", "font-size":11, fill:"var(--muted)", "font-family":"IBM Plex Mono, monospace"}, svg).textContent = hm(times[i]));
+  kinds.forEach(k => legendEl.insertAdjacentHTML("beforeend", `<span><i style="background:${kindOf(k).color}"></i>${esc(kindOf(k).label)}</span>`));
+}
+
+function hbars(container, items){
+  container.innerHTML = "";
+  if (!items.length){ container.innerHTML = `<div class="empty">Sin cierres todavía.</div>`; return; }
+  const max = Math.max(...items.map(i => i.n));
+  const rowH = 26, W = 640, H = items.length*rowH + 6, lw = 250;
+  const svg = el("svg", {viewBox:`0 0 ${W} ${H}`, role:"img", "aria-label":"motivos de cierre"}, container);
+  const t = tip(container);
+  items.forEach((it, i) => { const y = i*rowH + 4, w = Math.max((W-lw-90)*(it.n/max), 2);
+    el("text", {x:lw-10, y:y+15, "text-anchor":"end", "font-size":12, fill:"var(--ink-2)"}, svg).textContent = (it.label.length > 34 ? it.label.slice(0,33)+"…" : it.label);
+    const r = el("rect", {x:lw, y:y+4, width:w, height:rowH-10, rx:3, fill:it.color}, svg);
+    el("text", {x:lw+w+8, y:y+15, "font-size":12, fill:"var(--ink)", "font-family":"IBM Plex Mono, monospace"}, svg).textContent = `${it.n} · ${usd(it.pnl, 1)}`;
+    r.addEventListener("mousemove", () => { t.innerHTML = `<b>${esc(it.label)}</b><br>${it.n} posiciones · ${esc(usd(it.pnl))}`; t.style.left = ((lw+w/2)/W*100)+"%"; t.style.top = (y/H*100)+"%"; t.classList.add("on"); });
+    r.addEventListener("mouseleave", () => t.classList.remove("on")); });
+}
+
+function calibChart(container, rows){
+  container.innerHTML = "";
+  if (!rows.length){ container.innerHTML = `<div class="empty">Sin posiciones llenadas todavía.</div>`; return; }
+  const W = 640, H = 240, m = {l:52, r:16, t:14, b:34};
+  const X = v => m.l + v*(W-m.l-m.r), Y = v => m.t + (1-v)*(H-m.t-m.b);
+  const svg = el("svg", {viewBox:`0 0 ${W} ${H}`, role:"img", "aria-label":"calibración"}, container);
+  [0,.25,.5,.75,1].forEach(v => { el("line", {x1:m.l, x2:W-m.r, y1:Y(v), y2:Y(v), stroke:"var(--grid)"}, svg); el("line", {y1:m.t, y2:H-m.b, x1:X(v), x2:X(v), stroke:"var(--grid)"}, svg);
+    el("text", {x:m.l-8, y:Y(v)+4, "text-anchor":"end", "font-size":11, fill:"var(--muted)", "font-family":"IBM Plex Mono, monospace"}, svg).textContent = pct(v); el("text", {x:X(v), y:H-14, "text-anchor":"middle", "font-size":11, fill:"var(--muted)", "font-family":"IBM Plex Mono, monospace"}, svg).textContent = pct(v); });
+  el("line", {x1:X(0), y1:Y(0), x2:X(1), y2:Y(1), stroke:"var(--line-2)", "stroke-width":1.5}, svg);
+  el("text", {x:m.l+6, y:m.t+12, "font-size":11, fill:"var(--muted)"}, svg).textContent = "acierto real ↑";
+  el("text", {x:W-m.r, y:H-2, "text-anchor":"end", "font-size":11, fill:"var(--muted)"}, svg).textContent = "confianza declarada →";
+  const maxN = Math.max(...rows.map(r => r.n));
+  const t = tip(container);
+  rows.forEach(r => { const cx = X(r.conf_media ?? r.bucket+0.1), cy = Y(r.acierto_real), rad = 5 + 9*Math.sqrt(r.n/maxN);
+    const c = el("circle", {cx, cy, r:rad, fill:"var(--s1)", opacity:.85, stroke:"var(--surface)", "stroke-width":2}, svg);
+    c.addEventListener("mousemove", () => { t.innerHTML = `confianza <b>${esc(pct(r.conf_media ?? r.bucket, 0))}</b> → acierto <b>${esc(pct(r.acierto_real, 0))}</b><br><span style="color:var(--muted)">${r.n} posiciones · error medio ${esc(num(r.error_medio, 2))} USD</span>`; t.style.left = (cx/W*100)+"%"; t.style.top = (cy/H*100)+"%"; t.classList.add("on"); });
+    c.addEventListener("mouseleave", () => t.classList.remove("on")); });
+}
+
+// ------------------------------------------------------------ render
+let lastData = null;
+function render(d){
+  if (!d) return; lastData = d;
+  const s = d.summary || {};
+  $("gen").textContent = "Generado " + tm(d.generated_ms);
+  $("src").textContent = window.__SNAPSHOT__ ? "Instantánea estática con los datos de ese momento" : "Lectura en vivo de data/ cada 10 s";
+  const age = s.data_age_s;
+  const pd = $("p-data"); pd.className = "pill " + (age == null ? "crit" : age < 90 ? "good" : age < 900 ? "warn" : "crit");
+  pd.querySelector("b").textContent = age == null ? "sin datos" : age < 90 ? "al día" : ago(s.last_data_ts);
+  $("p-mode").querySelector("b").textContent = s.mode ? ({paper:"paper trading", replay:"replay"}[s.mode] || s.mode) : "–";
+  $("p-markets").querySelector("b").textContent = num(s.markets_active, 0);
+  $("p-games").querySelector("b").textContent = `${num(s.games_live,0)} · con modelo ${num(s.games_with_model,0)}`;
+  $("p-wallets").querySelector("b").textContent = `${num(s.wallets_profiled,0)} · inteligentes ${num(s.wallets_smart,0)}`;
+  $("p-models").querySelector("b").textContent = num(s.models_current, 0);
+  $("n-senales").textContent = num(s.positions_closed, 0); $("n-partidos").textContent = num(s.games_live, 0);
+  $("n-ballenas").textContent = num(s.wallets_profiled, 0); $("n-flujo").textContent = num((d.flow||[]).length, 0); $("n-modelos").textContent = num(s.models_current, 0);
+  $("cfg-smart").textContent = num(d.config?.smart_min_score, 2); $("cfg-mintrain").textContent = num(d.config?.learn_min_train, 0); $("cfg-minex").textContent = num(d.config?.learn_min_examples, 0);
+
+  const tiles = [
+    {lbl:"PnL válido (simulado)", val:usd(s.pnl_valid, 2), cls:sgn(s.pnl_valid) === "pos" ? "good" : sgn(s.pnl_valid) === "neg" ? "crit" : "", sub:`${num(s.n_valid,0)} posiciones que sí dicen algo`, key:true},
+    {lbl:"PnL total", val:usd(s.pnl, 2), cls:sgn(s.pnl) === "neg" ? "crit" : sgn(s.pnl) === "pos" ? "good" : "", sub:`incluye ${num((s.positions_closed||0)-(s.n_valid||0),0)} liquidaciones forzadas`},
+    {lbl:"Equity simulado", val:usd(s.equity, 0), sub:`arrancó con ${usd(s.start_cash, 0)}`},
+    {lbl:"Posiciones", val:`${num(s.positions_filled,0)} / ${num(s.positions_closed,0)}`, sub:`tasa de llenado ${pct(s.fill_rate)}`},
+    {lbl:"Tasa de acierto", val:pct(s.win_rate), sub:"posiciones llenadas con ganancia"},
+    {lbl:"Comisiones pagadas", val:usd(s.fees, 2), sub:"solo las operaciones taker"},
+    {lbl:"Señales última hora", val:num(s.signals_last_hour, 0), sub:`${num(s.signals_total,0)} en total`},
+    {lbl:"Último dato de mercado", val:age == null ? "–" : age < 60 ? `${age} s` : age < 3600 ? `${Math.round(age/60)} min` : `${(age/3600).toFixed(1)} h`, cls:age == null || age > 900 ? "crit" : "", sub:age != null && age > 900 ? "el recolector no está corriendo" : "cambio de libro más reciente"},
+  ];
+  $("tiles").innerHTML = tiles.map(t => `<div class="tile${t.key?" key":""}"><div class="lbl">${esc(t.lbl)}</div><div class="val ${t.cls||""}">${esc(t.val)}</div><div class="sub">${esc(t.sub)}</div></div>`).join("");
+
+  lineChart($("c-equity"), (d.equity||[]).map(p => ({x:p.ts, y:p.equity})), {baseline:s.start_cash, unit:"USD", label:"equity simulado"});
+  const kinds = Object.keys(KIND).filter(k => (d.signals?.by_kind||[]).some(b => b.kind === k)).concat((d.signals?.by_kind||[]).map(b=>b.kind).filter(k => !KIND[k]));
+  stackedBars($("c-signals"), $("l-signals"), d.signals?.timeline || [], kinds);
+
+  // tabla por tipo
+  const bk = d.by_kind || [];
+  $("t-kind").innerHTML = bk.length ? `<thead><tr><th>Tipo de señal</th><th class="num">Señales</th><th class="num">Llenadas</th><th class="num">Llenado</th><th class="num">PnL predicho</th><th class="num">PnL real</th><th class="num">PnL válido</th><th class="num">Error medio</th><th class="num">Acierto</th><th class="num">Fees</th></tr></thead><tbody>` +
+    bk.map(r => `<tr><td><span class="kind"><i style="background:${kindOf(r.kind).color}"></i>${esc(kindOf(r.kind).label)}</span></td><td class="num">${num(r.senales,0)}</td><td class="num">${num(r.llenadas,0)}</td><td class="num">${pct(r.tasa_llenado)}</td><td class="num">${esc(usd(r.pnl_predicho))}</td><td class="num ${sgn(r.pnl_real)}">${esc(usd(r.pnl_real))}</td><td class="num ${sgn(r.pnl_valido)}">${esc(usd(r.pnl_valido))} <span class="small">(${num(r.n_valido,0)})</span></td><td class="num ${sgn(r.error_medio)}">${esc(num(r.error_medio))}</td><td class="num">${pct(r.tasa_acierto)}</td><td class="num">${esc(usd(r.fees))}</td></tr>`).join("") + "</tbody>"
+    : `<tbody><tr><td><div class="empty">Sin posiciones todavía.</div></td></tr></tbody>`;
+
+  const ex = (d.exit_reasons||[]).map(r => ({label:`${kindOf(r.kind).label} · ${EXIT[r.exit_reason]||r.exit_reason}`, n:r.n, pnl:r.pnl_real, color:FORCED.has(r.exit_reason) ? "var(--muted)" : kindOf(r.kind).color})).sort((a,b)=>b.n-a.n).slice(0,14);
+  hbars($("c-exits"), ex);
+  calibChart($("c-calib"), d.calibration || []);
+  $("calib-note").textContent = (d.calibration||[]).length ? "El tamaño del punto es el número de posiciones. Sobre la diagonal: bien calibrado. Por debajo: el bot se sobreestima." : "";
+
+  const rp = d.recent_positions || [];
+  $("t-recent").innerHTML = rp.length ? `<thead><tr><th>Señal</th><th>Tipo</th><th>Mercado</th><th class="num">Shares</th><th class="num">Predicho</th><th class="num">Real</th><th>Cierre</th><th class="num">Conf.</th></tr></thead><tbody>` +
+    rp.map(r => `<tr><td class="mono">${esc(tm(r.ts_signal))}</td><td><span class="kind"><i style="background:${kindOf(r.kind).color}"></i>${esc(kindOf(r.kind).label)}</span></td><td class="mono">${esc(String(r.condition_id).slice(0,10))}…</td><td class="num">${num(r.size_filled,0)}</td><td class="num">${esc(usd(r.predicted_pnl))}</td><td class="num ${sgn(r.realized_pnl)}">${esc(usd(r.realized_pnl))}</td><td><span class="chip ${FORCED.has(r.exit_reason)?"":sgn(r.realized_pnl)==="pos"?"good":sgn(r.realized_pnl)==="neg"?"crit":""}">${esc(EXIT[r.exit_reason]||r.exit_reason)}</span></td><td class="num">${pct(r.confidence)}</td></tr>`).join("") + "</tbody>" : "";
+
+  // partidos
+  const gs = d.games || [];
+  $("games").innerHTML = gs.length ? gs.map(g => `<div class="game"><div class="gh"><div class="teams">${esc(g.home)} <span class="small">vs</span> ${esc(g.away)}</div><span class="chip ${g.live&&!g.ended?"live":""}">${g.ended?"terminado":g.live?"en vivo":"pendiente"}</span></div>
+      <div class="meta"><span>${esc(g.league)}</span><span>${esc(g.sport)}</span><span class="score">${esc(g.score||"–")} ${esc(g.period||"")} ${esc(g.elapsed||"")}</span><span>${g.has_model?"modelo: "+esc(g.model):"sin modelo"}</span>${g.pregame?`<span>previo L ${num(g.pregame.home,2)} · V ${num(g.pregame.away,2)}${g.pregame.draw?" · E "+num(g.pregame.draw,2):""}</span>`:""}</div>
+      ${g.markets.map(m => `<div class="q">${esc(m.question)} <span class="small">fee ${pct(m.fee_rate,0)}</span></div>` + m.tokens.map(t => { const mid = t.mid, mo = t.model; const lo = Math.min(mid??0, mo??0), hi = Math.max(mid??0, mo??0);
+        return `<div class="tok"><span class="name" title="${esc(t.outcome)}">${esc(t.outcome)} <span class="small">${t.side?({home:"local",away:"visitante",draw:"empate"}[t.side]):""}</span></span><div class="track">${mid!=null&&mo!=null?`<span class="band" style="left:${lo*100}%;width:${(hi-lo)*100}%"></span>`:""}${mid!=null?`<i class="m" style="left:calc(${mid*100}% - 1px)" title="mercado ${num(mid,3)}"></i>`:""}${mo!=null?`<i class="p" style="left:calc(${mo*100}% - 1px)" title="modelo ${num(mo,3)}"></i>`:""}</div><span class="num">${mid==null?"–":num(mid,2)}</span><span class="num" style="color:var(--s4)">${mo==null?"–":num(mo,2)}</span><span class="num ${t.dev==null?"":t.dev>0.04?"pos":t.dev<-0.04?"neg":""}">${t.dev==null?"":(t.dev>0?"+":"")+num(t.dev,2)}</span></div>`; }).join("")).join("")}
+    </div>`).join("") : `<div class="empty">No hay partidos enlazados a mercados en este momento. El feed de deportes se guarda solo cuando el recolector está corriendo.</div>`;
+
+  // wallets
+  const ws = d.wallets || [];
+  $("t-wallets").innerHTML = ws.length ? `<thead><tr><th>Wallet</th><th>Nombre</th><th class="num">Cerradas</th><th class="num">Acierto</th><th class="num">ROI</th><th class="num">PnL realizado</th><th class="num">Abiertas</th><th class="num">Valor abierto</th><th>Score</th><th>Perfilada</th></tr></thead><tbody>` +
+    ws.map(w => { const smart = w.score >= (d.config?.smart_min_score ?? .65) && w.n_closed >= 20; return `<tr><td class="mono">${esc(String(w.wallet).slice(0,10))}…</td><td>${esc(w.name||"")}${smart?' <span class="chip good">sigue</span>':""}</td><td class="num">${num(w.n_closed,0)}${w.truncated?"+":""}</td><td class="num">${pct(w.win_rate)}</td><td class="num ${sgn(w.roi)}">${pct(w.roi,1)}</td><td class="num ${sgn(w.realized_pnl)}">${esc(usd(w.realized_pnl,0))}</td><td class="num">${num(w.n_open,0)}</td><td class="num">${esc(usd(w.open_value,0))}</td><td><span class="score-bar"><span class="bar"><i style="width:${Math.round((w.score||0)*100)}%;background:${w.score>=.65?"var(--good)":w.score<=.4?"var(--crit)":"var(--s1)"}"></i></span><span class="mono">${num(w.score,2)}</span></span></td><td class="small">${esc(ago(w.ts_ms))}</td></tr>`; }).join("") + "</tbody>"
+    : `<tbody><tr><td><div class="empty">Sin wallets perfiladas todavía. Se perfilan solas cuando aparece un trade mayor a ${esc(usd(d.config?.whale_min_usd,0))}.</div></td></tr></tbody>`;
+
+  const fl = d.flow || [];
+  $("t-flow").innerHTML = fl.length ? `<thead><tr><th>Hora</th><th class="num">USD</th><th>Lado</th><th>Resultado</th><th class="num">Precio</th><th>Quién</th><th class="num">Score</th><th>Mercado</th></tr></thead><tbody>` +
+    fl.map(f => `<tr><td class="mono">${esc(tm(f.ts_ms))}</td><td class="num">${num(f.usd,0)}</td><td><span class="chip ${f.side==="BUY"?"good":"crit"}">${f.side==="BUY"?"compra":"venta"}</span></td><td>${esc(f.outcome)}</td><td class="num">${num(f.price,3)}</td><td>${esc(f.name||String(f.wallet).slice(0,10)+"…")}</td><td class="num">${f.score==null?"–":num(f.score,2)}</td><td>${esc(String(f.title).slice(0,60))}</td></tr>`).join("") + "</tbody>" : `<tbody><tr><td><div class="empty">Sin trades grandes registrados todavía.</div></td></tr></tbody>`;
+
+  const mv = d.model_vs_heuristic || [];
+  $("mv").innerHTML = mv.length ? `<div class="tablewrap" style="border:0"><table><thead><tr><th>Tipo</th><th class="num">N</th><th class="num">Mezcla</th><th class="num">Heurística</th><th class="num">Modelo</th></tr></thead><tbody>${mv.map(r => `<tr><td>${esc(kindOf(r.kind).label)}</td><td class="num">${r.n}</td><td class="num">${num(r.brier_mezcla,4)}</td><td class="num">${num(r.brier_heuristica,4)}</td><td class="num ${r.brier_modelo<r.brier_heuristica?"pos":"neg"}">${num(r.brier_modelo,4)}</td></tr>`).join("")}</tbody></table></div>`
+    : `<div class="empty">Todavía no hay señales puntuadas por un modelo. Aparecerá cuando <code>scalper train</code> promueva una versión.</div>`;
+  const md = d.models || [];
+  $("models").innerHTML = md.length ? `<div class="tablewrap" style="border:0"><table><thead><tr><th>Tipo</th><th>Versión</th><th class="num">Ejemplos</th><th class="num">Brier</th><th class="num">Heurística</th><th>Estado</th></tr></thead><tbody>${md.map(m => `<tr><td>${esc(kindOf(m.kind).label)}</td><td class="mono">v${m.version}${m.current?" ★":""}</td><td class="num">${num(m.n_train,0)}</td><td class="num">${num(m.brier_val,4)}</td><td class="num">${num(m.brier_heuristic_val,4)}</td><td><span class="chip ${m.promoted?"good":""}">${m.promoted?"promovido":"no promovido"}</span> <span class="small">${esc(m.reason||"")}</span></td></tr>`).join("")}</tbody></table></div>`
+    : `<div class="empty">Sin modelos entrenados. Hacen falta ${num(d.config?.learn_min_examples,0)} posiciones válidas por tipo de señal; el paper trading reentrena solo cada pocas horas.</div>`;
+
+  const tb = d.tables || [];
+  $("t-tables").innerHTML = `<thead><tr><th>Tabla</th><th class="num">Filas</th><th>Desde</th><th>Hasta</th></tr></thead><tbody>${tb.map(t => `<tr><td class="mono">${esc(t.table)}</td><td class="num">${num(t.rows,0)}</td><td class="small">${esc(tm(t.min_ts))}</td><td class="small">${esc(tm(t.max_ts))}</td></tr>`).join("")}</tbody>`;
+  const mk = d.markets || {};
+  $("markets").innerHTML = `<div class="legend">${(mk.by_category||[]).map(c => `<span><b>${esc(c.category)}</b> ${num(c.n,0)} mercados · ${esc(usd(c.volume,0))} en 24 h</span>`).join("")}</div>` +
+    `<div class="tablewrap" style="border:0"><table><thead><tr><th>Mercado</th><th>Categoría</th><th class="num">Fee</th><th class="num">Volumen 24 h</th></tr></thead><tbody>${(mk.top||[]).map(m => `<tr><td>${esc(String(m.question).slice(0,70))}</td><td>${esc(m.category)}</td><td class="num">${pct(m.fee_rate,0)}</td><td class="num">${esc(usd(m.volume_24h,0))}</td></tr>`).join("")}</tbody></table></div>`;
+  const c = d.config || {};
+  $("cfg").innerHTML = [["Categorías", (c.categories||[]).join(", ")], ["Edge mínimo neto por share", usd(c.min_edge_net, 3)], ["Tamaño objetivo", `${c.target_size} shares`], ["Latencia simulada", `${c.latency_ms} ms`], ["Prob. de llenado maker", pct(c.maker_fill_prob)], ["Trade que dispara perfilado", usd(c.whale_min_usd, 0)], ["Score mínimo para seguir", num(c.smart_min_score, 2)], ["σ básquet (calibrada NBA)", `${c.sigma_basketball} puntos`]].map(([k,v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
+}
+
+// ------------------------------------------------------------ navegación
+const links = [...document.querySelectorAll("#nav a")];
+const io = new IntersectionObserver(entries => { entries.forEach(e => { if (e.isIntersecting){ links.forEach(a => a.classList.toggle("active", a.getAttribute("href") === "#"+e.target.id)); } }); }, {rootMargin:"-30% 0px -60% 0px"});
+document.querySelectorAll("main section").forEach(s => io.observe(s));
+
+// ------------------------------------------------------------ datos
+async function load(){
+  if (window.__SNAPSHOT__){ render(window.__SNAPSHOT__); return; }
+  try { const r = await fetch("/api/all", {cache:"no-store"}); render(await r.json()); } catch (e) { $("gen").textContent = "No se pudo leer /api/all"; }
+}
+load();
+if (!window.__SNAPSHOT__) setInterval(load, 10000);
+})();
+</script>
