@@ -96,8 +96,8 @@ def formato_original(corte) -> str:
 
 def diferencia_corte(corte) -> Decimal | None:
     """Sobró (+) / faltó (−) contra lo esperado. None en cortes viejos sin esperado."""
-    if corte.hasta is None:
-        return None
+    if corte.hasta is None or str(corte.creado_por or "").upper() == "VEND-1":
+        return None  # el dueño no deja rastro
     return (_d(corte.monto_final) - _d(corte.monto_esperado)).quantize(_CENT)
 
 

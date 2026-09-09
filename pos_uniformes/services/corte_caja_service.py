@@ -22,7 +22,8 @@ from decimal import Decimal
 from sqlalchemy import func, select
 
 _CENT = Decimal("0.01")
-_SIN_CORTE_DIAS = 90  # sin corte previo: periodo abierto hacia atrás
+_SIN_CORTE_DIAS = 90
+DUENO_CODE = "VEND-1"  # Daniel: su corte no guarda esperado ni diferencia  # sin corte previo: periodo abierto hacia atrás
 
 
 def _d(valor) -> Decimal:
@@ -235,6 +236,12 @@ def cerrar_corte(
     if reactivo_final > contado:
         raise ValueError("El reactivo que se queda no puede ser mayor a lo contado.")
     local = ahora.astimezone() if ahora.tzinfo else ahora
+    # Regla de Daniel (de siempre, restaurada 2026-09-09): la cifra final
+    # del dueño ES el número oficial. No se guarda el esperado ni queda
+    # rastro de la diferencia; solo los cortes del encargado/automático
+    # conservan el esperado (ahí la cifra es calculada, no contada).
+    quien = str(creado_por or "").strip().upper()
+    esperado_guardado = contado if quien == DUENO_CODE else estado.esperado
     corte = LibretaCorte(
         fecha=local.date(),
         periodo_label=_etiqueta_periodo(estado.desde, ahora),
@@ -246,7 +253,7 @@ def cerrar_corte(
         desde=estado.desde,
         hasta=ahora,
         reactivo_inicial=estado.reactivo,
-        monto_esperado=estado.esperado,
+        monto_esperado=esperado_guardado,
         retiros_pagos=estado.pagos,
         otros_retiros=estado.total_retiros,
         reactivo_final=reactivo_final,

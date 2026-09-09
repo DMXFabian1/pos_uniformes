@@ -92,7 +92,9 @@ def formatear(d: DatosResumen) -> str:
     if d.cortes:
         for c in d.cortes:
             dif = c.diferencia
-            if dif == 0:
+            if str(c.creado_por or "").upper() == "VEND-1":
+                estado = "cifra del dueño"  # su corte no deja rastro de diferencia
+            elif dif == 0:
                 estado = "cuadró exacto ✅"
             elif dif > 0:
                 estado = f"sobraron {_pesos(dif)} ⚠️"

@@ -49,11 +49,14 @@ class FormatearTests(unittest.TestCase):
         self.assertIn("Descansa: nadie", t)
 
     def test_corte_cuadrado_y_sobrante(self) -> None:
-        exacto = CorteResumen("20:00", "VEND-1", Decimal("100"), Decimal("100"), Decimal("50"), Decimal("0"), Decimal("0"))
-        sobra = CorteResumen("21:00", "VEND-1", Decimal("110"), Decimal("100"), Decimal("50"), Decimal("0"), Decimal("5"))
-        t = formatear(DatosResumen(fecha=date(2026, 9, 8), cortes=[exacto, sobra]))
+        exacto = CorteResumen("20:00", "ENC-1", Decimal("100"), Decimal("100"), Decimal("50"), Decimal("0"), Decimal("0"))
+        sobra = CorteResumen("21:00", "ENC-1", Decimal("110"), Decimal("100"), Decimal("50"), Decimal("0"), Decimal("5"))
+        dueno = CorteResumen("21:30", "VEND-1", Decimal("90"), Decimal("100"), Decimal("50"), Decimal("0"), Decimal("0"))
+        t = formatear(DatosResumen(fecha=date(2026, 9, 8), cortes=[exacto, sobra, dueno]))
         self.assertIn("cuadró exacto ✅", t)
         self.assertIn("sobraron $10.00 ⚠️", t)
+        self.assertIn("por VEND-1: en caja $90.00 · cifra del dueño", t)
+        self.assertNotIn("FALTARON", t)
         self.assertIn("otros retiros $5.00", t)
 
 

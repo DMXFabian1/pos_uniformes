@@ -110,7 +110,7 @@ def texto_alerta_corte(corte, venta_efectivo, *, pagos=None, retiros=None) -> st
         nombre = (getattr(p, "employee_name", "") or getattr(p, "employee_code", "")).split()[0]
         lineas.append(f"  💵 {nombre}: ${_d(p.total):,.2f}")
     lineas.append(f"Se saca ${se_saca:,.2f} · reactivo queda ${_d(corte.reactivo_final):,.2f}")
-    if getattr(corte, "hasta", None) is not None:
+    if getattr(corte, "hasta", None) is not None and quien != "VEND-1":
         dif = (_d(corte.monto_final) - _d(corte.monto_esperado)).quantize(_CENT)
         if dif != 0:
             marca = "⚠️ " if abs(dif) >= TOLERANCIA_DIFERENCIA else ""

@@ -45,10 +45,11 @@ def _corte(**extra):
 
 class PurasTests(unittest.TestCase):
     def test_diferencia_y_retirado(self) -> None:
-        c = _corte()
+        c = _corte(creado_por="ENC-1")
         self.assertEqual(diferencia_corte(c), Decimal("-20.00"))
         self.assertEqual(retirado(c), Decimal("1820.00"))
         self.assertIsNone(diferencia_corte(_corte(hasta=None)))  # corte viejo sin esperado
+        self.assertIsNone(diferencia_corte(_corte(creado_por="VEND-1")))  # el dueño no deja rastro
 
     def test_formato_original(self) -> None:
         self.assertEqual(formato_original(_corte(creado_por="ENC-1")), FORMATO_ENCARGADO)
@@ -133,9 +134,10 @@ class DialogTests(unittest.TestCase):
     def test_filas_totales_y_previa(self) -> None:
         from pos_uniformes.ui.dialogs.historial_cortes_dialog import HistorialCortesDialog, filas_tabla, texto_diferencia
 
-        cortes = [_corte(), _corte(id=2, creado_por="ENC-1", monto_final=Decimal("13000.00"), nota="ok")]
+        cortes = [_corte(creado_por="ENC-1"), _corte(id=2, creado_por="ENC-1", monto_final=Decimal("13000.00"), nota="ok")]
         self.assertEqual(texto_diferencia(cortes[1]), "cuadró ✅")
         self.assertEqual(texto_diferencia(cortes[0]), "faltó $20.00")
+        self.assertEqual(texto_diferencia(_corte(creado_por="VEND-1")), "—")
         filas = filas_tabla(cortes)
         self.assertEqual(filas[0][0], "08/09/2026")
         self.assertEqual(filas[0][4], "$12,980.00")
@@ -159,7 +161,7 @@ class DialogTests(unittest.TestCase):
             dlg.formato_check.setChecked(False)
             self.assertIn("CORTE DE CAJA", dlg.previa.toPlainText())
             dlg.tabla.selectRow(0)
-            self.assertFalse(dlg.formato_check.isChecked())
+            self.assertTrue(dlg.formato_check.isChecked())
             self.assertIs(dlg.corte_seleccionado(), cortes[0])
 
         with patch("pos_uniformes.ui.helpers.ticket_routing_helper.route_tickets") as rt:

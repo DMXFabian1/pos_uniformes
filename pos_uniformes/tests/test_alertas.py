@@ -78,13 +78,19 @@ class TextosTests(unittest.TestCase):
         self.assertIn("Se saca $1,840.00 · reactivo queda $11,160.00", t)
         self.assertNotIn("FALTARON", t)
 
-    def test_corte_dueno_con_faltante(self) -> None:
-        t = al.texto_alerta_corte(self._corte(creado_por="VEND-1", monto_final=Decimal("12900.00"), nota="cambio"), Decimal("3230.00"))
+    def test_corte_encargado_con_faltante(self) -> None:
+        t = al.texto_alerta_corte(self._corte(creado_por="ENC-1", monto_final=Decimal("12900.00"), nota="cambio"), Decimal("3230.00"))
         self.assertIn("⚠️ FALTARON $100.00", t)
         self.assertIn("Nota: cambio", t)
-        t2 = al.texto_alerta_corte(self._corte(creado_por="VEND-1", monto_final=Decimal("13010.00")), Decimal("0"))
+        t2 = al.texto_alerta_corte(self._corte(creado_por="ENC-1", monto_final=Decimal("13010.00")), Decimal("0"))
         self.assertIn("Sobraron $10.00", t2)
         self.assertNotIn("⚠️", t2)
+
+    def test_corte_del_dueno_no_delata_diferencia(self) -> None:
+        # Regla de Daniel: su cifra es la oficial; ni sobró ni faltó en ningún aviso.
+        t = al.texto_alerta_corte(self._corte(creado_por="VEND-1", monto_final=Decimal("12900.00")), Decimal("3230.00"))
+        self.assertNotIn("FALTARON", t)
+        self.assertNotIn("Sobraron", t)
 
     def test_retiro(self) -> None:
         r = SimpleNamespace(monto=Decimal("500"), motivo="Proveedor", creado_por="enc-1", created_at=datetime(2026, 9, 9, 12, 5))
@@ -213,7 +219,8 @@ class EnganchesTests(unittest.TestCase):
             self.assertEqual(corte.monto_final, Decimal("13100.00"))
         self.assertEqual(len(pend), 1)
         self.assertIn("Corte hecho por VEND-1 a las 17:30", pend[0].texto)
-        self.assertIn("⚠️ FALTARON $60.00", pend[0].texto)
+        self.assertNotIn("FALTARON", pend[0].texto)
+        self.assertEqual(corte.monto_esperado, Decimal("13100.00"))  # sin rastro: esperado = su cifra
 
 
 class BotIntegraTests(unittest.TestCase):
