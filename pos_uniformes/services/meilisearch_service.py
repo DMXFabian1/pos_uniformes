@@ -59,12 +59,16 @@ def index_settings() -> dict[str, Any]:
                 "nombre_base",
                 "nombre_producto",
                 "sku",
+                "sku_num",          # "621" encuentra SKU000621 (2026-09-09)
                 "talla",
                 "color",
                 "tipo_pieza",
                 "tipo_prenda",
                 "categoria",
                 "escuela",
+                "nivel_educativo",  # sec / prepa / kinder ya pegan a algo
+                "atributo",         # Manga Corta, Cuello V, Polo, Tableada...
+                "escudo",           # "con escudo"
                 "genero",
                 "marca",
             ],
@@ -74,13 +78,19 @@ def index_settings() -> dict[str, Any]:
                 "tipo_pieza_id",
                 "tipo_prenda_id",
                 "modo",
+                "talla",
+                "color",
+                "nivel_educativo",
+                "en_stock",
             ],
-            "sortableAttributes": ["nombre_base", "precio_venta"],
+            "sortableAttributes": ["nombre_base", "precio_venta", "talla_orden", "ventas_60d"],
             "typoTolerance": {
                 "enabled": True,
                 "minWordSizeForTypos": {"oneTypo": 3, "twoTypos": 8},
-                "disableOnAttributes": ["sku"],
+                "disableOnAttributes": ["sku", "sku_num"],
             },
+            # Después de la relevancia de texto: primero lo que hay en
+            # existencia y luego lo que más se vende (Libreta, 60 días).
             "rankingRules": [
                 "words",
                 "typo",
@@ -88,6 +98,8 @@ def index_settings() -> dict[str, Any]:
                 "attribute",
                 "sort",
                 "exactness",
+                "en_stock:desc",
+                "ventas_60d:desc",
             ],
             # ── Sinónimos ──────────────────────────────────────────
             # Género de colores (la gente busca "roja" o "rojo" indistintamente)
@@ -144,6 +156,23 @@ def index_settings() -> dict[str, Any]:
                 "corbatin": ["corbatín", "moño"],
                 "corbatín": ["corbatin", "moño"],
                 "moño": ["corbatin", "corbatín"],
+                # Según los datos reales (2026-09-09)
+                "oscuro": ["obscuro"],
+                "obscuro": ["oscuro"],
+                "escocés": ["escoces"],
+                "escoces": ["escocés"],
+                "pgallo": ["pata de gallo"],
+                "guinda": ["vino"],
+                "tinto": ["vino"],
+                "bordo": ["vino"],
+                "borgoña": ["vino"],
+                "kaki": ["caqui"],
+                "rey": ["azul rey"],
+                "tele": ["telesecundaria"],
+                "uni": ["unitalla"],
+                "unitalla": ["uni"],
+                "escudo": ["con escudo"],
+                "tableada": ["tablas"],
             },
             # ── Stop words ─────────────────────────────────────────
             # Palabras que no aportan a la búsqueda
@@ -156,6 +185,89 @@ def index_settings() -> dict[str, Any]:
             "separatorTokens": ["|"],
             # ── Paginación ─────────────────────────────────────────
             "pagination": {"maxTotalHits": 5000},
+    }
+
+
+_TALLAS_LETRA = {"CH": 100, "MD": 101, "GD": 102, "EXG": 103, "UNI": 200, "UNITALLA": 200}
+
+
+def orden_talla(talla: str) -> int:
+    """Número para ordenar tallas: 2…46 numéricas, luego CH/MD/GD/EXG, rangos y raros al final."""
+    t = str(talla or "").strip().upper()
+    if not t:
+        return 999
+    if t.isdigit():
+        return int(t)
+    if t in _TALLAS_LETRA:
+        return _TALLAS_LETRA[t]
+    if "-" in t:  # rangos de calceta "13-18", "CH-MD"
+        primero = t.split("-", 1)[0]
+        return 300 + (int(primero) if primero.isdigit() else _TALLAS_LETRA.get(primero, 50))
+    return 500
+
+
+def sku_numero(sku: str) -> str:
+    """SKU000621 → "621": para teclear solo el número en caja."""
+    digitos = "".join(ch for ch in str(sku or "") if ch.isdigit()).lstrip("0")
+    return digitos or ""
+
+
+def ventas_por_sku(session: Session, dias: int = 60) -> dict[str, int]:
+    """Piezas vendidas por SKU en la Libreta (últimos `dias`). {} si no se puede."""
+    try:
+        from sqlalchemy import text
+
+        if session.get_bind().dialect.name != "postgresql":
+            return {}
+        rows = session.execute(text(
+            "select d->>'sku' as sku, sum((d->>'cantidad')::int) as n "
+            "from libreta_venta, jsonb_array_elements(detalle::jsonb) d "
+            "where created_at > now() - make_interval(days => :dias) and tipo in ('venta', 'apartado') "
+            "group by 1"
+        ), {"dias": dias}).all()
+        return {str(r[0]): int(r[1] or 0) for r in rows if r[0]}
+    except Exception as exc:  # noqa: BLE001 — sin Libreta o sin permisos: ranking sin ventas
+        logger.debug("ventas_por_sku no disponible: %s", exc)
+        try:
+            session.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        return {}
+
+
+def documento_variante(p, v, ventas: dict[str, int] | None = None) -> dict[str, Any]:
+    """Documento del índice para una variante (puro, testeable)."""
+    tipo_pieza_nombre = p.tipo_pieza.nombre if p.tipo_pieza else "Sin pieza"
+    stock = int(v.stock_actual or 0)
+    return {
+        "id": v.id,
+        "sku": v.sku,
+        "sku_num": sku_numero(v.sku),
+        "talla": v.talla or "",
+        "talla_orden": orden_talla(v.talla or ""),
+        "color": v.color or "",
+        "precio_venta": float(v.precio_venta or 0),
+        "stock_actual": stock,
+        "en_stock": 1 if stock > 0 else 0,
+        "ventas_60d": int((ventas or {}).get(str(v.sku), 0)),
+        "producto_id": p.id,
+        "nombre_base": p.nombre_base or p.nombre or "",
+        "nombre_producto": p.nombre or "",
+        "categoria": p.categoria.nombre if p.categoria else "",
+        "marca": p.marca.nombre if p.marca else "",
+        "escuela": p.escuela.nombre if p.escuela else "",
+        "escuela_id": p.escuela_id,
+        "tipo_pieza": tipo_pieza_nombre,
+        "tipo_pieza_id": p.tipo_pieza_id,
+        "tipo_prenda": p.tipo_prenda.nombre if p.tipo_prenda else "",
+        "tipo_prenda_id": p.tipo_prenda_id,
+        "nivel_educativo": p.nivel_educativo.nombre if getattr(p, "nivel_educativo", None) else "",
+        "atributo": p.atributo.nombre if getattr(p, "atributo", None) else "",
+        "escudo": p.escudo or "",
+        "genero": p.genero or "",
+        "family_key": f"{tipo_pieza_nombre}||{p.nombre_base or p.nombre}",
+        "modo": "school" if p.escuela_id else "basics",
+        "activo": True,
     }
 
 
@@ -192,39 +304,19 @@ def index_from_db(session: Session) -> int:
             selectinload(Producto.escuela),
             selectinload(Producto.tipo_pieza),
             selectinload(Producto.tipo_prenda),
+            selectinload(Producto.nivel_educativo),
+            selectinload(Producto.atributo),
         )
         .all()
     )
+    ventas = ventas_por_sku(session)
 
     docs: list[dict[str, Any]] = []
     for p in productos:
         for v in p.variantes:
             if not v.activo:
                 continue
-            tipo_pieza_nombre = p.tipo_pieza.nombre if p.tipo_pieza else "Sin pieza"
-            docs.append({
-                "id": v.id,
-                "sku": v.sku,
-                "talla": v.talla or "",
-                "color": v.color or "",
-                "precio_venta": float(v.precio_venta or 0),
-                "stock_actual": v.stock_actual or 0,
-                "producto_id": p.id,
-                "nombre_base": p.nombre_base or p.nombre or "",
-                "nombre_producto": p.nombre or "",
-                "categoria": p.categoria.nombre if p.categoria else "",
-                "marca": p.marca.nombre if p.marca else "",
-                "escuela": p.escuela.nombre if p.escuela else "",
-                "escuela_id": p.escuela_id,
-                "tipo_pieza": tipo_pieza_nombre,
-                "tipo_pieza_id": p.tipo_pieza_id,
-                "tipo_prenda": p.tipo_prenda.nombre if p.tipo_prenda else "",
-                "tipo_prenda_id": p.tipo_prenda_id,
-                "genero": p.genero or "",
-                "family_key": f"{tipo_pieza_nombre}||{p.nombre_base or p.nombre}",
-                "modo": "school" if p.escuela_id else "basics",
-                "activo": True,
-            })
+            docs.append(documento_variante(p, v, ventas))
 
     if not docs:
         logger.warning("index_from_db: 0 documentos generados de %d productos", len(productos))
@@ -255,10 +347,10 @@ def search(query: str, *, limit: int = 40, mode: str | None = None) -> list[dict
         # lo que mataba la tolerancia a typos.
         "matchingStrategy": "all",
         "attributesToRetrieve": [
-            "id", "sku", "talla", "color", "precio_venta", "stock_actual",
-            "producto_id", "nombre_base", "nombre_producto", "categoria",
-            "marca", "escuela", "tipo_pieza", "tipo_pieza_id", "tipo_prenda",
-            "genero", "family_key", "modo",
+            "id", "sku", "talla", "talla_orden", "color", "precio_venta", "stock_actual",
+            "en_stock", "ventas_60d", "producto_id", "nombre_base", "nombre_producto",
+            "categoria", "marca", "escuela", "tipo_pieza", "tipo_pieza_id", "tipo_prenda",
+            "nivel_educativo", "atributo", "escudo", "genero", "family_key", "modo",
         ],
     }
 

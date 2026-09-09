@@ -40,6 +40,64 @@ class IndexSettingsTests(unittest.TestCase):
         self.assertIn("sku", index_settings()["typoTolerance"]["disableOnAttributes"])
 
 
+class IndexDataTests(unittest.TestCase):
+    """2026-09-09: nivel/atributo/escudo indexados, sku corto, ranking por stock y ventas."""
+
+    def test_settings_traen_campos_nuevos(self) -> None:
+        from pos_uniformes.services.meilisearch_service import index_settings
+
+        st = index_settings()
+        for campo in ("nivel_educativo", "atributo", "escudo", "sku_num"):
+            self.assertIn(campo, st["searchableAttributes"])
+        for campo in ("talla", "color", "en_stock"):
+            self.assertIn(campo, st["filterableAttributes"])
+        self.assertEqual(st["rankingRules"][-2:], ["en_stock:desc", "ventas_60d:desc"])
+        self.assertIn("sku_num", st["typoTolerance"]["disableOnAttributes"])
+        self.assertIn("obscuro", st["synonyms"]["oscuro"])
+        self.assertIn("telesecundaria", st["synonyms"]["tele"])
+
+    def test_orden_talla_y_sku_numero(self) -> None:
+        from pos_uniformes.services.meilisearch_service import orden_talla, sku_numero
+
+        tallas = ["GD", "16", "4", "CH", "13-18", "EXG", "Uni", "8", "MD"]
+        self.assertEqual(sorted(tallas, key=orden_talla), ["4", "8", "16", "CH", "MD", "GD", "EXG", "Uni", "13-18"])
+        self.assertEqual(sku_numero("SKU000621"), "621")
+        self.assertEqual(sku_numero("SIN-CODIGO"), "")
+
+    def test_documento_variante(self) -> None:
+        from types import SimpleNamespace
+
+        from pos_uniformes.services.meilisearch_service import documento_variante
+
+        p = SimpleNamespace(
+            id=7, nombre="Camisa Manga Corta Blanca | Oficial | Camisa", nombre_base="Camisa Manga Corta Blanca",
+            categoria=SimpleNamespace(nombre="Camisas"), marca=SimpleNamespace(nombre="Prowear"),
+            escuela=None, escuela_id=None, tipo_pieza=SimpleNamespace(nombre="Camisa"), tipo_pieza_id=3,
+            tipo_prenda=SimpleNamespace(nombre="Oficial"), tipo_prenda_id=2,
+            nivel_educativo=SimpleNamespace(nombre="Secundaria"), atributo=SimpleNamespace(nombre="Manga Corta"),
+            escudo="Con Escudo", genero="Unisex",
+        )
+        v = SimpleNamespace(id=99, sku="SKU000230", talla="14", color="Blanca", precio_venta=180, stock_actual=0, activo=True)
+        d = documento_variante(p, v, {"SKU000230": 14})
+        self.assertEqual(d["sku_num"], "230")
+        self.assertEqual(d["talla_orden"], 14)
+        self.assertEqual(d["en_stock"], 0)
+        self.assertEqual(d["ventas_60d"], 14)
+        self.assertEqual(d["nivel_educativo"], "Secundaria")
+        self.assertEqual(d["atributo"], "Manga Corta")
+        self.assertEqual(d["escudo"], "Con Escudo")
+        self.assertEqual(d["modo"], "basics")
+
+    def test_ventas_por_sku_sin_postgres_devuelve_vacio(self) -> None:
+        from unittest.mock import MagicMock
+
+        from pos_uniformes.services.meilisearch_service import ventas_por_sku
+
+        session = MagicMock()
+        session.get_bind.return_value.dialect.name = "sqlite"
+        self.assertEqual(ventas_por_sku(session), {})
+
+
 class EnsureRunningTests(unittest.TestCase):
     """Auto-arranque silencioso: sin binario instalado NO descarga nada."""
 
