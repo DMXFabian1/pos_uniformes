@@ -313,11 +313,11 @@ def comisiones_desde_ultimo_pago(session, employee_code: str, horario: HorarioEm
 
 def chips_calendario_mes(session, year: int, month: int, hoy: date) -> dict[date, list[tuple[str, str]]]:
     """Chips del calendario COMPARTIDO (página Calendario del kiosko):
-    {fecha: [(tipo, texto)]} con los descansos y pagos de las empleadas.
+    {fecha: [(tipo, texto)]} con descansos, pagos y faltas de las empleadas.
 
-    Se pintan: descansos (fijos y movidos), pagos ya hechos y el PRÓXIMO
-    pago proyectado de cada una. Las faltas NO salen aquí — son del
-    calendario privado de la Libreta.
+    Se pintan: descansos (fijos y movidos), pagos ya hechos, el PRÓXIMO pago
+    proyectado de cada una y las faltas apuntadas (Daniel las quiso aquí,
+    2026-09-09: el papá apunta y todos ven lo mismo).
     """
     from pos_uniformes.database.models import Empleada, EmpleadaHorario
 
@@ -349,6 +349,8 @@ def chips_calendario_mes(session, year: int, month: int, hoy: date) -> dict[date
                 _agregar(fecha, DESCANSO, code)
             elif estado == PAGO:
                 _agregar(fecha, PAGO, code)
+            elif estado == FALTA:
+                _agregar(fecha, FALTA, code)
         proximo = fecha_proximo_pago(horario, hoy)
         if proximo is not None and proximo not in horario.eventos:
             _agregar(proximo, PAGO, code)

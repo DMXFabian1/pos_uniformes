@@ -1,6 +1,7 @@
 """Detalle de un día del calendario compartido del kiosko + consulta de pago con gafete.
 
-- `resumen_dia`: quién descansa, a quién le toca pago y qué conteos caen ese día.
+- `resumen_dia`: quién descansa, quién faltó, a quién le toca pago y qué
+  conteos caen ese día.
 - `vista_de_pagos`: al escanear un gafete, qué se puede ver:
     * empleada → SOLO su pago pendiente (desglose y cuándo le toca);
     * Daniel (VEND-1) o su papá (ENC-1) → el de todas las activas.
@@ -31,27 +32,34 @@ class ResumenDia:
     fecha: date
     descansan: list[str] = field(default_factory=list)   # nombres
     pagos: list[str] = field(default_factory=list)       # nombres con día de pago
+    faltas: list[str] = field(default_factory=list)      # nombres que faltaron
     conteos: list = field(default_factory=list)          # EstadoCalendarioConteo
 
     @property
     def vacio(self) -> bool:
-        return not (self.descansan or self.pagos or self.conteos)
+        return not (self.descansan or self.pagos or self.faltas or self.conteos)
 
 
 def resumen_dia(session, fecha: date, hoy: date | None = None) -> ResumenDia:
     """Lo que el calendario muestra de ese día, sin truncar (la celda corta a 3)."""
-    from pos_uniformes.services.calendario_empleadas_service import DESCANSO, PAGO, chips_calendario_mes
+    from pos_uniformes.services.calendario_empleadas_service import (
+        DESCANSO,
+        FALTA,
+        PAGO,
+        chips_calendario_mes,
+    )
 
     hoy = hoy or date.today()
     descansan: list[str] = []
     pagos: list[str] = []
+    faltas: list[str] = []
     try:
         chips = chips_calendario_mes(session, fecha.year, fecha.month, hoy).get(fecha, [])
     except Exception:  # noqa: BLE001 — tablas sin migrar
         session.rollback()
         chips = []
     for tipo, nombre in chips:
-        destino = descansan if tipo == DESCANSO else pagos if tipo == PAGO else None
+        destino = {DESCANSO: descansan, PAGO: pagos, FALTA: faltas}.get(tipo)
         if destino is not None and nombre not in destino:
             destino.append(nombre)
     conteos: list = []
@@ -65,7 +73,9 @@ def resumen_dia(session, fecha: date, hoy: date | None = None) -> ResumenDia:
         conteos = agrupar_calendario_por_dia(estados, fecha.year, fecha.month).get(fecha.day, [])
     except Exception:  # noqa: BLE001
         session.rollback()
-    return ResumenDia(fecha=fecha, descansan=descansan, pagos=pagos, conteos=list(conteos))
+    return ResumenDia(
+        fecha=fecha, descansan=descansan, pagos=pagos, faltas=faltas, conteos=list(conteos)
+    )
 
 
 @dataclass(frozen=True)

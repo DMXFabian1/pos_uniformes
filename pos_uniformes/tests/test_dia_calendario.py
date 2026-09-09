@@ -71,7 +71,42 @@ class ChipsPorDiaTests(unittest.TestCase):
         self.assertIn((PAGO, "Nayeli"), chips[date(2026, 9, 13)])
 
 
+    def test_las_faltas_tambien_salen_en_el_calendario(self) -> None:
+        """Daniel las quiso visibles (2026-09-09): el papá apunta y todos ven."""
+        from pos_uniformes.services.calendario_empleadas_service import FALTA, marcar_dia
+
+        with _factory()() as s:
+            _seed(s)
+            marcar_dia(s, "VEND-2", date(2026, 9, 10), FALTA, nota="apuntada por ENC-1")
+            s.commit()
+            chips = chips_calendario_mes(s, 2026, 9, HOY)
+        self.assertIn((FALTA, "Fanny"), chips[date(2026, 9, 10)])
+
+    def test_una_falta_no_se_confunde_con_descanso(self) -> None:
+        from pos_uniformes.services.calendario_empleadas_service import FALTA, marcar_dia
+
+        with _factory()() as s:
+            _seed(s)
+            marcar_dia(s, "VEND-2", date(2026, 9, 10), FALTA)
+            s.commit()
+            chips = chips_calendario_mes(s, 2026, 9, HOY)
+        del_dia = chips[date(2026, 9, 10)]
+        self.assertNotIn((DESCANSO, "Fanny"), del_dia)
+
+
 class ResumenDiaTests(unittest.TestCase):
+    def test_el_detalle_del_dia_lista_las_faltas(self) -> None:
+        from pos_uniformes.services.calendario_empleadas_service import FALTA, marcar_dia
+
+        with _factory()() as s:
+            _seed(s)
+            marcar_dia(s, "VEND-2", date(2026, 9, 10), FALTA)
+            s.commit()
+            r = svc.resumen_dia(s, date(2026, 9, 10), HOY)
+        self.assertEqual(r.faltas, ["Fanny"])
+        self.assertEqual(r.descansan, [])
+        self.assertFalse(r.vacio)  # un día con solo faltas ya no está vacío
+
     def test_resumen_del_dia(self) -> None:
         conteo = SimpleNamespace(escuela_nombre="Primaria Juárez", vencida=True)
         with _factory()() as s, patch(

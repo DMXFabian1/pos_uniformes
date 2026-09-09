@@ -1,6 +1,7 @@
 """Detalle de un día del calendario del kiosko (al tocar una celda).
 
-Arriba: quién descansa, a quién le toca pago y qué conteos caen ese día.
+Arriba: quién descansa, quién faltó, a quién le toca pago y qué conteos
+caen ese día.
 Abajo: "¿Cuánto llevas?" — se escanea el gafete. La empleada ve SOLO su
 pago pendiente con desglose; Daniel (VEND-1) o León (ENC-1) ven el de
 todas. Lo mostrado se borra solo a los 45 s (es una pantalla compartida).
@@ -111,9 +112,15 @@ class DiaCalendarioDialog(QDialog):
         fila = QHBoxLayout()
         fila.setSpacing(10)
         self.tarjeta_descansan = _tarjeta("🛌  DESCANSA", ", ".join(resumen.descansan) or "Nadie")
+        self.tarjeta_faltas = _tarjeta("❌  FALTÓ", ", ".join(resumen.faltas) or "Nadie")
         self.tarjeta_pagos = _tarjeta("💵  DÍA DE PAGO", ", ".join(resumen.pagos) or "Nadie")
         self.tarjeta_conteos = _tarjeta("📋  CONTEOS", texto_conteos(resumen.conteos))
-        for c in (self.tarjeta_descansan, self.tarjeta_pagos, self.tarjeta_conteos):
+        for c in (
+            self.tarjeta_descansan,
+            self.tarjeta_faltas,
+            self.tarjeta_pagos,
+            self.tarjeta_conteos,
+        ):
             fila.addWidget(c, 1)
         ly.addLayout(fila)
 

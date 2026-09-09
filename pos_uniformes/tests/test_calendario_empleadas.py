@@ -271,7 +271,7 @@ class ChipsCalendarioCompartidoTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.session.close()
 
-    def test_descansos_y_pagos_si_faltas_no(self) -> None:
+    def test_descansos_pagos_y_faltas(self) -> None:
         from pos_uniformes.services.calendario_empleadas_service import (
             chips_calendario_mes,
             guardar_horario,
@@ -293,8 +293,8 @@ class ChipsCalendarioCompartidoTests(unittest.TestCase):
         # semana (dom 13) — la falta del martes no lo mueve.
         self.assertIn(("pago", "Ana"), chips[date(2026, 9, 6)])
         self.assertIn(("pago", "Ana"), chips[date(2026, 9, 13)])
-        # La falta del 8 NO aparece en el calendario compartido.
-        self.assertNotIn(date(2026, 9, 8), chips)
+        # La falta del 8 también se ve (Daniel la quiso ahí, 2026-09-09).
+        self.assertIn(("falta", "Ana"), chips[date(2026, 9, 8)])
 
 
 class AutoservicioDescansosTests(unittest.TestCase):

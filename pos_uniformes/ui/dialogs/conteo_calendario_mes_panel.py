@@ -196,9 +196,8 @@ class ConteoCalendarioMesPanel(QWidget):
                 # Recordatorios retirados de este calendario: no se cargan.
                 self._recordatorios = []
                 self._completados = set()
-                # Sincronía con el calendario de la Libreta: descansos y
-                # pagos de las empleadas se pintan aquí solos (faltas no —
-                # esas son del calendario privado).
+                # Sincronía con el calendario de la Libreta: descansos,
+                # pagos y faltas de las empleadas se pintan aquí solos.
                 try:
                     from pos_uniformes.services.calendario_empleadas_service import (
                         chips_calendario_mes,
@@ -349,18 +348,17 @@ class ConteoCalendarioMesPanel(QWidget):
     _REC_COLORS = {
         "pago": ("#dcedff", "#1e4e8c"),
         "descanso": ("#e7dcff", "#5b3a99"),
+        "falta": ("#f6d3cb", "#a33b25"),
         "nota": ("#eee7dc", "#6b5a45"),
     }
 
     def _chip_empleada(self, tipo: str, nombre: str) -> QLabel:
         """Chip auto-sincronizado desde el calendario de la Libreta."""
-        icono = "🛌" if tipo == "descanso" else "💵"
+        icono = {"descanso": "🛌", "falta": "❌"}.get(tipo, "💵")
         bg, fg = self._REC_COLORS.get(tipo, ("#eee", "#444"))
         chip = QLabel(f"{icono} {nombre}")
-        chip.setToolTip(
-            f"{'Descansa' if tipo == 'descanso' else 'Día de pago de'} {nombre}"
-            " (viene del calendario de la Libreta)"
-        )
+        que = {"descanso": "Descansa", "falta": "Faltó"}.get(tipo, "Día de pago de")
+        chip.setToolTip(f"{que} {nombre} (viene del calendario de la Libreta)")
         chip.setStyleSheet(
             f"background: {bg}; color: {fg}; border: none; border-radius: 9px;"
             " padding: 3px 8px; font-size: 11px; font-weight: 700;"
