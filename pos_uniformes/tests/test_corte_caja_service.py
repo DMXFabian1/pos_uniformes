@@ -96,7 +96,7 @@ class CerrarCorteTests(unittest.TestCase):
         self.assertIsNotNone(corte.desde)
         self.assertEqual(guardados, {"reactivo_actual": Decimal("11160.00")})
 
-    def test_dueno_no_deja_rastro_del_esperado(self) -> None:
+    def test_dueno_guarda_el_real_aparte_de_su_cifra(self) -> None:
         session = MagicMock()
         with patch.object(caja, "estado_caja", return_value=self._estado()), patch.object(
             caja, "guardar_parametros", side_effect=lambda s, **k: None
@@ -106,7 +106,7 @@ class CerrarCorteTests(unittest.TestCase):
                 reactivo_final=Decimal("11160.00"), ahora=datetime(2026, 9, 8, 20, tzinfo=timezone.utc),
             )
         self.assertEqual(corte.monto_final, Decimal("11500.00"))
-        self.assertEqual(corte.monto_esperado, Decimal("11500.00"))  # no 12010: sin rastro
+        self.assertEqual(corte.monto_esperado, Decimal("12010.00"))  # el real, solo para Daniel
 
     def test_reactivo_por_defecto_es_el_mismo_fondo(self) -> None:
         session = MagicMock()

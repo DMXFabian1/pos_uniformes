@@ -49,7 +49,7 @@ class PurasTests(unittest.TestCase):
         self.assertEqual(diferencia_corte(c), Decimal("-20.00"))
         self.assertEqual(retirado(c), Decimal("1820.00"))
         self.assertIsNone(diferencia_corte(_corte(hasta=None)))  # corte viejo sin esperado
-        self.assertIsNone(diferencia_corte(_corte(creado_por="VEND-1")))  # el dueño no deja rastro
+        self.assertEqual(diferencia_corte(_corte(creado_por="VEND-1")), Decimal("-20.00"))  # el dueño sí lo ve
 
     def test_formato_original(self) -> None:
         self.assertEqual(formato_original(_corte(creado_por="ENC-1")), FORMATO_ENCARGADO)
@@ -137,12 +137,14 @@ class DialogTests(unittest.TestCase):
         cortes = [_corte(creado_por="ENC-1"), _corte(id=2, creado_por="ENC-1", monto_final=Decimal("13000.00"), nota="ok")]
         self.assertEqual(texto_diferencia(cortes[1]), "cuadró ✅")
         self.assertEqual(texto_diferencia(cortes[0]), "faltó $20.00")
-        self.assertEqual(texto_diferencia(_corte(creado_por="VEND-1")), "—")
+        self.assertEqual(texto_diferencia(_corte(creado_por="VEND-1")), "ajuste −$20.00")
+        self.assertEqual(texto_diferencia(_corte(creado_por="VEND-1", monto_final=Decimal("13000.00"))), "sin ajuste")
         filas = filas_tabla(cortes)
         self.assertEqual(filas[0][0], "08/09/2026")
         self.assertEqual(filas[0][4], "$12,980.00")
-        self.assertEqual(filas[0][6], "$1,820.00")
-        self.assertEqual(filas[1][9], "ok")
+        self.assertEqual(filas[0][5], "$13,000.00")  # real
+        self.assertEqual(filas[0][7], "$1,820.00")
+        self.assertEqual(filas[1][10], "ok")
 
         with patch.object(HistorialCortesDialog, "recargar"):
             dlg = HistorialCortesDialog(None, hoy=date(2026, 9, 9))

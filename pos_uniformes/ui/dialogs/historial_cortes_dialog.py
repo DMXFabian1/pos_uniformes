@@ -32,6 +32,7 @@ from PyQt6.QtWidgets import (
 from pos_uniformes.services.historial_cortes_service import (
     FORMATO_ENCARGADO,
     diferencia_corte,
+    es_del_dueno,
     formato_original,
     retirado,
     totales_cortes,
@@ -40,7 +41,7 @@ from pos_uniformes.services.historial_cortes_service import (
 logger = logging.getLogger(__name__)
 
 _MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre")
-COLUMNAS = ("Fecha", "Hora", "Periodo", "Por", "En caja", "Reactivo", "Se retiró", "Pagos", "Sobró/Faltó", "Nota")
+COLUMNAS = ("Fecha", "Hora", "Periodo", "Por", "En caja", "Real", "Reactivo", "Se retiró", "Pagos", "Ajuste / Sobró-Faltó", "Nota")
 
 
 def _item(texto: str, centrado: bool = True, negrita: bool = False) -> QTableWidgetItem:
@@ -64,12 +65,19 @@ def _hora(corte) -> str:
 
 
 def texto_diferencia(corte) -> str:
+    """Corte del dueño: 'ajuste ±$' (su cifra vs el real). Del encargado: sobró/faltó."""
     d = diferencia_corte(corte)
     if d is None:
         return "—"
     if d == 0:
-        return "cuadró ✅"
+        return "sin ajuste" if es_del_dueno(corte) else "cuadró ✅"
+    if es_del_dueno(corte):
+        return f"ajuste {'+' if d > 0 else '−'}${abs(d):,.2f}"
     return f"sobró ${d:,.2f}" if d > 0 else f"faltó ${-d:,.2f}"
+
+
+def texto_real(corte) -> str:
+    return "—" if corte.hasta is None else f"${Decimal(corte.monto_esperado or 0):,.2f}"
 
 
 def filas_tabla(cortes: list) -> list[tuple[str, ...]]:
@@ -82,6 +90,7 @@ def filas_tabla(cortes: list) -> list[tuple[str, ...]]:
             str(c.periodo_label or ""),
             str(c.creado_por or ""),
             f"${Decimal(c.monto_final):,.2f}",
+            texto_real(c),
             f"${Decimal(c.reactivo_final or 0):,.2f}",
             f"${retirado(c):,.2f}",
             f"${Decimal(c.retiros_pagos or 0):,.2f}",
@@ -220,7 +229,7 @@ class HistorialCortesDialog(QDialog):
         self.tabla.setRowCount(len(filas))
         for i, fila in enumerate(filas):
             for j, texto in enumerate(fila):
-                self.tabla.setItem(i, j, _item(texto, centrado=j not in (2, 9), negrita=(j == 4)))
+                self.tabla.setItem(i, j, _item(texto, centrado=j not in (2, 10), negrita=(j == 4)))
         if self._cortes:
             t = totales_cortes(self._cortes)
             self.totales_label.setText(

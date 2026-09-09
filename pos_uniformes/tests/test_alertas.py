@@ -86,11 +86,14 @@ class TextosTests(unittest.TestCase):
         self.assertIn("Sobraron $10.00", t2)
         self.assertNotIn("⚠️", t2)
 
-    def test_corte_del_dueno_no_delata_diferencia(self) -> None:
-        # Regla de Daniel: su cifra es la oficial; ni sobró ni faltó en ningún aviso.
+    def test_corte_del_dueno_muestra_ajuste_solo_a_daniel(self) -> None:
+        # Su cifra es la oficial; en SU Telegram ve el real y el ajuste (no "faltaron").
         t = al.texto_alerta_corte(self._corte(creado_por="VEND-1", monto_final=Decimal("12900.00")), Decimal("3230.00"))
         self.assertNotIn("FALTARON", t)
-        self.assertNotIn("Sobraron", t)
+        self.assertIn("Ajuste: real $13,000.00 → tu cifra $12,900.00 (−$100.00)", t)
+        # Sin cambios: todo normal, ninguna línea extra.
+        t2 = al.texto_alerta_corte(self._corte(creado_por="VEND-1"), Decimal("3230.00"))
+        self.assertNotIn("Ajuste", t2)
 
     def test_retiro(self) -> None:
         r = SimpleNamespace(monto=Decimal("500"), motivo="Proveedor", creado_por="enc-1", created_at=datetime(2026, 9, 9, 12, 5))
@@ -220,7 +223,8 @@ class EnganchesTests(unittest.TestCase):
         self.assertEqual(len(pend), 1)
         self.assertIn("Corte hecho por VEND-1 a las 17:30", pend[0].texto)
         self.assertNotIn("FALTARON", pend[0].texto)
-        self.assertEqual(corte.monto_esperado, Decimal("13100.00"))  # sin rastro: esperado = su cifra
+        self.assertIn("Ajuste: real $13,160.00 → tu cifra $13,100.00 (−$60.00)", pend[0].texto)
+        self.assertEqual(corte.monto_esperado, Decimal("13160.00"))  # el real se guarda; solo Daniel lo ve
 
 
 class BotIntegraTests(unittest.TestCase):
