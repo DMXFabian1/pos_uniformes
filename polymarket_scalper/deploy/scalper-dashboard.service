@@ -1,0 +1,21 @@
+[Unit]
+Description=Scalper Polymarket - panel web (solo en 127.0.0.1)
+After=network-online.target
+
+[Service]
+Type=simple
+User=scalper
+Group=scalper
+WorkingDirectory=/opt/scalper
+ExecStart=/opt/scalper/venv/bin/scalper -c /opt/scalper/config.yaml dashboard --host 127.0.0.1 --port 8787
+Restart=always
+RestartSec=5
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/scalper
+PrivateTmp=true
+NoNewPrivileges=true
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

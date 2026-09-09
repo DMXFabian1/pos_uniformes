@@ -36,6 +36,7 @@ scalper train                    # fase 5: entrenar P(ganancia) por señal desde
 scalper models                   # versiones, métricas y cuál está en uso
 scalper dashboard                # panel web en http://127.0.0.1:8787 (lee data/ en vivo)
 scalper dashboard --snapshot panel.html   # página autónoma con los datos actuales, para compartir
+scalper retention --dry-run      # disco: qué borraría y compactaría
 ```
 
 Todo se configura en `config.yaml`. Nada de esto toca una wallet ni firma órdenes.
@@ -142,6 +143,17 @@ y lo actualizan con el marcador. Sin precio previo, solo se modela si el partido
 
 Con pocos datos el sistema se comporta como antes (heurística); el aprendizaje entra a medida que
 el ledger crece. Ese es el mecanismo por el que "el margen de error se va reduciendo".
+
+## Disco (`scalper retention`)
+Los cambios de libro crecen ~4 GB/día y solo sirven para replay detallado de días recientes. La
+retención, que corre sola una vez al día dentro del recolector, conserva 3 días de `book_deltas`,
+14 de `book_snapshots` y 30 de `markets`, borra lo anterior y compacta cada día cerrado a un
+archivo por tabla. Las tablas del aprendizaje no se borran nunca. Crecimiento permanente: ~0,5 GB/día.
+
+## Servidor
+Guía completa en [`docs/SERVIDOR.md`](docs/SERVIDOR.md): elegir el servidor virtual, instalar con
+`deploy/install.sh`, servicios systemd que arrancan solos, panel por túnel SSH, disco, copias y
+actualización.
 
 ## Panel web (`scalper dashboard`)
 Un servidor local sin dependencias externas sirve una página que lee las tablas Parquet cada

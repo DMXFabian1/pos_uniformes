@@ -99,6 +99,15 @@ class ModelsCfg(BaseModel):
     pregame_proxy_max_progress: float = 0.15   # si el partido ya avanzó más que esto sin precio previo, no se modela
 
 
+class RetentionCfg(BaseModel):
+    enabled: bool = True
+    run_hours: float = 24            # cada cuánto corre dentro del recolector
+    compact: bool = True             # un archivo por tabla y día en días ya cerrados
+    min_quiet_seconds: int = 3600    # no tocar particiones con escrituras recientes
+    keep_days: dict[str, int] = Field(default_factory=lambda: {"book_deltas": 3, "book_snapshots": 14, "markets": 30})
+    # tablas sin entrada en keep_days se conservan para siempre (quotes, trades, games, flow, wallets, ledger…)
+
+
 class LearnCfg(BaseModel):
     enabled: bool = True            # usar el modelo promovido para puntuar señales
     backend: str = "auto"           # auto | hgb | logistic
@@ -145,6 +154,7 @@ class Config(BaseModel):
     flow: FlowCfg = Field(default_factory=FlowCfg)
     models: ModelsCfg = Field(default_factory=ModelsCfg)
     learn: LearnCfg = Field(default_factory=LearnCfg)
+    retention: RetentionCfg = Field(default_factory=RetentionCfg)
     signals: SignalsCfg = Field(default_factory=SignalsCfg)
     sim: SimCfg = Field(default_factory=SimCfg)
 

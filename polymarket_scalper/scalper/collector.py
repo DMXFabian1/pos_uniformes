@@ -98,6 +98,8 @@ class Collector:
             asyncio.create_task(self._flush_loop(), name="flush"),
             asyncio.create_task(self._status_loop(), name="status"),
         ]
+        if self.cfg.retention.enabled and self.persist:
+            self._tasks.append(asyncio.create_task(self._retention_loop(), name="retention"))
         if self.sports is not None:
             self._tasks.append(asyncio.create_task(self.sports.run(), name="sports"))
         if self.flow is not None and self.wallets is not None:
@@ -321,6 +323,18 @@ class Collector:
                     self.pending_resolution.pop(cid, None)
                     self.stats["resolved"] += 1
                     await self._emit(("resolution", ts, cid, {"tokens": rows}))
+
+    async def _retention_loop(self) -> None:
+        from .retention import apply_retention
+        period = max(self.cfg.retention.run_hours, 0.05) * 3600
+        while True:
+            await asyncio.sleep(period)
+            try:
+                self.writer.flush()
+                rep = await asyncio.to_thread(apply_retention, self.cfg)
+                log.info("retención de disco: %s", rep.summary())
+            except Exception:  # noqa: BLE001
+                log.exception("retención falló")
 
     async def _flush_loop(self) -> None:
         while True:

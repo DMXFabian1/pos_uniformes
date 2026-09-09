@@ -167,6 +167,30 @@ def cmd_games(args: argparse.Namespace) -> None:
         print(f"{t} {r['league']:14} {r['home'][:22]:22} vs {r['away'][:22]:22} {r['score']:18} {r['period']:6} {r['status']}")
 
 
+def cmd_retention(args: argparse.Namespace) -> None:
+    from .retention import apply_retention, disk_usage, estimate_growth
+
+    cfg = load_config(args.config)
+    print(f"{'tabla':16}{'archivos':>10}{'días':>6}{'MB':>10}{'conserva':>10}")
+    for r in disk_usage(cfg):
+        print(f"{r['table']:16}{r['files']:>10}{r['days']:>6}{r['mb']:>10}{str(r['keep_days']):>10}")
+    growth = estimate_growth(cfg)
+    if growth:
+        total = sum(growth.values())
+        print("\ncrecimiento estimado (MB/día): " + ", ".join(f"{k}={v}" for k, v in sorted(growth.items(), key=lambda kv: -kv[1])) + f"  · total ≈ {total:.0f} MB/día")
+        kept = sum(v for k, v in growth.items() if k not in cfg.retention.keep_days)
+        print(f"con la retención activa, el crecimiento permanente es ≈ {kept:.0f} MB/día ({kept * 30 / 1000:.1f} GB/mes)")
+    if args.apply or args.dry_run:
+        rep = apply_retention(cfg, dry_run=not args.apply)
+        print(("\n[simulación] " if not args.apply else "\n") + rep.summary())
+        for d in rep.deleted_dirs:
+            print("  borrar   ", d)
+        for d in rep.compacted_dirs:
+            print("  compactar", d)
+        if rep.skipped:
+            print(f"  omitidos {len(rep.skipped)} días con escrituras recientes")
+
+
 def cmd_dashboard(args: argparse.Namespace) -> None:
     cfg = load_config(args.config)
     if args.snapshot:
@@ -357,6 +381,11 @@ def main(argv: list[str] | None = None) -> None:
 
     s = sub.add_parser("status", help="qué datos hay en data/")
     s.set_defaults(fn=cmd_status)
+
+    s = sub.add_parser("retention", help="uso de disco, crecimiento estimado y limpieza/compactación")
+    s.add_argument("--apply", action="store_true", help="ejecutar borrado y compactación")
+    s.add_argument("--dry-run", action="store_true", help="mostrar qué haría sin tocar nada")
+    s.set_defaults(fn=cmd_retention)
 
     s = sub.add_parser("dashboard", help="panel web local (http://127.0.0.1:8787) que lee data/ en vivo")
     s.add_argument("--host", default="127.0.0.1")

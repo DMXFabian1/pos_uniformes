@@ -1,0 +1,26 @@
+[Unit]
+Description=Scalper Polymarket - paper trading (recolecta, simula, reentrena)
+After=network-online.target
+Wants=network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=scalper
+Group=scalper
+WorkingDirectory=/opt/scalper
+ExecStart=/opt/scalper/venv/bin/scalper -c /opt/scalper/config.yaml paper
+Restart=always
+RestartSec=10
+# seguridad básica: el servicio solo puede escribir en su carpeta
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/scalper
+PrivateTmp=true
+NoNewPrivileges=true
+# no dejar que un fallo de memoria tumbe el servidor entero
+MemoryMax=1500M
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=multi-user.target

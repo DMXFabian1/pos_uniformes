@@ -52,6 +52,16 @@ models:
   soccer_total_goals: 2.7
   pregame_proxy_max_progress: 0.15   # sin precio previo, solo se modela si el partido lleva < 15 %
 
+retention:                      # disco: book_deltas crece ~4 GB/día; el aprendizaje no los necesita
+  enabled: true
+  run_hours: 24                 # corre solo dentro del recolector; también a mano con `scalper retention`
+  compact: true                 # días cerrados: un archivo por tabla en vez de ~2.900
+  min_quiet_seconds: 3600       # nunca toca particiones con escrituras en la última hora
+  keep_days:                    # tablas sin entrada se conservan para siempre
+    book_deltas: 3
+    book_snapshots: 14
+    markets: 30                 # se reescribe cada 5 min; solo importa la última fila por mercado
+
 learn:                          # fase 5: modelo que aprende del ledger
   enabled: true
   backend: auto                 # auto usa scikit-learn (gradient boosting) si está; si no, logística
