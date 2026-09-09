@@ -52,6 +52,17 @@ models:
   soccer_total_goals: 2.7
   pregame_proxy_max_progress: 0.15   # sin precio previo, solo se modela si el partido lleva < 15 %
 
+learn:                          # fase 5: modelo que aprende del ledger
+  enabled: true
+  backend: auto                 # auto usa scikit-learn (gradient boosting) si está; si no, logística
+  shrink_n: 50                  # con n_train ejemplos, peso del modelo = n/(n+50); el resto es heurística
+  min_train: 30                 # por debajo de esto el modelo solo informa, no filtra ni dimensiona
+  min_p_win: 0.5                # con modelo confiable, señales con P(ganar) menor se descartan
+  size_floor: 0.2
+  min_examples: 40              # mínimo de posiciones cerradas por tipo de señal para entrenar
+  val_fraction: 0.3             # último 30 % temporal como validación
+  retrain_hours: 6              # en paper trading, reentrenar y recargar cada 6 h
+
 signals:
   min_edge_net: 0.004           # ganancia mínima neta por share (USD) para emitir señal
   max_edge_net: 0.25            # por encima de esto se descarta: casi siempre es un libro roto

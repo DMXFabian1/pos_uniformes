@@ -13,7 +13,7 @@ La fase 4 (modelo que aprende de ese error) se construye encima cuando haya sema
 ```bash
 cd polymarket_scalper
 python -m venv .venv && source .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e ".[dev,learn]"    # learn = scikit-learn para gradient boosting (opcional)
 pytest
 ```
 
@@ -32,6 +32,8 @@ scalper flow --min-usd 5000      # trades grandes recientes, con score de la wal
 scalper wallets --top 30         # ranking de wallets perfiladas
 scalper profile 0x2a69660046d7acc4ab204d7cc5ba78b0776cd2f7
 scalper calibrate --nba-csv nbastats_2023.csv   # σ del modelo de básquet con play-by-play real
+scalper train                    # fase 5: entrenar P(ganancia) por señal desde el ledger
+scalper models                   # versiones, métricas y cuál está en uso
 ```
 
 Todo se configura en `config.yaml`. Nada de esto toca una wallet ni firma órdenes.
@@ -116,11 +118,28 @@ y lo actualizan con el marcador. Sin precio previo, solo se modela si el partido
   (score y muestra mínimos) en un mercado seguido, sigue el mismo lado si el ask no se ha alejado.
   La ganancia esperada es una hipótesis (fracción de su ROI histórico); el ledger la contrasta.
 
-### Lo que viene (fase 5)
-Con el ledger y las tablas `quotes`/`trades`/`games`, se entrena un modelo (gradient boosting)
-que predice, por señal, la probabilidad de que termine en ganancia y el tamaño del error. Se
-sustituye la heurística de `confidence` por la salida del modelo y se reentrena por ventana,
-comparando siempre contra la versión anterior en replay antes de reemplazarla.
+### Fase 5: el modelo que aprende del error (`scalper/learn/`)
+- **Features** (`features.py`): se calculan una sola vez, cuando se emite la señal, con lo que se
+  sabe en ese momento (edge, fees, spread, actividad, volatilidad, profundidad, modelo vs mercado,
+  tiempo restante, perfil de la wallet, hora, categoría, liga…). Viajan dentro de la señal hasta el
+  ledger, así el entrenamiento ve exactamente lo mismo que vio el bot en vivo. Nada del resultado
+  entra en las features.
+- **Modelo** (`model.py`): gradient boosting de scikit-learn si está instalado
+  (`pip install -e ".[learn]"`), regresión logística en Python puro si no. Un modelo por tipo de
+  señal. Etiqueta: la posición cerró con ganancia. Se excluyen cierres que no dicen nada de la
+  señal (liquidación forzada al fin de corrida, sin llenar).
+- **Promoción campeón/retador** (`train.py`): partición temporal (el último 30 % valida). El
+  retador se promueve solo si en validación su Brier es mejor que el del campeón actual **y** mejor
+  que el de la heurística. Un modelo que no gana a la heurística se guarda con sus métricas pero no
+  se usa. Cada versión queda en `data/models/<señal>/vN.json`; `scalper models` muestra el historial.
+- **Uso en vivo** (`scorer.py`): la confianza de cada señal pasa a ser una mezcla
+  `w·modelo + (1−w)·heurística` con `w = n_train / (n_train + 50)`. Con menos de 30 ejemplos el
+  modelo solo informa; con más, descarta señales con P(ganar) < 0,5 y reduce el tamaño de las
+  dudosas. En paper trading se reentrena solo cada `learn.retrain_hours` y recarga si hubo promoción.
+- `scalper report` compara el Brier de la mezcla, la heurística y el modelo puro por tipo de señal.
+
+Con pocos datos el sistema se comporta como antes (heurística); el aprendizaje entra a medida que
+el ledger crece. Ese es el mecanismo por el que "el margen de error se va reduciendo".
 
 ## Advertencias honestas
 - Los arbitrajes puros aparecen poco y duran milisegundos; los bots existentes compiten por ellos.

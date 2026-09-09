@@ -167,6 +167,36 @@ def cmd_games(args: argparse.Namespace) -> None:
         print(f"{t} {r['league']:14} {r['home'][:22]:22} vs {r['away'][:22]:22} {r['score']:18} {r['period']:6} {r['status']}")
 
 
+def cmd_train(args: argparse.Namespace) -> None:
+    from .learn.train import format_reports, train_all
+
+    cfg = load_config(args.config)
+    reps = train_all(cfg.data_dir, kinds=args.kind or None, backend=args.backend or cfg.learn.backend,
+                     min_examples=args.min_examples or cfg.learn.min_examples, val_fraction=cfg.learn.val_fraction,
+                     promote=not args.no_promote)
+    print(format_reports(reps))
+
+
+def cmd_models(args: argparse.Namespace) -> None:
+    from .learn.registry import ModelStore
+
+    cfg = load_config(args.config)
+    store = ModelStore(cfg.data_dir)
+    kinds = store.kinds()
+    if not kinds:
+        print("sin modelos entrenados (corre `scalper train`)")
+        return
+    from datetime import datetime, timezone
+    for k in kinds:
+        print(f"\n{k}:")
+        for h in store.history(k):
+            t = datetime.fromtimestamp(h["trained_at"] / 1000, tz=timezone.utc).strftime("%Y-%m-%d %H:%M")
+            f = lambda x: "  -  " if x is None else f"{x:.4f}"
+            print(f"  v{h['version']:<3} {'*' if h['current'] else ' '} {t} n={h['n_train']:<5} {h['backend']:8} "
+                  f"brier={f(h['brier_val'])} heur={f(h['brier_heuristic_val'])} val={h['n_val']} "
+                  f"{'promovido' if h['promoted'] else 'no'}: {h['reason']}")
+
+
 def cmd_model(args: argparse.Namespace) -> None:
     """Diagnóstico: partidos en vivo enlazados, lado de cada token, mid del mercado y salida del modelo."""
     import polars as pl
@@ -315,6 +345,16 @@ def main(argv: list[str] | None = None) -> None:
 
     s = sub.add_parser("status", help="qué datos hay en data/")
     s.set_defaults(fn=cmd_status)
+
+    s = sub.add_parser("train", help="fase 5: entrenar P(ganancia) por tipo de señal desde el ledger")
+    s.add_argument("--kind", action="append")
+    s.add_argument("--backend", choices=["auto", "hgb", "logistic"])
+    s.add_argument("--min-examples", type=int)
+    s.add_argument("--no-promote", action="store_true")
+    s.set_defaults(fn=cmd_train)
+
+    s = sub.add_parser("models", help="versiones de modelos entrenados y cuál está en uso")
+    s.set_defaults(fn=cmd_models)
 
     s = sub.add_parser("model", help="diagnóstico: partidos en vivo, lado de cada token, mid vs modelo")
     s.add_argument("--all", action="store_true")

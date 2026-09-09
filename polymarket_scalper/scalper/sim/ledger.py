@@ -46,6 +46,9 @@ class Position:
             "confidence": s.confidence,
             "meta": dumps({**s.meta, "legs": [l.__dict__ for l in s.legs],
                            "fills": [f.__dict__ for f in self.fills]}),
+            "conf_heuristic": s.meta.get("conf_heuristic", s.confidence),
+            "p_win_model": s.meta.get("p_win_model"),
+            "model_version": s.meta.get("model_version"),
         }
 
 

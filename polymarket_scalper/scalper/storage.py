@@ -84,7 +84,7 @@ SCHEMAS: dict[str, pa.Schema] = {
         ("ts_signal", I()), ("ts_fill", I()), ("ts_exit", I()), ("status", S()), ("exit_reason", S()),
         ("size_target", F()), ("size_filled", F()), ("cost", F()), ("fees", F()), ("payout", F()),
         ("predicted_edge", F()), ("predicted_pnl", F()), ("realized_pnl", F()), ("error", F()),
-        ("confidence", F()), ("meta", S()),
+        ("confidence", F()), ("meta", S()), ("conf_heuristic", F()), ("p_win_model", F()), ("model_version", I()),
     ]),
 }
 

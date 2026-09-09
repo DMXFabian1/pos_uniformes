@@ -35,7 +35,17 @@ async def run_paper(cfg: Config, duration_seconds: int | None = None, run_id: st
             await asyncio.sleep(120)
             log.info("paper: %s", eng.summary())
 
+    async def retrainer() -> None:
+        from .learn_loop import retrain_and_reload
+        period = max(cfg.learn.retrain_hours, 0.1) * 3600
+        while True:
+            await asyncio.sleep(period)
+            writer.flush()
+            await asyncio.to_thread(retrain_and_reload, cfg, eng)
+
     tasks = [asyncio.create_task(ticker()), asyncio.create_task(reporter())]
+    if cfg.learn.enabled:
+        tasks.append(asyncio.create_task(retrainer()))
     if duration_seconds:
         async def stopper() -> None:
             await asyncio.sleep(duration_seconds)

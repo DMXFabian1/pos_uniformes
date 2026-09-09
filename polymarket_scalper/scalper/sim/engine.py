@@ -13,6 +13,7 @@ from typing import Any
 from ..book import OrderBook
 from ..config import Config
 from ..discovery import MarketInfo
+from ..learn import ModelStore, Scorer
 from ..models import GameState, ModelRegistry, WinProb, match_outcome, parse_game
 from ..signals import MarketContext, Signal, build_detectors
 from ..signals.base import Leg, TokenHistory
@@ -49,6 +50,8 @@ class Engine:
         self.pregame: dict[str, WinProb] = {}                 # game_id -> prob previa (del mercado)
         self.outcome_side: dict[str, dict[str, str]] = {}    # cid -> token -> home|away|draw
         self.wallets: dict[str, Any] = {}                     # wallet -> WalletProfile
+        lc = cfg.learn
+        self.scorer = Scorer(ModelStore(cfg.data_dir), lc.shrink_n, lc.min_train, lc.min_p_win, lc.size_floor, lc.enabled)
 
     # ------------------------------------------------------------ mercados
     def set_markets(self, markets: list[MarketInfo]) -> None:
@@ -307,8 +310,25 @@ class Engine:
                                              (s.kind.startswith("multi") and p.signal.event_id == s.event_id)):
                 self.stats["skipped_duplicate"] += 1
                 return
+        # fase 5: puntuar con el modelo aprendido (si hay) y guardar las features para entrenar después
+        m0 = self.markets.get(s.condition_id)
+        book0 = self.books.get(s.legs[0].token_id) if s.legs else None
+        res = self.scorer.score(s, m0, s.ts_ms, book0)
+        s.meta["features"] = res.features
+        s.meta["conf_heuristic"] = res.p_heuristic
+        s.meta["p_win_model"] = res.p_model
+        s.meta["model_version"] = res.version
+        s.confidence = round(res.p_blend, 4)
         if self.writer is not None:
             self.writer.append("signals", signal_row(s, self.run_id))
+        if res.gate:
+            self.stats["skipped_low_pwin"] += 1
+            return
+        if res.size_mult < 1.0:
+            s.size *= res.size_mult
+            for l in s.legs:
+                l.size *= res.size_mult
+            self.stats["sized_down"] += 1
         # el tope de plausibilidad es para arbitrajes (un libro roto parece dinero gratis); las señales
         # direccionales tienen su propio tope de desvío en el detector
         if s.horizon != "directional" and s.edge_net > self.cfg.signals.max_edge_net:

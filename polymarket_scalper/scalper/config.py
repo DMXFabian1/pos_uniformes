@@ -99,6 +99,18 @@ class ModelsCfg(BaseModel):
     pregame_proxy_max_progress: float = 0.15   # si el partido ya avanzó más que esto sin precio previo, no se modela
 
 
+class LearnCfg(BaseModel):
+    enabled: bool = True            # usar el modelo promovido para puntuar señales
+    backend: str = "auto"           # auto | hgb | logistic
+    shrink_n: int = 50              # peso del modelo = n_train / (n_train + shrink_n)
+    min_train: int = 30             # por debajo, el modelo no filtra ni dimensiona
+    min_p_win: float = 0.5          # con modelo confiable, señales por debajo se descartan
+    size_floor: float = 0.2
+    min_examples: int = 40
+    val_fraction: float = 0.3
+    retrain_hours: float = 6        # en paper: reentrenar y recargar cada tanto
+
+
 class SignalsCfg(BaseModel):
     min_edge_net: float = 0.004
     max_edge_net: float = 0.25          # más que esto casi siempre es un dato roto, no una oportunidad
@@ -132,6 +144,7 @@ class Config(BaseModel):
     sports_feed: SportsFeedCfg = Field(default_factory=SportsFeedCfg)
     flow: FlowCfg = Field(default_factory=FlowCfg)
     models: ModelsCfg = Field(default_factory=ModelsCfg)
+    learn: LearnCfg = Field(default_factory=LearnCfg)
     signals: SignalsCfg = Field(default_factory=SignalsCfg)
     sim: SimCfg = Field(default_factory=SimCfg)
 

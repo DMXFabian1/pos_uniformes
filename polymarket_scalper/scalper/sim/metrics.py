@@ -57,7 +57,26 @@ def by_exit_reason(df: pl.DataFrame) -> pl.DataFrame:
     ).sort(["kind", "exit_reason"])
 
 
+def model_vs_heuristic(df: pl.DataFrame) -> pl.DataFrame:
+    """Brier de la confianza usada (mezcla), de la heurística y del modelo puro, por tipo de señal."""
+    if "p_win_model" not in df.columns:
+        return pl.DataFrame()
+    filled = df.filter((pl.col("size_filled") > 0) & pl.col("p_win_model").is_not_null())
+    if filled.height == 0:
+        return pl.DataFrame()
+    y = (pl.col("realized_pnl") > 0).cast(pl.Float64)
+    return filled.group_by("kind").agg(
+        pl.len().alias("n"),
+        ((pl.col("confidence") - y) ** 2).mean().round(4).alias("brier_mezcla"),
+        ((pl.col("conf_heuristic") - y) ** 2).mean().round(4).alias("brier_heuristica"),
+        ((pl.col("p_win_model") - y) ** 2).mean().round(4).alias("brier_modelo"),
+    ).sort("kind")
+
+
 def report_text(df: pl.DataFrame) -> str:
     parts = ["== Por tipo de señal ==", str(by_kind(df)), "", "== Por motivo de cierre ==", str(by_exit_reason(df)),
              "", "== Calibración de confianza ==", str(calibration(df))]
+    mv = model_vs_heuristic(df)
+    if mv.height:
+        parts += ["", "== Modelo aprendido vs heurística (Brier, menor es mejor) ==", str(mv)]
     return "\n".join(parts)
