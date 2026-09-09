@@ -157,11 +157,15 @@ class TicketReimpresionTests(unittest.TestCase):
     def test_dueno_y_encargado_marcados_como_reimpresion(self) -> None:
         from pos_uniformes.ui.dialogs.historial_cortes_dialog import texto_ticket_reimpresion
 
-        t = texto_ticket_reimpresion(_corte(), self._datos(), FORMATO_DUENO)
+        t = texto_ticket_reimpresion(_corte(monto_final=Decimal("13000.00")), self._datos(), FORMATO_DUENO)  # sin ajuste
         self.assertIn("CORTE DE CAJA", t)
         self.assertIn("* REIMPRESION *", t)
         self.assertIn("Corte:", t)
         self.assertIn("$3,210.00", t)
+        # Con ajuste (12,980 vs real 13,000): la reimpresión tampoco delata la venta.
+        ajustado = texto_ticket_reimpresion(_corte(), self._datos(), FORMATO_DUENO)
+        self.assertNotIn("$3,210.00", ajustado)
+        self.assertIn("$12,980.00", ajustado)
         self.assertIn("Ana", t)
         self.assertNotIn("13,000.00", t)  # nunca el esperado en papel
         t2 = texto_ticket_reimpresion(_corte(creado_por="ENC-1"), self._datos(), FORMATO_ENCARGADO)

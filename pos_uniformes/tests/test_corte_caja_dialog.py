@@ -42,6 +42,24 @@ class TicketCorteTests(unittest.TestCase):
         self.assertIn("30 com.", texto)
         self.assertNotIn("esperado", texto.lower())  # nunca imprime esperado/diferencia
 
+    def test_con_ajuste_no_delata_la_suma(self) -> None:
+        # Cifra del dueño ≠ real: fuera VENTA, reactivo inicial y pagos (la suma delataría el ajuste).
+        from datetime import datetime as _dt
+
+        corte = _corte(creado_por="VEND-1", monto_final=Decimal("19311.00"), monto_esperado=Decimal("20311.00"), hasta=_dt(2026, 9, 9, 14, 22), desde=_dt(2026, 9, 8, 18, 15))
+        pago = SimpleNamespace(employee_name="Fanny Ortiz", employee_code="VEND-7", total=Decimal("1590.00"), sueldo_base=Decimal("1300.00"), comisiones=145, tarifa_comision=Decimal("2.00"), monto_comisiones=Decimal("290.00"), faltas=0, descuento_faltas=Decimal("0"), dias_trabajados=None)
+        texto = texto_ticket_corte(corte, pagos=[pago], venta_efectivo=Decimal("10741.00"))
+        self.assertIn("EN CAJA:", texto)
+        self.assertIn("$19,311.00", texto)
+        self.assertIn("Se queda (reactivo):", texto)
+        self.assertIn("Fanny Ortiz:", texto)  # la sección de pagos sí (es lo que se le paga)
+        for delator in ("VENTA (efectivo):", "Reactivo inicial:", "Pagos empleadas:", "10,741", "20,311"):
+            self.assertNotIn(delator, texto)
+        # Sin ajuste: ticket completo.
+        completo = texto_ticket_corte(_corte(creado_por="VEND-1", monto_final=Decimal("20311.00"), monto_esperado=Decimal("20311.00"), hasta=_dt(2026, 9, 9, 14, 22), desde=_dt(2026, 9, 8, 18, 15)), venta_efectivo=Decimal("10741.00"))
+        self.assertIn("VENTA (efectivo):", completo)
+        self.assertIn("Reactivo inicial:", completo)
+
     def test_tarjeta_informativa_en_ticket_del_dueno(self) -> None:
         texto = texto_ticket_corte(_corte(), venta_efectivo=Decimal("10741.00"), tarjeta=Decimal("705.00"), tarjeta_ops=2)
         self.assertIn("VENTA (efectivo):", texto)

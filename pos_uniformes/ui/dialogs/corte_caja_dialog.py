@@ -87,18 +87,22 @@ def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list |
         tk_field("Por:", str(corte.creado_por), lines)
     lines.append(tk_mid())
     lines.append(tk_row("Operaciones:", str(corte.operaciones)))
-    if venta_efectivo is not None:
+    # Si el dueño ajustó su cifra (≠ real), las líneas de VENTA, reactivo
+    # inicial y pagos delatarían el ajuste por simple suma: se omiten y solo
+    # sale EN CAJA / se queda / se retira. Sin ajuste, ticket completo.
+    ajustado = _con_ajuste(corte)
+    if venta_efectivo is not None and not ajustado:
         lines.append(tk_row("VENTA (efectivo):", f"${Decimal(venta_efectivo):,.2f}"))
     if tarjeta is not None and Decimal(tarjeta) > 0:
         # Informativa: la tarjeta no está en el cajón, no entra en EN CAJA.
         cuantas = f" ({tarjeta_ops})" if tarjeta_ops else ""
         lines.append(tk_row(f"Con tarjeta{cuantas}:", f"${Decimal(tarjeta):,.2f}"))
     con_reactivo = Decimal(corte.reactivo_inicial or 0) > 0 or Decimal(corte.reactivo_final or 0) > 0
-    if con_reactivo:
+    if con_reactivo and not ajustado:
         lines.append(tk_row("Reactivo inicial:", f"${Decimal(corte.reactivo_inicial):,.2f}"))
-    if Decimal(corte.retiros_pagos or 0) > 0:
+    if Decimal(corte.retiros_pagos or 0) > 0 and not ajustado:
         lines.append(tk_row("Pagos empleadas:", f"-${Decimal(corte.retiros_pagos):,.2f}"))
-    if Decimal(corte.otros_retiros or 0) > 0:
+    if Decimal(corte.otros_retiros or 0) > 0 and not ajustado:
         lines.append(tk_row("Otros retiros:", f"-${Decimal(corte.otros_retiros):,.2f}"))
     lines.append(tk_dbl())
     lines.append(tk_row("EN CAJA:", f"${Decimal(corte.monto_final):,.2f}"))
@@ -139,6 +143,14 @@ def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list |
     lines.append("")
     lines.append("Corte generado por la Libreta.".center(_TW))
     return "\n".join(lines)
+
+
+def _con_ajuste(corte) -> bool:
+    """True si la cifra del dueño no es la real (solo cortes por periodo con esperado guardado)."""
+    esperado = getattr(corte, "monto_esperado", None)
+    if esperado is None or getattr(corte, "hasta", None) is None and getattr(corte, "desde", None) is None:
+        return False
+    return Decimal(esperado or 0) > 0 and Decimal(corte.monto_final) != Decimal(esperado)
 
 
 def contar_tarjeta(rows: list) -> int:
