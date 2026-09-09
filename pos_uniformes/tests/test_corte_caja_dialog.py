@@ -42,6 +42,13 @@ class TicketCorteTests(unittest.TestCase):
         self.assertIn("30 com.", texto)
         self.assertNotIn("esperado", texto.lower())  # nunca imprime esperado/diferencia
 
+    def test_tarjeta_informativa_en_ticket_del_dueno(self) -> None:
+        texto = texto_ticket_corte(_corte(), venta_efectivo=Decimal("10741.00"), tarjeta=Decimal("705.00"), tarjeta_ops=2)
+        self.assertIn("VENTA (efectivo):", texto)
+        self.assertIn("Con tarjeta (2):", texto)
+        self.assertIn("$705.00", texto)
+        self.assertNotIn("Con tarjeta", texto_ticket_corte(_corte(), venta_efectivo=Decimal("1"), tarjeta=Decimal("0")))
+
     def test_sin_pagos_no_imprime_la_linea(self) -> None:
         texto = texto_ticket_corte(_corte(retiros_pagos=Decimal("0.00")))
         self.assertNotIn("Pagos empleadas", texto)

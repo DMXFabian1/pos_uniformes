@@ -111,7 +111,8 @@ def texto_ticket_reimpresion(corte, datos, formato: str) -> str:
             tarjeta=getattr(datos, "tarjeta", None), tarjeta_ops=getattr(datos, "tarjeta_ops", None),
         )
     return texto_ticket_corte(
-        corte, datos.por_empleada, pagos=datos.pagos, venta_efectivo=datos.venta_efectivo, retiros=datos.retiros, reimpresion=True
+        corte, datos.por_empleada, pagos=datos.pagos, venta_efectivo=datos.venta_efectivo, retiros=datos.retiros, reimpresion=True,
+        tarjeta=getattr(datos, "tarjeta", None), tarjeta_ops=getattr(datos, "tarjeta_ops", None),
     )
 
 

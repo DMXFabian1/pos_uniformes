@@ -55,7 +55,7 @@ def _seccion_retiros(retiros: list, lines: list[str], tk_top, tk_mid, tk_row, tk
     lines.append(tk_bot())
 
 
-def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list | None = None, venta_efectivo=None, retiros: list | None = None, reimpresion: bool = False) -> str:
+def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list | None = None, venta_efectivo=None, retiros: list | None = None, reimpresion: bool = False, tarjeta=None, tarjeta_ops: int | None = None) -> str:
     """Ticket térmico del corte por periodo: cifra final, fondo, pagos y
     comisiones por empleada. Sin esperado ni diferencia (solo en pantalla).
 
@@ -89,6 +89,10 @@ def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list |
     lines.append(tk_row("Operaciones:", str(corte.operaciones)))
     if venta_efectivo is not None:
         lines.append(tk_row("VENTA (efectivo):", f"${Decimal(venta_efectivo):,.2f}"))
+    if tarjeta is not None and Decimal(tarjeta) > 0:
+        # Informativa: la tarjeta no está en el cajón, no entra en EN CAJA.
+        cuantas = f" ({tarjeta_ops})" if tarjeta_ops else ""
+        lines.append(tk_row(f"Con tarjeta{cuantas}:", f"${Decimal(tarjeta):,.2f}"))
     con_reactivo = Decimal(corte.reactivo_inicial or 0) > 0 or Decimal(corte.reactivo_final or 0) > 0
     if con_reactivo:
         lines.append(tk_row("Reactivo inicial:", f"${Decimal(corte.reactivo_inicial):,.2f}"))
@@ -281,7 +285,8 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
 
             retiros_periodo = retiros_del_periodo(session, estado.desde, estado.hasta)
             texto = texto_ticket_corte(
-                corte, por_empleada, pagos=pagos_periodo, venta_efectivo=estado.resumen.efectivo, retiros=retiros_periodo
+                corte, por_empleada, pagos=pagos_periodo, venta_efectivo=estado.resumen.efectivo, retiros=retiros_periodo,
+                tarjeta=estado.resumen.tarjeta, tarjeta_ops=contar_tarjeta(rows),
             )
     except ValueError as exc:
         QMessageBox.warning(parent, "Corte", str(exc))
