@@ -36,6 +36,10 @@ echo === Reiniciando el bot de Telegram con el codigo nuevo ===
 call scripts\telegram_bot_vigia.bat --reiniciar
 
 echo.
+echo === Reiniciando la PWA (Libreta movil) con el codigo nuevo ===
+call scripts\servidor_pwa_vigia.bat --reiniciar
+
+echo.
 echo ============================================
 echo  LISTO. Version publicada para kioskos:
 if exist C:\pos_updates\PresupuestosSatelite\VERSION.txt (

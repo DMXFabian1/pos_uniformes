@@ -45,3 +45,4 @@ afluencia/afluencia.json
 afluencia/calibracion/
 afluencia/eventos/
 afluencia/*.pt
+data/*.pid
