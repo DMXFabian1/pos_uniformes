@@ -4,6 +4,7 @@ rem  Deja programado el resumen diario por Telegram en ESTA PC
 rem  (servidor): todos los dias a la hora indicada.
 rem  Uso: scripts\instalar_resumen_diario.bat [HH:MM] [auto]
 rem  Sin hora: resumen 15 min antes de cerrar (17:45; jue/dom 16:45). Con HH:MM: hora fija. "auto" activa el corte por hora.
+rem  Los nombres de tarea no llevan ":" (Windows los guarda como archivos y ese caracter no vale).
 rem =====================================================
 setlocal
 set "HORA=%~1"
@@ -16,9 +17,9 @@ if errorlevel 1 goto :error
 echo.
 if "%~1"=="" (
     echo === Resumen 15 min antes de cerrar: 17:45, jueves y domingo 16:45 ===
-    schtasks /Create /F /TN "POS Resumen 16:45" /SC DAILY /ST 16:45 /TR "\"%~dp0resumen_diario_telegram.bat\" --si-toca" >nul
+    schtasks /Create /F /TN "POS Resumen 1645" /SC DAILY /ST 16:45 /TR "\"%~dp0resumen_diario_telegram.bat\" --si-toca" >nul
     if errorlevel 1 goto :error
-    schtasks /Create /F /TN "POS Resumen 17:45" /SC DAILY /ST 17:45 /TR "\"%~dp0resumen_diario_telegram.bat\" --si-toca" >nul
+    schtasks /Create /F /TN "POS Resumen 1745" /SC DAILY /ST 17:45 /TR "\"%~dp0resumen_diario_telegram.bat\" --si-toca" >nul
     if errorlevel 1 goto :error
     schtasks /Delete /F /TN "POS Resumen diario" >nul 2>&1
     echo   Listo. El script decide cada dia cual de las dos toca segun el horario de la tienda.
@@ -38,8 +39,8 @@ start "POS Telegram bot" "%~dp0telegram_bot.bat"
 if /I "%~2"=="auto" (
     echo.
     echo === Corte automatico 30 min antes de cerrar (17:30; jueves y domingo 16:30) ===
-    schtasks /Create /F /TN "POS Corte 16:30" /SC DAILY /ST 16:30 /TR "\"%~dp0corte_automatico.bat\"" >nul
-    schtasks /Create /F /TN "POS Corte 17:30" /SC DAILY /ST 17:30 /TR "\"%~dp0corte_automatico.bat\"" >nul
+    schtasks /Create /F /TN "POS Corte 1630" /SC DAILY /ST 16:30 /TR "\"%~dp0corte_automatico.bat\"" >nul
+    schtasks /Create /F /TN "POS Corte 1730" /SC DAILY /ST 17:30 /TR "\"%~dp0corte_automatico.bat\"" >nul
     echo   Tareas de corte automatico creadas.
 ) else (
     echo   Corte automatico por hora NO activado: Daniel lo ordena con /corte. ^(instalar_resumen_diario.bat HH:MM auto lo activa^)
