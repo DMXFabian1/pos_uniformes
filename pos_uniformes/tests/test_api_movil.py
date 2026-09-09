@@ -532,6 +532,68 @@ class EncargadoMovilTests(unittest.TestCase):
         inicio = self.client.get("/api/v1/movil/encargado").json()
         self.assertIn("descansa", inicio["resumen"])
 
+    def _como_dueno(self):
+        daniel = self.session.query(Empleada).filter(Empleada.codigo == "VEND-1").one()
+        app.dependency_overrides[get_current_employee] = lambda: (daniel, None)
+
+    def test_corte_del_dueno_desde_el_celular(self) -> None:
+        """Él cuenta el cajón: su cifra es la oficial y el ticket se encola."""
+        from pos_uniformes.database.models import LibretaCorte, TipoTrabajo, Trabajo
+
+        self.session.add(CajaParametros(id=1, reactivo_actual=Decimal("1000.00")))
+        self.session.commit()
+        self._como_dueno()
+        with patch(
+            "pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"
+        ):
+            e = self.client.get("/api/v1/movil/dueno/corte_estado").json()
+            self.assertEqual(e["reactivo"], "1000.00")
+            self.assertEqual(e["efectivo"], "500.00")
+            self.assertEqual(e["esperado"], "1500.00")
+            r = self.client.post("/api/v1/movil/dueno/corte", json={
+                "contado": "1480", "reactivo_final": "1000",
+                "otros_retiros": "0", "nota": "faltaron 20",
+            })
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json()["monto"], "1480.00")
+        self.assertEqual(r.json()["retiro"], "480.00")
+        self.assertTrue(r.json()["ticket_encolado"])
+        corte = self.session.query(LibretaCorte).one()
+        self.assertEqual(corte.creado_por, "VEND-1")
+        self.assertEqual(corte.monto_final, Decimal("1480.00"))
+        # Su cifra es la oficial; el real calculado queda aparte (no en el cel).
+        self.assertEqual(corte.monto_esperado, Decimal("1500.00"))
+        self.assertNotIn("esperado", r.json())
+        trabajo = self.session.query(Trabajo).one()
+        self.assertEqual(trabajo.tipo, TipoTrabajo.TICKET)
+
+    def test_corte_del_dueno_rechaza_fondo_mayor_a_lo_contado(self) -> None:
+        self.session.add(CajaParametros(id=1, reactivo_actual=Decimal("1000.00")))
+        self.session.commit()
+        self._como_dueno()
+        with patch(
+            "pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"
+        ):
+            r = self.client.post("/api/v1/movil/dueno/corte", json={
+                "contado": "100", "reactivo_final": "500",
+            })
+        self.assertEqual(r.status_code, 422)
+
+    def test_corte_del_dueno_solo_dueno_y_solo_en_tienda(self) -> None:
+        with patch(
+            "pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"
+        ):
+            r = self.client.get("/api/v1/movil/dueno/corte_estado")  # León
+        self.assertEqual(r.status_code, 403)
+        self._como_dueno()
+        with patch(
+            "pos_uniformes.api.routers.movil._modo_servidor", return_value="casa"
+        ):
+            r = self.client.post("/api/v1/movil/dueno/corte", json={
+                "contado": "100", "reactivo_final": "0",
+            })
+        self.assertEqual(r.status_code, 409)
+
     def test_empleada_no_puede_usar_encargado(self) -> None:
         fanny = self.session.query(Empleada).filter(Empleada.codigo == "VEND-4").one()
         app.dependency_overrides[get_current_employee] = lambda: (fanny, None)

@@ -157,7 +157,8 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
   </div>
 
   <!-- DUEÑO -->
-  <div id="vista-dueno" class="oculto">
+  <div id="vista-dueno" class="oculto con-nav">
+   <div id="dueno-menu">
     <h1>📒 Tu tienda</h1>
     <p class="sub" id="dueno-fecha"></p>
     <div class="card banner">
@@ -166,6 +167,7 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
       <div id="d-detalle"></div>
     </div>
     <div id="d-dinero"></div>
+    <button class="btn-grande btn-acento oculto" id="d-btn-corte" onclick="duenoCorte()">🧾  Hacer corte</button>
     <div class="card">
       <strong>Hoy por empleada</strong>
       <div id="d-ranking"></div>
@@ -179,6 +181,8 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
       <div id="d-cortes"></div>
     </div>
     <button class="btn-suave salir" onclick="salir()">Salir</button>
+   </div>
+   <div id="dueno-sub"></div>
   </div>
 
   <!-- BUSCAR (todos los roles) -->
@@ -704,7 +708,78 @@ function pintarDueno(data) {
     (c.proximo_pago ? ` <span class="pill">paga ${fechaLarga(c.proximo_pago).split(" ")[0]} ${c.proximo_pago.slice(8)}</span>` : "") +
     `</span><span class="monto">${c.comisiones_ciclo} com.</span></div>`).join("") || "<div class='fila'>Sin ciclos aún.</div>";
   $("d-cortes").innerHTML = d.cortes.map(filaCorte).join("") || "<div class='fila'>Aún no hay cortes.</div>";
+  duenoMenu();
+  // El corte escribe en la base viva: solo desde la tienda.
+  $("d-btn-corte").classList.toggle("oculto", modoServidor !== "tienda");
   mostrar("dueno");
+}
+
+// ── Corte del dueño desde el celular ──────────────────────────────
+// Igual que "Hacer corte" del satélite: él cuenta el cajón y su cifra es
+// la oficial. El ticket sale por la impresora de la tienda.
+
+function duenoMenu() {
+  $("dueno-menu").classList.remove("oculto");
+  $("dueno-sub").innerHTML = "";
+}
+
+function duenoSub(html) {
+  $("dueno-menu").classList.add("oculto");
+  $("dueno-sub").innerHTML = html;
+}
+
+async function duenoCorte() {
+  let e;
+  try { e = await api("/api/v1/movil/dueno/corte_estado"); }
+  catch (err) { duenoMenu(); return; }
+  const fila = (t, v) => `<div class="fila"><span>${t}</span><span>${v}</span></div>`;
+  duenoSub(`<h1>Hacer corte</h1><p class="sub">${e.periodo}</p>` +
+    `<div class="card">` +
+      fila("Fondo con que abrió", pesos(e.reactivo)) +
+      fila("Venta en efectivo", pesos(e.efectivo)) +
+      (Number(e.tarjeta) ? fila("Con tarjeta (no está en el cajón)", pesos(e.tarjeta)) : "") +
+      (Number(e.pagos) ? fila("Pagos a empleadas", "-" + pesos(e.pagos)) : "") +
+      (Number(e.retiros_apuntados) ? fila("Ya salió del cajón", "-" + pesos(e.retiros_apuntados)) : "") +
+      `<div class="fila"><strong>DEBE HABER</strong><strong>${pesos(e.esperado)}</strong></div>` +
+    `</div>` +
+    `<div class="card">` +
+      `<div>Cuenta el cajón. ¿Cuánto hay?</div>` +
+      `<input id="corte-contado" type="number" inputmode="decimal" step="0.01" class="input-grande" value="${e.esperado}">` +
+      `<div>¿Cuánto se queda de fondo?</div>` +
+      `<input id="corte-fondo" type="number" inputmode="decimal" step="0.01" class="input-grande" value="${e.reactivo}">` +
+      `<div>Otros retiros (opcional)</div>` +
+      `<input id="corte-otros" type="number" inputmode="decimal" step="0.01" class="input-grande" value="0">` +
+      `<input id="corte-nota" type="text" class="input-grande" placeholder="Nota (opcional)">` +
+    `</div>` +
+    `<div id="corte-error" class="error oculto"></div>` +
+    `<button class="btn-grande btn-acento" onclick="duenoGuardarCorte()">🖨  Guardar e imprimir corte</button>` +
+    `<button class="btn-suave" onclick="duenoMenu()">← Regresar</button>`);
+}
+
+async function duenoGuardarCorte() {
+  const num = id => Number($(id).value || 0);
+  const err = $("corte-error");
+  if (num("corte-fondo") > num("corte-contado")) {
+    err.textContent = "El fondo que se queda no puede ser mayor a lo contado.";
+    err.classList.remove("oculto");
+    return;
+  }
+  err.classList.add("oculto");
+  let r;
+  try {
+    r = await encPost("/api/v1/movil/dueno/corte", {
+      contado: num("corte-contado"), reactivo_final: num("corte-fondo"),
+      otros_retiros: num("corte-otros"), nota: $("corte-nota").value || "",
+    });
+  } catch (e) {
+    err.textContent = "No se pudo hacer el corte. Inténtalo otra vez.";
+    err.classList.remove("oculto");
+    return;
+  }
+  duenoSub(`<div class="listo-texto">✅ Corte hecho:<br><br>En caja ${pesos(r.monto)}` +
+    `<br>Se retira ${pesos(r.retiro)}<br>Se queda de fondo ${pesos(r.reactivo_final)}` +
+    (r.ticket_encolado ? "<br><br>🖨 El ticket está saliendo en la impresora de la tienda." : "") +
+    `</div><button class="btn-grande" onclick="cargarInicio()">✅  Listo</button>`);
 }
 
 // ── Jalar hacia abajo para actualizar ──────────────────────────────

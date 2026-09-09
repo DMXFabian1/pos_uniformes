@@ -638,3 +638,119 @@ def encargado_retiro(
     except (ValueError, PermissionError) as exc:
         raise HTTPException(status_code=422, detail={"error": {"code": "retiro_invalido", "message": str(exc)}})
     return {"ok": True, "id": retiro.id, "monto": str(retiro.monto), "motivo": retiro.motivo}
+
+
+# ─── Corte del dueño desde el celular ────────────────────────────────────
+# Igual que "Hacer corte" del satélite: él cuenta el cajón y su cifra es la
+# oficial (el real calculado se guarda aparte y no sale al celular).
+
+
+def _solo_dueno(empleada) -> None:
+    if _rol(empleada.codigo) != "dueno":
+        raise HTTPException(status_code=403, detail={"error": {
+            "code": "solo_dueno", "message": "Solo el dueño hace este corte."}})
+
+
+@router.get("/dueno/corte_estado")
+def dueno_corte_estado(
+    current: tuple = Depends(get_current_employee),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Lo que debe haber en el cajón antes de contarlo."""
+    from pos_uniformes.services.corte_caja_service import _etiqueta_periodo, estado_caja
+
+    empleada, _p = current
+    _solo_dueno(empleada)
+    estado = estado_caja(db)
+    r = estado.resumen
+    return {
+        "periodo": _etiqueta_periodo(estado.desde, estado.hasta),
+        "desde": estado.desde.isoformat() if estado.desde else None,
+        "hasta": estado.hasta.isoformat(),
+        "reactivo": str(estado.reactivo),
+        "efectivo": str(r.efectivo),
+        "tarjeta": str(r.tarjeta),
+        "pagos": str(estado.pagos),
+        "retiros_apuntados": str(estado.total_retiros),
+        "esperado": str(estado.esperado),
+        "operaciones": r.operaciones,
+        "piezas": r.piezas,
+    }
+
+
+class CorteDuenoRequest(BaseModel):
+    contado: Decimal = Field(ge=0)
+    reactivo_final: Decimal = Field(ge=0)
+    otros_retiros: Decimal = Field(default=Decimal("0"), ge=0)
+    nota: str = Field(default="", max_length=200)
+
+
+@router.post("/dueno/corte")
+def dueno_hacer_corte(
+    body: CorteDuenoRequest,
+    current: tuple = Depends(get_current_employee),
+    db: Session = Depends(get_db),
+) -> dict:
+    from pos_uniformes.services import trabajos_service
+    from pos_uniformes.services.corte_caja_service import (
+        cerrar_corte,
+        estado_caja,
+        operaciones_del_periodo,
+        pagos_registrados_del_periodo,
+    )
+    from pos_uniformes.services.libreta_service import resumir_por_empleada
+    from pos_uniformes.ui.dialogs.corte_caja_dialog import texto_ticket_corte
+
+    empleada, _p = current
+    _solo_dueno(empleada)
+    _solo_tienda()
+    quien = str(empleada.codigo).upper()
+    estado = estado_caja(db)
+    por_empleada = resumir_por_empleada(
+        operaciones_del_periodo(db, estado.desde, estado.hasta)
+    )
+    try:
+        corte = cerrar_corte(
+            db,
+            contado=body.contado,
+            reactivo_final=body.reactivo_final,
+            otros_retiros=body.otros_retiros,
+            nota=body.nota,
+            creado_por=quien,
+            ahora=estado.hasta,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail={"error": {
+            "code": "corte_invalido", "message": str(exc)}})
+
+    ticket_encolado = False
+    try:
+        try:
+            from pos_uniformes.services.retiros_service import retiros_del_periodo
+
+            retiros = retiros_del_periodo(db, estado.desde, estado.hasta)
+        except Exception:  # noqa: BLE001 — base sin la tabla todavía
+            db.rollback()
+            retiros = []
+        texto = texto_ticket_corte(
+            corte,
+            por_empleada,
+            pagos=pagos_registrados_del_periodo(db, estado.desde, estado.hasta),
+            venta_efectivo=estado.resumen.efectivo,
+            retiros=retiros,
+        )
+        trabajos_service.enviar_ticket(db, texto, origen="pwa", creado_por=quien)
+        ticket_encolado = True
+        db.commit()
+    except Exception:  # noqa: BLE001 — el corte ya quedó; el ticket es extra
+        pass
+
+    retiro = (Decimal(corte.monto_final) - Decimal(corte.reactivo_final)).quantize(Decimal("0.01"))
+    return {
+        "ok": True,
+        "periodo": corte.periodo_label,
+        "monto": str(corte.monto_final),
+        "retiro": str(retiro),
+        "reactivo_final": str(corte.reactivo_final),
+        "ticket_encolado": ticket_encolado,
+    }
