@@ -128,3 +128,49 @@ def totales_cortes(cortes: list) -> TotalesCortes:
         pagos=sum((_d(c.retiros_pagos) for c in cortes), Decimal("0.00")),
         otros_retiros=sum((_d(c.otros_retiros) for c in cortes), Decimal("0.00")),
     )
+
+
+class SinPermiso(PermissionError):
+    pass
+
+
+def borrar_corte(session, corte_id: int, *, creado_por: str) -> dict:
+    """Borra un corte (SOLO Daniel, VEND-1) y deja el periodo coherente.
+
+    - Si era el ÚLTIMO corte: el periodo abierto vuelve a arrancar en el
+      corte anterior (lo vendido se junta) y el reactivo regresa al que
+      tenía ese corte al abrir (`reactivo_inicial`).
+    - Si era uno de en medio: el siguiente corte hereda su `desde`, así que
+      el tramo no se pierde.
+    Los pagos y retiros no se tocan: siguen fechados y caen en el periodo
+    que los contenga. Devuelve un resumen para el aviso.
+    """
+    from pos_uniformes.database.models import LibretaCorte
+    from pos_uniformes.services.corte_caja_service import guardar_parametros
+
+    if str(creado_por or "").strip().upper() != "VEND-1":
+        raise SinPermiso("Solo Daniel puede borrar cortes.")
+    corte = session.get(LibretaCorte, int(corte_id))
+    if corte is None:
+        raise ValueError("Ese corte ya no existe.")
+    siguiente = session.scalars(
+        select(LibretaCorte).where(LibretaCorte.id != corte.id, LibretaCorte.created_at > corte.created_at)
+        .order_by(LibretaCorte.created_at).limit(1)
+    ).first()
+    resumen = {"id": corte.id, "fecha": corte.fecha, "monto_final": _d(corte.monto_final), "era_ultimo": siguiente is None, "reactivo_restaurado": None}
+    if siguiente is None:
+        if not es_legacy(corte):
+            guardar_parametros(session, reactivo_actual=corte.reactivo_inicial)
+            resumen["reactivo_restaurado"] = _d(corte.reactivo_inicial)
+    elif not es_legacy(siguiente) and siguiente.desde is not None:
+        siguiente.desde = corte.desde
+        siguiente.periodo_label = _etiqueta(siguiente.desde, siguiente.hasta or siguiente.created_at)
+    session.delete(corte)
+    session.commit()
+    return resumen
+
+
+def _etiqueta(desde, hasta) -> str:
+    from pos_uniformes.services.corte_caja_service import _etiqueta_periodo
+
+    return _etiqueta_periodo(desde, hasta)

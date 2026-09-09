@@ -2829,7 +2829,8 @@ class QuoteSatelliteWindow(QMainWindow):
             return
         from pos_uniformes.ui.dialogs.historial_cortes_dialog import HistorialCortesDialog
 
-        HistorialCortesDialog(self).exec()
+        HistorialCortesDialog(self, creado_por=str(self._libreta_code or "")).exec()
+        self._refresh_libreta_view()  # por si borró un corte: el periodo abierto cambia
 
     def _editar_caja_nomina(self) -> None:
         """Fondo de caja y reglas de pago (solo dueño)."""

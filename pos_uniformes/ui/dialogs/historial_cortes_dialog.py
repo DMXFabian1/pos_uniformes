@@ -115,10 +115,11 @@ def texto_ticket_reimpresion(corte, datos, formato: str) -> str:
 
 
 class HistorialCortesDialog(QDialog):
-    def __init__(self, parent: QWidget | None = None, *, hoy: date | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, *, hoy: date | None = None, creado_por: str = "") -> None:
         super().__init__(parent)
         self.setWindowTitle("Cortes anteriores")
         self._hoy = hoy or date.today()
+        self._creado_por = str(creado_por or "").strip().upper()
         self._cortes: list = []
         self._datos_cache: dict[int, object] = {}
         self.resize(1080, 680)
@@ -171,11 +172,20 @@ class HistorialCortesDialog(QDialog):
         self.reprint_button.setEnabled(False)
         self.reprint_button.clicked.connect(self.reimprimir)
 
+        # Borrar: solo Daniel (VEND-1). Un corte doble o equivocado se quita
+        # y el periodo se recompone (ver historial_cortes_service.borrar_corte).
+        self.delete_button = QPushButton("🗑 Borrar corte")
+        self.delete_button.setObjectName("secondaryButton")
+        self.delete_button.setEnabled(False)
+        self.delete_button.setVisible(self._creado_por == "VEND-1")
+        self.delete_button.clicked.connect(self.borrar)
+
         derecha = QVBoxLayout()
         derecha.addWidget(QLabel("Ticket:"))
         derecha.addWidget(self.previa, 1)
         derecha.addWidget(self.formato_check)
         derecha.addWidget(self.reprint_button)
+        derecha.addWidget(self.delete_button)
 
         centro = QHBoxLayout()
         centro.addWidget(self.tabla, 3)
@@ -226,6 +236,7 @@ class HistorialCortesDialog(QDialog):
         self._cortes = list(cortes)
         self.previa.clear()
         self.reprint_button.setEnabled(False)
+        self.delete_button.setEnabled(False)
         filas = filas_tabla(self._cortes)
         self.tabla.setRowCount(len(filas))
         for i, fila in enumerate(filas):
@@ -269,7 +280,9 @@ class HistorialCortesDialog(QDialog):
         if corte is None:
             self.previa.clear()
             self.reprint_button.setEnabled(False)
+            self.delete_button.setEnabled(False)
             return
+        self.delete_button.setEnabled(True)
         if self.sender() is self.tabla:
             # Al cambiar de corte, el formato arranca como salió originalmente.
             self.formato_check.blockSignals(True)
@@ -284,6 +297,36 @@ class HistorialCortesDialog(QDialog):
             return
         self.previa.setPlainText(texto)
         self.reprint_button.setEnabled(True)
+
+    def borrar(self) -> None:
+        from PyQt6.QtWidgets import QMessageBox
+
+        corte = self.corte_seleccionado()
+        if corte is None or self._creado_por != "VEND-1":
+            return
+        texto = (
+            f"¿Borrar el corte del {corte.fecha:%d/%m/%Y} a las {_hora(corte)} "
+            f"({str(corte.creado_por or '')}, en caja ${Decimal(corte.monto_final):,.2f})?\n\n"
+            "Lo vendido en ese tramo pasa al siguiente corte (o al que está abierto). "
+            "Si era el último, el reactivo regresa al que tenía antes. No se puede deshacer."
+        )
+        if QMessageBox.question(self, "Borrar corte", texto) != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            from pos_uniformes.database.connection import get_session
+            from pos_uniformes.services.historial_cortes_service import borrar_corte
+
+            with get_session() as session:
+                resumen = borrar_corte(session, corte.id, creado_por=self._creado_por)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Historial de cortes: no se pudo borrar")
+            QMessageBox.warning(self, "No se borró", str(exc) or "Inténtalo otra vez.")
+            return
+        aviso = "Corte borrado."
+        if resumen.get("reactivo_restaurado") is not None:
+            aviso += f" Reactivo de vuelta en ${resumen['reactivo_restaurado']:,.2f}."
+        self.totales_label.setText(aviso)
+        self.recargar()
 
     def reimprimir(self) -> None:
         corte = self.corte_seleccionado()

@@ -14,7 +14,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
-from pos_uniformes.database.models import LibretaCorte
+from pos_uniformes.database.models import CajaParametros, LibretaCorte
 from pos_uniformes.services.historial_cortes_service import (
     FORMATO_DUENO,
     FORMATO_ENCARGADO,
@@ -25,6 +25,8 @@ from pos_uniformes.services.historial_cortes_service import (
     periodo_del_corte,
     retirado,
     totales_cortes,
+    SinPermiso,
+    borrar_corte,
 )
 
 _T0 = datetime(2026, 9, 7, 20, 30, tzinfo=timezone.utc)
@@ -96,6 +98,48 @@ class ConBaseTests(unittest.TestCase):
         self.assertEqual((d.hour, d.minute, d.date()), (0, 0, date(2026, 9, 5)))
         d, h = periodo_del_corte(self.session, nuevo)
         self.assertEqual((d.replace(tzinfo=None), h.replace(tzinfo=None)), (_T0.replace(tzinfo=None), (_T0 + timedelta(days=1)).replace(tzinfo=None)))
+
+
+class BorrarCorteTests(unittest.TestCase):
+    def setUp(self) -> None:
+        engine = create_engine("sqlite://")
+        LibretaCorte.__table__.create(engine)
+        CajaParametros.__table__.create(engine)
+        self.session = sessionmaker(bind=engine)()
+        from pos_uniformes.services.corte_caja_service import guardar_parametros
+
+        guardar_parametros(self.session, reactivo_actual=Decimal("11500.00"))
+        # a: 07/09 → 08/09 18:00 ; b: 08/09 18:00 → 09/09 12:00 (reactivo subió a 11500) ; c: 09/09 12:00 → 09/09 12:05 (doble)
+        self.a = self._c(date(2026, 9, 8), _T0, _T0 + timedelta(hours=21, minutes=30), Decimal("11160"), Decimal("11160"))
+        self.b = self._c(date(2026, 9, 9), self.a.hasta, self.a.hasta + timedelta(hours=18), Decimal("11160"), Decimal("11500"))
+        self.c = self._c(date(2026, 9, 9), self.b.hasta, self.b.hasta + timedelta(minutes=5), Decimal("11500"), Decimal("11500"))
+
+    def _c(self, fecha, desde, hasta, r_ini, r_fin):
+        fila = LibretaCorte(fecha=fecha, periodo_label="x", monto_final=Decimal("12000"), creado_por="VEND-1", created_at=hasta,
+                            desde=desde, hasta=hasta, reactivo_inicial=r_ini, reactivo_final=r_fin, monto_esperado=Decimal("12000"))
+        self.session.add(fila)
+        self.session.commit()
+        return fila
+
+    def test_solo_daniel(self) -> None:
+        with self.assertRaises(SinPermiso):
+            borrar_corte(self.session, self.c.id, creado_por="ENC-1")
+
+    def test_borrar_el_ultimo_restaura_reactivo(self) -> None:
+        from pos_uniformes.services.corte_caja_service import cargar_parametros, ultimo_corte
+
+        r = borrar_corte(self.session, self.c.id, creado_por="VEND-1")
+        self.assertTrue(r["era_ultimo"])
+        self.assertEqual(r["reactivo_restaurado"], Decimal("11500.00"))
+        self.assertEqual(cargar_parametros(self.session).reactivo_actual, Decimal("11500.00"))
+        self.assertEqual(ultimo_corte(self.session).id, self.b.id)
+
+    def test_borrar_uno_de_en_medio_extiende_el_siguiente(self) -> None:
+        r = borrar_corte(self.session, self.b.id, creado_por="VEND-1")
+        self.assertFalse(r["era_ultimo"])
+        self.session.refresh(self.c)
+        self.assertEqual(self.c.desde.replace(tzinfo=None), self.a.hasta.replace(tzinfo=None))
+        self.assertIsNone(self.session.get(LibretaCorte, self.b.id))
 
 
 class TicketReimpresionTests(unittest.TestCase):
@@ -171,10 +215,34 @@ class DialogTests(unittest.TestCase):
             self.assertTrue(dlg.formato_check.isChecked())
             self.assertIs(dlg.corte_seleccionado(), cortes[0])
 
+        # Borrar solo con gafete VEND-1 (este diálogo se abrió sin gafete): botón oculto
+        self.assertFalse(dlg.delete_button.isVisibleTo(dlg))
         with patch("pos_uniformes.ui.helpers.ticket_routing_helper.route_tickets") as rt:
             dlg.reimprimir()
         self.assertEqual(rt.call_args.args[1], "Corte de caja (reimpresión)")
         self.assertIn("* REIMPRESION *", rt.call_args.args[2][0])
+
+    def test_borrar_con_gafete_del_dueno(self) -> None:
+        from PyQt6.QtWidgets import QMessageBox
+
+        from pos_uniformes.ui.dialogs.historial_cortes_dialog import HistorialCortesDialog
+
+        with patch.object(HistorialCortesDialog, "recargar"):
+            dlg = HistorialCortesDialog(None, hoy=date(2026, 9, 9), creado_por="VEND-1")
+        self.assertTrue(dlg.delete_button.isVisibleTo(dlg))
+        dlg.pintar([_corte(creado_por="VEND-1")])
+        with patch.object(HistorialCortesDialog, "_datos", return_value=TicketReimpresionTests()._datos()):
+            dlg.tabla.selectRow(0)
+        self.assertTrue(dlg.delete_button.isEnabled())
+        with patch.object(QMessageBox, "question", return_value=QMessageBox.StandardButton.Yes), patch(
+            "pos_uniformes.services.historial_cortes_service.borrar_corte", return_value={"reactivo_restaurado": Decimal("11160.00")}
+        ) as borrar, patch("pos_uniformes.database.connection.get_session") as gs, patch.object(dlg, "recargar") as rec:
+            gs.return_value.__enter__.return_value = object()
+            dlg.borrar()
+        self.assertEqual(borrar.call_args.args[1], 1)
+        self.assertEqual(borrar.call_args.kwargs["creado_por"], "VEND-1")
+        self.assertIn("Reactivo de vuelta en $11,160.00", dlg.totales_label.text())
+        rec.assert_called_once()
 
     def test_sin_cortes(self) -> None:
         from pos_uniformes.ui.dialogs.historial_cortes_dialog import HistorialCortesDialog
