@@ -1622,6 +1622,9 @@ class QuickSaleWidget(QWidget):
             "Ticket de venta",
             tickets,
             on_printed=lambda: self._registrar_y_vaciar("venta", pago_tarjeta=card),
+            # "← Regresar": vuelve a la pregunta (copia / pago / sin ticket)
+            # con el carrito intacto; nada se registró todavía.
+            on_back=self._on_ticket_venta,
         )
         self._scan_input.setFocus()
 

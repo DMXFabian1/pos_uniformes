@@ -183,3 +183,48 @@ class TotalBadgeTests(unittest.TestCase):
         for d in creados:
             d.reject(); d.deleteLater()
         QApplication.processEvents()
+
+
+class RegresarButtonTests(unittest.TestCase):
+    """"← Regresar" cierra sin imprimir y vuelve a la pregunta anterior."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def _abrir(self, on_back):
+        printed: list[str] = []
+        notified: list[bool] = []
+
+        def _exec(dlg):
+            botones = [b for b in dlg.findChildren(QPushButton) if "Regresar" in b.text()]
+            if botones:
+                botones[0].click()
+            return 0
+
+        with patch.object(QDialog, "exec", new=_exec):
+            open_tickets_print_dialog(
+                None, _TITLE, ["ticket"], print_fn=lambda t: printed.append(t) or True,
+                on_printed=lambda: notified.append(True), on_back=on_back,
+            )
+        QApplication.processEvents()
+        return printed, notified
+
+    def test_regresar_llama_on_back_sin_imprimir_ni_registrar(self) -> None:
+        vueltas: list[bool] = []
+        printed, notified = self._abrir(lambda: vueltas.append(True))
+        self.assertEqual(vueltas, [True])
+        self.assertEqual(printed, [])
+        self.assertEqual(notified, [])
+
+    def test_sin_on_back_no_hay_boton(self) -> None:
+        botones: list[str] = []
+
+        def _exec(dlg):
+            botones.extend(b.text() for b in dlg.findChildren(QPushButton))
+            return 0
+
+        with patch.object(QDialog, "exec", new=_exec):
+            open_tickets_print_dialog(None, _TITLE, ["ticket"], print_fn=lambda t: True)
+        self.assertFalse(any("Regresar" in t for t in botones))
+        self.assertTrue(any("Cerrar" in t for t in botones))

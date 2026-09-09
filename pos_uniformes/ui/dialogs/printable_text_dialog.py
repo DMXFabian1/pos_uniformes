@@ -301,8 +301,13 @@ def open_tickets_print_dialog(
     alt_tickets: list[str] | None = None,
     alt_checkbox_label: str | None = None,
     on_printed: "Callable[[], None] | None" = None,
+    on_back: "Callable[[], None] | None" = None,
 ) -> None:
     """Muestra uno o varios tickets en una sola vista.
+
+    on_back agrega "← Regresar": cierra sin imprimir (no llama on_printed) y
+    después invoca on_back para volver a la pregunta anterior (p.ej. cambiar
+    copia / forma de pago / sin ticket en venta rápida).
 
     Un solo clic en "Imprimir" manda todos los tickets como jobs separados
     (cada uno se corta por el autocutter). Reemplaza el flujo anterior de un
@@ -455,6 +460,20 @@ def open_tickets_print_dialog(
 
     print_button.clicked.connect(_start_print)
     close_button.clicked.connect(dialog.reject)
+    volver = {"si": False}
+    back_button = None
+    if on_back is not None:
+        back_button = QPushButton("←  Regresar")
+        back_button.setObjectName("ticketCerrar")  # mismo estilo suave que Cerrar
+        back_button.setAutoDefault(False)
+
+        def _regresar() -> None:
+            if queue.is_printing() or (alt_queue is not None and alt_queue.is_printing()):
+                return
+            volver["si"] = True
+            dialog.reject()
+
+        back_button.clicked.connect(_regresar)
     # Al cerrar el dialogo, la cola deja de tocar sus widgets (evita crash).
     def _close_queues(_result: int) -> None:
         queue.close()
@@ -468,9 +487,13 @@ def open_tickets_print_dialog(
         layout.addWidget(alt_checkbox)
     botones_ly = QHBoxLayout()
     botones_ly.setSpacing(12)
+    if back_button is not None:
+        botones_ly.addWidget(back_button, 1)
     botones_ly.addWidget(close_button, 1)
     botones_ly.addWidget(print_button, 2)  # el botón principal, bien grande
     layout.addLayout(botones_ly)
     dialog.setLayout(layout)
     dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose, True)
     dialog.exec()
+    if volver["si"] and on_back is not None:
+        on_back()

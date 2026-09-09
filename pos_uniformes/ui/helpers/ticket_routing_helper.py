@@ -21,6 +21,7 @@ def route_tickets(
     alt_tickets: list[str] | None = None,
     alt_checkbox_label: str | None = None,
     on_printed=None,
+    on_back=None,
 ) -> None:
     tickets = [t for t in tickets if t and t.strip()]
     if not tickets:
@@ -51,6 +52,7 @@ def route_tickets(
             alt_tickets=alt_tickets,
             alt_checkbox_label=alt_checkbox_label,
             on_printed=on_printed,
+            on_back=on_back,
         )
 
 
