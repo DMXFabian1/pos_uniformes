@@ -339,6 +339,10 @@ def chips_calendario_mes(session, year: int, month: int, hoy: date) -> dict[date
         horario = cargar_horario(session, code)
         for fecha, estado in pintar_mes(horario, year, month).items():
             if estado == DESCANSO:
+                # Por días (Naye: solo fines de semana): los días que no le
+                # tocan NO son descansos, no ensucian el calendario (Daniel 2026-09-09).
+                if horario.por_dia:
+                    continue
                 _agregar(fecha, DESCANSO, code)
             elif estado == PAGO:
                 _agregar(fecha, PAGO, code)

@@ -55,10 +55,19 @@ _MESES = [
 ]
 
 _STYLES = (
-    "#mesNavBtn { background: #efe4d4; border: none; border-radius: 18px;"
+    "#mesNavBtn { background: #ffffff; border: 1.5px solid #e2d0b6; border-radius: 20px;"
     "  color: #7b2d14; font-size: 15px; font-weight: 800; }"
-    "#mesNavBtn:hover { background: #e6d6bf; }"
-    "#mesTitulo { color: #7b2d14; font-size: 21px; font-weight: 800; background: transparent; }"
+    "#mesNavBtn:hover { background: #f7ebdc; border-color: #c45425; }"
+    "#mesNavBtn:pressed { background: #e6d6bf; }"
+    "#mesTitulo { color: #7b2d14; font-size: 22px; font-weight: 800; background: transparent;"
+    "  letter-spacing: 0.5px; }"
+    "#diaCelda { background: #fffefb; border: 1px solid #eae0cf; border-radius: 14px; }"
+    "#diaCelda:hover { border: 1.5px solid #c45425; background: #fffaf3; }"
+    "#diaCelda[finde=\"true\"] { background: #f8f3ea; border-color: #e8ddcb; }"
+    "#diaCelda[ocupado=\"true\"] { background: #fffdf8; border-color: #dcc9ad; }"
+    "#diaCelda[hoy=\"true\"] { background: #fdf4ec; border: 2px solid #d1622f; }"
+    "#diaCelda[hoy=\"true\"]:hover { background: #fbeee1; }"
+    "#diaPista { color: #b3a08a; font-size: 11px; font-weight: 600; background: transparent; border: none; }"
     "#mesVencidas { background: #fdecec; color: #c0392b; font-weight: 700;"
     "  border: 1px solid #f0c0bd; border-radius: 10px; padding: 8px 12px; }"
     "#diaCabecera { color: #a0876f; font-size: 12px; font-weight: 800; background: transparent; }"
@@ -105,12 +114,12 @@ class ConteoCalendarioMesPanel(QWidget):
         nav = QHBoxLayout()
         prev_btn = QPushButton("◀")
         prev_btn.setObjectName("mesNavBtn")
-        prev_btn.setFixedSize(36, 36)
+        prev_btn.setFixedSize(40, 40)
         prev_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         prev_btn.clicked.connect(lambda: self._cambiar_mes(-1))
         next_btn = QPushButton("▶")
         next_btn.setObjectName("mesNavBtn")
-        next_btn.setFixedSize(36, 36)
+        next_btn.setFixedSize(40, 40)
         next_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         next_btn.clicked.connect(lambda: self._cambiar_mes(1))
         self._mes_label = QLabel("")
@@ -218,8 +227,13 @@ class ConteoCalendarioMesPanel(QWidget):
         self.refresh()
 
     def _agregar_recordatorio_en(self, fecha: date) -> None:
-        """Clic en un día del calendario: abre alta con esa fecha precargada."""
-        return  # recordatorios retirados: el clic en el día ya no abre nada
+        """Clic en un día del calendario: detalle del día (2026-09-09).
+
+        Quién descansa, a quién le toca pago, conteos, y consulta de pago
+        con gafete (la empleada ve el suyo; Daniel/León ven todos)."""
+        from pos_uniformes.ui.dialogs.dia_calendario_dialog import DiaCalendarioDialog
+
+        DiaCalendarioDialog(self, fecha, session_factory=self._session_factory, hoy=self._hoy).exec()
 
     def _render(self) -> None:
         self._mes_label.setText(f"{_MESES[self._mes]} {self._anio}")
@@ -275,26 +289,22 @@ class ConteoCalendarioMesPanel(QWidget):
     def _celda(self, dia: int, escuelas: list, recordatorios: list | None = None, col: int = 0) -> QWidget:
         recordatorios = recordatorios or []
         celda = _DiaCelda()
-        # Sin recordatorios, el día ya no es clicable: cursor normal.
+        celda.setObjectName("diaCelda")
+        # Todo día se puede tocar: abre el detalle (descansos, pagos, conteos).
+        celda.setCursor(Qt.CursorShape.PointingHandCursor)
         fecha_celda = date(self._anio, self._mes, dia)
         celda.clicked.connect(lambda f=fecha_celda: self._agregar_recordatorio_en(f))
         es_hoy = fecha_celda == self._hoy
         es_finde = col >= 5
-        if es_hoy:
-            fondo, borde, grosor = "#fdf4ec", "#d1622f", "2px"
-        elif escuelas or recordatorios:
-            fondo, borde, grosor = "#fffdf8", "#e2d0b6", "1px"
-        elif es_finde:
-            fondo, borde, grosor = "#f7f1e6", "#eadfcd", "1px"
-        else:
-            fondo, borde, grosor = "#fffefb", "#eae0cf", "1px"
-        celda.setStyleSheet(
-            f"QFrame {{ background: {fondo}; border: {grosor} solid {borde}; border-radius: 12px; }}"
-        )
-        celda.setMinimumHeight(72)
+        emp_del_dia = getattr(self, "_emp_chips", {}).get(fecha_celda, [])
+        celda.setProperty("hoy", "true" if es_hoy else "false")
+        celda.setProperty("finde", "true" if es_finde else "false")
+        celda.setProperty("ocupado", "true" if (escuelas or recordatorios or emp_del_dia) else "false")
+        celda.setToolTip(f"Toca para ver el detalle del {dia}")
+        celda.setMinimumHeight(84)
         v = QVBoxLayout(celda)
-        v.setContentsMargins(9, 7, 9, 7)
-        v.setSpacing(3)
+        v.setContentsMargins(10, 8, 10, 8)
+        v.setSpacing(4)
         num = QLabel(str(dia))
         if es_hoy:
             num.setFixedSize(26, 26)
@@ -329,8 +339,8 @@ class ConteoCalendarioMesPanel(QWidget):
         for w in chips[:3]:
             v.addWidget(w)
         if len(chips) > 3:
-            mas = QLabel(f"+{len(chips) - 3} más")
-            mas.setStyleSheet("font-size: 11px; color: #8a7a6a; background: transparent; border: none;")
+            mas = QLabel(f"+{len(chips) - 3} más · toca para ver")
+            mas.setObjectName("diaPista")
             v.addWidget(mas)
         v.addStretch()
         return celda
@@ -352,8 +362,8 @@ class ConteoCalendarioMesPanel(QWidget):
             " (viene del calendario de la Libreta)"
         )
         chip.setStyleSheet(
-            f"background: {bg}; color: {fg}; border: none; border-radius: 7px;"
-            " padding: 2px 7px; font-size: 11px; font-weight: 700;"
+            f"background: {bg}; color: {fg}; border: none; border-radius: 9px;"
+            " padding: 3px 8px; font-size: 11px; font-weight: 700;"
         )
         return chip
 
