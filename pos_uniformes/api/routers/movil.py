@@ -86,16 +86,26 @@ def _calendario_mes(db: Session, codigo: str, year: int, month: int) -> dict:
 
 
 def _payload_cortes(db: Session) -> list[dict]:
+    """Los cortes como los muestra el satélite: el periodo que cubren, lo que
+    se retiró y el fondo que quedó. `monto` es siempre la cifra OFICIAL (la
+    del dueño); el real que solo ve Daniel no sale al celular."""
+    from pos_uniformes.services.historial_cortes_service import es_legacy, retirado
     from pos_uniformes.services.libreta_service import listar_cortes
 
-    return [
-        {
+    filas = []
+    for corte in listar_cortes(db, limit=15):
+        legacy = es_legacy(corte)
+        filas.append({
             "fecha": corte.fecha.isoformat(),
             "monto": str(corte.monto_final),
             "por": corte.creado_por,
-        }
-        for corte in listar_cortes(db, limit=15)
-    ]
+            "periodo": corte.periodo_label or "HOY",
+            "legacy": legacy,
+            # En los viejos (totales del día) no hubo retiro ni fondo: '—'.
+            "retirado": None if legacy else str(retirado(corte)),
+            "reactivo_final": None if legacy else str(corte.reactivo_final),
+        })
+    return filas
 
 
 def _payload_dueno(db: Session) -> dict:
@@ -140,13 +150,36 @@ def _payload_dueno(db: Session) -> dict:
         )
     ciclos.sort(key=lambda c: c["nombre"])
 
+    # Principio de Daniel (2026-09-06): la Libreta solo habla de dinero REAL
+    # — nada de "vendido en total" (el valor de un apartado no es dinero
+    # recibido). Mismas cuatro cifras que la vista del dueño en el satélite.
+    en_caja = sum((c.monto_en_caja for c in cortes_hoy), Decimal("0.00"))
+    neto = sum((c.monto_neto_ventas for c in cortes_hoy), Decimal("0.00"))
+    abonos = sum((c.monto_abonos for c in cortes_hoy), Decimal("0.00"))
+    ventas = sum((c.monto_ventas for c in cortes_hoy), Decimal("0.00"))
+    tarjeta = sum(
+        (
+            Decimal(str(r.monto_total or 0))
+            for r in rows
+            if str(r.tipo) == "venta" and bool(getattr(r, "pago_tarjeta", False))
+        ),
+        Decimal("0.00"),
+    )
+    comisiones = sum(int(getattr(r, "comisiones", 0) or 0) for r in rows)
+    ventas_count = sum(1 for r in rows if str(r.tipo) == "venta")
+
     return {
         "hoy": {
-            "venta": str(
-                sum((c.monto_en_caja for c in cortes_hoy), Decimal("0.00"))
-            ),
+            "en_caja": str(en_caja),
+            "tarjeta": str(tarjeta),
+            "neto_tarjeta": str(neto - (ventas - tarjeta)),
+            "abonos": str(abonos),
+            "comisiones": comisiones,
+            "ventas": ventas_count,
             "operaciones": sum(c.operaciones for c in cortes_hoy),
             "piezas": sum(c.piezas for c in cortes_hoy),
+            # Compatibilidad con la PWA anterior (era la cifra del cajón).
+            "venta": str(en_caja),
         },
         "ranking": [
             {
@@ -344,7 +377,41 @@ def encargado_inicio(
         "equipo": _equipo(db),
         "descansos_semana": _descansos_semana(db),
         "resumen": _resumen_encargado(db),
+        "tarjetas": _tarjetas_encargado(db),
         "pagos": _payload_pagos(db),
+    }
+
+
+def _tarjetas_encargado(db: Session) -> dict:
+    """Lo mismo que el menú del kiosko de León (rediseño 2026-09-09): quién
+    descansa hoy y mañana con nombre de pila, y los pagos en una línea por
+    persona con la fecha ya en español (`cuando_pago`)."""
+    try:
+        from pos_uniformes.services.nomina_service import (
+            cuando_pago,
+            resumen_para_encargado,
+        )
+
+        resumen = resumen_para_encargado(db)
+    except Exception:  # noqa: BLE001 — base sin migrar o snapshot viejo
+        return {"descansan_hoy": [], "descansan_manana": [], "pagos": []}
+
+    def _pila(nombre: str) -> str:
+        return (nombre or "").split()[0] if nombre else ""
+
+    pagos = []
+    for a in resumen.pagos:
+        cuando = cuando_pago(a)
+        pagos.append({
+            "nombre": _pila(a.employee_name),
+            "cuando": cuando,
+            "total": str(a.total_estimado),
+            "urgente": cuando == "HOY" or cuando.startswith("ATRASADO"),
+        })
+    return {
+        "descansan_hoy": [_pila(n) for n in resumen.descansan_hoy],
+        "descansan_manana": [_pila(n) for n in resumen.descansan_manana],
+        "pagos": pagos,
     }
 
 

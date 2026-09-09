@@ -122,6 +122,38 @@ class ApiMovilTests(unittest.TestCase):
         self.assertEqual(d["ciclos"][0]["nombre"], "Fanny Ortiz")
         self.assertEqual(len(d["cortes"]), 1)
 
+    def test_dueno_solo_ve_dinero_real(self) -> None:
+        """Cajón, tarjeta (neto 4.5%), abonos y comisiones — sin 'vendido en
+        total': el valor de un apartado no es dinero recibido."""
+        s = self.session
+        s.add_all([
+            LibretaVenta(  # con tarjeta: entra al neto, no al cajón
+                employee_code="VEND-4", employee_name="Fanny", tipo="venta",
+                piezas=1, comisiones=1, monto_total=Decimal("200.00"),
+                monto_neto=Decimal("191.00"), pago_tarjeta=True, detalle=[],
+                created_at=datetime.now(),
+            ),
+            LibretaVenta(  # apartado: NO es dinero real
+                employee_code="VEND-4", employee_name="Fanny", tipo="apartado",
+                piezas=3, comisiones=2, monto_total=Decimal("1000.00"),
+                monto_neto=Decimal("1000.00"), detalle=[], created_at=datetime.now(),
+            ),
+            LibretaVenta(  # abono en efectivo: sí entra al cajón
+                employee_code="VEND-4", employee_name="Fanny", tipo="abono",
+                piezas=0, comisiones=0, monto_total=Decimal("250.00"),
+                monto_neto=Decimal("250.00"), detalle=[], created_at=datetime.now(),
+            ),
+        ])
+        s.commit()
+        self._como("VEND-1")
+        hoy = self.client.get("/api/v1/movil/inicio").json()["dueno"]["hoy"]
+        self.assertEqual(hoy["en_caja"], "750.00")  # 500 efectivo + 250 abono
+        self.assertEqual(hoy["tarjeta"], "200.00")
+        self.assertEqual(hoy["neto_tarjeta"], "191.00")
+        self.assertEqual(hoy["abonos"], "250.00")
+        self.assertEqual(hoy["comisiones"], 5)
+        self.assertEqual(hoy["ventas"], 2)
+
     def test_calendario_navegable(self) -> None:
         self._como("VEND-4")
         data = self.client.get("/api/v1/movil/calendario?year=2026&month=10").json()
@@ -362,6 +394,47 @@ class EncargadoMovilTests(unittest.TestCase):
         self.assertTrue(
             any("Fanny" in d["nombres"] for d in data["descansos_semana"])
         )
+
+    def test_tarjetas_del_menu_espejo_del_kiosko(self) -> None:
+        """Descansa hoy/mañana con nombre de pila y pagos en español."""
+        with patch(
+            "pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"
+        ):
+            data = self.client.get("/api/v1/movil/encargado").json()
+        t = data["tarjetas"]
+        self.assertEqual(t["descansan_hoy"], ["Fanny"])
+        self.assertEqual(t["descansan_manana"], [])
+        for pago in t["pagos"]:
+            self.assertNotRegex(pago["cuando"], r"Monday|Friday|Sunday")
+            self.assertEqual(pago["nombre"], pago["nombre"].split(" ")[0])
+
+    def test_cortes_traen_periodo_retiro_y_fondo(self) -> None:
+        """El celular muestra lo mismo que el historial del satélite."""
+        from pos_uniformes.database.models import LibretaCorte
+
+        self.session.add_all([
+            LibretaCorte(
+                fecha=date.today(), periodo_label="09/09 10:00 → 09/09 19:00",
+                monto_final=Decimal("2000.00"), reactivo_final=Decimal("500.00"),
+                creado_por="ENC-1", desde=datetime.now(), hasta=datetime.now(),
+            ),
+            LibretaCorte(  # viejo: total del día, sin periodo ni fondo
+                fecha=date.today(), periodo_label="HOY",
+                monto_final=Decimal("900.00"), creado_por="VEND-1",
+            ),
+        ])
+        self.session.commit()
+        with patch(
+            "pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"
+        ):
+            cortes = self.client.get("/api/v1/movil/encargado").json()["cortes"]
+        porperiodo = [c for c in cortes if not c["legacy"]][0]
+        self.assertEqual(porperiodo["periodo"], "09/09 10:00 → 09/09 19:00")
+        self.assertEqual(porperiodo["retirado"], "1500.00")
+        self.assertEqual(porperiodo["reactivo_final"], "500.00")
+        viejo = [c for c in cortes if c["legacy"]][0]
+        self.assertIsNone(viejo["retirado"])
+        self.assertIsNone(viejo["reactivo_final"])
 
     def test_marcar_falta_y_quitar(self) -> None:
         from pos_uniformes.database.models import EmpleadaEvento

@@ -86,6 +86,19 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
   border-radius:16px; min-height:64px; font-size:19px; font-weight:700; margin-bottom:12px}
 .btn-grande:active{background:#f1e6d6}
 .listo-texto{font-size:26px; font-weight:800; margin:24px 0; line-height:1.4}
+  .tarjetas{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:12px}
+  .tarjeta{background:var(--carta); border:2px solid var(--borde); border-radius:14px;
+    padding:10px 14px 12px}
+  .tarjeta .et{font-size:12px; font-weight:800; color:#a0876f; letter-spacing:1px}
+  .tarjeta .valor{font-size:22px; font-weight:800; color:var(--tinta); line-height:1.25;
+    margin-top:2px; overflow-wrap:anywhere}
+  .tarjeta.ancha{grid-column:1 / -1}
+  .pago-linea{font-size:19px; font-weight:700; color:var(--tinta); margin-top:4px;
+    overflow-wrap:anywhere}
+  .pago-linea.urgente{color:var(--acento)}
+  .fila-corte .sub{display:block; margin:2px 0 0; font-weight:600}
+  .btn-grande.btn-acento{background:var(--acento); color:#fff; border-color:var(--acento)}
+  .btn-grande.btn-acento:active{background:var(--acento-osc)}
   .input-grande { width: 100%; box-sizing: border-box; font-size: 26px; font-weight: 800; padding: 12px; border: 2px solid #ddd0c0; border-radius: 12px; margin: 6px 0 10px; }
 </style>
 </head>
@@ -132,11 +145,11 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
     <div id="enc-menu">
       <h1>¿Qué quieres hacer?</h1>
       <p class="sub" id="enc-modo"></p>
-      <button class="btn-grande" onclick="encApuntar()">🗓  Apuntar falta o descanso</button>
+      <div id="enc-tarjetas"></div>
+      <button class="btn-grande btn-acento" onclick="encCorteHoy()">🧾  Hacer corte</button>
       <button class="btn-grande" onclick="encVerCortes()">💵  Ver cortes</button>
-      <button class="btn-grande" onclick="encCorteHoy()">🧾  Hacer corte</button>
+      <button class="btn-grande" onclick="encApuntar()">🗓  Apuntar falta o descanso</button>
       <button class="btn-grande" onclick="encRetiro()">💸  Saqué dinero del cajón</button>
-      <div class="card" id="enc-resumen"></div>
       <div class="card" id="enc-descansos"></div>
       <button class="btn-suave" onclick="salir()">Salir</button>
     </div>
@@ -148,10 +161,11 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
     <h1>📒 Tu tienda</h1>
     <p class="sub" id="dueno-fecha"></p>
     <div class="card banner">
-      <div>VENTA DE HOY</div>
+      <div>EN EL CAJÓN (EFECTIVO)</div>
       <div class="big" id="d-venta"></div>
       <div id="d-detalle"></div>
     </div>
+    <div id="d-dinero"></div>
     <div class="card">
       <strong>Hoy por empleada</strong>
       <div id="d-ranking"></div>
@@ -403,7 +417,12 @@ async function moverMes(delta) {
 }
 
 function filaCorte(c) {
-  return `<div class="fila"><span>${fechaLarga(c.fecha)}</span>` +
+  // Igual que el historial del satélite: periodo, se retiró y fondo que
+  // quedó. Los cortes viejos (totales del día) van con '—'.
+  const detalle = c.legacy || !c.retirado
+    ? `<span class="sub">${c.periodo || "HOY"} · se retiró — · fondo —</span>`
+    : `<span class="sub">${c.periodo} · se retiró ${pesos(c.retirado)} · fondo ${pesos(c.reactivo_final)}</span>`;
+  return `<div class="fila fila-corte"><span>${fechaLarga(c.fecha)}<br>${detalle}</span>` +
          `<span class="monto">${pesos(c.monto)}</span></div>`;
 }
 
@@ -417,15 +436,36 @@ async function pintarEncargado(_data) {
   const enTienda = encData && encData.modo === "tienda";
   $("enc-modo").textContent = enTienda
     ? "Conectado a la tienda" : "Fuera de la tienda: solo puedes consultar";
-  const resumen = (encData && encData.resumen) || "";
-  $("enc-resumen").innerHTML = resumen
-    ? "<strong>📌 Hoy</strong>" + resumen.split("\n").map(l => `<div class="fila">${l}</div>`).join("")
-    : "";
+  pintarTarjetasEncargado((encData && encData.tarjetas) || null);
   const desc = (encData && encData.descansos_semana) || [];
   $("enc-descansos").innerHTML = "<strong>🛌 Descansos estos días</strong>" +
     (desc.length ? desc.map(d =>
       `<div class="fila"><span>${fechaLarga(d.fecha)}</span><span>${d.nombres.join(", ")}</span></div>`).join("")
      : "<div class='fila'>Nadie tiene descanso programado.</div>");
+}
+
+function pintarTarjetasEncargado(t) {
+  // Mismas tarjetas que el menú del kiosko de León: descansa hoy / mañana y
+  // los pagos, una línea por persona con la fecha ya en español.
+  const caja = $("enc-tarjetas");
+  if (!t) { caja.innerHTML = ""; return; }
+  const nadie = lista => (lista && lista.length ? lista.join(", ") : "nadie");
+  const pagos = t.pagos || [];
+  caja.innerHTML =
+    `<div class="tarjetas">` +
+      `<div class="tarjeta"><div class="et">🛌  HOY DESCANSA</div>` +
+      `<div class="valor">${nadie(t.descansan_hoy)}</div></div>` +
+      `<div class="tarjeta"><div class="et">🛌  MAÑANA DESCANSA</div>` +
+      `<div class="valor">${nadie(t.descansan_manana)}</div></div>` +
+      `<div class="tarjeta ancha"><div class="et">💵  PAGOS</div>` +
+      (pagos.length
+        ? pagos.slice(0, 5).map(p =>
+            `<div class="pago-linea${p.urgente ? " urgente" : ""}">` +
+            `${p.nombre}  ·  <b>${p.cuando}</b>  ·  ${pesos(p.total)}</div>`).join("") +
+          (pagos.length > 5 ? `<div class="sub" style="margin:6px 0 0">+${pagos.length - 5} más</div>` : "")
+        : `<div class="valor">Nadie cobra en los próximos 7 días.</div>`) +
+      `</div>` +
+    `</div>`;
 }
 
 function encMenu() {
@@ -631,12 +671,34 @@ async function encConfirmarPago(codigo, nombre) {
 function pintarDueno(data) {
   const d = data.dueno;
   $("dueno-fecha").textContent = fechaLarga(hoyISO());
-  $("d-venta").textContent = pesos(d.hoy.venta);
-  $("d-detalle").textContent = `${d.hoy.operaciones} operaciones · ${d.hoy.piezas} piezas`;
-  $("d-ranking").innerHTML = d.ranking.length ? d.ranking.map(r =>
-    `<div class="fila"><span>${r.nombre.split(" ")[0]} <span class="pill">${r.comisiones} com · ${r.piezas} pz</span></span>` +
+  // Solo dinero REAL, igual que la Libreta del satélite: lo que está en el
+  // cajón, lo que llega por la terminal (neto del 4.5%), los abonos y las
+  // comisiones. Nada de "vendido en total".
+  $("d-venta").textContent = pesos(d.hoy.en_caja != null ? d.hoy.en_caja : d.hoy.venta);
+  $("d-detalle").textContent = "ventas + abonos en efectivo · es la cifra del corte";
+  const tarjeta = Number(d.hoy.tarjeta || 0);
+  $("d-dinero").innerHTML =
+    `<div class="tarjetas">` +
+      `<div class="tarjeta"><div class="et">💳  CON TARJETA</div>` +
+      `<div class="valor">${pesos(d.hoy.tarjeta || 0)}</div>` +
+      `<div class="sub" style="margin:2px 0 0">${tarjeta
+        ? "neto tras 4.5%: " + pesos(d.hoy.neto_tarjeta)
+        : "sin cobros con tarjeta"}</div></div>` +
+      `<div class="tarjeta"><div class="et">🏷  ABONOS</div>` +
+      `<div class="valor">${pesos(d.hoy.abonos || 0)}</div>` +
+      `<div class="sub" style="margin:2px 0 0">de apartados, ya en el cajón</div></div>` +
+      `<div class="tarjeta ancha"><div class="et">🎖  COMISIONES</div>` +
+      `<div class="valor">${d.hoy.comisiones || 0}</div>` +
+      `<div class="sub" style="margin:2px 0 0">${d.hoy.ventas || 0} ventas · ${d.hoy.piezas || 0} piezas</div></div>` +
+    `</div>`;
+  // Mismo ranking que el satélite: medalla, comisiones, vendido, operaciones.
+  const medallas = ["🥇", "🥈", "🥉"];
+  $("d-ranking").innerHTML = d.ranking.length ? d.ranking.map((r, i) =>
+    `<div class="fila"><span>${medallas[i] || (i + 1) + "."}  ${r.nombre.split(" ")[0]}` +
+    `<span class="sub" style="display:block;margin:2px 0 0;font-weight:600">` +
+    `${r.comisiones} comisiones · ${r.operaciones} operaciones</span></span>` +
     `<span class="monto">${pesos(r.monto)}</span></div>`).join("")
-    : "<div class='fila'>Sin movimientos hoy.</div>";
+    : "<div class='fila'>Sin movimientos de empleadas hoy.</div>";
   $("d-ciclos").innerHTML = d.ciclos.map(c =>
     `<div class="fila"><span>${c.nombre.split(" ")[0]}` +
     (c.proximo_pago ? ` <span class="pill">paga ${fechaLarga(c.proximo_pago).split(" ")[0]} ${c.proximo_pago.slice(8)}</span>` : "") +
