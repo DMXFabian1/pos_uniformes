@@ -61,6 +61,8 @@ class DatosReimpresion:
     pagos: list
     retiros: list
     venta_efectivo: Decimal
+    tarjeta: Decimal = Decimal("0.00")
+    tarjeta_ops: int = 0
 
 
 def datos_para_reimprimir(session, corte) -> DatosReimpresion:
@@ -81,11 +83,14 @@ def datos_para_reimprimir(session, corte) -> DatosReimpresion:
     except Exception:  # noqa: BLE001 — base sin la tabla todavía
         session.rollback()
         retiros = []
+    resumen = resumir_periodo(rows)
     return DatosReimpresion(
         por_empleada=resumir_por_empleada(rows),
         pagos=pagos_registrados_del_periodo(session, desde, hasta),
         retiros=retiros,
-        venta_efectivo=resumir_periodo(rows).efectivo,
+        venta_efectivo=resumen.efectivo,
+        tarjeta=resumen.tarjeta,
+        tarjeta_ops=sum(1 for r in rows if getattr(r, "pago_tarjeta", False) and str(r.tipo) in ("venta", "abono")),
     )
 
 

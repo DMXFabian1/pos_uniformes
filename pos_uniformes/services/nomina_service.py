@@ -137,7 +137,7 @@ def pago_pendiente(session, employee_code: str, hoy: date | None = None) -> Deta
     return calcular_pago(horario, comisiones=comisiones, params=cargar_parametros(session), hasta=hoy)
 
 
-def registrar_pago_con_monto(session, employee_code: str, *, creado_por: str, fecha: date | None = None):
+def registrar_pago_con_monto(session, employee_code: str, *, creado_por: str, fecha: date | None = None, momento: datetime | None = None):
     """Calcula, guarda el desglose y anota el pago en el calendario.
 
     Devuelve la fila `EmpleadaPago`. Lanza PermissionError si quien paga no
@@ -166,9 +166,11 @@ def registrar_pago_con_monto(session, employee_code: str, *, creado_por: str, fe
         creado_por=str(creado_por).strip().upper(),
         dias_trabajados=detalle.dias_trabajados,
         tarifa_dia=detalle.tarifa_dia,
-        # Explícito (no server_default): el corte automático lo registra y
-        # cierra en el mismo instante, y así queda dentro del periodo.
-        created_at=datetime.now().astimezone(),
+        # Explícito (no server_default). El corte automático pasa `momento`
+        # = la hora del corte, así el pago queda DENTRO del periodo que cierra
+        # (bug 2026-09-09: el bot fijaba la hora antes de registrar el pago y
+        # el pago de Fanny no se restó de la venta).
+        created_at=momento or datetime.now().astimezone(),
     )
     session.add(pago)
     registrar_pago(session, code, fecha)  # commit incluido

@@ -127,15 +127,31 @@ class TicketEncargadoTests(unittest.TestCase):
         self.assertIn("+$108.00", texto)
         self.assertIn("1 falta(s):", texto)
         self.assertIn("-$216.67", texto)
-        self.assertIn("SE VENDIO:", texto)
+        self.assertIn("VENTA EN EFECTIVO:", texto)
         self.assertIn("$6,660.00", texto)
         self.assertIn("PAGAR A EVELYN:", texto)
         self.assertIn("$1,191.33", texto)
+        # La cuenta se ve: venta − pago = sacar
+        self.assertIn("Pago a Evelyn:", texto)
+        self.assertIn("-$1,191.33", texto)
         self.assertIn("SACAR DE LA VENTA:", texto)
         self.assertIn("$5,468.67", texto)
         self.assertIn("El reactivo de la caja se queda igual.", texto)
+        self.assertNotIn("tarjeta", texto)  # sin tarjeta no se menciona
         for prohibido in ("EN CAJA", "Fondo inicial", "Operaciones", "11,160"):
             self.assertNotIn(prohibido, texto)
+
+    def test_con_tarjeta_va_aparte(self) -> None:
+        corte = _corte(monto_final=Decimal("21901.00"), retiros_pagos=Decimal("0"))
+        texto = texto_ticket_corte_encargado(corte, Decimal("10741.00"), [], tarjeta=Decimal("705.00"), tarjeta_ops=2)
+        self.assertIn("VENTA EN EFECTIVO:", texto)
+        self.assertIn("$10,741.00", texto)
+        self.assertIn("Con tarjeta (2):", texto)
+        self.assertIn("$705.00", texto)
+        self.assertIn("no esta en el cajon", texto)
+        self.assertIn("Hoy no se paga a nadie.", texto)
+        self.assertIn("SACAR DE LA VENTA:", texto)
+        self.assertNotIn("$11,446", texto)  # nunca se suman efectivo + tarjeta
 
     def test_sin_pagos_y_fondo_que_baja(self) -> None:
         corte = _corte(monto_final=Decimal("10356.00"), reactivo_final=Decimal("10356.00"))

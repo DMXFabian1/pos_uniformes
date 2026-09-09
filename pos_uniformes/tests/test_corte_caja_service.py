@@ -155,6 +155,8 @@ class CorteAutomaticoTests(unittest.TestCase):
         reg.assert_called_once()
         self.assertEqual(reg.call_args.args[1], "VEND-2")
         self.assertEqual(reg.call_args.kwargs["creado_por"], "ENC-1")
+        # El pago se fecha a la hora del corte: queda dentro del periodo (bug del bot 2026-09-09).
+        self.assertEqual(reg.call_args.kwargs["momento"], estado.hasta)
         self.assertEqual(cerrar.call_args.kwargs["contado"], Decimal("16628.67"))  # 11160 + 6660 − 1191.33
         self.assertEqual(cerrar.call_args.kwargs["reactivo_final"], Decimal("11160.00"))
         self.assertEqual(auto.corte, "CORTE")

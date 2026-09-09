@@ -137,6 +137,11 @@ def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list |
     return "\n".join(lines)
 
 
+def contar_tarjeta(rows: list) -> int:
+    """Cuántas operaciones (venta/abono) fueron con tarjeta = vouchers a cuadrar."""
+    return sum(1 for r in rows or [] if getattr(r, "pago_tarjeta", False) and str(getattr(r, "tipo", "")) in ("venta", "abono"))
+
+
 def _hora_local(momento):
     return momento.astimezone() if getattr(momento, "tzinfo", None) else momento
 
@@ -448,6 +453,8 @@ def hacer_corte_automatico(parent: QWidget | None, *, creado_por: str):
                 resultado.pagos,
                 resumir_por_empleada(rows),
                 retiros=retiros_del_periodo(session, resultado.estado.desde, resultado.estado.hasta),
+                tarjeta=resultado.estado.resumen.tarjeta,
+                tarjeta_ops=contar_tarjeta(rows),
             )
     except Exception:  # noqa: BLE001
         logger.exception("Corte automático: no se pudo guardar")
@@ -462,12 +469,16 @@ def hacer_corte_automatico(parent: QWidget | None, *, creado_por: str):
     return resultado, texto
 
 
-def texto_ticket_corte_encargado(corte, venta_efectivo, pagos: list, por_empleada: list | None = None, retiros: list | None = None, reimpresion: bool = False) -> str:
+def texto_ticket_corte_encargado(
+    corte, venta_efectivo, pagos: list, por_empleada: list | None = None, retiros: list | None = None,
+    reimpresion: bool = False, tarjeta=None, tarjeta_ops: int | None = None,
+) -> str:
     """Ticket simple para León: cuánto se vendió, a quién pagar y cuánto sacar.
 
     Sin fondo, sin "en caja", sin operaciones: solo lo que él hace con el
-    dinero. El fondo del cajón no se toca (salvo que los pagos superen la
-    venta, y entonces se avisa)."""
+    dinero. La cuenta se ve completa (venta − pagos − lo que ya salió =
+    SACAR) y la tarjeta aparte porque no está en el cajón. El fondo del
+    cajón no se toca (salvo que los pagos superen la venta, y se avisa)."""
     from datetime import datetime
 
     from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
@@ -493,8 +504,13 @@ def texto_ticket_corte_encargado(corte, venta_efectivo, pagos: list, por_emplead
         lines.append(("Corte: " + _hora_local(corte.created_at).strftime("%d/%m/%Y %H:%M")).center(_TW))
     lines.append(datetime.now().strftime("%d/%m/%Y %H:%M").center(_TW))
     lines.append("")
+    tarjeta_monto = Decimal(tarjeta or 0).quantize(Decimal("0.01"))
     lines.append(tk_top())
-    lines.append(tk_row("SE VENDIO:", f"${venta:,.2f}"))
+    lines.append(tk_row("VENTA EN EFECTIVO:", f"${venta:,.2f}"))
+    if tarjeta_monto > 0:
+        cuantas = f" ({tarjeta_ops})" if tarjeta_ops else ""
+        lines.append(tk_row(f"Con tarjeta{cuantas}:", f"${tarjeta_monto:,.2f}"))
+        lines.append(tk_line("  (la tarjeta no esta en el cajon)"))
     lines.append(tk_bot())
     lines.append("")
     lines.append(tk_top())
@@ -505,15 +521,18 @@ def texto_ticket_corte_encargado(corte, venta_efectivo, pagos: list, por_emplead
             nombre = (p.employee_name or p.employee_code).split()[0].upper()
             lines.append(tk_row(f"PAGAR A {nombre}:"[: _TW - 14], f"${Decimal(p.total):,.2f}"))
             _desglose_pago(p, lines, tk_row)
-        if len(pagos) > 1:
-            lines.append(tk_mid())
-            lines.append(tk_row("Total pagos:", f"${total_pagos:,.2f}"))
     else:
         lines.append(tk_line("Hoy no se paga a nadie."))
-    if retiros:
-        lines.append(tk_mid())
-        for r in retiros:
-            lines.append(tk_row(f"YA SALIO ({str(r.motivo)[: _TW - 24]}):", f"${Decimal(r.monto):,.2f}"))
+    lines.append(tk_bot())
+    lines.append("")
+    # La cuenta, paso a paso, para que se vea de donde sale lo que se saca.
+    lines.append(tk_top())
+    lines.append(tk_row("Venta en efectivo:", f"${venta:,.2f}"))
+    for p in pagos:
+        nombre = (p.employee_name or p.employee_code).split()[0]
+        lines.append(tk_row(f"Pago a {nombre}:"[: _TW - 14], f"-${Decimal(p.total):,.2f}"))
+    for r in retiros or []:
+        lines.append(tk_row(f"Ya salio ({str(r.motivo)[: _TW - 26]}):", f"-${Decimal(r.monto):,.2f}"))
     lines.append(tk_dbl())
     lines.append(tk_row("SACAR DE LA VENTA:", f"${sacar:,.2f}"))
     lines.append(tk_bot())

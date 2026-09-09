@@ -320,13 +320,13 @@ def cerrar_corte_automatico(session, *, creado_por: str, ahora: datetime | None 
     se retira."""
     from pos_uniformes.services.nomina_service import registrar_pago_con_monto
 
-    hoy = (ahora.astimezone() if ahora and ahora.tzinfo else ahora or datetime.now()).date()
+    ahora = ahora or datetime.now().astimezone()
+    hoy = (ahora.astimezone() if ahora.tzinfo else ahora).date()
     pagos = []
     for aviso in pagos_que_tocan_hoy(session, hoy):
-        pagos.append(registrar_pago_con_monto(session, aviso.employee_code, creado_por=creado_por, fecha=hoy))
-    # El cierre se fecha DESPUÉS de registrar los pagos para que queden
-    # dentro del periodo que se está cerrando.
-    ahora = ahora or datetime.now().astimezone()
+        # Fechados EXACTAMENTE a la hora del corte: así caen dentro del
+        # periodo que se cierra (<= hasta) aunque `ahora` venga del caller.
+        pagos.append(registrar_pago_con_monto(session, aviso.employee_code, creado_por=creado_por, fecha=hoy, momento=ahora))
     estado = estado_caja(session, ahora)
     # Si los pagos superaron la venta, el fondo baja (no hay de dónde más
     # sacar); si no, se queda igual y el resto se retira.

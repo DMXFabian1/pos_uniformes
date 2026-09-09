@@ -80,7 +80,7 @@ class TicketsConRetirosTests(unittest.TestCase):
     def test_ticket_encargado_muestra_lo_que_ya_salio(self) -> None:
         retiros = [SimpleNamespace(motivo="Proveedor", monto=Decimal("500"))]
         texto = texto_ticket_corte_encargado(self._corte(), Decimal("6660"), [], retiros=retiros)
-        self.assertIn("YA SALIO (Proveedor):", texto)
+        self.assertIn("Ya salio (Proveedor):", texto)
         self.assertIn("$500.00", texto)
         self.assertIn("SACAR DE LA VENTA:", texto)
         self.assertIn("$6,160.00", texto)  # 17320 - 11160
