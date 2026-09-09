@@ -1,6 +1,12 @@
 # polymarket_scalper
 
-Bot de scalping para Polymarket enfocado en mercados de **deportes** y **política**.
+Bot de scalping para Polymarket enfocado en **NBA** y **tenis**: partidos en vivo (ganador del
+partido) y futuros (campeón, MVP, ganador del torneo). `config.amplio.yaml` guarda la versión con
+todos los deportes y política por si se quiere ampliar; el código es el mismo.
+
+> Temporada: la NBA arranca a fines de octubre. Hasta entonces solo aparecen sus futuros; el tenis
+> (ATP, WTA, Challengers) aporta partidos en vivo todos los días y es donde se acumulan los datos
+> para el modelo in-play.
 Esta entrega cubre las fases 1 a 3: recolectar datos, detectar oportunidades deterministas
 y simularlas (replay y paper trading) midiendo cuánto se equivoca cada predicción.
 La fase 4 (modelo que aprende de ese error) se construye encima cuando haya semanas de datos.
@@ -44,8 +50,8 @@ Todo se configura en `config.yaml`. Nada de esto toca una wallet ni firma órden
 ## Cómo funciona
 
 ### Fase 1: recolector (`scalper/collector.py`)
-- Descubre mercados vía Gamma API por tag (`sports`=1, `politics`=2), filtra por volumen y
-  libro habilitado, y lee la tasa de fee real de cada mercado (`feeSchedule.rate`).
+- Descubre mercados vía Gamma API por tag (`nba`=745, `tennis`=864), filtra por volumen, tipo de
+  mercado (`only_market_types`) y libro habilitado, y lee la tasa de fee real (`feeSchedule.rate`).
 - Se suscribe al websocket del CLOB (canal `market`) y mantiene el libro de cada token en memoria.
 - Persiste en Parquet particionado por día (`data/<tabla>/date=YYYY-MM-DD/`):
 

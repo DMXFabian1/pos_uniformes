@@ -19,6 +19,7 @@ class DiscoveryCfg(BaseModel):
     min_volume_24h: float = 2000
     max_markets: int = 400
     exclude_sports_market_types: list[str] = Field(default_factory=list)
+    only_market_types: list[str] = Field(default_factory=list)   # vacío = todos; "" = mercados sin tipo (futuros)
 
 
 class CollectorCfg(BaseModel):

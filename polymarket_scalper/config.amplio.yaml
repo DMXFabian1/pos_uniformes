@@ -1,25 +1,21 @@
-# Configuración del bot, enfocada en NBA y tenis. Todo lo que afecta al comportamiento vive aquí.
-# (config.amplio.yaml conserva la versión con todos los deportes y política, por si se quiere volver.)
+# Configuración del bot. Todo lo que afecta al comportamiento vive aquí.
 data_dir: data
 
 # Categorías a seguir. tag_id viene de https://gamma-api.polymarket.com/tags/slug/<slug>
 categories:
-  nba:
-    tag_id: 745
-    default_fee_rate: 0.03      # la NBA tiene el fee más bajo de deportes; se usa solo si el mercado no trae feeSchedule
-  tennis:
-    tag_id: 864
-    default_fee_rate: 0.05
+  sports:
+    tag_id: 1
+    default_fee_rate: 0.05      # se usa solo si el mercado no trae feeSchedule
+  politics:
+    tag_id: 2
+    default_fee_rate: 0.04
 
 discovery:
   refresh_seconds: 300          # cada cuánto se vuelven a buscar mercados
   events_per_category: 300      # cuántos eventos (ordenados por volumen 24h) revisar por categoría
-  min_volume_24h: 1000          # USD por evento/mercado. Por debajo de esto no hay con quién operar
-  max_markets: 300              # tope de mercados suscritos a la vez
-  exclude_sports_market_types: []
-  # Solo ganador del partido (moneyline) y mercados sin tipo (futuros: campeón, MVP, ganador del torneo).
-  # Los totales, hándicaps y sets individuales del tenis son cientos de mercados finos que solo hacen ruido.
-  only_market_types: ["moneyline", ""]
+  min_volume_24h: 2000          # USD. Por debajo de esto no hay con quién operar
+  max_markets: 400              # tope de mercados suscritos a la vez
+  exclude_sports_market_types: []  # p.ej. ["child_moneyline"]
 
 collector:
   gamma_url: https://gamma-api.polymarket.com

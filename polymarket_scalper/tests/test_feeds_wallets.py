@@ -62,3 +62,19 @@ def test_score_wallet_shrinks_small_samples_and_rewards_track_record():
     sf = score_wallet(farmer)
     assert sf["wins"] == 0 and sf["losses"] == 0 and abs(sf["score"] - 0.5) < 0.01   # neutral: no demuestra nada
     assert sf["score"] < s2["score"]
+
+
+def test_discovery_only_market_types_filter():
+    from scalper.discovery import parse_market
+    from scalper.config import Config
+    cfg = Config.model_validate({"categories": {"tennis": {"tag_id": 864, "default_fee_rate": 0.05}},
+                                 "discovery": {"only_market_types": ["moneyline", ""]}})
+    assert cfg.discovery.only_market_types == ["moneyline", ""]
+    ev = {"id": "1", "slug": "e", "title": "A vs B", "gameId": 7, "markets": []}
+    base = {"id": "m", "question": "q", "conditionId": "0x1", "clobTokenIds": '["1","2"]', "outcomes": '["A","B"]',
+            "enableOrderBook": True, "acceptingOrders": True, "feesEnabled": True, "feeSchedule": {"rate": 0.05}}
+    ml = parse_market({**base, "sportsMarketType": "moneyline"}, ev, "tennis", 0.05)
+    tot = parse_market({**base, "sportsMarketType": "tennis_match_totals"}, ev, "tennis", 0.05)
+    fut = parse_market({**base}, ev, "tennis", 0.05)
+    keep = [m for m in (ml, tot, fut) if m.sports_market_type in cfg.discovery.only_market_types]
+    assert [m.sports_market_type for m in keep] == ["moneyline", ""]

@@ -190,6 +190,8 @@ async def discover_markets(cfg: Config, gamma: GammaClient) -> list[MarketInfo]:
                     smt = str(m.get("sportsMarketType") or "")
                     if smt and smt in dcfg.exclude_sports_market_types:
                         continue
+                    if dcfg.only_market_types and smt not in dcfg.only_market_types:
+                        continue
                     mi = parse_market(m, ev, cat, ccfg.default_fee_rate)
                     if mi is None or not mi.condition_id:
                         continue
