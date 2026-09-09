@@ -167,7 +167,7 @@ class TicketReimpresionTests(unittest.TestCase):
         self.assertNotIn("$3,210.00", ajustado)
         self.assertIn("$12,980.00", ajustado)
         self.assertIn("Ana", t)
-        self.assertNotIn("13,000.00", t)  # nunca el esperado en papel
+        self.assertNotIn("esperado", t.lower())  # nunca la palabra ni la diferencia en papel
         t2 = texto_ticket_reimpresion(_corte(creado_por="ENC-1"), self._datos(), FORMATO_ENCARGADO)
         self.assertIn("VENTA EN EFECTIVO:", t2)
         self.assertIn("* REIMPRESION *", t2)
