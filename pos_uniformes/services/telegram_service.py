@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import ssl
+import urllib.error
 import urllib.parse
 import urllib.request
 
@@ -72,7 +73,11 @@ def _llamar(token: str, metodo: str, datos: dict | None = None, timeout: float =
 
     try:
         payload = _abrir(True)
-    except ssl.SSLCertVerificationError:
+    except (ssl.SSLCertVerificationError, urllib.error.URLError) as exc:
+        # urlopen envuelve el error TLS en URLError(reason=SSLCertVerificationError).
+        razon = getattr(exc, "reason", exc)
+        if not isinstance(razon, ssl.SSLCertVerificationError):
+            raise
         # Último recurso: el antivirus intercepta y su certificado no está
         # en el almacén que ve Python. Se avisa una vez y se sigue.
         if not _aviso_inseguro:

@@ -71,3 +71,44 @@ class PartirMensajeTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TlsFallbackTests(unittest.TestCase):
+    def test_certificado_no_reconocido_reintenta_sin_verificar(self) -> None:
+        import io
+        import json
+        import ssl
+        import urllib.error
+        from contextlib import redirect_stdout
+        from unittest.mock import MagicMock, patch
+
+        from pos_uniformes.services import telegram_service as tg
+
+        llamadas = []
+
+        def fake_urlopen(req, timeout=None, context=None):
+            llamadas.append(context.verify_mode)
+            if len(llamadas) == 1:
+                raise urllib.error.URLError(ssl.SSLCertVerificationError("self-signed certificate in certificate chain"))
+            resp = MagicMock()
+            resp.__enter__ = lambda s: s
+            resp.__exit__ = lambda s, *a: False
+            resp.read.return_value = json.dumps({"ok": True, "result": []}).encode()
+            return resp
+
+        tg._aviso_inseguro = False
+        with patch("urllib.request.urlopen", side_effect=fake_urlopen), redirect_stdout(io.StringIO()) as out:
+            payload = tg._llamar("t", "getUpdates")
+        self.assertTrue(payload["ok"])
+        self.assertEqual(llamadas[-1], ssl.CERT_NONE)
+        self.assertIn("continuando sin verificar", out.getvalue())
+
+    def test_otro_error_de_red_no_se_traga(self) -> None:
+        import urllib.error
+        from unittest.mock import patch
+
+        from pos_uniformes.services import telegram_service as tg
+
+        with patch("urllib.request.urlopen", side_effect=urllib.error.URLError("sin red")):
+            with self.assertRaises(urllib.error.URLError):
+                tg._llamar("t", "getUpdates")
