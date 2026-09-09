@@ -1583,6 +1583,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_caja_button.clicked.connect(self._editar_caja_nomina)
         self.libreta_pagos_button = QPushButton("💵 Pagos")
         self.libreta_pagos_button.clicked.connect(self._abrir_historial_pagos)
+        self.libreta_cortes_button = QPushButton("🧾 Cortes")
+        self.libreta_cortes_button.clicked.connect(self._abrir_historial_cortes)
         self.libreta_equipo_button = QPushButton("👥 Equipo")
         self.libreta_equipo_button.clicked.connect(self._abrir_equipo)
         self.libreta_retiro_button = QPushButton("💸 Retiro")
@@ -1595,6 +1597,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self.libreta_momento_button,
             self.libreta_caja_button,
             self.libreta_pagos_button,
+            self.libreta_cortes_button,
             self.libreta_equipo_button,
             self.libreta_retiro_button,
         ):
@@ -2613,6 +2616,14 @@ class QuoteSatelliteWindow(QMainWindow):
         from pos_uniformes.ui.dialogs.historial_pagos_dialog import HistorialPagosDialog
 
         HistorialPagosDialog(self).exec()
+
+    def _abrir_historial_cortes(self) -> None:
+        """Cortes anteriores con reimpresión (solo dueño)."""
+        if not self._libreta_is_owner:
+            return
+        from pos_uniformes.ui.dialogs.historial_cortes_dialog import HistorialCortesDialog
+
+        HistorialCortesDialog(self).exec()
 
     def _editar_caja_nomina(self) -> None:
         """Fondo de caja y reglas de pago (solo dueño)."""

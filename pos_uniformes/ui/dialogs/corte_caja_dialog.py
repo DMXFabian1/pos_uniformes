@@ -55,7 +55,7 @@ def _seccion_retiros(retiros: list, lines: list[str], tk_top, tk_mid, tk_row, tk
     lines.append(tk_bot())
 
 
-def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list | None = None, venta_efectivo=None, retiros: list | None = None) -> str:
+def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list | None = None, venta_efectivo=None, retiros: list | None = None, reimpresion: bool = False) -> str:
     """Ticket térmico del corte por periodo: cifra final, fondo, pagos y
     comisiones por empleada. Sin esperado ni diferencia (solo en pantalla).
 
@@ -77,7 +77,11 @@ def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list |
     lines: list[str] = []
     lines.append("CORTE DE CAJA".center(_TW))
     lines.append(str(corte.periodo_label or "").center(_TW))
+    if reimpresion:
+        lines.append("* REIMPRESION *".center(_TW))
     lines.append(tk_top())
+    if reimpresion and getattr(corte, "created_at", None):
+        tk_field("Corte:", _hora_local(corte.created_at).strftime("%d/%m/%Y %H:%M"), lines)
     tk_field("Impreso:", datetime.now().strftime("%d/%m/%Y %H:%M"), lines)
     if corte.creado_por:
         tk_field("Por:", str(corte.creado_por), lines)
@@ -128,6 +132,10 @@ def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list |
     lines.append("")
     lines.append("Corte generado por la Libreta.".center(_TW))
     return "\n".join(lines)
+
+
+def _hora_local(momento):
+    return momento.astimezone() if getattr(momento, "tzinfo", None) else momento
 
 
 def _desglose_pago(p, lines: list[str], tk_row) -> None:
@@ -451,7 +459,7 @@ def hacer_corte_automatico(parent: QWidget | None, *, creado_por: str):
     return resultado, texto
 
 
-def texto_ticket_corte_encargado(corte, venta_efectivo, pagos: list, por_empleada: list | None = None, retiros: list | None = None) -> str:
+def texto_ticket_corte_encargado(corte, venta_efectivo, pagos: list, por_empleada: list | None = None, retiros: list | None = None, reimpresion: bool = False) -> str:
     """Ticket simple para León: cuánto se vendió, a quién pagar y cuánto sacar.
 
     Sin fondo, sin "en caja", sin operaciones: solo lo que él hace con el
@@ -477,6 +485,9 @@ def texto_ticket_corte_encargado(corte, venta_efectivo, pagos: list, por_emplead
     lines: list[str] = []
     lines.append("CORTE".center(_TW))
     lines.append(str(corte.periodo_label or "").center(_TW))
+    if reimpresion and getattr(corte, "created_at", None):
+        lines.append("* REIMPRESION *".center(_TW))
+        lines.append(("Corte: " + _hora_local(corte.created_at).strftime("%d/%m/%Y %H:%M")).center(_TW))
     lines.append(datetime.now().strftime("%d/%m/%Y %H:%M").center(_TW))
     lines.append("")
     lines.append(tk_top())
