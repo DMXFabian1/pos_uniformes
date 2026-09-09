@@ -28,6 +28,24 @@ collector:
   rest_resync_seconds: 900      # re-sincronizar cada libro por REST (protege contra deltas perdidos)
   resolution_poll_seconds: 600  # cada cuánto se revisan resoluciones de mercados ya vistos
 
+sports_feed:
+  enabled: true
+  ws_url: wss://sports-api.polymarket.com/ws
+  store_all_leagues: false      # true guarda todos los partidos del feed, no solo los enlazados a mercados
+
+flow:
+  enabled: true
+  data_api_url: https://data-api.polymarket.com
+  poll_seconds: 10
+  page_size: 1000               # ~30 trades/s en toda la plataforma; 1000 cada 10 s deja margen
+  min_usd_global: 500           # fuera de los mercados seguidos solo se guardan trades grandes
+  whale_min_usd: 2000           # trade que dispara el perfilado de la wallet
+  profile_max_pages: 10         # historial: hasta 500 posiciones cerradas por wallet
+  profile_refresh_hours: 12
+  per_wallet_delay_seconds: 1.5
+  smart_min_score: 0.65         # umbral para considerar una wallet "dinero inteligente"
+  smart_min_closed: 20
+
 signals:
   min_edge_net: 0.004           # ganancia mínima neta por share (USD) para emitir señal
   max_edge_net: 0.25            # por encima de esto se descarta: casi siempre es un libro roto

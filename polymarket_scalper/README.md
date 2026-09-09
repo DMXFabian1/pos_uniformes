@@ -27,6 +27,10 @@ scalper replay --start 2026-09-09T00:00 --end 2026-09-09T12:00   # fase 3 sobre 
 scalper paper --duration 3600    # fase 3 en vivo, 1 hora, sin dinero
 scalper report                   # predicho vs real por tipo de señal
 scalper sql "select kind, count(*) from signals group by 1"
+scalper games                    # partidos en vivo enlazados a mercados
+scalper flow --min-usd 5000      # trades grandes recientes, con score de la wallet
+scalper wallets --top 30         # ranking de wallets perfiladas
+scalper profile 0x2a69660046d7acc4ab204d7cc5ba78b0776cd2f7
 ```
 
 Todo se configura en `config.yaml`. Nada de esto toca una wallet ni firma órdenes.
@@ -70,6 +74,21 @@ Cada señal lleva `edge_net` (USD por share después de fees), `confidence` (heu
 - Cada posición cerrada se escribe al `ledger` con `predicted_pnl`, `realized_pnl` y `error`.
 - `scalper report` agrupa por tipo de señal: tasa de llenado, PnL predicho vs real, error medio,
   tasa de acierto, y calibración de la confianza declarada vs la real.
+
+### Feeds para in-play y ballenas (`sports_feed.py`, `flow.py`, `wallets.py`)
+- **Partidos en vivo**: websocket de deportes de Polymarket (sin suscripción). Marcador, período
+  y estado por partido; el `gameId` enlaza con `event.gameId` de los mercados. Tabla `games`,
+  solo se guardan cambios de estado y, por defecto, solo partidos enlazados a mercados seguidos.
+- **Flujo con identidad**: sondeo de `data-api /trades`, que trae la wallet de cada trade. Se
+  guarda todo lo de los mercados seguidos y cualquier trade global grande (tabla `flow_trades`).
+- **Wallets**: un trade de más de `whale_min_usd` pone la wallet en cola. Se leen sus últimas
+  posiciones cerradas (ganancia realizada por mercado, ordenadas por fecha: el orden por defecto
+  del endpoint es por ganancia y sesga la muestra) y sus abiertas, y se calcula un score con
+  encogimiento bayesiano: pocas operaciones o retornos menores al 2 % no dan evidencia; muchas
+  operaciones con ROI positivo sí (`wallet_profiles`, `wallet_closed`). `scalper wallets` lista
+  el ranking; `scalper profile <wallet>` perfila una a mano; `scalper flow` muestra trades grandes.
+- **Retraso**: el flujo con identidad llega 2 a 3 minutos después que el websocket del CLOB. Sirve
+  para perfilar y para señales de "entró dinero inteligente"; no para competir en latencia.
 
 ### Lo que viene (fase 4)
 Con el ledger y las tablas `quotes`/`trades`, se entrena un modelo (gradient boosting) que

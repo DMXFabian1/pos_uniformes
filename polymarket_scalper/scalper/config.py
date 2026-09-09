@@ -33,6 +33,26 @@ class CollectorCfg(BaseModel):
     resolution_poll_seconds: int = 600
 
 
+class SportsFeedCfg(BaseModel):
+    enabled: bool = True
+    ws_url: str = "wss://sports-api.polymarket.com/ws"
+    store_all_leagues: bool = False   # False: solo partidos enlazados a mercados seguidos
+
+
+class FlowCfg(BaseModel):
+    enabled: bool = True
+    data_api_url: str = "https://data-api.polymarket.com"
+    poll_seconds: float = 10
+    page_size: int = 1000
+    min_usd_global: float = 500       # trades fuera de los mercados seguidos se guardan si superan esto
+    whale_min_usd: float = 2000       # a partir de aquí se perfila la wallet
+    profile_max_pages: int = 10       # 50 posiciones cerradas por página
+    profile_refresh_hours: float = 12
+    per_wallet_delay_seconds: float = 1.5
+    smart_min_score: float = 0.65
+    smart_min_closed: int = 20
+
+
 class ComplementCfg(BaseModel):
     enabled: bool = True
 
@@ -76,6 +96,8 @@ class Config(BaseModel):
     categories: dict[str, CategoryCfg]
     discovery: DiscoveryCfg = Field(default_factory=DiscoveryCfg)
     collector: CollectorCfg = Field(default_factory=CollectorCfg)
+    sports_feed: SportsFeedCfg = Field(default_factory=SportsFeedCfg)
+    flow: FlowCfg = Field(default_factory=FlowCfg)
     signals: SignalsCfg = Field(default_factory=SignalsCfg)
     sim: SimCfg = Field(default_factory=SimCfg)
 

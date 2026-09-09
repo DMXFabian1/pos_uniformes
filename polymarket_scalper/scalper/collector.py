@@ -6,6 +6,8 @@ Eventos que emite a los listeners (para paper trading):
     ("delta",   ts_ms, token_id, OrderBook)      nivel actualizado
     ("trade",   ts_ms, token_id, dict)           trade impreso
     ("resolution", ts_ms, condition_id, dict)    mercado resuelto
+    ("game",    ts_ms, game_id, dict)            estado de partido en vivo (fila de `games`)
+    ("flow",    ts_ms, condition_id, dict)       trade con wallet (fila de `flow_trades`)
 """
 from __future__ import annotations
 
@@ -20,7 +22,10 @@ from .book import OrderBook
 from .clob import ClobRest, WebSocketPool
 from .config import Config
 from .discovery import GammaClient, MarketInfo, discover_markets
+from .flow import DataApi, FlowPoller, flow_row
+from .sports_feed import SportsFeed, normalize_game, state_key
 from .storage import ParquetWriter, dumps
+from .wallets import WalletTracker
 
 log = logging.getLogger(__name__)
 
@@ -43,10 +48,24 @@ class Collector:
         self.token_to_cid: dict[str, str] = {}
         self.books: dict[str, OrderBook] = {}
         self.pending_resolution: dict[str, MarketInfo] = {}  # mercados retirados que aún no se resolvieron
+        self.game_to_cids: dict[str, list[str]] = {}
+        self.games: dict[str, dict[str, Any]] = {}          # último estado por game_id
+        self.sports: SportsFeed | None = None
+        self.data_api: DataApi | None = None
+        self.flow: FlowPoller | None = None
+        self.wallets: WalletTracker | None = None
+        if cfg.sports_feed.enabled:
+            self.sports = SportsFeed(cfg.sports_feed.ws_url, self._on_game)
+        if cfg.flow.enabled:
+            self.data_api = DataApi(cfg.flow.data_api_url)
+            self.flow = FlowPoller(self.data_api, self._on_flow_trade, cfg.flow.poll_seconds, cfg.flow.page_size)
+            self.wallets = WalletTracker(self.data_api, self.writer if persist else None, cfg.flow.profile_max_pages,
+                                         cfg.flow.profile_refresh_hours, cfg.flow.per_wallet_delay_seconds)
         self.listeners: list[Listener] = []
         self._stop = asyncio.Event()
         self._tasks: list[asyncio.Task] = []
-        self.stats: dict[str, int] = {"book": 0, "delta": 0, "trade": 0, "tick": 0, "resync": 0, "resolved": 0}
+        self.stats: dict[str, int] = {"book": 0, "delta": 0, "trade": 0, "tick": 0, "resync": 0, "resolved": 0,
+                                      "game": 0, "flow": 0, "whale": 0}
         self.started_ms = now_ms()
 
     # ------------------------------------------------------------------ ciclo de vida
@@ -79,6 +98,11 @@ class Collector:
             asyncio.create_task(self._flush_loop(), name="flush"),
             asyncio.create_task(self._status_loop(), name="status"),
         ]
+        if self.sports is not None:
+            self._tasks.append(asyncio.create_task(self.sports.run(), name="sports"))
+        if self.flow is not None and self.wallets is not None:
+            self._tasks.append(asyncio.create_task(self.flow.run(), name="flow"))
+            self._tasks.append(asyncio.create_task(self.wallets.run(), name="wallets"))
         await self._stop.wait()
         log.info("deteniendo recolector…")
         for t in self._tasks:
@@ -88,6 +112,8 @@ class Collector:
         self.writer.close()
         await self.gamma.close()
         await self.rest.close()
+        if self.data_api is not None:
+            await self.data_api.close()
         log.info("filas escritas: %s", dict(self.writer.rows_written))
 
     # ------------------------------------------------------------------ discovery
@@ -118,6 +144,10 @@ class Collector:
                     self.books[t.token_id].tick_size = mi.tick_size
             if self.persist:
                 self.writer.append("markets", mi.to_row(ts, status="new" if is_new else "active"))
+        self.game_to_cids = {}
+        for mi in self.markets.values():
+            if mi.event_game_id:
+                self.game_to_cids.setdefault(mi.event_game_id, []).append(mi.condition_id)
         if new_tokens:
             await self.pool.ensure(new_tokens)
         log.info("mercados activos=%d tokens=%d nuevos=%d retirados=%d", len(self.markets),
@@ -186,6 +216,40 @@ class Collector:
                 "hash": hash_, "source": source,
             })
         await self._emit(("book", ts, tid, book))
+
+    # ------------------------------------------------------------------ feed de deportes
+    async def _on_game(self, msg: dict[str, Any]) -> None:
+        ts = now_ms()
+        row = normalize_game(msg, ts)
+        gid = row["game_id"]
+        linked = gid in self.game_to_cids
+        if not linked and not self.cfg.sports_feed.store_all_leagues:
+            return
+        prev = self.games.get(gid)
+        if prev is not None and state_key(prev) == state_key(row):
+            return                                   # mismo estado repetido
+        self.games[gid] = row
+        self.stats["game"] += 1
+        if self.persist:
+            self.writer.append("games", row)
+        await self._emit(("game", ts, gid, {**row, "condition_ids": self.game_to_cids.get(gid, [])}))
+
+    # ------------------------------------------------------------------ flujo con wallet
+    async def _on_flow_trade(self, t: dict[str, Any]) -> None:
+        row = flow_row(t)
+        followed = row["condition_id"] in self.markets
+        if not followed and row["usd"] < self.cfg.flow.min_usd_global:
+            return
+        self.stats["flow"] += 1
+        if self.persist:
+            self.writer.append("flow_trades", row)
+        if row["usd"] >= self.cfg.flow.whale_min_usd and self.wallets is not None:
+            self.stats["whale"] += 1
+            self.wallets.enqueue(row["wallet"], row["name"])
+        await self._emit(("flow", row["ts_ms"], row["condition_id"], {**row, "followed": followed}))
+
+    def live_games(self) -> list[dict[str, Any]]:
+        return [g for g in self.games.values() if g["live"] and not g["ended"]]
 
     # ------------------------------------------------------------------ loops auxiliares
     async def _quote_loop(self) -> None:
@@ -267,9 +331,15 @@ class Collector:
         while True:
             await asyncio.sleep(60)
             valid = sum(1 for b in self.books.values() if b.is_valid)
-            log.info("estado: mercados=%d libros_validos=%d/%d ws=%s eventos=%s filas=%s",
+            extra = ""
+            if self.flow is not None and self.wallets is not None:
+                extra = (f" flow_polls={self.flow.polls} flow_lag={self.flow.lag_seconds}s"
+                         f" wallets={len(self.wallets.profiles)} cola={self.wallets.pending}")
+            if self.sports is not None:
+                extra += f" partidos_vivos={len(self.live_games())}"
+            log.info("estado: mercados=%d libros_validos=%d/%d ws=%s eventos=%s filas=%s%s",
                      len(self.markets), valid, len(self.books), self.pool.stats(), dict(self.stats),
-                     dict(self.writer.rows_written))
+                     dict(self.writer.rows_written), extra)
 
 
 def _fnum(x: Any) -> float | None:

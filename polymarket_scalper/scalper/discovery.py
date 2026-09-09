@@ -47,6 +47,8 @@ class MarketInfo:
     tags: list[str] = field(default_factory=list)
     event_market_count: int = 0          # mercados abiertos del evento (cobertura para multi-outcome)
     event_neg_risk_augmented: bool = False
+    event_game_id: str = ""              # enlaza con el feed en vivo de deportes
+    event_start_time: str = ""
 
     @property
     def is_binary(self) -> bool:
@@ -130,6 +132,8 @@ def parse_market(m: dict[str, Any], event: dict[str, Any], category: str, defaul
         tags=[str(t.get("slug")) for t in (event.get("tags") or []) if t.get("slug")],
         event_market_count=sum(1 for x in (event.get("markets") or []) if not x.get("closed")),
         event_neg_risk_augmented=bool(event.get("negRiskAugmented")),
+        event_game_id=str(event.get("gameId") or ""),
+        event_start_time=str(event.get("startTime") or ""),
     )
 
 

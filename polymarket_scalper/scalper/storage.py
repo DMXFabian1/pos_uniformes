@@ -33,6 +33,27 @@ SCHEMAS: dict[str, pa.Schema] = {
         ("fee_rate", F()), ("fee_type", S()), ("volume_24h", F()), ("liquidity", F()), ("end_date", S()),
         ("accepting_orders", B()), ("sports_market_type", S()), ("game_start_time", S()), ("tags", S()),
         ("event_market_count", I()), ("event_neg_risk_augmented", B()),
+        ("event_game_id", S()), ("event_start_time", S()),
+    ]),
+    "games": pa.schema([
+        ("ts_ms", I()), ("game_id", S()), ("league", S()), ("sport", S()), ("home", S()), ("away", S()),
+        ("status", S()), ("live", B()), ("ended", B()), ("score", S()), ("period", S()), ("elapsed", S()), ("raw", S()),
+    ]),
+    "flow_trades": pa.schema([
+        ("ts_ms", I()), ("wallet", S()), ("name", S()), ("pseudonym", S()), ("side", S()), ("size", F()),
+        ("price", F()), ("usd", F()), ("token_id", S()), ("condition_id", S()), ("outcome", S()),
+        ("outcome_index", I()), ("title", S()), ("slug", S()), ("event_slug", S()), ("tx_hash", S()),
+    ]),
+    "wallet_profiles": pa.schema([
+        ("ts_ms", I()), ("wallet", S()), ("name", S()), ("n_closed", I()), ("wins", I()), ("losses", I()),
+        ("total_bought", F()), ("realized_pnl", F()), ("roi", F()), ("win_rate", F()), ("win_rate_adj", F()),
+        ("roi_adj", F()), ("score", F()), ("biggest_win", F()), ("biggest_loss", F()), ("n_open", I()),
+        ("open_value", F()), ("open_pnl", F()), ("first_ts", I()), ("last_ts", I()), ("truncated", B()),
+    ]),
+    "wallet_closed": pa.schema([
+        ("ts_ms", I()), ("wallet", S()), ("condition_id", S()), ("token_id", S()), ("outcome", S()), ("title", S()),
+        ("event_slug", S()), ("avg_price", F()), ("total_bought", F()), ("realized_pnl", F()), ("cur_price", F()),
+        ("end_date", S()), ("closed_ts", I()),
     ]),
     "book_snapshots": pa.schema([
         ("ts_ms", I()), ("token_id", S()), ("condition_id", S()), ("bids", S()), ("asks", S()),
@@ -134,7 +155,27 @@ def scan(data_dir: str | Path, table: str, subdir: str = "") -> pl.LazyFrame | N
     files = sorted(d.rglob("*.parquet"))
     if not files:
         return None
-    return pl.scan_parquet([str(f) for f in files])
+    paths = [str(f) for f in files]
+    schema = SCHEMAS.get(table)
+    if schema is None:
+        return pl.scan_parquet(paths)
+    # el esquema puede crecer con el tiempo: archivos viejos sin columnas nuevas se rellenan con null
+    pl_schema = pl.Schema({f.name: _PL_TYPES[str(f.type)] for f in schema})
+    try:
+        return pl.scan_parquet(paths, schema=pl_schema, missing_columns="insert", extra_columns="ignore")
+    except TypeError:  # versiones de polars sin esos parámetros
+        return pl.scan_parquet(paths)
+
+
+_PL_TYPES = {"string": pl.String, "double": pl.Float64, "int64": pl.Int64, "bool": pl.Boolean}
+
+
+def latest_profiles(data_dir: str | Path) -> pl.DataFrame | None:
+    """Último perfil conocido de cada wallet."""
+    lf = scan(data_dir, "wallet_profiles")
+    if lf is None:
+        return None
+    return lf.sort("ts_ms").group_by("wallet").last().collect()
 
 
 def latest_markets(data_dir: str | Path) -> pl.DataFrame | None:
