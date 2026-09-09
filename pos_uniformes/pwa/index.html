@@ -96,6 +96,8 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
   .pago-linea{font-size:19px; font-weight:700; color:var(--tinta); margin-top:4px;
     overflow-wrap:anywhere}
   .pago-linea.urgente{color:var(--acento)}
+  .casilla{display:flex; align-items:center; gap:12px; font-weight:700; margin:4px 0 2px}
+  .casilla input{width:26px; height:26px; min-height:26px; margin:0; flex:none}
   .fila.mov{display:block; font-weight:700; line-height:1.4}
   .fila.mov .sub{display:block; margin:2px 0 0; font-weight:600}
   .fila-corte .sub{display:block; margin:2px 0 0; font-weight:600}
@@ -761,6 +763,8 @@ async function duenoCorte() {
       `<div>Otros retiros (opcional)</div>` +
       `<input id="corte-otros" type="number" inputmode="decimal" step="0.01" class="input-grande" value="0">` +
       `<input id="corte-nota" type="text" class="input-grande" placeholder="Nota (opcional)">` +
+      `<label class="casilla"><input type="checkbox" id="corte-sin-tarjeta">` +
+      `<span>Ocultar los pagos con tarjeta en el ticket</span></label>` +
     `</div>` +
     `<div id="corte-error" class="error oculto"></div>` +
     `<button class="btn-grande btn-acento" onclick="duenoGuardarCorte()">🖨  Guardar e imprimir corte</button>` +
@@ -781,6 +785,7 @@ async function duenoGuardarCorte() {
     r = await encPost("/api/v1/movil/dueno/corte", {
       contado: num("corte-contado"), reactivo_final: num("corte-fondo"),
       otros_retiros: num("corte-otros"), nota: $("corte-nota").value || "",
+      ocultar_tarjeta: $("corte-sin-tarjeta").checked,
     });
   } catch (e) {
     err.textContent = "No se pudo hacer el corte. Inténtalo otra vez.";

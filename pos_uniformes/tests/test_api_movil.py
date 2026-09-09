@@ -582,6 +582,56 @@ class EncargadoMovilTests(unittest.TestCase):
         trabajo = self.session.query(Trabajo).one()
         self.assertEqual(trabajo.tipo, TipoTrabajo.TICKET)
 
+    def test_corte_del_dueno_puede_ocultar_la_tarjeta_del_ticket(self) -> None:
+        """Casilla por corte: el papel sale sin la línea 'Con tarjeta'."""
+        from pos_uniformes.database.models import Trabajo
+
+        self.session.add(CajaParametros(id=1, reactivo_actual=Decimal("1000.00")))
+        self.session.add(
+            LibretaVenta(
+                employee_code="VEND-4", employee_name="Fanny", tipo="venta",
+                piezas=1, comisiones=1, monto_total=Decimal("705.00"),
+                monto_neto=Decimal("673.00"), pago_tarjeta=True, detalle=[],
+                created_at=datetime.now(),
+            )
+        )
+        self.session.commit()
+        self._como_dueno()
+        with patch(
+            "pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"
+        ):
+            r = self.client.post("/api/v1/movil/dueno/corte", json={
+                "contado": "1500", "reactivo_final": "1000", "ocultar_tarjeta": True,
+            })
+        self.assertEqual(r.status_code, 200, r.text)
+        texto = self.session.query(Trabajo).one().contenido["texto"]
+        self.assertNotIn("Con tarjeta", texto)
+        self.assertNotIn("705", texto)
+
+    def test_corte_del_dueno_por_defecto_imprime_la_tarjeta(self) -> None:
+        from pos_uniformes.database.models import Trabajo
+
+        self.session.add(CajaParametros(id=1, reactivo_actual=Decimal("1000.00")))
+        self.session.add(
+            LibretaVenta(
+                employee_code="VEND-4", employee_name="Fanny", tipo="venta",
+                piezas=1, comisiones=1, monto_total=Decimal("705.00"),
+                monto_neto=Decimal("673.00"), pago_tarjeta=True, detalle=[],
+                created_at=datetime.now(),
+            )
+        )
+        self.session.commit()
+        self._como_dueno()
+        with patch(
+            "pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"
+        ):
+            r = self.client.post("/api/v1/movil/dueno/corte", json={
+                "contado": "1500", "reactivo_final": "1000",
+            })
+        self.assertEqual(r.status_code, 200, r.text)
+        texto = self.session.query(Trabajo).one().contenido["texto"]
+        self.assertIn("Con tarjeta", texto)
+
     def test_corte_del_dueno_rechaza_fondo_mayor_a_lo_contado(self) -> None:
         self.session.add(CajaParametros(id=1, reactivo_actual=Decimal("1000.00")))
         self.session.commit()

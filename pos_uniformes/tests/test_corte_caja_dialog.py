@@ -67,6 +67,19 @@ class TicketCorteTests(unittest.TestCase):
         self.assertIn("$705.00", texto)
         self.assertNotIn("Con tarjeta", texto_ticket_corte(_corte(), venta_efectivo=Decimal("1"), tarjeta=Decimal("0")))
 
+    def test_ocultar_tarjeta_deja_el_resto_del_ticket_igual(self) -> None:
+        """La casilla del dueño solo quita esa línea del papel."""
+        con = texto_ticket_corte(_corte(), venta_efectivo=Decimal("10741.00"), tarjeta=Decimal("705.00"), tarjeta_ops=2)
+        sin = texto_ticket_corte(_corte(), venta_efectivo=Decimal("10741.00"), tarjeta=None, tarjeta_ops=None)
+        self.assertNotIn("Con tarjeta", sin)
+        self.assertNotIn("705", sin)
+        self.assertIn("VENTA (efectivo):", sin)
+        self.assertIn("EN CAJA:", sin)
+        # Lo único que cambia entre los dos es esa línea.
+        quitadas = [l for l in con.splitlines() if l not in sin.splitlines()]
+        self.assertEqual(len(quitadas), 1)
+        self.assertIn("Con tarjeta", quitadas[0])
+
     def test_sin_pagos_no_imprime_la_linea(self) -> None:
         texto = texto_ticket_corte(_corte(retiros_pagos=Decimal("0.00")))
         self.assertNotIn("Pagos empleadas", texto)

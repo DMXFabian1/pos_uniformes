@@ -24,6 +24,7 @@ from PyQt6.QtWidgets import (
 )
 
 from pos_uniformes.services.corte_caja_service import EstadoCaja, diferencia
+from pos_uniformes.services.nomina_service import OWNER_CODE
 
 logger = logging.getLogger(__name__)
 
@@ -258,6 +259,16 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
     form.addRow("", nota)
     ly.addLayout(form)
 
+    # Solo Daniel: dejar el papel sin la linea "Con tarjeta". Es por corte
+    # (arranca apagada); en pantalla la sigue viendo.
+    from PyQt6.QtWidgets import QCheckBox
+
+    sin_tarjeta = QCheckBox("Ocultar los pagos con tarjeta en el ticket")
+    sin_tarjeta.setVisible(str(creado_por or "").strip().upper() == OWNER_CODE)
+    if grande:
+        sin_tarjeta.setStyleSheet("font-size: 17px;")
+    ly.addWidget(sin_tarjeta)
+
     dif = QLabel("")
     dif.setStyleSheet("font-weight: 700;")
     ly.addWidget(dif)
@@ -309,7 +320,8 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
             retiros_periodo = retiros_del_periodo(session, estado.desde, estado.hasta)
             texto = texto_ticket_corte(
                 corte, por_empleada, pagos=pagos_periodo, venta_efectivo=estado.resumen.efectivo, retiros=retiros_periodo,
-                tarjeta=estado.resumen.tarjeta, tarjeta_ops=contar_tarjeta(rows),
+                tarjeta=None if sin_tarjeta.isChecked() else estado.resumen.tarjeta,
+                tarjeta_ops=None if sin_tarjeta.isChecked() else contar_tarjeta(rows),
             )
     except ValueError as exc:
         QMessageBox.warning(parent, "Corte", str(exc))

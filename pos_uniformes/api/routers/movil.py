@@ -721,6 +721,8 @@ class CorteDuenoRequest(BaseModel):
     reactivo_final: Decimal = Field(ge=0)
     otros_retiros: Decimal = Field(default=Decimal("0"), ge=0)
     nota: str = Field(default="", max_length=200)
+    # Solo el papel: la línea "Con tarjeta" no sale en este ticket.
+    ocultar_tarjeta: bool = False
 
 
 @router.post("/dueno/corte")
@@ -737,16 +739,15 @@ def dueno_hacer_corte(
         pagos_registrados_del_periodo,
     )
     from pos_uniformes.services.libreta_service import resumir_por_empleada
-    from pos_uniformes.ui.dialogs.corte_caja_dialog import texto_ticket_corte
+    from pos_uniformes.ui.dialogs.corte_caja_dialog import contar_tarjeta, texto_ticket_corte
 
     empleada, _p = current
     _solo_dueno(empleada)
     _solo_tienda()
     quien = str(empleada.codigo).upper()
     estado = estado_caja(db)
-    por_empleada = resumir_por_empleada(
-        operaciones_del_periodo(db, estado.desde, estado.hasta)
-    )
+    rows_periodo = operaciones_del_periodo(db, estado.desde, estado.hasta)
+    por_empleada = resumir_por_empleada(rows_periodo)
     try:
         corte = cerrar_corte(
             db,
@@ -776,6 +777,8 @@ def dueno_hacer_corte(
             pagos=pagos_registrados_del_periodo(db, estado.desde, estado.hasta),
             venta_efectivo=estado.resumen.efectivo,
             retiros=retiros,
+            tarjeta=None if body.ocultar_tarjeta else estado.resumen.tarjeta,
+            tarjeta_ops=None if body.ocultar_tarjeta else contar_tarjeta(rows_periodo),
         )
         trabajos_service.enviar_ticket(db, texto, origen="pwa", creado_por=quien)
         ticket_encolado = True
