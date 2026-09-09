@@ -166,6 +166,23 @@ class TicketEncargadoTests(unittest.TestCase):
         for prohibido in ("EN CAJA", "Fondo inicial", "Operaciones", "11,160"):
             self.assertNotIn(prohibido, texto)
 
+    def test_ya_pagado_en_el_periodo_se_ve_y_se_resta(self) -> None:
+        # Caso real 2026-09-09: Fanny cobró a las 14:22 y el corte de las 14:45 decía
+        # "no se paga a nadie" pero restaba $1,590 en silencio.
+        from datetime import datetime as _dt
+
+        corte = _corte(monto_final=Decimal("20596.00"), retiros_pagos=Decimal("1590"))
+        fanny = SimpleNamespace(employee_name="Fanny Ortiz", employee_code="VEND-7", total=Decimal("1590.00"), sueldo_base=Decimal("1300.00"),
+                                comisiones=145, tarifa_comision=Decimal("2.00"), monto_comisiones=Decimal("290.00"), faltas=0,
+                                descuento_faltas=Decimal("0"), dias_trabajados=None, created_at=_dt(2026, 9, 9, 14, 22))
+        texto = texto_ticket_corte_encargado(corte, Decimal("11026.00"), [], ya_pagados=[fanny])
+        self.assertNotIn("Hoy no se paga a nadie.", texto)
+        self.assertIn("YA PAGADO A FANNY:", texto)
+        self.assertIn("(se le pago a las 14:22)", texto)
+        self.assertIn("Pago a Fanny:", texto)
+        self.assertIn("-$1,590.00", texto)
+        self.assertIn("$9,436.00", texto)
+
     def test_con_tarjeta_va_aparte(self) -> None:
         corte = _corte(monto_final=Decimal("21901.00"), retiros_pagos=Decimal("0"))
         texto = texto_ticket_corte_encargado(corte, Decimal("10741.00"), [], tarjeta=Decimal("705.00"), tarjeta_ops=2)

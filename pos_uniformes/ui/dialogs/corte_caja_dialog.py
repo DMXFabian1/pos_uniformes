@@ -153,6 +153,17 @@ def _con_ajuste(corte) -> bool:
     return Decimal(esperado or 0) > 0 and Decimal(corte.monto_final) != Decimal(esperado)
 
 
+def pagos_previos_del_periodo(session, resultado) -> list:
+    """Pagos del periodo que NO registró este corte (ya se pagaron antes)."""
+    from pos_uniformes.services.corte_caja_service import pagos_registrados_del_periodo
+
+    nuevos = {id(p) for p in resultado.pagos} | {getattr(p, "id", None) for p in resultado.pagos}
+    return [
+        p for p in pagos_registrados_del_periodo(session, resultado.estado.desde, resultado.estado.hasta)
+        if id(p) not in nuevos and getattr(p, "id", None) not in nuevos
+    ]
+
+
 def contar_tarjeta(rows: list) -> int:
     """Cuántas operaciones (venta/abono) fueron con tarjeta = vouchers a cuadrar."""
     return sum(1 for r in rows or [] if getattr(r, "pago_tarjeta", False) and str(getattr(r, "tipo", "")) in ("venta", "abono"))
@@ -472,6 +483,7 @@ def hacer_corte_automatico(parent: QWidget | None, *, creado_por: str):
                 retiros=retiros_del_periodo(session, resultado.estado.desde, resultado.estado.hasta),
                 tarjeta=resultado.estado.resumen.tarjeta,
                 tarjeta_ops=contar_tarjeta(rows),
+                ya_pagados=pagos_previos_del_periodo(session, resultado),
             )
     except Exception:  # noqa: BLE001
         logger.exception("Corte automático: no se pudo guardar")
@@ -488,9 +500,14 @@ def hacer_corte_automatico(parent: QWidget | None, *, creado_por: str):
 
 def texto_ticket_corte_encargado(
     corte, venta_efectivo, pagos: list, por_empleada: list | None = None, retiros: list | None = None,
-    reimpresion: bool = False, tarjeta=None, tarjeta_ops: int | None = None,
+    reimpresion: bool = False, tarjeta=None, tarjeta_ops: int | None = None, ya_pagados: list | None = None,
 ) -> str:
     """Ticket simple para León: cuánto se vendió, a quién pagar y cuánto sacar.
+
+    `pagos` = los que ESTE corte registra (hay que pagarlos ahora).
+    `ya_pagados` = pagos hechos antes dentro del mismo periodo (ya salieron
+    del cajón): se listan como YA PAGADO y se restan en la cuenta, para que
+    nunca diga "no se paga a nadie" y aun así reste dinero.
 
     Sin fondo, sin "en caja", sin operaciones: solo lo que él hace con el
     dinero. La cuenta se ve completa (venta − pagos − lo que ya salió =
@@ -530,22 +547,34 @@ def texto_ticket_corte_encargado(
         lines.append(tk_line("  (la tarjeta no esta en el cajon)"))
     lines.append(tk_bot())
     lines.append("")
+    ya_pagados = list(ya_pagados or [])
     lines.append(tk_top())
-    if pagos:
-        for idx, p in enumerate(pagos):
-            if idx:
-                lines.append(tk_mid())
-            nombre = (p.employee_name or p.employee_code).split()[0].upper()
-            lines.append(tk_row(f"PAGAR A {nombre}:"[: _TW - 14], f"${Decimal(p.total):,.2f}"))
-            _desglose_pago(p, lines, tk_row)
-    else:
+    idx = 0
+    for p in pagos:
+        if idx:
+            lines.append(tk_mid())
+        idx += 1
+        nombre = (p.employee_name or p.employee_code).split()[0].upper()
+        lines.append(tk_row(f"PAGAR A {nombre}:"[: _TW - 14], f"${Decimal(p.total):,.2f}"))
+        _desglose_pago(p, lines, tk_row)
+    for p in ya_pagados:
+        if idx:
+            lines.append(tk_mid())
+        idx += 1
+        nombre = (p.employee_name or p.employee_code).split()[0].upper()
+        hora = _hora_local(getattr(p, "created_at", None)).strftime("%H:%M") if getattr(p, "created_at", None) else ""
+        lines.append(tk_row(f"YA PAGADO A {nombre}:"[: _TW - 14], f"${Decimal(p.total):,.2f}"))
+        if hora:
+            lines.append(tk_line(f"  (se le pago a las {hora})"))
+        _desglose_pago(p, lines, tk_row)
+    if not pagos and not ya_pagados:
         lines.append(tk_line("Hoy no se paga a nadie."))
     lines.append(tk_bot())
     lines.append("")
     # La cuenta, paso a paso, para que se vea de donde sale lo que se saca.
     lines.append(tk_top())
     lines.append(tk_row("Venta en efectivo:", f"${venta:,.2f}"))
-    for p in pagos:
+    for p in list(pagos) + ya_pagados:
         nombre = (p.employee_name or p.employee_code).split()[0]
         lines.append(tk_row(f"Pago a {nombre}:"[: _TW - 14], f"-${Decimal(p.total):,.2f}"))
     for r in retiros or []:

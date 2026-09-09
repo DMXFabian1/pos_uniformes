@@ -51,7 +51,7 @@ def hacer_corte_y_avisar(session, *, creado_por: str, ahora: datetime | None = N
         pagos_que_tocan_hoy,
     )
     from pos_uniformes.services.libreta_service import resumir_por_empleada
-    from pos_uniformes.ui.dialogs.corte_caja_dialog import contar_tarjeta, texto_ticket_corte_encargado
+    from pos_uniformes.ui.dialogs.corte_caja_dialog import contar_tarjeta, pagos_previos_del_periodo, texto_ticket_corte_encargado
 
     ahora = ahora or datetime.now().astimezone()
     estado = estado_caja(session, ahora)
@@ -68,9 +68,10 @@ def hacer_corte_y_avisar(session, *, creado_por: str, ahora: datetime | None = N
     except Exception:  # noqa: BLE001
         session.rollback()
         retiros = []
+    ya_pagados = pagos_previos_del_periodo(session, auto)
     texto = texto_ticket_corte_encargado(
         auto.corte, auto.estado.resumen.efectivo, auto.pagos, resumir_por_empleada(rows), retiros=retiros,
-        tarjeta=auto.estado.resumen.tarjeta, tarjeta_ops=contar_tarjeta(rows),
+        tarjeta=auto.estado.resumen.tarjeta, tarjeta_ops=contar_tarjeta(rows), ya_pagados=ya_pagados,
     )
     impreso = False
     try:
@@ -86,6 +87,8 @@ def hacer_corte_y_avisar(session, *, creado_por: str, ahora: datetime | None = N
         lineas.append(f"Con tarjeta: ${auto.estado.resumen.tarjeta:,.2f} ({contar_tarjeta(rows)} voucher(s), no está en el cajón)")
     for p in auto.pagos:
         lineas.append(f"Pagar a {(p.employee_name or p.employee_code).split()[0]}: ${Decimal(p.total):,.2f}")
+    for p in ya_pagados:
+        lineas.append(f"Ya pagado a {(p.employee_name or p.employee_code).split()[0]}: ${Decimal(p.total):,.2f}")
     for r in retiros:
         lineas.append(f"Ya salió ({r.motivo}): ${Decimal(r.monto):,.2f}")
     lineas.append(f"Sacar de la venta: ${retiro:,.2f}")
