@@ -16,6 +16,7 @@ _INSTALADORES = (
     "instalar_servidor_pwa.bat",
     "instalar_resumen_diario.bat",
     "quitar_parpadeo_tareas.bat",
+    "instalar_corte_propuesto.bat",
 )
 
 

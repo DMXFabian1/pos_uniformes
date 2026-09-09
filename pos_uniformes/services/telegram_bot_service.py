@@ -2,6 +2,7 @@
 
 Comandos:
     /corte        hace el corte ahora e imprime el ticket en la tienda
+    /nocorte      deja pasar el corte que se propuso hoy
     /estado       qué hay en caja ahora mismo
     /resumen      el resumen del día (el mismo de la noche)
     /pendientes   lo que falta por registrar
@@ -26,6 +27,7 @@ CODIGO_REMOTO = "VEND-1"  # Daniel: el que manda /corte
 AYUDA = (
     "Comandos:\n"
     "/corte — hacer el corte ahora e imprimir el ticket en la tienda\n"
+    "/nocorte — dejar pasar el corte propuesto hoy\n"
     "/estado — qué hay en caja ahora\n"
     "/resumen — resumen del día\n"
     "/pendientes — lo que falta por registrar\n"
@@ -60,6 +62,12 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
 
         with session_factory() as session:
             return hacer_corte_y_avisar(session, creado_por=CODIGO_REMOTO).mensaje
+    if cmd.nombre == "nocorte":
+        from pos_uniformes.services.corte_propuesta_service import cancelar
+
+        if cancelar(hoy):
+            return "Ok, hoy no se hace el corte. Cuando quieras, /corte."
+        return "No hay ningún corte propuesto hoy. Si lo quieres hacer, /corte."
     if cmd.nombre == "estado":
         from pos_uniformes.services.corte_remoto_service import texto_estado_actual
 

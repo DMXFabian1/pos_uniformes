@@ -40,10 +40,13 @@ if not errorlevel 1 echo   Tarea "POS Telegram vigia" creada (cada 5 min revisa 
 call "%~dp0telegram_bot_vigia.bat" --reiniciar
 if /I "%~2"=="auto" (
     echo.
-    echo === Corte automatico 30 min antes de cerrar (17:30; jueves y domingo 16:30) ===
+    echo === Corte 30 min antes de cerrar (17:30; jueves y domingo 16:30) ===
+    echo   No se imprime solo: te llega la propuesta al celular y contestas /corte.
     schtasks /Create /F /TN "POS Corte 1630" /SC DAILY /ST 16:30 /TR "wscript.exe \"%~dp0correr_oculto.vbs\" corte_automatico.bat" >nul
     schtasks /Create /F /TN "POS Corte 1730" /SC DAILY /ST 17:30 /TR "wscript.exe \"%~dp0correr_oculto.vbs\" corte_automatico.bat" >nul
-    echo   Tareas de corte automatico creadas.
+    schtasks /Create /F /TN "POS Corte recordatorio 1650" /SC DAILY /ST 16:50 /TR "wscript.exe \"%~dp0correr_oculto.vbs\" corte_automatico.bat --recordar" >nul
+    schtasks /Create /F /TN "POS Corte recordatorio 1750" /SC DAILY /ST 17:50 /TR "wscript.exe \"%~dp0correr_oculto.vbs\" corte_automatico.bat --recordar" >nul
+    echo   Tareas de corte y recordatorio creadas.
 ) else (
     echo   Corte automatico por hora NO activado: Daniel lo ordena con /corte. ^(instalar_resumen_diario.bat HH:MM auto lo activa^)
 )

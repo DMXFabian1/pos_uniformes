@@ -41,6 +41,35 @@ def texto_estado_actual(session, ahora: datetime | None = None) -> str:
     return "\n".join(lineas)
 
 
+def texto_propuesta_corte(session, ahora: datetime | None = None) -> str:
+    """Lo que llega al celular a la hora del corte: qué hay y qué pasaría si
+    lo haces. Nada se guarda ni se imprime hasta que Daniel conteste."""
+    from pos_uniformes.services.corte_caja_service import estado_caja, pagos_que_tocan_hoy
+
+    ahora = ahora or datetime.now().astimezone()
+    e = estado_caja(session, ahora)
+    avisos = pagos_que_tocan_hoy(session, ahora.date())
+    total_pagos = sum((Decimal(a.total_estimado) for a in avisos), Decimal("0.00"))
+    retiro = (e.resumen.efectivo - e.pagos - total_pagos - e.total_retiros).quantize(Decimal("0.01"))
+    lineas = [
+        f"🧾 ¿Hacemos el corte? ({ahora:%d/%m %H:%M})",
+        f"• Venta en efectivo: ${e.resumen.efectivo:,.2f} ({e.resumen.operaciones} ops)",
+    ]
+    if e.resumen.tarjeta:
+        lineas.append(f"• Con tarjeta: ${e.resumen.tarjeta:,.2f} (no está en el cajón)")
+    for a in avisos:
+        lineas.append(f"• Pagar a {a.employee_name.split()[0]}: ${Decimal(a.total_estimado):,.2f}")
+    if e.pagos:
+        lineas.append(f"• Pagos ya hechos: -${e.pagos:,.2f}")
+    if e.total_retiros:
+        lineas.append(f"• Ya salió del cajón: -${e.total_retiros:,.2f}")
+    lineas.append(f"• Se retiraría: ${retiro:,.2f} · queda de fondo ${e.reactivo:,.2f}")
+    lineas.append("")
+    lineas.append("Toca /corte para hacerlo e imprimir el ticket.")
+    lineas.append("Toca /nocorte para dejarlo pasar.")
+    return "\n".join(lineas)
+
+
 def hacer_corte_y_avisar(session, *, creado_por: str, ahora: datetime | None = None) -> ResultadoCorte:
     """Corte automático + ticket a la impresora. Devuelve el mensaje para Telegram."""
     from pos_uniformes.services import trabajos_service
