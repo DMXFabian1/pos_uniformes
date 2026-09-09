@@ -33,9 +33,11 @@ schtasks /Create /F /TN "POS Pendientes" /SC DAILY /ST 13:30 /TR "\"%~dp0resumen
 if not errorlevel 1 echo   Y a las 13:30 un recordatorio con lo que falta por registrar (pagos, faltas).
 echo.
 echo === Bot de Telegram (/corte, /estado, /resumen, /pendientes) ===
-schtasks /Create /F /TN "POS Telegram bot" /SC ONLOGON /TR "\"%~dp0telegram_bot.bat\"" >nul
-if not errorlevel 1 echo   Tarea "POS Telegram bot" creada (arranca al iniciar sesion).
-start "POS Telegram bot" "%~dp0telegram_bot.bat"
+schtasks /Create /F /TN "POS Telegram bot" /SC ONLOGON /TR "\"%~dp0telegram_bot_vigia.bat\"" >nul
+if not errorlevel 1 echo   Tarea "POS Telegram bot" creada (arranca al iniciar sesion, sin ventana).
+schtasks /Create /F /TN "POS Telegram vigia" /SC MINUTE /MO 5 /TR "\"%~dp0telegram_bot_vigia.bat\"" >nul
+if not errorlevel 1 echo   Tarea "POS Telegram vigia" creada (cada 5 min revisa que el bot viva y lo levanta si no).
+call "%~dp0telegram_bot_vigia.bat" --reiniciar
 if /I "%~2"=="auto" (
     echo.
     echo === Corte automatico 30 min antes de cerrar (17:30; jueves y domingo 16:30) ===

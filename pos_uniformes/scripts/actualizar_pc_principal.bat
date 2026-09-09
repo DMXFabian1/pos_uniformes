@@ -32,6 +32,10 @@ call scripts\build_presupuestos_satelite_windows.bat
 if errorlevel 1 goto :error
 
 echo.
+echo === Reiniciando el bot de Telegram con el codigo nuevo ===
+call scripts\telegram_bot_vigia.bat --reiniciar
+
+echo.
 echo ============================================
 echo  LISTO. Version publicada para kioskos:
 if exist C:\pos_updates\PresupuestosSatelite\VERSION.txt (

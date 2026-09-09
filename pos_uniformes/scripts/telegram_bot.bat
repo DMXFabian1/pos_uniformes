@@ -1,9 +1,6 @@
 @echo off
-rem Bot de Telegram (PC servidor): /corte, /estado, /resumen, /pendientes. Reinicia solo si se cae.
+rem Bot de Telegram (PC servidor). Ya NO deja una ventana abierta: llama al vigia,
+rem que mata el bot viejo (si hay) y levanta uno nuevo en segundo plano.
+rem Log: %APPDATA%\PresupuestosSatelite\logs\telegram_bot.log (o logs\ junto al codigo).
 setlocal
-cd /d "%~dp0..\.."
-:loop
-"%~dp0..\.venv\Scripts\python.exe" -m pos_uniformes.scripts.telegram_bot
-echo El bot termino, reiniciando en 15 s...
-timeout /t 15 /nobreak >nul
-goto loop
+call "%~dp0telegram_bot_vigia.bat" --reiniciar

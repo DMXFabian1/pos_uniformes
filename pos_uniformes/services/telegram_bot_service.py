@@ -95,7 +95,7 @@ def _es_viejo(msg: dict, ahora: float | None = None) -> bool:
 ESPERA_GETUPDATES_SEG = 15  # corta para que las alertas de la cola salgan pronto
 
 
-def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False, alertas: bool = True) -> None:
+def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False, alertas: bool = True, on_tick=None) -> None:
     """Long-polling: atiende mensajes del chat autorizado hasta que lo paren.
     En cada vuelta también manda las alertas encoladas (cortes, retiros) y
     lo que vea el vigilante (cierre sin corte, movimientos fuera de horario)."""
@@ -110,6 +110,11 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
         telegram_service.enviar_mensaje(texto, token=token, chat_id=chat_id)
 
     while True:
+        if on_tick is not None:
+            try:
+                on_tick()  # latido: el vigía sabe que seguimos vivos
+            except Exception:  # noqa: BLE001
+                pass
         if alertas:
             procesar(session_factory, _mandar, vigilante)
         try:
