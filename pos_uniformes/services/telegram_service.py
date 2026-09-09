@@ -11,12 +11,36 @@ cosa al bot desde tu Telegram y luego llama esta función.
 from __future__ import annotations
 
 import json
+import logging
 import os
+import ssl
 import urllib.parse
 import urllib.request
 
 _API = "https://api.telegram.org/bot{token}/{metodo}"
 _MAX = 4000  # Telegram corta en 4096
+_log = logging.getLogger("telegram")
+_aviso_inseguro = False
+
+
+def _contexto_ssl(verificar: bool = True) -> ssl.SSLContext:
+    """Contexto TLS que confía en los certificados de Windows.
+
+    En la PC de la tienda el antivirus inspecciona HTTPS con su propio
+    certificado; el paquete `truststore` hace que Python use el almacén del
+    sistema (donde ese certificado sí está). Sin truststore, el default.
+    """
+    if not verificar:
+        ctx = ssl.create_default_context()
+        ctx.check_hostname = False
+        ctx.verify_mode = ssl.CERT_NONE
+        return ctx
+    try:
+        import truststore  # type: ignore
+
+        return truststore.SSLContext(ssl.PROTOCOL_TLS_CLIENT)
+    except Exception:  # noqa: BLE001
+        return ssl.create_default_context()
 
 
 def _config(nombre: str) -> str:
@@ -37,11 +61,26 @@ def chat_id_configurado() -> str:
 
 
 def _llamar(token: str, metodo: str, datos: dict | None = None, timeout: float = 15.0) -> dict:
+    global _aviso_inseguro
     url = _API.format(token=token, metodo=metodo)
     cuerpo = urllib.parse.urlencode(datos or {}).encode("utf-8")
-    req = urllib.request.Request(url, data=cuerpo if datos else None)
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        payload = json.loads(resp.read().decode("utf-8"))
+
+    def _abrir(verificar: bool):
+        req = urllib.request.Request(url, data=cuerpo if datos else None)
+        with urllib.request.urlopen(req, timeout=timeout, context=_contexto_ssl(verificar)) as resp:
+            return json.loads(resp.read().decode("utf-8"))
+
+    try:
+        payload = _abrir(True)
+    except ssl.SSLCertVerificationError:
+        # Último recurso: el antivirus intercepta y su certificado no está
+        # en el almacén que ve Python. Se avisa una vez y se sigue.
+        if not _aviso_inseguro:
+            _aviso_inseguro = True
+            msg = "Telegram: certificado no reconocido (antivirus/proxy); continuando sin verificar TLS."
+            _log.warning(msg)
+            print(msg)
+        payload = _abrir(False)
     if not payload.get("ok"):
         raise RuntimeError(f"Telegram respondió: {payload.get('description', payload)}")
     return payload

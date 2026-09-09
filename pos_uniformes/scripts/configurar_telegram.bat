@@ -9,6 +9,9 @@ setlocal
 cd /d "%~dp0..\.."
 set "PY=%~dp0..\.venv\Scripts\python.exe"
 
+echo === Preparando (certificados del sistema para HTTPS) ===
+"%PY%" -m pip install -q truststore >nul 2>&1
+
 echo === 1/4 Token del bot ===
 set "TOKEN="
 set /p TOKEN=Pega el token que te dio @BotFather y Enter: 
