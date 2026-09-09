@@ -2116,6 +2116,22 @@ class AfluenciaHora(Base):
     )
 
 
+class AlertaTelegram(Base):
+    """Cola de alertas al celular de Daniel. Cualquier máquina (kiosko, PWA,
+    tarea) deja aquí el texto; el bot de la PC servidor lo manda y marca
+    `enviado_at`. Los kioskos no necesitan el token de Telegram."""
+
+    __tablename__ = "alerta_telegram"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    texto: Mapped[str] = mapped_column(Text, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    enviado_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    intentos: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+
+
 class CajaRetiro(Base):
     """Dinero que salió del cajón por algo que no es pago a empleada
     (proveedor, renta, cambio, comida...). Lo apuntan Daniel o León; el corte

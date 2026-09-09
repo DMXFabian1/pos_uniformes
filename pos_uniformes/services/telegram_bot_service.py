@@ -92,18 +92,31 @@ def _es_viejo(msg: dict, ahora: float | None = None) -> bool:
     return ((ahora if ahora is not None else time.time()) - fecha) > MAX_ANTIGUEDAD_SEG
 
 
-def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False) -> None:
-    """Long-polling: atiende mensajes del chat autorizado hasta que lo paren."""
+ESPERA_GETUPDATES_SEG = 15  # corta para que las alertas de la cola salgan pronto
+
+
+def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False, alertas: bool = True) -> None:
+    """Long-polling: atiende mensajes del chat autorizado hasta que lo paren.
+    En cada vuelta también manda las alertas encoladas (cortes, retiros) y
+    lo que vea el vigilante (cierre sin corte, movimientos fuera de horario)."""
     from pos_uniformes.services import telegram_service
+    from pos_uniformes.services.alertas_service import Vigilante, procesar
 
     offset = None
+    vigilante = Vigilante() if alertas else None
     logger.info("Bot escuchando (chat %s)…", chat_id)
+
+    def _mandar(texto: str) -> None:
+        telegram_service.enviar_mensaje(texto, token=token, chat_id=chat_id)
+
     while True:
+        if alertas:
+            procesar(session_factory, _mandar, vigilante)
         try:
-            datos = {"timeout": 30}
+            datos = {"timeout": ESPERA_GETUPDATES_SEG}
             if offset is not None:
                 datos["offset"] = offset
-            payload = telegram_service._llamar(token, "getUpdates", datos, timeout=45)
+            payload = telegram_service._llamar(token, "getUpdates", datos, timeout=ESPERA_GETUPDATES_SEG + 15)
         except Exception as exc:  # noqa: BLE001
             logger.warning("getUpdates falló: %s", exc)
             time.sleep(10)

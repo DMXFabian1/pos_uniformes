@@ -35,6 +35,12 @@ def registrar_retiro(session, *, monto, motivo: str, creado_por: str):
     )
     session.add(retiro)
     session.commit()
+    try:
+        from pos_uniformes.services.alertas_service import encolar, texto_alerta_retiro
+
+        encolar(session, texto_alerta_retiro(retiro))
+    except Exception:  # noqa: BLE001 — el retiro ya quedó guardado
+        pass
     return retiro
 
 

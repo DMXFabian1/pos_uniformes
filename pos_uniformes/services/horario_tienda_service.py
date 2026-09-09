@@ -10,6 +10,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
 
+APERTURA = time(9, 0)  # supuesto (2026-09-09): para las alertas de movimientos fuera de horario
 CIERRE_NORMAL = time(18, 0)
 CIERRE_TEMPRANO = time(17, 0)
 DIAS_CIERRE_TEMPRANO = (3, 6)  # jueves, domingo
@@ -21,6 +22,10 @@ MINUTOS_ANTES_RESUMEN = 15
 TOLERANCIA_MIN = 20
 
 AUTO_CODE = "AUTO"
+
+
+def hora_apertura(dia: date) -> time:
+    return APERTURA
 
 
 def hora_cierre(dia: date) -> time:

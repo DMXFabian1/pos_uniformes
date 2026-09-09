@@ -55,7 +55,7 @@ class EscucharTests(unittest.TestCase):
         with patch("pos_uniformes.services.telegram_service._llamar", return_value=updates), patch(
             "pos_uniformes.services.telegram_service.enviar_mensaje"
         ) as enviar, patch.object(bot, "atender_texto", wraps=bot.atender_texto) as atender:
-            bot.escuchar(session_factory=_sesion, token="t", chat_id="123", una_vez=True)
+            bot.escuchar(session_factory=_sesion, token="t", chat_id="123", una_vez=True, alertas=False)
         self.assertEqual(atender.call_count, 1)
         self.assertEqual(atender.call_args.args[0], "/ayuda")
         enviar.assert_called_once()
@@ -73,7 +73,7 @@ class EscucharTests(unittest.TestCase):
         with patch("pos_uniformes.services.telegram_service._llamar", return_value=updates), patch(
             "pos_uniformes.services.telegram_service.enviar_mensaje"
         ) as enviar, patch.object(bot, "atender_texto", wraps=bot.atender_texto) as atender:
-            bot.escuchar(session_factory=_sesion, token="t", chat_id="123", una_vez=True)
+            bot.escuchar(session_factory=_sesion, token="t", chat_id="123", una_vez=True, alertas=False)
         self.assertEqual(atender.call_count, 1)
         self.assertEqual(atender.call_args.args[0], "/ayuda")
         textos = [c.args[0] for c in enviar.call_args_list]

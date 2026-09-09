@@ -253,7 +253,25 @@ def cerrar_corte(
     )
     session.add(corte)
     guardar_parametros(session, reactivo_actual=reactivo_final)  # hace commit
+    _avisar_corte(session, corte, estado)
     return corte
+
+
+def _avisar_corte(session, corte, estado: EstadoCaja) -> None:
+    """Alerta al celular de Daniel (cola que manda el bot). Nunca rompe el corte."""
+    try:
+        from pos_uniformes.services.alertas_service import encolar, texto_alerta_corte
+
+        pagos = pagos_registrados_del_periodo(session, estado.desde, estado.hasta)
+        encolar(session, texto_alerta_corte(corte, estado.resumen.efectivo, pagos=pagos))
+    except Exception as exc:  # noqa: BLE001
+        import logging
+
+        logging.getLogger(__name__).warning("Corte guardado, pero la alerta no se encoló: %s", exc)
+        try:
+            session.rollback()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def _etiqueta_periodo(desde: datetime | None, hasta: datetime) -> str:

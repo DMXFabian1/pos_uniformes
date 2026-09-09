@@ -85,7 +85,7 @@ class CerrarCorteTests(unittest.TestCase):
                 nota="todo bien",
                 ahora=datetime(2026, 9, 8, 20, tzinfo=timezone.utc),
             )
-        session.add.assert_called_once_with(corte)
+        self.assertIs(session.add.call_args_list[0].args[0], corte)  # después encola la alerta
         self.assertEqual(corte.monto_final, Decimal("12000.00"))
         self.assertEqual(corte.monto_esperado, Decimal("12010.00"))  # 11160 + 2200 - 1350
         self.assertEqual(corte.retiros_pagos, Decimal("1350.00"))
