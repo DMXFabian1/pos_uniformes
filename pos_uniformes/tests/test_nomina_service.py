@@ -103,6 +103,12 @@ class TextoEncargadoTests(unittest.TestCase):
         self.assertIn("Bety: ATRASADO 2 día(s)", texto)
         self.assertIn("Caro: sin fecha", texto)
 
+    def test_cuando_pago_en_espanol(self) -> None:
+        from pos_uniformes.services.nomina_service import cuando_pago
+
+        self.assertEqual(cuando_pago(AvisoPago("V", "Kat", date(2026, 9, 11), 2, 0, Decimal("0"))), "viernes 11/09")
+        self.assertEqual(cuando_pago(AvisoPago("V", "Kat", date(2026, 9, 10), 1, 0, Decimal("0"))), "mañana")
+
     def test_sin_pagos(self) -> None:
         texto = texto_resumen_encargado(ResumenEncargado([], [], []), hoy=date(2026, 9, 8))
         self.assertIn("ninguno en los próximos 7 días", texto)

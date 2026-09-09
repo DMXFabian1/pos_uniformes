@@ -18,6 +18,7 @@ from decimal import Decimal
 from PyQt6.QtCore import QDate, Qt
 from PyQt6.QtGui import QColor, QFont
 from PyQt6.QtWidgets import (
+    QFrame,
     QCalendarWidget,
     QComboBox,
     QDialog,
@@ -686,31 +687,54 @@ class CalendarioEncargadoDialog(QDialog):
         ly = QVBoxLayout()
         ly.setSpacing(14)
         ly.addWidget(self._titulo("¿Qué quieres hacer?"))
-        # Resumen del día para León: quién descansa hoy/mañana y a quién le
-        # toca pago esta semana (se llena en _cargar_resumen_menu).
+        # Resumen del día para León en TARJETAS (rediseño 2026-09-09): quién
+        # descansa hoy/mañana y a quién le toca pago, una línea por persona
+        # en grande. Antes era un párrafo apretado (y con "Friday" en inglés).
+        from PyQt6.QtWidgets import QHBoxLayout as _QH
+
+        # Selector por nombre: QLabel hereda de QFrame y si no, los textos
+        # de adentro también salían con recuadro.
+        self._TARJETA = (
+            "QFrame#tarjetaResumen { background: #ffffff; border: 2px solid #ddd0c0; border-radius: 14px; }"
+            "QFrame#tarjetaResumen QLabel { border: none; background: transparent; }"
+        )
+        fila = _QH()
+        fila.setSpacing(10)
+        self._card_hoy, self._card_hoy_valor = self._tarjeta_resumen("🛌  HOY DESCANSA")
+        self._card_man, self._card_man_valor = self._tarjeta_resumen("🛌  MAÑANA DESCANSA")
+        fila.addWidget(self._card_hoy, 1)
+        fila.addWidget(self._card_man, 1)
+        ly.addLayout(fila)
+        self._card_pagos = QFrame()
+        self._card_pagos.setObjectName("tarjetaResumen")
+        self._card_pagos.setStyleSheet(self._TARJETA)
+        self._card_pagos_ly = QVBoxLayout(self._card_pagos)
+        self._card_pagos_ly.setContentsMargins(14, 10, 14, 12)
+        self._card_pagos_ly.setSpacing(4)
+        ly.addWidget(self._card_pagos)
+        # Línea chica: horario del corte / avisos de conexión.
         self._resumen_menu = QLabel("")
         self._resumen_menu.setWordWrap(True)
-        self._resumen_menu.setStyleSheet(
-            "font-size: 17px; font-weight: 600; color: #2c2a27; background: #ffffff;"
-            " border: 2px solid #ddd0c0; border-radius: 12px; padding: 10px;"
-        )
+        self._resumen_menu.setStyleSheet("font-size: 14px; font-weight: 600; color: #8a7358;")
         ly.addWidget(self._resumen_menu)
+        ly.addSpacing(4)
+        # El corte es lo de todos los días: va primero y en terracota.
+        btn_hacer = QPushButton("🧾  Hacer corte")
+        btn_hacer.setStyleSheet(self._BTN_ACENTO)
+        btn_hacer.clicked.connect(self._ir_a_corte_hoy)
+        ly.addWidget(btn_hacer)
         btn_apuntar = QPushButton("🗓  Apuntar falta o descanso")
         btn_apuntar.setStyleSheet(self._BTN)
         btn_apuntar.clicked.connect(self._ir_a_quien)
         ly.addWidget(btn_apuntar)
-        btn_cortes = QPushButton("💵  Ver cortes")
-        btn_cortes.setStyleSheet(self._BTN)
-        btn_cortes.clicked.connect(self._ir_a_cortes)
-        ly.addWidget(btn_cortes)
-        btn_hacer = QPushButton("🧾  Hacer corte")
-        btn_hacer.setStyleSheet(self._BTN)
-        btn_hacer.clicked.connect(self._ir_a_corte_hoy)
-        ly.addWidget(btn_hacer)
         btn_retiro = QPushButton("💸  Saqué dinero del cajón")
         btn_retiro.setStyleSheet(self._BTN)
         btn_retiro.clicked.connect(self._apuntar_retiro)
         ly.addWidget(btn_retiro)
+        btn_cortes = QPushButton("💵  Ver cortes")
+        btn_cortes.setStyleSheet(self._BTN)
+        btn_cortes.clicked.connect(self._ir_a_cortes)
+        ly.addWidget(btn_cortes)
         ly.addStretch()
         salir = QPushButton("Salir")
         salir.setStyleSheet(self._BTN_SUAVE)
@@ -844,25 +868,87 @@ class CalendarioEncargadoDialog(QDialog):
                 con_deshacer=False,
             )
 
+    def _tarjeta_resumen(self, titulo: str):
+        caja = QFrame()
+        caja.setObjectName("tarjetaResumen")
+        caja.setStyleSheet(self._TARJETA)
+        cl = QVBoxLayout(caja)
+        cl.setContentsMargins(14, 10, 14, 12)
+        cl.setSpacing(2)
+        t = QLabel(titulo)
+        t.setStyleSheet("font-size: 12px; font-weight: 800; color: #a0876f; letter-spacing: 1px;")
+        v = QLabel("—")
+        v.setWordWrap(True)
+        v.setStyleSheet("font-size: 22px; font-weight: 800; color: #2c2a27;")
+        cl.addWidget(t)
+        cl.addWidget(v)
+        return caja, v
+
+    @staticmethod
+    def _nombre_pila(nombre: str) -> str:
+        return (nombre or "").split()[0] if nombre else ""
+
+    def _pintar_resumen_menu(self, resumen) -> None:
+        """Tarjetas: descansos con nombre de pila; pagos una línea por persona."""
+        from pos_uniformes.services.nomina_service import cuando_pago
+
+        self._card_hoy_valor.setText(", ".join(self._nombre_pila(n) for n in resumen.descansan_hoy) or "nadie")
+        self._card_man_valor.setText(", ".join(self._nombre_pila(n) for n in resumen.descansan_manana) or "nadie")
+        while self._card_pagos_ly.count():
+            w = self._card_pagos_ly.takeAt(0).widget()
+            if w is not None:
+                w.setParent(None)
+                w.deleteLater()
+        t = QLabel("💵  PAGOS")
+        t.setStyleSheet("font-size: 12px; font-weight: 800; color: #a0876f; letter-spacing: 1px;")
+        self._card_pagos_ly.addWidget(t)
+        if not resumen.pagos:
+            v = QLabel("Nadie cobra en los próximos 7 días.")
+            v.setStyleSheet("font-size: 18px; font-weight: 700; color: #2c2a27;")
+            self._card_pagos_ly.addWidget(v)
+            return
+        for a in resumen.pagos[:5]:
+            cuando = cuando_pago(a)
+            urgente = cuando == "HOY" or cuando.startswith("ATRASADO")
+            fila = QLabel(f"{self._nombre_pila(a.employee_name)}  ·  <b>{cuando}</b>  ·  ${a.total_estimado:,.2f}")
+            fila.setTextFormat(Qt.TextFormat.RichText)
+            fila.setStyleSheet(
+                "font-size: 19px; font-weight: 700; color: %s;" % ("#a84f2d" if urgente else "#2c2a27")
+            )
+            self._card_pagos_ly.addWidget(fila)
+        if len(resumen.pagos) > 5:
+            mas = QLabel(f"+{len(resumen.pagos) - 5} más")
+            mas.setStyleSheet("font-size: 14px; color: #8a7358;")
+            self._card_pagos_ly.addWidget(mas)
+
     def _cargar_resumen_menu(self) -> None:
-        """Quién descansa hoy/mañana y pagos de la semana, en palabras llanas."""
-        texto = "Sin conexión con la PC principal."
+        """Quién descansa hoy/mañana y pagos de la semana, en tarjetas."""
+        texto = ""
         try:
             from pos_uniformes.database.connection import get_session
-            from pos_uniformes.services.nomina_service import resumen_para_encargado, texto_resumen_encargado
+            from pos_uniformes.services.nomina_service import ResumenEncargado, resumen_para_encargado
 
             with get_session() as session:
                 try:
-                    texto = texto_resumen_encargado(resumen_para_encargado(session))
+                    self._pintar_resumen_menu(resumen_para_encargado(session))
                 except Exception:  # noqa: BLE001 — base sin migrar: no dejar la sesión rota
                     logger.exception("Encargado: no se pudo cargar el resumen")
                     session.rollback()
+                    self._pintar_resumen_menu(ResumenEncargado([], [], []))
+                    texto = "Sin conexión con la PC principal."
         except Exception:  # noqa: BLE001
             logger.exception("Encargado: sin sesión para el resumen")
+            texto = "Sin conexión con la PC principal."
         try:
-            from pos_uniformes.services.horario_tienda_service import texto_horario_corte
+            from datetime import date as _date
 
-            texto = f"{texto}\n\n🧾 {texto_horario_corte()} Si necesitas hacerlo antes, usa el botón."
+            from pos_uniformes.services.horario_tienda_service import hora_corte
+
+            normal = hora_corte(_date(2026, 9, 7)).strftime("%H:%M")      # lunes
+            temprano = hora_corte(_date(2026, 9, 10)).strftime("%H:%M")   # jueves
+            # El corte por hora está apagado: Daniel lo ordena desde su celular
+            # o León lo hace con el botón. Nada de "se hace solo".
+            texto = (texto + "  " if texto else "") + f"🧾 Hora del corte: {normal} (jueves y domingo {temprano})."
         except Exception:  # noqa: BLE001
             pass
         self._resumen_menu.setText(texto)

@@ -252,6 +252,22 @@ def resumen_para_encargado(session, hoy: date | None = None) -> ResumenEncargado
     )
 
 
+_DIAS_ES = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
+
+
+def cuando_pago(a: AvisoPago) -> str:
+    """'HOY' · 'mañana' · 'viernes 11/09' · 'ATRASADO 2 día(s)' · 'sin fecha…' (en español, no %A)."""
+    if a.fecha_pago is None:
+        return "sin fecha (nunca se le ha pagado)"
+    if a.dias_para_pago is not None and a.dias_para_pago < 0:
+        return f"ATRASADO {-a.dias_para_pago} día(s)"
+    if a.dias_para_pago == 0:
+        return "HOY"
+    if a.dias_para_pago == 1:
+        return "mañana"
+    return f"{_DIAS_ES[a.fecha_pago.weekday()]} {a.fecha_pago.strftime('%d/%m')}"
+
+
 def texto_resumen_encargado(resumen: ResumenEncargado, hoy: date | None = None) -> str:
     """Texto corto para la pantalla del encargado / la app del celular."""
     hoy = hoy or date.today()
@@ -261,16 +277,7 @@ def texto_resumen_encargado(resumen: ResumenEncargado, hoy: date | None = None) 
     if resumen.pagos:
         lineas = []
         for a in resumen.pagos:
-            if a.fecha_pago is None:
-                cuando = "sin fecha (nunca se le ha pagado)"
-            elif a.dias_para_pago is not None and a.dias_para_pago < 0:
-                cuando = f"ATRASADO {-a.dias_para_pago} día(s)"
-            elif a.dias_para_pago == 0:
-                cuando = "HOY"
-            elif a.dias_para_pago == 1:
-                cuando = "mañana"
-            else:
-                cuando = a.fecha_pago.strftime("%A %d/%m")
+            cuando = cuando_pago(a)
             lineas.append(f"{a.employee_name}: {cuando} · {a.comisiones} comisiones · ${a.total_estimado:,.2f}")
         partes.append("Pagos: " + " | ".join(lineas))
     else:
