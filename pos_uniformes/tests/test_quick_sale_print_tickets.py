@@ -526,6 +526,55 @@ class ProductoSinCodigoTests(unittest.TestCase):
             datos = w._ask_producto_sin_codigo()
         self.assertEqual(datos, {"nombre": "Arreglo de bastilla", "precio": Decimal("80.50"), "cantidad": 2})
 
+    def test_chip_de_prenda_llena_el_nombre(self) -> None:
+        from PyQt6.QtWidgets import QLineEdit as _QLE, QPushButton as _QPB
+
+        w = self._widget()
+        vistos: dict = {}
+
+        def _exec(dlg):
+            botones = {b.text(): b for b in dlg.findChildren(_QPB)}
+            chips = [b for b in dlg.findChildren(_QPB) if b.objectName() == "chipPrenda"]
+            vistos["chips"] = [c.text() for c in chips]
+            botones["Blusa"].click()
+            vistos["nombre"] = dlg.findChildren(_QLE)[0].text()
+            vistos["marcado"] = botones["Blusa"].isChecked()
+            for k in ("1", "2", "0"):
+                botones[k].click()
+            botones["🛒  Agregar al carrito"].click()
+            return QDialog.DialogCode.Accepted
+
+        with patch.object(QDialog, "exec", _exec):
+            datos = w._ask_producto_sin_codigo()
+        self.assertEqual(vistos["chips"], list(QuickSaleWidget.PRENDAS_RAPIDAS))
+        self.assertEqual(len(vistos["chips"]), 8)
+        self.assertEqual(vistos["nombre"], "Blusa")
+        self.assertTrue(vistos["marcado"])
+        self.assertEqual(datos, {"nombre": "Blusa", "precio": Decimal("120.00"), "cantidad": 1})
+
+    def test_chip_otro_limpia_y_escribir_desmarca(self) -> None:
+        from PyQt6.QtWidgets import QLineEdit as _QLE, QPushButton as _QPB
+
+        w = self._widget()
+        vistos: dict = {}
+
+        def _exec(dlg):
+            botones = {b.text(): b for b in dlg.findChildren(_QPB)}
+            campo = dlg.findChildren(_QLE)[0]
+            botones["Camisa"].click()
+            botones["Otro"].click()
+            vistos["tras_otro"] = campo.text()
+            botones["Calceta"].click()
+            campo.setText("Calcetas largas")
+            campo.textEdited.emit("Calcetas largas")
+            vistos["calceta_marcada"] = botones["Calceta"].isChecked()
+            return QDialog.DialogCode.Rejected
+
+        with patch.object(QDialog, "exec", _exec):
+            self.assertIsNone(w._ask_producto_sin_codigo())
+        self.assertEqual(vistos["tras_otro"], "")
+        self.assertFalse(vistos["calceta_marcada"])
+
 
 class AnticipoApartadoTests(unittest.TestCase):
     """El anticipo del apartado es dinero que SÍ entró al cajón: va en el

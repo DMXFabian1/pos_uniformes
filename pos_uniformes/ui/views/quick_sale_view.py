@@ -1341,6 +1341,9 @@ class QuickSaleWidget(QWidget):
     # ─── Producto sin código ─────────────────────────────────────────────
 
     _SKU_SIN_CODIGO = "SIN-CODIGO"
+    # Prendas de un toque en "Producto sin código" (Daniel, 2026-09-09).
+    # 8 para que la cuadrícula 4×2 quede pareja; "Otro" limpia y deja escribir.
+    PRENDAS_RAPIDAS = ("Blusa", "Playera", "Camisa", "Pantalón", "Chamarra", "Calceta", "Ropa interior", "Otro")
 
     def _on_producto_sin_codigo(self) -> None:
         if not self._employee_code:
@@ -1463,7 +1466,60 @@ class QuickSaleWidget(QWidget):
         ly.addWidget(et)
         nombre_input = QLineEdit()
         nombre_input.setPlaceholderText("Ej. Listón, parche, arreglo de bastilla...")
+
+        # Chips de prendas (4×2, chicos): un toque llena "¿Qué es?" y salta
+        # al precio. Escribir a mano quita la marca del chip.
+        from PyQt6.QtWidgets import QButtonGroup, QGridLayout, QSizePolicy
+
+        _CHIP = (
+            "QPushButton { background: #ffffff; color: #2c2a27;"
+            "  border: 1.5px solid #ddd0c0; border-radius: 10px;"
+            "  min-height: 38px; padding: 0 6px; font-size: 14px; font-weight: 700; }"
+            "QPushButton:checked { background: #f7e3d8; color: #73341c;"
+            "  border: 2px solid #a84f2d; }"
+            "QPushButton:pressed { background: #f1e6d6; }"
+        )
+        chips = QGridLayout()
+        chips.setSpacing(6)
+        grupo = QButtonGroup(dlg)
+        grupo.setExclusive(True)
+        columnas = 4
+
+        def _elegir_prenda(nombre: str) -> None:
+            if nombre == "Otro":
+                nombre_input.blockSignals(True)
+                nombre_input.clear()
+                nombre_input.blockSignals(False)
+                nombre_input.setFocus()
+                return
+            nombre_input.blockSignals(True)
+            nombre_input.setText(nombre)
+            nombre_input.blockSignals(False)
+            precio_input.setFocus()
+
+        for i, prenda in enumerate(self.PRENDAS_RAPIDAS):
+            chip = QPushButton(prenda)
+            chip.setObjectName("chipPrenda")
+            chip.setCheckable(True)
+            chip.setAutoDefault(False)
+            chip.setStyleSheet(_CHIP)
+            chip.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            chip.clicked.connect(lambda _=False, n=prenda: _elegir_prenda(n))
+            grupo.addButton(chip)
+            chips.addWidget(chip, i // columnas, i % columnas)
+        for c in range(columnas):
+            chips.setColumnStretch(c, 1)
+        ly.addLayout(chips)
         ly.addWidget(nombre_input)
+
+        def _desmarcar_chips(_t: str) -> None:
+            marcado = grupo.checkedButton()
+            if marcado is not None and marcado.text() != nombre_input.text():
+                grupo.setExclusive(False)
+                marcado.setChecked(False)
+                grupo.setExclusive(True)
+
+        nombre_input.textEdited.connect(_desmarcar_chips)
 
         et2 = QLabel("Precio por pieza")
         et2.setStyleSheet(f"font-size: 13px; color: {_MUTED}; font-weight: 700;")
@@ -1527,7 +1583,7 @@ class QuickSaleWidget(QWidget):
                 cant_row.addWidget(cant_label)
             else:
                 cant_row.addWidget(b)
-        cant_row.addStretch()
+        cant_row.addStretch(1)
         cant_row.addWidget(total_label)
         ly.addLayout(cant_row)
         precio_input.textChanged.connect(lambda _t: _actualizar_total())
@@ -1580,7 +1636,7 @@ class QuickSaleWidget(QWidget):
         btn_cancel.clicked.connect(dlg.reject)
         btn_ok.clicked.connect(_confirmar)
         btn_row.addWidget(btn_cancel, 1)
-        btn_row.addWidget(btn_ok, 2)
+        btn_row.addWidget(btn_ok, 1)  # mitad y mitad: pie simétrico
         ly.addLayout(btn_row)
 
         dlg.setLayout(ly)
