@@ -251,7 +251,7 @@ class QuickSaleLibretaHookTests(unittest.TestCase):
         """Dispara Ticket Venta y simula que la impresión SÍ arrancó."""
         llamadas_previas = encolar.call_count
         with patch.object(widget, "_load_business_info", return_value=("M", "", "")), \
-                patch.object(widget, "_ask_venta_options", return_value=(False, card)), \
+                patch.object(widget, "_ask_venta_options", return_value=(False, card, False)), \
                 patch.object(widget, "_drenar_libreta_en_background"), \
                 patch("pos_uniformes.ui.views.quick_sale_view.route_tickets") as route:
             widget._on_ticket_venta()
@@ -310,7 +310,7 @@ class QuickSaleLibretaHookTests(unittest.TestCase):
         # Se contesta el diálogo pero NUNCA se imprime: cero registro.
         widget = self._make_widget()
         with patch.object(widget, "_load_business_info", return_value=("M", "", "")), \
-                patch.object(widget, "_ask_venta_options", return_value=(True, False)), \
+                patch.object(widget, "_ask_venta_options", return_value=(True, False, False)), \
                 patch(
                     "pos_uniformes.services.libreta_local_queue_service.encolar_operacion"
                 ) as encolar, \
@@ -321,7 +321,7 @@ class QuickSaleLibretaHookTests(unittest.TestCase):
     def test_registro_fallido_no_rompe_tickets(self) -> None:
         widget = self._make_widget()
         with patch.object(widget, "_load_business_info", return_value=("M", "", "")), \
-                patch.object(widget, "_ask_venta_options", return_value=(False, False)), \
+                patch.object(widget, "_ask_venta_options", return_value=(False, False, False)), \
                 patch(
                     "pos_uniformes.services.libreta_local_queue_service.encolar_operacion",
                     side_effect=OSError("disco lleno"),

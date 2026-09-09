@@ -1132,10 +1132,13 @@ class QuickSaleWidget(QWidget):
         dlg.exec()
         return respuesta["tarjeta"]
 
-    def _ask_venta_options(self) -> tuple[bool, bool]:
+    def _ask_venta_options(self) -> tuple[bool, bool, bool]:
         """Pregunta copia interna y forma de pago en un solo diálogo.
 
-        Devuelve (con_copia, pago_tarjeta). Default: sin copia, efectivo.
+        Devuelve (con_copia, pago_tarjeta, sin_ticket). Default: sin copia,
+        efectivo, con ticket. "Sin ticket" (2026-09-09, pedido de Daniel):
+        la venta se registra en la Libreta igual que siempre pero no sale
+        papel; el ticket se reconstruye y reimprime después desde la Libreta.
         Escanear el gafete de la empleada en sesión equivale a "sí, con
         copia"; cualquier otro código se rechaza. Aquí NO va el
         ScannerEnterGuard: el escaneo es entrada legítima y el Enter del
@@ -1207,10 +1210,16 @@ class QuickSaleWidget(QWidget):
         error_label.setVisible(False)
 
         wants_copy = False
+        sin_ticket = False
 
         def _accept_with_copy() -> None:
             nonlocal wants_copy
             wants_copy = True
+            dlg.accept()
+
+        def _accept_sin_ticket() -> None:
+            nonlocal sin_ticket
+            sin_ticket = True
             dlg.accept()
 
         def _on_scan() -> None:
@@ -1255,6 +1264,20 @@ class QuickSaleWidget(QWidget):
         btn_row.addWidget(yes_button, 1)
         ly.addLayout(btn_row)
 
+        # Sin papel: se registra igual, se reimprime después si hace falta.
+        sin_ticket_button = QPushButton("🚫  Sin ticket (se registra, no se imprime)")
+        sin_ticket_button.setObjectName("sinTicketButton")
+        sin_ticket_button.setStyleSheet(
+            "QPushButton { background: transparent; color: #73341c;"
+            "  border: 2px dashed #c9b8a3; border-radius: 14px; min-height: 48px;"
+            "  font-size: 15px; font-weight: 700; }"
+            "QPushButton:pressed { background: #e8dbc7; }"
+        )
+        sin_ticket_button.setAutoDefault(False)
+        sin_ticket_button.setDefault(False)
+        sin_ticket_button.clicked.connect(_accept_sin_ticket)
+        ly.addWidget(sin_ticket_button)
+
         ly.addSpacing(2)
         ly.addWidget(hint)
         ly.addWidget(scan_input)
@@ -1264,7 +1287,7 @@ class QuickSaleWidget(QWidget):
         QTimer.singleShot(0, scan_input.setFocus)
         dlg.exec()
         # La forma de pago vale aunque conteste "solo ticket del cliente".
-        return wants_copy, btn_tarjeta.isChecked()
+        return wants_copy, btn_tarjeta.isChecked(), sin_ticket
 
     def build_reprint_ticket(
         self,
@@ -1578,7 +1601,15 @@ class QuickSaleWidget(QWidget):
             wants_copy = True  # la COPIA EMPLEADA es automática
             card = self._ask_card_payment()
         else:
-            wants_copy, card = self._ask_venta_options()
+            wants_copy, card, sin_ticket = self._ask_venta_options()
+            if sin_ticket:
+                # Se anota igual (piezas, comisiones, forma de pago) y el
+                # carrito se vacía; nada va a la impresora. Reimpresión:
+                # Libreta → 🖨 Reimprimir (build_reprint_ticket).
+                self._registrar_y_vaciar("venta", pago_tarjeta=card)
+                self._avisar_sin_ticket()
+                self._scan_input.setFocus()
+                return
         tickets = [self._build_venta_text()]
         if self._discount_active:
             tickets.append(self._build_employee_copy_text(terminal_commission=card))
@@ -1593,6 +1624,19 @@ class QuickSaleWidget(QWidget):
             on_printed=lambda: self._registrar_y_vaciar("venta", pago_tarjeta=card),
         )
         self._scan_input.setFocus()
+
+    def _avisar_sin_ticket(self) -> None:
+        """Confirmación breve, sin botón que tocar: se cierra sola."""
+        aviso = QLabel("✅ Venta registrada sin ticket. Se puede reimprimir desde la Libreta.", self)
+        aviso.setStyleSheet(
+            "background: #2c2a27; color: #ffffff; border-radius: 12px;"
+            " padding: 12px 18px; font-size: 15px; font-weight: 700;"
+        )
+        aviso.adjustSize()
+        aviso.move(max(0, (self.width() - aviso.width()) // 2), max(0, self.height() - aviso.height() - 24))
+        aviso.show()
+        aviso.raise_()
+        QTimer.singleShot(3500, aviso.deleteLater)
 
     def _on_abono(self) -> None:
         """Registra en la Libreta un abono a un apartado (sin comisión).

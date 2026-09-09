@@ -49,18 +49,32 @@ class QuickSaleTicketDialogTests(unittest.TestCase):
         widget = self._make_widget()
         widget._discount_active = False
         with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")), \
-                patch.object(widget, "_ask_venta_options", return_value=(False, False)), \
+                patch.object(widget, "_ask_venta_options", return_value=(False, False, False)), \
                 patch(f"{_MOD}.route_tickets") as opd:
             widget._on_ticket_venta()
         opd.assert_called_once()
         tickets = opd.call_args.args[2]
         self.assertEqual(len(tickets), 1)
 
+    def test_venta_sin_ticket_registra_y_no_imprime(self) -> None:
+        # "Sin ticket": la Libreta la anota (con forma de pago) y el carrito
+        # se vacía, pero route_tickets ni se llama.
+        widget = self._make_widget()
+        widget._discount_active = False
+        with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")), \
+                patch.object(widget, "_ask_venta_options", return_value=(False, True, True)), \
+                patch.object(widget, "_registrar_en_libreta") as registrar, \
+                patch(f"{_MOD}.route_tickets") as opd:
+            widget._on_ticket_venta()
+        opd.assert_not_called()
+        registrar.assert_called_once_with("venta", cliente=None, pago_tarjeta=True)
+        self.assertEqual(widget._items, [])
+
     def test_venta_with_copy_confirmed_prints_store_copy(self) -> None:
         widget = self._make_widget()
         widget._discount_active = False
         with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")), \
-                patch.object(widget, "_ask_venta_options", return_value=(True, False)), \
+                patch.object(widget, "_ask_venta_options", return_value=(True, False, False)), \
                 patch(f"{_MOD}.route_tickets") as opd:
             widget._on_ticket_venta()
         opd.assert_called_once()
@@ -76,7 +90,7 @@ class QuickSaleTicketDialogTests(unittest.TestCase):
         widget = self._make_widget()
         widget._discount_active = False
         with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")), \
-                patch.object(widget, "_ask_venta_options", return_value=(True, True)), \
+                patch.object(widget, "_ask_venta_options", return_value=(True, True, False)), \
                 patch.object(widget, "_registrar_en_libreta") as registrar, \
                 patch(f"{_MOD}.route_tickets") as opd:
             widget._on_ticket_venta()
@@ -188,7 +202,7 @@ class AskStoreCopyScanTests(unittest.TestCase):
     def test_dialog_returns_copy_and_card_tuple(self) -> None:
         widget = self._make_widget()
         with patch.object(QDialog, "exec", self._fake_exec_scanning("EMPÑVEND-1")):
-            self.assertEqual(widget._ask_venta_options(), (True, False))
+            self.assertEqual(widget._ask_venta_options(), (True, False, False))
 
     def test_scan_confirms_copy_only_for_session_employee(self) -> None:
         widget = self._make_widget()
@@ -212,13 +226,25 @@ class AskStoreCopyScanTests(unittest.TestCase):
     def test_own_badge_scan_answers_yes(self) -> None:
         widget = self._make_widget()
         with patch.object(QDialog, "exec", self._fake_exec_scanning("EMPÑVEND-1")):
-            wants_copy, _card = widget._ask_venta_options()
+            wants_copy, _card, _sin = widget._ask_venta_options()
         self.assertTrue(wants_copy)
+
+    def test_boton_sin_ticket(self) -> None:
+        widget = self._make_widget()
+
+        def _exec(dlg):
+            from PyQt6.QtWidgets import QPushButton
+
+            [b for b in dlg.findChildren(QPushButton) if b.objectName() == "sinTicketButton"][0].click()
+            return 0
+
+        with patch.object(QDialog, "exec", _exec):
+            self.assertEqual(widget._ask_venta_options(), (False, False, True))
 
     def test_foreign_scan_does_not_answer(self) -> None:
         widget = self._make_widget()
         with patch.object(QDialog, "exec", self._fake_exec_scanning("EMP:VEND-2")):
-            wants_copy, _card = widget._ask_venta_options()
+            wants_copy, _card, _sin = widget._ask_venta_options()
         self.assertFalse(wants_copy)
 
 
@@ -291,7 +317,7 @@ class LibretaCarritoTests(unittest.TestCase):
     def _vender(self, widget: QuickSaleWidget, registros: list) -> None:
         """Corre el flujo de venta y simula que la impresión arrancó."""
         with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")), \
-                patch.object(widget, "_ask_venta_options", return_value=(False, False)), \
+                patch.object(widget, "_ask_venta_options", return_value=(False, False, False)), \
                 patch.object(widget, "_drenar_libreta_en_background"), \
                 patch("pos_uniformes.services.libreta_local_queue_service.encolar_operacion",
                       side_effect=lambda op: registros.append(op)), \
@@ -330,7 +356,7 @@ class LibretaCarritoTests(unittest.TestCase):
         widget = self._make_widget()
         widget._discount_active = False
         with patch.object(widget, "_load_business_info", return_value=("MAXIMODA", "", "")), \
-                patch.object(widget, "_ask_venta_options", return_value=(False, False)), \
+                patch.object(widget, "_ask_venta_options", return_value=(False, False, False)), \
                 patch(f"{_MOD}.route_tickets"):
             widget._on_ticket_venta()
         self.assertEqual(len(widget._items), 1)
