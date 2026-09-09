@@ -61,6 +61,25 @@ class EscucharTests(unittest.TestCase):
         enviar.assert_called_once()
         self.assertEqual(enviar.call_args.kwargs["chat_id"], "123")
 
+    def test_mensajes_viejos_no_se_ejecutan(self) -> None:
+        import time
+
+        viejo = int(time.time()) - 3600
+        updates = {"result": [
+            {"update_id": 1, "message": {"chat": {"id": 123}, "text": "/corte", "date": viejo}},
+            {"update_id": 2, "message": {"chat": {"id": 123}, "text": "hola", "date": viejo}},
+            {"update_id": 3, "message": {"chat": {"id": 123}, "text": "/ayuda", "date": int(time.time())}},
+        ]}
+        with patch("pos_uniformes.services.telegram_service._llamar", return_value=updates), patch(
+            "pos_uniformes.services.telegram_service.enviar_mensaje"
+        ) as enviar, patch.object(bot, "atender_texto", wraps=bot.atender_texto) as atender:
+            bot.escuchar(session_factory=_sesion, token="t", chat_id="123", una_vez=True)
+        self.assertEqual(atender.call_count, 1)
+        self.assertEqual(atender.call_args.args[0], "/ayuda")
+        textos = [c.args[0] for c in enviar.call_args_list]
+        self.assertEqual(len(textos), 2)  # aviso del /corte viejo + respuesta de /ayuda; el "hola" viejo, nada
+        self.assertIn("No atendí «/corte»", textos[0])
+
 
 if __name__ == "__main__":
     unittest.main()

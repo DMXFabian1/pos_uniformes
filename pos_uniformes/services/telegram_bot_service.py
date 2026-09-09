@@ -78,6 +78,20 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
     return f"No conozco /{cmd.nombre}. " + AYUDA
 
 
+MAX_ANTIGUEDAD_SEG = 10 * 60  # mensajes más viejos (bot apagado) no se ejecutan
+
+
+def _es_viejo(msg: dict, ahora: float | None = None) -> bool:
+    """Un /corte mandado ayer, con el bot apagado, no debe ejecutarse hoy."""
+    try:
+        fecha = float(msg.get("date") or 0)
+    except (TypeError, ValueError):
+        return False
+    if not fecha:
+        return False
+    return ((ahora if ahora is not None else time.time()) - fecha) > MAX_ANTIGUEDAD_SEG
+
+
 def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False) -> None:
     """Long-polling: atiende mensajes del chat autorizado hasta que lo paren."""
     from pos_uniformes.services import telegram_service
@@ -104,11 +118,20 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
             if chat != str(chat_id):
                 logger.info("Mensaje ignorado de chat %s", chat)
                 continue
-            try:
-                respuesta = atender_texto(texto, session_factory=session_factory)
-            except Exception as exc:  # noqa: BLE001
-                logger.exception("Error atendiendo %r", texto)
-                respuesta = f"Falló: {exc}"
+            if _es_viejo(msg):
+                logger.info("Mensaje viejo ignorado: %r", texto)
+                respuesta = (
+                    f"Ya estoy en línea. No atendí «{texto[:40]}» porque es de antes de arrancar; "
+                    "si todavía lo quieres, mándalo otra vez."
+                ) if parsear(texto) else ""
+                if not respuesta:
+                    continue
+            else:
+                try:
+                    respuesta = atender_texto(texto, session_factory=session_factory)
+                except Exception as exc:  # noqa: BLE001
+                    logger.exception("Error atendiendo %r", texto)
+                    respuesta = f"Falló: {exc}"
             try:
                 telegram_service.enviar_mensaje(respuesta, token=token, chat_id=chat_id)
             except Exception as exc:  # noqa: BLE001
