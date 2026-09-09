@@ -162,6 +162,24 @@ class CorteAutomaticoTests(unittest.TestCase):
         self.assertEqual(auto.corte, "CORTE")
         self.assertEqual(auto.pagos, [pago])
 
+    def test_retirar_fija_lo_que_sale_del_cajon(self) -> None:
+        """/corte 5000 desde el celular: sale esa cifra y el fondo se queda."""
+        session = MagicMock()
+        estado = EstadoCaja(
+            desde=None, hasta=datetime(2026, 9, 9, 20, tzinfo=timezone.utc), reactivo=Decimal("1000.00"),
+            resumen=ResumenPeriodo(11, 23, Decimal("7480"), Decimal("1200"), Decimal("0"), Decimal("0"), Decimal("7480.00")),
+            pagos=Decimal("0.00"),
+        )
+        with patch.object(caja, "pagos_que_tocan_hoy", return_value=[]), patch.object(
+            caja, "estado_caja", return_value=estado
+        ), patch.object(caja, "cerrar_corte", return_value="CORTE") as cerrar:
+            caja.cerrar_corte_automatico(
+                session, creado_por="VEND-1", ahora=estado.hasta, retirar=Decimal("5000"),
+            )
+        # EN CAJA = fondo + lo que se retira → se retira exactamente 5000.
+        self.assertEqual(cerrar.call_args.kwargs["contado"], Decimal("6000.00"))
+        self.assertEqual(cerrar.call_args.kwargs["reactivo_final"], Decimal("1000.00"))
+
     def test_pagos_que_tocan_hoy_filtra(self) -> None:
         from datetime import date as _date
 

@@ -121,6 +121,80 @@ class ScriptTests(unittest.TestCase):
         hacer.assert_called_once()
 
 
+class OpcionesCorteTests(unittest.TestCase):
+    """/corte 5000 sintarjeta — cuánto se retira y si se esconde la tarjeta."""
+
+    def _leer(self, texto):
+        from pos_uniformes.services.telegram_bot_service import leer_opciones_corte
+
+        return leer_opciones_corte(texto)
+
+    def test_sin_argumento_es_el_corte_de_siempre(self) -> None:
+        o = self._leer("")
+        self.assertIsNone(o.retirar)
+        self.assertFalse(o.sin_tarjeta)
+
+    def test_cifra_y_palabra_en_cualquier_orden(self) -> None:
+        from decimal import Decimal
+
+        for texto in ("5000 sintarjeta", "sintarjeta 5000", "sintarjeta $5,000"):
+            o = self._leer(texto)
+            self.assertEqual(o.retirar, Decimal("5000.00"), texto)
+            self.assertTrue(o.sin_tarjeta, texto)
+
+    def test_con_centavos(self) -> None:
+        from decimal import Decimal
+
+        self.assertEqual(self._leer("5000.50").retirar, Decimal("5000.50"))
+
+    def test_palabras_raras_explican_como_se_usa(self) -> None:
+        with self.assertRaises(ValueError) as caso:
+            self._leer("mañana")
+        self.assertIn("/corte 5000", str(caso.exception))
+
+    def test_negativo_se_rechaza(self) -> None:
+        with self.assertRaises(ValueError):
+            self._leer("-100")
+
+
+class CorteConModificacionesTests(unittest.TestCase):
+    """El bot pasa las opciones al corte y el papel cuadra con la cifra."""
+
+    def test_el_comando_llega_al_servicio(self) -> None:
+        from contextlib import contextmanager
+        from decimal import Decimal
+        from unittest.mock import MagicMock
+
+        from pos_uniformes.services import corte_remoto_service as crs
+        from pos_uniformes.services import telegram_bot_service as bot
+
+        @contextmanager
+        def _sesion():
+            yield MagicMock()
+
+        with patch.object(crs, "hacer_corte_y_avisar") as hacer:
+            hacer.return_value = MagicMock(mensaje="listo")
+            bot.atender_texto("/corte 5000 sintarjeta", session_factory=_sesion)
+        self.assertEqual(hacer.call_args.kwargs["retirar"], Decimal("5000.00"))
+        self.assertTrue(hacer.call_args.kwargs["sin_tarjeta"])
+
+    def test_argumento_invalido_no_hace_corte(self) -> None:
+        from contextlib import contextmanager
+        from unittest.mock import MagicMock
+
+        from pos_uniformes.services import corte_remoto_service as crs
+        from pos_uniformes.services import telegram_bot_service as bot
+
+        @contextmanager
+        def _sesion():
+            yield MagicMock()
+
+        with patch.object(crs, "hacer_corte_y_avisar") as hacer:
+            r = bot.atender_texto("/corte mañana", session_factory=_sesion)
+        hacer.assert_not_called()
+        self.assertIn("No entendí", r)
+
+
 class BotTests(unittest.TestCase):
     def test_nocorte_responde_segun_haya_propuesta(self) -> None:
         from pos_uniformes.services import telegram_bot_service as bot

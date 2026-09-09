@@ -359,11 +359,18 @@ def datos_ticket_encargado(session, desde: datetime | None, hasta: datetime) -> 
     )
 
 
-def cerrar_corte_automatico(session, *, creado_por: str, ahora: datetime | None = None, nota: str | None = None) -> CorteAutomatico:
+def cerrar_corte_automatico(
+    session, *, creado_por: str, ahora: datetime | None = None, nota: str | None = None,
+    retirar: Decimal | None = None,
+) -> CorteAutomatico:
     """Corte de un botón (encargado): registra los pagos que tocan hoy, cierra
     con el esperado como cifra final y deja el mismo fondo. Nadie cuenta ni
     captura nada; el ticket dice cuánto se vendió, a quién pagar y cuánto
-    se retira."""
+    se retira.
+
+    `retirar` (solo Daniel, desde el celular) fija cuánto sale del cajón: el
+    corte cierra en fondo + esa cifra y el resto se queda. El real calculado
+    igual queda guardado en `monto_esperado`, que solo ve él."""
     from pos_uniformes.services.nomina_service import registrar_pago_con_monto
 
     ahora = ahora or datetime.now().astimezone()
@@ -377,9 +384,13 @@ def cerrar_corte_automatico(session, *, creado_por: str, ahora: datetime | None 
     # Si los pagos superaron la venta, el fondo baja (no hay de dónde más
     # sacar); si no, se queda igual y el resto se retira.
     fondo = min(estado.reactivo, max(estado.esperado, Decimal("0.00")))
+    contado = max(estado.esperado, Decimal("0.00"))
+    if retirar is not None:
+        fondo = estado.reactivo
+        contado = (fondo + _d(retirar)).quantize(_CENT)
     corte = cerrar_corte(
         session,
-        contado=max(estado.esperado, Decimal("0.00")),
+        contado=contado,
         creado_por=creado_por,
         reactivo_final=fondo,
         nota=nota,

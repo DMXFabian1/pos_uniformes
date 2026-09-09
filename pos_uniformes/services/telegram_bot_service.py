@@ -2,6 +2,8 @@
 
 Comandos:
     /corte        hace el corte ahora e imprime el ticket en la tienda
+    /corte 5000   igual, pero se retiran $5,000 (el ticket cuadra con eso)
+    /corte sintarjeta   igual, pero los cobros con tarjeta quedan ocultos
     /nocorte      deja pasar el corte que se propuso hoy
     /estado       qué hay en caja ahora mismo
     /resumen      el resumen del día (el mismo de la noche)
@@ -19,6 +21,7 @@ import logging
 import time
 from dataclasses import dataclass
 from datetime import date
+from decimal import Decimal, InvalidOperation
 
 logger = logging.getLogger("telegram_bot")
 
@@ -27,6 +30,9 @@ CODIGO_REMOTO = "VEND-1"  # Daniel: el que manda /corte
 AYUDA = (
     "Comandos:\n"
     "/corte — hacer el corte ahora e imprimir el ticket en la tienda\n"
+    "/corte 5000 — el mismo corte, pero se retiran $5,000\n"
+    "/corte sintarjeta — sin que se vean los cobros con tarjeta\n"
+    "   (se pueden juntar: /corte 5000 sintarjeta)\n"
     "/nocorte — dejar pasar el corte propuesto hoy\n"
     "/estado — qué hay en caja ahora\n"
     "/resumen — resumen del día\n"
@@ -50,6 +56,43 @@ def parsear(texto: str) -> Comando | None:
     return Comando(nombre, partes[1].strip() if len(partes) > 1 else "")
 
 
+@dataclass(frozen=True)
+class OpcionesCorte:
+    """Lo que trae `/corte`: cuánto se retira y si se esconde la tarjeta."""
+
+    retirar: Decimal | None = None
+    sin_tarjeta: bool = False
+
+
+_SIN_TARJETA = {"sintarjeta", "sin-tarjeta", "sin_tarjeta", "st"}
+
+
+def leer_opciones_corte(argumento: str) -> OpcionesCorte:
+    """'5000 sintarjeta' → retira $5,000 y esconde la tarjeta. En cualquier
+    orden; '$5,000.50' también vale."""
+    retirar: Decimal | None = None
+    sin_tarjeta = False
+    for palabra in (argumento or "").split():
+        limpia = palabra.strip().lower()
+        if limpia in _SIN_TARJETA:
+            sin_tarjeta = True
+            continue
+        crudo = limpia.replace("$", "").replace(",", "").replace("_", "")
+        try:
+            valor = Decimal(crudo)
+        except (InvalidOperation, ValueError):
+            raise ValueError(
+                f"No entendí «{palabra}». Se usa así:\n"
+                "/corte — con la cifra calculada\n"
+                "/corte 5000 — se retiran $5,000\n"
+                "/corte 5000 sintarjeta — además, sin los cobros con tarjeta"
+            ) from None
+        if valor < 0:
+            raise ValueError("Lo que se retira no puede ser negativo.")
+        retirar = valor.quantize(Decimal("0.01"))
+    return OpcionesCorte(retirar=retirar, sin_tarjeta=sin_tarjeta)
+
+
 def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> str:
     """Devuelve la respuesta para un mensaje. `session_factory()` abre sesión."""
     cmd = parsear(texto)
@@ -60,8 +103,15 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
     if cmd.nombre == "corte":
         from pos_uniformes.services.corte_remoto_service import hacer_corte_y_avisar
 
+        try:
+            opciones = leer_opciones_corte(cmd.argumento)
+        except ValueError as exc:
+            return str(exc)
         with session_factory() as session:
-            return hacer_corte_y_avisar(session, creado_por=CODIGO_REMOTO).mensaje
+            return hacer_corte_y_avisar(
+                session, creado_por=CODIGO_REMOTO,
+                retirar=opciones.retirar, sin_tarjeta=opciones.sin_tarjeta,
+            ).mensaje
     if cmd.nombre == "nocorte":
         from pos_uniformes.services.corte_propuesta_service import cancelar
 
