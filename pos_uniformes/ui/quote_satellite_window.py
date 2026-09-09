@@ -2607,11 +2607,11 @@ class QuoteSatelliteWindow(QMainWindow):
             pregunta = "Este movimiento está oculto para tu papá.\n¿Volver a mostrárselo?"
         else:
             pregunta = (
-                "Tu papá dejará de ver este movimiento por completo: ni el "
-                "monto, ni las piezas, ni las comisiones.\n\n"
+                "Tu papá dejará de ver el dinero de este cobro: no aparece en "
+                "su ticket del corte, su pantalla ni su celular.\n\n"
                 + (
-                    f"Ojo: trae {comisiones} comisión(es); el pago que él calcule "
-                    "para esa empleada saldrá más bajo.\n\n"
+                    f"Sus {comisiones} comisión(es) sí siguen contando para el "
+                    "pago de la empleada.\n\n"
                     if comisiones
                     else ""
                 )
@@ -3172,7 +3172,7 @@ class QuoteSatelliteWindow(QMainWindow):
             if getattr(row, "pago_tarjeta", False):
                 tipo_txt += " (tarjeta)"
             if getattr(row, "privado", False):
-                tipo_txt = f"🔒 {tipo_txt}"  # tu papá no ve este movimiento
+                tipo_txt = f"🔒 {tipo_txt}"  # tu papá no ve este dinero
             if self._libreta_is_owner:
                 nombre = row.employee_name or row.employee_code
                 tipo_txt = f"{tipo_txt} — {nombre}"

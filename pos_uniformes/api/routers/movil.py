@@ -416,7 +416,7 @@ def encargado_inicio(
         "descansos_semana": _descansos_semana(db),
         "resumen": _resumen_encargado(db),
         "tarjetas": _tarjetas_encargado(db),
-        "pagos": _payload_pagos(db, str(empleada.codigo).upper()),
+        "pagos": _payload_pagos(db),
     }
 
 
@@ -466,11 +466,11 @@ def _resumen_encargado(db: Session) -> str:
         return ""
 
 
-def _payload_pagos(db: Session, para: str | None = None) -> list[dict]:
+def _payload_pagos(db: Session) -> list[dict]:
     try:
         from pos_uniformes.services.nomina_service import avisos_de_pago
 
-        avisos = avisos_de_pago(db, dias=365, para=para)
+        avisos = avisos_de_pago(db, dias=365)
     except Exception:  # noqa: BLE001
         return []
     return [
@@ -536,17 +536,15 @@ def encargado_corte_hoy(
     quien = str(empleada.codigo).upper()
     estado = estado_caja(db)
     r = estado.resumen
-    avisos = pagos_que_tocan_hoy(db, para=quien)
+    avisos = pagos_que_tocan_hoy(db)
     total_pagos = sum((a.total_estimado for a in avisos), Decimal("0"))
-    # Los movimientos privados del dueño no existen para el encargado.
+    # El DINERO de los cobros privados del dueño no existe para el encargado
+    # (las piezas y las comisiones sí: la empleada cobra lo que trabajó).
     from pos_uniformes.services.nomina_service import ve_privados
 
     tarjeta = r.tarjeta
-    piezas = r.piezas
     if not ve_privados(quien):
-        datos = datos_ticket_encargado(db, estado.desde, estado.hasta)
-        tarjeta = datos.tarjeta
-        piezas = sum(int(e.piezas or 0) for e in datos.por_empleada)
+        tarjeta = datos_ticket_encargado(db, estado.desde, estado.hasta).tarjeta
     return {
         "pagos_hoy": [
             {"codigo": a.employee_code, "nombre": a.employee_name, "total": str(a.total_estimado), "comisiones": a.comisiones}
@@ -562,7 +560,7 @@ def encargado_corte_hoy(
         "pagos": str(estado.pagos),
         "esperado": str(estado.esperado),
         "operaciones": r.operaciones,
-        "piezas": piezas,
+        "piezas": r.piezas,
         "hay_ventas": r.operaciones > 0,
         # Compatibilidad con la PWA anterior.
         "venta": str(r.efectivo),
@@ -628,7 +626,7 @@ def encargado_pago_pendiente(
 
     empleada, _p = current
     _solo_gestor(empleada)
-    d = pago_pendiente(db, employee_code, para=str(empleada.codigo).upper())
+    d = pago_pendiente(db, employee_code)
     return {
         "codigo": d.employee_code,
         "desde": d.desde.isoformat() if d.desde else None,

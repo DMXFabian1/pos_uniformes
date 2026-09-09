@@ -345,9 +345,8 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
             parent,
             "Movimientos ocultos",
             f"{ocultos} cobro(s) con tarjeta quedaron ocultos para el encargado: "
-            "no los verá en su ticket, su pantalla ni su celular.\n\n"
-            "Ojo: sus comisiones tampoco las cuenta él, así que el pago que "
-            "calcule saldrá más bajo.",
+            "ese dinero no aparece en su ticket, su pantalla ni su celular.\n\n"
+            "Las comisiones de la empleada sí siguen contando: su pago no cambia.",
         )
     try:
         from pos_uniformes.ui.helpers.ticket_routing_helper import route_tickets
@@ -428,7 +427,7 @@ def confirmar_pago(parent: QWidget | None, *, employee_code: str, employee_name:
     fecha = fecha or _date.today()
     try:
         with get_session() as session:
-            d = pago_pendiente(session, employee_code, fecha, para=creado_por)
+            d = pago_pendiente(session, employee_code, fecha)
     except Exception:  # noqa: BLE001
         logger.exception("Pago: no se pudo calcular")
         QMessageBox.warning(parent, "Sin conexión", "No se alcanzó la base. Inténtalo otra vez.")

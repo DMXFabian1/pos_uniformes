@@ -674,9 +674,10 @@ class EncargadoMovilTests(unittest.TestCase):
         ):
             estado = self.client.get("/api/v1/movil/encargado/corte_hoy").json()
             pend = self.client.get("/api/v1/movil/encargado/pago_pendiente/VEND-4").json()
-        self.assertEqual(estado["tarjeta"], "0.00")
-        self.assertEqual(pend["comisiones"], 2)  # solo las de la venta en efectivo
-        self.assertEqual(pend["total"], "1304.00")
+        self.assertEqual(estado["tarjeta"], "0.00")  # el dinero sí desaparece
+        # …pero la empleada cobra lo que trabajó: las 4 comisiones cuentan.
+        self.assertEqual(pend["comisiones"], 4)
+        self.assertEqual(pend["total"], "1308.00")
 
         # Y su ticket de corte tampoco lo lleva.
         self.session.query(Trabajo).delete()
@@ -689,7 +690,7 @@ class EncargadoMovilTests(unittest.TestCase):
         self.assertNotIn("Con tarjeta", texto)
         self.assertNotIn("705", texto)
         pago = self.session.query(EmpleadaPago).order_by(EmpleadaPago.id.desc()).first()
-        self.assertEqual(pago.comisiones, 2)
+        self.assertEqual(pago.comisiones, 4)  # el pago no se recorta por ocultar
 
     def test_corte_del_dueno_rechaza_fondo_mayor_a_lo_contado(self) -> None:
         self.session.add(CajaParametros(id=1, reactivo_actual=Decimal("1000.00")))

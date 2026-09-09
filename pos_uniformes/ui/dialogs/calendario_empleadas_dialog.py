@@ -831,7 +831,7 @@ class CalendarioEncargadoDialog(QDialog):
 
             with get_session() as session:
                 estado = estado_caja(session)
-                avisos = pagos_que_tocan_hoy(session, para="ENC-1")
+                avisos = pagos_que_tocan_hoy(session)
         except Exception:  # noqa: BLE001
             logger.exception("Encargado: no se pudo calcular el corte")
             QMessageBox.warning(self, "Sin conexión", "Inténtalo otra vez.")
@@ -965,7 +965,7 @@ class CalendarioEncargadoDialog(QDialog):
             from pos_uniformes.services.nomina_service import avisos_de_pago
 
             with get_session() as session:
-                avisos = avisos_de_pago(session, dias=365, para="ENC-1")
+                avisos = avisos_de_pago(session, dias=365)
         except Exception:  # noqa: BLE001
             logger.exception("Encargado: no se pudieron cargar los pagos")
             QMessageBox.warning(self, "Sin conexión", "Inténtalo otra vez.")

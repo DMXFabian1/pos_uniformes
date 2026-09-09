@@ -351,10 +351,11 @@ def eliminar_operacion(session, operacion_id: int) -> bool:
 
 
 # ─── Movimientos privados del dueño ──────────────────────────────────────
-# Un cobro con tarjeta que Daniel marca como privado desaparece por completo
+# El DINERO de un cobro con tarjeta que Daniel marca como privado desaparece
 # de lo que ve el encargado: su ticket de corte, su pantalla y su modo del
-# celular — monto, piezas y comisiones. Solo tarjeta: el efectivo está en el
-# cajón y esconderlo descuadraría el corte.
+# celular. Las comisiones y las piezas siguen contando (la empleada cobra lo
+# que trabajó). Solo tarjeta: el efectivo está en el cajón y esconderlo
+# descuadraría el corte.
 
 
 class SoloElDueno(PermissionError):

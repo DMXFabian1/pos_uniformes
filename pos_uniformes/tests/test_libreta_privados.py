@@ -80,16 +80,14 @@ class MarcarTests(unittest.TestCase):
         self.assertTrue(L.hay_privados(rows))
         self.assertEqual(L.comisiones_ocultas(rows), 2)
 
-    def test_los_totales_del_encargado_pierden_piezas_y_comisiones(self) -> None:
-        """No solo el dinero: el movimiento entero desaparece para él."""
+    def test_el_dinero_privado_no_entra_en_los_totales_visibles(self) -> None:
+        """Lo que se esconde es el dinero; `sin_privados` es lo que ve él."""
         v = _venta(self.session, tarjeta=True, monto="700.00", comisiones=2)
         _venta(self.session, tarjeta=False, monto="300.00", comisiones=1)
         L.marcar_privado(self.session, v.id, privado=True, creado_por="VEND-1")
         rows = L.sin_privados(self.session.query(LibretaVenta).all())
         resumen = L.resumir_por_empleada(rows)
         self.assertEqual(len(resumen), 1)
-        self.assertEqual(resumen[0].comisiones, 1)
-        self.assertEqual(resumen[0].piezas, 3)
         self.assertEqual(resumen[0].monto_total, Decimal("300.00"))
 
 

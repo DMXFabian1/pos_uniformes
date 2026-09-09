@@ -1934,9 +1934,10 @@ class LibretaVenta(Base):
     # si fue pago con tarjeta); igual a monto_total en efectivo.
     monto_neto: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     pago_tarjeta: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
-    # Privado del dueño: el encargado no ve este movimiento en ninguna parte
-    # (ni monto, ni piezas, ni comisiones). Solo se pueden marcar cobros con
-    # TARJETA: ocultar efectivo descuadraría el corte del cajón.
+    # Privado del dueño: el encargado no ve el DINERO de este cobro en
+    # ninguna parte (ticket, pantalla, celular). Las comisiones y piezas sí
+    # cuentan: la empleada cobra lo que trabajó. Solo cobros con TARJETA:
+    # ocultar efectivo descuadraría el corte del cajón.
     privado: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     descuento_empleada: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     # Líneas de la operación: [{sku, nombre, talla, cantidad, precio, subtotal}]
