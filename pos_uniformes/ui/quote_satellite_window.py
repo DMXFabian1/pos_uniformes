@@ -317,6 +317,15 @@ def _paginate(options: list, page: int, per_page: int) -> tuple[list, int, int]:
 _DIA_CORTO = ("Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom")
 
 
+def _ajustar_alto_lista(lista) -> None:
+    """Alto exacto al contenido de una QListWidget, contando renglones envueltos."""
+    lista.doItemsLayout()
+    alto = 2 * lista.frameWidth() + 12
+    for i in range(lista.count()):
+        alto += max(lista.visualItemRect(lista.item(i)).height(), lista.sizeHintForRow(i))
+    lista.setFixedHeight(max(alto, 120))
+
+
 class QuoteSatelliteWindow(QMainWindow):
     # Emite el resultado del watchdog de reconexión desde el hilo de fondo al
     # hilo de UI: (rows | None, school_links | None). None = DB no disponible.
@@ -1254,9 +1263,17 @@ class QuoteSatelliteWindow(QMainWindow):
         view_ly.setSpacing(8)
 
         header = QHBoxLayout()
+        titulo_col = QVBoxLayout()
+        titulo_col.setSpacing(0)
         self.libreta_titular_label = QLabel("")
         self.libreta_titular_label.setObjectName("libretaSaludo")
-        header.addWidget(self.libreta_titular_label)
+        titulo_col.addWidget(self.libreta_titular_label)
+        # Subtítulo bajo el saludo: "Llevas N piezas..." (empleada) o
+        # "N operaciones hoy" (dueño). Antes flotaba solo a media página.
+        self.libreta_resumen_label = QLabel("")
+        self.libreta_resumen_label.setObjectName("libretaSubtitulo")
+        titulo_col.addWidget(self.libreta_resumen_label)
+        header.addLayout(titulo_col)
         header.addStretch()
         self.libreta_hoy_button = QPushButton("Hoy")
         self.libreta_semana_button = QPushButton("Semana")
@@ -1333,13 +1350,36 @@ class QuoteSatelliteWindow(QMainWindow):
 
         # Banner del ciclo de pago (empleada): comisiones acumuladas desde su
         # último pago + cuándo le toca el siguiente. Se llena al refrescar.
-        self.libreta_ciclo_banner = QLabel("")
-        self.libreta_ciclo_banner.setObjectName("libretaCicloBanner")
-        self.libreta_ciclo_banner.setWordWrap(True)
-        self.libreta_ciclo_banner.setStyleSheet(
-            "background: #a84f2d; color: #ffffff; border-radius: 10px;"
-            "padding: 10px 14px; font-size: 15px; font-weight: 700;"
-        )
+        # Rediseño 2026-09-09: tarjeta compacta con tres datos (comisiones
+        # del ciclo · próximo pago · siguiente descanso) en vez de una franja
+        # naranja que se estiraba con el espacio sobrante.
+        self.libreta_ciclo_banner = QFrame()
+        self.libreta_ciclo_banner.setObjectName("libretaCicloCard")
+        self.libreta_ciclo_banner.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+        ciclo_ly = QHBoxLayout()
+        ciclo_ly.setContentsMargins(18, 12, 18, 12)
+        ciclo_ly.setSpacing(18)
+        self._libreta_ciclo_tiles: list[tuple[QWidget, QLabel, QLabel]] = []
+        for i in range(3):
+            tile = QWidget()
+            tile_ly = QVBoxLayout(tile)
+            tile_ly.setContentsMargins(0, 0, 0, 0)
+            tile_ly.setSpacing(0)
+            valor = QLabel("")
+            valor.setObjectName("cicloValor")
+            caption = QLabel("")
+            caption.setObjectName("cicloCaption")
+            caption.setWordWrap(True)
+            tile_ly.addWidget(valor)
+            tile_ly.addWidget(caption)
+            if i:
+                sep = QFrame()
+                sep.setObjectName("cicloSep")
+                sep.setFixedWidth(1)
+                ciclo_ly.addWidget(sep)
+            ciclo_ly.addWidget(tile, 1)
+            self._libreta_ciclo_tiles.append((tile, valor, caption))
+        self.libreta_ciclo_banner.setLayout(ciclo_ly)
         self.libreta_ciclo_banner.setVisible(False)
         view_ly.addWidget(self.libreta_ciclo_banner)
 
@@ -1426,10 +1466,6 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_meta_bar.setLayout(meta_bar_ly)
         view_ly.addWidget(self.libreta_meta_bar)
 
-        self.libreta_resumen_label = QLabel("")
-        self.libreta_resumen_label.setStyleSheet("font-size: 13px; color: #555;")
-        view_ly.addWidget(self.libreta_resumen_label)
-
         self.libreta_status_label = QLabel("")
         self.libreta_status_label.setStyleSheet("font-size: 12px; color: #b9770e;")
         self.libreta_status_label.setVisible(False)
@@ -1448,10 +1484,15 @@ class QuoteSatelliteWindow(QMainWindow):
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
         self.libreta_emp_list.setObjectName("libretaLista")
+        # Renglones largos (19 piezas) se envuelven en vez de cortarse.
+        self.libreta_emp_list.setWordWrap(True)
+        self.libreta_emp_list.setTextElideMode(Qt.TextElideMode.ElideNone)
+        self.libreta_emp_list.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.libreta_emp_list.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
         self.libreta_emp_list.itemDoubleClicked.connect(
             lambda item: self._mostrar_detalle_libreta(self.libreta_emp_list.row(item))
         )
-        view_ly.addWidget(self.libreta_emp_list, 1)
+        view_ly.addWidget(self.libreta_emp_list)
 
         # ── Panel del dueño: corte por día, ranking de empleadas y detalle ──
         self.libreta_owner_panel = QWidget()
@@ -1652,6 +1693,9 @@ class QuoteSatelliteWindow(QMainWindow):
 
         self.libreta_owner_panel.setLayout(owner_panel_ly)
         view_ly.addWidget(self.libreta_owner_panel, 1)
+        # El sobrante va abajo: sin esto los labels/tarjetas se estiraban
+        # para llenar la página (la franja naranja gigante de la empleada).
+        view_ly.addStretch(1)
 
         self.libreta_view.setLayout(view_ly)
         self.libreta_view.setVisible(False)
@@ -1778,6 +1822,73 @@ class QuoteSatelliteWindow(QMainWindow):
         except Exception:  # noqa: BLE001
             logger.exception("Libreta: fallo el banner del ciclo")
             return None
+
+    def _datos_ciclo_libreta(self, session) -> dict | None:
+        """Datos del ciclo de la empleada para la tarjeta (None = sin ciclo)."""
+        try:
+            from datetime import date as _date
+
+            from pos_uniformes.services.calendario_empleadas_service import (
+                cargar_horario,
+                comisiones_desde_ultimo_pago,
+                dias_para_pago,
+                fecha_proximo_pago,
+                proximo_descanso,
+            )
+
+            horario = cargar_horario(session, self._libreta_code)
+            if not getattr(horario, "configurado", horario.fecha_ultimo_pago is not None or horario.descanso_weekday is not None):
+                return None
+            hoy = _date.today()
+            return {
+                "comisiones": comisiones_desde_ultimo_pago(session, self._libreta_code, horario),
+                "proximo_pago": fecha_proximo_pago(horario, hoy),
+                "faltan": dias_para_pago(horario, hoy),
+                "descanso": None if horario.por_dia else proximo_descanso(horario, hoy),
+                "hoy": hoy,
+            }
+        except Exception:  # noqa: BLE001
+            logger.exception("Libreta: fallo la tarjeta del ciclo")
+            return None
+
+    @staticmethod
+    def _tiles_ciclo(datos: dict) -> list[tuple[str, str]]:
+        """(valor, leyenda) por tile — puro, testeable."""
+        from pos_uniformes.services.dia_calendario_service import DIAS_ES, MESES_ES
+
+        def _fecha(d):
+            return f"{DIAS_ES[d.weekday()][:3]} {d.day} {MESES_ES[d.month - 1][:3]}"
+
+        hoy = datos.get("hoy")
+        tiles = [(f"⭐ {int(datos.get('comisiones') or 0)}", "comisiones desde tu último pago")]
+        pago = datos.get("proximo_pago")
+        if pago is not None:
+            faltan = datos.get("faltan")
+            if hoy is not None and pago <= hoy:
+                leyenda = "próximo pago · ¡hoy!" if pago == hoy else "pago pendiente de registrar"
+            elif faltan is not None:
+                leyenda = f"próximo pago · faltan {faltan} día{'s' if faltan != 1 else ''}"
+            else:
+                leyenda = "próximo pago"
+            tiles.append((f"💵 {_fecha(pago)}", leyenda))
+        descanso = datos.get("descanso")
+        if descanso is not None:
+            tiles.append((f"🛌 {_fecha(descanso)}", "tu siguiente descanso"))
+        return tiles
+
+    def _pintar_ciclo_libreta(self, datos: dict) -> None:
+        tiles = self._tiles_ciclo(datos)
+        for i, (tile, valor, caption) in enumerate(self._libreta_ciclo_tiles):
+            if i < len(tiles):
+                valor.setText(tiles[i][0])
+                caption.setText(tiles[i][1])
+                tile.setVisible(True)
+            else:
+                tile.setVisible(False)
+        # Separadores: solo entre tiles visibles.
+        seps = self.libreta_ciclo_banner.findChildren(QFrame, "cicloSep")
+        for i, sep in enumerate(seps):
+            sep.setVisible(i + 1 < len(tiles))
 
     def _abrir_calendario_encargado(self) -> None:
         # Modo ultra-simple para León: tres preguntas con botones grandes
@@ -1963,7 +2074,7 @@ class QuoteSatelliteWindow(QMainWindow):
                         session, desde=desde, hasta=hasta, employee_code=employee_filter
                     )
                     if not self._libreta_is_owner:
-                        ciclo_texto = self._texto_ciclo_libreta(session)
+                        ciclo_texto = self._datos_ciclo_libreta(session)
                     else:
                         afluencia_filas = self._cargar_afluencia_libreta(session, desde, hasta)
                         pendientes = self._cargar_pendientes_libreta(session)
@@ -1972,7 +2083,7 @@ class QuoteSatelliteWindow(QMainWindow):
                 logger.exception("Libreta: fallo la consulta a la base")
         self.libreta_ciclo_banner.setVisible(bool(ciclo_texto))
         if ciclo_texto:
-            self.libreta_ciclo_banner.setText(ciclo_texto)
+            self._pintar_ciclo_libreta(ciclo_texto)
 
         if not fuente_db:
             week_rows = self._libreta_rows_locales(desde, hasta, employee_filter)
@@ -2688,6 +2799,12 @@ class QuoteSatelliteWindow(QMainWindow):
             sub.setText(texto_sub)
             sub.setVisible(bool(texto_sub))
 
+    def resizeEvent(self, event) -> None:  # noqa: N802 (API de Qt)
+        super().resizeEvent(event)
+        lista = getattr(self, "libreta_emp_list", None)
+        if lista is not None and lista.isVisible() and lista.count():
+            QTimer.singleShot(0, self._ajustar_alto_lista_emp)
+
     def _llenar_libreta_lista(self, rows: list) -> None:
         """Movimientos de la empleada en lenguaje simple, sin dinero."""
         from pos_uniformes.services.libreta_service import describir_detalle
@@ -2721,15 +2838,17 @@ class QuoteSatelliteWindow(QMainWindow):
                 verbo = "Apartaste" if tipo == "apartado" else "Vendiste"
                 icono = "📦" if tipo == "apartado" else "🛍️"
                 prendas = describir_detalle(list(row.detalle or []))
-                texto = f"{icono}  {dia}{hora} · {verbo} {piezas} pieza(s): {prendas}"
+                texto = f"{icono}  {dia}{hora} · {verbo} {piezas} pieza(s)"
                 if comisiones:
                     texto += f"  (+{comisiones} com.)"
+                # Las prendas en su propio renglón: se envuelven, no se cortan.
+                texto += f"\n      {prendas}"
             self.libreta_emp_list.addItem(QListWidgetItem(texto))
         # Igual que la tabla del dueño: la lista crece y scrollea la página.
-        alto = 2 * self.libreta_emp_list.frameWidth() + 8
-        for i in range(self.libreta_emp_list.count()):
-            alto += self.libreta_emp_list.sizeHintForRow(i)
-        self.libreta_emp_list.setFixedHeight(max(alto, 120))
+        _ajustar_alto_lista(self.libreta_emp_list)
+
+    def _ajustar_alto_lista_emp(self) -> None:
+        _ajustar_alto_lista(self.libreta_emp_list)
 
     def _pintar_libreta(self, rows: list, ranking_rows: list | None = None) -> None:
         self._libreta_last_pintura = (list(rows), ranking_rows)

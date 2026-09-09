@@ -646,6 +646,7 @@ class LibretaListaAmigableTests(unittest.TestCase):
             for i in range(fake.libreta_emp_list.count())
         ]
         self.assertIn("Vendiste 2 pieza(s)", textos[0])
+        self.assertIn("\n", textos[0])  # prendas en su propio renglón
         self.assertIn("Pants T:6 x2", textos[0])
         self.assertIn("+2 com.", textos[0])
         self.assertIn("Recibiste un abono de Ana", textos[1])
@@ -862,6 +863,61 @@ class LibretaCicloBannerTests(unittest.TestCase):
             texto = QuoteSatelliteWindow._texto_ciclo_libreta(fake, session=MagicMock())
         self.assertIn("Comisiones desde tu último pago: 47", texto)
         self.assertIn("jueves", texto)
+
+
+class TarjetaCicloTests(unittest.TestCase):
+    """Rediseño 2026-09-09: la franja naranja se volvió tarjeta con tiles."""
+
+    def test_tiles_con_pago_y_descanso(self) -> None:
+        from datetime import date as _date
+
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        tiles = QuoteSatelliteWindow._tiles_ciclo({
+            "comisiones": 35, "proximo_pago": _date(2026, 9, 13), "faltan": 4,
+            "descanso": _date(2026, 9, 11), "hoy": _date(2026, 9, 9),
+        })
+        self.assertEqual(tiles[0], ("⭐ 35", "comisiones desde tu último pago"))
+        self.assertEqual(tiles[1], ("💵 dom 13 sep", "próximo pago · faltan 4 días"))
+        self.assertEqual(tiles[2], ("🛌 vie 11 sep", "tu siguiente descanso"))
+
+    def test_tiles_pago_hoy_atrasado_y_sin_descanso(self) -> None:
+        from datetime import date as _date
+
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        hoy = _date(2026, 9, 9)
+        t = QuoteSatelliteWindow._tiles_ciclo({"comisiones": 3, "proximo_pago": hoy, "faltan": 0, "descanso": None, "hoy": hoy})
+        self.assertEqual(len(t), 2)
+        self.assertEqual(t[1][1], "próximo pago · ¡hoy!")
+        t = QuoteSatelliteWindow._tiles_ciclo({"comisiones": 3, "proximo_pago": _date(2026, 9, 6), "faltan": 0, "descanso": None, "hoy": hoy})
+        self.assertEqual(t[1][1], "pago pendiente de registrar")
+        t = QuoteSatelliteWindow._tiles_ciclo({"comisiones": 0, "proximo_pago": None, "faltan": None, "descanso": None, "hoy": hoy})
+        self.assertEqual(len(t), 1)
+
+    def test_datos_ciclo_por_dia_sin_descanso(self) -> None:
+        from datetime import date as _date
+
+        from pos_uniformes.services.calendario_empleadas_service import MODO_POR_DIA, HorarioEmpleada
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        horario = HorarioEmpleada("VEND-6", modo_pago=MODO_POR_DIA, dias_trabajo=[5, 6], fecha_ultimo_pago=_date.today())
+        fake = SimpleNamespace(_libreta_code="VEND-6")
+        with patch("pos_uniformes.services.calendario_empleadas_service.cargar_horario", return_value=horario), patch(
+            "pos_uniformes.services.calendario_empleadas_service.comisiones_desde_ultimo_pago", return_value=5
+        ):
+            datos = QuoteSatelliteWindow._datos_ciclo_libreta(fake, session=MagicMock())
+        self.assertEqual(datos["comisiones"], 5)
+        self.assertIsNone(datos["descanso"])  # por días: no hay "descanso"
+        self.assertIsNotNone(datos["proximo_pago"])
+
+    def test_datos_ciclo_sin_configurar(self) -> None:
+        from pos_uniformes.services.calendario_empleadas_service import HorarioEmpleada
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        fake = SimpleNamespace(_libreta_code="VEND-2")
+        with patch("pos_uniformes.services.calendario_empleadas_service.cargar_horario", return_value=HorarioEmpleada("VEND-2")):
+            self.assertIsNone(QuoteSatelliteWindow._datos_ciclo_libreta(fake, session=MagicMock()))
 
 
 class VentanaCicloTests(unittest.TestCase):

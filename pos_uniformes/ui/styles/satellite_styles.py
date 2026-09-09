@@ -699,6 +699,33 @@ QLabel#libretaCardValorClaro {
     font-weight: 900;
     color: #f9f4ea;
 }
+QLabel#libretaSubtitulo {
+    font-size: 13px;
+    font-weight: 600;
+    color: #8a7358;
+}
+QFrame#libretaCicloCard {
+    background: qlineargradient(x1:0, y1:0, x2:1, y2:0,
+        stop:0 #fff7ee, stop:1 #fbf0e2);
+    border: 1.5px solid #e8c9ad;
+    border-radius: 16px;
+}
+QFrame#cicloSep {
+    background: #e8c9ad;
+    border: none;
+}
+QLabel#cicloValor {
+    font-size: 22px;
+    font-weight: 900;
+    color: #73341c;
+    background: transparent;
+}
+QLabel#cicloCaption {
+    font-size: 12px;
+    font-weight: 700;
+    color: #a0876f;
+    background: transparent;
+}
 QListWidget#libretaLista {
     background: #fffdf8;
     border: 1px solid #ddd0c0;
@@ -710,6 +737,10 @@ QListWidget#libretaLista {
 QListWidget#libretaLista::item {
     padding: 10px 12px;
     border-bottom: 1px solid #efe5d8;
+}
+QListWidget#libretaLista::item:hover {
+    background: #fbf3e8;
+    border-radius: 8px;
 }
 QListWidget#libretaLista::item:selected {
     background: #f4d4bb;
