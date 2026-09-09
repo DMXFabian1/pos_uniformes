@@ -2804,7 +2804,8 @@ class QuoteSatelliteWindow(QMainWindow):
             return
         from pos_uniformes.ui.dialogs.historial_pagos_dialog import HistorialPagosDialog
 
-        HistorialPagosDialog(self).exec()
+        HistorialPagosDialog(self, creado_por=str(self._libreta_code or "")).exec()
+        self._refresh_libreta_view()
 
     def _abrir_historial_cortes(self) -> None:
         """Cortes anteriores con reimpresión (solo dueño)."""

@@ -60,10 +60,12 @@ def filas_tabla(pagos: list) -> list[tuple[str, ...]]:
 
 
 class HistorialPagosDialog(QDialog):
-    def __init__(self, parent: QWidget | None = None, *, hoy: date | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, *, hoy: date | None = None, creado_por: str = "") -> None:
         super().__init__(parent)
         self.setWindowTitle("Pagos a empleadas")
         self._hoy = hoy or date.today()
+        self._creado_por = str(creado_por or "").strip().upper()
+        self._pagos: list = []
         self.resize(980, 640)
 
         self.mes_combo = QComboBox()
@@ -108,9 +110,22 @@ class HistorialPagosDialog(QDialog):
         self.resumen_tabla.verticalHeader().setVisible(False)
         self.resumen_tabla.setMaximumHeight(180)
 
+        # Deshacer: un pago registrado por error (p.ej. un corte de prueba).
+        # Solo Daniel. Quita el registro, la marca del calendario y regresa
+        # la fecha de último pago para que el ciclo vuelva a contar completo.
+        self.undo_button = QPushButton("↩ Deshacer pago seleccionado")
+        self.undo_button.setObjectName("secondaryButton")
+        self.undo_button.setEnabled(False)
+        self.undo_button.setVisible(self._creado_por == "VEND-1")
+        self.undo_button.clicked.connect(self.deshacer)
+        self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
+        self.tabla.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
+        self.tabla.itemSelectionChanged.connect(lambda: self.undo_button.setEnabled(self.tabla.currentRow() >= 0))
+
         cerrar = QPushButton("Cerrar")
         cerrar.clicked.connect(self.accept)
         pie = QHBoxLayout()
+        pie.addWidget(self.undo_button)
         pie.addStretch()
         pie.addWidget(cerrar)
 
@@ -167,9 +182,39 @@ class HistorialPagosDialog(QDialog):
             self.totales_label.setText("Sin conexión con la PC principal.")
         self.pintar(pagos)
 
+    def deshacer(self) -> None:
+        from PyQt6.QtWidgets import QMessageBox
+
+        fila = self.tabla.currentRow()
+        if self._creado_por != "VEND-1" or fila < 0 or fila >= len(self._pagos):
+            return
+        p = self._pagos[fila]
+        texto = (
+            f"¿Deshacer el pago a {p.employee_name or p.employee_code} del {p.fecha:%d/%m/%Y} por ${Decimal(p.total):,.2f}?\n\n"
+            "Se quita el registro y la marca del calendario; su ciclo vuelve a contar desde antes de ese pago. "
+            "Úsalo solo si NO le diste ese dinero."
+        )
+        if QMessageBox.question(self, "Deshacer pago", texto) != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            from pos_uniformes.database.connection import get_session
+            from pos_uniformes.services.nomina_service import deshacer_pago
+
+            with get_session() as session:
+                r = deshacer_pago(session, p.id, creado_por=self._creado_por)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Historial de pagos: no se pudo deshacer")
+            QMessageBox.warning(self, "No se deshizo", str(exc) or "Inténtalo otra vez.")
+            return
+        self.recargar()
+        cuando = r["fecha_ultimo_pago"].strftime("%d/%m") if r.get("fecha_ultimo_pago") else "sin fecha"
+        self.totales_label.setText(f"Pago deshecho. Último pago de {r['employee_name']}: {cuando}.")
+
     def pintar(self, pagos: list) -> None:
         from pos_uniformes.services.nomina_service import resumir_pagos_por_empleada
 
+        self._pagos = list(pagos)
+        self.undo_button.setEnabled(False)
         filas = filas_tabla(pagos)
         self.tabla.setRowCount(len(filas))
         for i, fila in enumerate(filas):

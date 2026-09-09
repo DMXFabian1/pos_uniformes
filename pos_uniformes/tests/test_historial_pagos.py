@@ -45,6 +45,47 @@ class ResumirPagosTests(unittest.TestCase):
         self.assertEqual(rango_mes(2028, 2), (date(2028, 2, 1), date(2028, 2, 29)))
 
 
+class DeshacerPagoTests(unittest.TestCase):
+    def setUp(self) -> None:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from pos_uniformes.database.models import EmpleadaEvento, EmpleadaHorario, EmpleadaPago
+
+        engine = create_engine("sqlite://")
+        for t in (EmpleadaPago, EmpleadaHorario, EmpleadaEvento):
+            t.__table__.create(engine)
+        self.session = sessionmaker(bind=engine)()
+        from pos_uniformes.services.calendario_empleadas_service import guardar_horario, registrar_pago
+
+        guardar_horario(self.session, "VEND-7", descanso_weekday=None, ciclo_dias_pago=7, fecha_ultimo_pago=date(2026, 9, 2), actualizar_ultimo_pago=True)
+        registrar_pago(self.session, "VEND-7", date(2026, 9, 2))
+        self.pago = EmpleadaPago(
+            employee_code="VEND-7", employee_name="Fanny Ortiz", fecha=date(2026, 9, 9), desde=date(2026, 9, 3), hasta=date(2026, 9, 9),
+            comisiones=145, sueldo_base=Decimal("1300"), tarifa_comision=Decimal("2"), monto_comisiones=Decimal("290"), faltas=0,
+            descuento_faltas=Decimal("0"), total=Decimal("1590"), creado_por="VEND-1",
+        )
+        self.session.add(self.pago)
+        registrar_pago(self.session, "VEND-7", date(2026, 9, 9))  # como lo hace el corte
+
+    def test_deshacer_regresa_todo(self) -> None:
+        from pos_uniformes.database.models import EmpleadaEvento, EmpleadaHorario, EmpleadaPago
+        from pos_uniformes.services.nomina_service import deshacer_pago
+
+        r = deshacer_pago(self.session, self.pago.id, creado_por="VEND-1")
+        self.assertEqual(r["fecha_ultimo_pago"], date(2026, 9, 2))
+        self.assertEqual(self.session.get(EmpleadaHorario, "VEND-7").fecha_ultimo_pago, date(2026, 9, 2))
+        self.assertEqual(self.session.query(EmpleadaPago).count(), 0)
+        fechas = sorted(e.fecha for e in self.session.query(EmpleadaEvento).filter_by(tipo="pago").all())
+        self.assertEqual(fechas, [date(2026, 9, 2)])  # la marca del 9 se fue, la del 2 sigue
+
+    def test_solo_daniel(self) -> None:
+        from pos_uniformes.services.nomina_service import deshacer_pago
+
+        with self.assertRaises(PermissionError):
+            deshacer_pago(self.session, self.pago.id, creado_por="ENC-1")
+
+
 class HistorialDialogTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -62,8 +103,9 @@ class HistorialDialogTests(unittest.TestCase):
         with patch.object(HistorialPagosDialog, "_cargar_empleadas"), patch.object(
             HistorialPagosDialog, "recargar"
         ):
-            dlg = HistorialPagosDialog(None, hoy=date(2026, 9, 8))
+            dlg = HistorialPagosDialog(None, hoy=date(2026, 9, 8), creado_por="VEND-1")
         self.assertEqual(dlg.mes_combo.itemText(0), "Septiembre 2026")
+        self.assertTrue(dlg.undo_button.isVisibleTo(dlg))
         self.assertEqual(dlg.mes_combo.itemText(1), "Agosto 2026")
         dlg.pintar(pagos)
         self.assertEqual(dlg.tabla.rowCount(), 2)

@@ -177,6 +177,45 @@ def registrar_pago_con_monto(session, employee_code: str, *, creado_por: str, fe
     return pago
 
 
+def deshacer_pago(session, pago_id: int, *, creado_por: str) -> dict:
+    """Quita un pago registrado por error (SOLO Daniel, VEND-1).
+
+    Borra la fila `empleada_pago`, quita la marca 💵 de ese día en el
+    calendario (si no hay otro pago ese día) y regresa `fecha_ultimo_pago`
+    de la empleada al día anterior al periodo que cubría el pago — así el
+    siguiente corte/pago vuelve a contar ese tramo completo.
+    """
+    from pos_uniformes.database.models import EmpleadaEvento, EmpleadaHorario, EmpleadaPago
+    from pos_uniformes.services.calendario_empleadas_service import PAGO
+
+    if str(creado_por or "").strip().upper() != "VEND-1":
+        raise PermissionError("Solo Daniel puede deshacer pagos.")
+    pago = session.get(EmpleadaPago, int(pago_id))
+    if pago is None:
+        raise ValueError("Ese pago ya no existe.")
+    code = str(pago.employee_code).upper()
+    anterior = (pago.desde - timedelta(days=1)) if pago.desde else None
+    horario = session.get(EmpleadaHorario, code)
+    fecha_restaurada = None
+    if horario is not None and horario.fecha_ultimo_pago == pago.fecha:
+        horario.fecha_ultimo_pago = anterior
+        fecha_restaurada = anterior
+    otro_mismo_dia = (
+        session.query(EmpleadaPago)
+        .filter(EmpleadaPago.employee_code == code, EmpleadaPago.fecha == pago.fecha, EmpleadaPago.id != pago.id)
+        .first()
+    )
+    if otro_mismo_dia is None:
+        for ev in session.query(EmpleadaEvento).filter(
+            EmpleadaEvento.employee_code == code, EmpleadaEvento.fecha == pago.fecha, EmpleadaEvento.tipo == PAGO
+        ).all():
+            session.delete(ev)
+    resumen = {"employee_code": code, "employee_name": pago.employee_name, "fecha": pago.fecha, "total": pago.total, "fecha_ultimo_pago": fecha_restaurada}
+    session.delete(pago)
+    session.commit()
+    return resumen
+
+
 def ultimo_pago_registrado(session, employee_code: str):
     from pos_uniformes.database.models import EmpleadaPago
 
