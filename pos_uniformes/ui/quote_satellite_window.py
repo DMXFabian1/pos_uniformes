@@ -1882,7 +1882,9 @@ class QuoteSatelliteWindow(QMainWindow):
             )
 
             horario = cargar_horario(session, self._libreta_code)
-            if not getattr(horario, "configurado", horario.fecha_ultimo_pago is not None or horario.descanso_weekday is not None):
+            # Con último pago O patrón configurado ya hay qué mostrar (igual
+            # que la franja de antes: Stayce tiene pago pero no descanso).
+            if horario.fecha_ultimo_pago is None and not getattr(horario, "configurado", False):
                 return None
             hoy = _date.today()
             return {

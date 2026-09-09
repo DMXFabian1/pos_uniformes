@@ -911,6 +911,23 @@ class TarjetaCicloTests(unittest.TestCase):
         self.assertIsNone(datos["descanso"])  # por días: no hay "descanso"
         self.assertIsNotNone(datos["proximo_pago"])
 
+    def test_datos_ciclo_con_pago_pero_sin_descanso(self) -> None:
+        # Stayce: tiene último pago pero no descanso configurado → la tarjeta SÍ sale.
+        from datetime import date as _date
+
+        from pos_uniformes.services.calendario_empleadas_service import HorarioEmpleada
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        horario = HorarioEmpleada("VEND-5", fecha_ultimo_pago=_date.today())
+        fake = SimpleNamespace(_libreta_code="VEND-5")
+        with patch("pos_uniformes.services.calendario_empleadas_service.cargar_horario", return_value=horario), patch(
+            "pos_uniformes.services.calendario_empleadas_service.comisiones_desde_ultimo_pago", return_value=35
+        ):
+            datos = QuoteSatelliteWindow._datos_ciclo_libreta(fake, session=MagicMock())
+        self.assertEqual(datos["comisiones"], 35)
+        self.assertIsNotNone(datos["proximo_pago"])
+        self.assertIsNone(datos["descanso"])
+
     def test_datos_ciclo_sin_configurar(self) -> None:
         from pos_uniformes.services.calendario_empleadas_service import HorarioEmpleada
         from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
