@@ -89,16 +89,19 @@ def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list |
     lines.append(tk_row("Operaciones:", str(corte.operaciones)))
     if venta_efectivo is not None:
         lines.append(tk_row("VENTA (efectivo):", f"${Decimal(venta_efectivo):,.2f}"))
-    lines.append(tk_row("Reactivo inicial:", f"${Decimal(corte.reactivo_inicial):,.2f}"))
+    con_reactivo = Decimal(corte.reactivo_inicial or 0) > 0 or Decimal(corte.reactivo_final or 0) > 0
+    if con_reactivo:
+        lines.append(tk_row("Reactivo inicial:", f"${Decimal(corte.reactivo_inicial):,.2f}"))
     if Decimal(corte.retiros_pagos or 0) > 0:
         lines.append(tk_row("Pagos empleadas:", f"-${Decimal(corte.retiros_pagos):,.2f}"))
     if Decimal(corte.otros_retiros or 0) > 0:
         lines.append(tk_row("Otros retiros:", f"-${Decimal(corte.otros_retiros):,.2f}"))
     lines.append(tk_dbl())
     lines.append(tk_row("EN CAJA:", f"${Decimal(corte.monto_final):,.2f}"))
-    lines.append(tk_row("Se queda (reactivo):", f"${Decimal(corte.reactivo_final):,.2f}"))
-    retirado = (Decimal(corte.monto_final) - Decimal(corte.reactivo_final)).quantize(Decimal("0.01"))
-    lines.append(tk_row("Se retira:", f"${retirado:,.2f}"))
+    if con_reactivo:
+        lines.append(tk_row("Se queda (reactivo):", f"${Decimal(corte.reactivo_final):,.2f}"))
+        retirado = (Decimal(corte.monto_final) - Decimal(corte.reactivo_final)).quantize(Decimal("0.01"))
+        lines.append(tk_row("Se retira:", f"${retirado:,.2f}"))
     if corte.nota:
         tk_field("Nota:", str(corte.nota), lines)
     lines.append(tk_bot())

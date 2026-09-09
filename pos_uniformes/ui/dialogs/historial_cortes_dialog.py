@@ -33,6 +33,7 @@ from pos_uniformes.services.historial_cortes_service import (
     FORMATO_ENCARGADO,
     diferencia_corte,
     es_del_dueno,
+    es_legacy,
     formato_original,
     retirado,
     totales_cortes,
@@ -77,7 +78,7 @@ def texto_diferencia(corte) -> str:
 
 
 def texto_real(corte) -> str:
-    return "—" if corte.hasta is None else f"${Decimal(corte.monto_esperado or 0):,.2f}"
+    return "—" if es_legacy(corte) else f"${Decimal(corte.monto_esperado or 0):,.2f}"
 
 
 def filas_tabla(cortes: list) -> list[tuple[str, ...]]:
@@ -91,8 +92,8 @@ def filas_tabla(cortes: list) -> list[tuple[str, ...]]:
             str(c.creado_por or ""),
             f"${Decimal(c.monto_final):,.2f}",
             texto_real(c),
-            f"${Decimal(c.reactivo_final or 0):,.2f}",
-            f"${retirado(c):,.2f}",
+            "—" if es_legacy(c) else f"${Decimal(c.reactivo_final or 0):,.2f}",
+            "—" if es_legacy(c) else f"${retirado(c):,.2f}",
             f"${Decimal(c.retiros_pagos or 0):,.2f}",
             texto_diferencia(c),
             str(c.nota or ""),

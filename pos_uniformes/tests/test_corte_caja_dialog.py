@@ -47,6 +47,15 @@ class TicketCorteTests(unittest.TestCase):
         self.assertNotIn("Pagos empleadas", texto)
 
 
+class TicketLegacyTests(unittest.TestCase):
+    def test_sin_reactivo_no_imprime_esos_renglones(self) -> None:
+        texto = texto_ticket_corte(_corte(reactivo_inicial=Decimal("0"), reactivo_final=Decimal("0"), retiros_pagos=Decimal("0"), monto_final=Decimal("22300.00")))
+        self.assertIn("$22,300.00", texto)
+        self.assertNotIn("Reactivo inicial", texto)
+        self.assertNotIn("Se queda", texto)
+        self.assertNotIn("Se retira", texto)
+
+
 class TextoEstadoTests(unittest.TestCase):
     def test_texto_estado(self) -> None:
         estado = EstadoCaja(

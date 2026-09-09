@@ -37,22 +37,22 @@ def listar_cortes_mes(session, desde: date, hasta: date) -> list:
     return list(session.scalars(stmt).all())
 
 
-def periodo_del_corte(session, corte) -> tuple[datetime | None, datetime]:
-    """(desde, hasta) del corte; reconstruye el de los cortes viejos."""
-    from pos_uniformes.database.models import LibretaCorte
+def es_legacy(corte) -> bool:
+    """Corte de antes del corte por periodo (2026-09-08): era el total DEL DÍA
+    ("HOY"), sin reactivo ni esperado. La migración le puso `hasta = created_at`
+    pero no tiene `desde`."""
+    return getattr(corte, "desde", None) is None
 
+
+def periodo_del_corte(session, corte) -> tuple[datetime | None, datetime]:
+    """(desde, hasta) del corte. Los viejos cubren su día: de las 00:00 a la
+    hora en que se hicieron (nunca 90 días atrás ni "desde el anterior")."""
     hasta = corte.hasta or corte.created_at
-    desde = corte.desde
-    if desde is None and corte.hasta is None:
-        anterior = session.scalars(
-            select(LibretaCorte)
-            .where(LibretaCorte.created_at < corte.created_at)
-            .order_by(LibretaCorte.created_at.desc())
-            .limit(1)
-        ).first()
-        if anterior is not None:
-            desde = anterior.hasta or anterior.created_at
-    return desde, hasta
+    if not es_legacy(corte):
+        return corte.desde, hasta
+    local = hasta.astimezone() if getattr(hasta, "tzinfo", None) else hasta
+    inicio_dia = local.replace(hour=0, minute=0, second=0, microsecond=0)
+    return inicio_dia, hasta
 
 
 @dataclass(frozen=True)
@@ -96,8 +96,8 @@ def formato_original(corte) -> str:
 
 def diferencia_corte(corte) -> Decimal | None:
     """Sobró (+) / faltó (−) contra lo esperado. None en cortes viejos sin esperado."""
-    if corte.hasta is None:
-        return None
+    if corte.hasta is None or es_legacy(corte):
+        return None  # los viejos no guardaron esperado
     return (_d(corte.monto_final) - _d(corte.monto_esperado)).quantize(_CENT)
 
 
@@ -106,6 +106,8 @@ def es_del_dueno(corte) -> bool:
 
 
 def retirado(corte) -> Decimal:
+    if es_legacy(corte):
+        return Decimal("0.00")  # eran totales del día, no retiros
     return (_d(corte.monto_final) - _d(corte.reactivo_final)).quantize(_CENT)
 
 

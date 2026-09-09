@@ -49,6 +49,9 @@ class PurasTests(unittest.TestCase):
         self.assertEqual(diferencia_corte(c), Decimal("-20.00"))
         self.assertEqual(retirado(c), Decimal("1820.00"))
         self.assertIsNone(diferencia_corte(_corte(hasta=None)))  # corte viejo sin esperado
+        legacy = _corte(desde=None, reactivo_inicial=Decimal("0"), reactivo_final=Decimal("0"), monto_esperado=Decimal("0"), periodo_label="HOY")
+        self.assertIsNone(diferencia_corte(legacy))
+        self.assertEqual(retirado(legacy), Decimal("0.00"))  # era total del día, no retiro
         self.assertEqual(diferencia_corte(_corte(creado_por="VEND-1")), Decimal("-20.00"))  # el dueño sí lo ve
 
     def test_formato_original(self) -> None:
@@ -83,15 +86,14 @@ class ConBaseTests(unittest.TestCase):
         cortes = listar_cortes_mes(self.session, date(2026, 9, 1), date(2026, 9, 30))
         self.assertEqual([c.id for c in cortes], [b.id, a.id])
 
-    def test_periodo_de_corte_viejo_usa_el_anterior(self) -> None:
-        viejo1 = self._guardar(date(2026, 9, 1), _T0 - timedelta(days=6))
-        viejo2 = self._guardar(date(2026, 9, 3), _T0 - timedelta(days=4))
+    def test_periodo_de_corte_viejo_es_su_dia(self) -> None:
+        # Los cortes de antes ("HOY") eran el total del día: de 00:00 a la hora del corte.
+        # (Antes se iba 90 días atrás y reimprimía $64,822 de "hoy" — bug del 2026-09-09.)
+        viejo = self._guardar(date(2026, 9, 5), datetime(2026, 9, 5, 16, 35).astimezone(), hasta=datetime(2026, 9, 5, 16, 35).astimezone())
         nuevo = self._guardar(date(2026, 9, 8), _T0 + timedelta(days=1), desde=_T0, hasta=_T0 + timedelta(days=1))
-        d, h = periodo_del_corte(self.session, viejo2)
-        self.assertEqual(h.replace(tzinfo=None), viejo2.created_at.replace(tzinfo=None))
-        self.assertEqual(d.replace(tzinfo=None), viejo1.created_at.replace(tzinfo=None))
-        d, h = periodo_del_corte(self.session, viejo1)
-        self.assertIsNone(d)
+        d, h = periodo_del_corte(self.session, viejo)
+        self.assertEqual(h.replace(tzinfo=None), datetime(2026, 9, 5, 16, 35))
+        self.assertEqual((d.hour, d.minute, d.date()), (0, 0, date(2026, 9, 5)))
         d, h = periodo_del_corte(self.session, nuevo)
         self.assertEqual((d.replace(tzinfo=None), h.replace(tzinfo=None)), (_T0.replace(tzinfo=None), (_T0 + timedelta(days=1)).replace(tzinfo=None)))
 
@@ -139,6 +141,9 @@ class DialogTests(unittest.TestCase):
         self.assertEqual(texto_diferencia(cortes[0]), "faltó $20.00")
         self.assertEqual(texto_diferencia(_corte(creado_por="VEND-1")), "ajuste −$20.00")
         self.assertEqual(texto_diferencia(_corte(creado_por="VEND-1", monto_final=Decimal("13000.00"))), "sin ajuste")
+        legacy = _corte(desde=None, reactivo_inicial=Decimal("0"), reactivo_final=Decimal("0"), monto_esperado=Decimal("0"), periodo_label="HOY")
+        self.assertEqual(filas_tabla([legacy])[0][5:8], ("—", "—", "—"))
+        self.assertEqual(texto_diferencia(legacy), "—")
         filas = filas_tabla(cortes)
         self.assertEqual(filas[0][0], "08/09/2026")
         self.assertEqual(filas[0][4], "$12,980.00")
