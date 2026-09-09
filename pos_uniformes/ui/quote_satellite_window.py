@@ -1339,7 +1339,9 @@ class QuoteSatelliteWindow(QMainWindow):
             sub_card.setObjectName(
                 "libretaCardSubClaro" if index == 0 else "libretaCardSub"
             )
+            sub_card.setWordWrap(True)  # sin esto la tarjeta exigía todo el ancho
             sub_card.setVisible(False)
+            card.setMinimumWidth(0)
             card_ly.addWidget(titulo_card)
             card_ly.addWidget(valor_card)
             card_ly.addWidget(sub_card)
@@ -1399,6 +1401,29 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_print_button.setMinimumHeight(44)
         self.libreta_print_button.clicked.connect(self._imprimir_corte_libreta)
         owner_row.addWidget(self.libreta_print_button)
+        # Gestión del negocio (no dependen de un movimiento): aquí arriba,
+        # a un toque, en vez de mezcladas con las correcciones de la tabla.
+        self.libreta_retiro_button = QPushButton("💸 Retiro")
+        self.libreta_retiro_button.clicked.connect(self._apuntar_retiro_libreta)
+        self.libreta_cortes_button = QPushButton("🧾 Cortes")
+        self.libreta_cortes_button.clicked.connect(self._abrir_historial_cortes)
+        self.libreta_pagos_button = QPushButton("💵 Pagos")
+        self.libreta_pagos_button.clicked.connect(self._abrir_historial_pagos)
+        self.libreta_equipo_button = QPushButton("👥 Equipo")
+        self.libreta_equipo_button.clicked.connect(self._abrir_equipo)
+        self.libreta_caja_button = QPushButton("⚙ Caja y nómina")
+        self.libreta_caja_button.clicked.connect(self._editar_caja_nomina)
+        for gestion_btn in (
+            self.libreta_retiro_button,
+            self.libreta_cortes_button,
+            self.libreta_pagos_button,
+            self.libreta_equipo_button,
+            self.libreta_caja_button,
+        ):
+            gestion_btn.setObjectName("secondaryButton")
+            gestion_btn.setAutoDefault(False)
+            gestion_btn.setMinimumHeight(44)
+            owner_row.addWidget(gestion_btn)
         owner_row.addStretch()
         self.libreta_opciones_button = QPushButton("⚙ Más opciones")
         self.libreta_opciones_button.setObjectName("secondaryButton")
@@ -1500,14 +1525,27 @@ class QuoteSatelliteWindow(QMainWindow):
         owner_panel_ly.setContentsMargins(0, 0, 0, 0)
         owner_panel_ly.setSpacing(8)
 
-        def _seccion(texto: str) -> QLabel:
-            etiqueta = QLabel(texto)
-            etiqueta.setObjectName("libretaSeccion")
-            return etiqueta
+        # Secciones plegables (2026-09-09): cada encabezado es un botón que
+        # abre/cierra su cuerpo. Menos saturación: lo que no se está viendo
+        # se pliega a un renglón.
+        self._libreta_secciones: dict[str, dict] = {}
+
+        def _seccion(texto: str, key: str | None = None, abierta: bool = True) -> QPushButton:
+            boton = QPushButton(texto)
+            boton.setObjectName("libretaSeccion")
+            boton.setCheckable(True)
+            boton.setChecked(abierta)
+            boton.setAutoDefault(False)
+            boton.setCursor(Qt.CursorShape.PointingHandCursor)
+            boton.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Fixed)
+            if key is not None:
+                self._libreta_secciones[key] = {"header": boton, "cuerpo": [], "titulo": texto}
+                boton.toggled.connect(lambda _on, k=key: self._aplicar_seccion_libreta(k))
+            return boton
 
         # Desglose por día: solo tiene sentido en periodos de varios días
         # (ciclo, rango). En "Hoy" repetiría las tarjetas → se oculta.
-        self.libreta_daily_seccion = _seccion("POR DÍA")
+        self.libreta_daily_seccion = _seccion("POR DÍA", "dia")
         owner_panel_ly.addWidget(self.libreta_daily_seccion)
         self.libreta_daily_table = QTableWidget(0, 6)
         self.libreta_daily_table.setObjectName("libretaTabla")
@@ -1524,12 +1562,14 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_daily_table.setVerticalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
+        self.libreta_daily_table.verticalHeader().setDefaultSectionSize(36)
         owner_panel_ly.addWidget(self.libreta_daily_table)
+        self._libreta_secciones["dia"]["cuerpo"] = [self.libreta_daily_table]
 
         # Afluencia: lo que contaron las cámaras (afluencia/contador_afluencia.py)
         # contra las ventas de la misma hora. Oculto si no hay datos (el
         # contador no corre o la tabla aún no existe en esta base).
-        self.libreta_afluencia_seccion = _seccion("AFLUENCIA  ·  quién entra vs quién compra, por hora")
+        self.libreta_afluencia_seccion = _seccion("AFLUENCIA  ·  quién entra vs quién compra, por hora", "afluencia")
         owner_panel_ly.addWidget(self.libreta_afluencia_seccion)
         self.libreta_afluencia_table = QTableWidget(0, 5)
         self.libreta_afluencia_table.setObjectName("libretaTabla")
@@ -1545,13 +1585,15 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_afluencia_table.setVerticalScrollBarPolicy(
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
+        self.libreta_afluencia_table.verticalHeader().setDefaultSectionSize(36)
         owner_panel_ly.addWidget(self.libreta_afluencia_table)
+        self._libreta_secciones["afluencia"]["cuerpo"] = [self.libreta_afluencia_table]
         self.libreta_afluencia_seccion.setVisible(False)
         self.libreta_afluencia_table.setVisible(False)
 
         # Pendientes de hoy (solo dueño): pagos que tocan, posibles faltas,
         # descansos y horarios sin configurar, con botón de un toque.
-        self.libreta_pendientes_seccion = _seccion("PENDIENTES DE HOY  ·  lo que falta por registrar")
+        self.libreta_pendientes_seccion = _seccion("PENDIENTES DE HOY  ·  lo que falta por registrar", "pendientes")
         owner_panel_ly.addWidget(self.libreta_pendientes_seccion)
         self.libreta_pendientes_box = QWidget()
         self.libreta_pendientes_ly = QVBoxLayout()
@@ -1559,17 +1601,26 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_pendientes_ly.setSpacing(4)
         self.libreta_pendientes_box.setLayout(self.libreta_pendientes_ly)
         owner_panel_ly.addWidget(self.libreta_pendientes_box)
+        self._libreta_secciones["pendientes"]["cuerpo"] = [self.libreta_pendientes_box]
         self.libreta_pendientes_seccion.setVisible(False)
         self.libreta_pendientes_box.setVisible(False)
 
-        owner_panel_ly.addWidget(_seccion("EQUIPO  ·  toca un nombre para ver solo sus movimientos"))
+        self.libreta_equipo_seccion = _seccion("EQUIPO  ·  toca un nombre para ver solo sus movimientos", "equipo")
+        owner_panel_ly.addWidget(self.libreta_equipo_seccion)
         self.libreta_ranking_list = QListWidget()
         self.libreta_ranking_list.setObjectName("libretaLista")
         self.libreta_ranking_list.setMaximumHeight(170)
         self.libreta_ranking_list.itemClicked.connect(self._on_libreta_ranking_click)
         owner_panel_ly.addWidget(self.libreta_ranking_list)
+        self._libreta_secciones["equipo"]["cuerpo"] = [self.libreta_ranking_list]
 
-        owner_panel_ly.addWidget(_seccion("MOVIMIENTOS"))
+        self.libreta_mov_seccion = _seccion("MOVIMIENTOS", "movimientos")
+        owner_panel_ly.addWidget(self.libreta_mov_seccion)
+        self.libreta_mov_cuerpo = QWidget()
+        mov_ly = QVBoxLayout(self.libreta_mov_cuerpo)
+        mov_ly.setContentsMargins(0, 0, 0, 0)
+        mov_ly.setSpacing(8)
+        self._libreta_secciones["movimientos"]["cuerpo"] = [self.libreta_mov_cuerpo]
         # Filtros rápidos por tipo (para cuadrar tarjeta vs voucher, etc.)
         filtros_ly = QHBoxLayout()
         filtros_ly.setSpacing(6)
@@ -1597,14 +1648,18 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_filtro_emp_label.setVisible(False)
         filtros_ly.addWidget(self.libreta_filtro_emp_label)
         filtros_ly.addStretch()
-        owner_panel_ly.addLayout(filtros_ly)
+        mov_ly.addLayout(filtros_ly)
         # Correcciones sobre UN movimiento (se elige en la tabla). Solo
         # dueño: reimprimir NO registra otra venta; cambiar pago recalcula
-        # el neto; borrar deja el registro fuera del corte.
-        acciones_ly = QHBoxLayout()
+        # el neto; borrar deja el registro fuera del corte. La barra solo
+        # aparece cuando hay un movimiento seleccionado (2026-09-09).
+        self.libreta_acciones_bar = QFrame()
+        self.libreta_acciones_bar.setObjectName("libretaAccionesBar")
+        acciones_ly = QHBoxLayout(self.libreta_acciones_bar)
+        acciones_ly.setContentsMargins(12, 6, 12, 6)
         acciones_ly.setSpacing(6)
         acciones_label = QLabel("Con el movimiento seleccionado:")
-        acciones_label.setStyleSheet("font-size: 12px; color: #8a8177;")
+        acciones_label.setStyleSheet("font-size: 12px; color: #8a8177; background: transparent;")
         acciones_ly.addWidget(acciones_label)
         self.libreta_reprint_button = QPushButton("🖨 Reimprimir ticket")
         self.libreta_reprint_button.clicked.connect(self._reimprimir_ticket_libreta)
@@ -1620,33 +1675,19 @@ class QuoteSatelliteWindow(QMainWindow):
         # CAJA por defecto). No guarda nada; el DVR sirve el clip por RTSP.
         self.libreta_momento_button = QPushButton("📹 Ver momento")
         self.libreta_momento_button.clicked.connect(lambda: self._ver_momento_libreta())
-        self.libreta_caja_button = QPushButton("⚙ Caja y nómina")
-        self.libreta_caja_button.clicked.connect(self._editar_caja_nomina)
-        self.libreta_pagos_button = QPushButton("💵 Pagos")
-        self.libreta_pagos_button.clicked.connect(self._abrir_historial_pagos)
-        self.libreta_cortes_button = QPushButton("🧾 Cortes")
-        self.libreta_cortes_button.clicked.connect(self._abrir_historial_cortes)
-        self.libreta_equipo_button = QPushButton("👥 Equipo")
-        self.libreta_equipo_button.clicked.connect(self._abrir_equipo)
-        self.libreta_retiro_button = QPushButton("💸 Retiro")
-        self.libreta_retiro_button.clicked.connect(self._apuntar_retiro_libreta)
         for accion_btn in (
             self.libreta_reprint_button,
             self.libreta_pago_button,
             self.libreta_reasignar_button,
             self.libreta_delete_button,
             self.libreta_momento_button,
-            self.libreta_caja_button,
-            self.libreta_pagos_button,
-            self.libreta_cortes_button,
-            self.libreta_equipo_button,
-            self.libreta_retiro_button,
         ):
             accion_btn.setObjectName("secondaryButton")
             accion_btn.setAutoDefault(False)
             acciones_ly.addWidget(accion_btn)
         acciones_ly.addStretch()
-        owner_panel_ly.addLayout(acciones_ly)
+        self.libreta_acciones_bar.setVisible(False)
+        mov_ly.addWidget(self.libreta_acciones_bar)
         self.libreta_table = QTableWidget(0, 7)
         self.libreta_table.setObjectName("libretaTabla")
         self.libreta_table.setHorizontalHeaderLabels(
@@ -1666,7 +1707,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_table.cellDoubleClicked.connect(
             lambda fila, _col: self._mostrar_detalle_libreta(fila)
         )
-        owner_panel_ly.addWidget(self.libreta_table, 1)
+        self.libreta_table.itemSelectionChanged.connect(self._on_libreta_seleccion)
+        mov_ly.addWidget(self.libreta_table, 1)
         # Paginación de movimientos: 25 por página (días grandes no hacen
         # la página kilométrica). Botones tamaño dedo.
         self.libreta_pag_prev = QPushButton("◀  Anteriores")
@@ -1689,9 +1731,12 @@ class QuoteSatelliteWindow(QMainWindow):
         pag_ly.addWidget(self.libreta_pag_next)
         self.libreta_pag_bar.setLayout(pag_ly)
         self.libreta_pag_bar.setVisible(False)
-        owner_panel_ly.addWidget(self.libreta_pag_bar)
+        mov_ly.addWidget(self.libreta_pag_bar)
+        owner_panel_ly.addWidget(self.libreta_mov_cuerpo, 1)
 
         self.libreta_owner_panel.setLayout(owner_panel_ly)
+        for key in self._libreta_secciones:
+            self._aplicar_seccion_libreta(key)  # flechas ▾/▸ y cuerpos según estado
         view_ly.addWidget(self.libreta_owner_panel, 1)
         # El sobrante va abajo: sin esto los labels/tarjetas se estiraban
         # para llenar la página (la franja naranja gigante de la empleada).
@@ -2157,8 +2202,11 @@ class QuoteSatelliteWindow(QMainWindow):
         if not getattr(self, "_libreta_is_owner", False):
             pendientes = []
         visible = bool(pendientes)
-        self.libreta_pendientes_seccion.setVisible(visible)
-        self.libreta_pendientes_box.setVisible(visible)
+        if getattr(self, "_libreta_secciones", None):
+            self._seccion_libreta("pendientes", visible=visible)
+        else:
+            self.libreta_pendientes_seccion.setVisible(visible)
+            self.libreta_pendientes_box.setVisible(visible)
         if not visible:
             return
         iconos = {PAGO_ATRASADO: "❗", PAGO_HOY: "💵", POSIBLE_FALTA: "❓", SIN_HORARIO: "⚙️", DESCANSO_HOY: "🛌"}
@@ -2235,6 +2283,41 @@ class QuoteSatelliteWindow(QMainWindow):
                 pass
             return []
 
+    def _aplicar_seccion_libreta(self, key: str) -> None:
+        """Cuerpo visible = encabezado visible y sección abierta."""
+        sec = getattr(self, "_libreta_secciones", {}).get(key)
+        if not sec:
+            return
+        header = sec["header"]
+        abierta = header.isChecked()
+        flecha = "▾" if abierta else "▸"
+        header.setText(f"{flecha}  {sec['titulo']}")
+        visible = not header.isHidden() and abierta
+        for w in sec["cuerpo"]:
+            w.setVisible(visible)
+
+    def _seccion_libreta(self, key: str, *, visible: bool, titulo: str | None = None, abierta: bool | None = None) -> None:
+        """Muestra/oculta una sección plegable (y opcionalmente la abre/cierra o retitula)."""
+        sec = getattr(self, "_libreta_secciones", {}).get(key)
+        if not sec:
+            return
+        if titulo is not None:
+            sec["titulo"] = titulo
+        header = sec["header"]
+        header.setVisible(visible)
+        if abierta is not None and header.isChecked() != abierta:
+            header.setChecked(abierta)  # dispara _aplicar_seccion_libreta
+        else:
+            self._aplicar_seccion_libreta(key)
+
+    def _on_libreta_seleccion(self) -> None:
+        """La barra de correcciones solo aparece con un movimiento elegido."""
+        bar = getattr(self, "libreta_acciones_bar", None)
+        if bar is None:
+            return
+        tabla = self.libreta_table
+        bar.setVisible(bool(tabla.selectionModel() and tabla.selectionModel().hasSelection()))
+
     def _pintar_afluencia_libreta(self, filas: list) -> None:
         """Tabla por hora: entran, pasan por fuera, ventas y conversión. Oculta sin datos."""
         from pos_uniformes.services.afluencia_service import totales
@@ -2247,8 +2330,20 @@ class QuoteSatelliteWindow(QMainWindow):
         # Horas sin nadie y sin ventas no aportan nada.
         filas = [f for f in filas if f.entradas or f.pasan or f.ventas]
         visible = bool(filas)
-        self.libreta_afluencia_seccion.setVisible(visible)
-        self.libreta_afluencia_table.setVisible(visible)
+        sin_camaras = visible and not any(f.entradas or f.pasan for f in filas)
+        if sin_camaras:
+            # Solo hay ventas (el contador no corre): un renglón plegado en
+            # vez de una tabla de ceros.
+            ventas = sum(f.ventas for f in filas)
+            titulo = f"AFLUENCIA  ·  sin datos de cámaras · {ventas} venta(s)"
+        else:
+            titulo = "AFLUENCIA  ·  quién entra vs quién compra, por hora"
+        if getattr(self, "_libreta_secciones", None):
+            self._seccion_libreta("afluencia", visible=visible, titulo=titulo, abierta=(False if sin_camaras else None))
+        else:  # fakes de tests / sin secciones plegables
+            self.libreta_afluencia_seccion.setText(titulo)
+            self.libreta_afluencia_seccion.setVisible(visible)
+            self.libreta_afluencia_table.setVisible(visible and not sin_camaras)
         if not visible:
             self.libreta_afluencia_table.setRowCount(0)
             return
@@ -2951,8 +3046,11 @@ class QuoteSatelliteWindow(QMainWindow):
             # En "Hoy" el desglose por día es una sola fila que repite las
             # tarjetas: se oculta para no saturar. Aparece en ciclo y rango.
             mostrar_dias = self._libreta_periodo != "hoy"
-            self.libreta_daily_seccion.setVisible(mostrar_dias)
-            self.libreta_daily_table.setVisible(mostrar_dias)
+            if getattr(self, "_libreta_secciones", None):
+                self._seccion_libreta("dia", visible=mostrar_dias)
+            else:
+                self.libreta_daily_seccion.setVisible(mostrar_dias)
+                self.libreta_daily_table.setVisible(mostrar_dias)
             self.libreta_daily_table.setRowCount(len(cortes))
             for i, corte in enumerate(cortes):
                 self.libreta_daily_table.setItem(i, 0, QTableWidgetItem(corte.dia_label))

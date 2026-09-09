@@ -776,12 +776,27 @@ QLabel#libretaCardSubClaro {
     font-weight: 600;
     color: #f6ddca;
 }
-QLabel#libretaSeccion {
+QLabel#libretaSeccion, QPushButton#libretaSeccion {
     font-size: 12px;
     font-weight: 800;
     color: #8a8177;
     letter-spacing: 2px;
     margin-top: 6px;
+    text-align: left;
+    background: transparent;
+    border: none;
+    padding: 6px 4px;
+}
+QPushButton#libretaSeccion:hover {
+    color: #73341c;
+}
+QPushButton#libretaSeccion:checked {
+    color: #73341c;
+}
+QFrame#libretaAccionesBar {
+    background: #fbf3e8;
+    border: 1px solid #e8c9ad;
+    border-radius: 12px;
 }
 QTableWidget#libretaTabla {
     background: #fffdf8;
