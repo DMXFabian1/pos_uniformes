@@ -10272,6 +10272,10 @@ class MainWindow(QMainWindow):
 
     def _refresh_analytics(self, session) -> None:
         period_start, period_end = self._analytics_period_bounds()
+        # Ventas reales: la Libreta del kiosko (ver analytics_libreta_helper).
+        from pos_uniformes.ui.helpers.analytics_libreta_helper import cargar_y_pintar
+
+        cargar_y_pintar(self, session, period_start, period_end)
         previous_period_start, previous_period_end = resolve_previous_analytics_period_bounds(
             period_start=period_start,
             period_end=period_end,

@@ -17,6 +17,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from pos_uniformes.ui.helpers.analytics_libreta_helper import construir as construir_bloque_libreta
 from pos_uniformes.ui.helpers.date_field_helper import configure_friendly_date_edit
 from pos_uniformes.ui.helpers.analytics_period_helper import ANALYTICS_QUICK_PERIODS
 
@@ -281,6 +282,9 @@ def build_analytics_tab(window: "MainWindow") -> QWidget:
 
     layout.addWidget(filters_box)
     layout.addWidget(window.analytics_export_status_label)
+    # Lo que de verdad se vende (Libreta del kiosko). Va primero: la vista
+    # general de abajo lee las tablas del POS, que quedaron sin uso.
+    layout.addWidget(construir_bloque_libreta(window))
     layout.addWidget(business_title)
     layout.addWidget(business_subtitle)
     layout.addWidget(business_box)
