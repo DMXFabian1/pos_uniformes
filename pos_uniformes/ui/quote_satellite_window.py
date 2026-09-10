@@ -1752,6 +1752,9 @@ class QuoteSatelliteWindow(QMainWindow):
 
         self._libreta_code: str | None = None
         self._libreta_is_owner = False
+        # SKUs cuya falta ya se anotó en esta búsqueda (no multiplicar la señal
+        # porque la empleada toque dos veces el mismo botón).
+        self._demanda_anotada: set[str] = set()
         # Periodo: "hoy" | "semana" | "semana_pasada" | "rango"
         self._libreta_periodo = "hoy"
         self._libreta_tipo_filtro = "todo"
@@ -2116,6 +2119,12 @@ class QuoteSatelliteWindow(QMainWindow):
                         session.rollback()
                     try:
                         libreta_cola.drenar_cortes(session)
+                    except Exception:  # noqa: BLE001
+                        session.rollback()
+                    try:
+                        from pos_uniformes.services import demanda_service
+
+                        demanda_service.drenar(session)
                     except Exception:  # noqa: BLE001
                         session.rollback()
                     week_rows = listar_operaciones(
@@ -5281,6 +5290,7 @@ class QuoteSatelliteWindow(QMainWindow):
         query = self.guided_search_input.text().strip()
         if not query:
             return
+        self._demanda_anotada = set()
 
         try:
             from pos_uniformes.services import meilisearch_service
@@ -5300,6 +5310,9 @@ class QuoteSatelliteWindow(QMainWindow):
             no_results.setAlignment(Qt.AlignmentFlag.AlignCenter)
             no_results.setStyleSheet("color: #888; padding: 24px;")
             self._search_results_layout.addWidget(no_results)
+            # Alguien pidió algo que el catálogo no tiene. Es demanda no
+            # atendida y hasta hoy moría en esta etiqueta.
+            self._anotar_demanda("busqueda_vacia", texto=query)
         else:
             for fam in families:
                 card = self._build_search_family_card(fam)
@@ -5352,24 +5365,34 @@ class QuoteSatelliteWindow(QMainWindow):
             card_layout.addWidget(price_header)
 
             flow = FlowLayout(margin=0, h_spacing=6, v_spacing=6)
+            from pos_uniformes.ui.helpers.quote_guided_catalog_helper import (
+                esta_agotada,
+                estilo_talla,
+                etiqueta_talla,
+            )
+
             for v in grupo:
                 sku = v.get("sku", "")
-                talla = v.get("talla", "") or sku
-                btn = _DoubleClickButton(f"Talla {talla} · ${precio:,.2f}")
+                agotada = esta_agotada(v)
+                btn = _DoubleClickButton(etiqueta_talla(v, precio))
                 btn.setFixedHeight(32)
                 btn.setCursor(Qt.CursorShape.PointingHandCursor)
-                btn.setToolTip(f"SKU: {sku}")
-                btn.setProperty("searchVariantSku", sku)
-                btn.setStyleSheet(
-                    "QPushButton { background: #f5f0e8; border: 1px solid #c4b9a8;"
-                    " border-radius: 6px; font-size: 12px; color: #3a2a1a;"
-                    " padding: 4px 12px; }"
-                    "QPushButton:hover { background: #e8dfd2; border-color: #8B5E3C; }"
+                btn.setToolTip(
+                    f"SKU: {sku}" + ("\nSin existencia. Tócala y queda anotada." if agotada else "")
                 )
-                btn.clicked.connect(lambda checked, s=sku, b=btn: self._on_search_variant_select(s, b))
+                btn.setProperty("searchVariantSku", sku)
+                btn.setProperty("estiloBase", estilo_talla(v))
+                btn.setStyleSheet(estilo_talla(v))
+                btn.clicked.connect(
+                    lambda checked, s=sku, b=btn, var=v, pr=precio: self._on_search_variant_select(
+                        s, b, variante=var, precio=pr, producto=nombre
+                    )
+                )
 
-                def _on_dbl(sku=sku):
-                    self._on_search_variant_select(sku)
+                def _on_dbl(sku=sku, var=v, pr=precio, b=btn):
+                    self._on_search_variant_select(
+                        sku, b, variante=var, precio=pr, producto=nombre
+                    )
                     self._add_quote_item_by_sku(sku, 1)
                 btn.double_clicked.connect(_on_dbl)
                 flow.addWidget(btn)
@@ -5378,6 +5401,28 @@ class QuoteSatelliteWindow(QMainWindow):
             card_layout.addWidget(flow_container)
         card.setLayout(card_layout)
         return card
+
+    def _anotar_demanda(self, tipo: str, **campos) -> None:
+        """Deja una señal de demanda no atendida. Nunca estorba al mostrador.
+
+        Va a una cola local (funciona sin red) y de ahí sube a la base. Ver
+        `services/demanda_service.py`.
+        """
+        try:
+            from pos_uniformes.services import demanda_service
+            from pos_uniformes.services.satellite_identity_service import get_satellite_id
+
+            empleada = ""
+            if getattr(self, "quick_sale_widget", None) is not None:
+                empleada = str(getattr(self.quick_sale_widget, "_employee_code", "") or "")
+            demanda_service.anotar(
+                tipo,
+                employee_code=empleada or str(self._libreta_code or ""),
+                origen=get_satellite_id(),
+                **campos,
+            )
+        except Exception:  # noqa: BLE001 — una señal perdida no vale una venta
+            pass
 
     def _enter_search_mode(self) -> None:
         self._guided_steps_widget.setVisible(False)
@@ -5415,24 +5460,53 @@ class QuoteSatelliteWindow(QMainWindow):
         self.guided_search_input.clear()
         self._guided_search_input_submitted = False
 
-    def _on_search_variant_select(self, sku: str, btn: _DoubleClickButton | None = None) -> None:
-        """Single click — selecciona variante con highlight naranja + detail card."""
-        # Quitar highlight del botón anterior
-        if self._selected_search_btn is not None:
-            self._selected_search_btn.setStyleSheet(
-                "QPushButton { background: #f5f0e8; border: 1px solid #c4b9a8;"
-                " border-radius: 6px; font-size: 12px; color: #3a2a1a;"
-                " padding: 4px 12px; }"
-                "QPushButton:hover { background: #e8dfd2; border-color: #8B5E3C; }"
-            )
-        # Aplicar highlight naranja al botón clickeado
+    def _on_search_variant_select(
+        self,
+        sku: str,
+        btn: _DoubleClickButton | None = None,
+        *,
+        variante: dict | None = None,
+        precio: float = 0.0,
+        producto: str = "",
+    ) -> None:
+        """Un click: resalta la talla y muestra el detalle.
+
+        Si la talla está agotada, el toque queda anotado como demanda no
+        atendida. La empleada no llena nada: la señal sale del gesto que ya
+        hacía, y el botón le contesta "anotado" para que tenga qué decirle
+        al cliente.
+        """
+        from pos_uniformes.ui.helpers.quote_guided_catalog_helper import (
+            estilo_talla,
+            estilo_talla_seleccionada,
+            esta_agotada,
+            etiqueta_talla,
+        )
+
+        # Devolver el botón anterior a su propio estilo (una talla agotada no
+        # debe regresar pintada como disponible).
+        anterior = self._selected_search_btn
+        if anterior is not None:
+            anterior.setStyleSheet(str(anterior.property("estiloBase") or ""))
+
         if btn is not None:
             btn.setStyleSheet(
-                "QPushButton { background: #87492c; border: 1px solid #87492c;"
-                " border-radius: 6px; font-size: 12px; color: #fbf8f2;"
-                " padding: 4px 12px; font-weight: bold; }"
+                estilo_talla_seleccionada(variante) if variante else
+                estilo_talla_seleccionada({"stock_actual": 1})
             )
             self._selected_search_btn = btn
+
+        if variante is not None and esta_agotada(variante) and sku not in self._demanda_anotada:
+            self._demanda_anotada.add(sku)
+            self._anotar_demanda(
+                "talla_agotada",
+                sku=sku,
+                producto=producto,
+                talla=str(variante.get("talla") or ""),
+            )
+            if btn is not None:
+                btn.setText(etiqueta_talla(variante, precio, anotada=True))
+                btn.setProperty("estiloBase", estilo_talla(variante, anotada=True))
 
         self._gfs.sku = sku
         row = self._find_row_by_sku(sku)

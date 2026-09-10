@@ -1086,3 +1086,66 @@ def _inject_linked_products(
             injected.append(synthetic)
 
     return school_mode_rows + injected
+
+
+# ─── Tallas agotadas ─────────────────────────────────────────────────────
+# Antes toda talla se pintaba igual, hubiera o no existencia: la empleada
+# tocaba, no había, y ahí moría el dato. Ahora la talla en cero se ve
+# distinta, se puede tocar igual (un presupuesto no valida stock) y ese toque
+# queda anotado como demanda no atendida.
+
+_ESTILO_TALLA = (
+    "QPushButton {{ background: {fondo}; border: 1px {borde_tipo} {borde};"
+    " border-radius: 6px; font-size: 12px; color: {texto};"
+    " padding: 4px 12px; }}"
+    "QPushButton:hover {{ background: {hover}; border-color: #8B5E3C; }}"
+)
+
+
+def esta_agotada(variante: dict) -> bool:
+    """Sin existencia según el índice. Un dato viejo o raro cuenta como que sí hay."""
+    try:
+        return int(variante.get("stock_actual") or 0) <= 0
+    except (TypeError, ValueError):
+        return False
+
+
+def etiqueta_talla(variante: dict, precio: float, *, anotada: bool = False) -> str:
+    """Texto del botón de talla."""
+    talla = str(variante.get("talla") or variante.get("sku") or "")
+    if not esta_agotada(variante):
+        return f"Talla {talla} · ${precio:,.2f}"
+    return f"Talla {talla} · {'anotado ✓' if anotada else 'agotado'}"
+
+
+def estilo_talla(variante: dict, *, anotada: bool = False) -> str:
+    """Hoja de estilo del botón de talla según existencia."""
+    if not esta_agotada(variante):
+        return _ESTILO_TALLA.format(
+            fondo="#f5f0e8", borde_tipo="solid", borde="#c4b9a8",
+            texto="#3a2a1a", hover="#e8dfd2",
+        )
+    if anotada:
+        return _ESTILO_TALLA.format(
+            fondo="#eaf5ea", borde_tipo="solid", borde="#7aa87a",
+            texto="#2f6b2f", hover="#dcefdc",
+        )
+    return _ESTILO_TALLA.format(
+        fondo="#fbf9f6", borde_tipo="dashed", borde="#c9c2b6",
+        texto="#9a9186", hover="#f2ece2",
+    )
+
+
+def estilo_talla_seleccionada(variante: dict) -> str:
+    """La talla tocada. Verde si estaba agotada: acuse de que quedó anotada."""
+    if esta_agotada(variante):
+        return (
+            "QPushButton { background: #2f6b2f; border: 1px solid #2f6b2f;"
+            " border-radius: 6px; font-size: 12px; color: #f2fbf2;"
+            " padding: 4px 12px; font-weight: bold; }"
+        )
+    return (
+        "QPushButton { background: #87492c; border: 1px solid #87492c;"
+        " border-radius: 6px; font-size: 12px; color: #fbf8f2;"
+        " padding: 4px 12px; font-weight: bold; }"
+    )

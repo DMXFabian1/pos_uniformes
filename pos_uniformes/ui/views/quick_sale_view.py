@@ -905,10 +905,33 @@ class QuickSaleWidget(QWidget):
             QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
         )
         if reply == QMessageBox.StandardButton.Yes:
+            self._anotar_carrito_cancelado()
             self._items.clear()
             self._refresh_items_table()
             self._refresh_totals()
             self._scan_input.setFocus()
+
+    def _anotar_carrito_cancelado(self) -> None:
+        """Piezas que se escanearon y no se cobraron.
+
+        No siempre es venta perdida (a veces es un error de escaneo), por eso
+        se guarda aparte y no se suma a nada. Sirve para ver patrones: la
+        misma prenda cancelada muchas veces sí dice algo.
+        """
+        try:
+            from pos_uniformes.services import demanda_service
+
+            for item in list(self._items):
+                demanda_service.anotar(
+                    demanda_service.CARRITO_VACIO,
+                    sku=str(item.get("sku", "")),
+                    producto=str(item.get("nombre", "")),
+                    talla=str(item.get("talla", "")),
+                    piezas=int(item.get("cantidad", 1) or 1),
+                    employee_code=str(self._employee_code or ""),
+                )
+        except Exception:  # noqa: BLE001 — jamás estorbar al mostrador
+            pass
 
     # ─── Tickets ─────────────────────────────────────────────────────────
 
@@ -1073,8 +1096,11 @@ class QuickSaleWidget(QWidget):
                     return
                 from pos_uniformes.services import libreta_local_queue_service as cola
 
+                from pos_uniformes.services import demanda_service
+
                 with get_session() as session:
                     cola.drenar_pendientes(session)
+                    demanda_service.drenar(session)
             except Exception:  # noqa: BLE001
                 _logger.debug("Drenado de libreta pospuesto", exc_info=True)
 

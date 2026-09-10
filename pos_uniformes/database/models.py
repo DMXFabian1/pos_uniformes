@@ -2154,3 +2154,35 @@ class CajaRetiro(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
+
+
+class DemandaNoAtendida(Base):
+    """Lo que la gente pidió y no se pudo vender.
+
+    Es el dato que ninguna tabla tiene: las ventas dicen qué SÍ había, nunca
+    qué faltó. Aquí se anota solo, sin que la empleada llene nada:
+
+    - `busqueda_vacia`: buscó algo y el catálogo no devolvió nada.
+    - `talla_agotada`: tocó una talla que está en cero.
+    - `carrito_vacio`: armó una venta y la canceló sin cobrar.
+
+    Se agrega por producto/talla para decidir qué pedir. Una señal suelta es
+    ruido; la misma repetida es una orden de compra.
+    """
+
+    __tablename__ = "demanda_no_atendida"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    tipo: Mapped[str] = mapped_column(String(24), nullable=False, index=True)
+    # Lo que se tecleó (solo en `busqueda_vacia`).
+    texto: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    # Lo que se tocó (en `talla_agotada` y `carrito_vacio`).
+    sku: Mapped[str] = mapped_column(String(40), nullable=False, default="", index=True)
+    producto: Mapped[str] = mapped_column(String(160), nullable=False, default="")
+    talla: Mapped[str] = mapped_column(String(30), nullable=False, default="")
+    piezas: Mapped[int] = mapped_column(Integer, nullable=False, default=1, server_default="1")
+    employee_code: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    origen: Mapped[str] = mapped_column(String(60), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
