@@ -221,7 +221,7 @@ class HorarioDialog(QDialog):
         form.addRow("", self.sin_pago)
         hint = QLabel(
             "Por días: cobra sueldo/6 por cada día trabajado, al terminar sus días de la semana. "
-            "Si una semana viene más días, apúntalos como 'trabajó' en su calendario (tú o tu papá)."
+            "Si una semana viene más días, apúntalos como 'trabajó' en su calendario (tú o el encargado)."
         )
         hint.setWordWrap(True)
         hint.setStyleSheet("color: #8a8177; font-size: 12px;")

@@ -1670,7 +1670,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.libreta_reasignar_button.clicked.connect(self._reasignar_libreta)
         # Privado: ese cobro con tarjeta deja de existir para el encargado
         # (su ticket, su pantalla y su celular) — dinero, piezas y comisiones.
-        self.libreta_privado_button = QPushButton("🔒 Ocultar a mi papá")
+        self.libreta_privado_button = QPushButton("🔒 Ocultar del corte")
         self.libreta_privado_button.clicked.connect(self._alternar_privado_libreta)
         self.libreta_delete_button = QPushButton("🗑 Borrar")
         self.libreta_delete_button.clicked.connect(self._borrar_registro_libreta)
@@ -2313,7 +2313,7 @@ class QuoteSatelliteWindow(QMainWindow):
         idx = tabla.currentRow()
         row = rows[idx] if hay and 0 <= idx < len(rows) else None
         oculto = bool(getattr(row, "privado", False)) if row is not None else False
-        boton.setText("👁 Mostrar a mi papá" if oculto else "🔒 Ocultar a mi papá")
+        boton.setText("👁 Incluir en el corte" if oculto else "🔒 Ocultar del corte")
         # Solo tiene sentido en cobros con tarjeta (el efectivo descuadraría).
         boton.setEnabled(row is None or oculto or bool(getattr(row, "pago_tarjeta", False)))
 
@@ -2604,11 +2604,11 @@ class QuoteSatelliteWindow(QMainWindow):
         ya_privado = bool(getattr(row, "privado", False))
         comisiones = int(getattr(row, "comisiones", 0) or 0)
         if ya_privado:
-            pregunta = "Este movimiento está oculto para tu papá.\n¿Volver a mostrárselo?"
+            pregunta = "Este movimiento está oculto del corte.\n¿Volver a incluirlo?"
         else:
             pregunta = (
-                "Tu papá dejará de ver el dinero de este cobro: no aparece en "
-                "su ticket del corte, su pantalla ni su celular.\n\n"
+                "El dinero de este cobro deja de aparecer en el corte: ni en el "
+                "ticket, ni en la pantalla del encargado, ni en el celular.\n\n"
                 + (
                     f"Sus {comisiones} comisión(es) sí siguen contando para el "
                     "pago de la empleada.\n\n"
@@ -3172,7 +3172,7 @@ class QuoteSatelliteWindow(QMainWindow):
             if getattr(row, "pago_tarjeta", False):
                 tipo_txt += " (tarjeta)"
             if getattr(row, "privado", False):
-                tipo_txt = f"🔒 {tipo_txt}"  # tu papá no ve este dinero
+                tipo_txt = f"🔒 {tipo_txt}"  # este dinero no sale del corte
             if self._libreta_is_owner:
                 nombre = row.employee_name or row.employee_code
                 tipo_txt = f"{tipo_txt} — {nombre}"

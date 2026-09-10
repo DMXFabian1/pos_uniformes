@@ -764,7 +764,7 @@ async function duenoCorte() {
       `<input id="corte-otros" type="number" inputmode="decimal" step="0.01" class="input-grande" value="0">` +
       `<input id="corte-nota" type="text" class="input-grande" placeholder="Nota (opcional)">` +
       `<label class="casilla"><input type="checkbox" id="corte-sin-tarjeta">` +
-      `<span>Ocultar los cobros con tarjeta (tu papá no los verá)</span></label>` +
+      `<span>Ocultar los cobros con tarjeta (no salen en el ticket)</span></label>` +
     `</div>` +
     `<div id="corte-error" class="error oculto"></div>` +
     `<button class="btn-grande btn-acento" onclick="duenoGuardarCorte()">🖨  Guardar e imprimir corte</button>` +
@@ -794,7 +794,7 @@ async function duenoGuardarCorte() {
   }
   duenoSub(`<div class="listo-texto">✅ Corte hecho:<br><br>En caja ${pesos(r.monto)}` +
     `<br>Se retira ${pesos(r.retiro)}<br>Se queda de fondo ${pesos(r.reactivo_final)}` +
-    (r.ocultos ? `<br><br>🔒 ${r.ocultos} cobro(s) con tarjeta quedaron ocultos para tu papá` +
+    (r.ocultos ? `<br><br>🔒 ${r.ocultos} cobro(s) con tarjeta no salieron en el ticket` +
       `<br><span class="sub">Las comisiones de la empleada sí siguen contando: su pago no cambia.</span>` : "") +
     (r.ticket_encolado ? "<br><br>🖨 El ticket está saliendo en la impresora de la tienda." : "") +
     `</div><button class="btn-grande" onclick="cargarInicio()">✅  Listo</button>`);

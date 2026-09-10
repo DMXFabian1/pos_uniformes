@@ -92,7 +92,7 @@ class TicketConRetiroTests(unittest.TestCase):
         resultado, _t, _c, ocultar = self._correr(sin_tarjeta=True)
         ocultar.assert_called_once()
         self.assertEqual(ocultar.call_args.kwargs["creado_por"], "VEND-1")
-        self.assertIn("ocultos para tu papá", resultado.mensaje)
+        self.assertIn("no salieron en el ticket", resultado.mensaje)
 
 
 if __name__ == "__main__":

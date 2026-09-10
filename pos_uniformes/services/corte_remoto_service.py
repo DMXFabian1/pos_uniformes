@@ -157,6 +157,6 @@ def hacer_corte_y_avisar(
     lineas.append(f"Sacar de la venta: ${retiro:,.2f}")
     lineas.append(f"Reactivo que queda: ${Decimal(auto.corte.reactivo_final):,.2f}")
     if sin_tarjeta:
-        lineas.append("🔒 Los cobros con tarjeta quedaron ocultos para tu papá.")
+        lineas.append("🔒 Los cobros con tarjeta no salieron en el ticket.")
     lineas.append("🖨 Ticket enviado a la impresora de la tienda." if impreso else "⚠️ El corte quedó guardado pero no se pudo encolar el ticket.")
     return ResultadoCorte(True, "\n".join(lineas), impreso)

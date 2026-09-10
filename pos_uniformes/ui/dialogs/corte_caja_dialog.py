@@ -338,7 +338,7 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
     # (arranca apagada); en pantalla la sigue viendo.
     from PyQt6.QtWidgets import QCheckBox
 
-    sin_tarjeta = QCheckBox("Ocultar los cobros con tarjeta (tu papá no los verá)")
+    sin_tarjeta = QCheckBox("Ocultar los cobros con tarjeta (no salen en el ticket)")
     sin_tarjeta.setVisible(str(creado_por or "").strip().upper() == OWNER_CODE)
     if grande:
         sin_tarjeta.setStyleSheet("font-size: 17px;")
