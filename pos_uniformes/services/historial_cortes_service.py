@@ -115,6 +115,29 @@ def es_del_dueno(corte) -> bool:
     return str(corte.creado_por or "").upper() == "VEND-1"
 
 
+def venta_oficial(corte) -> Decimal:
+    """La venta que cuadra con la cifra del corte (la del ticket).
+
+    cifra − reactivo con que abrió + pagos + gastos. En los cortes viejos
+    (sin reactivo) la cifra ERA el total del día."""
+    if es_legacy(corte):
+        return _d(corte.monto_final)
+    return (
+        _d(corte.monto_final) - _d(corte.reactivo_inicial)
+        + _d(corte.retiros_pagos) + _d(corte.otros_retiros)
+    ).quantize(_CENT)
+
+
+def venta_real(corte) -> Decimal | None:
+    """Lo que de verdad se vendió (sin los ajustes del dueño). None en los viejos."""
+    if es_legacy(corte) or _d(corte.monto_esperado) <= 0:
+        return None
+    return (
+        _d(corte.monto_esperado) - _d(corte.reactivo_inicial)
+        + _d(corte.retiros_pagos) + _d(corte.otros_retiros)
+    ).quantize(_CENT)
+
+
 def retirado(corte) -> Decimal:
     if es_legacy(corte):
         return Decimal("0.00")  # eran totales del día, no retiros
@@ -128,6 +151,7 @@ class TotalesCortes:
     retirado: Decimal
     pagos: Decimal
     otros_retiros: Decimal
+    venta: Decimal = Decimal("0.00")
 
 
 def totales_cortes(cortes: list) -> TotalesCortes:
@@ -137,6 +161,7 @@ def totales_cortes(cortes: list) -> TotalesCortes:
         retirado=sum((retirado(c) for c in cortes), Decimal("0.00")),
         pagos=sum((_d(c.retiros_pagos) for c in cortes), Decimal("0.00")),
         otros_retiros=sum((_d(c.otros_retiros) for c in cortes), Decimal("0.00")),
+        venta=sum((venta_oficial(c) for c in cortes), Decimal("0.00")),
     )
 
 

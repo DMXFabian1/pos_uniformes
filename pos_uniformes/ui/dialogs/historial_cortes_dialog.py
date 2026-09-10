@@ -37,15 +37,19 @@ from pos_uniformes.services.historial_cortes_service import (
     formato_original,
     retirado,
     totales_cortes,
+    venta_oficial,
+    venta_real,
 )
 
 logger = logging.getLogger(__name__)
 
 _MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre")
-COLUMNAS = ("Fecha", "Hora", "Periodo", "Por", "En caja", "Real (sin ajustes)", "Reactivo", "Se retiró", "Pagos", "Ajuste / Sobró-Faltó", "Nota")
+# Mismo orden y mismas palabras que el ticket: reactivo · venta · pagos ·
+# gastos · SACAR DE LA VENTA. Lo real y el ajuste van escondidos.
+COLUMNAS = ("Fecha", "Hora", "Periodo", "Por", "Reactivo", "Venta", "Venta real", "Pagos", "Gastos", "Se retiró", "Ajuste", "Nota")
 # "En caja" es la cifra OFICIAL (la que se presenta y se audita). Lo REAL —
 # lo que de verdad se vendió — y el ajuste van escondidos: Ctrl+Shift+R los asoma.
-COLUMNAS_OCULTAS = (5, 9)
+COLUMNAS_OCULTAS = (6, 10)
 ATAJO_MODO_REAL = "Ctrl+Shift+R"
 
 
@@ -82,7 +86,9 @@ def texto_diferencia(corte) -> str:
 
 
 def texto_real(corte) -> str:
-    return "—" if es_legacy(corte) else f"${Decimal(corte.monto_esperado or 0):,.2f}"
+    """La venta real (sin ajustes). '—' en los cortes viejos."""
+    real = venta_real(corte)
+    return "—" if real is None else f"${real:,.2f}"
 
 
 def filas_tabla(cortes: list) -> list[tuple[str, ...]]:
@@ -94,11 +100,12 @@ def filas_tabla(cortes: list) -> list[tuple[str, ...]]:
             _hora(c),
             str(c.periodo_label or ""),
             str(c.creado_por or ""),
-            f"${Decimal(c.monto_final):,.2f}",
+            "—" if es_legacy(c) else f"${Decimal(c.reactivo_inicial or 0):,.2f}",
+            f"${venta_oficial(c):,.2f}",
             texto_real(c),
-            "—" if es_legacy(c) else f"${Decimal(c.reactivo_final or 0):,.2f}",
-            "—" if es_legacy(c) else f"${retirado(c):,.2f}",
             f"${Decimal(c.retiros_pagos or 0):,.2f}",
+            f"${Decimal(c.otros_retiros or 0):,.2f}",
+            "—" if es_legacy(c) else f"${retirado(c):,.2f}",
             texto_diferencia(c),
             str(c.nota or ""),
         ))
@@ -141,7 +148,7 @@ class HistorialCortesDialog(QDialog):
         self._creado_por = str(creado_por or "").strip().upper()
         self._cortes: list = []
         self._datos_cache: dict[tuple[int, bool], object] = {}
-        self.resize(1080, 680)
+        self.resize(1260, 700)
 
         self.mes_combo = QComboBox()
         y, m = self._hoy.year, self._hoy.month
@@ -167,7 +174,11 @@ class HistorialCortesDialog(QDialog):
         self.tabla = QTableWidget(0, len(COLUMNAS))
         self.tabla.setObjectName("libretaTabla")
         self.tabla.setHorizontalHeaderLabels(list(COLUMNAS))
-        self.tabla.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
+        # Las cifras se leen completas; solo Periodo y Nota se estiran.
+        encabezado = self.tabla.horizontalHeader()
+        encabezado.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
+        encabezado.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        encabezado.setSectionResizeMode(len(COLUMNAS) - 1, QHeaderView.ResizeMode.Stretch)
         self.tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.tabla.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tabla.setSelectionMode(QTableWidget.SelectionMode.SingleSelection)
@@ -273,12 +284,13 @@ class HistorialCortesDialog(QDialog):
         self.tabla.setRowCount(len(filas))
         for i, fila in enumerate(filas):
             for j, texto in enumerate(fila):
-                self.tabla.setItem(i, j, _item(texto, centrado=j not in (2, 10), negrita=(j == 4)))
+                self.tabla.setItem(i, j, _item(texto, centrado=j not in (2, 11), negrita=(j == 5)))
         if self._cortes:
             t = totales_cortes(self._cortes)
             self.totales_label.setText(
-                f"{t.cortes} corte(s) en el mes · Se retiró: ${t.retirado:,.2f}"
-                f" · Pagos a empleadas: ${t.pagos:,.2f} · Otros retiros: ${t.otros_retiros:,.2f}"
+                f"{t.cortes} corte(s) en el mes · Vendido: ${t.venta:,.2f}"
+                f" · Pagos a empleadas: ${t.pagos:,.2f} · Gastos: ${t.otros_retiros:,.2f}"
+                f" · Se retiró: ${t.retirado:,.2f}"
             )
         elif not self.totales_label.text().startswith("Sin conexión"):
             self.totales_label.setText("No hay cortes en este mes.")

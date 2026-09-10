@@ -64,9 +64,35 @@ class PurasTests(unittest.TestCase):
     def test_totales(self) -> None:
         t = totales_cortes([_corte(), _corte(id=2, monto_final=Decimal("11500.00"), retiros_pagos=Decimal("0"), otros_retiros=Decimal("200"))])
         self.assertEqual(t.cortes, 2)
+        # venta oficial: (12980−11160+1390) + (11500−11160+0+200) = 3210 + 540
+        self.assertEqual(t.venta, Decimal("3750.00"))
         self.assertEqual(t.retirado, Decimal("2160.00"))
         self.assertEqual(t.pagos, Decimal("1390.00"))
         self.assertEqual(t.otros_retiros, Decimal("200.00"))
+
+
+class VentaTests(unittest.TestCase):
+    """La tabla habla como el ticket: reactivo · venta · pagos · gastos · se retiró."""
+
+    def test_venta_oficial_y_real(self) -> None:
+        from pos_uniformes.services.historial_cortes_service import venta_oficial, venta_real
+
+        c = _corte()  # final 12,980 · real 13,000 · reactivo 11,160 · pagos 1,390
+        self.assertEqual(venta_oficial(c), Decimal("3210.00"))
+        self.assertEqual(venta_real(c), Decimal("3230.00"))
+        self.assertEqual(venta_oficial(c) - venta_real(c), diferencia_corte(c))
+
+    def test_con_gastos(self) -> None:
+        from pos_uniformes.services.historial_cortes_service import venta_oficial
+
+        self.assertEqual(venta_oficial(_corte(otros_retiros=Decimal("500"))), Decimal("3710.00"))
+
+    def test_corte_viejo_su_cifra_era_la_venta(self) -> None:
+        from pos_uniformes.services.historial_cortes_service import venta_oficial, venta_real
+
+        legacy = _corte(desde=None, reactivo_inicial=Decimal("0"), monto_esperado=Decimal("0"))
+        self.assertEqual(venta_oficial(legacy), Decimal("12980.00"))
+        self.assertIsNone(venta_real(legacy))
 
 
 class ConBaseTests(unittest.TestCase):
@@ -258,25 +284,33 @@ class DialogTests(unittest.TestCase):
         self.assertEqual(texto_diferencia(_corte(creado_por="VEND-1")), "ajuste −$20.00")
         self.assertEqual(texto_diferencia(_corte(creado_por="VEND-1", monto_final=Decimal("13000.00"))), "sin ajuste")
         legacy = _corte(desde=None, reactivo_inicial=Decimal("0"), reactivo_final=Decimal("0"), monto_esperado=Decimal("0"), periodo_label="HOY")
-        self.assertEqual(filas_tabla([legacy])[0][5:8], ("—", "—", "—"))
+        fila = filas_tabla([legacy])[0]
+        self.assertEqual(fila[4], "—")                 # sin reactivo
+        self.assertEqual(fila[5], "$12,980.00")        # su cifra ERA el total del día
+        self.assertEqual(fila[6], "—")                 # sin venta real guardada
+        self.assertEqual(fila[9], "—")                 # no se retiró nada
         self.assertEqual(texto_diferencia(legacy), "—")
+        # Mismo orden que el ticket: reactivo · venta · venta real · pagos · gastos · se retiró
         filas = filas_tabla(cortes)
         self.assertEqual(filas[0][0], "08/09/2026")
-        self.assertEqual(filas[0][4], "$12,980.00")
-        self.assertEqual(filas[0][5], "$13,000.00")  # real
-        self.assertEqual(filas[0][7], "$1,820.00")
-        self.assertEqual(filas[1][10], "ok")
+        self.assertEqual(filas[0][4], "$11,160.00")   # reactivo con que abrió
+        self.assertEqual(filas[0][5], "$3,210.00")    # venta oficial: 12980 − 11160 + 1390
+        self.assertEqual(filas[0][6], "$3,230.00")    # venta real: 13000 − 11160 + 1390
+        self.assertEqual(filas[0][7], "$1,390.00")    # pagos
+        self.assertEqual(filas[0][8], "$0.00")        # gastos
+        self.assertEqual(filas[0][9], "$1,820.00")    # se retiró
+        self.assertEqual(filas[1][11], "ok")
 
         with patch.object(HistorialCortesDialog, "recargar"):
             dlg = HistorialCortesDialog(None, hoy=date(2026, 9, 9))
         self.assertEqual(dlg.mes_combo.itemText(0), "Septiembre 2026")
         # Real y Ajuste ocultas por default; Ctrl+Shift+R las asoma (y las vuelve a esconder).
-        self.assertTrue(dlg.tabla.isColumnHidden(5) and dlg.tabla.isColumnHidden(9))
+        self.assertTrue(dlg.tabla.isColumnHidden(6) and dlg.tabla.isColumnHidden(10))
         dlg.alternar_modo_real()
-        self.assertFalse(dlg.tabla.isColumnHidden(5) or dlg.tabla.isColumnHidden(9))
+        self.assertFalse(dlg.tabla.isColumnHidden(6) or dlg.tabla.isColumnHidden(10))
         self.assertIn("con lo real", dlg.windowTitle())
         dlg.alternar_modo_real()
-        self.assertTrue(dlg.tabla.isColumnHidden(5))
+        self.assertTrue(dlg.tabla.isColumnHidden(6))
         dlg.pintar(cortes)
         self.assertEqual(dlg.tabla.rowCount(), 2)
         self.assertIn("2 corte(s)", dlg.totales_label.text())
