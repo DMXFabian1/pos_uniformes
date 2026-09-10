@@ -1752,9 +1752,6 @@ class QuoteSatelliteWindow(QMainWindow):
 
         self._libreta_code: str | None = None
         self._libreta_is_owner = False
-        # SKUs cuya falta ya se anotó en esta búsqueda (no multiplicar la señal
-        # porque la empleada toque dos veces el mismo botón).
-        self._demanda_anotada: set[str] = set()
         # Periodo: "hoy" | "semana" | "semana_pasada" | "rango"
         self._libreta_periodo = "hoy"
         self._libreta_tipo_filtro = "todo"
@@ -5496,8 +5493,11 @@ class QuoteSatelliteWindow(QMainWindow):
             )
             self._selected_search_btn = btn
 
-        if variante is not None and esta_agotada(variante) and sku not in self._demanda_anotada:
-            self._demanda_anotada.add(sku)
+        anotados = getattr(self, "_demanda_anotada", None)
+        if anotados is None:
+            anotados = self._demanda_anotada = set()
+        if variante is not None and esta_agotada(variante) and sku not in anotados:
+            anotados.add(sku)
             self._anotar_demanda(
                 "talla_agotada",
                 sku=sku,
