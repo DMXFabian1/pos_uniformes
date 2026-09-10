@@ -346,14 +346,15 @@ class DialogTests(unittest.TestCase):
 
         datos = TicketReimpresionTests()._datos()
         with patch.object(HistorialCortesDialog, "_datos", return_value=datos):
-            dlg.tabla.selectRow(1)  # el del encargado → formato simple por default
-            self.assertTrue(dlg.formato_check.isChecked())
+            # El ticket SIMPLE es el default para todos (Daniel 2026-09-10).
+            dlg.tabla.selectRow(1)
+            self.assertFalse(dlg.formato_check.isChecked())
             self.assertIn("Venta en efectivo:", dlg.previa.toPlainText())
             self.assertTrue(dlg.reprint_button.isEnabled())
-            dlg.formato_check.setChecked(False)
+            dlg.formato_check.setChecked(True)          # la casilla saca el completo
             self.assertIn("CORTE DE CAJA", dlg.previa.toPlainText())
-            dlg.tabla.selectRow(0)
-            self.assertTrue(dlg.formato_check.isChecked())
+            dlg.tabla.selectRow(0)                       # al cambiar de corte vuelve al simple
+            self.assertFalse(dlg.formato_check.isChecked())
             self.assertIs(dlg.corte_seleccionado(), cortes[0])
 
         # Borrar solo con gafete VEND-1 (este diálogo se abrió sin gafete): botón oculto

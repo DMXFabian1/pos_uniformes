@@ -427,10 +427,18 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
             from pos_uniformes.services.retiros_service import retiros_del_periodo
 
             retiros_periodo = retiros_del_periodo(session, estado.desde, estado.hasta)
-            texto = texto_ticket_corte(
-                corte, por_empleada, pagos=pagos_periodo, venta_efectivo=estado.resumen.efectivo, retiros=retiros_periodo,
+            # Formato por defecto: el ticket SIMPLE (Daniel 2026-09-10), el
+            # mismo que sale del encargado y de /corte. El completo (con
+            # operaciones por empleada) se saca desde 🧾 Cortes.
+            texto = texto_ticket_corte_encargado(
+                corte,
+                Decimal(str(venta.value())),          # la venta que se reporta
+                [],                                    # este corte no registra pagos
+                por_empleada,
+                retiros=retiros_periodo,
                 tarjeta=None if sin_tarjeta.isChecked() else estado.resumen.tarjeta,
                 tarjeta_ops=None if sin_tarjeta.isChecked() else contar_tarjeta(rows),
+                ya_pagados=pagos_periodo,              # los del periodo ya salieron del cajón
             )
     except ValueError as exc:
         QMessageBox.warning(parent, "Corte", str(exc))

@@ -34,7 +34,6 @@ from pos_uniformes.services.historial_cortes_service import (
     diferencia_corte,
     es_del_dueno,
     es_legacy,
-    formato_original,
     totales_cortes,
     venta_oficial,
     venta_real,
@@ -197,7 +196,8 @@ class HistorialCortesDialog(QDialog):
         self.previa.setPlaceholderText("Selecciona un corte para ver su ticket.")
         self.previa.setMinimumWidth(360)
 
-        self.formato_check = QCheckBox("Formato del encargado (ticket simple)")
+        # Por defecto el ticket simple (el de siempre); la casilla saca el completo.
+        self.formato_check = QCheckBox("Ticket completo (con operaciones por empleada)")
         self.formato_check.toggled.connect(lambda _v: self._mostrar_seleccionado())
         self.reprint_button = QPushButton("🖨 Reimprimir corte")
         self.reprint_button.setObjectName("primaryButton")
@@ -334,7 +334,7 @@ class HistorialCortesDialog(QDialog):
         return datos
 
     def _formato(self) -> str:
-        return FORMATO_ENCARGADO if self.formato_check.isChecked() else "dueno"
+        return "dueno" if self.formato_check.isChecked() else FORMATO_ENCARGADO
 
     def _mostrar_seleccionado(self) -> None:
         corte = self.corte_seleccionado()
@@ -350,9 +350,9 @@ class HistorialCortesDialog(QDialog):
         self.sin_ajuste_button.setEnabled(bool(dif) and es_del_dueno(corte))
         self.ajustar_button.setEnabled(es_del_dueno(corte) and not es_legacy(corte))
         if self.sender() is self.tabla:
-            # Al cambiar de corte, el formato arranca como salió originalmente.
+            # Al cambiar de corte se vuelve al formato de siempre: el simple.
             self.formato_check.blockSignals(True)
-            self.formato_check.setChecked(formato_original(corte) == FORMATO_ENCARGADO)
+            self.formato_check.setChecked(False)
             self.formato_check.blockSignals(False)
         try:
             texto = texto_ticket_reimpresion(corte, self._datos(corte), self._formato())
