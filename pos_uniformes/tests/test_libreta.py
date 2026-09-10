@@ -866,8 +866,8 @@ class LibretaCicloBannerTests(unittest.TestCase):
 
 
 class AjusteEnLibretaTests(unittest.TestCase):
-    """Lo que el dueño cambia en un corte manda también en su Libreta: eso es
-    lo REAL (Daniel 2026-09-10); Ctrl+Shift+R asoma lo que calculó el sistema."""
+    """Lo que el dueño cambia en un corte manda también en su Libreta: esas son
+    las cifras OFICIALES y no se anuncian; Ctrl+Shift+R asoma lo real."""
 
     def test_ajustes_en_rango_suma_solo_los_del_dueno(self) -> None:
         from datetime import datetime, timedelta, timezone
@@ -910,7 +910,7 @@ class AjusteEnLibretaTests(unittest.TestCase):
         )
         fake = SimpleNamespace(
             _libreta_is_owner=True, _libreta_periodo="hoy", _libreta_ajuste=Decimal("-500.00"),
-            _libreta_ver_calculado=False, _libreta_emp_filtro=None, _libreta_pagina=0,
+            _libreta_ver_real=False, _libreta_emp_filtro=None, _libreta_pagina=0,
             _libreta_rows_pintadas=[], _libreta_last_cortes=[], _libreta_last_por_empleada=[],
             _libreta_ranking_codes=[], _libreta_secciones={},
             _llenar_libreta_cards=lambda v: cards.append(v),
@@ -929,13 +929,13 @@ class AjusteEnLibretaTests(unittest.TestCase):
             QuoteSatelliteWindow._pintar_libreta(fake, [])
             cajon = cards[-1][0]
             self.assertEqual(cajon[1], "$2,513")           # 3013 − 500
-            self.assertIn("lo que hay en el cajón", cajon[2])
-            # Ver lo calculado: la cuenta teórica del sistema.
-            fake._libreta_ver_calculado = True
+            self.assertEqual(cajon[2], "ventas + abonos en efectivo · es la cifra del corte")  # lo oficial no se anuncia
+            # Ctrl+Shift+R: lo real, lo que de verdad se vendió.
+            fake._libreta_ver_real = True
             QuoteSatelliteWindow._pintar_libreta(fake, [])
         cajon = cards[-1][0]
         self.assertEqual(cajon[1], "$3,013")
-        self.assertIn("lo que calculó el sistema", cajon[2])
+        self.assertIn("REAL · lo que se vendió", cajon[2])
 
 
 class TarjetaCicloTests(unittest.TestCase):

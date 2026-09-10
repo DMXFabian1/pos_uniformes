@@ -90,7 +90,7 @@ class TextosTests(unittest.TestCase):
         # Su cifra es la oficial; en SU Telegram ve el real y el ajuste (no "faltaron").
         t = al.texto_alerta_corte(self._corte(creado_por="VEND-1", monto_final=Decimal("12900.00")), Decimal("3230.00"))
         self.assertNotIn("FALTARON", t)
-        self.assertIn("Ajuste: calculado $13,000.00 → real $12,900.00 (−$100.00)", t)
+        self.assertIn("Ajuste: real $13,000.00 → oficial $12,900.00 (−$100.00)", t)
         # Sin cambios: todo normal, ninguna línea extra.
         t2 = al.texto_alerta_corte(self._corte(creado_por="VEND-1"), Decimal("3230.00"))
         self.assertNotIn("Ajuste", t2)
@@ -223,7 +223,7 @@ class EnganchesTests(unittest.TestCase):
         self.assertEqual(len(pend), 1)
         self.assertIn("Corte hecho por VEND-1 a las 17:30", pend[0].texto)
         self.assertNotIn("FALTARON", pend[0].texto)
-        self.assertIn("Ajuste: calculado $13,160.00 → real $13,100.00 (−$60.00)", pend[0].texto)
+        self.assertIn("Ajuste: real $13,160.00 → oficial $13,100.00 (−$60.00)", pend[0].texto)
         self.assertEqual(corte.monto_esperado, Decimal("13160.00"))  # el real se guarda; solo Daniel lo ve
 
 

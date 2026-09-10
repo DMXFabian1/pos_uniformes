@@ -236,9 +236,10 @@ def cerrar_corte(
     if reactivo_final > contado:
         raise ValueError("El reactivo que se queda no puede ser mayor a lo contado.")
     local = ahora.astimezone() if ahora.tzinfo else ahora
-    # Regla de Daniel: su cifra final es la REAL y la oficial (ticket,
-    # encargado y PWA solo ven `monto_final`); lo que calculó el sistema se
-    # guarda en `monto_esperado` y SOLO lo ve él (historial, Telegram).
+    # Regla de Daniel: su cifra final es la OFICIAL — la que se presenta, la
+    # que ve el encargado y la que se audita (ticket y PWA solo leen
+    # `monto_final`). Lo REAL (lo que de verdad se vendió) queda en
+    # `monto_esperado` y SOLO lo ve él (historial con Ctrl+Shift+R, Telegram).
     corte = LibretaCorte(
         fecha=local.date(),
         periodo_label=_etiqueta_periodo(estado.desde, ahora),
@@ -281,9 +282,9 @@ def _avisar_corte(session, corte, estado: EstadoCaja) -> None:
 def ajustes_en_rango(session, desde, hasta) -> Decimal:
     """Cuánto cambió el dueño sus cortes en este rango (negativo = sacó dinero).
 
-    Su cifra es la oficial (2026-09-09): la Libreta también la respeta, así
-    que el efectivo mostrado se corrige con esta suma: eso es lo REAL, el
-    dinero que quedó en el cajón. Solo "ver lo calculado" la ignora.
+    Su cifra es la OFICIAL: la Libreta también la respeta, así
+    que el efectivo mostrado se corrige con esta suma: esas son las cifras
+    OFICIALES. Ver lo real (lo que de verdad se vendió) la ignora.
     """
     from pos_uniformes.database.models import LibretaCorte
 

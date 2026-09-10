@@ -55,7 +55,7 @@ class FormatearTests(unittest.TestCase):
         t = formatear(DatosResumen(fecha=date(2026, 9, 8), cortes=[exacto, sobra, dueno]))
         self.assertIn("cuadró exacto ✅", t)
         self.assertIn("sobraron $10.00 ⚠️", t)
-        self.assertIn("por VEND-1: en caja $90.00 · ajustado (calculado $100.00)", t)
+        self.assertIn("por VEND-1: en caja $90.00 · ajustado (real $100.00)", t)
         self.assertNotIn("FALTARON", t)
         normal = CorteResumen("21:40", "VEND-1", Decimal("100"), Decimal("100"), Decimal("50"), Decimal("0"), Decimal("0"))
         self.assertIn("por VEND-1: en caja $100.00 · cuadró exacto ✅", formatear(DatosResumen(fecha=date(2026, 9, 8), cortes=[normal])))

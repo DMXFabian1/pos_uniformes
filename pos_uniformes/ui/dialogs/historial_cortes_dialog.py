@@ -42,9 +42,9 @@ from pos_uniformes.services.historial_cortes_service import (
 logger = logging.getLogger(__name__)
 
 _MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre")
-COLUMNAS = ("Fecha", "Hora", "Periodo", "Por", "En caja (real)", "Calculado", "Reactivo", "Se retiró", "Pagos", "Ajuste / Sobró-Faltó", "Nota")
-# "En caja" es lo REAL (tu cifra, el dinero que quedó). Lo que calculó el
-# sistema y el ajuste van escondidos; Ctrl+Shift+R los asoma.
+COLUMNAS = ("Fecha", "Hora", "Periodo", "Por", "En caja", "Real (sin ajustes)", "Reactivo", "Se retiró", "Pagos", "Ajuste / Sobró-Faltó", "Nota")
+# "En caja" es la cifra OFICIAL (la que se presenta y se audita). Lo REAL —
+# lo que de verdad se vendió — y el ajuste van escondidos: Ctrl+Shift+R los asoma.
 COLUMNAS_OCULTAS = (5, 9)
 ATAJO_MODO_REAL = "Ctrl+Shift+R"
 
@@ -70,7 +70,7 @@ def _hora(corte) -> str:
 
 
 def texto_diferencia(corte) -> str:
-    """Corte del dueño: 'ajuste ±$' (lo real contra lo calculado). Del encargado: sobró/faltó."""
+    """Corte del dueño: 'ajuste ±$' (lo oficial contra lo real). Del encargado: sobró/faltó."""
     d = diferencia_corte(corte)
     if d is None:
         return "—"
@@ -106,8 +106,8 @@ def filas_tabla(cortes: list) -> list[tuple[str, ...]]:
 
 
 def venta_congruente(corte, datos) -> Decimal:
-    """La venta que cuadra con la cifra real (la del dueño): si ajustó, la
-    derivada (cifra − reactivo + pagos + gastos); si no, la de las ventas."""
+    """La venta que cuadra con la cifra OFICIAL: si el dueño ajustó, la
+    derivada (cifra − reactivo + pagos + gastos); si no, la vendida."""
     from pos_uniformes.ui.dialogs.corte_caja_dialog import _con_ajuste
 
     if not _con_ajuste(corte):
@@ -275,11 +275,11 @@ class HistorialCortesDialog(QDialog):
             self.totales_label.setText("No hay cortes en este mes.")
 
     def alternar_modo_real(self) -> None:
-        """Ctrl+Shift+R: asoma lo que calculó el sistema y el ajuste."""
+        """Ctrl+Shift+R: asoma lo real (lo vendido sin ajustes) y el ajuste."""
         self._modo_real = not self._modo_real
         for col in COLUMNAS_OCULTAS:
             self.tabla.setColumnHidden(col, not self._modo_real)
-        self.setWindowTitle("Cortes anteriores" + ("  ·  con lo calculado" if self._modo_real else ""))
+        self.setWindowTitle("Cortes anteriores" + ("  ·  con lo real" if self._modo_real else ""))
 
     def corte_seleccionado(self):
         fila = self.tabla.currentRow()

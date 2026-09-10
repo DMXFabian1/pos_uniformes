@@ -54,7 +54,7 @@ class PurasTests(unittest.TestCase):
         legacy = _corte(desde=None, reactivo_inicial=Decimal("0"), reactivo_final=Decimal("0"), monto_esperado=Decimal("0"), periodo_label="HOY")
         self.assertIsNone(diferencia_corte(legacy))
         self.assertEqual(retirado(legacy), Decimal("0.00"))  # era total del día, no retiro
-        self.assertEqual(diferencia_corte(_corte(creado_por="VEND-1")), Decimal("-20.00"))  # real vs calculado, solo para el dueño
+        self.assertEqual(diferencia_corte(_corte(creado_por="VEND-1")), Decimal("-20.00"))  # oficial vs real, solo para el dueño
 
     def test_formato_original(self) -> None:
         self.assertEqual(formato_original(_corte(creado_por="ENC-1")), FORMATO_ENCARGADO)
@@ -218,11 +218,11 @@ class DialogTests(unittest.TestCase):
         with patch.object(HistorialCortesDialog, "recargar"):
             dlg = HistorialCortesDialog(None, hoy=date(2026, 9, 9))
         self.assertEqual(dlg.mes_combo.itemText(0), "Septiembre 2026")
-        # Calculado y Ajuste ocultas por default; Ctrl+Shift+R las asoma (y las vuelve a esconder).
+        # Real y Ajuste ocultas por default; Ctrl+Shift+R las asoma (y las vuelve a esconder).
         self.assertTrue(dlg.tabla.isColumnHidden(5) and dlg.tabla.isColumnHidden(9))
         dlg.alternar_modo_real()
         self.assertFalse(dlg.tabla.isColumnHidden(5) or dlg.tabla.isColumnHidden(9))
-        self.assertIn("con lo calculado", dlg.windowTitle())
+        self.assertIn("con lo real", dlg.windowTitle())
         dlg.alternar_modo_real()
         self.assertTrue(dlg.tabla.isColumnHidden(5))
         dlg.pintar(cortes)
