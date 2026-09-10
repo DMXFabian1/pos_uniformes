@@ -240,6 +240,21 @@ def pagos_previos_del_periodo(session, resultado) -> list:
     ]
 
 
+def contado_desde_venta(estado: EstadoCaja, venta: Decimal, otros_retiros: Decimal) -> Decimal:
+    """Lo que debe quedar en el cajón si la venta en efectivo fue `venta`.
+
+    reactivo + venta − pagos ya hechos − retiros apuntados − otros retiros.
+    (Puro para poder probarlo.)"""
+    total = (
+        Decimal(estado.reactivo)
+        + Decimal(venta)
+        - Decimal(estado.pagos)
+        - Decimal(estado.retiros)
+        - Decimal(otros_retiros or 0)
+    )
+    return max(total, Decimal("0.00")).quantize(Decimal("0.01"))
+
+
 def contar_tarjeta(rows: list) -> int:
     """Cuántas operaciones (venta/abono) fueron con tarjeta = vouchers a cuadrar."""
     return sum(1 for r in rows or [] if getattr(r, "pago_tarjeta", False) and str(getattr(r, "tipo", "")) in ("venta", "abono"))
@@ -270,7 +285,7 @@ def texto_estado_caja(estado: EstadoCaja) -> str:
     partes = [
         f"Periodo: {_periodo(estado)}",
         f"Fondo (reactivo) con que abrió: ${estado.reactivo:,.2f}",
-        f"Efectivo de ventas y abonos: ${r.efectivo:,.2f}   ({r.operaciones} operaciones)",
+        f"VENTA EN EFECTIVO: ${r.efectivo:,.2f}   ({r.operaciones} operaciones)",
     ]
     if r.tarjeta:
         partes.append(f"Con tarjeta (no está en el cajón): ${r.tarjeta:,.2f}")
@@ -278,7 +293,7 @@ def texto_estado_caja(estado: EstadoCaja) -> str:
         partes.append(f"Pagos a empleadas ya hechos: -${estado.pagos:,.2f}")
     if estado.retiros:
         partes.append(f"Retiros apuntados (proveedor, renta...): -${estado.retiros:,.2f}")
-    partes.append(f"DEBE HABER EN EL CAJÓN: ${estado.esperado:,.2f}")
+    partes.append(f"En el cajón debe haber: ${estado.esperado:,.2f}")
     return "\n".join(partes)
 
 
@@ -323,8 +338,10 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
     ly.addWidget(resumen)
 
     form = QFormLayout()
-    contado = _spin(estado.esperado, grande)
-    form.addRow("Cuenta el cajón. ¿Cuánto hay?", contado)
+    # Se pregunta por la VENTA (Daniel 2026-09-10): es la cifra con la que se
+    # razona el corte. Lo que debe haber en el cajón se calcula y se muestra.
+    venta = _spin(estado.resumen.efectivo, grande)
+    form.addRow("¿Cuánto se vendió? (efectivo)", venta)
     fondo = _spin(estado.reactivo, grande)
     form.addRow("¿Cuánto se queda de fondo?", fondo)
     otros = _spin(Decimal("0.00"), grande)
@@ -348,17 +365,24 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
     dif.setStyleSheet("font-weight: 700;")
     ly.addWidget(dif)
 
-    def _refrescar_dif() -> None:
-        esperado = estado.esperado - Decimal(str(otros.value())).quantize(Decimal("0.01"))
-        d = diferencia(Decimal(str(contado.value())), esperado)
-        if d == 0:
-            dif.setText("✅ Cuadra exacto.")
-        elif d > 0:
-            dif.setText(f"Sobran ${d:,.2f}")
-        else:
-            dif.setText(f"Faltan ${-d:,.2f}")
+    def _contado() -> Decimal:
+        """Lo que queda en el cajón con la venta capturada."""
+        return contado_desde_venta(
+            estado, Decimal(str(venta.value())), Decimal(str(otros.value()))
+        )
 
-    contado.valueChanged.connect(lambda _v: _refrescar_dif())
+    def _refrescar_dif() -> None:
+        v = Decimal(str(venta.value())).quantize(Decimal("0.01"))
+        d = diferencia(v, estado.resumen.efectivo)
+        detalle = f"En el cajón quedan ${_contado():,.2f}."
+        if d == 0:
+            dif.setText(f"✅ Es la venta registrada. {detalle}")
+        elif d > 0:
+            dif.setText(f"${d:,.2f} más que lo registrado. {detalle}")
+        else:
+            dif.setText(f"${-d:,.2f} menos que lo registrado. {detalle}")
+
+    venta.valueChanged.connect(lambda _v: _refrescar_dif())
     otros.valueChanged.connect(lambda _v: _refrescar_dif())
     _refrescar_dif()
 
@@ -382,7 +406,7 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
         with get_session() as session:
             corte = cerrar_corte(
                 session,
-                contado=Decimal(str(contado.value())),
+                contado=_contado(),
                 reactivo_final=Decimal(str(fondo.value())),
                 otros_retiros=Decimal(str(otros.value())),
                 nota=nota.text(),

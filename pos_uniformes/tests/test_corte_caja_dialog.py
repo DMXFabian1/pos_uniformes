@@ -91,6 +91,43 @@ class TicketCorteTests(unittest.TestCase):
         self.assertNotIn("Pago a", texto)
 
 
+class ContadoDesdeVentaTests(unittest.TestCase):
+    """El corte del dueño pregunta por la VENTA; el cajón se calcula (2026-09-10)."""
+
+    def _estado(self, pagos="1390.00", retiros="0.00"):
+        return EstadoCaja(
+            desde=datetime(2026, 9, 9, 18, 10), hasta=datetime(2026, 9, 10, 12, 24),
+            reactivo=Decimal("11160.00"),
+            resumen=ResumenPeriodo(10, 19, Decimal("3547"), Decimal("0"), Decimal("0"), Decimal("0"), Decimal("3547.00")),
+            pagos=Decimal(pagos), retiros=Decimal(retiros),
+        )
+
+    def test_venta_registrada_da_el_esperado(self) -> None:
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import contado_desde_venta
+
+        estado = self._estado(pagos="0.00")
+        self.assertEqual(contado_desde_venta(estado, Decimal("3547"), Decimal("0")), estado.esperado)
+        self.assertEqual(contado_desde_venta(estado, Decimal("3547"), Decimal("0")), Decimal("14707.00"))
+
+    def test_declarar_menos_venta_deja_menos_en_el_cajon(self) -> None:
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import contado_desde_venta
+
+        estado = self._estado(pagos="0.00")
+        self.assertEqual(contado_desde_venta(estado, Decimal("547"), Decimal("0")), Decimal("11707.00"))
+
+    def test_resta_pagos_retiros_y_otros(self) -> None:
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import contado_desde_venta
+
+        estado = self._estado(pagos="1390.00", retiros="500.00")
+        self.assertEqual(contado_desde_venta(estado, Decimal("3547"), Decimal("200")), Decimal("12617.00"))
+
+    def test_nunca_negativo(self) -> None:
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import contado_desde_venta
+
+        estado = self._estado(pagos="20000.00")
+        self.assertEqual(contado_desde_venta(estado, Decimal("0"), Decimal("0")), Decimal("0.00"))
+
+
 class TicketLegacyTests(unittest.TestCase):
     def test_sin_reactivo_no_imprime_esos_renglones(self) -> None:
         texto = texto_ticket_corte(_corte(reactivo_inicial=Decimal("0"), reactivo_final=Decimal("0"), retiros_pagos=Decimal("0"), monto_final=Decimal("22300.00")))
@@ -115,7 +152,8 @@ class TextoEstadoTests(unittest.TestCase):
         self.assertIn("$2,800.00", texto)
         self.assertIn("tarjeta", texto.lower())
         self.assertIn("-$1,390.00", texto)
-        self.assertIn("DEBE HABER EN EL CAJÓN: $12,570.00", texto)
+        self.assertIn("VENTA EN EFECTIVO: $2,800.00", texto)
+        self.assertIn("En el cajón debe haber: $12,570.00", texto)
 
 
 if __name__ == "__main__":
