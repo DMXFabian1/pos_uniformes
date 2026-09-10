@@ -174,6 +174,22 @@ class TicketReimpresionTests(unittest.TestCase):
         self.assertIn("PAGAR A ANA:", t2)
 
 
+class VentaCongruenteTests(unittest.TestCase):
+    def test_reimpresion_encargado_con_ajuste_usa_la_venta_que_cuadra(self) -> None:
+        from pos_uniformes.ui.dialogs.historial_cortes_dialog import texto_ticket_reimpresion, venta_congruente
+
+        datos = TicketReimpresionTests()._datos()  # venta real 3,210
+        ajustado = _corte(creado_por="VEND-1", monto_final=Decimal("12980.00"), monto_esperado=Decimal("13000.00"))
+        # 12980 − 11160 + 1390 = 3,210 coincide; forzamos un ajuste de $500 para verlo
+        ajustado2 = _corte(creado_por="VEND-1", monto_final=Decimal("12500.00"), monto_esperado=Decimal("13000.00"))
+        self.assertEqual(venta_congruente(ajustado2, datos), Decimal("2730.00"))
+        t = texto_ticket_reimpresion(ajustado2, datos, FORMATO_ENCARGADO)
+        self.assertIn("$2,730.00", t)
+        self.assertNotIn("$3,210.00", t)
+        sin = _corte(creado_por="VEND-1", monto_final=Decimal("13000.00"))
+        self.assertEqual(venta_congruente(sin, datos), Decimal("3210.00"))
+
+
 class DialogTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls) -> None:
@@ -202,6 +218,13 @@ class DialogTests(unittest.TestCase):
         with patch.object(HistorialCortesDialog, "recargar"):
             dlg = HistorialCortesDialog(None, hoy=date(2026, 9, 9))
         self.assertEqual(dlg.mes_combo.itemText(0), "Septiembre 2026")
+        # Real y Ajuste ocultas por default; Ctrl+Shift+R las enseña (y las vuelve a esconder).
+        self.assertTrue(dlg.tabla.isColumnHidden(5) and dlg.tabla.isColumnHidden(9))
+        dlg.alternar_modo_real()
+        self.assertFalse(dlg.tabla.isColumnHidden(5) or dlg.tabla.isColumnHidden(9))
+        self.assertIn("modo real", dlg.windowTitle())
+        dlg.alternar_modo_real()
+        self.assertTrue(dlg.tabla.isColumnHidden(5))
         dlg.pintar(cortes)
         self.assertEqual(dlg.tabla.rowCount(), 2)
         self.assertIn("2 corte(s)", dlg.totales_label.text())

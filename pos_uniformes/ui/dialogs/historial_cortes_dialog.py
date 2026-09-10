@@ -13,7 +13,7 @@ from datetime import date
 from decimal import Decimal
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QFont, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -43,6 +43,10 @@ logger = logging.getLogger(__name__)
 
 _MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre")
 COLUMNAS = ("Fecha", "Hora", "Periodo", "Por", "En caja", "Real", "Reactivo", "Se retiró", "Pagos", "Ajuste / Sobró-Faltó", "Nota")
+# Lo real (esperado y ajuste) va escondido: lo impreso es la verdad oficial.
+# Ctrl+Shift+R en el diálogo lo muestra (solo Daniel abre este diálogo).
+COLUMNAS_OCULTAS = (5, 9)
+ATAJO_MODO_REAL = "Ctrl+Shift+R"
 
 
 def _item(texto: str, centrado: bool = True, negrita: bool = False) -> QTableWidgetItem:
@@ -101,13 +105,26 @@ def filas_tabla(cortes: list) -> list[tuple[str, ...]]:
     return filas
 
 
+def venta_congruente(corte, datos) -> Decimal:
+    """La venta que cuadra con la cifra impresa: si el dueño ajustó, la
+    derivada (cifra − reactivo + pagos + gastos); si no, la real."""
+    from pos_uniformes.ui.dialogs.corte_caja_dialog import _con_ajuste
+
+    if not _con_ajuste(corte):
+        return Decimal(datos.venta_efectivo or 0)
+    pagos = Decimal(getattr(corte, "retiros_pagos", 0) or 0)
+    gastos = Decimal(getattr(corte, "otros_retiros", 0) or 0)
+    return (Decimal(corte.monto_final) - Decimal(corte.reactivo_inicial or 0) + pagos + gastos).quantize(Decimal("0.01"))
+
+
 def texto_ticket_reimpresion(corte, datos, formato: str) -> str:
-    """Ticket del corte reconstruido, marcado como reimpresión."""
+    """Ticket del corte reconstruido, marcado como reimpresión. Congruente
+    con lo que se imprimió: nunca la venta real si hubo ajuste."""
     from pos_uniformes.ui.dialogs.corte_caja_dialog import texto_ticket_corte, texto_ticket_corte_encargado
 
     if formato == FORMATO_ENCARGADO:
         return texto_ticket_corte_encargado(
-            corte, datos.venta_efectivo, datos.pagos, datos.por_empleada, retiros=datos.retiros, reimpresion=True,
+            corte, venta_congruente(corte, datos), datos.pagos, datos.por_empleada, retiros=datos.retiros, reimpresion=True,
             tarjeta=getattr(datos, "tarjeta", None), tarjeta_ops=getattr(datos, "tarjeta_ops", None),
         )
     return texto_ticket_corte(
@@ -157,6 +174,10 @@ class HistorialCortesDialog(QDialog):
         self.tabla.verticalHeader().setVisible(False)
         self.tabla.setAlternatingRowColors(True)
         self.tabla.itemSelectionChanged.connect(self._mostrar_seleccionado)
+        self._modo_real = False
+        for col in COLUMNAS_OCULTAS:
+            self.tabla.setColumnHidden(col, True)
+        QShortcut(QKeySequence(ATAJO_MODO_REAL), self, activated=self.alternar_modo_real)
 
         self.previa = QPlainTextEdit()
         self.previa.setReadOnly(True)
@@ -252,6 +273,13 @@ class HistorialCortesDialog(QDialog):
             )
         elif not self.totales_label.text().startswith("Sin conexión"):
             self.totales_label.setText("No hay cortes en este mes.")
+
+    def alternar_modo_real(self) -> None:
+        """Ctrl+Shift+R: muestra/oculta Real y Ajuste. Lo impreso es lo oficial."""
+        self._modo_real = not self._modo_real
+        for col in COLUMNAS_OCULTAS:
+            self.tabla.setColumnHidden(col, not self._modo_real)
+        self.setWindowTitle("Cortes anteriores" + ("  ·  modo real" if self._modo_real else ""))
 
     def corte_seleccionado(self):
         fila = self.tabla.currentRow()
