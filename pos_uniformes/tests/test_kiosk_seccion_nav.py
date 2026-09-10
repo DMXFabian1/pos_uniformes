@@ -52,7 +52,9 @@ class SeccionNavTests(unittest.TestCase):
         s = self._stub()
         self.assertEqual(
             s._secciones_visibles(),
-            ["kiosk", "quicksale", "guided", "tariff", "libreta", "conteos"],
+            # "calendario" (solo mirar) y "conteos" (donde se trabaja) se
+            # separaron el 2026-09-10; antes eran una sola sección.
+            ["kiosk", "quicksale", "guided", "tariff", "libreta", "calendario", "conteos"],
         )
 
     def test_sin_ocultas_devuelve_exactamente_las_secciones_declaradas(self) -> None:

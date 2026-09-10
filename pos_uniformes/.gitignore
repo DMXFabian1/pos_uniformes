@@ -32,6 +32,7 @@ data/catalog_cache.json
 data/school_links_cache.json
 data/business_info.json
 data/libreta_pendiente.json
+data/demanda_pendiente.json
 data/print_routing.json
 data/ticket_print_settings.json
 data/anuncios/

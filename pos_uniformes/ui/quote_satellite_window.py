@@ -757,10 +757,18 @@ class QuoteSatelliteWindow(QMainWindow):
         self.nav_search_button = QPushButton("Buscar")
         self.nav_tariff_button = QPushButton("Tarifarios")
         self.nav_libreta_button = QPushButton("Libreta")
-        self.nav_conteos_button = QPushButton("Calendario")
+        # "Calendario" solo muestra qué escuela toca contar. El trabajo de
+        # conteo (imprimir hoja, capturar, seguir una jornada) vive en su
+        # propia sección "Conteos".
+        self.nav_calendario_button = QPushButton("Calendario")
+        self.nav_conteos_button = QPushButton("Conteos")
         # "Cámaras" abre el visor del DVR en ventana aparte (no es una página
         # del stack): empleadas ven solo entradas, admin con PIN ve todas.
         self.nav_camaras_button = QPushButton("Cámaras")
+        # Botón oculto (decisión de Daniel, 2026-09-10): su lugar en la barra lo
+        # toma "Conteos". El visor sigue vivo y a la mano con Ctrl+Shift+C; para
+        # restaurar el botón basta quitar esta línea.
+        self.nav_camaras_button.setVisible(False)
         # "Tarifarios" oculto (decisión de Daniel, 2026-09-02): su lugar lo
         # toma "Libreta". La página y su código siguen vivos; para restaurarla
         # basta quitar esta línea.
@@ -949,7 +957,8 @@ class QuoteSatelliteWindow(QMainWindow):
             self.nav_search_button: _icon_from_asset("kiosk_icons/search_quote.svg"),
             self.nav_tariff_button: _icon_from_asset("kiosk_icons/catalog_grid.svg"),
             self.nav_libreta_button: _icon_from_asset("kiosk_icons/quote_stack.svg"),
-            self.nav_conteos_button: _icon_from_asset("kiosk_icons/calendar.svg"),
+            self.nav_calendario_button: _icon_from_asset("kiosk_icons/calendar.svg"),
+            self.nav_conteos_button: _icon_from_asset("kiosk_icons/conteo.svg"),
             self.nav_camaras_button: _icon_from_asset("kiosk_icons/search_quote.svg"),
         }
         for button, icon in nav_icons.items():
@@ -1063,6 +1072,7 @@ class QuoteSatelliteWindow(QMainWindow):
             self.nav_search_button,
             self.nav_tariff_button,
             self.nav_libreta_button,
+            self.nav_calendario_button,
             self.nav_conteos_button,
         ):
             button.setObjectName("navButton")
@@ -1181,8 +1191,9 @@ class QuoteSatelliteWindow(QMainWindow):
         self.page_stack.addWidget(self._scrollable(self._build_tariff_page()))
         # "search" va al final del stack para no mover los indices existentes
         self.page_stack.addWidget(self._scrollable(self._build_search_page()))
-        self.page_stack.addWidget(self._scrollable(self._build_conteos_page()))
+        self.page_stack.addWidget(self._scrollable(self._build_calendario_page()))
         self.page_stack.addWidget(self._scrollable(self._build_libreta_page()))
+        self.page_stack.addWidget(self._scrollable(self._build_conteos_page()))
         return self.page_stack
 
     def _build_libreta_page(self) -> QWidget:
@@ -3261,11 +3272,12 @@ class QuoteSatelliteWindow(QMainWindow):
             alto += tabla.rowHeight(fila)
         tabla.setFixedHeight(max(alto + 6, 120))
 
-    def _build_conteos_page(self) -> QWidget:
-        """Página "Calendario" del kiosko (después de Tarifarios).
+    def _build_calendario_page(self) -> QWidget:
+        """Página "Calendario": solo mirar, qué escuela toca contar y cuándo.
 
-        Vista principal = calendario visual del mes; los trabajadores pueden ver
-        qué toca y imprimir la orden. La frecuencia se edita solo desde el admin.
+        Se le quitaron los botones de trabajo (2026-09-10): imprimir la hoja y
+        capturar viven ahora en la sección "Conteos". Aquí no se hace nada, se
+        ve — por eso no pide gafete.
         """
         from pos_uniformes.ui.dialogs.conteo_calendario_mes_panel import (
             ConteoCalendarioMesPanel,
@@ -3281,18 +3293,64 @@ class QuoteSatelliteWindow(QMainWindow):
         titulo.setObjectName("guidedStepTitle")
         header.addWidget(titulo)
         header.addStretch()
-        subir_btn = QPushButton("📤 Subir conteo")
-        subir_btn.setObjectName("secondaryButton")
-        subir_btn.clicked.connect(self._open_conteo_subir)
-        header.addWidget(subir_btn)
-        orden_btn = QPushButton("🖨 Imprimir orden de conteo")
-        orden_btn.setObjectName("secondaryButton")
-        orden_btn.clicked.connect(self._open_conteo_orden)
-        header.addWidget(orden_btn)
+        pista = QLabel("Para imprimir la hoja o capturar, entra a Conteos.")
+        pista.setObjectName("guidedStepHint")
+        header.addWidget(pista)
         layout.addLayout(header)
 
         self.conteos_panel = ConteoCalendarioMesPanel(page, refresh_on_init=False)
         layout.addWidget(self.conteos_panel, 1)
+        page.setLayout(layout)
+        return page
+
+    def _build_conteos_page(self) -> QWidget:
+        """Página "Conteos": donde se trabaja.
+
+        Paso 1 del plan (2026-09-10): por ahora solo recoge lo que ya existía
+        en Calendario — imprimir la hoja y subir el conteo. Los pasos que
+        siguen la convierten en algo que una empleada pueda usar sola: gafete
+        al entrar, dejar de mostrarle lo que el sistema cree que hay, y poder
+        dejar una jornada a medias.
+        """
+        page = QWidget()
+        layout = QVBoxLayout()
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(12)
+
+        header = QHBoxLayout()
+        titulo = QLabel("Conteos")
+        titulo.setObjectName("guidedStepTitle")
+        header.addWidget(titulo)
+        header.addStretch()
+        orden_btn = QPushButton("🖨 Imprimir hoja de conteo")
+        orden_btn.setObjectName("secondaryButton")
+        orden_btn.clicked.connect(self._open_conteo_orden)
+        header.addWidget(orden_btn)
+        subir_btn = QPushButton("📤 Capturar conteo")
+        subir_btn.setObjectName("primaryButton")
+        subir_btn.clicked.connect(self._open_conteo_subir)
+        header.addWidget(subir_btn)
+        layout.addLayout(header)
+
+        pasos = QLabel(
+            "1.  Imprime la hoja de la escuela que toca.\n"
+            "2.  Cuenta en el piso y anota en la hoja.\n"
+            "3.  Regresa aquí y captura lo que anotaste."
+        )
+        pasos.setObjectName("guidedStepHint")
+        layout.addWidget(pasos)
+
+        self.conteos_pendiente_label = QLabel("")
+        self.conteos_pendiente_label.setObjectName("analyticsLine")
+        self.conteos_pendiente_label.setWordWrap(True)
+        layout.addWidget(self.conteos_pendiente_label)
+
+        layout.addStretch(1)
+        aviso = QLabel(
+            "Lo que se captura queda pendiente de revisión: no cambia el inventario solo."
+        )
+        aviso.setObjectName("guidedStepHint")
+        layout.addWidget(aviso)
         page.setLayout(layout)
         return page
 
@@ -3356,6 +3414,37 @@ class QuoteSatelliteWindow(QMainWindow):
             texto = f"⚠  Conteo pendiente en {n} escuelas"
         self.conteo_banner_label.setText(texto)
         banner.setVisible(True)
+
+    def _refresh_conteos_pendiente(self) -> None:
+        """Qué escuelas traen conteo vencido, en la página Conteos.
+
+        Es la misma consulta del banner, dicha en voz alta: quien entra aquí
+        viene a trabajar y lo primero que necesita saber es qué toca.
+        """
+        etiqueta = getattr(self, "conteos_pendiente_label", None)
+        if etiqueta is None:
+            return
+        if self.offline_mode:
+            etiqueta.setText("Sin conexión: no se puede saber qué escuela toca.")
+            return
+        try:
+            from pos_uniformes.services.conteo_calendario_service import (
+                escuelas_con_conteo_vencido,
+            )
+
+            with get_session() as session:
+                vencidas = escuelas_con_conteo_vencido(session)
+        except Exception:  # noqa: BLE001 — sin conexión: no molestar
+            etiqueta.setText("")
+            return
+
+        if not vencidas:
+            etiqueta.setText("Todo al día. No hay conteos vencidos.")
+            return
+        nombres = ", ".join(v.escuela_nombre for v in vencidas[:6])
+        if len(vencidas) > 6:
+            nombres += f" y {len(vencidas) - 6} más"
+        etiqueta.setText(f"Toca contar ({len(vencidas)}):  {nombres}")
 
     def _open_conteo_orden(self) -> None:
         from pos_uniformes.ui.dialogs.conteo_orden_dialog import ConteoOrdenDialog
@@ -4468,6 +4557,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.nav_search_button.clicked.connect(lambda: self._set_page("search"))
         self.nav_tariff_button.clicked.connect(lambda: self._set_page("tariff"))
         self.nav_libreta_button.clicked.connect(lambda: self._set_page("libreta"))
+        self.nav_calendario_button.clicked.connect(lambda: self._set_page("calendario"))
         self.nav_conteos_button.clicked.connect(lambda: self._set_page("conteos"))
         self.nav_camaras_button.clicked.connect(self._open_camera_wall)
         self.tariff_generate_button.clicked.connect(self._handle_generate_tariff)
@@ -4712,8 +4802,9 @@ class QuoteSatelliteWindow(QMainWindow):
             "share": 5,
             "tariff": 6,
             "search": 7,
-            "conteos": 8,
+            "calendario": 8,
             "libreta": 9,
+            "conteos": 10,
         }
         button_map = {
             "kiosk": self.nav_kiosk_button,
@@ -4724,8 +4815,9 @@ class QuoteSatelliteWindow(QMainWindow):
             "share": self.nav_share_button,
             "tariff": self.nav_tariff_button,
             "search": self.nav_search_button,
-            "conteos": self.nav_conteos_button,
+            "calendario": self.nav_calendario_button,
             "libreta": self.nav_libreta_button,
+            "conteos": self.nav_conteos_button,
         }
         page_title_map = {
             "kiosk": "Kiosko listo para escaneo rapido.",
@@ -4736,15 +4828,18 @@ class QuoteSatelliteWindow(QMainWindow):
             "share": "Compartir por WhatsApp o imprimir.",
             "tariff": "Tarifario de precios por escuela.",
             "search": "Busqueda y seguimiento de presupuestos.",
-            "conteos": "Calendario de conteos por escuela.",
+            "calendario": "Calendario de conteos por escuela.",
+            "conteos": "Conteos — imprime la hoja, cuenta y captura.",
             "libreta": "Libreta de la tienda.",
         }
         self.current_page_key = page_key
         self.page_stack.setCurrentIndex(page_index_map[page_key])
         button_map[page_key].setChecked(True)
         self._set_status(page_title_map[page_key])
-        if page_key == "conteos":
+        if page_key == "calendario":
             self.conteos_panel.refresh()
+        if page_key == "conteos":
+            self._refresh_conteos_pendiente()
         if page_key == "kiosk":
             QTimer.singleShot(0, self.kiosk_scan_input.setFocus)
         if page_key == "quicksale":
@@ -4761,7 +4856,7 @@ class QuoteSatelliteWindow(QMainWindow):
     # (Catálogo, Presupuesto, Buscar) se saltan solas al navegar.
     _SECCIONES_NAV = (
         "kiosk", "quicksale", "catalog", "guided", "quote", "search", "tariff",
-        "libreta", "conteos",
+        "libreta", "calendario", "conteos",
     )
 
     def _secciones_visibles(self) -> list[str]:
@@ -4775,6 +4870,7 @@ class QuoteSatelliteWindow(QMainWindow):
             "search": self.nav_search_button,
             "tariff": self.nav_tariff_button,
             "libreta": self.nav_libreta_button,
+            "calendario": self.nav_calendario_button,
             "conteos": self.nav_conteos_button,
         }
         return [k for k in self._SECCIONES_NAV if not botones[k].isHidden()]

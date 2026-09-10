@@ -206,7 +206,11 @@ class InventoryCountDialogTests(unittest.TestCase):
 
         self.assertFalse(dialog.batch_table.selectionModel().hasSelection())
         self.assertEqual(dialog.batch_table.currentRow(), -1)
-        self.assertTrue(dialog.sku_input.hasFocus())
+        # `hasFocus()` exige además que ESTA sea la ventana activa, y en la
+        # suite completa puede quedar activa la ventana de otra prueba: el
+        # test fallaba solo al correr todo junto. Lo que importa aquí es a
+        # qué widget del diálogo volvió el foco.
+        self.assertIs(dialog.focusWidget(), dialog.sku_input)
 
     def test_decrement_selected_row_count_subtracts_one_piece(self) -> None:
         dialog = InventoryCountDialog(
