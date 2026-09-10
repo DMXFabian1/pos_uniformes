@@ -90,7 +90,7 @@ if ($versionRemota -and ($versionRemota -ne $versionLocal)) {
 # SIGUIENTE arranque): instalar mejoras del lanzador ya no requiere USB.
 if (Test-Path $share) {
     $updatesRoot = "\\$serverHost\pos_updates"
-    foreach ($f in @("lanzador_satelite.ps1", "lanzador_satelite.bat")) {
+    foreach ($f in @("lanzador_satelite.ps1", "lanzador_satelite.bat", "reparar_satelite.bat")) {
         Copy-Item (Join-Path $updatesRoot $f) $PSScriptRoot -Force -ErrorAction SilentlyContinue
     }
 }

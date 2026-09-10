@@ -87,6 +87,8 @@ if (Test-Path $updatesDir) {
     # lanzador_satelite.bat + .ps1 desde la carpeta compartida.
     Copy-Item (Join-Path $PSScriptRoot "lanzador_satelite.ps1") $updatesDir -Force
     Copy-Item (Join-Path $PSScriptRoot "lanzador_satelite.bat") $updatesDir -Force
+    # Reparador para el kiosko (cuando el .exe se copia a medias).
+    Copy-Item (Join-Path $PSScriptRoot "reparar_satelite.bat") $updatesDir -Force -ErrorAction SilentlyContinue
     Write-Host "  Publicado para kioskos en: $publishDir ($publishedVersion)"
 } else {
     Write-Host "  (No existe $updatesDir - no se publico para kioskos)"

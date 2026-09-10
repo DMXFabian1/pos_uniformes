@@ -37,6 +37,25 @@ class LanzadorTests(unittest.TestCase):
         self.assertLess(self.texto.index("quedo incompleto"), self.texto.index("Start-Process $exe.FullName"))
 
 
+class ReparadorTests(unittest.TestCase):
+    """El kiosko se repara solo, sin depender de la PC principal."""
+
+    def test_el_lanzador_se_lleva_el_reparador_al_kiosko(self) -> None:
+        texto = _PS1.read_text(encoding="utf-8", errors="ignore")
+        self.assertIn("reparar_satelite.bat", texto)
+
+    def test_el_reparador_borra_la_marca_y_abre_el_lanzador(self) -> None:
+        rep = _PS1.parent / "reparar_satelite.bat"
+        texto = rep.read_text(encoding="utf-8", errors="ignore")
+        self.assertIn("VERSION.txt", texto)
+        self.assertIn("taskkill", texto)
+        self.assertIn("lanzador_satelite.bat", texto)
+
+    def test_el_build_lo_publica(self) -> None:
+        build = (_PS1.parent / "build_presupuestos_satelite_windows.ps1").read_text(encoding="utf-8", errors="ignore")
+        self.assertIn("reparar_satelite.bat", build)
+
+
 class ForzarUpdateTests(unittest.TestCase):
     def test_borra_la_marca_de_version(self) -> None:
         texto = _FORZAR.read_text(encoding="utf-8", errors="ignore")
