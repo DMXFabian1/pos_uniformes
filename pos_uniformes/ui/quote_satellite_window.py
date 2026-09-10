@@ -1757,7 +1757,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self._libreta_tipo_filtro = "todo"
         self._libreta_emp_filtro: str | None = None
         self._libreta_ajuste = Decimal("0.00")   # lo que el dueño cambió en sus cortes
-        self._libreta_modo_real = False          # Ctrl+Shift+R
+        self._libreta_ver_calculado = False      # Ctrl+Shift+R: asomarse a lo teórico
         self._libreta_ranking_codes: list[str] = []
         # Últimos agregados pintados (para el ticket de corte)
         self._libreta_last_cortes: list = []
@@ -2898,17 +2898,20 @@ class QuoteSatelliteWindow(QMainWindow):
         HistorialPagosDialog(self, creado_por=str(self._libreta_code or "")).exec()
         self._refresh_libreta_view()
 
-    def _alternar_modo_real_libreta(self) -> None:
-        """Ctrl+Shift+R (solo dueño): efectivo sin ajustes / con ajustes."""
+    def _alternar_ver_calculado_libreta(self) -> None:
+        """Ctrl+Shift+R (solo dueño): asomarse a lo que calculó el sistema.
+
+        Lo normal es lo REAL (con tus ajustes): el dinero que quedó en el
+        cajón. Esto solo enseña, un momento, la cuenta teórica."""
         if not getattr(self, "_libreta_is_owner", False):
             return
-        self._libreta_modo_real = not getattr(self, "_libreta_modo_real", False)
+        self._libreta_ver_calculado = not getattr(self, "_libreta_ver_calculado", False)
         rows, ranking = getattr(self, "_libreta_last_pintura", (None, None))
         if rows is not None:
             self._pintar_libreta(rows, ranking_rows=ranking)
         self._set_status(
-            "Modo real: viendo el efectivo sin tus ajustes." if self._libreta_modo_real
-            else "Viendo las cifras oficiales (con tus ajustes)."
+            "Viendo lo que calculó el sistema (sin tus ajustes)." if self._libreta_ver_calculado
+            else "Viendo lo real: el dinero que quedó en el cajón."
         )
 
     def _abrir_historial_cortes(self) -> None:
@@ -3054,13 +3057,16 @@ class QuoteSatelliteWindow(QMainWindow):
             # Si el dueño ajustó un corte del periodo, su cifra es la que vale
             # aquí también (Ctrl+Shift+R muestra la real).
             ajuste = Decimal(str(getattr(self, "_libreta_ajuste", 0) or 0))
-            modo_real = bool(getattr(self, "_libreta_modo_real", False))
-            if ajuste and not modo_real:
-                total_en_caja = total_en_caja + ajuste
+            ver_calculado = bool(getattr(self, "_libreta_ver_calculado", False))
+            if ajuste and not ver_calculado:
+                total_en_caja = total_en_caja + ajuste  # lo real: con tus ajustes
             pie_cajon = (
                 "ventas + abonos en efectivo · es la cifra del corte"
                 if not ajuste
-                else (f"real, sin tus ajustes ({ajuste:+,.0f})" if modo_real else "ya con tus ajustes del corte")
+                else (
+                    f"lo que calculó el sistema ({-ajuste:+,.0f} vs lo real)" if ver_calculado
+                    else "lo que hay en el cajón · con tus ajustes"
+                )
             )
             self._llenar_libreta_cards(
                 [
@@ -4475,10 +4481,10 @@ class QuoteSatelliteWindow(QMainWindow):
         _guided_ctrl_shift_l = QShortcut(QKeySequence("Ctrl+Shift+L"), self.guided_page_scroll)
         _guided_ctrl_shift_l.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         _guided_ctrl_shift_l.activated.connect(self._open_school_product_link_admin)
-        # Ctrl+Shift+R: modo real en la Libreta (ver el efectivo sin los
-        # ajustes que hiciste en los cortes). Vuelve a lo oficial al repetirlo.
-        _real_shortcut = QShortcut(QKeySequence("Ctrl+Shift+R"), self)
-        _real_shortcut.activated.connect(self._alternar_modo_real_libreta)
+        # Ctrl+Shift+R: ver lo que CALCULÓ el sistema (sin tus ajustes). Lo
+        # normal ya es lo real: el dinero que de verdad quedó en el cajón.
+        _calculado_shortcut = QShortcut(QKeySequence("Ctrl+Shift+R"), self)
+        _calculado_shortcut.activated.connect(self._alternar_ver_calculado_libreta)
         _esc_shortcut = QShortcut(QKeySequence("Escape"), self)
         _esc_shortcut.activated.connect(self._handle_escape_key)
         _kiosk_ctrl_s = QShortcut(QKeySequence("Ctrl+S"), self)

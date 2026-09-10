@@ -93,7 +93,7 @@ def formatear(d: DatosResumen) -> str:
         for c in d.cortes:
             dif = c.diferencia
             if dif != 0 and str(c.creado_por or "").upper() == "VEND-1":
-                estado = f"ajustado (real {_pesos(c.esperado)})"  # solo Daniel lo ve
+                estado = f"ajustado (calculado {_pesos(c.esperado)})"  # solo el dueño lo ve
             elif dif == 0:
                 estado = "cuadró exacto ✅"
             elif dif > 0:
