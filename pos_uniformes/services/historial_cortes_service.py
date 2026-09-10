@@ -235,3 +235,46 @@ def quitar_ajuste(session, corte_id: int, *, creado_por: str) -> dict:
     corte.monto_final = real
     session.commit()
     return {"id": corte.id, "cambio": True, "antes": antes, "monto_final": real, "ajuste": (antes - real)}
+
+
+def ajustar_corte(session, corte_id: int, *, venta, creado_por: str) -> dict:
+    """Cambia la venta OFICIAL de un corte ya hecho (SOLO el dueño, VEND-1).
+
+    `venta` es lo que se reporta. La cifra del corte se recalcula con la
+    misma cuenta del ticket (venta + reactivo − pagos − gastos), así que
+    "se retira" cuadra con lo que de verdad se entregó. Lo que de verdad se
+    vendió sigue guardado aparte y solo lo ve el dueño.
+    """
+    from pos_uniformes.database.models import LibretaCorte
+
+    if str(creado_por or "").strip().upper() != "VEND-1":
+        raise SinPermiso("Solo el dueño puede ajustar un corte.")
+    corte = session.get(LibretaCorte, int(corte_id))
+    if corte is None:
+        raise ValueError("Ese corte ya no existe.")
+    if es_legacy(corte):
+        raise ValueError("Los cortes viejos no guardan la venta: no se pueden ajustar.")
+    venta = _d(venta)
+    if venta < 0:
+        raise ValueError("La venta no puede ser negativa.")
+    nuevo_final = (
+        venta + _d(corte.reactivo_inicial) - _d(corte.retiros_pagos) - _d(corte.otros_retiros)
+    ).quantize(_CENT)
+    if nuevo_final < _d(corte.reactivo_final):
+        raise ValueError(
+            "Con esa venta no alcanza para dejar el reactivo del cajón "
+            f"(${_d(corte.reactivo_final):,.2f})."
+        )
+    antes = _d(corte.monto_final)
+    corte.monto_final = nuevo_final
+    session.commit()
+    real = venta_real(corte)
+    return {
+        "id": corte.id,
+        "venta": venta,
+        "venta_real": real,
+        "sin_reportar": (real - venta) if real is not None else Decimal("0.00"),
+        "monto_final": nuevo_final,
+        "antes": antes,
+        "retirado": retirado(corte),
+    }

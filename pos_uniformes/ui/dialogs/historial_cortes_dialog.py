@@ -206,6 +206,13 @@ class HistorialCortesDialog(QDialog):
 
         # Borrar: solo Daniel (VEND-1). Un corte doble o equivocado se quita
         # y el periodo se recompone (ver historial_cortes_service.borrar_corte).
+        # Ajustar: cambiar la venta que se reporta de un corte ya hecho.
+        self.ajustar_button = QPushButton("✏️ Ajustar la venta")
+        self.ajustar_button.setObjectName("secondaryButton")
+        self.ajustar_button.setEnabled(False)
+        self.ajustar_button.setVisible(self._creado_por == "VEND-1")
+        self.ajustar_button.clicked.connect(self.ajustar)
+
         # Quitar el ajuste: la cifra oficial vuelve a ser la real (pruebas).
         self.sin_ajuste_button = QPushButton("↩ Quitar el ajuste")
         self.sin_ajuste_button.setObjectName("secondaryButton")
@@ -224,6 +231,7 @@ class HistorialCortesDialog(QDialog):
         derecha.addWidget(self.previa, 1)
         derecha.addWidget(self.formato_check)
         derecha.addWidget(self.reprint_button)
+        derecha.addWidget(self.ajustar_button)
         derecha.addWidget(self.sin_ajuste_button)
         derecha.addWidget(self.delete_button)
 
@@ -278,6 +286,7 @@ class HistorialCortesDialog(QDialog):
         self.reprint_button.setEnabled(False)
         self.delete_button.setEnabled(False)
         self.sin_ajuste_button.setEnabled(False)
+        self.ajustar_button.setEnabled(False)
         filas = filas_tabla(self._cortes)
         self.tabla.setRowCount(len(filas))
         for i, fila in enumerate(filas):
@@ -334,10 +343,12 @@ class HistorialCortesDialog(QDialog):
             self.reprint_button.setEnabled(False)
             self.delete_button.setEnabled(False)
             self.sin_ajuste_button.setEnabled(False)
+            self.ajustar_button.setEnabled(False)
             return
         self.delete_button.setEnabled(True)
         dif = diferencia_corte(corte)
         self.sin_ajuste_button.setEnabled(bool(dif) and es_del_dueno(corte))
+        self.ajustar_button.setEnabled(es_del_dueno(corte) and not es_legacy(corte))
         if self.sender() is self.tabla:
             # Al cambiar de corte, el formato arranca como salió originalmente.
             self.formato_check.blockSignals(True)
@@ -352,6 +363,70 @@ class HistorialCortesDialog(QDialog):
             return
         self.previa.setPlainText(texto)
         self.reprint_button.setEnabled(True)
+
+    def ajustar(self) -> None:
+        """Cambia la venta que se reporta de un corte ya hecho."""
+        from PyQt6.QtWidgets import QDialogButtonBox, QDoubleSpinBox, QFormLayout, QMessageBox
+
+        corte = self.corte_seleccionado()
+        if corte is None or self._creado_por != "VEND-1" or es_legacy(corte):
+            return
+        real = venta_real(corte) or venta_oficial(corte)
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Ajustar la venta")
+        ly = QVBoxLayout(dlg)
+        ly.setContentsMargins(20, 18, 20, 16)
+        cab = QLabel(
+            f"Corte del {corte.fecha:%d/%m/%Y} a las {_hora(corte)}\n"
+            f"Venta real: ${real:,.2f}   ·   reactivo ${Decimal(corte.reactivo_inicial or 0):,.2f}"
+        )
+        cab.setWordWrap(True)
+        ly.addWidget(cab)
+        form = QFormLayout()
+        spin = QDoubleSpinBox()
+        spin.setRange(0.0, 9_999_999.0)
+        spin.setDecimals(2)
+        spin.setPrefix("$ ")
+        spin.setValue(float(venta_oficial(corte)))
+        spin.setStyleSheet("font-size: 20px; font-weight: 800; padding: 6px;")
+        form.addRow("¿Cuánto se reporta?", spin)
+        ly.addLayout(form)
+        detalle = QLabel("")
+        detalle.setStyleSheet("font-weight: 700; color: #73341c;")
+        ly.addWidget(detalle)
+
+        def _refrescar() -> None:
+            v = Decimal(str(spin.value())).quantize(Decimal("0.01"))
+            fuera = (real - v).quantize(Decimal("0.01"))
+            entrega = (v - Decimal(corte.retiros_pagos or 0) - Decimal(corte.otros_retiros or 0)).quantize(Decimal("0.01"))
+            detalle.setText(
+                f"Se entrega ${entrega:,.2f}." + (f"   Sin reportar: ${fuera:,.2f}." if fuera else "   Sin ajuste.")
+            )
+
+        spin.valueChanged.connect(lambda _v: _refrescar())
+        _refrescar()
+        botones = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        botones.accepted.connect(dlg.accept)
+        botones.rejected.connect(dlg.reject)
+        ly.addWidget(botones)
+        if dlg.exec() != QDialog.DialogCode.Accepted:
+            return
+        try:
+            from pos_uniformes.database.connection import get_session
+            from pos_uniformes.services.historial_cortes_service import ajustar_corte
+
+            with get_session() as session:
+                r = ajustar_corte(session, corte.id, venta=Decimal(str(spin.value())), creado_por=self._creado_por)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Historial de cortes: no se pudo ajustar")
+            QMessageBox.warning(self, "No se pudo", str(exc) or "Inténtalo otra vez.")
+            return
+        self.recargar()
+        fuera = r.get("sin_reportar") or Decimal("0")
+        self.totales_label.setText(
+            f"Corte ajustado: se reporta ${r['venta']:,.2f}"
+            + (f" · fuera ${fuera:,.2f}" if fuera else " · sin ajuste")
+        )
 
     def quitar_ajuste(self) -> None:
         from PyQt6.QtWidgets import QMessageBox

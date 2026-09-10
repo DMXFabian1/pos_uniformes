@@ -203,6 +203,35 @@ class QuitarAjusteTests(unittest.TestCase):
         r = quitar_ajuste(self.session, self.corte.id, creado_por="VEND-1")
         self.assertFalse(r["cambio"])
 
+    def test_ajustar_la_venta_recalcula_la_cifra(self) -> None:
+        from pos_uniformes.services.historial_cortes_service import ajustar_corte, venta_oficial, venta_real
+
+        # Caso real del 09/09: venta real 16,640 y se entregan 12,042 (3,000 fuera).
+        self.corte.monto_final = Decimal("26202")
+        self.corte.monto_esperado = Decimal("26202")
+        self.corte.retiros_pagos = Decimal("1598")
+        self.session.commit()
+        self.assertEqual(venta_real(self.corte), Decimal("16640.00"))
+        r = ajustar_corte(self.session, self.corte.id, venta=Decimal("13640"), creado_por="VEND-1")
+        self.assertEqual(r["sin_reportar"], Decimal("3000.00"))
+        self.assertEqual(r["retirado"], Decimal("12042.00"))
+        self.session.refresh(self.corte)
+        self.assertEqual(venta_oficial(self.corte), Decimal("13640.00"))
+        self.assertEqual(venta_real(self.corte), Decimal("16640.00"))
+        self.assertEqual(diferencia_corte(self.corte), Decimal("-3000.00"))
+
+    def test_ajustar_no_puede_dejar_sin_reactivo(self) -> None:
+        from pos_uniformes.services.historial_cortes_service import ajustar_corte
+
+        with self.assertRaises(ValueError):
+            ajustar_corte(self.session, self.corte.id, venta=Decimal("0"), creado_por="VEND-1")
+
+    def test_ajustar_solo_el_dueno(self) -> None:
+        from pos_uniformes.services.historial_cortes_service import SinPermiso, ajustar_corte
+
+        with self.assertRaises(SinPermiso):
+            ajustar_corte(self.session, self.corte.id, venta=Decimal("100"), creado_por="ENC-1")
+
     def test_solo_el_dueno(self) -> None:
         from pos_uniformes.services.historial_cortes_service import SinPermiso, quitar_ajuste
 
