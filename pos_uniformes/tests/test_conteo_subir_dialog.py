@@ -9,7 +9,7 @@ os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 from unittest.mock import patch
 
-from PyQt6.QtWidgets import QApplication
+from PyQt6.QtWidgets import QApplication, QMessageBox
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
@@ -85,10 +85,14 @@ class ConteoSubirDialogTests(unittest.TestCase):
         # 1 fila-encabezado del producto + 2 variantes
         self.assertEqual(d._table.rowCount(), 3)
         self.assertEqual(len(d._fisico_inputs), 2)
-        self.assertTrue(d._registrar_btn.isEnabled())
-        # Físico vacío por defecto; el esperado (Tienda=10) va como placeholder gris.
+        # Nada que registrar todavía: el botón espera al primer número.
+        self.assertFalse(d._registrar_btn.isEnabled())
+        # Campo limpio: sin el esperado como pista. Si lo ve, lo copia.
         self.assertEqual(d._fisico_inputs[0].text(), "")
-        self.assertEqual(d._fisico_inputs[0].placeholderText(), "10")
+        self.assertEqual(d._fisico_inputs[0].placeholderText(), "")
+        # Y la columna con el stock del sistema ya no existe.
+        encabezados = [d._table.horizontalHeaderItem(c).text() for c in range(d._table.columnCount())]
+        self.assertEqual(encabezados, ["Talla", "Color", "Cuántas hay"])
 
     def test_excluye_productos_virtuales(self) -> None:
         # Pants 3pz y Chamarra son virtuales: no se cuentan (se arman de otros).
@@ -126,7 +130,13 @@ class ConteoSubirDialogTests(unittest.TestCase):
         # Solo la variante real aparece; la virtual (Pants 3pz) se excluye.
         self.assertEqual(len(d._fisico_inputs), 1)
 
-    def test_diferencia_menos_y_limpia_al_coincidir(self) -> None:
+    def test_el_avance_se_cuenta_sin_revelar_diferencias(self) -> None:
+        """Antes esto pintaba la diferencia contra lo esperado en vivo.
+
+        Se quitó a propósito: decirle a quien captura cuál era la respuesta
+        "correcta" convierte el conteo en una confirmación de lo que el
+        sistema ya creía. Ahora solo se le dice cuánto lleva.
+        """
         s = self.factory()
         _seed(s, "Uno", stock=10)
         s.commit()
@@ -134,21 +144,20 @@ class ConteoSubirDialogTests(unittest.TestCase):
         d = self._dialog()
         d._escuela_combo.setCurrentIndex(d._escuela_combo.findText("Uno"))
         d._cargar_piezas()
-        inp = d._fisico_inputs[0]
-        fila = next(
-            r for r in range(d._table.rowCount())
-            if d._table.cellWidget(r, 3) is inp
-        )
 
-        # Físico < esperado → "-2" en la columna Diferencia + input con estilo.
-        inp.setText("8")
-        self.assertEqual(d._table.item(fila, 4).text(), "-2")
-        self.assertTrue(inp.styleSheet())  # no vacío
+        self.assertIn("0 de 2", d._hint.text())
+        self.assertFalse(d._registrar_btn.isEnabled())
 
-        # Vuelve a coincidir → "—" y sin estilo.
-        inp.setText("10")
-        self.assertEqual(d._table.item(fila, 4).text(), "—")
-        self.assertFalse(inp.styleSheet())
+        d._fisico_inputs[0].setText("8")
+        self.assertIn("1 de 2", d._hint.text())
+        self.assertIn("sin contar", d._hint.text())
+        self.assertTrue(d._registrar_btn.isEnabled())
+        # Ni rastro del esperado: el campo no cambia de color al diferir.
+        self.assertFalse(d._fisico_inputs[0].styleSheet())
+
+        d._fisico_inputs[1].setText("3")
+        self.assertIn("2 de 2", d._hint.text())
+        self.assertNotIn("sin contar", d._hint.text())
 
     def test_registrar_guarda_conteos(self) -> None:
         s = self.factory()
@@ -159,23 +168,29 @@ class ConteoSubirDialogTests(unittest.TestCase):
         d = self._dialog()
         d._escuela_combo.setCurrentIndex(d._escuela_combo.findText("Uno"))
         d._cargar_piezas()
-        # Capturar una diferencia: una pieza con físico 8 (esperado 10); la otra
-        # se deja vacía → toma el esperado (sin diferencia).
+        # Una talla contada (8, esperado 10); la otra se deja vacía porque
+        # nadie la contó.
         d._fisico_inputs[0].setText("8")
-        with patch("pos_uniformes.ui.dialogs.conteo_subir_dialog.QMessageBox.information"):
+        with patch(
+            "pos_uniformes.ui.dialogs.conteo_subir_dialog.QMessageBox.information"
+        ), patch(
+            "pos_uniformes.ui.dialogs.conteo_subir_dialog.QMessageBox.question",
+            return_value=QMessageBox.StandardButton.Yes,
+        ):
             d._registrar()
 
         s = self.factory()
         conteos = s.scalars(
             select(ConteoInventario).where(ConteoInventario.escuela_id == eid)
         ).all()
-        # Se registraron las 2 piezas; una con diferencia -2.
-        self.assertEqual(len(conteos), 2)
-        difs = sorted(c.diferencia for c in conteos)
-        self.assertEqual(difs, [-2, 0])
-        # ultimo_conteo_at quedó marcado (reinicia el ciclo del calendario).
+        # SOLO la que se capturó. La vacía no se inventa.
+        self.assertEqual(len(conteos), 1)
+        self.assertEqual(conteos[0].diferencia, -2)
+        # Y la que nadie contó sigue sin fecha de conteo: no se le pone cara
+        # de nueva a un dato que nadie miró.
         variantes = s.scalars(select(Variante)).all()
-        self.assertTrue(all(v.ultimo_conteo_at is not None for v in variantes))
+        con_fecha = [v for v in variantes if v.ultimo_conteo_at is not None]
+        self.assertEqual(len(con_fecha), 1)
         s.close()
 
 

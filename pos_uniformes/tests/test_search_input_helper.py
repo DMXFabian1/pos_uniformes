@@ -56,6 +56,7 @@ class SearchInputHelperTests(unittest.TestCase):
         controller = getattr(line_edit, "_search_suggestion_controller")
         controller._anchor_text = "ma"
         controller.popup.show()
+        self.assertTrue(controller.popup.isVisible(), "el popup debe estar visible")
         controller.popup.setCurrentRow(0)
 
         handled = controller.eventFilter(
@@ -76,6 +77,7 @@ class SearchInputHelperTests(unittest.TestCase):
         controller = getattr(line_edit, "_search_suggestion_controller")
         controller._anchor_text = "pa"
         controller.popup.show()
+        self.assertTrue(controller.popup.isVisible(), "el popup debe estar visible")
         controller.popup.setCurrentRow(0)
 
         controller.eventFilter(
@@ -108,6 +110,7 @@ class SearchInputHelperTests(unittest.TestCase):
         controller = getattr(line_edit, "_search_suggestion_controller")
         controller._anchor_text = "marca:at co"
         controller.popup.show()
+        self.assertTrue(controller.popup.isVisible(), "el popup debe estar visible")
         controller.popup.setCurrentRow(0)
 
         handled = controller.eventFilter(

@@ -190,6 +190,31 @@ def _sin_hilos_ni_dialogos_modales(monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.setattr(clase, "start", lambda self, *a, **k: None, raising=False)
         monkeypatch.setattr(clase, "run", lambda self, *a, **k: None, raising=False)
 
+    # El satelite ademas lanza un `threading.Thread` (no QThread) desde su
+    # __init__ via refresh_all: el watchdog de la base. Ese hilo sobrevive al
+    # test, y cuando otro test parchea `get_session` o cuenta llamadas, el
+    # hilo huerfano se mete y lo hace fallar de forma intermitente (se vio en
+    # test_quote_satellite_offline_guards y test_search_input_helper).
+    #
+    # Se apaga SOLO durante la construccion: los tests del watchdog llaman
+    # `_start_background_db_refresh` a mano despues, y ese si debe ser el real.
+    try:
+        from pos_uniformes.ui import quote_satellite_window as _qsw
+    except Exception:  # noqa: BLE001
+        _qsw = None
+    if _qsw is not None:
+        _init_real = _qsw.QuoteSatelliteWindow.__init__
+
+        def _init_sin_watchdog(self, *args, **kwargs):
+            self._start_background_db_refresh = lambda: None
+            try:
+                _init_real(self, *args, **kwargs)
+            finally:
+                # De vuelta al metodo de la clase para lo que venga despues.
+                self.__dict__.pop("_start_background_db_refresh", None)
+
+        monkeypatch.setattr(_qsw.QuoteSatelliteWindow, "__init__", _init_sin_watchdog)
+
     from PyQt6.QtWidgets import QMessageBox
 
     for nombre in _DIALOGOS_BLOQUEANTES:

@@ -130,11 +130,13 @@ class ConteoSubirDialog(QDialog):
         self._hint.setWordWrap(True)
         layout.addWidget(self._hint)
 
+        # Solo lo que ella tiene que llenar. Antes había columnas "Tienda"
+        # (lo que el sistema cree que hay) y "Diferencia" en vivo: cualquiera
+        # cansado copia ese número, y entonces el conteo no cuenta nada.
+        # Daniel sí ve la diferencia al revisar, que es cuando sirve.
         self._table = QTableWidget()
-        self._table.setColumnCount(5)
-        self._table.setHorizontalHeaderLabels(
-            ["Talla", "Color", "Tienda", "Físico", "Diferencia"]
-        )
+        self._table.setColumnCount(3)
+        self._table.setHorizontalHeaderLabels(["Talla", "Color", "Cuántas hay"])
         self._table.verticalHeader().setVisible(False)
         # Filas con aire: si la fila queda corta, el campo "Físico" se comprime y
         # el número del placeholder se recorta (se ve como una rayita).
@@ -147,8 +149,6 @@ class ConteoSubirDialog(QDialog):
         header.setSectionResizeMode(0, QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.ResizeMode.Stretch)
         header.setSectionResizeMode(2, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(3, QHeaderView.ResizeMode.ResizeToContents)
-        header.setSectionResizeMode(4, QHeaderView.ResizeMode.ResizeToContents)
         layout.addWidget(self._table, 1)
 
         actions = QHBoxLayout()
@@ -253,45 +253,29 @@ class ConteoSubirDialog(QDialog):
             for v in items:
                 self._table.setItem(fila, 0, QTableWidgetItem(f"  {v.talla}"))
                 self._table.setItem(fila, 1, QTableWidgetItem(v.color))
-                sistema_item = QTableWidgetItem(str(v.stock_tienda))
-                sistema_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                self._table.setItem(fila, 2, sistema_item)
 
-                # Físico: vacío, con el esperado (Tienda) como placeholder en gris.
-                # Si se deja vacío se toma el esperado (sin diferencia).
+                # Campo limpio: sin placeholder con el esperado. Vacío significa
+                # "no la conté" y no se registra — no se toma por buena.
                 inp = QLineEdit()
                 inp.setValidator(QIntValidator(0, 999999, inp))
-                inp.setPlaceholderText(str(v.stock_tienda))
                 inp.setAlignment(Qt.AlignmentFlag.AlignCenter)
                 inp.setMinimumHeight(30)
                 inp.setMinimumWidth(72)
                 inp.setMaximumWidth(110)
-                # Placeholder (el esperado) legible pero distinto del texto real.
-                paleta = inp.palette()
-                paleta.setColor(QPalette.ColorRole.PlaceholderText, QColor("#8a7a6d"))
-                inp.setPalette(paleta)
-                inp.textChanged.connect(
-                    lambda _t, f=fila, s=v.stock_tienda, w=inp: self._on_fisico_changed(f, s, w)
-                )
-                self._table.setCellWidget(fila, 3, inp)
-
-                dif_item = QTableWidgetItem("—")
-                dif_item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                dif_item.setForeground(QBrush(QColor("#9a8b7f")))
-                self._table.setItem(fila, 4, dif_item)
+                inp.textChanged.connect(self._on_fisico_changed)
+                self._table.setCellWidget(fila, 2, inp)
 
                 self._variant_ids.append(v.variante_id)
                 self._fisico_inputs.append(inp)
                 self._sistemas.append(v.stock_tienda)
                 fila += 1
 
-        hay = total_piezas > 0
-        self._registrar_btn.setEnabled(hay)
-        if hay:
-            self._hint.setText(
-                f"{total_piezas} piezas. Captura el «Físico» de cada una y pulsa «Registrar conteo»."
-            )
+        if total_piezas:
+            # El avance y el botón los maneja `_on_fisico_changed`: al cargar
+            # no hay nada capturado, así que no hay nada que registrar.
+            self._on_fisico_changed()
         else:
+            self._registrar_btn.setEnabled(False)
             self._hint.setText("Esta escuela no tiene piezas para contar.")
 
     def _agregar_encabezado(self, fila: int, texto: str) -> None:
@@ -306,48 +290,58 @@ class ConteoSubirDialog(QDialog):
         self._table.setItem(fila, 0, item)
         self._table.setSpan(fila, 0, 1, self._table.columnCount())
 
-    def _on_fisico_changed(self, fila: int, sistema: int, widget: QLineEdit) -> None:
-        """Muestra la diferencia (físico − esperado) en la columna Diferencia.
+    def _on_fisico_changed(self, _texto: str = "") -> None:
+        """Cuántas tallas llevan número. Nada de diferencias.
 
-        Vacío o igual = "—" en gris; menos = "-N" en rojo; más = "+N" en verde.
-        Es lo mismo que el panel de uniformes: cuántas menos/más desde el conteo.
+        Antes esta función pintaba la diferencia contra lo esperado en vivo
+        (rojo si faltaba, verde si sobraba). Eso le decía a quien captura cuál
+        era la respuesta "correcta", y un conteo que confirma lo que el
+        sistema ya creía no sirve de nada.
         """
-        dif_item = self._table.item(fila, 4)
-        if dif_item is None:
-            return
-        txt = widget.text().strip()
-        dif = 0 if not txt else int(txt) - sistema
-
-        borde = ""
-        if dif == 0:
-            dif_item.setText("—")
-            dif_item.setForeground(QBrush(QColor("#9a8b7f")))
-        elif dif < 0:  # faltante: hay MENOS de lo esperado
-            dif_item.setText(str(dif))  # p.ej. -19
-            dif_item.setForeground(QBrush(QColor("#b91c1c")))
-            borde = "#dc2626"
-        else:  # sobrante: hay de MÁS
-            dif_item.setText(f"+{dif}")
-            dif_item.setForeground(QBrush(QColor("#166534")))
-            borde = "#16a34a"
-
-        if borde:
-            widget.setStyleSheet(
-                f"QLineEdit {{ border: 1px solid {borde}; border-radius: 6px;"
-                " padding: 3px 6px; font-weight: 700; }"
+        llenas = sum(1 for w in self._fisico_inputs if w.text().strip())
+        total = len(self._fisico_inputs)
+        self._registrar_btn.setEnabled(llenas > 0)
+        if total:
+            faltan = total - llenas
+            self._hint.setText(
+                f"{llenas} de {total} tallas capturadas."
+                + (f"  Las {faltan} vacías se quedan sin contar." if faltan else "")
             )
-        else:
-            widget.setStyleSheet("")
 
     def _registrar(self) -> None:
-        # Si el campo se deja vacío, se toma el esperado (Tienda) = sin diferencia.
+        """Registra SOLO las tallas que traen número.
+
+        Antes una casilla vacía tomaba el esperado y se guardaba como contada
+        sin diferencia: la talla quedaba con fecha de conteo fresca sin que
+        nadie la hubiera visto. Eso le pone cara de nuevo a un dato viejo, que
+        es peor que no contar. Ahora vacío = no la conté, y no se toca.
+        """
         conteos = []
-        for vid, inp, sistema in zip(self._variant_ids, self._fisico_inputs, self._sistemas):
+        sin_contar = 0
+        for vid, inp in zip(self._variant_ids, self._fisico_inputs):
             txt = inp.text().strip()
-            fisico = int(txt) if txt else sistema
-            conteos.append(ConteoInput(variante_id=vid, stock_fisico=fisico))
+            if not txt:
+                sin_contar += 1
+                continue
+            conteos.append(ConteoInput(variante_id=vid, stock_fisico=int(txt)))
         if not conteos:
+            QMessageBox.information(
+                self,
+                "Nada que registrar",
+                "No capturaste ninguna talla. Escribe cuántas hay al menos en una.",
+            )
             return
+        if sin_contar:
+            respuesta = QMessageBox.question(
+                self,
+                "Faltan tallas por capturar",
+                f"Vas a registrar {len(conteos)} tallas.\n"
+                f"Quedan {sin_contar} sin capturar y esas NO se van a tocar.\n\n"
+                "¿Registrar así?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            )
+            if respuesta != QMessageBox.StandardButton.Yes:
+                return
         session = self._session_factory()
         try:
             resultado = registrar_conteos_lote(session, conteos, self._contado_por)
@@ -361,7 +355,8 @@ class ConteoSubirDialog(QDialog):
         QMessageBox.information(
             self,
             "Conteo registrado",
-            f"Se registraron {resultado.total_contados} piezas "
-            f"({resultado.con_diferencia} con diferencia). El calendario se actualizó.",
+            f"Se registraron {resultado.total_contados} tallas a nombre de "
+            f"{self._contado_por}. Quedan pendientes de revisión: el inventario "
+            "no cambia hasta que se aprueben.",
         )
         self.accept()

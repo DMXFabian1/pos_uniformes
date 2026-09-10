@@ -3298,22 +3298,69 @@ class QuoteSatelliteWindow(QMainWindow):
     def _build_conteos_page(self) -> QWidget:
         """Página "Conteos": donde se trabaja.
 
-        Paso 1 del plan (2026-09-10): por ahora solo recoge lo que ya existía
-        en Calendario — imprimir la hoja y subir el conteo. Los pasos que
-        siguen la convierten en algo que una empleada pueda usar sola: gafete
-        al entrar, dejar de mostrarle lo que el sistema cree que hay, y poder
-        dejar una jornada a medias.
+        Entra con gafete (paso 2 del plan, 2026-09-10) para que cada conteo
+        quede a nombre de quien lo hizo: antes se guardaba como "admin
+        (satélite)" y no había forma de saber quién contó qué.
         """
         page = QWidget()
-        layout = QVBoxLayout()
-        layout.setContentsMargins(8, 8, 8, 8)
+        page_layout = QVBoxLayout()
+        page_layout.setContentsMargins(8, 8, 8, 8)
+        page_layout.setSpacing(12)
+        page.setLayout(page_layout)
+
+        # ── Gate: sin gafete no se cuenta ───────────────────────────────
+        self.conteos_gate = QWidget()
+        gate_ly = QVBoxLayout()
+        gate_ly.setContentsMargins(0, 40, 0, 0)
+        gate_ly.setSpacing(10)
+        gate_ly.addStretch(1)
+        gate_titulo = QLabel("Pasa tu gafete para contar")
+        # Sin `guidedStepTitle`: ese estilo es una etiqueta de sección y aquí
+        # se estiraba de lado a lado como una barra de color.
+        gate_titulo.setStyleSheet(
+            "font-size: 22px; font-weight: 800; color: #5c3019;"
+        )
+        gate_titulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        gate_ly.addWidget(gate_titulo)
+        gate_pista = QLabel("Así queda registrado quién hizo cada conteo.")
+        gate_pista.setObjectName("guidedStepHint")
+        gate_pista.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        gate_ly.addWidget(gate_pista)
+        self.conteos_gate_input = QLineEdit()
+        self.conteos_gate_input.setPlaceholderText("Escanea tu gafete…")
+        self.conteos_gate_input.setMinimumHeight(52)
+        self.conteos_gate_input.setMaximumWidth(420)
+        self.conteos_gate_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.conteos_gate_input.returnPressed.connect(self._on_conteos_gate_scan)
+        gate_ly.addWidget(self.conteos_gate_input, 0, Qt.AlignmentFlag.AlignHCenter)
+        self.conteos_gate_error = QLabel("")
+        self.conteos_gate_error.setObjectName("guidedStepHint")
+        self.conteos_gate_error.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.conteos_gate_error.setStyleSheet("color: #8a2f2f; font-weight: 600;")
+        self.conteos_gate_error.setVisible(False)
+        gate_ly.addWidget(self.conteos_gate_error)
+        gate_ly.addStretch(2)
+        self.conteos_gate.setLayout(gate_ly)
+        page_layout.addWidget(self.conteos_gate)
+
+        # ── Zona de trabajo (aparece tras el gafete) ────────────────────
+        self.conteos_work = QWidget()
+        layout = QVBoxLayout()   # de aquí en adelante se arma la zona de trabajo
+        layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(12)
 
         header = QHBoxLayout()
         titulo = QLabel("Conteos")
         titulo.setObjectName("guidedStepTitle")
         header.addWidget(titulo)
+        self.conteos_quien_label = QLabel("")
+        self.conteos_quien_label.setObjectName("guidedStepHint")
+        header.addWidget(self.conteos_quien_label)
         header.addStretch()
+        salir_btn = QPushButton("Salir")
+        salir_btn.setObjectName("secondaryButton")
+        salir_btn.clicked.connect(self._conteos_logout)
+        header.addWidget(salir_btn)
         orden_btn = QPushButton("🖨 Imprimir hoja de conteo")
         orden_btn.setObjectName("secondaryButton")
         orden_btn.clicked.connect(self._open_conteo_orden)
@@ -3343,7 +3390,12 @@ class QuoteSatelliteWindow(QMainWindow):
         )
         aviso.setObjectName("guidedStepHint")
         layout.addWidget(aviso)
-        page.setLayout(layout)
+
+        self.conteos_work.setLayout(layout)
+        self.conteos_work.setVisible(False)
+        page_layout.addWidget(self.conteos_work, 1)
+        self._conteos_code: str | None = None
+        self._conteos_nombre = ""
         return page
 
     def _build_kiosk_page(self) -> QWidget:
@@ -3447,8 +3499,72 @@ class QuoteSatelliteWindow(QMainWindow):
     def _open_conteo_subir(self) -> None:
         from pos_uniformes.ui.dialogs.conteo_subir_dialog import ConteoSubirDialog
 
-        ConteoSubirDialog(self).exec()
+        # Cada conteo queda a nombre de quien pasó el gafete. Sin gafete no
+        # se abre: el diálogo escribe en `contado_por` y ese dato tiene que
+        # servir para preguntarle a alguien.
+        quien = self._conteos_contado_por()
+        if quien is None:
+            return
+        ConteoSubirDialog(self, contado_por=quien).exec()
         self._refresh_conteo_banner()
+
+    def _conteos_contado_por(self) -> str | None:
+        """Quién está contando, tal como se guardará. None si no hay gafete."""
+        code = getattr(self, "_conteos_code", None)
+        if not code:
+            self._set_status("Pasa tu gafete para contar.")
+            return None
+        nombre = getattr(self, "_conteos_nombre", "") or ""
+        return f"{nombre} ({code})" if nombre else str(code)
+
+    def _on_conteos_gate_scan(self) -> None:
+        """Gafete en la página Conteos. Mismo criterio que la Libreta."""
+        code = QuickSaleWidget._clean_scanned_code(self.conteos_gate_input.text())
+        self.conteos_gate_input.clear()
+        if not code:
+            return
+        if not self._gafete_libreta_valido(code):
+            self.conteos_gate_error.setText(f"Gafete '{code}' no encontrado o inactivo.")
+            self.conteos_gate_error.setVisible(True)
+            QTimer.singleShot(0, self.conteos_gate_input.setFocus)
+            return
+        self.conteos_gate_error.setVisible(False)
+        self._conteos_code = code
+        self._conteos_nombre = self._nombre_de_gafete(code)
+        self.conteos_quien_label.setText(
+            f" ·  {self._conteos_nombre or code}"
+        )
+        self.conteos_gate.setVisible(False)
+        self.conteos_work.setVisible(True)
+        self._refresh_conteos_pendiente()
+
+    def _nombre_de_gafete(self, code: str) -> str:
+        """Nombre completo de la empleada. Cadena vacía si no se puede leer."""
+        if getattr(self, "offline_mode", False):
+            return ""
+        try:
+            from sqlalchemy import select as _select
+
+            from pos_uniformes.database.models import Empleada
+
+            with get_session() as session:
+                emp = session.scalar(_select(Empleada).where(Empleada.codigo == code))
+            return str(emp.nombre_completo) if emp is not None else ""
+        except Exception:  # noqa: BLE001 — sin nombre se usa el código
+            logger.exception("Conteos: no se pudo leer el nombre de '%s'", code)
+            return ""
+
+    def _conteos_logout(self) -> None:
+        """Cierra la sesión de conteo: la página vuelve al gafete."""
+        self._conteos_code = None
+        self._conteos_nombre = ""
+        self.conteos_work.setVisible(False)
+        self.conteos_gate.setVisible(True)
+        self.conteos_gate_error.setVisible(False)
+        # El cursor solo se mueve si de verdad estás parado en Conteos: si no,
+        # este foco diferido llega tarde y se lo quita a otra pantalla.
+        if getattr(self, "current_page_key", None) == "conteos":
+            QTimer.singleShot(0, self.conteos_gate_input.setFocus)
 
     def _build_quote_page(self) -> QWidget:
         page = QWidget()
@@ -4831,7 +4947,9 @@ class QuoteSatelliteWindow(QMainWindow):
         if page_key == "calendario":
             self.conteos_panel.refresh()
         if page_key == "conteos":
-            self._refresh_conteos_pendiente()
+            # Siempre se entra por el gafete, como la Libreta: salir de la
+            # página cierra la sesión de quien estaba contando.
+            self._conteos_logout()
         if page_key == "kiosk":
             QTimer.singleShot(0, self.kiosk_scan_input.setFocus)
         if page_key == "quicksale":
