@@ -631,6 +631,27 @@ from pos_uniformes.utils.product_templates import merge_choice_lists
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 from pos_uniformes.utils.qr_generator import QrGenerator
 
+# Pestañas que dejaron de tener sentido aquí porque su trabajo se mudó al
+# kiosko: la caja se cierra con el corte del satélite, los presupuestos se
+# hacen en Presupuesto guiado, los apartados en Venta Rápida y el catálogo
+# se lleva desde Panel Uniformes e Inventario.
+#
+# Se ocultan, NO se borran: fueron la base del sistema, sus datos siguen
+# intactos y el código completo sigue en el repositorio. Para volver a ver
+# alguna, quitar su nombre de esta tupla.
+PESTANAS_MUDADAS_AL_KIOSKO = ("Caja", "Presupuestos", "Apartados", "Catalogo")
+
+
+def caja_en_el_pos() -> bool:
+    """Si el POS todavía lleva la caja.
+
+    Con la pestaña Caja oculta no la lleva, así que sobra todo lo que la
+    acompañaba: la etiqueta de estado del encabezado, el botón de corte, el
+    recordatorio de las 5 y el aviso de "caja pendiente de corte" al abrir.
+    El corte de verdad se hace desde el kiosko.
+    """
+    return "Caja" not in PESTANAS_MUDADAS_AL_KIOSKO
+
 LISTING_SEARCH_DEBOUNCE_MS = 300
 CATALOG_PAGE_SIZE = 25
 INVENTORY_PAGE_SIZE = 25
@@ -1941,6 +1962,7 @@ class MainWindow(QMainWindow):
         top_actions.addWidget(self.page_help_button)
         top_actions.addWidget(self.header_more_button)
         top_actions.addWidget(self.cash_cut_button)
+        self.cash_cut_button.setVisible(caja_en_el_pos())
         top_actions.addWidget(self.cash_movement_button)
         top_actions.addWidget(self.logout_button)
         top_actions.addWidget(self.refresh_button)
@@ -1976,6 +1998,7 @@ class MainWindow(QMainWindow):
         hero_info_layout.setSpacing(4)
         hero_info_layout.addWidget(self.session_label)
         hero_info_layout.addWidget(self.cash_session_label)
+        self.cash_session_label.setVisible(caja_en_el_pos())
         hero_info_card.setLayout(hero_info_layout)
         hero_layout.addWidget(hero_info_card, 1)
         hero_layout.addLayout(top_actions, 0)
@@ -2298,17 +2321,39 @@ class MainWindow(QMainWindow):
             9: is_admin,  # Analitica
             10: is_admin, # Configuracion
         }
+        # Estas tres ya no viven aquí: la caja se cierra con el corte del
+        # kiosko, los presupuestos se hacen en Presupuesto guiado y los
+        # apartados en Venta Rápida. Se ocultan, no se borran — fueron la
+        # base y sus datos siguen intactos. Para volver a verlas, vaciar
+        # PESTANAS_MUDADAS_AL_KIOSKO.
+        for index in range(self.tabs.count()):
+            if self.tabs.tabText(index).strip() in PESTANAS_MUDADAS_AL_KIOSKO:
+                visible_by_index[index] = False
+
         for index, is_visible in visible_by_index.items():
             self.tabs.setTabVisible(index, is_visible)
 
         current_index = self.tabs.currentIndex()
         if not visible_by_index.get(current_index, False):
-            self.tabs.setCurrentIndex(1 if not is_admin else 0)
+            self.tabs.setCurrentIndex(self._primera_pestana_visible(visible_by_index, is_admin))
+
+    @staticmethod
+    def _primera_pestana_visible(visible_by_index: dict, is_admin: bool) -> int:
+        """A dónde caer cuando la pestaña actual quedó oculta."""
+        preferida = 0 if is_admin else 1
+        if visible_by_index.get(preferida, False):
+            return preferida
+        return next((i for i, visible in sorted(visible_by_index.items()) if visible), 0)
 
     def _focus_default_tab_for_role(self) -> None:
         if self.tabs is None:
             return
-        self.tabs.setCurrentIndex(0 if self.current_role == RolUsuario.ADMIN else 1)
+        preferida = 0 if self.current_role == RolUsuario.ADMIN else 1
+        if not self.tabs.isTabVisible(preferida):
+            preferida = next(
+                (i for i in range(self.tabs.count()) if self.tabs.isTabVisible(i)), 0
+            )
+        self.tabs.setCurrentIndex(preferida)
         self.tabs.update()
         self.tabs.repaint()
 
@@ -2324,6 +2369,8 @@ class MainWindow(QMainWindow):
         return active_session.abierta_at.date() < current_date
 
     def _ensure_cash_session_current_day_for_operation(self, action_label: str) -> bool:
+        if not caja_en_el_pos():
+            return True
         if not self.cash_session_requires_cut:
             return True
         QMessageBox.warning(
@@ -2337,6 +2384,8 @@ class MainWindow(QMainWindow):
         return False
 
     def _run_operational_checks(self) -> None:
+        if not caja_en_el_pos():
+            return
         if self.active_cash_session_id is None or self.cash_session_requires_cut:
             return
         # Probe TCP corto antes de tocar SQLAlchemy: este chequeo corre cada
@@ -4707,6 +4756,8 @@ class MainWindow(QMainWindow):
         return field.text().strip()
 
     def ensure_cash_session(self) -> bool:
+        if not caja_en_el_pos():
+            return True
         try:
             with get_session() as session:
                 gate_snapshot = load_cash_session_gate_snapshot(
@@ -9045,6 +9096,11 @@ class MainWindow(QMainWindow):
         self.session_label.setText(f"{self.current_username} | {self.current_full_name}")
 
     def _refresh_cash_session(self, session) -> None:
+        if not caja_en_el_pos():
+            # Sin caja en el POS no hay nada que consultar ni que pintar.
+            self.active_cash_session_id = None
+            self.cash_session_requires_cut = False
+            return
         active_session = CajaService.obtener_sesion_activa(session)
         self.active_cash_session_id = active_session.id if active_session is not None else None
         if active_session is None:

@@ -27,6 +27,7 @@ from pos_uniformes.database.models import ModoOrigenVenta, RolUsuario, TipoMovim
 from pos_uniformes.ui.main_window import (
     CATALOG_PAGE_SIZE,
     INVENTORY_PAGE_SIZE,
+    PESTANAS_MUDADAS_AL_KIOSKO,
     MainWindow,
     MultiSelectPickerButton,
     _TableSpinTabNavigator,
@@ -104,7 +105,9 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         active_session = SimpleNamespace(id=5, monto_apertura="1000.00")
         resumen = SimpleNamespace(esperado_en_caja="2450.00")
 
-        with patch("pos_uniformes.ui.main_window.CajaService.obtener_sesion_activa", return_value=active_session), patch(
+        with patch("pos_uniformes.ui.main_window.caja_en_el_pos", return_value=True), patch(
+            "pos_uniformes.ui.main_window.CajaService.obtener_sesion_activa", return_value=active_session
+        ), patch(
             "pos_uniformes.ui.main_window.CajaService.resumir_sesion",
             return_value=resumen,
         ), patch.object(window, "_is_stale_cash_session", return_value=True):
@@ -124,9 +127,9 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         window.current_role = RolUsuario.CAJERO
         active_session = SimpleNamespace(id=5, monto_apertura="1000.00")
 
-        with patch("pos_uniformes.ui.main_window.CajaService.obtener_sesion_activa", return_value=active_session), patch.object(
-            window, "_is_stale_cash_session", return_value=False
-        ):
+        with patch("pos_uniformes.ui.main_window.caja_en_el_pos", return_value=True), patch(
+            "pos_uniformes.ui.main_window.CajaService.obtener_sesion_activa", return_value=active_session
+        ), patch.object(window, "_is_stale_cash_session", return_value=False):
             window._refresh_cash_session(object())
 
         # Desde cc21062 el hero usa spans HTML y muestra "Reactivo $X" para
@@ -138,6 +141,21 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         self.assertIn("Reactivo $1000.00", label_text)
         self.assertNotIn("Reactivo inicial", label_text)
         self.assertNotIn("Esperado", label_text)
+
+    def test_sin_caja_en_el_pos_el_hero_no_consulta_ni_pinta(self) -> None:
+        """Lo de hoy: la pestaña Caja está oculta, así que ni se toca la base."""
+        window = MainWindow(user_id=1)
+        antes = window.cash_session_label.text()
+
+        with patch(
+            "pos_uniformes.ui.main_window.CajaService.obtener_sesion_activa"
+        ) as consulta:
+            window._refresh_cash_session(object())
+
+        consulta.assert_not_called()
+        self.assertEqual(window.cash_session_label.text(), antes)
+        self.assertIsNone(window.active_cash_session_id)
+        self.assertFalse(window.cash_session_requires_cut)
 
     def test_cashier_role_hides_manual_discount_controls(self) -> None:
         window = MainWindow(user_id=1)
@@ -1015,16 +1033,30 @@ class MainWindowSnapshotCacheTests(unittest.TestCase):
         window._apply_role_navigation()
 
         self.assertFalse(window.tabs.isTabVisible(0))
-        self.assertTrue(window.tabs.isTabVisible(1))
 
-    def test_cashier_role_redirects_from_hidden_dashboard_to_cashier(self) -> None:
+    def test_las_pestanas_mudadas_al_kiosko_ya_no_se_ven(self) -> None:
+        """Caja, Presupuestos, Apartados y Catalogo se ocultaron: su trabajo
+        vive en el kiosko. Ni el dueño las ve."""
+        window = MainWindow(user_id=1)
+        window.current_role = RolUsuario.ADMIN
+
+        window._apply_role_navigation()
+
+        for index in range(window.tabs.count()):
+            if window.tabs.tabText(index).strip() in PESTANAS_MUDADAS_AL_KIOSKO:
+                self.assertFalse(window.tabs.isTabVisible(index))
+        self.assertTrue(window.tabs.isTabVisible(0))  # Resumen sigue
+
+    def test_el_pos_nunca_queda_parado_en_una_pestana_oculta(self) -> None:
+        """Antes caía fijo en la 1 (Caja). Ahora esa está oculta."""
         window = MainWindow(user_id=1)
         window.current_role = RolUsuario.CAJERO
         window.tabs.setCurrentIndex(0)
 
         window._apply_role_navigation()
 
-        self.assertEqual(window.tabs.currentIndex(), 1)
+        indice = window.tabs.currentIndex()
+        self.assertNotIn(window.tabs.tabText(indice).strip(), PESTANAS_MUDADAS_AL_KIOSKO)
 
     def test_restore_catalog_selection_after_mutation_clears_stale_selection_when_row_disappears(self) -> None:
         window = MainWindow(user_id=1)

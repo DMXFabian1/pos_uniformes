@@ -132,12 +132,22 @@ class OperationalChecksProbeTests(unittest.TestCase):
         session.get.return_value = None  # sesión de caja no encontrada: sale limpio
         ctx = MagicMock()
         ctx.__enter__.return_value = session
-        with patch(
+        with patch(f"{_MW}.caja_en_el_pos", return_value=True), patch(
             "pos_uniformes.services.satellite_startup_service.probe_database_host",
             return_value=True,
         ), patch(f"{_MW}.get_session", return_value=ctx) as get_session:
             MainWindow._run_operational_checks(fake)
         get_session.assert_called_once()
+
+    def test_sin_caja_en_el_pos_ni_siquiera_prueba_la_red(self) -> None:
+        """Lo de hoy: el recordatorio de corte no corre, así que no hay chequeo."""
+        fake = self._fake_window()
+        with patch(
+            "pos_uniformes.services.satellite_startup_service.probe_database_host"
+        ) as probe, patch(f"{_MW}.get_session") as get_session:
+            MainWindow._run_operational_checks(fake)
+        probe.assert_not_called()
+        get_session.assert_not_called()
 
 
 class SatelliteCatalogRefreshIndexingTests(unittest.TestCase):
