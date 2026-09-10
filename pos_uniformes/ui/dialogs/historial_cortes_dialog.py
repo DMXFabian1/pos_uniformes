@@ -197,6 +197,13 @@ class HistorialCortesDialog(QDialog):
 
         # Borrar: solo Daniel (VEND-1). Un corte doble o equivocado se quita
         # y el periodo se recompone (ver historial_cortes_service.borrar_corte).
+        # Quitar el ajuste: la cifra oficial vuelve a ser la real (pruebas).
+        self.sin_ajuste_button = QPushButton("↩ Quitar el ajuste")
+        self.sin_ajuste_button.setObjectName("secondaryButton")
+        self.sin_ajuste_button.setEnabled(False)
+        self.sin_ajuste_button.setVisible(self._creado_por == "VEND-1")
+        self.sin_ajuste_button.clicked.connect(self.quitar_ajuste)
+
         self.delete_button = QPushButton("🗑 Borrar corte")
         self.delete_button.setObjectName("secondaryButton")
         self.delete_button.setEnabled(False)
@@ -208,6 +215,7 @@ class HistorialCortesDialog(QDialog):
         derecha.addWidget(self.previa, 1)
         derecha.addWidget(self.formato_check)
         derecha.addWidget(self.reprint_button)
+        derecha.addWidget(self.sin_ajuste_button)
         derecha.addWidget(self.delete_button)
 
         centro = QHBoxLayout()
@@ -260,6 +268,7 @@ class HistorialCortesDialog(QDialog):
         self.previa.clear()
         self.reprint_button.setEnabled(False)
         self.delete_button.setEnabled(False)
+        self.sin_ajuste_button.setEnabled(False)
         filas = filas_tabla(self._cortes)
         self.tabla.setRowCount(len(filas))
         for i, fila in enumerate(filas):
@@ -315,8 +324,11 @@ class HistorialCortesDialog(QDialog):
             self.previa.clear()
             self.reprint_button.setEnabled(False)
             self.delete_button.setEnabled(False)
+            self.sin_ajuste_button.setEnabled(False)
             return
         self.delete_button.setEnabled(True)
+        dif = diferencia_corte(corte)
+        self.sin_ajuste_button.setEnabled(bool(dif) and es_del_dueno(corte))
         if self.sender() is self.tabla:
             # Al cambiar de corte, el formato arranca como salió originalmente.
             self.formato_check.blockSignals(True)
@@ -331,6 +343,35 @@ class HistorialCortesDialog(QDialog):
             return
         self.previa.setPlainText(texto)
         self.reprint_button.setEnabled(True)
+
+    def quitar_ajuste(self) -> None:
+        from PyQt6.QtWidgets import QMessageBox
+
+        corte = self.corte_seleccionado()
+        if corte is None or self._creado_por != "VEND-1":
+            return
+        real = Decimal(corte.monto_esperado or 0)
+        texto = (
+            f"El corte del {corte.fecha:%d/%m/%Y} a las {_hora(corte)} dice ${Decimal(corte.monto_final):,.2f} "
+            f"y lo real fue ${real:,.2f}.\n\n¿Dejar la cifra en ${real:,.2f}? Así las dos quedan iguales."
+        )
+        if QMessageBox.question(self, "Quitar el ajuste", texto) != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            from pos_uniformes.database.connection import get_session
+            from pos_uniformes.services.historial_cortes_service import quitar_ajuste
+
+            with get_session() as session:
+                r = quitar_ajuste(session, corte.id, creado_por=self._creado_por)
+        except Exception as exc:  # noqa: BLE001
+            logger.exception("Historial de cortes: no se pudo quitar el ajuste")
+            QMessageBox.warning(self, "No se pudo", str(exc) or "Inténtalo otra vez.")
+            return
+        self.recargar()
+        self.totales_label.setText(
+            f"Ajuste quitado: el corte queda en ${r['monto_final']:,.2f}." if r.get("cambio")
+            else "Ese corte no tenía ajuste."
+        )
 
     def borrar(self) -> None:
         from PyQt6.QtWidgets import QMessageBox

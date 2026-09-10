@@ -142,6 +142,58 @@ class BorrarCorteTests(unittest.TestCase):
         self.assertIsNone(self.session.get(LibretaCorte, self.b.id))
 
 
+class QuitarAjusteTests(unittest.TestCase):
+    """Dejar la cifra oficial igual a la real (pruebas o ajustes que ya no aplican)."""
+
+    def setUp(self) -> None:
+        engine = create_engine("sqlite://")
+        LibretaCorte.__table__.create(engine)
+        self.session = sessionmaker(bind=engine)()
+        self.corte = LibretaCorte(
+            fecha=date(2026, 9, 9), periodo_label="x", monto_final=Decimal("23202"), monto_esperado=Decimal("26202"),
+            creado_por="VEND-1", created_at=_T0, desde=_T0 - timedelta(days=1), hasta=_T0,
+            reactivo_inicial=Decimal("11160"), reactivo_final=Decimal("11160"), retiros_pagos=Decimal("1598"),
+        )
+        self.session.add(self.corte)
+        self.session.commit()
+
+    def test_quita_el_ajuste(self) -> None:
+        from pos_uniformes.services.historial_cortes_service import quitar_ajuste
+
+        r = quitar_ajuste(self.session, self.corte.id, creado_por="VEND-1")
+        self.assertTrue(r["cambio"])
+        self.assertEqual(r["ajuste"], Decimal("-3000.00"))
+        self.session.refresh(self.corte)
+        self.assertEqual(self.corte.monto_final, Decimal("26202.00"))
+        self.assertEqual(diferencia_corte(self.corte), Decimal("0.00"))  # ya no hay diferencia
+        # El reactivo no se toca: solo cambia lo que se retiró.
+        self.assertEqual(self.corte.reactivo_final, Decimal("11160.00"))
+        self.assertEqual(retirado(self.corte), Decimal("15042.00"))
+
+    def test_sin_ajuste_no_hace_nada(self) -> None:
+        from pos_uniformes.services.historial_cortes_service import quitar_ajuste
+
+        quitar_ajuste(self.session, self.corte.id, creado_por="VEND-1")
+        r = quitar_ajuste(self.session, self.corte.id, creado_por="VEND-1")
+        self.assertFalse(r["cambio"])
+
+    def test_solo_el_dueno(self) -> None:
+        from pos_uniformes.services.historial_cortes_service import SinPermiso, quitar_ajuste
+
+        with self.assertRaises(SinPermiso):
+            quitar_ajuste(self.session, self.corte.id, creado_por="ENC-1")
+
+    def test_corte_viejo_no_tiene_ajuste_que_quitar(self) -> None:
+        from pos_uniformes.services.historial_cortes_service import quitar_ajuste
+
+        viejo = LibretaCorte(fecha=date(2026, 9, 5), periodo_label="HOY", monto_final=Decimal("22300"),
+                             monto_esperado=Decimal("0"), creado_por="VEND-1", created_at=_T0 - timedelta(days=4))
+        self.session.add(viejo)
+        self.session.commit()
+        with self.assertRaises(ValueError):
+            quitar_ajuste(self.session, viejo.id, creado_por="VEND-1")
+
+
 class TicketReimpresionTests(unittest.TestCase):
     def _datos(self):
         pago = SimpleNamespace(

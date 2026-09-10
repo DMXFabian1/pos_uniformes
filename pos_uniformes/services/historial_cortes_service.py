@@ -184,3 +184,29 @@ def _etiqueta(desde, hasta) -> str:
     from pos_uniformes.services.corte_caja_service import _etiqueta_periodo
 
     return _etiqueta_periodo(desde, hasta)
+
+
+def quitar_ajuste(session, corte_id: int, *, creado_por: str) -> dict:
+    """Deja la cifra oficial igual a la real (SOLO el dueño, VEND-1).
+
+    Sirve para deshacer un ajuste que fue de prueba o que ya no aplica: la
+    cifra que se presenta vuelve a ser lo que de verdad se vendió, y el
+    corte deja de tener diferencia. Si el corte no tenía ajuste, no hace
+    nada. El reactivo no se toca: solo cambia lo que se retiró.
+    """
+    from pos_uniformes.database.models import LibretaCorte
+
+    if str(creado_por or "").strip().upper() != "VEND-1":
+        raise SinPermiso("Solo el dueño puede quitar el ajuste de un corte.")
+    corte = session.get(LibretaCorte, int(corte_id))
+    if corte is None:
+        raise ValueError("Ese corte ya no existe.")
+    if es_legacy(corte) or _d(corte.monto_esperado) <= 0:
+        raise ValueError("Ese corte no guarda la cifra real: no hay ajuste que quitar.")
+    antes = _d(corte.monto_final)
+    real = _d(corte.monto_esperado)
+    if antes == real:
+        return {"id": corte.id, "cambio": False, "monto_final": antes}
+    corte.monto_final = real
+    session.commit()
+    return {"id": corte.id, "cambio": True, "antes": antes, "monto_final": real, "ajuste": (antes - real)}
