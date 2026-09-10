@@ -32,12 +32,8 @@ call scripts\build_presupuestos_satelite_windows.bat
 if errorlevel 1 goto :error
 
 echo.
-echo === Reiniciando el bot de Telegram con el codigo nuevo ===
-call scripts\telegram_bot_vigia.bat --reiniciar
-
-echo.
-echo === Reiniciando la PWA (Libreta movil) con el codigo nuevo ===
-call scripts\servidor_pwa_vigia.bat --reiniciar
+echo === Pidiendo al supervisor que reinicie bot y PWA con el codigo nuevo ===
+call scripts\supervisor.bat --pedir-reinicio
 
 echo.
 echo ============================================

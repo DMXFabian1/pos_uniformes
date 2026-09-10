@@ -150,7 +150,7 @@ def _es_viejo(msg: dict, ahora: float | None = None) -> bool:
     return ((ahora if ahora is not None else time.time()) - fecha) > MAX_ANTIGUEDAD_SEG
 
 
-ESPERA_GETUPDATES_SEG = 15  # corta para que las alertas de la cola salgan pronto
+ESPERA_GETUPDATES_SEG = 25  # una vuelta cada ~25 s: alertas casi al momento y pocas consultas
 
 
 def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False, alertas: bool = True, on_tick=None) -> None:

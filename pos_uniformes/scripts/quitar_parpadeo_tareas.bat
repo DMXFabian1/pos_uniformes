@@ -8,19 +8,8 @@ rem =====================================================
 setlocal
 cd /d "%~dp0.."
 
-echo === Dejando las tareas sin ventana ===
-schtasks /Create /F /TN "POS PWA servidor" /SC ONLOGON /TR "wscript.exe \"%~dp0correr_oculto.vbs\" servidor_pwa_vigia.bat" >nul
-if not errorlevel 1 echo   POS PWA servidor  - ok
-schtasks /Create /F /TN "POS PWA vigia" /SC MINUTE /MO 5 /TR "wscript.exe \"%~dp0correr_oculto.vbs\" servidor_pwa_vigia.bat" >nul
-if not errorlevel 1 echo   POS PWA vigia     - ok
-
-schtasks /Query /TN "POS Telegram bot" >nul 2>&1
-if not errorlevel 1 (
-    schtasks /Create /F /TN "POS Telegram bot" /SC ONLOGON /TR "wscript.exe \"%~dp0correr_oculto.vbs\" telegram_bot_vigia.bat" >nul
-    if not errorlevel 1 echo   POS Telegram bot  - ok
-    schtasks /Create /F /TN "POS Telegram vigia" /SC MINUTE /MO 5 /TR "wscript.exe \"%~dp0correr_oculto.vbs\" telegram_bot_vigia.bat" >nul
-    if not errorlevel 1 echo   POS Telegram vigia- ok
-)
+echo === Bot y PWA: un solo supervisor oculto (sustituye a las 4 tareas de cada 5 min) ===
+call "%~dp0instalar_supervisor.bat" sinpausa
 
 rem Las diarias de hora fija (las de Telegram y el corte) tambien parpadeaban.
 rem "POS Resumen diario" no se toca: esa lleva una hora que tu elegiste.

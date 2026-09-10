@@ -47,8 +47,8 @@ if errorlevel 1 (
     timeout /t 6 >nul
 )
 
-echo Reiniciando el bot de Telegram con el codigo nuevo...
-call scripts\telegram_bot_vigia.bat --reiniciar
+echo Pidiendo al supervisor que reinicie bot y PWA con el codigo nuevo...
+call scripts\supervisor.bat --pedir-reinicio
 
 :launch
 start "" .venv\Scripts\pythonw.exe main.py

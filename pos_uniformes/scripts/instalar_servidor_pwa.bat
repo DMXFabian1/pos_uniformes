@@ -10,18 +10,9 @@ rem =====================================================
 setlocal
 cd /d "%~dp0.."
 
-echo === Levantando el servidor PWA ahora ===
-call "%~dp0servidor_pwa_vigia.bat" --reiniciar
+echo === La PWA la cuida el supervisor (junto con el bot de Telegram) ===
+call "%~dp0instalar_supervisor.bat" sinpausa
 if errorlevel 1 goto :error
-
-echo.
-echo === Tareas de Windows ===
-rem Van por correr_oculto.vbs: si la tarea llamara al .bat directo, Windows
-rem abre una consola y se ve un parpadeo negro cada 5 minutos.
-schtasks /Create /F /TN "POS PWA servidor" /SC ONLOGON /TR "wscript.exe \"%~dp0correr_oculto.vbs\" servidor_pwa_vigia.bat" >nul
-if not errorlevel 1 echo   "POS PWA servidor" creada (arranca al iniciar sesion, sin ventana).
-schtasks /Create /F /TN "POS PWA vigia" /SC MINUTE /MO 5 /TR "wscript.exe \"%~dp0correr_oculto.vbs\" servidor_pwa_vigia.bat" >nul
-if not errorlevel 1 echo   "POS PWA vigia" creada (cada 5 min revisa que siga viva, sin parpadeo).
 
 echo.
 echo ============================================

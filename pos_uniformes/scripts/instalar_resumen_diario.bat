@@ -33,11 +33,8 @@ schtasks /Create /F /TN "POS Pendientes" /SC DAILY /ST 13:30 /TR "wscript.exe \"
 if not errorlevel 1 echo   Y a las 13:30 un recordatorio con lo que falta por registrar (pagos, faltas).
 echo.
 echo === Bot de Telegram (/corte, /estado, /resumen, /pendientes) ===
-schtasks /Create /F /TN "POS Telegram bot" /SC ONLOGON /TR "wscript.exe \"%~dp0correr_oculto.vbs\" telegram_bot_vigia.bat" >nul
-if not errorlevel 1 echo   Tarea "POS Telegram bot" creada (arranca al iniciar sesion, sin ventana).
-schtasks /Create /F /TN "POS Telegram vigia" /SC MINUTE /MO 5 /TR "wscript.exe \"%~dp0correr_oculto.vbs\" telegram_bot_vigia.bat" >nul
-if not errorlevel 1 echo   Tarea "POS Telegram vigia" creada (cada 5 min revisa que el bot viva, sin parpadeo).
-call "%~dp0telegram_bot_vigia.bat" --reiniciar
+rem Lo cuida el supervisor: un solo proceso oculto para bot + PWA (sin tareas cada 5 min).
+call "%~dp0instalar_supervisor.bat" sinpausa
 if /I "%~2"=="auto" (
     echo.
     echo === Corte 30 min antes de cerrar (17:30; jueves y domingo 16:30) ===
