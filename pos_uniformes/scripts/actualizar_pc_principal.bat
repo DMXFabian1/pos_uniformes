@@ -32,8 +32,8 @@ call scripts\build_presupuestos_satelite_windows.bat
 if errorlevel 1 goto :error
 
 echo.
-echo === Pidiendo al supervisor que reinicie bot y PWA con el codigo nuevo ===
-call scripts\supervisor.bat --pedir-reinicio
+echo === Dejando tareas y servicios al dia (supervisor, resumen, pendientes) ===
+call scripts\postactualizacion.bat
 
 echo.
 echo ============================================

@@ -47,9 +47,8 @@ if errorlevel 1 (
     timeout /t 6 >nul
 )
 
-echo Pidiendo al supervisor que reinicie bot y PWA con el codigo nuevo...
-call scripts\supervisor.bat --pedir-reinicio
-
 :launch
+rem Siempre: si la infraestructura ya esta al dia no toca nada (es barato).
+call scripts\postactualizacion.bat
 start "" .venv\Scripts\pythonw.exe main.py
 exit /b 0
