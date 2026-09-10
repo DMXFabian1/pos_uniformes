@@ -897,6 +897,21 @@ class AjusteEnLibretaTests(unittest.TestCase):
         ajuste = ajustes_en_rango(session, t0 - timedelta(hours=2), t0 + timedelta(hours=3))
         self.assertEqual(ajuste, Decimal("-500.00"))
 
+    def test_hoy_usa_el_dia_no_la_semana(self) -> None:
+        """La consulta de "hoy" trae la semana y filtra en memoria; los ajustes
+        deben mirar SOLO el día (si no, un ajuste de ayer descontaba hoy)."""
+        from datetime import date as _date, datetime as _dt, time as _t, timedelta as _td
+
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        fake = SimpleNamespace(_libreta_periodo="hoy")
+        desde, hasta = QuoteSatelliteWindow._libreta_ventana_mostrada(fake)
+        self.assertEqual(desde, _dt.combine(_date.today(), _t.min).astimezone())
+        self.assertEqual(hasta - desde, _td(days=1))
+        # Los demás periodos usan la ventana de siempre.
+        fake2 = SimpleNamespace(_libreta_periodo="semana", _libreta_ventana_actual=lambda: ("D", "H"))
+        self.assertEqual(QuoteSatelliteWindow._libreta_ventana_mostrada(fake2), ("D", "H"))
+
     def test_tarjeta_del_cajon_usa_la_cifra_ajustada(self) -> None:
         from PyQt6.QtWidgets import QApplication
 

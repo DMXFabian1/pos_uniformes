@@ -2033,6 +2033,19 @@ class QuoteSatelliteWindow(QMainWindow):
         # memoria; la meta semanal necesita la semana completa).
         return ventana_semana()
 
+    def _libreta_ventana_mostrada(self):
+        """El rango que de verdad se está viendo.
+
+        Ojo: "hoy" consulta la SEMANA y filtra en memoria, así que para todo
+        lo que dependa del periodo mostrado (los ajustes del corte, por
+        ejemplo) hay que usar este rango y no el de la consulta."""
+        if self._libreta_periodo == "hoy":
+            from datetime import datetime as _dt, time as _t, timedelta as _td
+
+            inicio = _dt.combine(_dt.now().date(), _t.min).astimezone()
+            return inicio, inicio + _td(days=1)
+        return self._libreta_ventana_actual()
+
     def _ventana_ciclo_actual(self):
         """Ventana "desde el último pago" de la empleada en contexto:
         la propia en modo empleada; la filtrada en el ranking, para el dueño."""
@@ -2113,10 +2126,11 @@ class QuoteSatelliteWindow(QMainWindow):
                     else:
                         afluencia_filas = self._cargar_afluencia_libreta(session, desde, hasta)
                         pendientes = self._cargar_pendientes_libreta(session)
-                        # Lo que el dueño cambió en sus cortes manda también aquí.
+                        # Lo que el dueño cambió en sus cortes manda también
+                        # aquí, pero solo lo del periodo QUE SE VE.
                         from pos_uniformes.services.corte_caja_service import ajustes_en_rango
 
-                        self._libreta_ajuste = ajustes_en_rango(session, desde, hasta)
+                        self._libreta_ajuste = ajustes_en_rango(session, *self._libreta_ventana_mostrada())
                 fuente_db = True
             except Exception:  # noqa: BLE001
                 logger.exception("Libreta: fallo la consulta a la base")
