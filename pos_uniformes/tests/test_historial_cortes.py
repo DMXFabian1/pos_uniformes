@@ -162,14 +162,14 @@ class TicketReimpresionTests(unittest.TestCase):
         self.assertIn("* REIMPRESION *", t)
         self.assertIn("Corte:", t)
         self.assertIn("$3,210.00", t)
-        # Con ajuste (12,980 vs real 13,000): la reimpresión tampoco delata la venta.
+        # Con ajuste (12,980 vs esperado 13,000): la venta impresa cuadra con su cifra y nada dice "esperado".
         ajustado = texto_ticket_reimpresion(_corte(), self._datos(), FORMATO_DUENO)
-        self.assertNotIn("$3,210.00", ajustado)
-        self.assertIn("$12,980.00", ajustado)
+        self.assertIn("$1,820.00", ajustado)  # SACAR = 12980 − 11160
+        self.assertNotIn("esperado", ajustado.lower())
         self.assertIn("Ana", t)
         self.assertNotIn("esperado", t.lower())  # nunca la palabra ni la diferencia en papel
         t2 = texto_ticket_reimpresion(_corte(creado_por="ENC-1"), self._datos(), FORMATO_ENCARGADO)
-        self.assertIn("VENTA EN EFECTIVO:", t2)
+        self.assertIn("Venta en efectivo:", t2)
         self.assertIn("* REIMPRESION *", t2)
         self.assertIn("PAGAR A ANA:", t2)
 
@@ -211,7 +211,7 @@ class DialogTests(unittest.TestCase):
         with patch.object(HistorialCortesDialog, "_datos", return_value=datos):
             dlg.tabla.selectRow(1)  # el del encargado → formato simple por default
             self.assertTrue(dlg.formato_check.isChecked())
-            self.assertIn("VENTA EN EFECTIVO:", dlg.previa.toPlainText())
+            self.assertIn("Venta en efectivo:", dlg.previa.toPlainText())
             self.assertTrue(dlg.reprint_button.isEnabled())
             dlg.formato_check.setChecked(False)
             self.assertIn("CORTE DE CAJA", dlg.previa.toPlainText())

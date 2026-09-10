@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 from decimal import Decimal
+from types import SimpleNamespace
 
 from PyQt6.QtWidgets import (
     QDialog,
@@ -56,16 +57,9 @@ def _seccion_retiros(retiros: list, lines: list[str], tk_top, tk_mid, tk_row, tk
     lines.append(tk_bot())
 
 
-def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list | None = None, venta_efectivo=None, retiros: list | None = None, reimpresion: bool = False, tarjeta=None, tarjeta_ops: int | None = None) -> str:
-    """Ticket térmico del corte por periodo: cifra final, fondo, pagos y
-    comisiones por empleada. Sin esperado ni diferencia (solo en pantalla).
-
-    `pagos` (EmpleadaPago) imprime la sección PAGAR HOY con nombre y monto:
-    es lo que el encargado toma del cajón para cada una."""
-    from datetime import datetime
-
+def _tk():
     from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
-        TICKET_CHAR_WIDTH as _TW,
+        TICKET_CHAR_WIDTH,
         tk_bot,
         tk_dbl,
         tk_field,
@@ -75,6 +69,107 @@ def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list |
         tk_top,
     )
 
+    return TICKET_CHAR_WIDTH, tk_top, tk_mid, tk_dbl, tk_bot, tk_row, tk_line, tk_field
+
+
+def _nombre_pila(p) -> str:
+    return (getattr(p, "employee_name", "") or getattr(p, "employee_code", "") or "?").split()[0]
+
+
+def _bloque_cuenta(lines, *, corte, venta, tarjeta, tarjeta_ops, pagos_restar, retiros, sacar) -> None:
+    """La cuenta de un corte, de arriba abajo (pedido de Daniel 2026-09-09):
+
+        Reactivo en caja        (primera línea; se queda igual)
+        Venta en efectivo
+        Con tarjeta (N) / VENTA TOTAL   (solo si hubo tarjeta)
+        ── Venta en efectivo − pagos − gastos ══ SACAR DE LA VENTA
+
+    Sin "EN CAJA" ni "Se retira": la venta es la que manda y todo lo que
+    sale del cajón se ve como resta."""
+    _TW, tk_top, tk_mid, tk_dbl, tk_bot, tk_row, tk_line, _tk_field = _tk()
+    venta = Decimal(venta or 0).quantize(Decimal("0.01"))
+    tarjeta_monto = Decimal(tarjeta or 0).quantize(Decimal("0.01"))
+    reactivo_ini = Decimal(getattr(corte, "reactivo_inicial", 0) or 0)
+    reactivo_fin = Decimal(getattr(corte, "reactivo_final", 0) or 0)
+    con_reactivo = reactivo_ini > 0 or reactivo_fin > 0
+
+    lines.append(tk_top())
+    if con_reactivo:
+        lines.append(tk_row("Reactivo en caja:", f"${reactivo_ini:,.2f}"))
+        lines.append(tk_mid())
+    lines.append(tk_row("Venta en efectivo:", f"${venta:,.2f}"))
+    if tarjeta_monto > 0:
+        cuantas = f" ({tarjeta_ops})" if tarjeta_ops else ""
+        lines.append(tk_row(f"Con tarjeta{cuantas}:", f"${tarjeta_monto:,.2f}"))
+        lines.append(tk_row("VENTA TOTAL:", f"${(venta + tarjeta_monto):,.2f}"))
+        lines.append(tk_line("  (la tarjeta no esta en el cajon)"))
+    restas = list(pagos_restar or []) or list(retiros or [])
+    if restas:
+        lines.append(tk_mid())
+        lines.append(tk_row("Venta en efectivo:", f"${venta:,.2f}"))
+        for p in pagos_restar or []:
+            lines.append(tk_row(f"Pago a {_nombre_pila(p)}:"[: _TW - 14], f"-${Decimal(p.total):,.2f}"))
+        for r in retiros or []:
+            lines.append(tk_row(f"Gasto ({str(r.motivo)[: _TW - 24]}):", f"-${Decimal(r.monto):,.2f}"))
+    if con_reactivo:
+        lines.append(tk_dbl())
+        lines.append(tk_row("SACAR DE LA VENTA:", f"${Decimal(sacar):,.2f}"))
+    lines.append(tk_bot())
+    if con_reactivo:
+        if reactivo_fin < reactivo_ini:
+            lines.append(tk_top())
+            lines.append(tk_line("OJO: los pagos fueron mas que"))
+            lines.append(tk_line("la venta. Se tomo del reactivo."))
+            lines.append(tk_row("Reactivo que queda:", f"${reactivo_fin:,.2f}"))
+            lines.append(tk_bot())
+        else:
+            lines.append("El reactivo de la caja se queda igual.".center(_TW))
+
+
+def _bloque_pagos(lines, pagos: list, ya_pagados: list, *, total: bool, titulo: str | None = None) -> None:
+    """PAGAR A X (desglose) · YA PAGADO A X (hora) (desglose). Si no hay nada, lo dice."""
+    _TW, tk_top, tk_mid, tk_dbl, tk_bot, tk_row, tk_line, _tk_field = _tk()
+    lines.append("")
+    if titulo:
+        lines.append(titulo.center(_TW))
+    lines.append(tk_top())
+    idx = 0
+    for p in pagos:
+        if idx:
+            lines.append(tk_mid())
+        idx += 1
+        lines.append(tk_row(f"PAGAR A {_nombre_pila(p).upper()}:"[: _TW - 14], f"${Decimal(p.total):,.2f}"))
+        _desglose_pago(p, lines, tk_row)
+    for p in ya_pagados:
+        if idx:
+            lines.append(tk_mid())
+        idx += 1
+        hora = _hora_local(getattr(p, "created_at", None)).strftime("%H:%M") if getattr(p, "created_at", None) else ""
+        lines.append(tk_row(f"YA PAGADO A {_nombre_pila(p).upper()}:"[: _TW - 14], f"${Decimal(p.total):,.2f}"))
+        if hora:
+            lines.append(tk_line(f"  (se le pago a las {hora})"))
+        _desglose_pago(p, lines, tk_row)
+    if not pagos and not ya_pagados:
+        lines.append(tk_line("Hoy no se paga a nadie."))
+    elif total and len(pagos) + len(ya_pagados) > 1:
+        lines.append(tk_dbl())
+        suma = sum((Decimal(p.total) for p in list(pagos) + list(ya_pagados)), Decimal("0.00"))
+        lines.append(tk_row("TOTAL PAGOS:", f"${suma:,.2f}"))
+    lines.append(tk_bot())
+
+
+def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list | None = None, venta_efectivo=None, retiros: list | None = None, reimpresion: bool = False, tarjeta=None, tarjeta_ops: int | None = None) -> str:
+    """Ticket del dueño (CORTE DE CAJA): misma cuenta simple que el del
+    encargado + POR EMPLEADA con operaciones. Sin esperado ni diferencia.
+
+    Si el dueño ajustó su cifra, la "venta en efectivo" que se imprime es la
+    que cuadra con su cifra (cifra − reactivo + pagos + gastos): el ticket
+    siempre suma y nada delata el ajuste."""
+    from datetime import datetime
+
+    _TW, tk_top, tk_mid, tk_dbl, tk_bot, tk_row, tk_line, tk_field = _tk()
+    pagos = list(pagos or [])
+    retiros = list(retiros or [])
     lines: list[str] = []
     lines.append("CORTE DE CAJA".center(_TW))
     lines.append(str(corte.periodo_label or "").center(_TW))
@@ -86,49 +181,29 @@ def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list |
     tk_field("Impreso:", datetime.now().strftime("%d/%m/%Y %H:%M"), lines)
     if corte.creado_por:
         tk_field("Por:", str(corte.creado_por), lines)
-    lines.append(tk_mid())
-    lines.append(tk_row("Operaciones:", str(corte.operaciones)))
-    # Si el dueño ajustó su cifra (≠ real), las líneas de VENTA, reactivo
-    # inicial y pagos delatarían el ajuste por simple suma: se omiten y solo
-    # sale EN CAJA / se queda / se retira. Sin ajuste, ticket completo.
-    ajustado = _con_ajuste(corte)
-    if venta_efectivo is not None and not ajustado:
-        lines.append(tk_row("VENTA (efectivo):", f"${Decimal(venta_efectivo):,.2f}"))
-    if tarjeta is not None and Decimal(tarjeta) > 0:
-        # Informativa: la tarjeta no está en el cajón, no entra en EN CAJA.
-        cuantas = f" ({tarjeta_ops})" if tarjeta_ops else ""
-        lines.append(tk_row(f"Con tarjeta{cuantas}:", f"${Decimal(tarjeta):,.2f}"))
-    con_reactivo = Decimal(corte.reactivo_inicial or 0) > 0 or Decimal(corte.reactivo_final or 0) > 0
-    if con_reactivo and not ajustado:
-        lines.append(tk_row("Reactivo inicial:", f"${Decimal(corte.reactivo_inicial):,.2f}"))
-    if Decimal(corte.retiros_pagos or 0) > 0 and not ajustado:
-        lines.append(tk_row("Pagos empleadas:", f"-${Decimal(corte.retiros_pagos):,.2f}"))
-    if Decimal(corte.otros_retiros or 0) > 0 and not ajustado:
-        lines.append(tk_row("Otros retiros:", f"-${Decimal(corte.otros_retiros):,.2f}"))
-    lines.append(tk_dbl())
-    lines.append(tk_row("EN CAJA:", f"${Decimal(corte.monto_final):,.2f}"))
-    if con_reactivo:
-        lines.append(tk_row("Se queda (reactivo):", f"${Decimal(corte.reactivo_final):,.2f}"))
-        retirado = (Decimal(corte.monto_final) - Decimal(corte.reactivo_final)).quantize(Decimal("0.01"))
-        lines.append(tk_row("Se retira:", f"${retirado:,.2f}"))
     if corte.nota:
         tk_field("Nota:", str(corte.nota), lines)
     lines.append(tk_bot())
+
+    con_reactivo = Decimal(corte.reactivo_inicial or 0) > 0 or Decimal(corte.reactivo_final or 0) > 0
+    # Sumas persistidas en el corte (valen aunque no se pasen las listas).
+    total_pagos = Decimal(getattr(corte, "retiros_pagos", 0) or 0) or sum((Decimal(p.total) for p in pagos), Decimal("0.00"))
+    total_gastos = Decimal(getattr(corte, "otros_retiros", 0) or 0) or sum((Decimal(r.monto) for r in retiros), Decimal("0.00"))
+    if con_reactivo and (_con_ajuste(corte) or venta_efectivo is None):
+        venta = Decimal(corte.monto_final) - Decimal(corte.reactivo_inicial or 0) + total_pagos + total_gastos
+    elif venta_efectivo is not None:
+        venta = Decimal(venta_efectivo)
+    else:
+        venta = Decimal(corte.monto_final)
+    sacar = (Decimal(corte.monto_final) - Decimal(corte.reactivo_final or 0)).quantize(Decimal("0.01"))
+    # Sin las listas (p.ej. corte viejo o ticket rápido) las restas salen como totales.
+    pagos_restar = pagos or ([SimpleNamespace(employee_name="empleadas", total=total_pagos)] if total_pagos > 0 else [])
+    gastos_restar = retiros or ([SimpleNamespace(motivo="otros", monto=total_gastos)] if total_gastos > 0 else [])
+    _bloque_cuenta(lines, corte=corte, venta=venta, tarjeta=tarjeta, tarjeta_ops=tarjeta_ops, pagos_restar=pagos_restar, retiros=gastos_restar, sacar=sacar)
+    if not con_reactivo:
+        lines.append(tk_row("Total del dia:", f"${Decimal(corte.monto_final):,.2f}"))
     if pagos:
-        lines.append("")
-        lines.append("PAGOS A EMPLEADAS".center(_TW))
-        lines.append(tk_top())
-        for idx, p in enumerate(pagos):
-            if idx:
-                lines.append(tk_mid())
-            nombre = (p.employee_name or p.employee_code)[: _TW - 16]
-            lines.append(tk_row(f"{nombre}:", f"${Decimal(p.total):,.2f}"))
-            _desglose_pago(p, lines, tk_row)
-        lines.append(tk_dbl())
-        total = sum((Decimal(p.total) for p in pagos), Decimal("0.00"))
-        lines.append(tk_row("TOTAL PAGOS:", f"${total:,.2f}"))
-        lines.append(tk_bot())
-    _seccion_retiros(retiros or [], lines, tk_top, tk_mid, tk_row, tk_dbl, tk_bot, _TW)
+        _bloque_pagos(lines, pagos, [], total=True, titulo="PAGOS A EMPLEADAS")
     if por_empleada:
         lines.append("")
         lines.append("POR EMPLEADA".center(_TW))
@@ -530,33 +605,18 @@ def texto_ticket_corte_encargado(
     corte, venta_efectivo, pagos: list, por_empleada: list | None = None, retiros: list | None = None,
     reimpresion: bool = False, tarjeta=None, tarjeta_ops: int | None = None, ya_pagados: list | None = None,
 ) -> str:
-    """Ticket simple para León: cuánto se vendió, a quién pagar y cuánto sacar.
+    """Ticket simple para León: la cuenta (reactivo · venta · restas ·
+    SACAR), a quién pagar con desglose y las comisiones.
 
-    `pagos` = los que ESTE corte registra (hay que pagarlos ahora).
-    `ya_pagados` = pagos hechos antes dentro del mismo periodo (ya salieron
-    del cajón): se listan como YA PAGADO y se restan en la cuenta, para que
-    nunca diga "no se paga a nadie" y aun así reste dinero.
-
-    Sin fondo, sin "en caja", sin operaciones: solo lo que él hace con el
-    dinero. La cuenta se ve completa (venta − pagos − lo que ya salió =
-    SACAR) y la tarjeta aparte porque no está en el cajón. El fondo del
-    cajón no se toca (salvo que los pagos superen la venta, y se avisa)."""
+    `pagos` = los que ESTE corte registra; `ya_pagados` = pagos hechos antes
+    dentro del periodo (ya salieron del cajón): salen como YA PAGADO y se
+    restan igual, para que nunca diga "no se paga a nadie" restando dinero."""
     from datetime import datetime
 
-    from pos_uniformes.ui.helpers.ticket_print_layout_helper import (
-        TICKET_CHAR_WIDTH as _TW,
-        tk_bot,
-        tk_dbl,
-        tk_line,
-        tk_mid,
-        tk_row,
-        tk_top,
-    )
-
-    venta = Decimal(venta_efectivo).quantize(Decimal("0.01"))
-    total_pagos = sum((Decimal(p.total) for p in pagos), Decimal("0.00")).quantize(Decimal("0.01"))
+    _TW, tk_top, tk_mid, tk_dbl, tk_bot, tk_row, tk_line, _tk_field = _tk()
+    pagos = list(pagos or [])
+    ya_pagados = list(ya_pagados or [])
     sacar = (Decimal(corte.monto_final) - Decimal(corte.reactivo_final)).quantize(Decimal("0.01"))
-    fondo_bajo = Decimal(corte.reactivo_final) < Decimal(corte.reactivo_inicial)
 
     lines: list[str] = []
     lines.append("CORTE".center(_TW))
@@ -566,59 +626,9 @@ def texto_ticket_corte_encargado(
         lines.append(("Corte: " + _hora_local(corte.created_at).strftime("%d/%m/%Y %H:%M")).center(_TW))
     lines.append(datetime.now().strftime("%d/%m/%Y %H:%M").center(_TW))
     lines.append("")
-    tarjeta_monto = Decimal(tarjeta or 0).quantize(Decimal("0.01"))
-    lines.append(tk_top())
-    lines.append(tk_row("VENTA EN EFECTIVO:", f"${venta:,.2f}"))
-    if tarjeta_monto > 0:
-        cuantas = f" ({tarjeta_ops})" if tarjeta_ops else ""
-        lines.append(tk_row(f"Con tarjeta{cuantas}:", f"${tarjeta_monto:,.2f}"))
-        lines.append(tk_line("  (la tarjeta no esta en el cajon)"))
-    lines.append(tk_bot())
-    lines.append("")
-    ya_pagados = list(ya_pagados or [])
-    lines.append(tk_top())
-    idx = 0
-    for p in pagos:
-        if idx:
-            lines.append(tk_mid())
-        idx += 1
-        nombre = (p.employee_name or p.employee_code).split()[0].upper()
-        lines.append(tk_row(f"PAGAR A {nombre}:"[: _TW - 14], f"${Decimal(p.total):,.2f}"))
-        _desglose_pago(p, lines, tk_row)
-    for p in ya_pagados:
-        if idx:
-            lines.append(tk_mid())
-        idx += 1
-        nombre = (p.employee_name or p.employee_code).split()[0].upper()
-        hora = _hora_local(getattr(p, "created_at", None)).strftime("%H:%M") if getattr(p, "created_at", None) else ""
-        lines.append(tk_row(f"YA PAGADO A {nombre}:"[: _TW - 14], f"${Decimal(p.total):,.2f}"))
-        if hora:
-            lines.append(tk_line(f"  (se le pago a las {hora})"))
-        _desglose_pago(p, lines, tk_row)
-    if not pagos and not ya_pagados:
-        lines.append(tk_line("Hoy no se paga a nadie."))
-    lines.append(tk_bot())
-    lines.append("")
-    # La cuenta, paso a paso, para que se vea de donde sale lo que se saca.
-    lines.append(tk_top())
-    lines.append(tk_row("Venta en efectivo:", f"${venta:,.2f}"))
-    for p in list(pagos) + ya_pagados:
-        nombre = (p.employee_name or p.employee_code).split()[0]
-        lines.append(tk_row(f"Pago a {nombre}:"[: _TW - 14], f"-${Decimal(p.total):,.2f}"))
-    for r in retiros or []:
-        lines.append(tk_row(f"Ya salio ({str(r.motivo)[: _TW - 26]}):", f"-${Decimal(r.monto):,.2f}"))
-    lines.append(tk_dbl())
-    lines.append(tk_row("SACAR DE LA VENTA:", f"${sacar:,.2f}"))
-    lines.append(tk_bot())
-    if fondo_bajo:
-        lines.append("")
-        lines.append(tk_top())
-        lines.append(tk_line("OJO: los pagos fueron mas que"))
-        lines.append(tk_line("la venta. Se tomo del reactivo."))
-        lines.append(tk_row("Reactivo que queda:", f"${Decimal(corte.reactivo_final):,.2f}"))
-        lines.append(tk_bot())
-    else:
-        lines.append("El reactivo de la caja se queda igual.".center(_TW))
+    _bloque_cuenta(lines, corte=corte, venta=venta_efectivo, tarjeta=tarjeta, tarjeta_ops=tarjeta_ops,
+                   pagos_restar=pagos + ya_pagados, retiros=retiros, sacar=sacar)
+    _bloque_pagos(lines, pagos, ya_pagados, total=False)
     if por_empleada:
         lines.append("")
         lines.append("COMISIONES".center(_TW))
@@ -628,7 +638,7 @@ def texto_ticket_corte_encargado(
             if not first:
                 lines.append(tk_mid())
             first = False
-            lines.append(tk_row(f"{(r.employee_name or r.employee_code).split()[0]}:", f"{r.comisiones} com."))
+            lines.append(tk_row(f"{_nombre_pila(r)}:", f"{r.comisiones} com."))
         lines.append(tk_bot())
     return "\n".join(lines)
 

@@ -34,37 +34,43 @@ class TicketCorteTests(unittest.TestCase):
     def test_ticket_trae_fondo_pagos_y_retiro(self) -> None:
         texto = texto_ticket_corte(_corte(), [SimpleNamespace(employee_name="Ana", employee_code="VEND-2", operaciones=7, comisiones=30)])
         self.assertIn("CORTE DE CAJA", texto)
-        self.assertIn("$11,160.00", texto)       # fondo inicial y final
-        self.assertIn("-$1,390.00", texto)       # pagos
-        self.assertIn("$13,000.00", texto)       # en caja
-        self.assertIn("$1,840.00", texto)        # se retira = 13000 - 11160
+        self.assertIn("Reactivo en caja:", texto)
+        self.assertIn("$11,160.00", texto)       # reactivo, primera línea
+        self.assertIn("-$1,390.00", texto)       # pagos como resta
+        self.assertIn("SACAR DE LA VENTA:", texto)
+        self.assertIn("$1,840.00", texto)        # 13000 - 11160
         self.assertIn("Ana", texto)
         self.assertIn("30 com.", texto)
         self.assertNotIn("esperado", texto.lower())  # nunca imprime esperado/diferencia
+        for viejo in ("EN CAJA", "Se retira", "Se queda"):
+            self.assertNotIn(viejo, texto)  # formato simple (Daniel 2026-09-09)
 
     def test_con_ajuste_no_delata_la_suma(self) -> None:
         # Cifra del dueño ≠ real: fuera VENTA, reactivo inicial y pagos (la suma delataría el ajuste).
         from datetime import datetime as _dt
 
-        corte = _corte(creado_por="VEND-1", monto_final=Decimal("19311.00"), monto_esperado=Decimal("20311.00"), hasta=_dt(2026, 9, 9, 14, 22), desde=_dt(2026, 9, 8, 18, 15))
+        corte = _corte(creado_por="VEND-1", monto_final=Decimal("19311.00"), monto_esperado=Decimal("20311.00"), retiros_pagos=Decimal("1590.00"), hasta=_dt(2026, 9, 9, 14, 22), desde=_dt(2026, 9, 8, 18, 15))
         pago = SimpleNamespace(employee_name="Fanny Ortiz", employee_code="VEND-7", total=Decimal("1590.00"), sueldo_base=Decimal("1300.00"), comisiones=145, tarifa_comision=Decimal("2.00"), monto_comisiones=Decimal("290.00"), faltas=0, descuento_faltas=Decimal("0"), dias_trabajados=None)
         texto = texto_ticket_corte(corte, pagos=[pago], venta_efectivo=Decimal("10741.00"))
-        self.assertIn("EN CAJA:", texto)
-        self.assertIn("$19,311.00", texto)
-        self.assertIn("Se queda (reactivo):", texto)
-        self.assertIn("Fanny Ortiz:", texto)  # la sección de pagos sí (es lo que se le paga)
-        for delator in ("VENTA (efectivo):", "Reactivo inicial:", "Pagos empleadas:", "10,741", "20,311"):
+        # La venta impresa es la que cuadra con su cifra: 19311 − 11160 + 1590 = 9,741 (no la real 10,741).
+        self.assertIn("$9,741.00", texto)
+        self.assertIn("SACAR DE LA VENTA:", texto)
+        self.assertIn("$8,151.00", texto)  # 19311 − 11160
+        self.assertIn("PAGAR A FANNY:", texto)
+        for delator in ("10,741", "20,311", "19,311", "esperado", "EN CAJA"):
             self.assertNotIn(delator, texto)
-        # Sin ajuste: ticket completo.
-        completo = texto_ticket_corte(_corte(creado_por="VEND-1", monto_final=Decimal("20311.00"), monto_esperado=Decimal("20311.00"), hasta=_dt(2026, 9, 9, 14, 22), desde=_dt(2026, 9, 8, 18, 15)), venta_efectivo=Decimal("10741.00"))
-        self.assertIn("VENTA (efectivo):", completo)
-        self.assertIn("Reactivo inicial:", completo)
+        # Sin ajuste: venta real.
+        completo = texto_ticket_corte(_corte(creado_por="VEND-1", monto_final=Decimal("20311.00"), monto_esperado=Decimal("20311.00"), retiros_pagos=Decimal("1590.00"), hasta=_dt(2026, 9, 9, 14, 22), desde=_dt(2026, 9, 8, 18, 15)), venta_efectivo=Decimal("10741.00"))
+        self.assertIn("$10,741.00", completo)
+        self.assertIn("Reactivo en caja:", completo)
 
     def test_tarjeta_informativa_en_ticket_del_dueno(self) -> None:
         texto = texto_ticket_corte(_corte(), venta_efectivo=Decimal("10741.00"), tarjeta=Decimal("705.00"), tarjeta_ops=2)
-        self.assertIn("VENTA (efectivo):", texto)
+        self.assertIn("Venta en efectivo:", texto)
         self.assertIn("Con tarjeta (2):", texto)
         self.assertIn("$705.00", texto)
+        self.assertIn("VENTA TOTAL:", texto)
+        self.assertIn("$11,446.00", texto)
         self.assertNotIn("Con tarjeta", texto_ticket_corte(_corte(), venta_efectivo=Decimal("1"), tarjeta=Decimal("0")))
 
     def test_ocultar_tarjeta_deja_el_resto_del_ticket_igual(self) -> None:
@@ -73,25 +79,25 @@ class TicketCorteTests(unittest.TestCase):
         sin = texto_ticket_corte(_corte(), venta_efectivo=Decimal("10741.00"), tarjeta=None, tarjeta_ops=None)
         self.assertNotIn("Con tarjeta", sin)
         self.assertNotIn("705", sin)
-        self.assertIn("VENTA (efectivo):", sin)
-        self.assertIn("EN CAJA:", sin)
-        # Lo único que cambia entre los dos es esa línea.
+        self.assertIn("Venta en efectivo:", sin)
+        # Lo único que cambia son las líneas de tarjeta (Con tarjeta · VENTA TOTAL · nota).
         quitadas = [l for l in con.splitlines() if l not in sin.splitlines()]
-        self.assertEqual(len(quitadas), 1)
+        self.assertEqual(len(quitadas), 3)
         self.assertIn("Con tarjeta", quitadas[0])
+        self.assertIn("VENTA TOTAL", quitadas[1])
 
     def test_sin_pagos_no_imprime_la_linea(self) -> None:
         texto = texto_ticket_corte(_corte(retiros_pagos=Decimal("0.00")))
-        self.assertNotIn("Pagos empleadas", texto)
+        self.assertNotIn("Pago a", texto)
 
 
 class TicketLegacyTests(unittest.TestCase):
     def test_sin_reactivo_no_imprime_esos_renglones(self) -> None:
         texto = texto_ticket_corte(_corte(reactivo_inicial=Decimal("0"), reactivo_final=Decimal("0"), retiros_pagos=Decimal("0"), monto_final=Decimal("22300.00")))
         self.assertIn("$22,300.00", texto)
-        self.assertNotIn("Reactivo inicial", texto)
-        self.assertNotIn("Se queda", texto)
-        self.assertNotIn("Se retira", texto)
+        self.assertIn("Total del dia:", texto)
+        self.assertNotIn("Reactivo", texto)
+        self.assertNotIn("SACAR", texto)
 
 
 class TextoEstadoTests(unittest.TestCase):
@@ -125,10 +131,10 @@ class TicketPagarHoyTests(unittest.TestCase):
                             sueldo_base=Decimal("1300.00"), tarifa_comision=Decimal("2.00"), monto_comisiones=Decimal("20.00"), descuento_faltas=Decimal("0.00")),
         ]
         texto = texto_ticket_corte(_corte(retiros_pagos=Decimal("2511.33")), pagos=pagos, venta_efectivo=Decimal("6660.00"))
-        self.assertIn("VENTA (efectivo):", texto)
+        self.assertIn("Venta en efectivo:", texto)
         self.assertIn("$6,660.00", texto)
         self.assertIn("PAGOS A EMPLEADAS", texto)
-        self.assertIn("Evelyn Ramírez:", texto)
+        self.assertIn("PAGAR A EVELYN:", texto)
         self.assertIn("$1,191.33", texto)
         self.assertIn("54 comisiones x $2:", texto)
         self.assertIn("1 falta(s):", texto)
@@ -165,7 +171,7 @@ class TicketEncargadoTests(unittest.TestCase):
         self.assertIn("+$108.00", texto)
         self.assertIn("1 falta(s):", texto)
         self.assertIn("-$216.67", texto)
-        self.assertIn("VENTA EN EFECTIVO:", texto)
+        self.assertIn("Venta en efectivo:", texto)
         self.assertIn("$6,660.00", texto)
         self.assertIn("PAGAR A EVELYN:", texto)
         self.assertIn("$1,191.33", texto)
@@ -176,7 +182,8 @@ class TicketEncargadoTests(unittest.TestCase):
         self.assertIn("$5,468.67", texto)
         self.assertIn("El reactivo de la caja se queda igual.", texto)
         self.assertNotIn("tarjeta", texto)  # sin tarjeta no se menciona
-        for prohibido in ("EN CAJA", "Fondo inicial", "Operaciones", "11,160"):
+        self.assertIn("Reactivo en caja:", texto)  # primera línea (Daniel 2026-09-09)
+        for prohibido in ("EN CAJA", "Fondo inicial", "Operaciones", "Se retira"):
             self.assertNotIn(prohibido, texto)
 
     def test_ya_pagado_en_el_periodo_se_ve_y_se_resta(self) -> None:
@@ -199,14 +206,15 @@ class TicketEncargadoTests(unittest.TestCase):
     def test_con_tarjeta_va_aparte(self) -> None:
         corte = _corte(monto_final=Decimal("21901.00"), retiros_pagos=Decimal("0"))
         texto = texto_ticket_corte_encargado(corte, Decimal("10741.00"), [], tarjeta=Decimal("705.00"), tarjeta_ops=2)
-        self.assertIn("VENTA EN EFECTIVO:", texto)
+        self.assertIn("Venta en efectivo:", texto)
         self.assertIn("$10,741.00", texto)
         self.assertIn("Con tarjeta (2):", texto)
         self.assertIn("$705.00", texto)
         self.assertIn("no esta en el cajon", texto)
         self.assertIn("Hoy no se paga a nadie.", texto)
         self.assertIn("SACAR DE LA VENTA:", texto)
-        self.assertNotIn("$11,446", texto)  # nunca se suman efectivo + tarjeta
+        self.assertIn("VENTA TOTAL:", texto)
+        self.assertIn("$11,446.00", texto)  # efectivo + tarjeta, informativo
 
     def test_sin_pagos_y_fondo_que_baja(self) -> None:
         corte = _corte(monto_final=Decimal("10356.00"), reactivo_final=Decimal("10356.00"))

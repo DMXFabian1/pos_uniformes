@@ -71,16 +71,16 @@ class TicketsConRetirosTests(unittest.TestCase):
     def test_ticket_dueno_lista_retiros(self) -> None:
         retiros = [SimpleNamespace(motivo="Proveedor de playeras", monto=Decimal("400")), SimpleNamespace(motivo="Cambio", monto=Decimal("100"))]
         texto = texto_ticket_corte(self._corte(), retiros=retiros)
-        self.assertIn("RETIROS DEL CAJON", texto)
-        self.assertIn("Proveedor de playeras:", texto)
-        self.assertIn("$400.00", texto)
-        self.assertIn("Total retiros:", texto)
-        self.assertIn("$500.00", texto)
+        self.assertIn("Gasto (Proveedor", texto)
+        self.assertIn("-$400.00", texto)
+        self.assertIn("Gasto (Cambio):", texto)
+        self.assertIn("-$100.00", texto)
+        self.assertIn("$6,160.00", texto)  # SACAR = 17320 - 11160
 
     def test_ticket_encargado_muestra_lo_que_ya_salio(self) -> None:
         retiros = [SimpleNamespace(motivo="Proveedor", monto=Decimal("500"))]
         texto = texto_ticket_corte_encargado(self._corte(), Decimal("6660"), [], retiros=retiros)
-        self.assertIn("Ya salio (Proveedor):", texto)
+        self.assertIn("Gasto (Proveedor):", texto)
         self.assertIn("$500.00", texto)
         self.assertIn("SACAR DE LA VENTA:", texto)
         self.assertIn("$6,160.00", texto)  # 17320 - 11160
