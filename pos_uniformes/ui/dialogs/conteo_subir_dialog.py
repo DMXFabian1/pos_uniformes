@@ -55,16 +55,29 @@ class ConteoSubirDialog(QDialog):
         *,
         session_factory: Callable[[], Session] | None = None,
         contado_por: str = "admin (satélite)",
+        jornada=None,
+        empleada_code: str = "",
     ) -> None:
+        """`jornada`: un `JornadaRef` (foto plana de una jornada abierta). Con ella el diálogo queda
+        amarrado a su escuela (o prenda básica), muestra lo que ya se capturó
+        en esa jornada y permite guardar a medias. Sin jornada funciona como
+        siempre (eligiendo escuela)."""
         super().__init__(parent)
-        self.setWindowTitle("Subir conteo")
         self._session_factory = session_factory or _default_session_factory
         self._contado_por = contado_por
+        self._jornada = jornada
+        self._empleada_code = (empleada_code or "").strip().upper()
         self._variant_ids: list[int] = []
         self._fisico_inputs: list[QLineEdit] = []
         self._sistemas: list[int] = []
+        self._ya_capturados: dict[int, int] = {}
         self._build_ui()
-        self._cargar_escuelas()
+        if jornada is not None:
+            self.setWindowTitle(f"Conteo · {jornada.titulo}")
+            self._modo_jornada()
+        else:
+            self.setWindowTitle("Subir conteo")
+            self._cargar_escuelas()
 
     # ── UI ────────────────────────────────────────────────────────────────────
 
@@ -157,6 +170,12 @@ class ConteoSubirDialog(QDialog):
         self._registrar_btn.setEnabled(False)
         self._registrar_btn.clicked.connect(self._registrar)
         actions.addWidget(self._registrar_btn)
+        # Solo con jornada: guardar lo que va y seguir otro día.
+        self._pausar_btn = QPushButton("Guardar y seguir después")
+        self._pausar_btn.setEnabled(False)
+        self._pausar_btn.setVisible(False)
+        self._pausar_btn.clicked.connect(self._pausar)
+        actions.addWidget(self._pausar_btn)
         actions.addStretch()
         layout.addLayout(actions)
 
@@ -184,6 +203,24 @@ class ConteoSubirDialog(QDialog):
         for e in escuelas:
             self._escuela_combo.addItem(e["escuela_nombre"], e["escuela_id"])
 
+    def _modo_jornada(self) -> None:
+        """Amarra el diálogo a la jornada: sin elegir escuela, y con lo que ya
+        se capturó puesto y bloqueado (para no contar dos veces)."""
+        from pos_uniformes.services.conteo_jornada_service import capturado_en_jornada
+
+        for w in (self._escuela_combo, self._tipo_combo, self._cargar_btn):
+            w.setVisible(False)
+        self._registrar_btn.setText("Terminar conteo")
+        self._pausar_btn.setVisible(True)
+        session = self._session_factory()
+        try:
+            self._ya_capturados = capturado_en_jornada(session, self._jornada.id)
+        except Exception:  # noqa: BLE001 — sin lo previo se captura de cero
+            self._ya_capturados = {}
+        finally:
+            session.close()
+        self._cargar_piezas()
+
     def _on_escuela_cambiada(self) -> None:
         """Muestra el filtro de tipo solo cuando se elige Productos básicos."""
         es_basicos = self._escuela_combo.currentData() == ESCUELA_ID_BASICOS
@@ -209,12 +246,18 @@ class ConteoSubirDialog(QDialog):
             self._tipo_combo.addItem(t, t)
 
     def _cargar_piezas(self) -> None:
-        escuela_id = self._escuela_combo.currentData()
-        if escuela_id is None:
-            return
-        tipo_basicos = (
-            self._tipo_combo.currentData() if int(escuela_id) == ESCUELA_ID_BASICOS else None
-        )
+        if self._jornada is not None:
+            escuela_id = (
+                ESCUELA_ID_BASICOS if self._jornada.escuela_id is None else self._jornada.escuela_id
+            )
+            tipo_basicos = self._jornada.tipo_pieza or None
+        else:
+            escuela_id = self._escuela_combo.currentData()
+            if escuela_id is None:
+                return
+            tipo_basicos = (
+                self._tipo_combo.currentData() if int(escuela_id) == ESCUELA_ID_BASICOS else None
+            )
         session = self._session_factory()
         try:
             if int(escuela_id) == ESCUELA_ID_BASICOS:
@@ -262,6 +305,14 @@ class ConteoSubirDialog(QDialog):
                 inp.setMinimumHeight(30)
                 inp.setMinimumWidth(72)
                 inp.setMaximumWidth(110)
+                if v.variante_id in self._ya_capturados:
+                    # Ya contada en esta jornada: se ve SU número (no el del
+                    # sistema) y no se vuelve a registrar.
+                    inp.setText(str(self._ya_capturados[v.variante_id]))
+                    inp.setReadOnly(True)
+                    inp.setStyleSheet(
+                        "QLineEdit { background: #eef5ee; color: #2f6b2f; border-color: #a9c9a9; }"
+                    )
                 inp.textChanged.connect(self._on_fisico_changed)
                 self._table.setCellWidget(fila, 2, inp)
 
@@ -299,8 +350,15 @@ class ConteoSubirDialog(QDialog):
         sistema ya creía no sirve de nada.
         """
         llenas = sum(1 for w in self._fisico_inputs if w.text().strip())
+        nuevas = sum(1 for w in self._fisico_inputs if w.text().strip() and not w.isReadOnly())
         total = len(self._fisico_inputs)
-        self._registrar_btn.setEnabled(llenas > 0)
+        if self._jornada is not None:
+            # Terminar vale con lo que haya (aunque todo venga de antes);
+            # pausar solo tiene sentido si hay algo nuevo que guardar.
+            self._registrar_btn.setEnabled(llenas > 0)
+            self._pausar_btn.setEnabled(nuevas > 0)
+        else:
+            self._registrar_btn.setEnabled(llenas > 0)
         if total:
             faltan = total - llenas
             self._hint.setText(
@@ -308,23 +366,61 @@ class ConteoSubirDialog(QDialog):
                 + (f"  Las {faltan} vacías se quedan sin contar." if faltan else "")
             )
 
+    def _nuevos(self) -> tuple[list, int]:
+        """(conteos nuevos, tallas vacías). Lo ya capturado en la jornada no cuenta."""
+        conteos = []
+        sin_contar = 0
+        for vid, inp in zip(self._variant_ids, self._fisico_inputs):
+            txt = inp.text().strip()
+            if inp.isReadOnly():
+                continue
+            if not txt:
+                sin_contar += 1
+                continue
+            conteos.append(ConteoInput(variante_id=vid, stock_fisico=int(txt)))
+        return conteos, sin_contar
+
+    def _guardar(self, conteos: list) -> bool:
+        """Sube los conteos nuevos. False si algo falló (ya avisó)."""
+        if not conteos:
+            return True
+        session = self._session_factory()
+        try:
+            registrar_conteos_lote(
+                session, conteos, self._contado_por,
+                jornada_id=self._jornada.id if self._jornada is not None else None,
+            )
+            session.commit()
+        except Exception as exc:  # noqa: BLE001
+            session.rollback()
+            QMessageBox.critical(self, "Error", f"No se pudo registrar el conteo:\n{exc}")
+            return False
+        finally:
+            session.close()
+        return True
+
+    def _pausar(self) -> None:
+        """Guarda lo que va y cierra. La jornada sigue abierta para retomarla."""
+        conteos, _ = self._nuevos()
+        if not self._guardar(conteos):
+            return
+        QMessageBox.information(
+            self,
+            "Guardado",
+            f"Se guardaron {len(conteos)} tallas. Puedes seguir después desde Conteos.",
+        )
+        self.accept()
+
     def _registrar(self) -> None:
-        """Registra SOLO las tallas que traen número.
+        """Registra SOLO las tallas que traen número (y con jornada, la cierra).
 
         Antes una casilla vacía tomaba el esperado y se guardaba como contada
         sin diferencia: la talla quedaba con fecha de conteo fresca sin que
         nadie la hubiera visto. Eso le pone cara de nuevo a un dato viejo, que
         es peor que no contar. Ahora vacío = no la conté, y no se toca.
         """
-        conteos = []
-        sin_contar = 0
-        for vid, inp in zip(self._variant_ids, self._fisico_inputs):
-            txt = inp.text().strip()
-            if not txt:
-                sin_contar += 1
-                continue
-            conteos.append(ConteoInput(variante_id=vid, stock_fisico=int(txt)))
-        if not conteos:
+        conteos, sin_contar = self._nuevos()
+        if not conteos and not self._ya_capturados:
             QMessageBox.information(
                 self,
                 "Nada que registrar",
@@ -337,25 +433,34 @@ class ConteoSubirDialog(QDialog):
                 "Faltan tallas por capturar",
                 f"Vas a registrar {len(conteos)} tallas.\n"
                 f"Quedan {sin_contar} sin capturar y esas NO se van a tocar.\n\n"
-                "¿Registrar así?",
+                + ("¿Terminar el conteo así?" if self._jornada is not None else "¿Registrar así?"),
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
             )
             if respuesta != QMessageBox.StandardButton.Yes:
                 return
-        session = self._session_factory()
-        try:
-            resultado = registrar_conteos_lote(session, conteos, self._contado_por)
-            session.commit()
-        except Exception as exc:  # noqa: BLE001
-            session.rollback()
-            QMessageBox.critical(self, "Error", f"No se pudo registrar el conteo:\n{exc}")
+        if not self._guardar(conteos):
             return
-        finally:
-            session.close()
+        if self._jornada is not None:
+            from pos_uniformes.services.conteo_jornada_service import terminar_jornada
+
+            from pos_uniformes.database.models import ConteoJornada
+
+            session = self._session_factory()
+            try:
+                jornada = session.get(ConteoJornada, self._jornada.id)
+                terminar_jornada(session, jornada, empleada_code=self._empleada_code)
+                session.commit()
+            except Exception as exc:  # noqa: BLE001
+                session.rollback()
+                QMessageBox.critical(self, "Error", f"Se guardó el conteo pero no se pudo cerrar la jornada:\n{exc}")
+                return
+            finally:
+                session.close()
+        total = len(conteos) + len(self._ya_capturados)
         QMessageBox.information(
             self,
             "Conteo registrado",
-            f"Se registraron {resultado.total_contados} tallas a nombre de "
+            f"Se registraron {total} tallas a nombre de "
             f"{self._contado_por}. Quedan pendientes de revisión: el inventario "
             "no cambia hasta que se aprueben.",
         )

@@ -93,8 +93,13 @@ def registrar_conteo(
     stock_fisico: int,
     contado_por: str,
     notas: str | None = None,
+    jornada_id: int | None = None,
 ) -> ConteoInventario:
-    """Registra un conteo físico para una variante. NO ajusta stock."""
+    """Registra un conteo físico para una variante. NO ajusta stock.
+
+    `jornada_id` liga el renglón a su jornada (ver conteo_jornada_service);
+    los conteos sueltos siguen valiendo con None.
+    """
     variante = session.scalar(
         select(Variante)
         .where(Variante.id == variante_id)
@@ -131,6 +136,7 @@ def registrar_conteo(
         ajustado=False,
         contado_por=contado_por.strip(),
         notas=notas.strip() if notas else None,
+        jornada_id=jornada_id,
     )
     session.add(conteo)
 
@@ -145,6 +151,7 @@ def registrar_conteos_lote(
     session: Session,
     conteos: list[ConteoInput],
     contado_por: str,
+    jornada_id: int | None = None,
 ) -> ConteoResultado:
     """Registra conteos para múltiples variantes en una transacción."""
     if not conteos:
@@ -162,6 +169,7 @@ def registrar_conteos_lote(
             stock_fisico=ci.stock_fisico,
             contado_por=contado_por,
             notas=ci.notas,
+            jornada_id=jornada_id,
         )
         if conteo.diferencia != 0:
             con_diferencia += 1
@@ -299,7 +307,11 @@ def obtener_variantes_para_conteo(
 
     for v in variantes:
         if v.ultimo_conteo_at is not None:
-            dias = (ahora - v.ultimo_conteo_at).days
+            ultimo = v.ultimo_conteo_at
+            if ultimo.tzinfo is None:
+                # SQLite (tests) devuelve la fecha sin zona; Postgres con zona.
+                ultimo = ultimo.replace(tzinfo=timezone.utc)
+            dias = (ahora - ultimo).days
             requiere = dias >= dias_vigencia
         else:
             dias = None

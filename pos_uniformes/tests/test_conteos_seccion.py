@@ -40,7 +40,9 @@ class SeccionesTests(unittest.TestCase):
 
         cuerpo = inspect.getsource(QuoteSatelliteWindow._build_conteos_page)
         self.assertIn("_open_conteo_orden", cuerpo)
-        self.assertIn("_open_conteo_subir", cuerpo)
+        self.assertIn("_conteos_empezar", cuerpo)       # abre una jornada
+        self.assertIn("conteos_jornadas_box", cuerpo)   # y lista las abiertas
+        self.assertIn("conteos_revisar_box", cuerpo)    # y lo que el dueño revisa
         # Y avisa que nada se aplica solo.
         self.assertIn("no cambia el inventario solo", cuerpo)
 
@@ -111,6 +113,7 @@ class GafeteEnConteosTests(unittest.TestCase):
         w._gafete_libreta_valido = lambda c: gafete_valido
         w._nombre_de_gafete = lambda c: nombre
         w._refresh_conteos_pendiente = lambda: None
+        w._refresh_conteos_vista = lambda: None
         w._refresh_conteo_banner = lambda: None
         for metodo in (
             "_on_conteos_gate_scan", "_conteos_logout",

@@ -55,12 +55,23 @@ class ConteoSubirDialogTests(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
 
     def setUp(self) -> None:
+        self._dialogos = []
         self.engine = create_engine("sqlite:///:memory:")
         Base.metadata.create_all(self.engine)
         self.factory = lambda: Session(self.engine)
 
     def _dialog(self) -> ConteoSubirDialog:
-        return ConteoSubirDialog(session_factory=self.factory)
+        d = ConteoSubirDialog(session_factory=self.factory)
+        self._dialogos.append(d)
+        return d
+
+    def tearDown(self) -> None:
+        # Ventanas vivas de otras pruebas estorban a las que dependen del foco.
+        for d in self._dialogos:
+            d.close()
+            d.deleteLater()
+        self._dialogos = []
+        self.app.processEvents()
 
     def test_carga_escuelas(self) -> None:
         s = self.factory()
@@ -196,3 +207,114 @@ class ConteoSubirDialogTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ConteoConJornadaTests(unittest.TestCase):
+    """Con jornada: amarrado a la escuela, se puede pausar y retomar."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def setUp(self) -> None:
+        self._dialogos = []
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.factory = lambda: Session(self.engine)
+        s = self.factory()
+        self.escuela = _seed(s, "Uno", stock=10)
+        s.commit()
+        from pos_uniformes.services.conteo_jornada_service import abrir_jornada, ref
+
+        j = abrir_jornada(
+            s, escuela_id=self.escuela.id, empleada_code="VEND-4", empleada_nombre="Stayce"
+        )
+        s.commit()
+        s.refresh(j)
+        self.jornada = ref(j)   # la UI trabaja con la foto, nunca con el objeto vivo
+        s.close()
+
+    def _dialog(self):
+        d = ConteoSubirDialog(
+            session_factory=self.factory, contado_por="Stayce (VEND-4)",
+            jornada=self.jornada, empleada_code="VEND-4",
+        )
+        self._dialogos.append(d)
+        return d
+
+    def tearDown(self) -> None:
+        for d in getattr(self, "_dialogos", []):
+            d.close()
+            d.deleteLater()
+        self._dialogos = []
+        self.app.processEvents()
+
+    def test_abre_amarrado_a_la_jornada_sin_elegir_escuela(self) -> None:
+        d = self._dialog()
+        self.assertFalse(d._escuela_combo.isVisibleTo(d))
+        self.assertEqual(len(d._fisico_inputs), 2)  # cargó solo
+        self.assertEqual(d._registrar_btn.text(), "Terminar conteo")
+        self.assertTrue(d._pausar_btn.isVisibleTo(d))
+        self.assertFalse(d._pausar_btn.isEnabled())  # nada nuevo todavía
+
+    def test_pausar_guarda_lo_que_va_y_deja_la_jornada_abierta(self) -> None:
+        from pos_uniformes.database.models import ConteoJornada
+
+        d = self._dialog()
+        d._fisico_inputs[0].setText("7")
+        self.assertTrue(d._pausar_btn.isEnabled())
+        with patch("pos_uniformes.ui.dialogs.conteo_subir_dialog.QMessageBox.information"):
+            d._pausar()
+
+        s = self.factory()
+        conteos = s.scalars(select(ConteoInventario)).all()
+        self.assertEqual(len(conteos), 1)
+        self.assertEqual(conteos[0].jornada_id, self.jornada.id)
+        self.assertIsNone(s.get(ConteoJornada, self.jornada.id).terminada_at)
+
+    def test_al_retomar_lo_capturado_aparece_puesto_y_bloqueado(self) -> None:
+        d = self._dialog()
+        d._fisico_inputs[0].setText("7")
+        with patch("pos_uniformes.ui.dialogs.conteo_subir_dialog.QMessageBox.information"):
+            d._pausar()
+
+        d2 = self._dialog()
+        self.assertEqual(d2._fisico_inputs[0].text(), "7")   # SU número, no el del sistema
+        self.assertTrue(d2._fisico_inputs[0].isReadOnly())
+        self.assertEqual(d2._fisico_inputs[1].text(), "")
+        self.assertIn("1 de 2", d2._hint.text())
+
+    def test_retomar_y_terminar_no_duplica_lo_de_antes(self) -> None:
+        from pos_uniformes.database.models import ConteoJornada
+
+        d = self._dialog()
+        d._fisico_inputs[0].setText("7")
+        with patch("pos_uniformes.ui.dialogs.conteo_subir_dialog.QMessageBox.information"):
+            d._pausar()
+
+        d2 = self._dialog()
+        d2._fisico_inputs[1].setText("10")
+        with patch("pos_uniformes.ui.dialogs.conteo_subir_dialog.QMessageBox.information"):
+            d2._registrar()
+
+        s = self.factory()
+        conteos = s.scalars(select(ConteoInventario)).all()
+        self.assertEqual(len(conteos), 2)  # una de cada sesión, ninguna repetida
+        self.assertIsNotNone(s.get(ConteoJornada, self.jornada.id).terminada_at)
+        # Y sigue sin tocar el inventario.
+        self.assertTrue(all(v.stock_actual == 10 for v in s.scalars(select(Variante)).all()))
+
+    def test_terminar_con_huecos_avisa_y_respeta_un_no(self) -> None:
+        from pos_uniformes.database.models import ConteoJornada
+
+        d = self._dialog()
+        d._fisico_inputs[0].setText("7")
+        with patch(
+            "pos_uniformes.ui.dialogs.conteo_subir_dialog.QMessageBox.question",
+            return_value=QMessageBox.StandardButton.No,
+        ) as pregunta:
+            d._registrar()
+        pregunta.assert_called_once()
+        s = self.factory()
+        self.assertEqual(len(s.scalars(select(ConteoInventario)).all()), 0)
+        self.assertIsNone(s.get(ConteoJornada, self.jornada.id).terminada_at)

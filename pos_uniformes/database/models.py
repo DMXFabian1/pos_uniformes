@@ -1067,10 +1067,53 @@ class ConteoInventario(Base):
         server_default=func.now(),
         nullable=False,
     )
+    # A qué jornada pertenece (2026-09-10). NULL en los conteos viejos.
+    jornada_id: Mapped[int | None] = mapped_column(
+        ForeignKey("conteo_jornada.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
 
     variante: Mapped["Variante"] = relationship()
     escuela: Mapped["Escuela"] = relationship()
     ajuste_lote: Mapped["AjusteInventarioLote"] = relationship()
+    jornada: Mapped["ConteoJornada | None"] = relationship(back_populates="conteos")
+
+
+class ConteoJornada(Base):
+    """Una sesión de conteo: quién, qué (escuela o prenda básica) y cuándo.
+
+    Antes cada renglón de `conteo_inventario` vivía suelto: no se podía dejar
+    un conteo a medias y seguir mañana, ni saber "voy en 4 de 14", ni revisar
+    "lo que contó Cristal el martes" como un bloque. La jornada es ese folio.
+
+    `escuela_id` NULL = productos básicos, acotados por `tipo_pieza`.
+    `terminada_at` NULL = sigue abierta (se puede retomar).
+    `revisada_at` NULL = Daniel todavía no la aplicó al inventario.
+    """
+
+    __tablename__ = "conteo_jornada"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    escuela_id: Mapped[int | None] = mapped_column(
+        ForeignKey("escuela.id", ondelete="RESTRICT"), nullable=True, index=True
+    )
+    tipo_pieza: Mapped[str] = mapped_column(String(60), nullable=False, default="")
+    titulo: Mapped[str] = mapped_column(String(160), nullable=False, default="")
+    empleada_code: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
+    empleada_nombre: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    iniciada_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+    terminada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
+    revisada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    revisada_por: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    # Cuántas tallas abarca la jornada al abrirse (para el "4 de 14").
+    total_tallas: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    notas: Mapped[str | None] = mapped_column(Text())
+
+    escuela: Mapped["Escuela | None"] = relationship()
+    conteos: Mapped[list["ConteoInventario"]] = relationship(back_populates="jornada")
 
 
 class ConfigConteoEscuela(Base):

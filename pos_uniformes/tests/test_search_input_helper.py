@@ -55,6 +55,12 @@ class SearchInputHelperTests(unittest.TestCase):
         apply_search_suggestions(line_edit, ["marca:Atlas", "marca:Nike"])
         controller = getattr(line_edit, "_search_suggestion_controller")
         controller._anchor_text = "ma"
+        # Estas pruebas son de navegación con teclado, no de cómo la
+        # plataforma muestra un Popup. Un widget con bandera Popup, en modo
+        # sin pantalla y con ventanas de otras pruebas alrededor, a veces
+        # ignora `show()` — y el filtro de teclas exige que esté visible.
+        # Sin la bandera es un hijo normal del line_edit y se muestra siempre.
+        controller.popup.setWindowFlag(Qt.WindowType.Popup, False)
         controller.popup.show()
         self.assertTrue(controller.popup.isVisible(), "el popup debe estar visible")
         controller.popup.setCurrentRow(0)
@@ -76,6 +82,12 @@ class SearchInputHelperTests(unittest.TestCase):
         apply_search_suggestions(line_edit, ["Pants", "Playera", "Parka"])
         controller = getattr(line_edit, "_search_suggestion_controller")
         controller._anchor_text = "pa"
+        # Estas pruebas son de navegación con teclado, no de cómo la
+        # plataforma muestra un Popup. Un widget con bandera Popup, en modo
+        # sin pantalla y con ventanas de otras pruebas alrededor, a veces
+        # ignora `show()` — y el filtro de teclas exige que esté visible.
+        # Sin la bandera es un hijo normal del line_edit y se muestra siempre.
+        controller.popup.setWindowFlag(Qt.WindowType.Popup, False)
         controller.popup.show()
         self.assertTrue(controller.popup.isVisible(), "el popup debe estar visible")
         controller.popup.setCurrentRow(0)
@@ -109,6 +121,12 @@ class SearchInputHelperTests(unittest.TestCase):
         apply_search_suggestions(line_edit, ["color:Azul Marino"])
         controller = getattr(line_edit, "_search_suggestion_controller")
         controller._anchor_text = "marca:at co"
+        # Estas pruebas son de navegación con teclado, no de cómo la
+        # plataforma muestra un Popup. Un widget con bandera Popup, en modo
+        # sin pantalla y con ventanas de otras pruebas alrededor, a veces
+        # ignora `show()` — y el filtro de teclas exige que esté visible.
+        # Sin la bandera es un hijo normal del line_edit y se muestra siempre.
+        controller.popup.setWindowFlag(Qt.WindowType.Popup, False)
         controller.popup.show()
         self.assertTrue(controller.popup.isVisible(), "el popup debe estar visible")
         controller.popup.setCurrentRow(0)

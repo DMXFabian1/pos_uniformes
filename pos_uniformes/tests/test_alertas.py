@@ -157,7 +157,10 @@ class VigilanteTests(unittest.TestCase):
             self.assertEqual(v.revisar(s, datetime(2026, 9, 7, 18, 30)), [])  # sin movimientos hoy
             v2 = al.Vigilante()
             v2.revisar(s, datetime(2026, 9, 8, 10, 0))
-            _venta(s, datetime.now().astimezone())
+            # A media mañana, NO a la hora real: corrida después del corte
+            # (17:30), `now()` caía "fuera de horario" y el test explotaba
+            # solo por la hora del reloj.
+            _venta(s, datetime.combine(date.today(), datetime.min.time()).replace(hour=10).astimezone())
             _corte_db(s, date.today())
             self.assertEqual(v2.revisar(s, datetime.combine(date.today(), datetime.min.time()).replace(hour=23)), [])
 

@@ -3365,16 +3365,16 @@ class QuoteSatelliteWindow(QMainWindow):
         orden_btn.setObjectName("secondaryButton")
         orden_btn.clicked.connect(self._open_conteo_orden)
         header.addWidget(orden_btn)
-        subir_btn = QPushButton("📤 Capturar conteo")
-        subir_btn.setObjectName("primaryButton")
-        subir_btn.clicked.connect(self._open_conteo_subir)
-        header.addWidget(subir_btn)
+        empezar_btn = QPushButton("＋ Empezar conteo")
+        empezar_btn.setObjectName("primaryButton")
+        empezar_btn.clicked.connect(self._conteos_empezar)
+        header.addWidget(empezar_btn)
         layout.addLayout(header)
 
         pasos = QLabel(
             "1.  Imprime la hoja de la escuela que toca.\n"
             "2.  Cuenta en el piso y anota en la hoja.\n"
-            "3.  Regresa aquí y captura lo que anotaste."
+            "3.  Regresa aquí y captura lo que anotaste. Puedes dejarlo a medias y seguir otro día."
         )
         pasos.setObjectName("guidedStepHint")
         layout.addWidget(pasos)
@@ -3383,6 +3383,23 @@ class QuoteSatelliteWindow(QMainWindow):
         self.conteos_pendiente_label.setObjectName("analyticsLine")
         self.conteos_pendiente_label.setWordWrap(True)
         layout.addWidget(self.conteos_pendiente_label)
+
+        # Jornadas sin terminar (las tarjetas las arma el helper).
+        self.conteos_jornadas_titulo = QLabel("Jornadas sin terminar")
+        self.conteos_jornadas_titulo.setObjectName("guidedGroupBoxTitle")
+        layout.addWidget(self.conteos_jornadas_titulo)
+        self.conteos_jornadas_box = QVBoxLayout()
+        self.conteos_jornadas_box.setSpacing(8)
+        layout.addLayout(self.conteos_jornadas_box)
+
+        # Solo el dueño: lo terminado que falta aplicar.
+        self.conteos_revisar_titulo = QLabel("Por revisar")
+        self.conteos_revisar_titulo.setObjectName("guidedGroupBoxTitle")
+        self.conteos_revisar_titulo.setVisible(False)
+        layout.addWidget(self.conteos_revisar_titulo)
+        self.conteos_revisar_box = QVBoxLayout()
+        self.conteos_revisar_box.setSpacing(8)
+        layout.addLayout(self.conteos_revisar_box)
 
         layout.addStretch(1)
         aviso = QLabel(
@@ -3468,7 +3485,11 @@ class QuoteSatelliteWindow(QMainWindow):
         etiqueta = getattr(self, "conteos_pendiente_label", None)
         if etiqueta is None:
             return
-        if self.offline_mode:
+        from pos_uniformes.services.satellite_startup_service import probe_database_host
+
+        # Sonda corta antes de tocar SQLAlchemy: con el servidor apagado, una
+        # conexión sin límite congela la pantalla (esto corre en el hilo de UI).
+        if self.offline_mode or not probe_database_host(0.5):
             etiqueta.setText("Sin conexión: no se puede saber qué escuela toca.")
             return
         try:
@@ -3489,6 +3510,89 @@ class QuoteSatelliteWindow(QMainWindow):
         if len(vencidas) > 6:
             nombres += f" y {len(vencidas) - 6} más"
         etiqueta.setText(f"Toca contar ({len(vencidas)}):  {nombres}")
+
+    def _refresh_conteos_vista(self) -> None:
+        """Lo pendiente, las jornadas abiertas y (dueño) lo que falta revisar."""
+        self._refresh_conteos_pendiente()
+        from pos_uniformes.ui.helpers.conteos_jornadas_helper import pintar_jornadas
+
+        from pos_uniformes.services.satellite_startup_service import probe_database_host
+
+        code = str(self._conteos_code or "")
+        if self.offline_mode or not probe_database_host(0.5):
+            pintar_jornadas(self, abiertas=[], por_revisar=[], code=code)
+            return
+        try:
+            from pos_uniformes.services import conteo_jornada_service as jn
+
+            with get_session() as session:
+                abiertas = [
+                    (jn.ref(j), jn.avance(session, j), jn.puede_seguirla(j, code))
+                    for j in jn.jornadas_abiertas(session)
+                ]
+                por_revisar = (
+                    [(jn.ref(j), jn.avance(session, j)) for j in jn.jornadas_por_revisar(session)]
+                    if code == jn.DUENO_CODE else []
+                )
+        except Exception:  # noqa: BLE001 — sin conexión: la página sigue
+            logger.exception("Conteos: no se pudieron leer las jornadas")
+            abiertas, por_revisar = [], []
+        pintar_jornadas(self, abiertas=abiertas, por_revisar=por_revisar, code=code)
+
+    def _conteos_empezar(self) -> None:
+        """Abre una jornada nueva y entra directo a capturar."""
+        quien = self._conteos_contado_por()
+        if quien is None:
+            return
+        from pos_uniformes.ui.dialogs.conteo_jornada_dialogs import ConteoNuevaJornadaDialog
+
+        dlg = ConteoNuevaJornadaDialog(self)
+        if dlg.exec() != int(QDialog.DialogCode.Accepted):
+            return
+        try:
+            from pos_uniformes.services import conteo_jornada_service as jn
+
+            with get_session() as session:
+                jornada = jn.abrir_jornada(
+                    session,
+                    escuela_id=dlg.escuela_id,
+                    tipo_pieza=dlg.tipo_pieza,
+                    empleada_code=str(self._conteos_code or ""),
+                    empleada_nombre=str(self._conteos_nombre or ""),
+                )
+                session.commit()
+                session.refresh(jornada)
+                foto = jn.ref(jornada)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "No se pudo abrir la jornada", str(exc))
+            return
+        self._conteos_capturar(foto)
+
+    def _conteos_capturar(self, foto) -> None:
+        """Abre la captura amarrada a una jornada (nueva o retomada)."""
+        quien = self._conteos_contado_por()
+        if quien is None:
+            return
+        from pos_uniformes.ui.dialogs.conteo_subir_dialog import ConteoSubirDialog
+
+        ConteoSubirDialog(
+            self, contado_por=quien, jornada=foto, empleada_code=str(self._conteos_code or "")
+        ).exec()
+        self._refresh_conteo_banner()
+        self._refresh_conteos_vista()
+
+    def _conteos_revisar(self, foto) -> None:
+        """El dueño revisa y aplica (o descarta) una jornada terminada."""
+        from pos_uniformes.services.conteo_jornada_service import DUENO_CODE
+
+        if str(self._conteos_code or "") != DUENO_CODE:
+            self._set_status("Solo el dueño revisa conteos.")
+            return
+        from pos_uniformes.ui.dialogs.conteo_jornada_dialogs import ConteoRevisionDialog
+
+        ConteoRevisionDialog(self, jornada=foto, revisada_por=DUENO_CODE).exec()
+        self._refresh_conteo_banner()
+        self._refresh_conteos_vista()
 
     def _open_conteo_orden(self) -> None:
         from pos_uniformes.ui.dialogs.conteo_orden_dialog import ConteoOrdenDialog
@@ -3536,7 +3640,7 @@ class QuoteSatelliteWindow(QMainWindow):
         )
         self.conteos_gate.setVisible(False)
         self.conteos_work.setVisible(True)
-        self._refresh_conteos_pendiente()
+        self._refresh_conteos_vista()
 
     def _nombre_de_gafete(self, code: str) -> str:
         """Nombre completo de la empleada. Cadena vacía si no se puede leer."""
