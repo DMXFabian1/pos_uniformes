@@ -18,6 +18,14 @@ if not exist C:\PresupuestosSatelite\lanzador_satelite.bat (
     exit /b 1
 )
 
-echo Abriendo el lanzador (copia la version nueva)...
+rem Trae el lanzador nuevo del servidor (por si el arreglo vive ahi).
+copy /y "\\192.168.0.10\pos_updates\lanzador_satelite.ps1" C:\PresupuestosSatelite\ >nul 2>&1
+copy /y "\\192.168.0.10\pos_updates\lanzador_satelite.bat" C:\PresupuestosSatelite\ >nul 2>&1
+
+rem Borra la marca de version: asi el lanzador copia TODO de nuevo, aunque el
+rem numero coincida (sirve cuando el .exe quedo a medias y no abre).
+del /q "%LOCALAPPDATA%\PresupuestosSatelite\app\VERSION.txt" >nul 2>&1
+
+echo Abriendo el lanzador (copia la version completa de nuevo)...
 start "" C:\PresupuestosSatelite\lanzador_satelite.bat
 exit /b 0

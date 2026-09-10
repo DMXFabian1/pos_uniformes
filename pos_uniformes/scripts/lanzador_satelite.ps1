@@ -57,8 +57,33 @@ if ($versionRemota -and ($versionRemota -ne $versionLocal)) {
     Write-Host "Actualizando satelite: '$versionLocal' -> '$versionRemota' ..."
     Write-Host "(la primera vez copia ~300 MB y tarda unos minutos; se ve avanzar)"
     # /NDL /NP: muestra cada archivo copiado (progreso visible) sin spam.
-    robocopy $share $appDir /MIR /R:5 /W:2 /NDL /NP
-    Write-Host "Actualizado."
+    # /XF VERSION.txt: la version se escribe HASTA el final y solo si la copia
+    # quedo completa. Si algo falla (red, antivirus), el kiosko conserva la
+    # version vieja y lo vuelve a intentar en el proximo arranque, en vez de
+    # quedarse con un .exe a medias ("Could not load PyInstaller's PKG").
+    robocopy $share $appDir /MIR /R:5 /W:2 /NDL /NP /XF VERSION.txt
+    $codigo = $LASTEXITCODE
+    $exeRemoto = Get-ChildItem $share -Filter "*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+    $copiaOk = $false
+    if ($exeRemoto) {
+        $exeLocal = Join-Path $appDir $exeRemoto.Name
+        if (($codigo -lt 8) -and (Test-Path $exeLocal) -and ((Get-Item $exeLocal).Length -eq $exeRemoto.Length)) {
+            $copiaOk = $true
+        } else {
+            Write-Host "La copia no quedo completa; reintentando el programa..."
+            Copy-Item $exeRemoto.FullName $exeLocal -Force -ErrorAction SilentlyContinue
+            $copiaOk = (Test-Path $exeLocal) -and ((Get-Item $exeLocal).Length -eq $exeRemoto.Length)
+        }
+    }
+    if ($copiaOk) {
+        Copy-Item (Join-Path $share "VERSION.txt") (Join-Path $appDir "VERSION.txt") -Force -ErrorAction SilentlyContinue
+        Write-Host "Actualizado."
+    } else {
+        Write-Host ""
+        Write-Host "*** No se pudo copiar completo (codigo $codigo). Se vuelve a intentar al abrir de nuevo. ***"
+        Write-Host "Si se repite: revisa la red o el antivirus de este kiosko."
+        Start-Sleep -Seconds 4
+    }
 }
 
 # El lanzador tambien se refresca a si mismo desde el share (aplica en el
@@ -72,6 +97,20 @@ if (Test-Path $share) {
 
 $exe = Get-ChildItem $appDir -Filter "*.exe" -ErrorAction SilentlyContinue |
     Select-Object -First 1
+
+# Red de seguridad: si el programa local no pesa lo mismo que el del servidor
+# quedo a medias (copia interrumpida, antivirus). Se copia de nuevo aunque la
+# version diga que esta al dia; si no, arranca y truena con el error de PKG.
+if ($exe -and (Test-Path $share)) {
+    $exeRemoto = Get-ChildItem $share -Filter "*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+    if ($exeRemoto -and ($exeRemoto.Name -eq $exe.Name) -and ($exeRemoto.Length -ne $exe.Length)) {
+        Write-Host "El programa quedo incompleto; copiandolo de nuevo..."
+        Get-Process "PresupuestosSatelite*" -ErrorAction SilentlyContinue | Stop-Process -Force
+        Start-Sleep -Seconds 2
+        Copy-Item $exeRemoto.FullName $exe.FullName -Force -ErrorAction SilentlyContinue
+        $exe = Get-ChildItem $appDir -Filter "*.exe" -ErrorAction SilentlyContinue | Select-Object -First 1
+    }
+}
 
 # Acceso directo en el Escritorio (se crea solo la primera vez, con el
 # icono de la app): el kiosko queda auto-instalado sin pasos manuales.
