@@ -6698,6 +6698,10 @@ QLabel#favDialogPriceLabel {
             dialog = QuickProductSearchDialog(
                 self, catalog_rows=self.catalog_snapshot_rows, kiosk_mode=False
             )
+            # Para que la demanda anotada quede a nombre de quien atendió.
+            dialog._employee_code = str(
+                getattr(self.quick_sale_widget, "_employee_code", "") or ""
+            )
             added_skus: list[str] = []
 
             def _add_and_track(sku: str, qty: int) -> None:

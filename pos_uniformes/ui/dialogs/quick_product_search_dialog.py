@@ -11,7 +11,7 @@ from decimal import Decimal
 from pathlib import Path
 
 from PyQt6.QtCore import Qt, QTimer, pyqtSignal, QStringListModel
-from PyQt6.QtGui import QKeySequence, QPixmap, QShortcut
+from PyQt6.QtGui import QColor, QKeySequence, QPixmap, QShortcut
 from PyQt6.QtWidgets import (
     QAbstractItemView,
     QCompleter,
@@ -117,7 +117,9 @@ class QuickProductSearchDialog(QDialog):
         root.addWidget(self._info_label)
 
         # Results table
-        columns = ["SKU", "Producto", "Talla", "Color", "Precio"]
+        # "Hay" evita el viaje a la bodega y, cuando dice agotado, el
+        # producto elegido queda anotado como demanda no atendida.
+        columns = ["SKU", "Producto", "Talla", "Color", "Precio", "Hay"]
         self._table = QTableWidget(0, len(columns))
         self._table.setHorizontalHeaderLabels(columns)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -252,6 +254,18 @@ class QuickProductSearchDialog(QDialog):
         self._populate_table(hits)
         engine = "Meilisearch" if used_meili else "local"
         self._info_label.setText(f"{len(hits)} resultado{'s' if len(hits) != 1 else ''} ({engine})")
+        if not hits:
+            # Pidieron algo que el catálogo no tiene.
+            try:
+                from pos_uniformes.services import demanda_service
+
+                demanda_service.anotar(
+                    demanda_service.BUSQUEDA_VACIA,
+                    texto=query,
+                    employee_code=str(getattr(self, "_employee_code", "") or ""),
+                )
+            except Exception:  # noqa: BLE001
+                pass
 
     def _populate_table(self, rows: list[dict]) -> None:
         self._table.setRowCount(0)
@@ -262,18 +276,25 @@ class QuickProductSearchDialog(QDialog):
             color = str(row.get("color", ""))
             precio = Decimal(str(row.get("precio_venta", 0))).quantize(Decimal("0.01"))
 
+            try:
+                stock = int(row.get("stock_actual") or 0)
+            except (TypeError, ValueError):
+                stock = 0
+
             self._table.insertRow(idx)
-            values = [sku, nombre, talla, color, f"${precio}"]
+            values = [sku, nombre, talla, color, f"${precio}", "agotado" if stock <= 0 else str(stock)]
             for col, value in enumerate(values):
                 cell = QTableWidgetItem(value)
                 cell.setTextAlignment(
                     Qt.AlignmentFlag.AlignVCenter | (
-                        Qt.AlignmentFlag.AlignRight if col == 4 else Qt.AlignmentFlag.AlignLeft
+                        Qt.AlignmentFlag.AlignRight if col in (4, 5) else Qt.AlignmentFlag.AlignLeft
                     )
                 )
+                if stock <= 0:
+                    cell.setForeground(QColor("#9a9186"))
                 self._table.setItem(idx, col, cell)
 
-        for col in [0, 2, 3, 4]:
+        for col in [0, 2, 3, 4, 5]:
             self._table.resizeColumnToContents(col)
 
         if rows:
@@ -335,11 +356,38 @@ class QuickProductSearchDialog(QDialog):
         row_idx = self._table.currentRow()
         if row_idx < 0 or row_idx >= len(self._result_rows):
             return
-        sku = str(self._result_rows[row_idx].get("sku", ""))
+        row = self._result_rows[row_idx]
+        sku = str(row.get("sku", ""))
         if not sku:
             return
+        self._anotar_si_agotado(row, self._qty_spin.value())
         self.sku_selected.emit(sku, self._qty_spin.value())
         self._qty_spin.setValue(1)
+
+    def _anotar_si_agotado(self, row: dict, piezas: int) -> None:
+        """Eligió algo que no hay: eso es demanda no atendida, no un error.
+
+        Se anota sola. Nadie llena nada y nada se bloquea: la empleada puede
+        seguir metiéndolo a la venta o al presupuesto igual que siempre.
+        """
+        try:
+            if int(row.get("stock_actual") or 0) > 0:
+                return
+        except (TypeError, ValueError):
+            return
+        try:
+            from pos_uniformes.services import demanda_service
+
+            demanda_service.anotar(
+                demanda_service.TALLA_AGOTADA,
+                sku=str(row.get("sku", "")),
+                producto=str(row.get("producto_nombre_base", "")),
+                talla=str(row.get("talla", "")),
+                piezas=max(1, int(piezas or 1)),
+                employee_code=str(getattr(self, "_employee_code", "") or ""),
+            )
+        except Exception:  # noqa: BLE001 — jamás estorbar al mostrador
+            pass
 
     def _handle_kiosk(self) -> None:
         row_idx = self._table.currentRow()
