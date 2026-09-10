@@ -117,11 +117,15 @@ class QuickProductSearchDialog(QDialog):
         root.addWidget(self._info_label)
 
         # Results table
-        # "Hay" es lo que CREE el sistema, no una promesa: las ventas del
-        # kiosko no descuentan stock, así que un número positivo viene del
-        # último conteo y va con "≈". El cero sí se usa: quien elige algo
-        # agotado deja anotada la demanda no atendida.
-        columns = ["SKU", "Producto", "Talla", "Color", "Precio", "Hay"]
+        # La columna "Hay" está apagada mientras el stock no sea confiable
+        # (la venta del kiosko no lo descuenta). Un número equivocado le
+        # estorba a quien atiende. La demanda se sigue anotando en silencio.
+        from pos_uniformes.services.demanda_service import EXISTENCIA_CONFIABLE
+
+        self._mostrar_existencia = bool(EXISTENCIA_CONFIABLE)
+        columns = ["SKU", "Producto", "Talla", "Color", "Precio"]
+        if self._mostrar_existencia:
+            columns.append("Hay")
         self._table = QTableWidget(0, len(columns))
         self._table.setHorizontalHeaderLabels(columns)
         self._table.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
@@ -284,9 +288,11 @@ class QuickProductSearchDialog(QDialog):
                 stock = 0
 
             self._table.insertRow(idx)
-            # El "≈" no es adorno: el número es del último conteo y las ventas
-            # no lo bajan. Mejor que dude a que prometa.
-            values = [sku, nombre, talla, color, f"${precio}", "agotado" if stock <= 0 else f"≈{stock}"]
+            values = [sku, nombre, talla, color, f"${precio}"]
+            if getattr(self, "_mostrar_existencia", False):
+                # El "≈" no es adorno: el número es del último conteo y las
+                # ventas no lo bajan. Mejor que dude a que prometa.
+                values.append("agotado" if stock <= 0 else f"≈{stock}")
             for col, value in enumerate(values):
                 cell = QTableWidgetItem(value)
                 cell.setTextAlignment(
@@ -294,17 +300,18 @@ class QuickProductSearchDialog(QDialog):
                         Qt.AlignmentFlag.AlignRight if col in (4, 5) else Qt.AlignmentFlag.AlignLeft
                     )
                 )
-                if stock <= 0:
-                    cell.setForeground(QColor("#9a9186"))
                 if col == 5:
+                    if stock <= 0:
+                        cell.setForeground(QColor("#9a9186"))
                     cell.setToolTip(
                         "Según el último conteo. Las ventas no descuentan stock,"
                         " así que puede haber menos. Verifica antes de prometer."
                     )
                 self._table.setItem(idx, col, cell)
 
-        for col in [0, 2, 3, 4, 5]:
-            self._table.resizeColumnToContents(col)
+        for col in range(self._table.columnCount()):
+            if col != 1:
+                self._table.resizeColumnToContents(col)
 
         if rows:
             self._table.selectRow(0)

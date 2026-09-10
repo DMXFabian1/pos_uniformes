@@ -27,6 +27,18 @@ from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
+# ── Interruptor de lo que ven las empleadas ─────────────────────────────
+# Hoy el stock del sistema NO es confiable: la venta del kiosko no lo
+# descuenta y 3,630 de 4,795 variantes activas nunca se han contado. Un
+# "agotado" o un "hay 5" apoyado en eso le estorba a quien atiende en vez de
+# ayudarle, así que la parte visible va apagada.
+#
+# La captura sigue encendida: es invisible y no le cuesta nada a nadie.
+#
+# Poner en True cuando el stock se sostenga solo (venta que descuenta +
+# conteo de lo que se mueve). Ver nota 21 de Obsidian.
+EXISTENCIA_CONFIABLE = False
+
 BUSQUEDA_VACIA = "busqueda_vacia"
 TALLA_AGOTADA = "talla_agotada"
 CARRITO_VACIO = "carrito_vacio"

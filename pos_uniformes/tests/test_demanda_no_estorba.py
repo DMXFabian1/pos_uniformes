@@ -46,13 +46,20 @@ class BotonComoEnElKioskoTests(unittest.TestCase):
         self.assertEqual(btn.property("searchVariantSku"), "SKU001573")
         self.assertIn("#f5f0e8", btn.styleSheet())  # el beige de siempre
 
-    def test_la_agotada_se_puede_seleccionar_y_volver_a_su_estilo(self) -> None:
-        btn = self._boton(AGOTADA, 155.0)
-        base = btn.property("estiloBase")
-        btn.setStyleSheet(estilo_talla_seleccionada(AGOTADA))
-        self.assertIn("#2f6b2f", btn.styleSheet())
-        btn.setStyleSheet(str(btn.property("estiloBase")))
-        self.assertEqual(btn.styleSheet(), base)  # no regresa pintada como disponible
+    def test_hoy_la_agotada_se_ve_igual_que_las_demas(self) -> None:
+        """El stock no es confiable: la empleada no ve nada distinto."""
+        self.assertEqual(
+            self._boton(AGOTADA, 155.0).text(), "Talla 18 · $155.00"
+        )
+
+    def test_con_el_stock_confiable_vuelve_a_su_estilo_al_deseleccionar(self) -> None:
+        with patch.object(dm, "EXISTENCIA_CONFIABLE", True):
+            btn = self._boton(AGOTADA, 155.0)
+            base = btn.property("estiloBase")
+            btn.setStyleSheet(estilo_talla_seleccionada(AGOTADA))
+            self.assertIn("#2f6b2f", btn.styleSheet())
+            btn.setStyleSheet(str(btn.property("estiloBase")))
+            self.assertEqual(btn.styleSheet(), base)  # no regresa pintada como disponible
 
     def test_el_sku_para_el_presupuesto_no_cambia_por_estar_agotada(self) -> None:
         self.assertEqual(self._boton(AGOTADA, 155.0).property("searchVariantSku"), AGOTADA["sku"])

@@ -100,13 +100,41 @@ if __name__ == "__main__":
     unittest.main()
 
 
-class BotonTallaTests(unittest.TestCase):
-    """El botón de talla en los resultados de búsqueda (parte pura)."""
+class BotonTallaApagadoTests(unittest.TestCase):
+    """Por defecto la empleada NO ve existencia: el stock no es confiable."""
 
     def setUp(self) -> None:
         from pos_uniformes.ui.helpers import quote_guided_catalog_helper as h
 
         self.h = h
+
+    def test_todas_las_tallas_se_ven_igual(self) -> None:
+        agotada = {"talla": "6", "stock_actual": 0}
+        self.assertEqual(self.h.etiqueta_talla(agotada, 265.0), "Talla 6 · $265.00")
+        self.assertEqual(self.h.estilo_talla(agotada), self.h.estilo_talla({"stock_actual": 9}))
+        self.assertNotIn("dashed", self.h.estilo_talla(agotada))
+
+    def test_tocarla_no_la_pinta_de_verde(self) -> None:
+        self.assertIn("#87492c", self.h.estilo_talla_seleccionada({"stock_actual": 0}))
+
+    def test_pero_por_dentro_si_sabe_que_esta_agotada(self) -> None:
+        """Sin esto no habría qué anotar: la señal se junta aunque no se vea."""
+        self.assertTrue(self.h.esta_agotada({"stock_actual": 0}))
+        self.assertFalse(self.h.esta_agotada({"stock_actual": 3}))
+
+
+class BotonTallaEncendidoTests(unittest.TestCase):
+    """El día que el stock se sostenga solo, se prende y se ve así."""
+
+    def setUp(self) -> None:
+        from unittest.mock import patch
+
+        from pos_uniformes.ui.helpers import quote_guided_catalog_helper as h
+
+        self.h = h
+        parche = patch.object(dm, "EXISTENCIA_CONFIABLE", True)
+        parche.start()
+        self.addCleanup(parche.stop)
 
     def test_con_existencia_muestra_precio(self) -> None:
         self.assertEqual(
@@ -127,14 +155,17 @@ class BotonTallaTests(unittest.TestCase):
     def test_stock_raro_se_asume_disponible(self) -> None:
         self.assertFalse(self.h.esta_agotada({"stock_actual": "muchos"}))
         self.assertTrue(self.h.esta_agotada({}))
-        self.assertTrue(self.h.esta_agotada({"stock_actual": None}))
 
     def test_la_agotada_se_ve_distinta_y_la_anotada_verde(self) -> None:
-        disponible = self.h.estilo_talla({"stock_actual": 3})
-        agotada = self.h.estilo_talla({"stock_actual": 0})
-        anotada = self.h.estilo_talla({"stock_actual": 0}, anotada=True)
-        self.assertIn("solid", disponible)
-        self.assertIn("dashed", agotada)
-        self.assertNotEqual(agotada, anotada)
+        self.assertIn("solid", self.h.estilo_talla({"stock_actual": 3}))
+        self.assertIn("dashed", self.h.estilo_talla({"stock_actual": 0}))
+        self.assertNotEqual(
+            self.h.estilo_talla({"stock_actual": 0}),
+            self.h.estilo_talla({"stock_actual": 0}, anotada=True),
+        )
         self.assertIn("#2f6b2f", self.h.estilo_talla_seleccionada({"stock_actual": 0}))
         self.assertIn("#87492c", self.h.estilo_talla_seleccionada({"stock_actual": 9}))
+
+
+if __name__ == "__main__":
+    unittest.main()

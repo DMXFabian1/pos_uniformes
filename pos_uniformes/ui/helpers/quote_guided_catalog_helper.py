@@ -1103,24 +1103,38 @@ _ESTILO_TALLA = (
 
 
 def esta_agotada(variante: dict) -> bool:
-    """Sin existencia según el índice. Un dato viejo o raro cuenta como que sí hay."""
+    """Sin existencia según el índice. Un dato viejo o raro cuenta como que sí hay.
+
+    Sirve para anotar la demanda aunque no se muestre nada: la señal se junta
+    igual, y el día que el stock sea confiable ya habrá historia.
+    """
     try:
         return int(variante.get("stock_actual") or 0) <= 0
     except (TypeError, ValueError):
         return False
 
 
+def _mostrar_existencia() -> bool:
+    """Si la empleada debe ver el stock. Hoy no: el número no es confiable."""
+    try:
+        from pos_uniformes.services.demanda_service import EXISTENCIA_CONFIABLE
+
+        return bool(EXISTENCIA_CONFIABLE)
+    except Exception:  # noqa: BLE001
+        return False
+
+
 def etiqueta_talla(variante: dict, precio: float, *, anotada: bool = False) -> str:
     """Texto del botón de talla."""
     talla = str(variante.get("talla") or variante.get("sku") or "")
-    if not esta_agotada(variante):
+    if not _mostrar_existencia() or not esta_agotada(variante):
         return f"Talla {talla} · ${precio:,.2f}"
     return f"Talla {talla} · {'anotado ✓' if anotada else 'agotado'}"
 
 
 def estilo_talla(variante: dict, *, anotada: bool = False) -> str:
     """Hoja de estilo del botón de talla según existencia."""
-    if not esta_agotada(variante):
+    if not _mostrar_existencia() or not esta_agotada(variante):
         return _ESTILO_TALLA.format(
             fondo="#f5f0e8", borde_tipo="solid", borde="#c4b9a8",
             texto="#3a2a1a", hover="#e8dfd2",
@@ -1138,7 +1152,7 @@ def estilo_talla(variante: dict, *, anotada: bool = False) -> str:
 
 def estilo_talla_seleccionada(variante: dict) -> str:
     """La talla tocada. Verde si estaba agotada: acuse de que quedó anotada."""
-    if esta_agotada(variante):
+    if _mostrar_existencia() and esta_agotada(variante):
         return (
             "QPushButton { background: #2f6b2f; border: 1px solid #2f6b2f;"
             " border-radius: 6px; font-size: 12px; color: #f2fbf2;"
