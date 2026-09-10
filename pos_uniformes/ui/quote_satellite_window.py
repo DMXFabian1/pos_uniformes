@@ -3288,16 +3288,8 @@ class QuoteSatelliteWindow(QMainWindow):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(10)
 
-        header = QHBoxLayout()
-        titulo = QLabel("Calendario de conteos")
-        titulo.setObjectName("guidedStepTitle")
-        header.addWidget(titulo)
-        header.addStretch()
-        pista = QLabel("Para imprimir la hoja o capturar, entra a Conteos.")
-        pista.setObjectName("guidedStepHint")
-        header.addWidget(pista)
-        layout.addLayout(header)
-
+        # Sin encabezado: el sidebar ya dice "Calendario" y el panel trae su
+        # propio título con el mes. La página es el calendario y nada más.
         self.conteos_panel = ConteoCalendarioMesPanel(page, refresh_on_init=False)
         layout.addWidget(self.conteos_panel, 1)
         page.setLayout(layout)
