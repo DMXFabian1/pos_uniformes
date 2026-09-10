@@ -39,7 +39,7 @@ def _factory():
 def _seed(s):
     s.add_all([
         Empleada(codigo="VEND-1", nombre_completo="Daniel Fabian", activo=True),
-        Empleada(codigo="ENC-1", nombre_completo="León Fabian", activo=True),
+        Empleada(codigo="ENC-1", nombre_completo="Encargado Prueba", activo=True),
         Empleada(codigo="VEND-2", nombre_completo="Fanny López", activo=True),
         Empleada(codigo="VEND-6", nombre_completo="Nayeli Ruiz", activo=True),
         Empleada(codigo="VEND-9", nombre_completo="Lupita Baja", activo=False),
@@ -72,7 +72,7 @@ class ChipsPorDiaTests(unittest.TestCase):
 
 
     def test_las_faltas_tambien_salen_en_el_calendario(self) -> None:
-        """Daniel las quiso visibles (2026-09-09): el papá apunta y todos ven."""
+        """Daniel las quiso visibles (2026-09-09): el encargado apunta y todos ven."""
         from pos_uniformes.services.calendario_empleadas_service import FALTA, marcar_dia
 
         with _factory()() as s:

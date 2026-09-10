@@ -6,7 +6,7 @@ Los valores viven en `caja_parametros` (hoy 1300 + 2/comisión − 216.67/falta)
 
 Al registrar el pago se guarda el desglose en `empleada_pago`, se anota el
 evento "pago" del calendario y el corte de caja lo descuenta del cajón.
-Solo Daniel (VEND-1) y su papá (ENC-1) registran pagos.
+Solo el dueño (VEND-1) y el encargado (ENC-1) registran pagos.
 """
 
 from __future__ import annotations

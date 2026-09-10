@@ -58,7 +58,7 @@ class ApiMovilTests(unittest.TestCase):
         s.add_all(
             [
                 Empleada(codigo="VEND-1", nombre_completo="Daniel Fabian", activo=True),
-                Empleada(codigo="ENC-1", nombre_completo="León Fabian", activo=True),
+                Empleada(codigo="ENC-1", nombre_completo="Encargado Prueba", activo=True),
                 Empleada(codigo="VEND-4", nombre_completo="Fanny Ortiz", activo=True),
             ]
         )
@@ -359,7 +359,7 @@ if __name__ == "__main__":
 
 
 class EncargadoMovilTests(unittest.TestCase):
-    """El modo de León en el celular: espejo del kiosko (apuntar, cortes)."""
+    """El modo del encargado en el celular: espejo del kiosko (apuntar, cortes)."""
 
     def setUp(self) -> None:
         from pos_uniformes.database.models import Trabajo
@@ -374,7 +374,7 @@ class EncargadoMovilTests(unittest.TestCase):
         self.session = sessionmaker(bind=engine)()
         self.session.add_all(
             [
-                Empleada(codigo="ENC-1", nombre_completo="León Fabian", activo=True),
+                Empleada(codigo="ENC-1", nombre_completo="Encargado Prueba", activo=True),
                 Empleada(codigo="VEND-1", nombre_completo="Daniel", activo=True),
                 Empleada(codigo="VEND-4", nombre_completo="Fanny Ortiz", activo=True),
             ]
@@ -633,7 +633,7 @@ class EncargadoMovilTests(unittest.TestCase):
         self.assertIn("Con tarjeta", texto)
 
     def test_ocultar_deja_el_movimiento_fuera_de_lo_que_ve_el_encargado(self) -> None:
-        """No es solo el papel: para León ese cobro no existe."""
+        """No es solo el papel: para el encargado ese cobro no existe."""
         from pos_uniformes.database.models import EmpleadaPago, LibretaVenta, Trabajo
 
         self.session.add(CajaParametros(
@@ -666,7 +666,7 @@ class EncargadoMovilTests(unittest.TestCase):
         self.assertEqual(r.json()["ocultos"], 1)
         self.assertTrue(self.session.get(LibretaVenta, con_tarjeta.id).privado)
 
-        # A partir de aquí, León: ni el dinero ni las comisiones de esa venta.
+        # A partir de aquí, el encargado: ni el dinero ni las comisiones de esa venta.
         leon = self.session.query(Empleada).filter(Empleada.codigo == "ENC-1").one()
         app.dependency_overrides[get_current_employee] = lambda: (leon, None)
         with patch(
@@ -708,7 +708,7 @@ class EncargadoMovilTests(unittest.TestCase):
         with patch(
             "pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"
         ):
-            r = self.client.get("/api/v1/movil/dueno/corte_estado")  # León
+            r = self.client.get("/api/v1/movil/dueno/corte_estado")  # el encargado
         self.assertEqual(r.status_code, 403)
         self._como_dueno()
         with patch(

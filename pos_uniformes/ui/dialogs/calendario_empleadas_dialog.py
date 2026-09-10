@@ -131,7 +131,7 @@ class CalendarioEmpleadasDialog(QDialog):
         super().__init__(parent)
         self._code = str(employee_code).strip().upper()
         self._is_owner = bool(is_owner)
-        # Encargado (el papá): marca faltas/descansos de cualquier empleada,
+        # Encargado (ENC-1): marca faltas/descansos de cualquier empleada,
         # pero sin pagos, sin config de horarios y sin banner de comisiones.
         self._es_encargado = bool(is_encargado) and not self._is_owner
         self._gestiona = self._is_owner or self._es_encargado
@@ -608,7 +608,7 @@ def _fecha_en_palabras(fecha: date) -> str:
 
 
 class CalendarioEncargadoDialog(QDialog):
-    """Modo ultra-simple para el encargado (León, papá de Daniel — no le
+    """Modo ultra-simple para el encargado (ENC-1 — no le
     gusta la tecnología): tres preguntas con botones GRANDES, confirmación
     en palabras llanas y botón de "me equivoqué". Nada de combos, tablas
     ni configuración."""
@@ -682,12 +682,12 @@ class CalendarioEncargadoDialog(QDialog):
         return lbl
 
     def _pagina_menu(self) -> QWidget:
-        """Pantalla de inicio de León: dos cosas, en grande."""
+        """Pantalla de inicio del encargado: dos cosas, en grande."""
         pagina = QWidget()
         ly = QVBoxLayout()
         ly.setSpacing(14)
         ly.addWidget(self._titulo("¿Qué quieres hacer?"))
-        # Resumen del día para León en TARJETAS (rediseño 2026-09-09): quién
+        # Resumen del día del encargado en TARJETAS (rediseño 2026-09-09): quién
         # descansa hoy/mañana y a quién le toca pago, una línea por persona
         # en grande. Antes era un párrafo apretado (y con "Friday" en inglés).
         from PyQt6.QtWidgets import QHBoxLayout as _QH
@@ -798,7 +798,7 @@ class CalendarioEncargadoDialog(QDialog):
         self._pila.setCurrentWidget(self._pg_cortes)
 
     def _pagina_corte(self) -> QWidget:
-        """Previa del corte de León: venta, a quién pagar, cuánto se retira.
+        """Previa del corte del encargado: venta, a quién pagar, cuánto se retira.
         Un solo botón; nada que contar ni capturar."""
         pagina = QWidget()
         ly = QVBoxLayout()
@@ -947,7 +947,7 @@ class CalendarioEncargadoDialog(QDialog):
             normal = hora_corte(_date(2026, 9, 7)).strftime("%H:%M")      # lunes
             temprano = hora_corte(_date(2026, 9, 10)).strftime("%H:%M")   # jueves
             # El corte por hora está apagado: Daniel lo ordena desde su celular
-            # o León lo hace con el botón. Nada de "se hace solo".
+            # o el encargado lo hace con el botón. Nada de "se hace solo".
             texto = (texto + "  " if texto else "") + f"🧾 Hora del corte: {normal} (jueves y domingo {temprano})."
         except Exception:  # noqa: BLE001
             pass
@@ -1150,7 +1150,7 @@ class CalendarioEncargadoDialog(QDialog):
         for emp in filas:
             code = str(emp.codigo).upper()
             if code in ("VEND-1", "ENC-1"):
-                continue  # Daniel y el propio León no se apuntan aquí
+                continue  # el dueño y el propio encargado no se apuntan aquí
             nombre = (emp.nombre_completo or emp.codigo).split()[0]
             btn = QPushButton(f"👤  {nombre}")
             btn.setStyleSheet(self._BTN)
@@ -1195,7 +1195,7 @@ class CalendarioEncargadoDialog(QDialog):
                     self._sel_code,
                     fecha,
                     self._sel_tipo,
-                    nota="apuntado por León (ENC-1)",
+                    nota="apuntado por el encargado (ENC-1)",
                 )
         except Exception:  # noqa: BLE001
             logger.exception("Encargado: no se pudo apuntar")

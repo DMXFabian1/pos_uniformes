@@ -3,7 +3,7 @@
 Arriba: quién descansa, quién faltó, a quién le toca pago y qué conteos
 caen ese día.
 Abajo: "¿Cuánto llevas?" — se escanea el gafete. La empleada ve SOLO su
-pago pendiente con desglose; Daniel (VEND-1) o León (ENC-1) ven el de
+pago pendiente con desglose; el dueño (VEND-1) o el encargado (ENC-1) ven el de
 todas. Lo mostrado se borra solo a los 45 s (es una pantalla compartida).
 """
 

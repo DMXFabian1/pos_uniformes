@@ -317,7 +317,7 @@ def chips_calendario_mes(session, year: int, month: int, hoy: date) -> dict[date
 
     Se pintan: descansos (fijos y movidos), pagos ya hechos, el PRÓXIMO pago
     proyectado de cada una y las faltas apuntadas (Daniel las quiso aquí,
-    2026-09-09: el papá apunta y todos ven lo mismo).
+    2026-09-09: el encargado apunta y todos ven lo mismo).
     """
     from pos_uniformes.database.models import Empleada, EmpleadaHorario
 
@@ -529,7 +529,7 @@ def cargar_horarios_todos(session) -> dict[str, HorarioEmpleada]:
 
 # ─── Encargado y límite mensual de movimientos ───────────────────────────
 
-# Gafete del encargado (el papá de Daniel): marca faltas/descansos de
+# Gafete del encargado (ENC-1): marca faltas/descansos de
 # cualquier empleada y, desde 2026-09-08, también hace el corte de caja y
 # registra los pagos (con el monto calculado por nomina_service). No cambia
 # horarios. "Si no está en el calendario, no existe."

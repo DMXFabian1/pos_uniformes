@@ -39,7 +39,7 @@ class PendientesDelDiaTests(unittest.TestCase):
         return session
 
     def test_detecta_todo(self) -> None:
-        empleadas = [_emp("VEND-2", "Ana López"), _emp("VEND-3", "Bety Ruiz"), _emp("VEND-4", "Caro Díaz"), _emp("VEND-5", "Dani Nueva"), _emp("ENC-1", "León")]
+        empleadas = [_emp("VEND-2", "Ana López"), _emp("VEND-3", "Bety Ruiz"), _emp("VEND-4", "Caro Díaz"), _emp("VEND-5", "Dani Nueva"), _emp("ENC-1", "Encargado Prueba")]
         horarios = {
             "VEND-2": HorarioEmpleada("VEND-2", descanso_weekday=2, fecha_ultimo_pago=date(2026, 9, 2)),  # descansa miércoles
             "VEND-3": HorarioEmpleada("VEND-3", descanso_weekday=6, fecha_ultimo_pago=date(2026, 9, 2)),  # trabaja, sin movimientos

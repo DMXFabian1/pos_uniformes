@@ -483,7 +483,7 @@ class CorteTicketTests(unittest.TestCase):
 
 
 class HistorialCortesTests(unittest.TestCase):
-    """El corte guarda SOLO la cifra final del dueño; León ve fecha y cifra."""
+    """El corte guarda SOLO la cifra final del dueño; el encargado ve fecha y cifra."""
 
     def setUp(self) -> None:
         from sqlalchemy import create_engine
@@ -560,7 +560,7 @@ class HistorialCortesTests(unittest.TestCase):
         self.assertNotIn("76", textos[0])
 
     def test_leon_hace_corte_de_un_boton(self) -> None:
-        """León no cuenta ni captura: ve venta / a quién pagar / se retira y
+        """El encargado no cuenta ni captura: ve venta / a quién pagar / se retira y
         aprieta Imprimir. Los pagos del día se registran solos."""
         import os as _os
 
@@ -865,6 +865,79 @@ class LibretaCicloBannerTests(unittest.TestCase):
         self.assertIn("jueves", texto)
 
 
+class AjusteEnLibretaTests(unittest.TestCase):
+    """Lo que el dueño cambia en un corte manda también en su Libreta
+    (Daniel 2026-09-10); Ctrl+Shift+R enseña lo real."""
+
+    def test_ajustes_en_rango_suma_solo_los_del_dueno(self) -> None:
+        from datetime import datetime, timedelta, timezone
+
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from pos_uniformes.database.models import LibretaCorte
+        from pos_uniformes.services.corte_caja_service import ajustes_en_rango
+
+        engine = create_engine("sqlite://")
+        LibretaCorte.__table__.create(engine)
+        session = sessionmaker(bind=engine)()
+        t0 = datetime(2026, 9, 10, 12, 0, tzinfo=timezone.utc)
+
+        def _corte(quien, final, esperado, cuando):
+            session.add(LibretaCorte(
+                fecha=cuando.date(), periodo_label="x", monto_final=Decimal(final), monto_esperado=Decimal(esperado),
+                creado_por=quien, created_at=cuando, desde=cuando - timedelta(hours=6), hasta=cuando,
+            ))
+
+        _corte("VEND-1", "9500", "10000", t0)                      # sacó 500
+        _corte("VEND-1", "3000", "3000", t0 + timedelta(hours=1))   # sin ajuste
+        _corte("ENC-1", "1000", "1200", t0 + timedelta(hours=2))    # del encargado: no cuenta
+        _corte("VEND-1", "800", "1000", t0 - timedelta(days=5))     # fuera del rango
+        session.commit()
+        ajuste = ajustes_en_rango(session, t0 - timedelta(hours=2), t0 + timedelta(hours=3))
+        self.assertEqual(ajuste, Decimal("-500.00"))
+
+    def test_tarjeta_del_cajon_usa_la_cifra_ajustada(self) -> None:
+        from PyQt6.QtWidgets import QApplication
+
+        QApplication.instance() or QApplication([])
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        cards: list = []
+        corte_dia = SimpleNamespace(
+            dia_label="10/09", monto_en_caja=Decimal("3013"), monto_ventas=Decimal("3013"),
+            monto_neto_ventas=Decimal("3013"), monto_abonos=Decimal("0"), operaciones=9,
+        )
+        fake = SimpleNamespace(
+            _libreta_is_owner=True, _libreta_periodo="hoy", _libreta_ajuste=Decimal("-500.00"),
+            _libreta_modo_real=False, _libreta_emp_filtro=None, _libreta_pagina=0,
+            _libreta_rows_pintadas=[], _libreta_last_cortes=[], _libreta_last_por_empleada=[],
+            _libreta_ranking_codes=[], _libreta_secciones={},
+            _llenar_libreta_cards=lambda v: cards.append(v),
+            _libreta_periodo_texto=lambda: "hoy",
+            libreta_resumen_label=MagicMock(), libreta_daily_seccion=MagicMock(),
+            libreta_daily_table=MagicMock(), libreta_ranking_list=MagicMock(),
+            libreta_table=MagicMock(), libreta_pag_bar=MagicMock(), libreta_pag_label=MagicMock(),
+            libreta_pag_prev=MagicMock(), libreta_pag_next=MagicMock(),
+            _ajustar_alto_tabla_libreta=lambda *a, **k: None,
+            _pintar_afluencia_libreta=lambda *a, **k: None,
+            _pintar_pendientes_libreta=lambda *a, **k: None,
+        )
+        with patch("pos_uniformes.services.libreta_service.resumir_por_dia", return_value=[corte_dia]), patch(
+            "pos_uniformes.services.libreta_service.resumir_por_empleada", return_value=[]
+        ):
+            QuoteSatelliteWindow._pintar_libreta(fake, [])
+            cajon = cards[-1][0]
+            self.assertEqual(cajon[1], "$2,513")           # 3013 − 500
+            self.assertIn("ya con tus ajustes", cajon[2])
+            # Modo real: la cifra sin tocar.
+            fake._libreta_modo_real = True
+            QuoteSatelliteWindow._pintar_libreta(fake, [])
+        cajon = cards[-1][0]
+        self.assertEqual(cajon[1], "$3,013")
+        self.assertIn("real, sin tus ajustes", cajon[2])
+
+
 class TarjetaCicloTests(unittest.TestCase):
     """Rediseño 2026-09-09: la franja naranja se volvió tarjeta con tiles."""
 
@@ -1133,7 +1206,7 @@ class GafeteEncargadoTests(unittest.TestCase):
 
 
 class CalendarioEncargadoSimpleTests(unittest.TestCase):
-    """El modo de León: botones por empleada (sin Daniel ni él mismo) y
+    """El modo del encargado: botones por empleada (sin el dueño ni él mismo) y
     marca con nota de auditoría."""
 
     @classmethod
@@ -1172,7 +1245,7 @@ class CalendarioEncargadoSimpleTests(unittest.TestCase):
             SimpleNamespace(codigo=c, nombre_completo=n, activo=True)
             for c, n in (
                 ("VEND-4", "Fanny Ruiz"),
-                ("ENC-1", "León Fabian"),
+                ("ENC-1", "Encargado Prueba"),
                 ("VEND-1", "Daniel"),
             )
         ]

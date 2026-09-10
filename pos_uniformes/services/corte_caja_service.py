@@ -8,7 +8,7 @@ Reglas (Daniel, 2026-09-08):
 - El corte es por MOMENTO: cubre desde el corte anterior hasta ahora. Lo que
   se venda después queda para el siguiente corte, aunque sea el mismo día.
 - Al cerrar se captura lo contado y cuánto se queda como reactivo (por
-  defecto el mismo fondo). Solo Daniel (VEND-1) y su papá (ENC-1) lo hacen.
+  defecto el mismo fondo). Solo el dueño (VEND-1) y el encargado (ENC-1) lo hacen.
 
 La lógica de sumas es pura; lo que lleva `session` toca la base.
 """
@@ -237,7 +237,7 @@ def cerrar_corte(
         raise ValueError("El reactivo que se queda no puede ser mayor a lo contado.")
     local = ahora.astimezone() if ahora.tzinfo else ahora
     # Regla de Daniel (2026-09-09): su cifra final es la oficial (ticket,
-    # León, PWA solo ven `monto_final`); el real calculado se guarda en
+    # encargado y PWA solo ven `monto_final`); el real calculado se guarda en
     # `monto_esperado` y SOLO lo ve él (historial, Telegram) como "ajuste".
     corte = LibretaCorte(
         fecha=local.date(),
@@ -276,6 +276,35 @@ def _avisar_corte(session, corte, estado: EstadoCaja) -> None:
             session.rollback()
         except Exception:  # noqa: BLE001
             pass
+
+
+def ajustes_en_rango(session, desde, hasta) -> Decimal:
+    """Cuánto cambió el dueño sus cortes en este rango (negativo = sacó dinero).
+
+    Su cifra es la oficial (2026-09-09): la Libreta también la respeta, así
+    que el efectivo mostrado se corrige con esta suma. El modo real la ignora.
+    """
+    from pos_uniformes.database.models import LibretaCorte
+
+    try:
+        stmt = select(
+            func.coalesce(func.sum(LibretaCorte.monto_final - LibretaCorte.monto_esperado), 0)
+        ).where(
+            LibretaCorte.creado_por == DUENO_CODE,
+            LibretaCorte.hasta.is_not(None),
+            LibretaCorte.monto_esperado > 0,
+        )
+        if desde is not None:
+            stmt = stmt.where(LibretaCorte.hasta >= desde)
+        if hasta is not None:
+            stmt = stmt.where(LibretaCorte.hasta <= hasta)
+        return _d(session.scalar(stmt))
+    except Exception:  # noqa: BLE001 — base sin las columnas nuevas
+        try:
+            session.rollback()
+        except Exception:  # noqa: BLE001
+            pass
+        return Decimal("0.00")
 
 
 def _etiqueta_periodo(desde: datetime | None, hasta: datetime) -> str:

@@ -605,7 +605,7 @@ def texto_ticket_corte_encargado(
     corte, venta_efectivo, pagos: list, por_empleada: list | None = None, retiros: list | None = None,
     reimpresion: bool = False, tarjeta=None, tarjeta_ops: int | None = None, ya_pagados: list | None = None,
 ) -> str:
-    """Ticket simple para León: la cuenta (reactivo · venta · restas ·
+    """Ticket simple para el encargado: la cuenta (reactivo · venta · restas ·
     SACAR), a quién pagar con desglose y las comisiones.
 
     `pagos` = los que ESTE corte registra; `ya_pagados` = pagos hechos antes

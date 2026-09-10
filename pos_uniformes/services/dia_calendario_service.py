@@ -4,7 +4,7 @@
   conteos caen ese día.
 - `vista_de_pagos`: al escanear un gafete, qué se puede ver:
     * empleada → SOLO su pago pendiente (desglose y cuándo le toca);
-    * Daniel (VEND-1) o su papá (ENC-1) → el de todas las activas.
+    * El dueño (VEND-1) o el encargado (ENC-1) → el de todas las activas.
   Cualquier otro código (producto, gafete de baja, vacío) → None.
 
 Nada de aquí registra ni cambia datos.

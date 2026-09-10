@@ -344,7 +344,7 @@ def imprimir_etiqueta(
     }
 
 
-# ─── Encargado (León) desde el celular — espejo de su modo del kiosko ────
+# ─── Encargado (ENC-1) desde el celular — espejo de su modo del kiosko ────
 # Lectura siempre; las ACCIONES (apuntar, hacer corte) solo en modo tienda
 # (base viva). El ticket del corte se encola a la impresora del satélite.
 
@@ -421,7 +421,7 @@ def encargado_inicio(
 
 
 def _tarjetas_encargado(db: Session) -> dict:
-    """Lo mismo que el menú del kiosko de León (rediseño 2026-09-09): quién
+    """Lo mismo que el menú del kiosko del encargado (rediseño 2026-09-09): quién
     descansa hoy y mañana con nombre de pila, y los pagos en una línea por
     persona con la fecha ya en español (`cuando_pago`)."""
     try:

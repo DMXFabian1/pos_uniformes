@@ -1756,6 +1756,8 @@ class QuoteSatelliteWindow(QMainWindow):
         self._libreta_periodo = "hoy"
         self._libreta_tipo_filtro = "todo"
         self._libreta_emp_filtro: str | None = None
+        self._libreta_ajuste = Decimal("0.00")   # lo que el dueño cambió en sus cortes
+        self._libreta_modo_real = False          # Ctrl+Shift+R
         self._libreta_ranking_codes: list[str] = []
         # Últimos agregados pintados (para el ticket de corte)
         self._libreta_last_cortes: list = []
@@ -1924,7 +1926,7 @@ class QuoteSatelliteWindow(QMainWindow):
             sep.setVisible(i + 1 < len(tiles))
 
     def _abrir_calendario_encargado(self) -> None:
-        # Modo ultra-simple para León: tres preguntas con botones grandes
+        # Modo ultra-simple para el encargado: tres preguntas con botones grandes
         # (¿quién? → ¿qué pasó? → ¿cuándo?), sin combos ni configuración.
         from pos_uniformes.ui.dialogs.calendario_empleadas_dialog import (
             CalendarioEncargadoDialog,
@@ -2111,6 +2113,10 @@ class QuoteSatelliteWindow(QMainWindow):
                     else:
                         afluencia_filas = self._cargar_afluencia_libreta(session, desde, hasta)
                         pendientes = self._cargar_pendientes_libreta(session)
+                        # Lo que el dueño cambió en sus cortes manda también aquí.
+                        from pos_uniformes.services.corte_caja_service import ajustes_en_rango
+
+                        self._libreta_ajuste = ajustes_en_rango(session, desde, hasta)
                 fuente_db = True
             except Exception:  # noqa: BLE001
                 logger.exception("Libreta: fallo la consulta a la base")
@@ -2892,6 +2898,19 @@ class QuoteSatelliteWindow(QMainWindow):
         HistorialPagosDialog(self, creado_por=str(self._libreta_code or "")).exec()
         self._refresh_libreta_view()
 
+    def _alternar_modo_real_libreta(self) -> None:
+        """Ctrl+Shift+R (solo dueño): efectivo sin ajustes / con ajustes."""
+        if not getattr(self, "_libreta_is_owner", False):
+            return
+        self._libreta_modo_real = not getattr(self, "_libreta_modo_real", False)
+        rows, ranking = getattr(self, "_libreta_last_pintura", (None, None))
+        if rows is not None:
+            self._pintar_libreta(rows, ranking_rows=ranking)
+        self._set_status(
+            "Modo real: viendo el efectivo sin tus ajustes." if self._libreta_modo_real
+            else "Viendo las cifras oficiales (con tus ajustes)."
+        )
+
     def _abrir_historial_cortes(self) -> None:
         """Cortes anteriores con reimpresión (solo dueño)."""
         if not self._libreta_is_owner:
@@ -3032,12 +3051,23 @@ class QuoteSatelliteWindow(QMainWindow):
             #   · los abonos (parte del cajón, se muestran para explicarlo),
             #   · las comisiones del equipo.
             neto_tarjeta = total_neto - (total_ventas - total_tarjeta)
+            # Si el dueño ajustó un corte del periodo, su cifra es la que vale
+            # aquí también (Ctrl+Shift+R muestra la real).
+            ajuste = Decimal(str(getattr(self, "_libreta_ajuste", 0) or 0))
+            modo_real = bool(getattr(self, "_libreta_modo_real", False))
+            if ajuste and not modo_real:
+                total_en_caja = total_en_caja + ajuste
+            pie_cajon = (
+                "ventas + abonos en efectivo · es la cifra del corte"
+                if not ajuste
+                else (f"real, sin tus ajustes ({ajuste:+,.0f})" if modo_real else "ya con tus ajustes del corte")
+            )
             self._llenar_libreta_cards(
                 [
                     (
                         "EN EL CAJÓN (EFECTIVO)",
                         f"${total_en_caja:,.0f}",
-                        "ventas + abonos en efectivo · es la cifra del corte",
+                        pie_cajon,
                     ),
                     (
                         "CON TARJETA",
@@ -4445,6 +4475,10 @@ class QuoteSatelliteWindow(QMainWindow):
         _guided_ctrl_shift_l = QShortcut(QKeySequence("Ctrl+Shift+L"), self.guided_page_scroll)
         _guided_ctrl_shift_l.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
         _guided_ctrl_shift_l.activated.connect(self._open_school_product_link_admin)
+        # Ctrl+Shift+R: modo real en la Libreta (ver el efectivo sin los
+        # ajustes que hiciste en los cortes). Vuelve a lo oficial al repetirlo.
+        _real_shortcut = QShortcut(QKeySequence("Ctrl+Shift+R"), self)
+        _real_shortcut.activated.connect(self._alternar_modo_real_libreta)
         _esc_shortcut = QShortcut(QKeySequence("Escape"), self)
         _esc_shortcut.activated.connect(self._handle_escape_key)
         _kiosk_ctrl_s = QShortcut(QKeySequence("Ctrl+S"), self)

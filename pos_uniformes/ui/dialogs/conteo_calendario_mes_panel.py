@@ -229,7 +229,7 @@ class ConteoCalendarioMesPanel(QWidget):
         """Clic en un día del calendario: detalle del día (2026-09-09).
 
         Quién descansa, a quién le toca pago, conteos, y consulta de pago
-        con gafete (la empleada ve el suyo; Daniel/León ven todos)."""
+        con gafete (la empleada ve el suyo; dueño y encargado ven todos)."""
         from pos_uniformes.ui.dialogs.dia_calendario_dialog import DiaCalendarioDialog
 
         DiaCalendarioDialog(self, fecha, session_factory=self._session_factory, hoy=self._hoy).exec()

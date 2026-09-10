@@ -25,7 +25,7 @@ class EquipoServiceTests(unittest.TestCase):
         self.session = sessionmaker(bind=engine)()
         self.session.add_all([
             Empleada(codigo="VEND-1", nombre_completo="Daniel", activo=True),
-            Empleada(codigo="ENC-1", nombre_completo="León", activo=True),
+            Empleada(codigo="ENC-1", nombre_completo="Encargado Prueba", activo=True),
             Empleada(codigo="VEND-2", nombre_completo="Ana López", activo=True),
             Empleada(codigo="VEND-9", nombre_completo="Lupita Mora", activo=True),
             EmpleadaHorario(employee_code="VEND-2", descanso_weekday=2, fecha_ultimo_pago=date(2026, 9, 2)),

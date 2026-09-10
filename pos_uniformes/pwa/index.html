@@ -148,7 +148,7 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
     <button class="btn-suave salir" onclick="salir()">Salir</button>
   </div>
 
-  <!-- ENCARGADO (León) — espejo de su modo del kiosko -->
+  <!-- ENCARGADO (ENC-1) — espejo de su modo del kiosko -->
   <div id="vista-encargado" class="oculto con-nav">
     <div id="enc-menu">
       <h1>¿Qué quieres hacer?</h1>
@@ -443,7 +443,7 @@ function filaCorte(c) {
          `<span class="monto">${pesos(c.monto)}</span></div>`;
 }
 
-// ── Encargado (León): espejo de su modo del kiosko ────────────────
+// ── Encargado (ENC-1): espejo de su modo del kiosko ────────────────
 let encData = null, encSel = {};
 
 async function pintarEncargado(_data) {
@@ -462,7 +462,7 @@ async function pintarEncargado(_data) {
 }
 
 function pintarTarjetasEncargado(t) {
-  // Mismas tarjetas que el menú del kiosko de León: descansa hoy / mañana y
+  // Mismas tarjetas que el menú del kiosko del encargado: descansa hoy / mañana y
   // los pagos, una línea por persona con la fecha ya en español.
   const caja = $("enc-tarjetas");
   if (!t) { caja.innerHTML = ""; return; }
