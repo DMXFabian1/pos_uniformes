@@ -117,8 +117,10 @@ class QuickProductSearchDialog(QDialog):
         root.addWidget(self._info_label)
 
         # Results table
-        # "Hay" evita el viaje a la bodega y, cuando dice agotado, el
-        # producto elegido queda anotado como demanda no atendida.
+        # "Hay" es lo que CREE el sistema, no una promesa: las ventas del
+        # kiosko no descuentan stock, así que un número positivo viene del
+        # último conteo y va con "≈". El cero sí se usa: quien elige algo
+        # agotado deja anotada la demanda no atendida.
         columns = ["SKU", "Producto", "Talla", "Color", "Precio", "Hay"]
         self._table = QTableWidget(0, len(columns))
         self._table.setHorizontalHeaderLabels(columns)
@@ -282,7 +284,9 @@ class QuickProductSearchDialog(QDialog):
                 stock = 0
 
             self._table.insertRow(idx)
-            values = [sku, nombre, talla, color, f"${precio}", "agotado" if stock <= 0 else str(stock)]
+            # El "≈" no es adorno: el número es del último conteo y las ventas
+            # no lo bajan. Mejor que dude a que prometa.
+            values = [sku, nombre, talla, color, f"${precio}", "agotado" if stock <= 0 else f"≈{stock}"]
             for col, value in enumerate(values):
                 cell = QTableWidgetItem(value)
                 cell.setTextAlignment(
@@ -292,6 +296,11 @@ class QuickProductSearchDialog(QDialog):
                 )
                 if stock <= 0:
                     cell.setForeground(QColor("#9a9186"))
+                if col == 5:
+                    cell.setToolTip(
+                        "Según el último conteo. Las ventas no descuentan stock,"
+                        " así que puede haber menos. Verifica antes de prometer."
+                    )
                 self._table.setItem(idx, col, cell)
 
         for col in [0, 2, 3, 4, 5]:
