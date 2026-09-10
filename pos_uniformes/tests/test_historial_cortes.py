@@ -276,7 +276,7 @@ class DialogTests(unittest.TestCase):
         cls.app = QApplication.instance() or QApplication([])
 
     def test_filas_totales_y_previa(self) -> None:
-        from pos_uniformes.ui.dialogs.historial_cortes_dialog import HistorialCortesDialog, filas_tabla, texto_diferencia
+        from pos_uniformes.ui.dialogs.historial_cortes_dialog import COLUMNAS, HistorialCortesDialog, filas_tabla, texto_diferencia
 
         cortes = [_corte(creado_por="ENC-1"), _corte(id=2, creado_por="ENC-1", monto_final=Decimal("13000.00"), nota="ok")]
         self.assertEqual(texto_diferencia(cortes[1]), "cuadró ✅")
@@ -288,7 +288,6 @@ class DialogTests(unittest.TestCase):
         self.assertEqual(fila[4], "—")                 # sin reactivo
         self.assertEqual(fila[5], "$12,980.00")        # su cifra ERA el total del día
         self.assertEqual(fila[6], "—")                 # sin venta real guardada
-        self.assertEqual(fila[9], "—")                 # no se retiró nada
         self.assertEqual(texto_diferencia(legacy), "—")
         # Mismo orden que el ticket: reactivo · venta · venta real · pagos · gastos · se retiró
         filas = filas_tabla(cortes)
@@ -298,16 +297,16 @@ class DialogTests(unittest.TestCase):
         self.assertEqual(filas[0][6], "$3,230.00")    # venta real: 13000 − 11160 + 1390
         self.assertEqual(filas[0][7], "$1,390.00")    # pagos
         self.assertEqual(filas[0][8], "$0.00")        # gastos
-        self.assertEqual(filas[0][9], "$1,820.00")    # se retiró
-        self.assertEqual(filas[1][11], "ok")
+        self.assertEqual(filas[1][10], "ok")
+        self.assertNotIn("Se retiró", COLUMNAS)       # quitada a pedido de Daniel (2026-09-10)
 
         with patch.object(HistorialCortesDialog, "recargar"):
             dlg = HistorialCortesDialog(None, hoy=date(2026, 9, 9))
         self.assertEqual(dlg.mes_combo.itemText(0), "Septiembre 2026")
         # Real y Ajuste ocultas por default; Ctrl+Shift+R las asoma (y las vuelve a esconder).
-        self.assertTrue(dlg.tabla.isColumnHidden(6) and dlg.tabla.isColumnHidden(10))
+        self.assertTrue(dlg.tabla.isColumnHidden(6) and dlg.tabla.isColumnHidden(9))
         dlg.alternar_modo_real()
-        self.assertFalse(dlg.tabla.isColumnHidden(6) or dlg.tabla.isColumnHidden(10))
+        self.assertFalse(dlg.tabla.isColumnHidden(6) or dlg.tabla.isColumnHidden(9))
         self.assertIn("con lo real", dlg.windowTitle())
         dlg.alternar_modo_real()
         self.assertTrue(dlg.tabla.isColumnHidden(6))
