@@ -36,6 +36,7 @@ class ParametrosCaja:
     sueldo_base: Decimal = Decimal("0.00")
     tarifa_comision: Decimal = Decimal("0.00")
     descuento_falta: Decimal = Decimal("0.00")
+    ocultar_tarjeta: bool = False   # cómo dejó el dueño la casilla del corte
 
 
 @dataclass(frozen=True)
@@ -121,6 +122,7 @@ def cargar_parametros(session) -> ParametrosCaja:
         sueldo_base=_d(fila.sueldo_base),
         tarifa_comision=_d(fila.tarifa_comision),
         descuento_falta=_d(fila.descuento_falta),
+        ocultar_tarjeta=bool(getattr(fila, "ocultar_tarjeta", False)),
     )
 
 
@@ -132,11 +134,11 @@ def guardar_parametros(session, **campos) -> ParametrosCaja:
     if fila is None:
         fila = CajaParametros(id=1)
         session.add(fila)
-    permitidos = {"reactivo_actual", "sueldo_base", "tarifa_comision", "descuento_falta"}
+    permitidos = {"reactivo_actual", "sueldo_base", "tarifa_comision", "descuento_falta", "ocultar_tarjeta"}
     for nombre, valor in campos.items():
         if nombre not in permitidos:
             raise ValueError(f"parámetro desconocido: {nombre}")
-        setattr(fila, nombre, _d(valor))
+        setattr(fila, nombre, bool(valor) if nombre == "ocultar_tarjeta" else _d(valor))
     session.commit()
     return cargar_parametros(session)
 
@@ -307,6 +309,17 @@ def ajustes_en_rango(session, desde, hasta) -> Decimal:
         except Exception:  # noqa: BLE001
             pass
         return Decimal("0.00")
+
+
+def recordar_ocultar_tarjeta(session, valor: bool) -> None:
+    """Guarda cómo dejó el dueño la casilla del corte. Nunca rompe el corte."""
+    try:
+        guardar_parametros(session, ocultar_tarjeta=bool(valor))
+    except Exception:  # noqa: BLE001 — base sin la columna todavía
+        try:
+            session.rollback()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def _etiqueta_periodo(desde: datetime | None, hasta: datetime) -> str:

@@ -702,13 +702,15 @@ def dueno_corte_estado(
     db: Session = Depends(get_db),
 ) -> dict:
     """Lo que debe haber en el cajón antes de contarlo."""
-    from pos_uniformes.services.corte_caja_service import _etiqueta_periodo, estado_caja
+    from pos_uniformes.services.corte_caja_service import _etiqueta_periodo, cargar_parametros, estado_caja
 
     empleada, _p = current
     _solo_dueno(empleada)
     estado = estado_caja(db)
     r = estado.resumen
     return {
+        # Cómo dejó el dueño la casilla la última vez (kiosko o celular).
+        "ocultar_tarjeta": bool(getattr(cargar_parametros(db), "ocultar_tarjeta", False)),
         "periodo": _etiqueta_periodo(estado.desde, estado.hasta),
         "desde": estado.desde.isoformat() if estado.desde else None,
         "hasta": estado.hasta.isoformat(),
@@ -769,6 +771,9 @@ def dueno_hacer_corte(
         raise HTTPException(status_code=422, detail={"error": {
             "code": "corte_invalido", "message": str(exc)}})
 
+    from pos_uniformes.services.corte_caja_service import recordar_ocultar_tarjeta
+
+    recordar_ocultar_tarjeta(db, body.ocultar_tarjeta)
     ocultos = 0
     if body.ocultar_tarjeta:
         # Privados: desaparecen de todo lo que ve el encargado, no solo de

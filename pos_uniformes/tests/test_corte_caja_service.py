@@ -56,6 +56,41 @@ class EstadoCajaTests(unittest.TestCase):
         self.assertEqual(diferencia(Decimal("11920"), Decimal("11910")), Decimal("10.00"))
 
 
+class OcultarTarjetaRecordadoTests(unittest.TestCase):
+    """La casilla del corte llega como la dejó el dueño (2026-09-10)."""
+
+    def setUp(self) -> None:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from pos_uniformes.database.models import CajaParametros
+
+        engine = create_engine("sqlite://")
+        CajaParametros.__table__.create(engine)
+        self.session = sessionmaker(bind=engine)()
+
+    def test_arranca_apagada_y_se_recuerda(self) -> None:
+        self.assertFalse(caja.cargar_parametros(self.session).ocultar_tarjeta)
+        caja.recordar_ocultar_tarjeta(self.session, True)
+        self.assertTrue(caja.cargar_parametros(self.session).ocultar_tarjeta)
+        caja.recordar_ocultar_tarjeta(self.session, False)
+        self.assertFalse(caja.cargar_parametros(self.session).ocultar_tarjeta)
+
+    def test_no_pisa_el_reactivo(self) -> None:
+        caja.guardar_parametros(self.session, reactivo_actual=Decimal("11160"))
+        caja.recordar_ocultar_tarjeta(self.session, True)
+        p = caja.cargar_parametros(self.session)
+        self.assertEqual(p.reactivo_actual, Decimal("11160.00"))
+        self.assertTrue(p.ocultar_tarjeta)
+
+    def test_sin_la_columna_no_truena(self) -> None:
+        from unittest.mock import MagicMock
+
+        rota = MagicMock()
+        rota.get.side_effect = RuntimeError("no such column")
+        caja.recordar_ocultar_tarjeta(rota, True)  # no lanza
+
+
 class CerrarCorteTests(unittest.TestCase):
     def _estado(self, reactivo="11160.00", efectivo="2200.00", pagos="1350.00"):
         return EstadoCaja(

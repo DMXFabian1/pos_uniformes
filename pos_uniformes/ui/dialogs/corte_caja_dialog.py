@@ -321,6 +321,9 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
             estado = estado_caja(session)
             rows = operaciones_del_periodo(session, estado.desde, estado.hasta)
             por_empleada = resumir_por_empleada(rows)
+            from pos_uniformes.services.corte_caja_service import cargar_parametros
+
+            parametros = cargar_parametros(session)
     except Exception:  # noqa: BLE001
         logger.exception("Corte: no se pudo calcular el estado de caja")
         QMessageBox.warning(parent, "Sin conexión", "No se alcanzó la base. Inténtalo otra vez.")
@@ -356,6 +359,8 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
     from PyQt6.QtWidgets import QCheckBox
 
     sin_tarjeta = QCheckBox("Ocultar los cobros con tarjeta (no salen en el ticket)")
+    # Llega como la dejó la última vez (2026-09-10).
+    sin_tarjeta.setChecked(bool(getattr(parametros, "ocultar_tarjeta", False)))
     sin_tarjeta.setVisible(str(creado_por or "").strip().upper() == OWNER_CODE)
     if grande:
         sin_tarjeta.setStyleSheet("font-size: 17px;")
@@ -413,6 +418,9 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
                 creado_por=creado_por,
                 ahora=estado.hasta,
             )
+            from pos_uniformes.services.corte_caja_service import recordar_ocultar_tarjeta
+
+            recordar_ocultar_tarjeta(session, sin_tarjeta.isChecked())
             if sin_tarjeta.isChecked():
                 # Privados: desaparecen de TODO lo que ve el encargado (su
                 # ticket, su pantalla y su celular), no solo de este papel.

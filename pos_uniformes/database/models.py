@@ -2062,6 +2062,9 @@ class CajaParametros(Base):
     sueldo_base: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"), server_default="0")
     tarifa_comision: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"), server_default="0")
     descuento_falta: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"), server_default="0")
+    # Última decisión del dueño sobre la casilla "Ocultar los cobros con
+    # tarjeta" del corte: la próxima vez llega como la dejó.
+    ocultar_tarjeta: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
     )
