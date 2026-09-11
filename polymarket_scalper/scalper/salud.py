@@ -41,6 +41,17 @@ BUCKETS: tuple[tuple[str, float, float], ...] = (
 )
 
 
+def freshness_score(freshness_ms: float | None, media_vida_ms: float = 1_000.0) -> float | None:
+    """Frescura como número entre 0 y 1, para poder cruzarla con llenado y resultado.
+
+    Decae a la mitad cada `media_vida_ms`: 0 ms vale 1, un segundo 0,5, dos segundos 0,25. Es una
+    escala de análisis, no un umbral de decisión: no se usa para bloquear nada.
+    """
+    if freshness_ms is None:
+        return None
+    return round(0.5 ** (max(freshness_ms, 0.0) / media_vida_ms), 4)
+
+
 def bucket(freshness_ms: float | None) -> str:
     if freshness_ms is None:
         return "desconocida"

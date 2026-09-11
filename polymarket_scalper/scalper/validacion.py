@@ -21,7 +21,7 @@ demuestra que una estrategia no sirva**. Demuestra que todavía no se sabe.
 from __future__ import annotations
 
 import json
-import math
+import random
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -29,7 +29,7 @@ from typing import Any
 import polars as pl
 
 from .evaluacion import CIERRES_EXCLUIDOS, bootstrap_ic, es_del_dado
-from .salud import CONTAMINADOS, bucket
+from .salud import CONTAMINADOS, bucket, freshness_score
 from .storage import scan
 
 # --------------------------------------------------------------------------- etiquetas de confianza
@@ -92,6 +92,21 @@ def _entrada(row: dict[str, Any]) -> float | None:
             return coste / row["size_filled"]
     e = _meta(row).get("entry")
     return float(e) if e is not None else None
+
+
+def _drawdown_esperado(pnls: list[float], p: float, sims: int = 200, semilla: int = 7) -> float | None:
+    """Caída típica si solo se hubiera llenado una fracción `p` de las órdenes.
+
+    Se conserva el orden en que ocurrieron y se sortea cuáles entran. No inventa resultados: usa
+    los que hubo. Lo que supone es que las órdenes que hoy no se llenan darían lo mismo que las
+    que sí, que es optimista cuando hay selección adversa.
+    """
+    if not pnls:
+        return None
+    rng = random.Random(semilla)
+    caidas = [_drawdown([x for x in pnls if rng.random() < p]) for _ in range(sims)]
+    m = _mediana(caidas)
+    return None if m is None else round(m, 4)
 
 
 def _drawdown(pnls: list[float]) -> float:
@@ -229,6 +244,7 @@ def llenado(d: Datos) -> list[Llenado]:
                 "ev_por_orden": None if media_llenada is None else round(p * media_llenada, 4),
                 "ev_sin_barridos": None if media_limpia is None else round(p * media_limpia, 4),
                 "pnl_esperado": None if media_llenada is None else round(p * media_llenada * max(len(obs), len(maker)), 2),
+                "drawdown": _drawdown_esperado(pnls, p),
             })
         L.estado = _semaforo_llenado(L, len(validas))
         out.append(L)
@@ -262,9 +278,31 @@ def barrido_de_edge(d: Datos) -> list[dict[str, Any]]:
 
 
 # --------------------------------------------------------------------------- 4: tramos de ventaja
+def _tramo_de(pct: float) -> str:
+    for nombre, lo, hi in TRAMOS_EDGE:
+        if lo <= pct < hi:
+            return nombre
+    return TRAMOS_EDGE[-1][0]
+
+
+def _ordenes_por_tramo(fills: list[dict[str, Any]]) -> dict[tuple[str, str], tuple[int, int]]:
+    """Órdenes puestas y llenadas en cada tramo de ventaja, para poder cruzarlo con el resultado."""
+    acc: dict[tuple[str, str], list[int]] = {}
+    for r in fills:
+        if r.get("sombra") or not r.get("precio"):
+            continue
+        pct = (r.get("edge_net") or 0.0) / r["precio"]
+        k = (r.get("strategy") or "?", _tramo_de(pct))
+        c = acc.setdefault(k, [0, 0])
+        c[0] += 1
+        c[1] += 1 if r.get("llenada") else 0
+    return {k: (v[0], v[1]) for k, v in acc.items()}
+
+
 def tramos_de_edge(d: Datos) -> list[dict[str, Any]]:
     """Ventaja prometida contra resultado, por tramos fijos. No se supone que más sea mejor."""
     out: list[dict[str, Any]] = []
+    ordenes = _ordenes_por_tramo(d.fills)
     for est, filas in sorted(_por_estrategia(d.ledger).items()):
         validas = _validas(filas)
         con_pct: list[tuple[float, dict[str, Any]]] = []
@@ -277,7 +315,10 @@ def tramos_de_edge(d: Datos) -> list[dict[str, Any]]:
             pnls = [r["realized_pnl"] for r in sub]
             adv = [r["adverse_10s"] for r in sub if r.get("adverse_10s") is not None]
             tfav = [r["t_fav_1t_ms"] for r in sub if r.get("t_fav_1t_ms") is not None]
+            puestas, llenas = ordenes.get((est, nombre), (0, 0))
             out.append({"estrategia": est, "tramo": nombre, "n": len(sub),
+                        "ordenes": puestas, "llenadas": llenas,
+                        "tasa_llenado": round(llenas / puestas, 3) if puestas else None,
                         "pnl": round(sum(pnls), 4) if pnls else 0.0,
                         "media": _media(pnls) and round(_media(pnls), 4),
                         "acierto": None if not pnls else round(sum(1 for x in pnls if x > 0) / len(pnls), 3),
@@ -358,8 +399,11 @@ def por_frescura(d: Datos) -> list[dict[str, Any]]:
     for r in d.ledger + d.contaminadas:
         b = bucket(r.get("freshness_ms"))
         c = cajones.setdefault(b, {"tramo": b, "senales": 0, "llenadas": 0, "pnl": 0.0,
-                                   "adversa": [], "n_validas": 0})
+                                   "adversa": [], "n_validas": 0, "scores": []})
         c["senales"] += 1
+        sc = freshness_score(r.get("freshness_ms"))
+        if sc is not None:
+            c["scores"].append(sc)
         if (r.get("size_filled") or 0) > 0:
             c["llenadas"] += 1
         if r in d.ledger and r.get("exit_reason") not in CIERRES_EXCLUIDOS and (r.get("size_filled") or 0) > 0:
@@ -387,6 +431,7 @@ def por_frescura(d: Datos) -> list[dict[str, Any]]:
                     "n_validas": c["n_validas"], "pnl": round(c["pnl"], 4),
                     "pnl_medio": round(c["pnl"] / c["n_validas"], 4) if c["n_validas"] else None,
                     "adversa_10s": _media(c["adversa"]) and round(_media(c["adversa"]), 5),
+                    "score_medio": _media(c.get("scores") or []) and round(_media(c["scores"]), 3),
                     "nivel": nivel(c["n_validas"])})
     return out
 
@@ -680,6 +725,7 @@ def formatear(inf: Informe) -> str:  # noqa: C901 - es un informe, se lee de arr
         L.append("     " + "".join(f"{s_['tasa'] * 100:>9.0f}%" for s_ in x.sensibilidad))
         L.append("  ev " + "".join(_f(s_["ev_por_orden"], 3, 10) for s_ in x.sensibilidad))
         L.append("  sb " + "".join(_f(s_["ev_sin_barridos"], 3, 10) for s_ in x.sensibilidad))
+        L.append("  dd " + "".join(_f(s_.get("drawdown"), 2, 10) for s_ in x.sensibilidad))
     L.append("")
 
     # ---- 3
@@ -695,16 +741,17 @@ def formatear(inf: Informe) -> str:  # noqa: C901 - es un informe, se lee de arr
 
     # ---- 4
     L.append("-- 4. VENTAJA PROMETIDA CONTRA RESULTADO, POR TRAMOS -------------------------------")
-    L.append(f"{'estrategia':22}{'tramo':>9}{'n':>5}{'pnl':>10}{'por op.':>10}{'acierto':>9}"
-             f"{'adversa':>10}{'a favor en':>12}  confianza")
-    L.append("-" * 106)
+    L.append(f"{'estrategia':22}{'tramo':>9}{'órdenes':>9}{'llenado':>9}{'n':>5}{'pnl':>10}{'por op.':>10}"
+             f"{'acierto':>9}{'adversa':>10}{'a favor en':>12}{'caída':>9}  confianza")
+    L.append("-" * 124)
     for r in inf.tramos:
-        if not r["n"]:
+        if not r["n"] and not r.get("ordenes"):
             continue
         tf = "-" if r["t_favorable_1t_s"] is None else f"{r['t_favorable_1t_s']:.1f} s"
-        L.append(f"{r['estrategia'][:22]:22}{r['tramo']:>9}{r['n']:>5}{_f(r['pnl'], 2, 10)}"
+        L.append(f"{r['estrategia'][:22]:22}{r['tramo']:>9}{r.get('ordenes', 0):>9}"
+                 f"{_p(r.get('tasa_llenado'), 9)}{r['n']:>5}{_f(r['pnl'], 2, 10)}"
                  f"{_f(r['media'], 3, 10)}{_p(r['acierto'], 9)}{_f(r['adversa_10s'], 5, 10)}{tf:>12}"
-                 f"  {r['nivel']}")
+                 f"{_f(r['drawdown'], 2, 9)}  {r['nivel']}")
     L.append("")
 
     # ---- 5

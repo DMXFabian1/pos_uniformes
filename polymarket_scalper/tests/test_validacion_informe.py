@@ -275,3 +275,33 @@ def test_sin_datos_el_informe_se_imprime_igual(tmp_path):
     inf = analizar(tmp_path)
     texto = formatear(inf)
     assert "INFORME DE VALIDACIÓN" in texto and inf.estados == []
+
+
+# ------------------------------------------------------------------ añadidos de la fase
+def test_la_caida_esperada_depende_de_la_tasa_de_llenado(tmp_path):
+    # una racha mala seguida de una buena: con llenado parcial la caída típica es menor
+    pnls = [-2.0] * 6 + [3.0] * 6
+    ledger = [_fila(i, pnl=x) for i, x in enumerate(pnls)]
+    _escribir(tmp_path, ledger=ledger, fills=[_obs(i) for i in range(12)])
+    L = analizar(tmp_path).llenado[0]
+    por = {s["tasa"]: s for s in L.sensibilidad}
+    assert por[1.0]["drawdown"] == -12.0                 # llenándolo todo se sufre la racha entera
+    assert por[0.3]["drawdown"] > por[1.0]["drawdown"]   # con menos llenado, menos caída
+
+
+def test_los_tramos_de_ventaja_traen_ordenes_y_llenado(tmp_path):
+    # dos órdenes en el tramo 4-5 % (0.02 sobre 0.50), una de ellas llenada
+    fills = [dict(_obs(0), edge_net=0.02, precio=0.50, llenada=True),
+             dict(_obs(1), edge_net=0.02, precio=0.50, llenada=False)]
+    _escribir(tmp_path, ledger=[_fila(0, edge=0.02, entrada=0.50)], fills=fills)
+    tramos = {r["tramo"]: r for r in analizar(tmp_path).tramos if r.get("ordenes")}
+    assert tramos["4-5 %"]["ordenes"] == 2 and tramos["4-5 %"]["llenadas"] == 1
+    assert tramos["4-5 %"]["tasa_llenado"] == 0.5
+
+
+def test_el_score_de_frescura_decae_a_la_mitad_cada_segundo():
+    from scalper.salud import freshness_score
+    assert freshness_score(0) == 1.0
+    assert freshness_score(1000) == 0.5
+    assert freshness_score(2000) == 0.25
+    assert freshness_score(None) is None
