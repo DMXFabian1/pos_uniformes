@@ -44,6 +44,16 @@ el comando responde. Puedes volver a ejecutarlo cuando actualices el código; no
 
 ## 4. Arrancar el bot
 
+**Con doble clic:** en la carpeta del proyecto hay dos archivos para abrir directamente desde el
+Explorador de Windows, sin tocar PowerShell:
+
+- **`Iniciar-bot.bat`** arranca el bot.
+- **`Abrir-panel.bat`** levanta el panel y abre el navegador solo.
+
+Puedes hacerles clic derecho, "Enviar a", "Escritorio (crear acceso directo)" y tenerlos a mano.
+
+**Desde PowerShell**, si lo prefieres:
+
 ```powershell
 .\deploy\iniciar-bot.ps1
 ```
@@ -65,7 +75,7 @@ El log queda en `logs\bot.log` y rota solo a los 10 MB, así que nunca llena el 
 
 ## 5. Ver el panel
 
-En **otra** ventana de PowerShell, dentro de la misma carpeta:
+Doble clic en **`Abrir-panel.bat`**, o desde **otra** ventana de PowerShell en la misma carpeta:
 
 ```powershell
 .\deploy\iniciar-panel.ps1

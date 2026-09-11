@@ -2,6 +2,7 @@
 # los de shell y los servicios systemd siempre con LF aunque se editen en Windows.
 * text=auto
 *.ps1 text eol=crlf
+*.bat text eol=crlf
 *.sh text eol=lf
 *.service text eol=lf
 *.py text eol=lf
