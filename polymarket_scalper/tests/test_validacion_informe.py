@@ -350,3 +350,26 @@ def test_sin_tasa_necesaria_el_llenado_no_se_da_por_bueno(tmp_path):
     inf = analizar(tmp_path)
     assert inf.llenado[0].requerida is None
     assert inf.llenado[0].estado == LLENA_SIN_MEDIDA
+
+
+def test_la_tabla_dice_que_parte_de_los_llenados_llego_por_barrido(tmp_path):
+    # En la corrida de cuatro horas, 221 de 233 llenados de TENNIS_SPREAD_CAPTURE y 97 de 103 de
+    # TENNIS_DIRECTIONAL llegaron por barrido del nivel. Un llenado por barrido no es una
+    # contrapartida que llega a nuestro precio: es el mercado moviéndose contra nosotros. Sin esa
+    # columna, una tasa de llenado del 79 % parece una buena noticia.
+    fills = [_obs(i, llenada=True) for i in range(10)]
+    for f in fills[:8]:
+        f["barrido"] = True
+    _escribir(tmp_path, ledger=[_fila(i) for i in range(10)], fills=fills)
+    inf = analizar(tmp_path)
+    assert inf.llenado[0].barridas == 8 and inf.llenado[0].por_barrido == 0.8
+    assert "barrido" in formatear(inf)
+
+
+def test_una_orden_sin_llenar_no_cuenta_como_barrida(tmp_path):
+    fills = [_obs(i, llenada=i < 5) for i in range(10)]
+    for f in fills:
+        f["barrido"] = True          # el nivel se barrió también en las que no se llenaron
+    _escribir(tmp_path, ledger=[_fila(i) for i in range(5)], fills=fills)
+    inf = analizar(tmp_path)
+    assert inf.llenado[0].barridas == 5 and inf.llenado[0].por_barrido == 1.0

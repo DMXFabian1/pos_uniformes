@@ -335,6 +335,31 @@ medir una tasa de llenado, la de las que no se llenan. Comprobado en los datos: 
 sola fila, en ningún experimento, que se haya llenado sin escenarios. El filtro no estaba
 protegiendo de nada y sí estaba tirando dato bueno.
 
+### El hallazgo de la corrida de cuatro horas: nos llenamos casi siempre por barrido
+
+338 posiciones, 1 170 decisiones registradas, −640,83 USD en papel. El número que explica el resto
+no es la tasa de llenado, que parece sana:
+
+| Estrategia | Llenados | Por barrido |
+|---|---|---|
+| TENNIS_SPREAD_CAPTURE | 233 de 296 (79 %) | **221 (95 %)** |
+| TENNIS_DIRECTIONAL | 103 de 155 (66 %) | **97 (94 %)** |
+
+Un barrido es que alguien se llevó el nivel de precio entero por delante. Que el 95 % de nuestros
+llenados lleguen así significa que **casi nunca nos llena una contrapartida que viene a nuestro
+precio**: nos llena el mercado al moverse en contra, recogiéndonos de paso. Es selección adversa en
+su forma más mecánica, y encaja con todo lo demás que se midió:
+
+- el movimiento en contra es inmediato (−0,5 ticks en 0,0 s, en el 99 % de las operaciones) y el
+  movimiento a favor tarda 18-28 s y llega a menos operaciones;
+- el mid ya está en contra a los 100 ms del llenado y sigue en contra a los 60 s;
+- MFE +0,014 contra MAE −0,035 en `TENNIS_DIRECTIONAL`.
+
+Tiene una consecuencia sobre el propio informe: la columna "valor esperado sin barridos" de la
+sensibilidad al llenado se calcula sobre los llenados limpios, y quedan seis en `TENNIS_DIRECTIONAL`
+y doce en `TENNIS_SPREAD_CAPTURE`. **No hay contrafactual limpio que calcular**, y eso ya es la
+respuesta: no existe una versión de estas estrategias que se llene sin que la barran.
+
 ### La regla que no cambia
 
 Ningún número del ledger anterior al cambio A cuenta como evidencia sobre las señales maker: se

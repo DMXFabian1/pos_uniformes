@@ -233,6 +233,7 @@ class Llenado:
     espera_mediana_s: float | None = None
     cola_mediana: float | None = None
     barridas: int = 0
+    por_barrido: float | None = None   # fracción de los llenados que llegó por barrido del nivel
     estado: str = LLENA_POCO
     corto: bool = False               # se llena menos de lo que haría falta para batir al taker
     sensibilidad: list[dict[str, Any]] = field(default_factory=list)
@@ -265,7 +266,8 @@ def llenado(d: Datos) -> list[Llenado]:
             L.espera_mediana_s = _mediana([r["espera_ms"] / 1000 for r in obs
                                            if r.get("espera_ms") and r["espera_ms"] >= 0])
             L.cola_mediana = _mediana([r["cola_delante"] for r in obs if r.get("cola_delante") is not None])
-            L.barridas = sum(1 for r in obs if r.get("barrido"))
+            L.barridas = sum(1 for r in obs if r.get("barrido") and r.get("llenada"))
+            L.por_barrido = round(L.barridas / L.llenadas, 4) if L.llenadas else None
         validas = pnl_por_est.get(est, [])
         maker = [r for r in validas if (r.get("entry_role") or _meta(r).get("entry_role")) == "maker"]
         pnls = [r["realized_pnl"] for r in maker]
@@ -792,13 +794,18 @@ def formatear(inf: Informe) -> str:  # noqa: C901 - es un informe, se lee de arr
     # ---- 1 y 2
     L.append("-- 1 y 2. ¿SE LLENAN LAS ÓRDENES, Y HACEN FALTA MÁS? -------------------------------")
     L.append(f"{'estrategia':24}{'órdenes':>9}{'llenado':>9}{'conserv.':>10}{'optim.':>9}"
-             f"{'necesario':>11}{'espera':>9}{'cola':>8}  ¿se llena? (no dice si gana)")
-    L.append("-" * 100)
+             f"{'necesario':>11}{'barrido':>9}{'espera':>9}{'cola':>8}  ¿se llena? (no dice si gana)")
+    L.append("-" * 110)
     for x in inf.llenado:
         espera = "-" if x.espera_mediana_s is None else f"{x.espera_mediana_s:.1f} s"
         cola = "-" if x.cola_mediana is None else f"{x.cola_mediana:.0f}"
         L.append(f"{x.estrategia[:24]:24}{x.ordenes:>9}{_p(x.tasa, 9)}{_p(x.tasa_conservadora, 10)}"
-                 f"{_p(x.tasa_optimista, 9)}{_p(x.requerida, 11)}{espera:>9}{cola:>8}  {x.estado}")
+                 f"{_p(x.tasa_optimista, 9)}{_p(x.requerida, 11)}{_p(x.por_barrido, 9)}"
+                 f"{espera:>9}{cola:>8}  {x.estado}")
+    L.append("")
+    L.append("'barrido' es la parte de los llenados en los que alguien se llevó el nivel entero por")
+    L.append("delante. Un llenado por barrido no es un contrapartida que llega a nuestro precio: es")
+    L.append("el mercado moviéndose contra nosotros y recogiéndonos de paso.")
     L.append("")
     L.append("Sensibilidad al llenado: valor esperado por orden si la tasa fuera otra.")
     L.append("Supone que las órdenes que hoy no se llenan se comportarían como las que sí. Es")
