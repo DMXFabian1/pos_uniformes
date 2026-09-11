@@ -78,6 +78,8 @@ salud:                          # cuándo el feed deja de describir el mercado. 
   sin_mensajes_viejo_s: 15
   sin_mensajes_congelado_s: 60
   registro_segundos: 15
+  ventana_latencia_s: 5         # el retraso se mide sobre los últimos segundos, no sobre los últimos N
+  minimo_muestras: 20           # mensajes: el feed llega a ráfagas y el recuento fijo mezcla épocas
 
 validacion:                     # fase de medición: seguir qué pasa después de cada fill. No decide nada.
   seguimiento_s: 900            # se sigue la trayectoria del precio 15 min tras el llenado

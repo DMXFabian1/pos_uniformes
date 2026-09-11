@@ -258,6 +258,28 @@ Consecuencias, ya implementadas:
 Queda pendiente distinguir si el retraso lo introduce Polymarket o el camino de red hasta este
 contenedor. Se decide con la misma medición corriendo desde otra ubicación.
 
+### Segunda medición del feed: llega a ráfagas, no con retraso constante
+
+Durante la fase de validación, con el contenedor sin otra carga, el feed se comportó así en tres
+minutos consecutivos:
+
+| Minuto | Mensajes por segundo | Retraso mediano | Retraso p95 |
+|---|---|---|---|
+| 1 | 187 | 18,8 s | 33,5 s |
+| 2 | 173 | 62,0 s | 84,7 s |
+| 3 | 173 | 0,12 s | 137,3 s |
+
+Dos cosas quedan claras. La primera: a 180 mensajes por segundo no estamos saturados ni de lejos
+(el motor procesa 37 000 por segundo en el perfilado), así que el retraso sigue siendo del feed.
+La segunda, nueva: **el retraso no es constante, es a ráfagas**. El mismo minuto puede tener una
+mediana de 120 ms y un p95 de dos minutos.
+
+Eso tiene una consecuencia sobre cómo medimos la frescura. La mediana se calcula sobre los
+últimos 5 000 mensajes, que a este ritmo son casi medio minuto de historia: mezcla ráfagas viejas
+con mensajes recién llegados, y el estado del feed oscila entre SANO y VIEJO sin que el libro haya
+cambiado de calidad. La medida correcta para decidir si el libro está al día es el retraso de los
+mensajes **más recientes**, en una ventana de tiempo, no de recuento.
+
 ### La regla que no cambia
 
 Ningún número del ledger anterior al cambio A cuenta como evidencia sobre las señales maker: se

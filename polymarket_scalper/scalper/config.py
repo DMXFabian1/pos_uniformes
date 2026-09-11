@@ -127,6 +127,10 @@ class SaludCfg(BaseModel):
     sin_mensajes_viejo_s: float = 15
     sin_mensajes_congelado_s: float = 60
     registro_segundos: float = 15        # cada cuánto se guarda una fila de salud del feed
+    # El retraso se mide sobre los mensajes de los últimos segundos, no sobre los últimos N
+    # mensajes: el feed llega a ráfagas y un recuento fijo mezcla lo viejo con lo recién llegado.
+    ventana_latencia_s: float = 5.0
+    minimo_muestras: int = 20            # si en la ventana hay menos, se usan las últimas de todas
 
 
 class ValidacionCfg(BaseModel):

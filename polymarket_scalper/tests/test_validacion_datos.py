@@ -254,3 +254,24 @@ def test_la_decision_enlaza_con_la_sombra_por_el_id_de_la_senal(cfg, tmp_path):
     d = scan(tmp_path, "decisions").collect().to_dicts()[0]
     assert d["signal_id"] == sombra.signal.signal_id and d["motivo"] == "bajo_el_minimo_requerido"
     assert d["experiment"] == "exp-test" and d["feed_state"] == SANO and not d["contaminado"]
+
+
+def test_el_retraso_se_mide_sobre_los_mensajes_recientes_no_sobre_los_ultimos_n(cfg, monkeypatch):
+    """El feed llega a ráfagas: con un recuento fijo, una ráfaga vieja contamina la medida."""
+    from scalper import collector as mod
+
+    col = mod.Collector(cfg, persist=False)
+    ahora = 1_000_000_000
+    monkeypatch.setattr(mod, "now_ms", lambda: ahora)
+    # una ráfaga de hace un minuto con 60 s de retraso, y treinta mensajes recientes al día
+    for i in range(500):
+        col.latencias.append((ahora - 60_000 + i, 60_000))
+    for i in range(30):
+        col.latencias.append((ahora - 1_000 + i * 30, 120))
+    lat = col.latencia()
+    assert lat["mediana"] == 120 and lat["n"] == 30        # la ráfaga vieja queda fuera
+    # y si en la ventana no hay casi nada, se usan los últimos de todos en vez de quedarse ciego
+    col.latencias.clear()
+    for i in range(40):
+        col.latencias.append((ahora - 600_000 + i, 4_000))
+    assert col.latencia()["mediana"] == 4_000

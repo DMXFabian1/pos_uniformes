@@ -85,7 +85,7 @@ class Collector:
         self.stats: dict[str, int] = {"book": 0, "delta": 0, "trade": 0, "tick": 0, "resync": 0, "resolved": 0,
                                       "game": 0, "flow": 0, "whale": 0, "updown_resueltas": 0}
         self.started_ms = now_ms()
-        self.latencias: deque = deque(maxlen=5000)     # recv_ms - ts_ms de los últimos mensajes del CLOB
+        self.latencias: deque = deque(maxlen=50000)    # (recv_ms, retraso) de los mensajes del CLOB
 
     # ------------------------------------------------------------------ ciclo de vida
     def add_listener(self, fn: Listener) -> None:
@@ -219,7 +219,7 @@ class Collector:
         recv = now_ms()
         ts = int(msg.get("timestamp") or recv)
         if msg.get("timestamp"):
-            self.latencias.append(recv - ts)
+            self.latencias.append((recv, recv - ts))
         if et == "book":
             await self._apply_snapshot(msg.get("asset_id", ""), msg.get("bids") or [], msg.get("asks") or [],
                                        ts, msg.get("hash", ""), source="ws", recv_ms=recv)
@@ -568,13 +568,27 @@ class Collector:
             paginas_llenas=self.flow.paginas_llenas if self.flow is not None else 0,
         )
 
-    def latencia(self) -> dict[str, float] | None:
-        """Retraso entre el reloj del exchange y el nuestro, sobre los últimos mensajes del CLOB."""
+    def latencia(self, ventana_s: float | None = None) -> dict[str, float] | None:
+        """Retraso entre el reloj del exchange y el nuestro, sobre los mensajes recientes.
+
+        La ventana es de tiempo y no de recuento a propósito: el feed llega a ráfagas, y con un
+        número fijo de mensajes la mediana mezcla una ráfaga vieja con lo que acaba de llegar. Si
+        en la ventana hay muy pocos mensajes se usan los últimos disponibles, para no quedarse sin
+        medida justo cuando el feed se para.
+        """
         if not self.latencias:
             return None
-        xs = sorted(self.latencias)
+        c = self.cfg.salud
+        ventana = c.ventana_latencia_s if ventana_s is None else ventana_s
+        corte = now_ms() - ventana * 1000
+        recientes = [lag for t, lag in self.latencias if t >= corte]
+        if len(recientes) < c.minimo_muestras:
+            recientes = [lag for _, lag in list(self.latencias)[-c.minimo_muestras:]]
+        xs = sorted(recientes)
+        if not xs:
+            return None
         return {"n": len(xs), "mediana": xs[len(xs) // 2], "p95": xs[min(len(xs) - 1, int(len(xs) * 0.95))],
-                "max": xs[-1]}
+                "max": xs[-1], "ventana_s": ventana}
 
 
 def _fnum(x: Any) -> float | None:
