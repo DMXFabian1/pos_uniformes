@@ -8,20 +8,26 @@ Eventos que emite a los listeners (para paper trading):
     ("resolution", ts_ms, condition_id, dict)    mercado resuelto
     ("game",    ts_ms, game_id, dict)            estado de partido en vivo (fila de `games`)
     ("flow",    ts_ms, condition_id, dict)       trade con wallet (fila de `flow_trades`)
+    ("price",   ts_ms, symbol, dict)             precio de referencia de cripto
+    ("updown",  ts_ms, condition_id, dict)       ventana "Up or Down" activa, con su strike
+    ("updown_settle", ts_ms, condition_id, dict) ventana cerrada: quién ganó
 """
 from __future__ import annotations
 
 import asyncio
+import bisect
 import logging
 import signal
 import time
+from collections import defaultdict, deque
 from datetime import datetime, timezone
 from typing import Any, Awaitable, Callable
 
 from .book import OrderBook
 from .clob import ClobRest, WebSocketPool
 from .config import Config
-from .discovery import GammaClient, MarketInfo, discover_markets
+from .crypto_feed import CryptoFeed
+from .discovery import GammaClient, MarketInfo, discover_markets, discover_updown
 from .flow import DataApi, FlowPoller, flow_row
 from .keepawake import KeepAwake
 from .sports_feed import SportsFeed, normalize_game, state_key
@@ -51,6 +57,15 @@ class Collector:
         self.pending_resolution: dict[str, MarketInfo] = {}  # mercados retirados que aún no se resolvieron
         self.game_to_cids: dict[str, list[str]] = {}
         self.games: dict[str, dict[str, Any]] = {}          # último estado por game_id
+        self.crypto: CryptoFeed | None = None
+        self.prices: dict[str, deque] = defaultdict(lambda: deque(maxlen=20000))  # símbolo -> (ts_ms, precio)
+        self._price_last_saved: dict[str, int] = {}
+        self.updown: dict[str, MarketInfo] = {}             # condition_id -> ventana activa
+        self.strikes: dict[str, tuple[float, int]] = {}     # condition_id -> (strike, ts del strike)
+        self._updown_done: set[str] = set()
+        if cfg.updown.enabled:
+            syms = {sl.split("-")[0] for sl in cfg.updown.series}
+            self.crypto = CryptoFeed(cfg.updown.ws_url, self._on_price, syms or None)
         self.sports: SportsFeed | None = None
         self.data_api: DataApi | None = None
         self.flow: FlowPoller | None = None
@@ -67,7 +82,7 @@ class Collector:
         self._closed = False
         self._tasks: list[asyncio.Task] = []
         self.stats: dict[str, int] = {"book": 0, "delta": 0, "trade": 0, "tick": 0, "resync": 0, "resolved": 0,
-                                      "game": 0, "flow": 0, "whale": 0}
+                                      "game": 0, "flow": 0, "whale": 0, "updown_resueltas": 0}
         self.started_ms = now_ms()
 
     # ------------------------------------------------------------------ ciclo de vida
@@ -113,6 +128,9 @@ class Collector:
         ]
         if self.cfg.retention.enabled and self.persist:
             self._tasks.append(asyncio.create_task(self._retention_loop(), name="retention"))
+        if self.crypto is not None:
+            self._tasks.append(asyncio.create_task(self.crypto.run(), name="precios"))
+            self._tasks.append(asyncio.create_task(self._updown_loop(), name="updown"))
         if self.sports is not None:
             self._tasks.append(asyncio.create_task(self.sports.run(), name="sports"))
         if self.flow is not None and self.wallets is not None:
@@ -248,6 +266,127 @@ class Collector:
             })
         await self._emit(("book", ts, tid, book))
 
+    # ------------------------------------------------------------------ cripto: precio y ventanas
+    async def _on_price(self, row: dict[str, Any]) -> None:
+        sym, ts = row["symbol"], int(row["ts_ms"])
+        self.prices[sym].append((ts, float(row["price"])))
+        cada = int(self.cfg.updown.price_sample_seconds * 1000)
+        if self.persist and ts - self._price_last_saved.get(sym, 0) >= cada:
+            self._price_last_saved[sym] = ts
+            self.writer.append("crypto_prices", {"ts_ms": ts, "symbol": sym, "price": float(row["price"])})
+        await self._emit(("price", ts, sym, row))
+
+    def price_at(self, symbol: str, ts_ms: int, tolerancia_s: float) -> tuple[float, int] | None:
+        """Precio más cercano a ts_ms dentro de la tolerancia. None si no estábamos escuchando."""
+        serie = self.prices.get(symbol)
+        if not serie:
+            return None
+        datos = list(serie)
+        ts = [t for t, _ in datos]
+        i = bisect.bisect_left(ts, ts_ms)
+        mejor: tuple[float, int] | None = None
+        for j in (i - 1, i):
+            if 0 <= j < len(datos):
+                t, p = datos[j]
+                if mejor is None or abs(t - ts_ms) < abs(mejor[1] - ts_ms):
+                    mejor = (p, t)
+        if mejor is None or abs(mejor[1] - ts_ms) > tolerancia_s * 1000:
+            return None
+        return mejor
+
+    def price_from(self, symbol: str, ts_ms: int, tolerancia_s: float) -> tuple[float, int] | None:
+        """Primer precio en ts_ms o después, dentro de la tolerancia.
+
+        Para el strike y la liquidación hace falta esto y no el más cercano: las ventanas se
+        descubren por adelantado, y tomar el precio anterior a la apertura sesga el modelo.
+        """
+        serie = self.prices.get(symbol)
+        if not serie:
+            return None
+        datos = list(serie)
+        ts = [t for t, _ in datos]
+        i = bisect.bisect_left(ts, ts_ms)
+        if i >= len(datos):
+            return None
+        t, p = datos[i]
+        return (p, t) if t - ts_ms <= tolerancia_s * 1000 else None
+
+    async def _updown_loop(self) -> None:
+        ucfg = self.cfg.updown
+        while True:
+            try:
+                await self._refresh_updown()
+            except Exception:  # noqa: BLE001
+                log.exception("ciclo up/down falló")
+            await asyncio.sleep(ucfg.refresh_seconds)
+
+    async def _refresh_updown(self) -> None:
+        ucfg = self.cfg.updown
+        ahora = now_ms()
+        encontrados = await discover_updown(self.cfg, self.gamma)
+        nuevos: list[str] = []
+        for mi in encontrados:
+            cid = mi.condition_id
+            if cid in self._updown_done:
+                continue
+            if cid not in self.updown:
+                self.updown[cid] = mi
+                self.markets[cid] = mi
+                for t in mi.tokens:
+                    self.token_to_cid[t.token_id] = cid
+                    if t.token_id not in self.books:
+                        self.books[t.token_id] = OrderBook(t.token_id, cid, mi.tick_size)
+                        nuevos.append(t.token_id)
+                if self.persist:
+                    self.writer.append("markets", mi.to_row(ahora, status="updown"))
+            if cid not in self.strikes and ahora >= mi.updown_start_ms:
+                golpe = self.price_from(mi.updown_symbol, mi.updown_start_ms, ucfg.strike_tolerance_seconds)
+                if golpe is not None:
+                    self.strikes[cid] = golpe
+                    if self.persist:
+                        self.writer.append("updown_windows", {
+                            "ts_ms": ahora, "condition_id": cid, "slug": mi.slug, "symbol": mi.updown_symbol,
+                            "window_s": mi.updown_window_s, "start_ms": mi.updown_start_ms, "end_ms": mi.updown_end_ms,
+                            "strike": golpe[0], "strike_ts_ms": golpe[1], "settle_price": None, "up_won": None,
+                            "status": "abierta"})
+            strike = self.strikes.get(cid)
+            if strike is not None:
+                await self._emit(("updown", ahora, cid, {"market": mi, "strike": strike[0], "strike_ts_ms": strike[1],
+                                                          "symbol": mi.updown_symbol, "start_ms": mi.updown_start_ms,
+                                                          "end_ms": mi.updown_end_ms, "window_s": mi.updown_window_s}))
+        if nuevos:
+            await self.pool.ensure(nuevos)
+        await self._liquidar_updown(ahora)
+
+    async def _liquidar_updown(self, ahora: int) -> None:
+        """Ventana vencida: el ganador sale del precio de referencia al cierre."""
+        ucfg = self.cfg.updown
+        for cid, mi in list(self.updown.items()):
+            if ahora < mi.updown_end_ms + 3000:
+                continue
+            self.updown.pop(cid, None)
+            self._updown_done.add(cid)
+            strike = self.strikes.get(cid)
+            cierre = self.price_from(mi.updown_symbol, mi.updown_end_ms, ucfg.strike_tolerance_seconds)
+            up_won = None if (strike is None or cierre is None) else cierre[0] > strike[0]
+            if self.persist:
+                self.writer.append("updown_windows", {
+                    "ts_ms": ahora, "condition_id": cid, "slug": mi.slug, "symbol": mi.updown_symbol,
+                    "window_s": mi.updown_window_s, "start_ms": mi.updown_start_ms, "end_ms": mi.updown_end_ms,
+                    "strike": None if strike is None else strike[0], "strike_ts_ms": None if strike is None else strike[1],
+                    "settle_price": None if cierre is None else cierre[0], "up_won": up_won,
+                    "status": "resuelta" if up_won is not None else "sin_datos"})
+            await self.pool.drop(mi.token_ids)
+            for t in mi.token_ids:
+                self.books.pop(t, None)
+                self.token_to_cid.pop(t, None)
+            self.strikes.pop(cid, None)
+            self.stats["updown_resueltas"] += 1
+            if up_won is not None:
+                ganador = next((t.token_id for t in mi.tokens if t.outcome.lower() == ("up" if up_won else "down")), None)
+                await self._emit(("updown_settle", ahora, cid, {"up_won": up_won, "winner_token": ganador,
+                                                                 "market": mi, "settle_price": cierre[0]}))
+
     # ------------------------------------------------------------------ feed de deportes
     async def _on_game(self, msg: dict[str, Any]) -> None:
         ts = now_ms()
@@ -380,6 +519,11 @@ class Collector:
                          f" wallets={len(self.wallets.profiles)} cola={self.wallets.pending}")
             if self.sports is not None:
                 extra += f" partidos_vivos={len(self.live_games())}"
+            if self.crypto is not None:
+                btc = self.crypto.price("btc")
+                extra += f" updown={len(self.updown)} strikes={len(self.strikes)}"
+                if btc:
+                    extra += f" btc={btc[1]:,.0f}"
             log.info("estado: mercados=%d libros_validos=%d/%d ws=%s eventos=%s filas=%s%s",
                      len(self.markets), valid, len(self.books), self.pool.stats(), dict(self.stats),
                      dict(self.writer.rows_written), extra)

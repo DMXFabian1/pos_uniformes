@@ -57,6 +57,19 @@ models:
   soccer_total_goals: 2.7
   pregame_proxy_max_progress: 0.15   # sin precio previo, solo se modela si el partido lleva < 15 %
 
+updown:                         # mercados "Up or Down" de cripto (5 y 15 minutos)
+  enabled: true
+  series: [btc-up-or-down-5m, btc-up-or-down-15m]   # añade eth-…, sol-… si quieres más
+  refresh_seconds: 20           # viven minutos: se descubren mucho más seguido que el resto
+  max_markets: 12
+  min_seconds_left: 45          # no entrar en el tramo final, donde el modelo ya no aporta
+  min_edge_net: 0.03            # la comisión de cripto es 7 %: sin ventaja grande no compensa
+  max_edge_net: 0.45            # por encima, casi siempre es un precio de apertura mal leído
+  annual_vol: {}                # volatilidad anualizada por símbolo; vacío usa la típica de cada uno
+  default_annual_vol: 0.6
+  # Regla del motor: aquí se compra y se aguanta hasta la resolución. Vender antes paga la
+  # comisión dos veces y se come la ventaja.
+
 retention:                      # disco: book_deltas crece ~4 GB/día; el aprendizaje no los necesita
   enabled: true
   run_hours: 24                 # corre solo dentro del recolector; también a mano con `scalper retention`

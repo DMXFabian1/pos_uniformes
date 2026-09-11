@@ -101,6 +101,23 @@ class ModelsCfg(BaseModel):
     pregame_proxy_max_progress: float = 0.15   # si el partido ya avanzó más que esto sin precio previo, no se modela
 
 
+class UpDownCfg(BaseModel):
+    """Mercados "Up or Down" de cripto: viven 5 o 15 minutos y se resuelven contra el precio real."""
+    enabled: bool = True
+    tag_id: int = 102127                     # tag "Up or Down"
+    series: list[str] = Field(default_factory=lambda: ["btc-up-or-down-5m", "btc-up-or-down-15m"])
+    refresh_seconds: float = 20              # viven minutos: hay que descubrirlos rápido
+    max_markets: int = 12
+    ws_url: str = "wss://ws-live-data.polymarket.com"
+    price_sample_seconds: float = 1.0        # muestreo que se guarda en disco
+    strike_tolerance_seconds: float = 10     # margen tras la apertura para tomar el strike
+    min_seconds_left: float = 45             # no entrar en el tramo final
+    min_edge_net: float = 0.03               # el fee de cripto es 7 %: hace falta ventaja grande
+    max_edge_net: float = 0.45               # más que esto suele ser un strike mal leído
+    annual_vol: dict[str, float] = Field(default_factory=dict)   # p.ej. {btc: 0.48}
+    default_annual_vol: float = 0.6
+
+
 class RetentionCfg(BaseModel):
     enabled: bool = True
     run_hours: float = 24            # cada cuánto corre dentro del recolector
@@ -157,6 +174,7 @@ class Config(BaseModel):
     models: ModelsCfg = Field(default_factory=ModelsCfg)
     learn: LearnCfg = Field(default_factory=LearnCfg)
     retention: RetentionCfg = Field(default_factory=RetentionCfg)
+    updown: UpDownCfg = Field(default_factory=UpDownCfg)
     signals: SignalsCfg = Field(default_factory=SignalsCfg)
     sim: SimCfg = Field(default_factory=SimCfg)
 

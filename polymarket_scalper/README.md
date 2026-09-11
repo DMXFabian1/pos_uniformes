@@ -1,8 +1,8 @@
 # polymarket_scalper
 
-Bot de scalping para Polymarket enfocado en **NBA** y **tenis**: partidos en vivo (ganador del
-partido) y futuros (campeón, MVP, ganador del torneo). `config.amplio.yaml` guarda la versión con
-todos los deportes y política por si se quiere ampliar; el código es el mismo.
+Bot de scalping para Polymarket enfocado en **NBA**, **tenis** y los mercados **"Up or Down" de
+cripto** (ventanas de 5 y 15 minutos). `config.amplio.yaml` guarda la versión con todos los
+deportes y política por si se quiere ampliar; el código es el mismo.
 
 > Temporada: la NBA arranca a fines de octubre. Hasta entonces solo aparecen sus futuros; el tenis
 > (ATP, WTA, Challengers) aporta partidos en vivo todos los días y es donde se acumulan los datos
@@ -66,6 +66,8 @@ Todo se configura en `config.yaml`. Nada de esto toca una wallet ni firma órden
 | `trades` | cada trade impreso, con su fee_rate_bps |
 | `quotes` | top-of-book muestreado cada N segundos (para features rápidas) |
 | `resolutions` | qué token ganó cuando el mercado cerró |
+| `crypto_prices` | precio de referencia de cripto, muestreado cada segundo |
+| `updown_windows` | cada ventana "Up or Down": strike, cierre y quién ganó |
 
 ### Fase 2: señales (`scalper/signals/`)
 Todas incluyen las comisiones: el taker paga `shares × rate × p × (1−p)`, el maker no paga.
@@ -119,6 +121,28 @@ y lo actualizan con el marcador. Sin precio previo, solo se modela si el partido
   al saque se infieren del precio previo y se propaga desde sets, juegos y tiebreak actuales.
 - **Fútbol** (`soccer.py`): goles restantes como Poisson por equipo; las tasas salen del precio
   previo de local/empate/visitante. Devuelve las tres probabilidades para los mercados de 3 salidas.
+
+### Mercados "Up or Down" de cripto (`crypto_feed.py`, `models/crypto.py`, `signals/updown.py`)
+Ventanas de 5 o 15 minutos que pagan según si el precio al cierre supera al de apertura. Son el
+único mercado donde tenemos **el mismo dato con el que se resuelven**: Polymarket publica el precio
+de referencia en vivo y el bot lo escucha.
+
+- **Modelo:** `P(Up) = Φ(ln(S/K) / (σ·√τ))`, con `K` el precio de apertura, `S` el actual y `τ` la
+  fracción de ventana que falta. Sin deriva a propósito: en 5 minutos la tendencia es ruido.
+  σ se calibra con los propios datos; por defecto sale de la volatilidad anualizada típica de cada
+  símbolo.
+- **El strike se toma en la apertura o después, nunca antes.** Las ventanas se descubren por
+  adelantado, y tomar el precio previo sesgaba el modelo. Si el bot no estaba escuchando cuando
+  abrió la ventana, no hay strike y no se opera.
+- **Se compra y se aguanta hasta la resolución.** La comisión de cripto es del 7 %, la más alta de
+  la plataforma, y solo la paga quien cruza el libro. Entrar y salir la pagaría dos veces y se
+  comería la ventaja; la resolución no cobra nada.
+- **Por qué importan aunque sean difíciles:** se resuelven en minutos contra un dato objetivo, así
+  que el ledger acumula ejemplos etiquetados cientos de veces más rápido que el deporte. Son el
+  combustible del aprendizaje de la fase 5.
+- **Advertencia honesta:** son los mercados con más bots compitiendo y la comisión más alta. Al
+  abrir la ventana el modelo vale exactamente 0,50, así que operar ahí es apostar a que el sesgo
+  del mercado es ruido. Si eso es cierto solo lo dirá el ledger con cientos de posiciones.
 
 ### Detectores in-play y de dinero inteligente
 - **model_deviation**: para cada token enlazado a un partido en vivo, si

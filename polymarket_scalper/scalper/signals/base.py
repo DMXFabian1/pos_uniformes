@@ -9,6 +9,7 @@ from typing import Any, Protocol
 from ..book import OrderBook
 from ..discovery import MarketInfo
 from ..models.base import GameState, WinProb
+from ..models.crypto import UpDownState
 
 _counter = itertools.count(1)
 
@@ -83,6 +84,8 @@ class MarketContext:
     pregame: WinProb | None = None                   # probabilidad previa al partido (del mercado)
     outcome_side: dict[str, str] = field(default_factory=dict)      # token_id -> home | away | draw
     wallets: dict[str, Any] = field(default_factory=dict)           # wallet -> WalletProfile
+    updown: UpDownState | None = None               # ventana "Up or Down" activa
+    updown_prob: float | None = None                # P(Up) del modelo de difusión
 
     def book(self, token_id: str) -> OrderBook | None:
         return self.books.get(token_id) or self.event_books.get(token_id)

@@ -15,6 +15,7 @@ from ..config import Config
 from ..discovery import MarketInfo
 from ..learn import ModelStore, Scorer
 from ..models import GameState, ModelRegistry, WinProb, match_outcome, parse_game
+from ..models.crypto import UpDownModel, UpDownState
 from ..signals import MarketContext, Signal, build_detectors
 from ..signals.base import Leg, TokenHistory
 from ..storage import ParquetWriter
@@ -30,7 +31,7 @@ class Engine:
         self.run_id = run_id
         self.mode = mode
         self.writer = writer
-        self.detectors = build_detectors(cfg.signals)
+        self.detectors = build_detectors(cfg.signals, cfg.updown)
         self.fill_model = FillModel(cfg.sim.slippage_ticks, cfg.sim.maker_fill_prob, cfg.sim.seed)
         self.markets: dict[str, MarketInfo] = {}
         self.token_to_cid: dict[str, str] = {}
@@ -50,6 +51,10 @@ class Engine:
         self.pregame: dict[str, WinProb] = {}                 # game_id -> prob previa (del mercado)
         self.outcome_side: dict[str, dict[str, str]] = {}    # cid -> token -> home|away|draw
         self.wallets: dict[str, Any] = {}                     # wallet -> WalletProfile
+        # "Up or Down": ventana por mercado y último precio de referencia por símbolo
+        self.updown_model = UpDownModel(cfg.updown.annual_vol, cfg.updown.default_annual_vol)
+        self.updown: dict[str, dict[str, Any]] = {}
+        self.spot: dict[str, tuple[int, float]] = {}
         lc = cfg.learn
         self.scorer = Scorer(ModelStore(cfg.data_dir), lc.shrink_n, lc.min_train, lc.min_p_win, lc.size_floor, lc.enabled)
 
@@ -96,6 +101,12 @@ class Engine:
             self.on_game(event[1], event[2], event[3])
         elif kind == "flow":
             self.on_flow(event[1], event[2], event[3])
+        elif kind == "price":
+            self.on_price(event[1], event[2], event[3])
+        elif kind == "updown":
+            self.on_updown(event[1], event[2], event[3])
+        elif kind == "updown_settle":
+            self.on_updown_settle(event[1], event[2], event[3])
 
     def on_game(self, ts_ms: int, game_id: str, row: dict[str, Any]) -> None:
         self.now_ms = max(self.now_ms, ts_ms)
@@ -119,6 +130,53 @@ class Engine:
         for cid in cids:
             self.last_detect.pop(cid, None)              # un cambio de marcador siempre se evalúa
             self._maybe_detect(cid, ts_ms)
+
+    # ------------------------------------------------------------ "Up or Down"
+    def on_price(self, ts_ms: int, symbol: str, row: dict[str, Any]) -> None:
+        self.now_ms = max(self.now_ms, ts_ms)
+        self.spot[symbol] = (ts_ms, float(row["price"]))
+        self._process_pending(ts_ms)
+        for cid, w in list(self.updown.items()):
+            if w["symbol"] == symbol and ts_ms < w["end_ms"]:
+                self._maybe_detect(cid, ts_ms)
+
+    def on_updown(self, ts_ms: int, condition_id: str, info: dict[str, Any]) -> None:
+        self.now_ms = max(self.now_ms, ts_ms)
+        mi = info.get("market")
+        if mi is not None and condition_id not in self.markets:
+            self.markets[condition_id] = mi
+            for t in mi.tokens:
+                self.token_to_cid[t.token_id] = condition_id
+                self.books.setdefault(t.token_id, OrderBook(t.token_id, condition_id, mi.tick_size))
+        self.updown[condition_id] = {k: info[k] for k in ("strike", "symbol", "start_ms", "end_ms", "window_s")}
+        self._maybe_detect(condition_id, ts_ms)
+
+    def on_updown_settle(self, ts_ms: int, condition_id: str, info: dict[str, Any]) -> None:
+        """La ventana venció: las posiciones abiertas cobran 1 por share del lado ganador."""
+        self.now_ms = max(self.now_ms, ts_ms)
+        self.updown.pop(condition_id, None)
+        ganador = info.get("winner_token")
+        for pos in [p for p in self.positions if p.status == "open" and p.signal.condition_id == condition_id]:
+            pago = sum(sh for t, sh in pos.inventory.items() if t == ganador and sh > 0)
+            pos.payout += pago
+            pos.inventory = {}
+            self._close(pos, ts_ms, "updown_settle")
+
+    def _updown_state(self, cid: str) -> tuple[UpDownState | None, float | None]:
+        w = self.updown.get(cid)
+        if w is None or not w.get("strike"):
+            return None, None
+        spot = self.spot.get(w["symbol"])
+        if spot is None:
+            return None, None
+        st = UpDownState(symbol=w["symbol"], strike=float(w["strike"]), spot=spot[1],
+                         seconds_left=max(0.0, (w["end_ms"] - max(self.now_ms, spot[0])) / 1000),
+                         window_seconds=float(w["window_s"]), spot_ts_ms=spot[0])
+        try:
+            return st, self.updown_model.prob_up(st)
+        except Exception:  # noqa: BLE001
+            log.exception("modelo up/down falló en %s", cid[:10])
+            return st, None
 
     def on_flow(self, ts_ms: int, condition_id: str, flow: dict[str, Any]) -> None:
         self.now_ms = max(self.now_ms, ts_ms)
@@ -298,8 +356,10 @@ class Engine:
         sibs = [self.markets[c] for c in self.event_index.get(m.event_id, []) if c in self.markets]
         ebooks = {t.token_id: self.books[t.token_id] for s in sibs for t in s.tokens if t.token_id in self.books}
         g, wp, pre = self._model_for(m.condition_id)
+        ud, p_up = self._updown_state(m.condition_id)
         return MarketContext(m, books, self.history, sibs, ebooks, game=g, model_prob=wp, pregame=pre,
-                            outcome_side=self.outcome_side.get(m.condition_id, {}), wallets=self.wallets)
+                            outcome_side=self.outcome_side.get(m.condition_id, {}), wallets=self.wallets,
+                            updown=ud, updown_prob=p_up)
 
     def _on_signal(self, s: Signal) -> None:
         self.stats["signals"] += 1
@@ -447,7 +507,9 @@ class Engine:
             pos.payout += got * (s.meta.get("n", len(s.legs)) - 1)
             pos.inventory = {}
             self._close(pos, ts_ms, "guaranteed")
-        # horizon == "directional": queda abierta; sale por target/stop/tiempo/fin de partido
+        # horizon "directional": sale por target/stop/tiempo/fin de partido
+        # horizon "resolution" (up/down): queda abierta hasta la liquidación; vender antes
+        # pagaría la comisión de cripto por segunda vez
 
     @staticmethod
     def _adjust_unwind(pos: Position, side: str, paid_or_received: float, undo_notional: float, undo_fee: float) -> None:

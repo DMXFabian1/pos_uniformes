@@ -44,13 +44,16 @@ el comando responde. Puedes volver a ejecutarlo cuando actualices el código; no
 
 ## 4. Arrancar el bot
 
-**Con doble clic:** en la carpeta del proyecto hay dos archivos para abrir directamente desde el
-Explorador de Windows, sin tocar PowerShell:
+**Todo de un solo clic:** doble clic en **`INICIAR-TODO.bat`**. Abre el bot en una ventana, el
+panel en otra y el navegador en el panel. Es la forma recomendada.
 
-- **`Iniciar-bot.bat`** arranca el bot.
-- **`Abrir-panel.bat`** levanta el panel y abre el navegador solo.
+Si prefieres controlarlos por separado:
 
-Puedes hacerles clic derecho, "Enviar a", "Escritorio (crear acceso directo)" y tenerlos a mano.
+- **`Iniciar-bot.bat`** solo el bot.
+- **`Abrir-panel.bat`** solo el panel, con el navegador.
+
+Clic derecho sobre cualquiera de ellos, "Enviar a", "Escritorio (crear acceso directo)", y lo
+tienes a mano sin buscar la carpeta.
 
 **Desde PowerShell**, si lo prefieres:
 

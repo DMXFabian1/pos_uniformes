@@ -39,6 +39,14 @@ SCHEMAS: dict[str, pa.Schema] = {
         ("ts_ms", I()), ("game_id", S()), ("league", S()), ("sport", S()), ("home", S()), ("away", S()),
         ("status", S()), ("live", B()), ("ended", B()), ("score", S()), ("period", S()), ("elapsed", S()), ("raw", S()),
     ]),
+    "crypto_prices": pa.schema([
+        ("ts_ms", I()), ("symbol", S()), ("price", F()),
+    ]),
+    "updown_windows": pa.schema([
+        ("ts_ms", I()), ("condition_id", S()), ("slug", S()), ("symbol", S()), ("window_s", I()),
+        ("start_ms", I()), ("end_ms", I()), ("strike", F()), ("strike_ts_ms", I()),
+        ("settle_price", F()), ("up_won", B()), ("status", S()),
+    ]),
     "flow_trades": pa.schema([
         ("ts_ms", I()), ("wallet", S()), ("name", S()), ("pseudonym", S()), ("side", S()), ("size", F()),
         ("price", F()), ("usd", F()), ("token_id", S()), ("condition_id", S()), ("outcome", S()),

@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import json
 import logging
+import re
+from datetime import datetime, timezone
 from dataclasses import dataclass, field, asdict
 from typing import Any
 
@@ -49,6 +51,10 @@ class MarketInfo:
     event_neg_risk_augmented: bool = False
     event_game_id: str = ""              # enlaza con el feed en vivo de deportes
     event_start_time: str = ""
+    updown_symbol: str = ""              # mercados "Up or Down": símbolo, ventana y límites
+    updown_window_s: int = 0
+    updown_start_ms: int = 0
+    updown_end_ms: int = 0
 
     @property
     def is_binary(self) -> bool:
@@ -88,6 +94,26 @@ class MarketInfo:
         kwargs = {k: row[k] for k in cls.__dataclass_fields__
               if k in row and row[k] is not None and k not in ("tokens", "tags")}
         return cls(tokens=toks, tags=tags, **kwargs)
+
+
+_SLUG_UPDOWN = re.compile(r"^([a-z0-9]+)-updown-(\d+)([mh])-(\d+)$")
+
+
+def parse_updown_slug(slug: str) -> tuple[str, int, int] | None:
+    """'btc-updown-5m-1789088700' -> ('btc', 300 s de ventana, epoch de inicio en ms)."""
+    m = _SLUG_UPDOWN.match(slug or "")
+    if not m:
+        return None
+    sym, n, unidad, inicio = m.group(1), int(m.group(2)), m.group(3), int(m.group(4))
+    ventana = n * (3600 if unidad == "h" else 60)
+    return sym, ventana, inicio * 1000
+
+
+def _iso_ms(x: Any) -> int:
+    try:
+        return int(datetime.fromisoformat(str(x).replace("Z", "+00:00")).timestamp() * 1000)
+    except (TypeError, ValueError):
+        return 0
 
 
 def _f(x: Any, default: float = 0.0) -> float:
@@ -153,11 +179,56 @@ class GammaClient:
         data = r.json()
         return data if isinstance(data, list) else []
 
+    async def events_updown(self, tag_id: int, limit: int = 60) -> list[dict[str, Any]]:
+        """Eventos "Up or Down" todavía vigentes (los caducados nunca se cierran en Gamma)."""
+        now = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        r = await self._c.get("/events", params={"closed": "false", "active": "true", "limit": limit,
+                                                 "tag_id": tag_id, "end_date_min": now,
+                                                 "order": "endDate", "ascending": "true"})
+        r.raise_for_status()
+        data = r.json()
+        return data if isinstance(data, list) else []
+
     async def market_by_condition(self, condition_id: str) -> dict[str, Any] | None:
         r = await self._c.get("/markets", params={"condition_ids": condition_id})
         r.raise_for_status()
         data = r.json()
         return data[0] if isinstance(data, list) and data else None
+
+
+async def discover_updown(cfg: Config, gamma: GammaClient) -> list[MarketInfo]:
+    """Mercados "Up or Down" vigentes de las series configuradas, ordenados por cierre más próximo."""
+    ucfg = cfg.updown
+    if not ucfg.enabled or not ucfg.series:
+        return []
+    try:
+        events = await gamma.events_updown(ucfg.tag_id, limit=100)
+    except httpx.HTTPError as e:
+        log.warning("descubrimiento up/down falló: %s", e)
+        return []
+    series = set(ucfg.series)
+    out: list[MarketInfo] = []
+    for ev in events:
+        slugs = {str(x.get("slug")) for x in (ev.get("series") or []) if x.get("slug")}
+        if not (slugs & series):
+            continue
+        partes = parse_updown_slug(str(ev.get("slug") or ""))
+        if partes is None:
+            continue
+        sym, ventana, inicio_ms = partes
+        for m in ev.get("markets") or []:
+            if not m.get("enableOrderBook") or m.get("closed") or not m.get("acceptingOrders"):
+                continue
+            mi = parse_market(m, ev, "crypto_updown", 0.07)
+            if mi is None or not mi.condition_id:
+                continue
+            mi.updown_symbol = sym
+            mi.updown_window_s = ventana
+            mi.updown_start_ms = inicio_ms or _iso_ms(ev.get("startTime"))
+            mi.updown_end_ms = _iso_ms(m.get("endDate") or ev.get("endDate")) or (mi.updown_start_ms + ventana * 1000)
+            out.append(mi)
+    out.sort(key=lambda m: m.updown_end_ms)
+    return out[: ucfg.max_markets]
 
 
 async def discover_markets(cfg: Config, gamma: GammaClient) -> list[MarketInfo]:
