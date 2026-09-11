@@ -63,7 +63,10 @@ def test_lista_ordenada_por_ventaja_y_agrupada(tmp_path):
     assert btc.accion == "Comprar Up" and btc.precio == 0.55
     assert btc.inversion == round(0.55 * 50, 2) and btc.ganancia == round(0.08 * 50, 2)
     assert "Bitcoin va 12 puntos básicos por encima" in btc.razon
-    assert "el modelo da 68 % a que suba" in btc.razon and "la ventana anterior terminó arriba" in btc.razon
+    # la explicación compara siempre modelo contra mercado, que es lo que justifica entrar
+    assert "el modelo calcula 68 % de que suba" in btc.razon
+    assert "el mercado lo vende como si fuera 55 %" in btc.razon
+    assert "la ventana anterior terminó arriba" in btc.razon
     nba = grupos["NBA"][0]
     assert nba.accion == "Comprar Lakers" and "marcador 102-88" in nba.razon and "en Q4" in nba.razon
     ten = grupos["Tenis"][0]
