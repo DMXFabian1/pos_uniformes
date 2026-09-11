@@ -1,0 +1,4 @@
+# Solo para desarrollar y probar en la Mac. NO va a la tienda ni al exe.
+#     pos_uniformes/.venv/bin/python -m pip install -r pos_uniformes/requirements-dev.txt
+pytest>=8
+pytest-xdist>=3.6   # la suite completa repartida entre nucleos: 80 s -> 28 s
