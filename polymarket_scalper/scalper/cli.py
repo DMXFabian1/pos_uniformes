@@ -9,9 +9,18 @@ import sys
 from .config import load_config
 
 
-def _setup_logging(verbose: bool) -> None:
-    logging.basicConfig(level=logging.DEBUG if verbose else logging.INFO,
-                        format="%(asctime)s %(levelname)s %(name)s: %(message)s", datefmt="%H:%M:%S")
+def _setup_logging(verbose: bool, log_file: str | None = None) -> None:
+    level = logging.DEBUG if verbose else logging.INFO
+    handlers: list[logging.Handler] = [logging.StreamHandler()]
+    if log_file:
+        from logging.handlers import RotatingFileHandler
+        from pathlib import Path
+
+        Path(log_file).parent.mkdir(parents=True, exist_ok=True)
+        # 10 MB por archivo, 5 archivos: el log nunca llena el disco
+        handlers.append(RotatingFileHandler(log_file, maxBytes=10_000_000, backupCount=5, encoding="utf-8"))
+    logging.basicConfig(level=level, handlers=handlers, format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+                        datefmt="%Y-%m-%d %H:%M:%S" if log_file else "%H:%M:%S")
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("websockets").setLevel(logging.WARNING)
 
@@ -352,6 +361,7 @@ def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(prog="scalper", description="Bot de scalping para Polymarket")
     p.add_argument("-c", "--config", default="config.yaml")
     p.add_argument("-v", "--verbose", action="store_true")
+    p.add_argument("--log-file", help="además de la consola, escribir el log aquí (rota a los 10 MB)")
     sub = p.add_subparsers(dest="cmd", required=True)
 
     s = sub.add_parser("discover", help="lista los mercados que se seguirían")
@@ -438,7 +448,7 @@ def main(argv: list[str] | None = None) -> None:
     s.set_defaults(fn=cmd_sql)
 
     args = p.parse_args(argv)
-    _setup_logging(args.verbose)
+    _setup_logging(args.verbose, args.log_file)
     try:
         args.fn(args)
     except KeyboardInterrupt:

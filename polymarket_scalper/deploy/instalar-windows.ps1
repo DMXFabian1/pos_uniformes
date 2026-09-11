@@ -1,0 +1,47 @@
+# Instalación del bot en Windows 10/11. Se puede repetir para actualizar.
+# Uso, desde PowerShell y dentro de la carpeta del proyecto:
+#   powershell -ExecutionPolicy Bypass -File deploy\instalar-windows.ps1
+$ErrorActionPreference = "Stop"
+$proyecto = Split-Path -Parent $PSScriptRoot
+Set-Location $proyecto
+
+Write-Host "== buscando Python" -ForegroundColor Cyan
+$py = $null
+foreach ($cand in @(@("py", @("-3")), @("python", @()), @("python3", @()))) {
+  $nombre = $cand[0]; $pre = $cand[1]
+  if (-not (Get-Command $nombre -ErrorAction SilentlyContinue)) { continue }
+  try { $v = & $nombre @($pre + @("--version")) 2>&1 } catch { continue }
+  if ("$v" -match "Python 3\.(\d+)") {
+    if ([int]$Matches[1] -ge 11) { $py = @($nombre, $pre); Write-Host "   $v"; break }
+    Write-Host "   $v es muy antigua; hace falta 3.11 o superior" -ForegroundColor Yellow
+  }
+}
+if (-not $py) {
+  Write-Host "No encontré Python 3.11+. Instálalo desde https://www.python.org/downloads/ " -ForegroundColor Red
+  Write-Host "y marca 'Add python.exe to PATH' durante la instalación. Luego vuelve a ejecutar este script." -ForegroundColor Red
+  exit 1
+}
+
+Write-Host "== entorno virtual .venv" -ForegroundColor Cyan
+if (-not (Test-Path ".venv")) { & $py[0] @($py[1] + @("-m", "venv", ".venv")) }
+$pip = Join-Path $proyecto ".venv\Scripts\pip.exe"
+$exe = Join-Path $proyecto ".venv\Scripts\scalper.exe"
+
+Write-Host "== dependencias (puede tardar unos minutos)" -ForegroundColor Cyan
+& $pip install --quiet --upgrade pip
+& $pip install --quiet -e ".[learn]"
+if ($LASTEXITCODE -ne 0) { Write-Host "falló la instalación de dependencias" -ForegroundColor Red; exit 1 }
+
+Write-Host "== comprobación" -ForegroundColor Cyan
+$env:PYTHONUTF8 = "1"
+& $exe --help | Out-Null
+if ($LASTEXITCODE -ne 0) { Write-Host "el comando scalper no responde" -ForegroundColor Red; exit 1 }
+New-Item -ItemType Directory -Force -Path (Join-Path $proyecto "data") | Out-Null
+
+Write-Host ""
+Write-Host "Listo. Desde esta carpeta:" -ForegroundColor Green
+Write-Host "  .\deploy\iniciar-bot.ps1        arranca el bot (paper trading, sin dinero real)"
+Write-Host "  .\deploy\iniciar-panel.ps1      abre el panel en http://127.0.0.1:8787"
+Write-Host "  .\deploy\programar-inicio.ps1   para que el bot arranque solo al encender la PC"
+Write-Host ""
+Write-Host "Comandos sueltos: .venv\Scripts\scalper.exe status | report | wallets | retention"

@@ -27,6 +27,7 @@ collector:
   quote_sample_seconds: 5       # muestreo regular del top-of-book (tabla quotes)
   rest_resync_seconds: 900      # re-sincronizar cada libro por REST (protege contra deltas perdidos)
   resolution_poll_seconds: 600  # cada cuánto se revisan resoluciones de mercados ya vistos
+  prevent_sleep: true           # Windows/macOS: impedir que el equipo se suspenda mientras el bot corre
 
 sports_feed:
   enabled: true

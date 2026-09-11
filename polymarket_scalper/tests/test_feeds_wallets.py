@@ -78,3 +78,25 @@ def test_discovery_only_market_types_filter():
     fut = parse_market({**base}, ev, "tennis", 0.05)
     keep = [m for m in (ml, tot, fut) if m.sports_market_type in cfg.discovery.only_market_types]
     assert [m.sports_market_type for m in keep] == ["moneyline", ""]
+
+
+def test_collector_shutdown_flushes_buffer_on_interrupt(cfg, tmp_path):
+    """En Windows Ctrl+C llega como excepción: el cierre debe volcar igual lo pendiente."""
+    import asyncio
+    from scalper.collector import Collector
+    from scalper.storage import ParquetWriter, scan
+
+    cfg.data_dir = str(tmp_path)
+    cfg.collector.prevent_sleep = False
+    col = Collector(cfg, writer=ParquetWriter(tmp_path, flush_seconds=10**9, flush_rows=10**9))
+
+    async def boom():
+        raise KeyboardInterrupt
+
+    col._run_inner = boom
+    col.writer.append("trades", {"ts_ms": 1_700_000_000_000, "token_id": "t", "condition_id": "c", "price": 0.5,
+                                 "size": 1.0, "side": "BUY", "fee_rate_bps": 0.0, "tx_hash": "0x"})
+    asyncio.run(col.run())                       # no debe propagar la interrupción
+    assert col._closed and scan(tmp_path, "trades").collect().height == 1
+    asyncio.run(col._shutdown())                 # idempotente
+    assert scan(tmp_path, "trades").collect().height == 1

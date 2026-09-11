@@ -23,6 +23,9 @@ pip install -e ".[dev,learn]"    # learn = scikit-learn para gradient boosting (
 pytest
 ```
 
+En Windows: `powershell -ExecutionPolicy Bypass -File deploy\instalar-windows.ps1`
+(ver [`docs/WINDOWS.md`](docs/WINDOWS.md)).
+
 ## Uso
 
 ```bash
@@ -156,10 +159,13 @@ retención, que corre sola una vez al día dentro del recolector, conserva 3 dí
 14 de `book_snapshots` y 30 de `markets`, borra lo anterior y compacta cada día cerrado a un
 archivo por tabla. Las tablas del aprendizaje no se borran nunca. Crecimiento permanente: ~0,5 GB/día.
 
-## Servidor
-Guía completa en [`docs/SERVIDOR.md`](docs/SERVIDOR.md): elegir el servidor virtual, instalar con
-`deploy/install.sh`, servicios systemd que arrancan solos, panel por túnel SSH, disco, copias y
-actualización.
+## Dónde correrlo
+- **Windows** (lo más sencillo para empezar): [`docs/WINDOWS.md`](docs/WINDOWS.md). Instalación con
+  `deploy\instalar-windows.ps1`, arranque con `deploy\iniciar-bot.ps1`, tareas programadas para que
+  arranque al encender la PC, y bloqueo de suspensión mientras corre.
+- **Servidor Linux** (cuando quieras que corra sin depender de tu equipo):
+  [`docs/SERVIDOR.md`](docs/SERVIDOR.md). Instalación con `deploy/install.sh`, servicios systemd,
+  panel por túnel SSH, disco, copias y actualización.
 
 ## Panel web (`scalper dashboard`)
 Un servidor local sin dependencias externas sirve una página que lee las tablas Parquet cada

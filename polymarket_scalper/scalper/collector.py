@@ -23,6 +23,7 @@ from .clob import ClobRest, WebSocketPool
 from .config import Config
 from .discovery import GammaClient, MarketInfo, discover_markets
 from .flow import DataApi, FlowPoller, flow_row
+from .keepawake import KeepAwake
 from .sports_feed import SportsFeed, normalize_game, state_key
 from .storage import ParquetWriter, dumps
 from .wallets import WalletTracker
@@ -63,6 +64,7 @@ class Collector:
                                          cfg.flow.profile_refresh_hours, cfg.flow.per_wallet_delay_seconds)
         self.listeners: list[Listener] = []
         self._stop = asyncio.Event()
+        self._closed = False
         self._tasks: list[asyncio.Task] = []
         self.stats: dict[str, int] = {"book": 0, "delta": 0, "trade": 0, "tick": 0, "resync": 0, "resolved": 0,
                                       "game": 0, "flow": 0, "whale": 0}
@@ -83,12 +85,23 @@ class Collector:
         self._stop.set()
 
     async def run(self) -> None:
+        """Recolecta hasta stop() o Ctrl+C. El cierre siempre vuelca los buffers a disco."""
+        with KeepAwake(self.cfg.collector.prevent_sleep):
+            try:
+                await self._run_inner()
+            except (KeyboardInterrupt, asyncio.CancelledError):
+                # en Windows no hay add_signal_handler: Ctrl+C llega como excepción aquí
+                log.info("interrumpido; guardando lo pendiente…")
+            finally:
+                await self._shutdown()
+
+    async def _run_inner(self) -> None:
         loop = asyncio.get_running_loop()
         for sig in (signal.SIGINT, signal.SIGTERM):
             try:
                 loop.add_signal_handler(sig, self.stop)
-            except NotImplementedError:
-                pass
+            except (NotImplementedError, AttributeError, ValueError):
+                pass        # Windows, o un hilo que no es el principal
         await self.refresh_markets()
         self._tasks = [
             asyncio.create_task(self._discovery_loop(), name="discovery"),
@@ -106,16 +119,32 @@ class Collector:
             self._tasks.append(asyncio.create_task(self.flow.run(), name="flow"))
             self._tasks.append(asyncio.create_task(self.wallets.run(), name="wallets"))
         await self._stop.wait()
+
+    async def _shutdown(self) -> None:
+        """Idempotente: se puede llamar dos veces sin efectos raros."""
+        if self._closed:
+            return
+        self._closed = True
         log.info("deteniendo recolector…")
+        self._stop.set()
         for t in self._tasks:
             t.cancel()
         await asyncio.gather(*self._tasks, return_exceptions=True)
-        await self.pool.stop()
-        self.writer.close()
-        await self.gamma.close()
-        await self.rest.close()
+        try:
+            await self.pool.stop()
+        except Exception:  # noqa: BLE001
+            log.exception("error cerrando websockets")
+        self.writer.close()                 # lo importante: los datos en disco
+        for closer in (self.gamma.close, self.rest.close):
+            try:
+                await closer()
+            except Exception:  # noqa: BLE001
+                pass
         if self.data_api is not None:
-            await self.data_api.close()
+            try:
+                await self.data_api.close()
+            except Exception:  # noqa: BLE001
+                pass
         log.info("filas escritas: %s", dict(self.writer.rows_written))
 
     # ------------------------------------------------------------------ discovery

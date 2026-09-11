@@ -32,6 +32,7 @@ class CollectorCfg(BaseModel):
     quote_sample_seconds: int = 5
     rest_resync_seconds: int = 900
     resolution_poll_seconds: int = 600
+    prevent_sleep: bool = True    # Windows/macOS: impedir que el equipo se suspenda mientras corre
 
 
 class SportsFeedCfg(BaseModel):
