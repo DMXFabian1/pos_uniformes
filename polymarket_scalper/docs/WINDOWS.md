@@ -195,6 +195,10 @@ Con las tareas activas no necesitas dejar ventanas abiertas. El log sigue en `lo
   ventana del bot con Ctrl+C.
 - **`VER-INFORMES.bat`** muestra de una vez: qué datos hay, el estudio del arrastre entre ventanas
   de cripto, los resultados por tipo de señal, los modelos aprendidos y el uso de disco.
+- **`VER-VALIDACION.bat`** es el informe de la fase de medición: cuántas órdenes se llenan de
+  verdad frente a cuántas harían falta, cuánta ventaja hace falta, qué hace el precio después de
+  cada llenado, cómo afecta la antigüedad del libro y qué se está rechazando. Al final lista las
+  versiones del motor que han operado. Es el que hay que mirar mientras se acumula muestra.
 
 ## 11. Comandos del día a día
 
