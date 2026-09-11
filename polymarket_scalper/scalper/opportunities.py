@@ -36,6 +36,17 @@ VEREDICTOS = {
     "pasada": ("YA PASÓ", "Se detectó hace rato: el precio ya se movió. No entres a ciegas."),
 }
 
+# Prioridad por cuánto supera la señal al edge mínimo requerido de su estrategia (medido en el
+# ledger: coste de salida + selección adversa + margen). Sin ledger se usa el mínimo por defecto.
+PRIORIDADES = {
+    "S": "Muy por encima del mínimo y con el modelo seguro. Es de las pocas que valen la pena.",
+    "A": "Cómodamente por encima del mínimo.",
+    "B": "Por encima del mínimo, con poco margen.",
+    "C": "Justo en el límite. Pasarla no cuesta nada.",
+    "NO TRADE": "Por debajo del mínimo que esta estrategia necesita para ser rentable. No se entra.",
+}
+MINIMO_POR_DEFECTO = 0.01     # USD por share, mientras no haya ledger que lo mida
+
 
 @dataclass
 class Oportunidad:
@@ -56,6 +67,10 @@ class Oportunidad:
     fee: float
     razon: str                  # explicación en palabras
     veredicto: str = "justa"    # entrar | justa | pasada
+    prioridad: str = "C"        # S | A | B | C | NO TRADE
+    porque: str = ""            # por qué existe este trade, en una frase
+    edge_minimo: float = MINIMO_POR_DEFECTO
+    estrategia: str = ""
     contexto: list[dict[str, Any]] = field(default_factory=list)   # el partido o el mercado
     matematica: list[dict[str, Any]] = field(default_factory=list)  # de dónde sale la ventaja
     detalle: dict[str, Any] = field(default_factory=dict)
@@ -75,6 +90,17 @@ class Oportunidad:
         return VEREDICTOS[self.veredicto][0]
 
     @property
+    def nota_prioridad(self) -> str:
+        """La razón real de la prioridad: caducar y quedarse corta de ventaja no es lo mismo."""
+        if not self.fresca:
+            return VEREDICTOS["pasada"][1]
+        return PRIORIDADES.get(self.prioridad, "")
+
+    @property
+    def veces_el_minimo(self) -> float:
+        return round(self.edge_neto / self.edge_minimo, 2) if self.edge_minimo > 0 else 0.0
+
+    @property
     def nota_veredicto(self) -> str:
         return VEREDICTOS[self.veredicto][1]
 
@@ -90,10 +116,11 @@ class Oportunidad:
         d = {k: getattr(self, k) for k in ("ts_ms", "grupo", "categoria", "kind", "condition_id", "mercado", "accion",
                                            "precio", "edge_neto", "edge_pct", "tamano", "inversion", "ganancia",
                                            "confianza", "fee", "razon", "veredicto", "contexto", "matematica",
-                                           "detalle")}
+                                           "detalle", "prioridad", "porque", "edge_minimo", "estrategia")}
         d.update(antiguedad_s=round(self.antiguedad_s, 1), fresca=self.fresca, perdida=self.perdida,
                  prob_acierto=self.prob_acierto, titulo_veredicto=self.titulo_veredicto,
-                 nota_veredicto=self.nota_veredicto)
+                 nota_veredicto=self.nota_veredicto, nota_prioridad=self.nota_prioridad,
+                 veces_el_minimo=self.veces_el_minimo)
         return d
 
 
@@ -248,6 +275,9 @@ def _matematica(kind: str, m: dict[str, Any], precio: float, fee: float, edge: f
             _fila("Volatilidad reciente", f"{m.get('mid_vol', 0):.4f}", "malo"),
         ]
     filas.append(_fila("Comisión", f"−{fee:.4f} por share", "malo" if fee > 0 else ""))
+    minimo = m.get("_edge_minimo")
+    if minimo:
+        filas.append(_fila("Mínimo que pide esta estrategia", f"{minimo:.4f} por share"))
     filas.append(_fila("Ventaja neta", f"{edge:+.4f} por share", "bueno" if edge > 0 else "malo"))
     filas.append(_fila("Por cada 100 USD", f"{edge / precio * 100:+.1f} USD" if precio else "–",
                        "bueno" if edge > 0 else "malo"))
@@ -261,6 +291,34 @@ def _decidir(kind: str, edge: float, precio: float, confianza: float, fresca: bo
     edge_pct = edge / precio if precio else 0
     holgada = edge > 2 * fee and edge_pct >= 0.05
     return "entrar" if (holgada and confianza >= 0.55) else "justa"
+
+
+def _prioridad(edge: float, minimo: float, confianza: float, fresca: bool) -> str:
+    """S/A/B/C/NO TRADE según cuántas veces la señal supera el mínimo que su estrategia necesita."""
+    if not fresca:
+        return "NO TRADE"
+    if minimo <= 0:
+        minimo = MINIMO_POR_DEFECTO
+    veces = edge / minimo
+    if veces < 1:
+        return "NO TRADE"
+    if veces >= 3 and confianza >= 0.65:
+        return "S"
+    if veces >= 2 and confianza >= 0.55:
+        return "A"
+    if veces >= 1.3:
+        return "B"
+    return "C"
+
+
+def minimos_por_estrategia(data_dir: str | Path) -> dict[str, float]:
+    """Edge mínimo requerido de cada estrategia, medido en el ledger. Vacío si aún no hay datos."""
+    try:
+        from .evaluacion import evaluar as evaluar_metricas
+        return {e.strategy: e.edge_minimo_requerido for e in evaluar_metricas(data_dir)
+                if e.edge_minimo_requerido is not None and e.n >= 20}
+    except Exception:  # noqa: BLE001 - un informe roto no debe tumbar la lista de oportunidades
+        return {}
 
 
 def _grupo_de(categoria: str, meta: dict[str, Any]) -> tuple[str, str]:
@@ -285,6 +343,7 @@ def listar(data_dir: str | Path, minutos: float = 30, solo_frescas: bool = False
     if not df.height:
         return []
     mk = latest_markets(data_dir)
+    minimos = minimos_por_estrategia(data_dir)
     info: dict[str, dict[str, Any]] = {}
     if mk is not None:
         for r in mk.to_dicts():
@@ -324,9 +383,13 @@ def listar(data_dir: str | Path, minutos: float = 30, solo_frescas: bool = False
             edge_neto=round(edge, 4), edge_pct=round(edge / precio, 4) if precio else 0.0, tamano=tam,
             inversion=inversion, ganancia=round(edge * tam, 2), confianza=float(r["confidence"]),
             fee=fee, razon=razon, detalle=m)
+        op.estrategia = str(m.get("strategy") or r["kind"])
+        op.edge_minimo = round(minimos.get(op.estrategia, MINIMO_POR_DEFECTO), 5)
+        op.porque = str(m.get("por_que") or "")
         op.contexto = _contexto(r["kind"], m, mercado)
-        op.matematica = _matematica(r["kind"], m, precio, fee, edge, tam)
+        op.matematica = _matematica(r["kind"], {**m, "_edge_minimo": op.edge_minimo}, precio, fee, edge, tam)
         op.veredicto = _decidir(r["kind"], edge, precio, op.confianza, op.fresca, fee)
+        op.prioridad = _prioridad(edge, op.edge_minimo, op.confianza, op.fresca)
         out.append(op)
     if solo_frescas:
         out = [o for o in out if o.fresca]
@@ -365,11 +428,16 @@ def formatear(ops: list[Oportunidad], ancho: int = 100) -> str:
                       f"mejor ventaja {_pct(r['mejor_edge_pct'], 1)} sobre lo invertido")
         lineas.append("=" * ancho)
         for o in lista[:8]:
-            lineas.append(f"\n  {o.titulo_veredicto:<10} {o.accion.upper()}  ·  {o.mercado[:58]}")
-            lineas.append(f"     {o.nota_veredicto}")
+            etiqueta = o.prioridad if o.fresca else f"{o.titulo_veredicto}"
+            lineas.append(f"\n  [{etiqueta:^8}] {o.accion.upper()}  ·  {o.mercado[:58]}")
+            lineas.append(f"     {o.nota_prioridad}")
+            if o.porque:
+                lineas.append(f"     POR QUÉ EXISTE: {o.porque}")
             lineas.append(f"     precio {o.precio:.3f}   invertir {o.inversion:>8.2f}   "
                           f"ganar {o.ganancia:>7.2f}   perder {o.perdida:>8.2f}   "
                           f"ventaja {_pct(o.edge_pct, 1):>7}")
+            lineas.append(f"     ventaja {o.edge_neto:.4f} por share, {o.veces_el_minimo:.1f}x el mínimo "
+                          f"que pide {o.estrategia} ({o.edge_minimo:.4f})")
             if o.prob_acierto is not None:
                 lineas.append(f"     acierta {_pct(o.prob_acierto)} de las veces según el modelo")
             lineas.append(f"     {o.razon}")

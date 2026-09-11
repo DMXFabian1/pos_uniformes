@@ -112,6 +112,14 @@ td.pos{color:var(--good)} td.neg{color:var(--crit)}
 
 .op{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column}
 .op .veredicto{display:flex;align-items:center;gap:12px;padding:13px 18px;border-bottom:1px solid var(--line)}
+.prio{font:700 11px/1 "IBM Plex Mono",monospace;letter-spacing:.06em;padding:5px 8px;border-radius:5px;border:1px solid var(--line);white-space:nowrap}
+.prio.S{background:var(--good);color:#fff;border-color:transparent}
+.prio.A{background:color-mix(in srgb,var(--good) 22%,var(--surface));color:var(--good)}
+.prio.B{background:color-mix(in srgb,var(--warn) 20%,var(--surface));color:var(--warn)}
+.prio.C{background:var(--surface-2);color:var(--muted)}
+.prio.NOTRADE{background:var(--surface-2);color:var(--muted);text-decoration:line-through}
+.porque{padding:11px 18px;border-bottom:1px solid var(--line);background:var(--surface-2);font-size:13px;line-height:1.5}
+.porque b{font-size:11px;letter-spacing:.06em;color:var(--muted);display:block;margin-bottom:3px;text-transform:uppercase}
 .op .sello{font-size:19px;font-weight:700;letter-spacing:.02em;line-height:1;white-space:nowrap}
 .op .accion{font-size:15px;font-weight:600;color:var(--ink);line-height:1.25}
 .op .sub{font-size:12px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -177,6 +185,7 @@ footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);paddin
     <nav class="nav" id="nav">
       <a href="#oportunidades" class="active">Oportunidades <span class="count" id="n-ops">–</span></a>
       <a href="#resumen">Resumen</a>
+      <a href="#ejecucion">Ejecución <span class="count" id="n-ejec">–</span></a>
       <a href="#senales">Señales y resultados <span class="count" id="n-senales">–</span></a>
       <a href="#partidos">Partidos en vivo <span class="count" id="n-partidos">–</span></a>
       <a href="#ballenas">Ballenas <span class="count" id="n-ballenas">–</span></a>
@@ -224,6 +233,25 @@ footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);paddin
       <div class="grid-2">
         <div class="card"><div class="card-head"><h3>Equity simulado</h3><span>USD, acumulado al cerrar cada posición</span></div><div class="chart" id="c-equity"></div></div>
         <div class="card"><div class="card-head"><h3>Señales detectadas</h3><span>por tipo, en bloques de 15 min</span></div><div class="chart" id="c-signals"></div><div class="legend" id="l-signals"></div></div>
+      </div>
+    </section>
+
+    <section id="ejecucion">
+      <div class="sec-head"><h2>Ejecución</h2><p>Lo que de verdad pasa con las órdenes que se ponen: cuántas se llenan, cuánta ventaja hace falta y qué hace el precio justo después de llenarnos.</p></div>
+      <details class="help" open><summary>Cómo leer esto</summary><div class="body">
+        <p><b>El 60 % de referencia no es un resultado.</b> Era el supuesto de partida sobre cuántas órdenes se llenarían. Aquí se muestra al lado de la tasa observada precisamente para poder desmentirlo. Lo que decide es la columna <b>llenadas</b> contra la de <b>break-even</b>.</p>
+        <p><b>Break-even</b> es la tasa de llenado a partir de la cual poner la orden gana a cruzar el libro. Sale de dividir la ventaja que daría cruzar entre la que da poner la orden. Si cruzar da ventaja negativa, el break-even es cero: cualquier llenado es mejor.</p>
+        <p><b>Conservador y optimista</b> son los dos extremos de la incertidumbre sobre la posición en la cola. El conservador supone que toda la liquidez que había en el nivel estaba delante y nadie la canceló; el optimista, que estábamos al frente. El resultado real está entre los dos.</p>
+        <p><b>Edge mínimo</b> es lo que esta estrategia necesita por share para tener sentido: coste de salida más la selección adversa medida más un margen. Por debajo de eso, la respuesta correcta es no entrar.</p>
+        <p><b>Selección adversa</b> es cuánto se mueve el precio medio en los segundos siguientes al llenado. Si es negativa, nos están llenando justo cuando el mercado se va en contra.</p>
+      </div></details>
+      <div class="grid-2">
+        <div class="card"><div class="card-head"><h3>¿Se llenan las órdenes?</h3><span>observado contra break-even y contra la referencia</span></div><div class="tablewrap"><table id="t-fill"></table></div></div>
+        <div class="card"><div class="card-head"><h3>¿Cuánta ventaja hace falta?</h3><span>edge mínimo, captura y selección adversa</span></div><div class="tablewrap"><table id="t-edge"></table></div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card"><div class="card-head"><h3>Decisiones de NO operar</h3><span>últimas 24 h, por motivo</span></div><div class="tablewrap"><table id="t-notrade"></table></div></div>
+        <div class="card"><div class="card-head"><h3>Reacción del mercado al partido</h3><span>cuánto tarda el precio en moverse tras un cambio</span></div><div class="tablewrap"><table id="t-reac"></table></div></div>
       </div>
     </section>
 
@@ -475,6 +503,36 @@ function render(d){
   $("t-recent").innerHTML = rp.length ? `<thead><tr><th>Señal</th><th>Tipo</th><th>Mercado</th><th class="num">Shares</th><th class="num">Predicho</th><th class="num">Real</th><th>Cierre</th><th class="num">Conf.</th></tr></thead><tbody>` +
     rp.map(r => `<tr><td class="mono">${esc(tm(r.ts_signal))}</td><td><span class="kind"><i style="background:${kindOf(r.kind).color}"></i>${esc(kindOf(r.kind).label)}</span></td><td class="mono">${esc(String(r.condition_id).slice(0,10))}…</td><td class="num">${num(r.size_filled,0)}</td><td class="num">${esc(usd(r.predicted_pnl))}</td><td class="num ${sgn(r.realized_pnl)}">${esc(usd(r.realized_pnl))}</td><td><span class="chip ${FORCED.has(r.exit_reason)?"":sgn(r.realized_pnl)==="pos"?"good":sgn(r.realized_pnl)==="neg"?"crit":""}">${esc(EXIT[r.exit_reason]||r.exit_reason)}</span></td><td class="num">${pct(r.confidence)}</td></tr>`).join("") + "</tbody>" : "";
 
+  // ejecución: lo que de verdad pasa con las órdenes
+  const ej = d.ejecucion || [];
+  const conOrdenes = ej.filter(e => (e.ejecucion||{}).ordenes > 0);
+  $("n-ejec").textContent = num(conOrdenes.length, 0);
+  const vacia = (id, texto) => { $(id).innerHTML = `<tbody><tr><td class="small">${esc(texto)}</td></tr></tbody>`; };
+  if (conOrdenes.length){
+    $("t-fill").innerHTML = "<thead><tr><th>estrategia</th><th class='num'>órdenes</th><th class='num'>llenadas</th><th class='num'>conservador</th><th class='num'>optimista</th><th class='num'>break-even</th><th class='num'>margen</th><th class='num'>referencia</th><th class='num'>espera</th></tr></thead><tbody>" +
+      conOrdenes.map(e => { const x = e.ejecucion; const m = x.margen_sobre_break_even;
+        return `<tr><td>${esc(e.strategy)}</td><td class="num">${num(x.ordenes,0)}</td><td class="num">${pct(x.tasa_llenado)}</td><td class="num">${pct(x.tasa_conservadora)}</td><td class="num">${pct(x.tasa_optimista)}</td><td class="num">${pct(x.break_even_llenado)}</td><td class="num ${m==null?"":m>0?"pos":"neg"}">${pct(m)}</td><td class="num small">${pct(x.tasa_baseline)}</td><td class="num">${x.espera_media_s==null?"–":num(x.espera_media_s,1)+" s"}</td></tr>`;
+      }).join("") + "</tbody>";
+  } else vacia("t-fill", "Todavía no se ha puesto ninguna orden límite en esta corrida.");
+  const conDatos = ej.filter(e => e.n > 0);
+  if (conDatos.length){
+    $("t-edge").innerHTML = "<thead><tr><th>estrategia</th><th class='num'>n</th><th class='num'>edge mínimo</th><th class='num'>señales sobre el mínimo</th><th class='num'>aparente</th><th class='num'>realizado</th><th class='num'>captura</th><th class='num'>adversa 10 s</th></tr></thead><tbody>" +
+      conDatos.map(e => { const adv = (e.adversa||{}).adverse_10s;
+        return `<tr><td>${esc(e.strategy)}</td><td class="num">${num(e.n,0)}</td><td class="num">${num(e.edge_minimo_requerido,4)}</td><td class="num">${pct(e.senales_sobre_minimo)}</td><td class="num">${num(e.edge_aparente,4)}</td><td class="num ${sgn(e.edge_realizado)}">${num(e.edge_realizado,4)}</td><td class="num">${pct(e.captura)}</td><td class="num ${adv==null?"":adv<0?"neg":"pos"}">${adv==null?"–":num(adv,4)}</td></tr>`;
+      }).join("") + "</tbody>";
+  } else vacia("t-edge", "Sin posiciones cerradas todavía.");
+  const dec = d.decisiones || {motivos: [], no_trade: 0, trade: 0};
+  if ((dec.motivos||[]).length){
+    $("t-notrade").innerHTML = `<thead><tr><th>estrategia</th><th>motivo</th><th class='num'>veces</th></tr></thead><tbody>` +
+      dec.motivos.map(r => `<tr><td>${esc(r.strategy)}</td><td>${esc(String(r.motivo).replace(/_/g," "))}</td><td class="num">${num(r.n,0)}</td></tr>`).join("") +
+      `<tr><td colspan="2" class="small">operadas en el mismo periodo</td><td class="num">${num(dec.trade,0)}</td></tr></tbody>`;
+  } else vacia("t-notrade", "Sin decisiones registradas en las últimas 24 h.");
+  const re = (d.reacciones||{}).por_liga || [];
+  if (re.length){
+    $("t-reac").innerHTML = "<thead><tr><th>liga</th><th class='num'>eventos</th><th class='num'>reaccionó</th><th class='num'>retraso mediano</th><th class='num'>movimiento medio</th></tr></thead><tbody>" +
+      re.map(r => `<tr><td>${esc(r.league||"–")}</td><td class="num">${num(r.eventos,0)}</td><td class="num">${pct(r.tasa_reaccion)}</td><td class="num">${r.lag_mediano_ms==null?"–":num(r.lag_mediano_ms/1000,1)+" s"}</td><td class="num">${num(r.movimiento_medio,4)}</td></tr>`).join("") + "</tbody>";
+  } else vacia("t-reac", "Sin partidos en vivo medidos todavía.");
+
   // oportunidades
   const op = d.oportunidades || {grupos: [], total: 0, vigentes: 0};
   $("n-ops").textContent = num(op.vigentes, 0);
@@ -489,8 +547,10 @@ function render(d){
         <div class="op ${esc(o.veredicto)}">
           <div class="veredicto">
             <span class="sello">${esc(o.titulo_veredicto)}</span>
+            <span class="prio ${esc(String(o.prioridad||"C").replace(" ",""))}" title="${esc(o.nota_prioridad||"")}">${esc(o.prioridad||"")}</span>
             <div style="min-width:0"><div class="accion">${esc(o.accion)}</div><div class="sub" title="${esc(o.mercado)}">${esc(o.mercado)}</div></div>
           </div>
+          ${o.porque ? `<div class="porque"><b>Por qué existe este trade</b>${esc(o.porque)}</div>` : ""}
           <div class="opcuerpo">
             <div class="opcol"><h4>Qué está pasando</h4>${filas(o.contexto)}</div>
             <div class="opcol"><h4>De dónde sale la ventaja</h4>${mat(o.matematica)}</div>
@@ -500,7 +560,7 @@ function render(d){
             <div class="gana"><span class="et">Ganas si acierta</span><span class="vl">+${num(o.ganancia,2)}</span></div>
             <div class="pierde"><span class="et">Pierdes si falla</span><span class="vl">−${num(o.perdida,2)}</span></div>
           </div>
-          <div class="oppie">${esc(o.nota_veredicto)}${o.prob_acierto != null ? ` El modelo acierta ${esc(pct(o.prob_acierto))} de las veces en situaciones como esta.` : ""}${!o.fresca ? ` Detectada hace ${Math.round(o.antiguedad_s/60)} min.` : ""}</div>
+          <div class="oppie">${o.veces_el_minimo ? `Ventaja ${num(o.edge_neto,4)} por share: ${num(o.veces_el_minimo,1)}× el mínimo que necesita ${esc(o.estrategia||o.kind)} (${num(o.edge_minimo,4)}). ` : ""}${esc(o.nota_veredicto)}${o.prob_acierto != null ? ` El modelo acierta ${esc(pct(o.prob_acierto))} de las veces en situaciones como esta.` : ""}${!o.fresca ? ` Detectada hace ${Math.round(o.antiguedad_s/60)} min.` : ""}</div>
         </div>`).join("")}</div>
     </div>`;
   }).join("") : `<div class="empty">Ahora mismo no hay ninguna oportunidad que supere el costo de operar.<br><br>Eso es lo normal la mayor parte del tiempo: el bot solo avisa cuando los números dan. Si acaba de arrancar, dale unos minutos para que se llenen los libros.</div>`;

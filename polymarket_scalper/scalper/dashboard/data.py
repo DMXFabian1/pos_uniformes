@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import time
 from pathlib import Path
 from typing import Any
@@ -14,6 +15,8 @@ from ..learn.registry import ModelStore
 from ..models import ModelRegistry, WinProb, match_outcome, parse_game
 from ..opportunities import listar as listar_oportunidades, por_grupo, resumen_grupo
 from ..storage import latest_markets, latest_profiles, scan
+
+log = logging.getLogger(__name__)
 
 EXCLUDED_EXITS = ["end", "end_stuck", "unfilled", "expired_unfilled", "spread_gone", "no_book", "price_moved"]
 
@@ -234,6 +237,49 @@ def _oportunidades(cfg: Config) -> dict[str, Any]:
     }
 
 
+def _ejecucion(cfg: Config, run_id: str | None) -> list[dict[str, Any]]:
+    """Métricas de ejecución por estrategia, de la misma fuente que el veredicto de 'listo'."""
+    from ..evaluacion import evaluar as evaluar_metricas
+    try:
+        return [e.to_dict() for e in evaluar_metricas(cfg.data_path, run_id, cfg.sim.fill_baseline_prob)]
+    except Exception:  # noqa: BLE001 - el panel nunca debe caerse por un informe
+        log.exception("no se pudieron calcular las métricas de ejecución")
+        return []
+
+
+def _decisiones(data_dir: Path, horas: float = 24) -> dict[str, Any]:
+    """Qué decidió el motor, incluidas las de NO operar. Sin esto no se ve lo que se descartó."""
+    lf = scan(data_dir, "decisions")
+    if lf is None:
+        return {"motivos": [], "total": 0, "no_trade": 0, "trade": 0}
+    desde = int((time.time() - horas * 3600) * 1000)
+    df = lf.filter(pl.col("ts_ms") >= desde).collect()
+    if not df.height:
+        return {"motivos": [], "total": 0, "no_trade": 0, "trade": 0}
+    nt = df.filter(pl.col("decision") == "no_trade")
+    motivos = (nt.group_by(["strategy", "motivo"]).agg(pl.len().alias("n"))
+               .sort("n", descending=True).head(20)) if nt.height else None
+    return {"motivos": _rows(motivos), "total": int(df.height), "no_trade": int(nt.height),
+            "trade": int(df.filter(pl.col("decision") == "trade").height)}
+
+
+def _reacciones(data_dir: Path, limite: int = 12) -> dict[str, Any]:
+    """Cuánto tarda el mercado en reaccionar a lo que pasa en el partido, por liga."""
+    lf = scan(data_dir, "reactions")
+    if lf is None:
+        return {"por_liga": [], "n": 0}
+    df = lf.collect()
+    if not df.height:
+        return {"por_liga": [], "n": 0}
+    por_liga = (df.group_by("league").agg(
+        pl.len().alias("eventos"),
+        pl.col("reacciono").mean().round(3).alias("tasa_reaccion"),
+        pl.col("lag_ms").median().alias("lag_mediano_ms"),
+        pl.col("movimiento").abs().mean().round(5).alias("movimiento_medio"),
+    ).sort("eventos", descending=True).head(limite))
+    return {"por_liga": _rows(por_liga), "n": int(df.height)}
+
+
 def build_payload(cfg: Config, run_id: str | None = None) -> dict[str, Any]:
     data_dir = cfg.data_path
     led = _ledger(data_dir, run_id)
@@ -255,6 +301,13 @@ def build_payload(cfg: Config, run_id: str | None = None) -> dict[str, Any]:
     }
     ops = _oportunidades(cfg)
     summary["oportunidades_vigentes"] = ops["vigentes"]
+    ejec = _ejecucion(cfg, run_id)
+    dec = _decisiones(data_dir)
+    summary["no_trade_24h"] = dec["no_trade"]
+    con_ordenes = [e for e in ejec if e["ejecucion"]["ordenes"]]
+    summary["tasa_llenado_observada"] = (
+        round(sum(e["ejecucion"]["llenadas"] for e in con_ordenes) /
+              sum(e["ejecucion"]["ordenes"] for e in con_ordenes), 4) if con_ordenes else None)
     return {
         "generated_ms": now, "config": {"categories": list(cfg.categories), "min_edge_net": cfg.signals.min_edge_net,
                                         "target_size": cfg.signals.target_size, "latency_ms": cfg.sim.latency_ms,
@@ -264,7 +317,7 @@ def build_payload(cfg: Config, run_id: str | None = None) -> dict[str, Any]:
         "summary": summary, "equity": sections["equity"], "by_kind": sections["by_kind"], "exit_reasons": sections["exit_reasons"],
         "calibration": sections["calibration"], "model_vs_heuristic": sections["model_vs_heuristic"],
         "recent_positions": sections["recent_positions"], "signals": sig, "games": games, "wallets": wallets,
-        "oportunidades": ops,
+        "oportunidades": ops, "ejecucion": ejec, "decisiones": dec, "reacciones": _reacciones(data_dir),
         "flow": _flow(data_dir, cfg.flow.whale_min_usd / 2), "markets": _markets(data_dir), "models": _models(data_dir),
         "tables": tables,
     }
