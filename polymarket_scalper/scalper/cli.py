@@ -256,6 +256,35 @@ def cmd_listo(args: argparse.Namespace) -> None:
     print(formatear(evaluar(cfg.data_dir), etiquetas))
 
 
+def cmd_ejecucion(args: argparse.Namespace) -> None:
+    """Cómo se está ejecutando: llenados reales contra el break-even, edge mínimo y selección adversa."""
+    from .evaluacion import evaluar, formatear
+
+    cfg = load_config(args.config)
+    print(formatear(evaluar(cfg.data_dir, run_id=getattr(args, "run_id", None),
+                            baseline=cfg.sim.fill_baseline_prob)))
+
+
+def cmd_validar(args: argparse.Namespace) -> None:
+    """Validación honesta: hacia adelante, por pliegues, y en escenarios peores."""
+    from .evaluacion import evaluar
+    from .learn.train import formatear_walk_forward, walk_forward_all
+
+    cfg = load_config(args.config)
+    print("== Validación hacia adelante (entrenar con el pasado, juzgar con el futuro) ==")
+    print(formatear_walk_forward(walk_forward_all(cfg.data_dir, folds=args.pliegues)))
+    print("\n== Resistencia de cada estrategia ==")
+    for e in evaluar(cfg.data_dir, baseline=cfg.sim.fill_baseline_prob):
+        if not e.estres:
+            continue
+        peor = min(e.estres.values())
+        estado = "aguanta" if peor > 0 else "NO aguanta"
+        partes = "  ".join(f"{k}={v:+.2f}" for k, v in e.estres.items())
+        print(f"{e.strategy[:24]:24}{partes}   → {estado}")
+    print("\nUn escenario con ganancia negativa no invalida la estrategia por sí solo, pero sí")
+    print("impide activarla: si depende de que todo salga como en el caso base, no está lista.")
+
+
 def cmd_ahora(args: argparse.Namespace) -> None:
     """Qué comprar ahora mismo, por mercado, explicado en palabras."""
     from .opportunities import formatear, listar
@@ -277,6 +306,7 @@ def cmd_overview(args: argparse.Namespace) -> None:
         ("QUÉ DATOS HAY GUARDADOS", cmd_status),
         ("ARRASTRE ENTRE VENTANAS DE CRIPTO: ¿a favor o en contra de la racha?", cmd_updown_study),
         ("RESULTADOS POR TIPO DE SEÑAL (predicho contra real)", cmd_report),
+        ("EJECUCIÓN: ¿se llenan las órdenes que ponemos?", cmd_ejecucion),
         ("WALLETS CON HISTORIAL", cmd_wallets),
         ("MODELOS APRENDIDOS", cmd_models),
         ("RADIOGRAFÍA DEL MERCADO", cmd_mercado),
@@ -514,6 +544,14 @@ def main(argv: list[str] | None = None) -> None:
 
     s = sub.add_parser("listo", help="¿está el bot listo para dinero real? veredicto por señal, con números")
     s.set_defaults(fn=cmd_listo)
+
+    s = sub.add_parser("ejecucion", help="llenados reales vs break-even, edge mínimo y selección adversa")
+    s.add_argument("--run-id", help="limitar a una corrida")
+    s.set_defaults(fn=cmd_ejecucion)
+
+    s = sub.add_parser("validar", help="validación hacia adelante por pliegues y pruebas de resistencia")
+    s.add_argument("--pliegues", type=int, default=4)
+    s.set_defaults(fn=cmd_validar)
 
     s = sub.add_parser("ahora", help="qué comprar ahora mismo, por mercado, explicado en palabras")
     s.add_argument("--minutos", type=float, default=30, help="cuánto atrás mirar")

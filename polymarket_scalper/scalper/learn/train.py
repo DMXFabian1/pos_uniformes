@@ -143,6 +143,93 @@ def _importance(model: WinModel, schema: FeatureSchema, X: list[list[float]], y:
     return out[:top]
 
 
+@dataclass
+class FoldReport:
+    fold: int
+    n_train: int
+    n_val: int
+    brier_modelo: float | None = None
+    brier_heuristica: float | None = None
+    gana: bool = False
+
+
+@dataclass
+class WalkForward:
+    """Validación hacia adelante: entrenar con el pasado, evaluar con el futuro inmediato, repetir.
+
+    Una sola partición 70/30 puede acertar por casualidad con el tramo que tocó. Aquí el modelo se
+    reentrena en cada pliegue con todo lo anterior y se juzga con lo siguiente, que es exactamente
+    como se usaría en vivo. Se considera estable si le gana a la heurística en la mayoría de los
+    pliegues, no en uno.
+    """
+    kind: str
+    n_total: int = 0
+    folds: list[FoldReport] = field(default_factory=list)
+    estable: bool = False
+    razon: str = ""
+
+    @property
+    def ganados(self) -> int:
+        return sum(1 for f in self.folds if f.gana)
+
+
+def walk_forward(data_dir: str | Path, kind: str, folds: int = 4, min_train: int = 40,
+                 min_val: int = 12, backend: str = "auto") -> WalkForward:
+    ex = load_examples(data_dir, kind)
+    wf = WalkForward(kind=kind, n_total=len(ex))
+    necesario = min_train + folds * min_val
+    if len(ex) < necesario:
+        wf.razon = f"pocos ejemplos ({len(ex)} < {necesario} para {folds} pliegues)"
+        return wf
+    tam = (len(ex) - min_train) // folds
+    for i in range(folds):
+        corte = min_train + i * tam
+        train, val = ex[:corte], ex[corte:corte + tam]
+        if len(val) < min_val:
+            break
+        ytr = [e["y"] for e in train]
+        if len(set(ytr)) < 2:
+            continue                       # sin las dos clases no hay nada que aprender todavía
+        schema = FeatureSchema.from_rows([e["features"] for e in train])
+        model = WinModel(backend).fit([schema.vector(e["features"]) for e in train], ytr)
+        yva = [e["y"] for e in val]
+        p = model.predict_proba([schema.vector(e["features"]) for e in val])
+        bm, bh = brier(p, yva), brier([e["conf_heuristic"] for e in val], yva)
+        wf.folds.append(FoldReport(i + 1, len(train), len(val), round(bm, 4), round(bh, 4), bm < bh - 1e-6))
+    if not wf.folds:
+        wf.razon = "no se pudo formar ningún pliegue válido"
+        return wf
+    wf.estable = wf.ganados > len(wf.folds) / 2
+    wf.razon = f"le gana a la heurística en {wf.ganados} de {len(wf.folds)} pliegues"
+    return wf
+
+
+def walk_forward_all(data_dir: str | Path, kinds: list[str] | None = None, **kw: Any) -> list[WalkForward]:
+    lf = scan(data_dir, "ledger")
+    if lf is None:
+        return []
+    if kinds is None:
+        kinds = sorted(lf.select("kind").unique().collect()["kind"].to_list())
+    return [walk_forward(data_dir, k, **kw) for k in kinds]
+
+
+def formatear_walk_forward(reps: list[WalkForward]) -> str:
+    if not reps:
+        return "sin ledger"
+    lineas = []
+    for r in reps:
+        if not r.folds:
+            lineas.append(f"{r.kind:20} ejemplos={r.n_total:<5} sin validar: {r.razon}")
+            continue
+        estado = "ESTABLE" if r.estable else "inestable"
+        lineas.append(f"{r.kind:20} ejemplos={r.n_total:<5} {estado} ({r.razon})")
+        for f in r.folds:
+            marca = "gana" if f.gana else "pierde"
+            lineas.append(f"   pliegue {f.fold}  train={f.n_train:<5} val={f.n_val:<4} "
+                          f"brier modelo={f.brier_modelo:.4f} heurística={f.brier_heuristica:.4f}  {marca}")
+    return "\n".join(lineas)
+
+
 def train_all(data_dir: str | Path, kinds: list[str] | None = None, **kw: Any) -> list[TrainReport]:
     lf = scan(data_dir, "ledger")
     if lf is None:
