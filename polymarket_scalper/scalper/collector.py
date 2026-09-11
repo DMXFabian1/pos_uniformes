@@ -560,6 +560,7 @@ class Collector:
             lat["mediana"] if lat else 0.0, hace,
             Umbrales(c.sano_ms, c.degradado_ms, c.sin_mensajes_viejo_s, c.sin_mensajes_congelado_s),
             p95_ms=lat["p95"] if lat else 0,
+            min_ms=lat["min"] if lat else 0,
             mensajes_por_segundo=sum(x.messages for x in self.pool.conns) / transcurrido,
             libros_validos=sum(1 for b in self.books.values() if b.is_valid),
             libros_totales=len(self.books),
@@ -588,7 +589,7 @@ class Collector:
         if not xs:
             return None
         return {"n": len(xs), "mediana": xs[len(xs) // 2], "p95": xs[min(len(xs) - 1, int(len(xs) * 0.95))],
-                "max": xs[-1], "ventana_s": ventana}
+                "min": xs[0], "max": xs[-1], "ventana_s": ventana}
 
 
 def _fnum(x: Any) -> float | None:

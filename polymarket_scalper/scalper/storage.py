@@ -153,6 +153,7 @@ SCHEMAS: dict[str, pa.Schema] = {
     # salud del feed a lo largo del tiempo: sin esto no se puede separar el dato bueno del sucio
     "feed_health": pa.schema([
         ("ts_ms", I()), ("run_id", S()), ("experiment", S()), ("estado", S()), ("freshness_ms", I()),
+        ("min_ms", I()),
         ("p95_ms", I()), ("mensajes_por_segundo", F()), ("ultimo_mensaje_hace_ms", I()),
         ("libros_validos", I()), ("libros_totales", I()), ("reconexiones", I()),
         ("trade_feed_lag_s", I()), ("paginas_llenas", I()),

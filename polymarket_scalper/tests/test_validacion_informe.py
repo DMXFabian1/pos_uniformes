@@ -194,6 +194,22 @@ def test_el_informe_corta_por_frescura_del_libro(tmp_path):
     assert tramos["2-5s"]["n_validas"] == 2 and tramos["2-5s"]["pnl_medio"] == -1.0
 
 
+def test_con_el_reloj_desfasado_el_corte_por_frescura_sigue_significando_algo(tmp_path):
+    # Caso real: el reloj del contenedor iba ~200 ms por detrás del que estampa los mensajes, así
+    # que `recv - ts` salía negativo en la mayoría de las decisiones. Sin descontar ese suelo, todas
+    # esas filas caían en `10s+` y el informe daba a entender que se operaba con el libro rancio.
+    ledger = [_fila(i, freshness=-180, pnl=2.0) for i in range(3)] + \
+             [_fila(3 + i, freshness=-98, pnl=-1.0) for i in range(2)]
+    _escribir(tmp_path, ledger=ledger)
+    inf = analizar(tmp_path)
+    tramos = {r["tramo"]: r for r in inf.frescura}
+    assert "10s+" not in tramos
+    assert tramos["0-250ms"]["n_validas"] == 5
+    assert inf.salud["desfase_reloj_ms"] == -180.0
+    # Y la frescura que se enseña es relativa al suelo, nunca negativa.
+    assert inf.cadena["retraso_feed_ms"] >= 0
+
+
 def test_los_umbrales_de_frescura_se_prueban_todos_sin_elegir_el_mejor(tmp_path):
     ledger = [_fila(0, freshness=200, pnl=1.0), _fila(1, freshness=3_000, pnl=-5.0)]
     _escribir(tmp_path, ledger=ledger)
@@ -305,3 +321,6 @@ def test_el_score_de_frescura_decae_a_la_mitad_cada_segundo():
     assert freshness_score(1000) == 0.5
     assert freshness_score(2000) == 0.25
     assert freshness_score(None) is None
+    # Con el reloj desfasado, la escala se mide desde el suelo, no desde cero.
+    assert freshness_score(-200, desfase_ms=-200) == 1.0
+    assert freshness_score(800, desfase_ms=-200) == 0.5

@@ -4,7 +4,8 @@ import json
 import polars as pl
 
 from scalper.experimento import congelar, diferencias, registrar, umbrales
-from scalper.salud import CONGELADO, DEGRADADO, SANO, VIEJO, bucket, evaluar
+from scalper.salud import (CONGELADO, DEGRADADO, SANO, VIEJO, bucket, corregir,
+                          desfase_reloj, evaluar)
 from scalper.sim.engine import Engine
 from scalper.storage import ParquetWriter, scan
 from conftest import make_market
@@ -91,6 +92,32 @@ def test_los_tramos_de_frescura_cubren_todo():
     assert bucket(250) == "250-500ms" and bucket(1500) == "1-2s"
     assert bucket(9999) == "5-10s" and bucket(60_000) == "10s+"
     assert bucket(None) == "desconocida"
+
+
+def test_una_frescura_negativa_es_el_libro_mas_fresco_no_el_mas_viejo():
+    # Con el reloj desfasado, `recv - ts` sale negativo. Antes no encajaba en ningún tramo y caía
+    # en `10s+`: el dato recién llegado se contaba como el más rancio posible.
+    assert bucket(-207) == "0-250ms"
+    assert bucket(-1) == "0-250ms"
+
+
+def test_el_desfase_de_reloj_se_estima_con_el_minimo_observado():
+    # El mensaje que menos tardó es el que menos transporte lleva dentro: filtro de mínimo.
+    assert desfase_reloj([-207, -98, -42, 846]) == -207.0
+    # Un mínimo positivo es retraso de verdad: no hay desfase que descontar.
+    assert desfase_reloj([120, 300, 900]) == 0.0
+    assert desfase_reloj([]) == 0.0
+    assert desfase_reloj([None, -50]) == -50.0
+
+
+def test_descontado_el_desfase_la_frescura_es_relativa_al_suelo():
+    # -207 es el suelo: pasa a valer 0 y cae en el primer tramo; -98 queda a 109 ms de él.
+    assert corregir(-207, -207) == 0.0
+    assert corregir(-98, -207) == 109.0
+    assert bucket(-98, -207) == "0-250ms"
+    assert bucket(846, -207) == "1-2s"
+    # Nunca negativa: por debajo del suelo el mínimo es cero.
+    assert corregir(-300, -207) == 0.0
 
 
 def test_la_salud_se_guarda_cada_cierto_tiempo(cfg, tmp_path):

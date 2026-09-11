@@ -91,6 +91,24 @@ ruido.
 
 Las operaciones tomadas con el feed VIEJO o CONGELADO se cuentan aparte y no se mezclan.
 
+### El reloj no está sincronizado, y eso cambia cómo se lee la frescura
+
+La frescura se mide restando: la hora a la que llega el mensaje menos la que lleva estampada. Esa
+resta lleva dentro el desfase entre los dos relojes, que nadie conoce. En la primera corrida larga
+la mediana salió en **−98 ms**, con mínimos de −207 ms: el mensaje parecía llegar antes de haber
+salido. No es que el libro venga del futuro; es que nuestro reloj va detrás.
+
+Esto tenía una consecuencia silenciosa: una frescura negativa no encajaba en ningún tramo de
+análisis y terminaba en el último, `10s+`. El dato más fresco posible se contaba como el más viejo.
+Afectaba a **179 de 206 decisiones** y a **55 de 69 posiciones** de esa corrida, así que el corte
+por frescura —la pregunta 8 entera— decía justo lo contrario de lo que pasaba.
+
+Ahora el informe estima el desfase con un filtro de mínimo (el mensaje que menos tardó es el que
+menos transporte lleva dentro, el mismo truco de NTP), lo descuenta de toda frescura y lo imprime
+en la cabecera. La consecuencia hay que decirla entera: **el retraso absoluto del feed no se puede
+medir sin relojes sincronizados**. Lo que sí vale, y es lo que necesita esta fase, es la comparación
+entre un momento y otro sobre ese suelo común.
+
 ## 5. Lo que se rechaza también se mide
 
 Cada señal que el motor descarta deja una **posición sombra**: ejecuta y se cierra igual que una

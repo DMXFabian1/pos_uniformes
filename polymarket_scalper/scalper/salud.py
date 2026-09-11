@@ -14,6 +14,17 @@ Estados:
 
 Los umbrales son una hipótesis, no una verdad: se registran junto a cada decisión precisamente
 para poder comprobar después a partir de qué antigüedad desaparece la ventaja.
+
+**Sobre el signo de la frescura.** La frescura se mide como `recv - ts`: la diferencia entre
+nuestro reloj y el que estampó el mensaje. Esa resta lleva dentro el desfase entre los dos relojes,
+que no conocemos. Si nuestro reloj va atrasado, la resta sale negativa, y una frescura negativa no
+significa que el libro llegue del futuro: significa que el número absoluto no se puede leer como un
+retraso. Lo que sí es válido es la comparación entre momentos, una vez descontado el suelo.
+
+El suelo se estima como el mínimo observado (`desfase_reloj`): el mensaje que menos tardó es el que
+menos contaminado está por el transporte, así que su retraso aparente es la mejor estimación del
+desfase. Es el mismo truco de filtro de mínimo que usa NTP, y como NTP solo sirve para medidas
+relativas: sin relojes sincronizados no hay retraso absoluto.
 """
 from __future__ import annotations
 
@@ -41,22 +52,51 @@ BUCKETS: tuple[tuple[str, float, float], ...] = (
 )
 
 
-def freshness_score(freshness_ms: float | None, media_vida_ms: float = 1_000.0) -> float | None:
+def desfase_reloj(valores) -> float:
+    """Desfase estimado entre el reloj del exchange y el nuestro, en ms.
+
+    Filtro de mínimo: de todos los retrasos aparentes observados, el más pequeño es el que menos
+    transporte lleva dentro, así que se acerca al desfase puro. Solo se corrige cuando sale
+    negativo; un mínimo positivo es retraso de verdad y no hay nada que descontar.
+    """
+    xs = [float(v) for v in valores if v is not None]
+    if not xs:
+        return 0.0
+    return min(min(xs), 0.0)
+
+
+def corregir(freshness_ms: float | None, desfase_ms: float = 0.0) -> float | None:
+    """Frescura descontado el desfase de reloj. Nunca negativa: el suelo es cero."""
+    if freshness_ms is None:
+        return None
+    return max(float(freshness_ms) - desfase_ms, 0.0)
+
+
+def freshness_score(freshness_ms: float | None, media_vida_ms: float = 1_000.0,
+                    desfase_ms: float = 0.0) -> float | None:
     """Frescura como número entre 0 y 1, para poder cruzarla con llenado y resultado.
 
     Decae a la mitad cada `media_vida_ms`: 0 ms vale 1, un segundo 0,5, dos segundos 0,25. Es una
     escala de análisis, no un umbral de decisión: no se usa para bloquear nada.
     """
-    if freshness_ms is None:
+    v = corregir(freshness_ms, desfase_ms)
+    if v is None:
         return None
-    return round(0.5 ** (max(freshness_ms, 0.0) / media_vida_ms), 4)
+    return round(0.5 ** (v / media_vida_ms), 4)
 
 
-def bucket(freshness_ms: float | None) -> str:
-    if freshness_ms is None:
+def bucket(freshness_ms: float | None, desfase_ms: float = 0.0) -> str:
+    """Cajón de antigüedad. Por debajo del suelo cae en el primero, no en el último.
+
+    Antes, una frescura negativa no encajaba en ningún tramo y terminaba en `10s+`: el dato más
+    fresco posible se contaba como el más viejo, y con el reloj desfasado eso afectaba a la mayoría
+    de las decisiones. El cajón de lo que llega antes de tiempo es el de lo que acaba de llegar.
+    """
+    v = corregir(freshness_ms, desfase_ms)
+    if v is None:
         return "desconocida"
     for nombre, lo, hi in BUCKETS:
-        if lo <= freshness_ms < hi:
+        if lo <= v < hi:
             return nombre
     return "10s+"
 
@@ -67,6 +107,7 @@ class Salud:
     estado: str = SANO
     freshness_ms: int = 0            # retraso mediano reciente entre el reloj del exchange y el nuestro
     p95_ms: int = 0
+    min_ms: int = 0                  # el menor retraso aparente de la ventana: estima el desfase de reloj
     mensajes_por_segundo: float = 0.0
     ultimo_mensaje_hace_ms: int = 0
     libros_validos: int = 0
@@ -87,6 +128,7 @@ class Salud:
     def to_row(self, ts_ms: int, run_id: str, experiment: str) -> dict[str, Any]:
         return {"ts_ms": ts_ms, "run_id": run_id, "experiment": experiment, "estado": self.estado,
                 "freshness_ms": int(self.freshness_ms), "p95_ms": int(self.p95_ms),
+                "min_ms": int(self.min_ms),
                 "mensajes_por_segundo": round(self.mensajes_por_segundo, 2),
                 "ultimo_mensaje_hace_ms": int(self.ultimo_mensaje_hace_ms),
                 "libros_validos": int(self.libros_validos), "libros_totales": int(self.libros_totales),

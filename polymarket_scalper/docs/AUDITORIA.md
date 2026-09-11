@@ -280,6 +280,30 @@ con mensajes recién llegados, y el estado del feed oscila entre SANO y VIEJO si
 cambiado de calidad. La medida correcta para decidir si el libro está al día es el retraso de los
 mensajes **más recientes**, en una ventana de tiempo, no de recuento.
 
+### Tercera medición: con la ventana de tiempo, el retraso era mucho menor de lo que parecía
+
+Con la ventana por tiempo en su sitio, cuatro horas de corrida (194 muestras de salud) dieron algo
+distinto de lo anterior: mediana −98 ms, p25 −155 ms, p75 −42 ms, máximo 846 ms; el p95 llegó a
+1 675 ms en el peor momento. Nada parecido a los 62 s del apartado anterior, que eran un artefacto
+de mezclar ráfagas de medio minuto en una sola mediana.
+
+Pero el signo sobraba. Un retraso negativo no existe: significa que el reloj del contenedor va
+detrás del que estampa los mensajes, unos 200 ms. Y ahí había un fallo real de medición: una
+frescura negativa no encajaba en ningún tramo de análisis y caía en el último, `10s+`. **179 de 206
+decisiones y 55 de 69 posiciones** de esa corrida se estaban contando como tomadas con el libro más
+rancio posible, cuando eran las más frescas. La pregunta 8 del informe —cómo cambia todo con la
+frescura— respondía al revés.
+
+La corrección es la de NTP: el mensaje que menos tardó es el que menos transporte lleva dentro, así
+que su retraso aparente estima el desfase. Se descuenta ese suelo de toda frescura y se imprime en
+la cabecera del informe. Con eso, la misma corrida pasa a leerse como 112 ms de mediana sobre el
+suelo y 155 ms de p95, y el corte por frescura reparte las operaciones entre `0-250ms`, `250-500ms`
+y `1-2s` en vez de amontonarlas en `10s+`.
+
+Lo que no se puede hacer es fingir que eso es el retraso absoluto del feed: **sin relojes
+sincronizados no hay retraso absoluto**, solo comparación entre momentos sobre un suelo común. Para
+lo que necesita esta fase —¿desaparece la ventaja cuando el libro envejece?— la comparación basta.
+
 ### La regla que no cambia
 
 Ningún número del ledger anterior al cambio A cuenta como evidencia sobre las señales maker: se
