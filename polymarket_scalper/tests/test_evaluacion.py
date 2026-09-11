@@ -87,13 +87,13 @@ def test_el_edge_minimo_suma_coste_de_salida_y_seleccion_adversa():
     assert e.coste_salida == 0.01                   # 0.5 USD de comisión sobre 50 shares
     assert e.adversa["adverse_10s"] == -0.01
     assert e.edge_minimo_requerido == 0.025         # 0.01 + 0.01 + 0.005
-    assert e.señales_sobre_minimo == 0.0            # ninguna señal de 0.02 llega al mínimo
+    assert e.senales_sobre_minimo == 0.0            # ninguna señal de 0.02 llega al mínimo
 
 
 def test_sin_seleccion_adversa_el_minimo_es_solo_coste_mas_margen():
     filas = [_fila(i, fees=0.0, adverse={"adverse_10s": 0.02}, edge=0.02) for i in range(4)]
     e = evaluar_filas(filas, margen=0.005)
-    assert e.edge_minimo_requerido == 0.005 and e.señales_sobre_minimo == 1.0
+    assert e.edge_minimo_requerido == 0.005 and e.senales_sobre_minimo == 1.0
 
 
 def test_edge_aparente_contra_realizado():

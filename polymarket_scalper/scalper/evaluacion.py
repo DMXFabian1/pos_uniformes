@@ -77,7 +77,7 @@ class Estrategia:
     adversa: dict[str, float | None] = field(default_factory=dict)
     coste_salida: float | None = None
     edge_minimo_requerido: float | None = None
-    señales_sobre_minimo: float | None = None
+    senales_sobre_minimo: float | None = None
     ejecucion: Ejecucion = field(default_factory=Ejecucion)
     salidas: dict[str, int] = field(default_factory=dict)
     deciles: list[dict[str, Any]] = field(default_factory=list)
@@ -273,7 +273,7 @@ def evaluar_filas(filas: list[dict[str, Any]], baseline: float = 0.6,
     adv = e.adversa.get("adverse_10s") or e.adversa.get("adverse_5s") or 0.0
     e.edge_minimo_requerido = round((e.coste_salida or 0.0) + max(-adv, 0.0) + margen, 5)
     if aparentes:
-        e.señales_sobre_minimo = round(sum(1 for x in aparentes if x >= e.edge_minimo_requerido) / len(aparentes), 3)
+        e.senales_sobre_minimo = round(sum(1 for x in aparentes if x >= e.edge_minimo_requerido) / len(aparentes), 3)
     e.deciles = _deciles(validas)
     e.estres = _estres(validas, e.pnl)
     return e
@@ -331,7 +331,7 @@ def formatear(ests: list[Estrategia]) -> str:
         if not e.n:
             continue
         g = lambda v, d=4: "   -   " if v is None else f"{v:+.{d}f}"   # noqa: E731
-        pct = "  -  " if e.señales_sobre_minimo is None else f"{e.señales_sobre_minimo * 100:.0f}%"
+        pct = "  -  " if e.senales_sobre_minimo is None else f"{e.senales_sobre_minimo * 100:.0f}%"
         cap = "  -  " if e.captura is None else f"{e.captura * 100:.0f}%"
         out.append(f"{e.strategy[:24]:24}{e.edge_minimo_requerido or 0:>11.4f}{pct:>11}{g(e.edge_aparente):>10}"
                    f"{g(e.edge_realizado):>11}{cap:>9}{g(e.adversa.get('adverse_10s'), 5):>14}")
