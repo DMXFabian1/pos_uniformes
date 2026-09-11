@@ -29,6 +29,9 @@ if errorlevel 1 (
 
 echo.
 echo  2/2  Actualizando dependencias...
+echo  Limpiando restos de instalaciones interrumpidas...
+for /d %%D in (".venv\Lib\site-packages\~*") do rmdir /s /q "%%D" 2>nul
+
 if not exist ".venv\Scripts\python.exe" (
   echo  No hay entorno virtual. Ejecuta primero:
   echo    powershell -ExecutionPolicy Bypass -File deploy\instalar-windows.ps1

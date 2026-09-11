@@ -168,6 +168,7 @@ Si te quedas corto de espacio, baja `keep_days` en `config.yaml` y reinicia el b
 |---|---|---|
 | `py no se reconoce como comando` | Python sin PATH | reinstala marcando "Add python.exe to PATH" |
 | `ERROR: To modify pip, please run...` | pip no puede reemplazarse a sí mismo en Windows | ya resuelto en el script; si lo ves, instala a mano con `.venv\Scripts\python.exe -m pip install -e ".[learn]"` |
+| `WARNING: Ignoring invalid distribution ~olymarket-scalper` | carpeta residual de una instalación interrumpida | inofensivo; `ACTUALIZAR.bat` y el instalador la borran solos |
 | `no se puede cargar el archivo ... está deshabilitada la ejecución de scripts` | política de PowerShell | usa `powershell -ExecutionPolicy Bypass -File ...` como indica la guía |
 | Caracteres raros en vez de acentos | consola en codificación antigua | los scripts ya fijan `PYTHONUTF8=1`; si lanzas el comando a mano, escribe antes `$env:PYTHONUTF8=1` |
 | `libros_validos` muy bajo de madrugada | pocos partidos a esa hora | normal, no es un error |

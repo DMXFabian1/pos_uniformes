@@ -30,6 +30,15 @@ $vpy = Join-Path $proyecto ".venv\Scripts\python.exe"
 $exe = Join-Path $proyecto ".venv\Scripts\scalper.exe"
 if (-not (Test-Path $vpy)) { Write-Host "no se creó el entorno virtual .venv" -ForegroundColor Red; exit 1 }
 
+# restos de instalaciones interrumpidas: pip avisa de "invalid distribution ~..." en cada uso
+$sitePkgs = Join-Path $proyecto ".venv\Lib\site-packages"
+if (Test-Path $sitePkgs) {
+  Get-ChildItem -Path $sitePkgs -Directory -Filter "~*" -ErrorAction SilentlyContinue | ForEach-Object {
+    Write-Host "   limpiando resto: $($_.Name)" -ForegroundColor DarkGray
+    Remove-Item $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
+  }
+}
+
 Write-Host "== dependencias (puede tardar unos minutos)" -ForegroundColor Cyan
 & $vpy -m pip install --quiet --upgrade pip
 & $vpy -m pip install --quiet -e ".[learn]"
