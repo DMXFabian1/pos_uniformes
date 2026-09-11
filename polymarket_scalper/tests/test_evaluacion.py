@@ -185,3 +185,18 @@ def test_walk_forward_necesita_muestra_y_reporta_por_pliegue(tmp_path):
 def test_walk_forward_sin_datos_lo_dice(tmp_path):
     wf = walk_forward(tmp_path, "model_deviation")
     assert not wf.estable and "pocos ejemplos" in wf.razon
+
+
+def test_el_triplete_bruto_ejecutable_conservador_y_realizado():
+    """Los cuatro números de la misma operación, que casi nunca coinciden."""
+    filas = []
+    for i in range(4):
+        f = _fila(i, edge=0.02, pnl=0.5, filled=50.0)     # realizado 0.01 por share
+        f["meta"] = json.dumps({"edge_raw": 0.05, "edge_conservador": -0.004})
+        filas.append(f)
+    e = evaluar_filas(filas)
+    assert e.edge_bruto == 0.05           # antes de cualquier coste
+    assert e.edge_aparente == 0.02        # lo que prometió el detector tras comisiones
+    assert e.edge_conservador == -0.004   # si hubiera que salir al bid de ese momento
+    assert e.edge_realizado == 0.01       # lo que llegó al bolsillo
+    assert "conservador" in formatear([e])

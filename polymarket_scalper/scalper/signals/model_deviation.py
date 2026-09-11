@@ -70,10 +70,14 @@ class ModelDeviationDetector:
             if dev < self.min_deviation:
                 ctx.no_trade(self.kind, "desvio_insuficiente", side=side, desvio=dev, p_model=p_model, entrada=e.precio)
                 continue
-            # salida: vender como taker cerca del modelo, pagando fee y medio spread
+            # salida ideal: el mercado converge al modelo y se vende ahí, pagando fee y medio spread
             exit_px = p_model - (b.spread or 0) / 2
             fee_out = taker_fee(e.size, exit_px, m.fee_rate) / e.size
             edge_net = exit_px - e.precio - e.fee_in - fee_out
+            # salida conservadora: el mercado no converge nada y hay que salir al bid de ahora
+            salida_ya = b.best_bid
+            edge_conservador = round(salida_ya - e.precio - e.fee_in
+                                     - taker_fee(e.size, salida_ya, m.fee_rate) / e.size, 5)
             if edge_net < self.min_edge_net:
                 ctx.no_trade(self.kind, "edge_neto_insuficiente", side=side, edge_net=edge_net, p_model=p_model,
                              entrada=e.precio)
@@ -96,6 +100,8 @@ class ModelDeviationDetector:
                       "entry": round(e.precio, 4), "target": round(exit_px, 4),
                       "stop": round(max(e.precio - self.stop_fraction * edge_net, 0.01), 4),
                       "edge_taker": edge_taker, "queue_ahead": round(e.queue_ahead, 2),
+                      "edge_raw": round(dev, 5), "edge_conservador": edge_conservador,
+                      "salida_conservadora": round(salida_ya, 4),
                       "game_id": g.game_id, "sport": g.sport, "league": g.league, "model": wp.model,
                       "score": f"{g.home_score}-{g.away_score}", "period": g.period,
                       "pregame": round(ctx.pregame.for_side(side), 4) if ctx.pregame else None,

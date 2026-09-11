@@ -79,6 +79,9 @@ class SmartMoneyDetector:
                   "entry": round(e.precio, 4), "target": round(exit_px, 4),
                   "stop": round(max(e.precio - 2 * edge_net, 0.01), 4), "p_market": round(b.mid, 4),
                   "edge_taker": edge_taker, "queue_ahead": round(e.queue_ahead, 2),
+                  "edge_raw": round(edge_gross, 5),
+                  "edge_conservador": round(b.best_bid - e.precio - e.fee_in
+                                            - taker_fee(e.size, b.best_bid, m.fee_rate) / e.size, 5),
                   "por_que": (f"La wallet {nombre} ({prof.n_closed} cierres, {prof.roi * 100:.0f} % de retorno) acaba de "
                               f"comprar a {their_px:.2f} y el precio sigue en {b.mid:.2f}: se entra antes de que el "
                               f"mercado la siga.")},

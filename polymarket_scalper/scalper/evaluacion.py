@@ -71,7 +71,9 @@ class Estrategia:
     acierto: float = 0.0
     fees: float = 0.0
     duracion_media_s: float | None = None
-    edge_aparente: float | None = None     # USD por share prometidos por el detector
+    edge_bruto: float | None = None        # USD por share antes de cualquier coste
+    edge_aparente: float | None = None     # USD por share prometidos por el detector (ejecutable)
+    edge_conservador: float | None = None  # USD por share si hubiera que salir al bid de ese momento
     edge_realizado: float | None = None    # USD por share efectivamente obtenidos
     captura: float | None = None           # realizado / aparente
     adversa: dict[str, float | None] = field(default_factory=dict)
@@ -262,6 +264,12 @@ def evaluar_filas(filas: list[dict[str, Any]], baseline: float = 0.6,
     # edge aparente vs realizado, ambos en USD por share
     aparentes = [r["predicted_edge"] for r in validas if r.get("predicted_edge") is not None]
     reales = [r["realized_pnl"] / r["size_filled"] for r in validas if r.get("size_filled")]
+    brutos = [_meta(r).get("edge_raw") for r in validas]
+    brutos = [x for x in brutos if x is not None]
+    conserv = [_meta(r).get("edge_conservador") for r in validas]
+    conserv = [x for x in conserv if x is not None]
+    e.edge_bruto = round(_media(brutos), 5) if brutos else None
+    e.edge_conservador = round(_media(conserv), 5) if conserv else None
     e.edge_aparente = round(_media(aparentes), 5) if aparentes else None
     e.edge_realizado = round(_media(reales), 5) if reales else None
     if e.edge_aparente and abs(e.edge_aparente) > 1e-9 and e.edge_realizado is not None:
@@ -337,17 +345,18 @@ def formatear(ests: list[Estrategia]) -> str:
     out.append("es el número que había que comprobar. Lo que decide es 'llenadas' contra 'break-even'.")
     out.append("")
     out.append("== ¿Cuánta ventaja hace falta y cuánta llega al bolsillo? ==")
-    out.append(f"{'estrategia':24}{'edge mín.':>11}{'% señales':>11}{'aparente':>10}{'realizado':>11}"
-               f"{'captura':>9}{'adversa 10 s':>14}")
-    out.append("-" * 90)
+    out.append(f"{'estrategia':24}{'edge mín.':>11}{'% señales':>11}{'bruto':>9}{'ejecutable':>12}"
+               f"{'conservador':>13}{'realizado':>11}{'captura':>9}{'adversa 10 s':>14}")
+    out.append("-" * 114)
     for e in ests:
         if not e.n:
             continue
         g = lambda v, d=4: "   -   " if v is None else f"{v:+.{d}f}"   # noqa: E731
         pct = "  -  " if e.senales_sobre_minimo is None else f"{e.senales_sobre_minimo * 100:.0f}%"
         cap = "  -  " if e.captura is None else f"{e.captura * 100:.0f}%"
-        out.append(f"{e.strategy[:24]:24}{e.edge_minimo_requerido or 0:>11.4f}{pct:>11}{g(e.edge_aparente):>10}"
-                   f"{g(e.edge_realizado):>11}{cap:>9}{g(e.adversa.get('adverse_10s'), 5):>14}")
+        out.append(f"{e.strategy[:24]:24}{e.edge_minimo_requerido or 0:>11.4f}{pct:>11}{g(e.edge_bruto):>9}"
+                   f"{g(e.edge_aparente):>12}{g(e.edge_conservador):>13}{g(e.edge_realizado):>11}{cap:>9}"
+                   f"{g(e.adversa.get('adverse_10s'), 5):>14}")
     out.append("")
     for e in ests:
         if not e.deciles:

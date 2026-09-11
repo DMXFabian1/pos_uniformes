@@ -65,6 +65,10 @@ class UpDownDetector:
                 confidence=round(max(0.05, min(conf, 0.95)), 3), horizon="resolution",
                 meta={"entry_role": e.rol, "side": lado, "p_model": round(p_model, 4),
                       "edge_taker": edge_taker, "queue_ahead": round(e.queue_ahead, 2),
+                      "edge_raw": round(edge_bruto, 5),
+                      # conservadora: si hubiera que deshacer ya, se vende al bid pagando comisión
+                      "edge_conservador": round(b.best_bid - entrada
+                                                - taker_fee(size, b.best_bid, m.fee_rate) / size, 5),
                       "por_que": (f"Bitcoin va {mueve:+.0f} pb respecto a la apertura a {st.seconds_left:.0f} s del "
                                   f"cierre: el modelo da {p_model * 100:.0f} % a {lado.capitalize()} y el mercado "
                                   f"lo vende a {b.mid:.2f}."),
