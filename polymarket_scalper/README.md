@@ -222,6 +222,14 @@ solo la rentabilidad de todo lo maker-first. Ya no existe como supuesto operativ
 El 60 % sigue apareciendo en los informes, pero etiquetado como *referencia*: está ahí para poder
 desmentirlo, no para sostener ningún resultado.
 
+### Fase de validación (`scalper validacion`)
+Medir antes de mejorar. El motor se congela antes de cada corrida (commit, umbrales y modelos:
+si algo cambia, empieza otro experimento y los datos se separan solos), el feed tiene cuatro
+estados explícitos, cada orden puesta guarda sus condiciones y su resultado, cada llenado deja la
+trayectoria del precio hasta 15 minutos, y cada señal rechazada se sigue como sombra para saber
+si se descartan malos trades o buenas oportunidades. El detalle está en
+[docs/VALIDACION.md](docs/VALIDACION.md).
+
 ### Reacción del mercado (`scalper/reaction.py`)
 La tesis del scalping en vivo es que el marcador cambia antes que el precio. En lugar de suponerlo,
 cada cambio de marcador abre una medición: se guarda el mid de cada token y se espera a que se
