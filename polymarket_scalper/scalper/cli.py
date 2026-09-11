@@ -236,6 +236,14 @@ def cmd_dashboard(args: argparse.Namespace) -> None:
     serve(cfg, args.host, args.port, args.refresh)
 
 
+def cmd_mercado(args: argparse.Namespace) -> None:
+    """Radiografía: dónde hay movimiento, qué tan ancho es el spread y cuánto pesa la comisión."""
+    from .diagnostico import formatear, radiografia
+
+    cfg = load_config(args.config)
+    print(formatear(radiografia(cfg.data_dir)))
+
+
 def cmd_listo(args: argparse.Namespace) -> None:
     """¿Está el bot listo para operar con dinero real? La respuesta la dan los números."""
     from .readiness import evaluar, formatear
@@ -271,6 +279,7 @@ def cmd_overview(args: argparse.Namespace) -> None:
         ("RESULTADOS POR TIPO DE SEÑAL (predicho contra real)", cmd_report),
         ("WALLETS CON HISTORIAL", cmd_wallets),
         ("MODELOS APRENDIDOS", cmd_models),
+        ("RADIOGRAFÍA DEL MERCADO", cmd_mercado),
         ("¿LISTO PARA DINERO REAL?", cmd_listo),
         ("USO DE DISCO", cmd_retention),
     ]
@@ -499,6 +508,9 @@ def main(argv: list[str] | None = None) -> None:
     s.add_argument("--min-edge", type=float, default=0.0)
     s.add_argument("--grupo")
     s.set_defaults(fn=cmd_overview)
+
+    s = sub.add_parser("mercado", help="radiografía: dónde hay movimiento, spreads reales y peso de la comisión")
+    s.set_defaults(fn=cmd_mercado)
 
     s = sub.add_parser("listo", help="¿está el bot listo para dinero real? veredicto por señal, con números")
     s.set_defaults(fn=cmd_listo)
