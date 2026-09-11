@@ -3298,103 +3298,149 @@ class QuoteSatelliteWindow(QMainWindow):
     def _build_conteos_page(self) -> QWidget:
         """Página "Conteos": donde se trabaja.
 
-        Entra con gafete (paso 2 del plan, 2026-09-10) para que cada conteo
-        quede a nombre de quien lo hizo: antes se guardaba como "admin
-        (satélite)" y no había forma de saber quién contó qué.
+        Entra con gafete (cada conteo lleva nombre) y usa las mismas piezas
+        que la Libreta — gate, saludo, tarjetas de números, secciones — para
+        que se sienta la misma app y no un módulo pegado.
         """
+        from pos_uniformes.ui.views.quick_sale_view import _GATE_STYLE
+
         page = QWidget()
         page_layout = QVBoxLayout()
-        page_layout.setContentsMargins(8, 8, 8, 8)
-        page_layout.setSpacing(12)
+        page_layout.setContentsMargins(0, 0, 0, 0)
+        page_layout.setSpacing(0)
         page.setLayout(page_layout)
 
-        # ── Gate: sin gafete no se cuenta ───────────────────────────────
+        # ── Gate: réplica del de la Libreta ─────────────────────────────
         self.conteos_gate = QWidget()
-        gate_ly = QVBoxLayout()
-        gate_ly.setContentsMargins(0, 40, 0, 0)
-        gate_ly.setSpacing(10)
-        gate_ly.addStretch(1)
-        gate_titulo = QLabel("Pasa tu gafete para contar")
-        # Sin `guidedStepTitle`: ese estilo es una etiqueta de sección y aquí
-        # se estiraba de lado a lado como una barra de color.
-        gate_titulo.setStyleSheet(
-            "font-size: 22px; font-weight: 800; color: #5c3019;"
-        )
-        gate_titulo.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        gate_ly.addWidget(gate_titulo)
-        gate_pista = QLabel("Así queda registrado quién hizo cada conteo.")
-        gate_pista.setObjectName("guidedStepHint")
-        gate_pista.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        gate_ly.addWidget(gate_pista)
+        self.conteos_gate.setObjectName("gateRoot")
+        self.conteos_gate.setStyleSheet(_GATE_STYLE)
+        gate_outer = QVBoxLayout()
+        gate_outer.setContentsMargins(40, 40, 40, 40)
+        gate_card = QFrame()
+        gate_card.setObjectName("gateCard")
+        gate_cl = QVBoxLayout()
+        gate_cl.setContentsMargins(48, 40, 48, 40)
+        gate_cl.setSpacing(12)
+        gate_cl.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        gate_icon = QLabel("📋")
+        gate_icon.setObjectName("gateEmoji")
+        gate_icon.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        gate_cl.addWidget(gate_icon)
+        gate_title = QLabel("Conteos")
+        gate_title.setObjectName("gateTitle")
+        gate_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        gate_cl.addWidget(gate_title)
+        gate_hint = QLabel("Escanea tu gafete para contar")
+        gate_hint.setObjectName("gateHint")
+        gate_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        gate_cl.addWidget(gate_hint)
+        gate_cl.addSpacing(8)
         self.conteos_gate_input = QLineEdit()
-        self.conteos_gate_input.setPlaceholderText("Escanea tu gafete…")
-        self.conteos_gate_input.setMinimumHeight(52)
-        self.conteos_gate_input.setMaximumWidth(420)
+        self.conteos_gate_input.setObjectName("gateInput")
+        self.conteos_gate_input.setPlaceholderText("Gafete...")
         self.conteos_gate_input.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.conteos_gate_input.returnPressed.connect(self._on_conteos_gate_scan)
-        gate_ly.addWidget(self.conteos_gate_input, 0, Qt.AlignmentFlag.AlignHCenter)
+        gate_cl.addWidget(self.conteos_gate_input, 0, Qt.AlignmentFlag.AlignCenter)
         self.conteos_gate_error = QLabel("")
-        self.conteos_gate_error.setObjectName("guidedStepHint")
+        self.conteos_gate_error.setObjectName("gateError")
         self.conteos_gate_error.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self.conteos_gate_error.setStyleSheet("color: #8a2f2f; font-weight: 600;")
         self.conteos_gate_error.setVisible(False)
-        gate_ly.addWidget(self.conteos_gate_error)
-        gate_ly.addStretch(2)
-        self.conteos_gate.setLayout(gate_ly)
+        gate_cl.addWidget(self.conteos_gate_error)
+        gate_card.setLayout(gate_cl)
+        gate_outer.addStretch()
+        gate_outer.addWidget(gate_card, 0, Qt.AlignmentFlag.AlignHCenter)
+        gate_outer.addStretch()
+        self.conteos_gate.setLayout(gate_outer)
         page_layout.addWidget(self.conteos_gate)
 
-        # ── Zona de trabajo (aparece tras el gafete) ────────────────────
+        # ── Zona de trabajo ─────────────────────────────────────────────
         self.conteos_work = QWidget()
-        layout = QVBoxLayout()   # de aquí en adelante se arma la zona de trabajo
+        layout = QVBoxLayout()
         layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(12)
+        layout.setSpacing(8)
 
         header = QHBoxLayout()
-        titulo = QLabel("Conteos")
-        titulo.setObjectName("guidedStepTitle")
-        header.addWidget(titulo)
+        header.setSpacing(8)
+        titulo_col = QVBoxLayout()
+        titulo_col.setSpacing(0)
+        self.conteos_titulo_label = QLabel("📋 Conteos")
+        self.conteos_titulo_label.setObjectName("libretaSaludo")
+        titulo_col.addWidget(self.conteos_titulo_label)
         self.conteos_quien_label = QLabel("")
-        self.conteos_quien_label.setObjectName("guidedStepHint")
-        header.addWidget(self.conteos_quien_label)
+        self.conteos_quien_label.setObjectName("libretaSubtitulo")
+        titulo_col.addWidget(self.conteos_quien_label)
+        header.addLayout(titulo_col)
         header.addStretch()
-        salir_btn = QPushButton("Salir")
-        salir_btn.setObjectName("secondaryButton")
-        salir_btn.clicked.connect(self._conteos_logout)
-        header.addWidget(salir_btn)
-        orden_btn = QPushButton("🖨 Imprimir hoja de conteo")
-        orden_btn.setObjectName("secondaryButton")
+        orden_btn = QPushButton("🖨 Imprimir hoja")
+        orden_btn.setAutoDefault(False)
         orden_btn.clicked.connect(self._open_conteo_orden)
         header.addWidget(orden_btn)
         empezar_btn = QPushButton("＋ Empezar conteo")
         empezar_btn.setObjectName("primaryButton")
+        empezar_btn.setAutoDefault(False)
         empezar_btn.clicked.connect(self._conteos_empezar)
         header.addWidget(empezar_btn)
+        salir_btn = QPushButton("Salir")
+        salir_btn.setAutoDefault(False)
+        salir_btn.clicked.connect(self._conteos_logout)
+        header.addWidget(salir_btn)
         layout.addLayout(header)
 
-        pasos = QLabel(
-            "1.  Imprime la hoja de la escuela que toca.\n"
-            "2.  Cuenta en el piso y anota en la hoja.\n"
-            "3.  Regresa aquí y captura lo que anotaste. Puedes dejarlo a medias y seguir otro día."
-        )
-        pasos.setObjectName("guidedStepHint")
-        layout.addWidget(pasos)
+        # Tarjetas de números, como en la Libreta: la destacada dice qué toca.
+        cards_row = QHBoxLayout()
+        cards_row.setSpacing(10)
+        self._conteos_cards: dict[str, tuple[QFrame, QLabel, QLabel, QLabel]] = {}
+        for index, (key, titulo) in enumerate(
+            (("por_contar", "POR CONTAR"), ("a_medias", "A MEDIAS"),
+             ("mias", "MÍAS"), ("por_revisar", "POR REVISAR"))
+        ):
+            card = QFrame()
+            card.setObjectName("libretaCardDestacada" if index == 0 else "libretaCard")
+            card_ly = QVBoxLayout()
+            card_ly.setContentsMargins(16, 12, 16, 12)
+            card_ly.setSpacing(2)
+            t = QLabel(titulo)
+            t.setObjectName("libretaCardTituloClaro" if index == 0 else "libretaCardTitulo")
+            v = QLabel("—")
+            v.setObjectName("libretaCardValorClaro" if index == 0 else "libretaCardValor")
+            sub = QLabel("")
+            sub.setObjectName("libretaCardSubClaro" if index == 0 else "libretaCardSub")
+            sub.setWordWrap(True)
+            card.setMinimumWidth(0)
+            card_ly.addWidget(t)
+            card_ly.addWidget(v)
+            card_ly.addWidget(sub)
+            card.setLayout(card_ly)
+            cards_row.addWidget(card, 1)
+            self._conteos_cards[key] = (card, t, v, sub)
+        # "Por revisar" solo existe para el dueño.
+        self._conteos_cards["por_revisar"][0].setVisible(False)
+        layout.addLayout(cards_row)
 
+        # Los tres pasos, en un renglón discreto.
+        self.conteos_pasos_label = QLabel(
+            "1  Imprime la hoja de la escuela que toca   ·   2  Cuenta en el piso y anota   ·   "
+            "3  Regresa aquí y captura. Puedes dejarlo a medias."
+        )
+        self.conteos_pasos_label.setObjectName("libretaSubtitulo")
+        self.conteos_pasos_label.setWordWrap(True)
+        layout.addWidget(self.conteos_pasos_label)
+
+        # Lo que dice la sonda / la base (qué escuelas tocan).
         self.conteos_pendiente_label = QLabel("")
-        self.conteos_pendiente_label.setObjectName("analyticsLine")
+        self.conteos_pendiente_label.setObjectName("libretaSubtitulo")
         self.conteos_pendiente_label.setWordWrap(True)
         layout.addWidget(self.conteos_pendiente_label)
 
-        # Jornadas sin terminar (las tarjetas las arma el helper).
-        self.conteos_jornadas_titulo = QLabel("Jornadas sin terminar")
-        self.conteos_jornadas_titulo.setObjectName("guidedGroupBoxTitle")
+        self.conteos_jornadas_titulo = QLabel("JORNADAS SIN TERMINAR  ·  toca Seguir para retomar la tuya")
+        self.conteos_jornadas_titulo.setObjectName("libretaSeccion")
         layout.addWidget(self.conteos_jornadas_titulo)
         self.conteos_jornadas_box = QVBoxLayout()
         self.conteos_jornadas_box.setSpacing(8)
         layout.addLayout(self.conteos_jornadas_box)
 
-        # Solo el dueño: lo terminado que falta aplicar.
-        self.conteos_revisar_titulo = QLabel("Por revisar")
-        self.conteos_revisar_titulo.setObjectName("guidedGroupBoxTitle")
+        self.conteos_revisar_titulo = QLabel("POR REVISAR  ·  terminadas, esperando que las apliques")
+        self.conteos_revisar_titulo.setObjectName("libretaSeccion")
         self.conteos_revisar_titulo.setVisible(False)
         layout.addWidget(self.conteos_revisar_titulo)
         self.conteos_revisar_box = QVBoxLayout()
@@ -3405,7 +3451,7 @@ class QuoteSatelliteWindow(QMainWindow):
         aviso = QLabel(
             "Lo que se captura queda pendiente de revisión: no cambia el inventario solo."
         )
-        aviso.setObjectName("guidedStepHint")
+        aviso.setObjectName("libretaSubtitulo")
         layout.addWidget(aviso)
 
         self.conteos_work.setLayout(layout)
@@ -3491,6 +3537,7 @@ class QuoteSatelliteWindow(QMainWindow):
         # conexión sin límite congela la pantalla (esto corre en el hilo de UI).
         if self.offline_mode or not probe_database_host(0.5):
             etiqueta.setText("Sin conexión: no se puede saber qué escuela toca.")
+            self._conteos_card("por_contar", "—", "sin conexión")
             return
         try:
             from pos_uniformes.services.conteo_calendario_service import (
@@ -3503,13 +3550,25 @@ class QuoteSatelliteWindow(QMainWindow):
             etiqueta.setText("")
             return
 
+        self._conteos_card("por_contar", str(len(vencidas)),
+                           "escuelas con conteo vencido" if vencidas else "todo al día")
         if not vencidas:
             etiqueta.setText("Todo al día. No hay conteos vencidos.")
             return
         nombres = ", ".join(v.escuela_nombre for v in vencidas[:6])
         if len(vencidas) > 6:
             nombres += f" y {len(vencidas) - 6} más"
-        etiqueta.setText(f"Toca contar ({len(vencidas)}):  {nombres}")
+        etiqueta.setText(f"Toca contar:  {nombres}")
+
+    def _conteos_card(self, key: str, valor: str, sub: str = "") -> None:
+        """Escribe una tarjeta de números de Conteos (si existe)."""
+        cards = getattr(self, "_conteos_cards", None) or {}
+        if key not in cards:
+            return
+        card, _t, v, s_ = cards[key]
+        v.setText(valor)
+        s_.setText(sub)
+        s_.setVisible(bool(sub))
 
     def _refresh_conteos_vista(self) -> None:
         """Lo pendiente, las jornadas abiertas y (dueño) lo que falta revisar."""
@@ -3635,9 +3694,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.conteos_gate_error.setVisible(False)
         self._conteos_code = code
         self._conteos_nombre = self._nombre_de_gafete(code)
-        self.conteos_quien_label.setText(
-            f" ·  {self._conteos_nombre or code}"
-        )
+        self.conteos_quien_label.setText(self._conteos_nombre or code)
         self.conteos_gate.setVisible(False)
         self.conteos_work.setVisible(True)
         self._refresh_conteos_vista()
