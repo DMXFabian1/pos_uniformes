@@ -343,3 +343,17 @@ def test_las_reacciones_llevan_la_corrida_y_el_experimento(cfg, tmp_path):
     df = scan(tmp_path, "reactions").collect()
     assert df.height and set(df["experiment"].to_list()) == {"exp-test"}
     assert set(df["run_id"].to_list()) == {"t"}
+
+
+def test_dos_experimentos_con_los_mismos_umbrales_deciden_igual():
+    from scalper.experimento import cambios_que_deciden
+
+    a = {"umbrales": '{"signals": {"min_edge_net": 0.01}}', "modelos": '{"spread": 3}'}
+    assert cambios_que_deciden(a, dict(a)) == []
+    b = {"umbrales": '{"signals": {"min_edge_net": 0.02}}', "modelos": '{"spread": 3}'}
+    assert cambios_que_deciden(a, b) == ["signals.min_edge_net: 0.01 → 0.02"]
+    # Un modelo promovido también cambia lo que decide.
+    c = {"umbrales": a["umbrales"], "modelos": '{"spread": 4}'}
+    assert cambios_que_deciden(a, c) == ["spread: 3 → 4"]
+    # Si no se puede leer, no se inventa una respuesta.
+    assert cambios_que_deciden(a, {"umbrales": "esto no es json", "modelos": "{}"}) is None

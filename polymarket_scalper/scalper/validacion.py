@@ -689,6 +689,25 @@ def _p(x: float | None, ancho: int = 8) -> str:
     return ("-" if x is None else f"{x * 100:.0f} %").rjust(ancho)
 
 
+def _mezclables(experimentos: list[dict[str, Any]]) -> str:
+    """Aviso sobre juntar experimentos: lo que la huella puede y no puede garantizar."""
+    from .experimento import cambios_que_deciden
+
+    orden = sorted(experimentos, key=lambda r: r.get("ts_ms") or 0)
+    distintos = []
+    for a, b in zip(orden, orden[1:]):
+        c = cambios_que_deciden(a, b)
+        if c is None:
+            return "no se puede comprobar si deciden igual: los umbrales guardados no se leen."
+        distintos += c
+    if not distintos:
+        return ("todos deciden igual (mismos umbrales y modelos), así que no se mezclan estrategias. "
+                "Pero decidir igual no es medir igual: si entre un commit y otro cambió cómo se "
+                "calcula lo que se mide, los números no son comparables. Compruébalo antes de juntar.")
+    return (f"deciden distinto ({len(distintos)} umbral(es) o modelo(s) cambiados): lo de abajo "
+            f"mezcla motores y no es de ninguno. Usa --experimento.")
+
+
 def formatear(inf: Informe) -> str:  # noqa: C901 - es un informe, se lee de arriba abajo
     d = inf.datos
     L: list[str] = []
@@ -700,6 +719,7 @@ def formatear(inf: Informe) -> str:  # noqa: C901 - es un informe, se lee de arr
     elif d.experimentos:
         L.append(f"Experimentos en los datos: {len(d.experimentos)} "
                  f"(usa --experimento para quedarte con uno solo)")
+        L.append("  " + _mezclables(d.experimentos))
     L.append("")
     L.append("Este informe no busca que el bot gane más. Busca saber qué es verdad.")
     L.append("Cada bloque lleva el tamaño de muestra: con menos de 20 operaciones nada de esto concluye.")

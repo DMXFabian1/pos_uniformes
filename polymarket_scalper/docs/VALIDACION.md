@@ -31,6 +31,13 @@ scalper validacion --experimento exp-20260911-0c13b8f5
 
 Si la corrida arranca con el árbol sucio, el log lo avisa: esos datos no se podrán reproducir.
 
+La huella incluye el commit, así que **arreglar un informe o un test también abre un experimento
+nuevo**, aunque el motor decida exactamente igual. Para que eso no parta la muestra sin motivo,
+`scalper experimentos` y la cabecera del informe dicen si entre dos experimentos cambió algo de lo
+que decide. Con un matiz que no se puede saltar: **decidir igual no es medir igual**. Si entre un
+commit y otro cambió cómo se calcula la selección adversa o cuándo se marca un llenado, los números
+no son comparables aunque las señales sí lo sean. La huella no puede detectarlo; hay que mirarlo.
+
 ## 2. Tres ventajas distintas, más una cuarta
 
 La medición anterior dejó un caso que resume la fase entera: una señal con **+13,8 % de ventaja

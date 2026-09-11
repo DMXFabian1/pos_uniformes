@@ -142,6 +142,26 @@ def diferencias(a: dict[str, Any], b: dict[str, Any], prefijo: str = "") -> list
     return out
 
 
+def cambios_que_deciden(a: dict[str, Any], b: dict[str, Any]) -> list[str] | None:
+    """Diferencias en lo que decide: umbrales y modelos. `None` si no se puede leer.
+
+    Ojo con lo que esto NO dice: que dos experimentos decidan igual no garantiza que midan igual.
+    Entre un commit y otro puede haberse arreglado cómo se calcula la selección adversa o cuándo se
+    marca el llenado, y entonces los números de los dos no son comparables aunque las señales sí.
+    Eso hay que mirarlo en el historial de cambios; la huella no puede saberlo.
+    """
+    out: list[str] = []
+    for campo in ("umbrales", "modelos"):
+        try:
+            va, vb = json.loads(a.get(campo) or "{}"), json.loads(b.get(campo) or "{}")
+        except (json.JSONDecodeError, TypeError):
+            return None
+        if not isinstance(va, dict) or not isinstance(vb, dict):
+            return None
+        out += diferencias(va, vb)
+    return out
+
+
 def historial(data_dir: str | Path) -> list[dict[str, Any]]:
     lf = scan(data_dir, "experiments")
     if lf is None:
@@ -162,15 +182,21 @@ def formatear_historial(data_dir: str | Path) -> str:
         if r.get("nota"):
             lineas.append(f"   nota: {r['nota']}")
         if previo is not None:
-            try:
-                cambios = diferencias(json.loads(previo["umbrales"]), json.loads(r["umbrales"]))
-            except (json.JSONDecodeError, TypeError):
-                cambios = []
-            if cambios:
+            cambios = cambios_que_deciden(previo, r)
+            if cambios is None:
+                lineas.append("   no se puede comparar con el anterior: los umbrales no se leen.")
+            elif cambios:
                 lineas.append("   cambió respecto al anterior:")
                 lineas += [f"      {c}" for c in cambios[:20]]
                 if len(cambios) > 20:
                     lineas.append(f"      … y {len(cambios) - 20} más")
+                lineas.append("   la muestra NO se puede juntar con la del anterior: decide distinto.")
+            else:
+                # La huella incluye el commit, así que un arreglo del informe o de un test abre un
+                # experimento nuevo aunque el motor decida exactamente igual. Cuando es el caso hay
+                # que decirlo: si no, la muestra queda partida sin motivo.
+                lineas.append("   nada de lo que decide cambió (mismos umbrales y mismos modelos): "
+                              "la muestra se puede juntar.")
         previo = r
         lineas.append("")
     return "\n".join(lineas)
