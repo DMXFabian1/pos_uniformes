@@ -536,6 +536,12 @@ class Collector:
             lat = self.latencia()
             if lat:
                 extra += f" latencia_feed_ms(mediana/p95)={lat['mediana']:.0f}/{lat['p95']:.0f}"
+            # el indexador de data-api se congela a ratos; cuando pasa, el dinero inteligente queda
+            # ciego y conviene saberlo en vez de creer que no hay ballenas operando
+            if self.flow is not None and self.flow.lag_seconds > self.cfg.flow.stale_warn_seconds:
+                log.warning("flujo de trades detenido: el último trade de data-api es de hace %d s. "
+                            "Las señales de dinero inteligente no pueden dispararse mientras dure.",
+                            self.flow.lag_seconds)
             log.info("estado: mercados=%d libros_validos=%d/%d ws=%s eventos=%s filas=%s%s",
                      len(self.markets), valid, len(self.books), self.pool.stats(), dict(self.stats),
                      dict(self.writer.rows_written), extra)

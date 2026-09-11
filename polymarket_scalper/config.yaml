@@ -51,6 +51,7 @@ flow:
   per_wallet_delay_seconds: 1.5
   smart_min_score: 0.65         # umbral para considerar una wallet "dinero inteligente"
   smart_min_closed: 20
+  stale_warn_seconds: 420       # data-api va 2-3 min por detrás; más que esto es que se detuvo y se avisa
 
 models:
   sigma_basketball: 16.2        # desviación del margen final a partido completo. NBA 2023-24: 16.2 (`scalper calibrate`)

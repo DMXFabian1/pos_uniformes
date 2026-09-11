@@ -126,3 +126,22 @@ def test_el_lector_de_flujo_cuenta_los_huecos_cuando_la_pagina_viene_entera_nuev
     assert asyncio.run(fp.poll_once()) == 1 and fp.paginas_llenas == 0   # la primera no cuenta
     assert asyncio.run(fp.poll_once()) == 1 and fp.paginas_llenas == 1
     assert asyncio.run(fp.poll_once()) == 1 and fp.paginas_llenas == 2
+
+
+def test_el_retraso_del_flujo_se_calcula_desde_el_ultimo_trade_visto():
+    """Si data-api se congela, el retraso crece solo: es la señal de que no llegan trades."""
+    import time
+
+    from scalper.flow import FlowPoller
+
+    class Api:
+        async def trades(self, limit=2000, offset=0, **kw):
+            return []
+
+    async def handler(x):
+        pass
+
+    fp = FlowPoller(Api(), handler, poll_seconds=0)
+    assert fp.lag_seconds == -1                       # todavía no vimos ningún trade
+    fp.last_ts = int(time.time()) - 500
+    assert 495 <= fp.lag_seconds <= 505

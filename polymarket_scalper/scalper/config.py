@@ -53,6 +53,8 @@ class FlowCfg(BaseModel):
     per_wallet_delay_seconds: float = 1.5
     smart_min_score: float = 0.65
     smart_min_closed: int = 20
+    # data-api va 2-3 min por detrás en condiciones normales; más que esto es que se detuvo
+    stale_warn_seconds: int = 420
 
 
 class ComplementCfg(BaseModel):
