@@ -69,6 +69,9 @@ def test_lista_ordenada_por_ventaja_y_agrupada(tmp_path):
     assert "la ventana anterior terminó arriba" in btc.razon
     nba = grupos["NBA"][0]
     assert nba.accion == "Comprar Lakers" and "marcador 102-88" in nba.razon and "en Q4" in nba.razon
+    ctx = {f["etiqueta"]: f["valor"] for f in nba.contexto}
+    assert ctx["Marcador"] == "102-88" and ctx["Período"] == "Q4" and ctx["Lado"] == "local"
+    assert "Partido" not in ctx                     # el mercado ya sale en la cabecera
     ten = grupos["Tenis"][0]
     assert ten.accion == "Comprar Zverev" and "Tobias1909" in ten.razon and "8,200 USD" in ten.razon
 
@@ -83,13 +86,34 @@ def test_distingue_vigentes_de_caducadas(tmp_path):
     assert not vieja.fresca                                  # una ventana de cripto de hace una hora no sirve
     solo = listar(tmp_path, minutos=120, solo_frescas=True)
     assert all(o.fresca for o in solo) and len(solo) < len(todas)
-    assert "ya pudo cambiar" in formatear(todas)
+    assert "YA PASÓ" in formatear(todas) and "No entres a ciegas" in formatear(todas)
 
 
 def test_filtro_por_ventaja_minima(tmp_path):
     _datos(tmp_path)
     assert len(listar(tmp_path, minutos=120, min_edge=0.06)) == 2      # solo las de 0.08 y 0.20
     assert listar(tmp_path, minutos=120, min_edge=0.5) == []
+
+
+def test_veredicto_grada_la_senal(tmp_path):
+    """El motor ya aprobó la señal; el veredicto dice si es holgada, justa o si caducó."""
+    _datos(tmp_path)
+    ops = listar(tmp_path, minutos=120)
+    btc = next(o for o in ops if o.kind == "updown_model" and o.fresca)
+    assert btc.veredicto == "entrar" and btc.titulo_veredicto == "ENTRAR"
+    assert btc.perdida == btc.inversion and btc.prob_acierto == 0.68
+    # el contexto y la matemática vienen desglosados para la interfaz
+    etiquetas = [f["etiqueta"] for f in btc.contexto]
+    assert "Precio de apertura" in etiquetas and "Queda de la ventana" in etiquetas
+    mat = {f["etiqueta"]: f["valor"] for f in btc.matematica}
+    assert mat["El modelo dice"] == "68.0 %" and mat["El mercado pide"] == "55.0 %"
+    assert mat["Ventaja neta"].startswith("+0.08") and "Comisión" in mat
+    caducada = next(o for o in ops if not o.fresca)
+    assert caducada.veredicto == "pasada" and caducada.titulo_veredicto == "YA PASÓ"
+    # el de dinero inteligente tiene su propio contexto
+    sm = next(o for o in ops if o.kind == "smart_money")
+    assert "Wallet" in [f["etiqueta"] for f in sm.contexto]
+    assert sm.veredicto in ("entrar", "justa")
 
 
 def test_resumen_y_texto_sin_datos(tmp_path):

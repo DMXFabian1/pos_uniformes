@@ -30,6 +30,13 @@ GRUPOS = {"crypto_updown": ("Cripto", "Ventanas de 5 y 15 minutos de Bitcoin"),
           "tennis": ("Tenis", "Partidos y torneos de tenis")}
 
 
+VEREDICTOS = {
+    "entrar": ("ENTRAR", "La ventaja cubre de sobra la comisión y el modelo está seguro."),
+    "justa": ("AJUSTADA", "Da números, pero por poco. Si dudas, déjala pasar."),
+    "pasada": ("YA PASÓ", "Se detectó hace rato: el precio ya se movió. No entres a ciegas."),
+}
+
+
 @dataclass
 class Oportunidad:
     ts_ms: int
@@ -48,7 +55,28 @@ class Oportunidad:
     confianza: float
     fee: float
     razon: str                  # explicación en palabras
+    veredicto: str = "justa"    # entrar | justa | pasada
+    contexto: list[dict[str, Any]] = field(default_factory=list)   # el partido o el mercado
+    matematica: list[dict[str, Any]] = field(default_factory=list)  # de dónde sale la ventaja
     detalle: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def perdida(self) -> float:
+        """Lo que se pierde si falla. En estos mercados, todo lo invertido."""
+        return round(self.inversion, 2)
+
+    @property
+    def prob_acierto(self) -> float | None:
+        p = self.detalle.get("p_model")
+        return round(float(p), 4) if p is not None else None
+
+    @property
+    def titulo_veredicto(self) -> str:
+        return VEREDICTOS[self.veredicto][0]
+
+    @property
+    def nota_veredicto(self) -> str:
+        return VEREDICTOS[self.veredicto][1]
 
     @property
     def antiguedad_s(self) -> float:
@@ -61,9 +89,11 @@ class Oportunidad:
     def to_dict(self) -> dict[str, Any]:
         d = {k: getattr(self, k) for k in ("ts_ms", "grupo", "categoria", "kind", "condition_id", "mercado", "accion",
                                            "precio", "edge_neto", "edge_pct", "tamano", "inversion", "ganancia",
-                                           "confianza", "fee", "razon", "detalle")}
-        d["antiguedad_s"] = round(self.antiguedad_s, 1)
-        d["fresca"] = self.fresca
+                                           "confianza", "fee", "razon", "veredicto", "contexto", "matematica",
+                                           "detalle")}
+        d.update(antiguedad_s=round(self.antiguedad_s, 1), fresca=self.fresca, perdida=self.perdida,
+                 prob_acierto=self.prob_acierto, titulo_veredicto=self.titulo_veredicto,
+                 nota_veredicto=self.nota_veredicto)
         return d
 
 
@@ -142,6 +172,97 @@ def _explicar(kind: str, m: dict[str, Any], mercado: str, precio: float, edge: f
     return "Revisar", f"Señal {kind} con ventaja de {edge:.3f} por share."
 
 
+def _fila(etiqueta: str, valor: Any, tipo: str = "") -> dict[str, Any]:
+    return {"etiqueta": etiqueta, "valor": valor, "tipo": tipo}
+
+
+def _mmss(segundos: Any) -> str:
+    try:
+        s = int(float(segundos))
+    except (TypeError, ValueError):
+        return "–"
+    return f"{s // 60}:{s % 60:02d}"
+
+
+def _contexto(kind: str, m: dict[str, Any], mercado: str) -> list[dict[str, Any]]:
+    """Lo que está pasando: el partido, la ventana, quién entró."""
+    if kind == "updown_model":
+        strike, spot = m.get("strike"), m.get("spot")
+        mv = m.get("moneyness_bps")
+        return [
+            _fila("Activo", str(m.get("symbol") or "–").upper()),
+            _fila("Precio de apertura", f"{strike:,.0f}" if strike else "–"),
+            _fila("Precio ahora", f"{spot:,.0f}" if spot else "–",
+                  "bueno" if (mv or 0) > 0 else "malo" if (mv or 0) < 0 else ""),
+            _fila("Se movió", f"{mv:+.1f} puntos básicos" if mv is not None else "–",
+                  "bueno" if (mv or 0) > 0 else "malo" if (mv or 0) < 0 else ""),
+            _fila("Queda de la ventana", _mmss(m.get("seconds_left"))),
+        ]
+    if kind == "model_deviation":
+        equipo = {"home": "local", "away": "visitante", "draw": "empate"}.get(str(m.get("side")), "–")
+        return [
+            _fila("Marcador", str(m.get("score") or "–")),
+            _fila("Período", str(m.get("period") or "–")),
+            _fila("Queda del partido", _pct(m.get("tau", 0)) if m.get("tau") is not None else "–"),
+            _fila("Lado", equipo),
+            _fila("Precio antes de empezar", f"{m['pregame']:.2f}" if m.get("pregame") else "–"),
+        ]
+    if kind == "smart_money":
+        return [
+            _fila("Wallet", str(m.get("wallet_name") or m.get("wallet", ""))[:24]),
+            _fila("Entró con", f"{float(m.get('their_usd') or 0):,.0f} USD"),
+            _fila("A precio", f"{float(m.get('their_price') or 0):.3f}"),
+            _fila("Su historial", f"{m.get('wallet_n', 0)} posiciones cerradas"),
+            _fila("Su retorno", _pct(m.get("wallet_roi", 0), 1),
+                  "bueno" if (m.get("wallet_roi") or 0) > 0 else "malo"),
+        ]
+    if kind == "spread_capture":
+        return [
+            _fila("Hueco compra-venta", f"{m.get('spread_ticks', 0):.0f} ticks"),
+            _fila("Actividad", f"{m.get('tpm', 0):.1f} trades por minuto"),
+            _fila("Precio medio", f"{m.get('mid', 0):.3f}" if m.get("mid") else "–"),
+        ]
+    return [_fila("Tipo", "arbitraje: el resultado no importa"),
+            _fila("Patas", str(m.get("n") or 2))]
+
+
+def _matematica(kind: str, m: dict[str, Any], precio: float, fee: float, edge: float,
+                tamano: float) -> list[dict[str, Any]]:
+    """De dónde sale la ventaja, paso a paso, hasta el número final."""
+    filas: list[dict[str, Any]] = []
+    p_modelo = m.get("p_model")
+    if kind in ("updown_model", "model_deviation") and p_modelo is not None:
+        filas += [
+            _fila("El modelo dice", _pct(p_modelo, 1)),
+            _fila("El mercado pide", _pct(precio, 1)),
+            _fila("Diferencia a favor", f"{(p_modelo - precio) * 100:+.1f} puntos", "bueno"),
+        ]
+    elif kind == "smart_money":
+        filas += [
+            _fila("Retorno histórico", _pct(m.get("wallet_roi", 0), 1)),
+            _fila("Se asume la mitad", _pct((m.get("wallet_roi", 0) or 0) / 2, 1)),
+        ]
+    elif kind == "spread_capture":
+        filas += [
+            _fila("Medio hueco", f"{(m.get('spread_ticks', 0) / 2) * 0.01:.3f} por share"),
+            _fila("Volatilidad reciente", f"{m.get('mid_vol', 0):.4f}", "malo"),
+        ]
+    filas.append(_fila("Comisión", f"−{fee:.4f} por share", "malo" if fee > 0 else ""))
+    filas.append(_fila("Ventaja neta", f"{edge:+.4f} por share", "bueno" if edge > 0 else "malo"))
+    filas.append(_fila("Por cada 100 USD", f"{edge / precio * 100:+.1f} USD" if precio else "–",
+                       "bueno" if edge > 0 else "malo"))
+    return filas
+
+
+def _decidir(kind: str, edge: float, precio: float, confianza: float, fresca: bool, fee: float) -> str:
+    """Gradúa la señal que el motor ya aprobó: fuerte, justa o caducada."""
+    if not fresca:
+        return "pasada"
+    edge_pct = edge / precio if precio else 0
+    holgada = edge > 2 * fee and edge_pct >= 0.05
+    return "entrar" if (holgada and confianza >= 0.55) else "justa"
+
+
 def _grupo_de(categoria: str, meta: dict[str, Any]) -> tuple[str, str]:
     if categoria in GRUPOS:
         return GRUPOS[categoria][0], GRUPOS[categoria][1]
@@ -196,12 +317,17 @@ def listar(data_dir: str | Path, minutos: float = 30, solo_frescas: bool = False
             accion = f"Comprar {nombre_lado}"
         grupo, _sub = _grupo_de(categoria, m)
         inversion = round(precio * tam, 2) if precio else 0.0
-        out.append(Oportunidad(
+        fee = round(float(r["fee_est"]), 4)
+        op = Oportunidad(
             ts_ms=int(r["ts_ms"]), grupo=grupo, categoria=categoria, kind=r["kind"],
             condition_id=r["condition_id"], mercado=mercado, accion=accion, precio=round(precio, 4),
             edge_neto=round(edge, 4), edge_pct=round(edge / precio, 4) if precio else 0.0, tamano=tam,
             inversion=inversion, ganancia=round(edge * tam, 2), confianza=float(r["confidence"]),
-            fee=round(float(r["fee_est"]), 4), razon=razon, detalle=m))
+            fee=fee, razon=razon, detalle=m)
+        op.contexto = _contexto(r["kind"], m, mercado)
+        op.matematica = _matematica(r["kind"], m, precio, fee, edge, tam)
+        op.veredicto = _decidir(r["kind"], edge, precio, op.confianza, op.fresca, fee)
+        out.append(op)
     if solo_frescas:
         out = [o for o in out if o.fresca]
     # Lo vigente manda: una señal caducada con mucha ventaja no sirve, el precio ya cambió.
@@ -239,13 +365,15 @@ def formatear(ops: list[Oportunidad], ancho: int = 100) -> str:
                       f"mejor ventaja {_pct(r['mejor_edge_pct'], 1)} sobre lo invertido")
         lineas.append("=" * ancho)
         for o in lista[:8]:
-            marca = "AHORA " if o.fresca else "vieja "
-            lineas.append(f"\n  [{marca}] {o.accion.upper()}  ·  {o.mercado[:62]}")
-            lineas.append(f"     precio {o.precio:.3f}   invertir {o.inversion:>8.2f} USD   "
-                          f"ganar {o.ganancia:>7.2f} USD   ventaja {_pct(o.edge_pct, 1):>7}   "
-                          f"confianza {_pct(o.confianza)}")
+            lineas.append(f"\n  {o.titulo_veredicto:<10} {o.accion.upper()}  ·  {o.mercado[:58]}")
+            lineas.append(f"     {o.nota_veredicto}")
+            lineas.append(f"     precio {o.precio:.3f}   invertir {o.inversion:>8.2f}   "
+                          f"ganar {o.ganancia:>7.2f}   perder {o.perdida:>8.2f}   "
+                          f"ventaja {_pct(o.edge_pct, 1):>7}")
+            if o.prob_acierto is not None:
+                lineas.append(f"     acierta {_pct(o.prob_acierto)} de las veces según el modelo")
             lineas.append(f"     {o.razon}")
             if not o.fresca:
-                lineas.append(f"     (detectada hace {o.antiguedad_s / 60:.0f} min: el precio ya pudo cambiar)")
+                lineas.append(f"     (detectada hace {o.antiguedad_s / 60:.0f} min)")
         lineas.append("")
     return "\n".join(lineas)

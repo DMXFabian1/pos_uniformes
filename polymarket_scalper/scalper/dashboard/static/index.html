@@ -103,24 +103,46 @@ td.pos{color:var(--good)} td.neg{color:var(--crit)}
 .chip.live{color:var(--good)}
 .empty{padding:22px;color:var(--muted);font-size:13px;text-align:center;border:1px dashed var(--line-2);border-radius:8px;background:var(--surface-2)}
 .empty code{font-family:"IBM Plex Mono",monospace;color:var(--ink-2)}
-.ops{display:flex;flex-direction:column;gap:18px}
-.opgrupo{display:flex;flex-direction:column;gap:10px}
+.ops{display:flex;flex-direction:column;gap:22px}
+.opgrupo{display:flex;flex-direction:column;gap:12px}
 .opcab{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid var(--line)}
-.opcab h3{font-size:14px;color:var(--ink);text-transform:none;letter-spacing:0;font-weight:600}
+.opcab h3{font-size:15px;color:var(--ink);text-transform:none;letter-spacing:0;font-weight:600}
 .opcab .meta{font-size:12px;color:var(--muted)}
-.oplista{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:10px}
-.op{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow);border-left:3px solid var(--muted)}
-.op.viva{border-left-color:var(--good)}
-.op .fila1{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
-.op .accion{font-size:15px;font-weight:600;color:var(--ink)}
-.op .mercado{font-size:12px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.op .cifras{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:8px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
-.op .cifras div{display:flex;flex-direction:column;gap:1px}
-.op .cifras .et{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
-.op .cifras .vl{font-family:"IBM Plex Mono",monospace;font-size:14px;font-variant-numeric:tabular-nums;color:var(--ink)}
-.op .cifras .vl.good{color:var(--good)}
-.op .razon{font-size:12.5px;color:var(--ink-2);line-height:1.5}
-.op .pie{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11px;color:var(--muted)}
+.oplista{display:grid;grid-template-columns:repeat(auto-fill,minmax(520px,1fr));gap:14px}
+
+.op{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden;box-shadow:var(--shadow);display:flex;flex-direction:column}
+.op .veredicto{display:flex;align-items:center;gap:12px;padding:13px 18px;border-bottom:1px solid var(--line)}
+.op .sello{font-size:19px;font-weight:700;letter-spacing:.02em;line-height:1;white-space:nowrap}
+.op .accion{font-size:15px;font-weight:600;color:var(--ink);line-height:1.25}
+.op .sub{font-size:12px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.op.entrar .veredicto{background:color-mix(in srgb,var(--good) 14%,var(--surface))}
+.op.entrar{border-color:color-mix(in srgb,var(--good) 45%,var(--line))}
+.op.entrar .sello{color:var(--good)}
+.op.justa .veredicto{background:color-mix(in srgb,var(--warn) 13%,var(--surface))}
+.op.justa .sello{color:var(--warn)}
+.op.pasada .veredicto{background:var(--surface-2)}
+.op.pasada .sello{color:var(--muted)}
+.op.pasada{opacity:.72}
+
+.opcuerpo{display:grid;grid-template-columns:1fr 1fr;gap:0}
+.opcol{padding:13px 18px;display:flex;flex-direction:column;gap:7px;min-width:0}
+.opcol+.opcol{border-left:1px solid var(--line)}
+.opcol h4{font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:500;margin:0 0 2px}
+.opfila{display:flex;justify-content:space-between;align-items:baseline;gap:12px;font-size:12.5px}
+.opfila .et{color:var(--ink-2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.opfila .vl{font-family:"IBM Plex Mono",monospace;font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
+.opfila .vl.bueno{color:var(--good)} .opfila .vl.malo{color:var(--crit)}
+.opfila.total{border-top:1px solid var(--line);padding-top:7px;margin-top:2px}
+.opfila.total .et{color:var(--ink);font-weight:500} .opfila.total .vl{font-size:14px;font-weight:600}
+
+.opdinero{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line);background:var(--surface-2)}
+.opdinero div{padding:11px 18px;display:flex;flex-direction:column;gap:2px}
+.opdinero div+div{border-left:1px solid var(--line)}
+.opdinero .et{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.opdinero .vl{font-family:"IBM Plex Mono",monospace;font-size:17px;font-weight:600;font-variant-numeric:tabular-nums}
+.opdinero .gana .vl{color:var(--good)} .opdinero .pierde .vl{color:var(--crit)}
+.oppie{padding:11px 18px;font-size:12.5px;color:var(--ink-2);line-height:1.5;border-top:1px solid var(--line)}
+@media (max-width:640px){.opcuerpo{grid-template-columns:1fr}.opcol+.opcol{border-left:0;border-top:1px solid var(--line)}}
 .games{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
 .game{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow)}
 .game .gh{display:flex;justify-content:space-between;gap:8px;align-items:center}
@@ -184,7 +206,8 @@ footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);paddin
       <details class="help" open><summary>Cómo leer esto</summary><div class="body">
         <p><b>Solo aparece lo que da números después de comisiones.</b> Si no hay nada, no es que el bot esté parado: es que ninguna oportunidad supera el costo de operar. Eso es lo normal la mayor parte del tiempo.</p>
         <p><b>Ventaja</b> es lo que se espera ganar sobre lo invertido. Una ventaja del 15 % significa que por cada 100 USD puestos se esperan 15 de ganancia, en promedio y a la larga. No es una garantía en cada operación.</p>
-        <p><b>El borde verde</b> marca lo que sigue vigente. Lo gris es de hace rato y el precio ya pudo moverse, sobre todo en las ventanas de cripto, que duran cinco minutos.</p>
+        <p><b>El sello de arriba es la decisión.</b> <b>ENTRAR</b> es una ventaja holgada con el modelo seguro. <b>AJUSTADA</b> da números pero por poco: si dudas, déjala pasar. <b>YA PASÓ</b> se detectó hace rato y el precio ya se movió, sobre todo en las ventanas de cripto, que duran cinco minutos.</p>
+        <p><b>Mira siempre las dos cifras de abajo.</b> Lo que ganas si acierta y lo que pierdes si falla. En estos mercados, si falla se pierde todo lo invertido.</p>
         <p><b>Nada de esto se ejecuta solo.</b> El bot mira y avisa; no firma órdenes ni maneja una wallet.</p>
       </div></details>
       <div class="ops" id="ops"></div>
@@ -456,22 +479,28 @@ function render(d){
   const op = d.oportunidades || {grupos: [], total: 0, vigentes: 0};
   $("n-ops").textContent = num(op.vigentes, 0);
   const grupos = (op.grupos || []).filter(g => (g.lista || []).length);
+  const filas = f => (f || []).map(x => `<div class="opfila"><span class="et">${esc(x.etiqueta)}</span><span class="vl ${esc(x.tipo||"")}">${esc(x.valor)}</span></div>`).join("");
+  const mat = f => (f || []).map((x, i, arr) => `<div class="opfila${i >= arr.length - 2 ? " total" : ""}"><span class="et">${esc(x.etiqueta)}</span><span class="vl ${esc(x.tipo||"")}">${esc(x.valor)}</span></div>`).join("");
   $("ops").innerHTML = grupos.length ? grupos.map(g => {
     const r = g.resumen || {};
     return `<div class="opgrupo">
-      <div class="opcab"><h3>${esc(g.nombre)}</h3><span class="meta">${num(r.frescas,0)} vigentes de ${num(r.total,0)}${r.ganancia_total ? ` · ${esc(usd(r.ganancia_total))} en juego` : ""}</span></div>
+      <div class="opcab"><h3>${esc(g.nombre)}</h3><span class="meta">${num(r.frescas,0)} vigentes de ${num(r.total,0)}</span></div>
       <div class="oplista">${(g.lista||[]).map(o => `
-        <div class="op${o.fresca ? " viva" : ""}">
-          <div class="fila1"><span class="accion">${esc(o.accion)}</span><span class="chip ${o.fresca?"good":""}">${o.fresca ? "vigente" : "hace " + Math.round(o.antiguedad_s/60) + " min"}</span></div>
-          <div class="mercado" title="${esc(o.mercado)}">${esc(o.mercado)}</div>
-          <div class="cifras">
-            <div><span class="et">Precio</span><span class="vl">${num(o.precio,3)}</span></div>
-            <div><span class="et">Invertir</span><span class="vl">${num(o.inversion,2)}</span></div>
-            <div><span class="et">Ganar</span><span class="vl good">${num(o.ganancia,2)}</span></div>
-            <div><span class="et">Ventaja</span><span class="vl good">${pct(o.edge_pct,1)}</span></div>
+        <div class="op ${esc(o.veredicto)}">
+          <div class="veredicto">
+            <span class="sello">${esc(o.titulo_veredicto)}</span>
+            <div style="min-width:0"><div class="accion">${esc(o.accion)}</div><div class="sub" title="${esc(o.mercado)}">${esc(o.mercado)}</div></div>
           </div>
-          <div class="razon">${esc(o.razon)}</div>
-          <div class="pie"><span>confianza ${pct(o.confianza)}</span><span>${esc(kindOf(o.kind).label)}</span></div>
+          <div class="opcuerpo">
+            <div class="opcol"><h4>Qué está pasando</h4>${filas(o.contexto)}</div>
+            <div class="opcol"><h4>De dónde sale la ventaja</h4>${mat(o.matematica)}</div>
+          </div>
+          <div class="opdinero">
+            <div><span class="et">Inviertes</span><span class="vl">${num(o.inversion,2)}</span></div>
+            <div class="gana"><span class="et">Ganas si acierta</span><span class="vl">+${num(o.ganancia,2)}</span></div>
+            <div class="pierde"><span class="et">Pierdes si falla</span><span class="vl">−${num(o.perdida,2)}</span></div>
+          </div>
+          <div class="oppie">${esc(o.nota_veredicto)}${o.prob_acierto != null ? ` El modelo acierta ${esc(pct(o.prob_acierto))} de las veces en situaciones como esta.` : ""}${!o.fresca ? ` Detectada hace ${Math.round(o.antiguedad_s/60)} min.` : ""}</div>
         </div>`).join("")}</div>
     </div>`;
   }).join("") : `<div class="empty">Ahora mismo no hay ninguna oportunidad que supere el costo de operar.<br><br>Eso es lo normal la mayor parte del tiempo: el bot solo avisa cuando los números dan. Si acaba de arrancar, dale unos minutos para que se llenen los libros.</div>`;
