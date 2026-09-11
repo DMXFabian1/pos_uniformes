@@ -124,7 +124,14 @@ powershell -ExecutionPolicy Bypass -File deploy\programar-inicio.ps1 -Quitar   #
 
 Con las tareas activas no necesitas dejar ventanas abiertas. El log sigue en `logs\bot.log`.
 
-## 8. Comandos del día a día
+## 8. Actualizar e informes con doble clic
+
+- **`ACTUALIZAR.bat`** descarga la última versión y actualiza las dependencias. Cierra antes la
+  ventana del bot con Ctrl+C.
+- **`VER-INFORMES.bat`** muestra de una vez: qué datos hay, el estudio del arrastre entre ventanas
+  de cripto, los resultados por tipo de señal, los modelos aprendidos y el uso de disco.
+
+## 9. Comandos del día a día
 
 Desde la carpeta del proyecto, con el bot corriendo o detenido:
 
@@ -132,6 +139,7 @@ Desde la carpeta del proyecto, con el bot corriendo o detenido:
 $s = ".venv\Scripts\scalper.exe"
 
 & $s status        # qué tablas hay y desde cuándo
+& $s updown-study  # ¿el sesgo al abrir una ventana de cripto es información o sobrerreacción?
 & $s report        # lo que predijo vs lo que obtuvo, por tipo de señal
 & $s wallets       # ranking de wallets por historial
 & $s games         # partidos en vivo enlazados a mercados
@@ -141,7 +149,7 @@ $s = ".venv\Scripts\scalper.exe"
 & $s models        # versiones del modelo y cuál está en uso
 ```
 
-## 9. Disco
+## 10. Disco
 
 Con el enfoque en NBA y tenis, y la limpieza automática que corre una vez al día, el crecimiento
 permanente ronda los 200 a 400 MB por día. Para revisarlo:
@@ -154,7 +162,7 @@ permanente ronda los 200 a 400 MB por día. Para revisarlo:
 
 Si te quedas corto de espacio, baja `keep_days` en `config.yaml` y reinicia el bot.
 
-## 10. Problemas frecuentes
+## 11. Problemas frecuentes
 
 | Síntoma | Causa | Solución |
 |---|---|---|
@@ -167,7 +175,7 @@ Si te quedas corto de espacio, baja `keep_days` en `config.yaml` y reinicia el b
 | El bot se detuvo solo de noche | la PC se durmió | revisa el paso 6 |
 | El panel no abre | el proceso del panel no está corriendo | ejecuta `.\deploy\iniciar-panel.ps1` |
 
-## 11. Qué esperar
+## 12. Qué esperar
 
 - **Primeras horas:** se llena `data\`, aparecen las primeras wallets perfiladas y los partidos de
   tenis en vivo. La NBA solo muestra futuros hasta que arranque la temporada, a fines de octubre.
