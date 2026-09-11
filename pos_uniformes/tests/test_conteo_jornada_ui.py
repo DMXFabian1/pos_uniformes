@@ -204,3 +204,45 @@ class RevisionDialogTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class DestinoDialogTests(unittest.TestCase):
+    """Quien imprime decide: carta (HP) o tira (tickets)."""
+
+    def test_carta_y_tira_son_las_dos_salidas(self) -> None:
+        from PyQt6.QtWidgets import QPushButton
+
+        from pos_uniformes.ui.dialogs.conteo_jornada_dialogs import ConteoDestinoDialog
+
+        d = ConteoDestinoDialog(titulo="Práxedis Guerrero")
+        self.assertEqual(d.destino, "")
+        textos = [b.text() for b in d.findChildren(QPushButton)]
+        self.assertTrue(any("carta" in t.lower() for t in textos))
+        self.assertTrue(any("tira" in t.lower() for t in textos))
+        carta = next(b for b in d.findChildren(QPushButton) if "carta" in b.text().lower())
+        carta.click()
+        self.assertEqual(d.destino, ConteoDestinoDialog.CARTA)
+        d.deleteLater()
+
+    def test_la_tira_es_una_opcion_real(self) -> None:
+        from PyQt6.QtWidgets import QPushButton
+
+        from pos_uniformes.ui.dialogs.conteo_jornada_dialogs import ConteoDestinoDialog
+
+        d = ConteoDestinoDialog()
+        tira = next(b for b in d.findChildren(QPushButton) if "tira" in b.text().lower())
+        tira.click()
+        self.assertEqual(d.destino, ConteoDestinoDialog.TIRA)
+        d.deleteLater()
+
+    def test_la_ventana_manda_la_tira_por_el_camino_de_siempre(self) -> None:
+        """La tira usa el mismo generador y la misma salida que el admin."""
+        import inspect
+
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        fuente = inspect.getsource(QuoteSatelliteWindow._conteos_imprimir_tira)
+        self.assertIn("build_conteo_sheets", fuente)
+        self.assertIn("open_conteo_print_dialog", fuente)
+        fuente_hoja = inspect.getsource(QuoteSatelliteWindow._conteos_imprimir_hoja)
+        self.assertIn("ConteoDestinoDialog", fuente_hoja)

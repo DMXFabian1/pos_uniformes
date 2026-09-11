@@ -73,6 +73,7 @@ class ConteoNuevaJornadaDialog(QDialog):
         self._session_factory = session_factory or _default_session_factory
         self.escuela_id: int | None = None
         self.tipo_pieza: str = ""
+        self.titulo: str = ""   # "Práxedis Guerrero" o "Básicos · Camisa", para rotular
 
         layout = QVBoxLayout()
         layout.setSpacing(10)
@@ -147,9 +148,11 @@ class ConteoNuevaJornadaDialog(QDialog):
                 return
             self.escuela_id = None
             self.tipo_pieza = str(tipo)
+            self.titulo = f"Básicos · {tipo}"
         else:
             self.escuela_id = int(dato)
             self.tipo_pieza = ""
+            self.titulo = self._escuela_combo.currentText()
         self.accept()
 
 
@@ -310,4 +313,53 @@ class ConteoRevisionDialog(QDialog):
         finally:
             session.close()
         self.resultado = "descartada"
+        self.accept()
+
+
+class ConteoDestinoDialog(QDialog):
+    """¿A qué impresora va la hoja? Lo decide quien imprime, cada vez.
+
+    Dos botones grandes: **carta** (la HP, tarjetas con Talla · Exist. ·
+    Pedido de a tres por fila) o **tira** (la impresora de tickets, una tira
+    por prenda). La tira es el respaldo cuando la HP falla.
+    """
+
+    CARTA = "carta"
+    TIRA = "tira"
+
+    def __init__(self, parent: QWidget | None = None, *, titulo: str = "") -> None:
+        super().__init__(parent)
+        self.setWindowTitle("¿En qué impresora?")
+        self.setStyleSheet(_ESTILO)
+        self.destino: str = ""
+
+        layout = QVBoxLayout()
+        layout.setSpacing(10)
+        encabezado = QLabel(f"Hoja de conteo · {titulo}" if titulo else "Hoja de conteo")
+        encabezado.setStyleSheet("font-size: 14px; font-weight: 700;")
+        layout.addWidget(encabezado)
+        pregunta = QLabel("¿Dónde la imprimo?")
+        pregunta.setStyleSheet("color: #8a7a68; font-size: 12px;")
+        layout.addWidget(pregunta)
+
+        fila = QHBoxLayout()
+        fila.setSpacing(10)
+        carta = QPushButton("🖨  Hoja carta\n(HP, tres prendas por hoja)")
+        carta.setObjectName("primaryButton")
+        carta.setMinimumSize(210, 74)
+        carta.clicked.connect(lambda: self._elegir(self.CARTA))
+        fila.addWidget(carta)
+        tira = QPushButton("🧾  Tira de tickets\n(una tira por prenda)")
+        tira.setMinimumSize(210, 74)
+        tira.clicked.connect(lambda: self._elegir(self.TIRA))
+        fila.addWidget(tira)
+        layout.addLayout(fila)
+
+        botones = QDialogButtonBox(QDialogButtonBox.StandardButton.Cancel)
+        botones.rejected.connect(self.reject)
+        layout.addWidget(botones)
+        self.setLayout(layout)
+
+    def _elegir(self, destino: str) -> None:
+        self.destino = destino
         self.accept()

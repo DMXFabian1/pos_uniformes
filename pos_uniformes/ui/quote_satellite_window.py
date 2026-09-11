@@ -3655,6 +3655,17 @@ class QuoteSatelliteWindow(QMainWindow):
         if self.offline_mode or not probe_database_host(0.5):
             QMessageBox.warning(self, "Sin conexión", "La hoja se arma con el catálogo de la PC principal. Enciéndela e intenta de nuevo.")
             return
+
+        # Quien imprime decide a dónde va: carta (HP) o tira (tickets). La
+        # tira es el respaldo cuando la HP anda fallando (2026-09-11).
+        from pos_uniformes.ui.dialogs.conteo_jornada_dialogs import ConteoDestinoDialog
+
+        destino_dlg = ConteoDestinoDialog(self, titulo=dlg.titulo)
+        if destino_dlg.exec() != int(QDialog.DialogCode.Accepted) or not destino_dlg.destino:
+            return
+        if destino_dlg.destino == ConteoDestinoDialog.TIRA:
+            self._conteos_imprimir_tira(dlg.escuela_id, dlg.tipo_pieza)
+            return
         try:
             from pos_uniformes.services.conteo_hoja_carta_service import (
                 construir_hoja_html,
@@ -3676,6 +3687,38 @@ class QuoteSatelliteWindow(QMainWindow):
 
         if imprimir_hoja_carta(self, html, f"Hoja de conteo · {titulo}"):
             self._set_status(f"Hoja de {titulo} enviada a la impresora.")
+
+    def _conteos_imprimir_tira(self, escuela_id: int | None, tipo_pieza: str) -> None:
+        """La hoja de siempre en la impresora de tickets: una tira por prenda.
+
+        Mismo generador que el admin (`conteo_sheet_service`) y misma salida
+        (`open_conteo_print_dialog`, que en un kiosko la encola al servidor).
+        """
+        from pos_uniformes.services.conteo_sheet_service import (
+            build_conteo_sheets,
+            build_conteo_sheets_basicos,
+        )
+        from pos_uniformes.ui.dialogs.conteo_print_dialog import open_conteo_print_dialog
+
+        try:
+            with get_session() as session:
+                if escuela_id is None:
+                    titulo = f"Básicos · {tipo_pieza}" if tipo_pieza else "Básicos"
+                    sheets = build_conteo_sheets_basicos(session, tipo_pieza=tipo_pieza or None)
+                else:
+                    from pos_uniformes.database.models import Escuela
+
+                    escuela = session.get(Escuela, escuela_id)
+                    titulo = escuela.nombre if escuela is not None else f"Escuela {escuela_id}"
+                    sheets = build_conteo_sheets(session, escuela_id, titulo)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "No se pudieron armar las tiras", str(exc))
+            return
+        if not sheets:
+            QMessageBox.information(self, "Sin piezas", f"{titulo} no tiene piezas para contar.")
+            return
+        open_conteo_print_dialog(self, f"Conteo — {titulo}", sheets)
+        self._set_status(f"{len(sheets)} tiras de {titulo} enviadas a la impresora de tickets.")
 
     def _conteos_empezar(self) -> None:
         """Abre una jornada nueva y entra directo a capturar."""
