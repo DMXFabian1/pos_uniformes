@@ -217,7 +217,7 @@ class Ventana(QMainWindow):
         v.addSpacing(16)
 
         self.navs: list[QPushButton] = []
-        for i, (texto, _) in enumerate((("Panel en vivo", 0), ("Actividad del bot", 1), ("Informes", 2))):
+        for i, texto in enumerate(("Oportunidades", "Panel en vivo", "Actividad del bot", "Informes")):
             b = QPushButton(texto)
             b.setObjectName("nav")
             b.setCheckable(True)
@@ -273,6 +273,7 @@ class Ventana(QMainWindow):
         v.addLayout(tarjetas)
 
         self.pilas = QStackedWidget()
+        self.pilas.addWidget(self._pagina_oportunidades())
         self.pilas.addWidget(self._pagina_panel())
         self.pilas.addWidget(self._pagina_log())
         self.pilas.addWidget(self._pagina_informes())
@@ -287,6 +288,47 @@ class Ventana(QMainWindow):
         a.setWordWrap(True)
         layout.addWidget(t)
         layout.addWidget(a)
+
+    def _pagina_oportunidades(self) -> QWidget:
+        p = QWidget()
+        v = QVBoxLayout(p)
+        v.setContentsMargins(0, 0, 0, 0)
+        v.setSpacing(8)
+        self._titulo_pagina(v, "Oportunidades ahora mismo",
+                            "Qué comprar, a qué precio y por qué, separado por mercado. Las cifras ya descuentan "
+                            "las comisiones. Si no aparece nada es que ninguna supera el costo de operar.")
+        self.ops = QPlainTextEdit()
+        self.ops.setReadOnly(True)
+        self.ops.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
+        self.ops.setPlainText("Pulsa «Iniciar bot» para que empiece a buscar.")
+        v.addWidget(self.ops, 1)
+        fila = QHBoxLayout()
+        b = QPushButton("Actualizar ahora")
+        b.setObjectName("secundario")
+        b.clicked.connect(self._refrescar_oportunidades)
+        fila.addWidget(b)
+        nota = QLabel("Se actualiza solo cada 15 segundos mientras el bot corre.")
+        nota.setObjectName("ayuda")
+        fila.addWidget(nota)
+        fila.addStretch(1)
+        v.addLayout(fila)
+        self._reloj_ops = QTimer(self)
+        self._reloj_ops.timeout.connect(self._refrescar_oportunidades)
+        self._reloj_ops.start(15000)
+        return p
+
+    def _refrescar_oportunidades(self) -> None:
+        """Lee las señales recientes y las traduce a lenguaje llano. Es rápido: solo mira Parquet."""
+        try:
+            from .opportunities import formatear, listar
+
+            texto = formatear(listar(self.data_dir, minutos=30))
+        except Exception as e:  # noqa: BLE001
+            texto = f"No se pudieron leer las oportunidades: {e}"
+        barra = self.ops.verticalScrollBar()
+        pos = barra.value()
+        self.ops.setPlainText(texto)
+        barra.setValue(min(pos, barra.maximum()))
 
     def _pagina_panel(self) -> QWidget:
         p = QWidget()
@@ -412,7 +454,7 @@ class Ventana(QMainWindow):
             self.bot = None
         else:
             self.log.clear()
-            self._ir(1)
+            self._ir(2)
             self.bot = self._lanzar(["-c", self.config, "--log-file", "logs/bot.log", "paper"], self._leer_bot)
             self.bot.finished.connect(lambda *_: self._refrescar())
             QTimer.singleShot(2500, self._asegurar_panel)
@@ -494,7 +536,7 @@ class Ventana(QMainWindow):
 
     # ---------------------------------------------------------------- acciones
     def _generar_informes(self) -> None:
-        self._ir(2)
+        self._ir(3)
         self.informes.clear()
         self.informes.appendHtml(f"<span style='color:{C['suave']}'>Generando informes…</span>")
         self.b_informes.setEnabled(False)
@@ -531,6 +573,8 @@ class Ventana(QMainWindow):
         self.b_bot.setStyleSheet("")           # fuerza a releer el QSS con el nuevo objectName
         self.punto.setPixmap(_punto(C["ok"] if corriendo else C["error"]))
         self.estado.setText("funcionando" if corriendo else "detenido")
+        if corriendo:
+            self._refrescar_oportunidades()
         t = _dato_mas_reciente(self.data_dir)
         if t is None:
             self.tarjetas["datos"].poner("sin datos", "aún no hay nada guardado", C["error"])

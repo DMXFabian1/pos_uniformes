@@ -206,6 +206,20 @@ El arrastre también viaja como feature de cada señal (`prev_up_won`, `prev_ret
 Con pocos datos el sistema se comporta como antes (heurística); el aprendizaje entra a medida que
 el ledger crece. Ese es el mecanismo por el que "el margen de error se va reduciendo".
 
+## Qué hacer ahora (`scalper ahora`) y cuándo confiar (`scalper listo`)
+- **`scalper ahora`** traduce lo que el motor acaba de decidir a lenguaje llano, agrupado por
+  mercado: qué comprar, a qué precio, cuánto se invierte, cuánto se espera ganar y por qué, con las
+  comisiones ya descontadas. Lo vigente va primero; lo de hace rato se marca como caducado, porque
+  en las ventanas de cripto de cinco minutos el precio ya se movió.
+- **`scalper listo`** responde si el bot puede operar con dinero real, señal por señal, con cuatro
+  criterios objetivos: al menos 100 posiciones cerradas, ganancia neta positiva, una ventaja que no
+  quepa en la suerte (estadístico t mayor que 2) y un modelo aprendido que no empeore a la
+  heurística. Más siete días de datos. Mientras no se cumplan, el veredicto dice exactamente qué
+  falta.
+
+La capa que firma órdenes no existe a propósito: se construye cuando `scalper listo` diga que sí,
+y se prueba con el tamaño mínimo para comprobar que los llenados reales se parecen a los simulados.
+
 ## Disco (`scalper retention`)
 Los cambios de libro crecen ~4 GB/día y solo sirven para replay detallado de días recientes. La
 retención, que corre sola una vez al día dentro del recolector, conserva 3 días de `book_deltas`,

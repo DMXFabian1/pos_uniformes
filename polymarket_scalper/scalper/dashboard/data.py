@@ -12,6 +12,7 @@ from ..config import Config
 from ..discovery import MarketInfo
 from ..learn.registry import ModelStore
 from ..models import ModelRegistry, WinProb, match_outcome, parse_game
+from ..opportunities import listar as listar_oportunidades, por_grupo, resumen_grupo
 from ..storage import latest_markets, latest_profiles, scan
 
 EXCLUDED_EXITS = ["end", "end_stuck", "unfilled", "expired_unfilled", "spread_gone", "no_book", "price_moved"]
@@ -223,6 +224,16 @@ def _models(data_dir: Path) -> list[dict[str, Any]]:
     return out
 
 
+def _oportunidades(cfg: Config) -> dict[str, Any]:
+    ops = listar_oportunidades(cfg.data_dir, minutos=30)
+    grupos = por_grupo(ops)
+    return {
+        "total": len(ops), "vigentes": sum(1 for o in ops if o.fresca),
+        "grupos": [{"nombre": g, "resumen": resumen_grupo(lista),
+                    "lista": [o.to_dict() for o in lista[:10]]} for g, lista in grupos.items()],
+    }
+
+
 def build_payload(cfg: Config, run_id: str | None = None) -> dict[str, Any]:
     data_dir = cfg.data_path
     led = _ledger(data_dir, run_id)
@@ -242,6 +253,8 @@ def build_payload(cfg: Config, run_id: str | None = None) -> dict[str, Any]:
         "wallets_profiled": len(wallets), "wallets_smart": sum(1 for w in wallets if w.get("score", 0) >= cfg.flow.smart_min_score and w.get("n_closed", 0) >= cfg.flow.smart_min_closed),
         "models_current": sum(1 for m in _models(data_dir) if m["current"]),
     }
+    ops = _oportunidades(cfg)
+    summary["oportunidades_vigentes"] = ops["vigentes"]
     return {
         "generated_ms": now, "config": {"categories": list(cfg.categories), "min_edge_net": cfg.signals.min_edge_net,
                                         "target_size": cfg.signals.target_size, "latency_ms": cfg.sim.latency_ms,
@@ -251,6 +264,7 @@ def build_payload(cfg: Config, run_id: str | None = None) -> dict[str, Any]:
         "summary": summary, "equity": sections["equity"], "by_kind": sections["by_kind"], "exit_reasons": sections["exit_reasons"],
         "calibration": sections["calibration"], "model_vs_heuristic": sections["model_vs_heuristic"],
         "recent_positions": sections["recent_positions"], "signals": sig, "games": games, "wallets": wallets,
+        "oportunidades": ops,
         "flow": _flow(data_dir, cfg.flow.whale_min_usd / 2), "markets": _markets(data_dir), "models": _models(data_dir),
         "tables": tables,
     }

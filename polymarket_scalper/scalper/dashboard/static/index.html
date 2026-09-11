@@ -103,6 +103,24 @@ td.pos{color:var(--good)} td.neg{color:var(--crit)}
 .chip.live{color:var(--good)}
 .empty{padding:22px;color:var(--muted);font-size:13px;text-align:center;border:1px dashed var(--line-2);border-radius:8px;background:var(--surface-2)}
 .empty code{font-family:"IBM Plex Mono",monospace;color:var(--ink-2)}
+.ops{display:flex;flex-direction:column;gap:18px}
+.opgrupo{display:flex;flex-direction:column;gap:10px}
+.opcab{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid var(--line)}
+.opcab h3{font-size:14px;color:var(--ink);text-transform:none;letter-spacing:0;font-weight:600}
+.opcab .meta{font-size:12px;color:var(--muted)}
+.oplista{display:grid;grid-template-columns:repeat(auto-fill,minmax(420px,1fr));gap:10px}
+.op{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:13px 15px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow);border-left:3px solid var(--muted)}
+.op.viva{border-left-color:var(--good)}
+.op .fila1{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+.op .accion{font-size:15px;font-weight:600;color:var(--ink)}
+.op .mercado{font-size:12px;color:var(--ink-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.op .cifras{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:8px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.op .cifras div{display:flex;flex-direction:column;gap:1px}
+.op .cifras .et{font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.op .cifras .vl{font-family:"IBM Plex Mono",monospace;font-size:14px;font-variant-numeric:tabular-nums;color:var(--ink)}
+.op .cifras .vl.good{color:var(--good)}
+.op .razon{font-size:12.5px;color:var(--ink-2);line-height:1.5}
+.op .pie{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11px;color:var(--muted)}
 .games{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:12px}
 .game{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:12px 14px;display:flex;flex-direction:column;gap:8px;box-shadow:var(--shadow)}
 .game .gh{display:flex;justify-content:space-between;gap:8px;align-items:center}
@@ -135,7 +153,8 @@ footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);paddin
   <aside class="rail">
     <div class="brand"><div class="mark">PM</div><div><b>Scalper Polymarket</b><small>panel de operación</small></div></div>
     <nav class="nav" id="nav">
-      <a href="#resumen" class="active">Resumen</a>
+      <a href="#oportunidades" class="active">Oportunidades <span class="count" id="n-ops">–</span></a>
+      <a href="#resumen">Resumen</a>
       <a href="#senales">Señales y resultados <span class="count" id="n-senales">–</span></a>
       <a href="#partidos">Partidos en vivo <span class="count" id="n-partidos">–</span></a>
       <a href="#ballenas">Ballenas <span class="count" id="n-ballenas">–</span></a>
@@ -159,6 +178,17 @@ footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);paddin
       <span class="pill" id="p-wallets"><span class="dot"></span>Wallets perfiladas <b>–</b></span>
       <span class="pill" id="p-models"><span class="dot"></span>Modelos en uso <b>–</b></span>
     </header>
+
+    <section id="oportunidades">
+      <div class="sec-head"><h2>Oportunidades ahora mismo</h2><p>Lo que el bot ve en este momento, por mercado: qué comprar, a qué precio y por qué. Las cifras ya descuentan las comisiones.</p></div>
+      <details class="help" open><summary>Cómo leer esto</summary><div class="body">
+        <p><b>Solo aparece lo que da números después de comisiones.</b> Si no hay nada, no es que el bot esté parado: es que ninguna oportunidad supera el costo de operar. Eso es lo normal la mayor parte del tiempo.</p>
+        <p><b>Ventaja</b> es lo que se espera ganar sobre lo invertido. Una ventaja del 15 % significa que por cada 100 USD puestos se esperan 15 de ganancia, en promedio y a la larga. No es una garantía en cada operación.</p>
+        <p><b>El borde verde</b> marca lo que sigue vigente. Lo gris es de hace rato y el precio ya pudo moverse, sobre todo en las ventanas de cripto, que duran cinco minutos.</p>
+        <p><b>Nada de esto se ejecuta solo.</b> El bot mira y avisa; no firma órdenes ni maneja una wallet.</p>
+      </div></details>
+      <div class="ops" id="ops"></div>
+    </section>
 
     <section id="resumen">
       <div class="sec-head"><h2>Resumen</h2><p>Lo que el bot ha hecho con dinero simulado y qué tan sano está el flujo de datos.</p></div>
@@ -421,6 +451,30 @@ function render(d){
   const rp = d.recent_positions || [];
   $("t-recent").innerHTML = rp.length ? `<thead><tr><th>Señal</th><th>Tipo</th><th>Mercado</th><th class="num">Shares</th><th class="num">Predicho</th><th class="num">Real</th><th>Cierre</th><th class="num">Conf.</th></tr></thead><tbody>` +
     rp.map(r => `<tr><td class="mono">${esc(tm(r.ts_signal))}</td><td><span class="kind"><i style="background:${kindOf(r.kind).color}"></i>${esc(kindOf(r.kind).label)}</span></td><td class="mono">${esc(String(r.condition_id).slice(0,10))}…</td><td class="num">${num(r.size_filled,0)}</td><td class="num">${esc(usd(r.predicted_pnl))}</td><td class="num ${sgn(r.realized_pnl)}">${esc(usd(r.realized_pnl))}</td><td><span class="chip ${FORCED.has(r.exit_reason)?"":sgn(r.realized_pnl)==="pos"?"good":sgn(r.realized_pnl)==="neg"?"crit":""}">${esc(EXIT[r.exit_reason]||r.exit_reason)}</span></td><td class="num">${pct(r.confidence)}</td></tr>`).join("") + "</tbody>" : "";
+
+  // oportunidades
+  const op = d.oportunidades || {grupos: [], total: 0, vigentes: 0};
+  $("n-ops").textContent = num(op.vigentes, 0);
+  const grupos = (op.grupos || []).filter(g => (g.lista || []).length);
+  $("ops").innerHTML = grupos.length ? grupos.map(g => {
+    const r = g.resumen || {};
+    return `<div class="opgrupo">
+      <div class="opcab"><h3>${esc(g.nombre)}</h3><span class="meta">${num(r.frescas,0)} vigentes de ${num(r.total,0)}${r.ganancia_total ? ` · ${esc(usd(r.ganancia_total))} en juego` : ""}</span></div>
+      <div class="oplista">${(g.lista||[]).map(o => `
+        <div class="op${o.fresca ? " viva" : ""}">
+          <div class="fila1"><span class="accion">${esc(o.accion)}</span><span class="chip ${o.fresca?"good":""}">${o.fresca ? "vigente" : "hace " + Math.round(o.antiguedad_s/60) + " min"}</span></div>
+          <div class="mercado" title="${esc(o.mercado)}">${esc(o.mercado)}</div>
+          <div class="cifras">
+            <div><span class="et">Precio</span><span class="vl">${num(o.precio,3)}</span></div>
+            <div><span class="et">Invertir</span><span class="vl">${num(o.inversion,2)}</span></div>
+            <div><span class="et">Ganar</span><span class="vl good">${num(o.ganancia,2)}</span></div>
+            <div><span class="et">Ventaja</span><span class="vl good">${pct(o.edge_pct,1)}</span></div>
+          </div>
+          <div class="razon">${esc(o.razon)}</div>
+          <div class="pie"><span>confianza ${pct(o.confianza)}</span><span>${esc(kindOf(o.kind).label)}</span></div>
+        </div>`).join("")}</div>
+    </div>`;
+  }).join("") : `<div class="empty">Ahora mismo no hay ninguna oportunidad que supere el costo de operar.<br><br>Eso es lo normal la mayor parte del tiempo: el bot solo avisa cuando los números dan. Si acaba de arrancar, dale unos minutos para que se llenen los libros.</div>`;
 
   // partidos
   const gs = d.games || [];

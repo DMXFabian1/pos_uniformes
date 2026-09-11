@@ -236,17 +236,42 @@ def cmd_dashboard(args: argparse.Namespace) -> None:
     serve(cfg, args.host, args.port, args.refresh)
 
 
+def cmd_listo(args: argparse.Namespace) -> None:
+    """¿Está el bot listo para operar con dinero real? La respuesta la dan los números."""
+    from .readiness import evaluar, formatear
+
+    cfg = load_config(args.config)
+    etiquetas = {"updown_model": "Cripto: modelo", "model_deviation": "Deporte: modelo",
+                 "smart_money": "Dinero inteligente", "spread_capture": "Captura de spread",
+                 "complement_buy": "Arbitraje SÍ+NO", "complement_sell": "Arbitraje SÍ+NO (venta)",
+                 "multi_buy_all_yes": "Arbitraje multi (SÍ)", "multi_buy_all_no": "Arbitraje multi (NO)"}
+    print(formatear(evaluar(cfg.data_dir), etiquetas))
+
+
+def cmd_ahora(args: argparse.Namespace) -> None:
+    """Qué comprar ahora mismo, por mercado, explicado en palabras."""
+    from .opportunities import formatear, listar
+
+    cfg = load_config(args.config)
+    ops = listar(cfg.data_dir, minutos=args.minutos, solo_frescas=args.solo_vigentes, min_edge=args.min_edge)
+    if args.grupo:
+        ops = [o for o in ops if o.grupo.lower() == args.grupo.lower()]
+    print(formatear(ops))
+
+
 def cmd_overview(args: argparse.Namespace) -> None:
     """Todos los informes de una pasada, en el orden en que conviene leerlos."""
     def titulo(t: str) -> None:
         print("\n" + "=" * 74 + f"\n  {t}\n" + "=" * 74)
 
     secciones = [
+        ("OPORTUNIDADES AHORA MISMO", cmd_ahora),
         ("QUÉ DATOS HAY GUARDADOS", cmd_status),
         ("ARRASTRE ENTRE VENTANAS DE CRIPTO: ¿a favor o en contra de la racha?", cmd_updown_study),
         ("RESULTADOS POR TIPO DE SEÑAL (predicho contra real)", cmd_report),
         ("WALLETS CON HISTORIAL", cmd_wallets),
         ("MODELOS APRENDIDOS", cmd_models),
+        ("¿LISTO PARA DINERO REAL?", cmd_listo),
         ("USO DE DISCO", cmd_retention),
     ]
     for nombre, fn in secciones:
@@ -469,7 +494,21 @@ def main(argv: list[str] | None = None) -> None:
     s.add_argument("--min-closed", type=int, default=20)
     s.add_argument("--apply", action="store_true")
     s.add_argument("--dry-run", action="store_true")
+    s.add_argument("--minutos", type=float, default=30)
+    s.add_argument("--solo-vigentes", action="store_true")
+    s.add_argument("--min-edge", type=float, default=0.0)
+    s.add_argument("--grupo")
     s.set_defaults(fn=cmd_overview)
+
+    s = sub.add_parser("listo", help="¿está el bot listo para dinero real? veredicto por señal, con números")
+    s.set_defaults(fn=cmd_listo)
+
+    s = sub.add_parser("ahora", help="qué comprar ahora mismo, por mercado, explicado en palabras")
+    s.add_argument("--minutos", type=float, default=30, help="cuánto atrás mirar")
+    s.add_argument("--solo-vigentes", action="store_true", help="ocultar las que ya caducaron")
+    s.add_argument("--min-edge", type=float, default=0.0, help="ventaja mínima por share")
+    s.add_argument("--grupo", help="filtrar: Cripto, NBA o Tenis")
+    s.set_defaults(fn=cmd_ahora)
 
     s = sub.add_parser("updown-study", help="¿el sesgo al abrir una ventana es información o sobrerreacción?")
     s.add_argument("--offset", type=float, default=20, help="segundos tras la apertura en que se mide el precio")
