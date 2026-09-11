@@ -34,6 +34,24 @@
       "presentation": { "reveal": "always", "panel": "dedicated", "group": "scalper" }
     },
     {
+      "label": "Oportunidades: qué comprar ahora",
+      "detail": "Lo que el bot ve en este momento, por mercado, explicado en palabras.",
+      "type": "shell",
+      "command": "${config:python.defaultInterpreterPath}",
+      "args": ["-m", "scalper.cli", "-c", "config.yaml", "ahora"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "¿Listo para dinero real?",
+      "detail": "Veredicto objetivo por señal: posiciones, ganancia neta, t y modelo.",
+      "type": "shell",
+      "command": "${config:python.defaultInterpreterPath}",
+      "args": ["-m", "scalper.cli", "-c", "config.yaml", "listo"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
       "label": "Informes: ver todo",
       "detail": "Datos guardados, estudio del arrastre, resultados por señal, modelos y disco.",
       "type": "shell",
