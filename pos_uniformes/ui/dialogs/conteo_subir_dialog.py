@@ -290,8 +290,11 @@ class ConteoSubirDialog(QDialog):
         self._table.setRowCount(total_filas)
 
         fila = 0
-        for producto, items in grupos:
-            self._agregar_encabezado(fila, f"{producto}  ·  {len(items)} pzs")
+        for numero, (producto, items) in enumerate(grupos, 1):
+            # Mismo número que en la hoja de papel: las dos leen el mismo
+            # alcance, así que "7." aquí es "7." en la hoja.
+            nombre_corto = str(producto).split(" | ")[0].strip()
+            self._agregar_encabezado(fila, f"{numero}.  {nombre_corto}  ·  {len(items)} tallas")
             fila += 1
             for v in items:
                 self._table.setItem(fila, 0, QTableWidgetItem(f"  {v.talla}"))

@@ -39,7 +39,7 @@ class SeccionesTests(unittest.TestCase):
         import inspect
 
         cuerpo = inspect.getsource(QuoteSatelliteWindow._build_conteos_page)
-        self.assertIn("_open_conteo_orden", cuerpo)
+        self.assertIn("_conteos_imprimir_hoja", cuerpo)  # la hoja carta (HP)
         self.assertIn("_conteos_empezar", cuerpo)       # abre una jornada
         self.assertIn("conteos_jornadas_box", cuerpo)   # y lista las abiertas
         self.assertIn("conteos_revisar_box", cuerpo)    # y lo que el dueño revisa

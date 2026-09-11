@@ -3425,7 +3425,7 @@ class QuoteSatelliteWindow(QMainWindow):
         acciones_ly.setSpacing(8)
         orden_btn = QPushButton("1 ·  🖨 Imprimir la hoja")
         orden_btn.setAutoDefault(False)
-        orden_btn.clicked.connect(self._open_conteo_orden)
+        orden_btn.clicked.connect(self._conteos_imprimir_hoja)
         acciones_ly.addWidget(orden_btn)
         paso2 = QLabel("2 ·  Cuenta en el piso y anota")
         paso2.setStyleSheet("font-size: 13px; font-weight: 600; color: #8a7358; background: transparent; padding: 0 8px;")
@@ -3638,6 +3638,44 @@ class QuoteSatelliteWindow(QMainWindow):
             logger.exception("Conteos: no se pudieron leer las jornadas")
             abiertas, por_revisar, recientes = [], [], []
         pintar_jornadas(self, abiertas=abiertas, por_revisar=por_revisar, recientes=recientes, code=code)
+
+    def _conteos_imprimir_hoja(self) -> None:
+        """La hoja de conteo en papel carta (HP), para una escuela o prenda.
+
+        Mismo orden y numeración que la pantalla de captura. La tira térmica
+        de antes sigue en el admin (Ctrl+Shift+A → Conteos) como respaldo.
+        """
+        from pos_uniformes.ui.dialogs.conteo_jornada_dialogs import ConteoNuevaJornadaDialog
+
+        dlg = ConteoNuevaJornadaDialog(self, titulo="Imprimir hoja de conteo", boton="Imprimir")
+        if dlg.exec() != int(QDialog.DialogCode.Accepted):
+            return
+        from pos_uniformes.services.satellite_startup_service import probe_database_host
+
+        if self.offline_mode or not probe_database_host(0.5):
+            QMessageBox.warning(self, "Sin conexión", "La hoja se arma con el catálogo de la PC principal. Enciéndela e intenta de nuevo.")
+            return
+        try:
+            from pos_uniformes.services.conteo_hoja_carta_service import (
+                construir_hoja_html,
+                grupos_para_hoja,
+            )
+
+            with get_session() as session:
+                titulo, grupos = grupos_para_hoja(
+                    session, escuela_id=dlg.escuela_id, tipo_pieza=dlg.tipo_pieza
+                )
+            if not grupos:
+                QMessageBox.information(self, "Sin piezas", f"{titulo} no tiene piezas para contar.")
+                return
+            html = construir_hoja_html(grupos, titulo=titulo, quien=str(self._conteos_nombre or ""))
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "No se pudo armar la hoja", str(exc))
+            return
+        from pos_uniformes.ui.helpers.conteo_hoja_carta_print_helper import imprimir_hoja_carta
+
+        if imprimir_hoja_carta(self, html, f"Hoja de conteo · {titulo}"):
+            self._set_status(f"Hoja de {titulo} enviada a la impresora.")
 
     def _conteos_empezar(self) -> None:
         """Abre una jornada nueva y entra directo a capturar."""

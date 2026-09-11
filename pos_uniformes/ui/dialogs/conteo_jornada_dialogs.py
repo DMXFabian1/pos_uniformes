@@ -62,9 +62,13 @@ class ConteoNuevaJornadaDialog(QDialog):
         parent: QWidget | None = None,
         *,
         session_factory: Callable[[], Session] | None = None,
+        titulo: str = "Empezar conteo",
+        boton: str = "Empezar",
     ) -> None:
+        """El mismo selector sirve para empezar una jornada y para imprimir la
+        hoja: cambian el título y el texto del botón."""
         super().__init__(parent)
-        self.setWindowTitle("Empezar conteo")
+        self.setWindowTitle(titulo)
         self.setStyleSheet(_ESTILO)
         self._session_factory = session_factory or _default_session_factory
         self.escuela_id: int | None = None
@@ -85,7 +89,7 @@ class ConteoNuevaJornadaDialog(QDialog):
         layout.addWidget(pista)
 
         botones = QDialogButtonBox()
-        ok = botones.addButton("Empezar", QDialogButtonBox.ButtonRole.AcceptRole)
+        ok = botones.addButton(boton, QDialogButtonBox.ButtonRole.AcceptRole)
         ok.setObjectName("primaryButton")
         botones.addButton(QDialogButtonBox.StandardButton.Cancel)
         botones.accepted.connect(self._aceptar)

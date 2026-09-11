@@ -78,8 +78,13 @@ def ref(jornada: ConteoJornada) -> JornadaRef:
     )
 
 
-def _variantes_del_alcance(session: Session, escuela_id: int | None, tipo_pieza: str) -> list[dict]:
-    """Los grupos producto→tallas que abarca la jornada (mismo orden que la captura)."""
+def alcance(session: Session, escuela_id: int | None, tipo_pieza: str = "") -> list[dict]:
+    """Los grupos producto→tallas de una escuela (o prenda básica), en el
+    orden que comparten la pantalla de captura y la hoja de papel.
+
+    Es UNA sola función a propósito: si la hoja dice "7. Suéter Cuello V" y la
+    pantalla dice "7. Suéter Cuello V", es porque las dos preguntaron aquí.
+    """
     from pos_uniformes.services.conteo_service import (
         obtener_variantes_agrupadas_por_producto,
         obtener_variantes_basicos_agrupadas,
@@ -103,7 +108,7 @@ def abrir_jornada(
     """Abre una jornada nueva y deja anotado cuántas tallas abarca."""
     if not empleada_code or not empleada_code.strip():
         raise ValueError("Una jornada necesita el gafete de quien cuenta.")
-    grupos = _variantes_del_alcance(session, escuela_id, tipo_pieza)
+    grupos = alcance(session, escuela_id, tipo_pieza)
     total = sum(len(g["variantes"]) for g in grupos)
     if escuela_id is None:
         titulo = f"Básicos · {tipo_pieza}" if tipo_pieza else "Básicos"
@@ -207,7 +212,7 @@ class Avance:
 def avance(session: Session, jornada: ConteoJornada) -> Avance:
     """Cuántas tallas y cuántas prendas van (puro sobre la consulta)."""
     hechas = capturado_en_jornada(session, jornada.id)
-    grupos = _variantes_del_alcance(session, jornada.escuela_id, jornada.tipo_pieza)
+    grupos = alcance(session, jornada.escuela_id, jornada.tipo_pieza)
     prendas_total = len(grupos)
     prendas_hechas = sum(
         1 for g in grupos
