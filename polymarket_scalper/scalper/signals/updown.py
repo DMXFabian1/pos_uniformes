@@ -7,14 +7,15 @@ pagaría dos veces y se comería cualquier ventaja, así que este detector nunca
 from __future__ import annotations
 
 from ..fees import taker_fee
-from .base import Leg, MarketContext, Signal
+from .base import Leg, MarketContext, Signal, precio_maker
 
 
 class UpDownDetector:
     kind = "updown_model"
 
     def __init__(self, min_edge_net: float, target_size: float, min_seconds_left: float = 45,
-                 max_edge_net: float = 0.45):
+                 max_edge_net: float = 0.45, maker_first: bool = True):
+        self.maker_first = maker_first
         self.min_edge_net = min_edge_net
         self.target_size = target_size
         self.min_seconds_left = min_seconds_left
@@ -34,12 +35,21 @@ class UpDownDetector:
             b = ctx.book(tok.token_id)
             if b is None or not b.is_valid:
                 continue
-            w = b.walk_buy(self.target_size)
-            size = w.shares
-            if size < m.min_order_size:
-                continue
-            entrada = w.avg_price
-            fee = taker_fee(size, entrada, m.fee_rate) / size      # se paga una sola vez
+            if self.maker_first:
+                entrada = precio_maker(b, p_model, self.min_edge_net)
+                if entrada is None:
+                    continue
+                size = max(self.target_size, m.min_order_size)
+                fee = 0.0                                          # quien pone la orden no paga
+                rol, precio_limite = "maker", entrada
+            else:
+                w = b.walk_buy(self.target_size)
+                size = w.shares
+                if size < m.min_order_size:
+                    continue
+                entrada = w.avg_price
+                fee = taker_fee(size, entrada, m.fee_rate) / size   # se paga una sola vez
+                rol, precio_limite = "taker", w.worst_price
             edge_bruto = p_model - entrada
             edge_neto = edge_bruto - fee
             if edge_neto < self.min_edge_net or edge_neto > self.max_edge_net:
@@ -48,10 +58,10 @@ class UpDownDetector:
             conf *= 0.7 + 0.3 * min(st.seconds_left / st.window_seconds, 1.0)
             out.append(Signal(
                 ts_ms=ts_ms, kind=self.kind, condition_id=m.condition_id, event_id=m.event_id,
-                legs=[Leg(tok.token_id, "BUY", w.worst_price, size, "taker", tok.outcome)],
+                legs=[Leg(tok.token_id, "BUY", precio_limite, size, rol, tok.outcome)],
                 size=size, edge_gross=edge_bruto, fee_est=fee, edge_net=edge_neto,
                 confidence=round(max(0.05, min(conf, 0.95)), 3), horizon="resolution",
-                meta={"side": "up" if es_up else "down", "p_model": round(p_model, 4),
+                meta={"entry_role": rol, "side": "up" if es_up else "down", "p_model": round(p_model, 4),
                       "p_market": round(b.mid, 4), "entry": round(entrada, 4), "symbol": st.symbol,
                       "strike": st.strike, "spot": st.spot, "seconds_left": round(st.seconds_left, 1),
                       "tau": round(st.tau, 4), "window_s": st.window_seconds,

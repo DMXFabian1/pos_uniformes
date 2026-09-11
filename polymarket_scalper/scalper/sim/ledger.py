@@ -16,6 +16,7 @@ class Position:
     exec_ts: int = 0                 # cuándo puede ejecutarse (latencia)
     fills: list[Fill] = field(default_factory=list)
     maker_orders: list[MakerOrder] = field(default_factory=list)
+    entrada_maker: MakerOrder | None = None      # orden puesta esperando llenarse (maker-first)
     ts_fill: int = 0
     ts_exit: int = 0
     size_filled: float = 0.0

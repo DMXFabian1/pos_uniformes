@@ -92,6 +92,8 @@ learn:                          # fase 5: modelo que aprende del ledger
   retrain_hours: 6              # en paper trading, reentrenar y recargar cada 6 h
 
 signals:
+  maker_first: true             # poner órdenes en vez de cruzar el libro: la comisión es cero
+  maker_entry_timeout_s: 90     # si la orden puesta no se llena en este tiempo, se cancela sin perder nada
   min_edge_net: 0.004           # ganancia mínima neta por share (USD) para emitir señal
   max_edge_net: 0.25            # por encima de esto se descarta: casi siempre es un libro roto
   target_size: 50               # shares objetivo por señal

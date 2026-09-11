@@ -8,7 +8,7 @@ tiempo máximo, o al terminar el partido. El ledger mide si el modelo tenía raz
 from __future__ import annotations
 
 from ..fees import taker_fee
-from .base import Leg, MarketContext, Signal
+from .base import Leg, MarketContext, Signal, precio_maker
 
 
 class ModelDeviationDetector:
@@ -16,7 +16,8 @@ class ModelDeviationDetector:
 
     def __init__(self, min_edge_net: float, target_size: float, min_deviation: float = 0.04,
                  max_deviation: float = 0.35, stop_fraction: float = 1.5, min_tau: float = 0.02,
-                 require_pregame: bool = False):
+                 require_pregame: bool = False, maker_first: bool = True):
+        self.maker_first = maker_first
         self.min_edge_net = min_edge_net
         self.target_size = target_size
         self.min_deviation = min_deviation
@@ -44,15 +45,24 @@ class ModelDeviationDetector:
             b = ctx.book(tok.token_id)
             if b is None or not b.is_valid:
                 continue
-            w = b.walk_buy(self.target_size)
-            size = w.shares
-            if size < m.min_order_size:
-                continue
-            entry = w.avg_price
+            if self.maker_first:
+                entry = precio_maker(b, p_model, self.min_deviation)
+                if entry is None:
+                    continue
+                size = max(self.target_size, m.min_order_size)
+                fee_in = 0.0                                        # quien pone la orden no paga
+                rol, precio_limite = "maker", entry
+            else:
+                w = b.walk_buy(self.target_size)
+                size = w.shares
+                if size < m.min_order_size:
+                    continue
+                entry = w.avg_price
+                fee_in = taker_fee(size, entry, m.fee_rate) / size
+                rol, precio_limite = "taker", w.worst_price
             dev = p_model - entry
             if dev < self.min_deviation or dev > self.max_deviation:
                 continue
-            fee_in = taker_fee(size, entry, m.fee_rate) / size
             # salida: vender como taker cerca del modelo, pagando fee y medio spread
             exit_px = p_model - (b.spread or 0) / 2
             fee_out = taker_fee(size, exit_px, m.fee_rate) / size
@@ -66,10 +76,10 @@ class ModelDeviationDetector:
                 conf *= 0.6 + 0.4 * (1 - tau)          # más cerca del final, el modelo sabe más
             out.append(Signal(
                 ts_ms=ts_ms, kind=self.kind, condition_id=m.condition_id, event_id=m.event_id,
-                legs=[Leg(tok.token_id, "BUY", w.worst_price, size, "taker", tok.outcome)],
+                legs=[Leg(tok.token_id, "BUY", precio_limite, size, rol, tok.outcome)],
                 size=size, edge_gross=dev, fee_est=fee_in + fee_out, edge_net=edge_net,
                 confidence=round(max(0.05, min(conf, 0.95)), 3), horizon="directional",
-                meta={"side": side, "p_model": round(p_model, 4), "p_market": round(b.mid, 4), "entry": round(entry, 4),
+                meta={"entry_role": rol, "side": side, "p_model": round(p_model, 4), "p_market": round(b.mid, 4), "entry": round(entry, 4),
                       "target": round(exit_px, 4), "stop": round(max(entry - self.stop_fraction * edge_net, 0.01), 4),
                       "game_id": g.game_id, "sport": g.sport, "league": g.league, "model": wp.model,
                       "score": f"{g.home_score}-{g.away_score}", "period": g.period,

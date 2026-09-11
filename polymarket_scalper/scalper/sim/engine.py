@@ -166,6 +166,10 @@ class Engine:
             }
         ganador = info.get("winner_token")
         for pos in [p for p in self.positions if p.status == "open" and p.signal.condition_id == condition_id]:
+            if pos.entrada_maker is not None and pos.size_filled <= 0:
+                self.stats["entradas_maker_sin_llenar"] += 1
+                self._close(pos, ts_ms, "sin_llenar")     # la ventana cerró y nunca nos llenaron
+                continue
             pago = sum(sh for t, sh in pos.inventory.items() if t == ganador and sh > 0)
             pos.payout += pago
             pos.inventory = {}
@@ -298,11 +302,14 @@ class Engine:
             self.history[token_id].mids.append((ts_ms, book.mid))
             self.ultimo_mid[token_id] = book.mid
         self._process_pending(ts_ms)
-        for pos in self.positions:
-            if pos.status == "open" and pos.maker_orders:
-                for o in pos.maker_orders:
-                    if o.token_id == token_id and self.fill_model.maker_on_book(o, book, ts_ms) > 0:
-                        self._after_maker_fill(pos, ts_ms)
+        for pos in list(self.positions):
+            if pos.status != "open":
+                continue
+            self._revisar_entrada(pos, ts_ms, token_id, book=book)
+            for o in pos.maker_orders:
+                if o.token_id == token_id and self.fill_model.maker_on_book(o, book, ts_ms) > 0:
+                    self._after_maker_fill(pos, ts_ms)
+        self._caducar_entradas(ts_ms)
         self._expire(ts_ms)
         self._check_directional(ts_ms, token_id)
         cid = self.token_to_cid.get(token_id)
@@ -313,11 +320,14 @@ class Engine:
         self.now_ms = max(self.now_ms, ts_ms)
         self.history[token_id].trades.append((ts_ms, trade["price"], trade["size"], trade["side"]))
         self._process_pending(ts_ms)
-        for pos in self.positions:
-            if pos.status == "open" and pos.maker_orders:
-                for o in pos.maker_orders:
-                    if self.fill_model.maker_on_trade(o, trade, ts_ms) > 0:
-                        self._after_maker_fill(pos, ts_ms)
+        for pos in list(self.positions):
+            if pos.status != "open":
+                continue
+            self._revisar_entrada(pos, ts_ms, trade=trade)
+            for o in pos.maker_orders:
+                if self.fill_model.maker_on_trade(o, trade, ts_ms) > 0:
+                    self._after_maker_fill(pos, ts_ms)
+        self._caducar_entradas(ts_ms)
         self._expire(ts_ms)
         cid = self.token_to_cid.get(token_id)
         if cid:
@@ -339,6 +349,7 @@ class Engine:
         """Llamar periódicamente aunque no lleguen eventos (latencia y expiraciones)."""
         self.now_ms = max(self.now_ms, ts_ms)
         self._process_pending(ts_ms)
+        self._caducar_entradas(ts_ms)
         self._expire(ts_ms)
         self._check_directional(ts_ms)
 
@@ -444,6 +455,8 @@ class Engine:
             s = pos.signal
             if s.kind == "spread_capture":
                 self._place_makers(pos, ts_ms)
+            elif s.meta.get("entry_role") == "maker":
+                self._poner_entrada(pos, ts_ms)
             else:
                 self._execute_taker(pos, ts_ms)
 
@@ -532,6 +545,56 @@ class Engine:
             pos.cost += undo_notional
         pos.fees += undo_fee
 
+    def _poner_entrada(self, pos: Position, ts_ms: int) -> None:
+        """Pone la orden de compra y espera. No cruza el libro, así que no paga comisión."""
+        leg = pos.signal.legs[0]
+        book = self.books.get(leg.token_id)
+        if book is None or not book.is_valid:
+            self._close(pos, ts_ms, "no_book")
+            return
+        if book.best_ask <= leg.price + 1e-9:
+            # el mercado ya bajó hasta nuestro precio: la ventaja se evaporó mientras esperábamos
+            self._close(pos, ts_ms, "price_moved")
+            return
+        pos.entrada_maker = self.fill_model.place_maker(leg, book, ts_ms)
+        pos.status = "open"
+        pos.ts_fill = ts_ms
+
+    def _revisar_entrada(self, pos: Position, ts_ms: int, token_id: str | None = None,
+                         trade: dict[str, Any] | None = None, book: OrderBook | None = None) -> None:
+        """Intenta llenar la orden de entrada con el trade o el libro que acaba de llegar."""
+        o = pos.entrada_maker
+        if o is None or o.done:
+            return
+        if token_id is not None and o.token_id != token_id:
+            return
+        llenado = 0.0
+        if trade is not None:
+            llenado = self.fill_model.maker_on_trade(o, trade, ts_ms)
+        elif book is not None:
+            llenado = self.fill_model.maker_on_book(o, book, ts_ms)
+        if llenado <= 0:
+            return
+        pos.fills.extend(f for f in o.fills if f not in pos.fills)
+        pos.cost = sum(f.notional for f in o.fills)          # sin comisión: la orden se puso, no se cruzó
+        pos.size_filled = o.filled
+        pos.inventory[o.token_id] = o.filled
+        self.stats["entradas_maker_llenadas"] += 1
+        if o.done:
+            self.stats["entradas_maker_completas"] += 1
+
+    def _caducar_entradas(self, ts_ms: int) -> None:
+        """Orden puesta que no se llenó a tiempo: se cancela. No cuesta nada, solo no pasó nada."""
+        limite = self.cfg.signals.maker_entry_timeout_s * 1000
+        for pos in [p for p in self.positions if p.status == "open" and p.entrada_maker is not None]:
+            o = pos.entrada_maker
+            if o.done or ts_ms - o.ts_placed < limite:
+                continue
+            pos.entrada_maker = None
+            if o.filled <= 0:
+                self.stats["entradas_maker_sin_llenar"] += 1
+                self._close(pos, ts_ms, "sin_llenar")
+
     def _place_makers(self, pos: Position, ts_ms: int) -> None:
         s = pos.signal
         book = self.books.get(s.legs[0].token_id)
@@ -567,7 +630,8 @@ class Engine:
 
     def _check_directional(self, ts_ms: int, token_id: str | None = None) -> None:
         max_hold = self.cfg.sim.max_hold_directional_seconds * 1000
-        for pos in [p for p in self.positions if p.status == "open" and p.signal.horizon == "directional"]:
+        for pos in [p for p in self.positions if p.status == "open" and p.signal.horizon == "directional"
+                    and p.size_filled > 0]:
             tid = pos.signal.legs[0].token_id
             if token_id is not None and tid != token_id:
                 continue

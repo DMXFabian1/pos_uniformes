@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..fees import taker_fee
-from .base import Leg, MarketContext, Signal
+from .base import Leg, MarketContext, Signal, precio_maker
 
 
 class SmartMoneyDetector:
@@ -18,7 +18,8 @@ class SmartMoneyDetector:
 
     def __init__(self, min_edge_net: float, target_size: float, min_score: float = 0.65, min_closed: int = 20,
                  min_usd: float = 1000, max_chase_ticks: int = 3, edge_fraction_of_roi: float = 0.5,
-                 max_price: float = 0.9):
+                 max_price: float = 0.9, maker_first: bool = True):
+        self.maker_first = maker_first
         self.min_edge_net = min_edge_net
         self.target_size = target_size
         self.min_score = min_score
@@ -47,26 +48,36 @@ class SmartMoneyDetector:
         their_px = float(flow.get("price") or 0)
         if b.best_ask > their_px + self.max_chase_ticks * b.tick_size or b.best_ask > self.max_price:
             return []                                   # ya se movió: no perseguir
-        w = b.walk_buy(self.target_size)
-        size = w.shares
-        if size < m.min_order_size:
-            return []
-        entry = w.avg_price
-        fee_in = taker_fee(size, entry, m.fee_rate) / size
         # hipótesis: capturamos una fracción del ROI histórico de la wallet sobre el precio de entrada
-        edge_gross = max(prof.roi_adj, 0.0) * self.edge_fraction_of_roi * entry
-        exit_px = entry + edge_gross
+        justo = their_px * (1 + max(prof.roi_adj, 0.0) * self.edge_fraction_of_roi)
+        if self.maker_first:
+            entry = precio_maker(b, justo, self.min_edge_net)
+            if entry is None:
+                return []
+            size = max(self.target_size, m.min_order_size)
+            fee_in = 0.0
+            rol, precio_limite = "maker", entry
+        else:
+            w = b.walk_buy(self.target_size)
+            size = w.shares
+            if size < m.min_order_size:
+                return []
+            entry = w.avg_price
+            fee_in = taker_fee(size, entry, m.fee_rate) / size
+            rol, precio_limite = "taker", w.worst_price
+        edge_gross = justo - entry
+        exit_px = justo
         fee_out = taker_fee(size, exit_px, m.fee_rate) / size
-        edge_net = edge_gross - fee_in - fee_out - (b.spread or 0) / 2
+        edge_net = edge_gross - fee_in - fee_out - (0 if self.maker_first else (b.spread or 0) / 2)
         if edge_net < self.min_edge_net:
             return []
         conf = min(0.95, prof.score * (0.6 + 0.4 * min(prof.n_closed / 200, 1.0)))
         return [Signal(
             ts_ms=ts_ms, kind=self.kind, condition_id=m.condition_id, event_id=m.event_id,
-            legs=[Leg(tok.token_id, "BUY", w.worst_price, size, "taker", tok.outcome)],
+            legs=[Leg(tok.token_id, "BUY", precio_limite, size, rol, tok.outcome)],
             size=size, edge_gross=edge_gross, fee_est=fee_in + fee_out, edge_net=edge_net,
             confidence=round(conf, 3), horizon="directional",
-            meta={"wallet": flow.get("wallet"), "wallet_name": flow.get("name"), "wallet_score": prof.score,
+            meta={"entry_role": rol, "wallet": flow.get("wallet"), "wallet_name": flow.get("name"), "wallet_score": prof.score,
                   "wallet_n": prof.n_closed, "wallet_roi": prof.roi, "their_price": their_px, "their_usd": flow.get("usd"),
                   "entry": round(entry, 4), "target": round(exit_px, 4),
                   "stop": round(max(entry - 2 * edge_net, 0.01), 4), "p_market": round(b.mid, 4)},

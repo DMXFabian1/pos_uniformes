@@ -173,6 +173,28 @@ información y seguirla era lo correcto. El informe avisa cuando la muestra es d
 El arrastre también viaja como feature de cada señal (`prev_up_won`, `prev_return_bps`,
 `market_skew`, `elapsed_s`), así que el modelo de la fase 5 lo aprende por su cuenta.
 
+### Maker-first: poner órdenes en vez de cruzarlas
+La comisión de Polymarket **solo la paga quien cruza el libro**. Quien pone la orden y espera no
+paga nada. La radiografía de los datos propios dejó claro el peso de esa diferencia: cruzar el
+libro en un mercado a 0,50 cuesta entre 1,6 % y 4,5 % del precio según la categoría, solo por
+entrar. Ese es el listón que cualquier señal tenía que superar antes de ganar un centavo.
+
+Por eso las tres señales direccionales (`updown_model`, `model_deviation`, `smart_money`) entran
+poniendo una orden límite dentro del spread, al precio más alto que cumple tres condiciones: no
+cruza, deja la ventaja mínima pedida, y no queda por detrás del mejor comprador (si hay que
+ponerse detrás de la cola, no compensa y la señal se descarta).
+
+Consecuencias, todas medidas en el ledger:
+- La comisión de entrada es **cero**, así que la ventaja es entera.
+- Se compra más barato: el límite queda por debajo del precio que pedía el mercado.
+- Puede no llenarse. Si pasa el plazo (`signals.maker_entry_timeout_s`) la orden se cancela y la
+  posición cierra como `sin_llenar`, con resultado exactamente cero. Eso es coste de oportunidad,
+  no pérdida, y queda fuera de las estadísticas.
+- Si el mercado baja hasta nuestro límite antes de poner la orden, la ventaja se evaporó y la
+  señal se descarta (`price_moved`).
+
+`signals.maker_first: false` vuelve al comportamiento anterior, que sigue probado.
+
 ### Detectores in-play y de dinero inteligente
 - **model_deviation**: para cada token enlazado a un partido en vivo, si
   `p_modelo − ask − fee(entrada) − costo de salida > umbral`, compra como taker. Sale cuando el

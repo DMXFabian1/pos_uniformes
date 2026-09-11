@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import itertools
+import math
 from collections import deque
 from dataclasses import dataclass, field
 from typing import Any, Protocol
@@ -93,6 +94,29 @@ class MarketContext:
 
     def wallet_profile(self, wallet: str) -> Any | None:
         return self.wallets.get((wallet or "").lower())
+
+
+def precio_maker(book: OrderBook, p_justo: float, min_edge: float) -> float | None:
+    """Precio al que poner una orden de compra sin cruzar el libro.
+
+    La comisión de Polymarket solo la paga quien cruza. Poniendo la orden y esperando, la
+    ventaja es entera. A cambio puede no llenarse, que es un coste de oportunidad, no una
+    pérdida.
+
+    Se busca el precio más alto que cumpla las tres condiciones:
+      1. no cruza (queda por debajo del mejor vendedor),
+      2. deja al menos `min_edge` de ventaja frente al valor justo,
+      3. no queda por detrás del mejor comprador, o no se llenaría nunca.
+    """
+    if not book.is_valid:
+        return None
+    tick = book.tick_size
+    tope = min(book.best_ask - tick, p_justo - min_edge)
+    limite = math.floor(round(tope / tick, 9)) * tick
+    limite = round(limite, 10)
+    if limite < book.best_bid - 1e-9 or limite <= 0:
+        return None                       # habría que ponerse detrás de la cola: no compensa
+    return limite
 
 
 class Detector(Protocol):

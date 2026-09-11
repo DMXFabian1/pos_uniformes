@@ -24,11 +24,12 @@ def build_detectors(cfg: SignalsCfg, updown: UpDownCfg | None = None) -> list[De
     if cfg.model_deviation.enabled:
         d = cfg.model_deviation
         dets.append(ModelDeviationDetector(d.min_edge_net, cfg.target_size, d.min_deviation, d.max_deviation,
-                                           d.stop_fraction, d.min_tau, d.require_pregame))
+                                           d.stop_fraction, d.min_tau, d.require_pregame, cfg.maker_first))
     if cfg.smart_money.enabled:
         d = cfg.smart_money
         dets.append(SmartMoneyDetector(d.min_edge_net, cfg.target_size, d.min_score, d.min_closed, d.min_usd,
-                                       d.max_chase_ticks, d.edge_fraction_of_roi, d.max_price))
+                                       d.max_chase_ticks, d.edge_fraction_of_roi, d.max_price, cfg.maker_first))
     if updown is not None and updown.enabled:
-        dets.append(UpDownDetector(updown.min_edge_net, cfg.target_size, updown.min_seconds_left, updown.max_edge_net))
+        dets.append(UpDownDetector(updown.min_edge_net, cfg.target_size, updown.min_seconds_left,
+                                   updown.max_edge_net, cfg.maker_first))
     return dets

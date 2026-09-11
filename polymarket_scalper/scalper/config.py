@@ -140,6 +140,9 @@ class LearnCfg(BaseModel):
 
 
 class SignalsCfg(BaseModel):
+    # Poner órdenes en vez de cruzarlas: la comisión solo la paga quien cruza el libro.
+    maker_first: bool = True
+    maker_entry_timeout_s: float = 90     # si la orden no se llena en este tiempo, se cancela
     min_edge_net: float = 0.004
     max_edge_net: float = 0.25          # más que esto casi siempre es un dato roto, no una oportunidad
     target_size: float = 50

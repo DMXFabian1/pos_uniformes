@@ -3,11 +3,12 @@ from scalper.wallets import WalletProfile
 from conftest import make_market
 
 
-def _engine(cfg, markets):
+def _engine(cfg, markets, maker_first=False):
     cfg.sim.latency_ms = 100
     cfg.sim.slippage_ticks = 0
     cfg.signals.spread.enabled = False
     cfg.signals.complement.enabled = False
+    cfg.signals.maker_first = maker_first        # estos casos verifican la ruta que cruza el libro
     eng = Engine(cfg, "test", "replay")
     eng.set_markets(markets)
     return eng

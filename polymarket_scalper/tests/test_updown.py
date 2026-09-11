@@ -58,7 +58,7 @@ def test_detector_requires_edge_above_the_seven_percent_fee():
     m = make_market(fee=0.07, outcomes=("Up", "Down"))
     up, down = m.tokens[0].token_id, m.tokens[1].token_id
     st = UpDownState("btc", 113000, 113113, 150, 300)
-    det = UpDownDetector(min_edge_net=0.03, target_size=50, min_seconds_left=45)
+    det = UpDownDetector(min_edge_net=0.03, target_size=50, min_seconds_left=45, maker_first=False)
     # modelo 0.82 contra ask 0.70: bruto 0.12, fee 0.07*0.7*0.3=0.0147 -> neto ~0.105
     sig = det.detect(_ctx(m, make_book(up, [(0.68, 500)], [(0.70, 500)]),
                           make_book(down, [(0.28, 500)], [(0.30, 500)]), st, 0.82), 1000)
@@ -81,12 +81,12 @@ def test_detector_skips_the_final_stretch_and_absurd_edges():
     bu = make_book(up, [(0.68, 500)], [(0.70, 500)])
     bd = make_book(down, [(0.28, 500)], [(0.30, 500)])
     st = UpDownState("btc", 113000, 113113, 150, 300)
-    det = UpDownDetector(0.03, 50, min_seconds_left=45, max_edge_net=0.45)
+    det = UpDownDetector(0.03, 50, min_seconds_left=45, max_edge_net=0.45, maker_first=False)
     assert det.detect(_ctx(m, bu, bd, UpDownState("btc", 113000, 113113, 20, 300), 0.82), 1) == []
     assert det.detect(_ctx(m, bu, bd, None, None), 1) == []
     # con p=0.999 la ventaja neta ronda 0.28: pasa el tope por defecto pero no uno estricto
     assert len(det.detect(_ctx(m, bu, bd, st, 0.999), 1)) == 1
-    estricto = UpDownDetector(0.03, 50, min_seconds_left=45, max_edge_net=0.20)
+    estricto = UpDownDetector(0.03, 50, min_seconds_left=45, max_edge_net=0.20, maker_first=False)
     assert estricto.detect(_ctx(m, bu, bd, st, 0.999), 1) == []
 
 
@@ -96,6 +96,7 @@ def test_engine_buys_holds_and_settles_at_expiry(cfg):
     cfg.sim.max_position_usd = 1000
     cfg.signals.spread.enabled = False
     cfg.signals.complement.enabled = False
+    cfg.signals.maker_first = False              # este caso verifica la ruta que cruza el libro
     cfg.updown.min_edge_net = 0.03
     m = make_market(fee=0.07, outcomes=("Up", "Down"))
     m.slug = "btc-updown-5m-1000"
@@ -132,6 +133,7 @@ def test_engine_settlement_when_the_model_was_wrong(cfg):
     cfg.sim.max_position_usd = 1000
     cfg.signals.spread.enabled = False
     cfg.signals.complement.enabled = False
+    cfg.signals.maker_first = False
     m = make_market(fee=0.07, outcomes=("Up", "Down"))
     eng = Engine(cfg, "t", "replay")
     eng.set_markets([m])
