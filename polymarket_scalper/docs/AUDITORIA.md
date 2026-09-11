@@ -224,6 +224,40 @@ valen.
 5. **Capa de ejecución real.** Sigue deliberadamente fuera hasta que `scalper listo` y
    `scalper validar` pasen a la vez.
 
+### Hallazgo de la medición en vivo: el feed va tarde
+
+Con `recv_ms` en su sitio (cambio B) se pudo medir por primera vez el retraso del feed del CLOB.
+Sobre 428 544 cambios de libro capturados:
+
+| Medida | Valor |
+|---|---|
+| Retraso mediano | ~0,6 s |
+| Mensajes con más de 5 s de retraso | 17,1 % |
+| Percentil 99 | ~71 s |
+| Mensajes recibidos por segundo | mediana 922, máximo 4 250 |
+
+No es culpa del motor. Dos pruebas:
+
+1. **El perfilado** de un replay sobre esos mismos datos: 67 111 actualizaciones de libro en
+   1,14 s, es decir 17 µs por evento y unos 37 000 eventos por segundo. El motor va dos órdenes
+   de magnitud por encima de lo que llega.
+2. **La correlación es negativa (−0,37)**: cuando vamos atrasados recibimos *menos* mensajes por
+   segundo (mediana 538) que cuando vamos al día (1 022). Si el cuello de botella fuéramos
+   nosotros, estaríamos drenando a máxima velocidad mientras acumulamos retraso; pasa lo
+   contrario.
+
+Consecuencias, ya implementadas:
+
+- El motor recibe el retraso medido y **no abre posiciones** cuando supera `sim.max_feed_lag_ms`
+  (5 s por defecto), anotando la decisión con el motivo `feed_atrasado`.
+- Refuerza la decisión de operar como maker: una estrategia que pone la orden y espera es mucho
+  menos sensible al retraso del feed que una que intenta cruzar el libro antes que nadie.
+- Cualquier plan que dependa de reaccionar en menos de un segundo desde esta máquina queda
+  descartado por evidencia, no por opinión.
+
+Queda pendiente distinguir si el retraso lo introduce Polymarket o el camino de red hasta este
+contenedor. Se decide con la misma medición corriendo desde otra ubicación.
+
 ### La regla que no cambia
 
 Ningún número del ledger anterior al cambio A cuenta como evidencia sobre las señales maker: se

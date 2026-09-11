@@ -304,6 +304,12 @@ de modelos aprendidos y estado de las tablas. Cada sección trae un "Cómo leer 
 llano. Con `--snapshot` genera una página autónoma con los datos embebidos.
 
 ## Advertencias honestas
+- **El feed del CLOB va tarde, y eso limita lo que se puede intentar.** Medido sobre 428 544
+  cambios de libro: retraso mediano de unos 0,6 s, con un 17 % de mensajes por encima de 5 s y
+  tramos que llegan a más de un minuto. No es el motor (procesa 37 000 eventos por segundo en el
+  perfilado, y cuando vamos atrasados recibimos *menos* mensajes, no más). Por eso el bot no
+  abre posiciones cuando el retraso supera `sim.max_feed_lag_ms`, y por eso la estrategia de
+  poner órdenes y esperar es la adecuada: no depende de llegar primero.
 - **Los resultados anteriores a la medición de llenados no son evidencia.** Todo lo que el ledger
   dijo sobre señales maker mientras el simulador usaba el 60 % inventado se generó con ese número.
   La cuenta que vale para el veredicto empieza con los datos nuevos.
