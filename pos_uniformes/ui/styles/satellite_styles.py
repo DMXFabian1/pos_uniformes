@@ -798,6 +798,19 @@ QFrame#libretaAccionesBar {
     border: 1px solid #e8c9ad;
     border-radius: 12px;
 }
+/* Caja blanca para contenido armado con widgets (tarjetas, filas): la
+   misma piel que libretaLista, que solo aplica a QListWidget. */
+QFrame#libretaPanel {
+    background: #fffdf8;
+    border: 1px solid #ddd0c0;
+    border-radius: 14px;
+}
+QLabel#libretaPanelVacio {
+    font-size: 14px;
+    color: #8a8177;
+    padding: 12px 6px;
+    background: transparent;
+}
 QTableWidget#libretaTabla {
     background: #fffdf8;
     border: 1px solid #ddd0c0;

@@ -104,6 +104,7 @@ class GafeteEnConteosTests(unittest.TestCase):
         w.conteos_gate_input = QLineEdit(w._padre)
         w.conteos_gate_error = QLabel(w._padre)
         w.conteos_quien_label = QLabel(w._padre)
+        w.conteos_titulo_label = QLabel(w._padre)
         w.conteos_pendiente_label = QLabel(w._padre)
         w._conteos_code = None
         w._conteos_nombre = ""
@@ -136,7 +137,7 @@ class GafeteEnConteosTests(unittest.TestCase):
         self.assertFalse(w.conteos_gate.isVisibleTo(w._padre))
         self.assertTrue(w.conteos_work.isVisibleTo(w._padre))
         self.assertEqual(w._conteos_contado_por(), "Cristal Torres (VEND-4)")
-        self.assertIn("Cristal Torres", w.conteos_quien_label.text())
+        self.assertIn("Cristal Torres", w.conteos_titulo_label.text())   # "Hola, Cristal Torres 👋"
 
     def test_un_gafete_inventado_no_pasa(self) -> None:
         w = self._stub(gafete_valido=False)

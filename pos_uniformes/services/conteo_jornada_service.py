@@ -25,6 +25,8 @@ from sqlalchemy.orm import Session
 from pos_uniformes.database.models import ConteoInventario, ConteoJornada, Escuela
 
 DUENO_CODE = "VEND-1"
+# Marca en `notas` de una jornada que el dueño descartó (sin aplicar).
+DESCARTADA = "descartada"
 
 
 class JornadaAjena(Exception):
@@ -48,10 +50,16 @@ class JornadaRef:
     total_tallas: int
     iniciada_at: datetime | None
     terminada_at: datetime | None = None
+    revisada_at: datetime | None = None
+    aplicada: bool = True   # False = el dueño la descartó
 
     @property
     def quien(self) -> str:
         return self.empleada_nombre or self.empleada_code
+
+    @property
+    def estado(self) -> str:
+        return estado_de(self)
 
 
 def ref(jornada: ConteoJornada) -> JornadaRef:
@@ -65,6 +73,8 @@ def ref(jornada: ConteoJornada) -> JornadaRef:
         total_tallas=int(jornada.total_tallas or 0),
         iniciada_at=jornada.iniciada_at,
         terminada_at=jornada.terminada_at,
+        revisada_at=jornada.revisada_at,
+        aplicada=(jornada.notas or "") != DESCARTADA,
     )
 
 
@@ -133,6 +143,29 @@ def jornadas_por_revisar(session: Session) -> list[ConteoJornada]:
             .order_by(ConteoJornada.terminada_at.desc())
         ).all()
     )
+
+
+def jornadas_recientes(session: Session, *, limite: int = 8) -> list[ConteoJornada]:
+    """Las últimas terminadas (aplicadas, descartadas o por revisar), para el historial."""
+    return list(
+        session.scalars(
+            select(ConteoJornada)
+            .where(ConteoJornada.terminada_at.is_not(None))
+            .order_by(ConteoJornada.terminada_at.desc())
+            .limit(limite)
+        ).all()
+    )
+
+
+def estado_de(jornada) -> str:
+    """'Por revisar' / 'Aplicada' / 'Descartada' / 'A medias'. Vale con JornadaRef."""
+    terminada = getattr(jornada, "terminada_at", None)
+    revisada = getattr(jornada, "revisada_at", None)
+    if terminada is None:
+        return "A medias"
+    if revisada is None:
+        return "Por revisar"
+    return "Aplicada" if getattr(jornada, "aplicada", True) else "Descartada"
 
 
 def puede_seguirla(jornada: ConteoJornada, empleada_code: str) -> bool:
@@ -283,6 +316,7 @@ def descartar_jornada(session: Session, jornada: ConteoJornada, *, revisada_por:
         raise PermissionError("Solo el dueño descarta un conteo.")
     jornada.revisada_at = func.now()
     jornada.revisada_por = revisada_por.strip().upper()
+    jornada.notas = DESCARTADA
     if jornada.terminada_at is None:
         jornada.terminada_at = func.now()
     session.add(jornada)

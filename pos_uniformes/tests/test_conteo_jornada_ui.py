@@ -41,7 +41,7 @@ class TarjetasTests(unittest.TestCase):
         self.padre = QWidget()
         self.w = SimpleNamespace(
             conteos_jornadas_box=QVBoxLayout(), conteos_revisar_box=QVBoxLayout(),
-            conteos_revisar_titulo=QLabel(self.padre),
+            conteos_revisar_titulo=QLabel(self.padre), conteos_quien_label=QLabel(self.padre),
             _conteos_capturar=lambda f: self.capturadas.append(f),
             _conteos_revisar=lambda f: self.revisadas.append(f),
         )
@@ -93,6 +93,35 @@ class TarjetasTests(unittest.TestCase):
         self.assertEqual(btn.text(), "Revisar")
         btn.click()
         self.assertEqual([f.id for f in self.revisadas], [9])
+
+
+    def test_el_subtitulo_resume_como_en_la_libreta(self) -> None:
+        tarjetas.pintar_jornadas(
+            self.w, abiertas=[(_foto(), _avance(), True), (_foto(id=2, empleada_code="VEND-5"), _avance(), False)],
+            por_revisar=[(_foto(id=3, terminada_at=datetime.now()), _avance())], code="VEND-4",
+        )
+        self.assertEqual(self.w.conteos_quien_label.text(), "2 a medias (1 tuya)  ·  1 por revisar")
+        tarjetas.pintar_jornadas(self.w, abiertas=[], por_revisar=[], code="VEND-4")
+        self.assertEqual(self.w.conteos_quien_label.text(), "Nada a medias")
+
+    def test_el_historial_pinta_estado_con_color(self) -> None:
+        from dataclasses import replace
+
+        from PyQt6.QtWidgets import QTableWidget
+
+        tabla = QTableWidget(0, 5, self.padre)
+        ahora = datetime.now()
+        recientes = [
+            (_foto(id=1, terminada_at=ahora), _avance(14, 14, 128, 128)),                      # por revisar
+            (replace(_foto(id=2, terminada_at=ahora), revisada_at=ahora), _avance()),          # aplicada
+            (replace(_foto(id=3, terminada_at=ahora), revisada_at=ahora, aplicada=False), _avance()),  # descartada
+        ]
+        tarjetas.pintar_historial(tabla, recientes)
+        self.assertEqual(tabla.rowCount(), 3)
+        self.assertEqual([tabla.item(i, 4).text() for i in range(3)], ["Por revisar", "Aplicada", "Descartada"])
+        self.assertEqual(tabla.item(0, 3).text(), "128 de 128")
+        tarjetas.pintar_historial(tabla, [])
+        self.assertIn("Todavía no hay", tabla.item(0, 0).text())
 
 
 class RevisionDialogTests(unittest.TestCase):

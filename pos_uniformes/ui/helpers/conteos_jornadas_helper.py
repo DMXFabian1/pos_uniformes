@@ -53,6 +53,9 @@ def _tarjeta(foto, avance, *, boton: str, activo: bool, al_click, resaltada: boo
 
     card = QFrame()
     card.setObjectName("libretaCard")
+    # Dentro de un área con scroll, sin esto la tarjeta se aplasta hasta
+    # encimar los textos cuando la página compite por altura.
+    card.setMinimumHeight(68)
     if resaltada:
         card.setStyleSheet(_ESTILO_PROPIA)
     ly = QHBoxLayout()
@@ -97,12 +100,15 @@ def _tarjeta(foto, avance, *, boton: str, activo: bool, al_click, resaltada: boo
     return card
 
 
-def pintar_jornadas(window, *, abiertas, por_revisar, code: str) -> None:
-    """Rellena las dos listas de la página Conteos.
+def pintar_jornadas(window, *, abiertas, por_revisar, code: str, recientes=()) -> None:
+    """Rellena la página Conteos: números, listas e historial.
 
     `abiertas`: [(JornadaRef, Avance, puede_seguir)]
     `por_revisar`: [(JornadaRef, Avance)] — solo llega algo si es el dueño.
+    `recientes`: [(JornadaRef, Avance)] — las últimas terminadas.
     """
+    from pos_uniformes.services.conteo_jornada_service import DUENO_CODE
+
     mias = sum(1 for foto, _a, _p in abiertas if foto.empleada_code == code)
     escribir = getattr(window, "_conteos_card", None)
     if escribir is not None:
@@ -111,14 +117,22 @@ def pintar_jornadas(window, *, abiertas, por_revisar, code: str) -> None:
         escribir("por_revisar", str(len(por_revisar)), "esperando tu revisión" if por_revisar else "nada pendiente")
         cards = getattr(window, "_conteos_cards", {})
         if "por_revisar" in cards:
-            from pos_uniformes.services.conteo_jornada_service import DUENO_CODE
-
             cards["por_revisar"][0].setVisible(code == DUENO_CODE)
+
+    # Subtítulo bajo el saludo, como "0 operacion(es) hoy" en la Libreta.
+    sub = getattr(window, "conteos_quien_label", None)
+    if sub is not None:
+        partes = []
+        if abiertas:
+            partes.append(f"{len(abiertas)} a medias" + (f" ({mias} tuya{'s' if mias != 1 else ''})" if mias else ""))
+        if por_revisar:
+            partes.append(f"{len(por_revisar)} por revisar")
+        sub.setText("  ·  ".join(partes) if partes else "Nada a medias")
 
     _vaciar(window.conteos_jornadas_box)
     if not abiertas:
-        vacio = QLabel("No hay conteos a medias. Empieza uno con el botón de arriba.")
-        vacio.setObjectName("libretaSubtitulo")
+        vacio = QLabel("No hay conteos a medias. Empieza uno desde la barra de arriba.")
+        vacio.setObjectName("libretaPanelVacio")
         window.conteos_jornadas_box.addWidget(vacio)
     for foto, avance, puede in abiertas:
         window.conteos_jornadas_box.addWidget(
@@ -130,6 +144,9 @@ def pintar_jornadas(window, *, abiertas, por_revisar, code: str) -> None:
 
     _vaciar(window.conteos_revisar_box)
     window.conteos_revisar_titulo.setVisible(bool(por_revisar))
+    panel = getattr(window, "conteos_revisar_panel", None)
+    if panel is not None:
+        panel.setVisible(bool(por_revisar))
     for foto, avance in por_revisar:
         window.conteos_revisar_box.addWidget(
             _tarjeta(
@@ -137,3 +154,41 @@ def pintar_jornadas(window, *, abiertas, por_revisar, code: str) -> None:
                 al_click=window._conteos_revisar, resaltada=True,
             )
         )
+
+
+    tabla = getattr(window, "conteos_historial_table", None)
+    if tabla is not None:
+        pintar_historial(tabla, recientes)
+
+
+def pintar_historial(tabla, recientes) -> None:
+    """Las últimas jornadas terminadas, una fila cada una."""
+    from PyQt6.QtGui import QBrush, QColor
+    from PyQt6.QtWidgets import QTableWidgetItem
+
+    from pos_uniformes.services.conteo_jornada_service import cuando
+
+    colores = {"Aplicada": "#166534", "Descartada": "#8a8177", "Por revisar": "#b9770e"}
+    filas = list(recientes)
+    tabla.setRowCount(len(filas))
+    for i, (foto, avance) in enumerate(filas):
+        estado = foto.estado
+        valores = (
+            foto.titulo, foto.quien, cuando(foto.terminada_at),
+            f"{avance.tallas_hechas} de {avance.tallas_total}", estado,
+        )
+        for col, txt in enumerate(valores):
+            item = QTableWidgetItem(txt)
+            if col in (2, 3, 4):
+                item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+            if col == 4:
+                item.setForeground(QBrush(QColor(colores.get(estado, "#2c2a27"))))
+            tabla.setItem(i, col, item)
+    if not filas:
+        tabla.setRowCount(1)
+        item = QTableWidgetItem("Todavía no hay conteos terminados.")
+        item.setForeground(QBrush(QColor("#8a8177")))
+        tabla.setItem(0, 0, item)
+        tabla.setSpan(0, 0, 1, tabla.columnCount())
+    else:
+        tabla.clearSpans()

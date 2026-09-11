@@ -3359,6 +3359,7 @@ class QuoteSatelliteWindow(QMainWindow):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(8)
 
+        # Encabezado: saludo grande + subtítulo, como la Libreta.
         header = QHBoxLayout()
         header.setSpacing(8)
         titulo_col = QVBoxLayout()
@@ -3371,22 +3372,21 @@ class QuoteSatelliteWindow(QMainWindow):
         titulo_col.addWidget(self.conteos_quien_label)
         header.addLayout(titulo_col)
         header.addStretch()
-        orden_btn = QPushButton("🖨 Imprimir hoja")
-        orden_btn.setAutoDefault(False)
-        orden_btn.clicked.connect(self._open_conteo_orden)
-        header.addWidget(orden_btn)
-        empezar_btn = QPushButton("＋ Empezar conteo")
-        empezar_btn.setObjectName("primaryButton")
-        empezar_btn.setAutoDefault(False)
-        empezar_btn.clicked.connect(self._conteos_empezar)
-        header.addWidget(empezar_btn)
+        actualizar_btn = QPushButton("Actualizar")
+        actualizar_btn.setAutoDefault(False)
+        actualizar_btn.clicked.connect(self._refresh_conteos_vista)
+        header.addWidget(actualizar_btn)
+        calendario_btn = QPushButton("📅 Calendario")
+        calendario_btn.setAutoDefault(False)
+        calendario_btn.clicked.connect(lambda: self._set_page("calendario"))
+        header.addWidget(calendario_btn)
         salir_btn = QPushButton("Salir")
         salir_btn.setAutoDefault(False)
         salir_btn.clicked.connect(self._conteos_logout)
         header.addWidget(salir_btn)
         layout.addLayout(header)
 
-        # Tarjetas de números, como en la Libreta: la destacada dice qué toca.
+        # Tarjetas de números: la destacada dice qué toca.
         cards_row = QHBoxLayout()
         cards_row.setSpacing(10)
         self._conteos_cards: dict[str, tuple[QFrame, QLabel, QLabel, QLabel]] = {}
@@ -3413,44 +3413,82 @@ class QuoteSatelliteWindow(QMainWindow):
             card.setLayout(card_ly)
             cards_row.addWidget(card, 1)
             self._conteos_cards[key] = (card, t, v, sub)
-        # "Por revisar" solo existe para el dueño.
         self._conteos_cards["por_revisar"][0].setVisible(False)
         layout.addLayout(cards_row)
 
-        # Los tres pasos, en un renglón discreto.
-        self.conteos_pasos_label = QLabel(
-            "1  Imprime la hoja de la escuela que toca   ·   2  Cuenta en el piso y anota   ·   "
-            "3  Regresa aquí y captura. Puedes dejarlo a medias."
-        )
-        self.conteos_pasos_label.setObjectName("libretaSubtitulo")
-        self.conteos_pasos_label.setWordWrap(True)
-        layout.addWidget(self.conteos_pasos_label)
+        # Barra de acciones con marco (como la de la Libreta): los tres
+        # pasos, y los dos que se hacen aquí son botones.
+        self.conteos_acciones_bar = QFrame()
+        self.conteos_acciones_bar.setObjectName("libretaAccionesBar")
+        acciones_ly = QHBoxLayout(self.conteos_acciones_bar)
+        acciones_ly.setContentsMargins(12, 8, 12, 8)
+        acciones_ly.setSpacing(8)
+        orden_btn = QPushButton("1 ·  🖨 Imprimir la hoja")
+        orden_btn.setAutoDefault(False)
+        orden_btn.clicked.connect(self._open_conteo_orden)
+        acciones_ly.addWidget(orden_btn)
+        paso2 = QLabel("2 ·  Cuenta en el piso y anota")
+        paso2.setStyleSheet("font-size: 13px; font-weight: 600; color: #8a7358; background: transparent; padding: 0 8px;")
+        acciones_ly.addWidget(paso2)
+        empezar_btn = QPushButton("3 ·  ＋ Capturar lo que anotaste")
+        empezar_btn.setObjectName("primaryButton")
+        empezar_btn.setAutoDefault(False)
+        empezar_btn.clicked.connect(self._conteos_empezar)
+        acciones_ly.addWidget(empezar_btn)
+        acciones_ly.addStretch()
+        layout.addWidget(self.conteos_acciones_bar)
 
-        # Lo que dice la sonda / la base (qué escuelas tocan).
+        # Aviso en ámbar cuando no hay servidor (mismo tono que la Libreta).
         self.conteos_pendiente_label = QLabel("")
-        self.conteos_pendiente_label.setObjectName("libretaSubtitulo")
+        self.conteos_pendiente_label.setStyleSheet("font-size: 12px; color: #b9770e;")
         self.conteos_pendiente_label.setWordWrap(True)
+        self.conteos_pendiente_label.setVisible(False)
         layout.addWidget(self.conteos_pendiente_label)
+
+        def _panel() -> tuple[QFrame, QVBoxLayout]:
+            marco = QFrame()
+            marco.setObjectName("libretaPanel")
+            interior = QVBoxLayout(marco)
+            interior.setContentsMargins(10, 10, 10, 10)
+            interior.setSpacing(8)
+            return marco, interior
 
         self.conteos_jornadas_titulo = QLabel("JORNADAS SIN TERMINAR  ·  toca Seguir para retomar la tuya")
         self.conteos_jornadas_titulo.setObjectName("libretaSeccion")
         layout.addWidget(self.conteos_jornadas_titulo)
-        self.conteos_jornadas_box = QVBoxLayout()
-        self.conteos_jornadas_box.setSpacing(8)
-        layout.addLayout(self.conteos_jornadas_box)
+        self.conteos_jornadas_panel, self.conteos_jornadas_box = _panel()
+        layout.addWidget(self.conteos_jornadas_panel)
 
         self.conteos_revisar_titulo = QLabel("POR REVISAR  ·  terminadas, esperando que las apliques")
         self.conteos_revisar_titulo.setObjectName("libretaSeccion")
         self.conteos_revisar_titulo.setVisible(False)
         layout.addWidget(self.conteos_revisar_titulo)
-        self.conteos_revisar_box = QVBoxLayout()
-        self.conteos_revisar_box.setSpacing(8)
-        layout.addLayout(self.conteos_revisar_box)
+        self.conteos_revisar_panel, self.conteos_revisar_box = _panel()
+        self.conteos_revisar_panel.setVisible(False)
+        layout.addWidget(self.conteos_revisar_panel)
 
-        layout.addStretch(1)
-        aviso = QLabel(
-            "Lo que se captura queda pendiente de revisión: no cambia el inventario solo."
+        # Historial: las últimas jornadas terminadas, en tabla como la Libreta.
+        historial_titulo = QLabel("HISTORIAL  ·  últimos conteos terminados")
+        historial_titulo.setObjectName("libretaSeccion")
+        layout.addWidget(historial_titulo)
+        self.conteos_historial_table = QTableWidget(0, 5)
+        self.conteos_historial_table.setObjectName("libretaTabla")
+        self.conteos_historial_table.setHorizontalHeaderLabels(
+            ["Escuela / prenda", "Quién", "Terminada", "Tallas", "Estado"]
         )
+        self.conteos_historial_table.verticalHeader().setVisible(False)
+        self.conteos_historial_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self.conteos_historial_table.setSelectionMode(QTableWidget.SelectionMode.NoSelection)
+        self.conteos_historial_table.setShowGrid(False)
+        self.conteos_historial_table.setAlternatingRowColors(True)
+        self.conteos_historial_table.setMinimumHeight(180)
+        hh = self.conteos_historial_table.horizontalHeader()
+        hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        for col in (1, 2, 3, 4):
+            hh.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+        layout.addWidget(self.conteos_historial_table, 1)
+
+        aviso = QLabel("Lo que se captura queda pendiente de revisión: no cambia el inventario solo.")
         aviso.setObjectName("libretaSubtitulo")
         layout.addWidget(aviso)
 
@@ -3536,9 +3574,11 @@ class QuoteSatelliteWindow(QMainWindow):
         # Sonda corta antes de tocar SQLAlchemy: con el servidor apagado, una
         # conexión sin límite congela la pantalla (esto corre en el hilo de UI).
         if self.offline_mode or not probe_database_host(0.5):
-            etiqueta.setText("Sin conexión: no se puede saber qué escuela toca.")
+            etiqueta.setText("Sin conexion con la PC principal: no se puede saber qué escuela toca.")
+            etiqueta.setVisible(True)
             self._conteos_card("por_contar", "—", "sin conexión")
             return
+        etiqueta.setVisible(False)
         try:
             from pos_uniformes.services.conteo_calendario_service import (
                 escuelas_con_conteo_vencido,
@@ -3550,15 +3590,13 @@ class QuoteSatelliteWindow(QMainWindow):
             etiqueta.setText("")
             return
 
-        self._conteos_card("por_contar", str(len(vencidas)),
-                           "escuelas con conteo vencido" if vencidas else "todo al día")
-        if not vencidas:
-            etiqueta.setText("Todo al día. No hay conteos vencidos.")
-            return
-        nombres = ", ".join(v.escuela_nombre for v in vencidas[:6])
-        if len(vencidas) > 6:
-            nombres += f" y {len(vencidas) - 6} más"
-        etiqueta.setText(f"Toca contar:  {nombres}")
+        nombres = ", ".join(v.escuela_nombre for v in vencidas[:2])
+        if len(vencidas) > 2:
+            nombres += f" y {len(vencidas) - 2} más"
+        self._conteos_card(
+            "por_contar", str(len(vencidas)),
+            f"toca: {nombres}" if vencidas else "todo al día",
+        )
 
     def _conteos_card(self, key: str, valor: str, sub: str = "") -> None:
         """Escribe una tarjeta de números de Conteos (si existe)."""
@@ -3579,7 +3617,7 @@ class QuoteSatelliteWindow(QMainWindow):
 
         code = str(self._conteos_code or "")
         if self.offline_mode or not probe_database_host(0.5):
-            pintar_jornadas(self, abiertas=[], por_revisar=[], code=code)
+            pintar_jornadas(self, abiertas=[], por_revisar=[], recientes=[], code=code)
             return
         try:
             from pos_uniformes.services import conteo_jornada_service as jn
@@ -3593,10 +3631,13 @@ class QuoteSatelliteWindow(QMainWindow):
                     [(jn.ref(j), jn.avance(session, j)) for j in jn.jornadas_por_revisar(session)]
                     if code == jn.DUENO_CODE else []
                 )
+                recientes = [
+                    (jn.ref(j), jn.avance(session, j)) for j in jn.jornadas_recientes(session)
+                ]
         except Exception:  # noqa: BLE001 — sin conexión: la página sigue
             logger.exception("Conteos: no se pudieron leer las jornadas")
-            abiertas, por_revisar = [], []
-        pintar_jornadas(self, abiertas=abiertas, por_revisar=por_revisar, code=code)
+            abiertas, por_revisar, recientes = [], [], []
+        pintar_jornadas(self, abiertas=abiertas, por_revisar=por_revisar, recientes=recientes, code=code)
 
     def _conteos_empezar(self) -> None:
         """Abre una jornada nueva y entra directo a capturar."""
@@ -3694,7 +3735,14 @@ class QuoteSatelliteWindow(QMainWindow):
         self.conteos_gate_error.setVisible(False)
         self._conteos_code = code
         self._conteos_nombre = self._nombre_de_gafete(code)
-        self.conteos_quien_label.setText(self._conteos_nombre or code)
+        from pos_uniformes.services.conteo_jornada_service import DUENO_CODE
+
+        if code == DUENO_CODE:
+            self.conteos_titulo_label.setText("📋 Conteos de la tienda")
+            self.conteos_quien_label.setText("")
+        else:
+            self.conteos_titulo_label.setText(f"Hola, {self._conteos_nombre or code} 👋")
+            self.conteos_quien_label.setText("")
         self.conteos_gate.setVisible(False)
         self.conteos_work.setVisible(True)
         self._refresh_conteos_vista()

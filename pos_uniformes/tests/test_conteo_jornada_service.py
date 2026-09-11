@@ -165,3 +165,42 @@ class JornadaTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class HistorialTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.s = Session(self.engine)
+        self.escuela = _seed(self.s, "Uno")
+        self.s.commit()
+
+    def tearDown(self) -> None:
+        self.s.close()
+
+    def test_recientes_solo_terminadas_y_con_su_estado(self) -> None:
+        abierta = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4")
+        aplicada = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4")
+        descartada = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-5")
+        por_revisar = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-2")
+        for j in (aplicada, descartada, por_revisar):
+            jn.terminar_jornada(self.s, j, empleada_code="VEND-1")
+        jn.aplicar_jornada(self.s, aplicada, revisada_por="VEND-1")
+        jn.descartar_jornada(self.s, descartada, revisada_por="VEND-1")
+        self.s.commit()
+
+        recientes = jn.jornadas_recientes(self.s)
+        self.assertNotIn(abierta, recientes)
+        self.assertEqual(len(recientes), 3)
+        estados = {jn.ref(j).empleada_code + str(j.id): jn.ref(j).estado for j in recientes}
+        self.assertEqual(jn.ref(aplicada).estado, "Aplicada")
+        self.assertEqual(jn.ref(descartada).estado, "Descartada")
+        self.assertEqual(jn.ref(por_revisar).estado, "Por revisar")
+        self.assertEqual(jn.ref(abierta).estado, "A medias")
+
+    def test_el_limite_se_respeta(self) -> None:
+        for _ in range(4):
+            j = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4")
+            jn.terminar_jornada(self.s, j, empleada_code="VEND-4")
+        self.s.commit()
+        self.assertEqual(len(jn.jornadas_recientes(self.s, limite=2)), 2)
