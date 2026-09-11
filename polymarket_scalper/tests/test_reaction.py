@@ -61,3 +61,14 @@ def test_partido_no_en_vivo_no_genera_eventos():
     r = ReactionEngine()
     assert r.on_game(1, None, _g(live=False), {"h": ("c1", 0.5)}) is None
     assert r.on_game(1, _g(), _g(ended=True), {"h": ("c1", 0.5)}) is None
+
+
+def test_un_retraso_negativo_no_se_guarda_porque_significa_relojes_distintos():
+    """El libro trae el reloj del exchange y el partido el nuestro: si sale negativo, no mide nada."""
+    r = ReactionEngine(umbral_ticks=1)
+    r.on_game(10_000, _g(), _g(score=(2, 0)), {"h": ("c1", 0.55)})
+    r.on_book(9_000, "h", 0.58, 0.01)                    # observación anterior al evento
+    assert r.drenar() == [] and r.descartadas_por_reloj == 1
+    r.on_book(12_000, "h", 0.58, 0.01)
+    filas = r.drenar()
+    assert len(filas) == 1 and filas[0]["lag_ms"] == 2000

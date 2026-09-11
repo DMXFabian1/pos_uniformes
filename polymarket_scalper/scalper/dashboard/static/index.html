@@ -118,6 +118,12 @@ td.pos{color:var(--good)} td.neg{color:var(--crit)}
 .prio.B{background:color-mix(in srgb,var(--warn) 20%,var(--surface));color:var(--warn)}
 .prio.C{background:var(--surface-2);color:var(--muted)}
 .prio.NOTRADE{background:var(--surface-2);color:var(--muted);text-decoration:line-through}
+.sem{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:10px;margin-bottom:14px}
+.sem .e{border:1px solid var(--line);border-radius:9px;padding:12px 14px;background:var(--surface)}
+.sem .e b{display:block;font-size:13px;margin-bottom:4px}
+.sem .e .luz{font:600 12px/1.3 -apple-system,system-ui,sans-serif;margin-bottom:6px}
+.sem .e .m{color:var(--muted);font-size:12px;line-height:1.5}
+.sem .e .f{color:var(--warn);font-size:12px;margin-top:6px;line-height:1.5}
 .porque{padding:11px 18px;border-bottom:1px solid var(--line);background:var(--surface-2);font-size:13px;line-height:1.5}
 .porque b{font-size:11px;letter-spacing:.06em;color:var(--muted);display:block;margin-bottom:3px;text-transform:uppercase}
 .op .sello{font-size:19px;font-weight:700;letter-spacing:.02em;line-height:1;white-space:nowrap}
@@ -245,12 +251,17 @@ footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);paddin
         <p><b>Edge mínimo</b> es lo que esta estrategia necesita por share para tener sentido: coste de salida más la selección adversa medida más un margen. Por debajo de eso, la respuesta correcta es no entrar.</p>
         <p><b>Selección adversa</b> es cuánto se mueve el precio medio en los segundos siguientes al llenado. Si es negativa, nos están llenando justo cuando el mercado se va en contra.</p>
       </div></details>
+      <div class="sem" id="semaforo"></div>
       <div class="grid-2">
-        <div class="card"><div class="card-head"><h3>¿Se llenan las órdenes?</h3><span>observado contra break-even y contra la referencia</span></div><div class="tablewrap"><table id="t-fill"></table></div></div>
-        <div class="card"><div class="card-head"><h3>¿Cuánta ventaja hace falta?</h3><span>edge mínimo, captura y selección adversa</span></div><div class="tablewrap"><table id="t-edge"></table></div></div>
+        <div class="card"><div class="card-head"><h3>A · Ejecución</h3><span>órdenes puestas, llenadas y la tasa que haría falta</span></div><div class="tablewrap"><table id="t-fill"></table></div></div>
+        <div class="card"><div class="card-head"><h3>B · Ventaja</h3><span>bruta, ejecutable, realizada y el mínimo necesario</span></div><div class="tablewrap"><table id="t-edge"></table></div></div>
       </div>
       <div class="grid-2">
-        <div class="card"><div class="card-head"><h3>Decisiones de NO operar</h3><span>últimas 24 h, por motivo</span></div><div class="tablewrap"><table id="t-notrade"></table></div></div>
+        <div class="card"><div class="card-head"><h3>C · Selección adversa</h3><span>movimiento medio del mid tras el llenado</span></div><div class="tablewrap"><table id="t-adversa"></table></div></div>
+        <div class="card"><div class="card-head"><h3>D · Frescura del libro</h3><span>todo lo anterior, cortado por antigüedad del dato</span></div><div class="tablewrap"><table id="t-fresc"></table></div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card"><div class="card-head"><h3>Qué estamos rechazando</h3><span>cada señal descartada se sigue como sombra, sin tocar el dinero</span></div><div class="tablewrap"><table id="t-notrade"></table></div></div>
         <div class="card"><div class="card-head"><h3>Reacción del mercado al partido</h3><span>cuánto tarda el precio en moverse tras un cambio</span></div><div class="tablewrap"><table id="t-reac"></table></div></div>
       </div>
     </section>
@@ -503,30 +514,61 @@ function render(d){
   $("t-recent").innerHTML = rp.length ? `<thead><tr><th>Señal</th><th>Tipo</th><th>Mercado</th><th class="num">Shares</th><th class="num">Predicho</th><th class="num">Real</th><th>Cierre</th><th class="num">Conf.</th></tr></thead><tbody>` +
     rp.map(r => `<tr><td class="mono">${esc(tm(r.ts_signal))}</td><td><span class="kind"><i style="background:${kindOf(r.kind).color}"></i>${esc(kindOf(r.kind).label)}</span></td><td class="mono">${esc(String(r.condition_id).slice(0,10))}…</td><td class="num">${num(r.size_filled,0)}</td><td class="num">${esc(usd(r.predicted_pnl))}</td><td class="num ${sgn(r.realized_pnl)}">${esc(usd(r.realized_pnl))}</td><td><span class="chip ${FORCED.has(r.exit_reason)?"":sgn(r.realized_pnl)==="pos"?"good":sgn(r.realized_pnl)==="neg"?"crit":""}">${esc(EXIT[r.exit_reason]||r.exit_reason)}</span></td><td class="num">${pct(r.confidence)}</td></tr>`).join("") + "</tbody>" : "";
 
-  // ejecución: lo que de verdad pasa con las órdenes
+  // ejecución medida: las cuatro tablas de la fase de validación
+  const val = d.validacion || {llenado: [], post_fill: [], frescura: [], estados: [], salud: {}};
   const ej = d.ejecucion || [];
-  const conOrdenes = ej.filter(e => (e.ejecucion||{}).ordenes > 0);
-  $("n-ejec").textContent = num(conOrdenes.length, 0);
   const vacia = (id, texto) => { $(id).innerHTML = `<tbody><tr><td class="small">${esc(texto)}</td></tr></tbody>`; };
+  $("n-ejec").textContent = num((val.estados || []).length, 0);
+
+  // semáforo: verde solo cuando está demostrado
+  const LUZ = {"🟢":"var(--good)", "🟡":"var(--warn)", "🟠":"var(--warn)", "🔴":"var(--bad)", "⚫":"var(--muted)"};
+  $("semaforo").innerHTML = (val.estados || []).length ? val.estados.map(e => `
+    <div class="e"><b>${esc(e.estrategia)}</b>
+      <div class="luz" style="color:${LUZ[String(e.semaforo).slice(0,2)] || "var(--muted)"}">${esc(e.semaforo)}</div>
+      <div class="m">${esc(e.motivo)}</div>
+      <div class="m" style="margin-top:4px">n = ${num(e.n,0)} · ${esc(e.nivel)}</div>
+      ${(e.faltan||[]).length ? `<div class="f">Falta: ${esc(e.faltan.join("; "))}</div>` : ""}
+    </div>`).join("") : `<div class="empty">Todavía no hay operaciones medidas con el motor actual.</div>`;
+
+  // A · ejecución
+  const conOrdenes = (val.llenado || []).filter(x => x.ordenes > 0);
   if (conOrdenes.length){
-    $("t-fill").innerHTML = "<thead><tr><th>estrategia</th><th class='num'>órdenes</th><th class='num'>llenadas</th><th class='num'>conservador</th><th class='num'>optimista</th><th class='num'>break-even</th><th class='num'>margen</th><th class='num'>referencia</th><th class='num'>espera</th></tr></thead><tbody>" +
-      conOrdenes.map(e => { const x = e.ejecucion; const m = x.margen_sobre_break_even;
-        return `<tr><td>${esc(e.strategy)}</td><td class="num">${num(x.ordenes,0)}</td><td class="num">${pct(x.tasa_llenado)}</td><td class="num">${pct(x.tasa_conservadora)}</td><td class="num">${pct(x.tasa_optimista)}</td><td class="num">${pct(x.break_even_llenado)}</td><td class="num ${m==null?"":m>0?"pos":"neg"}">${pct(m)}</td><td class="num small">${pct(x.tasa_baseline)}</td><td class="num">${x.espera_media_s==null?"–":num(x.espera_media_s,1)+" s"}</td></tr>`;
-      }).join("") + "</tbody>";
-  } else vacia("t-fill", "Todavía no se ha puesto ninguna orden límite en esta corrida.");
+    $("t-fill").innerHTML = "<thead><tr><th>estrategia</th><th class='num'>órdenes</th><th class='num'>llenadas</th><th class='num'>tasa</th><th class='num'>conserv.</th><th class='num'>optim.</th><th class='num'>necesaria</th><th class='num'>espera</th><th>estado</th></tr></thead><tbody>" +
+      conOrdenes.map(x => `<tr><td>${esc(x.estrategia)}</td><td class="num">${num(x.ordenes,0)}</td><td class="num">${num(x.llenadas,0)}</td><td class="num">${pct(x.tasa)}</td><td class="num">${pct(x.tasa_conservadora)}</td><td class="num">${pct(x.tasa_optimista)}</td><td class="num ${x.tasa!=null&&x.requerida!=null?(x.tasa>=x.requerida?"pos":"neg"):""}">${pct(x.requerida)}</td><td class="num">${x.espera_mediana_s==null?"–":num(x.espera_mediana_s,1)+" s"}</td><td class="small">${esc(x.estado)}</td></tr>`).join("") + "</tbody>";
+  } else vacia("t-fill", "Todavía no se ha puesto ninguna orden límite con el motor actual.");
+
+  // B · ventaja
   const conDatos = ej.filter(e => e.n > 0);
   if (conDatos.length){
-    $("t-edge").innerHTML = "<thead><tr><th>estrategia</th><th class='num'>n</th><th class='num'>edge mínimo</th><th class='num'>señales sobre el mínimo</th><th class='num'>aparente</th><th class='num'>realizado</th><th class='num'>captura</th><th class='num'>adversa 10 s</th></tr></thead><tbody>" +
-      conDatos.map(e => { const adv = (e.adversa||{}).adverse_10s;
-        return `<tr><td>${esc(e.strategy)}</td><td class="num">${num(e.n,0)}</td><td class="num">${num(e.edge_minimo_requerido,4)}</td><td class="num">${pct(e.senales_sobre_minimo)}</td><td class="num">${num(e.edge_aparente,4)}</td><td class="num ${sgn(e.edge_realizado)}">${num(e.edge_realizado,4)}</td><td class="num">${pct(e.captura)}</td><td class="num ${adv==null?"":adv<0?"neg":"pos"}">${adv==null?"–":num(adv,4)}</td></tr>`;
-      }).join("") + "</tbody>";
+    $("t-edge").innerHTML = "<thead><tr><th>estrategia</th><th class='num'>n</th><th class='num'>bruta</th><th class='num'>ejecutable</th><th class='num'>conservadora</th><th class='num'>realizada</th><th class='num'>mínima</th><th class='num'>captura</th></tr></thead><tbody>" +
+      conDatos.map(e => `<tr><td>${esc(e.strategy)}</td><td class="num">${num(e.n,0)}</td><td class="num">${num(e.edge_bruto,4)}</td><td class="num">${num(e.edge_aparente,4)}</td><td class="num ${sgn(e.edge_conservador)}">${num(e.edge_conservador,4)}</td><td class="num ${sgn(e.edge_realizado)}">${num(e.edge_realizado,4)}</td><td class="num">${num(e.edge_minimo_requerido,4)}</td><td class="num">${pct(e.captura)}</td></tr>`).join("") + "</tbody>";
   } else vacia("t-edge", "Sin posiciones cerradas todavía.");
-  const dec = d.decisiones || {motivos: [], no_trade: 0, trade: 0};
-  if ((dec.motivos||[]).length){
-    $("t-notrade").innerHTML = `<thead><tr><th>estrategia</th><th>motivo</th><th class='num'>veces</th></tr></thead><tbody>` +
-      dec.motivos.map(r => `<tr><td>${esc(r.strategy)}</td><td>${esc(String(r.motivo).replace(/_/g," "))}</td><td class="num">${num(r.n,0)}</td></tr>`).join("") +
-      `<tr><td colspan="2" class="small">operadas en el mismo periodo</td><td class="num">${num(dec.trade,0)}</td></tr></tbody>`;
-  } else vacia("t-notrade", "Sin decisiones registradas en las últimas 24 h.");
+
+  // C · selección adversa
+  const HZ = ["adverse_100ms","adverse_500ms","adverse_1s","adverse_2s","adverse_5s","adverse_10s","adverse_30s","adverse_60s"];
+  const HZL = ["100ms","500ms","1s","2s","5s","10s","30s","60s"];
+  const pf = (val.post_fill || []).filter(r => r.n > 0);
+  if (pf.length){
+    $("t-adversa").innerHTML = "<thead><tr><th>estrategia</th><th class='num'>n</th>" + HZL.map(h => `<th class='num'>${h}</th>`).join("") + "<th class='num'>MFE</th><th class='num'>MAE</th></tr></thead><tbody>" +
+      pf.map(r => `<tr><td>${esc(r.estrategia)}</td><td class="num">${num(r.n,0)}</td>` +
+        HZ.map(h => `<td class="num ${r[h]==null?"":r[h]<0?"neg":"pos"}">${r[h]==null?"–":num(r[h],4)}</td>`).join("") +
+        `<td class="num pos">${r.mfe_medio==null?"–":num(r.mfe_medio,4)}</td><td class="num neg">${r.mae_medio==null?"–":num(r.mae_medio,4)}</td></tr>`).join("") + "</tbody>";
+  } else vacia("t-adversa", "Sin llenados medidos todavía.");
+
+  // D · frescura
+  const fr = val.frescura || [];
+  if (fr.length){
+    $("t-fresc").innerHTML = "<thead><tr><th>antigüedad</th><th class='num'>señales</th><th class='num'>no opera</th><th class='num'>llenadas</th><th class='num'>tasa</th><th class='num'>válidas</th><th class='num'>pnl medio</th><th class='num'>adversa 10 s</th></tr></thead><tbody>" +
+      fr.map(r => `<tr><td>${esc(r.tramo)}</td><td class="num">${num(r.senales,0)}</td><td class="num">${num(r.no_trade,0)}</td><td class="num">${num(r.llenadas,0)}</td><td class="num">${pct(r.tasa_llenado)}</td><td class="num">${num(r.n_validas,0)}</td><td class="num ${sgn(r.pnl_medio)}">${r.pnl_medio==null?"–":num(r.pnl_medio,3)}</td><td class="num ${r.adversa_10s==null?"":r.adversa_10s<0?"neg":"pos"}">${r.adversa_10s==null?"–":num(r.adversa_10s,4)}</td></tr>`).join("") + "</tbody>";
+  } else vacia("t-fresc", "Sin decisiones registradas todavía.");
+
+  // qué se rechaza
+  const rz = val.rechazos || [];
+  if (rz.length){
+    $("t-notrade").innerHTML = `<thead><tr><th>estrategia</th><th>motivo</th><th class='num'>rechazos</th><th class='num'>seguidas</th><th class='num'>pnl sombra</th><th>veredicto</th></tr></thead><tbody>` +
+      rz.map(r => `<tr><td>${esc(r.estrategia)}</td><td>${esc(String(r.motivo).replace(/_/g," "))}</td><td class="num">${num(r.rechazos,0)}</td><td class="num">${num(r.seguidas,0)}</td><td class="num ${sgn(r.pnl)}">${num(r.pnl,2)}</td><td class="small">${esc(r.veredicto)}</td></tr>`).join("") + "</tbody>";
+  } else vacia("t-notrade", "Sin decisiones de no operar registradas.");
+
   const re = (d.reacciones||{}).por_liga || [];
   if (re.length){
     $("t-reac").innerHTML = "<thead><tr><th>liga</th><th class='num'>eventos</th><th class='num'>reaccionó</th><th class='num'>retraso mediano</th><th class='num'>movimiento medio</th></tr></thead><tbody>" +

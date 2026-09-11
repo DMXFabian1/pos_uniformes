@@ -360,7 +360,11 @@ class Engine:
         if book.is_valid:
             self.history[token_id].mids.append((ts_ms, book.mid))
             self.ultimo_mid[token_id] = book.mid
-            self.reaction.on_book(ts_ms, token_id, book.mid, book.tick_size)
+            # El retraso de reacción compara con el instante del evento del partido, que viene de
+            # nuestro reloj. El libro trae el reloj del exchange, que va por detrás: mezclarlos daba
+            # retrasos negativos. Se usa el momento de recepción cuando lo hay.
+            recv = (delta or {}).get("recv_ms")
+            self.reaction.on_book(int(recv) if recv else ts_ms, token_id, book.mid, book.tick_size)
         self._marcar_adversa(ts_ms, token_id)
         self._process_pending(ts_ms)
         for pos in list(self.positions):

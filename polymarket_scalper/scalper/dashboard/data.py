@@ -280,6 +280,19 @@ def _reacciones(data_dir: Path, limite: int = 12) -> dict[str, Any]:
     return {"por_liga": _rows(por_liga), "n": int(df.height)}
 
 
+def _validacion(cfg: Config) -> dict[str, Any]:
+    """Las cuatro tablas de la fase de medición y el semáforo, de la misma fuente que el informe."""
+    from ..validacion import analizar
+    try:
+        inf = analizar(cfg.data_path)
+    except Exception:  # noqa: BLE001 - el panel nunca debe caerse por un informe
+        log.exception("no se pudo calcular el informe de validación")
+        return {"llenado": [], "post_fill": [], "frescura": [], "estados": [], "salud": {}}
+    return {"llenado": [l.to_dict() for l in inf.llenado], "post_fill": inf.post_fill,
+            "frescura": inf.frescura, "estados": [e.to_dict() for e in inf.estados],
+            "salud": inf.salud, "rechazos": inf.rechazos[:12], "cadena": inf.cadena}
+
+
 def build_payload(cfg: Config, run_id: str | None = None) -> dict[str, Any]:
     data_dir = cfg.data_path
     led = _ledger(data_dir, run_id)
@@ -318,6 +331,7 @@ def build_payload(cfg: Config, run_id: str | None = None) -> dict[str, Any]:
         "calibration": sections["calibration"], "model_vs_heuristic": sections["model_vs_heuristic"],
         "recent_positions": sections["recent_positions"], "signals": sig, "games": games, "wallets": wallets,
         "oportunidades": ops, "ejecucion": ejec, "decisiones": dec, "reacciones": _reacciones(data_dir),
+        "validacion": _validacion(cfg),
         "flow": _flow(data_dir, cfg.flow.whale_min_usd / 2), "markets": _markets(data_dir), "models": _models(data_dir),
         "tables": tables,
     }

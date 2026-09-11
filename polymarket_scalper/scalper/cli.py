@@ -285,6 +285,27 @@ def cmd_validar(args: argparse.Namespace) -> None:
     print("impide activarla: si depende de que todo salga como en el caso base, no está lista.")
 
 
+def cmd_validacion(args: argparse.Namespace) -> None:
+    """El informe de la fase de medición: diez preguntas, con el tamaño de muestra al lado."""
+    from .validacion import analizar, formatear
+
+    cfg = load_config(args.config)
+    print(formatear(analizar(cfg.data_dir, getattr(args, "experimento", None))))
+
+
+def cmd_experimentos(args: argparse.Namespace) -> None:
+    """Versiones del motor que han operado, y qué cambió entre una y otra."""
+    from .experimento import congelar, formatear_historial, registrar
+
+    cfg = load_config(args.config)
+    if args.congelar:
+        exp = congelar(cfg, nota=args.nota or "")
+        registrar(cfg, exp)
+        print(exp.resumen())
+        return
+    print(formatear_historial(cfg.data_dir))
+
+
 def cmd_ahora(args: argparse.Namespace) -> None:
     """Qué comprar ahora mismo, por mercado, explicado en palabras."""
     from .opportunities import formatear, listar
@@ -552,6 +573,15 @@ def main(argv: list[str] | None = None) -> None:
     s = sub.add_parser("validar", help="validación hacia adelante por pliegues y pruebas de resistencia")
     s.add_argument("--pliegues", type=int, default=4)
     s.set_defaults(fn=cmd_validar)
+
+    s = sub.add_parser("validacion", help="informe de medición: llenado, ventaja mínima, selección adversa, frescura")
+    s.add_argument("--experimento", help="quedarse con una sola versión del motor")
+    s.set_defaults(fn=cmd_validacion)
+
+    s = sub.add_parser("experimentos", help="versiones congeladas del motor y qué cambió entre ellas")
+    s.add_argument("--congelar", action="store_true", help="registrar la versión actual")
+    s.add_argument("--nota", help="para qué es este experimento")
+    s.set_defaults(fn=cmd_experimentos)
 
     s = sub.add_parser("ahora", help="qué comprar ahora mismo, por mercado, explicado en palabras")
     s.add_argument("--minutos", type=float, default=30, help="cuánto atrás mirar")

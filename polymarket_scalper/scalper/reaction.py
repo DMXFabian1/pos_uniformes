@@ -45,6 +45,7 @@ class ReactionEngine:
         self.puntos: dict[str, deque] = {}               # game_id -> (ts, puntos anotados)
         self.rows: list[dict[str, Any]] = []             # filas listas para persistir
         self.max_lags = max_lags
+        self.descartadas_por_reloj = 0                   # mediciones imposibles: el libro venía de antes
 
     # ------------------------------------------------------------ eventos del partido
     def on_game(self, ts_ms: int, prev: GameState | None, g: GameState, mids: dict[str, tuple[str, float]]) -> str | None:
@@ -79,8 +80,12 @@ class ReactionEngine:
                 continue
             cid, mid0 = p.mids[token_id]
             if abs(mid - mid0) + 1e-12 >= self.umbral_ticks * tick:
-                p.resueltos.add(token_id)
                 lag = ts_ms - p.ts_evento
+                if lag < 0:
+                    # relojes distintos: esta observación no mide nada, pero la espera sigue abierta
+                    self.descartadas_por_reloj += 1
+                    continue
+                p.resueltos.add(token_id)
                 self.lags.setdefault(p.league, deque(maxlen=self.max_lags)).append(lag)
                 self.rows.append({"ts_ms": ts_ms, "game_id": p.game_id, "league": p.league, "condition_id": cid,
                                   "token_id": token_id, "evento": p.evento, "ts_evento": p.ts_evento,
