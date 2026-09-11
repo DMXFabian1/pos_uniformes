@@ -1,0 +1,10 @@
+# Finales de línea por plataforma: los scripts de PowerShell viajan con CRLF,
+# los de shell y los servicios systemd siempre con LF aunque se editen en Windows.
+* text=auto
+*.ps1 text eol=crlf
+*.sh text eol=lf
+*.service text eol=lf
+*.py text eol=lf
+*.yaml text eol=lf
+*.md text eol=lf
+*.parquet binary

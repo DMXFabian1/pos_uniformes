@@ -1,4 +1,4 @@
-# Registra el bot y el panel como tareas de Windows: arrancan al iniciar sesión y se reinician solos.
+﻿# Registra el bot y el panel como tareas de Windows: arrancan al iniciar sesión y se reinician solos.
 # Ejecutar como administrador:
 #   powershell -ExecutionPolicy Bypass -File deploy\programar-inicio.ps1
 # Para quitarlas:  deploy\programar-inicio.ps1 -Quitar

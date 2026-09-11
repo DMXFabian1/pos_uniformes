@@ -1,7 +1,8 @@
-# Instalación del bot en Windows 10/11. Se puede repetir para actualizar.
+﻿# Instalación del bot en Windows 10/11. Se puede repetir para actualizar.
 # Uso, desde PowerShell y dentro de la carpeta del proyecto:
 #   powershell -ExecutionPolicy Bypass -File deploy\instalar-windows.ps1
 $ErrorActionPreference = "Stop"
+try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }   # acentos legibles en PowerShell 5.1
 $proyecto = Split-Path -Parent $PSScriptRoot
 Set-Location $proyecto
 

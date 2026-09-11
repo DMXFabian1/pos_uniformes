@@ -1,9 +1,10 @@
-# Arranca el bot en modo paper trading (recolecta, simula y reentrena). Ctrl+C para detenerlo:
+﻿# Arranca el bot en modo paper trading (recolecta, simula y reentrena). Ctrl+C para detenerlo:
 # el cierre guarda en disco lo que esté pendiente.
 $ErrorActionPreference = "Stop"
 $proyecto = Split-Path -Parent $PSScriptRoot
 Set-Location $proyecto
-$env:PYTHONUTF8 = "1"                      # acentos y tablas se ven bien en la consola
+$env:PYTHONUTF8 = "1"                      # Python escribe UTF-8
+try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }   # y la consola lo muestra bien
 $env:PYTHONUNBUFFERED = "1"
 $exe = Join-Path $proyecto ".venv\Scripts\scalper.exe"
 if (-not (Test-Path $exe)) { Write-Host "Falta instalar: ejecuta deploy\instalar-windows.ps1" -ForegroundColor Red; exit 1 }
