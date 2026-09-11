@@ -208,3 +208,33 @@ def test_las_reacciones_del_mercado_se_persisten(cfg, tmp_path):
     fila = ok.filter(pl.col("token_id") == h).sort("ts_evento").to_dicts()[-1]
     assert fila["evento"] == "marcador" and fila["lag_ms"] == 2000 and fila["league"] == "nba"
     assert eng.stats["reacciones"] >= 1
+
+
+def test_el_motor_rechaza_lo_que_no_llega_al_minimo_medido(cfg):
+    """Filtro global de NO TRADE: por debajo de lo que la estrategia necesita, no se entra."""
+    eng, m, h, a = _nba(cfg)
+    eng.on_game(2000, "g1", _game(score="100-88", period="Q4", elapsed="06:00", live=True))
+    edge = eng.positions[0].signal.edge_net
+    eng.positions.clear()
+    eng._ultima_decision.clear()
+    eng.minimos = {"NBA_DIRECTIONAL": edge + 0.01}          # como si el ledger pidiera más
+    eng.on_game(2400, "g1", _game(score="100-89", period="Q4", elapsed="05:50", live=True))
+    assert not eng.positions
+    assert eng.stats["skipped_bajo_minimo"] == 1 and eng.stats["no_trade_bajo_el_minimo_requerido"] == 1
+
+
+def test_sin_muestra_suficiente_el_minimo_no_filtra(cfg, tmp_path):
+    """El mínimo solo existe con al menos 20 posiciones cerradas: con menos filtraría por ruido."""
+    from scalper.evaluacion import minimos_requeridos
+    from scalper.storage import ParquetWriter
+    from test_evaluacion import _fila
+
+    w = ParquetWriter(tmp_path, flush_seconds=10**9, flush_rows=10**9)
+    for i in range(19):
+        w.append("ledger", _fila(i, strategy="NBA_DIRECTIONAL"))
+    w.close()
+    assert minimos_requeridos(tmp_path) == {}
+    w2 = ParquetWriter(tmp_path, flush_seconds=10**9, flush_rows=10**9)
+    w2.append("ledger", _fila(19, strategy="NBA_DIRECTIONAL"))
+    w2.close()
+    assert "NBA_DIRECTIONAL" in minimos_requeridos(tmp_path)

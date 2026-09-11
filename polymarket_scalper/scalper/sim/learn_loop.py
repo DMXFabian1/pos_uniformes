@@ -17,5 +17,7 @@ def retrain_and_reload(cfg: Config, eng: Engine) -> None:
         log.info("reentrenamiento:\n%s", format_reports(reps))
         if any(r.promoted for r in reps):
             eng.scorer.reload()
+        # con más posiciones cerradas, el mínimo requerido de cada estrategia puede haber cambiado
+        eng.recargar_minimos()
     except Exception:  # noqa: BLE001
         log.exception("reentrenamiento falló")

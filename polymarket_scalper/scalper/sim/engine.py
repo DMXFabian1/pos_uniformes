@@ -15,6 +15,7 @@ from ..config import Config
 from ..discovery import MarketInfo
 from ..learn import ModelStore, Scorer
 from ..models import GameState, ModelRegistry, WinProb, match_outcome, parse_game
+from ..evaluacion import minimos_requeridos
 from ..micro import instantanea
 from ..models.crypto import UpDownModel, UpDownState
 from ..reaction import ReactionEngine
@@ -68,6 +69,14 @@ class Engine:
         self.prev_window: dict[str, dict[str, Any]] = {}
         lc = cfg.learn
         self.scorer = Scorer(ModelStore(cfg.data_dir), lc.shrink_n, lc.min_train, lc.min_p_win, lc.size_floor, lc.enabled)
+        # filtro global de NO TRADE: lo que cada estrategia necesita por share, medido en el ledger
+        self.minimos: dict[str, float] = minimos_requeridos(cfg.data_dir)
+        if self.minimos:
+            log.info("edge mínimo medido por estrategia: %s", {k: round(v, 4) for k, v in self.minimos.items()})
+
+    def recargar_minimos(self) -> None:
+        """Vuelve a leer el mínimo requerido de cada estrategia. Se llama al reentrenar."""
+        self.minimos = minimos_requeridos(self.cfg.data_dir)
 
     # ------------------------------------------------------------ mercados
     def set_markets(self, markets: list[MarketInfo]) -> None:
@@ -533,6 +542,14 @@ class Engine:
             self.stats["sized_down"] += 1
         # el tope de plausibilidad es para arbitrajes (un libro roto parece dinero gratis); las señales
         # direccionales tienen su propio tope de desvío en el detector
+        # NO TRADE global: por debajo de lo que esta estrategia necesita para ser rentable, no se entra.
+        # El mínimo solo existe cuando hay muestra suficiente; sin ella este filtro no actúa.
+        minimo = self.minimos.get(s.strategy)
+        if minimo is not None and s.edge_net < minimo:
+            self.stats["skipped_bajo_minimo"] += 1
+            self._decision(s.ts_ms, s.condition_id, s.kind, "no_trade", "bajo_el_minimo_requerido", s.edge_net,
+                           {"minimo_requerido": round(minimo, 5)}, s.strategy)
+            return
         if s.horizon != "directional" and s.edge_net > self.cfg.signals.max_edge_net:
             self.stats["skipped_implausible"] += 1
             self._decision(s.ts_ms, s.condition_id, s.kind, "no_trade", "edge_implausible", s.edge_net, {}, s.strategy)

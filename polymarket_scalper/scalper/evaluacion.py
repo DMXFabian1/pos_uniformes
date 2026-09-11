@@ -295,6 +295,19 @@ def evaluar(data_dir: str | Path, run_id: str | None = None, baseline: float = 0
     return sorted((evaluar_filas(v, baseline, margen) for v in grupos.values()), key=lambda e: e.strategy)
 
 
+def minimos_requeridos(data_dir: str | Path, min_n: int = 20) -> dict[str, float]:
+    """Edge mínimo medido de cada estrategia, para que el motor pueda usarlo como filtro.
+
+    Solo se devuelven estrategias con al menos `min_n` posiciones cerradas: con menos, el mínimo
+    sería una opinión disfrazada de medición y filtraría señales por ruido.
+    """
+    try:
+        return {e.strategy: e.edge_minimo_requerido for e in evaluar(data_dir)
+                if e.edge_minimo_requerido is not None and e.n >= min_n}
+    except Exception:  # noqa: BLE001 - un informe roto nunca debe impedir operar
+        return {}
+
+
 # --------------------------------------------------------------------------- presentación
 def formatear(ests: list[Estrategia]) -> str:
     if not ests:

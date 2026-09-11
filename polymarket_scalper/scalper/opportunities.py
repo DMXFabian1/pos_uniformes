@@ -313,12 +313,8 @@ def _prioridad(edge: float, minimo: float, confianza: float, fresca: bool) -> st
 
 def minimos_por_estrategia(data_dir: str | Path) -> dict[str, float]:
     """Edge mínimo requerido de cada estrategia, medido en el ledger. Vacío si aún no hay datos."""
-    try:
-        from .evaluacion import evaluar as evaluar_metricas
-        return {e.strategy: e.edge_minimo_requerido for e in evaluar_metricas(data_dir)
-                if e.edge_minimo_requerido is not None and e.n >= 20}
-    except Exception:  # noqa: BLE001 - un informe roto no debe tumbar la lista de oportunidades
-        return {}
+    from .evaluacion import minimos_requeridos
+    return minimos_requeridos(data_dir)
 
 
 def _grupo_de(categoria: str, meta: dict[str, Any]) -> tuple[str, str]:
