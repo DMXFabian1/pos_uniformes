@@ -93,9 +93,9 @@ Deja esa terminal abierta y abre `http://127.0.0.1:8787` en el navegador. Se act
 ## 6. Disco
 
 La retención corre sola una vez al día dentro del recolector (`retention.run_hours`). Conserva
-3 días de cambios de libro y 14 de instantáneas, borra el resto y compacta cada día cerrado a un
-archivo por tabla. Las tablas que alimentan el aprendizaje (cotizaciones, trades, partidos, flujo,
-wallets, señales, ledger) no se borran nunca.
+3 días de cambios de libro, 14 de instantáneas y 30 del registro de decisiones, borra el resto y
+compacta cada día cerrado a un archivo por tabla. Las tablas que alimentan el aprendizaje
+(cotizaciones, trades, partidos, flujo, wallets, reacciones, señales, ledger) no se borran nunca.
 
 ```bash
 scalper retention              # cuánto ocupa cada tabla y cuánto crece por día

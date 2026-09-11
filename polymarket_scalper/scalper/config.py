@@ -45,7 +45,7 @@ class FlowCfg(BaseModel):
     enabled: bool = True
     data_api_url: str = "https://data-api.polymarket.com"
     poll_seconds: float = 10
-    page_size: int = 1000
+    page_size: int = 2000             # máximo que acepta data-api; con 1000 se perdían trades
     min_usd_global: float = 500       # trades fuera de los mercados seguidos se guardan si superan esto
     whale_min_usd: float = 2000       # a partir de aquí se perfila la wallet
     profile_max_pages: int = 10       # 50 posiciones cerradas por página
@@ -123,7 +123,8 @@ class RetentionCfg(BaseModel):
     run_hours: float = 24            # cada cuánto corre dentro del recolector
     compact: bool = True             # un archivo por tabla y día en días ya cerrados
     min_quiet_seconds: int = 3600    # no tocar particiones con escrituras recientes
-    keep_days: dict[str, int] = Field(default_factory=lambda: {"book_deltas": 3, "book_snapshots": 14, "markets": 30})
+    keep_days: dict[str, int] = Field(default_factory=lambda: {"book_deltas": 3, "book_snapshots": 14, "markets": 30,
+                                                               "decisions": 30})
     # tablas sin entrada en keep_days se conservan para siempre (quotes, trades, games, flow, wallets, ledger…)
 
 
@@ -166,6 +167,9 @@ class SimCfg(BaseModel):
     time_stop_directional_seconds: int = 900       # scalping: si no convergió en 15 min, fuera
     max_hold_directional_seconds: int = 4 * 3600   # tope duro por si el time stop no puede ejecutarse (sin libro)
     max_entry_slip_ticks: int = 3
+    # Si el feed del CLOB va más atrasado que esto, el libro que vemos ya no describe el mercado
+    # y no se abren posiciones. Medido: mediana ~0,7 s, pero con tramos de decenas de segundos.
+    max_feed_lag_ms: int = 5000        # 0 = sin límite
     start_cash: float = 1000
     max_position_usd: float = 60
     max_market_exposure_usd: float = 120           # suma de colateral abierto en el mismo mercado

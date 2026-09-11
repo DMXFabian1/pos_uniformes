@@ -238,3 +238,16 @@ def test_sin_muestra_suficiente_el_minimo_no_filtra(cfg, tmp_path):
     w2.append("ledger", _fila(19, strategy="NBA_DIRECTIONAL"))
     w2.close()
     assert "NBA_DIRECTIONAL" in minimos_requeridos(tmp_path)
+
+
+def test_con_el_feed_atrasado_no_se_abre_nada(cfg):
+    """Un libro de hace medio minuto no describe el mercado: operarlo es operar a ciegas."""
+    eng, m, h, a = _nba(cfg)
+    cfg.sim.max_feed_lag_ms = 5000
+    eng.feed_lag_ms = 30_000
+    eng.on_game(2000, "g1", _game(score="100-88", period="Q4", elapsed="06:00", live=True))
+    assert not eng.positions and eng.stats["no_trade_feed_atrasado"] == 1
+    eng.feed_lag_ms = 400                                  # el feed se pone al día
+    eng._ultima_decision.clear()
+    eng.on_game(2400, "g1", _game(score="100-89", period="Q4", elapsed="05:50", live=True))
+    assert eng.positions

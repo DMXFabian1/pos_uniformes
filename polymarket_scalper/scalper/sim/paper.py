@@ -27,6 +27,9 @@ async def run_paper(cfg: Config, duration_seconds: int | None = None, run_id: st
     async def ticker() -> None:
         while True:
             await asyncio.sleep(1)
+            # el motor necesita saber si está mirando un libro viejo antes de decidir nada
+            lat = col.latencia()
+            eng.feed_lag_ms = int(lat["mediana"]) if lat else 0
             eng.tick(int(time.time() * 1000))
             writer.maybe_flush()
 

@@ -54,6 +54,9 @@ class Engine:
         self.last_detect: dict[str, int] = {}
         self.stats: dict[str, int] = defaultdict(int)
         self.now_ms = 0
+        # Retraso del feed medido por el recolector (paper). En replay vale 0: los eventos se
+        # reproducen en su propio tiempo y no hay retraso que valga.
+        self.feed_lag_ms = 0
         # in-play
         self.models = ModelRegistry(cfg.models.sigma_basketball, cfg.models.sigma_by_league, cfg.models.soccer_total_goals)
         self.games: dict[str, GameState] = {}                 # game_id -> último estado
@@ -542,6 +545,13 @@ class Engine:
             self.stats["sized_down"] += 1
         # el tope de plausibilidad es para arbitrajes (un libro roto parece dinero gratis); las señales
         # direccionales tienen su propio tope de desvío en el detector
+        # NO TRADE por datos viejos: si el feed va atrasado, el libro que vemos ya no existe.
+        tope_lag = self.cfg.sim.max_feed_lag_ms
+        if tope_lag and self.feed_lag_ms > tope_lag:
+            self.stats["skipped_feed_atrasado"] += 1
+            self._decision(s.ts_ms, s.condition_id, s.kind, "no_trade", "feed_atrasado", s.edge_net,
+                           {"feed_lag_ms": self.feed_lag_ms, "tope_ms": tope_lag}, s.strategy)
+            return
         # NO TRADE global: por debajo de lo que esta estrategia necesita para ser rentable, no se entra.
         # El mínimo solo existe cuando hay muestra suficiente; sin ella este filtro no actúa.
         minimo = self.minimos.get(s.strategy)

@@ -100,3 +100,29 @@ def test_collector_shutdown_flushes_buffer_on_interrupt(cfg, tmp_path):
     assert col._closed and scan(tmp_path, "trades").collect().height == 1
     asyncio.run(col._shutdown())                 # idempotente
     assert scan(tmp_path, "trades").collect().height == 1
+
+
+def test_el_lector_de_flujo_cuenta_los_huecos_cuando_la_pagina_viene_entera_nueva():
+    """Si todo lo que llega es nuevo, entre consulta y consulta hubo más trades de los que caben."""
+    import asyncio
+
+    from scalper.flow import FlowPoller
+
+    base = {"proxyWallet": "0xabc", "side": "BUY", "size": 100, "price": 0.45, "asset": "t",
+            "conditionId": "c", "outcome": "Yes", "outcomeIndex": 0, "title": "x", "slug": "s",
+            "eventSlug": "e", "transactionHash": "0xh"}
+    paginas = [[{**base, "timestamp": 1, "transactionHash": "a"}],
+               [{**base, "timestamp": 2, "transactionHash": "b"}],
+               [{**base, "timestamp": 3, "transactionHash": "c"}]]
+
+    class Api:
+        async def trades(self, limit=2000, offset=0, **kw):
+            return paginas.pop(0)
+
+    async def handler(x):
+        pass
+
+    fp = FlowPoller(Api(), handler, poll_seconds=0)
+    assert asyncio.run(fp.poll_once()) == 1 and fp.paginas_llenas == 0   # la primera no cuenta
+    assert asyncio.run(fp.poll_once()) == 1 and fp.paginas_llenas == 1
+    assert asyncio.run(fp.poll_once()) == 1 and fp.paginas_llenas == 2

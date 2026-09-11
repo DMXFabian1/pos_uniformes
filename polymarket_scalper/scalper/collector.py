@@ -524,6 +524,7 @@ class Collector:
             extra = ""
             if self.flow is not None and self.wallets is not None:
                 extra = (f" flow_polls={self.flow.polls} flow_lag={self.flow.lag_seconds}s"
+                         f" flow_huecos={self.flow.paginas_llenas}"
                          f" wallets={len(self.wallets.profiles)} cola={self.wallets.pending}")
             if self.sports is not None:
                 extra += f" partidos_vivos={len(self.live_games())}"

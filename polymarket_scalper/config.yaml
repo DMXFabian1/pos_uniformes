@@ -42,7 +42,8 @@ flow:
   enabled: true
   data_api_url: https://data-api.polymarket.com
   poll_seconds: 10
-  page_size: 1000               # ~30 trades/s en toda la plataforma; 1000 cada 10 s deja margen
+  page_size: 2000               # máximo de data-api. Con 1000 la página venía entera nueva y se perdían
+                                # trades: el contador paginas_llenas del recolector lo delata
   min_usd_global: 500           # fuera de los mercados seguidos solo se guardan trades grandes
   whale_min_usd: 2000           # trade que dispara el perfilado de la wallet
   profile_max_pages: 10         # historial: hasta 500 posiciones cerradas por wallet
@@ -79,6 +80,7 @@ retention:                      # disco: book_deltas crece ~4 GB/día; el aprend
     book_deltas: 3
     book_snapshots: 14
     markets: 30                 # se reescribe cada 5 min; solo importa la última fila por mercado
+    decisions: 30               # cada decisión de no operar; sirve para ajustar filtros, no para el histórico largo
 
 learn:                          # fase 5: modelo que aprende del ledger
   enabled: true
@@ -140,6 +142,7 @@ sim:
   max_game_exposure_usd: 180    # colateral máximo abierto en mercados del mismo partido/evento
   adverse_horizons_ms: [100, 500, 1000, 2000, 5000, 10000]   # selección adversa: mid tras el fill
   max_entry_slip_ticks: 3       # si el precio se movió más que esto entre señal y ejecución, no entrar
+  max_feed_lag_ms: 5000         # si el feed va más atrasado que esto, el libro es viejo y no se opera (0 = sin límite)
   start_cash: 1000
   max_position_usd: 60
   max_open_positions: 15

@@ -104,6 +104,7 @@ class FlowPoller:
         self.handler = handler
         self.poll_seconds = poll_seconds
         self.page_size = page_size
+        self.paginas_llenas = 0      # veces que la página vino entera nueva: señal de datos perdidos
         self._seen: OrderedDict[tuple, None] = OrderedDict()
         self._cap = seen_capacity
         self._stop = asyncio.Event()
@@ -134,7 +135,11 @@ class FlowPoller:
             await self.handler(t)
         self.new_trades += len(fresh)
         if batch and len(fresh) == len(batch) and self._prev_nonempty:
-            log.warning("flow: la página completa era nueva (%d); puede haber huecos, subir page_size o bajar poll_seconds", len(batch))
+            # todo lo que vino era nuevo: entre esta consulta y la anterior hubo más trades de los
+            # que caben en una página, así que se perdieron. Se cuenta para poder dimensionarlo.
+            self.paginas_llenas += 1
+            log.warning("flow: la página completa era nueva (%d); hay huecos (%d veces). Subir page_size "
+                        "o bajar poll_seconds", len(batch), self.paginas_llenas)
         self._prev_nonempty = bool(batch)
         return len(fresh)
 
