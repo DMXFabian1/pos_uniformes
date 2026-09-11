@@ -104,6 +104,11 @@ suma al real.
 Las señales descartadas dentro de un detector (por ejemplo, ventaja insuficiente antes de que la
 señal llegue a existir) se cuentan en `decisions` pero todavía no generan sombra.
 
+Una limitación deliberada: el seguimiento posterior al llenado cubre las entradas direccionales y
+las que esperan a la resolución. La captura de spread entra por los dos lados a la vez, así que
+medir su MFE y su MAE contra un único precio de entrada no significaría nada; sus órdenes sí
+quedan en `fill_observations`, pero sin trayectoria.
+
 ## 6. El informe
 
 ```bash
