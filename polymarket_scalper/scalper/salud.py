@@ -58,11 +58,68 @@ def desfase_reloj(valores) -> float:
     Filtro de mínimo: de todos los retrasos aparentes observados, el más pequeño es el que menos
     transporte lleva dentro, así que se acerca al desfase puro. Solo se corrige cuando sale
     negativo; un mínimo positivo es retraso de verdad y no hay nada que descontar.
+
+    Un solo número vale para un rato corto. Para una corrida larga hace falta `Desfase`: el reloj
+    deriva, y entonces el mínimo global es el del final y deja inflada toda la frescura anterior.
     """
     xs = [float(v) for v in valores if v is not None]
     if not xs:
         return 0.0
     return min(min(xs), 0.0)
+
+
+class Desfase:
+    """Desfase de reloj por tramos, porque el reloj deriva y un suelo global no sirve.
+
+    En una corrida de cuatro horas el reloj del contenedor se fue casi 800 ms respecto al del
+    exchange, de forma sostenida: unos 4 ms por minuto. Con un único mínimo global, el suelo pasa a
+    ser el del último tramo y toda la frescura de las horas anteriores sale inflada por la deriva
+    en vez de por el feed. Se estima un suelo por ventana y cada fila se corrige con el suyo.
+    """
+
+    VENTANA_MS = 10 * 60 * 1000
+
+    def __init__(self, muestras, ventana_ms: int = VENTANA_MS) -> None:
+        self.ventana_ms = max(int(ventana_ms), 1)
+        suelos: dict[int, float] = {}
+        for ts, v in muestras:
+            if ts is None or v is None:
+                continue
+            k = int(ts) // self.ventana_ms
+            f = float(v)
+            if k not in suelos or f < suelos[k]:
+                suelos[k] = f
+        self.suelos = {k: min(v, 0.0) for k, v in suelos.items()}
+        self._claves = sorted(self.suelos)
+
+    def __bool__(self) -> bool:
+        return any(v < 0 for v in self.suelos.values())
+
+    def en(self, ts_ms) -> float:
+        """Suelo del tramo al que pertenece `ts_ms`; si ese tramo está vacío, el más cercano."""
+        if not self._claves or ts_ms is None:
+            return 0.0
+        k = int(ts_ms) // self.ventana_ms
+        if k in self.suelos:
+            return self.suelos[k]
+        cercana = min(self._claves, key=lambda c: abs(c - k))
+        return self.suelos[cercana]
+
+    def mediana(self) -> float:
+        if not self._claves:
+            return 0.0
+        xs = sorted(self.suelos.values())
+        return xs[len(xs) // 2]
+
+    def deriva_ms_por_hora(self) -> float | None:
+        """Cuánto se mueve el suelo por hora. Si es grande, el reloj no está sincronizado."""
+        if len(self._claves) < 2:
+            return None
+        a, b = self._claves[0], self._claves[-1]
+        horas = (b - a) * self.ventana_ms / 3_600_000
+        if horas <= 0:
+            return None
+        return round((self.suelos[b] - self.suelos[a]) / horas, 1)
 
 
 def corregir(freshness_ms: float | None, desfase_ms: float = 0.0) -> float | None:

@@ -29,7 +29,7 @@ from typing import Any
 import polars as pl
 
 from .evaluacion import CIERRES_EXCLUIDOS, bootstrap_ic, es_del_dado
-from .salud import CONTAMINADOS, bucket, corregir, desfase_reloj, freshness_score
+from .salud import CONTAMINADOS, Desfase, bucket, corregir, freshness_score
 from .storage import scan
 
 # --------------------------------------------------------------------------- etiquetas de confianza
@@ -143,7 +143,7 @@ class Datos:
     salud: list[dict[str, Any]] = field(default_factory=list)
     reacciones: list[dict[str, Any]] = field(default_factory=list)
     experimentos: list[dict[str, Any]] = field(default_factory=list)
-    desfase_ms: float = 0.0            # desfase de reloj estimado; se descuenta de toda frescura
+    desfase: Desfase = field(default_factory=lambda: Desfase(()))   # suelo de reloj por tramos
 
     @property
     def estrategias(self) -> list[str]:
@@ -185,13 +185,26 @@ def cargar(data_dir: str | Path, experiment: str | None = None) -> Datos:
     # El desfase de reloj se estima con todo lo observado: el mínimo por ventana cuando está
     # registrado y, si no, las propias medianas. Sin descontarlo, una frescura negativa se leía como
     # el libro más viejo posible en vez de como el más fresco.
-    suelos = [r.get("min_ms") for r in d.salud if r.get("min_ms") is not None]
-    if not suelos:
-        suelos = ([r.get("freshness_ms") for r in d.salud]
-                  + [r.get("freshness_ms") for r in d.ledger + d.contaminadas + d.sombras]
-                  + [r.get("freshness_ms") for r in d.decisiones])
-    d.desfase_ms = desfase_reloj(suelos)
+    muestras = [(_ts(r), r.get("min_ms")) for r in d.salud if r.get("min_ms") is not None]
+    if not muestras:
+        muestras = [(_ts(r), r.get("freshness_ms"))
+                    for r in d.salud + d.ledger + d.contaminadas + d.sombras + d.decisiones]
+    d.desfase = Desfase(muestras)
     return d
+
+
+def _ts(r: dict[str, Any]) -> int | None:
+    """El instante de una fila, se llame como se llame la columna en su tabla."""
+    for k in ("ts_ms", "ts_signal", "ts_placed", "ts_fill"):
+        v = r.get(k)
+        if v is not None:
+            return int(v)
+    return None
+
+
+def _fresca(r: dict[str, Any], d: "Datos") -> float | None:
+    """Frescura de una fila descontado el suelo de reloj de su propio tramo."""
+    return corregir(r.get("freshness_ms"), d.desfase.en(_ts(r)))
 
 
 def _validas(filas: list[dict[str, Any]]) -> list[dict[str, Any]]:
@@ -439,11 +452,11 @@ def por_frescura(d: Datos) -> list[dict[str, Any]]:
     """Todo lo anterior, cortado por la antigüedad del libro con el que se decidió."""
     cajones: dict[str, dict[str, Any]] = {}
     for r in d.ledger + d.contaminadas:
-        b = bucket(r.get("freshness_ms"), d.desfase_ms)
+        b = bucket(r.get("freshness_ms"), d.desfase.en(_ts(r)))
         c = cajones.setdefault(b, {"tramo": b, "senales": 0, "llenadas": 0, "pnl": 0.0,
                                    "adversa": [], "n_validas": 0, "scores": []})
         c["senales"] += 1
-        sc = freshness_score(r.get("freshness_ms"), desfase_ms=d.desfase_ms)
+        sc = freshness_score(r.get("freshness_ms"), desfase_ms=d.desfase.en(_ts(r)))
         if sc is not None:
             c["scores"].append(sc)
         if (r.get("size_filled") or 0) > 0:
@@ -456,7 +469,7 @@ def por_frescura(d: Datos) -> list[dict[str, Any]]:
     for r in d.decisiones:
         if r.get("decision") != "no_trade":
             continue
-        b = bucket(r.get("freshness_ms"), d.desfase_ms)
+        b = bucket(r.get("freshness_ms"), d.desfase.en(_ts(r)))
         c = cajones.setdefault(b, {"tramo": b, "senales": 0, "llenadas": 0, "pnl": 0.0,
                                    "adversa": [], "n_validas": 0})
         c.setdefault("no_trade", 0)
@@ -484,8 +497,7 @@ def umbral_de_frescura(d: Datos) -> list[dict[str, Any]]:
     sombras_feed = [r for r in _validas(d.sombras) if r.get("motivo_rechazo") == "feed_atrasado"]
     out = []
     for t in UMBRALES_FRESCURA_MS:
-        dentro = [r for r in reales + sombras_feed
-                  if (corregir(r.get("freshness_ms"), d.desfase_ms) or 0.0) <= t]
+        dentro = [r for r in reales + sombras_feed if (_fresca(r, d) or 0.0) <= t]
         pnl = sum(r["realized_pnl"] for r in dentro)
         out.append({"umbral_ms": t, "operaciones": len(dentro), "pnl": round(pnl, 4),
                     "media": round(pnl / len(dentro), 4) if dentro else None, "nivel": nivel(len(dentro))})
@@ -506,9 +518,10 @@ def salud_del_feed(d: Datos) -> dict[str, Any]:
         "posiciones_contaminadas": len(d.contaminadas),
         "decisiones_contaminadas": decisiones_sucias,
         "decisiones": len(d.decisiones),
-        "freshness_mediana_ms": _mediana([corregir(r["freshness_ms"], d.desfase_ms) for r in d.salud]),
-        "freshness_p95_ms": _mediana([corregir(r["p95_ms"], d.desfase_ms) for r in d.salud]),
-        "desfase_reloj_ms": d.desfase_ms,
+        "freshness_mediana_ms": _mediana([_fresca(r, d) for r in d.salud]),
+        "freshness_p95_ms": _mediana([corregir(r["p95_ms"], d.desfase.en(_ts(r))) for r in d.salud]),
+        "desfase_reloj_ms": d.desfase.mediana(),
+        "deriva_reloj_ms_hora": d.desfase.deriva_ms_por_hora(),
         "descartadas_del_dado": d.descartadas_del_dado,
     }
 
@@ -587,8 +600,8 @@ def cadena_de_tiempos(d: Datos) -> dict[str, Any]:
         "orden_a_llenado_s": espera,
         "llenado_a_favorable_s": favorable,
         "llenado_a_salida_s": salida,
-        "retraso_feed_ms": _mediana([corregir(r["freshness_ms"], d.desfase_ms)
-                                     for r in validas if r.get("freshness_ms") is not None]),
+        "retraso_feed_ms": _mediana([_fresca(r, d) for r in validas
+                                     if r.get("freshness_ms") is not None]),
         "retraso_proceso_ms": _mediana([r["proc_delay_ms"] for r in validas if r.get("proc_delay_ms")]),
         "retraso_decision_ms": _mediana([r["decision_delay_ms"] for r in validas if r.get("decision_delay_ms")]),
         "retraso_ejecucion_ms": _mediana([r["exec_delay_ms"] for r in validas if r.get("exec_delay_ms")]),
@@ -767,9 +780,12 @@ def formatear(inf: Informe) -> str:  # noqa: C901 - es un informe, se lee de arr
         L.append(f"Frescura mediana {s['freshness_mediana_ms']:.0f} ms   p95 típico "
                  f"{s['freshness_p95_ms']:.0f} ms   (sobre el suelo observado)")
         if s.get("desfase_reloj_ms"):
-            L.append(f"Desfase de reloj estimado: {s['desfase_reloj_ms']:.0f} ms. La frescura de arriba es "
-                     f"relativa a ese suelo:")
+            L.append(f"Desfase de reloj estimado: {s['desfase_reloj_ms']:.0f} ms (suelo por tramos de "
+                     f"10 min). La frescura de arriba es relativa a ese suelo:")
             L.append("  sin relojes sincronizados no hay retraso absoluto, solo comparación entre momentos.")
+        if s.get("deriva_reloj_ms_hora"):
+            L.append(f"El reloj deriva {s['deriva_reloj_ms_hora']:.0f} ms por hora respecto al del "
+                     f"exchange: por eso el suelo se estima por tramos y no una sola vez.")
     L.append(f"Decisiones registradas: {s['decisiones']}  (con datos sucios: {s['decisiones_contaminadas']})")
     L.append("")
 

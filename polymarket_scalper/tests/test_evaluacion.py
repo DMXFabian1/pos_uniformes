@@ -214,3 +214,17 @@ def test_las_filas_del_dado_no_cuentan_como_evidencia():
     assert e.descartadas_del_dado == 1
     assert e.n == 2 and e.pnl == 1.0            # la vieja de +26 queda fuera; la taker se queda
     assert "anteriores a esta medición" in formatear([e])
+
+
+def test_una_orden_que_nunca_se_lleno_no_es_del_dado():
+    from scalper.evaluacion import es_del_dado
+
+    # Llenada sin escenarios: eso sí salió del dado del 60 %.
+    assert es_del_dado({"entry_role": "maker", "fill_conservador": None, "size_filled": 50.0})
+    # Sin llenar: llega sin escenarios porque no hubo llenado, no porque se tirara un dado. Tirarla
+    # dejaba fuera justo las órdenes que hacen falta para medir la tasa de llenado.
+    assert not es_del_dado({"entry_role": "maker", "fill_conservador": None, "size_filled": 0.0})
+    # Con escenarios, del modelo de cola.
+    assert not es_del_dado({"entry_role": "maker", "fill_conservador": 50.0, "size_filled": 50.0})
+    # Las taker nunca usaron el dado.
+    assert not es_del_dado({"entry_role": "taker", "fill_conservador": None, "size_filled": 50.0})

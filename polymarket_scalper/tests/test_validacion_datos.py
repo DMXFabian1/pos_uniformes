@@ -357,3 +357,28 @@ def test_dos_experimentos_con_los_mismos_umbrales_deciden_igual():
     assert cambios_que_deciden(a, c) == ["spread: 3 → 4"]
     # Si no se puede leer, no se inventa una respuesta.
     assert cambios_que_deciden(a, {"umbrales": "esto no es json", "modelos": "{}"}) is None
+
+
+def test_el_suelo_de_reloj_se_estima_por_tramos_porque_el_reloj_deriva():
+    from scalper.salud import Desfase
+
+    # Caso real: en cuatro horas el reloj se fue de -50 ms a -800 ms, de forma sostenida. Con un
+    # único mínimo global, el suelo del final dejaba inflada toda la frescura de las horas previas.
+    hora = 3_600_000
+    muestras = [(t * hora // 6, -50 - 130 * t) for t in range(7)]   # una muestra cada 10 minutos
+    dsf = Desfase(muestras)
+    assert dsf.en(0) == -50.0
+    assert dsf.en(6 * hora // 6) == -830.0
+    # Cada tramo se corrige con el suyo: la frescura del primero no arrastra la deriva del último.
+    assert corregir(-50, dsf.en(0)) == 0.0
+    assert corregir(-830, dsf.en(hora)) == 0.0
+    assert dsf.deriva_ms_por_hora() == -780.0
+
+
+def test_sin_muestras_el_suelo_no_corrige_nada():
+    from scalper.salud import Desfase
+
+    dsf = Desfase(())
+    assert not dsf and dsf.en(123) == 0.0 and dsf.deriva_ms_por_hora() is None
+    # Un suelo positivo es retraso de verdad: no hay desfase que descontar.
+    assert Desfase([(0, 300), (1, 500)]).en(0) == 0.0

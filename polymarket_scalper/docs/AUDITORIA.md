@@ -304,6 +304,37 @@ Lo que no se puede hacer es fingir que eso es el retraso absoluto del feed: **si
 sincronizados no hay retraso absoluto**, solo comparación entre momentos sobre un suelo común. Para
 lo que necesita esta fase —¿desaparece la ventaja cuando el libro envejece?— la comparación basta.
 
+### Cuarta medición: el reloj no está desfasado, está derivando
+
+La corrección anterior traía un fallo propio, y se vio a las tres horas de corrida. El suelo se
+estimaba una sola vez, con el mínimo de toda la corrida. Pero el reloj del contenedor no está
+parado a 200 ms del exchange: **deriva unos 230 ms por hora**, de forma sostenida. Los mínimos por
+media hora fueron −122, −254, −387, −518, −662, −794, −849.
+
+Con un suelo único, el del final se aplicaba a todo, y la frescura de las primeras horas salía
+inflada por la deriva del reloj en vez de por el feed. El informe llegó a decir 410 ms de frescura
+mediana, y el corte por frescura enseñaba una degradación monótona preciosa —−1,99 por operación en
+`0-250ms`, −2,09 en `250-500ms`, −3,58 en `500ms-1s`— que era **enteramente artefacto de la deriva**:
+las operaciones viejas parecían más rancias solo por ser viejas.
+
+`salud.Desfase` estima ahora un suelo por tramo de diez minutos y corrige cada fila con el suyo. Con
+eso, la frescura mediana de la misma corrida es **25 ms**, el p95 típico 64 ms, y 274 de 276
+posiciones caen en el tramo `0-250ms`. La conclusión se da la vuelta: **la frescura del libro no es
+la variable que explica las pérdidas**, porque casi no hay variación que explicar. El feed llega
+bien.
+
+La moraleja, que vale para todo el resto del informe: una degradación monótona y bonita es
+sospechosa antes que convincente.
+
+### Una orden sin llenar no la generó el dado
+
+`es_del_dado()` marcaba como contaminada toda entrada maker sin escenarios de llenado. Una orden que
+nunca se llenó tampoco los trae —no hubo llenado que escenificar—, así que caían 20 órdenes de
+`TENNIS_DIRECTIONAL` del experimento en curso: justo la mitad de la muestra que hace falta para
+medir una tasa de llenado, la de las que no se llenan. Comprobado en los datos: no existe ni una
+sola fila, en ningún experimento, que se haya llenado sin escenarios. El filtro no estaba
+protegiendo de nada y sí estaba tirando dato bueno.
+
 ### La regla que no cambia
 
 Ningún número del ledger anterior al cambio A cuenta como evidencia sobre las señales maker: se

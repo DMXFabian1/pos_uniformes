@@ -128,12 +128,18 @@ def _meta(row: dict[str, Any]) -> dict[str, Any]:
 def es_del_dado(row: dict[str, Any]) -> bool:
     """¿Esta fila la generó el modelo de llenado por azar que ya no existe?
 
-    Una entrada maker anterior al modelo de cola no trae los escenarios de llenado. Su resultado
-    depende de una probabilidad inventada, así que no puede contar como evidencia de nada. Las
+    Una entrada maker **llenada** antes del modelo de cola no trae los escenarios de llenado: su
+    resultado depende de una probabilidad inventada y no puede contar como evidencia de nada. Las
     entradas taker no usaban el dado y sí cuentan.
+
+    Lo que no es del dado es una orden que **nunca se llenó**. También llega sin escenarios, porque
+    no hubo llenado que escenificar, y darla por contaminada tiraba justo la mitad de la muestra que
+    hace falta para medir la tasa de llenado: las órdenes que se quedan sin llenar. En la corrida de
+    cuatro horas eran 20 órdenes de TENNIS_DIRECTIONAL, todas del experimento en curso.
     """
     rol = row.get("entry_role") or _meta(row).get("entry_role")
-    return rol == "maker" and row.get("fill_conservador") is None
+    return (rol == "maker" and row.get("fill_conservador") is None
+            and (row.get("size_filled") or 0) > 0)
 
 
 def _strategy(row: dict[str, Any]) -> str:
