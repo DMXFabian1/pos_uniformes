@@ -28,9 +28,13 @@ En Windows: `powershell -ExecutionPolicy Bypass -File deploy\instalar-windows.ps
 
 ## Uso
 
-**Aplicación de escritorio** (`scalper gui`, o `SCALPER.bat` en Windows): ventana con botones para
-arrancar el bot, abrir el panel y ver los informes, con la actividad en vivo y el estado siempre a
-la vista. Al cerrarla detiene el bot guardando los datos. Usa Tkinter, incluido con Python.
+**Aplicación de escritorio** (`scalper gui`, o `SCALPER.bat` en Windows): ventana en PyQt6 con el
+panel HTML incrustado, la actividad del bot en vivo y los informes, todo en un sitio. Los botones
+arrancan y detienen el bot, que se cierra siempre guardando los datos pendientes. Si PyQt6 no está
+instalado, abre una versión sencilla en Tkinter (`scalper gui --tk` la fuerza).
+
+Se instala con `pip install -e ".[gui]"`. En máquinas sin aceleración gráfica el panel incrustado
+puede no cargar; el botón «Abrir en el navegador» muestra exactamente lo mismo.
 
 ```bash
 scalper discover                 # qué mercados se seguirían con la config actual

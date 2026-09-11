@@ -201,12 +201,27 @@ def cmd_retention(args: argparse.Namespace) -> None:
 
 
 def cmd_gui(args: argparse.Namespace) -> None:
-    """Ventana de escritorio: botones para arrancar el bot, el panel y ver informes."""
+    """Ventana de escritorio. Usa PyQt6 si está instalado; si no, la versión en Tkinter."""
+    import os
     from pathlib import Path
 
-    from .gui import lanzar
+    proyecto = Path(args.config).resolve().parent
+    nombre = Path(args.config).name
+    # sin GPU dedicada (máquinas virtuales, escritorio remoto) el componente web necesita esto
+    os.environ.setdefault("QTWEBENGINE_CHROMIUM_FLAGS", "--disable-gpu-compositing")
 
-    sys.exit(lanzar(Path(args.config).resolve().parent, Path(args.config).name))
+    if not args.tk:
+        try:
+            from .qtapp import lanzar as lanzar_qt
+
+            sys.exit(lanzar_qt(proyecto, nombre))
+        except ImportError:
+            print("PyQt6 no está instalado; abriendo la versión sencilla.\n"
+                  "Para la interfaz completa:  pip install PyQt6 PyQt6-WebEngine")
+
+    from .gui import lanzar as lanzar_tk
+
+    sys.exit(lanzar_tk(proyecto, nombre))
 
 
 def cmd_dashboard(args: argparse.Namespace) -> None:
@@ -435,6 +450,7 @@ def main(argv: list[str] | None = None) -> None:
     s.set_defaults(fn=cmd_retention)
 
     s = sub.add_parser("gui", help="ventana de escritorio con botones (sin usar la terminal)")
+    s.add_argument("--tk", action="store_true", help="usar la versión sencilla en Tkinter")
     s.set_defaults(fn=cmd_gui)
 
     s = sub.add_parser("dashboard", help="panel web local (http://127.0.0.1:8787) que lee data/ en vivo")

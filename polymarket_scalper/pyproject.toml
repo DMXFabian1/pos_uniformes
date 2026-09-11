@@ -20,6 +20,7 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 learn = ["scikit-learn>=1.4"]
+gui = ["PyQt6>=6.6", "PyQt6-WebEngine>=6.6"]
 
 [project.scripts]
 scalper = "scalper.cli:main"

@@ -44,21 +44,26 @@ el comando responde. Puedes volver a ejecutarlo cuando actualices el código; no
 
 ## 4. La forma más simple: la aplicación de escritorio
 
-Doble clic en **`SCALPER.bat`**. Se abre una ventana con botones y no necesitas terminal para nada:
+Doble clic en **`SCALPER.bat`**. Se abre una ventana con el panel dentro, y no necesitas terminal
+para nada.
+
+A la izquierda, tres secciones y los botones principales:
+
+| Sección | Qué muestra |
+|---|---|
+| **Panel en vivo** | el panel completo, dentro de la propia ventana: resumen, resultados por señal, partidos, wallets y aprendizaje |
+| **Actividad del bot** | lo que está haciendo ahora mismo, con avisos en ámbar y errores en rojo |
+| **Informes** | datos guardados, estudio del arrastre de cripto, resultados, wallets, modelos y disco |
 
 | Botón | Qué hace |
 |---|---|
-| **Iniciar bot** | arranca la recolección y la simulación. Cambia a «Detener bot» |
-| **Abrir panel** | levanta el panel web y lo abre en el navegador |
-| **Ver informes** | genera todos los informes y los muestra en la pestaña «Informes» |
+| **Iniciar bot** | arranca la recolección y la simulación, y levanta el panel solo. Cambia a «Detener bot» |
+| **Generar informes** | los calcula y los muestra en la sección «Informes» |
 | **Carpeta de datos** | abre la carpeta `data` en el Explorador |
 
 Arriba se ven en todo momento los mercados seguidos, las señales detectadas, el precio de Bitcoin,
-las ventanas de cripto activas y hace cuánto llegó el último dato. El punto junto al título está
-verde cuando el bot funciona y rojo cuando está detenido.
-
-La pestaña «Actividad» muestra lo que el bot está haciendo en vivo, con los avisos en ámbar y los
-errores en rojo.
+las ventanas de cripto activas y hace cuánto llegó el último dato, en verde si está al día y en
+rojo si el bot no está escribiendo. El punto junto al título está verde cuando funciona.
 
 **Al cerrar la ventana**, si el bot está funcionando, pregunta antes y lo detiene guardando los
 datos pendientes. Nunca pierdes lo que estaba en memoria.
@@ -66,8 +71,12 @@ datos pendientes. Nunca pierdes lo que estaba en memoria.
 Para tenerlo a mano: clic derecho sobre `SCALPER.bat`, "Enviar a", "Escritorio (crear acceso
 directo)". Luego puedes renombrar el acceso directo como quieras.
 
-> Si al abrirlo no pasa nada, es que tu instalación de Python no incluye Tkinter. Reinstala Python
-> marcando la casilla **"tcl/tk and IDLE"**, que viene activada por defecto.
+> La ventana usa PyQt6, que el instalador descarga junto con lo demás. Si no está disponible, la
+> aplicación abre una versión más sencilla hecha con Tkinter, que viene incluido con Python. Puedes
+> forzar esa versión con `scalper gui --tk`.
+>
+> Si el panel no se ve dentro de la ventana (pasa en algunas máquinas virtuales y escritorios
+> remotos sin aceleración gráfica), usa el botón «Abrir en el navegador»: el contenido es el mismo.
 
 ## 5. Arrancar el bot desde la terminal
 
@@ -232,7 +241,8 @@ Si te quedas corto de espacio, baja `keep_days` en `config.yaml` y reinicia el b
 | `flow_lag` de varios minutos | el indexador de Polymarket va con retraso | normal, no afecta a los precios del libro |
 | El bot se detuvo solo de noche | la PC se durmió | revisa el paso 6 |
 | El panel no abre | el proceso del panel no está corriendo | pulsa «Abrir panel» en la aplicación |
-| `SCALPER.bat` no abre ninguna ventana | Python sin Tkinter | reinstala Python marcando "tcl/tk and IDLE" |
+| `SCALPER.bat` no abre ninguna ventana | falta PyQt6 y Tkinter | `.venv\Scripts\python.exe -m pip install PyQt6 PyQt6-WebEngine` |
+| La ventana abre pero el panel sale en blanco | el componente web no arranca sin aceleración gráfica | usa «Abrir en el navegador», o `scalper gui --tk` |
 
 ## 14. Qué esperar
 

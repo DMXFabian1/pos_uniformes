@@ -41,7 +41,7 @@ if (Test-Path $sitePkgs) {
 
 Write-Host "== dependencias (puede tardar unos minutos)" -ForegroundColor Cyan
 & $vpy -m pip install --quiet --upgrade pip
-& $vpy -m pip install --quiet -e ".[learn]"
+& $vpy -m pip install --quiet -e ".[learn,gui]"
 if ($LASTEXITCODE -ne 0) {
   Write-Host "falló la instalación de dependencias" -ForegroundColor Red
   Write-Host "prueba a mano para ver el detalle:" -ForegroundColor Yellow
@@ -57,6 +57,7 @@ New-Item -ItemType Directory -Force -Path (Join-Path $proyecto "data") | Out-Nul
 
 Write-Host ""
 Write-Host "Listo. Desde esta carpeta:" -ForegroundColor Green
+Write-Host "  SCALPER.bat                     abre la aplicacion con ventana y botones"
 Write-Host "  .\deploy\iniciar-bot.ps1        arranca el bot (paper trading, sin dinero real)"
 Write-Host "  .\deploy\iniciar-panel.ps1      abre el panel en http://127.0.0.1:8787"
 Write-Host "  .\deploy\programar-inicio.ps1   para que el bot arranque solo al encender la PC"

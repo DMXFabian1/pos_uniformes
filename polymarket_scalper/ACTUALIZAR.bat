@@ -38,7 +38,7 @@ if not exist ".venv\Scripts\python.exe" (
   pause
   exit /b 1
 )
-.venv\Scripts\python.exe -m pip install --quiet -e ".[learn]"
+.venv\Scripts\python.exe -m pip install --quiet -e ".[learn,gui]"
 if errorlevel 1 (
   echo  Fallo la instalacion de dependencias.
   pause
