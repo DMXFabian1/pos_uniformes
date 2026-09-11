@@ -24,13 +24,20 @@ if (-not $py) {
 
 Write-Host "== entorno virtual .venv" -ForegroundColor Cyan
 if (-not (Test-Path ".venv")) { & $py[0] @($py[1] + @("-m", "venv", ".venv")) }
-$pip = Join-Path $proyecto ".venv\Scripts\pip.exe"
+# en Windows pip.exe no puede reemplazarse a sí mismo: siempre se invoca como "python -m pip"
+$vpy = Join-Path $proyecto ".venv\Scripts\python.exe"
 $exe = Join-Path $proyecto ".venv\Scripts\scalper.exe"
+if (-not (Test-Path $vpy)) { Write-Host "no se creó el entorno virtual .venv" -ForegroundColor Red; exit 1 }
 
 Write-Host "== dependencias (puede tardar unos minutos)" -ForegroundColor Cyan
-& $pip install --quiet --upgrade pip
-& $pip install --quiet -e ".[learn]"
-if ($LASTEXITCODE -ne 0) { Write-Host "falló la instalación de dependencias" -ForegroundColor Red; exit 1 }
+& $vpy -m pip install --quiet --upgrade pip
+& $vpy -m pip install --quiet -e ".[learn]"
+if ($LASTEXITCODE -ne 0) {
+  Write-Host "falló la instalación de dependencias" -ForegroundColor Red
+  Write-Host "prueba a mano para ver el detalle:" -ForegroundColor Yellow
+  Write-Host "  $vpy -m pip install -e `".[learn]`"" -ForegroundColor Yellow
+  exit 1
+}
 
 Write-Host "== comprobación" -ForegroundColor Cyan
 $env:PYTHONUTF8 = "1"
