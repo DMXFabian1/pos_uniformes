@@ -39,7 +39,7 @@ class HojaHtmlTests(unittest.TestCase):
     def test_encabezado_con_escuela_fecha_y_totales(self) -> None:
         self.assertIn("Práxedis Guerrero", self.html)
         self.assertIn("11/09/2026", self.html)
-        self.assertIn("2 prendas · 16 tallas", self.html)
+        self.assertIn("2 prendas &nbsp;·&nbsp; 16 tallas", self.html)
 
     def test_la_regla_de_oro_va_impresa(self) -> None:
         self.assertIn("vacío NO es cero", self.html)
@@ -52,10 +52,13 @@ class HojaHtmlTests(unittest.TestCase):
 
     def test_prendas_numeradas_n_de_total_y_con_nombre_limpio(self) -> None:
         """Sin la escuela ni el "| Deportivo | Pants 2pz" del catálogo (como en la tira)."""
-        self.assertIn("<b>1/2</b>&nbsp; <b>Pants 2pz Deportivo</b>", self.html)
-        self.assertIn("<b>2/2</b>&nbsp; <b>Suéter Cuello V H Verde Secundaria</b>", self.html)
+        self.assertIn("<b>1/2</b>", self.html)
+        self.assertIn("<b>Pants 2pz Deportivo</b>", self.html)
+        self.assertIn("<b>2/2</b>", self.html)
+        self.assertIn("<b>Suéter Cuello V H Verde Secundaria</b>", self.html)
         self.assertNotIn("| Deportivo", self.html)
-        self.assertNotIn("Práxedis Guerrero</b>", self.html)  # la escuela no se repite en cada tarjeta
+        # La escuela va UNA vez, en la banda de arriba; no se repite en cada tarjeta.
+        self.assertEqual(self.html.count("Práxedis Guerrero"), 1)
 
     def test_una_fila_por_talla_con_dos_casillas(self) -> None:
         for t in ("4", "46"):
@@ -66,15 +69,23 @@ class HojaHtmlTests(unittest.TestCase):
     def test_los_bordes_van_como_atributo_porque_qt_ignora_el_css(self) -> None:
         self.assertIn('border="1" cellspacing="0"', self.html)
 
-    def test_con_quien_va_el_nombre_en_vez_de_la_raya(self) -> None:
+    def test_con_quien_va_el_nombre_y_sin_quien_una_caja_para_escribir(self) -> None:
         con = hoja.construir_hoja_html(GRUPOS, titulo="X", quien="Stayce Chavarria")
-        self.assertIn("Cuenta: Stayce Chavarria", con)
-        self.assertNotIn("Cuenta: ____", con)
-        self.assertIn("Cuenta: ____", self.html)
+        self.assertIn("<b>Stayce Chavarria</b>", con)
+        self.assertIn("CUENTA</font><br><b>Stayce", con)
+        # Sin nombre: una caja blanca con borde, no una raya de guiones.
+        self.assertIn('CUENTA</font><br><table border="1"', self.html)
+        self.assertNotIn("____", self.html)
+
+    def test_lleva_la_paleta_del_kiosko_y_zebra_en_las_tallas(self) -> None:
+        self.assertIn(f'bgcolor="{hoja.CAFE}"', self.html)     # banda café del título
+        self.assertIn(f'bgcolor="{hoja.CREMA}"', self.html)    # encabezados crema
+        # 16 tallas: 8 filas con fondo suave (las impares) → zebra.
+        self.assertEqual(self.html.count(f'bgcolor="{hoja.CREMA_SUAVE}"><b>'), 8)
 
     def test_sin_grupos_no_truena(self) -> None:
         vacia = hoja.construir_hoja_html([], titulo="Nada")
-        self.assertIn("0 prendas · 0 tallas", vacia)
+        self.assertIn("0 prendas &nbsp;·&nbsp; 0 tallas", vacia)
 
 
 class NombreTests(unittest.TestCase):
