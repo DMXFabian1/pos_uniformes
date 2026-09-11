@@ -14,6 +14,7 @@ from typing import Any
 
 from ..book import OrderBook
 from ..discovery import MarketInfo
+from ..micro import NOMBRES as MICRO
 from ..signals.base import Signal
 
 NUMERIC = [
@@ -22,7 +23,8 @@ NUMERIC = [
     "volume_24h_log", "p_model", "p_market", "deviation", "tau", "lead", "pregame", "has_pregame",
     "wallet_score", "wallet_n_log", "wallet_roi", "their_usd_log", "hour_utc", "dow", "is_maker",
     "moneyness_bps", "elapsed_s", "seconds_left", "window_s", "market_skew", "prev_up_won", "prev_return_bps",
-]
+    "event_risk_score", "ms_since_event", "reaction_lag_ms", "queue_ahead", "edge_taker",
+] + MICRO
 CATEGORICAL = ["category", "sport", "league", "side", "sports_market_type", "horizon"]
 
 
@@ -75,6 +77,9 @@ class FeatureSchema:
                    categorical=d.get("categorical", list(CATEGORICAL)))
 
 
+_MICRO_SET = set(MICRO)
+
+
 def _log1p(x: Any) -> float:
     try:
         return math.log1p(max(float(x), 0.0))
@@ -110,6 +115,12 @@ def build_features(s: Signal, m: MarketInfo | None, ts_ms: int, book: OrderBook 
         "market_skew": meta.get("market_skew") or 0.0,
         "prev_up_won": 1.0 if meta.get("prev_up_won") else (0.0 if meta.get("prev_up_won") is False else 0.5),
         "prev_return_bps": meta.get("prev_return_bps") or 0.0,
+        "event_risk_score": meta.get("event_risk_score") or 0.0,
+        "ms_since_event": meta.get("ms_since_event") or 0.0,
+        "reaction_lag_ms": meta.get("reaction_lag_ms") or 0.0,
+        "queue_ahead": meta.get("queue_ahead") or 0.0,
+        "edge_taker": meta.get("edge_taker") if meta.get("edge_taker") is not None else 0.0,
+        **{k: v for k, v in (meta.get("micro") or {}).items() if k in _MICRO_SET},
         "hour_utc": dt.hour, "dow": dt.weekday(),
         "is_maker": 1.0 if any(l.role == "maker" for l in s.legs) else 0.0,
         "category": m.category if m else "", "sport": meta.get("sport", ""), "league": meta.get("league", ""),

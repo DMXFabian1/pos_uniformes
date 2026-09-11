@@ -31,9 +31,14 @@ class OrderBook:
         self.snapshot_ts = ts
         self.hash = hash_
 
-    def apply_delta(self, side: str, price: float, size: float, ts: int, hash_: str = "") -> None:
-        """`size` es el tamaño absoluto que queda en el nivel (0 = nivel eliminado)."""
+    def apply_delta(self, side: str, price: float, size: float, ts: int, hash_: str = "") -> float:
+        """`size` es el tamaño absoluto que queda en el nivel (0 = nivel eliminado).
+
+        Devuelve el cambio firmado del nivel (positivo = alguien puso, negativo = alguien quitó o
+        le llenaron). Es la materia prima del flujo de órdenes.
+        """
         levels = self.bids if side.upper() == "BUY" else self.asks
+        antes = levels.get(price, 0.0)
         if size <= 0:
             levels.pop(price, None)
         else:
@@ -41,6 +46,17 @@ class OrderBook:
         self.last_ts = ts
         if hash_:
             self.hash = hash_
+        return size - antes
+
+    def depth_at(self, side: str, ticks: int) -> float:
+        """Alias legible de depth_within: shares a `ticks` o menos del mejor precio del lado."""
+        return self.depth_within(side, ticks)
+
+    def imbalance_at(self, ticks: int) -> float:
+        """(profundidad bid - profundidad ask) / total, dentro de `ticks` del mejor precio. [-1, 1]."""
+        b, a = self.depth_within("BUY", ticks), self.depth_within("SELL", ticks)
+        tot = a + b
+        return 0.0 if tot == 0 else (b - a) / tot
 
     # ---------- lectura ----------
     @property

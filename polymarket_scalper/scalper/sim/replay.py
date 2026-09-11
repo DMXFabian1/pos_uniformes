@@ -109,8 +109,8 @@ def run_replay(cfg: Config, start: str | None = None, end: str | None = None, co
             b = eng.books.get(r["token_id"])
             if b is None or b.snapshot_ts == 0:
                 continue
-            b.apply_delta(r["side"], r["price"], r["size"], ts, r.get("hash") or "")
-            eng.on_book(ts, r["token_id"], b)
+            cambio = b.apply_delta(r["side"], r["price"], r["size"], ts, r.get("hash") or "")
+            eng.on_book(ts, r["token_id"], b, {"side": r["side"], "price": r["price"], "size": r["size"], "delta": cambio})
         elif kind == "trade":
             eng.on_trade(ts, r["token_id"], r)
         elif kind == "resolution":

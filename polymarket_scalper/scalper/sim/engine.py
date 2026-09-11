@@ -15,6 +15,7 @@ from ..config import Config
 from ..discovery import MarketInfo
 from ..learn import ModelStore, Scorer
 from ..models import GameState, ModelRegistry, WinProb, match_outcome, parse_game
+from ..micro import instantanea
 from ..models.crypto import UpDownModel, UpDownState
 from ..reaction import ReactionEngine
 from ..signals import MarketContext, Signal, build_detectors
@@ -102,7 +103,7 @@ class Engine:
         if kind == "markets":
             self.set_markets(event[2])
         elif kind == "book" or kind == "delta":
-            self.on_book(event[1], event[2], event[3])
+            self.on_book(event[1], event[2], event[3], event[4] if len(event) > 4 else None)
         elif kind == "trade":
             self.on_trade(event[1], event[2], event[3])
         elif kind == "resolution":
@@ -308,8 +309,10 @@ class Engine:
             pos.inventory = {t: s for t, s in pos.inventory.items() if sides.get(t) is None}
             self._close(pos, ts_ms, "game_end")
 
-    def on_book(self, ts_ms: int, token_id: str, book: OrderBook) -> None:
+    def on_book(self, ts_ms: int, token_id: str, book: OrderBook, delta: dict[str, Any] | None = None) -> None:
         self.now_ms = max(self.now_ms, ts_ms)
+        if delta is not None:
+            self.history[token_id].flujo.append((ts_ms, delta.get("side", ""), float(delta.get("delta", 0.0))))
         if book.is_valid:
             self.history[token_id].mids.append((ts_ms, book.mid))
             self.ultimo_mid[token_id] = book.mid
@@ -502,9 +505,12 @@ class Engine:
                                              (s.kind.startswith("multi") and p.signal.event_id == s.event_id)):
                 self.stats["skipped_duplicate"] += 1
                 return
-        # fase 5: puntuar con el modelo aprendido (si hay) y guardar las features para entrenar después
+        # microestructura en el instante de la señal: forma del libro, flujo y velocidad del mid
         m0 = self.markets.get(s.condition_id)
-        book0 = self.books.get(s.legs[0].token_id) if s.legs else None
+        tok0 = s.legs[0].token_id if s.legs else ""
+        book0 = self.books.get(tok0)
+        s.meta["micro"] = instantanea(book0, self.history.get(tok0), s.ts_ms)
+        # fase 5: puntuar con el modelo aprendido (si hay) y guardar las features para entrenar después
         res = self.scorer.score(s, m0, s.ts_ms, book0)
         s.meta["features"] = res.features
         s.meta["conf_heuristic"] = res.p_heuristic

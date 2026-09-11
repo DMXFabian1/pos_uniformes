@@ -3,7 +3,7 @@
 Eventos que emite a los listeners (para paper trading):
     ("markets", ts_ms, list[MarketInfo])         tras cada discovery
     ("book",    ts_ms, token_id, OrderBook)      snapshot completo aplicado
-    ("delta",   ts_ms, token_id, OrderBook)      nivel actualizado
+    ("delta",   ts_ms, token_id, OrderBook, dict) nivel actualizado; dict = {side, price, size, delta}
     ("trade",   ts_ms, token_id, dict)           trade impreso
     ("resolution", ts_ms, condition_id, dict)    mercado resuelto
     ("game",    ts_ms, game_id, dict)            estado de partido en vivo (fila de `games`)
@@ -84,6 +84,7 @@ class Collector:
         self.stats: dict[str, int] = {"book": 0, "delta": 0, "trade": 0, "tick": 0, "resync": 0, "resolved": 0,
                                       "game": 0, "flow": 0, "whale": 0, "updown_resueltas": 0}
         self.started_ms = now_ms()
+        self.latencias: deque = deque(maxlen=5000)     # recv_ms - ts_ms de los últimos mensajes del CLOB
 
     # ------------------------------------------------------------------ ciclo de vida
     def add_listener(self, fn: Listener) -> None:
@@ -214,10 +215,13 @@ class Collector:
     # ------------------------------------------------------------------ websocket
     async def _on_ws_message(self, msg: dict[str, Any]) -> None:
         et = msg.get("event_type")
-        ts = int(msg.get("timestamp") or now_ms())
+        recv = now_ms()
+        ts = int(msg.get("timestamp") or recv)
+        if msg.get("timestamp"):
+            self.latencias.append(recv - ts)
         if et == "book":
             await self._apply_snapshot(msg.get("asset_id", ""), msg.get("bids") or [], msg.get("asks") or [],
-                                       ts, msg.get("hash", ""), source="ws")
+                                       ts, msg.get("hash", ""), source="ws", recv_ms=recv)
         elif et == "price_change":
             for ch in msg.get("price_changes") or []:
                 tid = ch.get("asset_id", "")
@@ -225,21 +229,24 @@ class Collector:
                 if book is None:
                     continue
                 price, size = float(ch["price"]), float(ch["size"])
-                book.apply_delta(ch.get("side", ""), price, size, ts, ch.get("hash", ""))
+                delta = book.apply_delta(ch.get("side", ""), price, size, ts, ch.get("hash", ""))
                 self.stats["delta"] += 1
                 if self.persist:
                     self.writer.append("book_deltas", {
                         "ts_ms": ts, "token_id": tid, "condition_id": book.condition_id, "side": ch.get("side", ""),
                         "price": price, "size": size, "best_bid": _fnum(ch.get("best_bid")),
                         "best_ask": _fnum(ch.get("best_ask")), "hash": ch.get("hash", ""),
+                        "recv_ms": recv, "delta_size": delta,
                     })
-                await self._emit(("delta", ts, tid, book))
+                await self._emit(("delta", ts, tid, book, {"side": ch.get("side", ""), "price": price, "size": size,
+                                                            "delta": delta}))
         elif et == "last_trade_price":
             tid = msg.get("asset_id", "")
             cid = self.token_to_cid.get(tid, msg.get("market", ""))
             trade = {"ts_ms": ts, "token_id": tid, "condition_id": cid, "price": float(msg.get("price") or 0),
                      "size": float(msg.get("size") or 0), "side": msg.get("side", ""),
-                     "fee_rate_bps": _fnum(msg.get("fee_rate_bps")), "tx_hash": msg.get("transaction_hash", "")}
+                     "fee_rate_bps": _fnum(msg.get("fee_rate_bps")), "tx_hash": msg.get("transaction_hash", ""),
+                     "recv_ms": recv}
             self.stats["trade"] += 1
             if self.persist:
                 self.writer.append("trades", trade)
@@ -251,7 +258,8 @@ class Collector:
                 book.tick_size = float(msg.get("new_tick_size") or book.tick_size)
                 self.stats["tick"] += 1
 
-    async def _apply_snapshot(self, tid: str, bids: list, asks: list, ts: int, hash_: str, source: str) -> None:
+    async def _apply_snapshot(self, tid: str, bids: list, asks: list, ts: int, hash_: str, source: str,
+                              recv_ms: int | None = None) -> None:
         book = self.books.get(tid)
         if book is None:
             return
@@ -262,7 +270,7 @@ class Collector:
                 "ts_ms": ts, "token_id": tid, "condition_id": book.condition_id,
                 "bids": dumps([[float(l["price"]), float(l["size"])] for l in bids]),
                 "asks": dumps([[float(l["price"]), float(l["size"])] for l in asks]),
-                "hash": hash_, "source": source,
+                "hash": hash_, "source": source, "recv_ms": recv_ms or now_ms(),
             })
         await self._emit(("book", ts, tid, book))
 
@@ -524,9 +532,20 @@ class Collector:
                 extra += f" updown={len(self.updown)} strikes={len(self.strikes)}"
                 if btc:
                     extra += f" btc={btc[1]:,.0f}"
+            lat = self.latencia()
+            if lat:
+                extra += f" latencia_feed_ms(mediana/p95)={lat['mediana']:.0f}/{lat['p95']:.0f}"
             log.info("estado: mercados=%d libros_validos=%d/%d ws=%s eventos=%s filas=%s%s",
                      len(self.markets), valid, len(self.books), self.pool.stats(), dict(self.stats),
                      dict(self.writer.rows_written), extra)
+
+    def latencia(self) -> dict[str, float] | None:
+        """Retraso entre el reloj del exchange y el nuestro, sobre los últimos mensajes del CLOB."""
+        if not self.latencias:
+            return None
+        xs = sorted(self.latencias)
+        return {"n": len(xs), "mediana": xs[len(xs) // 2], "p95": xs[min(len(xs) - 1, int(len(xs) * 0.95))],
+                "max": xs[-1]}
 
 
 def _fnum(x: Any) -> float | None:

@@ -83,9 +83,15 @@ class Signal:
 
 @dataclass
 class TokenHistory:
-    """Historia corta por token: trades y mids recientes (para volatilidad/actividad)."""
+    """Historia corta por token: trades, mids y cambios de nivel recientes.
+
+    `flujo` guarda el cambio firmado de cada nivel del libro: positivo cuando alguien pone
+    órdenes, negativo cuando las quita o se las llenan. Es lo que permite distinguir un libro
+    que se está construyendo de uno que se está vaciando.
+    """
     trades: deque = field(default_factory=lambda: deque(maxlen=500))   # (ts_ms, price, size, side)
     mids: deque = field(default_factory=lambda: deque(maxlen=2000))    # (ts_ms, mid)
+    flujo: deque = field(default_factory=lambda: deque(maxlen=4000))   # (ts_ms, side, delta_size)
 
     def trades_in(self, ts_ms: int, window_ms: int) -> list[tuple]:
         lo = ts_ms - window_ms

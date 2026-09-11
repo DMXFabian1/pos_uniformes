@@ -63,17 +63,19 @@ SCHEMAS: dict[str, pa.Schema] = {
         ("event_slug", S()), ("avg_price", F()), ("total_bought", F()), ("realized_pnl", F()), ("cur_price", F()),
         ("end_date", S()), ("closed_ts", I()),
     ]),
+    # ts_ms es el reloj del exchange; recv_ms el nuestro al recibirlo. La diferencia es la latencia del feed.
     "book_snapshots": pa.schema([
         ("ts_ms", I()), ("token_id", S()), ("condition_id", S()), ("bids", S()), ("asks", S()),
-        ("hash", S()), ("source", S()),
+        ("hash", S()), ("source", S()), ("recv_ms", I()),
     ]),
     "book_deltas": pa.schema([
         ("ts_ms", I()), ("token_id", S()), ("condition_id", S()), ("side", S()), ("price", F()), ("size", F()),
-        ("best_bid", F()), ("best_ask", F()), ("hash", S()),
+        ("best_bid", F()), ("best_ask", F()), ("hash", S()), ("recv_ms", I()),
+        ("delta_size", F()),      # cambio firmado del nivel: + puso, - quitó/llenaron (flujo de órdenes)
     ]),
     "trades": pa.schema([
         ("ts_ms", I()), ("token_id", S()), ("condition_id", S()), ("price", F()), ("size", F()), ("side", S()),
-        ("fee_rate_bps", F()), ("tx_hash", S()),
+        ("fee_rate_bps", F()), ("tx_hash", S()), ("recv_ms", I()),
     ]),
     "quotes": pa.schema([
         ("ts_ms", I()), ("token_id", S()), ("condition_id", S()), ("best_bid", F()), ("best_ask", F()),
