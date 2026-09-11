@@ -38,6 +38,7 @@ class Engine:
         self.event_index: dict[str, list[str]] = defaultdict(list)
         self.books: dict[str, OrderBook] = {}
         self.history: dict[str, TokenHistory] = defaultdict(TokenHistory)
+        self.ultimo_mid: dict[str, float] = {}     # para valorar posiciones que quedan abiertas
         self.positions: list[Position] = []
         self.closed: list[Position] = []
         self.cash = cfg.sim.start_cash
@@ -295,6 +296,7 @@ class Engine:
         self.now_ms = max(self.now_ms, ts_ms)
         if book.is_valid:
             self.history[token_id].mids.append((ts_ms, book.mid))
+            self.ultimo_mid[token_id] = book.mid
         self._process_pending(ts_ms)
         for pos in self.positions:
             if pos.status == "open" and pos.maker_orders:
@@ -616,17 +618,35 @@ class Engine:
         pos.inventory = {t: s for t, s in pos.inventory.items() if abs(s) > 1e-9}
 
     # ------------------------------------------------------------ cierre
+    def _valorar(self, token_id: str, comprado: bool) -> float:
+        """A cuánto vale una posición que sigue abierta.
+
+        Orden: el precio que se puede tocar ahora, el último precio medio visto, y solo si no hay
+        nada de eso, el peor caso. Valorar a cero una posición viva es mentir sobre el resultado.
+        """
+        book = self.books.get(token_id)
+        if book is not None:
+            tocable = book.best_bid if comprado else book.best_ask
+            if tocable is not None:
+                return tocable
+            if book.mid is not None:
+                return book.mid
+        ultimo = self.ultimo_mid.get(token_id)
+        if ultimo is not None:
+            return ultimo
+        return 0.0 if comprado else 1.0
+
     def _close(self, pos: Position, ts_ms: int, reason: str) -> None:
-        # inventario que no se pudo deshacer: se valora al peor caso razonable, nunca como ganancia
+        # Inventario que sigue abierto al cerrar los libros: se valora a mercado, no a cero.
+        # El motivo lleva el sufijo _stuck y queda fuera de las estadísticas, porque no es el
+        # resultado de la señal sino de haber cortado la corrida a mitad.
         stuck = {t: sh for t, sh in pos.inventory.items() if abs(sh) > 1e-9}
         if stuck:
             for tid, sh in stuck.items():
-                book = self.books.get(tid)
+                px = self._valorar(tid, comprado=sh > 0)
                 if sh > 0:
-                    px = book.best_bid if book is not None and book.best_bid is not None else 0.0
                     pos.payout += sh * px
                 else:
-                    px = book.best_ask if book is not None and book.best_ask is not None else 1.0
                     pos.cost += -sh * px
             pos.inventory = {}
             reason = f"{reason}_stuck"

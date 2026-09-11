@@ -141,3 +141,32 @@ def test_implausible_edge_is_discarded(cfg):
     eng.books[n].apply_snapshot([{"price": 0.01, "size": 100}], [{"price": 0.02, "size": 100}], 1000)
     eng.on_book(1000, y, eng.books[y])
     assert not eng.positions and eng.stats["skipped_implausible"] == 1
+
+
+def test_posicion_abierta_al_cerrar_se_valora_a_mercado_no_a_cero(cfg):
+    """Cortar la corrida con una posición viva no es una pérdida: se valora a lo que vale."""
+    from scalper.signals.base import Signal
+    from scalper.sim.ledger import Position
+    m = make_market(fee=0.0, outcomes=("Up", "Down"))
+    eng = _engine(cfg, [m])
+    up = m.tokens[0].token_id
+    sig = Signal(1, "updown_model", m.condition_id, m.event_id,
+                 [Leg(up, "BUY", 0.27, 50, "taker", "Up")], 50, 0.10, 0.0, 0.08, 0.6, "resolution")
+    pos = Position(signal=sig, status="open", cost=13.5, fees=0.7, inventory={up: 50})
+    eng.positions.append(pos)
+    eng.books[up].apply_snapshot([{"price": 0.30, "size": 500}], [{"price": 0.32, "size": 500}], 1000)
+    eng.on_book(1000, up, eng.books[up])
+    eng.close_all(2000, "end")
+    # con libro, simplemente se vende al mejor comprador
+    assert pos.exit_reason == "end" and abs(pos.payout - 50 * 0.30) < 1e-9
+    assert pos.realized_pnl > 0                                 # compró a 0.27 y vale 0.30
+
+    # sin libro, se usa el último precio medio conocido en vez de dar todo por perdido
+    pos2 = Position(signal=sig, status="open", cost=13.5, fees=0.7, inventory={up: 50})
+    eng.positions.append(pos2)
+    eng.books[up].bids.clear()
+    eng.books[up].asks.clear()
+    eng.close_all(3000, "end")
+    assert pos2.exit_reason == "end_stuck"
+    assert abs(pos2.payout - 50 * 0.31) < 1e-9                  # el mid que se vio antes
+    assert pos2.realized_pnl > -14.2                            # muy lejos de dar todo por perdido
