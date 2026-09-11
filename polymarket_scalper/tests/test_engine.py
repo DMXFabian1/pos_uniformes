@@ -44,7 +44,7 @@ def test_complement_arb_lifecycle_records_ledger(cfg):
     eng.on_book(1000, y, eng.books[y])
     assert len(eng.positions) == 1 and eng.positions[0].status == "pending"
     eng.tick(1200)                                                   # pasa la latencia
-    assert not eng.positions and len(eng.closed) == 1
+    assert not eng.reales and len(eng.closed) == 1
     p = eng.closed[0]
     assert p.exit_reason == "merge" and p.size_filled == 50
     assert abs(p.realized_pnl - 50 * 0.10) < 1e-9
@@ -140,7 +140,7 @@ def test_implausible_edge_is_discarded(cfg):
     eng.books[y].apply_snapshot([{"price": 0.01, "size": 100}], [{"price": 0.02, "size": 100}], 1000)
     eng.books[n].apply_snapshot([{"price": 0.01, "size": 100}], [{"price": 0.02, "size": 100}], 1000)
     eng.on_book(1000, y, eng.books[y])
-    assert not eng.positions and eng.stats["skipped_implausible"] == 1
+    assert not eng.reales and eng.stats["skipped_edge_implausible"] == 1
 
 
 def test_posicion_abierta_al_cerrar_se_valora_a_mercado_no_a_cero(cfg):

@@ -72,6 +72,21 @@ updown:                         # mercados "Up or Down" de cripto (5 y 15 minuto
   # Regla del motor: aquí se compra y se aguanta hasta la resolución. Vender antes paga la
   # comisión dos veces y se come la ventaja.
 
+salud:                          # cuándo el feed deja de describir el mercado. Son hipótesis a medir,
+  sano_ms: 1000                 # no verdades: cada decisión guarda la frescura con la que se tomó
+  degradado_ms: 5000            # por encima de esto el libro se considera VIEJO y no se abre nada
+  sin_mensajes_viejo_s: 15
+  sin_mensajes_congelado_s: 60
+  registro_segundos: 15
+
+validacion:                     # fase de medición: seguir qué pasa después de cada fill. No decide nada.
+  seguimiento_s: 900            # se sigue la trayectoria del precio 15 min tras el llenado
+  ledger_horizonte_s: 60        # MAE/MFE que van al ledger: la ventana corta, la del scalping
+  horizontes_ms: [100, 500, 1000, 2000, 5000, 10000, 30000, 60000, 120000, 300000, 600000, 900000]
+  ticks_movimiento: [0.5, 1, 2, 3]
+  sombras: true                 # seguir también las señales rechazadas, para saber qué se deja pasar
+  max_sombras: 60
+
 retention:                      # disco: book_deltas crece ~4 GB/día; el aprendizaje no los necesita
   enabled: true
   run_hours: 24                 # corre solo dentro del recolector; también a mano con `scalper retention`
@@ -141,9 +156,8 @@ sim:
   max_hold_directional_seconds: 14400   # tope duro (4 h) por si el time stop no encuentra libro
   max_market_exposure_usd: 120  # colateral máximo abierto en un mismo mercado
   max_game_exposure_usd: 180    # colateral máximo abierto en mercados del mismo partido/evento
-  adverse_horizons_ms: [100, 500, 1000, 2000, 5000, 10000]   # selección adversa: mid tras el fill
+  adverse_horizons_ms: [100, 500, 1000, 2000, 5000, 10000, 30000, 60000]   # selección adversa: mid tras el fill
   max_entry_slip_ticks: 3       # si el precio se movió más que esto entre señal y ejecución, no entrar
-  max_feed_lag_ms: 5000         # si el feed va más atrasado que esto, el libro es viejo y no se opera (0 = sin límite)
   start_cash: 1000
   max_position_usd: 60
   max_open_positions: 15

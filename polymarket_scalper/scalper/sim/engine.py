@@ -7,6 +7,7 @@ con su ganancia predicha y la realizada. Ese error es lo que la fase 4 aprender�
 from __future__ import annotations
 
 import logging
+import time
 from collections import defaultdict
 from typing import Any
 
@@ -19,6 +20,7 @@ from ..evaluacion import minimos_requeridos
 from ..micro import instantanea
 from ..models.crypto import UpDownModel, UpDownState
 from ..reaction import ReactionEngine
+from ..salud import CONTAMINADOS, Salud, Umbrales, evaluar as evaluar_salud
 from ..signals import MarketContext, Signal, build_detectors
 from ..signals.base import Leg, TokenHistory, strategy_id
 from ..storage import ParquetWriter, dumps
@@ -31,16 +33,19 @@ log = logging.getLogger(__name__)
 
 
 class Engine:
-    def __init__(self, cfg: Config, run_id: str, mode: str, writer: ParquetWriter | None = None):
+    def __init__(self, cfg: Config, run_id: str, mode: str, writer: ParquetWriter | None = None,
+                 experiment: str = ""):
         self.cfg = cfg
         self.run_id = run_id
         self.mode = mode
         self.writer = writer
+        # versión congelada del motor: todo lo que se escriba lleva esta marca
+        self.experiment = experiment
         self.detectors = build_detectors(cfg.signals, cfg.updown)
         self.fill_model = FillModel(cfg.sim.slippage_ticks, cfg.sim.fill_baseline_prob, cfg.sim.seed)
         self.reaction = ReactionEngine()
         self._ultima_decision: dict[tuple[str, str, str], int] = {}
-        self._marcas: list[Position] = []          # posiciones con horizontes de selección adversa pendientes
+        self._seguidas: list[Position] = []        # posiciones cuyo precio posterior se sigue midiendo
         self._por_escribir: list[Position] = []    # cerradas que esperan a completar sus marcas antes de ir al ledger
         self.markets: dict[str, MarketInfo] = {}
         self.token_to_cid: dict[str, str] = {}
@@ -54,9 +59,11 @@ class Engine:
         self.last_detect: dict[str, int] = {}
         self.stats: dict[str, int] = defaultdict(int)
         self.now_ms = 0
-        # Retraso del feed medido por el recolector (paper). En replay vale 0: los eventos se
+        # Salud del feed, que llega del recolector. En replay se queda en SANO: los eventos se
         # reproducen en su propio tiempo y no hay retraso que valga.
-        self.feed_lag_ms = 0
+        self.salud = Salud()
+        self._ultima_salud_ms = 0
+        self._proc_delay_ms = 0        # lo que tarda el motor desde que recibe el mensaje hasta procesarlo
         # in-play
         self.models = ModelRegistry(cfg.models.sigma_basketball, cfg.models.sigma_by_league, cfg.models.soccer_total_goals)
         self.games: dict[str, GameState] = {}                 # game_id -> último estado
@@ -80,6 +87,26 @@ class Engine:
     def recargar_minimos(self) -> None:
         """Vuelve a leer el mínimo requerido de cada estrategia. Se llama al reentrenar."""
         self.minimos = minimos_requeridos(self.cfg.data_dir)
+
+    @property
+    def feed_lag_ms(self) -> int:
+        return self.salud.freshness_ms
+
+    @feed_lag_ms.setter
+    def feed_lag_ms(self, ms: int) -> None:
+        """Fijar el retraso recalcula el estado del feed: los dos no pueden ir por separado."""
+        c = self.cfg.salud
+        self.salud = evaluar_salud(ms, 0, Umbrales(c.sano_ms, c.degradado_ms, c.sin_mensajes_viejo_s,
+                                                   c.sin_mensajes_congelado_s))
+
+    def registrar_salud(self, ts_ms: int, salud: Salud) -> None:
+        """Guarda el estado del feed cada cierto tiempo, para poder marcar después el dato sucio."""
+        self.salud = salud
+        cada = self.cfg.salud.registro_segundos * 1000
+        if self.writer is None or ts_ms - self._ultima_salud_ms < cada:
+            return
+        self._ultima_salud_ms = ts_ms
+        self.writer.append("feed_health", salud.to_row(ts_ms, self.run_id, self.experiment))
 
     # ------------------------------------------------------------ mercados
     def set_markets(self, markets: list[MarketInfo]) -> None:
@@ -324,7 +351,12 @@ class Engine:
     def on_book(self, ts_ms: int, token_id: str, book: OrderBook, delta: dict[str, Any] | None = None) -> None:
         self.now_ms = max(self.now_ms, ts_ms)
         if delta is not None:
-            self.history[token_id].flujo.append((ts_ms, delta.get("side", ""), float(delta.get("delta", 0.0))))
+            if "delta" in delta:
+                self.history[token_id].flujo.append((ts_ms, delta.get("side", ""), float(delta["delta"])))
+            recv = delta.get("recv_ms")
+            if recv and self.mode == "paper":
+                # el evento ya venía con retraso del feed; esto mide solo lo que tardamos nosotros
+                self._proc_delay_ms = max(0, int(time.time() * 1000) - int(recv))
         if book.is_valid:
             self.history[token_id].mids.append((ts_ms, book.mid))
             self.ultimo_mid[token_id] = book.mid
@@ -398,43 +430,133 @@ class Engine:
             for r in rows:
                 self.writer.append("reactions", r)
 
-    # ------------------------------------------------------------ selección adversa
-    def _marcar_adversa(self, ts_ms: int, token_id: str | None = None) -> None:
-        """Rellena mid - precio_entrada en cada horizonte tras el fill.
+    # ------------------------------------------------------------ ¿en qué condiciones se llena?
+    def _condiciones(self, pos: Position, book: OrderBook, precio: float, size: float) -> dict[str, Any]:
+        """Foto del momento en que se pone la orden. Es la mitad izquierda de P(fill | condiciones)."""
+        s = pos.signal
+        micro = s.meta.get("micro") or {}
+        tick = book.tick_size or 0.01
+        bid, ask = book.best_bid, book.best_ask
+        return {
+            "precio": round(precio, 6), "size": round(size, 4),
+            "distancia_bid_ticks": None if bid is None else round((precio - bid) / tick, 3),
+            "distancia_ask_ticks": None if ask is None else round((ask - precio) / tick, 3),
+            "spread_ticks": book.spread_ticks,
+            "profundidad_propia": round(book.depth_within("BUY", 1), 4),
+            "profundidad_contraria": round(book.depth_within("SELL", 1), 4),
+            "imbalance_1t": micro.get("imbalance_1t"), "imbalance_3t": micro.get("imbalance_3t"),
+            "vel_1s": micro.get("vel_1s"), "vel_5s": micro.get("vel_5s"), "vol_60s": micro.get("vel_vol_60s"),
+            "trades_por_minuto": None if micro.get("trade_count") is None else round(micro["trade_count"] * 12, 3),
+            "freshness_ms": self.salud.freshness_ms, "feed_state": self.salud.estado,
+            "hora_utc": int((s.ts_ms // 3_600_000) % 24),
+            "tau_partido": s.meta.get("tau"), "seconds_left": s.meta.get("seconds_left"),
+            "edge_net": s.edge_net,
+        }
 
-        El mid es un estado: en el instante ts_fill + h vale lo último que se observó antes de ese
-        instante. Por eso, al llegar una actualización a `ts_ms`, los horizontes que vencieron
-        estrictamente antes toman el mid previo; el que vence justo ahora toma el nuevo.
+    def _guardar_observacion_fill(self, pos: Position) -> None:
+        """Una fila por orden puesta, con sus condiciones y si acabó llenándose."""
+        if self.writer is None or not pos.cond_fill:
+            return
+        ordenes = [pos.orden_entrada] if pos.orden_entrada is not None else list(pos.maker_orders)
+        for o in ordenes:
+            if o is None:
+                continue
+            llenada = o.filled > 1e-9
+            self.writer.append("fill_observations", {
+                "ts_ms": o.ts_placed, "run_id": self.run_id, "experiment": self.experiment,
+                "signal_id": pos.signal.signal_id, "strategy": pos.signal.strategy,
+                "condition_id": pos.signal.condition_id, "token_id": o.token_id,
+                **{k: v for k, v in pos.cond_fill.items() if k not in ("precio", "size")},
+                "precio": round(o.price, 6), "size": round(o.size, 4),
+                "cola_delante": round(o.queue_inicial, 4),
+                "llenada": llenada, "fraccion_llenada": round(o.filled / o.size, 4) if o.size else 0.0,
+                "espera_ms": (pos.ts_fill - o.ts_placed) if (llenada and pos.ts_fill) else None,
+                "vol_cruzado": round(o.vol_cruzado, 4), "barrido": bool(o.barrido),
+                "llenada_conservador": o.filled_conservador > 1e-9,
+                "llenada_optimista": o.filled_optimista > 1e-9,
+                "sombra": pos.sombra,
+            })
+
+    # ------------------------------------------------------------ qué pasa después del fill
+    def _seguir(self, ts_ms: int, token_id: str | None = None) -> None:
+        """Mide la trayectoria del precio tras cada llenado. No decide nada: solo registra.
+
+        En cada horizonte se toma el estado del libro **anterior** al instante, porque el mid es un
+        estado: en el momento ts_fill+h vale lo último que se observó antes. Fuera de los horizontes
+        se actualiza el recorrido continuo: lo mejor y lo peor que llegó a estar (MFE y MAE), cuánto
+        tardó en moverse medio tick, uno, dos y tres, y cuándo se tocó el objetivo y el stop.
         """
-        for pos in list(self._marcas):
+        v = self.cfg.validacion
+        horizontes = sorted(set(v.horizontes_ms) | set(self.cfg.sim.adverse_horizons_ms))
+        adversos = set(self.cfg.sim.adverse_horizons_ms)
+        corto = v.ledger_horizonte_s * 1000
+        for pos in list(self._seguidas):
             tid = pos.signal.legs[0].token_id
             if token_id is not None and tid != token_id:
                 continue
             book = self.books.get(tid)
-            mid_ahora = book.mid if (book is not None and book.is_valid) else self.ultimo_mid.get(tid)
-            precio = pos.fills[0].avg_price if pos.fills else None
-            for h in self.cfg.sim.adverse_horizons_ms:
+            hay = book is not None and book.is_valid
+            ahora = (book.mid, book.best_bid, book.best_ask) if hay else None
+            entrada = pos.entrada_px
+            for h in horizontes:
                 vence = pos.ts_fill + h
-                if pos.adverse.get(h, "x") is not None or ts_ms < vence:
+                if h in pos.horizontes_hechos or ts_ms < vence:
                     continue
-                mid = mid_ahora if (token_id is not None and vence == ts_ms) else pos.mid_previo
-                if token_id is None:                       # tick: el estado no cambió desde la última vez
-                    mid = pos.mid_previo
-                pos.adverse[h] = None if (mid is None or precio is None) else (mid - precio)
-            if token_id is not None:
-                pos.mid_previo = mid_ahora
-            if all(pos.adverse.get(h, "x") is not None for h in self.cfg.sim.adverse_horizons_ms):
-                self._marcas.remove(pos)
+                pos.horizontes_hechos.add(h)
+                # el estado en el instante del horizonte: el nuevo solo si la observación cae justo ahí
+                estado = ahora if (token_id is not None and vence == ts_ms) else pos.obs_previa
+                mid, bid, ask = estado if estado else (None, None, None)
+                if h in adversos:
+                    pos.adverse[h] = None if (mid is None or entrada is None) else mid - entrada
+                if self.writer is not None and entrada is not None:
+                    self.writer.append("post_fill", {
+                        "ts_ms": vence, "run_id": self.run_id, "experiment": self.experiment,
+                        "signal_id": pos.signal.signal_id, "strategy": pos.signal.strategy,
+                        "condition_id": pos.signal.condition_id, "token_id": tid, "horizonte_ms": h,
+                        "entrada": round(entrada, 6), "mid": mid, "best_bid": bid, "best_ask": ask,
+                        "delta": None if mid is None else round(mid - entrada, 6),
+                        "delta_bid": None if bid is None else round(bid - entrada, 6),
+                        "sombra": pos.sombra, "contaminado": pos.contaminado, "feed_state": pos.feed_state,
+                    })
+            if token_id is not None and hay and entrada is not None:
+                dt = ts_ms - pos.ts_fill
+                delta = book.mid - entrada
+                if dt <= corto:
+                    if pos.mfe is None or delta > pos.mfe:
+                        pos.mfe, pos.t_mfe_ms = delta, dt
+                    if pos.mae is None or delta < pos.mae:
+                        pos.mae, pos.t_mae_ms = delta, dt
+                for k in v.ticks_movimiento:
+                    if k not in pos.t_fav and delta >= k * pos.tick - 1e-12:
+                        pos.t_fav[k] = dt
+                    if k not in pos.t_adv and delta <= -k * pos.tick + 1e-12:
+                        pos.t_adv[k] = dt
+                target, stop = pos.signal.meta.get("target"), pos.signal.meta.get("stop")
+                if pos.t_target_ms is None and target is not None and book.best_bid >= target - 1e-9:
+                    pos.t_target_ms = dt
+                if pos.t_stop_ms is None and stop is not None and book.best_bid <= stop + 1e-9:
+                    pos.t_stop_ms = dt
+                pos.obs_previa = ahora
+            if ts_ms >= pos.ts_fill + v.seguimiento_s * 1000:
+                self._seguidas.remove(pos)
+
+    def _marcar_adversa(self, ts_ms: int, token_id: str | None = None) -> None:
+        """Nombre anterior del seguimiento. Se conserva porque lo usan las pruebas y el motor."""
+        self._seguir(ts_ms, token_id)
 
     def _iniciar_marcas(self, pos: Position, ts_ms: int) -> None:
-        """Primer fill de una posición direccional: empieza a medir qué hace el precio después."""
-        if pos in self._marcas or pos.signal.horizon not in ("directional", "resolution"):
+        """Primer fill: desde aquí se mide todo lo que hace el precio después."""
+        if pos in self._seguidas or pos.signal.horizon not in ("directional", "resolution"):
             return
         tid = pos.signal.legs[0].token_id
         book = self.books.get(tid)
-        pos.mid_previo = book.mid if (book is not None and book.is_valid) else self.ultimo_mid.get(tid)
+        if book is not None and book.is_valid:
+            pos.obs_previa = (book.mid, book.best_bid, book.best_ask)
+            pos.mid_previo = book.mid
+            pos.tick = book.tick_size
+        pos.entrada_px = pos.fills[0].avg_price if pos.fills else None
         pos.adverse = {h: None for h in self.cfg.sim.adverse_horizons_ms}
-        self._marcas.append(pos)
+        self._seguidas.append(pos)
 
     def _escribir_cerradas(self, ts_ms: int, forzar: bool = False) -> None:
         """Las cerradas van al ledger cuando sus marcas están completas (o el plazo venció)."""
@@ -443,15 +565,16 @@ class Engine:
             return
         tope = max(self.cfg.sim.adverse_horizons_ms, default=0)
         for pos in list(self._por_escribir):
-            if forzar or pos not in self._marcas or ts_ms >= pos.ts_fill + tope:
-                if pos in self._marcas:
-                    self._marcas.remove(pos)
+            # sin seguimiento (arbitrajes, captura de spread) no hay nada que esperar
+            completa = not pos.adverse or all(pos.adverse.get(h) is not None
+                                              for h in self.cfg.sim.adverse_horizons_ms)
+            if forzar or completa or ts_ms >= pos.ts_fill + tope:
                 self._por_escribir.remove(pos)
                 self.writer.append("ledger", pos.to_row(self.run_id, self.mode))
 
     # ------------------------------------------------------------ decisiones (incluidas NO TRADE)
     def _decision(self, ts_ms: int, cid: str, kind: str, decision: str, motivo: str, edge_net: float | None = None,
-                  detalle: dict[str, Any] | None = None, strategy: str = "") -> None:
+                  detalle: dict[str, Any] | None = None, strategy: str = "", signal_id: str = "") -> None:
         clave = (cid, kind, motivo)
         if decision == "no_trade":
             ultimo = self._ultima_decision.get(clave, -10**12)
@@ -466,7 +589,32 @@ class Engine:
                 "ts_ms": ts_ms, "run_id": self.run_id, "condition_id": cid, "kind": kind,
                 "strategy": strategy or strategy_id(kind, detalle or {}, m.category if m else ""),
                 "decision": decision, "motivo": motivo, "edge_net": edge_net, "detalle": dumps(detalle or {}),
+                "experiment": self.experiment, "freshness_ms": self.salud.freshness_ms,
+                "feed_state": self.salud.estado, "contaminado": self.salud.contaminado,
+                "signal_id": signal_id,
             })
+
+    def _rechazar(self, s: Signal, motivo: str, detalle: dict[str, Any] | None = None) -> None:
+        """Anota el NO TRADE y, si procede, deja una posición sombra siguiéndolo.
+
+        La sombra ejecuta y se cierra igual que una posición real, pero no toca el efectivo ni los
+        topes de riesgo, y su fila del ledger va marcada. Así se puede responder a la pregunta que
+        de otro modo queda abierta: ¿estamos rechazando malos trades o buenas oportunidades?
+        """
+        self.stats[f"skipped_{motivo}"] += 1
+        self._decision(s.ts_ms, s.condition_id, s.kind, "no_trade", motivo, s.edge_net,
+                       detalle or {}, s.strategy, s.signal_id)
+        v = self.cfg.validacion
+        if not v.sombras or len(self.sombras) >= v.max_sombras:
+            return
+        if any(self._misma_oportunidad(p, s) for p in self.sombras):
+            return                                   # ya hay una sombra siguiendo esta misma oportunidad
+        pos = Position(signal=s, exec_ts=s.ts_ms + self.cfg.sim.latency_ms, sombra=True,
+                       motivo_rechazo=motivo, experiment=self.experiment,
+                       freshness_ms=self.salud.freshness_ms, feed_state=self.salud.estado,
+                       contaminado=self.salud.contaminado, proc_delay_ms=self._proc_delay_ms)
+        self.positions.append(pos)
+        self.stats["sombras"] += 1
 
     def _registrar_rechazos(self, ctx: MarketContext, ts_ms: int) -> None:
         for r in ctx.rechazos:
@@ -512,11 +660,10 @@ class Engine:
         self.stats["signals"] += 1
         # la misma oportunidad se re-detecta cada detect_interval_ms mientras siga abierta:
         # no se registra ni se opera dos veces
-        for p in self.positions:
-            if p.signal.kind == s.kind and (p.signal.condition_id == s.condition_id or
-                                             (s.kind.startswith("multi") and p.signal.event_id == s.event_id)):
-                self.stats["skipped_duplicate"] += 1
-                return
+        # una sombra nunca bloquea una operación real: solo está mirando
+        if any(self._misma_oportunidad(p, s) for p in self.reales):
+            self.stats["skipped_duplicate"] += 1
+            return
         # microestructura en el instante de la señal: forma del libro, flujo y velocidad del mid
         m0 = self.markets.get(s.condition_id)
         tok0 = s.legs[0].token_id if s.legs else ""
@@ -534,9 +681,7 @@ class Engine:
         if self.writer is not None:
             self.writer.append("signals", signal_row(s, self.run_id))
         if res.gate:
-            self.stats["skipped_low_pwin"] += 1
-            self._decision(s.ts_ms, s.condition_id, s.kind, "no_trade", "modelo_p_win_baja", s.edge_net,
-                           {"p_win": res.p_blend}, s.strategy)
+            self._rechazar(s, "modelo_p_win_baja", {"p_win": res.p_blend})
             return
         if res.size_mult < 1.0:
             s.size *= res.size_mult
@@ -546,28 +691,26 @@ class Engine:
         # el tope de plausibilidad es para arbitrajes (un libro roto parece dinero gratis); las señales
         # direccionales tienen su propio tope de desvío en el detector
         # NO TRADE por datos viejos: si el feed va atrasado, el libro que vemos ya no existe.
-        tope_lag = self.cfg.sim.max_feed_lag_ms
-        if tope_lag and self.feed_lag_ms > tope_lag:
-            self.stats["skipped_feed_atrasado"] += 1
-            self._decision(s.ts_ms, s.condition_id, s.kind, "no_trade", "feed_atrasado", s.edge_net,
-                           {"feed_lag_ms": self.feed_lag_ms, "tope_ms": tope_lag}, s.strategy)
+        if not self.salud.puede_operar:
+            self._rechazar(s, "feed_atrasado", {"feed_state": self.salud.estado,
+                                                "freshness_ms": self.salud.freshness_ms,
+                                                "motivo_feed": self.salud.motivo})
             return
         # NO TRADE global: por debajo de lo que esta estrategia necesita para ser rentable, no se entra.
         # El mínimo solo existe cuando hay muestra suficiente; sin ella este filtro no actúa.
         minimo = self.minimos.get(s.strategy)
         if minimo is not None and s.edge_net < minimo:
-            self.stats["skipped_bajo_minimo"] += 1
-            self._decision(s.ts_ms, s.condition_id, s.kind, "no_trade", "bajo_el_minimo_requerido", s.edge_net,
-                           {"minimo_requerido": round(minimo, 5)}, s.strategy)
+            self._rechazar(s, "bajo_el_minimo_requerido", {"minimo_requerido": round(minimo, 5)})
             return
         if s.horizon != "directional" and s.edge_net > self.cfg.signals.max_edge_net:
-            self.stats["skipped_implausible"] += 1
-            self._decision(s.ts_ms, s.condition_id, s.kind, "no_trade", "edge_implausible", s.edge_net, {}, s.strategy)
+            # un libro roto parece dinero gratis; aquí ni siquiera se sigue como sombra
+            self.stats["skipped_edge_implausible"] += 1
+            self._decision(s.ts_ms, s.condition_id, s.kind, "no_trade", "edge_implausible", s.edge_net,
+                           {}, s.strategy, s.signal_id)
             return
         # riesgo: tope de posiciones, tope de USD por posición, por mercado y por partido/evento
-        if len(self.positions) >= self.cfg.sim.max_open_positions:
-            self.stats["skipped_max_positions"] += 1
-            self._decision(s.ts_ms, s.condition_id, s.kind, "no_trade", "tope_posiciones", s.edge_net, {}, s.strategy)
+        if self._abiertas() >= self.cfg.sim.max_open_positions:
+            self._rechazar(s, "tope_posiciones", {"abiertas": self._abiertas()})
             return
         per_share = self._collateral_per_share(s)
         m = self.markets.get(s.condition_id)
@@ -577,36 +720,55 @@ class Engine:
         tope_usd = min(tope_usd, self.cfg.sim.max_market_exposure_usd - exp_mercado,
                        self.cfg.sim.max_game_exposure_usd - exp_evento)
         if tope_usd <= 0:
-            self.stats["skipped_exposure"] += 1
-            self._decision(s.ts_ms, s.condition_id, s.kind, "no_trade", "tope_exposicion", s.edge_net,
-                           {"mercado_usd": round(exp_mercado, 2), "evento_usd": round(exp_evento, 2)}, s.strategy)
+            self._rechazar(s, "tope_exposicion", {"mercado_usd": round(exp_mercado, 2),
+                                                  "evento_usd": round(exp_evento, 2)})
             return
         max_size = tope_usd / per_share if per_share > 0 else s.size
         if max_size < s.size:
             min_sz = m.min_order_size if m else 5
             if max_size < min_sz:
-                self.stats["skipped_too_small"] += 1
-                self._decision(s.ts_ms, s.condition_id, s.kind, "no_trade", "tamano_minimo", s.edge_net, {}, s.strategy)
+                self._rechazar(s, "tamano_minimo", {"cabrian": round(max_size, 2), "minimo": min_sz})
                 return
             scale = max_size / s.size
             s.size = max_size
             for l in s.legs:
                 l.size *= scale
         if per_share * s.size > self.cash:
-            self.stats["skipped_no_cash"] += 1
-            self._decision(s.ts_ms, s.condition_id, s.kind, "no_trade", "sin_efectivo", s.edge_net, {}, s.strategy)
+            self._rechazar(s, "sin_efectivo", {"hace_falta": round(per_share * s.size, 2),
+                                               "hay": round(self.cash, 2)})
             return
-        pos = Position(signal=s, exec_ts=s.ts_ms + self.cfg.sim.latency_ms)
+        pos = Position(signal=s, exec_ts=s.ts_ms + self.cfg.sim.latency_ms, experiment=self.experiment,
+                       freshness_ms=self.salud.freshness_ms, feed_state=self.salud.estado,
+                       contaminado=self.salud.contaminado, proc_delay_ms=self._proc_delay_ms,
+                       decision_delay_ms=max(0, self.now_ms - s.ts_ms))
         self.positions.append(pos)
         self.stats["positions"] += 1
         self._decision(s.ts_ms, s.condition_id, s.kind, "trade", "", s.edge_net,
                        {"size": round(s.size, 2), "entry_role": s.meta.get("entry_role", "taker")}, s.strategy)
 
+    @staticmethod
+    def _misma_oportunidad(p: Position, s: Signal) -> bool:
+        return p.signal.kind == s.kind and (p.signal.condition_id == s.condition_id or
+                                            (s.kind.startswith("multi") and p.signal.event_id == s.event_id))
+
+    @property
+    def reales(self) -> list[Position]:
+        """Posiciones de verdad. `positions` incluye además las sombras, que solo se miden."""
+        return [p for p in self.positions if not p.sombra]
+
+    @property
+    def sombras(self) -> list[Position]:
+        return [p for p in self.positions if p.sombra]
+
+    def _abiertas(self) -> int:
+        """Posiciones reales. Las sombras no ocupan sitio: no existen para el riesgo."""
+        return sum(1 for p in self.positions if not p.sombra)
+
     def _exposicion(self, cond) -> float:
         """Colateral comprometido (abierto o pendiente) en las posiciones que cumplen la condición."""
         total = 0.0
         for p in self.positions:
-            if not cond(p):
+            if p.sombra or not cond(p):
                 continue
             if p.status == "open" and p.size_filled > 0:
                 total += p.collateral
@@ -733,8 +895,10 @@ class Engine:
             self._close(pos, ts_ms, "price_moved")
             return
         pos.entrada_maker = pos.orden_entrada = self.fill_model.place_maker(leg, book, ts_ms)
+        pos.cond_fill = self._condiciones(pos, book, leg.price, leg.size)
         pos.status = "open"
         pos.ts_placed = ts_ms
+        pos.exec_delay_ms = ts_ms - pos.signal.ts_ms
 
     def _revisar_entrada(self, pos: Position, ts_ms: int, token_id: str | None = None,
                          trade: dict[str, Any] | None = None, book: OrderBook | None = None) -> None:
@@ -788,7 +952,10 @@ class Engine:
             self._close(pos, ts_ms, "spread_gone")
             return
         pos.maker_orders = [self.fill_model.place_maker(l, book, ts_ms) for l in s.legs]
+        pos.cond_fill = self._condiciones(pos, book, s.legs[0].price, s.legs[0].size)
         pos.status = "open"
+        pos.ts_placed = ts_ms
+        pos.exec_delay_ms = ts_ms - s.ts_ms
         pos.ts_fill = ts_ms
 
     def _after_maker_fill(self, pos: Position, ts_ms: int) -> None:
@@ -910,11 +1077,13 @@ class Engine:
         pos.ts_exit = ts_ms
         pos.exit_reason = reason
         pos.realized_pnl = pos.payout - pos.cost - pos.fees
-        self.cash += pos.realized_pnl
+        if not pos.sombra:
+            self.cash += pos.realized_pnl        # una sombra nunca toca el dinero
         if pos in self.positions:
             self.positions.remove(pos)
         self.closed.append(pos)
         self.stats[f"closed_{reason}"] += 1
+        self._guardar_observacion_fill(pos)
         if self.writer is not None:
             self._por_escribir.append(pos)
             self._escribir_cerradas(ts_ms)
@@ -936,9 +1105,14 @@ class Engine:
         self._escribir_cerradas(ts_ms, forzar=True)
 
     def summary(self) -> dict[str, Any]:
-        closed = [p for p in self.closed if p.size_filled > 0]
+        reales = [p for p in self.closed if not p.sombra]
+        closed = [p for p in reales if p.size_filled > 0]
+        sombras = [p for p in self.closed if p.sombra]
         return {
-            "run_id": self.run_id, "mode": self.mode, "cash": round(self.cash, 4),
-            "pnl": round(self.cash - self.cfg.sim.start_cash, 4), "positions_closed": len(self.closed),
-            "positions_filled": len(closed), "open": len(self.positions), **dict(self.stats),
+            "run_id": self.run_id, "experiment": self.experiment, "mode": self.mode,
+            "cash": round(self.cash, 4), "pnl": round(self.cash - self.cfg.sim.start_cash, 4),
+            "positions_closed": len(reales), "positions_filled": len(closed),
+            "open": self._abiertas(), "sombras_cerradas": len(sombras),
+            "pnl_sombras": round(sum(p.realized_pnl for p in sombras), 4),
+            "feed": self.salud.estado, **dict(self.stats),
         }

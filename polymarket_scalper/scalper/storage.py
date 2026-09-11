@@ -101,12 +101,61 @@ SCHEMAS: dict[str, pa.Schema] = {
         ("barrido", B()), ("edge_taker", F()),
         # selección adversa: mid - precio de entrada a cada horizonte tras el primer fill (negativo = en contra)
         ("adverse_100ms", F()), ("adverse_500ms", F()), ("adverse_1s", F()), ("adverse_2s", F()),
-        ("adverse_5s", F()), ("adverse_10s", F()),
+        ("adverse_5s", F()), ("adverse_10s", F()), ("adverse_30s", F()), ("adverse_60s", F()),
+        # qué versión del motor produjo esta fila, y con qué calidad de datos se decidió
+        ("experiment", S()), ("freshness_ms", I()), ("feed_state", S()), ("contaminado", B()),
+        # recorrido del precio tras el fill: lo mejor y lo peor que llegó a estar, y cuándo
+        ("mfe", F()), ("mae", F()), ("t_mfe_ms", I()), ("t_mae_ms", I()),
+        # cuánto tardó en moverse medio tick, uno, dos y tres, a favor y en contra
+        ("t_fav_05t_ms", I()), ("t_fav_1t_ms", I()), ("t_fav_2t_ms", I()), ("t_fav_3t_ms", I()),
+        ("t_adv_05t_ms", I()), ("t_adv_1t_ms", I()), ("t_adv_2t_ms", I()), ("t_adv_3t_ms", I()),
+        # cuándo se tocó el objetivo y cuándo el stop (aunque la salida ocurriera por otra causa)
+        ("t_target_ms", I()), ("t_stop_ms", I()), ("target_antes_que_stop", B()),
+        # la cadena de retrasos, separada: feed, proceso, decisión y ejecución
+        ("proc_delay_ms", I()), ("decision_delay_ms", I()), ("exec_delay_ms", I()),
+        ("sombra", B()),        # posición hipotética: se rechazó y se sigue solo para medir
+        ("motivo_rechazo", S()),
+    ]),
+    # trayectoria del precio tras cada llenado, un punto por horizonte. En formato largo para no
+    # multiplicar columnas y para poder preguntar "¿dónde aparece la ventaja?" sin suposiciones.
+    "post_fill": pa.schema([
+        ("ts_ms", I()), ("run_id", S()), ("experiment", S()), ("signal_id", S()), ("strategy", S()),
+        ("condition_id", S()), ("token_id", S()), ("horizonte_ms", I()), ("entrada", F()),
+        ("mid", F()), ("best_bid", F()), ("best_ask", F()), ("delta", F()), ("delta_bid", F()),
+        ("sombra", B()), ("contaminado", B()), ("feed_state", S()),
+    ]),
+    # una versión congelada del motor: mientras la huella no cambie, los datos son comparables
+    "experiments": pa.schema([
+        ("ts_ms", I()), ("experiment_id", S()), ("commit", S()), ("dirty", B()), ("huella", S()),
+        ("umbrales", S()), ("modelos", S()), ("nota", S()),
+    ]),
+    # una fila por orden puesta: las condiciones del momento y si acabó llenándose. Es el conjunto
+    # de datos con el que después se puede estimar P(fill | condiciones) sin suponer nada.
+    "fill_observations": pa.schema([
+        ("ts_ms", I()), ("run_id", S()), ("experiment", S()), ("signal_id", S()), ("strategy", S()),
+        ("condition_id", S()), ("token_id", S()), ("precio", F()), ("size", F()),
+        ("distancia_bid_ticks", F()), ("distancia_ask_ticks", F()), ("spread_ticks", F()),
+        ("profundidad_propia", F()), ("profundidad_contraria", F()), ("cola_delante", F()),
+        ("imbalance_1t", F()), ("imbalance_3t", F()), ("vel_1s", F()), ("vel_5s", F()), ("vol_60s", F()),
+        ("trades_por_minuto", F()), ("freshness_ms", I()), ("feed_state", S()), ("hora_utc", I()),
+        ("tau_partido", F()), ("seconds_left", F()), ("edge_net", F()),
+        # resultado
+        ("llenada", B()), ("fraccion_llenada", F()), ("espera_ms", I()), ("vol_cruzado", F()),
+        ("barrido", B()), ("llenada_conservador", B()), ("llenada_optimista", B()), ("sombra", B()),
     ]),
     # cada decisión del motor, incluidas las de NO operar: sin esto no se sabe si los filtros sobran o faltan
     "decisions": pa.schema([
         ("ts_ms", I()), ("run_id", S()), ("condition_id", S()), ("kind", S()), ("strategy", S()),
         ("decision", S()), ("motivo", S()), ("edge_net", F()), ("detalle", S()),
+        ("experiment", S()), ("freshness_ms", I()), ("feed_state", S()), ("contaminado", B()),
+        ("signal_id", S()),     # si la señal llegó a existir, enlaza con su posición sombra
+    ]),
+    # salud del feed a lo largo del tiempo: sin esto no se puede separar el dato bueno del sucio
+    "feed_health": pa.schema([
+        ("ts_ms", I()), ("run_id", S()), ("experiment", S()), ("estado", S()), ("freshness_ms", I()),
+        ("p95_ms", I()), ("mensajes_por_segundo", F()), ("ultimo_mensaje_hace_ms", I()),
+        ("libros_validos", I()), ("libros_totales", I()), ("reconexiones", I()),
+        ("trade_feed_lag_s", I()), ("paginas_llenas", I()),
     ]),
     # Market Reaction Engine: cuánto tarda el precio en moverse tras un cambio en el partido
     "reactions": pa.schema([

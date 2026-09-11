@@ -11,6 +11,7 @@ import polars as pl
 
 from ..config import Config
 from ..discovery import MarketInfo
+from ..experimento import congelar, registrar
 from ..storage import ParquetWriter, latest_markets, latest_profiles, scan
 from ..wallets import WalletProfile
 from .engine import Engine
@@ -63,8 +64,11 @@ def run_replay(cfg: Config, start: str | None = None, end: str | None = None, co
         flows = flows.filter(pl.col("condition_id").is_in(list(conditions)))
 
     run_id = run_id or f"replay-{int(time.time())}"
+    exp = congelar(cfg, nota=f"replay {run_id}")
+    if persist:
+        registrar(cfg, exp)
     writer = ParquetWriter(data_dir, flush_seconds=10**9, flush_rows=10**9, subdir=f"run={run_id}") if persist else None
-    eng = Engine(cfg, run_id, "replay", writer)
+    eng = Engine(cfg, run_id, "replay", writer, experiment=exp.experiment_id)
     eng.set_markets(markets)
     prof = latest_profiles(data_dir)
     if prof is not None:

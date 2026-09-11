@@ -23,6 +23,32 @@ class Position:
     ts_exit: int = 0
     adverse: dict[int, float | None] = field(default_factory=dict)   # horizonte_ms -> mid - precio de entrada
     mid_previo: float | None = None  # último mid observado (estado del libro) para las marcas
+    obs_previa: tuple[float | None, float | None, float | None] | None = None   # (mid, bid, ask)
+    horizontes_hechos: set = field(default_factory=set)
+    cond_fill: dict[str, Any] = field(default_factory=dict)   # condiciones al poner la orden
+    # --- calidad del dato con el que se decidió, y versión del motor que decidió
+    experiment: str = ""
+    freshness_ms: int = 0
+    feed_state: str = "SANO"
+    contaminado: bool = False
+    # --- posición hipotética: se rechazó y se sigue solo para medir qué habría pasado
+    sombra: bool = False
+    motivo_rechazo: str = ""
+    # --- recorrido del precio tras el fill (en la ventana corta del ledger)
+    entrada_px: float | None = None
+    tick: float = 0.01
+    mfe: float | None = None
+    mae: float | None = None
+    t_mfe_ms: int | None = None
+    t_mae_ms: int | None = None
+    t_fav: dict[float, int] = field(default_factory=dict)    # ticks a favor -> ms hasta alcanzarlos
+    t_adv: dict[float, int] = field(default_factory=dict)
+    t_target_ms: int | None = None
+    t_stop_ms: int | None = None
+    # --- la cadena de retrasos, separada
+    proc_delay_ms: int = 0        # del evento de mercado a que el motor termina de procesarlo
+    decision_delay_ms: int = 0    # de ahí a que la señal existe
+    exec_delay_ms: int = 0        # de la señal a que la orden está puesta
     size_filled: float = 0.0
     cost: float = 0.0                # USD gastados (compras / colateral)
     fees: float = 0.0
@@ -44,6 +70,11 @@ class Position:
         o = self.orden_entrada or self.entrada_maker
         esc = o.escenarios() if o is not None else {}
         adv = {f"adverse_{_hz(h)}": (None if v is None else round(v, 5)) for h, v in self.adverse.items()}
+        mov = {f"t_fav_{_tk(k)}t_ms": v for k, v in self.t_fav.items()}
+        mov.update({f"t_adv_{_tk(k)}t_ms": v for k, v in self.t_adv.items()})
+        antes = None
+        if self.t_target_ms is not None or self.t_stop_ms is not None:
+            antes = self.t_target_ms is not None and (self.t_stop_ms is None or self.t_target_ms <= self.t_stop_ms)
         hold = (self.ts_exit - self.ts_fill) / 1000 if (self.ts_fill and self.ts_exit and self.size_filled > 0) else None
         return {
             "run_id": run_id, "mode": mode, "signal_id": s.signal_id, "kind": s.kind, "condition_id": s.condition_id,
@@ -65,12 +96,25 @@ class Position:
             "vol_cruzado": None if o is None else round(o.vol_cruzado, 4),
             "barrido": None if o is None else bool(o.barrido),
             "edge_taker": s.meta.get("edge_taker"),
-            **adv,
+            "experiment": self.experiment, "freshness_ms": self.freshness_ms, "feed_state": self.feed_state,
+            "contaminado": self.contaminado, "sombra": self.sombra, "motivo_rechazo": self.motivo_rechazo,
+            "mfe": None if self.mfe is None else round(self.mfe, 5),
+            "mae": None if self.mae is None else round(self.mae, 5),
+            "t_mfe_ms": self.t_mfe_ms, "t_mae_ms": self.t_mae_ms,
+            "t_target_ms": self.t_target_ms, "t_stop_ms": self.t_stop_ms, "target_antes_que_stop": antes,
+            "proc_delay_ms": self.proc_delay_ms, "decision_delay_ms": self.decision_delay_ms,
+            "exec_delay_ms": self.exec_delay_ms,
+            **adv, **mov,
         }
 
 
 def _hz(h: int) -> str:
     return f"{h}ms" if h < 1000 else f"{h // 1000}s"
+
+
+def _tk(k: float) -> str:
+    """0.5 -> '05', 1 -> '1', 2 -> '2'. Los nombres de columna no admiten el punto."""
+    return "05" if abs(k - 0.5) < 1e-9 else str(int(k))
 
 
 def signal_row(s: Signal, run_id: str) -> dict[str, Any]:

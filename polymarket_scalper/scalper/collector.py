@@ -31,6 +31,7 @@ from .discovery import GammaClient, MarketInfo, discover_markets, discover_updow
 from .flow import DataApi, FlowPoller, flow_row
 from .keepawake import KeepAwake
 from .sports_feed import SportsFeed, normalize_game, state_key
+from .salud import Salud
 from .storage import ParquetWriter, dumps
 from .wallets import WalletTracker
 
@@ -238,8 +239,8 @@ class Collector:
                         "best_ask": _fnum(ch.get("best_ask")), "hash": ch.get("hash", ""),
                         "recv_ms": recv, "delta_size": delta,
                     })
-                await self._emit(("delta", ts, tid, book, {"side": ch.get("side", ""), "price": price, "size": size,
-                                                            "delta": delta}))
+                await self._emit(("delta", ts, tid, book, {"side": ch.get("side", ""), "price": price,
+                                                            "size": size, "delta": delta, "recv_ms": recv}))
         elif et == "last_trade_price":
             tid = msg.get("asset_id", "")
             cid = self.token_to_cid.get(tid, msg.get("market", ""))
@@ -272,7 +273,7 @@ class Collector:
                 "asks": dumps([[float(l["price"]), float(l["size"])] for l in asks]),
                 "hash": hash_, "source": source, "recv_ms": recv_ms or now_ms(),
             })
-        await self._emit(("book", ts, tid, book))
+        await self._emit(("book", ts, tid, book, {"recv_ms": recv_ms or now_ms()}))
 
     # ------------------------------------------------------------------ cripto: precio y ventanas
     async def _on_price(self, row: dict[str, Any]) -> None:
@@ -545,6 +546,27 @@ class Collector:
             log.info("estado: mercados=%d libros_validos=%d/%d ws=%s eventos=%s filas=%s%s",
                      len(self.markets), valid, len(self.books), self.pool.stats(), dict(self.stats),
                      dict(self.writer.rows_written), extra)
+
+    def salud_feed(self) -> "Salud":
+        """Estado del feed ahora mismo, con todo lo que hace falta para poder marcar datos sucios."""
+        from .salud import Umbrales, evaluar
+        c = self.cfg.salud
+        lat = self.latencia()
+        ahora = now_ms()
+        ultimo = max((c.last_msg_ts for c in self.pool.conns), default=0.0)
+        hace = (ahora / 1000 - ultimo) * 1000 if ultimo else 0.0
+        transcurrido = max((ahora - self.started_ms) / 1000, 1e-9)
+        return evaluar(
+            lat["mediana"] if lat else 0.0, hace,
+            Umbrales(c.sano_ms, c.degradado_ms, c.sin_mensajes_viejo_s, c.sin_mensajes_congelado_s),
+            p95_ms=lat["p95"] if lat else 0,
+            mensajes_por_segundo=sum(x.messages for x in self.pool.conns) / transcurrido,
+            libros_validos=sum(1 for b in self.books.values() if b.is_valid),
+            libros_totales=len(self.books),
+            reconexiones=sum(x.reconnects for x in self.pool.conns),
+            trade_feed_lag_s=self.flow.lag_seconds if self.flow is not None else -1,
+            paginas_llenas=self.flow.paginas_llenas if self.flow is not None else 0,
+        )
 
     def latencia(self) -> dict[str, float] | None:
         """Retraso entre el reloj del exchange y el nuestro, sobre los últimos mensajes del CLOB."""

@@ -7,6 +7,7 @@ import time
 
 from ..collector import Collector
 from ..config import Config
+from ..experimento import congelar, registrar
 from ..storage import ParquetWriter
 from .engine import Engine
 
@@ -16,9 +17,16 @@ log = logging.getLogger(__name__)
 async def run_paper(cfg: Config, duration_seconds: int | None = None, run_id: str | None = None,
                     persist_market_data: bool = True) -> Engine:
     run_id = run_id or f"paper-{int(time.time())}"
+    # congelar el motor antes de empezar: si algo que decide cambia, esto será otro experimento
+    exp = congelar(cfg, nota=f"paper {run_id}")
+    registrar(cfg, exp)
+    log.info("motor congelado:\n%s", exp.resumen())
+    if exp.dirty:
+        log.warning("el árbol de trabajo tiene cambios sin comprometer: los datos de esta corrida "
+                    "no se podrán reproducir exactamente")
     col = Collector(cfg, persist=persist_market_data)
     writer = ParquetWriter(cfg.data_dir, cfg.collector.flush_seconds, cfg.collector.flush_rows, subdir=f"run={run_id}")
-    eng = Engine(cfg, run_id, "paper", writer)
+    eng = Engine(cfg, run_id, "paper", writer, experiment=exp.experiment_id)
     eng.attach_books(col.books)
     if col.wallets is not None:
         eng.attach_wallets(col.wallets.profiles)
@@ -28,8 +36,7 @@ async def run_paper(cfg: Config, duration_seconds: int | None = None, run_id: st
         while True:
             await asyncio.sleep(1)
             # el motor necesita saber si está mirando un libro viejo antes de decidir nada
-            lat = col.latencia()
-            eng.feed_lag_ms = int(lat["mediana"]) if lat else 0
+            eng.registrar_salud(int(time.time() * 1000), col.salud_feed())
             eng.tick(int(time.time() * 1000))
             writer.maybe_flush()
 

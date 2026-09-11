@@ -120,6 +120,26 @@ class UpDownCfg(BaseModel):
     default_annual_vol: float = 0.6
 
 
+class SaludCfg(BaseModel):
+    """Umbrales que definen cuándo el feed deja de servir. Son hipótesis: se miden y se revisan."""
+    sano_ms: int = 1000
+    degradado_ms: int = 5000
+    sin_mensajes_viejo_s: float = 15
+    sin_mensajes_congelado_s: float = 60
+    registro_segundos: float = 15        # cada cuánto se guarda una fila de salud del feed
+
+
+class ValidacionCfg(BaseModel):
+    """Cuánto se sigue el precio después de un fill. Solo mide: no cambia ninguna decisión."""
+    seguimiento_s: float = 900          # hasta dónde se sigue la trayectoria (el time stop actual)
+    ledger_horizonte_s: float = 60      # MAE/MFE del ledger: la ventana de scalping que importa
+    horizontes_ms: list[int] = Field(default_factory=lambda: [
+        100, 500, 1_000, 2_000, 5_000, 10_000, 30_000, 60_000, 120_000, 300_000, 600_000, 900_000])
+    ticks_movimiento: list[float] = Field(default_factory=lambda: [0.5, 1.0, 2.0, 3.0])
+    sombras: bool = True                # seguir las señales rechazadas para saber qué nos perdimos
+    max_sombras: int = 60
+
+
 class RetentionCfg(BaseModel):
     enabled: bool = True
     run_hours: float = 24            # cada cuánto corre dentro del recolector
@@ -169,15 +189,13 @@ class SimCfg(BaseModel):
     time_stop_directional_seconds: int = 900       # scalping: si no convergió en 15 min, fuera
     max_hold_directional_seconds: int = 4 * 3600   # tope duro por si el time stop no puede ejecutarse (sin libro)
     max_entry_slip_ticks: int = 3
-    # Si el feed del CLOB va más atrasado que esto, el libro que vemos ya no describe el mercado
-    # y no se abren posiciones. Medido: mediana ~0,7 s, pero con tramos de decenas de segundos.
-    max_feed_lag_ms: int = 5000        # 0 = sin límite
     start_cash: float = 1000
     max_position_usd: float = 60
     max_market_exposure_usd: float = 120           # suma de colateral abierto en el mismo mercado
     max_game_exposure_usd: float = 180             # suma en mercados del mismo partido/evento
     max_open_positions: int = 15
-    adverse_horizons_ms: list[int] = Field(default_factory=lambda: [100, 500, 1000, 2000, 5000, 10000])
+    adverse_horizons_ms: list[int] = Field(default_factory=lambda: [100, 500, 1000, 2000, 5000, 10000,
+                                                                   30000, 60000])
     seed: int = 7
 
 
@@ -191,6 +209,8 @@ class Config(BaseModel):
     models: ModelsCfg = Field(default_factory=ModelsCfg)
     learn: LearnCfg = Field(default_factory=LearnCfg)
     retention: RetentionCfg = Field(default_factory=RetentionCfg)
+    salud: SaludCfg = Field(default_factory=SaludCfg)
+    validacion: ValidacionCfg = Field(default_factory=ValidacionCfg)
     updown: UpDownCfg = Field(default_factory=UpDownCfg)
     signals: SignalsCfg = Field(default_factory=SignalsCfg)
     sim: SimCfg = Field(default_factory=SimCfg)

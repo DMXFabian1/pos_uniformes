@@ -103,13 +103,13 @@ def test_tope_de_exposicion_por_mercado_rechaza_y_lo_anota(cfg):
                   0.05, 0.0, 0.05, 0.5, "directional", {"entry_role": "maker"})
     eng.positions.append(Position(signal=otra, exec_ts=10**12))
     eng.on_game(2000, "g1", _game(score="100-88", period="Q4", elapsed="06:00", live=True))
-    assert len(eng.positions) == 1 and eng.stats["no_trade_tope_exposicion"] == 1
+    assert len(eng.reales) == 1 and eng.stats["no_trade_tope_exposicion"] == 1
     # y con tope holgado, sí entra, pero recortada al hueco que queda
     cfg.sim.max_market_exposure_usd = 50
     eng._ultima_decision.clear()
     eng.on_game(2300, "g1", _game(score="100-89", period="Q4", elapsed="05:50", live=True))
-    assert len(eng.positions) == 2
-    nueva = eng.positions[1].signal
+    assert len(eng.reales) == 2
+    nueva = eng.reales[1].signal
     assert nueva.size * nueva.legs[0].price <= 15 + 1e-6
 
 
@@ -159,7 +159,9 @@ def test_una_salida_rapida_espera_a_completar_las_marcas_antes_de_ir_al_ledger(c
     assert pos.status == "closed" and pos.exit_reason == "target"
     assert pos in eng._por_escribir                            # todavía no está en el ledger
     eng.tick(3600)
-    eng.tick(13_500)                                           # +10 s: ya puede escribirse
+    eng.tick(13_500)
+    assert pos in eng._por_escribir                            # faltan los horizontes de 30 y 60 s
+    eng.tick(63_500)                                           # +60 s: ya está todo medido
     assert pos not in eng._por_escribir
     w.close()
     assert scan(tmp_path, "ledger").collect().height == 1
@@ -219,8 +221,8 @@ def test_el_motor_rechaza_lo_que_no_llega_al_minimo_medido(cfg):
     eng._ultima_decision.clear()
     eng.minimos = {"NBA_DIRECTIONAL": edge + 0.01}          # como si el ledger pidiera más
     eng.on_game(2400, "g1", _game(score="100-89", period="Q4", elapsed="05:50", live=True))
-    assert not eng.positions
-    assert eng.stats["skipped_bajo_minimo"] == 1 and eng.stats["no_trade_bajo_el_minimo_requerido"] == 1
+    assert not eng.reales and len(eng.sombras) == 1        # se sigue como sombra, sin tocar dinero
+    assert eng.stats["skipped_bajo_el_minimo_requerido"] == 1 and eng.stats["no_trade_bajo_el_minimo_requerido"] == 1
 
 
 def test_sin_muestra_suficiente_el_minimo_no_filtra(cfg, tmp_path):
@@ -243,11 +245,10 @@ def test_sin_muestra_suficiente_el_minimo_no_filtra(cfg, tmp_path):
 def test_con_el_feed_atrasado_no_se_abre_nada(cfg):
     """Un libro de hace medio minuto no describe el mercado: operarlo es operar a ciegas."""
     eng, m, h, a = _nba(cfg)
-    cfg.sim.max_feed_lag_ms = 5000
-    eng.feed_lag_ms = 30_000
+    eng.feed_lag_ms = 30_000                               # el umbral vive en cfg.salud.degradado_ms
     eng.on_game(2000, "g1", _game(score="100-88", period="Q4", elapsed="06:00", live=True))
-    assert not eng.positions and eng.stats["no_trade_feed_atrasado"] == 1
+    assert not eng.reales and eng.stats["no_trade_feed_atrasado"] == 1
     eng.feed_lag_ms = 400                                  # el feed se pone al día
     eng._ultima_decision.clear()
     eng.on_game(2400, "g1", _game(score="100-89", period="Q4", elapsed="05:50", live=True))
-    assert eng.positions
+    assert eng.reales
