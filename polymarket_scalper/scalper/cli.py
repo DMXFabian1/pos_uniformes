@@ -212,6 +212,13 @@ def cmd_dashboard(args: argparse.Namespace) -> None:
     serve(cfg, args.host, args.port, args.refresh)
 
 
+def cmd_updown_study(args: argparse.Namespace) -> None:
+    from .studies import estudiar, formatear
+
+    cfg = load_config(args.config)
+    print(formatear(estudiar(cfg.data_dir, args.offset, args.size)))
+
+
 def cmd_train(args: argparse.Namespace) -> None:
     from .learn.train import format_reports, train_all
 
@@ -404,6 +411,11 @@ def main(argv: list[str] | None = None) -> None:
     s.add_argument("--snapshot", help="en vez de servir, guardar una página autónoma con los datos actuales")
     s.add_argument("--run-id")
     s.set_defaults(fn=cmd_dashboard)
+
+    s = sub.add_parser("updown-study", help="¿el sesgo al abrir una ventana es información o sobrerreacción?")
+    s.add_argument("--offset", type=float, default=20, help="segundos tras la apertura en que se mide el precio")
+    s.add_argument("--size", type=float, default=50, help="shares por operación en el cálculo")
+    s.set_defaults(fn=cmd_updown_study)
 
     s = sub.add_parser("train", help="fase 5: entrenar P(ganancia) por tipo de señal desde el ledger")
     s.add_argument("--kind", action="append")

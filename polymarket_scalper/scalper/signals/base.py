@@ -86,6 +86,7 @@ class MarketContext:
     wallets: dict[str, Any] = field(default_factory=dict)           # wallet -> WalletProfile
     updown: UpDownState | None = None               # ventana "Up or Down" activa
     updown_prob: float | None = None                # P(Up) del modelo de difusión
+    prev_window: dict[str, Any] | None = None       # cómo terminó la ventana anterior del símbolo
 
     def book(self, token_id: str) -> OrderBook | None:
         return self.books.get(token_id) or self.event_books.get(token_id)

@@ -21,6 +21,7 @@ NUMERIC = [
     "spread_ticks", "tpm", "mid_vol", "imbalance", "bid_depth", "ask_depth", "fee_rate", "tick_size",
     "volume_24h_log", "p_model", "p_market", "deviation", "tau", "lead", "pregame", "has_pregame",
     "wallet_score", "wallet_n_log", "wallet_roi", "their_usd_log", "hour_utc", "dow", "is_maker",
+    "moneyness_bps", "elapsed_s", "seconds_left", "window_s", "market_skew", "prev_up_won", "prev_return_bps",
 ]
 CATEGORICAL = ["category", "sport", "league", "side", "sports_market_type", "horizon"]
 
@@ -104,6 +105,11 @@ def build_features(s: Signal, m: MarketInfo | None, ts_ms: int, book: OrderBook 
         "pregame": meta.get("pregame") or 0.0, "has_pregame": 1.0 if meta.get("pregame") is not None else 0.0,
         "wallet_score": meta.get("wallet_score", 0.0) or 0.0, "wallet_n_log": _log1p(meta.get("wallet_n", 0)),
         "wallet_roi": meta.get("wallet_roi", 0.0) or 0.0, "their_usd_log": _log1p(meta.get("their_usd", 0)),
+        "moneyness_bps": meta.get("moneyness_bps") or 0.0, "elapsed_s": meta.get("elapsed_s") or 0.0,
+        "seconds_left": meta.get("seconds_left") or 0.0, "window_s": meta.get("window_s") or 0.0,
+        "market_skew": meta.get("market_skew") or 0.0,
+        "prev_up_won": 1.0 if meta.get("prev_up_won") else (0.0 if meta.get("prev_up_won") is False else 0.5),
+        "prev_return_bps": meta.get("prev_return_bps") or 0.0,
         "hour_utc": dt.hour, "dow": dt.weekday(),
         "is_maker": 1.0 if any(l.role == "maker" for l in s.legs) else 0.0,
         "category": m.category if m else "", "sport": meta.get("sport", ""), "league": meta.get("league", ""),

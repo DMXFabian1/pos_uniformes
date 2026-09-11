@@ -144,6 +144,21 @@ de referencia en vivo y el bot lo escucha.
   abrir la ventana el modelo vale exactamente 0,50, así que operar ahí es apostar a que el sesgo
   del mercado es ruido. Si eso es cierto solo lo dirá el ledger con cientos de posiciones.
 
+### ¿Conviene ir a favor o en contra de la racha? (`scalper updown-study`)
+Al abrir una ventana, el precio de referencia y el strike son casi iguales, así que la
+probabilidad real es ~0,50. Pero el libro no arranca en 0,50: arranca sesgado por cómo terminó la
+ventana anterior. Ese sesgo puede ser **información** (el mercado sabe algo) o **sobrerreacción**
+(memoria de la racha). La diferencia decide si conviene seguir la racha o ir en contra.
+
+`scalper updown-study` lo mide con los datos recogidos: toma cada ventana resuelta, mira el precio
+del token "Up" a los 20 segundos de abrir, lo compara con el resultado real y calcula lo que
+habría dado cada estrategia con la comisión del 7 % incluida. Si con cientos de ventanas "ir en
+contra" sale positivo, la sobrerreacción es real y explotable; si sale negativo, el sesgo era
+información y seguirla era lo correcto. El informe avisa cuando la muestra es demasiado pequeña.
+
+El arrastre también viaja como feature de cada señal (`prev_up_won`, `prev_return_bps`,
+`market_skew`, `elapsed_s`), así que el modelo de la fase 5 lo aprende por su cuenta.
+
 ### Detectores in-play y de dinero inteligente
 - **model_deviation**: para cada token enlazado a un partido en vivo, si
   `p_modelo − ask − fee(entrada) − costo de salida > umbral`, compra como taker. Sale cuando el

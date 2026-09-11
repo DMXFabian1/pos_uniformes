@@ -55,6 +55,8 @@ class Engine:
         self.updown_model = UpDownModel(cfg.updown.annual_vol, cfg.updown.default_annual_vol)
         self.updown: dict[str, dict[str, Any]] = {}
         self.spot: dict[str, tuple[int, float]] = {}
+        # arrastre: cómo terminó la ventana anterior del mismo símbolo (la "racha" que ve el mercado)
+        self.prev_window: dict[str, dict[str, Any]] = {}
         lc = cfg.learn
         self.scorer = Scorer(ModelStore(cfg.data_dir), lc.shrink_n, lc.min_train, lc.min_p_win, lc.size_floor, lc.enabled)
 
@@ -154,7 +156,13 @@ class Engine:
     def on_updown_settle(self, ts_ms: int, condition_id: str, info: dict[str, Any]) -> None:
         """La ventana venció: las posiciones abiertas cobran 1 por share del lado ganador."""
         self.now_ms = max(self.now_ms, ts_ms)
-        self.updown.pop(condition_id, None)
+        w = self.updown.pop(condition_id, None)
+        if w is not None and info.get("up_won") is not None:
+            strike, cierre = w.get("strike"), info.get("settle_price")
+            self.prev_window[w["symbol"]] = {
+                "up_won": bool(info["up_won"]), "end_ms": w["end_ms"],
+                "return_bps": round((cierre / strike - 1) * 10000, 3) if (strike and cierre) else None,
+            }
         ganador = info.get("winner_token")
         for pos in [p for p in self.positions if p.status == "open" and p.signal.condition_id == condition_id]:
             pago = sum(sh for t, sh in pos.inventory.items() if t == ganador and sh > 0)
@@ -359,7 +367,8 @@ class Engine:
         ud, p_up = self._updown_state(m.condition_id)
         return MarketContext(m, books, self.history, sibs, ebooks, game=g, model_prob=wp, pregame=pre,
                             outcome_side=self.outcome_side.get(m.condition_id, {}), wallets=self.wallets,
-                            updown=ud, updown_prob=p_up)
+                            updown=ud, updown_prob=p_up,
+                            prev_window=self.prev_window.get(ud.symbol) if ud is not None else None)
 
     def _on_signal(self, s: Signal) -> None:
         self.stats["signals"] += 1

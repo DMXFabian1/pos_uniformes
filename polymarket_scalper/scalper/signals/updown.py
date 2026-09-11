@@ -56,6 +56,12 @@ class UpDownDetector:
                       "strike": st.strike, "spot": st.spot, "seconds_left": round(st.seconds_left, 1),
                       "tau": round(st.tau, 4), "window_s": st.window_seconds,
                       "moneyness_bps": round((st.spot / st.strike - 1) * 10000, 2) if st.strike else None,
-                      "sport": "crypto", "league": st.symbol},
+                      "sport": "crypto", "league": st.symbol,
+                      # arrastre de la ventana anterior: así el ledger puede medir si el sesgo
+                      # de apertura que deja la racha es información o sobrerreacción
+                      "prev_up_won": (ctx.prev_window or {}).get("up_won"),
+                      "prev_return_bps": (ctx.prev_window or {}).get("return_bps"),
+                      "elapsed_s": round(st.window_seconds - st.seconds_left, 1),
+                      "market_skew": round((b.mid - 0.5) * (1 if es_up else -1), 4)},
             ))
         return out
