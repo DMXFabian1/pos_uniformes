@@ -200,3 +200,17 @@ def test_el_triplete_bruto_ejecutable_conservador_y_realizado():
     assert e.edge_conservador == -0.004   # si hubiera que salir al bid de ese momento
     assert e.edge_realizado == 0.01       # lo que llegó al bolsillo
     assert "conservador" in formatear([e])
+
+
+def test_las_filas_del_dado_no_cuentan_como_evidencia():
+    """Una entrada maker sin escenarios de llenado es de cuando el fill salía de un dado."""
+    vieja = _fila(0, role="maker", pnl=26.0, cons=None, opt=None)
+    vieja["fill_conservador"] = None
+    vieja["fill_optimista"] = None
+    nueva = _fila(1, role="maker", pnl=-1.0)
+    taker_viejo = _fila(2, role="taker", pnl=2.0)
+    taker_viejo["fill_conservador"] = None
+    e = evaluar_filas([vieja, nueva, taker_viejo])
+    assert e.descartadas_del_dado == 1
+    assert e.n == 2 and e.pnl == 1.0            # la vieja de +26 queda fuera; la taker se queda
+    assert "anteriores a esta medición" in formatear([e])

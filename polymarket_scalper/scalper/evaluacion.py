@@ -84,6 +84,7 @@ class Estrategia:
     salidas: dict[str, int] = field(default_factory=dict)
     deciles: list[dict[str, Any]] = field(default_factory=list)
     estres: dict[str, float] = field(default_factory=dict)
+    descartadas_del_dado: int = 0     # filas viejas, generadas cuando el llenado salía de un dado
 
     def to_dict(self) -> dict[str, Any]:
         d = dict(self.__dict__)
@@ -122,6 +123,17 @@ def _meta(row: dict[str, Any]) -> dict[str, Any]:
         return json.loads(row.get("meta") or "{}")
     except json.JSONDecodeError:
         return {}
+
+
+def es_del_dado(row: dict[str, Any]) -> bool:
+    """¿Esta fila la generó el modelo de llenado por azar que ya no existe?
+
+    Una entrada maker anterior al modelo de cola no trae los escenarios de llenado. Su resultado
+    depende de una probabilidad inventada, así que no puede contar como evidencia de nada. Las
+    entradas taker no usaban el dado y sí cuentan.
+    """
+    rol = row.get("entry_role") or _meta(row).get("entry_role")
+    return rol == "maker" and row.get("fill_conservador") is None
 
 
 def _strategy(row: dict[str, Any]) -> str:
@@ -237,6 +249,12 @@ def evaluar_filas(filas: list[dict[str, Any]], baseline: float = 0.6,
     """Todas las métricas de un grupo de filas del ledger que comparten estrategia."""
     nombre = _strategy(filas[0]) if filas else "?"
     e = Estrategia(strategy=nombre)
+    # lo primero: fuera las filas que produjo el modelo de llenado por azar
+    viejas = [r for r in filas if es_del_dado(r)]
+    e.descartadas_del_dado = len(viejas)
+    filas = [r for r in filas if not es_del_dado(r)]
+    if not filas:
+        return e
     validas = [r for r in filas if (r.get("size_filled") or 0) > 0
                and r.get("exit_reason") not in CIERRES_EXCLUIDOS]
     e.ejecucion = _ejecucion(filas, baseline)
@@ -343,6 +361,11 @@ def formatear(ests: list[Estrategia]) -> str:
     out.append("")
     out.append("La columna 'referencia' es el 60 % que se suponía antes de medir. No es un resultado:")
     out.append("es el número que había que comprobar. Lo que decide es 'llenadas' contra 'break-even'.")
+    descartadas = sum(e.descartadas_del_dado for e in ests)
+    if descartadas:
+        out.append("")
+        out.append(f"Se dejaron fuera {descartadas} posiciones anteriores a esta medición: su llenado salía")
+        out.append("de una probabilidad inventada, así que no dicen nada sobre si la estrategia funciona.")
     out.append("")
     out.append("== ¿Cuánta ventaja hace falta y cuánta llega al bolsillo? ==")
     out.append(f"{'estrategia':24}{'edge mín.':>11}{'% señales':>11}{'bruto':>9}{'ejecutable':>12}"
