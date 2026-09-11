@@ -48,6 +48,15 @@ NARANJA = "🟠 PROBLEMA DE EJECUCIÓN"
 ROJO = "🔴 VALOR ESPERADO NEGATIVO"
 NEGRO = "⚫ DATO NO VÁLIDO"
 
+# Vocabulario aparte para la columna de llenado. Reutilizar el semáforo de rentabilidad ahí era
+# justo la confusión que esta fase tiene prohibida: que una orden se llene no dice nada de si el
+# trade gana. TENNIS_SPREAD_CAPTURE salía 🟢 EVIDENCIA POSITIVA en la tabla de llenado mientras su
+# intervalo de confianza estaba entero por debajo de cero.
+LLENA_OK = "🟢 SE LLENA LO NECESARIO"
+LLENA_CORTO = "🟠 NO SE LLENA LO NECESARIO"
+LLENA_POCO = "🟡 DATOS INSUFICIENTES"
+LLENA_SIN_MEDIDA = "⚪ SIN TASA NECESARIA"
+
 # Tramos fijos de ventaja, en porcentaje sobre el precio de entrada.
 TRAMOS_EDGE: tuple[tuple[str, float, float], ...] = (
     ("0-1 %", 0.0, 0.01), ("1-2 %", 0.01, 0.02), ("2-3 %", 0.02, 0.03), ("3-4 %", 0.03, 0.04),
@@ -211,11 +220,20 @@ class Llenado:
     espera_mediana_s: float | None = None
     cola_mediana: float | None = None
     barridas: int = 0
-    estado: str = AMARILLO
+    estado: str = LLENA_POCO
+    corto: bool = False               # se llena menos de lo que haría falta para batir al taker
     sensibilidad: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return dict(self.__dict__)
+
+
+def _edge_taker(r: dict[str, Any]) -> float | None:
+    """La ventaja de cruzar que calculó el detector. `None` cuando no se registró."""
+    v = r.get("edge_taker")
+    if v is None:
+        v = _meta(r).get("edge_taker")
+    return None if v is None else float(v)
 
 
 def llenado(d: Datos) -> list[Llenado]:
@@ -239,13 +257,19 @@ def llenado(d: Datos) -> list[Llenado]:
         maker = [r for r in validas if (r.get("entry_role") or _meta(r).get("entry_role")) == "maker"]
         pnls = [r["realized_pnl"] for r in maker]
         media_llenada = _media(pnls)
-        # lo que daría cruzar el libro: la ventaja taker que el detector calculó, por el tamaño
-        cruzar = _media([(r.get("edge_taker") if r.get("edge_taker") is not None else _meta(r).get("edge_taker") or 0.0)
-                         * (r.get("size_filled") or 0) for r in maker])
-        if media_llenada and media_llenada > 0:
-            L.requerida = round(max(0.0, min((cruzar or 0.0) / media_llenada, 1.0)), 4)
+        # Lo que daría cruzar el libro: la ventaja taker que el detector calculó, por el tamaño.
+        # Una ventaja taker que no se registró es desconocida, no cero: darla por cero convertiría
+        # la tasa necesaria en 0 % y cualquier llenado pasaría el examen sin haberlo medido.
+        takers = [_edge_taker(r) for r in maker]
+        con_taker = [(t, r) for t, r in zip(takers, maker) if t is not None]
+        cruzar = (_media([t * (r.get("size_filled") or 0) for t, r in con_taker])
+                  if len(con_taker) == len(maker) and maker else None)
+        if cruzar is None:
+            L.requerida = None
+        elif media_llenada and media_llenada > 0:
+            L.requerida = round(max(0.0, min(cruzar / media_llenada, 1.0)), 4)
         elif media_llenada is not None and media_llenada <= 0:
-            L.requerida = 1.0 if (cruzar or 0) <= 0 else 1.0     # perdiendo por operación, ninguna tasa salva
+            L.requerida = 1.0                                    # perdiendo por operación, ninguna tasa salva
         # sensibilidad: qué valor esperado por orden daría cada tasa de llenado
         limpios = [r["realized_pnl"] for r in maker if not r.get("barrido")]
         media_limpia = _media(limpios)
@@ -257,17 +281,24 @@ def llenado(d: Datos) -> list[Llenado]:
                 "pnl_esperado": None if media_llenada is None else round(p * media_llenada * max(len(obs), len(maker)), 2),
                 "drawdown": _drawdown_esperado(pnls, p),
             })
+        L.corto = bool(L.ordenes >= 3 and L.tasa is not None and L.requerida is not None
+                       and L.tasa < L.requerida)
         L.estado = _semaforo_llenado(L, len(validas))
         out.append(L)
     return out
 
 
 def _semaforo_llenado(L: Llenado, n_validas: int) -> str:
-    if L.ordenes >= 3 and L.tasa is not None and L.requerida is not None and L.tasa < L.requerida:
-        return NARANJA
+    """Veredicto **solo sobre el llenado**. No dice nada de si la estrategia gana."""
+    if L.corto:
+        return LLENA_CORTO
+    if L.requerida is None:
+        # Sin tasa necesaria no hay contra qué comparar: la captura de spread entra por los dos
+        # lados, así que no existe un "cruzar en vez de esperar" con el que medirla.
+        return LLENA_SIN_MEDIDA
     if n_validas < 20:
-        return AMARILLO
-    return VERDE
+        return LLENA_POCO
+    return LLENA_OK
 
 
 # --------------------------------------------------------------------------- 3: edge mínimo
@@ -595,7 +626,7 @@ def estado_por_estrategia(d: Datos, lls: list[Llenado]) -> list[Estado]:
         L = por_ll.get(est)
         if not validas and sucias:
             semaforo, motivo = NEGRO, "todas las posiciones se tomaron con el feed viejo o congelado"
-        elif L is not None and L.estado == NARANJA:
+        elif L is not None and L.corto:
             semaforo = NARANJA
             motivo = (f"se llena el {L.tasa * 100:.0f} % de las órdenes y haría falta el "
                       f"{L.requerida * 100:.0f} %")
@@ -745,7 +776,7 @@ def formatear(inf: Informe) -> str:  # noqa: C901 - es un informe, se lee de arr
     # ---- 1 y 2
     L.append("-- 1 y 2. ¿SE LLENAN LAS ÓRDENES, Y HACEN FALTA MÁS? -------------------------------")
     L.append(f"{'estrategia':24}{'órdenes':>9}{'llenado':>9}{'conserv.':>10}{'optim.':>9}"
-             f"{'necesario':>11}{'espera':>9}{'cola':>8}  estado")
+             f"{'necesario':>11}{'espera':>9}{'cola':>8}  ¿se llena? (no dice si gana)")
     L.append("-" * 100)
     for x in inf.llenado:
         espera = "-" if x.espera_mediana_s is None else f"{x.espera_mediana_s:.1f} s"

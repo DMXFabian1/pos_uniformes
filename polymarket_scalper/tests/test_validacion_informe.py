@@ -324,3 +324,29 @@ def test_el_score_de_frescura_decae_a_la_mitad_cada_segundo():
     # Con el reloj desfasado, la escala se mide desde el suelo, no desde cero.
     assert freshness_score(-200, desfase_ms=-200) == 1.0
     assert freshness_score(800, desfase_ms=-200) == 0.5
+
+
+def test_que_una_orden_se_llene_no_es_un_veredicto_sobre_si_gana(tmp_path):
+    # Caso real: TENNIS_SPREAD_CAPTURE se llenaba bien y salía 🟢 EVIDENCIA POSITIVA en la tabla de
+    # llenado, mientras su intervalo de confianza estaba entero por debajo de cero. La columna de
+    # llenado responde a "¿se llena?", nunca a "¿gana?".
+    from scalper.validacion import LLENA_OK, LLENA_SIN_MEDIDA
+    ledger = [_fila(i, pnl=-3.0, edge_taker=0.0) for i in range(25)]
+    fills = [_obs(i) for i in range(25)]
+    _escribir(tmp_path, ledger=ledger, fills=fills)
+    inf = analizar(tmp_path)
+    assert inf.llenado[0].estado in (LLENA_OK, LLENA_SIN_MEDIDA)
+    assert VERDE not in inf.llenado[0].estado
+    assert inf.estados[0].semaforo == ROJO      # el veredicto de verdad sigue siendo el de abajo
+
+
+def test_sin_tasa_necesaria_el_llenado_no_se_da_por_bueno(tmp_path):
+    # La captura de spread entra por los dos lados: no hay "cruzar en vez de esperar" con el que
+    # comparar, así que no se puede decir que se llene lo suficiente. Se dice que no hay medida.
+    from scalper.validacion import LLENA_SIN_MEDIDA
+    ledger = [_fila(i, pnl=1.0, edge_taker=None) for i in range(25)]
+    fills = [_obs(i) for i in range(25)]
+    _escribir(tmp_path, ledger=ledger, fills=fills)
+    inf = analizar(tmp_path)
+    assert inf.llenado[0].requerida is None
+    assert inf.llenado[0].estado == LLENA_SIN_MEDIDA

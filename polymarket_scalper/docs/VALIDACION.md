@@ -168,6 +168,18 @@ Son etiquetas de confianza, no garantías estadísticas.
 | 🔴 VALOR ESPERADO NEGATIVO | el intervalo queda entero por debajo de cero |
 | ⚫ DATO NO VÁLIDO | se decidió con el feed viejo o congelado |
 
+La columna de llenado tiene **su propio vocabulario**, y a propósito: 🟢 SE LLENA LO NECESARIO,
+🟠 NO SE LLENA LO NECESARIO, 🟡 DATOS INSUFICIENTES, ⚪ SIN TASA NECESARIA. Reutilizar allí el
+semáforo de rentabilidad era exactamente la confusión que esta fase tiene prohibida: en la primera
+corrida, TENNIS_SPREAD_CAPTURE aparecía como 🟢 EVIDENCIA POSITIVA en la tabla de llenado —porque
+sus órdenes se llenaban— mientras su intervalo de confianza estaba entero por debajo de cero. Que
+una orden se llene no dice nada de si el trade gana.
+
+Y ⚪ no es un aprobado tímido: es que no hay contra qué comparar. La tasa necesaria sale de dividir
+lo que daría cruzar el libro entre lo que deja esperar en la cola; si la ventaja taker no está
+registrada, no es cero, es desconocida. Darla por cero haría que cualquier llenado pasara el examen
+sin haberlo medido.
+
 **Verde no significa que gane: significa que se ha demostrado que gana.** Naranja no significa que
 pierda: significa que la ejecución se come la ventaja. Amarillo es la respuesta honesta la mayor
 parte del tiempo.
