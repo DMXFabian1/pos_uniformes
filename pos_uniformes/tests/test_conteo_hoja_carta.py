@@ -10,7 +10,16 @@ from types import SimpleNamespace
 
 import pytest
 
-from pos_uniformes.services import conteo_hoja_carta_service as hoja
+pytest.importorskip("PyQt6.QtPrintSupport")
+
+from PyQt6.QtWidgets import QApplication  # noqa: E402
+
+from pos_uniformes.services import conteo_hoja_carta_service as hoja  # noqa: E402
+
+# La QApplication nace al importar, como en los demás archivos de Qt: si nace
+# dentro de un test, al salir del proceso Qt destruye las cosas en mal orden
+# y aborta ("Fatal Python error: Aborted") aunque todo haya pasado.
+_APP = QApplication.instance() or QApplication([])
 
 
 def _grupo(nombre, tallas):
@@ -35,22 +44,27 @@ class HojaHtmlTests(unittest.TestCase):
     def test_la_regla_de_oro_va_impresa(self) -> None:
         self.assertIn("vacío NO es cero", self.html)
 
-    def test_prendas_numeradas_y_con_nombre_corto(self) -> None:
-        """El "| Deportivo | Pants 2pz" del catálogo no va a la hoja."""
-        self.assertIn("1.&nbsp; Pants 2pz Deportivo Práxedis Guerrero</p>", self.html)
-        self.assertIn("2.&nbsp; Suéter Cuello V H Verde Práxedis Guerrero Secundaria</p>", self.html)
+    def test_es_el_formato_de_la_tira_talla_exist_pedido(self) -> None:
+        """El formato que Daniel diseñó y usa: una tabla por prenda con esas tres columnas."""
+        self.assertEqual(self.html.count("<b>Talla</b>"), 2)
+        self.assertEqual(self.html.count("<b>Exist.</b>"), 2)
+        self.assertEqual(self.html.count("<b>Pedido</b>"), 2)
+
+    def test_prendas_numeradas_n_de_total_y_con_nombre_limpio(self) -> None:
+        """Sin la escuela ni el "| Deportivo | Pants 2pz" del catálogo (como en la tira)."""
+        self.assertIn("<b>1/2</b>&nbsp; <b>Pants 2pz Deportivo</b>", self.html)
+        self.assertIn("<b>2/2</b>&nbsp; <b>Suéter Cuello V H Verde Secundaria</b>", self.html)
         self.assertNotIn("| Deportivo", self.html)
+        self.assertNotIn("Práxedis Guerrero</b>", self.html)  # la escuela no se repite en cada tarjeta
 
-    def test_una_casilla_por_talla(self) -> None:
-        self.assertEqual(self.html.count('<td class="c">'), 16)
+    def test_una_fila_por_talla_con_dos_casillas(self) -> None:
         for t in ("4", "46"):
-            self.assertIn(f'<td class="t">{t}</td>', self.html)
+            self.assertIn(f"<b>{t}</b>", self.html)
+        # 16 tallas × 2 casillas vacías (Exist. y Pedido)
+        self.assertEqual(self.html.count("&nbsp;</td><td height="), 16)
 
-    def test_las_rejillas_largas_se_parten_para_que_quepan(self) -> None:
-        """12 tallas > CASILLAS_POR_FILA (11): dos filas de casillas, no una que se salga."""
-        self.assertEqual(hoja.CASILLAS_POR_FILA, 11)
-        sueter = self.html.split("2.&nbsp;")[1]
-        self.assertEqual(sueter.count('<table class="tallas">'), 2)
+    def test_los_bordes_van_como_atributo_porque_qt_ignora_el_css(self) -> None:
+        self.assertIn('border="1" cellspacing="0"', self.html)
 
     def test_con_quien_va_el_nombre_en_vez_de_la_raya(self) -> None:
         con = hoja.construir_hoja_html(GRUPOS, titulo="X", quien="Stayce Chavarria")
@@ -61,6 +75,47 @@ class HojaHtmlTests(unittest.TestCase):
     def test_sin_grupos_no_truena(self) -> None:
         vacia = hoja.construir_hoja_html([], titulo="Nada")
         self.assertIn("0 prendas · 0 tallas", vacia)
+
+
+class NombreTests(unittest.TestCase):
+    def test_limpia_como_la_tira(self) -> None:
+        f = hoja.nombre_para_hoja
+        self.assertEqual(f("Playera Deportiva Ad Hoc Práxedis Guerrero | Deportivo", "Práxedis Guerrero"), "Playera Deportiva")
+        self.assertEqual(f("Chaleco Verde Práxedis Guerrero Secundaria", "Práxedis Guerrero"), "Chaleco Verde Secundaria")
+        self.assertEqual(f("", "X", tipo_pieza="Suéter"), "Suéter")
+
+
+class PaginacionTests(unittest.TestCase):
+    """Nunca se parte una tarjeta: las páginas se cortan entre filas."""
+
+    def test_tres_por_fila_y_corta_cuando_no_cabe(self) -> None:
+        # 6 tarjetas de 300 pt: dos filas de 310 → 620 cabe en 640; la tercera fila no.
+        alturas = [300] * 9
+        paginas = hoja.paginar(alturas, tope=640)
+        self.assertEqual(paginas, [[0, 1, 2, 3, 4, 5], [6, 7, 8]])
+
+    def test_la_fila_mide_lo_que_su_tarjeta_mas_alta(self) -> None:
+        paginas = hoja.paginar([100, 400, 100, 100, 100, 100], tope=500)
+        self.assertEqual(paginas, [[0, 1, 2], [3, 4, 5]])   # 410 + 110 > 500
+
+    def test_las_paginas_siguientes_caben_mas(self) -> None:
+        paginas = hoja.paginar([300] * 12, tope=640, tope_siguientes=1000)
+        self.assertEqual(len(paginas[0]), 6)
+        self.assertEqual(len(paginas[1]), 6)   # 3 filas × 310 = 930 < 1000
+
+    def test_una_tarjeta_gigante_va_sola_sin_reventar(self) -> None:
+        self.assertEqual(hoja.paginar([900], tope=640), [[0]])
+        self.assertEqual(hoja.paginar([], tope=640), [])
+
+    def test_el_html_marca_el_salto_de_pagina(self) -> None:
+        muchos = [_grupo(f"Prenda {i}", [str(t) for t in range(12)]) for i in range(9)]
+        html = hoja.construir_hoja_html(muchos, titulo="X")
+        self.assertIn("page-break-before: always", html)
+
+    def test_la_altura_estimada_crece_con_las_tallas(self) -> None:
+        chica = hoja.altura_tarjeta_pt(_grupo("A", ["4"]), "X")
+        grande = hoja.altura_tarjeta_pt(_grupo("A", [str(t) for t in range(12)]), "X")
+        self.assertEqual(grande - chica, 11 * hoja._PT_FILA)
 
 
 class HojaYPantallaTests(unittest.TestCase):
@@ -81,7 +136,6 @@ class HojaYPantallaTests(unittest.TestCase):
 
 class ImpresionTests(unittest.TestCase):
     def test_elige_la_hp_si_la_hay(self) -> None:
-        pytest.importorskip("PyQt6.QtPrintSupport")
         from pos_uniformes.ui.helpers.conteo_hoja_carta_print_helper import elegir_impresora_por_defecto as f
 
         self.assertEqual(f(["Brother QL-800", "HP Smart Tank 750", "PDF"]), "HP Smart Tank 750")
@@ -90,10 +144,6 @@ class ImpresionTests(unittest.TestCase):
         self.assertIsNone(f([]))
 
     def test_la_hoja_se_vuelve_pdf_de_verdad(self) -> None:
-        pytest.importorskip("PyQt6.QtPrintSupport")
-        from PyQt6.QtWidgets import QApplication
-
-        QApplication.instance() or QApplication([])
         from pos_uniformes.ui.helpers.conteo_hoja_carta_print_helper import guardar_pdf
 
         html = hoja.construir_hoja_html(GRUPOS, titulo="Práxedis Guerrero")
