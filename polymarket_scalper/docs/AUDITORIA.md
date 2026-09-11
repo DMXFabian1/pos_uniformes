@@ -1,6 +1,8 @@
 # Auditoría de arquitectura (FASE 1 de la misión)
 
 Fecha: 2026-09-11. Estado auditado: commit `ec3b2d6` (89 tests, maker-first recién incorporado).
+**Estado de ejecución del plan al final de esta sesión: cambios A, B, C, D, E, F, G y H hechos
+(142 tests). Lo que queda pendiente está al final, en §9.**
 
 Este documento responde, antes de tocar código, a las ocho preguntas de la misión: qué existe,
 qué está duplicado, qué datos se capturan y no se usan, qué métricas faltan, qué partes del
@@ -188,3 +190,42 @@ valen.
 - Todo fill maker registra los tres escenarios; el informe muestra siempre observado vs baseline.
 - Cada métrica nueva nace con su test sobre datos sintéticos de resultado conocido.
 - No se ajusta ningún umbral a mano "porque mejora el PnL de la muestra". Los umbrales se mueven solo con walk-forward.
+
+
+---
+
+## 9. Qué se hizo y qué falta
+
+### Hecho en esta sesión
+
+| Cambio | Qué cambió | Cómo se comprueba |
+|---|---|---|
+| **A** | El fill maker ya no sale de un dado. Una orden se llena cuando el volumen que cruza su precio consume la cola que tenía delante. Se registran tres escenarios (conservador, base, optimista), la cola inicial, el volumen cruzado y si el nivel fue barrido. `maker_fill_prob` pasó a llamarse `fill_baseline_prob` y solo aparece en los informes como referencia. | `tests/test_fill_model.py`, `scalper ejecucion` |
+| **B** | Cada mensaje del CLOB guarda `recv_ms`; cada delta guarda el cambio firmado del nivel. El recolector reporta latencia mediana y p95 del feed. | línea de estado del recolector, `tests/test_micro.py` |
+| **C** | `micro.py`: profundidad e imbalance a 1/2/3/5 ticks, altas y bajas por lado, tasa de cancelación, flujo agresor y velocidad del mid a 250 ms…60 s, adjuntos a cada señal y disponibles como features. | `tests/test_micro.py` |
+| **D** | Tabla `decisions` con cada decisión, incluidas las de NO operar y su motivo. `strategy_id` separa NBA, tenis, cripto 5m/15m, arbitraje y dinero inteligente. Marcas de selección adversa a 100 ms…10 s tras el fill. `edge_taker` guardado en cada señal. | `tests/test_decisiones.py`, panel → Ejecución |
+| **E** | Time stop de 15 minutos para direccionales; el stop mira el mejor bid, no el mid; topes de exposición por mercado y por evento. | `tests/test_decisiones.py` |
+| **F** | `reaction.py` mide el retraso entre cambio de marcador y movimiento del mid (tabla `reactions`) y expone `ms_since_event`, retraso típico por liga y `event_risk_score` explicable. | `tests/test_reaction.py`, panel → Ejecución |
+| **G** | `evaluacion.py` es la única fuente de métricas: tasa de llenado observada/conservadora/optimista, break-even de llenado, edge mínimo requerido, selección adversa, aparente vs realizado, deciles, bootstrap y pruebas de resistencia. `readiness.py` la consume y añade tres criterios nuevos. `learn/train.py` añade walk-forward. | `tests/test_evaluacion.py`, `scalper ejecucion`, `scalper validar`, `scalper listo` |
+| **H** | Panel con sección Ejecución; tarjetas con prioridad S/A/B/C/NO TRADE y la frase de por qué existe el trade. | `tests/test_dashboard.py` |
+
+### Pendiente, y por qué
+
+1. **Modelos separados de fill y de salida.** Necesitan cientos de órdenes maker con sus tres
+   escenarios registrados. El dato ya se está generando (cambio A y D); entrenarlos ahora sería
+   ajustar ruido.
+2. **Activar el filtro `event_risk_score`.** Está medido y guardado, pero `max_event_risk` sigue
+   en 1.0 (no filtra). Fijar un umbral sin ver la distribución sería inventarlo.
+3. **Entradas MAX / IDEAL / AGRESIVA.** Hoy `planear_entrada` calcula un solo precio límite. La
+   elección entre varios precios según P(fill) necesita el modelo de fill del punto 1.
+4. **Benchmark contra comprar y mantener y contra azar.** Requiere una muestra con varios días
+   de partidos; con las horas que hay, cualquier comparación diría más del muestreo que de la
+   estrategia.
+5. **Capa de ejecución real.** Sigue deliberadamente fuera hasta que `scalper listo` y
+   `scalper validar` pasen a la vez.
+
+### La regla que no cambia
+
+Ningún número del ledger anterior al cambio A cuenta como evidencia sobre las señales maker: se
+generó con el dado del 60 %. La cuenta de posiciones válidas para el veredicto empieza de cero
+con los datos nuevos.

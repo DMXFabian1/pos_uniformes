@@ -100,11 +100,18 @@ Cada señal lleva `edge_net` (USD por share después de fees), `confidence` (heu
 ### Fase 3: simulación (`scalper/sim/`)
 - `engine.py` recibe los mismos eventos en replay y en paper trading. Aplica latencia, slippage
   y fees, arbitrajes rotos (una pata llena y la otra no) se deshacen contra el libro con su costo.
-- Las órdenes maker se llenan solo cuando un trade cruza nuestro precio (con probabilidad
-  configurable y cola por delante) o cuando el mercado pasa a través de nosotros.
-- Cada posición cerrada se escribe al `ledger` con `predicted_pnl`, `realized_pnl` y `error`.
+- Las órdenes maker se llenan **por cola, no por azar**: cuando el volumen que cruza su precio
+  consume lo que había delante y llega hasta ellas, o cuando el mercado pasa a través. De cada
+  orden se guardan tres escenarios (conservador, base, optimista), la cola inicial, el volumen
+  que cruzó y si el nivel fue barrido. Ver *Ejecución medida* más abajo.
+- Cada posición cerrada se escribe al `ledger` con `predicted_pnl`, `realized_pnl`, `error`, la
+  estrategia, el rol de entrada y el movimiento del precio a 100 ms, 500 ms, 1, 2, 5 y 10 s tras
+  el llenado (selección adversa).
+- Cada decisión, **incluidas las de no operar**, se escribe a la tabla `decisions` con su motivo.
 - `scalper report` agrupa por tipo de señal: tasa de llenado, PnL predicho vs real, error medio,
   tasa de acierto, y calibración de la confianza declarada vs la real.
+- `scalper ejecucion` responde la pregunta que decide todo: cuántas órdenes se llenan de verdad
+  y si eso basta. `scalper validar` valida hacia adelante y en escenarios peores.
 
 ### Feeds para in-play y ballenas (`sports_feed.py`, `flow.py`, `wallets.py`)
 - **Partidos en vivo**: websocket de deportes de Polymarket (sin suscripción). Marcador, período
@@ -195,6 +202,34 @@ Consecuencias, todas medidas en el ledger:
 
 `signals.maker_first: false` vuelve al comportamiento anterior, que sigue probado.
 
+### Ejecución medida (`scalper ejecucion`)
+Poner órdenes en vez de cruzarlas solo gana si las órdenes se llenan. Durante un tiempo el
+simulador supuso que se llenaba el 60 % de las veces: un número inventado que decidía por sí
+solo la rentabilidad de todo lo maker-first. Ya no existe como supuesto operativo. Lo que hay es:
+
+- **Tasa de llenado observada**, contada sobre las órdenes que realmente se pusieron.
+- **Conservadora y optimista**: los dos extremos de la incertidumbre sobre la posición en la cola.
+  La conservadora supone que toda la liquidez del nivel estaba delante y nadie la canceló; la
+  optimista, que estábamos al frente. El resultado real vive entre las dos.
+- **Break-even de llenado** = ventaja cruzando ÷ ventaja poniendo la orden. Es la tasa a partir de
+  la cual poner la orden gana a cruzar el libro. Si cruzar da ventaja negativa, el break-even es
+  cero y cualquier llenado gana.
+- **Edge mínimo requerido** = coste de salida medido + selección adversa medida + margen. Por
+  debajo de eso la respuesta correcta es no entrar, y la tarjeta de la oportunidad lo dice.
+- **Selección adversa**: cuánto se mueve el mid en los segundos siguientes al llenado. Si es
+  negativa, nos están llenando justo cuando el mercado se va en contra.
+
+El 60 % sigue apareciendo en los informes, pero etiquetado como *referencia*: está ahí para poder
+desmentirlo, no para sostener ningún resultado.
+
+### Reacción del mercado (`scalper/reaction.py`)
+La tesis del scalping en vivo es que el marcador cambia antes que el precio. En lugar de suponerlo,
+cada cambio de marcador abre una medición: se guarda el mid de cada token y se espera a que se
+mueva un tick. El retraso y el tamaño del movimiento van a la tabla `reactions`. De ahí salen el
+retraso típico por liga, si el precio aún no ha reaccionado al último evento, y un
+`event_risk_score` explicable por componentes (cuán reciente es el evento y cuántos puntos se
+anotaron en el último minuto).
+
 ### Detectores in-play y de dinero inteligente
 - **model_deviation**: para cada token enlazado a un partido en vivo, si
   `p_modelo − ask − fee(entrada) − costo de salida > umbral`, compra como taker. Sale cuando el
@@ -233,11 +268,16 @@ el ledger crece. Ese es el mecanismo por el que "el margen de error se va reduci
   mercado: qué comprar, a qué precio, cuánto se invierte, cuánto se espera ganar y por qué, con las
   comisiones ya descontadas. Lo vigente va primero; lo de hace rato se marca como caducado, porque
   en las ventanas de cripto de cinco minutos el precio ya se movió.
-- **`scalper listo`** responde si el bot puede operar con dinero real, señal por señal, con cuatro
-  criterios objetivos: al menos 100 posiciones cerradas, ganancia neta positiva, una ventaja que no
-  quepa en la suerte (estadístico t mayor que 2) y un modelo aprendido que no empeore a la
-  heurística. Más siete días de datos. Mientras no se cumplan, el veredicto dice exactamente qué
-  falta.
+- **`scalper listo`** responde si el bot puede operar con dinero real, estrategia por estrategia,
+  con siete criterios objetivos: al menos 100 posiciones cerradas, ganancia neta positiva, una
+  ventaja que no quepa en la suerte (estadístico t mayor que 2), un intervalo de confianza por
+  bootstrap que no toque el cero, una tasa de llenado por encima del break-even, un modelo
+  aprendido que no empeore a la heurística, y ganancia que sobreviva a los escenarios peores.
+  Más siete días de datos. Mientras no se cumplan, el veredicto dice exactamente qué falta.
+- **`scalper ejecucion`** y **`scalper validar`** son el detalle detrás de ese veredicto: la
+  primera muestra llenados, break-even, edge mínimo y selección adversa; la segunda valida hacia
+  adelante por pliegues y somete cada estrategia a comisión más alta, llenado conservador y
+  descarte de los llenados de menos de un segundo.
 
 La capa que firma órdenes no existe a propósito: se construye cuando `scalper listo` diga que sí,
 y se prueba con el tamaño mínimo para comprobar que los llenados reales se parecen a los simulados.
@@ -264,6 +304,9 @@ de modelos aprendidos y estado de las tablas. Cada sección trae un "Cómo leer 
 llano. Con `--snapshot` genera una página autónoma con los datos embebidos.
 
 ## Advertencias honestas
+- **Los resultados anteriores a la medición de llenados no son evidencia.** Todo lo que el ledger
+  dijo sobre señales maker mientras el simulador usaba el 60 % inventado se generó con ese número.
+  La cuenta que vale para el veredicto empieza con los datos nuevos.
 - Los arbitrajes puros aparecen poco y duran milisegundos; los bots existentes compiten por ellos.
   El valor de esta fase es medir con datos reales cuántos aparecen, cuánto duran y qué tan seguido
   la latencia los rompe.
