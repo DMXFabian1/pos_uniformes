@@ -330,14 +330,14 @@ def test_que_una_orden_se_llene_no_es_un_veredicto_sobre_si_gana(tmp_path):
     # Caso real: TENNIS_SPREAD_CAPTURE se llenaba bien y salía 🟢 EVIDENCIA POSITIVA en la tabla de
     # llenado, mientras su intervalo de confianza estaba entero por debajo de cero. La columna de
     # llenado responde a "¿se llena?", nunca a "¿gana?".
-    from scalper.validacion import LLENA_OK, LLENA_SIN_MEDIDA
+    from scalper.validacion import LLENA_INUTIL
     ledger = [_fila(i, pnl=-3.0, edge_taker=0.0) for i in range(25)]
     fills = [_obs(i) for i in range(25)]
     _escribir(tmp_path, ledger=ledger, fills=fills)
     inf = analizar(tmp_path)
-    assert inf.llenado[0].estado in (LLENA_OK, LLENA_SIN_MEDIDA)
     assert VERDE not in inf.llenado[0].estado
-    assert inf.estados[0].semaforo == ROJO      # el veredicto de verdad sigue siendo el de abajo
+    assert inf.llenado[0].estado == LLENA_INUTIL      # pierde por orden llenada
+    assert inf.estados[0].semaforo == ROJO            # el veredicto de verdad sigue siendo el de abajo
 
 
 def test_sin_tasa_necesaria_el_llenado_no_se_da_por_bueno(tmp_path):
@@ -373,3 +373,31 @@ def test_una_orden_sin_llenar_no_cuenta_como_barrida(tmp_path):
     _escribir(tmp_path, ledger=[_fila(i) for i in range(5)], fills=fills)
     inf = analizar(tmp_path)
     assert inf.llenado[0].barridas == 5 and inf.llenado[0].por_barrido == 1.0
+
+
+def test_una_perdida_demostrada_no_se_disfraza_de_problema_de_ejecucion(tmp_path):
+    # Caso real: TENNIS_DIRECTIONAL salía 🟠 PROBLEMA DE EJECUCIÓN —"se llena el 66 % y haría falta
+    # el 100 %"— con n=98 y el intervalo de confianza entero por debajo de cero, (-3.14, -1.51). El
+    # 100 % no era una medida: era el comodín que se ponía al perder por orden llenada. Naranja se
+    # lee como "esto se arregla ejecutando mejor", y aquí llenarse más solo pierde más.
+    from scalper.validacion import LLENA_INUTIL
+    ledger = [_fila(i, pnl=-2.3, edge_taker=0.01) for i in range(30)]
+    fills = [_obs(i, llenada=i < 20) for i in range(30)]
+    _escribir(tmp_path, ledger=ledger, fills=fills)
+    inf = analizar(tmp_path)
+    assert inf.llenado[0].salvable is False
+    assert inf.llenado[0].requerida is None       # no existe tasa de equilibrio, no es el 100 %
+    assert inf.llenado[0].estado == LLENA_INUTIL
+    assert inf.estados[0].semaforo == ROJO
+    assert "llenarse más solo pierde más" in inf.estados[0].motivo
+
+
+def test_naranja_se_reserva_para_cuando_si_hay_ventaja_que_la_ejecucion_se_come(tmp_path):
+    # Gana 1 USD por orden llenada, pero se llena el 30 % y haría falta el 80 %. Eso sí es un
+    # problema de ejecución: la ventaja existe y el llenado no llega a ella.
+    ledger = [_fila(i, pnl=1.0, edge_taker=0.016) for i in range(3)]
+    fills = [_obs(i, llenada=i < 3) for i in range(10)]
+    _escribir(tmp_path, ledger=ledger, fills=fills)
+    inf = analizar(tmp_path)
+    assert inf.llenado[0].salvable is True
+    assert inf.estados[0].semaforo == NARANJA

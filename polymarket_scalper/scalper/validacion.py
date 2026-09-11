@@ -56,6 +56,7 @@ LLENA_OK = "🟢 SE LLENA LO NECESARIO"
 LLENA_CORTO = "🟠 NO SE LLENA LO NECESARIO"
 LLENA_POCO = "🟡 DATOS INSUFICIENTES"
 LLENA_SIN_MEDIDA = "⚪ SIN TASA NECESARIA"
+LLENA_INUTIL = "⚫ NINGUNA TASA LA SALVA"
 
 # Tramos fijos de ventaja, en porcentaje sobre el precio de entrada.
 TRAMOS_EDGE: tuple[tuple[str, float, float], ...] = (
@@ -234,6 +235,7 @@ class Llenado:
     cola_mediana: float | None = None
     barridas: int = 0
     por_barrido: float | None = None   # fracción de los llenados que llegó por barrido del nivel
+    salvable: bool = True              # False si pierde por orden llenada: ninguna tasa la salva
     estado: str = LLENA_POCO
     corto: bool = False               # se llena menos de lo que haría falta para batir al taker
     sensibilidad: list[dict[str, Any]] = field(default_factory=list)
@@ -279,12 +281,16 @@ def llenado(d: Datos) -> list[Llenado]:
         con_taker = [(t, r) for t, r in zip(takers, maker) if t is not None]
         cruzar = (_media([t * (r.get("size_filled") or 0) for t, r in con_taker])
                   if len(con_taker) == len(maker) and maker else None)
-        if cruzar is None:
+        if media_llenada is not None and media_llenada <= 0 and maker:
+            # Pierde por orden llenada. La tasa de equilibrio no es el 100 %: no existe. Llenarse
+            # más solo pierde más, así que esto no es un problema de ejecución y no puede
+            # presentarse como tal.
+            L.salvable = False
+            L.requerida = None
+        elif cruzar is None:
             L.requerida = None
         elif media_llenada and media_llenada > 0:
             L.requerida = round(max(0.0, min(cruzar / media_llenada, 1.0)), 4)
-        elif media_llenada is not None and media_llenada <= 0:
-            L.requerida = 1.0                                    # perdiendo por operación, ninguna tasa salva
         # sensibilidad: qué valor esperado por orden daría cada tasa de llenado
         limpios = [r["realized_pnl"] for r in maker if not r.get("barrido")]
         media_limpia = _media(limpios)
@@ -305,6 +311,8 @@ def llenado(d: Datos) -> list[Llenado]:
 
 def _semaforo_llenado(L: Llenado, n_validas: int) -> str:
     """Veredicto **solo sobre el llenado**. No dice nada de si la estrategia gana."""
+    if not L.salvable:
+        return LLENA_INUTIL
     if L.corto:
         return LLENA_CORTO
     if L.requerida is None:
@@ -641,14 +649,18 @@ def estado_por_estrategia(d: Datos, lls: list[Llenado]) -> list[Estado]:
         L = por_ll.get(est)
         if not validas and sucias:
             semaforo, motivo = NEGRO, "todas las posiciones se tomaron con el feed viejo o congelado"
+        elif ic is not None and ic[1] < 0:
+            # La pérdida demostrada va antes que cualquier diagnóstico de ejecución: naranja se lee
+            # como "esto se arregla ejecutando mejor", y con el intervalo entero bajo cero no.
+            semaforo, motivo = ROJO, f"el intervalo de confianza queda entero por debajo de cero {ic}"
+            if L is not None and not L.salvable:
+                motivo += "; pierde por orden llenada, así que llenarse más solo pierde más"
         elif L is not None and L.corto:
             semaforo = NARANJA
             motivo = (f"se llena el {L.tasa * 100:.0f} % de las órdenes y haría falta el "
                       f"{L.requerida * 100:.0f} %")
         elif n < 20:
             semaforo, motivo = AMARILLO, f"solo hay {n} operaciones: no alcanza para concluir nada"
-        elif ic is not None and ic[1] < 0:
-            semaforo, motivo = ROJO, f"el intervalo de confianza queda entero por debajo de cero {ic}"
         elif ic is not None and ic[0] > 0:
             semaforo, motivo = VERDE, f"el intervalo de confianza queda entero por encima de cero {ic}"
         else:

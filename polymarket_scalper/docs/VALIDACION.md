@@ -175,6 +175,14 @@ corrida, TENNIS_SPREAD_CAPTURE aparecía como 🟢 EVIDENCIA POSITIVA en la tabl
 sus órdenes se llenaban— mientras su intervalo de confianza estaba entero por debajo de cero. Que
 una orden se llene no dice nada de si el trade gana.
 
+⚫ NINGUNA TASA LA SALVA es el caso que estaba mal contado. Cuando una estrategia pierde por orden
+llenada, la tasa de equilibrio no es el 100 %: **no existe**. Ponerle 100 % la hacía aparecer como
+🟠 PROBLEMA DE EJECUCIÓN —"se llena el 66 % y haría falta el 100 %"— cuando su intervalo de
+confianza estaba entero por debajo de cero. Naranja se lee como "esto se arregla ejecutando mejor",
+y ahí llenarse más solo pierde más. El semáforo de estrategia mira ahora el intervalo **antes** que
+el diagnóstico de ejecución: naranja queda reservado para cuando la ventaja existe y el llenado no
+llega a ella.
+
 Y ⚪ no es un aprobado tímido: es que no hay contra qué comparar. La tasa necesaria sale de dividir
 lo que daría cruzar el libro entre lo que deja esperar en la cola; si la ventaja taker no está
 registrada, no es cero, es desconocida. Darla por cero haría que cualquier llenado pasara el examen
