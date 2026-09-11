@@ -46,7 +46,12 @@ scalper models                   # versiones, métricas y cuál está en uso
 scalper dashboard                # panel web en http://127.0.0.1:8787 (lee data/ en vivo)
 scalper dashboard --snapshot panel.html   # página autónoma con los datos actuales, para compartir
 scalper retention --dry-run      # disco: qué borraría y compactaría
+scalper overview                 # todos los informes de una pasada
+scalper updown-study             # ¿a favor o en contra de la racha en cripto?
 ```
+
+Desde **VS Code**: abrir la carpeta del proyecto y usar Ctrl+Shift+P → `Run Task`, o F5 para
+depurar. Las tareas y configuraciones están en `.vscode/`.
 
 Todo se configura en `config.yaml`. Nada de esto toca una wallet ni firma órdenes.
 

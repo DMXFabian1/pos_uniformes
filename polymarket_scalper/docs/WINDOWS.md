@@ -76,9 +76,37 @@ hasta 30 segundos de datos sin escribir.
 
 El log queda en `logs\bot.log` y rota solo a los 10 MB, así que nunca llena el disco.
 
-## 5. Ver el panel
+## 5. Usarlo desde VS Code (recomendado si prefieres no usar la terminal)
 
-Doble clic en **`Abrir-panel.bat`**, o desde **otra** ventana de PowerShell en la misma carpeta:
+Abre VS Code, menú **Archivo → Abrir carpeta**, y elige la carpeta `polymarket_scalper`. VS Code
+detecta la configuración incluida y te ofrece instalar la extensión de Python: acéptala.
+
+A partir de ahí todo se ejecuta desde el menú, sin escribir comandos:
+
+**Ctrl+Shift+P**, escribe `Run Task`, Enter, y elige de la lista:
+
+| Tarea | Qué hace |
+|---|---|
+| **Bot: iniciar (paper trading)** | arranca el bot. También con **Ctrl+Shift+B** |
+| **Panel: abrir en el navegador** | levanta el panel en http://127.0.0.1:8787 |
+| **Informes: ver todo** | datos, arrastre de cripto, resultados, wallets, modelos y disco |
+| **Informe: arrastre entre ventanas de cripto** | solo el estudio de la racha |
+| **Mercados: ver cuáles se siguen** | la lista de mercados activos |
+| **Mantenimiento: correr las pruebas** | las 60 pruebas del proyecto |
+
+Cada tarea abre su propia pestaña de terminal dentro de VS Code. Para detener el bot, haz clic en
+esa pestaña y pulsa **Ctrl+C**: guarda los datos antes de cerrar.
+
+Si además quieres poner puntos de interrupción y ver el código paso a paso, pulsa **F5** y elige
+una de las configuraciones: bot, solo recolectar, panel, replay o estudio del arrastre.
+
+> La primera vez, si VS Code pregunta por el intérprete de Python, elige el que está en
+> `.venv\Scripts\python.exe` dentro del proyecto. La configuración ya lo apunta, así que
+> normalmente no pregunta.
+
+## 6. Ver el panel
+
+Doble clic en **`Abrir-panel.bat`**, la tarea de VS Code, o desde **otra** ventana de PowerShell:
 
 ```powershell
 .\deploy\iniciar-panel.ps1
@@ -87,7 +115,7 @@ Doble clic en **`Abrir-panel.bat`**, o desde **otra** ventana de PowerShell en l
 Abre el navegador solo en <http://127.0.0.1:8787>. Se actualiza cada 10 segundos. Puedes abrirlo y
 cerrarlo cuando quieras, es independiente del bot.
 
-## 6. Evitar que la PC se duerma
+## 7. Evitar que la PC se duerma
 
 El bot ya bloquea la suspensión mientras corre (`collector.prevent_sleep` en `config.yaml`). La
 pantalla sí puede apagarse, que es lo normal. Aun así, conviene revisarlo en el sistema:
@@ -103,7 +131,7 @@ powercfg /requests
 
 Con el bot corriendo debe aparecer una entrada bajo `SYSTEM`.
 
-## 7. Que arranque solo al encender la PC
+## 8. Que arranque solo al encender la PC
 
 Abre PowerShell **como administrador** (clic derecho en el icono, "Ejecutar como administrador"),
 ve a la carpeta del proyecto y ejecuta:
@@ -124,20 +152,21 @@ powershell -ExecutionPolicy Bypass -File deploy\programar-inicio.ps1 -Quitar   #
 
 Con las tareas activas no necesitas dejar ventanas abiertas. El log sigue en `logs\bot.log`.
 
-## 8. Actualizar e informes con doble clic
+## 9. Actualizar e informes con doble clic
 
 - **`ACTUALIZAR.bat`** descarga la última versión y actualiza las dependencias. Cierra antes la
   ventana del bot con Ctrl+C.
 - **`VER-INFORMES.bat`** muestra de una vez: qué datos hay, el estudio del arrastre entre ventanas
   de cripto, los resultados por tipo de señal, los modelos aprendidos y el uso de disco.
 
-## 9. Comandos del día a día
+## 10. Comandos del día a día
 
 Desde la carpeta del proyecto, con el bot corriendo o detenido:
 
 ```powershell
 $s = ".venv\Scripts\scalper.exe"
 
+& $s overview      # todos los informes de una pasada
 & $s status        # qué tablas hay y desde cuándo
 & $s updown-study  # ¿el sesgo al abrir una ventana de cripto es información o sobrerreacción?
 & $s report        # lo que predijo vs lo que obtuvo, por tipo de señal
@@ -149,7 +178,7 @@ $s = ".venv\Scripts\scalper.exe"
 & $s models        # versiones del modelo y cuál está en uso
 ```
 
-## 10. Disco
+## 11. Disco
 
 Con el enfoque en NBA y tenis, y la limpieza automática que corre una vez al día, el crecimiento
 permanente ronda los 200 a 400 MB por día. Para revisarlo:
@@ -162,7 +191,7 @@ permanente ronda los 200 a 400 MB por día. Para revisarlo:
 
 Si te quedas corto de espacio, baja `keep_days` en `config.yaml` y reinicia el bot.
 
-## 11. Problemas frecuentes
+## 12. Problemas frecuentes
 
 | Síntoma | Causa | Solución |
 |---|---|---|
@@ -176,7 +205,7 @@ Si te quedas corto de espacio, baja `keep_days` en `config.yaml` y reinicia el b
 | El bot se detuvo solo de noche | la PC se durmió | revisa el paso 6 |
 | El panel no abre | el proceso del panel no está corriendo | ejecuta `.\deploy\iniciar-panel.ps1` |
 
-## 12. Qué esperar
+## 13. Qué esperar
 
 - **Primeras horas:** se llena `data\`, aparecen las primeras wallets perfiladas y los partidos de
   tenis en vivo. La NBA solo muestra futuros hasta que arranque la temporada, a fines de octubre.

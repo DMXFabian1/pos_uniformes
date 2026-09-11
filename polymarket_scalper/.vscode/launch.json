@@ -1,0 +1,57 @@
+{
+  // Ejecutar con F5. Permite poner puntos de interrupción en el código.
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Bot (paper trading)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "scalper.cli",
+      "args": ["-c", "config.yaml", "paper"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "justMyCode": false,
+      "env": { "PYTHONUTF8": "1", "PYTHONUNBUFFERED": "1" }
+    },
+    {
+      "name": "Solo recolectar (sin simular)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "scalper.cli",
+      "args": ["-c", "config.yaml", "collect", "--duration", "300"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "env": { "PYTHONUTF8": "1", "PYTHONUNBUFFERED": "1" }
+    },
+    {
+      "name": "Panel web",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "scalper.cli",
+      "args": ["-c", "config.yaml", "dashboard"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "env": { "PYTHONUTF8": "1" }
+    },
+    {
+      "name": "Replay sobre los datos guardados",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "scalper.cli",
+      "args": ["-c", "config.yaml", "replay"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "env": { "PYTHONUTF8": "1" }
+    },
+    {
+      "name": "Estudio del arrastre (cripto)",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "scalper.cli",
+      "args": ["-c", "config.yaml", "updown-study"],
+      "cwd": "${workspaceFolder}",
+      "console": "integratedTerminal",
+      "env": { "PYTHONUTF8": "1" }
+    }
+  ]
+}

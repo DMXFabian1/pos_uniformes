@@ -212,6 +212,27 @@ def cmd_dashboard(args: argparse.Namespace) -> None:
     serve(cfg, args.host, args.port, args.refresh)
 
 
+def cmd_overview(args: argparse.Namespace) -> None:
+    """Todos los informes de una pasada, en el orden en que conviene leerlos."""
+    def titulo(t: str) -> None:
+        print("\n" + "=" * 74 + f"\n  {t}\n" + "=" * 74)
+
+    secciones = [
+        ("QUÉ DATOS HAY GUARDADOS", cmd_status),
+        ("ARRASTRE ENTRE VENTANAS DE CRIPTO: ¿a favor o en contra de la racha?", cmd_updown_study),
+        ("RESULTADOS POR TIPO DE SEÑAL (predicho contra real)", cmd_report),
+        ("WALLETS CON HISTORIAL", cmd_wallets),
+        ("MODELOS APRENDIDOS", cmd_models),
+        ("USO DE DISCO", cmd_retention),
+    ]
+    for nombre, fn in secciones:
+        titulo(nombre)
+        try:
+            fn(args)
+        except Exception as e:  # noqa: BLE001
+            print(f"(no se pudo mostrar: {e})")
+
+
 def cmd_updown_study(args: argparse.Namespace) -> None:
     from .studies import estudiar, formatear
 
@@ -411,6 +432,16 @@ def main(argv: list[str] | None = None) -> None:
     s.add_argument("--snapshot", help="en vez de servir, guardar una página autónoma con los datos actuales")
     s.add_argument("--run-id")
     s.set_defaults(fn=cmd_dashboard)
+
+    s = sub.add_parser("overview", help="todos los informes de una pasada")
+    s.add_argument("--offset", type=float, default=20)
+    s.add_argument("--size", type=float, default=50)
+    s.add_argument("--run-id")
+    s.add_argument("--top", type=int, default=20)
+    s.add_argument("--min-closed", type=int, default=20)
+    s.add_argument("--apply", action="store_true")
+    s.add_argument("--dry-run", action="store_true")
+    s.set_defaults(fn=cmd_overview)
 
     s = sub.add_parser("updown-study", help="¿el sesgo al abrir una ventana es información o sobrerreacción?")
     s.add_argument("--offset", type=float, default=20, help="segundos tras la apertura en que se mide el precio")

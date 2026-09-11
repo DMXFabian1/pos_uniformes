@@ -1,0 +1,119 @@
+{
+  // Tareas del bot. Se ejecutan con Ctrl+Shift+P -> "Run Task", o con Ctrl+Shift+B la principal.
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Bot: iniciar (paper trading)",
+      "detail": "Recolecta el mercado, simula operaciones y reentrena. Ctrl+C guarda y detiene.",
+      "type": "shell",
+      "command": "${config:python.defaultInterpreterPath}",
+      "args": ["-m", "scalper.cli", "-c", "config.yaml", "--log-file", "logs/bot.log", "paper"],
+      "group": { "kind": "build", "isDefault": true },
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "scalper", "clear": true }
+    },
+    {
+      "label": "Panel: abrir en el navegador",
+      "detail": "Sirve http://127.0.0.1:8787 y lo abre. El bot puede estar corriendo o no.",
+      "type": "shell",
+      "command": "${config:python.defaultInterpreterPath}",
+      "args": ["-m", "scalper.cli", "-c", "config.yaml", "--log-file", "logs/panel.log", "dashboard"],
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "scalper" }
+    },
+    {
+      "label": "Informes: ver todo",
+      "detail": "Datos guardados, estudio del arrastre, resultados por señal, modelos y disco.",
+      "type": "shell",
+      "command": "${config:python.defaultInterpreterPath}",
+      "args": ["-m", "scalper.cli", "-c", "config.yaml", "overview"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "Informe: estado de los datos",
+      "type": "shell",
+      "command": "${config:python.defaultInterpreterPath}",
+      "args": ["-m", "scalper.cli", "-c", "config.yaml", "status"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Informe: arrastre entre ventanas de cripto",
+      "detail": "¿El sesgo al abrir una ventana es información o sobrerreacción?",
+      "type": "shell",
+      "command": "${config:python.defaultInterpreterPath}",
+      "args": ["-m", "scalper.cli", "-c", "config.yaml", "updown-study"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Informe: resultados por tipo de señal",
+      "type": "shell",
+      "command": "${config:python.defaultInterpreterPath}",
+      "args": ["-m", "scalper.cli", "-c", "config.yaml", "report"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Informe: partidos en vivo y modelo",
+      "type": "shell",
+      "command": "${config:python.defaultInterpreterPath}",
+      "args": ["-m", "scalper.cli", "-c", "config.yaml", "model"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Informe: wallets (dinero inteligente)",
+      "type": "shell",
+      "command": "${config:python.defaultInterpreterPath}",
+      "args": ["-m", "scalper.cli", "-c", "config.yaml", "wallets"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Informe: uso de disco",
+      "type": "shell",
+      "command": "${config:python.defaultInterpreterPath}",
+      "args": ["-m", "scalper.cli", "-c", "config.yaml", "retention"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Mercados: ver cuáles se siguen",
+      "type": "shell",
+      "command": "${config:python.defaultInterpreterPath}",
+      "args": ["-m", "scalper.cli", "-c", "config.yaml", "discover", "--limit", "30"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Aprendizaje: entrenar ahora",
+      "detail": "El paper trading lo hace solo cada 6 h; esto lo fuerza.",
+      "type": "shell",
+      "command": "${config:python.defaultInterpreterPath}",
+      "args": ["-m", "scalper.cli", "-c", "config.yaml", "train"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Mantenimiento: instalar o actualizar dependencias",
+      "type": "shell",
+      "command": "${config:python.defaultInterpreterPath}",
+      "args": ["-m", "pip", "install", "-e", ".[dev,learn]"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Mantenimiento: correr las pruebas",
+      "type": "shell",
+      "command": "${config:python.defaultInterpreterPath}",
+      "args": ["-m", "pytest", "-q"],
+      "group": "test",
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    }
+  ]
+}
