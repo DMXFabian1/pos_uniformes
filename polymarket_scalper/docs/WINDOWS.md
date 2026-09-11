@@ -42,7 +42,34 @@ el comando responde. Puedes volver a ejecutarlo cuando actualices el código; no
 > `-ExecutionPolicy Bypass` es necesario porque Windows bloquea los scripts descargados por
 > defecto. Afecta solo a esa ejecución, no cambia la configuración del sistema.
 
-## 4. Arrancar el bot
+## 4. La forma más simple: la aplicación de escritorio
+
+Doble clic en **`SCALPER.bat`**. Se abre una ventana con botones y no necesitas terminal para nada:
+
+| Botón | Qué hace |
+|---|---|
+| **Iniciar bot** | arranca la recolección y la simulación. Cambia a «Detener bot» |
+| **Abrir panel** | levanta el panel web y lo abre en el navegador |
+| **Ver informes** | genera todos los informes y los muestra en la pestaña «Informes» |
+| **Carpeta de datos** | abre la carpeta `data` en el Explorador |
+
+Arriba se ven en todo momento los mercados seguidos, las señales detectadas, el precio de Bitcoin,
+las ventanas de cripto activas y hace cuánto llegó el último dato. El punto junto al título está
+verde cuando el bot funciona y rojo cuando está detenido.
+
+La pestaña «Actividad» muestra lo que el bot está haciendo en vivo, con los avisos en ámbar y los
+errores en rojo.
+
+**Al cerrar la ventana**, si el bot está funcionando, pregunta antes y lo detiene guardando los
+datos pendientes. Nunca pierdes lo que estaba en memoria.
+
+Para tenerlo a mano: clic derecho sobre `SCALPER.bat`, "Enviar a", "Escritorio (crear acceso
+directo)". Luego puedes renombrar el acceso directo como quieras.
+
+> Si al abrirlo no pasa nada, es que tu instalación de Python no incluye Tkinter. Reinstala Python
+> marcando la casilla **"tcl/tk and IDLE"**, que viene activada por defecto.
+
+## 5. Arrancar el bot desde la terminal
 
 **Todo de un solo clic:** doble clic en **`INICIAR-TODO.bat`**. Abre el bot en una ventana, el
 panel en otra y el navegador en el panel. Es la forma recomendada.
@@ -76,7 +103,7 @@ hasta 30 segundos de datos sin escribir.
 
 El log queda en `logs\bot.log` y rota solo a los 10 MB, así que nunca llena el disco.
 
-## 5. Usarlo desde VS Code (recomendado si prefieres no usar la terminal)
+## 6. Usarlo desde VS Code (recomendado si prefieres no usar la terminal)
 
 Abre VS Code, menú **Archivo → Abrir carpeta**, y elige la carpeta `polymarket_scalper`. VS Code
 detecta la configuración incluida y te ofrece instalar la extensión de Python: acéptala.
@@ -87,6 +114,7 @@ A partir de ahí todo se ejecuta desde el menú, sin escribir comandos:
 
 | Tarea | Qué hace |
 |---|---|
+| **Aplicación de escritorio** | abre la ventana con botones |
 | **Bot: iniciar (paper trading)** | arranca el bot. También con **Ctrl+Shift+B** |
 | **Panel: abrir en el navegador** | levanta el panel en http://127.0.0.1:8787 |
 | **Informes: ver todo** | datos, arrastre de cripto, resultados, wallets, modelos y disco |
@@ -104,7 +132,7 @@ una de las configuraciones: bot, solo recolectar, panel, replay o estudio del ar
 > `.venv\Scripts\python.exe` dentro del proyecto. La configuración ya lo apunta, así que
 > normalmente no pregunta.
 
-## 6. Ver el panel
+## 7. Ver el panel
 
 Doble clic en **`Abrir-panel.bat`**, la tarea de VS Code, o desde **otra** ventana de PowerShell:
 
@@ -115,7 +143,7 @@ Doble clic en **`Abrir-panel.bat`**, la tarea de VS Code, o desde **otra** venta
 Abre el navegador solo en <http://127.0.0.1:8787>. Se actualiza cada 10 segundos. Puedes abrirlo y
 cerrarlo cuando quieras, es independiente del bot.
 
-## 7. Evitar que la PC se duerma
+## 8. Evitar que la PC se duerma
 
 El bot ya bloquea la suspensión mientras corre (`collector.prevent_sleep` en `config.yaml`). La
 pantalla sí puede apagarse, que es lo normal. Aun así, conviene revisarlo en el sistema:
@@ -131,7 +159,7 @@ powercfg /requests
 
 Con el bot corriendo debe aparecer una entrada bajo `SYSTEM`.
 
-## 8. Que arranque solo al encender la PC
+## 9. Que arranque solo al encender la PC
 
 Abre PowerShell **como administrador** (clic derecho en el icono, "Ejecutar como administrador"),
 ve a la carpeta del proyecto y ejecuta:
@@ -152,14 +180,14 @@ powershell -ExecutionPolicy Bypass -File deploy\programar-inicio.ps1 -Quitar   #
 
 Con las tareas activas no necesitas dejar ventanas abiertas. El log sigue en `logs\bot.log`.
 
-## 9. Actualizar e informes con doble clic
+## 10. Actualizar e informes con doble clic
 
 - **`ACTUALIZAR.bat`** descarga la última versión y actualiza las dependencias. Cierra antes la
   ventana del bot con Ctrl+C.
 - **`VER-INFORMES.bat`** muestra de una vez: qué datos hay, el estudio del arrastre entre ventanas
   de cripto, los resultados por tipo de señal, los modelos aprendidos y el uso de disco.
 
-## 10. Comandos del día a día
+## 11. Comandos del día a día
 
 Desde la carpeta del proyecto, con el bot corriendo o detenido:
 
@@ -178,7 +206,7 @@ $s = ".venv\Scripts\scalper.exe"
 & $s models        # versiones del modelo y cuál está en uso
 ```
 
-## 11. Disco
+## 12. Disco
 
 Con el enfoque en NBA y tenis, y la limpieza automática que corre una vez al día, el crecimiento
 permanente ronda los 200 a 400 MB por día. Para revisarlo:
@@ -191,7 +219,7 @@ permanente ronda los 200 a 400 MB por día. Para revisarlo:
 
 Si te quedas corto de espacio, baja `keep_days` en `config.yaml` y reinicia el bot.
 
-## 12. Problemas frecuentes
+## 13. Problemas frecuentes
 
 | Síntoma | Causa | Solución |
 |---|---|---|
@@ -203,9 +231,10 @@ Si te quedas corto de espacio, baja `keep_days` en `config.yaml` y reinicia el b
 | `libros_validos` muy bajo de madrugada | pocos partidos a esa hora | normal, no es un error |
 | `flow_lag` de varios minutos | el indexador de Polymarket va con retraso | normal, no afecta a los precios del libro |
 | El bot se detuvo solo de noche | la PC se durmió | revisa el paso 6 |
-| El panel no abre | el proceso del panel no está corriendo | ejecuta `.\deploy\iniciar-panel.ps1` |
+| El panel no abre | el proceso del panel no está corriendo | pulsa «Abrir panel» en la aplicación |
+| `SCALPER.bat` no abre ninguna ventana | Python sin Tkinter | reinstala Python marcando "tcl/tk and IDLE" |
 
-## 13. Qué esperar
+## 14. Qué esperar
 
 - **Primeras horas:** se llena `data\`, aparecen las primeras wallets perfiladas y los partidos de
   tenis en vivo. La NBA solo muestra futuros hasta que arranque la temporada, a fines de octubre.

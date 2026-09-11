@@ -200,6 +200,15 @@ def cmd_retention(args: argparse.Namespace) -> None:
             print(f"  omitidos {len(rep.skipped)} días con escrituras recientes")
 
 
+def cmd_gui(args: argparse.Namespace) -> None:
+    """Ventana de escritorio: botones para arrancar el bot, el panel y ver informes."""
+    from pathlib import Path
+
+    from .gui import lanzar
+
+    sys.exit(lanzar(Path(args.config).resolve().parent, Path(args.config).name))
+
+
 def cmd_dashboard(args: argparse.Namespace) -> None:
     cfg = load_config(args.config)
     if args.snapshot:
@@ -424,6 +433,9 @@ def main(argv: list[str] | None = None) -> None:
     s.add_argument("--apply", action="store_true", help="ejecutar borrado y compactación")
     s.add_argument("--dry-run", action="store_true", help="mostrar qué haría sin tocar nada")
     s.set_defaults(fn=cmd_retention)
+
+    s = sub.add_parser("gui", help="ventana de escritorio con botones (sin usar la terminal)")
+    s.set_defaults(fn=cmd_gui)
 
     s = sub.add_parser("dashboard", help="panel web local (http://127.0.0.1:8787) que lee data/ en vivo")
     s.add_argument("--host", default="127.0.0.1")

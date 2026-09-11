@@ -3,6 +3,16 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "Aplicación de escritorio (ventana con botones)",
+      "detail": "Abre la ventana desde la que se maneja todo sin usar la terminal.",
+      "type": "shell",
+      "command": "${config:python.defaultInterpreterPath}",
+      "args": ["-m", "scalper.cli", "-c", "config.yaml", "gui"],
+      "isBackground": true,
+      "problemMatcher": [],
+      "presentation": { "reveal": "silent", "panel": "dedicated" }
+    },
+    {
       "label": "Bot: iniciar (paper trading)",
       "detail": "Recolecta el mercado, simula operaciones y reentrena. Ctrl+C guarda y detiene.",
       "type": "shell",

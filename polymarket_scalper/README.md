@@ -28,6 +28,10 @@ En Windows: `powershell -ExecutionPolicy Bypass -File deploy\instalar-windows.ps
 
 ## Uso
 
+**Aplicación de escritorio** (`scalper gui`, o `SCALPER.bat` en Windows): ventana con botones para
+arrancar el bot, abrir el panel y ver los informes, con la actividad en vivo y el estado siempre a
+la vista. Al cerrarla detiene el bot guardando los datos. Usa Tkinter, incluido con Python.
+
 ```bash
 scalper discover                 # qué mercados se seguirían con la config actual
 scalper collect                  # fase 1: recolectar 24/7 (Ctrl+C para parar)
@@ -43,6 +47,7 @@ scalper profile 0x2a69660046d7acc4ab204d7cc5ba78b0776cd2f7
 scalper calibrate --nba-csv nbastats_2023.csv   # σ del modelo de básquet con play-by-play real
 scalper train                    # fase 5: entrenar P(ganancia) por señal desde el ledger
 scalper models                   # versiones, métricas y cuál está en uso
+scalper gui                      # ventana de escritorio con botones (sin terminal)
 scalper dashboard                # panel web en http://127.0.0.1:8787 (lee data/ en vivo)
 scalper dashboard --snapshot panel.html   # página autónoma con los datos actuales, para compartir
 scalper retention --dry-run      # disco: qué borraría y compactaría
