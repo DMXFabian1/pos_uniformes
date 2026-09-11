@@ -21,8 +21,9 @@ La fase 4 (modelo que aprende de ese error) se construye encima cuando haya sema
 .\CORRER.ps1 -Informe     # solo mirar cómo va la medición, sin arrancar nada
 ```
 
-En VS Code: **Ctrl+Shift+B**. Con doble clic: `INICIAR-TODO.bat`, y `VER-VALIDACION.bat` para el
-informe. El detalle está en [docs/WINDOWS.md](docs/WINDOWS.md).
+Hay que **ejecutar** el script, no pegar su contenido en la terminal. Con doble clic:
+`CORRER.bat`. En VS Code: **Ctrl+Shift+B**. Para el informe sin arrancar nada:
+`VER-VALIDACION.bat`. El detalle está en [docs/WINDOWS.md](docs/WINDOWS.md).
 
 ## Instalación
 

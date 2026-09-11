@@ -13,7 +13,25 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-Set-Location $PSScriptRoot
+
+# $PSScriptRoot solo tiene valor cuando PowerShell ejecuta el archivo. Si alguien pega el
+# contenido en la terminal queda vacío, así que se usa la carpeta actual y se comprueba que
+# sea la del proyecto. Más vale un mensaje claro que doce errores seguidos.
+$raiz = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
+if (-not (Test-Path (Join-Path $raiz "config.yaml"))) {
+    Write-Host ""
+    Write-Host "  Esto hay que EJECUTARLO, no pegarlo en la terminal." -ForegroundColor Red
+    Write-Host ""
+    Write-Host "  Ve a la carpeta del proyecto y lánzalo:" -ForegroundColor Yellow
+    Write-Host "     cd <carpeta>\polymarket_scalper" -ForegroundColor White
+    Write-Host "     .\CORRER.ps1" -ForegroundColor White
+    Write-Host ""
+    Write-Host "  Si no recuerdas dónde está:" -ForegroundColor Yellow
+    Write-Host "     Get-ChildItem -Path `$HOME -Recurse -Directory -Filter polymarket_scalper -ErrorAction SilentlyContinue | Select-Object -First 3 FullName" -ForegroundColor White
+    Write-Host ""
+    exit 1
+}
+Set-Location $raiz
 $env:PYTHONUTF8 = "1"
 $env:PYTHONUNBUFFERED = "1"
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
@@ -21,7 +39,7 @@ try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch { }
 function Paso($n, $texto) { Write-Host "`n[$n] $texto" -ForegroundColor Cyan }
 function Aviso($texto) { Write-Host "     $texto" -ForegroundColor DarkGray }
 
-$exe = Join-Path $PSScriptRoot ".venv\Scripts\scalper.exe"
+$exe = Join-Path $raiz ".venv\Scripts\scalper.exe"
 
 # ---------------------------------------------------------------- 1. traer la última versión
 if (-not $SinPull -and -not $Informe) {
@@ -43,7 +61,7 @@ if (-not $SinPull -and -not $Informe) {
 Paso 2 "Comprobando la instalación"
 if (-not (Test-Path $exe)) {
     Aviso "Falta instalar. Lanzo el instalador; tarda un par de minutos la primera vez."
-    $instalador = Join-Path $PSScriptRoot "deploy\instalar-windows.ps1"
+    $instalador = Join-Path $raiz "deploy\instalar-windows.ps1"
     & powershell -ExecutionPolicy Bypass -File "$instalador"
     if (-not (Test-Path $exe)) {
         Write-Host "`nLa instalación no terminó bien. Revisa los mensajes de arriba." -ForegroundColor Red
@@ -52,7 +70,7 @@ if (-not (Test-Path $exe)) {
 } else {
     Aviso "Instalado."
 }
-New-Item -ItemType Directory -Force -Path (Join-Path $PSScriptRoot "logs") | Out-Null
+New-Item -ItemType Directory -Force -Path (Join-Path $raiz "logs") | Out-Null
 
 # ---------------------------------------------------------------- solo informe
 if ($Informe) {
@@ -71,7 +89,7 @@ Aviso "empieza otro experimento y los datos quedan separados."
 # ---------------------------------------------------------------- 4. panel en otra ventana
 if (-not $SoloBot) {
     Paso 4 "Abriendo el panel en otra ventana"
-    $orden = "Set-Location '$PSScriptRoot'; `$env:PYTHONUTF8='1'; " +
+    $orden = "Set-Location '$raiz'; `$env:PYTHONUTF8='1'; " +
              "& '$exe' -c config.yaml --log-file logs\panel.log dashboard"
     Start-Process powershell -ArgumentList "-NoExit -ExecutionPolicy Bypass -Command `"$orden`""
     Start-Sleep -Seconds 4

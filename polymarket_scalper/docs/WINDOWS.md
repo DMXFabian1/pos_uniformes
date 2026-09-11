@@ -197,6 +197,18 @@ Abre la carpeta del proyecto en VS Code, abre una terminal con **Ctrl+ñ** y esc
 .\CORRER.ps1
 ```
 
+**Hay que ejecutarlo, no pegar su contenido en la terminal.** Si se pega, PowerShell deja
+`$PSScriptRoot` vacío y falla todo. El script lo detecta y te lo dice, pero es más fácil no
+hacerlo. Si Windows bloquea la ejecución de scripts, o prefieres el doble clic, usa
+**`CORRER.bat`**, que se ocupa de la política de ejecución y de la carpeta.
+
+Si no recuerdas dónde está el proyecto:
+
+```powershell
+Get-ChildItem -Path $HOME -Recurse -Directory -Filter polymarket_scalper -ErrorAction SilentlyContinue |
+  Select-Object -First 3 FullName
+```
+
 Hace todo lo necesario, en este orden: descarga la última versión (si no tienes cambios locales
 sin guardar), comprueba la instalación y la hace si falta, congela la versión del motor para que
 lo que se mida sea comparable, abre el panel en otra ventana y deja el bot corriendo en esta.
