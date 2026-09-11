@@ -3,6 +3,14 @@
   "version": "2.0.0",
   "tasks": [
     {
+      "label": "▶ ARRANCAR TODO (bot + panel)",
+      "detail": "Lo único que hace falta para dejarlo corriendo: arranca el bot y el panel web.",
+      "dependsOrder": "sequence",
+      "dependsOn": ["Bot: iniciar (paper trading)", "Panel: abrir en el navegador"],
+      "group": { "kind": "build", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
       "label": "Aplicación de escritorio (ventana con botones)",
       "detail": "Abre la ventana desde la que se maneja todo sin usar la terminal.",
       "type": "shell",
@@ -18,7 +26,6 @@
       "type": "shell",
       "command": "${config:python.defaultInterpreterPath}",
       "args": ["-m", "scalper.cli", "-c", "config.yaml", "--log-file", "logs/bot.log", "paper"],
-      "group": { "kind": "build", "isDefault": true },
       "isBackground": true,
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "dedicated", "group": "scalper", "clear": true }
@@ -50,6 +57,33 @@
       "args": ["-m", "scalper.cli", "-c", "config.yaml", "listo"],
       "problemMatcher": [],
       "presentation": { "reveal": "always", "panel": "shared", "clear": true }
+    },
+    {
+      "label": "Medición: informe de validación",
+      "detail": "Cuánto se llena, cuánta ventaja hace falta, qué pasa tras el fill y qué se rechaza.",
+      "type": "shell",
+      "command": "${config:python.defaultInterpreterPath}",
+      "args": ["-m", "scalper.cli", "-c", "config.yaml", "validacion"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "Medición: versiones del motor",
+      "detail": "Qué versiones han operado y qué cambió entre una y otra. Si cambia algo, los datos se separan.",
+      "type": "shell",
+      "command": "${config:python.defaultInterpreterPath}",
+      "args": ["-m", "scalper.cli", "-c", "config.yaml", "experimentos"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
+    },
+    {
+      "label": "Medición: ejecución y resistencia",
+      "detail": "Llenados contra break-even, y las mismas operaciones en escenarios peores.",
+      "type": "shell",
+      "command": "${config:python.defaultInterpreterPath}",
+      "args": ["-m", "scalper.cli", "-c", "config.yaml", "ejecucion"],
+      "problemMatcher": [],
+      "presentation": { "reveal": "always", "panel": "dedicated", "clear": true }
     },
     {
       "label": "Informes: ver todo",

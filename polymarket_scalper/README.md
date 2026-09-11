@@ -14,6 +14,16 @@ La fase 4 (modelo que aprende de ese error) se construye encima cuando haya sema
 > Proyecto independiente. Vive en esta carpeta solo hasta tener su repo propio:
 > `git subtree split -P polymarket_scalper -b polymarket_scalper` y push de esa rama.
 
+## Arrancar (Windows, un solo comando)
+
+```powershell
+.\CORRER.ps1              # actualiza, instala si falta, congela el experimento, arranca bot y panel
+.\CORRER.ps1 -Informe     # solo mirar cómo va la medición, sin arrancar nada
+```
+
+En VS Code: **Ctrl+Shift+B**. Con doble clic: `INICIAR-TODO.bat`, y `VER-VALIDACION.bat` para el
+informe. El detalle está en [docs/WINDOWS.md](docs/WINDOWS.md).
+
 ## Instalación
 
 ```bash

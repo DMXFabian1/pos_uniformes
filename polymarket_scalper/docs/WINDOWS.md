@@ -189,6 +189,30 @@ powershell -ExecutionPolicy Bypass -File deploy\programar-inicio.ps1 -Quitar   #
 
 Con las tareas activas no necesitas dejar ventanas abiertas. El log sigue en `logs\bot.log`.
 
+## 9.bis. Un solo comando desde VS Code (`CORRER.ps1`)
+
+Abre la carpeta del proyecto en VS Code, abre una terminal con **Ctrl+ñ** y escribe:
+
+```powershell
+.\CORRER.ps1
+```
+
+Hace todo lo necesario, en este orden: descarga la última versión (si no tienes cambios locales
+sin guardar), comprueba la instalación y la hace si falta, congela la versión del motor para que
+lo que se mida sea comparable, abre el panel en otra ventana y deja el bot corriendo en esta.
+Ctrl+C lo detiene guardando lo pendiente.
+
+Variantes:
+
+```powershell
+.\CORRER.ps1 -SoloBot     # sin panel, una sola ventana
+.\CORRER.ps1 -SinPull     # no descarga cambios
+.\CORRER.ps1 -Informe     # no arranca nada: enseña cómo va la medición
+```
+
+Si prefieres los menús de VS Code: **Ctrl+Shift+B** lanza `▶ ARRANCAR TODO (bot + panel)`, y
+**Ctrl+Shift+P → Run Task** tiene el resto, incluidas las tres de la fase de medición.
+
 ## 10. Actualizar e informes con doble clic
 
 - **`ACTUALIZAR.bat`** descarga la última versión y actualiza las dependencias. Cierra antes la

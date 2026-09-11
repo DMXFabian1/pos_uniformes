@@ -54,6 +54,16 @@
       "env": { "PYTHONUTF8": "1" }
     },
     {
+      "name": "Informe de validación",
+      "type": "debugpy",
+      "request": "launch",
+      "module": "scalper.cli",
+      "args": ["-c", "config.yaml", "validacion"],
+      "console": "integratedTerminal",
+      "cwd": "${workspaceFolder}",
+      "justMyCode": false
+    },
+    {
       "name": "Estudio del arrastre (cripto)",
       "type": "debugpy",
       "request": "launch",
