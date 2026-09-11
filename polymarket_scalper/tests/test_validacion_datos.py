@@ -275,3 +275,44 @@ def test_el_retraso_se_mide_sobre_los_mensajes_recientes_no_sobre_los_ultimos_n(
     for i in range(40):
         col.latencias.append((ahora - 600_000 + i, 4_000))
     assert col.latencia()["mediana"] == 4_000
+
+
+def test_la_captura_de_spread_marca_el_llenado_cuando_se_llena_no_al_poner(cfg, tmp_path):
+    """ts_fill era el momento de poner la orden: daba esperas de cero y tiempos de tenencia falsos."""
+    from conftest import make_book
+
+    w = ParquetWriter(tmp_path, flush_seconds=10**9, flush_rows=10**9)
+    cfg.sim.latency_ms = 100
+    cfg.sim.slippage_ticks = 0
+    cfg.signals.complement.enabled = False
+    cfg.sim.max_hold_seconds = 30
+    m = make_market(fee=0.05)
+    eng = Engine(cfg, "t", "replay", w, experiment="exp-test")
+    eng.set_markets([m])
+    y = m.tokens[0].token_id
+    eng.books[y].apply_snapshot([{"price": 0.40, "size": 100}], [{"price": 0.45, "size": 100}], 1000)
+    for i in range(10):
+        eng.on_trade(1000 + i * 300, y, {"token_id": y, "price": 0.42, "size": 5, "side": "BUY"})
+    pos = next(p for p in eng.reales if p.signal.kind == "spread_capture")
+    eng.tick(4200)
+    assert pos.ts_placed and pos.ts_fill == 0                 # puesta, todavía sin llenar
+    eng.on_trade(9000, y, {"token_id": y, "price": 0.41, "size": 200, "side": "SELL"})
+    assert pos.ts_fill == 9000
+    eng.close_all(600_000)
+    w.close()
+    r = scan(tmp_path, "fill_observations").collect().to_dicts()[0]
+    assert r["espera_ms"] == 9000 - pos.ts_placed and r["espera_ms"] > 0
+
+
+def test_las_reacciones_llevan_la_corrida_y_el_experimento(cfg, tmp_path):
+    w = ParquetWriter(tmp_path, flush_seconds=10**9, flush_rows=10**9)
+    eng, m, h, a = _nba(cfg, writer=w)
+    eng.on_game(2000, "g1", _game(score="100-88", period="Q4", elapsed="06:00", live=True))
+    eng.on_game(5000, "g1", _game(score="103-88", period="Q4", elapsed="05:40", live=True))
+    eng.books[h].apply_snapshot([{"price": 0.74, "size": 500}], [{"price": 0.76, "size": 500}], 7000)
+    eng.on_book(7000, h, eng.books[h])
+    eng.close_all(600_000)
+    w.close()
+    df = scan(tmp_path, "reactions").collect()
+    assert df.height and set(df["experiment"].to_list()) == {"exp-test"}
+    assert set(df["run_id"].to_list()) == {"t"}

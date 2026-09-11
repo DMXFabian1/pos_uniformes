@@ -171,7 +171,7 @@ def cargar(data_dir: str | Path, experiment: str | None = None) -> Datos:
     d.decisiones = _filas(data_dir, "decisions", experiment)
     d.fills = _filas(data_dir, "fill_observations", experiment)
     d.salud = _filas(data_dir, "feed_health", experiment)
-    d.reacciones = _filas(data_dir, "reactions")
+    d.reacciones = _filas(data_dir, "reactions", experiment)
     return d
 
 
@@ -221,7 +221,8 @@ def llenado(d: Datos) -> list[Llenado]:
             L.tasa = round(L.llenadas / len(obs), 4)
             L.tasa_conservadora = round(sum(1 for r in obs if r.get("llenada_conservador")) / len(obs), 4)
             L.tasa_optimista = round(sum(1 for r in obs if r.get("llenada_optimista")) / len(obs), 4)
-            L.espera_mediana_s = _mediana([r["espera_ms"] / 1000 for r in obs if r.get("espera_ms")])
+            L.espera_mediana_s = _mediana([r["espera_ms"] / 1000 for r in obs
+                                           if r.get("espera_ms") and r["espera_ms"] >= 0])
             L.cola_mediana = _mediana([r["cola_delante"] for r in obs if r.get("cola_delante") is not None])
             L.barridas = sum(1 for r in obs if r.get("barrido"))
         validas = pnl_por_est.get(est, [])

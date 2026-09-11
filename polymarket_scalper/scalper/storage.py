@@ -161,7 +161,7 @@ SCHEMAS: dict[str, pa.Schema] = {
     "reactions": pa.schema([
         ("ts_ms", I()), ("game_id", S()), ("league", S()), ("condition_id", S()), ("token_id", S()),
         ("evento", S()), ("ts_evento", I()), ("mid_antes", F()), ("mid_despues", F()), ("lag_ms", I()),
-        ("movimiento", F()), ("reacciono", B()),
+        ("movimiento", F()), ("reacciono", B()), ("run_id", S()), ("experiment", S()),
     ]),
 }
 

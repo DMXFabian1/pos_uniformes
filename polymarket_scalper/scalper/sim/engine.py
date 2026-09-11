@@ -432,7 +432,7 @@ class Engine:
         self.stats["sin_reaccion"] += sum(1 for r in rows if not r["reacciono"])
         if self.writer is not None:
             for r in rows:
-                self.writer.append("reactions", r)
+                self.writer.append("reactions", {**r, "run_id": self.run_id, "experiment": self.experiment})
 
     # ------------------------------------------------------------ ¿en qué condiciones se llena?
     def _condiciones(self, pos: Position, book: OrderBook, precio: float, size: float) -> dict[str, Any]:
@@ -474,7 +474,10 @@ class Engine:
                 "precio": round(o.price, 6), "size": round(o.size, 4),
                 "cola_delante": round(o.queue_inicial, 4),
                 "llenada": llenada, "fraccion_llenada": round(o.filled / o.size, 4) if o.size else 0.0,
-                "espera_ms": (pos.ts_fill - o.ts_placed) if (llenada and pos.ts_fill) else None,
+                # solo si el reloj da un número posible: los feeds llegan con retrasos distintos y
+                # restar dos marcas de origen distinto produce esperas negativas que no miden nada
+                "espera_ms": (pos.ts_fill - o.ts_placed)
+                if (llenada and pos.ts_fill and pos.ts_fill >= o.ts_placed) else None,
                 "vol_cruzado": round(o.vol_cruzado, 4), "barrido": bool(o.barrido),
                 "llenada_conservador": o.filled_conservador > 1e-9,
                 "llenada_optimista": o.filled_optimista > 1e-9,
@@ -960,9 +963,10 @@ class Engine:
         pos.status = "open"
         pos.ts_placed = ts_ms
         pos.exec_delay_ms = ts_ms - s.ts_ms
-        pos.ts_fill = ts_ms
 
     def _after_maker_fill(self, pos: Position, ts_ms: int) -> None:
+        if not pos.ts_fill:
+            pos.ts_fill = ts_ms          # el primer llenado de verdad, no el momento de poner
         # sincroniza fills e inventario con las órdenes maker
         pos.fills = [f for o in pos.maker_orders for f in o.fills]
         inv: dict[str, float] = {}
@@ -1018,7 +1022,8 @@ class Engine:
     def _expire(self, ts_ms: int) -> None:
         max_hold = self.cfg.sim.max_hold_seconds * 1000
         for pos in [p for p in self.positions if p.status == "open" and p.maker_orders]:
-            if ts_ms - pos.ts_fill < max_hold:
+            # el reloj corre desde que la orden está puesta, que es cuando empieza el riesgo
+            if ts_ms - (pos.ts_placed or pos.ts_fill) < max_hold:
                 continue
             self._unwind_inventory(pos, ts_ms)
             self._close(pos, ts_ms, "expired" if pos.size_filled > 0 or pos.fills else "expired_unfilled")
