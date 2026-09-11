@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Any
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 
 class CategoryCfg(BaseModel):
@@ -155,15 +155,23 @@ class SignalsCfg(BaseModel):
 
 
 class SimCfg(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     latency_ms: int = 400
     slippage_ticks: int = 1
-    maker_fill_prob: float = 0.6
+    # El 60 % es solo una REFERENCIA para comparar con la tasa de llenado observada. No decide
+    # ningún fill: las órdenes maker se llenan por cola (ver sim/fill_model.py).
+    fill_baseline_prob: float = Field(0.6, validation_alias=AliasChoices("fill_baseline_prob", "maker_fill_prob"))
     max_hold_seconds: int = 600
-    max_hold_directional_seconds: int = 4 * 3600
+    time_stop_directional_seconds: int = 900       # scalping: si no convergió en 15 min, fuera
+    max_hold_directional_seconds: int = 4 * 3600   # tope duro por si el time stop no puede ejecutarse (sin libro)
     max_entry_slip_ticks: int = 3
     start_cash: float = 1000
     max_position_usd: float = 60
+    max_market_exposure_usd: float = 120           # suma de colateral abierto en el mismo mercado
+    max_game_exposure_usd: float = 180             # suma en mercados del mismo partido/evento
     max_open_positions: int = 15
+    adverse_horizons_ms: list[int] = Field(default_factory=lambda: [100, 500, 1000, 2000, 5000, 10000])
     seed: int = 7
 
 

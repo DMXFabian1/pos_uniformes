@@ -258,7 +258,7 @@ def build_payload(cfg: Config, run_id: str | None = None) -> dict[str, Any]:
     return {
         "generated_ms": now, "config": {"categories": list(cfg.categories), "min_edge_net": cfg.signals.min_edge_net,
                                         "target_size": cfg.signals.target_size, "latency_ms": cfg.sim.latency_ms,
-                                        "maker_fill_prob": cfg.sim.maker_fill_prob, "whale_min_usd": cfg.flow.whale_min_usd,
+                                        "fill_baseline_prob": cfg.sim.fill_baseline_prob, "whale_min_usd": cfg.flow.whale_min_usd,
                                         "smart_min_score": cfg.flow.smart_min_score, "sigma_basketball": cfg.models.sigma_basketball,
                                         "learn_min_train": cfg.learn.min_train, "learn_min_examples": cfg.learn.min_examples},
         "summary": summary, "equity": sections["equity"], "by_kind": sections["by_kind"], "exit_reasons": sections["exit_reasons"],

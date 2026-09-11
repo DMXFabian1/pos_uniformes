@@ -17,8 +17,12 @@ class Position:
     fills: list[Fill] = field(default_factory=list)
     maker_orders: list[MakerOrder] = field(default_factory=list)
     entrada_maker: MakerOrder | None = None      # orden puesta esperando llenarse (maker-first)
-    ts_fill: int = 0
+    orden_entrada: MakerOrder | None = None      # la misma orden, conservada tras llenarse o caducar (informe)
+    ts_placed: int = 0               # cuándo se puso la orden maker
+    ts_fill: int = 0                 # primer fill real
     ts_exit: int = 0
+    adverse: dict[int, float | None] = field(default_factory=dict)   # horizonte_ms -> mid - precio de entrada
+    mid_previo: float | None = None  # último mid observado (estado del libro) para las marcas
     size_filled: float = 0.0
     cost: float = 0.0                # USD gastados (compras / colateral)
     fees: float = 0.0
@@ -37,6 +41,10 @@ class Position:
 
     def to_row(self, run_id: str, mode: str) -> dict[str, Any]:
         s = self.signal
+        o = self.orden_entrada or self.entrada_maker
+        esc = o.escenarios() if o is not None else {}
+        adv = {f"adverse_{_hz(h)}": (None if v is None else round(v, 5)) for h, v in self.adverse.items()}
+        hold = (self.ts_exit - self.ts_fill) / 1000 if (self.ts_fill and self.ts_exit and self.size_filled > 0) else None
         return {
             "run_id": run_id, "mode": mode, "signal_id": s.signal_id, "kind": s.kind, "condition_id": s.condition_id,
             "event_id": s.event_id, "ts_signal": s.ts_ms, "ts_fill": self.ts_fill, "ts_exit": self.ts_exit,
@@ -50,7 +58,19 @@ class Position:
             "conf_heuristic": s.meta.get("conf_heuristic", s.confidence),
             "p_win_model": s.meta.get("p_win_model"),
             "model_version": s.meta.get("model_version"),
+            "strategy": s.strategy, "entry_role": s.meta.get("entry_role", "taker"),
+            "ts_placed": self.ts_placed, "hold_s": None if hold is None else round(hold, 3),
+            "fill_conservador": esc.get("conservador"), "fill_optimista": esc.get("optimista"),
+            "queue_inicial": None if o is None else round(o.queue_inicial, 4),
+            "vol_cruzado": None if o is None else round(o.vol_cruzado, 4),
+            "barrido": None if o is None else bool(o.barrido),
+            "edge_taker": s.meta.get("edge_taker"),
+            **adv,
         }
+
+
+def _hz(h: int) -> str:
+    return f"{h}ms" if h < 1000 else f"{h // 1000}s"
 
 
 def signal_row(s: Signal, run_id: str) -> dict[str, Any]:
@@ -58,5 +78,5 @@ def signal_row(s: Signal, run_id: str) -> dict[str, Any]:
         "ts_ms": s.ts_ms, "signal_id": s.signal_id, "kind": s.kind, "condition_id": s.condition_id,
         "event_id": s.event_id, "legs": dumps([l.__dict__ for l in s.legs]), "size": s.size,
         "edge_gross": s.edge_gross, "fee_est": s.fee_est, "edge_net": s.edge_net, "confidence": s.confidence,
-        "horizon": s.horizon, "meta": dumps(s.meta), "run_id": run_id,
+        "horizon": s.horizon, "meta": dumps({**s.meta, "strategy": s.strategy}), "run_id": run_id,
     }

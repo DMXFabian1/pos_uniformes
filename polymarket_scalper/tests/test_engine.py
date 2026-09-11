@@ -7,7 +7,7 @@ from conftest import make_book, make_market
 def _engine(cfg, markets):
     cfg.sim.latency_ms = 100
     cfg.sim.slippage_ticks = 0
-    cfg.sim.maker_fill_prob = 1.0
+    cfg.sim.fill_baseline_prob = 1.0
     cfg.signals.min_edge_net = 0.004
     eng = Engine(cfg, "test", "replay")
     eng.set_markets(markets)
@@ -15,7 +15,7 @@ def _engine(cfg, markets):
 
 
 def test_taker_fill_walks_book_with_slippage_and_fee():
-    fm = FillModel(slippage_ticks=1, maker_fill_prob=1.0)
+    fm = FillModel(slippage_ticks=1)
     b = make_book("t", [(0.40, 10)], [(0.45, 20), (0.47, 30)])
     f = fm.fill_taker(Leg("t", "BUY", 0.47, 30), b, 0.05, 1)
     assert f.shares == 30 and abs(f.notional - (20 * 0.45 + 10 * 0.47 + 30 * 0.01)) < 1e-9 and f.fee > 0
@@ -24,7 +24,7 @@ def test_taker_fill_walks_book_with_slippage_and_fee():
 
 
 def test_maker_fills_on_crossing_trade_and_queue():
-    fm = FillModel(slippage_ticks=0, maker_fill_prob=1.0)
+    fm = FillModel(slippage_ticks=0)
     o = MakerOrder("t", "BUY", 0.41, 50, queue_ahead=20, ts_placed=0)
     assert fm.maker_on_trade(o, {"token_id": "t", "side": "BUY", "price": 0.41, "size": 100}, 1) == 0   # no cruza
     assert fm.maker_on_trade(o, {"token_id": "t", "side": "SELL", "price": 0.41, "size": 30}, 1) == 10  # 20 de cola

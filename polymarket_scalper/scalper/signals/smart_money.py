@@ -10,7 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from ..fees import taker_fee
-from .base import Leg, MarketContext, Signal, precio_maker
+from .base import Leg, MarketContext, Signal, planear_entrada
 
 
 class SmartMoneyDetector:
@@ -47,38 +47,39 @@ class SmartMoneyDetector:
             return []
         their_px = float(flow.get("price") or 0)
         if b.best_ask > their_px + self.max_chase_ticks * b.tick_size or b.best_ask > self.max_price:
+            ctx.no_trade(self.kind, "precio_ya_se_movio", wallet=flow.get("wallet"), their_price=their_px,
+                         best_ask=b.best_ask)
             return []                                   # ya se movió: no perseguir
         # hipótesis: capturamos una fracción del ROI histórico de la wallet sobre el precio de entrada
         justo = their_px * (1 + max(prof.roi_adj, 0.0) * self.edge_fraction_of_roi)
-        if self.maker_first:
-            entry = precio_maker(b, justo, self.min_edge_net)
-            if entry is None:
-                return []
-            size = max(self.target_size, m.min_order_size)
-            fee_in = 0.0
-            rol, precio_limite = "maker", entry
-        else:
-            w = b.walk_buy(self.target_size)
-            size = w.shares
-            if size < m.min_order_size:
-                return []
-            entry = w.avg_price
-            fee_in = taker_fee(size, entry, m.fee_rate) / size
-            rol, precio_limite = "taker", w.worst_price
-        edge_gross = justo - entry
-        exit_px = justo
-        fee_out = taker_fee(size, exit_px, m.fee_rate) / size
-        edge_net = edge_gross - fee_in - fee_out - (0 if self.maker_first else (b.spread or 0) / 2)
-        if edge_net < self.min_edge_net:
+        e = planear_entrada(b, m, justo, self.min_edge_net, self.target_size, self.maker_first)
+        if e is None:
+            ctx.no_trade(self.kind, "sin_precio_de_entrada", wallet=flow.get("wallet"), justo=justo, mid=b.mid)
             return []
+        edge_gross = justo - e.precio
+        exit_px = justo
+        fee_out = taker_fee(e.size, exit_px, m.fee_rate) / e.size
+        edge_net = edge_gross - e.fee_in - fee_out - (0 if self.maker_first else (b.spread or 0) / 2)
+        if edge_net < self.min_edge_net:
+            ctx.no_trade(self.kind, "edge_neto_insuficiente", wallet=flow.get("wallet"), edge_net=edge_net)
+            return []
+        edge_taker = None
+        if e.taker_precio is not None:
+            edge_taker = round(exit_px - e.taker_precio - e.taker_fee_in
+                               - taker_fee(e.taker_size, exit_px, m.fee_rate) / e.taker_size - (b.spread or 0) / 2, 5)
         conf = min(0.95, prof.score * (0.6 + 0.4 * min(prof.n_closed / 200, 1.0)))
+        nombre = flow.get("name") or str(flow.get("wallet", ""))[:10]
         return [Signal(
             ts_ms=ts_ms, kind=self.kind, condition_id=m.condition_id, event_id=m.event_id,
-            legs=[Leg(tok.token_id, "BUY", precio_limite, size, rol, tok.outcome)],
-            size=size, edge_gross=edge_gross, fee_est=fee_in + fee_out, edge_net=edge_net,
+            legs=[Leg(tok.token_id, "BUY", e.precio_limite, e.size, e.rol, tok.outcome)],
+            size=e.size, edge_gross=edge_gross, fee_est=e.fee_in + fee_out, edge_net=edge_net,
             confidence=round(conf, 3), horizon="directional",
-            meta={"entry_role": rol, "wallet": flow.get("wallet"), "wallet_name": flow.get("name"), "wallet_score": prof.score,
+            meta={"entry_role": e.rol, "wallet": flow.get("wallet"), "wallet_name": flow.get("name"), "wallet_score": prof.score,
                   "wallet_n": prof.n_closed, "wallet_roi": prof.roi, "their_price": their_px, "their_usd": flow.get("usd"),
-                  "entry": round(entry, 4), "target": round(exit_px, 4),
-                  "stop": round(max(entry - 2 * edge_net, 0.01), 4), "p_market": round(b.mid, 4)},
+                  "entry": round(e.precio, 4), "target": round(exit_px, 4),
+                  "stop": round(max(e.precio - 2 * edge_net, 0.01), 4), "p_market": round(b.mid, 4),
+                  "edge_taker": edge_taker, "queue_ahead": round(e.queue_ahead, 2),
+                  "por_que": (f"La wallet {nombre} ({prof.n_closed} cierres, {prof.roi * 100:.0f} % de retorno) acaba de "
+                              f"comprar a {their_px:.2f} y el precio sigue en {b.mid:.2f}: se entra antes de que el "
+                              f"mercado la siga.")},
         )]

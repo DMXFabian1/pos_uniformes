@@ -131,9 +131,14 @@ signals:
 sim:
   latency_ms: 400               # retraso entre señal y ejecución
   slippage_ticks: 1             # ticks adicionales de penalización en órdenes taker
-  maker_fill_prob: 0.6          # probabilidad de que un trade que cruza nuestro precio nos llene
+  fill_baseline_prob: 0.6       # SOLO referencia para el informe de ejecución. Los fills maker se simulan
+                                # por cola (volumen que cruza el precio vs lo que había delante), nunca por azar.
   max_hold_seconds: 600         # tiempo máximo con una posición de spread abierta
-  max_hold_directional_seconds: 14400   # posiciones direccionales (modelo, dinero inteligente): 4 h
+  time_stop_directional_seconds: 900    # scalping: si el precio no convergió en 15 min, se sale
+  max_hold_directional_seconds: 14400   # tope duro (4 h) por si el time stop no encuentra libro
+  max_market_exposure_usd: 120  # colateral máximo abierto en un mismo mercado
+  max_game_exposure_usd: 180    # colateral máximo abierto en mercados del mismo partido/evento
+  adverse_horizons_ms: [100, 500, 1000, 2000, 5000, 10000]   # selección adversa: mid tras el fill
   max_entry_slip_ticks: 3       # si el precio se movió más que esto entre señal y ejecución, no entrar
   start_cash: 1000
   max_position_usd: 60

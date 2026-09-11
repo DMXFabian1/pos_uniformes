@@ -93,6 +93,24 @@ SCHEMAS: dict[str, pa.Schema] = {
         ("size_target", F()), ("size_filled", F()), ("cost", F()), ("fees", F()), ("payout", F()),
         ("predicted_edge", F()), ("predicted_pnl", F()), ("realized_pnl", F()), ("error", F()),
         ("confidence", F()), ("meta", S()), ("conf_heuristic", F()), ("p_win_model", F()), ("model_version", I()),
+        # ejecución: estrategia, rol de entrada y los tres escenarios de llenado de la orden maker
+        ("strategy", S()), ("entry_role", S()), ("ts_placed", I()), ("hold_s", F()),
+        ("fill_conservador", F()), ("fill_optimista", F()), ("queue_inicial", F()), ("vol_cruzado", F()),
+        ("barrido", B()), ("edge_taker", F()),
+        # selección adversa: mid - precio de entrada a cada horizonte tras el primer fill (negativo = en contra)
+        ("adverse_100ms", F()), ("adverse_500ms", F()), ("adverse_1s", F()), ("adverse_2s", F()),
+        ("adverse_5s", F()), ("adverse_10s", F()),
+    ]),
+    # cada decisión del motor, incluidas las de NO operar: sin esto no se sabe si los filtros sobran o faltan
+    "decisions": pa.schema([
+        ("ts_ms", I()), ("run_id", S()), ("condition_id", S()), ("kind", S()), ("strategy", S()),
+        ("decision", S()), ("motivo", S()), ("edge_net", F()), ("detalle", S()),
+    ]),
+    # Market Reaction Engine: cuánto tarda el precio en moverse tras un cambio en el partido
+    "reactions": pa.schema([
+        ("ts_ms", I()), ("game_id", S()), ("league", S()), ("condition_id", S()), ("token_id", S()),
+        ("evento", S()), ("ts_evento", I()), ("mid_antes", F()), ("mid_despues", F()), ("lag_ms", I()),
+        ("movimiento", F()), ("reacciono", B()),
     ]),
 }
 

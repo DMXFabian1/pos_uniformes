@@ -16,11 +16,14 @@ from ..discovery import MarketInfo
 from ..learn import ModelStore, Scorer
 from ..models import GameState, ModelRegistry, WinProb, match_outcome, parse_game
 from ..models.crypto import UpDownModel, UpDownState
+from ..reaction import ReactionEngine
 from ..signals import MarketContext, Signal, build_detectors
-from ..signals.base import Leg, TokenHistory
-from ..storage import ParquetWriter
+from ..signals.base import Leg, TokenHistory, strategy_id
+from ..storage import ParquetWriter, dumps
 from .fill_model import FillModel
 from .ledger import Position, signal_row
+
+DECISION_DEDUPE_MS = 30_000      # el mismo motivo de NO TRADE en el mismo mercado se anota como mucho cada 30 s
 
 log = logging.getLogger(__name__)
 
@@ -32,7 +35,11 @@ class Engine:
         self.mode = mode
         self.writer = writer
         self.detectors = build_detectors(cfg.signals, cfg.updown)
-        self.fill_model = FillModel(cfg.sim.slippage_ticks, cfg.sim.maker_fill_prob, cfg.sim.seed)
+        self.fill_model = FillModel(cfg.sim.slippage_ticks, cfg.sim.fill_baseline_prob, cfg.sim.seed)
+        self.reaction = ReactionEngine()
+        self._ultima_decision: dict[tuple[str, str, str], int] = {}
+        self._marcas: list[Position] = []          # posiciones con horizontes de selección adversa pendientes
+        self._por_escribir: list[Position] = []    # cerradas que esperan a completar sus marcas antes de ir al ledger
         self.markets: dict[str, MarketInfo] = {}
         self.token_to_cid: dict[str, str] = {}
         self.event_index: dict[str, list[str]] = defaultdict(list)
@@ -121,6 +128,10 @@ class Engine:
             return
         for cid in cids:
             self._ensure_sides(cid, g)
+        mids = {t.token_id: (cid, self.books[t.token_id].mid) for cid in cids
+                for t in self.markets[cid].tokens if t.token_id in self.books and self.books[t.token_id].is_valid}
+        self.reaction.on_game(ts_ms, prev, g, {k: v for k, v in mids.items() if v[1] is not None})
+        self._drenar_reacciones()
         if not g.live and not g.ended:
             self._capture_pregame(game_id, cids)
         elif g.live and game_id not in self.pregame and prev is not None and not prev.live:
@@ -206,6 +217,7 @@ class Engine:
                     self._on_signal(sig)
             except Exception:  # noqa: BLE001
                 log.exception("detector %s falló en flow", det.kind)
+        self._registrar_rechazos(ctx, ts_ms)
 
     def _ensure_sides(self, cid: str, g: GameState) -> None:
         if cid in self.outcome_side:
@@ -301,6 +313,8 @@ class Engine:
         if book.is_valid:
             self.history[token_id].mids.append((ts_ms, book.mid))
             self.ultimo_mid[token_id] = book.mid
+            self.reaction.on_book(ts_ms, token_id, book.mid, book.tick_size)
+        self._marcar_adversa(ts_ms, token_id)
         self._process_pending(ts_ms)
         for pos in list(self.positions):
             if pos.status != "open":
@@ -312,6 +326,7 @@ class Engine:
         self._caducar_entradas(ts_ms)
         self._expire(ts_ms)
         self._check_directional(ts_ms, token_id)
+        self._escribir_cerradas(ts_ms)
         cid = self.token_to_cid.get(token_id)
         if cid:
             self._maybe_detect(cid, ts_ms)
@@ -348,10 +363,102 @@ class Engine:
     def tick(self, ts_ms: int) -> None:
         """Llamar periódicamente aunque no lleguen eventos (latencia y expiraciones)."""
         self.now_ms = max(self.now_ms, ts_ms)
+        self._marcar_adversa(ts_ms)
         self._process_pending(ts_ms)
         self._caducar_entradas(ts_ms)
         self._expire(ts_ms)
         self._check_directional(ts_ms)
+        self.reaction.expirar(ts_ms)
+        self._drenar_reacciones()
+        self._escribir_cerradas(ts_ms)
+
+    # ------------------------------------------------------------ reacción del mercado
+    def _drenar_reacciones(self) -> None:
+        rows = self.reaction.drenar()
+        if not rows:
+            return
+        self.stats["reacciones"] += sum(1 for r in rows if r["reacciono"])
+        self.stats["sin_reaccion"] += sum(1 for r in rows if not r["reacciono"])
+        if self.writer is not None:
+            for r in rows:
+                self.writer.append("reactions", r)
+
+    # ------------------------------------------------------------ selección adversa
+    def _marcar_adversa(self, ts_ms: int, token_id: str | None = None) -> None:
+        """Rellena mid - precio_entrada en cada horizonte tras el fill.
+
+        El mid es un estado: en el instante ts_fill + h vale lo último que se observó antes de ese
+        instante. Por eso, al llegar una actualización a `ts_ms`, los horizontes que vencieron
+        estrictamente antes toman el mid previo; el que vence justo ahora toma el nuevo.
+        """
+        for pos in list(self._marcas):
+            tid = pos.signal.legs[0].token_id
+            if token_id is not None and tid != token_id:
+                continue
+            book = self.books.get(tid)
+            mid_ahora = book.mid if (book is not None and book.is_valid) else self.ultimo_mid.get(tid)
+            precio = pos.fills[0].avg_price if pos.fills else None
+            for h in self.cfg.sim.adverse_horizons_ms:
+                vence = pos.ts_fill + h
+                if pos.adverse.get(h, "x") is not None or ts_ms < vence:
+                    continue
+                mid = mid_ahora if (token_id is not None and vence == ts_ms) else pos.mid_previo
+                if token_id is None:                       # tick: el estado no cambió desde la última vez
+                    mid = pos.mid_previo
+                pos.adverse[h] = None if (mid is None or precio is None) else (mid - precio)
+            if token_id is not None:
+                pos.mid_previo = mid_ahora
+            if all(pos.adverse.get(h, "x") is not None for h in self.cfg.sim.adverse_horizons_ms):
+                self._marcas.remove(pos)
+
+    def _iniciar_marcas(self, pos: Position, ts_ms: int) -> None:
+        """Primer fill de una posición direccional: empieza a medir qué hace el precio después."""
+        if pos in self._marcas or pos.signal.horizon not in ("directional", "resolution"):
+            return
+        tid = pos.signal.legs[0].token_id
+        book = self.books.get(tid)
+        pos.mid_previo = book.mid if (book is not None and book.is_valid) else self.ultimo_mid.get(tid)
+        pos.adverse = {h: None for h in self.cfg.sim.adverse_horizons_ms}
+        self._marcas.append(pos)
+
+    def _escribir_cerradas(self, ts_ms: int, forzar: bool = False) -> None:
+        """Las cerradas van al ledger cuando sus marcas están completas (o el plazo venció)."""
+        if self.writer is None:
+            self._por_escribir.clear()
+            return
+        tope = max(self.cfg.sim.adverse_horizons_ms, default=0)
+        for pos in list(self._por_escribir):
+            if forzar or pos not in self._marcas or ts_ms >= pos.ts_fill + tope:
+                if pos in self._marcas:
+                    self._marcas.remove(pos)
+                self._por_escribir.remove(pos)
+                self.writer.append("ledger", pos.to_row(self.run_id, self.mode))
+
+    # ------------------------------------------------------------ decisiones (incluidas NO TRADE)
+    def _decision(self, ts_ms: int, cid: str, kind: str, decision: str, motivo: str, edge_net: float | None = None,
+                  detalle: dict[str, Any] | None = None, strategy: str = "") -> None:
+        clave = (cid, kind, motivo)
+        if decision == "no_trade":
+            ultimo = self._ultima_decision.get(clave, -10**12)
+            if ts_ms - ultimo < DECISION_DEDUPE_MS:
+                return
+            self._ultima_decision[clave] = ts_ms
+            self.stats["no_trade"] += 1
+            self.stats[f"no_trade_{motivo}"] += 1
+        if self.writer is not None:
+            m = self.markets.get(cid)
+            self.writer.append("decisions", {
+                "ts_ms": ts_ms, "run_id": self.run_id, "condition_id": cid, "kind": kind,
+                "strategy": strategy or strategy_id(kind, detalle or {}, m.category if m else ""),
+                "decision": decision, "motivo": motivo, "edge_net": edge_net, "detalle": dumps(detalle or {}),
+            })
+
+    def _registrar_rechazos(self, ctx: MarketContext, ts_ms: int) -> None:
+        for r in ctx.rechazos:
+            r = dict(r)
+            kind, motivo = r.pop("kind"), r.pop("motivo")
+            self._decision(ts_ms, ctx.market.condition_id, kind, "no_trade", motivo, r.get("edge_net"), r)
+        ctx.rechazos.clear()
 
     # ------------------------------------------------------------ detección
     def _maybe_detect(self, cid: str, ts_ms: int) -> None:
@@ -371,6 +478,7 @@ class Engine:
                 continue
             for s in signals:
                 self._on_signal(s)
+        self._registrar_rechazos(ctx, ts_ms)
 
     def _context(self, m: MarketInfo) -> MarketContext:
         books = {t.token_id: self.books[t.token_id] for t in m.tokens if t.token_id in self.books}
@@ -378,10 +486,12 @@ class Engine:
         ebooks = {t.token_id: self.books[t.token_id] for s in sibs for t in s.tokens if t.token_id in self.books}
         g, wp, pre = self._model_for(m.condition_id)
         ud, p_up = self._updown_state(m.condition_id)
+        reaccion = self.reaction.estado(g.game_id, g.league, self.now_ms) if g is not None else None
         return MarketContext(m, books, self.history, sibs, ebooks, game=g, model_prob=wp, pregame=pre,
                             outcome_side=self.outcome_side.get(m.condition_id, {}), wallets=self.wallets,
                             updown=ud, updown_prob=p_up,
-                            prev_window=self.prev_window.get(ud.symbol) if ud is not None else None)
+                            prev_window=self.prev_window.get(ud.symbol) if ud is not None else None,
+                            reaction=reaccion)
 
     def _on_signal(self, s: Signal) -> None:
         self.stats["signals"] += 1
@@ -401,10 +511,14 @@ class Engine:
         s.meta["p_win_model"] = res.p_model
         s.meta["model_version"] = res.version
         s.confidence = round(res.p_blend, 4)
+        m_cat = m0.category if m0 else ""
+        s.strategy = strategy_id(s.kind, s.meta, m_cat)
         if self.writer is not None:
             self.writer.append("signals", signal_row(s, self.run_id))
         if res.gate:
             self.stats["skipped_low_pwin"] += 1
+            self._decision(s.ts_ms, s.condition_id, s.kind, "no_trade", "modelo_p_win_baja", s.edge_net,
+                           {"p_win": res.p_blend}, s.strategy)
             return
         if res.size_mult < 1.0:
             s.size *= res.size_mult
@@ -415,18 +529,31 @@ class Engine:
         # direccionales tienen su propio tope de desvío en el detector
         if s.horizon != "directional" and s.edge_net > self.cfg.signals.max_edge_net:
             self.stats["skipped_implausible"] += 1
+            self._decision(s.ts_ms, s.condition_id, s.kind, "no_trade", "edge_implausible", s.edge_net, {}, s.strategy)
             return
-        # riesgo: tope de posiciones, tope de USD por posición
+        # riesgo: tope de posiciones, tope de USD por posición, por mercado y por partido/evento
         if len(self.positions) >= self.cfg.sim.max_open_positions:
             self.stats["skipped_max_positions"] += 1
+            self._decision(s.ts_ms, s.condition_id, s.kind, "no_trade", "tope_posiciones", s.edge_net, {}, s.strategy)
             return
         per_share = self._collateral_per_share(s)
-        max_size = self.cfg.sim.max_position_usd / per_share if per_share > 0 else s.size
+        m = self.markets.get(s.condition_id)
+        tope_usd = self.cfg.sim.max_position_usd
+        exp_mercado = self._exposicion(lambda p: p.signal.condition_id == s.condition_id)
+        exp_evento = self._exposicion(lambda p: p.signal.event_id == s.event_id and s.event_id)
+        tope_usd = min(tope_usd, self.cfg.sim.max_market_exposure_usd - exp_mercado,
+                       self.cfg.sim.max_game_exposure_usd - exp_evento)
+        if tope_usd <= 0:
+            self.stats["skipped_exposure"] += 1
+            self._decision(s.ts_ms, s.condition_id, s.kind, "no_trade", "tope_exposicion", s.edge_net,
+                           {"mercado_usd": round(exp_mercado, 2), "evento_usd": round(exp_evento, 2)}, s.strategy)
+            return
+        max_size = tope_usd / per_share if per_share > 0 else s.size
         if max_size < s.size:
-            m = self.markets.get(s.condition_id)
             min_sz = m.min_order_size if m else 5
             if max_size < min_sz:
                 self.stats["skipped_too_small"] += 1
+                self._decision(s.ts_ms, s.condition_id, s.kind, "no_trade", "tamano_minimo", s.edge_net, {}, s.strategy)
                 return
             scale = max_size / s.size
             s.size = max_size
@@ -434,10 +561,25 @@ class Engine:
                 l.size *= scale
         if per_share * s.size > self.cash:
             self.stats["skipped_no_cash"] += 1
+            self._decision(s.ts_ms, s.condition_id, s.kind, "no_trade", "sin_efectivo", s.edge_net, {}, s.strategy)
             return
         pos = Position(signal=s, exec_ts=s.ts_ms + self.cfg.sim.latency_ms)
         self.positions.append(pos)
         self.stats["positions"] += 1
+        self._decision(s.ts_ms, s.condition_id, s.kind, "trade", "", s.edge_net,
+                       {"size": round(s.size, 2), "entry_role": s.meta.get("entry_role", "taker")}, s.strategy)
+
+    def _exposicion(self, cond) -> float:
+        """Colateral comprometido (abierto o pendiente) en las posiciones que cumplen la condición."""
+        total = 0.0
+        for p in self.positions:
+            if not cond(p):
+                continue
+            if p.status == "open" and p.size_filled > 0:
+                total += p.collateral
+            else:
+                total += self._collateral_per_share(p.signal) * p.signal.size
+        return total
 
     @staticmethod
     def _collateral_per_share(s: Signal) -> float:
@@ -515,6 +657,7 @@ class Engine:
             self._close(pos, ts_ms, "unfilled")
             return
         pos.status = "open"
+        self._iniciar_marcas(pos, ts_ms)
         if s.kind == "complement_buy":
             pos.payout += got                       # merge SÍ+NO -> 1 USD por share
             pos.inventory = {}
@@ -556,9 +699,9 @@ class Engine:
             # el mercado ya bajó hasta nuestro precio: la ventaja se evaporó mientras esperábamos
             self._close(pos, ts_ms, "price_moved")
             return
-        pos.entrada_maker = self.fill_model.place_maker(leg, book, ts_ms)
+        pos.entrada_maker = pos.orden_entrada = self.fill_model.place_maker(leg, book, ts_ms)
         pos.status = "open"
-        pos.ts_fill = ts_ms
+        pos.ts_placed = ts_ms
 
     def _revisar_entrada(self, pos: Position, ts_ms: int, token_id: str | None = None,
                          trade: dict[str, Any] | None = None, book: OrderBook | None = None) -> None:
@@ -575,11 +718,17 @@ class Engine:
             llenado = self.fill_model.maker_on_book(o, book, ts_ms)
         if llenado <= 0:
             return
+        primero = pos.size_filled <= 0
         pos.fills.extend(f for f in o.fills if f not in pos.fills)
         pos.cost = sum(f.notional for f in o.fills)          # sin comisión: la orden se puso, no se cruzó
         pos.size_filled = o.filled
         pos.inventory[o.token_id] = o.filled
-        self.stats["entradas_maker_llenadas"] += 1
+        if primero:
+            pos.ts_fill = ts_ms
+            self.stats["entradas_maker_llenadas"] += 1
+            if o.barrido:
+                self.stats["entradas_maker_barridas"] += 1
+            self._iniciar_marcas(pos, ts_ms)
         if o.done:
             self.stats["entradas_maker_completas"] += 1
 
@@ -629,6 +778,13 @@ class Engine:
             self._close(pos, ts_ms, "both_filled")
 
     def _check_directional(self, ts_ms: int, token_id: str | None = None) -> None:
+        """Salidas de una posición direccional, en este orden: target, stop, time stop, tope duro.
+
+        El stop mira el mejor bid, que es a lo que de verdad se vendería, no el mid. El time stop es
+        la regla de scalping: si el precio no convergió en el plazo, la tesis de desalineación ya no
+        vale y se sale, gane o pierda. El tope duro solo actúa si el time stop no encontró libro.
+        """
+        time_stop = self.cfg.sim.time_stop_directional_seconds * 1000
         max_hold = self.cfg.sim.max_hold_directional_seconds * 1000
         for pos in [p for p in self.positions if p.status == "open" and p.signal.horizon == "directional"
                     and p.size_filled > 0]:
@@ -638,17 +794,20 @@ class Engine:
             book = self.books.get(tid)
             if book is None or not book.is_valid:
                 continue
-            mid = book.mid
             target, stop = pos.signal.meta.get("target"), pos.signal.meta.get("stop")
             reason = None
             if target is not None and book.best_bid >= target - 1e-9:
                 reason = "target"
-            elif stop is not None and mid <= stop + 1e-9:
+            elif stop is not None and book.best_bid <= stop + 1e-9:
                 reason = "stop"
+            elif ts_ms - pos.ts_fill >= time_stop:
+                reason = "time_stop"
             elif ts_ms - pos.ts_fill >= max_hold:
                 reason = "max_hold"
             if reason is None:
                 continue
+            # si quedaba parte de la orden de entrada sin llenar, se cancela: no se añade más
+            pos.entrada_maker = None
             self._unwind_inventory(pos, ts_ms)
             self._close(pos, ts_ms, reason)
 
@@ -724,7 +883,8 @@ class Engine:
         self.closed.append(pos)
         self.stats[f"closed_{reason}"] += 1
         if self.writer is not None:
-            self.writer.append("ledger", pos.to_row(self.run_id, self.mode))
+            self._por_escribir.append(pos)
+            self._escribir_cerradas(ts_ms)
         if reason not in ("unfilled", "expired_unfilled", "spread_gone", "no_book", "price_moved"):
             log.info("cierre %s %s size=%.1f pred=%.4f real=%.4f err=%.4f (%s)", pos.signal.kind,
                      pos.signal.condition_id[:10], pos.size_filled, pos.predicted_pnl, pos.realized_pnl,
@@ -732,9 +892,15 @@ class Engine:
 
     def close_all(self, ts_ms: int, reason: str = "end") -> None:
         for pos in list(self.positions):
+            if pos.status == "open" and pos.size_filled <= 0 and pos.entrada_maker is not None:
+                self._close(pos, ts_ms, "sin_llenar")       # orden puesta que nunca se llenó: no pasó nada
+                continue
             if pos.status == "open":
                 self._unwind_inventory(pos, ts_ms)
             self._close(pos, ts_ms, reason if pos.status == "open" else "unfilled")
+        self.reaction.expirar(ts_ms + self.reaction.ventana_ms)
+        self._drenar_reacciones()
+        self._escribir_cerradas(ts_ms, forzar=True)
 
     def summary(self) -> dict[str, Any]:
         closed = [p for p in self.closed if p.size_filled > 0]
