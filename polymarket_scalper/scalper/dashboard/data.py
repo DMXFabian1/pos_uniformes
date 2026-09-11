@@ -281,16 +281,25 @@ def _reacciones(data_dir: Path, limite: int = 12) -> dict[str, Any]:
 
 
 def _validacion(cfg: Config) -> dict[str, Any]:
-    """Las cuatro tablas de la fase de medición y el semáforo, de la misma fuente que el informe."""
+    """Las cuatro tablas de la fase de medición y el semáforo, de la misma fuente que el informe.
+
+    Solo del experimento en curso: mezclar versiones del motor da un número que no es de ninguna.
+    """
+    from ..experimento import historial
     from ..validacion import analizar
+    vacio = {"llenado": [], "post_fill": [], "frescura": [], "estados": [], "salud": {},
+             "experimento": None, "experimentos": 0}
     try:
-        inf = analizar(cfg.data_path)
+        exps = historial(cfg.data_dir)
+        actual = exps[-1]["experiment_id"] if exps else None
+        inf = analizar(cfg.data_path, actual)
     except Exception:  # noqa: BLE001 - el panel nunca debe caerse por un informe
         log.exception("no se pudo calcular el informe de validación")
-        return {"llenado": [], "post_fill": [], "frescura": [], "estados": [], "salud": {}}
+        return vacio
     return {"llenado": [l.to_dict() for l in inf.llenado], "post_fill": inf.post_fill,
             "frescura": inf.frescura, "estados": [e.to_dict() for e in inf.estados],
-            "salud": inf.salud, "rechazos": inf.rechazos[:12], "cadena": inf.cadena}
+            "salud": inf.salud, "rechazos": inf.rechazos[:12], "cadena": inf.cadena,
+            "experimento": actual, "experimentos": len(exps)}
 
 
 def build_payload(cfg: Config, run_id: str | None = None) -> dict[str, Any]:

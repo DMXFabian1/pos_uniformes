@@ -49,3 +49,45 @@ def test_el_panel_trae_la_ejecucion_las_decisiones_y_las_reacciones(cfg, tmp_pat
     assert p["decisiones"]["motivos"][0]["motivo"] == "edge_neto_insuficiente"
     assert p["reacciones"]["por_liga"][0]["league"] == "nba"
     json.dumps(p, default=str)
+
+
+def test_las_oportunidades_traen_su_instante_de_caducidad(cfg, tmp_path):
+    """El panel las retira solas: para eso cada una necesita saber cuándo deja de valer."""
+    import time
+
+    from scalper.opportunities import listar
+    from scalper.storage import ParquetWriter, dumps
+
+    cfg.data_dir = str(tmp_path)
+    ahora = int(time.time() * 1000)
+    w = ParquetWriter(tmp_path, flush_seconds=10**9, flush_rows=10**9)
+    w.append("signals", {"ts_ms": ahora - 30_000, "signal_id": "s1", "kind": "updown_model",
+                         "condition_id": "c", "event_id": "e",
+                         "legs": dumps([{"token_id": "t", "side": "BUY", "price": 0.4, "size": 50,
+                                         "role": "maker", "outcome": "Up"}]),
+                         "size": 50.0, "edge_gross": 0.05, "fee_est": 0.0, "edge_net": 0.05,
+                         "confidence": 0.7, "horizon": "resolution",
+                         "meta": dumps({"entry": 0.4, "side": "up", "p_model": 0.45}), "run_id": "r"})
+    w.close()
+    o = listar(tmp_path, minutos=30)[0]
+    assert o.frescura_s == 90                       # una ventana de cripto no vale más que eso
+    assert o.caduca_ms == o.ts_ms + 90_000
+    assert o.fresca and o.to_dict()["caduca_ms"] == o.caduca_ms
+
+
+def test_el_panel_mide_solo_el_experimento_en_curso(cfg, tmp_path):
+    """Mezclar versiones del motor da un número que no es de ninguna."""
+    from scalper.storage import ParquetWriter
+    from test_evaluacion import _fila
+
+    cfg.data_dir = str(tmp_path)
+    w = ParquetWriter(tmp_path, flush_seconds=10**9, flush_rows=10**9)
+    for i, exp in [(0, "exp-viejo"), (1, "exp-viejo"), (2, "exp-nuevo")]:
+        w.append("ledger", dict(_fila(i, strategy="NBA_DIRECTIONAL", pnl=1.0), experiment=exp))
+    for ts, eid in ((1_000, "exp-viejo"), (2_000, "exp-nuevo")):
+        w.append("experiments", {"ts_ms": ts, "experiment_id": eid, "commit": "abc", "dirty": False,
+                                 "huella": eid, "umbrales": "{}", "modelos": "{}", "nota": ""})
+    w.close()
+    v = build_payload(cfg)["validacion"]
+    assert v["experimento"] == "exp-nuevo" and v["experimentos"] == 2
+    assert v["salud"]["posiciones_validas"] == 1        # solo la del experimento en curso

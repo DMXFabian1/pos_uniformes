@@ -52,17 +52,28 @@ p{margin:0}
 .rail .foot{margin-top:auto;display:flex;flex-direction:column;gap:8px;font-size:11px;color:var(--muted);padding:0 6px}
 .btn{appearance:none;border:1px solid var(--line-2);background:var(--surface);color:var(--ink);border-radius:6px;padding:6px 10px;font:inherit;font-size:12px;cursor:pointer}
 .btn:hover{border-color:var(--accent)}
-main{padding:22px 28px 60px;display:flex;flex-direction:column;gap:34px;min-width:0}
-.topbar{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding-bottom:14px;border-bottom:1px solid var(--line)}
-.topbar h1{font-size:20px;letter-spacing:-.01em;margin-right:6px}
+main{padding:0 28px 40px;display:block;min-width:0}
+.topbar{position:sticky;top:0;z-index:9;display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;
+  padding:14px 0 12px;margin-bottom:16px;border-bottom:1px solid var(--line);background:var(--bg)}
+.topbar h1{font-size:17px;letter-spacing:-.01em;margin-right:4px;white-space:nowrap}
+.topbar .sep{flex:1}
+/* Cuánta muestra falta para que el semáforo pueda dejar de estar en amarillo. */
+.progreso{display:inline-flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.progreso .barra{width:92px;height:6px;border-radius:3px;background:var(--surface-2);overflow:hidden}
+.progreso .barra i{display:block;height:100%;background:var(--accent);border-radius:3px}
 .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 9px;border-radius:999px;background:var(--surface);border:1px solid var(--line);font-size:12px;color:var(--ink-2);white-space:nowrap}
 .pill .dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
 .pill.good .dot{background:var(--good)} .pill.warn .dot{background:var(--warn)} .pill.crit .dot{background:var(--crit)}
 .pill b{color:var(--ink);font-weight:500}
-section{scroll-margin-top:12px;display:flex;flex-direction:column;gap:14px}
+/* Una vista cada vez. Se cambia con la barra lateral o con las teclas 1-9: así no hay que
+   subir y bajar buscando lo que uno quiere ver. */
+section{display:none}
+section.activa{display:flex;flex-direction:column;gap:14px;animation:entra .12s ease-out}
+@keyframes entra{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
 .sec-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .sec-head p{color:var(--muted);font-size:13px;max-width:70ch}
 .help{background:var(--surface-2);border:1px solid var(--line);border-radius:8px;padding:0 14px;max-width:96ch}
+.help:not([open]) summary{padding:7px 0}
 .help summary{cursor:pointer;padding:9px 0;color:var(--ink-2);font-size:12.5px;font-weight:500;letter-spacing:.02em;list-style:none;display:flex;align-items:center;gap:8px}
 .help summary::before{content:"?";display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;background:var(--surface);border:1px solid var(--line-2);font-family:"IBM Plex Mono",monospace;font-size:11px}
 .help summary::-webkit-details-marker{display:none}
@@ -85,7 +96,9 @@ section{scroll-margin-top:12px;display:flex;flex-direction:column;gap:14px}
 .chart .tip.on{opacity:1}
 .legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:12px;color:var(--ink-2)}
 .legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:-1px}
-.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.tablewrap{overflow:auto;max-height:min(52vh,520px);border:1px solid var(--line);border-radius:8px;background:var(--surface)}
+.tablewrap thead th{position:sticky;top:0;z-index:2;background:var(--surface-2)}
+.tablewrap.corta{max-height:min(30vh,300px)}
 table{border-collapse:collapse;width:100%;font-size:13px}
 th,td{padding:8px 12px;text-align:left;border-bottom:1px solid var(--line);white-space:nowrap;vertical-align:middle}
 th{font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:500;background:var(--surface-2);position:sticky;top:0}
@@ -103,7 +116,14 @@ td.pos{color:var(--good)} td.neg{color:var(--crit)}
 .chip.live{color:var(--good)}
 .empty{padding:22px;color:var(--muted);font-size:13px;text-align:center;border:1px dashed var(--line-2);border-radius:8px;background:var(--surface-2)}
 .empty code{font-family:"IBM Plex Mono",monospace;color:var(--ink-2)}
-.ops{display:flex;flex-direction:column;gap:22px}
+.ops{display:flex;flex-direction:column;gap:18px}
+.controles{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:12.5px;color:var(--muted)}
+.controles .btn{padding:4px 10px;font-size:12px}
+.controles .btn[aria-pressed="true"]{background:var(--accent);color:#fff;border-color:transparent}
+/* La antigüedad corre en pantalla; cuando llega a cero la tarjeta se retira sola. */
+.edad{font-family:"IBM Plex Mono",monospace;font-size:11px;color:var(--muted);white-space:nowrap}
+.edad.poco{color:var(--warn)}
+.op.caducando{opacity:.55}
 .opgrupo{display:flex;flex-direction:column;gap:12px}
 .opcab{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;padding-bottom:8px;border-bottom:1px solid var(--line)}
 .opcab h3{font-size:15px;color:var(--ink);text-transform:none;letter-spacing:0;font-weight:600}
@@ -189,49 +209,58 @@ footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);paddin
   <aside class="rail">
     <div class="brand"><div class="mark">PM</div><div><b>Scalper Polymarket</b><small>panel de operación</small></div></div>
     <nav class="nav" id="nav">
-      <a href="#oportunidades" class="active">Oportunidades <span class="count" id="n-ops">–</span></a>
-      <a href="#resumen">Resumen</a>
-      <a href="#ejecucion">Ejecución <span class="count" id="n-ejec">–</span></a>
-      <a href="#senales">Señales y resultados <span class="count" id="n-senales">–</span></a>
-      <a href="#partidos">Partidos en vivo <span class="count" id="n-partidos">–</span></a>
-      <a href="#ballenas">Ballenas <span class="count" id="n-ballenas">–</span></a>
-      <a href="#flujo">Flujo grande <span class="count" id="n-flujo">–</span></a>
-      <a href="#modelos">Aprendizaje <span class="count" id="n-modelos">–</span></a>
-      <a href="#datos">Datos y configuración</a>
+      <a href="#oportunidades" class="active" data-vista="oportunidades"><span>Oportunidades</span> <span class="count" id="n-ops">–</span></a>
+      <a href="#ejecucion" data-vista="ejecucion"><span>Ejecución</span> <span class="count" id="n-ejec">–</span></a>
+      <a href="#resumen" data-vista="resumen"><span>Resumen</span></a>
+      <a href="#senales" data-vista="senales"><span>Señales y resultados</span> <span class="count" id="n-senales">–</span></a>
+      <a href="#partidos" data-vista="partidos"><span>Partidos en vivo</span> <span class="count" id="n-partidos">–</span></a>
+      <a href="#ballenas" data-vista="ballenas"><span>Ballenas</span> <span class="count" id="n-ballenas">–</span></a>
+      <a href="#flujo" data-vista="flujo"><span>Flujo grande</span> <span class="count" id="n-flujo">–</span></a>
+      <a href="#modelos" data-vista="modelos"><span>Aprendizaje</span> <span class="count" id="n-modelos">–</span></a>
+      <a href="#datos" data-vista="datos"><span>Datos y configuración</span></a>
     </nav>
     <div class="foot">
       <div id="gen">–</div>
       <div id="src">–</div>
+      <div class="small">Teclas 1-9 para cambiar de vista</div>
       <button class="btn" id="theme" type="button">Cambiar tema</button>
     </div>
   </aside>
   <main>
     <header class="topbar">
-      <h1>Estado del bot</h1>
+      <h1 id="titulo-vista">Oportunidades</h1>
       <span class="pill" id="p-data"><span class="dot"></span>Datos <b>–</b></span>
-      <span class="pill" id="p-mode"><span class="dot"></span>Modo <b>–</b></span>
-      <span class="pill" id="p-markets"><span class="dot"></span>Mercados seguidos <b>–</b></span>
-      <span class="pill" id="p-games"><span class="dot"></span>Partidos en vivo <b>–</b></span>
-      <span class="pill" id="p-wallets"><span class="dot"></span>Wallets perfiladas <b>–</b></span>
-      <span class="pill" id="p-models"><span class="dot"></span>Modelos en uso <b>–</b></span>
+      <span class="pill" id="p-feed"><span class="dot"></span>Feed <b>–</b></span>
+      <span class="pill" id="p-markets"><span class="dot"></span>Mercados <b>–</b></span>
+      <span class="pill" id="p-games"><span class="dot"></span>En vivo <b>–</b></span>
+      <span class="sep"></span>
+      <span class="progreso" id="p-muestra" title="Operaciones medidas. Con menos de 100 el veredicto no puede salir del amarillo.">
+        muestra <span class="barra"><i style="width:0%"></i></span> <b>–</b>
+      </span>
     </header>
 
     <section id="oportunidades">
-      <div class="sec-head"><h2>Oportunidades ahora mismo</h2><p>Lo que el bot ve en este momento, por mercado: qué comprar, a qué precio y por qué. Las cifras ya descuentan las comisiones.</p></div>
-      <details class="help" open><summary>Cómo leer esto</summary><div class="body">
+      <div class="sec-head"><p>Lo que el bot ve en este momento, por mercado: qué comprar, a qué precio y por qué. Las cifras ya descuentan las comisiones, y cada tarjeta se retira sola cuando caduca.</p></div>
+      <details class="help"><summary>Cómo leer esto</summary><div class="body">
         <p><b>Solo aparece lo que da números después de comisiones.</b> Si no hay nada, no es que el bot esté parado: es que ninguna oportunidad supera el costo de operar. Eso es lo normal la mayor parte del tiempo.</p>
         <p><b>Ventaja</b> es lo que se espera ganar sobre lo invertido. Una ventaja del 15 % significa que por cada 100 USD puestos se esperan 15 de ganancia, en promedio y a la larga. No es una garantía en cada operación.</p>
-        <p><b>El sello de arriba es la decisión.</b> <b>ENTRAR</b> es una ventaja holgada con el modelo seguro. <b>AJUSTADA</b> da números pero por poco: si dudas, déjala pasar. <b>YA PASÓ</b> se detectó hace rato y el precio ya se movió, sobre todo en las ventanas de cripto, que duran cinco minutos.</p>
+        <p><b>El sello de arriba es la decisión, y sale de comparar la ventaja con el mínimo que esa estrategia necesita para ser rentable</b>, medido en sus propias operaciones. <b>ENTRAR</b> es el doble o más de ese mínimo. <b>AJUSTADA</b> lo supera con poco margen. <b>AL LÍMITE</b> lo roza. <b>NO ENTRAR</b> no llega. La letra al lado es el mismo dato en escala S, A, B, C.</p>
+        <p><b>Cada tarjeta lleva su cuenta atrás y desaparece sola al caducar.</b> Una señal de hace cinco minutos en un mercado que dura cinco minutos ya no existe. Si quieres ver las que se fueron, pulsa «Mostrar caducadas».</p>
         <p><b>Mira siempre las dos cifras de abajo.</b> Lo que ganas si acierta y lo que pierdes si falla. En estos mercados, si falla se pierde todo lo invertido.</p>
         <p><b>Nada de esto se ejecuta solo.</b> El bot mira y avisa; no firma órdenes ni maneja una wallet.</p>
       </div></details>
+      <div class="controles">
+        <button class="btn" id="f-caducadas" type="button" aria-pressed="false">Mostrar caducadas</button>
+        <button class="btn" id="f-entrar" type="button" aria-pressed="false">Solo las que entran</button>
+        <span id="ops-resumen"></span>
+      </div>
       <div class="ops" id="ops"></div>
     </section>
 
     <section id="resumen">
-      <div class="sec-head"><h2>Resumen</h2><p>Lo que el bot ha hecho con dinero simulado y qué tan sano está el flujo de datos.</p></div>
+      <div class="sec-head"><p>Lo que el bot ha hecho con dinero simulado y qué tan sano está el flujo de datos.</p></div>
       <div class="tiles" id="tiles"></div>
-      <details class="help" open><summary>Cómo leer esto</summary><div class="body">
+      <details class="help"><summary>Cómo leer esto</summary><div class="body">
         <p><b>Nada de esto es dinero real.</b> El bot recolecta el mercado, detecta oportunidades y las ejecuta contra un simulador con latencia, deslizamiento y comisiones. El ledger guarda cada posición con la ganancia que predijo y la que obtuvo.</p>
         <p><b>PnL válido</b> es la cifra que importa. Excluye las posiciones liquidadas a la fuerza al terminar una corrida corta (motivo "fin de corrida"), que no dicen nada de la estrategia. <b>PnL total</b> las incluye y por eso suele ser peor en corridas de minutos.</p>
         <p><b>Datos hace N s</b> indica cuándo llegó el último cambio de libro. Si supera unos minutos, el recolector no está corriendo.</p>
@@ -243,8 +272,8 @@ footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);paddin
     </section>
 
     <section id="ejecucion">
-      <div class="sec-head"><h2>Ejecución</h2><p>Lo que de verdad pasa con las órdenes que se ponen: cuántas se llenan, cuánta ventaja hace falta y qué hace el precio justo después de llenarnos.</p></div>
-      <details class="help" open><summary>Cómo leer esto</summary><div class="body">
+      <div class="sec-head"><p>Lo que de verdad pasa con las órdenes que se ponen: cuántas se llenan, cuánta ventaja hace falta y qué hace el precio justo después de llenarnos.</p></div>
+      <details class="help"><summary>Cómo leer esto</summary><div class="body">
         <p><b>El 60 % de referencia no es un resultado.</b> Era el supuesto de partida sobre cuántas órdenes se llenarían. Aquí se muestra al lado de la tasa observada precisamente para poder desmentirlo. Lo que decide es la columna <b>llenadas</b> contra la de <b>break-even</b>.</p>
         <p><b>Break-even</b> es la tasa de llenado a partir de la cual poner la orden gana a cruzar el libro. Sale de dividir la ventaja que daría cruzar entre la que da poner la orden. Si cruzar da ventaja negativa, el break-even es cero: cualquier llenado es mejor.</p>
         <p><b>Conservador y optimista</b> son los dos extremos de la incertidumbre sobre la posición en la cola. El conservador supone que toda la liquidez que había en el nivel estaba delante y nadie la canceló; el optimista, que estábamos al frente. El resultado real está entre los dos.</p>
@@ -252,14 +281,10 @@ footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);paddin
         <p><b>Selección adversa</b> es cuánto se mueve el precio medio en los segundos siguientes al llenado. Si es negativa, nos están llenando justo cuando el mercado se va en contra.</p>
       </div></details>
       <div class="sem" id="semaforo"></div>
-      <div class="grid-2">
-        <div class="card"><div class="card-head"><h3>A · Ejecución</h3><span>órdenes puestas, llenadas y la tasa que haría falta</span></div><div class="tablewrap"><table id="t-fill"></table></div></div>
-        <div class="card"><div class="card-head"><h3>B · Ventaja</h3><span>bruta, ejecutable, realizada y el mínimo necesario</span></div><div class="tablewrap"><table id="t-edge"></table></div></div>
-      </div>
-      <div class="grid-2">
-        <div class="card"><div class="card-head"><h3>C · Selección adversa</h3><span>movimiento medio del mid tras el llenado</span></div><div class="tablewrap"><table id="t-adversa"></table></div></div>
-        <div class="card"><div class="card-head"><h3>D · Frescura del libro</h3><span>todo lo anterior, cortado por antigüedad del dato</span></div><div class="tablewrap"><table id="t-fresc"></table></div></div>
-      </div>
+      <div class="card"><div class="card-head"><h3>A · Ejecución</h3><span>órdenes puestas, llenadas y la tasa que haría falta</span></div><div class="tablewrap corta"><table id="t-fill"></table></div></div>
+      <div class="card"><div class="card-head"><h3>B · Ventaja</h3><span>bruta, ejecutable, conservadora, realizada y el mínimo necesario</span></div><div class="tablewrap corta"><table id="t-edge"></table></div></div>
+      <div class="card"><div class="card-head"><h3>C · Selección adversa</h3><span>movimiento medio del mid tras el llenado</span></div><div class="tablewrap corta"><table id="t-adversa"></table></div></div>
+      <div class="card"><div class="card-head"><h3>D · Frescura del libro</h3><span>todo lo anterior, cortado por antigüedad del dato</span></div><div class="tablewrap corta"><table id="t-fresc"></table></div></div>
       <div class="grid-2">
         <div class="card"><div class="card-head"><h3>Qué estamos rechazando</h3><span>cada señal descartada se sigue como sombra, sin tocar el dinero</span></div><div class="tablewrap"><table id="t-notrade"></table></div></div>
         <div class="card"><div class="card-head"><h3>Reacción del mercado al partido</h3><span>cuánto tarda el precio en moverse tras un cambio</span></div><div class="tablewrap"><table id="t-reac"></table></div></div>
@@ -267,7 +292,7 @@ footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);paddin
     </section>
 
     <section id="senales">
-      <div class="sec-head"><h2>Señales y resultados</h2><p>Cada tipo de oportunidad, cuánto prometía y cuánto dio. La diferencia es el error que el bot aprende a reducir.</p></div>
+      <div class="sec-head"><p>Cada tipo de oportunidad, cuánto prometía y cuánto dio. La diferencia es el error que el bot aprende a reducir.</p></div>
       <details class="help"><summary>Cómo leer esto</summary><div class="body">
         <p><b>Complemento</b>: comprar SÍ y NO del mismo mercado por menos de 1 USD y fusionarlos por 1. <b>Multi-resultado</b>: lo mismo con todos los candidatos de un evento donde solo uno gana. Son deterministas: si se llenan, ganan. El riesgo es que el precio se mueva antes de ejecutar.</p>
         <p><b>Captura de spread</b>: poner órdenes dentro de un spread ancho como maker (sin comisión) y cobrar la diferencia. Pierde cuando solo se llena un lado y hay que deshacer pagando comisión.</p>
@@ -283,7 +308,7 @@ footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);paddin
     </section>
 
     <section id="partidos">
-      <div class="sec-head"><h2>Partidos en vivo</h2><p>Partidos del feed enlazados a mercados, con el precio del mercado y lo que dice el modelo de probabilidad.</p></div>
+      <div class="sec-head"><p>Partidos del feed enlazados a mercados, con el precio del mercado y lo que dice el modelo de probabilidad.</p></div>
       <details class="help"><summary>Cómo leer esto</summary><div class="body">
         <p>Cada fila es un resultado del mercado. La barra va de 0 a 1: la marca gris es el <b>precio del mercado</b> (mid) y la marca ámbar es la <b>probabilidad del modelo</b>. Cuando el modelo está claramente a la derecha del mercado, ese resultado está barato según el modelo.</p>
         <p>Los modelos existen para básquet (Stern, σ calibrada con la NBA), tenis (cadena de Markov por puntos) y fútbol (Poisson). Esports no tiene modelo. Sin precio previo al partido, el modelo se apoya en el primer precio visto y es menos confiable; el motor solo opera si el partido acaba de empezar.</p>
@@ -292,7 +317,7 @@ footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);paddin
     </section>
 
     <section id="ballenas">
-      <div class="sec-head"><h2>Ballenas y dinero inteligente</h2><p>Wallets que hicieron trades grandes, perfiladas por su historial real, no por su tamaño.</p></div>
+      <div class="sec-head"><p>Wallets que hicieron trades grandes, perfiladas por su historial real, no por su tamaño.</p></div>
       <details class="help"><summary>Cómo leer esto</summary><div class="body">
         <p>El <b>score</b> va de 0 a 1 y 0,5 es neutral. Combina tasa de acierto y ROI de las últimas posiciones cerradas, con encogimiento: pocas operaciones o retornos menores al 2 % no cuentan como evidencia. Una wallet que compra a 0,999 en mercados decididos gana casi siempre y aun así queda en 0,5.</p>
         <p>El bot sigue a una wallet solo si tiene score ≥ <span class="mono" id="cfg-smart">–</span> y suficientes posiciones cerradas. El signo <b>+</b> junto a N indica que el historial es más largo que la muestra.</p>
@@ -301,7 +326,7 @@ footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);paddin
     </section>
 
     <section id="flujo">
-      <div class="sec-head"><h2>Flujo grande</h2><p>Trades recientes de gran tamaño en toda la plataforma, con quién los hizo y su score si ya está perfilado.</p></div>
+      <div class="sec-head"><p>Trades recientes de gran tamaño en toda la plataforma, con quién los hizo y su score si ya está perfilado.</p></div>
       <details class="help"><summary>Cómo leer esto</summary><div class="body">
         <p>Viene de la API de datos de Polymarket, que identifica la wallet de cada trade. Llega con 2 a 3 minutos de retraso respecto al libro, así que sirve para saber quién es quién, no para competir en velocidad.</p>
       </div></details>
@@ -309,7 +334,7 @@ footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);paddin
     </section>
 
     <section id="modelos">
-      <div class="sec-head"><h2>Aprendizaje</h2><p>El modelo que aprende del ledger: qué versiones existen, cuál está en uso y si le gana a la heurística.</p></div>
+      <div class="sec-head"><p>El modelo que aprende del ledger: qué versiones existen, cuál está en uso y si le gana a la heurística.</p></div>
       <details class="help"><summary>Cómo leer esto</summary><div class="body">
         <p>Por cada tipo de señal se entrena un modelo que predice la probabilidad de ganar a partir de lo que se sabía al emitirla. <b>Brier</b> mide el error de esa probabilidad (0 es perfecto, 0,25 es tirar una moneda). Una versión nueva se <b>promueve</b> solo si en validación tiene mejor Brier que la versión actual y que la heurística.</p>
         <p>Con menos de <span class="mono" id="cfg-mintrain">–</span> ejemplos el modelo solo informa; con más, descarta señales con probabilidad de ganar menor a 0,5 y reduce el tamaño de las dudosas. Para entrenar hacen falta <span class="mono" id="cfg-minex">–</span> posiciones válidas por tipo.</p>
@@ -321,7 +346,7 @@ footer{color:var(--muted);font-size:12px;border-top:1px solid var(--line);paddin
     </section>
 
     <section id="datos">
-      <div class="sec-head"><h2>Datos y configuración</h2><p>Qué hay guardado en disco y con qué parámetros corre el bot.</p></div>
+      <div class="sec-head"><p>Qué hay guardado en disco y con qué parámetros corre el bot.</p></div>
       <div class="grid-2">
         <div class="card"><div class="card-head"><h3>Tablas</h3><span>filas y rango de tiempo</span></div><div class="tablewrap" style="border:0"><table id="t-tables"></table></div></div>
         <div class="card"><div class="card-head"><h3>Mercados seguidos</h3><span>por categoría y los de mayor volumen</span></div><div id="markets"></div></div>
@@ -474,11 +499,28 @@ function render(d){
   const age = s.data_age_s;
   const pd = $("p-data"); pd.className = "pill " + (age == null ? "crit" : age < 90 ? "good" : age < 900 ? "warn" : "crit");
   pd.querySelector("b").textContent = age == null ? "sin datos" : age < 90 ? "al día" : ago(s.last_data_ts);
-  $("p-mode").querySelector("b").textContent = s.mode ? ({paper:"paper trading", replay:"replay"}[s.mode] || s.mode) : "–";
   $("p-markets").querySelector("b").textContent = num(s.markets_active, 0);
   $("p-games").querySelector("b").textContent = `${num(s.games_live,0)} · con modelo ${num(s.games_with_model,0)}`;
-  $("p-wallets").querySelector("b").textContent = `${num(s.wallets_profiled,0)} · inteligentes ${num(s.wallets_smart,0)}`;
-  $("p-models").querySelector("b").textContent = num(s.models_current, 0);
+  // Estado del feed: si el libro va viejo, nada de lo que se ve describe el mercado de ahora.
+  const sal = (d.validacion || {}).salud || {};
+  const rep_ = sal.reparto || {};
+  const sano = (rep_.SANO || 0) + (rep_.DEGRADADO || 0);
+  const pFeed = $("p-feed");
+  pFeed.className = "pill " + (!sal.muestras ? "" : sano >= .95 ? "good" : sano >= .8 ? "warn" : "crit");
+  pFeed.querySelector("b").textContent = !sal.muestras ? "–"
+    : `${pct(sano)} al día · ${sal.freshness_mediana_ms == null ? "–"
+        : num(Math.max(0, sal.freshness_mediana_ms),0) + " ms"}`;
+  // Cuánta muestra falta para poder concluir algo
+  const nVal = sal.posiciones_validas || 0;
+  const prog = $("p-muestra");
+  prog.querySelector("i").style.width = Math.min(100, nVal) + "%";
+  prog.querySelector("b").textContent = `${num(nVal,0)} / 100`;
+  const vv = d.validacion || {};
+  prog.title = vv.experimento
+    ? `Operaciones medidas del experimento ${vv.experimento}` +
+      (vv.experimentos > 1 ? ` (hay ${vv.experimentos} versiones del motor; solo se cuenta la actual)` : "") +
+      ". Con menos de 100 el veredicto no puede salir del amarillo."
+    : "Operaciones medidas. Con menos de 100 el veredicto no puede salir del amarillo.";
   $("n-senales").textContent = num(s.positions_closed, 0); $("n-partidos").textContent = num(s.games_live, 0);
   $("n-ballenas").textContent = num(s.wallets_profiled, 0); $("n-flujo").textContent = num((d.flow||[]).length, 0); $("n-modelos").textContent = num(s.models_current, 0);
   $("cfg-smart").textContent = num(d.config?.smart_min_score, 2); $("cfg-mintrain").textContent = num(d.config?.learn_min_train, 0); $("cfg-minex").textContent = num(d.config?.learn_min_examples, 0);
@@ -575,37 +617,9 @@ function render(d){
       re.map(r => `<tr><td>${esc(r.league||"–")}</td><td class="num">${num(r.eventos,0)}</td><td class="num">${pct(r.tasa_reaccion)}</td><td class="num">${r.lag_mediano_ms==null?"–":num(r.lag_mediano_ms/1000,1)+" s"}</td><td class="num">${num(r.movimiento_medio,4)}</td></tr>`).join("") + "</tbody>";
   } else vacia("t-reac", "Sin partidos en vivo medidos todavía.");
 
-  // oportunidades
-  const op = d.oportunidades || {grupos: [], total: 0, vigentes: 0};
-  $("n-ops").textContent = num(op.vigentes, 0);
-  const grupos = (op.grupos || []).filter(g => (g.lista || []).length);
-  const filas = f => (f || []).map(x => `<div class="opfila"><span class="et">${esc(x.etiqueta)}</span><span class="vl ${esc(x.tipo||"")}">${esc(x.valor)}</span></div>`).join("");
-  const mat = f => (f || []).map((x, i, arr) => `<div class="opfila${i >= arr.length - 2 ? " total" : ""}"><span class="et">${esc(x.etiqueta)}</span><span class="vl ${esc(x.tipo||"")}">${esc(x.valor)}</span></div>`).join("");
-  $("ops").innerHTML = grupos.length ? grupos.map(g => {
-    const r = g.resumen || {};
-    return `<div class="opgrupo">
-      <div class="opcab"><h3>${esc(g.nombre)}</h3><span class="meta">${num(r.frescas,0)} vigentes de ${num(r.total,0)}</span></div>
-      <div class="oplista">${(g.lista||[]).map(o => `
-        <div class="op ${esc(o.veredicto)}">
-          <div class="veredicto">
-            <span class="sello">${esc(o.titulo_veredicto)}</span>
-            <span class="prio ${esc(String(o.prioridad||"C").replace(" ",""))}" title="${esc(o.nota_prioridad||"")}">${esc(o.prioridad||"")}</span>
-            <div style="min-width:0"><div class="accion">${esc(o.accion)}</div><div class="sub" title="${esc(o.mercado)}">${esc(o.mercado)}</div></div>
-          </div>
-          ${o.porque ? `<div class="porque"><b>Por qué existe este trade</b>${esc(o.porque)}</div>` : ""}
-          <div class="opcuerpo">
-            <div class="opcol"><h4>Qué está pasando</h4>${filas(o.contexto)}</div>
-            <div class="opcol"><h4>De dónde sale la ventaja</h4>${mat(o.matematica)}</div>
-          </div>
-          <div class="opdinero">
-            <div><span class="et">Inviertes</span><span class="vl">${num(o.inversion,2)}</span></div>
-            <div class="gana"><span class="et">Ganas si acierta</span><span class="vl">+${num(o.ganancia,2)}</span></div>
-            <div class="pierde"><span class="et">Pierdes si falla</span><span class="vl">−${num(o.perdida,2)}</span></div>
-          </div>
-          <div class="oppie">${o.veces_el_minimo ? `Ventaja ${num(o.edge_neto,4)} por share: ${num(o.veces_el_minimo,1)}× el mínimo que necesita ${esc(o.estrategia||o.kind)} (${num(o.edge_minimo,4)}). ` : ""}${esc(o.nota_veredicto)}${o.prob_acierto != null ? ` El modelo acierta ${esc(pct(o.prob_acierto))} de las veces en situaciones como esta.` : ""}${!o.fresca ? ` Detectada hace ${Math.round(o.antiguedad_s/60)} min.` : ""}</div>
-        </div>`).join("")}</div>
-    </div>`;
-  }).join("") : `<div class="empty">Ahora mismo no hay ninguna oportunidad que supere el costo de operar.<br><br>Eso es lo normal la mayor parte del tiempo: el bot solo avisa cuando los números dan. Si acaba de arrancar, dale unos minutos para que se llenen los libros.</div>`;
+  // oportunidades: se guardan y se pintan aparte, porque caducan solas con el reloj
+  ultimasOps = d.oportunidades || {grupos: [], total: 0, vigentes: 0};
+  pintarOps();
 
   // partidos
   const gs = d.games || [];
@@ -641,10 +655,150 @@ function render(d){
   $("cfg").innerHTML = [["Categorías", (c.categories||[]).join(", ")], ["Edge mínimo neto por share", usd(c.min_edge_net, 3)], ["Tamaño objetivo", `${c.target_size} shares`], ["Latencia simulada", `${c.latency_ms} ms`], ["Fill de referencia (no decide nada)", pct(c.fill_baseline_prob)], ["Trade que dispara perfilado", usd(c.whale_min_usd, 0)], ["Score mínimo para seguir", num(c.smart_min_score, 2)], ["σ básquet (calibrada NBA)", `${c.sigma_basketball} puntos`]].map(([k,v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join("");
 }
 
-// ------------------------------------------------------------ navegación
+// ------------------------------------------------------------ oportunidades
+// Una oportunidad vale mientras el precio no se haya movido. Cada una trae su instante de
+// caducidad, así que el panel las retira solas en vez de dejarlas acumulándose en pantalla.
+let ultimasOps = {grupos: [], total: 0, vigentes: 0};
+let verCaducadas = false, soloEntran = false;
+
+function vigente(o){ return o.caduca_ms ? Date.now() < o.caduca_ms : o.fresca; }
+
+// La prioridad sale de comparar la ventaja con el mínimo medido de esa estrategia, así que es
+// la que manda. El sello solo la traduce a palabras, para que no digan cosas distintas.
+const RANGO = {"S":0, "A":1, "B":2, "C":3, "NO TRADE":4};
+function decision(o){
+  if (!vigente(o)) return {sello:"YA PASÓ", clase:"pasada"};
+  switch (String(o.prioridad || "C")) {
+    case "S": return {sello:"ENTRAR", clase:"entrar"};
+    case "A": return {sello:"ENTRAR", clase:"entrar"};
+    case "B": return {sello:"AJUSTADA", clase:"justa"};
+    case "C": return {sello:"AL LÍMITE", clase:"justa"};
+    default:  return {sello:"NO ENTRAR", clase:"pasada"};
+  }
+}
+
+function restante(o){
+  if (!o.caduca_ms) return null;
+  return Math.max(0, Math.round((o.caduca_ms - Date.now()) / 1000));
+}
+
+function pintarOps(){
+  const filas = f => (f || []).map(x => `<div class="opfila"><span class="et">${esc(x.etiqueta)}</span><span class="vl ${esc(x.tipo||"")}">${esc(x.valor)}</span></div>`).join("");
+  const mat = f => (f || []).map((x, i, arr) => `<div class="opfila${i >= arr.length - 2 ? " total" : ""}"><span class="et">${esc(x.etiqueta)}</span><span class="vl ${esc(x.tipo||"")}">${esc(x.valor)}</span></div>`).join("");
+  const pasa = o => (verCaducadas || vigente(o)) && (!soloEntran || decision(o).sello === "ENTRAR");
+
+  // primero lo que más merece mirarse: prioridad, y a igualdad, más ventaja
+  const orden = (a, b) => (RANGO[a.prioridad] ?? 9) - (RANGO[b.prioridad] ?? 9) || (b.edge_pct - a.edge_pct);
+  const grupos = (ultimasOps.grupos || [])
+      .map(g => ({...g, lista: (g.lista || []).filter(pasa).sort(orden)}))
+      .filter(g => g.lista.length);
+  const vivas = (ultimasOps.grupos || []).reduce((n, g) => n + (g.lista || []).filter(vigente).length, 0);
+  const total = (ultimasOps.grupos || []).reduce((n, g) => n + (g.lista || []).length, 0);
+  $("n-ops").textContent = num(vivas, 0);
+  $("ops-resumen").textContent = total
+    ? `${vivas} vigentes de ${total} detectadas en la última media hora`
+    : "";
+
+  $("ops").innerHTML = grupos.length ? grupos.map(g => {
+    return `<div class="opgrupo">
+      <div class="opcab"><h3>${esc(g.nombre)}</h3><span class="meta">${g.lista.length} en pantalla</span></div>
+      <div class="oplista">${g.lista.map(o => {
+        const seg = restante(o), viva = vigente(o), dec = decision(o);
+        return `
+        <div class="op ${esc(dec.clase)}${viva && seg != null && seg <= 30 ? " caducando" : ""}" data-caduca="${o.caduca_ms || 0}">
+          <div class="veredicto">
+            <span class="sello">${esc(dec.sello)}</span>
+            <span class="prio ${esc(String(o.prioridad||"C").replace(" ",""))}" title="${esc(o.nota_prioridad||"")}">${esc(o.prioridad||"")}</span>
+            <div style="min-width:0"><div class="accion">${esc(o.accion)}</div><div class="sub" title="${esc(o.mercado)}">${esc(o.mercado)}</div></div>
+            <span class="edad ${seg != null && seg <= 30 ? "poco" : ""}" data-edad>${etiquetaEdad(o)}</span>
+          </div>
+          ${o.porque ? `<div class="porque"><b>Por qué existe este trade</b>${esc(o.porque)}</div>` : ""}
+          <div class="opcuerpo">
+            <div class="opcol"><h4>Qué está pasando</h4>${filas(o.contexto)}</div>
+            <div class="opcol"><h4>De dónde sale la ventaja</h4>${mat(o.matematica)}</div>
+          </div>
+          <div class="opdinero">
+            <div><span class="et">Inviertes</span><span class="vl">${num(o.inversion,2)}</span></div>
+            <div class="gana"><span class="et">Ganas si acierta</span><span class="vl">+${num(o.ganancia,2)}</span></div>
+            <div class="pierde"><span class="et">Pierdes si falla</span><span class="vl">−${num(o.perdida,2)}</span></div>
+          </div>
+          <div class="oppie">${o.veces_el_minimo ? `Ventaja ${num(o.edge_neto,4)} por share: ${num(o.veces_el_minimo,1)}× el mínimo que necesita ${esc(o.estrategia||o.kind)} (${num(o.edge_minimo,4)}). ` : ""}${esc(o.nota_prioridad || o.nota_veredicto)}${o.prob_acierto != null ? ` El modelo acierta ${esc(pct(o.prob_acierto))} de las veces en situaciones como esta.` : ""}</div>
+        </div>`;
+      }).join("")}</div>
+    </div>`;
+  }).join("") : `<div class="empty">${vacio(total, vivas)}</div>`;
+}
+
+// Decir por qué no hay nada en pantalla, que no es lo mismo que no haber nada.
+function vacio(total, vivas){
+  if (!total) return "Ahora mismo no hay ninguna oportunidad que supere el costo de operar.<br><br>Eso es lo normal la mayor parte del tiempo: el bot solo avisa cuando los números dan. Si acaba de arrancar, dale unos minutos para que se llenen los libros.";
+  if (!vivas) return "Las " + total + " oportunidades detectadas en la última media hora ya caducaron.<br><br>Pulsa «Mostrar caducadas» si quieres ver cuáles eran.";
+  if (soloEntran) return "Hay " + vivas + " oportunidades vigentes, pero ninguna llega a ENTRAR.<br><br>Quita el filtro «Solo las que entran» para verlas.";
+  return "Nada que mostrar con los filtros actuales.";
+}
+
+function etiquetaEdad(o){
+  const seg = restante(o);
+  if (seg == null) return o.fresca ? "" : "caducada";
+  if (seg <= 0) return "caducada";
+  return seg >= 60 ? `quedan ${Math.floor(seg/60)} min` : `quedan ${seg} s`;
+}
+
+function refrescarEdades(){
+  const tarjetas = [...document.querySelectorAll(".op[data-caduca]")];
+  if (!tarjetas.length) return;
+  let alguna = false;
+  tarjetas.forEach(el => {
+    const caduca = +el.dataset.caduca;
+    if (!caduca) return;
+    const seg = Math.max(0, Math.round((caduca - Date.now()) / 1000));
+    const et = el.querySelector("[data-edad]");
+    if (et) {
+      et.textContent = seg <= 0 ? "caducada" : (seg >= 60 ? `quedan ${Math.floor(seg/60)} min` : `quedan ${seg} s`);
+      et.classList.toggle("poco", seg > 0 && seg <= 30);
+    }
+    el.classList.toggle("caducando", seg > 0 && seg <= 30);
+    if (seg <= 0 && !verCaducadas) alguna = true;
+  });
+  if (alguna) pintarOps();       // alguna acaba de caducar: se retira de la lista
+}
+
+for (const [id, set] of [["f-caducadas", v => verCaducadas = v], ["f-entrar", v => soloEntran = v]]) {
+  const b = $(id);
+  b.addEventListener("click", () => {
+    const nuevo = b.getAttribute("aria-pressed") !== "true";
+    b.setAttribute("aria-pressed", String(nuevo));
+    set(nuevo);
+    pintarOps();
+  });
+}
+
+// ------------------------------------------------------------ navegación por vistas
+// Una vista cada vez. Antes todo estaba en una página larga y había que subir y bajar para
+// comparar dos cosas; ahora se cambia con un clic o con las teclas 1-9, y la última elegida
+// se recuerda para la próxima vez.
 const links = [...document.querySelectorAll("#nav a")];
-const io = new IntersectionObserver(entries => { entries.forEach(e => { if (e.isIntersecting){ links.forEach(a => a.classList.toggle("active", a.getAttribute("href") === "#"+e.target.id)); } }); }, {rootMargin:"-30% 0px -60% 0px"});
-document.querySelectorAll("main section").forEach(s => io.observe(s));
+const TITULOS = {oportunidades:"Oportunidades", ejecucion:"Ejecución", resumen:"Resumen",
+  senales:"Señales y resultados", partidos:"Partidos en vivo", ballenas:"Ballenas",
+  flujo:"Flujo grande", modelos:"Aprendizaje", datos:"Datos y configuración"};
+
+function mostrar(vista){
+  if (!TITULOS[vista]) vista = "oportunidades";
+  document.querySelectorAll("main section").forEach(s => s.classList.toggle("activa", s.id === vista));
+  links.forEach(a => a.classList.toggle("active", a.dataset.vista === vista));
+  $("titulo-vista").textContent = TITULOS[vista];
+  try { localStorage.setItem("scalper.vista", vista); } catch (e) {}
+  window.scrollTo({top:0});
+}
+links.forEach(a => a.addEventListener("click", ev => { ev.preventDefault(); mostrar(a.dataset.vista); }));
+document.addEventListener("keydown", ev => {
+  if (ev.metaKey || ev.ctrlKey || ev.altKey || /^(INPUT|TEXTAREA)$/.test(ev.target.tagName)) return;
+  const i = parseInt(ev.key, 10);
+  if (i >= 1 && i <= links.length) mostrar(links[i - 1].dataset.vista);
+});
+let guardada = "oportunidades";
+try { guardada = localStorage.getItem("scalper.vista") || guardada; } catch (e) {}
+mostrar(location.hash ? location.hash.slice(1) : guardada);
 
 // ------------------------------------------------------------ datos
 async function load(){
@@ -653,5 +807,8 @@ async function load(){
 }
 load();
 if (!window.__SNAPSHOT__) setInterval(load, 10000);
+// La antigüedad de cada oportunidad corre en pantalla aunque no lleguen datos nuevos: una señal
+// de hace cinco minutos en un mercado de cinco minutos ya no existe, y quedarse ahí engaña.
+setInterval(refrescarEdades, 1000);
 })();
 </script>

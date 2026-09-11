@@ -109,8 +109,18 @@ class Oportunidad:
         return max(0.0, (time.time() * 1000 - self.ts_ms) / 1000)
 
     @property
+    def frescura_s(self) -> float:
+        """Cuánto vale esta señal antes de darla por caducada."""
+        return float(FRESCURA_S.get(self.kind, FRESCURA_POR_DEFECTO))
+
+    @property
+    def caduca_ms(self) -> int:
+        """Instante en que deja de valer. El panel lo usa para retirarla sola."""
+        return int(self.ts_ms + self.frescura_s * 1000)
+
+    @property
     def fresca(self) -> bool:
-        return self.antiguedad_s <= FRESCURA_S.get(self.kind, FRESCURA_POR_DEFECTO)
+        return self.antiguedad_s <= self.frescura_s
 
     def to_dict(self) -> dict[str, Any]:
         d = {k: getattr(self, k) for k in ("ts_ms", "grupo", "categoria", "kind", "condition_id", "mercado", "accion",
@@ -120,7 +130,8 @@ class Oportunidad:
         d.update(antiguedad_s=round(self.antiguedad_s, 1), fresca=self.fresca, perdida=self.perdida,
                  prob_acierto=self.prob_acierto, titulo_veredicto=self.titulo_veredicto,
                  nota_veredicto=self.nota_veredicto, nota_prioridad=self.nota_prioridad,
-                 veces_el_minimo=self.veces_el_minimo)
+                 veces_el_minimo=self.veces_el_minimo, frescura_s=self.frescura_s,
+                 caduca_ms=self.caduca_ms)
         return d
 
 
@@ -277,7 +288,7 @@ def _matematica(kind: str, m: dict[str, Any], precio: float, fee: float, edge: f
     filas.append(_fila("Comisión", f"−{fee:.4f} por share", "malo" if fee > 0 else ""))
     minimo = m.get("_edge_minimo")
     if minimo:
-        filas.append(_fila("Mínimo que pide esta estrategia", f"{minimo:.4f} por share"))
+        filas.append(_fila("Mínimo de la estrategia", f"{minimo:.4f} por share"))
     filas.append(_fila("Ventaja neta", f"{edge:+.4f} por share", "bueno" if edge > 0 else "malo"))
     filas.append(_fila("Por cada 100 USD", f"{edge / precio * 100:+.1f} USD" if precio else "–",
                        "bueno" if edge > 0 else "malo"))
