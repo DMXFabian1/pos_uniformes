@@ -401,3 +401,45 @@ def test_naranja_se_reserva_para_cuando_si_hay_ventaja_que_la_ejecucion_se_come(
     inf = analizar(tmp_path)
     assert inf.llenado[0].salvable is True
     assert inf.estados[0].semaforo == NARANJA
+
+
+def test_la_relacion_se_comprueba_en_muestra_independiente(tmp_path):
+    # Un detector puede perder dinero y aun así saber cuáles de sus señales son mejores. Eso es lo
+    # que mide la correlación de rangos, y lo único que no se puede contestar mirando más veces los
+    # mismos datos es si se repite en un trozo independiente.
+    from scalper.validacion import veredicto_fuera_de_muestra
+    ledger = []
+    for exp, base in (("exp-a", 0), ("exp-b", 1000)):
+        for i in range(30):
+            # más ventaja prometida, mejor resultado, pero todo en negativo
+            ledger.append(_fila(base + i, edge=0.01 + i * 0.001, pnl=-5.0 + i * 0.1,
+                                entrada=0.50, experiment=exp))
+    _escribir(tmp_path, ledger=ledger)
+    inf = analizar(tmp_path)
+    filas = [r for r in inf.fuera if r["estrategia"] == "NBA_DIRECTIONAL"]
+    assert len(filas) == 2 and all(r["rho"] > 0.9 and r["p"] < 0.05 for r in filas)
+    veredicto = veredicto_fuera_de_muestra(inf.fuera, "NBA_DIRECTIONAL")
+    assert "se repite" in veredicto
+    # Y se dice entero: ordenar bien dentro de lo negativo no es ganar.
+    assert "no cobra" in veredicto
+
+
+def test_una_relacion_que_cambia_de_signo_entre_trozos_no_se_repite(tmp_path):
+    from scalper.validacion import veredicto_fuera_de_muestra
+    ledger = []
+    for i in range(30):
+        ledger.append(_fila(i, edge=0.01 + i * 0.001, pnl=1.0 + i * 0.1, experiment="exp-a"))
+    for i in range(30):
+        ledger.append(_fila(1000 + i, edge=0.01 + i * 0.001, pnl=5.0 - i * 0.1, experiment="exp-b"))
+    _escribir(tmp_path, ledger=ledger)
+    inf = analizar(tmp_path)
+    assert "cambia de signo" in veredicto_fuera_de_muestra(inf.fuera, "NBA_DIRECTIONAL")
+
+
+def test_con_un_solo_trozo_no_se_finge_una_comprobacion_fuera_de_muestra(tmp_path):
+    from scalper.validacion import veredicto_fuera_de_muestra
+    ledger = [_fila(i, edge=0.01 + i * 0.001, pnl=-1.0, experiment="exp-a") for i in range(10)]
+    _escribir(tmp_path, ledger=ledger)
+    inf = analizar(tmp_path)
+    assert inf.fuera == []
+    assert "sin muestra independiente" in veredicto_fuera_de_muestra(inf.fuera, "NBA_DIRECTIONAL")

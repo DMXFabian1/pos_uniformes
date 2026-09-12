@@ -21,6 +21,7 @@ demuestra que una estrategia no sirva**. Demuestra que todavía no se sabe.
 from __future__ import annotations
 
 import json
+import math
 import random
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -457,6 +458,122 @@ def pnl_por_horizonte(d: Datos) -> list[dict[str, Any]]:
     return out
 
 
+# --------------------------------------------------------------------------- fuera de muestra
+def _rangos(valores: list[float]) -> list[int]:
+    orden = sorted(range(len(valores)), key=lambda i: valores[i])
+    r = [0] * len(valores)
+    for puesto, i in enumerate(orden):
+        r[i] = puesto
+    return r
+
+
+def _correlacion_de_rangos(pares: list[tuple[float, float]]) -> float:
+    """Spearman: ¿el orden que promete el detector se parece al orden de los resultados?
+
+    De rangos y no de valores a propósito: el PnL de estos mercados tiene colas largas y una
+    correlación de Pearson la decidirían cuatro operaciones extremas.
+    """
+    if len(pares) < 2:
+        return 0.0
+    ra, rb = _rangos([a for a, _ in pares]), _rangos([b for _, b in pares])
+    n = len(pares)
+    ma, mb = sum(ra) / n, sum(rb) / n
+    num = sum((x - ma) * (y - mb) for x, y in zip(ra, rb))
+    den = math.sqrt(sum((x - ma) ** 2 for x in ra) * sum((y - mb) ** 2 for y in rb))
+    return round(num / den, 4) if den else 0.0
+
+
+def _p_permutacion(pares: list[tuple[float, float]], repeticiones: int = 2000,
+                   semilla: int = 7) -> float:
+    """¿Con qué facilidad sale esta correlación barajando los resultados al azar?
+
+    No supone ninguna distribución: solo vuelve a repartir los resultados que de verdad ocurrieron
+    entre las ventajas que de verdad se prometieron.
+    """
+    if len(pares) < 20:
+        return 1.0
+    observada = abs(_correlacion_de_rangos(pares))
+    rng = random.Random(semilla)
+    ventajas = [a for a, _ in pares]
+    resultados = [b for _, b in pares]
+    mayores = 0
+    for _ in range(repeticiones):
+        rng.shuffle(resultados)
+        if abs(_correlacion_de_rangos(list(zip(ventajas, resultados)))) >= observada:
+            mayores += 1
+    return round(mayores / repeticiones, 4)
+
+
+def _pliegues(d: Datos) -> list[tuple[str, list[dict[str, Any]]]]:
+    """Trozos independientes de la muestra: por experimento si hay varios, si no por tiempo."""
+    por_exp = _por_clave(d.ledger, "experiment")
+    if len(por_exp) > 1:
+        orden = sorted(por_exp, key=lambda k: min(_ts(r) or 0 for r in por_exp[k]))
+        return [(k, por_exp[k]) for k in orden]
+    filas = sorted(d.ledger, key=lambda r: _ts(r) or 0)
+    if len(filas) < 40:
+        return [("toda la muestra", filas)] if filas else []
+    mitad = len(filas) // 2
+    return [("primera mitad", filas[:mitad]), ("segunda mitad", filas[mitad:])]
+
+
+def _por_clave(filas: list[dict[str, Any]], clave: str) -> dict[str, list[dict[str, Any]]]:
+    out: dict[str, list[dict[str, Any]]] = {}
+    for r in filas:
+        out.setdefault(str(r.get(clave) or "?"), []).append(r)
+    return out
+
+
+def fuera_de_muestra(d: Datos) -> list[dict[str, Any]]:
+    """¿La ventaja que promete el detector ordena los resultados también en muestra nueva?
+
+    Es la única pregunta que no se puede contestar mirando más veces los mismos datos. Un detector
+    puede perder dinero y aun así saber cuáles de sus señales son mejores que otras; eso es lo que
+    mide la correlación de rangos. Que se repita en un trozo independiente de la muestra es lo que
+    separa una regularidad de una casualidad que ya vimos.
+
+    **Ordenar bien no es ganar.** Si la media sigue en negativo en los dos trozos, lo demostrado es
+    que la señal lleva información, no que se pueda cobrar.
+    """
+    out: list[dict[str, Any]] = []
+    trozos = _pliegues(d)
+    if len(trozos) < 2:
+        return out
+    for est in d.estrategias:
+        for nombre, filas in trozos:
+            validas = _validas([r for r in filas if (r.get("strategy") or r.get("kind")) == est])
+            pares: list[tuple[float, float]] = []
+            for r in validas:
+                ent = _entrada(r)
+                if ent and ent > 0 and r.get("predicted_edge") is not None:
+                    pares.append((r["predicted_edge"] / ent, r["realized_pnl"]))
+            if not pares:
+                continue
+            pnls = [b for _, b in pares]
+            out.append({"estrategia": est, "pliegue": nombre, "n": len(pares),
+                        "media": round(sum(pnls) / len(pnls), 4),
+                        "rho": _correlacion_de_rangos(pares) if len(pares) >= 20 else None,
+                        "p": _p_permutacion(pares) if len(pares) >= 20 else None,
+                        "nivel": nivel(len(pares))})
+    return out
+
+
+def veredicto_fuera_de_muestra(filas: list[dict[str, Any]], est: str) -> str:
+    """Resumen por estrategia de si la relación se repitió o no."""
+    suyas = [r for r in filas if r["estrategia"] == est and r["rho"] is not None]
+    if len(suyas) < 2:
+        return "sin muestra independiente todavía"
+    firmes = [r for r in suyas if r["p"] is not None and r["p"] < 0.05]
+    if len(firmes) < 2:
+        return "no se repite: la relación no aparece en los dos trozos"
+    signos = {r["rho"] > 0 for r in firmes}
+    if len(signos) > 1:
+        return "no se repite: cambia de signo entre trozos"
+    if all(r["media"] < 0 for r in suyas):
+        return "se repite, pero ordenando dentro de lo negativo: la señal informa, no cobra"
+    return "se repite"
+
+
 # --------------------------------------------------------------------------- 8 y 9: frescura
 def por_frescura(d: Datos) -> list[dict[str, Any]]:
     """Todo lo anterior, cortado por la antigüedad del libro con el que se decidió."""
@@ -710,6 +827,7 @@ class Informe:
     salidas: list[dict[str, Any]]
     cadena: dict[str, Any]
     estados: list[Estado]
+    fuera: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -720,6 +838,7 @@ class Informe:
             "umbrales_frescura": self.umbrales_frescura, "salud": self.salud, "rechazos": self.rechazos,
             "salidas": self.salidas, "cadena": self.cadena,
             "estados": [e.to_dict() for e in self.estados],
+            "fuera_de_muestra": self.fuera,
         }
 
 
@@ -732,6 +851,7 @@ def analizar(data_dir: str | Path, experiment: str | None = None) -> Informe:
         horizontes=pnl_por_horizonte(d), frescura=por_frescura(d), umbrales_frescura=umbral_de_frescura(d),
         salud=salud_del_feed(d), rechazos=oportunidades_rechazadas(d), salidas=probabilidad_de_salida(d),
         cadena=cadena_de_tiempos(d), estados=estado_por_estrategia(d, lls),
+        fuera=fuera_de_muestra(d),
     )
 
 
@@ -965,6 +1085,27 @@ def formatear(inf: Informe) -> str:  # noqa: C901 - es un informe, se lee de arr
     L.append("")
 
     # ---- semáforo
+    if inf.fuera:
+        L.append("-- ¿SE SOSTIENE FUERA DE MUESTRA? --------------------------------------------------")
+        L.append("¿La ventaja que promete el detector ordena los resultados también en muestra nueva?")
+        L.append("Es lo único que no se puede contestar mirando más veces los mismos datos.")
+        L.append(f"{'estrategia':24}{'pliegue':24}{'n':>5}{'media':>10}{'rho':>8}{'p':>8}  confianza")
+        L.append("-" * 100)
+        vistas: set[str] = set()
+        for r in inf.fuera:
+            rho = "-" if r["rho"] is None else f"{r['rho']:+.3f}"
+            pv = "-" if r["p"] is None else f"{r['p']:.3f}"
+            L.append(f"{r['estrategia'][:24]:24}{r['pliegue'][:24]:24}{r['n']:>5}"
+                     f"{r['media']:>+10.3f}{rho:>8}{pv:>8}  {r['nivel']}")
+            vistas.add(r["estrategia"])
+        L.append("")
+        for est in sorted(vistas):
+            L.append(f"  {est[:28]:30}{veredicto_fuera_de_muestra(inf.fuera, est)}")
+        L.append("")
+        L.append("rho es la correlación de rangos entre ventaja prometida y resultado; p es con qué")
+        L.append("facilidad saldría barajando los resultados al azar. Ordenar bien no es ganar: si la")
+        L.append("media sigue negativa, lo demostrado es que la señal informa, no que se pueda cobrar.")
+        L.append("")
     L.append("-- SEMÁFORO ------------------------------------------------------------------------")
     for e in inf.estados:
         L.append(f"{e.estrategia[:26]:26}{e.semaforo:28}n={e.n:<5}{e.nivel}")

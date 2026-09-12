@@ -197,6 +197,31 @@ estrategia no sirva**. Siete operaciones perdedoras son muestra insuficiente, no
 Lo único que quedó demostrado del modelo anterior es que sobreestimaba la rentabilidad al suponer
 llenados irreales.
 
+## 6 bis. La única pregunta que no se contesta mirando los mismos datos
+
+Un detector puede perder dinero y aun así saber cuáles de sus señales son mejores que otras. Son
+dos cosas distintas y el informe las separa: `-- ¿SE SOSTIENE FUERA DE MUESTRA?` mide la
+correlación de rangos entre la ventaja prometida y el resultado, y la vuelve a medir en un trozo
+independiente de la muestra —otro experimento si hay más de uno, la otra mitad del tiempo si no—.
+
+De rangos y no de valores a propósito: el PnL de estos mercados tiene colas largas y una
+correlación de Pearson la decidirían cuatro operaciones extremas. La significación sale de barajar
+los resultados 2 000 veces entre las ventajas realmente prometidas, sin suponer ninguna
+distribución.
+
+La primera medición, con dos corridas independientes (4 h de tarde y 8 h de noche, torneos
+distintos):
+
+| Estrategia | Corrida 1 | Corrida 2 | Veredicto |
+|---|---|---|---|
+| TENNIS_SPREAD_CAPTURE | rho +0,494 (p<0,001) | rho +0,321 (p=0,020) | se repite |
+| TENNIS_DIRECTIONAL | rho −0,025 (p=0,81) | rho +0,111 (p=0,23) | no se repite |
+
+Y el veredicto se da entero, porque la mitad es engañosa: **"se repite, pero ordenando dentro de lo
+negativo: la señal informa, no cobra"**. La media sigue en negativo en los dos trozos. Lo
+demostrado es que la ventaja que calcula el detector lleva información real sobre cuáles de sus
+señales saldrán mejor, no que ninguna de ellas se pueda cobrar.
+
 ## 7. Escalera de madurez
 
 1. **MEDIBLE** (`listo_para_medir` en el informe): hay muestra suficiente, el llenado sale de
