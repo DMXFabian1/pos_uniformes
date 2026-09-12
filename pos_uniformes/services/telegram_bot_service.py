@@ -38,8 +38,8 @@ AYUDA = (
     "/estado — qué hay en caja ahora\n"
     "/resumen — resumen del día\n"
     "/pendientes — lo que falta por registrar\n"
-    "/asistencia — quién vino hoy, con botones para marcar\n"
-    "/vino Fanny · /falta Fanny · /descanso Fanny — marcar a mano\n"
+    "/asistencia — quién vino hoy, con botones: faltó / descanso\n"
+    "/falta Fanny · /descanso Fanny · /vino Fanny — lo mismo por texto\n"
     "/ayuda — esta lista"
 )
 

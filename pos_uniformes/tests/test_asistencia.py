@@ -180,17 +180,31 @@ class DanielTieneLaUltimaPalabraTests(unittest.TestCase):
         self.assertIsNone(asis.buscar_code(self.s, "zzz"))
         self.assertIsNone(asis.buscar_code(self.s, ""))
 
-    def test_el_teclado_lleva_una_fila_por_empleada_con_marca(self) -> None:
-        asis.marcar(self.s, "VEND-2", asis.VINO, HOY)
+    def test_el_teclado_pregunta_solo_las_excepciones(self) -> None:
+        """Que vino ya se deduce: los botones son faltó y descanso."""
+        asis.marcar(self.s, "VEND-2", asis.NO_VINO, HOY)
         filas = asis.teclado_asistencia(asis.asistencia_del_dia(self.s, HOY))
         self.assertEqual(len(filas), 2)
         textos = {b[0] for fila in filas for b in fila}
-        self.assertIn("✅ Fanny vino", textos)       # marcada
-        self.assertIn("☐ Cristal vino", textos)     # sin marcar
+        self.assertIn("✗ Fanny faltó", textos)       # marcada
+        self.assertIn("☐ Cristal faltó", textos)     # sin marcar
+        self.assertIn("☐ descanso", textos)
+        self.assertFalse(any("vino" in t for t in textos))
         datos = {b[1] for fila in filas for b in fila}
-        self.assertIn("asis:VEND-2:vino", datos)
-        self.assertIn("asis:VEND-3:falta", datos)
+        self.assertIn("asis:VEND-2:falta", datos)
+        self.assertIn("asis:VEND-3:descanso", datos)
         self.assertTrue(all(len(d) <= 64 for d in datos))
+
+    def test_tocar_dos_veces_quita_la_marca(self) -> None:
+        self.assertEqual(asis.marcar(self.s, "VEND-2", asis.NO_VINO, HOY), "Fanny: falta ✗")
+        self.assertEqual(asis.marcar(self.s, "VEND-2", asis.NO_VINO, HOY), "Fanny: marca quitada ↩")
+        lista = {a.code: a for a in asis.asistencia_del_dia(self.s, HOY)}
+        self.assertEqual(lista["VEND-2"].estado, asis.SIN_SENAL)   # de vuelta a lo deducido
+        self.assertFalse(lista["VEND-2"].confirmado)
+        # Un botón distinto no quita: cambia.
+        asis.marcar(self.s, "VEND-2", asis.NO_VINO, HOY)
+        self.assertEqual(asis.marcar(self.s, "VEND-2", asis.DESCANSA, HOY), "Fanny: descansa 🛌")
+        self.assertEqual({a.code: a for a in asis.asistencia_del_dia(self.s, HOY)}["VEND-2"].estado, asis.DESCANSO)
 
     def test_interpretar_toque(self) -> None:
         self.assertEqual(asis.interpretar_toque("asis:VEND-4:vino"), ("VEND-4", "vino"))

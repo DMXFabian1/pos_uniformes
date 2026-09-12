@@ -157,7 +157,7 @@ def texto_asistencia(lista: list[Asistencia], hoy: date | None = None, ahora: da
         partes.append(f"{cuenta[FALTA]} falta")
     lineas.append("—")
     lineas.append(f"{len(lista)} activas · " + " · ".join(partes))
-    lineas.append("Presencia = primer movimiento en la Libreta o un conteo abierto. Tú tienes la última palabra con los botones.")
+    lineas.append("Presencia = primer movimiento en la Libreta o un conteo abierto. Marca con los botones quien faltó o descansa.")
     return "\n".join(lineas)
 
 
@@ -183,17 +183,19 @@ _PREFIJO = "asis"
 
 
 def teclado_asistencia(lista: list[Asistencia]) -> list[list[tuple[str, str]]]:
-    """Una fila por empleada: [nombre ✅ vino] [✗ falta] (puro).
+    """Una fila por empleada: [nombre ☐ faltó] [☐ descanso] (puro).
 
-    El dato del botón es "asis:<code>:<accion>" — cabe de sobra en los 64
-    bytes que permite Telegram."""
+    Que vino ya lo deduce el sistema; lo que Daniel tiene que decir es la
+    excepción: faltó, o descansa hoy. Tocar de nuevo el botón marcado quita
+    la marca (vuelve a lo deducido). El dato del botón es "asis:<code>:<accion>".
+    """
     filas = []
     for a in lista:
-        marca_v = "✅" if a.estado == PRESENTE and a.confirmado else "☐"
         marca_f = "✗" if a.estado == FALTA and a.confirmado else "☐"
+        marca_d = "🛌" if a.estado == DESCANSO and a.confirmado else "☐"
         filas.append([
-            (f"{marca_v} {a.nombre_corto} vino", f"{_PREFIJO}:{a.code}:{VINO}"),
-            (f"{marca_f} falta", f"{_PREFIJO}:{a.code}:{NO_VINO}"),
+            (f"{marca_f} {a.nombre_corto} faltó", f"{_PREFIJO}:{a.code}:{NO_VINO}"),
+            (f"{marca_d} descanso", f"{_PREFIJO}:{a.code}:{DESCANSA}"),
         ])
     return filas
 
@@ -218,14 +220,20 @@ def marcar(session, code: str, accion: str, hoy: date | None = None) -> str:
     from pos_uniformes.services.calendario_empleadas_service import marcar_dia
     from sqlalchemy import select
 
+    from pos_uniformes.services.calendario_empleadas_service import cargar_horario, quitar_marca
+
     hoy = hoy or date.today()
     code = (code or "").strip().upper()
     emp = session.scalar(select(Empleada).where(Empleada.codigo == code, Empleada.activo.is_(True)))
     if emp is None:
         return f"No conozco el gafete {code}."
-    tipo = {VINO: C_TRABAJO, NO_VINO: C_FALTA, DESCANSA: C_DESCANSO}[accion]
-    marcar_dia(session, code, hoy, tipo, nota=NOTA_TELEGRAM)
     nombre = emp.nombre_completo.split()[0]
+    tipo = {VINO: C_TRABAJO, NO_VINO: C_FALTA, DESCANSA: C_DESCANSO}[accion]
+    # Mismo botón dos veces = quitar la marca: vuelve a lo que el sistema deduce.
+    if cargar_horario(session, code).eventos.get(hoy) == tipo:
+        quitar_marca(session, code, hoy)
+        return f"{nombre}: marca quitada ↩"
+    marcar_dia(session, code, hoy, tipo, nota=NOTA_TELEGRAM)
     return {VINO: f"{nombre}: vino ✅", NO_VINO: f"{nombre}: falta ✗", DESCANSA: f"{nombre}: descansa 🛌"}[accion]
 
 
