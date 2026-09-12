@@ -59,6 +59,29 @@ class AplicarTests(unittest.TestCase):
         self.assertEqual(post.version_aplicada(), post.INFRA_VERSION)
         self.assertIn(f"infraestructura en la version {post.INFRA_VERSION}", hechos)
 
+    def test_el_snapshot_a_casa_se_conserva_pero_oculto(self) -> None:
+        """La ventana negra del 2026-09-12: "POS Snapshot Casa" se creaba directo,
+        sin correr_oculto.vbs, y la v2 no la conocía. Si existe, se recrea oculta."""
+        creadas: list[post.Tarea] = []
+        with patch.object(post, "existe_tarea", side_effect=lambda n: n == "POS Snapshot Casa"), patch.object(
+            post, "borrar_tarea", return_value=True
+        ), patch.object(post, "crear_tarea", side_effect=lambda t: creadas.append(t) or True):
+            post.aplicar()
+        snap = next(t for t in creadas if t.nombre == "POS Snapshot Casa")
+        self.assertEqual(snap.schedule, ("/SC", "MINUTE", "/MO", "15"))
+        comando = " ".join(snap.comando(Path("C:/x/scripts")))
+        self.assertIn("correr_oculto.vbs", comando)
+        self.assertIn("enviar_snapshot_casa.bat", comando)
+
+    def test_sin_snapshot_previo_no_se_inventa(self) -> None:
+        nombres = [t.nombre for t in post.tareas_esperadas(hay_telegram=False, resumen_a_hora_fija=False)]
+        self.assertNotIn("POS Snapshot Casa", nombres)
+        con = [t.nombre for t in post.tareas_esperadas(hay_telegram=False, resumen_a_hora_fija=False, snapshot_casa=True)]
+        self.assertIn("POS Snapshot Casa", con)
+
+    def test_la_version_subio_para_que_se_aplique_al_actualizar(self) -> None:
+        self.assertGreaterEqual(post.INFRA_VERSION, 3)
+
     def test_segunda_vez_no_toca_nada(self) -> None:
         post.marcar_aplicada()
         with patch.object(post, "crear_tarea") as crear, patch.object(post, "borrar_tarea") as borrar:

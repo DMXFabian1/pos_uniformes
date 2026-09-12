@@ -31,7 +31,10 @@ from pathlib import Path
 # Súbela cuando cambien las tareas de abajo: es lo que dispara el trabajo.
 #   1 = vigías cada 5 min (2026-09-09)
 #   2 = supervisor único oculto + diarias por correr_oculto.vbs (2026-09-10)
-INFRA_VERSION = 2
+#   3 = "POS Snapshot Casa" también oculta: se creaba directo con
+#       programar_snapshot_casa.bat y abría la ventana negra cada 15 min;
+#       la limpieza de la v2 no la conocía y la dejó viva (2026-09-12)
+INFRA_VERSION = 3
 
 # Tareas que ya no van (las crearon versiones anteriores).
 TAREAS_OBSOLETAS = (
@@ -61,12 +64,19 @@ class Tarea:
         return ["schtasks", "/Create", "/F", "/TN", self.nombre, *self.schedule, "/TR", " ".join(partes)]
 
 
-def tareas_esperadas(*, hay_telegram: bool, resumen_a_hora_fija: bool) -> list[Tarea]:
-    """Las tareas que deben existir en esta PC (puro, testeable)."""
+def tareas_esperadas(*, hay_telegram: bool, resumen_a_hora_fija: bool, snapshot_casa: bool = False) -> list[Tarea]:
+    """Las tareas que deben existir en esta PC (puro, testeable).
+
+    `snapshot_casa`: la copia de la Libreta a la PC de la casa cada 15 min
+    (PWA). Solo se conserva si ya existía: es opcional y la programó Daniel.
+    Pase lo que pase, va OCULTA — la versión directa era la ventana negra.
+    """
     tareas = [
         Tarea("POS Supervisor", ("/SC", "ONLOGON"), "supervisor.bat"),
         Tarea("POS Supervisor check", ("/SC", "MINUTE", "/MO", "30"), "supervisor.bat"),
     ]
+    if snapshot_casa:
+        tareas.append(Tarea("POS Snapshot Casa", ("/SC", "MINUTE", "/MO", "15"), "enviar_snapshot_casa.bat"))
     if hay_telegram and not resumen_a_hora_fija:
         # El resumen sale 15 min antes de cerrar; el script decide cuál toca.
         tareas.append(Tarea("POS Resumen 1645", ("/SC", "DAILY", "/ST", "16:45"), "resumen_diario_telegram.bat", ("--si-toca",)))
@@ -161,7 +171,10 @@ def aplicar(*, forzar: bool = False) -> list[str]:
             if existe_tarea(nombre) and borrar_tarea(nombre):
                 hechos.append(f"quitada la tarea vieja: {nombre}")
         fijo = existe_tarea(TAREA_RESUMEN_FIJO)
-        for t in tareas_esperadas(hay_telegram=hay_telegram(), resumen_a_hora_fija=fijo):
+        # El snapshot a la casa solo se conserva si Daniel ya lo tenía; se
+        # recrea con /F por encima de la versión visible (misma /TN).
+        snapshot = existe_tarea("POS Snapshot Casa")
+        for t in tareas_esperadas(hay_telegram=hay_telegram(), resumen_a_hora_fija=fijo, snapshot_casa=snapshot):
             hechos.append(f"tarea al dia: {t.nombre}" if crear_tarea(t) else f"NO se pudo crear: {t.nombre}")
         marcar_aplicada()
         hechos.append(f"infraestructura en la version {INFRA_VERSION}")
