@@ -479,6 +479,7 @@ class Engine:
                 "espera_ms": (pos.ts_fill - o.ts_placed)
                 if (llenada and pos.ts_fill and pos.ts_fill >= o.ts_placed) else None,
                 "vol_cruzado": round(o.vol_cruzado, 4), "barrido": bool(o.barrido),
+                "causa_fill": o.causa or None,
                 "llenada_conservador": o.filled_conservador > 1e-9,
                 "llenada_optimista": o.filled_optimista > 1e-9,
                 "sombra": pos.sombra,
@@ -932,6 +933,8 @@ class Engine:
             self.stats["entradas_maker_llenadas"] += 1
             if o.barrido:
                 self.stats["entradas_maker_barridas"] += 1
+            if o.causa:
+                self.stats[f"entradas_maker_por_{o.causa}"] = self.stats.get(f"entradas_maker_por_{o.causa}", 0) + 1
             self._iniciar_marcas(pos, ts_ms)
         if o.done:
             self.stats["entradas_maker_completas"] += 1

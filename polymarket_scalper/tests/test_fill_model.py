@@ -85,3 +85,47 @@ def test_place_maker_toma_la_cola_del_nivel():
     assert o.queue_ahead == 77 and o.queue_inicial == 77 and o.ts_placed == 5
     o2 = fm.place_maker(Leg("t", "BUY", 0.42, 50, "maker"), b, 5)     # nivel vacío: nadie delante
     assert o2.queue_ahead == 0
+
+
+def test_un_empate_no_es_un_barrido_y_respeta_la_cola():
+    # El mejor vendedor llega exactamente a nuestro precio de compra. Eso es una contrapartida que
+    # viene a nuestro precio —el caso bueno del maker—, no que nos pasen por encima. Antes esto
+    # llenaba la orden entera al instante y la marcaba como barrida: 301 de los 349 "barridos" de
+    # TENNIS_SPREAD_CAPTURE eran esto.
+    fm = FillModel()
+    o = _orden(queue=100, size=50, price=0.41)
+    libro = make_book("t", [(0.41, 100)], [(0.41, 30)])       # empate, 30 ofrecidos
+    assert fm.maker_on_book(o, libro, 1) == 0.0               # los 30 se los come la cola de 100
+    assert not o.barrido and o.filled == 0.0
+    libro2 = make_book("t", [(0.41, 100)], [(0.41, 200)])     # ahora hay 200 ofrecidos
+    llenado = fm.maker_on_book(o, libro2, 2)
+    assert llenado == 50.0 and o.causa == "empate" and not o.barrido
+
+
+def test_el_empate_no_se_cuenta_dos_veces_si_dura_varios_libros():
+    fm = FillModel()
+    o = _orden(queue=0.0, size=50, price=0.41)
+    libro = make_book("t", [(0.41, 0)], [(0.41, 20)])
+    assert fm.maker_on_book(o, libro, 1) == 20.0
+    # el mismo empate en el siguiente libro no vuelve a llenar
+    assert fm.maker_on_book(o, make_book("t", [(0.41, 0)], [(0.41, 20)]), 2) == 0.0
+    assert o.filled == 20.0
+
+
+def test_un_libro_atravesado_si_es_un_barrido():
+    # El mejor vendedor por DEBAJO de nuestra compra: el precio pasó de largo por nuestro nivel y
+    # lo que hubiera ahí se consumió entero, cola incluida.
+    fm = FillModel()
+    o = _orden(queue=1000, size=50, price=0.41)
+    llenado = fm.maker_on_book(o, make_book("t", [(0.39, 100)], [(0.40, 100)]), 1)
+    assert llenado == 50.0 and o.barrido and o.causa == "barrido"
+
+
+def test_un_trade_al_precio_llena_por_cola_y_uno_que_atraviesa_barre():
+    fm = FillModel()
+    a = _orden(queue=0.0, size=50, price=0.41)
+    fm.maker_on_trade(a, {"token_id": "t", "side": "SELL", "price": 0.41, "size": 50}, 1)
+    assert a.causa == "trade" and not a.barrido
+    b = _orden(queue=1000, size=50, price=0.41)
+    fm.maker_on_trade(b, {"token_id": "t", "side": "SELL", "price": 0.40, "size": 10}, 1)
+    assert b.causa == "barrido" and b.barrido

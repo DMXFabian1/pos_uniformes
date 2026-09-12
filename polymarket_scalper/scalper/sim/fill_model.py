@@ -10,8 +10,20 @@ exactitud dónde quedamos en la cola, cada orden lleva tres escenarios y los tre
 - OPTIMISTA: la orden está al frente de la cola: cualquier volumen que cruza es nuestro.
 
 Un trade impreso **por debajo** de nuestro precio de compra (o por encima del de venta) significa
-que el nivel entero fue barrido: en los tres escenarios nos llenaron. Lo mismo si el libro cruza
-nuestro precio. Esos fills son los que más selección adversa sufren, y se marcan.
+que el nivel entero fue barrido: en los tres escenarios nos llenaron. Lo mismo si el libro llega
+**atravesado**, con el mejor vendedor por debajo de nuestra compra. Esos fills son los que más
+selección adversa sufren, y se marcan.
+
+**Lo que no es un barrido.** Que el libro llegue *empatado* —el mejor vendedor exactamente a
+nuestro precio de compra— no es que nos hayan pasado por encima: es una contrapartida que viene a
+nuestro precio, que es el caso bueno del maker. Antes los dos casos se metían en el mismo saco y,
+además, el empate llenaba la orden entera al instante saltándose la cola. De 349 llenados de
+`TENNIS_SPREAD_CAPTURE` marcados como barrido, 301 no tenían ni un solo trade cruzando nuestro
+precio: eran empates. La conclusión que salía de ahí —"casi nunca nos llena una contrapartida que
+viene a nuestro precio"— la producía este archivo, no el mercado.
+
+Cada orden guarda ahora la causa de su llenado (`causa`), para que la diferencia se pueda medir en
+vez de suponerse.
 """
 from __future__ import annotations
 
@@ -51,7 +63,9 @@ class MakerOrder:
     nivel_visto: float = 0.0         # último tamaño observado del nivel (para detectar cancelaciones)
     vol_nivel_desde_libro: float = 0.0   # trades en el nivel desde la última observación del libro
     cancelado_delante: float = 0.0   # cancelaciones observadas en el nivel (BASE las descuenta)
-    barrido: bool = False            # el nivel fue barrido o el libro cruzó: fill "malo" por construcción
+    barrido: bool = False            # nos pasaron por encima: el precio atravesó nuestro nivel
+    causa: str = ""                  # "trade" (cola), "barrido" (nos atravesaron) o "empate" (vienen a nuestro precio)
+    lock_aplicado: float = 0.0       # volumen del empate ya consumido, para no contarlo dos veces
     ts_fill: dict[str, int | None] = field(default_factory=lambda: {e: None for e in ESCENARIOS})
 
     def __post_init__(self) -> None:
@@ -137,6 +151,7 @@ class FillModel:
         if barre:
             # el agresor pasó de largo por nuestro nivel: todo lo que había ahí, incluidos nosotros, se consumió
             order.barrido = True
+            order.causa = "barrido"
             order.queue_ahead = 0.0
             got = order.remaining
         else:
@@ -145,6 +160,8 @@ class FillModel:
             order.queue_ahead -= used
             avail -= used
             got = min(order.remaining, avail)
+            if got > 1e-9 and not order.causa:
+                order.causa = "trade"
         if got > 1e-9:
             self._record(order, got, ts_ms)
         order._marcar(ts_ms)
@@ -155,15 +172,44 @@ class FillModel:
         if order.done or book.token_id != order.token_id:
             return 0.0
         ba, bb = book.best_ask, book.best_bid
-        crossed = (order.side == "BUY" and ba is not None and ba <= order.price + 1e-9) or \
-                  (order.side == "SELL" and bb is not None and bb >= order.price - 1e-9)
-        if crossed:
+        tick = book.tick_size or 1e-9
+        if order.side == "BUY":
+            atravesado = ba is not None and ba < order.price - tick / 2
+            empatado = ba is not None and abs(ba - order.price) <= tick / 2
+            opuesto = book.asks.get(order.price, 0.0) if empatado else 0.0
+        else:
+            atravesado = bb is not None and bb > order.price + tick / 2
+            empatado = bb is not None and abs(bb - order.price) <= tick / 2
+            opuesto = book.bids.get(order.price, 0.0) if empatado else 0.0
+        if atravesado:
+            # El precio pasó de largo por nuestro nivel: lo que hubiera ahí se consumió entero.
             order.barrido = True
+            order.causa = "barrido"
             order.queue_ahead = 0.0
             got = order.remaining
             self._record(order, got, ts_ms)
             order._marcar(ts_ms)
             return got
+        if empatado and opuesto > 0:
+            # Empate: hay contrapartida exactamente a nuestro precio. Eso no nos pasa por encima,
+            # así que **no salta la cola**: el volumen ofrecido consume primero lo que hay delante.
+            # Solo cuenta el incremento sobre lo ya aplicado, o un empate que dure varios libros se
+            # contaría tantas veces como libros lleguen.
+            nuevo_vol = max(opuesto - order.lock_aplicado, 0.0)
+            order.lock_aplicado = opuesto
+            if nuevo_vol > 0:
+                order.vol_cruzado += nuevo_vol
+                usado = min(order.queue_ahead, nuevo_vol)
+                order.queue_ahead -= usado
+                got = min(order.remaining, nuevo_vol - usado)
+                if got > 1e-9:
+                    if not order.causa:
+                        order.causa = "empate"
+                    self._record(order, got, ts_ms)
+                order._marcar(ts_ms)
+                return got
+            return 0.0
+        order.lock_aplicado = 0.0
         levels = book.bids if order.side == "BUY" else book.asks
         ahora = levels.get(order.price, 0.0)
         esperado = max(order.nivel_visto - order.vol_nivel_desde_libro, 0.0)

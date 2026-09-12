@@ -95,6 +95,7 @@ class Position:
             "queue_inicial": None if o is None else round(o.queue_inicial, 4),
             "vol_cruzado": None if o is None else round(o.vol_cruzado, 4),
             "barrido": None if o is None else bool(o.barrido),
+            "causa_fill": None if o is None else (o.causa or None),
             "edge_taker": s.meta.get("edge_taker"),
             "experiment": self.experiment, "freshness_ms": self.freshness_ms, "feed_state": self.feed_state,
             "contaminado": self.contaminado, "sombra": self.sombra, "motivo_rechazo": self.motivo_rechazo,

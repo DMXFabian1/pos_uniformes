@@ -98,7 +98,7 @@ SCHEMAS: dict[str, pa.Schema] = {
         # ejecución: estrategia, rol de entrada y los tres escenarios de llenado de la orden maker
         ("strategy", S()), ("entry_role", S()), ("ts_placed", I()), ("hold_s", F()),
         ("fill_conservador", F()), ("fill_optimista", F()), ("queue_inicial", F()), ("vol_cruzado", F()),
-        ("barrido", B()), ("edge_taker", F()),
+        ("barrido", B()), ("causa_fill", S()), ("edge_taker", F()),
         # selección adversa: mid - precio de entrada a cada horizonte tras el primer fill (negativo = en contra)
         ("adverse_100ms", F()), ("adverse_500ms", F()), ("adverse_1s", F()), ("adverse_2s", F()),
         ("adverse_5s", F()), ("adverse_10s", F()), ("adverse_30s", F()), ("adverse_60s", F()),
@@ -141,7 +141,7 @@ SCHEMAS: dict[str, pa.Schema] = {
         ("tau_partido", F()), ("seconds_left", F()), ("edge_net", F()),
         # resultado
         ("llenada", B()), ("fraccion_llenada", F()), ("espera_ms", I()), ("vol_cruzado", F()),
-        ("barrido", B()), ("llenada_conservador", B()), ("llenada_optimista", B()), ("sombra", B()),
+        ("barrido", B()), ("causa_fill", S()), ("llenada_conservador", B()), ("llenada_optimista", B()), ("sombra", B()),
     ]),
     # cada decisión del motor, incluidas las de NO operar: sin esto no se sabe si los filtros sobran o faltan
     "decisions": pa.schema([
