@@ -17,7 +17,7 @@ class TareasEsperadasTests(unittest.TestCase):
 
     def test_con_telegram_agrega_resumen_y_pendientes(self) -> None:
         nombres = [t.nombre for t in post.tareas_esperadas(hay_telegram=True, resumen_a_hora_fija=False)]
-        self.assertEqual(nombres, ["POS Supervisor", "POS Supervisor check", "POS Resumen 1645", "POS Resumen 1745", "POS Pendientes"])
+        self.assertEqual(nombres, ["POS Supervisor", "POS Supervisor check", "POS Resumen 1645", "POS Resumen 1745", "POS Pendientes", "POS Asistencia"])
 
     def test_hora_fija_elegida_por_daniel_se_respeta(self) -> None:
         nombres = [t.nombre for t in post.tareas_esperadas(hay_telegram=True, resumen_a_hora_fija=True)]
@@ -80,7 +80,15 @@ class AplicarTests(unittest.TestCase):
         self.assertIn("POS Snapshot Casa", con)
 
     def test_la_version_subio_para_que_se_aplique_al_actualizar(self) -> None:
-        self.assertGreaterEqual(post.INFRA_VERSION, 3)
+        self.assertGreaterEqual(post.INFRA_VERSION, 4)
+
+    def test_con_telegram_manda_la_asistencia_a_las_11(self) -> None:
+        tareas = {t.nombre: t for t in post.tareas_esperadas(hay_telegram=True, resumen_a_hora_fija=False)}
+        self.assertIn("POS Asistencia", tareas)
+        self.assertEqual(tareas["POS Asistencia"].schedule, ("/SC", "DAILY", "/ST", "11:00"))
+        self.assertEqual(tareas["POS Asistencia"].args, ("--asistencia",))
+        sin = [t.nombre for t in post.tareas_esperadas(hay_telegram=False, resumen_a_hora_fija=False)]
+        self.assertNotIn("POS Asistencia", sin)
 
     def test_segunda_vez_no_toca_nada(self) -> None:
         post.marcar_aplicada()

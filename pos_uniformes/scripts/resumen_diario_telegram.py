@@ -40,6 +40,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--guardar-token", default="", help="escribe el token en pos_uniformes.env y sale")
     parser.add_argument("--fecha", default="", help="AAAA-MM-DD (default: hoy)")
     parser.add_argument("--pendientes", action="store_true", help="solo el recordatorio de pendientes (mediodía)")
+    parser.add_argument("--asistencia", action="store_true", help="solo la lista de asistencia (media mañana)")
     parser.add_argument(
         "--si-toca",
         action="store_true",
@@ -95,6 +96,11 @@ def main(argv: list[str] | None = None) -> int:
             if not texto:
                 print("Sin pendientes: no se envía nada.")
                 return 0
+        elif args.asistencia:
+            from pos_uniformes.services.asistencia_service import asistencia_del_dia, texto_asistencia
+
+            # La tienda abre todos los días (horario_tienda_service).
+            texto = texto_asistencia(asistencia_del_dia(session, hoy), hoy)
         else:
             texto = formatear(recolectar(session, hoy))
     if args.imprimir:

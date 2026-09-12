@@ -8,6 +8,7 @@ Comandos:
     /estado       qué hay en caja ahora mismo
     /resumen      el resumen del día (el mismo de la noche)
     /pendientes   lo que falta por registrar
+    /asistencia   quién vino hoy (deducido de su primer movimiento)
     /ayuda        esta lista
 
 Solo responde al chat configurado (POS_UNIFORMES_TELEGRAM_CHAT_ID); a
@@ -37,6 +38,7 @@ AYUDA = (
     "/estado — qué hay en caja ahora\n"
     "/resumen — resumen del día\n"
     "/pendientes — lo que falta por registrar\n"
+    "/asistencia — quién vino hoy (por su primer movimiento)\n"
     "/ayuda — esta lista"
 )
 
@@ -133,6 +135,11 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
 
         with session_factory() as session:
             return texto_solo_pendientes(session, hoy) or "Sin pendientes. ✅"
+    if cmd.nombre == "asistencia":
+        from pos_uniformes.services.asistencia_service import asistencia_del_dia, texto_asistencia
+
+        with session_factory() as session:
+            return texto_asistencia(asistencia_del_dia(session, hoy), hoy)
     return f"No conozco /{cmd.nombre}. " + AYUDA
 
 

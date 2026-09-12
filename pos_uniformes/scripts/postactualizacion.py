@@ -34,7 +34,8 @@ from pathlib import Path
 #   3 = "POS Snapshot Casa" también oculta: se creaba directo con
 #       programar_snapshot_casa.bat y abría la ventana negra cada 15 min;
 #       la limpieza de la v2 no la conocía y la dejó viva (2026-09-12)
-INFRA_VERSION = 3
+#   4 = "POS Asistencia": la lista de quién vino, a las 11:00 (2026-09-12)
+INFRA_VERSION = 4
 
 # Tareas que ya no van (las crearon versiones anteriores).
 TAREAS_OBSOLETAS = (
@@ -83,6 +84,9 @@ def tareas_esperadas(*, hay_telegram: bool, resumen_a_hora_fija: bool, snapshot_
         tareas.append(Tarea("POS Resumen 1745", ("/SC", "DAILY", "/ST", "17:45"), "resumen_diario_telegram.bat", ("--si-toca",)))
     if hay_telegram:
         tareas.append(Tarea("POS Pendientes", ("/SC", "DAILY", "/ST", "13:30"), "resumen_diario_telegram.bat", ("--pendientes",)))
+        # Dos horas después de abrir: ya hubo tiempo de que cada quien
+        # hiciera su primer movimiento, que es de donde sale la presencia.
+        tareas.append(Tarea("POS Asistencia", ("/SC", "DAILY", "/ST", "11:00"), "resumen_diario_telegram.bat", ("--asistencia",)))
     return tareas
 
 
