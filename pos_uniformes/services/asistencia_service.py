@@ -157,7 +157,42 @@ def texto_asistencia(lista: list[Asistencia], hoy: date | None = None, ahora: da
         partes.append(f"{cuenta[FALTA]} falta")
     lineas.append("—")
     lineas.append(f"{len(lista)} activas · " + " · ".join(partes))
-    lineas.append("Presencia = primer movimiento en la Libreta o un conteo abierto. Marca con los botones quien faltó o descansa.")
+    lineas.append("Presencia = primer movimiento en la Libreta o un conteo abierto.")
+    comandos = comandos_asistencia(lista)
+    if comandos:
+        lineas.append("")
+        lineas.append("Marcar (toca uno; repetir lo quita):")
+        lineas.append(comandos)
+    return "\n".join(lineas)
+
+
+def token_nombre(a: Asistencia, lista: list[Asistencia] | None = None) -> str:
+    """El nombre como va en el comando: sin acentos ni espacios, para que
+    Telegram lo vuelva tocable. Si dos se llaman igual, se agrega la inicial
+    del apellido."""
+    import unicodedata
+
+    def _limpio(texto: str) -> str:
+        sin = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode()
+        return "".join(ch for ch in sin if ch.isalnum())
+
+    nombre = _limpio(a.nombre_corto)
+    repetido = lista is not None and sum(1 for o in lista if _limpio(o.nombre_corto).lower() == nombre.lower()) > 1
+    if repetido:
+        partes = a.nombre.split()
+        if len(partes) > 1:
+            nombre += _limpio(partes[1])[:1].upper()
+    return nombre or a.code.replace("-", "")
+
+
+def comandos_asistencia(lista: list[Asistencia]) -> str:
+    """Una línea por empleada con sus comandos tocables (puro)."""
+    lineas = []
+    for a in lista:
+        t = token_nombre(a, lista)
+        marca_f = "✗ " if a.estado == FALTA and a.confirmado else ""
+        marca_d = "🛌 " if a.estado == DESCANSO and a.confirmado else ""
+        lineas.append(f"{marca_f}/falta_{t} · {marca_d}/descanso_{t}")
     return "\n".join(lineas)
 
 
@@ -244,12 +279,29 @@ def buscar_code(session, nombre: str) -> str | None:
     from pos_uniformes.database.models import Empleada
     from pos_uniformes.services.nomina_service import QUIEN_PUEDE_PAGAR
 
-    pista = (nombre or "").strip().lower()
+    import unicodedata
+
+    def _plano(texto: str) -> str:
+        sin = unicodedata.normalize("NFKD", texto or "").encode("ascii", "ignore").decode()
+        return "".join(ch for ch in sin if ch.isalnum()).lower()
+
+    pista = _plano(nombre)
     if not pista:
         return None
-    candidatas = [
+    activas = [
         e for e in session.scalars(select(Empleada).where(Empleada.activo.is_(True))).all()
         if e.codigo.upper() not in QUIEN_PUEDE_PAGAR
-        and (e.nombre_completo.lower().startswith(pista) or e.codigo.lower() == pista)
     ]
+    por_gafete = [e for e in activas if _plano(e.codigo) == pista]
+    if len(por_gafete) == 1:
+        return por_gafete[0].codigo.upper()
+    # "FannyO" (nombre + inicial del apellido, cuando dos se llaman igual)
+    # o "Fanny" (prefijo del nombre completo sin espacios).
+    candidatas = [e for e in activas if _plano(e.nombre_completo).startswith(pista)]
+    if len(candidatas) != 1:
+        partes_iguales = [
+            e for e in activas
+            if _plano(e.nombre_completo.split()[0]) + _plano(" ".join(e.nombre_completo.split()[1:2]))[:1] == pista
+        ]
+        candidatas = partes_iguales if len(partes_iguales) == 1 else candidatas
     return candidatas[0].codigo.upper() if len(candidatas) == 1 else None

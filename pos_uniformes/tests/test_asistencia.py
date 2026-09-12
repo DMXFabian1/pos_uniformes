@@ -258,7 +258,9 @@ class BotConBotonesTests(unittest.TestCase):
         editado = llamadas[1][1]
         self.assertEqual(editado["message_id"], "501")
         self.assertIn("✗ Fanny — falta (tú)", editado["text"])
-        self.assertIn("inline_keyboard", editado["reply_markup"])
+        # Ya no se mandan botones: Daniel prefiere los comandos tocables del texto.
+        self.assertNotIn("reply_markup", editado)
+        self.assertIn("/falta_Fanny", editado["text"])
 
     def test_un_toque_de_otro_chat_se_ignora(self) -> None:
         from unittest.mock import patch
@@ -283,3 +285,59 @@ class BotConBotonesTests(unittest.TestCase):
         j = json.loads(teclado([[("a", "x:1"), ("b", "x:2")], [("c", "y" * 100)]]))
         self.assertEqual(j["inline_keyboard"][0][0], {"text": "a", "callback_data": "x:1"})
         self.assertEqual(len(j["inline_keyboard"][1][0]["callback_data"]), 64)
+
+
+class ComandosTocablesTests(unittest.TestCase):
+    """Sin botones: cada empleada trae /falta_Nombre · /descanso_Nombre en el texto."""
+
+    def setUp(self) -> None:
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        self.s = Session(engine)
+        _emp(self.s, "VEND-2", "Fanny Ortiz", descanso=0)
+        _emp(self.s, "VEND-3", "José María Ruiz", descanso=1)     # acento y espacio
+        _emp(self.s, "VEND-4", "Fanny Delgado", descanso=2)      # se llama igual que la otra
+        self.s.commit()
+
+    def tearDown(self) -> None:
+        self.s.close()
+
+    def test_los_comandos_van_sin_acentos_y_desambiguados(self) -> None:
+        lista = asis.asistencia_del_dia(self.s, HOY)
+        texto = asis.comandos_asistencia(lista)
+        self.assertIn("/falta_Jose · /descanso_Jose", texto)   # primer nombre, sin acento
+        self.assertIn("/falta_FannyO · /descanso_FannyO", texto)         # inicial del apellido
+        self.assertIn("/falta_FannyD · /descanso_FannyD", texto)
+        # Todo lo que va después de "/" es tocable en Telegram: solo letras, dígitos y _.
+        import re
+
+        for cmd in re.findall(r"/\S+", texto):
+            self.assertRegex(cmd, r"^/[A-Za-z0-9_]+$")
+
+    def test_el_comando_tocable_llega_al_bot_como_falta_nombre(self) -> None:
+        from pos_uniformes.services import telegram_bot_service as bot
+
+        c = bot.parsear("/falta_Jose")
+        self.assertEqual((c.nombre, c.argumento), ("falta", "Jose"))
+        c = bot.parsear("/descanso_FannyO@mi_bot")
+        self.assertEqual((c.nombre, c.argumento), ("descanso", "FannyO"))
+        self.assertEqual(bot.parsear("/falta Fanny").argumento, "Fanny")   # con espacio sigue valiendo
+        self.assertEqual(bot.parsear("/falta_").nombre, "falta_")            # sin nombre: no truena
+
+    def test_buscar_code_entiende_lo_que_manda_el_comando(self) -> None:
+        self.assertEqual(asis.buscar_code(self.s, "Jose"), "VEND-3")
+        self.assertEqual(asis.buscar_code(self.s, "FannyO"), "VEND-2")
+        self.assertEqual(asis.buscar_code(self.s, "FannyD"), "VEND-4")
+        self.assertIsNone(asis.buscar_code(self.s, "Fanny"))   # ambigua: no adivina
+
+    def test_de_punta_a_punta_con_el_bot(self) -> None:
+        from sqlalchemy.orm import sessionmaker
+
+        from pos_uniformes.services import telegram_bot_service as bot
+
+        factory = sessionmaker(bind=self.s.get_bind())
+        r = bot.atender_texto("/falta_FannyO", session_factory=factory, hoy=HOY)
+        self.assertTrue(r.startswith("Fanny: falta ✗"))
+        self.assertIn("✗ /falta_FannyO", r)   # la marca se ve en su propio comando
+        r = bot.atender_texto("/falta_FannyO", session_factory=factory, hoy=HOY)
+        self.assertTrue(r.startswith("Fanny: marca quitada ↩"))

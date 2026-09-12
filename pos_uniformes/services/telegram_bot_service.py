@@ -38,8 +38,8 @@ AYUDA = (
     "/estado — qué hay en caja ahora\n"
     "/resumen — resumen del día\n"
     "/pendientes — lo que falta por registrar\n"
-    "/asistencia — quién vino hoy, con botones: faltó / descanso\n"
-    "/falta Fanny · /descanso Fanny · /vino Fanny — lo mismo por texto\n"
+    "/asistencia — quién vino hoy, con un comando por empleada para marcar\n"
+    "/falta_Fanny · /descanso_Fanny · /vino_Fanny — o con espacio: /falta Fanny\n"
     "/ayuda — esta lista"
 )
 
@@ -56,7 +56,12 @@ def parsear(texto: str) -> Comando | None:
         return None
     partes = t[1:].split(maxsplit=1)
     nombre = partes[0].split("@")[0].lower()
-    return Comando(nombre, partes[1].strip() if len(partes) > 1 else "")
+    argumento = partes[1].strip() if len(partes) > 1 else ""
+    # "/falta_Fanny" (tocable en Telegram, una sola palabra) = "/falta Fanny".
+    for base in ("falta", "descanso", "vino"):
+        if nombre.startswith(base + "_") and len(nombre) > len(base) + 1:
+            return Comando(base, (partes[0].split("@")[0][len(base) + 1:] + " " + argumento).strip())
+    return Comando(nombre, argumento)
 
 
 @dataclass(frozen=True)
@@ -153,12 +158,16 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
 
 
 def mensaje_asistencia(session, hoy: date | None = None) -> tuple[str, str]:
-    """(texto, botones JSON) de la lista de asistencia de hoy."""
+    """(texto, botones JSON) de la lista de asistencia de hoy.
+
+    Los botones quedaron en desuso (Daniel prefiere los comandos tocables
+    que van en el propio texto: /falta_Fanny, /descanso_Fanny); se devuelve
+    "" para no mandarlos. La infraestructura de toques sigue viva por si
+    vuelve a hacer falta."""
     from pos_uniformes.services import asistencia_service as asis
-    from pos_uniformes.services.telegram_service import teclado
 
     lista = asis.asistencia_del_dia(session, hoy)
-    return asis.texto_asistencia(lista, hoy), teclado(asis.teclado_asistencia(lista))
+    return asis.texto_asistencia(lista, hoy), ""
 
 
 def atender_toque(dato: str, *, session_factory, hoy: date | None = None) -> tuple[str, str, str] | None:
@@ -252,15 +261,8 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
                 except Exception as exc:  # noqa: BLE001
                     logger.exception("Error atendiendo %r", texto)
                     respuesta = f"Falló: {exc}"
-            botones = None
-            if parsear(texto) and parsear(texto).nombre in ("asistencia", "vino", "falta", "descanso"):
-                try:
-                    with session_factory() as session:
-                        botones = mensaje_asistencia(session)[1]
-                except Exception:  # noqa: BLE001 — sin botones sigue valiendo el texto
-                    botones = None
             try:
-                telegram_service.enviar_mensaje(respuesta, token=token, chat_id=chat_id, botones=botones)
+                telegram_service.enviar_mensaje(respuesta, token=token, chat_id=chat_id)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("No se pudo responder: %s", exc)
         if una_vez:
