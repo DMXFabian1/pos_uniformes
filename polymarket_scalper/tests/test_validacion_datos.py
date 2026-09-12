@@ -382,3 +382,25 @@ def test_sin_muestras_el_suelo_no_corrige_nada():
     assert not dsf and dsf.en(123) == 0.0 and dsf.deriva_ms_por_hora() is None
     # Un suelo positivo es retraso de verdad: no hay desfase que descontar.
     assert Desfase([(0, 300), (1, 500)]).en(0) == 0.0
+
+
+def test_promocionar_un_modelo_cambia_la_huella_del_experimento(cfg, tmp_path, monkeypatch):
+    # `muestra-3` promovió spread_capture v2 a las 5 h 53 min de una corrida de 8 h. Las 186
+    # posiciones decididas con él llevaban el mismo experiment_id que las 494 anteriores, porque la
+    # huella se calcula una vez, al arrancar. Si un modelo nuevo no mueve la huella, no hay forma
+    # de separar después lo que decidió un motor de lo que decidió el otro.
+    from scalper import experimento as ex
+
+    cfg.data_dir = str(tmp_path)
+    monkeypatch.setattr(ex, "commit_actual", lambda: ("abc1234", False))
+    monkeypatch.setattr(ex, "modelos_en_uso", lambda _d: {})
+    sin_modelo = ex.congelar(cfg)
+    monkeypatch.setattr(ex, "modelos_en_uso", lambda _d: {"spread_capture": 2})
+    con_modelo = ex.congelar(cfg)
+    assert sin_modelo.huella != con_modelo.huella
+    assert sin_modelo.experiment_id != con_modelo.experiment_id
+    # Y la comparación lo dice con nombre y versión, no solo que "algo" cambió.
+    cambios = ex.cambios_que_deciden(
+        {"umbrales": ex.dumps(sin_modelo.umbrales), "modelos": ex.dumps(sin_modelo.modelos)},
+        {"umbrales": ex.dumps(con_modelo.umbrales), "modelos": ex.dumps(con_modelo.modelos)})
+    assert cambios == ["spread_capture: None → 2"]

@@ -46,12 +46,28 @@ async def run_paper(cfg: Config, duration_seconds: int | None = None, run_id: st
             log.info("paper: %s", eng.summary())
 
     async def retrainer() -> None:
+        """Reentrena y, si eso cambia lo que el motor decide, abre un experimento nuevo.
+
+        Promocionar un modelo a mitad de corrida cambia el motor. Sin esto, las filas de antes y
+        las de después llevaban el mismo `experiment_id` y quedaban mezcladas para siempre: en
+        `muestra-3`, 186 de 680 posiciones se decidieron con un modelo que no existía al congelar.
+        La huella no puede detectarlo sola porque se calcula una vez, al arrancar.
+        """
         from .learn_loop import retrain_and_reload
+        nonlocal exp
         period = max(cfg.learn.retrain_hours, 0.1) * 3600
         while True:
             await asyncio.sleep(period)
             writer.flush()
             await asyncio.to_thread(retrain_and_reload, cfg, eng)
+            nuevo_exp = congelar(cfg, nota=f"paper {run_id} (modelos nuevos)")
+            if nuevo_exp.huella != exp.huella:
+                registrar(cfg, nuevo_exp)
+                log.warning("el reentrenamiento cambió lo que el motor decide: a partir de aquí, "
+                            "experimento %s (antes %s). Los datos de las dos mitades no se mezclan.",
+                            nuevo_exp.experiment_id, exp.experiment_id)
+                exp = nuevo_exp
+                eng.experiment = exp.experiment_id
 
     tasks = [asyncio.create_task(ticker()), asyncio.create_task(reporter())]
     if cfg.learn.enabled:

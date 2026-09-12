@@ -31,6 +31,15 @@ scalper validacion --experimento exp-20260911-0c13b8f5
 
 Si la corrida arranca con el árbol sucio, el log lo avisa: esos datos no se podrán reproducir.
 
+**La huella también se recalcula a mitad de corrida.** Al principio no: se congelaba una vez, al
+arrancar, y el reentrenamiento podía promocionar un modelo ocho horas después sin que nada lo
+notara. Pasó en `muestra-3`: `spread_capture` v2 entró a las 5 h 53 min, y desde ahí empezó a
+descartar señales (`skipped_modelo_p_win_baja`) y a recortar tamaños (`sized_down`). **186 de las
+680 posiciones se decidieron con un modelo que no existía al congelar**, y todas llevaban el mismo
+`experiment_id` que las 494 anteriores. Ahora, después de cada reentrenamiento, se vuelve a
+calcular la huella; si cambió, se registra el experimento nuevo, el log lo avisa y las filas
+siguientes ya van marcadas con él. Una posición pertenece al motor que la decidió.
+
 La huella incluye el commit, así que **arreglar un informe o un test también abre un experimento
 nuevo**, aunque el motor decida exactamente igual. Para que eso no parta la muestra sin motivo,
 `scalper experimentos` y la cabecera del informe dicen si entre dos experimentos cambió algo de lo
