@@ -109,19 +109,67 @@ def partir_mensaje(texto: str, maximo: int = _MAX) -> list[str]:
     return partes
 
 
-def enviar_mensaje(texto: str, *, token: str | None = None, chat_id: str | None = None) -> int:
-    """Manda el texto (partido si es largo). Devuelve cuántos mensajes salieron."""
+def _credenciales(token: str | None, chat_id: str | None) -> tuple[str, str]:
     token = token or token_configurado()
     chat_id = chat_id or chat_id_configurado()
     if not token or not chat_id:
         raise RuntimeError(
             "Falta POS_UNIFORMES_TELEGRAM_BOT_TOKEN o POS_UNIFORMES_TELEGRAM_CHAT_ID en pos_uniformes.env."
         )
+    return token, chat_id
+
+
+def teclado(filas: list[list[tuple[str, str]]]) -> str:
+    """Botones debajo del mensaje: [[(texto, dato), …], …] → JSON para Telegram.
+
+    El `dato` regresa tal cual cuando alguien toca (callback_query). Máximo 64
+    bytes por botón, por regla de Telegram.
+    """
+    return json.dumps({
+        "inline_keyboard": [
+            [{"text": texto, "callback_data": dato[:64]} for texto, dato in fila] for fila in filas
+        ]
+    })
+
+
+def enviar_mensaje(
+    texto: str, *, token: str | None = None, chat_id: str | None = None, botones: str | None = None
+) -> int:
+    """Manda el texto (partido si es largo). Devuelve cuántos mensajes salieron.
+
+    `botones`: lo que devuelve `teclado()`; van en el último pedazo."""
+    token, chat_id = _credenciales(token, chat_id)
     enviados = 0
-    for parte in partir_mensaje(texto):
-        _llamar(token, "sendMessage", {"chat_id": chat_id, "text": parte, "disable_web_page_preview": "true"})
+    partes = partir_mensaje(texto)
+    for i, parte in enumerate(partes):
+        datos = {"chat_id": chat_id, "text": parte, "disable_web_page_preview": "true"}
+        if botones and i == len(partes) - 1:
+            datos["reply_markup"] = botones
+        _llamar(token, "sendMessage", datos)
         enviados += 1
     return enviados
+
+
+def editar_mensaje(
+    message_id: int, texto: str, *, token: str | None = None, chat_id: str | None = None, botones: str | None = None
+) -> None:
+    """Reescribe un mensaje ya mandado (y sus botones). Para que la lista de
+    asistencia se actualice en el mismo lugar en vez de mandar otra."""
+    token, chat_id = _credenciales(token, chat_id)
+    datos = {"chat_id": chat_id, "message_id": str(message_id), "text": texto[:_MAX]}
+    if botones:
+        datos["reply_markup"] = botones
+    _llamar(token, "editMessageText", datos)
+
+
+def responder_toque(callback_query_id: str, texto: str = "", *, token: str | None = None) -> None:
+    """Le dice a Telegram que el toque se atendió (si no, el botón se queda
+    'cargando' en el celular)."""
+    token = token or token_configurado()
+    datos = {"callback_query_id": callback_query_id}
+    if texto:
+        datos["text"] = texto[:200]
+    _llamar(token, "answerCallbackQuery", datos)
 
 
 def obtener_chat_ids(token: str | None = None) -> list[tuple[str, str]]:

@@ -31,6 +31,7 @@ class Asistencia:
     primera_senal: datetime | None = None   # hora local del primer movimiento
     movimientos: int = 0
     nota: str = ""                          # p.ej. "marcada por León"
+    confirmado: bool = False                # Daniel dijo "vino"/"falta" (manda sobre lo deducido)
 
     @property
     def nombre_corto(self) -> str:
@@ -45,8 +46,11 @@ def _local(momento: datetime) -> datetime:
     return momento.astimezone().replace(tzinfo=None)
 
 
-def clasificar(*, estado_dia: str, movimientos: int, primera: datetime | None) -> str:
-    """Puro: del estado del calendario y la actividad, el estado de asistencia."""
+def clasificar(*, estado_dia: str, movimientos: int, primera: datetime | None, confirmado_trabajo: bool = False) -> str:
+    """Puro: del estado del calendario y la actividad, el estado de asistencia.
+
+    `confirmado_trabajo`: Daniel marcó "vino" en el calendario; vale aunque
+    no haya vendido nada todavía."""
     from pos_uniformes.services.calendario_empleadas_service import DESCANSO as C_DESCANSO
     from pos_uniformes.services.calendario_empleadas_service import FALTA as C_FALTA
 
@@ -54,6 +58,8 @@ def clasificar(*, estado_dia: str, movimientos: int, primera: datetime | None) -
         return FALTA
     if estado_dia == C_DESCANSO:
         return DESCANSO
+    if confirmado_trabajo:
+        return PRESENTE
     return PRESENTE if (movimientos > 0 or primera is not None) else SIN_SENAL
 
 
@@ -61,6 +67,7 @@ def asistencia_del_dia(session, hoy: date | None = None) -> list[Asistencia]:
     from sqlalchemy import func, select
 
     from pos_uniformes.database.models import ConteoJornada, Empleada, LibretaVenta
+    from pos_uniformes.services.calendario_empleadas_service import TRABAJO as C_TRABAJO
     from pos_uniformes.services.calendario_empleadas_service import cargar_horario, estado_del_dia
     from pos_uniformes.services.libreta_service import ventana_hoy
     from pos_uniformes.services.nomina_service import QUIEN_PUEDE_PAGAR
@@ -105,11 +112,15 @@ def asistencia_del_dia(session, hoy: date | None = None) -> list[Asistencia]:
         horario = cargar_horario(session, e.codigo)
         estado_dia = estado_del_dia(horario, hoy)
         primera, n = actividad.get(code, (None, 0))
-        estado = clasificar(estado_dia=estado_dia, movimientos=n, primera=primera)
+        marcado = hoy in horario.eventos
+        confirmado_trabajo = marcado and horario.eventos.get(hoy) == C_TRABAJO
+        estado = clasificar(
+            estado_dia=estado_dia, movimientos=n, primera=primera, confirmado_trabajo=confirmado_trabajo
+        )
         nota = ""
-        if estado in (FALTA, DESCANSO) and hoy in horario.eventos:
-            nota = "marcado en el calendario"
-        salida.append(Asistencia(code, e.nombre_completo, estado, primera, n, nota))
+        if marcado and estado in (FALTA, DESCANSO, PRESENTE):
+            nota = _nota_de(session, code, hoy)
+        salida.append(Asistencia(code, e.nombre_completo, estado, primera, n, nota, confirmado=marcado))
     orden = {PRESENTE: 0, SIN_SENAL: 1, FALTA: 2, DESCANSO: 3}
     return sorted(salida, key=lambda a: (orden[a.estado], a.primera_senal or datetime.max, a.nombre))
 
@@ -124,16 +135,18 @@ def texto_asistencia(lista: list[Asistencia], hoy: date | None = None, ahora: da
         return "\n".join(lineas)
     for a in lista:
         icono = _ICONO[a.estado]
+        sello = f" ({a.nota})" if a.nota else ""
         if a.estado == PRESENTE:
             hora = f" desde {a.primera_senal:%H:%M}" if a.primera_senal else ""
             movs = f" · {a.movimientos} mov." if a.movimientos else ""
-            lineas.append(f"{icono} {a.nombre_corto} —{hora}{movs}")
+            base = f"{hora}{movs}".strip() or " vino"
+            lineas.append(f"{icono} {a.nombre_corto} — {base.strip()}{sello}")
         elif a.estado == SIN_SENAL:
             lineas.append(f"{icono} {a.nombre_corto} — sin movimientos todavía")
         elif a.estado == FALTA:
-            lineas.append(f"{icono} {a.nombre_corto} — falta" + (f" ({a.nota})" if a.nota else ""))
+            lineas.append(f"{icono} {a.nombre_corto} — falta{sello}")
         else:
-            lineas.append(f"{icono} {a.nombre_corto} — descansa")
+            lineas.append(f"{icono} {a.nombre_corto} — descansa{sello}")
     cuenta = {k: sum(1 for a in lista if a.estado == k) for k in (PRESENTE, SIN_SENAL, DESCANSO, FALTA)}
     partes = [f"{cuenta[PRESENTE]} presentes"]
     if cuenta[SIN_SENAL]:
@@ -144,5 +157,91 @@ def texto_asistencia(lista: list[Asistencia], hoy: date | None = None, ahora: da
         partes.append(f"{cuenta[FALTA]} falta")
     lineas.append("—")
     lineas.append(f"{len(lista)} activas · " + " · ".join(partes))
-    lineas.append("Presencia = primer movimiento en la Libreta o un conteo abierto.")
+    lineas.append("Presencia = primer movimiento en la Libreta o un conteo abierto. Tú tienes la última palabra con los botones.")
     return "\n".join(lineas)
+
+
+def _nota_de(session, code: str, dia: date) -> str:
+    """De dónde salió la marca del calendario ('tú', 'León'…)."""
+    from sqlalchemy import select
+
+    from pos_uniformes.database.models import EmpleadaEvento
+
+    ev = session.scalar(
+        select(EmpleadaEvento).where(EmpleadaEvento.employee_code == code, EmpleadaEvento.fecha == dia)
+    )
+    nota = str(getattr(ev, "nota", "") or "")
+    if nota.startswith(NOTA_TELEGRAM):
+        return "tú"
+    return nota or "marcado en el calendario"
+
+
+# ── Marcar desde Telegram ───────────────────────────────────────────────
+NOTA_TELEGRAM = "Daniel desde Telegram"
+VINO, NO_VINO, DESCANSA = "vino", "falta", "descanso"
+_PREFIJO = "asis"
+
+
+def teclado_asistencia(lista: list[Asistencia]) -> list[list[tuple[str, str]]]:
+    """Una fila por empleada: [nombre ✅ vino] [✗ falta] (puro).
+
+    El dato del botón es "asis:<code>:<accion>" — cabe de sobra en los 64
+    bytes que permite Telegram."""
+    filas = []
+    for a in lista:
+        marca_v = "✅" if a.estado == PRESENTE and a.confirmado else "☐"
+        marca_f = "✗" if a.estado == FALTA and a.confirmado else "☐"
+        filas.append([
+            (f"{marca_v} {a.nombre_corto} vino", f"{_PREFIJO}:{a.code}:{VINO}"),
+            (f"{marca_f} falta", f"{_PREFIJO}:{a.code}:{NO_VINO}"),
+        ])
+    return filas
+
+
+def interpretar_toque(dato: str) -> tuple[str, str] | None:
+    """'asis:VEND-4:vino' → ('VEND-4', 'vino'). None si no es nuestro (puro)."""
+    partes = (dato or "").split(":")
+    if len(partes) != 3 or partes[0] != _PREFIJO or partes[2] not in (VINO, NO_VINO, DESCANSA):
+        return None
+    return partes[1].strip().upper(), partes[2]
+
+
+def marcar(session, code: str, accion: str, hoy: date | None = None) -> str:
+    """Escribe la palabra de Daniel en el calendario (el mismo que usa León).
+
+    'vino' → TRABAJO, 'falta' → FALTA, 'descanso' → DESCANSO. Devuelve el
+    texto corto para confirmar en el celular."""
+    from pos_uniformes.database.models import Empleada
+    from pos_uniformes.services.calendario_empleadas_service import DESCANSO as C_DESCANSO
+    from pos_uniformes.services.calendario_empleadas_service import FALTA as C_FALTA
+    from pos_uniformes.services.calendario_empleadas_service import TRABAJO as C_TRABAJO
+    from pos_uniformes.services.calendario_empleadas_service import marcar_dia
+    from sqlalchemy import select
+
+    hoy = hoy or date.today()
+    code = (code or "").strip().upper()
+    emp = session.scalar(select(Empleada).where(Empleada.codigo == code, Empleada.activo.is_(True)))
+    if emp is None:
+        return f"No conozco el gafete {code}."
+    tipo = {VINO: C_TRABAJO, NO_VINO: C_FALTA, DESCANSA: C_DESCANSO}[accion]
+    marcar_dia(session, code, hoy, tipo, nota=NOTA_TELEGRAM)
+    nombre = emp.nombre_completo.split()[0]
+    return {VINO: f"{nombre}: vino ✅", NO_VINO: f"{nombre}: falta ✗", DESCANSA: f"{nombre}: descansa 🛌"}[accion]
+
+
+def buscar_code(session, nombre: str) -> str | None:
+    """'/vino fanny' → el gafete de la única activa cuyo nombre empiece así."""
+    from sqlalchemy import select
+
+    from pos_uniformes.database.models import Empleada
+    from pos_uniformes.services.nomina_service import QUIEN_PUEDE_PAGAR
+
+    pista = (nombre or "").strip().lower()
+    if not pista:
+        return None
+    candidatas = [
+        e for e in session.scalars(select(Empleada).where(Empleada.activo.is_(True))).all()
+        if e.codigo.upper() not in QUIEN_PUEDE_PAGAR
+        and (e.nombre_completo.lower().startswith(pista) or e.codigo.lower() == pista)
+    ]
+    return candidatas[0].codigo.upper() if len(candidatas) == 1 else None

@@ -38,7 +38,8 @@ AYUDA = (
     "/estado — qué hay en caja ahora\n"
     "/resumen — resumen del día\n"
     "/pendientes — lo que falta por registrar\n"
-    "/asistencia — quién vino hoy (por su primer movimiento)\n"
+    "/asistencia — quién vino hoy, con botones para marcar\n"
+    "/vino Fanny · /falta Fanny · /descanso Fanny — marcar a mano\n"
     "/ayuda — esta lista"
 )
 
@@ -136,11 +137,43 @@ def atender_texto(texto: str, *, session_factory, hoy: date | None = None) -> st
         with session_factory() as session:
             return texto_solo_pendientes(session, hoy) or "Sin pendientes. ✅"
     if cmd.nombre == "asistencia":
-        from pos_uniformes.services.asistencia_service import asistencia_del_dia, texto_asistencia
-
         with session_factory() as session:
-            return texto_asistencia(asistencia_del_dia(session, hoy), hoy)
+            return mensaje_asistencia(session, hoy)[0]
+    if cmd.nombre in ("vino", "falta", "descanso"):
+        from pos_uniformes.services import asistencia_service as asis
+
+        accion = {"vino": asis.VINO, "falta": asis.NO_VINO, "descanso": asis.DESCANSA}[cmd.nombre]
+        with session_factory() as session:
+            code = asis.buscar_code(session, cmd.argumento)
+            if code is None:
+                return f"¿Quién? Escribe el nombre como aparece en la lista: /{cmd.nombre} Fanny"
+            hecho = asis.marcar(session, code, accion, hoy)
+            return hecho + "\n\n" + mensaje_asistencia(session, hoy)[0]
     return f"No conozco /{cmd.nombre}. " + AYUDA
+
+
+def mensaje_asistencia(session, hoy: date | None = None) -> tuple[str, str]:
+    """(texto, botones JSON) de la lista de asistencia de hoy."""
+    from pos_uniformes.services import asistencia_service as asis
+    from pos_uniformes.services.telegram_service import teclado
+
+    lista = asis.asistencia_del_dia(session, hoy)
+    return asis.texto_asistencia(lista, hoy), teclado(asis.teclado_asistencia(lista))
+
+
+def atender_toque(dato: str, *, session_factory, hoy: date | None = None) -> tuple[str, str, str] | None:
+    """Un botón de asistencia tocado: marca y devuelve (aviso corto, texto nuevo, botones nuevos).
+    None si el dato no es de asistencia."""
+    from pos_uniformes.services import asistencia_service as asis
+
+    toque = asis.interpretar_toque(dato)
+    if toque is None:
+        return None
+    code, accion = toque
+    with session_factory() as session:
+        aviso = asis.marcar(session, code, accion, hoy)
+        texto, botones = mensaje_asistencia(session, hoy)
+    return aviso, texto, botones
 
 
 MAX_ANTIGUEDAD_SEG = 10 * 60  # mensajes más viejos (bot apagado) no se ejecutan
@@ -195,6 +228,10 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
             continue
         for upd in payload.get("result", []):
             offset = int(upd["update_id"]) + 1
+            toque = upd.get("callback_query")
+            if toque:
+                _atender_toque(toque, session_factory=session_factory, token=token, chat_id=chat_id)
+                continue
             msg = upd.get("message") or {}
             chat = str((msg.get("chat") or {}).get("id", ""))
             texto = msg.get("text") or ""
@@ -215,9 +252,45 @@ def escuchar(*, session_factory, token: str, chat_id: str, una_vez: bool = False
                 except Exception as exc:  # noqa: BLE001
                     logger.exception("Error atendiendo %r", texto)
                     respuesta = f"Falló: {exc}"
+            botones = None
+            if parsear(texto) and parsear(texto).nombre in ("asistencia", "vino", "falta", "descanso"):
+                try:
+                    with session_factory() as session:
+                        botones = mensaje_asistencia(session)[1]
+                except Exception:  # noqa: BLE001 — sin botones sigue valiendo el texto
+                    botones = None
             try:
-                telegram_service.enviar_mensaje(respuesta, token=token, chat_id=chat_id)
+                telegram_service.enviar_mensaje(respuesta, token=token, chat_id=chat_id, botones=botones)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("No se pudo responder: %s", exc)
         if una_vez:
             return
+
+
+def _atender_toque(toque: dict, *, session_factory, token: str, chat_id: str) -> None:
+    """Un botón tocado en el celular: marca, avisa y reescribe la lista en el
+    mismo mensaje. Solo del chat autorizado."""
+    from pos_uniformes.services import telegram_service
+
+    msg = toque.get("message") or {}
+    chat = str((msg.get("chat") or {}).get("id", ""))
+    if chat != str(chat_id):
+        logger.info("Toque ignorado de chat %s", chat)
+        return
+    dato = str(toque.get("data") or "")
+    try:
+        resultado = atender_toque(dato, session_factory=session_factory)
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("Error atendiendo el toque %r", dato)
+        resultado = (f"Falló: {exc}", "", "")
+    try:
+        telegram_service.responder_toque(str(toque.get("id", "")), resultado[0] if resultado else "", token=token)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("No se pudo responder el toque: %s", exc)
+    if resultado and resultado[1] and msg.get("message_id") is not None:
+        try:
+            telegram_service.editar_mensaje(
+                int(msg["message_id"]), resultado[1], token=token, chat_id=chat_id, botones=resultado[2]
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("No se pudo actualizar la lista: %s", exc)

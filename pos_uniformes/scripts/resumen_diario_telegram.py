@@ -85,6 +85,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     hoy = date.fromisoformat(args.fecha) if args.fecha else date.today()
+    botones = None
     from pos_uniformes.database.connection import get_session
     from pos_uniformes.services.resumen_diario_service import formatear, recolectar
 
@@ -97,17 +98,17 @@ def main(argv: list[str] | None = None) -> int:
                 print("Sin pendientes: no se envía nada.")
                 return 0
         elif args.asistencia:
-            from pos_uniformes.services.asistencia_service import asistencia_del_dia, texto_asistencia
+            from pos_uniformes.services.telegram_bot_service import mensaje_asistencia
 
             # La tienda abre todos los días (horario_tienda_service).
-            texto = texto_asistencia(asistencia_del_dia(session, hoy), hoy)
+            texto, botones = mensaje_asistencia(session, hoy)
         else:
             texto = formatear(recolectar(session, hoy))
     if args.imprimir:
         print(texto)
         return 0
     try:
-        n = telegram_service.enviar_mensaje(texto)
+        n = telegram_service.enviar_mensaje(texto, botones=botones)
     except Exception as exc:  # noqa: BLE001
         print(f"No se pudo enviar: {exc}")
         print(texto)
