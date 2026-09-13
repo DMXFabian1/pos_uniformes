@@ -38,6 +38,54 @@ class CalcularPagoTests(unittest.TestCase):
         self.assertEqual(d.descuento_faltas, Decimal("216.67"))
         self.assertEqual(d.total, Decimal("1103.33"))
 
+    def test_falto_pero_vino_en_su_descanso_no_se_descuenta(self) -> None:
+        # Regla de Daniel (2026-09-13): solo se descuenta si laboró menos de
+        # sus días. Stayce descansa los sábados; faltó el martes y vino el sábado.
+        from pos_uniformes.services.calendario_empleadas_service import TRABAJO
+
+        h = HorarioEmpleada("VEND-4", descanso_weekday=5, fecha_ultimo_pago=date(2026, 9, 6))   # ciclo 7–13 sep
+        h.eventos[date(2026, 9, 8)] = FALTA      # martes
+        h.eventos[date(2026, 9, 12)] = TRABAJO   # sábado: vino
+        d = calcular_pago(h, comisiones=0, params=PARAMS, hasta=date(2026, 9, 13))
+        self.assertEqual(d.faltas, 0)
+        self.assertEqual(d.total, Decimal("1300.00"))
+
+    def test_falto_y_ademas_descanso_su_dia_si_se_descuenta(self) -> None:
+        h = HorarioEmpleada("VEND-4", descanso_weekday=5, fecha_ultimo_pago=date(2026, 9, 6))
+        h.eventos[date(2026, 9, 8)] = FALTA
+        d = calcular_pago(h, comisiones=0, params=PARAMS, hasta=date(2026, 9, 13))
+        self.assertEqual(d.faltas, 1)
+        self.assertEqual(d.total, Decimal("1083.33"))
+
+    def test_el_dia_extra_solo_compensa_dentro_del_mismo_ciclo(self) -> None:
+        from pos_uniformes.services.calendario_empleadas_service import TRABAJO
+
+        h = HorarioEmpleada("VEND-4", descanso_weekday=5, fecha_ultimo_pago=date(2026, 9, 6))
+        h.eventos[date(2026, 9, 8)] = FALTA
+        h.eventos[date(2026, 9, 5)] = TRABAJO    # sábado del ciclo anterior: no cuenta
+        d = calcular_pago(h, comisiones=0, params=PARAMS, hasta=date(2026, 9, 13))
+        self.assertEqual(d.faltas, 1)
+
+    def test_dos_faltas_y_un_sabado_trabajado_descuenta_una(self) -> None:
+        from pos_uniformes.services.calendario_empleadas_service import TRABAJO
+
+        h = HorarioEmpleada("VEND-4", descanso_weekday=5, fecha_ultimo_pago=date(2026, 9, 6))
+        h.eventos[date(2026, 9, 8)] = FALTA
+        h.eventos[date(2026, 9, 9)] = FALTA
+        h.eventos[date(2026, 9, 12)] = TRABAJO
+        d = calcular_pago(h, comisiones=0, params=PARAMS, hasta=date(2026, 9, 13))
+        self.assertEqual(d.faltas, 1)
+
+    def test_el_descanso_movido_tambien_cuenta_como_dia_trabajado(self) -> None:
+        # Marcó el martes como descanso; el sábado quedó "trabajo (descanso movido)".
+        from pos_uniformes.services.calendario_empleadas_service import DESCANSO, TRABAJO
+
+        h = HorarioEmpleada("VEND-4", descanso_weekday=5, fecha_ultimo_pago=date(2026, 9, 6))
+        h.eventos[date(2026, 9, 8)] = DESCANSO
+        h.eventos[date(2026, 9, 12)] = TRABAJO
+        d = calcular_pago(h, comisiones=0, params=PARAMS, hasta=date(2026, 9, 13))
+        self.assertEqual((d.faltas, d.total), (0, Decimal("1300.00")))
+
     def test_sin_pago_previo_mira_los_ultimos_7_dias(self) -> None:
         h = HorarioEmpleada("VEND-3")
         h.eventos[date(2026, 9, 3)] = FALTA

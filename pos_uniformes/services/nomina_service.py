@@ -22,7 +22,7 @@ from pos_uniformes.services.calendario_empleadas_service import (
     cargar_horario,
     comisiones_desde_ultimo_pago,
     es_dia_trabajado,
-    faltas_en_rango,
+    faltas_netas_en_rango,
     fecha_proximo_pago,
     quienes_descansan,
     registrar_pago,
@@ -114,7 +114,9 @@ def calcular_pago(
             dias_trabajados=dias,
             tarifa_dia=tarifa_dia,
         )
-    faltas = faltas_en_rango(horario, inicio, hasta)
+    # Faltas menos días que trabajó de más (vino en su descanso): solo se
+    # descuenta si laboró menos días de los que le tocan.
+    faltas = faltas_netas_en_rango(horario, inicio, hasta)
     return DetallePago(
         employee_code=horario.employee_code,
         desde=desde,

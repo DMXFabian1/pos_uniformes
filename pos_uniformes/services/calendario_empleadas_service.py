@@ -139,9 +139,31 @@ def pintar_mes(horario: HorarioEmpleada, year: int, month: int) -> dict[date, st
 
 
 def faltas_en_rango(horario: HorarioEmpleada, desde: date, hasta: date) -> int:
+    """Faltas marcadas en el rango, tal cual."""
     return sum(
         1 for f, t in horario.eventos.items() if t == FALTA and desde <= f <= hasta
     )
+
+
+def dias_extra_en_rango(horario: HorarioEmpleada, desde: date, hasta: date) -> int:
+    """Días que trabajó cuando por patrón le tocaba descansar (marcados
+    "trabajo", incluido el fijo que se movió)."""
+    if horario.por_dia or horario.descanso_weekday is None:
+        return 0
+    return sum(
+        1 for f, t in horario.eventos.items()
+        if t == TRABAJO and desde <= f <= hasta and f.weekday() == horario.descanso_weekday
+    )
+
+
+def faltas_netas_en_rango(horario: HorarioEmpleada, desde: date, hasta: date) -> int:
+    """Lo que de verdad se descuenta: faltas menos días trabajados de más.
+
+    Regla de Daniel (2026-09-13): "solo se descuentan faltas cuando laboran
+    menos de sus días". Faltó el martes pero vino el sábado (su descanso) =
+    trabajó sus 6 días = nada que descontar.
+    """
+    return max(0, faltas_en_rango(horario, desde, hasta) - dias_extra_en_rango(horario, desde, hasta))
 
 
 def proximo_descanso(horario: HorarioEmpleada, hoy: date) -> date | None:
