@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import unittest
+from datetime import date
 
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
@@ -266,3 +267,64 @@ class HojaEnElCelularTests(unittest.TestCase):
         self.assertFalse(p1["completa"])
         # Nunca viaja el stock del sistema al celular.
         self.assertNotIn("stock", str(hoja).lower().replace("stock_fisico", ""))
+
+
+class UltimoConteoTests(unittest.TestCase):
+    """Cuándo se contó cada escuela, para no contar la misma a cada rato."""
+
+    def setUp(self) -> None:
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.s = Session(self.engine)
+        self.a = _seed(self.s, "A")
+        self.b = _seed(self.s, "B")
+        self.c = _seed(self.s, "C")
+        self.s.commit()
+
+    def tearDown(self) -> None:
+        self.s.close()
+
+    def test_texto_habla_como_persona(self) -> None:
+        from datetime import datetime, timedelta
+
+        hoy = date(2026, 9, 13)
+        u = lambda d, q="": jn.UltimoConteo(datetime(2026, 9, 13) - timedelta(days=d), q)
+        self.assertEqual(jn.UltimoConteo(None).texto(hoy), "nunca")
+        self.assertEqual(u(0).texto(hoy), "hoy")
+        self.assertEqual(u(1, "Stayce Chavarria").texto(hoy), "ayer (Stayce)")
+        self.assertEqual(u(3).texto(hoy), "hace 3 días")
+        self.assertEqual(u(45).texto(hoy), "hace 1 mes")
+        self.assertEqual(u(75, "Fanny Ortiz").texto(hoy), "hace 2 meses (Fanny)")
+        self.assertEqual(u(400).texto(hoy), "hace más de 1 año")
+
+    def test_manda_la_ultima_jornada_terminada_con_quien(self) -> None:
+        j1 = jn.abrir_jornada(self.s, escuela_id=self.a.id, empleada_code="VEND-4", empleada_nombre="Stayce Chavarria")
+        jn.terminar_jornada(self.s, j1, empleada_code="VEND-4")
+        j2 = jn.abrir_jornada(self.s, escuela_id=self.a.id, empleada_code="VEND-5", empleada_nombre="Fanny Ortiz")
+        jn.terminar_jornada(self.s, j2, empleada_code="VEND-5")
+        abierta = jn.abrir_jornada(self.s, escuela_id=self.b.id, empleada_code="VEND-4")   # sin terminar: no cuenta
+        self.s.commit()
+        u = jn.ultimos_conteos(self.s)
+        self.assertEqual(jn.ultimo_conteo_de(u, self.a.id).quien, "Fanny Ortiz")   # la más reciente
+        self.assertIsNone(jn.ultimo_conteo_de(u, self.b.id).fecha)
+        self.assertEqual(jn.ultimo_conteo_de(u, self.c.id).texto(), "nunca")
+
+    def test_sin_jornada_se_cae_a_la_fecha_de_las_tallas(self) -> None:
+        """Los conteos de antes de las jornadas también cuentan (sin quién)."""
+        from datetime import datetime, timedelta
+
+        v = self.s.scalars(select(Variante).join(Variante.producto).where(Variante.producto.has(escuela_id=self.b.id))).first()
+        v.ultimo_conteo_at = datetime.now() - timedelta(days=10)
+        self.s.commit()
+        u = jn.ultimo_conteo_de(jn.ultimos_conteos(self.s), self.b.id)
+        self.assertIsNotNone(u.fecha)
+        self.assertEqual(u.quien, "")
+        self.assertEqual(u.texto(), "hace 10 días")
+
+    def test_basicos_por_prenda(self) -> None:
+        j = jn.abrir_jornada(self.s, escuela_id=None, tipo_pieza="Camisa", empleada_code="VEND-4", empleada_nombre="Stayce")
+        jn.terminar_jornada(self.s, j, empleada_code="VEND-4")
+        self.s.commit()
+        u = jn.ultimos_conteos(self.s)
+        self.assertEqual(jn.ultimo_conteo_de(u, None, "Camisa").texto(), "hoy (Stayce)")
+        self.assertEqual(jn.ultimo_conteo_de(u, None, "Pantalón").texto(), "nunca")

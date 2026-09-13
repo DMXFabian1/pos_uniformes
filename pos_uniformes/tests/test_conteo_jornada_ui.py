@@ -246,3 +246,61 @@ class DestinoDialogTests(unittest.TestCase):
         self.assertIn("open_conteo_print_dialog", fuente)
         fuente_hoja = inspect.getsource(QuoteSatelliteWindow._conteos_imprimir_hoja)
         self.assertIn("ConteoDestinoDialog", fuente_hoja)
+
+
+class SelectorConFechaTests(unittest.TestCase):
+    """El selector del kiosko dice cuándo se contó cada escuela."""
+
+    def setUp(self) -> None:
+        from datetime import datetime, timedelta
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        self.factory = lambda: Session(engine)
+        s = self.factory()
+        from pos_uniformes.tests.test_conteo_jornada_service import _seed
+
+        a = _seed(s, "Alfa")
+        b = _seed(s, "Beta")
+        s.commit()
+        self.a_id, self.b_id = a.id, b.id   # ids, no objetos: la sesión se cierra
+        j = jn.abrir_jornada(s, escuela_id=a.id, empleada_code="VEND-4", empleada_nombre="Stayce Chavarria")
+        jn.terminar_jornada(s, j, empleada_code="VEND-4")
+        s.commit()
+        j.terminada_at = datetime.now() - timedelta(days=2)
+        s.commit()
+        s.close()
+        self._dialogos = []
+
+    def tearDown(self) -> None:
+        for d in self._dialogos:
+            d.close(); d.deleteLater()
+        _APP.processEvents()
+
+    def _dialogo(self):
+        from pos_uniformes.ui.dialogs.conteo_jornada_dialogs import ConteoNuevaJornadaDialog
+
+        d = ConteoNuevaJornadaDialog(session_factory=self.factory)
+        self._dialogos.append(d)
+        return d
+
+    def test_cada_escuela_lleva_su_fecha_en_el_combo(self) -> None:
+        d = self._dialogo()
+        textos = [d._escuela_combo.itemText(i) for i in range(d._escuela_combo.count())]
+        self.assertTrue(any(t.startswith("Alfa") and "hace 2 días (Stayce)" in t for t in textos), textos)
+        self.assertTrue(any(t.startswith("Beta") and "nunca" in t for t in textos), textos)
+
+    def test_avisa_si_fue_hace_poco_y_el_titulo_queda_limpio(self) -> None:
+        d = self._dialogo()
+        idx = next(i for i in range(d._escuela_combo.count()) if d._escuela_combo.itemText(i).startswith("Alfa"))
+        d._escuela_combo.setCurrentIndex(idx)
+        self.assertIn("Ojo", d._ultimo_label.text())
+        d._aceptar()
+        self.assertEqual(d.titulo, "Alfa")            # sin la fecha pegada
+        self.assertEqual(d.escuela_id, self.a_id)
+
+    def test_nunca_contada_lo_dice_sin_regano(self) -> None:
+        d = self._dialogo()
+        idx = next(i for i in range(d._escuela_combo.count()) if d._escuela_combo.itemText(i).startswith("Beta"))
+        d._escuela_combo.setCurrentIndex(idx)
+        self.assertEqual(d._ultimo_label.text(), "Nunca se ha contado.")

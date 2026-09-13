@@ -15,6 +15,8 @@ es cero, y nada toca el inventario hasta que Daniel aplique.
 
 from __future__ import annotations
 
+from datetime import date
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -89,10 +91,26 @@ def listar(current: tuple = Depends(get_current_employee), db: Session = Depends
         db.rollback()
     from pos_uniformes.services.catalog_school_link_service import list_all_schools
 
+    # Cuándo se contó cada una: para no contar la misma escuela a cada rato.
+    try:
+        ultimos = jn.ultimos_conteos(db)
+    except Exception:  # noqa: BLE001
+        db.rollback()
+        ultimos = {}
+
+    def _ultimo(escuela_id, tipo_pieza=""):
+        u = jn.ultimo_conteo_de(ultimos, escuela_id, tipo_pieza)
+        dias = None
+        if u.fecha is not None:
+            f = u.fecha.astimezone().date() if u.fecha.tzinfo else u.fecha.date()
+            dias = (date.today() - f).days
+        return {"texto": u.texto(), "dias": dias, "quien": u.quien}
+
     for e in list_all_schools(db):
         escuelas.append({
             "escuela_id": int(e["escuela_id"]), "nombre": str(e["escuela_nombre"]),
             "toca": int(e["escuela_id"]) in vencidas_ids,
+            "ultimo": _ultimo(int(e["escuela_id"])),
         })
     escuelas.sort(key=lambda x: (not x["toca"], x["nombre"]))
 
@@ -104,7 +122,8 @@ def listar(current: tuple = Depends(get_current_employee), db: Session = Depends
     except Exception:  # noqa: BLE001
         db.rollback()
         tipos = []
-    return {"modo": "tienda" if _es_tienda() else "casa", "abiertas": abiertas, "escuelas": escuelas, "basicos": tipos}
+    basicos = [{"tipo_pieza": t, "ultimo": _ultimo(None, t)} for t in tipos]
+    return {"modo": "tienda" if _es_tienda() else "casa", "abiertas": abiertas, "escuelas": escuelas, "basicos": basicos}
 
 
 def _es_tienda() -> bool:

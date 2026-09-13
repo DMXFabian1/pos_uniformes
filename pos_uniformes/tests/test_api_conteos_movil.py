@@ -154,3 +154,30 @@ class ApiConteosMovilTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class UltimoConteoEnLaListaTests(ApiConteosMovilTests):
+    """Cada escuela dice cuándo se contó, para no contar la misma a cada rato."""
+
+    def test_nunca_contada(self) -> None:
+        self._como("VEND-4")
+        e = self.client.get("/api/v1/movil/conteos").json()["escuelas"][0]
+        self.assertEqual(e["ultimo"], {"texto": "nunca", "dias": None, "quien": ""})
+
+    def test_despues_de_terminar_dice_hoy_y_quien(self) -> None:
+        hoja = self._abrir("VEND-4")
+        jid = hoja["jornada"]["id"]
+        vid = hoja["prendas"][0]["tallas"][0]["variante_id"]
+        self.client.post(f"/api/v1/movil/conteos/{jid}/tallas", json={"items": [{"variante_id": vid, "fisico": 7}]})
+        self.client.post(f"/api/v1/movil/conteos/{jid}/terminar")
+        e = self.client.get("/api/v1/movil/conteos").json()["escuelas"][0]
+        self.assertEqual(e["ultimo"]["dias"], 0)
+        self.assertEqual(e["ultimo"]["quien"], "Stayce Chavarria")
+        self.assertEqual(e["ultimo"]["texto"], "hoy (Stayce)")
+
+    def test_los_basicos_tambien_traen_su_fecha(self) -> None:
+        self._como("VEND-4")
+        basicos = self.client.get("/api/v1/movil/conteos").json()["basicos"]
+        for b in basicos:
+            self.assertIn("tipo_pieza", b)
+            self.assertIn("ultimo", b)

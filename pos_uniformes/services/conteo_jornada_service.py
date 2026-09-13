@@ -17,7 +17,7 @@ Reglas:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
@@ -442,3 +442,71 @@ def cuando(momento: datetime | None) -> str:
     if dias == 1:
         return f"ayer {hora}"
     return local.strftime("%d/%m ") + hora
+
+
+# ─── ¿Cuándo se contó por última vez? ───────────────────────────────────
+@dataclass(frozen=True)
+class UltimoConteo:
+    fecha: datetime | None      # None = nunca
+    quien: str = ""             # nombre de quien terminó la última jornada (si la hubo)
+
+    def texto(self, hoy: date | None = None) -> str:
+        """'hoy', 'ayer', 'hace 3 días', 'hace 2 meses' o 'nunca'."""
+        if self.fecha is None:
+            return "nunca"
+        hoy = hoy or date.today()
+        f = self.fecha.astimezone().date() if self.fecha.tzinfo else self.fecha.date()
+        dias = (hoy - f).days
+        if dias <= 0:
+            base = "hoy"
+        elif dias == 1:
+            base = "ayer"
+        elif dias < 30:
+            base = f"hace {dias} días"
+        elif dias < 365:
+            m = dias // 30
+            base = "hace 1 mes" if m == 1 else f"hace {m} meses"
+        else:
+            base = f"hace más de {dias // 365} año" + ("s" if dias // 365 > 1 else "")
+        return f"{base} ({self.quien.split()[0]})" if self.quien else base
+
+
+def ultimos_conteos(session: Session) -> dict:
+    """Cuándo se contó cada escuela (y cada prenda básica) por última vez.
+
+    Claves: `escuela_id` (int) para escuelas y `("basicos", tipo_pieza)` para
+    básicos. Primero manda la última **jornada terminada** (trae quién);
+    si una escuela nunca tuvo jornada, se cae a la fecha de conteo más
+    reciente de sus tallas (los conteos de antes de las jornadas).
+    """
+    from pos_uniformes.database.models import Producto, Variante
+
+    salida: dict = {}
+    # 1. Jornadas terminadas: la más reciente por escuela / prenda básica.
+    filas = session.execute(
+        select(ConteoJornada.escuela_id, ConteoJornada.tipo_pieza, ConteoJornada.empleada_nombre,
+               ConteoJornada.empleada_code, ConteoJornada.terminada_at)
+        .where(ConteoJornada.terminada_at.is_not(None))
+        .order_by(ConteoJornada.terminada_at.desc())
+    ).all()
+    for escuela_id, tipo_pieza, nombre, code, terminada in filas:
+        clave = int(escuela_id) if escuela_id is not None else ("basicos", str(tipo_pieza or ""))
+        if clave not in salida:
+            salida[clave] = UltimoConteo(terminada, nombre or code or "")
+    # 2. Conteos viejos (sin jornada): la talla contada más recientemente.
+    viejos = session.execute(
+        select(Producto.escuela_id, func.max(Variante.ultimo_conteo_at))
+        .join(Variante, Variante.producto_id == Producto.id)
+        .where(Producto.escuela_id.is_not(None), Variante.ultimo_conteo_at.is_not(None))
+        .group_by(Producto.escuela_id)
+    ).all()
+    for escuela_id, fecha in viejos:
+        clave = int(escuela_id)
+        if clave not in salida and fecha is not None:
+            salida[clave] = UltimoConteo(fecha, "")
+    return salida
+
+
+def ultimo_conteo_de(ultimos: dict, escuela_id: int | None, tipo_pieza: str = "") -> UltimoConteo:
+    clave = int(escuela_id) if escuela_id is not None else ("basicos", tipo_pieza or "")
+    return ultimos.get(clave, UltimoConteo(None))

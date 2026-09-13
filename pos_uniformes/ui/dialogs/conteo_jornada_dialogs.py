@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+from datetime import date
 
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QBrush, QColor
@@ -83,7 +84,14 @@ class ConteoNuevaJornadaDialog(QDialog):
         layout.addWidget(self._escuela_combo)
         self._tipo_combo = QComboBox()
         self._tipo_combo.setVisible(False)
+        self._tipo_combo.currentIndexChanged.connect(self._pintar_ultimo)
         layout.addWidget(self._tipo_combo)
+        # Cuándo se contó por última vez lo elegido: para no contar la misma
+        # escuela a cada rato. Verde si fue hace poco.
+        self._ultimo_label = QLabel("")
+        self._ultimo_label.setStyleSheet("color: #8a7a68; font-size: 12px; font-weight: 600;")
+        layout.addWidget(self._ultimo_label)
+        self._ultimos: dict = {}
         pista = QLabel("Imprime la hoja antes de ir al piso, y regresa aquí a capturar.")
         pista.setStyleSheet("color: #8a7a68; font-size: 12px;")
         pista.setWordWrap(True)
@@ -103,9 +111,15 @@ class ConteoNuevaJornadaDialog(QDialog):
     def _cargar_escuelas(self) -> None:
         from pos_uniformes.services.catalog_school_link_service import list_all_schools
 
+        from pos_uniformes.services.conteo_jornada_service import ultimo_conteo_de, ultimos_conteos
+
         session = self._session_factory()
         try:
             escuelas = list_all_schools(session)
+            try:
+                self._ultimos = ultimos_conteos(session)
+            except Exception:  # noqa: BLE001 — sin fechas se puede contar igual
+                self._ultimos = {}
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Sin conexión", f"No se pudieron cargar las escuelas:\n{exc}")
             escuelas = []
@@ -114,13 +128,43 @@ class ConteoNuevaJornadaDialog(QDialog):
         self._escuela_combo.clear()
         self._escuela_combo.addItem(f"— {NOMBRE_BASICOS} —", ESCUELA_ID_BASICOS)
         for e in escuelas:
-            self._escuela_combo.addItem(e["escuela_nombre"], e["escuela_id"])
+            u = ultimo_conteo_de(self._ultimos, int(e["escuela_id"]))
+            self._escuela_combo.addItem(f'{e["escuela_nombre"]}   ·  {u.texto()}', e["escuela_id"])
         if self._escuela_combo.count() > 1:
             self._escuela_combo.setCurrentIndex(1)
+        self._pintar_ultimo()
+
+    def ultimo_elegido(self):
+        """El UltimoConteo de lo que está seleccionado ahora."""
+        from pos_uniformes.services.conteo_jornada_service import ultimo_conteo_de
+
+        dato = self._escuela_combo.currentData()
+        if dato is None:
+            return ultimo_conteo_de({}, None)
+        if int(dato) == ESCUELA_ID_BASICOS:
+            return ultimo_conteo_de(self._ultimos, None, str(self._tipo_combo.currentData() or ""))
+        return ultimo_conteo_de(self._ultimos, int(dato))
+
+    def _pintar_ultimo(self, *_args) -> None:
+        u = self.ultimo_elegido()
+        texto = u.texto()
+        if u.fecha is None:
+            self._ultimo_label.setText("Nunca se ha contado.")
+            self._ultimo_label.setStyleSheet("color: #8a7a68; font-size: 12px; font-weight: 600;")
+            return
+        f = u.fecha.astimezone().date() if u.fecha.tzinfo else u.fecha.date()
+        dias = (date.today() - f).days
+        if dias < 7:
+            self._ultimo_label.setText(f"Ojo: ya se contó {texto}. ¿De verdad hace falta otra vez?")
+            self._ultimo_label.setStyleSheet("color: #2f6b2f; font-size: 12px; font-weight: 700;")
+        else:
+            self._ultimo_label.setText(f"Último conteo: {texto}.")
+            self._ultimo_label.setStyleSheet("color: #8a7a68; font-size: 12px; font-weight: 600;")
 
     def _on_escuela(self) -> None:
         es_basicos = self._escuela_combo.currentData() == ESCUELA_ID_BASICOS
         self._tipo_combo.setVisible(es_basicos)
+        self._pintar_ultimo()
         if es_basicos and self._tipo_combo.count() == 0:
             from pos_uniformes.services.conteo_service import obtener_variantes_basicos_agrupadas
 
@@ -152,7 +196,7 @@ class ConteoNuevaJornadaDialog(QDialog):
         else:
             self.escuela_id = int(dato)
             self.tipo_pieza = ""
-            self.titulo = self._escuela_combo.currentText()
+            self.titulo = self._escuela_combo.currentText().split("   ·  ")[0].strip()
         self.accept()
 
 

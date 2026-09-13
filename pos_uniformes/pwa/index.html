@@ -58,6 +58,9 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
 .chip{background:var(--carta); border:1px solid var(--borde); border-radius:999px;
   padding:9px 14px; font-weight:700; font-size:14px; color:var(--acento-osc)}
 .chip.toca{border-color:var(--acento); background:#fbf3e8}
+.chip small{display:block; font-weight:600; font-size:11px; color:var(--tenue); margin-top:1px}
+.chip.reciente{opacity:.55}
+.chip.reciente small{color:var(--verde)}
 .prenda{padding:0; overflow:hidden}
 .prenda .cab{background:var(--acento-osc); color:#fff; padding:10px 14px; font-weight:800;
   font-size:15px; display:flex; justify-content:space-between; align-items:center; gap:8px}
@@ -412,18 +415,36 @@ async function contCargarLista() {
                    : `<button class="btn-suave" disabled>Es de otra</button>`) + `</div>`;
         }).join("") + `</div>`
       : "";
-    $("cont-escuelas").innerHTML = (d.escuelas || []).map(e =>
-      `<span class="chip${e.toca ? " toca" : ""}" onclick="contEmpezar(${e.escuela_id}, '')">${e.toca ? "⚠ " : ""}${e.nombre}</span>`).join("") || "<span class='sub'>Sin escuelas.</span>";
-    $("cont-basicos").innerHTML = (d.basicos || []).map(t =>
-      `<span class="chip" onclick="contEmpezar(null, '${t.replace(/'/g, "")}')">${t}</span>`).join("") || "<span class='sub'>—</span>";
+    // Cada ficha dice cuándo se contó por última vez: las recientes se ven
+    // apagadas para que no se cuente la misma escuela a cada rato.
+    contUltimos = {};
+    const ficha = (nombre, ultimo, onclick, toca) => {
+      const reciente = ultimo && ultimo.dias !== null && ultimo.dias < 7;
+      return `<span class="chip${toca ? " toca" : ""}${reciente ? " reciente" : ""}" onclick="${onclick}">` +
+        `${toca ? "⚠ " : ""}${nombre}<small>${ultimo ? ultimo.texto : ""}</small></span>`;
+    };
+    $("cont-escuelas").innerHTML = (d.escuelas || []).map(e => {
+      contUltimos["e" + e.escuela_id] = e.ultimo;
+      return ficha(e.nombre, e.ultimo, `contEmpezar(${e.escuela_id}, '')`, e.toca);
+    }).join("") || "<span class='sub'>Sin escuelas.</span>";
+    $("cont-basicos").innerHTML = (d.basicos || []).map(b => {
+      const t = typeof b === "string" ? b : b.tipo_pieza;
+      const u = typeof b === "string" ? null : b.ultimo;
+      contUltimos["b" + t] = u;
+      return ficha(t, u, `contEmpezar(null, '${t.replace(/'/g, "")}')`, false);
+    }).join("") || "<span class='sub'>—</span>";
   } catch (e) {
     $("cont-abiertas").innerHTML = "<div class='card error'>No se pudo cargar. ¿Hay WiFi?</div>";
   }
 }
 
+let contUltimos = {};
 async function contEmpezar(escuelaId, tipoPieza) {
   const que = tipoPieza ? ("Básicos · " + tipoPieza) : "esta escuela";
-  if (!confirm(`¿Empezar el conteo de ${que}?`)) return;
+  const u = contUltimos[tipoPieza ? "b" + tipoPieza : "e" + escuelaId];
+  let aviso = "";
+  if (u && u.dias !== null && u.dias < 7) aviso = `Ojo: ${que === "esta escuela" ? "esta escuela" : que} ya se contó ${u.texto}.\n\n`;
+  if (!confirm(`${aviso}¿Empezar el conteo de ${que}?`)) return;
   try {
     const hoja = await contPost("/api/v1/movil/conteos", {escuela_id: escuelaId, tipo_pieza: tipoPieza || ""});
     contPintarHoja(hoja);
