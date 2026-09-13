@@ -12,6 +12,7 @@ from decimal import Decimal
 from types import SimpleNamespace
 
 from PyQt6.QtWidgets import (
+    QCheckBox,
     QDialog,
     QDoubleSpinBox,
     QFormLayout,
@@ -321,9 +322,16 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
             estado = estado_caja(session)
             rows = operaciones_del_periodo(session, estado.desde, estado.hasta)
             por_empleada = resumir_por_empleada(rows)
-            from pos_uniformes.services.corte_caja_service import cargar_parametros
+            from pos_uniformes.services.corte_caja_service import cargar_parametros, pagos_que_tocan_hoy
 
             parametros = cargar_parametros(session)
+            # Los pagos que caen hoy y nadie ha registrado: se ofrecen aquí
+            # mismo (Daniel 2026-09-13: "al hacer corte no me descontó los pagos").
+            try:
+                avisos_hoy = pagos_que_tocan_hoy(session, estado.hasta.date())
+            except Exception:  # noqa: BLE001
+                session.rollback()
+                avisos_hoy = []
     except Exception:  # noqa: BLE001
         logger.exception("Corte: no se pudo calcular el estado de caja")
         QMessageBox.warning(parent, "Sin conexión", "No se alcanzó la base. Inténtalo otra vez.")
@@ -356,8 +364,6 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
 
     # Solo Daniel: dejar el papel sin la linea "Con tarjeta". Es por corte
     # (arranca apagada); en pantalla la sigue viendo.
-    from PyQt6.QtWidgets import QCheckBox
-
     sin_tarjeta = QCheckBox("Ocultar los cobros con tarjeta (no salen en el ticket)")
     # Llega como la dejó la última vez (2026-09-10).
     sin_tarjeta.setChecked(bool(getattr(parametros, "ocultar_tarjeta", False)))
@@ -366,15 +372,36 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
         sin_tarjeta.setStyleSheet("font-size: 17px;")
     ly.addWidget(sin_tarjeta)
 
+    # Pagos que tocan hoy: marcados = "ya le pagué del cajón", se registran
+    # al guardar y se restan de lo que debe quedar.
+    casillas_pago: list[tuple[QCheckBox, object]] = []
+    if avisos_hoy:
+        titulo_pagos = QLabel("Pagos que tocan hoy (marca los que salieron del cajón):")
+        titulo_pagos.setStyleSheet("font-weight: 700;")
+        ly.addWidget(titulo_pagos)
+        for aviso in avisos_hoy:
+            nombre = str(aviso.employee_name or aviso.employee_code).split()[0]
+            cb = QCheckBox(f"{nombre}  ·  ${Decimal(aviso.total_estimado):,.2f}  ({aviso.comisiones} comisiones)")
+            cb.setChecked(True)
+            if grande:
+                cb.setStyleSheet("font-size: 17px;")
+            ly.addWidget(cb)
+            casillas_pago.append((cb, aviso))
+
     dif = QLabel("")
     dif.setStyleSheet("font-weight: 700;")
     ly.addWidget(dif)
 
+    def _pagos_marcados() -> list:
+        return [a for cb, a in casillas_pago if cb.isChecked()]
+
     def _contado() -> Decimal:
         """Lo que queda en el cajón con la venta capturada."""
-        return contado_desde_venta(
+        base = contado_desde_venta(
             estado, Decimal(str(venta.value())), Decimal(str(otros.value()))
         )
+        pagos_nuevos = sum((Decimal(a.total_estimado) for a in _pagos_marcados()), Decimal("0.00"))
+        return max(base - pagos_nuevos, Decimal("0.00")).quantize(Decimal("0.01"))
 
     def _refrescar_dif() -> None:
         v = Decimal(str(venta.value())).quantize(Decimal("0.01"))
@@ -389,6 +416,8 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
 
     venta.valueChanged.connect(lambda _v: _refrescar_dif())
     otros.valueChanged.connect(lambda _v: _refrescar_dif())
+    for cb, _a in casillas_pago:
+        cb.toggled.connect(lambda _v: _refrescar_dif())
     _refrescar_dif()
 
     botones = QHBoxLayout()
@@ -409,6 +438,15 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
 
     try:
         with get_session() as session:
+            # Primero los pagos marcados, con la hora del corte para que caigan
+            # DENTRO del periodo que se cierra (mismo cuidado que el corte automático).
+            from pos_uniformes.services.nomina_service import registrar_pago_con_monto
+
+            for aviso in _pagos_marcados():
+                registrar_pago_con_monto(
+                    session, aviso.employee_code, creado_por=creado_por,
+                    fecha=estado.hasta.date(), momento=estado.hasta,
+                )
             corte = cerrar_corte(
                 session,
                 contado=_contado(),
