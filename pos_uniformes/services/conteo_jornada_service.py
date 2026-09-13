@@ -193,6 +193,107 @@ def capturado_en_jornada(session: Session, jornada_id: int) -> dict[int, int]:
     return {int(vid): int(fisico) for vid, fisico in filas}
 
 
+def guardar_tallas(
+    session: Session,
+    jornada: ConteoJornada,
+    items: list[dict],
+    *,
+    contado_por: str,
+) -> int:
+    """Guarda tallas de una jornada como se llena una hoja: se puede corregir.
+
+    `items`: [{"variante_id": int, "fisico": int | None, "pedido": int | None}].
+    - fisico None o vacío = "no la conté": si había renglón, se borra; si no, nada.
+    - Si la talla ya tenía renglón en ESTA jornada, se actualiza (no se
+      duplica: la revisión de Daniel vería dos veces la misma talla).
+    - `pedido` (cuántas pedir) va en `notas` como "Pedido: N".
+    Devuelve cuántas tallas quedaron guardadas.
+    """
+    from pos_uniformes.database.models import Variante
+    from pos_uniformes.services.conteo_service import registrar_conteo
+
+    guardadas = 0
+    for item in items:
+        vid = int(item.get("variante_id"))
+        fisico = item.get("fisico")
+        pedido = item.get("pedido")
+        nota = f"Pedido: {int(pedido)}" if pedido not in (None, "") else None
+        existente = session.scalar(
+            select(ConteoInventario).where(
+                ConteoInventario.jornada_id == jornada.id, ConteoInventario.variante_id == vid
+            )
+        )
+        if fisico in (None, ""):
+            if existente is not None and not existente.ajustado:
+                session.delete(existente)
+            continue
+        fisico = int(fisico)
+        if existente is None:
+            registrar_conteo(session, vid, fisico, contado_por, notas=nota, jornada_id=jornada.id)
+        elif not existente.ajustado:
+            existente.stock_fisico = fisico
+            existente.diferencia = fisico - int(existente.stock_sistema)
+            existente.notas = nota
+            existente.contado_at = func.now()
+            existente.contado_por = contado_por
+            session.add(existente)
+        guardadas += 1
+    session.flush()
+    return guardadas
+
+
+def hoja_de_jornada(session: Session, jornada: ConteoJornada) -> dict:
+    """La hoja tal como se dibuja: prendas numeradas, cada una con sus tallas
+    y lo ya capturado. Es lo que consume el celular."""
+    filas = session.execute(
+        select(ConteoInventario.variante_id, ConteoInventario.stock_fisico, ConteoInventario.notas)
+        .where(ConteoInventario.jornada_id == jornada.id)
+    ).all()
+    capturado = {}
+    for vid, fisico, notas in filas:
+        pedido = None
+        if notas and str(notas).startswith("Pedido:"):
+            try:
+                pedido = int(str(notas).split(":", 1)[1])
+            except ValueError:
+                pedido = None
+        capturado[int(vid)] = (int(fisico), pedido)
+    grupos = alcance(session, jornada.escuela_id, jornada.tipo_pieza)
+    prendas = []
+    for numero, g in enumerate(grupos, 1):
+        tallas = []
+        for v in g["variantes"]:
+            fisico, pedido = capturado.get(v.variante_id, (None, None))
+            tallas.append({
+                "variante_id": v.variante_id, "talla": str(v.talla or "U"),
+                "color": str(getattr(v, "color", "") or ""), "fisico": fisico, "pedido": pedido,
+            })
+        prendas.append({
+            "numero": numero, "total": len(grupos),
+            "nombre": str(g["producto_nombre"]).split(" | ")[0].strip(),
+            "tipo_pieza": str(g.get("tipo_pieza") or ""),
+            "tallas": tallas,
+            "completa": bool(tallas) and all(t["fisico"] is not None for t in tallas),
+        })
+    a = avance(session, jornada)
+    return {
+        "jornada": _dict_ref(ref(jornada)),
+        "avance": {"tallas_hechas": a.tallas_hechas, "tallas_total": a.tallas_total,
+                   "prendas_hechas": a.prendas_hechas, "prendas_total": a.prendas_total},
+        "prendas": prendas,
+    }
+
+
+def _dict_ref(r: "JornadaRef") -> dict:
+    return {
+        "id": r.id, "titulo": r.titulo, "escuela_id": r.escuela_id, "tipo_pieza": r.tipo_pieza,
+        "empleada_code": r.empleada_code, "empleada_nombre": r.empleada_nombre,
+        "iniciada_at": r.iniciada_at.isoformat() if r.iniciada_at else None,
+        "terminada_at": r.terminada_at.isoformat() if r.terminada_at else None,
+        "estado": r.estado, "cuando": cuando(r.terminada_at or r.iniciada_at),
+    }
+
+
 @dataclass(frozen=True)
 class Avance:
     tallas_hechas: int

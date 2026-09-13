@@ -10,7 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from pos_uniformes.api.routers import health, auth, catalog, clients, favorites, movil, quotes, sales, search
+from pos_uniformes.api.routers import health, auth, catalog, clients, conteos_movil, favorites, movil, quotes, sales, search
 
 
 @asynccontextmanager
@@ -83,6 +83,7 @@ app.include_router(catalog.router)
 app.include_router(clients.router)
 app.include_router(favorites.router)
 app.include_router(movil.router)
+app.include_router(conteos_movil.router)
 app.include_router(quotes.router)
 app.include_router(sales.router)
 app.include_router(search.router)

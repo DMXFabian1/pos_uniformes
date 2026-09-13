@@ -1,6 +1,6 @@
 // Service worker mínimo: cachea el cascarón para que la app abra al
 // instante; los datos SIEMPRE van a la red (la verdad vive en el servidor).
-const CACHE = "maximoda-v4";
+const CACHE = "maximoda-v5";
 const SHELL = ["./", "index.html", "manifest.webmanifest", "html5-qrcode.min.js", "icon-192.png", "icon-512.png"];
 
 self.addEventListener("install", (e) => {

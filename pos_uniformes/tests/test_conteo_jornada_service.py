@@ -204,3 +204,65 @@ class HistorialTests(unittest.TestCase):
             jn.terminar_jornada(self.s, j, empleada_code="VEND-4")
         self.s.commit()
         self.assertEqual(len(jn.jornadas_recientes(self.s, limite=2)), 2)
+
+
+class HojaEnElCelularTests(unittest.TestCase):
+    """guardar_tallas: se llena como una hoja, se puede corregir, no duplica."""
+
+    def setUp(self) -> None:
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.s = Session(self.engine)
+        self.escuela = _seed(self.s, "Uno")   # 2 prendas × 2 tallas, stock 10
+        self.s.commit()
+        self.j = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4", empleada_nombre="Stayce")
+        self.v = list(self.s.scalars(select(Variante).order_by(Variante.id)).all())
+
+    def tearDown(self) -> None:
+        self.s.close()
+
+    def _renglones(self):
+        return list(self.s.scalars(select(ConteoInventario).where(ConteoInventario.jornada_id == self.j.id)).all())
+
+    def test_guarda_solo_lo_que_trae_numero(self) -> None:
+        n = jn.guardar_tallas(self.s, self.j, [
+            {"variante_id": self.v[0].id, "fisico": 7, "pedido": 3},
+            {"variante_id": self.v[1].id, "fisico": None},
+        ], contado_por="Stayce (VEND-4)")
+        self.assertEqual(n, 1)
+        r = self._renglones()
+        self.assertEqual(len(r), 1)
+        self.assertEqual((r[0].stock_fisico, r[0].diferencia, r[0].notas), (7, -3, "Pedido: 3"))
+
+    def test_corregir_actualiza_en_vez_de_duplicar(self) -> None:
+        jn.guardar_tallas(self.s, self.j, [{"variante_id": self.v[0].id, "fisico": 7}], contado_por="x")
+        jn.guardar_tallas(self.s, self.j, [{"variante_id": self.v[0].id, "fisico": 9, "pedido": 1}], contado_por="x")
+        r = self._renglones()
+        self.assertEqual(len(r), 1)
+        self.assertEqual((r[0].stock_fisico, r[0].diferencia, r[0].notas), (9, -1, "Pedido: 1"))
+        # Y la revisión de Daniel ve UNA sola línea, con el último número.
+        self.assertEqual(len(jn.resumen_para_revisar(self.s, self.j).lineas), 1)
+
+    def test_borrar_el_numero_deshace_la_talla(self) -> None:
+        jn.guardar_tallas(self.s, self.j, [{"variante_id": self.v[0].id, "fisico": 7}], contado_por="x")
+        jn.guardar_tallas(self.s, self.j, [{"variante_id": self.v[0].id, "fisico": ""}], contado_por="x")
+        self.assertEqual(self._renglones(), [])
+
+    def test_la_hoja_trae_lo_capturado_y_el_avance(self) -> None:
+        jn.guardar_tallas(self.s, self.j, [
+            {"variante_id": self.v[0].id, "fisico": 7, "pedido": 2},
+            {"variante_id": self.v[1].id, "fisico": 10},
+        ], contado_por="x")
+        self.s.commit()
+        hoja = jn.hoja_de_jornada(self.s, self.j)
+        self.assertEqual(hoja["jornada"]["titulo"], "Uno")
+        self.assertEqual(hoja["avance"], {"tallas_hechas": 2, "tallas_total": 4, "prendas_hechas": 1, "prendas_total": 2})
+        p0, p1 = hoja["prendas"]
+        self.assertEqual((p0["numero"], p0["total"]), (1, 2))
+        self.assertTrue(p0["completa"])
+        self.assertEqual(p0["tallas"][0]["fisico"], 7)
+        self.assertEqual(p0["tallas"][0]["pedido"], 2)
+        self.assertIsNone(p1["tallas"][0]["fisico"])
+        self.assertFalse(p1["completa"])
+        # Nunca viaja el stock del sistema al celular.
+        self.assertNotIn("stock", str(hoja).lower().replace("stock_fisico", ""))
