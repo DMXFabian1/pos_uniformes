@@ -1,6 +1,6 @@
 """Bodega desde el celular de Daniel: llegó mercancía / pasar al piso.
 
-Dos gestos, nada más:
+Tres gestos, nada más:
 
 - **Llegó mercancía** (del maquilador): entra al inventario (`ENTRADA_COMPRA`,
   sube `stock_actual`). Llega al piso; lo que Daniel decida guardar va a una
@@ -8,6 +8,8 @@ Dos gestos, nada más:
   Revisar para aprender: qué se pidió y qué llegó.
 - **Pasar al piso**: sale de la caja al rack. El total no cambia (ya era
   inventario), solo deja de estar guardado.
+- **Corregir caja**: recuento de lo que hay en la caja (para el reconteo de
+  las 31 cajas paradas desde julio). Solo cambia la caja.
 
 Todo lo pesado ya existe (`InventarioService`, `BodegaService`); aquí se
 encadena en una sola transacción y se prepara lo que el celular enseña.
@@ -23,12 +25,15 @@ from sqlalchemy.orm import Session
 from pos_uniformes.database.models import (
     BodegaCaja,
     BodegaContenido,
+    BodegaMovimiento,
     BodegaUbicacion,
     CategoriaCaja,
     ConteoInventario,
     Escuela,
     EstadoCaja,
     Producto,
+    TipoMovimientoBodega,
+    TipoMovimientoInventario,
     Variante,
 )
 from pos_uniformes.services.bodega_service import BodegaService
@@ -251,3 +256,55 @@ def pasar_al_piso(session: Session, *, caja_id: int, items: list[dict], quien_co
         BodegaService.cambiar_estado_caja(session, caja.id, EstadoCaja.VACIA)
     session.flush()
     return {"caja_codigo": caja.codigo, "piezas": piezas, "tallas": tallas, "quedan": quedan}
+
+
+def corregir_caja(session: Session, *, caja_id: int, items: list[dict], quien_code: str, quien: str = "") -> dict:
+    """Recuento de una caja: `items` = [{variante_id, cantidad}] con lo que
+    HAY de verdad. Solo cambia lo que está en la caja (movimiento AJUSTE); el
+    total del inventario no se toca — eso lo corrige el conteo del piso al
+    aplicarse. Si la caja dice más de lo que el sistema tiene en total, el
+    total sube para no dejar "a la mano" en negativo."""
+    _exigir_dueno(quien_code)
+    caja = session.get(BodegaCaja, caja_id)
+    if caja is None:
+        raise ValueError("Esa caja no existe.")
+    firma = f"{quien} ({quien_code})" if quien else quien_code
+    cambios = 0
+    for i in items:
+        vid = int(i["variante_id"])
+        real = i.get("cantidad")
+        if real in (None, ""):
+            continue
+        real = max(0, int(real))
+        contenido = session.scalar(
+            select(BodegaContenido).where(BodegaContenido.caja_id == caja.id, BodegaContenido.variante_id == vid)
+        )
+        antes = int(contenido.cantidad) if contenido else 0
+        if real == antes:
+            continue
+        if contenido is None:
+            contenido = BodegaContenido(caja_id=caja.id, variante_id=vid, cantidad=real)
+            session.add(contenido)
+        elif real == 0:
+            session.delete(contenido)
+        else:
+            contenido.cantidad = real
+        session.flush()
+        variante = session.get(Variante, vid)
+        if variante is not None:
+            en_cajas = int(session.scalar(select(func.coalesce(func.sum(BodegaContenido.cantidad), 0)).where(BodegaContenido.variante_id == vid)))
+            if en_cajas > int(variante.stock_actual):
+                InventarioService.registrar_movimiento(
+                    session, variante, TipoMovimientoInventario.AJUSTE_ENTRADA, en_cajas - int(variante.stock_actual),
+                    referencia=caja.codigo, observacion="Recuento de caja: había más de lo que el sistema tenía en total", creado_por=firma,
+                )
+        session.add(BodegaMovimiento(
+            caja_id=caja.id, variante_id=vid, tipo=TipoMovimientoBodega.AJUSTE.value, cantidad=real - antes,
+            observacion=f"Recuento: de {antes} a {real}", creado_por=firma,
+        ))
+        cambios += 1
+    session.flush()
+    quedan = int(session.scalar(select(func.coalesce(func.sum(BodegaContenido.cantidad), 0)).where(BodegaContenido.caja_id == caja.id)))
+    BodegaService.cambiar_estado_caja(session, caja.id, EstadoCaja.VACIA if quedan == 0 else EstadoCaja.ACTIVA)
+    session.flush()
+    return {"caja_codigo": caja.codigo, "cambios": cambios, "quedan": quedan}

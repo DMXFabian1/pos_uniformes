@@ -1033,10 +1033,59 @@ let bodPrenda = null, bodCaja = null;
 
 function duenoBodega() {
   duenoSub(`<h1>📦 Bodega</h1>
-    <p class="sub">Lo que llega del maquilador entra al piso; si guardas parte en una caja, lo dices ahí mismo. Lo que sacas de una caja al rack, "Pasar al piso".</p>
+    <p class="sub">Lo que llega del maquilador entra al piso; si guardas parte en una caja, lo dices ahí mismo. Lo que sacas de una caja al rack, "Pasar al piso". Si recontaste una caja, "Corregir caja".</p>
     <button class="btn-grande btn-acento" onclick="bodLlegoInicio()">📥  Llegó mercancía</button>
     <button class="btn-grande" onclick="bodPisoInicio()">🧺  Pasar al piso</button>
+    <button class="btn-grande" onclick="bodCorregirInicio()">✏️  Corregir caja (recuento)</button>
     <button class="btn-suave salir" onclick="duenoMenu()">← Regresar</button>`);
+}
+
+// Recuento de una caja: se escribe lo que HAY; en blanco = no la revisé.
+async function bodCorregirInicio() {
+  bodCaja = null;
+  duenoSub(`<h1>✏️ Corregir caja</h1><p class="sub">¿Qué caja recontaste?</p><div id="bod-cajas"><div class="card">Cargando...</div></div>
+    <button class="btn-suave salir" onclick="duenoBodega()">← Regresar</button>`);
+  try {
+    const cajas = (await api("/api/v1/movil/bodega/cajas")).cajas;
+    window._bodCajas = cajas;
+    $("bod-cajas").innerHTML = cajas.length
+      ? cajas.map((c, i) => `<div class="fila" onclick="bodCorregirCaja(${i})" style="cursor:pointer"><span><b>${c.codigo}</b>` +
+          `<span class="sub" style="display:block">${c.ubicacion || "sin ubicación"} · ${c.tallas} tallas</span></span><span class="monto">${c.piezas} pzas ›</span></div>`).join("")
+      : "<div class='card'>No hay cajas activas.</div>";
+  } catch (e) { $("bod-cajas").innerHTML = "<div class='card error'>No se pudo cargar.</div>"; }
+}
+
+async function bodCorregirCaja(i) {
+  bodCaja = window._bodCajas[i];
+  let contenido = [];
+  try { contenido = (await api("/api/v1/movil/bodega/cajas/" + bodCaja.id)).contenido; } catch (e) { alert("No se pudo abrir la caja."); return; }
+  const filas = contenido.map(c =>
+    `<tr><td class="t">${c.talla}${c.color && !/^(unico|único)$/i.test(c.color) ? " " + c.color : ""}<small class="quien">${c.producto} · el sistema dice ${c.cantidad}</small></td>` +
+    `<td><input inputmode="numeric" pattern="[0-9]*" placeholder="${c.cantidad}" data-v="${c.variante_id}" data-antes="${c.cantidad}"></td></tr>`).join("");
+  duenoSub(`<h1>✏️ Caja ${bodCaja.codigo}</h1>
+    <p class="sub">${bodCaja.ubicacion || ""} · escribe cuántas hay de verdad. En blanco = no la revisé. 0 = ya no hay.</p>
+    <div class="card prenda"><table class="tallas"><tr><th>Talla</th><th>Hay</th></tr>${filas || "<tr><td colspan=2 class='sub'>La caja está vacía en el sistema.</td></tr>"}</table></div>
+    <div class="barra-fija">
+      <button class="btn-suave" onclick="bodCorregirInicio()">← Otra caja</button>
+      <button class="btn-acento" onclick="bodCorregirGuardar()">Guardar</button>
+    </div>`);
+}
+
+async function bodCorregirGuardar() {
+  const items = [...document.querySelectorAll("#dueno-sub input[data-v]")]
+    .filter(i => i.value.trim() !== "")
+    .map(i => ({variante_id: Number(i.dataset.v), cantidad: Number(i.value) || 0}))
+    .filter(i => true);
+  const cambios = [...document.querySelectorAll("#dueno-sub input[data-v]")].filter(i => i.value.trim() !== "" && Number(i.value) !== Number(i.dataset.antes)).length;
+  if (!cambios) { alert("No cambiaste nada: escribe solo en las tallas donde el número real es otro."); return; }
+  if (!confirm(`${cambios} talla${cambios === 1 ? "" : "s"} de la caja ${bodCaja.codigo} quedan con el número real. ¿Guardar?`)) return;
+  try {
+    const r = await contPost("/api/v1/movil/bodega/corregir", {caja_id: bodCaja.id, items});
+    duenoSub(`<h1>✓ Caja corregida</h1>
+      <div class="card"><strong>${r.cambios} talla${r.cambios === 1 ? "" : "s"}</strong> ajustada${r.cambios === 1 ? "" : "s"} en la caja <b>${r.caja_codigo}</b>. ${r.quedan ? `Quedan ${r.quedan} piezas.` : "La caja quedó vacía."}</div>
+      <button class="btn-grande btn-acento" onclick="bodCorregirInicio()">✏️  Otra caja</button>
+      <button class="btn-suave salir" onclick="duenoBodega()">← Bodega</button>`);
+  } catch (e) { alert(e.message); }
 }
 
 function bodLlegoInicio() {

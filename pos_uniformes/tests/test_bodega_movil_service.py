@@ -156,6 +156,52 @@ class BodegaMovilTests(unittest.TestCase):
         self.assertEqual(bm.buscar_prendas(self.s, "prenda zzz"), [])  # varias palabras, todas deben estar
         self.assertEqual(len(bm.buscar_prendas(self.s, "prenda")), 2)
 
+    # --- corregir caja -----------------------------------------------------------
+    def test_corregir_caja_cambia_solo_la_caja(self) -> None:
+        from pos_uniformes.database.models import BodegaMovimiento
+
+        v0, v1 = self.v[0], self.v[1]
+        r = bm.llego_mercancia(self.s, items=[{"variante_id": v0.id, "cantidad": 8, "a_caja": 8}, {"variante_id": v1.id, "cantidad": 3, "a_caja": 3}], quien_code="VEND-1", caja_nueva=True)
+        out = bm.corregir_caja(self.s, caja_id=r["caja_id"], items=[
+            {"variante_id": v0.id, "cantidad": 5},      # había 8, hay 5
+            {"variante_id": v1.id, "cantidad": 3},      # igual: no es cambio
+        ], quien_code="VEND-1", quien="Daniel")
+        self.s.commit()
+        self.assertEqual((out["cambios"], out["quedan"]), (1, 8))
+        self.assertEqual(self._contenido(v0.id), 5)
+        self.s.refresh(v0)
+        self.assertEqual(v0.stock_actual, 18)   # el total no se toca (10 + 8 que llegaron)
+        ajustes = [m for m in self.s.scalars(select(BodegaMovimiento)).all() if m.tipo == "AJUSTE"]
+        self.assertEqual(len(ajustes), 1)
+        self.assertEqual((ajustes[0].cantidad, ajustes[0].observacion), (-3, "Recuento: de 8 a 5"))
+        self.assertIn("VEND-1", ajustes[0].creado_por)
+
+    def test_corregir_a_cero_vacia_la_caja_y_en_blanco_no_toca(self) -> None:
+        v0, v1 = self.v[0], self.v[1]
+        r = bm.llego_mercancia(self.s, items=[{"variante_id": v0.id, "cantidad": 4, "a_caja": 4}, {"variante_id": v1.id, "cantidad": 2, "a_caja": 2}], quien_code="VEND-1", caja_nueva=True)
+        out = bm.corregir_caja(self.s, caja_id=r["caja_id"], items=[{"variante_id": v0.id, "cantidad": 0}, {"variante_id": v1.id, "cantidad": ""}], quien_code="VEND-1")
+        self.assertEqual((out["cambios"], out["quedan"]), (1, 2))
+        self.assertEqual(self._contenido(v1.id), 2)   # en blanco = no la revisé
+        out = bm.corregir_caja(self.s, caja_id=r["caja_id"], items=[{"variante_id": v1.id, "cantidad": 0}], quien_code="VEND-1")
+        self.assertEqual(out["quedan"], 0)
+        self.assertEqual(self.s.get(BodegaCaja, r["caja_id"]).estado, "VACIA")
+
+    def test_si_la_caja_tiene_mas_que_el_total_el_total_sube(self) -> None:
+        from pos_uniformes.database.models import MovimientoInventario
+
+        v0 = self.v[0]   # stock_actual 10, nada en cajas
+        r = bm.llego_mercancia(self.s, items=[{"variante_id": v0.id, "cantidad": 1, "a_caja": 1}], quien_code="VEND-1", caja_nueva=True)
+        bm.corregir_caja(self.s, caja_id=r["caja_id"], items=[{"variante_id": v0.id, "cantidad": 15}], quien_code="VEND-1")
+        self.s.refresh(v0)
+        self.assertEqual(self._contenido(v0.id), 15)
+        self.assertEqual(v0.stock_actual, 15)   # 11 → 15 para no dejar "a la mano" negativo
+        tipos = [m.tipo_movimiento.value for m in self.s.scalars(select(MovimientoInventario)).all()]
+        self.assertIn("AJUSTE_ENTRADA", tipos)
+
+    def test_corregir_solo_el_dueno(self) -> None:
+        with self.assertRaises(bm.SoloElDueno):
+            bm.corregir_caja(self.s, caja_id=1, items=[], quien_code="VEND-4")
+
 
 if __name__ == "__main__":
     unittest.main()

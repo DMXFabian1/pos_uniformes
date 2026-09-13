@@ -88,6 +88,17 @@ class ApiBodegaMovilTests(unittest.TestCase):
         self.assertEqual(r.status_code, 422)
         self.assertIn("No hay piezas", r.json()["detail"]["error"]["message"])
 
+    def test_corregir_caja(self) -> None:
+        self._como("VEND-1")
+        vid = self.v[0].id
+        r = self.client.post("/api/v1/movil/bodega/llego", json={"items": [{"variante_id": vid, "cantidad": 9, "a_caja": 9}], "caja_nueva": True}).json()
+        r = self.client.post("/api/v1/movil/bodega/corregir", json={"caja_id": r["caja_id"], "items": [{"variante_id": vid, "cantidad": 4}]})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual((r.json()["cambios"], r.json()["quedan"]), (1, 4))
+        self._como("VEND-4")
+        r = self.client.post("/api/v1/movil/bodega/corregir", json={"caja_id": 1, "items": []})
+        self.assertEqual(r.status_code, 403)
+
 
 if __name__ == "__main__":
     unittest.main()

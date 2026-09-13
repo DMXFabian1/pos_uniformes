@@ -87,3 +87,21 @@ def piso(body: PisoRequest, current: tuple = Depends(get_current_employee), db: 
         db.rollback()
         raise HTTPException(status_code=422, detail={"error": {"code": "invalido", "message": str(exc)}})
     return {"ok": True, **r}
+
+
+class CorregirRequest(BaseModel):
+    caja_id: int
+    items: list[PiezaIn]
+
+
+@router.post("/corregir")
+def corregir(body: CorregirRequest, current: tuple = Depends(get_current_employee), db: Session = Depends(get_db)) -> dict:
+    _solo_tienda()
+    code, nombre = _dueno(current)
+    try:
+        r = bm.corregir_caja(db, caja_id=body.caja_id, items=[i.model_dump() for i in body.items], quien_code=code, quien=nombre)
+        db.commit()
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=422, detail={"error": {"code": "invalido", "message": str(exc)}})
+    return {"ok": True, **r}
