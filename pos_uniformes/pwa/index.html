@@ -61,6 +61,8 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
 .chip small{display:block; font-weight:600; font-size:11px; color:var(--tenue); margin-top:1px}
 .chip.reciente{opacity:.55}
 .chip.reciente small{color:var(--verde)}
+.chip.proceso{border-color:#b45309; background:#fff4e5}
+.chip.proceso small{color:#b45309; font-weight:600}
 .prenda{padding:0; overflow:hidden}
 .prenda .cab{background:var(--acento-osc); color:#fff; padding:10px 14px; font-weight:800;
   font-size:15px; display:flex; justify-content:space-between; align-items:center; gap:8px}
@@ -411,27 +413,32 @@ async function contCargarLista() {
           return `<div class="jornada" style="margin-top:10px"><div class="info"><b>${j.titulo}</b>` +
             `<span>${j.empleada_nombre || j.empleada_code} · ${j.cuando} · ${a.prendas_hechas} de ${a.prendas_total} prendas</span>` +
             `<div class="avance"><div style="width:${pct}%"></div></div></div>` +
-            (j.mia ? `<button class="btn-acento" onclick="contAbrirHoja(${j.id})">Seguir</button>`
-                   : `<button class="btn-suave" disabled>Es de otra</button>`) + `</div>`;
+            `<button class="btn-acento" onclick="contAbrirHoja(${j.id})">Seguir</button></div>`;
         }).join("") + `</div>`
       : "";
     // Cada ficha dice cuándo se contó por última vez: las recientes se ven
     // apagadas para que no se cuente la misma escuela a cada rato.
     contUltimos = {};
-    const ficha = (nombre, ultimo, onclick, toca) => {
+    // "En proceso · Fanny": ya la está contando alguien; al tocarla se sigue
+    // esa misma jornada, no se abre otra (así nadie se pisa).
+    const ficha = (nombre, ultimo, onclick, toca, enProceso) => {
       const reciente = ultimo && ultimo.dias !== null && ultimo.dias < 7;
+      if (enProceso) {
+        return `<span class="chip proceso" onclick="contSeguirEnProceso(${enProceso.jornada_id}, '${nombre.replace(/'/g, "")}', '${enProceso.quien.replace(/'/g, "")}')">` +
+          `${nombre}<small>En proceso · ${enProceso.quien}</small></span>`;
+      }
       return `<span class="chip${toca ? " toca" : ""}${reciente ? " reciente" : ""}" onclick="${onclick}">` +
         `${toca ? "⚠ " : ""}${nombre}<small>${ultimo ? ultimo.texto : ""}</small></span>`;
     };
     $("cont-escuelas").innerHTML = (d.escuelas || []).map(e => {
       contUltimos["e" + e.escuela_id] = e.ultimo;
-      return ficha(e.nombre, e.ultimo, `contEmpezar(${e.escuela_id}, '')`, e.toca);
+      return ficha(e.nombre, e.ultimo, `contEmpezar(${e.escuela_id}, '')`, e.toca, e.en_proceso);
     }).join("") || "<span class='sub'>Sin escuelas.</span>";
     $("cont-basicos").innerHTML = (d.basicos || []).map(b => {
       const t = typeof b === "string" ? b : b.tipo_pieza;
       const u = typeof b === "string" ? null : b.ultimo;
       contUltimos["b" + t] = u;
-      return ficha(t, u, `contEmpezar(null, '${t.replace(/'/g, "")}')`, false);
+      return ficha(t, u, `contEmpezar(null, '${t.replace(/'/g, "")}')`, false, typeof b === "string" ? null : b.en_proceso);
     }).join("") || "<span class='sub'>—</span>";
   } catch (e) {
     $("cont-abiertas").innerHTML = "<div class='card error'>No se pudo cargar. ¿Hay WiFi?</div>";
@@ -447,8 +454,14 @@ async function contEmpezar(escuelaId, tipoPieza) {
   if (!confirm(`${aviso}¿Empezar el conteo de ${que}?`)) return;
   try {
     const hoja = await contPost("/api/v1/movil/conteos", {escuela_id: escuelaId, tipo_pieza: tipoPieza || ""});
+    if (hoja.en_proceso) alert(`Ya la está contando ${hoja.en_proceso.quien}. Sigues en esa misma jornada; lo que anotes queda a tu nombre.`);
     contPintarHoja(hoja);
   } catch (e) { alert(e.message); }
+}
+
+async function contSeguirEnProceso(id, nombre, quien) {
+  if (!confirm(`${nombre} la está contando ${quien}.\n\n¿Seguir esa jornada? Lo que anotes queda a tu nombre.`)) return;
+  contAbrirHoja(id);
 }
 
 async function contAbrirHoja(id) {

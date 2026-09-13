@@ -3425,7 +3425,7 @@ class QuoteSatelliteWindow(QMainWindow):
         acciones_ly.setSpacing(8)
         orden_btn = QPushButton("1 ·  🖨 Imprimir la hoja")
         orden_btn.setAutoDefault(False)
-        orden_btn.clicked.connect(self._conteos_imprimir_hoja)
+        orden_btn.clicked.connect(lambda: self._conteos_imprimir_hoja())
         acciones_ly.addWidget(orden_btn)
         paso2 = QLabel("2 ·  Cuenta en el piso y anota")
         paso2.setStyleSheet("font-size: 13px; font-weight: 600; color: #8a7358; background: transparent; padding: 0 8px;")
@@ -3639,17 +3639,23 @@ class QuoteSatelliteWindow(QMainWindow):
             abiertas, por_revisar, recientes = [], [], []
         pintar_jornadas(self, abiertas=abiertas, por_revisar=por_revisar, recientes=recientes, code=code)
 
-    def _conteos_imprimir_hoja(self) -> None:
+    def _conteos_imprimir_hoja(self, *, escuela_id=None, tipo_pieza: str = "", titulo: str = "") -> None:
         """La hoja de conteo en papel carta (HP), para una escuela o prenda.
 
         Mismo orden y numeración que la pantalla de captura. La tira térmica
         de antes sigue en el admin (Ctrl+Shift+A → Conteos) como respaldo.
+        Con `titulo` ya decidido (otra hoja de una jornada en proceso) no pregunta qué.
         """
+        from types import SimpleNamespace
+
         from pos_uniformes.ui.dialogs.conteo_jornada_dialogs import ConteoNuevaJornadaDialog
 
-        dlg = ConteoNuevaJornadaDialog(self, titulo="Imprimir hoja de conteo", boton="Imprimir")
-        if dlg.exec() != int(QDialog.DialogCode.Accepted):
-            return
+        if titulo:
+            dlg = SimpleNamespace(escuela_id=escuela_id, tipo_pieza=tipo_pieza, titulo=titulo)
+        else:
+            dlg = ConteoNuevaJornadaDialog(self, titulo="Imprimir hoja de conteo", boton="Imprimir")
+            if dlg.exec() != int(QDialog.DialogCode.Accepted):
+                return
         from pos_uniformes.services.satellite_startup_service import probe_database_host
 
         if self.offline_mode or not probe_database_host(0.5):
@@ -3730,9 +3736,9 @@ class QuoteSatelliteWindow(QMainWindow):
         dlg = ConteoNuevaJornadaDialog(self)
         if dlg.exec() != int(QDialog.DialogCode.Accepted):
             return
-        try:
-            from pos_uniformes.services import conteo_jornada_service as jn
+        from pos_uniformes.services import conteo_jornada_service as jn
 
+        try:
             with get_session() as session:
                 jornada = jn.abrir_jornada(
                     session,
@@ -3744,10 +3750,33 @@ class QuoteSatelliteWindow(QMainWindow):
                 session.commit()
                 session.refresh(jornada)
                 foto = jn.ref(jornada)
+        except jn.JornadaEnProceso as en_proceso:
+            # Ya la está contando alguien: no se abre otra, se sigue esa.
+            self._conteos_ofrecer_seguir(jn.ref(en_proceso.jornada))
+            return
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "No se pudo abrir la jornada", str(exc))
             return
         self._conteos_capturar(foto)
+
+    def _conteos_ofrecer_seguir(self, foto) -> None:
+        """Esa escuela ya tiene una jornada abierta: seguirla (capturar en la
+        misma) o imprimir otra hoja para repartirse las prendas."""
+        cuando = foto.iniciada_at.strftime("%H:%M") if foto.iniciada_at else "hoy"
+        caja = QMessageBox(self)
+        caja.setWindowTitle("Ya la están contando")
+        caja.setText(f"{foto.titulo} la empezó {foto.quien} a las {cuando} y sigue a medias.")
+        caja.setInformativeText("Captura en esa misma jornada; lo que anotes queda a tu nombre.")
+        seguir = caja.addButton("Seguirla", QMessageBox.ButtonRole.AcceptRole)
+        otra_hoja = caja.addButton("Imprimir otra hoja", QMessageBox.ButtonRole.ActionRole)
+        caja.addButton(QMessageBox.StandardButton.Cancel)
+        caja.setDefaultButton(seguir)
+        caja.exec()
+        pulsado = caja.clickedButton()
+        if pulsado is seguir:
+            self._conteos_capturar(foto)
+        elif pulsado is otra_hoja:
+            self._conteos_imprimir_hoja(escuela_id=foto.escuela_id, tipo_pieza=foto.tipo_pieza, titulo=foto.titulo)
 
     def _conteos_capturar(self, foto) -> None:
         """Abre la captura amarrada a una jornada (nueva o retomada)."""

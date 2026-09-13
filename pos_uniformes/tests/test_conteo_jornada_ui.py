@@ -382,3 +382,64 @@ class SelectorConFechaTests(unittest.TestCase):
         idx = next(i for i in range(d._escuela_combo.count()) if d._escuela_combo.itemText(i).startswith("Beta"))
         d._escuela_combo.setCurrentIndex(idx)
         self.assertEqual(d._ultimo_label.text(), "Nunca se ha contado.")
+
+    def test_la_que_esta_en_proceso_lo_dice_y_ofrece_seguirla(self) -> None:
+        s = self.factory()
+        jn.abrir_jornada(s, escuela_id=self.b_id, empleada_code="VEND-5", empleada_nombre="Fanny Ortiz")
+        s.commit(); s.close()
+        d = self._dialogo()
+        idx = next(i for i in range(d._escuela_combo.count()) if d._escuela_combo.itemText(i).startswith("Beta"))
+        self.assertIn("EN PROCESO (Fanny Ortiz)", d._escuela_combo.itemText(idx))
+        d._escuela_combo.setCurrentIndex(idx)
+        self.assertIn("Fanny Ortiz", d._ultimo_label.text())
+        self.assertIn("seguirla", d._ultimo_label.text())
+        self.assertEqual(d.abierta_elegida().empleada_code, "VEND-5")
+        d._aceptar()
+        self.assertEqual(d.titulo, "Beta")
+        # Alfa no está en proceso.
+        idx = next(i for i in range(d._escuela_combo.count()) if d._escuela_combo.itemText(i).startswith("Alfa"))
+        d._escuela_combo.setCurrentIndex(idx)
+        self.assertIsNone(d.abierta_elegida())
+
+
+class OfrecerSeguirTests(unittest.TestCase):
+    """En el kiosko, elegir una escuela ya abierta ofrece seguirla o imprimir otra hoja."""
+
+    def _ventana(self):
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        return SimpleNamespace(
+            capturadas=[], hojas=[],
+            _conteos_capturar=lambda self_, foto: self_.capturadas.append(foto),
+            _conteos_imprimir_hoja=lambda self_, **kw: self_.hojas.append(kw),
+            _conteos_ofrecer_seguir=QuoteSatelliteWindow._conteos_ofrecer_seguir,
+        )
+
+    def _correr(self, boton_texto: str):
+        from unittest.mock import MagicMock
+
+        w = self._ventana()
+        w._conteos_capturar = w._conteos_capturar.__get__(w)
+        w._conteos_imprimir_hoja = w._conteos_imprimir_hoja.__get__(w)
+        foto = _foto(escuela_id=7, titulo="Beta", empleada_nombre="Fanny")
+        botones = {}
+        caja = MagicMock()
+        caja.addButton.side_effect = lambda texto, *a: botones.setdefault(texto, object()) if isinstance(texto, str) else object()
+        caja.clickedButton.side_effect = lambda: botones.get(boton_texto)
+        with patch("pos_uniformes.ui.quote_satellite_window.QMessageBox", return_value=caja):
+            w._conteos_ofrecer_seguir(w, foto)
+        return w, foto
+
+    def test_seguirla_abre_la_captura_en_esa_jornada(self) -> None:
+        w, foto = self._correr("Seguirla")
+        self.assertEqual(w.capturadas, [foto])
+        self.assertEqual(w.hojas, [])
+
+    def test_otra_hoja_imprime_sin_volver_a_preguntar(self) -> None:
+        w, foto = self._correr("Imprimir otra hoja")
+        self.assertEqual(w.capturadas, [])
+        self.assertEqual(w.hojas, [{"escuela_id": 7, "tipo_pieza": "", "titulo": "Beta"}])
+
+    def test_cancelar_no_hace_nada(self) -> None:
+        w, _ = self._correr("Cancelar")
+        self.assertEqual((w.capturadas, w.hojas), ([], []))

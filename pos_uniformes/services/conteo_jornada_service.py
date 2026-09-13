@@ -30,7 +30,17 @@ DESCARTADA = "descartada"
 
 
 class JornadaAjena(Exception):
-    """Alguien intentó seguir una jornada que abrió otra persona."""
+    """Ya no se lanza (2026-09-13): la jornada es de la escuela, no de quien la
+    abrió. Se conserva por si algún código viejo la captura."""
+
+
+class JornadaEnProceso(Exception):
+    """Esa escuela (o prenda de básicos) ya tiene una jornada abierta. Trae la
+    jornada para que la pantalla ofrezca seguirla en vez de abrir otra."""
+
+    def __init__(self, jornada: "ConteoJornada") -> None:
+        self.jornada = jornada
+        super().__init__(f"{jornada.titulo} ya la está contando {jornada.empleada_nombre or jornada.empleada_code}.")
 
 
 @dataclass(frozen=True)
@@ -105,9 +115,16 @@ def abrir_jornada(
     empleada_code: str,
     empleada_nombre: str = "",
 ) -> ConteoJornada:
-    """Abre una jornada nueva y deja anotado cuántas tallas abarca."""
+    """Abre una jornada nueva y deja anotado cuántas tallas abarca.
+
+    Una sola abierta por escuela (o prenda de básicos): si ya hay una, lanza
+    `JornadaEnProceso` con ella, para que quien llega la siga y no se pisen.
+    """
     if not empleada_code or not empleada_code.strip():
         raise ValueError("Una jornada necesita el gafete de quien cuenta.")
+    abierta = jornada_abierta_de(session, escuela_id, tipo_pieza)
+    if abierta is not None:
+        raise JornadaEnProceso(abierta)
     grupos = alcance(session, escuela_id, tipo_pieza)
     total = sum(len(g["variantes"]) for g in grupos)
     if escuela_id is None:
@@ -126,6 +143,26 @@ def abrir_jornada(
     session.add(jornada)
     session.flush()
     return jornada
+
+
+def jornada_abierta_de(session: Session, escuela_id: int | None, tipo_pieza: str = "") -> ConteoJornada | None:
+    """La jornada sin terminar de esa escuela (o prenda de básicos), si hay."""
+    q = select(ConteoJornada).where(ConteoJornada.terminada_at.is_(None))
+    if escuela_id is None:
+        q = q.where(ConteoJornada.escuela_id.is_(None), ConteoJornada.tipo_pieza == (tipo_pieza or "").strip())
+    else:
+        q = q.where(ConteoJornada.escuela_id == escuela_id)
+    return session.scalars(q.order_by(ConteoJornada.iniciada_at.desc())).first()
+
+
+def abiertas_por_alcance(session: Session) -> dict:
+    """{escuela_id | ("basicos", tipo_pieza): jornada abierta} para marcar
+    "en proceso" en los selectores."""
+    out: dict = {}
+    for j in jornadas_abiertas(session):
+        clave = ("basicos", j.tipo_pieza) if j.escuela_id is None else j.escuela_id
+        out.setdefault(clave, j)
+    return out
 
 
 def jornadas_abiertas(session: Session) -> list[ConteoJornada]:
@@ -174,9 +211,10 @@ def estado_de(jornada) -> str:
 
 
 def puede_seguirla(jornada: ConteoJornada, empleada_code: str) -> bool:
-    """Solo quien la abrió, o el dueño."""
-    code = (empleada_code or "").strip().upper()
-    return code == jornada.empleada_code or code == DUENO_CODE
+    """Cualquiera con gafete. La jornada es de la escuela, no de quien la
+    abrió: da igual con qué sesión se imprimió la hoja, cada talla guarda
+    quién la contó (`contado_por`)."""
+    return bool((empleada_code or "").strip())
 
 
 def capturado_en_jornada(session: Session, jornada_id: int) -> dict[int, int]:
@@ -331,7 +369,7 @@ def avance(session: Session, jornada: ConteoJornada) -> Avance:
 def terminar_jornada(session: Session, jornada: ConteoJornada, *, empleada_code: str) -> ConteoJornada:
     """La cierra. No aplica nada al inventario: eso lo hace la revisión."""
     if not puede_seguirla(jornada, empleada_code):
-        raise JornadaAjena(f"La jornada la abrió {jornada.empleada_nombre or jornada.empleada_code}.")
+        raise ValueError("Para terminar una jornada hace falta el gafete.")
     jornada.terminada_at = func.now()
     session.add(jornada)
     session.flush()

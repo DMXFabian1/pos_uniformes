@@ -94,6 +94,7 @@ class ConteoNuevaJornadaDialog(QDialog):
         self._ultimo_label.setStyleSheet("color: #8a7a68; font-size: 12px; font-weight: 600;")
         layout.addWidget(self._ultimo_label)
         self._ultimos: dict = {}
+        self._abiertas: dict = {}
         pista = QLabel("Imprime la hoja antes de ir al piso, y regresa aquí a capturar.")
         pista.setStyleSheet("color: #8a7a68; font-size: 12px;")
         pista.setWordWrap(True)
@@ -115,6 +116,8 @@ class ConteoNuevaJornadaDialog(QDialog):
 
         from pos_uniformes.services.conteo_jornada_service import ultimo_conteo_de, ultimos_conteos
 
+        from pos_uniformes.services.conteo_jornada_service import abiertas_por_alcance, ref
+
         session = self._session_factory()
         try:
             escuelas = list_all_schools(session)
@@ -122,6 +125,12 @@ class ConteoNuevaJornadaDialog(QDialog):
                 self._ultimos = ultimos_conteos(session)
             except Exception:  # noqa: BLE001 — sin fechas se puede contar igual
                 self._ultimos = {}
+            try:
+                # Quién está contando qué ahora mismo: se marca "en proceso"
+                # para que la siguiente la siga en vez de abrir otra.
+                self._abiertas = {k: ref(j) for k, j in abiertas_por_alcance(session).items()}
+            except Exception:  # noqa: BLE001
+                self._abiertas = {}
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Sin conexión", f"No se pudieron cargar las escuelas:\n{exc}")
             escuelas = []
@@ -131,7 +140,9 @@ class ConteoNuevaJornadaDialog(QDialog):
         self._escuela_combo.addItem(f"— {NOMBRE_BASICOS} —", ESCUELA_ID_BASICOS)
         for e in escuelas:
             u = ultimo_conteo_de(self._ultimos, int(e["escuela_id"]))
-            self._escuela_combo.addItem(f'{e["escuela_nombre"]}   ·  {u.texto()}', e["escuela_id"])
+            abierta = self._abiertas.get(int(e["escuela_id"]))
+            estado = f"EN PROCESO ({abierta.quien})" if abierta is not None else u.texto()
+            self._escuela_combo.addItem(f'{e["escuela_nombre"]}   ·  {estado}', e["escuela_id"])
         if self._escuela_combo.count() > 1:
             self._escuela_combo.setCurrentIndex(1)
         self._pintar_ultimo()
@@ -147,7 +158,21 @@ class ConteoNuevaJornadaDialog(QDialog):
             return ultimo_conteo_de(self._ultimos, None, str(self._tipo_combo.currentData() or ""))
         return ultimo_conteo_de(self._ultimos, int(dato))
 
+    def abierta_elegida(self):
+        """La JornadaRef en proceso de lo seleccionado, o None."""
+        dato = self._escuela_combo.currentData()
+        if dato is None:
+            return None
+        if int(dato) == ESCUELA_ID_BASICOS:
+            return self._abiertas.get(("basicos", str(self._tipo_combo.currentData() or "")))
+        return self._abiertas.get(int(dato))
+
     def _pintar_ultimo(self, *_args) -> None:
+        abierta = self.abierta_elegida()
+        if abierta is not None:
+            self._ultimo_label.setText(f"En proceso: la está contando {abierta.quien} desde {abierta.iniciada_at.strftime('%H:%M') if abierta.iniciada_at else 'hoy'}. Puedes seguirla.")
+            self._ultimo_label.setStyleSheet("color: #b45309; font-size: 12px; font-weight: 700;")
+            return
         u = self.ultimo_elegido()
         texto = u.texto()
         if u.fecha is None:
@@ -181,7 +206,8 @@ class ConteoNuevaJornadaDialog(QDialog):
             # Una jornada de básicos SIEMPRE es de una prenda: los 2,361
             # renglones de "todos" no se cuentan en una tarde.
             for t in tipos:
-                self._tipo_combo.addItem(t, t)
+                abierta = self._abiertas.get(("basicos", t))
+                self._tipo_combo.addItem(f"{t}   ·  EN PROCESO ({abierta.quien})" if abierta is not None else t, t)
 
     def _aceptar(self) -> None:
         dato = self._escuela_combo.currentData()

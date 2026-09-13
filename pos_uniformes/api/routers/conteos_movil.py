@@ -98,6 +98,13 @@ def listar(current: tuple = Depends(get_current_employee), db: Session = Depends
         db.rollback()
         ultimos = {}
 
+    # Quién está contando qué ahora mismo: la ficha dice "En proceso · Fanny"
+    # y al tocarla se sigue esa jornada en vez de abrir otra.
+    en_proceso = {}
+    for j in jn.jornadas_abiertas(db):
+        clave = ("basicos", j.tipo_pieza) if j.escuela_id is None else j.escuela_id
+        en_proceso.setdefault(clave, {"jornada_id": j.id, "quien": j.empleada_nombre or j.empleada_code, "cuando": jn.cuando(j.iniciada_at)})
+
     def _ultimo(escuela_id, tipo_pieza=""):
         u = jn.ultimo_conteo_de(ultimos, escuela_id, tipo_pieza)
         dias = None
@@ -111,6 +118,7 @@ def listar(current: tuple = Depends(get_current_employee), db: Session = Depends
             "escuela_id": int(e["escuela_id"]), "nombre": str(e["escuela_nombre"]),
             "toca": int(e["escuela_id"]) in vencidas_ids,
             "ultimo": _ultimo(int(e["escuela_id"])),
+            "en_proceso": en_proceso.get(int(e["escuela_id"])),
         })
     escuelas.sort(key=lambda x: (not x["toca"], x["nombre"]))
 
@@ -122,7 +130,7 @@ def listar(current: tuple = Depends(get_current_employee), db: Session = Depends
     except Exception:  # noqa: BLE001
         db.rollback()
         tipos = []
-    basicos = [{"tipo_pieza": t, "ultimo": _ultimo(None, t)} for t in tipos]
+    basicos = [{"tipo_pieza": t, "ultimo": _ultimo(None, t), "en_proceso": en_proceso.get(("basicos", t))} for t in tipos]
     return {"modo": "tienda" if _es_tienda() else "casa", "abiertas": abiertas, "escuelas": escuelas, "basicos": basicos}
 
 
@@ -144,10 +152,18 @@ def abrir(body: AbrirRequest, current: tuple = Depends(get_current_employee), db
     if body.escuela_id is None and not body.tipo_pieza.strip():
         raise HTTPException(status_code=422, detail={"error": {
             "code": "sin_alcance", "message": "Elige una escuela o una prenda de básicos."}})
-    j = jn.abrir_jornada(
-        db, escuela_id=body.escuela_id, tipo_pieza=body.tipo_pieza.strip(),
-        empleada_code=code, empleada_nombre=str(empleada.nombre_completo or ""),
-    )
+    try:
+        j = jn.abrir_jornada(
+            db, escuela_id=body.escuela_id, tipo_pieza=body.tipo_pieza.strip(),
+            empleada_code=code, empleada_nombre=str(empleada.nombre_completo or ""),
+        )
+    except jn.JornadaEnProceso as en_proceso:
+        # Una sola abierta por escuela: se devuelve la que ya existe, con la
+        # marca, y el celular la sigue. Nadie se pisa con nadie.
+        db.rollback()
+        hoja = jn.hoja_de_jornada(db, en_proceso.jornada)
+        hoja["en_proceso"] = {"quien": en_proceso.jornada.empleada_nombre or en_proceso.jornada.empleada_code}
+        return hoja
     db.commit()
     db.refresh(j)
     return jn.hoja_de_jornada(db, j)

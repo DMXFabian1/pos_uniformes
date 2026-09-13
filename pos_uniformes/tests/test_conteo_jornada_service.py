@@ -93,13 +93,40 @@ class JornadaTests(unittest.TestCase):
         registrar_conteos_lote(self.s, [ConteoInput(v[0].id, 7)], "x", jornada_id=j.id)
         self.assertEqual(jn.capturado_en_jornada(self.s, j.id), {v[0].id: 7})
 
-    def test_solo_quien_la_abrio_o_el_dueno_pueden_seguirla(self) -> None:
+    def test_cualquiera_con_gafete_la_sigue(self) -> None:
+        # 2026-09-13: las empleadas imprimían con la sesión de otra y luego no
+        # podían capturar. La jornada es de la escuela; cada talla guarda quién.
         j = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4")
         self.assertTrue(jn.puede_seguirla(j, "VEND-4"))
         self.assertTrue(jn.puede_seguirla(j, "VEND-1"))
-        self.assertFalse(jn.puede_seguirla(j, "VEND-5"))
-        with self.assertRaises(jn.JornadaAjena):
-            jn.terminar_jornada(self.s, j, empleada_code="VEND-5")
+        self.assertTrue(jn.puede_seguirla(j, "VEND-5"))
+        self.assertFalse(jn.puede_seguirla(j, ""))
+        jn.terminar_jornada(self.s, j, empleada_code="VEND-5")
+        self.assertIsNotNone(j.terminada_at)
+
+    def test_una_sola_jornada_abierta_por_escuela(self) -> None:
+        j = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4", empleada_nombre="Fanny")
+        with self.assertRaises(jn.JornadaEnProceso) as ctx:
+            jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-5")
+        self.assertIs(ctx.exception.jornada, j)
+        self.assertIn("Fanny", str(ctx.exception))
+        self.assertIs(jn.jornada_abierta_de(self.s, self.escuela.id), j)
+        self.assertEqual(jn.abiertas_por_alcance(self.s), {self.escuela.id: j})
+        # Otra escuela sí puede abrir a la vez.
+        otra = _seed(self.s, "Dos")
+        self.s.flush()
+        jn.abrir_jornada(self.s, escuela_id=otra.id, empleada_code="VEND-5")
+        # Y al terminarla, la misma escuela vuelve a poder abrirse.
+        jn.terminar_jornada(self.s, j, empleada_code="VEND-4")
+        self.assertIsNone(jn.jornada_abierta_de(self.s, self.escuela.id))
+        jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-5")
+
+    def test_basicos_una_abierta_por_prenda(self) -> None:
+        j = jn.abrir_jornada(self.s, escuela_id=None, tipo_pieza="Playera", empleada_code="VEND-4")
+        with self.assertRaises(jn.JornadaEnProceso):
+            jn.abrir_jornada(self.s, escuela_id=None, tipo_pieza="Playera", empleada_code="VEND-5")
+        jn.abrir_jornada(self.s, escuela_id=None, tipo_pieza="Pants", empleada_code="VEND-5")
+        self.assertIs(jn.abiertas_por_alcance(self.s)[("basicos", "Playera")], j)
 
     def test_terminar_no_toca_el_inventario(self) -> None:
         j = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4")
@@ -180,12 +207,14 @@ class HistorialTests(unittest.TestCase):
         self.s.close()
 
     def test_recientes_solo_terminadas_y_con_su_estado(self) -> None:
-        abierta = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4")
+        # Una abierta a la vez por escuela: se abren y terminan en secuencia.
         aplicada = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4")
+        jn.terminar_jornada(self.s, aplicada, empleada_code="VEND-1")
         descartada = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-5")
+        jn.terminar_jornada(self.s, descartada, empleada_code="VEND-1")
         por_revisar = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-2")
-        for j in (aplicada, descartada, por_revisar):
-            jn.terminar_jornada(self.s, j, empleada_code="VEND-1")
+        jn.terminar_jornada(self.s, por_revisar, empleada_code="VEND-1")
+        abierta = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4")
         jn.aplicar_jornada(self.s, aplicada, revisada_por="VEND-1")
         jn.descartar_jornada(self.s, descartada, revisada_por="VEND-1")
         self.s.commit()

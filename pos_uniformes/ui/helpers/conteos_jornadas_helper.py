@@ -113,7 +113,7 @@ def pintar_jornadas(window, *, abiertas, por_revisar, code: str, recientes=()) -
     escribir = getattr(window, "_conteos_card", None)
     if escribir is not None:
         escribir("a_medias", str(len(abiertas)), "jornadas sin terminar" if abiertas else "nada a medias")
-        escribir("mias", str(mias), "que puedo seguir" if mias else "ninguna mía")
+        escribir("mias", str(mias), "las empecé yo" if mias else "ninguna empezada por mí")
         escribir("por_revisar", str(len(por_revisar)), "esperando tu revisión" if por_revisar else "nada pendiente")
         cards = getattr(window, "_conteos_cards", {})
         if "por_revisar" in cards:

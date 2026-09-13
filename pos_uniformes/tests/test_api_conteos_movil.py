@@ -123,18 +123,34 @@ class ApiConteosMovilTests(unittest.TestCase):
         r = self.client.post(f"/api/v1/movil/conteos/{jid}/tallas", json={"items": [{"variante_id": vid, "fisico": 1}]})
         self.assertEqual(r.status_code, 409)
 
-    def test_la_jornada_de_otra_no_se_toca_pero_daniel_si_puede(self) -> None:
+    def test_cualquiera_sigue_la_jornada_y_cada_talla_dice_quien(self) -> None:
+        # Fanny imprime con la sesión de Ana y luego captura con la suya: da igual.
         hoja = self._abrir("VEND-4")
         jid = hoja["jornada"]["id"]
         vid = hoja["prendas"][0]["tallas"][0]["variante_id"]
         self._como("VEND-5")
-        self.assertEqual(self.client.get(f"/api/v1/movil/conteos/{jid}").status_code, 403)
-        r = self.client.post(f"/api/v1/movil/conteos/{jid}/tallas", json={"items": [{"variante_id": vid, "fisico": 1}]})
-        self.assertEqual(r.status_code, 403)
-        lista = self.client.get("/api/v1/movil/conteos").json()
-        self.assertFalse(lista["abiertas"][0]["mia"])
-        self._como("VEND-1")
         self.assertEqual(self.client.get(f"/api/v1/movil/conteos/{jid}").status_code, 200)
+        r = self.client.post(f"/api/v1/movil/conteos/{jid}/tallas", json={"items": [{"variante_id": vid, "fisico": 1}]})
+        self.assertEqual(r.status_code, 200, r.text)
+        renglon = self.session.scalars(select(ConteoInventario).where(ConteoInventario.jornada_id == jid)).one()
+        self.assertIn("VEND-5", renglon.contado_por)
+        lista = self.client.get("/api/v1/movil/conteos").json()
+        self.assertTrue(lista["abiertas"][0]["mia"])
+
+    def test_una_sola_jornada_por_escuela_la_segunda_sigue_la_primera(self) -> None:
+        hoja = self._abrir("VEND-4")
+        jid = hoja["jornada"]["id"]
+        # La lista marca la escuela como en proceso.
+        lista = self.client.get("/api/v1/movil/conteos").json()
+        self.assertEqual(lista["escuelas"][0]["en_proceso"]["jornada_id"], jid)
+        self.assertEqual(lista["escuelas"][0]["en_proceso"]["quien"], "Stayce Chavarria")
+        # Otra empleada intenta abrir la misma: recibe la que ya existe, marcada.
+        self._como("VEND-5")
+        r = self.client.post("/api/v1/movil/conteos", json={"escuela_id": self.escuela.id})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json()["jornada"]["id"], jid)
+        self.assertEqual(r.json()["en_proceso"]["quien"], "Stayce Chavarria")
+        self.assertEqual(len(self.session.scalars(select(ConteoJornada)).all()), 1)
 
     def test_en_casa_se_puede_ver_pero_no_contar(self) -> None:
         hoja = self._abrir()
