@@ -101,6 +101,31 @@ def pytest_addoption(parser: pytest.Parser) -> None:
     )
 
 
+_VENTANAS_SATELITE: list = []
+
+
+def pytest_sessionfinish(session, exitstatus) -> None:
+    """Cierra las ventanas satelite que los tests dejaron vivas, con Qt aun
+    despierto, para que no las mate el recolector a destiempo."""
+    if not _VENTANAS_SATELITE:
+        return
+    try:
+        from PyQt6.QtWidgets import QApplication
+
+        app = QApplication.instance()
+        for w in _VENTANAS_SATELITE:
+            try:
+                w.close()
+                w.deleteLater()
+            except Exception:  # noqa: BLE001
+                pass
+        if app is not None:
+            app.processEvents()
+    except Exception:  # noqa: BLE001
+        pass
+    _VENTANAS_SATELITE.clear()
+
+
 def pytest_configure(config: pytest.Config) -> None:
     """Ultima red: si apuntamos a algo que huele a produccion, no corremos."""
     if config.getoption("--db-real"):
@@ -212,6 +237,12 @@ def _sin_hilos_ni_dialogos_modales(monkeypatch: pytest.MonkeyPatch) -> None:
             finally:
                 # De vuelta al metodo de la clase para lo que venga despues.
                 self.__dict__.pop("_start_background_db_refresh", None)
+            # Muchos tests crean la ventana y la sueltan sin cerrarla. Si el
+            # recolector de basura la alcanza a media prueba (cualquier prueba,
+            # en el mismo worker), Qt todavia la tiene instalada como filtro de
+            # eventos y el proceso muere con "Segmentation fault ... eventFilter".
+            # Se guarda una referencia viva y se cierran todas al final.
+            _VENTANAS_SATELITE.append(self)
 
         monkeypatch.setattr(_qsw.QuoteSatelliteWindow, "__init__", _init_sin_watchdog)
 

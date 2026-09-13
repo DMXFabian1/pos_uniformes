@@ -50,6 +50,9 @@ class KioskLookupFallbackTests(unittest.TestCase):
                 "producto_activo": True, "variante_activo": True,
             }
         ]
+        # La búsqueda va por el índice O(1), no por la lista: sin esto el test
+        # dependía de lo que trajera data/catalog_cache.json en esta máquina.
+        window._rebuild_sku_index()
         return window
 
     def test_lookup_falls_back_to_cache_on_db_error(self) -> None:
