@@ -3,8 +3,9 @@
 Dos gestos, nada más:
 
 - **Llegó mercancía** (del maquilador): entra al inventario (`ENTRADA_COMPRA`,
-  sube `stock_actual`) y se guarda en una caja (`BodegaContenido`). Es el dato
-  que le faltaba a Revisar para aprender: qué se pidió y qué llegó.
+  sube `stock_actual`). Llega al piso; lo que Daniel decida guardar va a una
+  caja (`BodegaContenido`), talla por talla. Es el dato que le faltaba a
+  Revisar para aprender: qué se pidió y qué llegó.
 - **Pasar al piso**: sale de la caja al rack. El total no cambia (ya era
   inventario), solo deja de estar guardado.
 
@@ -177,33 +178,54 @@ def llego_mercancia(
     caja_nueva: bool = False,
     referencia: str = "",
 ) -> dict:
-    """`items`: [{variante_id, cantidad}]. Entra al inventario y a la caja.
-    Con `caja_nueva` se abre una caja en el almacén y ahí se guarda."""
+    """`items`: [{variante_id, cantidad, a_caja}]. `cantidad` entra al
+    inventario (llega al piso); `a_caja` (≤ cantidad, opcional) es lo que se
+    guarda. Solo si algo va a caja se usa `caja_id` o se abre una nueva
+    (`caja_nueva`) en el almacén."""
     _exigir_dueno(quien_code)
-    limpios = [(int(i["variante_id"]), int(i.get("cantidad") or 0)) for i in items]
-    limpios = [(v, n) for v, n in limpios if n > 0]
+    limpios: list[tuple[int, int, int]] = []
+    for i in items:
+        n = int(i.get("cantidad") or 0)
+        a_caja = int(i.get("a_caja") or 0)
+        if n <= 0:
+            continue
+        if a_caja < 0 or a_caja > n:
+            raise ValueError("No se puede guardar en caja más de lo que llegó.")
+        limpios.append((int(i["variante_id"]), n, a_caja))
     if not limpios:
         raise ValueError("No hay piezas que registrar.")
     firma = f"{quien} ({quien_code})" if quien else quien_code
-    if caja_nueva or caja_id is None:
-        caja = BodegaService.crear_caja(session, CategoriaCaja.A, ubicacion_id=_ubicacion_almacen(session), creado_por=firma, notas=referencia or None)
-    else:
-        caja = session.get(BodegaCaja, caja_id)
-        if caja is None:
-            raise ValueError("Esa caja no existe.")
+    guardadas = sum(a for _, _, a in limpios)
+    caja = None
+    if guardadas > 0:
+        if caja_nueva or caja_id is None:
+            caja = BodegaService.crear_caja(session, CategoriaCaja.A, ubicacion_id=_ubicacion_almacen(session), creado_por=firma, notas=referencia or None)
+        else:
+            caja = session.get(BodegaCaja, caja_id)
+            if caja is None:
+                raise ValueError("Esa caja no existe.")
     piezas = 0
-    for vid, n in limpios:
+    for vid, n, a_caja in limpios:
         variante = session.get(Variante, vid)
         if variante is None:
             raise ValueError(f"No existe la talla {vid}.")
+        donde = f"{n - a_caja} al piso" + (f", {a_caja} en {caja.codigo}" if a_caja and caja else "")
         InventarioService.registrar_ingreso_compra(
-            session, variante, n, referencia=referencia or "maquilador", observacion=f"Llegó y se guardó en {caja.codigo}", creado_por=firma,
+            session, variante, n, referencia=referencia or "maquilador", observacion=f"Llegó: {donde}", creado_por=firma,
         )
         session.flush()
-        BodegaService.ingresar_producto(session, caja.id, vid, n, creado_por=firma, observacion=referencia or None)
+        if a_caja and caja is not None:
+            BodegaService.ingresar_producto(session, caja.id, vid, a_caja, creado_por=firma, observacion=referencia or None)
         piezas += n
     session.flush()
-    return {"caja_id": caja.id, "caja_codigo": caja.codigo, "piezas": piezas, "tallas": len(limpios)}
+    return {
+        "caja_id": caja.id if caja else None,
+        "caja_codigo": caja.codigo if caja else "",
+        "piezas": piezas,
+        "al_piso": piezas - guardadas,
+        "en_caja": guardadas,
+        "tallas": len(limpios),
+    }
 
 
 def pasar_al_piso(session: Session, *, caja_id: int, items: list[dict], quien_code: str, quien: str = "") -> dict:

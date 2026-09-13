@@ -19,6 +19,7 @@ router = APIRouter(prefix="/api/v1/movil/bodega", tags=["movil-bodega"])
 class PiezaIn(BaseModel):
     variante_id: int
     cantidad: int = Field(default=0, ge=0, le=99999)
+    a_caja: int = Field(default=0, ge=0, le=99999)   # solo en "llegó": cuántas de esas se guardan
 
 
 class LlegoRequest(BaseModel):

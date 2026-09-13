@@ -60,20 +60,27 @@ class ApiBodegaMovilTests(unittest.TestCase):
         self.assertEqual(len(prendas), 1)
         vid = prendas[0]["tallas"][0]["variante_id"]
         r = self.client.post("/api/v1/movil/bodega/llego", json={
-            "items": [{"variante_id": vid, "cantidad": 12}], "caja_nueva": True, "referencia": "Maquilador",
+            "items": [{"variante_id": vid, "cantidad": 12, "a_caja": 9}], "caja_nueva": True, "referencia": "Maquilador",
         })
         self.assertEqual(r.status_code, 200, r.text)
-        self.assertEqual((r.json()["piezas"], r.json()["tallas"]), (12, 1))
+        self.assertEqual((r.json()["piezas"], r.json()["tallas"], r.json()["al_piso"], r.json()["en_caja"]), (12, 1, 3, 9))
         caja_id = r.json()["caja_id"]
         cajas = self.client.get("/api/v1/movil/bodega/cajas").json()["cajas"]
-        self.assertEqual((cajas[0]["id"], cajas[0]["piezas"]), (caja_id, 12))
+        self.assertEqual((cajas[0]["id"], cajas[0]["piezas"]), (caja_id, 9))
         contenido = self.client.get(f"/api/v1/movil/bodega/cajas/{caja_id}").json()["contenido"]
-        self.assertEqual((contenido[0]["variante_id"], contenido[0]["cantidad"]), (vid, 12))
+        self.assertEqual((contenido[0]["variante_id"], contenido[0]["cantidad"]), (vid, 9))
         r = self.client.post("/api/v1/movil/bodega/piso", json={"caja_id": caja_id, "items": [{"variante_id": vid, "cantidad": 5}]})
         self.assertEqual(r.status_code, 200, r.text)
-        self.assertEqual(r.json()["quedan"], 7)
+        self.assertEqual(r.json()["quedan"], 4)
         self.session.expire_all()
         self.assertEqual(self.session.get(Variante, vid).stock_actual, 22)
+
+    def test_todo_al_piso_no_abre_caja(self) -> None:
+        self._como("VEND-1")
+        r = self.client.post("/api/v1/movil/bodega/llego", json={"items": [{"variante_id": self.v[0].id, "cantidad": 3}]})
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual((r.json()["al_piso"], r.json()["en_caja"], r.json()["caja_id"]), (3, 0, None))
+        self.assertEqual(self.client.get("/api/v1/movil/bodega/cajas").json()["cajas"], [])
 
     def test_sin_piezas_es_422_con_mensaje(self) -> None:
         self._como("VEND-1")

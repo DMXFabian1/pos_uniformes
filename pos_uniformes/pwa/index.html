@@ -1033,7 +1033,7 @@ let bodPrenda = null, bodCaja = null;
 
 function duenoBodega() {
   duenoSub(`<h1>📦 Bodega</h1>
-    <p class="sub">Lo que llega del maquilador se guarda en una caja. Lo que pasas al rack sale de la caja.</p>
+    <p class="sub">Lo que llega del maquilador entra al piso; si guardas parte en una caja, lo dices ahí mismo. Lo que sacas de una caja al rack, "Pasar al piso".</p>
     <button class="btn-grande btn-acento" onclick="bodLlegoInicio()">📥  Llegó mercancía</button>
     <button class="btn-grande" onclick="bodPisoInicio()">🧺  Pasar al piso</button>
     <button class="btn-suave salir" onclick="duenoMenu()">← Regresar</button>`);
@@ -1071,21 +1071,28 @@ async function bodElegirPrenda(i) {
   let cajas = [];
   try { cajas = (await api("/api/v1/movil/bodega/cajas")).cajas; } catch (e) {}
   // Cada talla: lo que pediste (prellenado), cuántas hay a la mano y en cajas.
+  // Llega al piso; la columna "a caja" solo aparece si Daniel decide guardar.
   const filas = bodPrenda.tallas.map(t => {
     const pista = [t.a_la_mano ? `${t.a_la_mano} a la mano` : "", t.en_cajas ? `${t.en_cajas} en cajas` : ""].filter(Boolean).join(" · ");
     const pediste = t.pedido ? `<small class="quien">pediste ${t.pedido}</small>` : "";
     return `<tr><td class="t">${t.talla}${t.color && !/^(unico|único)$/i.test(t.color) ? " " + t.color : ""}${pediste}<small class="quien">${pista}</small></td>` +
-      `<td><input inputmode="numeric" pattern="[0-9]*" placeholder="0" value="${t.pedido || ""}" data-v="${t.variante_id}"></td></tr>`;
+      `<td><input inputmode="numeric" pattern="[0-9]*" placeholder="0" value="${t.pedido || ""}" data-v="${t.variante_id}"></td>` +
+      `<td class="bod-acaja oculto"><input inputmode="numeric" pattern="[0-9]*" placeholder="0" data-caja-v="${t.variante_id}"></td></tr>`;
   }).join("");
   const opciones = cajas.map(c => `<option value="${c.id}">${c.codigo} · ${c.ubicacion || "sin ubicación"} · ${c.piezas} pzas</option>`).join("");
   duenoSub(`<h1>📥 ${bodPrenda.nombre}</h1>
     <p class="sub">${bodPrenda.escuela} · escribe cuántas llegaron de cada talla</p>
-    <div class="card prenda"><table class="tallas"><tr><th>Talla</th><th>Llegaron</th></tr>${filas}</table></div>
+    <div class="card prenda"><table class="tallas" id="bod-tabla"><tr><th>Talla</th><th>Llegaron</th><th class="bod-acaja oculto">A caja</th></tr>${filas}</table></div>
     <div class="card">
-      <strong>¿En qué caja se guardan?</strong>
-      <select id="bod-caja" style="width:100%;min-height:44px;margin-top:8px;font-size:15px">
-        <option value="nueva">Caja nueva (en el almacén)</option>${opciones}
-      </select>
+      <label style="display:flex;align-items:center;gap:10px;font-weight:700">
+        <input type="checkbox" id="bod-guardar" onchange="bodToggleCaja()" style="width:22px;height:22px;margin:0"> Guardar parte en una caja
+      </label>
+      <div id="bod-caja-datos" class="oculto" style="margin-top:8px">
+        <p class="sub" style="margin:0 0 6px">Escribe en la columna "A caja" cuántas de las que llegaron se guardan. Lo demás se queda en el piso.</p>
+        <select id="bod-caja" style="width:100%;min-height:44px;font-size:15px">
+          <option value="nueva">Caja nueva (en el almacén)</option>${opciones}
+        </select>
+      </div>
       <input id="bod-ref" placeholder="Nota: maquilador, fecha... (opcional)" style="margin-top:8px">
     </div>
     <div class="barra-fija">
@@ -1094,20 +1101,33 @@ async function bodElegirPrenda(i) {
     </div>`);
 }
 
+function bodToggleCaja() {
+  const on = $("bod-guardar").checked;
+  document.querySelectorAll(".bod-acaja").forEach(e => e.classList.toggle("oculto", !on));
+  $("bod-caja-datos").classList.toggle("oculto", !on);
+}
+
 async function bodLlegoGuardar() {
-  const items = [...document.querySelectorAll("#dueno-sub input[data-v]")]
-    .map(i => ({variante_id: Number(i.dataset.v), cantidad: Number(i.value) || 0})).filter(i => i.cantidad > 0);
+  const guardar = $("bod-guardar").checked;
+  const items = [...document.querySelectorAll("#dueno-sub input[data-v]")].map(i => {
+    const aCaja = guardar ? (document.querySelector(`#dueno-sub input[data-caja-v="${i.dataset.v}"]`) || {}).value : 0;
+    return {variante_id: Number(i.dataset.v), cantidad: Number(i.value) || 0, a_caja: Number(aCaja) || 0};
+  }).filter(i => i.cantidad > 0);
   if (!items.length) { alert("Escribe cuántas llegaron de al menos una talla."); return; }
-  const caja = $("bod-caja").value;
+  if (items.some(i => i.a_caja > i.cantidad)) { alert("En una talla pusiste más a caja de las que llegaron."); return; }
+  const caja = guardar ? $("bod-caja").value : "nueva";
   const total = items.reduce((a, b) => a + b.cantidad, 0);
-  if (!confirm(`${total} piezas de ${bodPrenda.nombre} entran al inventario y se guardan en ${caja === "nueva" ? "una caja nueva" : "la caja elegida"}. ¿Guardar?`)) return;
+  const enCaja = items.reduce((a, b) => a + b.a_caja, 0);
+  const donde = enCaja ? `${total - enCaja} al piso y ${enCaja} a ${caja === "nueva" ? "una caja nueva" : "la caja elegida"}` : "todas al piso";
+  if (!confirm(`${total} piezas de ${bodPrenda.nombre} entran al inventario: ${donde}. ¿Guardar?`)) return;
   try {
     const r = await contPost("/api/v1/movil/bodega/llego", {
       items, caja_id: caja === "nueva" ? null : Number(caja), caja_nueva: caja === "nueva", referencia: $("bod-ref").value.trim(),
     });
+    const detalle = r.en_caja ? `${r.al_piso} al piso y ${r.en_caja} en la caja <b>${r.caja_codigo}</b>` : "todas al piso";
     duenoSub(`<h1>✓ Guardado</h1>
-      <div class="card"><strong>${r.piezas} piezas</strong> de ${bodPrenda.nombre} en ${r.tallas} tallas, en la caja <b>${r.caja_codigo}</b>.
-      <p class="sub">Ya cuentan en el inventario. Cuando las pases al rack, usa "Pasar al piso".</p></div>
+      <div class="card"><strong>${r.piezas} piezas</strong> de ${bodPrenda.nombre} en ${r.tallas} tallas: ${detalle}.
+      <p class="sub">Ya cuentan en el inventario.</p></div>
       <button class="btn-grande btn-acento" onclick="bodLlegoInicio()">📥  Llegó otra prenda</button>
       <button class="btn-suave salir" onclick="duenoBodega()">← Bodega</button>`);
   } catch (e) { alert(e.message); }
