@@ -137,6 +137,26 @@ class ApiConteosMovilTests(unittest.TestCase):
         lista = self.client.get("/api/v1/movil/conteos").json()
         self.assertTrue(lista["abiertas"][0]["mia"])
 
+    def test_lo_que_otra_capturo_con_otro_numero_no_se_pisa_sin_reemplazar(self) -> None:
+        hoja = self._abrir("VEND-4")
+        jid = hoja["jornada"]["id"]
+        vid = hoja["prendas"][0]["tallas"][0]["variante_id"]
+        self.client.post(f"/api/v1/movil/conteos/{jid}/tallas", json={"items": [{"variante_id": vid, "fisico": 5}]})
+        self._como("VEND-5")
+        r = self.client.post(f"/api/v1/movil/conteos/{jid}/tallas", json={"items": [{"variante_id": vid, "fisico": 7}]}).json()
+        self.assertEqual(r["guardadas"], 0)
+        c = r["conflictos"][0]
+        self.assertEqual((c["variante_id"], c["quien"], c["fisico_suyo"], c["fisico_tuyo"]), (vid, "Stayce", 5, 7))
+        # La hoja dice quién la capturó.
+        hoja = self.client.get(f"/api/v1/movil/conteos/{jid}").json()
+        self.assertEqual(hoja["prendas"][0]["tallas"][0]["quien"], "Stayce")
+        self.assertEqual(hoja["prendas"][0]["tallas"][0]["fisico"], 5)
+        # Con reemplazar=true gana lo de Fanny.
+        r = self.client.post(f"/api/v1/movil/conteos/{jid}/tallas", json={"items": [{"variante_id": vid, "fisico": 7}], "reemplazar": True}).json()
+        self.assertEqual((r["guardadas"], r["conflictos"]), (1, []))
+        renglon = self.session.scalars(select(ConteoInventario).where(ConteoInventario.jornada_id == jid)).one()
+        self.assertEqual((renglon.stock_fisico, renglon.contado_por), (7, "Fanny Ortiz (VEND-5)"))
+
     def test_una_sola_jornada_por_escuela_la_segunda_sigue_la_primera(self) -> None:
         hoja = self._abrir("VEND-4")
         jid = hoja["jornada"]["id"]

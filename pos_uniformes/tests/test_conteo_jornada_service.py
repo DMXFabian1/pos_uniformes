@@ -259,7 +259,7 @@ class HojaEnElCelularTests(unittest.TestCase):
             {"variante_id": self.v[0].id, "fisico": 7, "pedido": 3},
             {"variante_id": self.v[1].id, "fisico": None},
         ], contado_por="Stayce (VEND-4)")
-        self.assertEqual(n, 1)
+        self.assertEqual((n.guardadas, n.conflictos), (1, []))
         r = self._renglones()
         self.assertEqual(len(r), 1)
         self.assertEqual((r[0].stock_fisico, r[0].diferencia, r[0].notas), (7, -3, "Pedido: 3"))
@@ -277,6 +277,45 @@ class HojaEnElCelularTests(unittest.TestCase):
         jn.guardar_tallas(self.s, self.j, [{"variante_id": self.v[0].id, "fisico": 7}], contado_por="x")
         jn.guardar_tallas(self.s, self.j, [{"variante_id": self.v[0].id, "fisico": ""}], contado_por="x")
         self.assertEqual(self._renglones(), [])
+
+    def test_lo_de_otra_no_se_pisa_sin_preguntar(self) -> None:
+        # Dos capturando la misma prenda: la segunda no pisa a la primera.
+        jn.guardar_tallas(self.s, self.j, [{"variante_id": self.v[0].id, "fisico": 5}], contado_por="Ana López (VEND-3)")
+        res = jn.guardar_tallas(self.s, self.j, [
+            {"variante_id": self.v[0].id, "fisico": 7},
+            {"variante_id": self.v[1].id, "fisico": 2},
+        ], contado_por="Fanny Ortiz (VEND-5)")
+        self.assertEqual(res.guardadas, 1)
+        self.assertEqual(len(res.conflictos), 1)
+        c = res.conflictos[0]
+        self.assertEqual((c.variante_id, c.talla, c.fisico_suyo, c.fisico_tuyo), (self.v[0].id, "6", 5, 7))
+        self.assertEqual((c.quien, c.nombre_corto), ("Ana López (VEND-3)", "Ana"))
+        self.assertIn("Prenda 0", c.producto)
+        self.assertTrue(c.cuando.startswith("hoy"))
+        r = {x.variante_id: x for x in self._renglones()}
+        self.assertEqual(r[self.v[0].id].stock_fisico, 5)   # sigue lo de Ana
+        # Mismo número que Ana: no es conflicto, no hay nada que pisar.
+        res = jn.guardar_tallas(self.s, self.j, [{"variante_id": self.v[0].id, "fisico": 5}], contado_por="Fanny Ortiz (VEND-5)")
+        self.assertEqual((res.guardadas, res.conflictos), (1, []))
+        # Con permiso explícito, gana lo que llega y queda a nombre de quien reemplazó.
+        res = jn.guardar_tallas(self.s, self.j, [{"variante_id": self.v[0].id, "fisico": 7}], contado_por="Fanny Ortiz (VEND-5)", reemplazar_ajenas=True)
+        self.assertEqual((res.guardadas, res.conflictos), (1, []))
+        r = {x.variante_id: x for x in self._renglones()}
+        self.assertEqual((r[self.v[0].id].stock_fisico, r[self.v[0].id].contado_por), (7, "Fanny Ortiz (VEND-5)"))
+
+    def test_borrar_lo_de_otra_tambien_pregunta(self) -> None:
+        jn.guardar_tallas(self.s, self.j, [{"variante_id": self.v[0].id, "fisico": 5}], contado_por="Ana López (VEND-3)")
+        res = jn.guardar_tallas(self.s, self.j, [{"variante_id": self.v[0].id, "fisico": None}], contado_por="Fanny Ortiz (VEND-5)")
+        self.assertEqual(len(res.conflictos), 1)
+        self.assertIsNone(res.conflictos[0].fisico_tuyo)
+        self.assertEqual(len(self._renglones()), 1)
+
+    def test_la_hoja_dice_quien_capturo_cada_talla(self) -> None:
+        jn.guardar_tallas(self.s, self.j, [{"variante_id": self.v[0].id, "fisico": 5}], contado_por="Ana López (VEND-3)")
+        hoja = jn.hoja_de_jornada(self.s, self.j)
+        tallas = hoja["prendas"][0]["tallas"]
+        self.assertEqual(tallas[0]["quien"], "Ana")
+        self.assertEqual(tallas[1]["quien"], "")
 
     def test_la_hoja_trae_lo_capturado_y_el_avance(self) -> None:
         jn.guardar_tallas(self.s, self.j, [

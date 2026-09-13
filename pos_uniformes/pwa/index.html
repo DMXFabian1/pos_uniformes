@@ -64,6 +64,7 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
 .chip.proceso{border-color:#b45309; background:#fff4e5}
 .chip.proceso small{color:#b45309; font-weight:600}
 #cont-ver-todas a{color:var(--acento-osc); font-weight:700; text-decoration:underline; cursor:pointer}
+.tallas .quien{display:block; font-size:10px; color:var(--tenue); font-weight:600}
 .prenda{padding:0; overflow:hidden}
 .prenda .cab{background:var(--acento-osc); color:#fff; padding:10px 14px; font-weight:800;
   font-size:15px; display:flex; justify-content:space-between; align-items:center; gap:8px}
@@ -488,7 +489,9 @@ function contPintarHoja(hoja) {
       const b = borrador[t.variante_id] || {};
       const fis = b.fisico !== undefined ? b.fisico : (t.fisico ?? "");
       // Sin columna Pedido: los pedidos los gestiona Daniel, no van en el conteo.
-      return `<tr><td class="t">${t.talla}</td>` +
+      // Si la capturó otra compañera se ve su nombre junto a la talla.
+      const quien = t.quien && t.fisico !== null && b.fisico === undefined ? `<small class="quien">${t.quien}</small>` : "";
+      return `<tr><td class="t">${t.talla}${quien}</td>` +
         `<td><input inputmode="numeric" pattern="[0-9]*" placeholder="" value="${fis}" data-v="${t.variante_id}" data-k="fisico" data-p="${p.numero}" oninput="contCambio(${p.numero})"></td></tr>`;
     }).join("");
     return `<div class="card prenda${p.completa ? " lista" : ""}" id="prenda-${p.numero}">` +
@@ -536,10 +539,24 @@ function contCambio(num) {
 async function contGuardar(num) {
   if (!contJornada) return;
   clearTimeout(contTimers[num]);
-  const items = Object.values(contItems(num));
+  let items = Object.values(contItems(num));
   contMarcar(num, "guardando…");
   try {
-    const r = await contPost(`/api/v1/movil/conteos/${contJornada}/tallas`, {items});
+    let r = await contPost(`/api/v1/movil/conteos/${contJornada}/tallas`, {items});
+    // Otra compañera capturó alguna de estas tallas con otro número mientras
+    // tú contabas: no se pisa sin preguntar.
+    if (r.conflictos && r.conflictos.length) {
+      const lineas = r.conflictos.map(c => `• Talla ${c.talla}: ${c.quien} puso ${c.fisico_suyo} (${c.cuando}), tú ${c.fisico_tuyo === null ? "vacío" : c.fisico_tuyo}`).join("\n");
+      const suyas = new Set(r.conflictos.map(c => c.variante_id));
+      if (confirm(`Mientras contabas, alguien más capturó:\n\n${lineas}\n\n¿Reemplazar con lo tuyo?`)) {
+        r = await contPost(`/api/v1/movil/conteos/${contJornada}/tallas`, {items: items.filter(it => suyas.has(it.variante_id)), reemplazar: true});
+      } else {
+        for (const c of r.conflictos) {
+          const inp = document.querySelector(`#prenda-${num} input[data-v="${c.variante_id}"]`);
+          if (inp) inp.value = c.fisico_suyo;
+        }
+      }
+    }
     contSucias.delete(num);
     const b = contBorrador(); for (const it of items) delete b[it.variante_id]; contGuardarBorrador(b);
     const completa = items.length && items.every(it => it.fisico !== null);

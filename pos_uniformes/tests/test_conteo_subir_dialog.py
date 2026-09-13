@@ -284,6 +284,55 @@ class ConteoConJornadaTests(unittest.TestCase):
         self.assertEqual(d2._fisico_inputs[1].text(), "")
         self.assertIn("1 de 2", d2._hint.text())
 
+    def _otra_captura(self, variante_idx: int, fisico: int, quien="Ana López (VEND-3)") -> None:
+        """Otra empleada guarda una talla en la misma jornada, desde otro kiosko."""
+        from pos_uniformes.database.models import ConteoJornada, Variante
+        from pos_uniformes.services.conteo_jornada_service import guardar_tallas
+
+        s = self.factory()
+        v = list(s.scalars(select(Variante).order_by(Variante.id)).all())
+        guardar_tallas(s, s.get(ConteoJornada, self.jornada.id), [{"variante_id": v[variante_idx].id, "fisico": fisico}], contado_por=quien)
+        s.commit(); s.close()
+
+    def test_si_otra_capturo_la_misma_talla_pregunta_y_no_dice_si(self) -> None:
+        d = self._dialog()
+        d._fisico_inputs[0].setText("7")
+        d._fisico_inputs[1].setText("3")
+        self._otra_captura(0, 5)   # mientras Stayce tenía la pantalla abierta
+        with patch("pos_uniformes.ui.dialogs.conteo_subir_dialog.QMessageBox.question",
+                   return_value=QMessageBox.StandardButton.No) as preg, \
+             patch("pos_uniformes.ui.dialogs.conteo_subir_dialog.QMessageBox.information"):
+            d._pausar()
+        preg.assert_called_once()
+        self.assertIn("Ana puso 5", preg.call_args.args[2])
+        self.assertIn("tú 7", preg.call_args.args[2])
+        s = self.factory()
+        por_vid = {c.variante_id: c for c in s.scalars(select(ConteoInventario)).all()}
+        v = sorted(por_vid)
+        self.assertEqual((por_vid[v[0]].stock_fisico, por_vid[v[0]].contado_por), (5, "Ana López (VEND-3)"))
+        self.assertEqual(por_vid[v[1]].stock_fisico, 3)   # lo que no chocaba sí se guardó
+        # En pantalla quedó el número de Ana, bloqueado.
+        self.assertEqual(d._fisico_inputs[0].text(), "5")
+        self.assertTrue(d._fisico_inputs[0].isReadOnly())
+
+    def test_si_otra_capturo_la_misma_talla_y_dice_si_gana_lo_suyo(self) -> None:
+        d = self._dialog()
+        d._fisico_inputs[0].setText("7")
+        self._otra_captura(0, 5)
+        with patch("pos_uniformes.ui.dialogs.conteo_subir_dialog.QMessageBox.question",
+                   return_value=QMessageBox.StandardButton.Yes), \
+             patch("pos_uniformes.ui.dialogs.conteo_subir_dialog.QMessageBox.information"):
+            d._pausar()
+        s = self.factory()
+        conteos = s.scalars(select(ConteoInventario)).all()
+        self.assertEqual(len(conteos), 1)   # no duplicó
+        self.assertEqual((conteos[0].stock_fisico, conteos[0].contado_por), (7, "Stayce (VEND-4)"))
+
+    def test_al_retomar_se_ve_quien_capturo(self) -> None:
+        self._otra_captura(0, 5)
+        d = self._dialog()
+        self.assertEqual(d._fisico_inputs[0].toolTip(), "La capturó Ana López (VEND-3)")
+
     def test_retomar_y_terminar_no_duplica_lo_de_antes(self) -> None:
         from pos_uniformes.database.models import ConteoJornada
 

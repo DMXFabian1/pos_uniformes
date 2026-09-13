@@ -217,6 +217,16 @@ def puede_seguirla(jornada: ConteoJornada, empleada_code: str) -> bool:
     return bool((empleada_code or "").strip())
 
 
+def quien_capturo(session: Session, jornada_id: int) -> dict[int, str]:
+    """{variante_id: contado_por} de lo capturado en la jornada."""
+    filas = session.execute(
+        select(ConteoInventario.variante_id, ConteoInventario.contado_por)
+        .where(ConteoInventario.jornada_id == jornada_id)
+        .order_by(ConteoInventario.contado_at.asc(), ConteoInventario.id.asc())
+    ).all()
+    return {int(vid): str(por or "") for vid, por in filas}
+
+
 def capturado_en_jornada(session: Session, jornada_id: int) -> dict[int, int]:
     """{variante_id: stock_fisico} de lo que ya se capturó en la jornada.
 
@@ -231,13 +241,43 @@ def capturado_en_jornada(session: Session, jornada_id: int) -> dict[int, int]:
     return {int(vid): int(fisico) for vid, fisico in filas}
 
 
+@dataclass(frozen=True)
+class Conflicto:
+    """Una talla que otra persona ya capturó en esta jornada con otro número."""
+
+    variante_id: int
+    producto: str
+    talla: str
+    quien: str          # tal como quedó en contado_por: "Ana López (VEND-3)"
+    fisico_suyo: int
+    fisico_tuyo: int | None
+    cuando: str         # "hoy 10:32"
+
+    @property
+    def nombre_corto(self) -> str:
+        return primer_nombre(self.quien)
+
+
+@dataclass(frozen=True)
+class Guardado:
+    guardadas: int
+    conflictos: list[Conflicto]
+
+
+def primer_nombre(contado_por: str) -> str:
+    """'Ana López (VEND-3)' → 'Ana'; 'VEND-3' → 'VEND-3'."""
+    nombre = str(contado_por or "").split("(")[0].strip()
+    return nombre.split()[0] if nombre else str(contado_por or "")
+
+
 def guardar_tallas(
     session: Session,
     jornada: ConteoJornada,
     items: list[dict],
     *,
     contado_por: str,
-) -> int:
+    reemplazar_ajenas: bool = False,
+) -> Guardado:
     """Guarda tallas de una jornada como se llena una hoja: se puede corregir.
 
     `items`: [{"variante_id": int, "fisico": int | None, "pedido": int | None}].
@@ -245,27 +285,48 @@ def guardar_tallas(
     - Si la talla ya tenía renglón en ESTA jornada, se actualiza (no se
       duplica: la revisión de Daniel vería dos veces la misma talla).
     - `pedido` (cuántas pedir) va en `notas` como "Pedido: N".
-    Devuelve cuántas tallas quedaron guardadas.
+    - Si el renglón lo capturó OTRA persona con otro número, no se pisa: va en
+      `conflictos` para que la pantalla pregunte. Con `reemplazar_ajenas` gana
+      lo que llega.
     """
-    from pos_uniformes.database.models import Variante
+    from pos_uniformes.database.models import Producto, Variante
     from pos_uniformes.services.conteo_service import registrar_conteo
 
     guardadas = 0
+    conflictos: list[Conflicto] = []
     for item in items:
         vid = int(item.get("variante_id"))
         fisico = item.get("fisico")
         pedido = item.get("pedido")
         nota = f"Pedido: {int(pedido)}" if pedido not in (None, "") else None
+        fisico = None if fisico in (None, "") else int(fisico)
         existente = session.scalar(
             select(ConteoInventario).where(
                 ConteoInventario.jornada_id == jornada.id, ConteoInventario.variante_id == vid
             )
         )
-        if fisico in (None, ""):
+        ajeno = (
+            existente is not None
+            and (existente.contado_por or "") != (contado_por or "")
+            and int(existente.stock_fisico) != fisico
+        )
+        if ajeno and not reemplazar_ajenas:
+            v = session.get(Variante, vid)
+            prod = session.get(Producto, v.producto_id) if v is not None else None
+            conflictos.append(Conflicto(
+                variante_id=vid,
+                producto=str(prod.nombre) if prod is not None else "",
+                talla=str(v.talla or "") if v is not None else "",
+                quien=str(existente.contado_por or ""),
+                fisico_suyo=int(existente.stock_fisico),
+                fisico_tuyo=fisico,
+                cuando=cuando(existente.contado_at),
+            ))
+            continue
+        if fisico is None:
             if existente is not None and not existente.ajustado:
                 session.delete(existente)
             continue
-        fisico = int(fisico)
         if existente is None:
             registrar_conteo(session, vid, fisico, contado_por, notas=nota, jornada_id=jornada.id)
         elif not existente.ajustado:
@@ -277,18 +338,19 @@ def guardar_tallas(
             session.add(existente)
         guardadas += 1
     session.flush()
-    return guardadas
+    return Guardado(guardadas, conflictos)
 
 
 def hoja_de_jornada(session: Session, jornada: ConteoJornada) -> dict:
     """La hoja tal como se dibuja: prendas numeradas, cada una con sus tallas
     y lo ya capturado. Es lo que consume el celular."""
     filas = session.execute(
-        select(ConteoInventario.variante_id, ConteoInventario.stock_fisico, ConteoInventario.notas)
+        select(ConteoInventario.variante_id, ConteoInventario.stock_fisico, ConteoInventario.notas, ConteoInventario.contado_por)
         .where(ConteoInventario.jornada_id == jornada.id)
     ).all()
     capturado = {}
-    for vid, fisico, notas in filas:
+    quien_por_vid = {int(vid): primer_nombre(por) for vid, _f, _n, por in filas}
+    for vid, fisico, notas, _por in filas:
         pedido = None
         if notas and str(notas).startswith("Pedido:"):
             try:
@@ -305,6 +367,7 @@ def hoja_de_jornada(session: Session, jornada: ConteoJornada) -> dict:
             tallas.append({
                 "variante_id": v.variante_id, "talla": str(v.talla or "U"),
                 "color": str(getattr(v, "color", "") or ""), "fisico": fisico, "pedido": pedido,
+                "quien": quien_por_vid.get(v.variante_id, ""),
             })
         prendas.append({
             "numero": numero, "total": len(grupos),

@@ -71,6 +71,7 @@ class ConteoSubirDialog(QDialog):
         self._fisico_inputs: list[QLineEdit] = []
         self._sistemas: list[int] = []
         self._ya_capturados: dict[int, int] = {}
+        self._quien_capturo: dict[int, str] = {}
         self._build_ui()
         if jornada is not None:
             self.setWindowTitle(f"Conteo · {jornada.titulo}")
@@ -206,7 +207,7 @@ class ConteoSubirDialog(QDialog):
     def _modo_jornada(self) -> None:
         """Amarra el diálogo a la jornada: sin elegir escuela, y con lo que ya
         se capturó puesto y bloqueado (para no contar dos veces)."""
-        from pos_uniformes.services.conteo_jornada_service import capturado_en_jornada
+        from pos_uniformes.services.conteo_jornada_service import capturado_en_jornada, quien_capturo
 
         for w in (self._escuela_combo, self._tipo_combo, self._cargar_btn):
             w.setVisible(False)
@@ -215,8 +216,10 @@ class ConteoSubirDialog(QDialog):
         session = self._session_factory()
         try:
             self._ya_capturados = capturado_en_jornada(session, self._jornada.id)
+            self._quien_capturo = quien_capturo(session, self._jornada.id)
         except Exception:  # noqa: BLE001 — sin lo previo se captura de cero
             self._ya_capturados = {}
+            self._quien_capturo = {}
         finally:
             session.close()
         self._cargar_piezas()
@@ -316,6 +319,9 @@ class ConteoSubirDialog(QDialog):
                     inp.setStyleSheet(
                         "QLineEdit { background: #eef5ee; color: #2f6b2f; border-color: #a9c9a9; }"
                     )
+                    quien = self._quien_capturo.get(v.variante_id, "")
+                    if quien:
+                        inp.setToolTip(f"La capturó {quien}")
                 inp.textChanged.connect(self._on_fisico_changed)
                 self._table.setCellWidget(fila, 2, inp)
 
@@ -384,15 +390,45 @@ class ConteoSubirDialog(QDialog):
         return conteos, sin_contar
 
     def _guardar(self, conteos: list) -> bool:
-        """Sube los conteos nuevos. False si algo falló (ya avisó)."""
+        """Sube los conteos nuevos. False si algo falló (ya avisó).
+
+        Con jornada va por `guardar_tallas`: si otra capturó la misma talla
+        mientras esta pantalla estaba abierta, no la pisa: pregunta.
+        """
         if not conteos:
             return True
+        if self._jornada is None:
+            return self._guardar_suelto(conteos)
+        from pos_uniformes.database.models import ConteoJornada
+        from pos_uniformes.services.conteo_jornada_service import guardar_tallas
+
+        items = [{"variante_id": c.variante_id, "fisico": c.stock_fisico, "pedido": None} for c in conteos]
+        reemplazar = False
+        while True:
+            session = self._session_factory()
+            try:
+                j = session.get(ConteoJornada, self._jornada.id)
+                res = guardar_tallas(session, j, items, contado_por=self._contado_por, reemplazar_ajenas=reemplazar)
+                session.commit()
+            except Exception as exc:  # noqa: BLE001
+                session.rollback()
+                QMessageBox.critical(self, "Error", f"No se pudo registrar el conteo:\n{exc}")
+                return False
+            finally:
+                session.close()
+            if not res.conflictos:
+                return True
+            if not self._preguntar_conflictos(res.conflictos):
+                # Se queda lo de la otra persona; en pantalla se ve su número.
+                self._tomar_ajenas(res.conflictos)
+                return True
+            items = [i for i in items if i["variante_id"] in {c.variante_id for c in res.conflictos}]
+            reemplazar = True
+
+    def _guardar_suelto(self, conteos: list) -> bool:
         session = self._session_factory()
         try:
-            registrar_conteos_lote(
-                session, conteos, self._contado_por,
-                jornada_id=self._jornada.id if self._jornada is not None else None,
-            )
+            registrar_conteos_lote(session, conteos, self._contado_por)
             session.commit()
         except Exception as exc:  # noqa: BLE001
             session.rollback()
@@ -401,6 +437,40 @@ class ConteoSubirDialog(QDialog):
         finally:
             session.close()
         return True
+
+    def _preguntar_conflictos(self, conflictos) -> bool:
+        """True = reemplazar con lo mío; False = dejar lo que capturó la otra."""
+        from pos_uniformes.services.conteo_hoja_carta_service import nombre_para_hoja
+
+        lineas = []
+        for c in conflictos[:12]:
+            tuyo = "vacío" if c.fisico_tuyo is None else str(c.fisico_tuyo)
+            lineas.append(f"• {nombre_para_hoja(c.producto, self._jornada.titulo)} talla {c.talla}: {c.nombre_corto} puso {c.fisico_suyo} ({c.cuando}), tú {tuyo}")
+        if len(conflictos) > 12:
+            lineas.append(f"… y {len(conflictos) - 12} más")
+        r = QMessageBox.question(
+            self, "Ya la capturó otra persona",
+            "Mientras contabas, alguien más capturó estas tallas con otro número:\n\n"
+            + "\n".join(lineas) + "\n\n¿Reemplazar con lo tuyo?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        return r == QMessageBox.StandardButton.Yes
+
+    def _tomar_ajenas(self, conflictos) -> None:
+        """Pone en pantalla el número de la otra persona y bloquea la talla."""
+        por_vid = {c.variante_id: c for c in conflictos}
+        for vid, inp in zip(self._variant_ids, self._fisico_inputs):
+            c = por_vid.get(vid)
+            if c is None:
+                continue
+            inp.blockSignals(True)
+            inp.setText(str(c.fisico_suyo))
+            inp.setReadOnly(True)
+            inp.setStyleSheet("QLineEdit { background: #eef5ee; color: #2f6b2f; border-color: #a9c9a9; }")
+            inp.setToolTip(f"La capturó {c.quien}")
+            inp.blockSignals(False)
+            self._ya_capturados[vid] = c.fisico_suyo
 
     def _pausar(self) -> None:
         """Guarda lo que va y cierra. La jornada sigue abierta para retomarla."""

@@ -40,6 +40,7 @@ class TallaIn(BaseModel):
 
 class TallasRequest(BaseModel):
     items: list[TallaIn]
+    reemplazar: bool = False   # True = pisar lo que otra capturó con otro número
 
 
 def _quien(empleada) -> tuple[str, str]:
@@ -190,10 +191,16 @@ def guardar(jornada_id: int, body: TallasRequest, current: tuple = Depends(get_c
     if j.terminada_at is not None:
         raise HTTPException(status_code=409, detail={"error": {
             "code": "terminada", "message": "Esa jornada ya se terminó."}})
-    guardadas = jn.guardar_tallas(db, j, [i.model_dump() for i in body.items], contado_por=contado_por)
+    res = jn.guardar_tallas(db, j, [i.model_dump() for i in body.items], contado_por=contado_por, reemplazar_ajenas=body.reemplazar)
     db.commit()
     a = jn.avance(db, j)
-    return {"ok": True, "guardadas": guardadas, "avance": {
+    # Lo que otra capturó con otro número no se pisó: el celular pregunta y,
+    # si la empleada dice que sí, vuelve a mandar con reemplazar=true.
+    conflictos = [{
+        "variante_id": c.variante_id, "producto": c.producto, "talla": c.talla,
+        "quien": c.nombre_corto, "fisico_suyo": c.fisico_suyo, "fisico_tuyo": c.fisico_tuyo, "cuando": c.cuando,
+    } for c in res.conflictos]
+    return {"ok": True, "guardadas": res.guardadas, "conflictos": conflictos, "avance": {
         "tallas_hechas": a.tallas_hechas, "tallas_total": a.tallas_total,
         "prendas_hechas": a.prendas_hechas, "prendas_total": a.prendas_total}}
 
