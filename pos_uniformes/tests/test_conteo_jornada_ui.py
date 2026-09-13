@@ -192,6 +192,18 @@ class RevisionDialogTests(unittest.TestCase):
         self.assertEqual(d._table.rowCount(), 2)
         self.assertEqual(d._table.item(self._fila(d, "8"), 10).text(), "no se mueve")
 
+    def test_si_nada_hay_que_pedir_se_muestran_todas_y_lo_dice(self) -> None:
+        from pos_uniformes.database.models import LibretaVenta
+
+        s = self.factory()
+        s.query(LibretaVenta).delete()   # sin Libreta: todo "sin datos"
+        s.commit(); s.close()
+        d = self._dialogo()
+        self.assertTrue(d._solo_pedir.isChecked())
+        self.assertEqual(d._table.rowCount(), 2)   # no una tabla vacía
+        self.assertIn("se muestran todas", d._resumen_label.text())
+        self.assertEqual(d._table.item(0, 10).text(), "sin datos")
+
     def test_lo_de_las_cajas_se_ve_y_dice_surtir(self) -> None:
         from pos_uniformes.database.models import BodegaCaja, BodegaContenido
 

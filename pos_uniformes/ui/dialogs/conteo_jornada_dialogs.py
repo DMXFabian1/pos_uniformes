@@ -386,7 +386,12 @@ class ConteoRevisionDialog(QDialog):
         if r.urgentes:
             partes.append(f"<span style='color:#b91c1c'><b>{r.urgentes} urgentes</b> (no hay y la piden)</span>")
         partes.append(f"tu pedido: <b>{piezas}</b> piezas en {tallas} tallas")
-        self._resumen_label.setText(" · ".join(partes))
+        texto = " · ".join(partes)
+        if not r.lineas:
+            texto += "<br><span style='color:#8a8a8a'>Esta jornada no tiene tallas capturadas.</span>"
+        elif self._filtro_sin_efecto():
+            texto += "<br><span style='color:#8a8a8a'>Nada que pedir ni surtir todavía (faltan ventas para sacar el ritmo): se muestran todas las tallas.</span>"
+        self._resumen_label.setText(texto)
         self._hoja_btn.setEnabled(piezas > 0)
 
     def _lineas_visibles(self):
@@ -394,7 +399,17 @@ class ConteoRevisionDialog(QDialog):
 
         if not self._solo_pedir.isChecked():
             return list(self._revision.lineas)
-        return [l for l in self._revision.lineas if l.estado in (URGENTE, PEDIR, SURTIR) or self._pedidos.get(l.conteo_id)]
+        que_hacer = [l for l in self._revision.lineas if l.estado in (URGENTE, PEDIR, SURTIR) or self._pedidos.get(l.conteo_id)]
+        # Con poca Libreta casi nada tiene ritmo: si el filtro se lo come todo,
+        # se enseñan todas en vez de una tabla vacía (pasó el 2026-09-13).
+        return que_hacer if que_hacer else list(self._revision.lineas)
+
+    def _filtro_sin_efecto(self) -> bool:
+        from pos_uniformes.services.revision_service import PEDIR, SURTIR, URGENTE
+
+        return self._solo_pedir.isChecked() and bool(self._revision.lineas) and not any(
+            l.estado in (URGENTE, PEDIR, SURTIR) or self._pedidos.get(l.conteo_id) for l in self._revision.lineas
+        )
 
     # --- pintura -------------------------------------------------------------------
     def _pintar(self) -> None:
