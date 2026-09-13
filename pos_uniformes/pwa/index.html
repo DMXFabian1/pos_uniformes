@@ -214,6 +214,7 @@ table.tallas input{margin:0; min-height:46px; font-size:20px; font-weight:800; t
     </div>
     <div id="d-dinero"></div>
     <button class="btn-grande btn-acento oculto" id="d-btn-corte" onclick="duenoCorte()">🧾  Hacer corte</button>
+    <button class="btn-grande oculto" id="d-btn-bodega" onclick="duenoBodega()">📦  Bodega: llegó mercancía / pasar al piso</button>
     <div class="card">
       <strong>Hoy por empleada</strong>
       <div id="d-ranking"></div>
@@ -1020,7 +1021,141 @@ function pintarDueno(data) {
   duenoMenu();
   // El corte escribe en la base viva: solo desde la tienda.
   $("d-btn-corte").classList.toggle("oculto", modoServidor !== "tienda");
+  $("d-btn-bodega").classList.toggle("oculto", modoServidor !== "tienda");
   mostrar("dueno");
+}
+
+// ─── Bodega: llegó mercancía / pasar al piso (solo el dueño) ───────────────
+// Dos gestos y nada más. Lo que llega del maquilador entra al inventario y
+// a una caja; lo que pasa al rack sale de la caja. Es el dato que Revisar
+// necesita para saber qué se pidió y qué llegó.
+let bodPrenda = null, bodCaja = null;
+
+function duenoBodega() {
+  duenoSub(`<h1>📦 Bodega</h1>
+    <p class="sub">Lo que llega del maquilador se guarda en una caja. Lo que pasas al rack sale de la caja.</p>
+    <button class="btn-grande btn-acento" onclick="bodLlegoInicio()">📥  Llegó mercancía</button>
+    <button class="btn-grande" onclick="bodPisoInicio()">🧺  Pasar al piso</button>
+    <button class="btn-suave salir" onclick="duenoMenu()">← Regresar</button>`);
+}
+
+function bodLlegoInicio() {
+  bodPrenda = null;
+  duenoSub(`<h1>📥 Llegó mercancía</h1>
+    <p class="sub">¿Qué prenda llegó?</p>
+    <div class="fila-busca">
+      <input id="bod-q" placeholder="Camisa blanca, pants Conalep..." onkeydown="if(event.key==='Enter')bodBuscar()">
+      <button class="btn-suave" onclick="bodBuscar()">🔎</button>
+    </div>
+    <div id="bod-resultado"></div>
+    <button class="btn-suave salir" onclick="duenoBodega()">← Regresar</button>`);
+  $("bod-q").focus();
+}
+
+async function bodBuscar() {
+  const q = $("bod-q").value.trim();
+  if (q.length < 2) return;
+  $("bod-resultado").innerHTML = "<div class='card'>Buscando...</div>";
+  try {
+    const d = await api("/api/v1/movil/bodega/prendas?q=" + encodeURIComponent(q));
+    window._bodPrendas = d.prendas;
+    $("bod-resultado").innerHTML = d.prendas.length
+      ? d.prendas.map((p, i) => `<div class="fila" onclick="bodElegirPrenda(${i})" style="cursor:pointer"><span><b>${p.nombre}</b>` +
+          `<span class="sub" style="display:block">${p.escuela} · ${p.tallas.length} tallas</span></span><span class="monto">›</span></div>`).join("")
+      : "<div class='card'>No encontré esa prenda.</div>";
+  } catch (e) { $("bod-resultado").innerHTML = "<div class='card error'>No se pudo buscar.</div>"; }
+}
+
+async function bodElegirPrenda(i) {
+  bodPrenda = window._bodPrendas[i];
+  let cajas = [];
+  try { cajas = (await api("/api/v1/movil/bodega/cajas")).cajas; } catch (e) {}
+  // Cada talla: lo que pediste (prellenado), cuántas hay a la mano y en cajas.
+  const filas = bodPrenda.tallas.map(t => {
+    const pista = [t.a_la_mano ? `${t.a_la_mano} a la mano` : "", t.en_cajas ? `${t.en_cajas} en cajas` : ""].filter(Boolean).join(" · ");
+    const pediste = t.pedido ? `<small class="quien">pediste ${t.pedido}</small>` : "";
+    return `<tr><td class="t">${t.talla}${t.color && !/^(unico|único)$/i.test(t.color) ? " " + t.color : ""}${pediste}<small class="quien">${pista}</small></td>` +
+      `<td><input inputmode="numeric" pattern="[0-9]*" placeholder="0" value="${t.pedido || ""}" data-v="${t.variante_id}"></td></tr>`;
+  }).join("");
+  const opciones = cajas.map(c => `<option value="${c.id}">${c.codigo} · ${c.ubicacion || "sin ubicación"} · ${c.piezas} pzas</option>`).join("");
+  duenoSub(`<h1>📥 ${bodPrenda.nombre}</h1>
+    <p class="sub">${bodPrenda.escuela} · escribe cuántas llegaron de cada talla</p>
+    <div class="card prenda"><table class="tallas"><tr><th>Talla</th><th>Llegaron</th></tr>${filas}</table></div>
+    <div class="card">
+      <strong>¿En qué caja se guardan?</strong>
+      <select id="bod-caja" style="width:100%;min-height:44px;margin-top:8px;font-size:15px">
+        <option value="nueva">Caja nueva (en el almacén)</option>${opciones}
+      </select>
+      <input id="bod-ref" placeholder="Nota: maquilador, fecha... (opcional)" style="margin-top:8px">
+    </div>
+    <div class="barra-fija">
+      <button class="btn-suave" onclick="bodLlegoInicio()">← Otra prenda</button>
+      <button class="btn-acento" onclick="bodLlegoGuardar()">Guardar</button>
+    </div>`);
+}
+
+async function bodLlegoGuardar() {
+  const items = [...document.querySelectorAll("#dueno-sub input[data-v]")]
+    .map(i => ({variante_id: Number(i.dataset.v), cantidad: Number(i.value) || 0})).filter(i => i.cantidad > 0);
+  if (!items.length) { alert("Escribe cuántas llegaron de al menos una talla."); return; }
+  const caja = $("bod-caja").value;
+  const total = items.reduce((a, b) => a + b.cantidad, 0);
+  if (!confirm(`${total} piezas de ${bodPrenda.nombre} entran al inventario y se guardan en ${caja === "nueva" ? "una caja nueva" : "la caja elegida"}. ¿Guardar?`)) return;
+  try {
+    const r = await contPost("/api/v1/movil/bodega/llego", {
+      items, caja_id: caja === "nueva" ? null : Number(caja), caja_nueva: caja === "nueva", referencia: $("bod-ref").value.trim(),
+    });
+    duenoSub(`<h1>✓ Guardado</h1>
+      <div class="card"><strong>${r.piezas} piezas</strong> de ${bodPrenda.nombre} en ${r.tallas} tallas, en la caja <b>${r.caja_codigo}</b>.
+      <p class="sub">Ya cuentan en el inventario. Cuando las pases al rack, usa "Pasar al piso".</p></div>
+      <button class="btn-grande btn-acento" onclick="bodLlegoInicio()">📥  Llegó otra prenda</button>
+      <button class="btn-suave salir" onclick="duenoBodega()">← Bodega</button>`);
+  } catch (e) { alert(e.message); }
+}
+
+async function bodPisoInicio() {
+  bodCaja = null;
+  duenoSub(`<h1>🧺 Pasar al piso</h1><p class="sub">¿De qué caja?</p><div id="bod-cajas"><div class="card">Cargando...</div></div>
+    <button class="btn-suave salir" onclick="duenoBodega()">← Regresar</button>`);
+  try {
+    const cajas = (await api("/api/v1/movil/bodega/cajas")).cajas.filter(c => c.piezas > 0);
+    window._bodCajas = cajas;
+    $("bod-cajas").innerHTML = cajas.length
+      ? cajas.map((c, i) => `<div class="fila" onclick="bodElegirCaja(${i})" style="cursor:pointer"><span><b>${c.codigo}</b>` +
+          `<span class="sub" style="display:block">${c.ubicacion || "sin ubicación"} · ${c.tallas} tallas</span></span><span class="monto">${c.piezas} pzas ›</span></div>`).join("")
+      : "<div class='card'>No hay cajas con piezas.</div>";
+  } catch (e) { $("bod-cajas").innerHTML = "<div class='card error'>No se pudo cargar.</div>"; }
+}
+
+async function bodElegirCaja(i) {
+  bodCaja = window._bodCajas[i];
+  let contenido = [];
+  try { contenido = (await api("/api/v1/movil/bodega/cajas/" + bodCaja.id)).contenido; } catch (e) { alert("No se pudo abrir la caja."); return; }
+  const filas = contenido.map(c =>
+    `<tr><td class="t">${c.talla}${c.color && !/^(unico|único)$/i.test(c.color) ? " " + c.color : ""}<small class="quien">${c.producto} · hay ${c.cantidad}</small></td>` +
+    `<td><input inputmode="numeric" pattern="[0-9]*" placeholder="0" data-v="${c.variante_id}" data-max="${c.cantidad}"></td></tr>`).join("");
+  duenoSub(`<h1>🧺 Caja ${bodCaja.codigo}</h1>
+    <p class="sub">${bodCaja.ubicacion || ""} · escribe cuántas pasan al rack</p>
+    <div class="card prenda"><table class="tallas"><tr><th>Prenda</th><th>Al piso</th></tr>${filas}</table></div>
+    <div class="barra-fija">
+      <button class="btn-suave" onclick="bodPisoInicio()">← Otra caja</button>
+      <button class="btn-acento" onclick="bodPisoGuardar()">Guardar</button>
+    </div>`);
+}
+
+async function bodPisoGuardar() {
+  const inputs = [...document.querySelectorAll("#dueno-sub input[data-v]")];
+  const pasadas = inputs.filter(i => Number(i.value) > Number(i.dataset.max));
+  if (pasadas.length) { alert("Hay una talla con más piezas de las que tiene la caja."); return; }
+  const items = inputs.map(i => ({variante_id: Number(i.dataset.v), cantidad: Number(i.value) || 0})).filter(i => i.cantidad > 0);
+  if (!items.length) { alert("Escribe cuántas pasan al piso."); return; }
+  try {
+    const r = await contPost("/api/v1/movil/bodega/piso", {caja_id: bodCaja.id, items});
+    duenoSub(`<h1>✓ Al piso</h1>
+      <div class="card"><strong>${r.piezas} piezas</strong> salieron de la caja <b>${r.caja_codigo}</b>. ${r.quedan ? `Quedan ${r.quedan} en la caja.` : "La caja quedó vacía."}</div>
+      <button class="btn-grande btn-acento" onclick="bodPisoInicio()">🧺  Otra caja</button>
+      <button class="btn-suave salir" onclick="duenoBodega()">← Bodega</button>`);
+  } catch (e) { alert(e.message); }
 }
 
 // ── Corte del dueño desde el celular ──────────────────────────────
