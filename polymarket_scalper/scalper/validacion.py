@@ -458,6 +458,29 @@ def pnl_por_horizonte(d: Datos) -> list[dict[str, Any]]:
     return out
 
 
+def por_salida(d: Datos) -> list[dict[str, Any]]:
+    """Resultado según cómo terminó la posición. Es la vista que más explica.
+
+    En la captura de spread separa los dos casos que la estrategia mezcla: cuando se llenan **las
+    dos patas** se cobra el spread y se gana; cuando solo se llena una, queda un direccional que
+    nadie pidió y se pierde varias veces lo que se ganaba. Las dos cifras son estables en las tres
+    corridas (+1,7 y −6,4 a −8,5 por operación), así que no es una racha: es la mecánica.
+    """
+    out: list[dict[str, Any]] = []
+    for est, filas in sorted(_por_estrategia(d.ledger).items()):
+        validas = _validas(filas)
+        for motivo, sub in sorted(_por_clave(validas, "exit_reason").items()):
+            pnls = [r["realized_pnl"] for r in sub]
+            dur = [(r["ts_exit"] - r["ts_fill"]) / 1000 for r in sub
+                   if r.get("ts_exit") and r.get("ts_fill") and r["ts_exit"] >= r["ts_fill"]]
+            out.append({"estrategia": est, "salida": motivo, "n": len(sub),
+                        "pnl": round(sum(pnls), 2),
+                        "media": round(sum(pnls) / len(pnls), 3),
+                        "duracion_mediana_s": _mediana(dur),
+                        "nivel": nivel(len(sub))})
+    return sorted(out, key=lambda r: (r["estrategia"], r["pnl"]))
+
+
 # --------------------------------------------------------------------------- fuera de muestra
 def _rangos(valores: list[float]) -> list[int]:
     orden = sorted(range(len(valores)), key=lambda i: valores[i])
@@ -828,6 +851,7 @@ class Informe:
     cadena: dict[str, Any]
     estados: list[Estado]
     fuera: list[dict[str, Any]] = field(default_factory=list)
+    salidas_pnl: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -839,6 +863,7 @@ class Informe:
             "salidas": self.salidas, "cadena": self.cadena,
             "estados": [e.to_dict() for e in self.estados],
             "fuera_de_muestra": self.fuera,
+            "salidas_pnl": self.salidas_pnl,
         }
 
 
@@ -851,7 +876,7 @@ def analizar(data_dir: str | Path, experiment: str | None = None) -> Informe:
         horizontes=pnl_por_horizonte(d), frescura=por_frescura(d), umbrales_frescura=umbral_de_frescura(d),
         salud=salud_del_feed(d), rechazos=oportunidades_rechazadas(d), salidas=probabilidad_de_salida(d),
         cadena=cadena_de_tiempos(d), estados=estado_por_estrategia(d, lls),
-        fuera=fuera_de_muestra(d),
+        fuera=fuera_de_muestra(d), salidas_pnl=por_salida(d),
     )
 
 
@@ -1085,6 +1110,17 @@ def formatear(inf: Informe) -> str:  # noqa: C901 - es un informe, se lee de arr
     L.append("")
 
     # ---- semáforo
+    if inf.salidas_pnl:
+        L.append("-- ¿CÓMO TERMINAN, Y CUÁNTO CUESTA CADA FINAL? -------------------------------------")
+        L.append("Una media global esconde que una misma estrategia tenga un final que gana y otro que")
+        L.append("pierde mucho más. Aquí se ven separados.")
+        L.append(f"{'estrategia':24}{'salida':16}{'n':>5}{'pnl':>10}{'por op.':>10}{'duración':>11}  confianza")
+        L.append("-" * 100)
+        for r in inf.salidas_pnl:
+            dur = "-" if r["duracion_mediana_s"] is None else f"{r['duracion_mediana_s']:.0f} s"
+            L.append(f"{r['estrategia'][:24]:24}{r['salida'][:16]:16}{r['n']:>5}{r['pnl']:>+10.1f}"
+                     f"{r['media']:>+10.2f}{dur:>11}  {r['nivel']}")
+        L.append("")
     if inf.fuera:
         L.append("-- ¿SE SOSTIENE FUERA DE MUESTRA? --------------------------------------------------")
         L.append("¿La ventaja que promete el detector ordena los resultados también en muestra nueva?")

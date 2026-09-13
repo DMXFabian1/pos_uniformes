@@ -231,6 +231,44 @@ negativo: la señal informa, no cobra"**. La media sigue en negativo en los dos 
 demostrado es que la ventaja que calcula el detector lleva información real sobre cuáles de sus
 señales saldrán mejor, no que ninguna de ellas se pueda cobrar.
 
+## 6 ter. El hallazgo: la captura de spread no pierde, se le sueltan las patas
+
+La media global de `TENNIS_SPREAD_CAPTURE` es −2,36 por operación, y esconde dos finales opuestos.
+Separados por cómo termina la posición, en las tres corridas:
+
+| Corrida | Se llenan las dos patas | Se llena solo una |
+|---|---|---|
+| muestra-1 | 82 × **+1,76** | 62 × −8,51 |
+| muestra-2 | 51 × **+1,77** | 28 × −6,88 |
+| muestra-3 | 132 × **+1,68** | 132 × −6,39 |
+
+Cuando la estrategia hace lo que dice —entrar por los dos lados y cobrar el spread— gana, y gana
+lo mismo en las tres corridas: entre +1,68 y +1,77 por operación, 265 veces, con una mediana de
+128 segundos. Eso ya no es una racha.
+
+Cuando solo se llena una pata, queda un direccional que nadie pidió, se sostiene una mediana de
+**586 segundos** y cuesta entre −6,4 y −8,5. Pasa cerca de la mitad de las veces, y se lleva por
+delante todo lo anterior.
+
+El punto de equilibrio sale de ahí: con esas dos cifras haría falta que las dos patas se llenaran
+el **79 %** de las veces, y se llenan el 50 %.
+
+### Y esto explica la correlación de rangos
+
+La relación entre ventaja prometida y resultado, que se repitió en cuatro trozos independientes,
+resulta ser esto mismo. El "acierto" por tramo y la fracción de veces que se llenan las dos patas
+son el mismo número:
+
+| Tramo | 1-2 % | 2-3 % | 3-4 % | 4-5 % | 5-7 % | 7-10 % | 10 %+ |
+|---|---|---|---|---|---|---|---|
+| acierto | 48 % | 44 % | 57 % | 61 % | 74 % | 42 % | 50 % |
+| las dos patas | 48 % | 43 % | 55 % | 61 % | 74 % | 42 % | 50 % |
+
+Así que el detector no predice operaciones rentables: **un spread más ancho da más margen para que
+la segunda pata llegue antes de que el precio se mueva**. Es mecánico, no predictivo, y por eso se
+repite tan bien. Conviene decirlo porque la lectura fácil —"el modelo sabe cuáles son buenas"— es
+más halagadora y es falsa.
+
 ## 7. Escalera de madurez
 
 1. **MEDIBLE** (`listo_para_medir` en el informe): hay muestra suficiente, el llenado sale de

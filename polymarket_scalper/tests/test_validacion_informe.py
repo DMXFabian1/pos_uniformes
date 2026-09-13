@@ -443,3 +443,19 @@ def test_con_un_solo_trozo_no_se_finge_una_comprobacion_fuera_de_muestra(tmp_pat
     inf = analizar(tmp_path)
     assert inf.fuera == []
     assert "sin muestra independiente" in veredicto_fuera_de_muestra(inf.fuera, "NBA_DIRECTIONAL")
+
+
+def test_el_resultado_se_separa_por_como_termino_la_posicion(tmp_path):
+    # La media global de TENNIS_SPREAD_CAPTURE (-2,36) escondía dos finales opuestos: cuando se
+    # llenan las dos patas gana +1,68 y cuando solo se llena una pierde -6,39. Sin separarlos, la
+    # estrategia parece perder; separados, se ve que tiene un problema de patas sueltas.
+    ledger = [_fila(i, pnl=1.68, exit_reason="both_filled") for i in range(20)] + \
+             [_fila(100 + i, pnl=-6.39, exit_reason="expired") for i in range(20)]
+    _escribir(tmp_path, ledger=ledger)
+    inf = analizar(tmp_path)
+    por = {r["salida"]: r for r in inf.salidas_pnl}
+    assert por["both_filled"]["n"] == 20 and por["both_filled"]["media"] == 1.68
+    assert por["expired"]["n"] == 20 and por["expired"]["media"] == -6.39
+    # El que más pierde va primero: es el que hay que mirar.
+    assert inf.salidas_pnl[0]["salida"] == "expired"
+    assert "¿CÓMO TERMINAN" in formatear(inf)
