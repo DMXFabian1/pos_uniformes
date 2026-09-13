@@ -3791,6 +3791,82 @@ class QuoteSatelliteWindow(QMainWindow):
         self._refresh_conteo_banner()
         self._refresh_conteos_vista()
 
+    def _conteos_eliminar(self, foto) -> None:
+        """Borra una jornada a medias (duplicada o abierta por error) con lo
+        que llevara capturado. Nunca tocó el inventario, así que no se pierde
+        nada aplicado."""
+        from pos_uniformes.services import conteo_jornada_service as jn
+
+        code = str(self._conteos_code or "")
+        if not jn.puede_eliminarla(foto, code):
+            self._set_status("Solo el dueño, o quien la abrió, puede eliminarla.")
+            return
+        r = QMessageBox.question(
+            self, "Eliminar jornada",
+            f"Se borra la jornada de {foto.titulo} ({foto.quien}, {jn.cuando(foto.iniciada_at)}) y lo que llevara capturado.\n\n¿Eliminar?",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if r != QMessageBox.StandardButton.Yes:
+            return
+        try:
+            from pos_uniformes.database.models import ConteoJornada
+
+            with get_session() as session:
+                j = session.get(ConteoJornada, foto.id)
+                n = jn.eliminar_jornada(session, j, empleada_code=code) if j is not None else 0
+                session.commit()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "No se eliminó", str(exc))
+            return
+        self._set_status(f"Jornada de {foto.titulo} eliminada" + (f" ({n} tallas)." if n else "."))
+        self._refresh_conteos_vista()
+
+    def _conteos_reasignar(self, foto) -> None:
+        """El dueño pasa una jornada a medias a otra empleada."""
+        from PyQt6.QtWidgets import QInputDialog
+
+        from pos_uniformes.services import conteo_jornada_service as jn
+
+        if str(self._conteos_code or "") != jn.DUENO_CODE:
+            self._set_status("Solo el dueño reasigna jornadas.")
+            return
+        try:
+            from pos_uniformes.database.models import Empleada
+
+            with get_session() as session:
+                gente = [
+                    (str(e.codigo).upper(), str(e.nombre_completo or ""))
+                    for e in session.query(Empleada).filter(Empleada.activo.is_(True)).order_by(Empleada.nombre_completo).all()
+                ]
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Sin conexión", str(exc))
+            return
+        gente = [g for g in gente if g[0] != foto.empleada_code]
+        if not gente:
+            self._set_status("No hay otra empleada activa a quién pasársela.")
+            return
+        opciones = [f"{n} ({c})" if n else c for c, n in gente]
+        elegido, ok = QInputDialog.getItem(
+            self, "Reasignar jornada", f"¿A quién le pasas {foto.titulo}?", opciones, 0, False,
+        )
+        if not ok or not elegido:
+            return
+        a_code, a_nombre = gente[opciones.index(elegido)]
+        try:
+            from pos_uniformes.database.models import ConteoJornada
+
+            with get_session() as session:
+                j = session.get(ConteoJornada, foto.id)
+                if j is not None:
+                    jn.reasignar_jornada(session, j, a_code=a_code, a_nombre=a_nombre, por_code=jn.DUENO_CODE)
+                session.commit()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "No se reasignó", str(exc))
+            return
+        self._set_status(f"{foto.titulo} ahora es de {a_nombre or a_code}.")
+        self._refresh_conteos_vista()
+
     def _conteos_revisar(self, foto) -> None:
         """El dueño revisa y aplica (o descarta) una jornada terminada."""
         from pos_uniformes.services.conteo_jornada_service import DUENO_CODE

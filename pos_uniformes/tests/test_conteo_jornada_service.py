@@ -121,6 +121,39 @@ class JornadaTests(unittest.TestCase):
         self.assertIsNone(jn.jornada_abierta_de(self.s, self.escuela.id))
         jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-5")
 
+    def test_eliminar_una_jornada_a_medias_se_lleva_sus_tallas(self) -> None:
+        # Se abrieron dos de la misma escuela (antes de la regla de una sola): sobra una.
+        j = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4")
+        v = self._variantes()
+        registrar_conteos_lote(self.s, [ConteoInput(v[0].id, 3)], "x", jornada_id=j.id)
+        self.assertFalse(jn.puede_eliminarla(j, "VEND-5"))
+        with self.assertRaises(PermissionError):
+            jn.eliminar_jornada(self.s, j, empleada_code="VEND-5")
+        self.assertTrue(jn.puede_eliminarla(j, "VEND-4"))
+        n = jn.eliminar_jornada(self.s, j, empleada_code="VEND-1")
+        self.s.commit()
+        self.assertEqual(n, 1)
+        self.assertEqual(jn.jornadas_abiertas(self.s), [])
+        self.assertEqual(self.s.scalars(select(ConteoInventario)).all(), [])
+        self.assertEqual(v[0].stock_actual, 10)   # nunca tocó el inventario
+
+    def test_una_terminada_no_se_elimina(self) -> None:
+        j = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4")
+        jn.terminar_jornada(self.s, j, empleada_code="VEND-4")
+        self.assertFalse(jn.puede_eliminarla(j, "VEND-1"))
+        with self.assertRaises(PermissionError):
+            jn.eliminar_jornada(self.s, j, empleada_code="VEND-1")
+
+    def test_reasignar_solo_el_dueno_y_lo_capturado_conserva_quien(self) -> None:
+        j = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4", empleada_nombre="Stayce")
+        v = self._variantes()
+        registrar_conteos_lote(self.s, [ConteoInput(v[0].id, 3)], "Stayce (VEND-4)", jornada_id=j.id)
+        with self.assertRaises(PermissionError):
+            jn.reasignar_jornada(self.s, j, a_code="VEND-5", a_nombre="Fanny", por_code="VEND-4")
+        jn.reasignar_jornada(self.s, j, a_code="vend-5", a_nombre="Fanny Ortiz", por_code="VEND-1")
+        self.assertEqual((j.empleada_code, j.quien if hasattr(j, "quien") else j.empleada_nombre), ("VEND-5", "Fanny Ortiz"))
+        self.assertEqual(self.s.scalars(select(ConteoInventario)).one().contado_por, "Stayce (VEND-4)")
+
     def test_basicos_una_abierta_por_prenda(self) -> None:
         j = jn.abrir_jornada(self.s, escuela_id=None, tipo_pieza="Playera", empleada_code="VEND-4")
         with self.assertRaises(jn.JornadaEnProceso):

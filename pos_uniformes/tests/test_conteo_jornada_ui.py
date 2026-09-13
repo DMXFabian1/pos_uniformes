@@ -80,6 +80,30 @@ class TarjetasTests(unittest.TestCase):
         b1.click()
         self.assertEqual([f.id for f in self.capturadas], [1])
 
+    def test_eliminar_y_reasignar_segun_quien_mira(self) -> None:
+        from PyQt6.QtWidgets import QPushButton
+
+        eliminadas, reasignadas = [], []
+        self.w._conteos_eliminar = lambda f: eliminadas.append(f.id)
+        self.w._conteos_reasignar = lambda f: reasignadas.append(f.id)
+        propia = _foto(id=1, empleada_code="VEND-4")
+        ajena = _foto(id=2, empleada_code="VEND-5", empleada_nombre="Fanny")
+
+        # Una empleada: puede eliminar la suya, no la ajena; reasignar nunca.
+        tarjetas.pintar_jornadas(self.w, abiertas=[(propia, _avance(), True), (ajena, _avance(), True)], por_revisar=[], code="VEND-4")
+        textos = lambda i: [b.text() for b in self.w.conteos_jornadas_box.itemAt(i).widget().findChildren(QPushButton)]  # noqa: E731
+        self.assertEqual(textos(0), ["Eliminar", "Seguir"])
+        self.assertEqual(textos(1), ["Seguir"])
+        next(b for b in self.w.conteos_jornadas_box.itemAt(0).widget().findChildren(QPushButton) if b.text() == "Eliminar").click()
+        self.assertEqual(eliminadas, [1])
+
+        # El dueño: reasignar y eliminar en todas.
+        tarjetas.pintar_jornadas(self.w, abiertas=[(propia, _avance(), True), (ajena, _avance(), True)], por_revisar=[], code="VEND-1")
+        self.assertEqual(textos(0), ["Reasignar", "Eliminar", "Seguir"])
+        self.assertEqual(textos(1), ["Reasignar", "Eliminar", "Seguir"])
+        next(b for b in self.w.conteos_jornadas_box.itemAt(1).widget().findChildren(QPushButton) if b.text() == "Reasignar").click()
+        self.assertEqual(reasignadas, [2])
+
     def test_lo_por_revisar_solo_aparece_si_llega_y_abre_la_revision(self) -> None:
         from PyQt6.QtWidgets import QPushButton
 

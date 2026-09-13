@@ -48,7 +48,9 @@ def texto_avance(avance) -> str:
     )
 
 
-def _tarjeta(foto, avance, *, boton: str, activo: bool, al_click, resaltada: bool) -> QFrame:
+def _tarjeta(foto, avance, *, boton: str, activo: bool, al_click, resaltada: bool, extras=()) -> QFrame:
+    """`extras`: [(texto, callback, es_peligroso)] — botones chicos junto al
+    principal (Reasignar, Eliminar)."""
     from pos_uniformes.services.conteo_jornada_service import cuando
 
     card = QFrame()
@@ -88,6 +90,13 @@ def _tarjeta(foto, avance, *, boton: str, activo: bool, al_click, resaltada: boo
     der.addWidget(barra)
     ly.addLayout(der)
 
+    for texto, cb, peligroso in extras:
+        chico = QPushButton(texto)
+        chico.setObjectName("dangerButton" if peligroso else "")
+        chico.setAutoDefault(False)
+        chico.setStyleSheet("QPushButton { padding: 5px 10px; font-size: 12px; }")
+        chico.clicked.connect(lambda _c=False, f=foto, c=cb: c(f))
+        ly.addWidget(chico)
     btn = QPushButton(boton if activo else "Es de otra")
     if activo:
         btn.setObjectName("primaryButton")
@@ -134,11 +143,23 @@ def pintar_jornadas(window, *, abiertas, por_revisar, code: str, recientes=()) -
         vacio = QLabel("No hay conteos a medias. Empieza uno desde la barra de arriba.")
         vacio.setObjectName("libretaPanelVacio")
         window.conteos_jornadas_box.addWidget(vacio)
+    from pos_uniformes.services.conteo_jornada_service import puede_eliminarla
+
+    reasignar = getattr(window, "_conteos_reasignar", None)
+    eliminar = getattr(window, "_conteos_eliminar", None)
     for foto, avance, puede in abiertas:
+        # Reasignar: solo el dueño. Eliminar: el dueño o quien la abrió (para
+        # las duplicadas o abiertas por error, como pidió Daniel el 2026-09-13).
+        extras = []
+        if reasignar is not None and code == DUENO_CODE:
+            extras.append(("Reasignar", reasignar, False))
+        if eliminar is not None and puede_eliminarla(foto, code):
+            extras.append(("Eliminar", eliminar, True))
         window.conteos_jornadas_box.addWidget(
             _tarjeta(
                 foto, avance, boton="Seguir", activo=puede,
                 al_click=window._conteos_capturar, resaltada=(foto.empleada_code == code),
+                extras=extras,
             )
         )
 

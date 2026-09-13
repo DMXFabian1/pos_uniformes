@@ -530,6 +530,42 @@ def descartar_jornada(session: Session, jornada: ConteoJornada, *, revisada_por:
     session.flush()
 
 
+def puede_eliminarla(jornada: ConteoJornada, empleada_code: str) -> bool:
+    """Una jornada a medias la borra el dueño, o quien la abrió."""
+    code = (empleada_code or "").strip().upper()
+    return jornada.terminada_at is None and (code == DUENO_CODE or code == jornada.empleada_code)
+
+
+def eliminar_jornada(session: Session, jornada: ConteoJornada, *, empleada_code: str) -> int:
+    """Borra una jornada a medias (duplicada, abierta por error) con sus
+    tallas capturadas, que nunca tocaron el inventario. Devuelve cuántas
+    tallas se fueron con ella. Si alguna ya se aplicó, no se borra."""
+    if not puede_eliminarla(jornada, empleada_code):
+        raise PermissionError("Solo el dueño, o quien la abrió, puede eliminar una jornada a medias.")
+    renglones = list(session.scalars(select(ConteoInventario).where(ConteoInventario.jornada_id == jornada.id)).all())
+    if any(r.ajustado for r in renglones):
+        raise ValueError("Esa jornada ya tiene tallas aplicadas al inventario: no se puede borrar.")
+    for r in renglones:
+        session.delete(r)
+    session.delete(jornada)
+    session.flush()
+    return len(renglones)
+
+
+def reasignar_jornada(session: Session, jornada: ConteoJornada, *, a_code: str, a_nombre: str = "", por_code: str) -> ConteoJornada:
+    """Cambia a nombre de quién está la jornada (solo el dueño). Lo ya
+    capturado conserva quién lo contó."""
+    if (por_code or "").strip().upper() != DUENO_CODE:
+        raise PermissionError("Solo el dueño reasigna una jornada.")
+    if not (a_code or "").strip():
+        raise ValueError("Elige a quién se la pasas.")
+    jornada.empleada_code = a_code.strip().upper()
+    jornada.empleada_nombre = (a_nombre or "").strip()
+    session.add(jornada)
+    session.flush()
+    return jornada
+
+
 def cuando(momento: datetime | None) -> str:
     """'hoy 10:20' / 'ayer 16:05' / '08/09 12:40' para las tarjetas."""
     if momento is None:
