@@ -67,10 +67,9 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
 table.tallas{width:100%; border-collapse:collapse}
 table.tallas th{font-size:12px; color:var(--acento-osc); background:#f5ebe0; padding:7px 6px; text-align:center}
 table.tallas td{padding:4px 6px; border-top:1px solid #efe5d8; text-align:center}
-table.tallas td.t{font-weight:800; font-size:16px; width:30%}
+table.tallas td.t{font-weight:800; font-size:18px; width:38%}
 table.tallas input{margin:0; min-height:46px; font-size:20px; font-weight:800; text-align:center;
   padding:0 6px; border-radius:10px}
-table.tallas input.pedido{font-weight:600; color:var(--tenue)}
 .prenda .pie{display:flex; gap:8px; padding:8px 10px 10px; align-items:center}
 .prenda .pie .estado{flex:1; font-size:12px; color:var(--tenue)}
 .prenda .pie .estado.ok{color:var(--verde); font-weight:700}
@@ -257,7 +256,7 @@ table.tallas input.pedido{font-weight:600; color:var(--tenue)}
       <h1 id="cont-titulo"></h1>
       <p class="sub" id="cont-avance-txt"></p>
       <div class="avance"><div id="cont-avance" style="width:0%"></div></div>
-      <p class="sub" style="margin:8px 0 12px">Exist. = cuántas hay. Si no contaste una talla, déjala vacía: vacío NO es cero. Pedido = cuántas pedir (opcional). Cada prenda se guarda sola.</p>
+      <p class="sub" style="margin:8px 0 12px">Escribe cuántas hay de cada talla. Si no contaste una, déjala vacía: vacío NO es cero. Cada prenda se guarda sola.</p>
       <div id="cont-prendas"></div>
       <div class="barra-fija">
         <button class="btn-suave" onclick="contSalir()">Dejar para después</button>
@@ -446,15 +445,14 @@ function contPintarHoja(hoja) {
     const filas = p.tallas.map(t => {
       const b = borrador[t.variante_id] || {};
       const fis = b.fisico !== undefined ? b.fisico : (t.fisico ?? "");
-      const ped = b.pedido !== undefined ? b.pedido : (t.pedido ?? "");
+      // Sin columna Pedido: los pedidos los gestiona Daniel, no van en el conteo.
       return `<tr><td class="t">${t.talla}</td>` +
-        `<td><input inputmode="numeric" pattern="[0-9]*" placeholder="" value="${fis}" data-v="${t.variante_id}" data-k="fisico" data-p="${p.numero}" oninput="contCambio(${p.numero})"></td>` +
-        `<td><input class="pedido" inputmode="numeric" pattern="[0-9]*" placeholder="" value="${ped}" data-v="${t.variante_id}" data-k="pedido" data-p="${p.numero}" oninput="contCambio(${p.numero})"></td></tr>`;
+        `<td><input inputmode="numeric" pattern="[0-9]*" placeholder="" value="${fis}" data-v="${t.variante_id}" data-k="fisico" data-p="${p.numero}" oninput="contCambio(${p.numero})"></td></tr>`;
     }).join("");
     return `<div class="card prenda${p.completa ? " lista" : ""}" id="prenda-${p.numero}">` +
       `<div class="cab"><span>${p.nombre}</span><span class="n">${p.numero}/${p.total}</span></div>` +
       (p.tipo_pieza && !p.nombre.toLowerCase().includes(p.tipo_pieza.toLowerCase()) ? `<p class="sub">${p.tipo_pieza}</p>` : "") +
-      `<table class="tallas"><tr><th>Talla</th><th>Exist.</th><th>Pedido</th></tr>${filas}</table>` +
+      `<table class="tallas"><tr><th>Talla</th><th>Cuántas hay</th></tr>${filas}</table>` +
       `<div class="pie"><span class="estado" id="estado-${p.numero}">${p.completa ? "✓ completa" : ""}</span>` +
       `<button class="btn-suave" id="btn-${p.numero}" onclick="contGuardar(${p.numero})">Guardar</button></div></div>`;
   }).join("");
@@ -475,9 +473,9 @@ function contMarcar(num, texto, clase) {
 
 function contItems(num) {
   return [...document.querySelectorAll(`#prenda-${num} input`)].reduce((acc, inp) => {
-    const v = inp.dataset.v; acc[v] = acc[v] || {variante_id: Number(v), fisico: null, pedido: null};
+    const v = inp.dataset.v; acc[v] = acc[v] || {variante_id: Number(v), fisico: null};
     const val = inp.value.trim();
-    acc[v][inp.dataset.k] = val === "" ? null : Number(val);
+    acc[v][inp.dataset.k] = val === "" ? null : Number(val);   // solo "fisico" desde el celular
     return acc;
   }, {});
 }
@@ -487,7 +485,7 @@ function contCambio(num) {
   contMarcar(num, "sin guardar…");
   // Borrador local por si se va el WiFi antes de subir.
   const b = contBorrador();
-  for (const it of Object.values(contItems(num))) b[it.variante_id] = {fisico: it.fisico, pedido: it.pedido};
+  for (const it of Object.values(contItems(num))) b[it.variante_id] = {fisico: it.fisico};
   contGuardarBorrador(b);
   clearTimeout(contTimers[num]);
   contTimers[num] = setTimeout(() => contGuardar(num), 1800);
