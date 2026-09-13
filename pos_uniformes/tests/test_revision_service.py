@@ -1,0 +1,194 @@
+"""Revisar = decidir qué pedir: ventas por talla, ritmo, sugerencia y memoria del pedido."""
+
+from __future__ import annotations
+
+import unittest
+from datetime import date, datetime, timedelta
+
+from sqlalchemy import create_engine, select
+
+from pos_uniformes.database.connection import Base
+from pos_uniformes.database.models import ConteoInventario, DemandaNoAtendida, LibretaVenta, Variante
+from pos_uniformes.services import conteo_jornada_service as jn
+from pos_uniformes.services import revision_service as rv
+from pos_uniformes.services.conteo_service import ConteoInput, registrar_conteos_lote
+from pos_uniformes.tests.test_conteo_jornada_service import _seed
+from sqlalchemy.orm import Session
+
+HOY = date(2026, 9, 13)
+
+
+def _dt(d: date, hora: int = 12) -> datetime:
+    return datetime(d.year, d.month, d.day, hora)
+
+
+class SugerirTests(unittest.TestCase):
+    def test_pide_lo_que_falta_para_cuatro_semanas(self) -> None:
+        # 14 vendidas en 14 días = 7/semana; 4 semanas = 28; hay 10 → pedir 18
+        sugerido, ritmo, cubiertas, estado = rv.sugerir(conto=10, vendidas=14, dias_observados=14, pidieron=0)
+        self.assertEqual((sugerido, ritmo, cubiertas, estado), (18, 7.0, 1.4, rv.PEDIR))
+
+    def test_bien_cuando_alcanza(self) -> None:
+        sugerido, _, cubiertas, estado = rv.sugerir(conto=40, vendidas=14, dias_observados=14, pidieron=0)
+        self.assertEqual((sugerido, estado), (0, rv.BIEN))
+        self.assertGreaterEqual(cubiertas, 4)
+
+    def test_urgente_si_no_hay_y_la_piden(self) -> None:
+        sugerido, _, _, estado = rv.sugerir(conto=0, vendidas=0, dias_observados=20, pidieron=3)
+        self.assertEqual(estado, rv.URGENTE)
+        self.assertGreater(sugerido, 0)
+
+    def test_lo_que_pidieron_y_no_habia_cuenta_como_venta(self) -> None:
+        con, *_ = rv.sugerir(conto=0, vendidas=4, dias_observados=28, pidieron=0)
+        con_demanda, *_ = rv.sugerir(conto=0, vendidas=4, dias_observados=28, pidieron=4)
+        self.assertEqual((con, con_demanda), (4, 8))
+
+    def test_no_se_mueve_vs_sin_datos(self) -> None:
+        self.assertEqual(rv.sugerir(conto=5, vendidas=0, dias_observados=30, pidieron=0)[3], rv.NO_SE_MUEVE)
+        self.assertEqual(rv.sugerir(conto=5, vendidas=0, dias_observados=3, pidieron=0)[3], rv.SIN_DATOS)
+
+    def test_semanas_configurables(self) -> None:
+        self.assertEqual(rv.sugerir(conto=0, vendidas=7, dias_observados=7, pidieron=0, semanas=2)[0], 14)
+
+
+class RevisarTests(unittest.TestCase):
+    def setUp(self) -> None:
+        self.engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(self.engine)
+        self.s = Session(self.engine)
+        self.escuela = _seed(self.s, "Uno")   # 2 prendas × tallas 6 y 8
+        self.s.commit()
+        self.v = list(self.s.scalars(select(Variante).order_by(Variante.id)).all())
+
+    def tearDown(self) -> None:
+        self.s.close()
+
+    # --- ayudas ---------------------------------------------------------------
+    def _venta(self, dia: date, sku: str, cantidad: int, tipo: str = "venta") -> None:
+        self.s.add(LibretaVenta(
+            employee_code="VEND-4", tipo=tipo, piezas=cantidad, monto_total=100 * cantidad,
+            detalle=[{"sku": sku, "talla": "6", "nombre": "x", "cantidad": cantidad, "precio": "100", "subtotal": "100"}],
+            created_at=_dt(dia),
+        ))
+        self.s.flush()
+
+    def _conteo_previo(self, variante: Variante, fisico: int, dia: date, *, pedido: int | None = None, sugerido: int | None = None) -> ConteoInventario:
+        c = ConteoInventario(
+            variante_id=variante.id, escuela_id=self.escuela.id, stock_sistema=0, stock_fisico=fisico,
+            diferencia=fisico, contado_por="x", contado_at=_dt(dia), pedido=pedido, pedido_sugerido=sugerido,
+            pedido_decidido_at=_dt(dia) if pedido is not None else None,
+        )
+        self.s.add(c)
+        self.s.flush()
+        return c
+
+    def _jornada_con(self, tallas: dict[Variante, int], dia: date = HOY, notas: dict[Variante, str] | None = None):
+        j = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4", empleada_nombre="Fanny")
+        registrar_conteos_lote(
+            self.s,
+            [ConteoInput(v.id, n, (notas or {}).get(v)) for v, n in tallas.items()],
+            "Fanny (VEND-4)",
+            jornada_id=j.id,
+        )
+        for c in self.s.scalars(select(ConteoInventario).where(ConteoInventario.jornada_id == j.id)):
+            c.contado_at = _dt(dia)
+        self.s.flush()
+        return j
+
+    # --- pruebas ---------------------------------------------------------------
+    def test_ventas_desde_el_conteo_anterior_por_sku(self) -> None:
+        v0 = self.v[0]
+        self._conteo_previo(v0, 20, HOY - timedelta(days=14))
+        self._venta(HOY - timedelta(days=20), v0.sku, 5)   # antes del conteo anterior: no cuenta
+        self._venta(HOY - timedelta(days=10), v0.sku, 3)
+        self._venta(HOY - timedelta(days=2), v0.sku, 4)
+        self._venta(HOY - timedelta(days=2), self.v[1].sku, 9)  # otra talla
+        j = self._jornada_con({v0: 13})
+        linea = rv.revisar(self.s, j, hoy=HOY).lineas[0]
+        self.assertEqual((linea.anterior, linea.anterior_at), (20, HOY - timedelta(days=14)))
+        self.assertEqual(linea.vendidas, 7)
+        self.assertEqual(linea.dias_observados, 14)
+        self.assertEqual(linea.ritmo_semana, 3.5)
+        # 3.5 × 4 = 14; hay 13 → pedir 1
+        self.assertEqual((linea.sugerido, linea.estado), (1, rv.PEDIR))
+
+    def test_sin_conteo_anterior_mira_desde_que_hay_libreta(self) -> None:
+        v0 = self.v[0]
+        self._venta(HOY - timedelta(days=21), v0.sku, 6)
+        self._venta(HOY - timedelta(days=1), v0.sku, 1)
+        j = self._jornada_con({v0: 0})
+        linea = rv.revisar(self.s, j, hoy=HOY).lineas[0]
+        self.assertIsNone(linea.anterior)
+        self.assertEqual((linea.vendidas, linea.dias_observados), (7, 21))
+        self.assertEqual(linea.estado, rv.URGENTE)
+
+    def test_sin_libreta_no_inventa_ritmo(self) -> None:
+        j = self._jornada_con({self.v[0]: 4})
+        linea = rv.revisar(self.s, j, hoy=HOY).lineas[0]
+        self.assertEqual((linea.vendidas, linea.dias_observados, linea.sugerido, linea.estado), (0, 0, 0, rv.SIN_DATOS))
+
+    def test_apartados_cuentan_y_otros_tipos_no(self) -> None:
+        v0 = self.v[0]
+        self._venta(HOY - timedelta(days=5), v0.sku, 2, tipo="apartado")
+        self._venta(HOY - timedelta(days=5), v0.sku, 9, tipo="devolucion")
+        j = self._jornada_con({v0: 30})
+        self.assertEqual(rv.revisar(self.s, j, hoy=HOY).lineas[0].vendidas, 2)
+
+    def test_lo_que_pidieron_y_no_habia_entra_a_la_cuenta(self) -> None:
+        v0 = self.v[0]
+        self._venta(HOY - timedelta(days=13), v0.sku, 1)  # para que exista Libreta
+        self.s.add(DemandaNoAtendida(tipo="talla_agotada", sku=v0.sku, piezas=2, created_at=_dt(HOY - timedelta(days=3))))
+        self.s.add(DemandaNoAtendida(tipo="busqueda_vacia", sku=v0.sku, piezas=1, created_at=_dt(HOY - timedelta(days=3))))
+        self.s.flush()
+        j = self._jornada_con({v0: 0})
+        linea = rv.revisar(self.s, j, hoy=HOY).lineas[0]
+        self.assertEqual(linea.pidieron, 2)
+        self.assertEqual(linea.estado, rv.URGENTE)
+
+    def test_lo_que_ellas_anotaron_en_la_hoja(self) -> None:
+        v0 = self.v[0]
+        j = self._jornada_con({v0: 3}, notas={v0: "Pedido: 12"})
+        self.assertEqual(rv.revisar(self.s, j, hoy=HOY).lineas[0].ellas_sugieren, 12)
+
+    def test_recuerda_el_pedido_anterior_y_que_paso_despues(self) -> None:
+        v0 = self.v[0]
+        self._conteo_previo(v0, 2, HOY - timedelta(days=21), pedido=6, sugerido=5)
+        self._venta(HOY - timedelta(days=10), v0.sku, 4)
+        j = self._jornada_con({v0: 4})
+        linea = rv.revisar(self.s, j, hoy=HOY).lineas[0]
+        self.assertEqual((linea.pedido_anterior, linea.pedido_anterior_at), (6, HOY - timedelta(days=21)))
+        self.assertEqual(linea.vendidas_desde_pedido, 4)
+
+    def test_guardar_pedidos_es_del_dueno_y_deja_memoria(self) -> None:
+        v0, v1 = self.v[0], self.v[1]
+        self._venta(HOY - timedelta(days=14), v0.sku, 14)
+        j = self._jornada_con({v0: 10, v1: 10})
+        rev = rv.revisar(self.s, j, hoy=HOY)
+        ids = {l.variante_id: l.conteo_id for l in rev.lineas}
+        with self.assertRaises(PermissionError):
+            rv.guardar_pedidos(self.s, j, {ids[v0.id]: 20}, decidido_por="VEND-4")
+        n = rv.guardar_pedidos(self.s, j, {ids[v0.id]: 20, ids[v1.id]: None}, decidido_por="VEND-1")
+        self.assertEqual(n, 1)
+        c0 = self.s.get(ConteoInventario, ids[v0.id])
+        self.assertEqual((c0.pedido, c0.pedido_sugerido), (20, rev.lineas[0].sugerido))
+        self.assertIsNotNone(c0.pedido_decidido_at)
+        self.assertIsNone(self.s.get(ConteoInventario, ids[v1.id]).pedido)
+        # La revisión ya trae lo decidido.
+        rev2 = rv.revisar(self.s, j, hoy=HOY)
+        self.assertEqual([l.pedido for l in rev2.lineas], [20, None])
+        self.assertEqual(rev2.piezas_pedidas, 20)
+
+    def test_totales(self) -> None:
+        v0, v1 = self.v[0], self.v[1]
+        self._venta(HOY - timedelta(days=14), v0.sku, 14)
+        self._venta(HOY - timedelta(days=14), v1.sku, 2)
+        j = self._jornada_con({v0: 0, v1: 50})
+        rev = rv.revisar(self.s, j, hoy=HOY)
+        self.assertEqual(rev.tallas_a_pedir, 1)
+        self.assertEqual(rev.piezas_sugeridas, 28)
+        self.assertEqual(rev.urgentes, 1)
+        self.assertEqual(rev.quien, "Fanny")
+
+
+if __name__ == "__main__":
+    unittest.main()

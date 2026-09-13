@@ -1073,6 +1073,12 @@ class ConteoInventario(Base):
         nullable=True,
         index=True,
     )
+    # Lo que Daniel decidió pedir al revisar (2026-09-13), junto a lo que el
+    # sistema le sugirió. Es la memoria con la que la siguiente revisión
+    # aprende: "pediste 6, se vendieron 4 en 3 semanas".
+    pedido_sugerido: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    pedido: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    pedido_decidido_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
     variante: Mapped["Variante"] = relationship()
     escuela: Mapped["Escuela"] = relationship()
