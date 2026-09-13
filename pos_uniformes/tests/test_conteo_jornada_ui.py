@@ -315,6 +315,27 @@ class RevisionDialogTests(unittest.TestCase):
         self.assertEqual(len(h._grafica.semanas), 12)
         self.assertEqual(sum(s.vendidas for s in h._grafica.semanas), 14)
 
+    def test_la_historia_de_la_escuela_ordena_lo_que_mas_se_vende(self) -> None:
+        from pos_uniformes.ui.dialogs.conteo_jornada_dialogs import EscuelaHistoriaDialog
+
+        h = EscuelaHistoriaDialog(escuela_id=self.foto.escuela_id, session_factory=self.factory)
+        self._dialogos.append(h)
+        self.assertEqual(h._encabezado.text(), "Uno")
+        self.assertIn("<b>14</b> piezas vendidas", h._resumen.text())
+        self.assertEqual(h._tabla.rowCount(), 2)                       # solo prendas
+        self.assertEqual(h._tabla.item(0, 2).text(), "14")             # la que vende va primero
+        self.assertEqual(h._tabla.item(0, 3).text(), "100 %")
+        h._solo_prendas.setChecked(True)
+        self.assertEqual(h._tabla.rowCount(), 6)                       # 2 prendas + 4 tallas
+        self.assertEqual(h._tabla.item(1, 1).text(), "6 AZUL")         # talla 6 es la vendida
+        self.assertEqual(h._tabla.item(1, 2).text(), "14")
+        # Desde Revisar se abre con un botón.
+        d = self._dialogo()
+        with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.EscuelaHistoriaDialog") as esc:
+            d._historia_escuela()
+            esc.assert_called_once()
+            self.assertEqual(esc.call_args.kwargs["escuela_id"], self.foto.escuela_id)
+
     def test_descartar_no_toca_el_stock(self) -> None:
         d = self._dialogo()
         with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.QMessageBox.question",

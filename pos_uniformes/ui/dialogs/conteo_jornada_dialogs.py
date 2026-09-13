@@ -332,6 +332,9 @@ class ConteoRevisionDialog(QDialog):
         self._historia_btn = QPushButton("Historia de la talla")
         self._historia_btn.clicked.connect(self._historia)
         acciones.addWidget(self._historia_btn)
+        self._escuela_btn = QPushButton("Historia de la escuela")
+        self._escuela_btn.clicked.connect(self._historia_escuela)
+        acciones.addWidget(self._escuela_btn)
         acciones.addStretch()
         descartar = QPushButton("Descartar")
         descartar.setObjectName("dangerButton")
@@ -558,6 +561,12 @@ class ConteoRevisionDialog(QDialog):
         if linea is None:
             return
         TallaHistoriaDialog(self, variante_id=linea.variante_id, titulo=self._revision.titulo, session_factory=self._session_factory).exec()
+
+    def _historia_escuela(self) -> None:
+        EscuelaHistoriaDialog(
+            self, escuela_id=self._jornada.escuela_id, tipo_pieza=getattr(self._jornada, "tipo_pieza", "") or "",
+            session_factory=self._session_factory,
+        ).exec()
 
     def _aplicar(self) -> None:
         if self._revision is None:
@@ -816,6 +825,127 @@ class TallaHistoriaDialog(QDialog):
                     fuente.setBold(True)
                     item.setFont(fuente)
                 self._tabla.setItem(fila, col, item)
+
+
+class EscuelaHistoriaDialog(QDialog):
+    """Cómo se ha vendido una escuela: piezas por semana y, por prenda y
+    talla, qué se pide más y qué menos. Lo pidió Daniel el 2026-09-13:
+    "más que historial de talla me viene bien un historial de escuela"."""
+
+    def __init__(self, parent: QWidget | None = None, *, escuela_id: int | None, tipo_pieza: str = "", session_factory: Callable[[], Session] | None = None) -> None:
+        super().__init__(parent)
+        self.setStyleSheet(_ESTILO)
+        self._session_factory = session_factory or _default_session_factory
+        self._escuela_id = escuela_id
+        self._tipo_pieza = tipo_pieza
+        self.historia = None
+
+        layout = QVBoxLayout()
+        layout.setSpacing(10)
+        self._encabezado = QLabel("")
+        self._encabezado.setStyleSheet("font-size: 15px; font-weight: 600; color: #5c3019;")
+        layout.addWidget(self._encabezado)
+        self._resumen = QLabel("")
+        self._resumen.setWordWrap(True)
+        layout.addWidget(self._resumen)
+        layout.addWidget(QLabel("Piezas por semana · <span style='color:#87492c'>■ vendidas</span> · <span style='color:#c0392b'>■ pidieron y no había</span>"))
+        self._grafica = SemanasWidget()
+        layout.addWidget(self._grafica)
+
+        fila = QHBoxLayout()
+        fila.addWidget(QLabel("Por prenda y talla, de lo que más se vende a lo que menos"))
+        fila.addStretch()
+        self._solo_prendas = QPushButton("Ver tallas")
+        self._solo_prendas.setCheckable(True)
+        self._solo_prendas.toggled.connect(self._pintar)
+        fila.addWidget(self._solo_prendas)
+        layout.addLayout(fila)
+        self._tabla = QTableWidget()
+        self._tabla.setColumnCount(7)
+        self._tabla.setHorizontalHeaderLabels(["Prenda", "Talla", "Vendidas", "% del total", "Pidieron", "A la mano", "En cajas"])
+        self._tabla.verticalHeader().setVisible(False)
+        self._tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._tabla.setAlternatingRowColors(True)
+        self._tabla.setShowGrid(False)
+        h = self._tabla.horizontalHeader()
+        h.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        for c in range(1, 7):
+            h.setSectionResizeMode(c, QHeaderView.ResizeMode.ResizeToContents)
+        layout.addWidget(self._tabla, 1)
+
+        botones = QHBoxLayout()
+        botones.addStretch()
+        cerrar = QPushButton("Cerrar")
+        cerrar.setObjectName("primaryButton")
+        cerrar.clicked.connect(self.accept)
+        botones.addWidget(cerrar)
+        layout.addLayout(botones)
+        self.setLayout(layout)
+        self.resize(900, 680)
+        self._cargar()
+
+    def _cargar(self) -> None:
+        from pos_uniformes.services.revision_service import historia_de_escuela
+
+        session = self._session_factory()
+        try:
+            self.historia = historia_de_escuela(session, self._escuela_id, self._tipo_pieza)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Error", f"No se pudo leer la historia:\n{exc}")
+            return
+        finally:
+            session.close()
+        h = self.historia
+        self.setWindowTitle(f"Historia · {h.titulo}")
+        self._encabezado.setText(h.titulo)
+        partes = [f"<b>{h.vendidas_total}</b> piezas vendidas en {len(h.semanas)} semanas"]
+        if h.pidieron_total:
+            partes.append(f"<span style='color:#b91c1c'><b>{h.pidieron_total}</b> pidieron y no había</span>")
+        if h.pedido_total:
+            partes.append(f"has pedido <b>{h.pedido_total}</b>")
+        if h.vendidas_total and h.prendas:
+            partes.append(f"<b>{h.prendas_del_80}</b> de {len(h.prendas)} prendas hacen el 80 % de lo vendido")
+        self._resumen.setText(" · ".join(partes))
+        self._grafica.poner(h.semanas if h.vendidas_total or h.pidieron_total else [])
+        self._pintar()
+
+    def _pintar(self, *_a) -> None:
+        if self.historia is None:
+            return
+        from pos_uniformes.services.conteo_hoja_carta_service import nombre_para_hoja
+
+        h = self.historia
+        con_tallas = self._solo_prendas.isChecked()
+        self._solo_prendas.setText("Solo prendas" if con_tallas else "Ver tallas")
+        filas = []
+        for p in h.prendas:
+            filas.append((p, None))
+            if con_tallas:
+                for t in p.tallas:
+                    filas.append((p, t))
+        self._tabla.setRowCount(len(filas))
+        total = h.vendidas_total or 0
+        for i, (p, t) in enumerate(filas):
+            if t is None:
+                pct = f"{100 * p.vendidas / total:.0f} %" if total and p.vendidas else "—"
+                valores = (nombre_para_hoja(p.producto, h.titulo), "", str(p.vendidas), pct, str(p.pidieron) if p.pidieron else "—", str(p.a_la_mano), str(p.en_cajas) if p.en_cajas else "—")
+            else:
+                talla = f"{t.talla} {t.color}".strip() if t.color and t.color.upper() not in ("UNICO", "ÚNICO") else t.talla
+                pct = f"{100 * t.vendidas / total:.0f} %" if total and t.vendidas else "—"
+                valores = ("", talla, str(t.vendidas) if t.vendidas else "—", pct, str(t.pidieron) if t.pidieron else "—", str(t.a_la_mano), str(t.en_cajas) if t.en_cajas else "—")
+            for col, txt in enumerate(valores):
+                item = QTableWidgetItem(txt)
+                if col:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                if t is None:
+                    fuente = item.font()
+                    fuente.setBold(True)
+                    item.setFont(fuente)
+                    if con_tallas:
+                        item.setBackground(QBrush(QColor("#f5ebe0")))
+                if col == 4 and ((t is None and p.pidieron) or (t is not None and t.pidieron)):
+                    item.setForeground(QBrush(QColor("#b91c1c")))
+                self._tabla.setItem(i, col, item)
 
 
 class ConteoDestinoDialog(QDialog):

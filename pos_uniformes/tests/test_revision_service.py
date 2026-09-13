@@ -122,6 +122,17 @@ class _Escenario(unittest.TestCase):
         return j
 
 
+    def _caja(self, codigo: str, variante: Variante, cantidad: int) -> None:
+        from pos_uniformes.database.models import BodegaCaja, BodegaContenido
+
+        caja = self.s.scalar(select(BodegaCaja).where(BodegaCaja.codigo == codigo))
+        if caja is None:
+            caja = BodegaCaja(codigo=codigo)
+            self.s.add(caja)
+            self.s.flush()
+        self.s.add(BodegaContenido(caja_id=caja.id, variante_id=variante.id, cantidad=cantidad))
+        self.s.flush()
+
 class RevisarTests(_Escenario):
     def test_ventas_desde_el_conteo_anterior_por_sku(self) -> None:
         v0 = self.v[0]
@@ -171,17 +182,6 @@ class RevisarTests(_Escenario):
         linea = rv.revisar(self.s, j, hoy=HOY).lineas[0]
         self.assertEqual(linea.pidieron, 2)
         self.assertEqual(linea.estado, rv.URGENTE)
-
-    def _caja(self, codigo: str, variante: Variante, cantidad: int) -> None:
-        from pos_uniformes.database.models import BodegaCaja, BodegaContenido
-
-        caja = self.s.scalar(select(BodegaCaja).where(BodegaCaja.codigo == codigo))
-        if caja is None:
-            caja = BodegaCaja(codigo=codigo)
-            self.s.add(caja)
-            self.s.flush()
-        self.s.add(BodegaContenido(caja_id=caja.id, variante_id=variante.id, cantidad=cantidad))
-        self.s.flush()
 
     def test_lo_de_las_cajas_entra_al_total_y_dice_de_donde(self) -> None:
         v0, v1 = self.v[0], self.v[1]
@@ -335,6 +335,39 @@ class HistoriaTests(_Escenario):
     def test_variante_inexistente(self) -> None:
         with self.assertRaises(ValueError):
             rv.historia_de_talla(self.s, 99999, hoy=HOY)
+
+
+class HistoriaEscuelaTests(_Escenario):
+    def test_por_prenda_y_talla_de_mayor_a_menor(self) -> None:
+        v = self.v   # Prenda 0 (tallas 6, 8), Prenda 1 (tallas 6, 8)
+        lunes = HOY - timedelta(days=HOY.weekday())
+        self._venta(lunes - timedelta(days=7), v[3].sku, 9)    # Prenda 1 talla 8
+        self._venta(lunes, v[0].sku, 4)                        # Prenda 0 talla 6
+        self._venta(lunes, v[1].sku, 1)                        # Prenda 0 talla 8
+        self.s.add(DemandaNoAtendida(tipo="talla_agotada", sku=v[2].sku, piezas=2, created_at=_dt(lunes)))
+        self._caja("A-1", v[0], 5)
+        self._conteo_previo(v[3], 2, HOY - timedelta(days=10), pedido=12, sugerido=10)
+        self.s.commit()
+        h = rv.historia_de_escuela(self.s, self.escuela.id, hoy=HOY)
+        self.assertEqual(h.titulo, "Uno")
+        self.assertEqual((h.vendidas_total, h.pidieron_total, h.pedido_total), (14, 2, 12))
+        self.assertEqual([p.producto.split()[1] for p in h.prendas], ["1", "0"])   # Prenda 1 vende más
+        p1, p0 = h.prendas
+        self.assertEqual((p1.vendidas, p1.pidieron, p1.pedido_total), (9, 2, 12))
+        self.assertEqual([t.talla for t in p1.tallas], ["8", "6"])
+        self.assertEqual((p0.vendidas, p0.en_cajas), (5, 5))
+        self.assertEqual(p0.tallas[0].talla, "6")
+        self.assertEqual((p0.tallas[0].a_la_mano, p0.tallas[0].en_cajas), (5, 5))   # stock 10 − 5 en cajas
+        self.assertEqual(len(h.semanas), 12)
+        self.assertEqual((h.semanas[-1].vendidas, h.semanas[-1].pidieron), (5, 2))
+        self.assertEqual(h.semanas[-2].vendidas, 9)
+        self.assertEqual(h.prendas_del_80, 2)   # 9 de 14 no llega al 80 %: hacen falta las dos
+
+    def test_sin_ventas_no_truena(self) -> None:
+        h = rv.historia_de_escuela(self.s, self.escuela.id, hoy=HOY)
+        self.assertEqual((h.vendidas_total, h.prendas_del_80), (0, 0))
+        self.assertEqual(len(h.prendas), 2)
+        self.assertTrue(all(s.vendidas == 0 for s in h.semanas))
 
 
 if __name__ == "__main__":

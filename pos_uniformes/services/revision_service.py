@@ -536,3 +536,127 @@ def historia_de_talla(session: Session, variante_id: int, *, hoy: date | None = 
         pedido_total=sum(c.pedido or 0 for c in conteos),
         vendidas_total=sum(s.vendidas for s in semanas_out),
     )
+
+
+# --- la historia de una escuela (o prenda básica) --------------------------------
+
+@dataclass(frozen=True)
+class TallaEscuela:
+    variante_id: int
+    talla: str
+    color: str
+    vendidas: int
+    pidieron: int
+    a_la_mano: int
+    en_cajas: int
+    pedido_total: int      # lo que Daniel ha pedido de esta talla (últimas 12 semanas)
+
+
+@dataclass(frozen=True)
+class PrendaEscuela:
+    producto: str
+    tipo_pieza: str
+    vendidas: int
+    pidieron: int
+    a_la_mano: int
+    en_cajas: int
+    pedido_total: int
+    tallas: list[TallaEscuela]     # de la que más vende a la que menos
+
+
+@dataclass(frozen=True)
+class HistoriaEscuela:
+    titulo: str
+    hoy: date
+    semanas: list[SemanaHistorica]
+    prendas: list[PrendaEscuela]   # de la que más vende a la que menos
+    vendidas_total: int
+    pidieron_total: int
+    pedido_total: int
+
+    @property
+    def prendas_del_80(self) -> int:
+        """Cuántas prendas hacen el 80 % de lo vendido: dónde está el negocio."""
+        if self.vendidas_total <= 0:
+            return 0
+        acumulado = 0
+        for i, p in enumerate(self.prendas, start=1):
+            acumulado += p.vendidas
+            if acumulado >= 0.8 * self.vendidas_total:
+                return i
+        return len(self.prendas)
+
+
+def historia_de_escuela(session: Session, escuela_id: int | None, tipo_pieza: str = "", *, hoy: date | None = None, semanas: int = SEMANAS_HISTORIA) -> HistoriaEscuela:
+    """Cómo se ha vendido una escuela (o una prenda de básicos): piezas por
+    semana y, por prenda y talla, vendidas, pidieron-y-no-había, lo que hay
+    y lo que se ha pedido. Para ver qué se pide más y qué menos."""
+    from pos_uniformes.services.conteo_jornada_service import alcance
+
+    hoy = hoy or date.today()
+    grupos = alcance(session, escuela_id, tipo_pieza)
+    if escuela_id is None:
+        titulo = f"Básicos · {tipo_pieza}" if tipo_pieza else "Básicos"
+    else:
+        from pos_uniformes.database.models import Escuela
+
+        e = session.get(Escuela, escuela_id)
+        titulo = e.nombre if e is not None else f"Escuela {escuela_id}"
+
+    inicio = _lunes(hoy) - timedelta(weeks=semanas - 1)
+    ventas = _ventas_por_sku(session, inicio)
+    pidieron = _pidieron_por_sku(session, inicio)
+    variante_ids = [v.variante_id for g in grupos for v in g["variantes"]]
+    cajas = _en_cajas(session, variante_ids)
+    pedidos: dict[int, int] = defaultdict(int)
+    if variante_ids:
+        desde_dt = datetime.combine(inicio, datetime.min.time())
+        for vid, pedido in session.execute(
+            select(ConteoInventario.variante_id, ConteoInventario.pedido).where(
+                ConteoInventario.variante_id.in_(variante_ids),
+                ConteoInventario.pedido.is_not(None),
+                ConteoInventario.pedido_decidido_at >= desde_dt,
+            )
+        ).all():
+            pedidos[int(vid)] += int(pedido or 0)
+
+    por_semana: dict[date, list[int]] = {inicio + timedelta(weeks=i): [0, 0] for i in range(semanas)}
+    prendas: list[PrendaEscuela] = []
+    for g in grupos:
+        tallas: list[TallaEscuela] = []
+        for v in g["variantes"]:
+            sku = str(v.sku or "")
+            vend = sum(p for f, p in ventas.get(sku, []) if f >= inicio)
+            pid = sum(p for f, p in pidieron.get(sku, []) if f >= inicio)
+            for f, p in ventas.get(sku, []):
+                k = _lunes(f)
+                if k in por_semana:
+                    por_semana[k][0] += p
+            for f, p in pidieron.get(sku, []):
+                k = _lunes(f)
+                if k in por_semana:
+                    por_semana[k][1] += p
+            en_cajas = cajas.get(v.variante_id, (0, ()))[0]
+            tallas.append(TallaEscuela(
+                variante_id=v.variante_id, talla=str(v.talla or ""), color=str(v.color or ""),
+                # A la mano = total − lo que está en cajas (cualquier caja, tenga o
+                # no ubicación), igual que en el resto de Revisar.
+                vendidas=vend, pidieron=pid, a_la_mano=max(0, int(getattr(v, "stock_actual", 0) or 0) - en_cajas), en_cajas=en_cajas,
+                pedido_total=pedidos.get(v.variante_id, 0),
+            ))
+        tallas.sort(key=lambda t: (-t.vendidas, -t.pidieron, t.talla))
+        prendas.append(PrendaEscuela(
+            producto=str(g.get("producto_nombre") or ""), tipo_pieza=str(g.get("tipo_pieza") or ""),
+            vendidas=sum(t.vendidas for t in tallas), pidieron=sum(t.pidieron for t in tallas),
+            a_la_mano=sum(t.a_la_mano for t in tallas), en_cajas=sum(t.en_cajas for t in tallas),
+            pedido_total=sum(t.pedido_total for t in tallas), tallas=tallas,
+        ))
+    prendas.sort(key=lambda p: (-p.vendidas, -p.pidieron, p.producto))
+    return HistoriaEscuela(
+        titulo=titulo, hoy=hoy,
+        semanas=[SemanaHistorica(k, v, q) for k, (v, q) in sorted(por_semana.items())],
+        prendas=prendas,
+        vendidas_total=sum(p.vendidas for p in prendas),
+        pidieron_total=sum(p.pidieron for p in prendas),
+        pedido_total=sum(p.pedido_total for p in prendas),
+    )
