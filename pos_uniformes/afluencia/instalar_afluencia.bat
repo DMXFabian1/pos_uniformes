@@ -18,11 +18,14 @@ if errorlevel 1 goto :error
 
 echo.
 echo === 2/4 Configuracion de camaras y lineas ===
-rem Las lineas se calibran desde la Mac y viajan en afluencia.json.example;
-rem por eso SIEMPRE se copia encima: asi un cambio de linea llega con
-rem actualizar + este .bat, sin editar nada a mano en el servidor.
-copy /Y afluencia.json.example afluencia.json >nul
-echo   afluencia.json tomado del ejemplo (lineas calibradas).
+rem Las lineas las dibuja Daniel en esta PC con dibujar_lineas.bat; el
+rem ejemplo solo sirve la primera vez. Nunca se pisa lo que el dibujo.
+if not exist afluencia.json (
+    copy afluencia.json.example afluencia.json >nul
+    echo   Creado afluencia.json desde el ejemplo.
+) else (
+    echo   Ya existe afluencia.json, se conserva. Para mover lineas: afluencia\dibujar_lineas.bat
+)
 
 echo.
 echo === 2b/4 Deteniendo el contador que ya corria (si hay) ===

@@ -111,6 +111,38 @@ def cargar_config(path: Path) -> dict:
     return cfg
 
 
+def linea_de(cam: dict) -> Linea:
+    x1, y1, x2, y2 = cam["linea"]
+    return Linea(x1, y1, x2, y2, cam.get("lado_dentro", "abajo"))
+
+
+def aplicar_cambios(cfg_nuevo: dict, hilos: list) -> list[str]:
+    """Pasa a los hilos las líneas que cambiaron en afluencia.json. Devuelve
+    los nombres actualizados. Cámaras nuevas o canal distinto necesitan
+    reiniciar el contador; eso se avisa en el log y no se intenta en caliente."""
+    por_nombre = {h.cam["nombre"]: h for h in hilos}
+    cambiadas: list[str] = []
+    for cam in cfg_nuevo.get("camaras", []):
+        h = por_nombre.get(cam["nombre"])
+        if h is None:
+            log.warning("%s: cámara nueva en afluencia.json, se toma al reiniciar", cam["nombre"])
+            continue
+        if cam.get("modo", "linea") != h.modo or int(cam.get("canal", -1)) != int(h.cam.get("canal", -1)):
+            log.warning("%s: cambió modo o canal, se toma al reiniciar", cam["nombre"])
+            continue
+        if h.modo != "linea":
+            continue
+        if list(cam["linea"]) != list(h.cam["linea"]) or cam.get("lado_dentro", "abajo") != h.cam.get("lado_dentro", "abajo"):
+            try:
+                h.cambiar_linea(cam)
+            except (ValueError, KeyError) as exc:
+                log.warning("%s: línea inválida, se conserva la anterior (%s)", cam["nombre"], exc)
+                continue
+            cambiadas.append(cam["nombre"])
+            log.info("%s: línea nueva %s, dentro = %s", cam["nombre"], cam["linea"], cam.get("lado_dentro", "abajo"))
+    return cambiadas
+
+
 # --- almacenamiento ------------------------------------------------------------
 
 class AlmacenPostgres:
@@ -179,10 +211,16 @@ class HiloCamara(threading.Thread):
         self.debug_dir = debug_dir
         self.modo = cam.get("modo", "linea")
         if self.modo == "linea":
-            x1, y1, x2, y2 = cam["linea"]
-            self.contador_linea = ContadorLinea(Linea(x1, y1, x2, y2, cam.get("lado_dentro", "abajo")))
+            self.contador_linea = ContadorLinea(linea_de(cam))
         else:
             self.contador_paso = ContadorPaso()
+
+    def cambiar_linea(self, cam: dict) -> None:
+        # Daniel dibuja la línea desde dibujar_lineas.bat y el archivo cambia;
+        # se reemplaza el contador entero (la asignación es atómica) para que
+        # nadie quede contado a medias con la línea vieja.
+        self.cam = cam
+        self.contador_linea = ContadorLinea(linea_de(cam))
 
     def run(self) -> None:
         import cv2
@@ -288,6 +326,8 @@ def calibrar(cfg: dict, urls: dict[str, str], salida: Path) -> None:
             log.warning("%s: sin cuadro", nombre)
             continue
         frame = cv2.resize(frame, (1280, 720))
+        (salida / "cuadros").mkdir(exist_ok=True)
+        cv2.imwrite(str(salida / "cuadros" / f"{nombre}.jpg"), frame)  # limpio, para dibujar_lineas.py
         h, w = frame.shape[:2]
         for i in range(1, 10):
             x, y = int(w * i / 10), int(h * i / 10)
@@ -355,9 +395,22 @@ def main(argv: list[str] | None = None) -> int:
 
     inicio = time.time()
     ultimo_guardado = time.time()
+    ruta_cfg = Path(args.config)
+    mtime_cfg = ruta_cfg.stat().st_mtime
     try:
         while not parar.is_set():
             time.sleep(1)
+            try:
+                m = ruta_cfg.stat().st_mtime
+            except OSError:
+                m = mtime_cfg
+            if m != mtime_cfg:
+                mtime_cfg = m
+                try:
+                    aplicar_cambios(cargar_config(ruta_cfg), hilos)
+                except (SystemExit, ValueError) as exc:
+                    # Archivo a medio escribir o roto: se sigue con lo que había.
+                    log.warning("afluencia.json no se pudo leer, se conserva lo anterior (%s)", exc)
             if time.time() - ultimo_guardado >= cfg["intervalo_guardado_s"]:
                 ultimo_guardado = time.time()
                 with lock:
