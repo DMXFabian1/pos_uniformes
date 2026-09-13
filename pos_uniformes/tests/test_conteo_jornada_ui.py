@@ -236,6 +236,30 @@ class RevisionDialogTests(unittest.TestCase):
         c = s.scalars(select(ConteoInventario).where(ConteoInventario.variante_id == self.v_ids[0])).one()
         self.assertEqual(c.pedido, 21)
 
+    def test_doble_clic_en_una_fila_abre_la_historia(self) -> None:
+        d = self._dialogo()
+        fila = self._fila(d, "6")
+        with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.TallaHistoriaDialog") as hist:
+            d._doble_clic(d._table.item(fila, 2))      # cualquier columna menos Pedido
+            hist.assert_called_once()
+            self.assertEqual(hist.call_args.kwargs["variante_id"], self.v_ids[0])
+            hist.reset_mock()
+            d._doble_clic(d._table.item(fila, 9))      # Pedido: ahí el doble clic edita
+            hist.assert_not_called()
+
+    def test_la_historia_muestra_conteos_y_semanas(self) -> None:
+        from pos_uniformes.ui.dialogs.conteo_jornada_dialogs import TallaHistoriaDialog
+
+        h = TallaHistoriaDialog(variante_id=self.v_ids[0], titulo="Uno", session_factory=self.factory)
+        self._dialogos.append(h)
+        self.assertIn("talla 6", h._encabezado.text())
+        self.assertIn("<b>14</b> vendidas", h._resumen.text())
+        self.assertEqual(h._tabla.rowCount(), 1)
+        self.assertEqual(h._tabla.item(0, 1).text(), "7")
+        self.assertEqual(h._tabla.item(0, 5).text(), "0")   # el conteo fue después de la venta
+        self.assertEqual(len(h._grafica.semanas), 12)
+        self.assertEqual(sum(s.vendidas for s in h._grafica.semanas), 14)
+
     def test_descartar_no_toca_el_stock(self) -> None:
         d = self._dialogo()
         with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.QMessageBox.question",

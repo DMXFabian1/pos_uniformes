@@ -51,7 +51,9 @@ class SugerirTests(unittest.TestCase):
         self.assertEqual(rv.sugerir(conto=0, vendidas=7, dias_observados=7, pidieron=0, semanas=2)[0], 14)
 
 
-class RevisarTests(unittest.TestCase):
+class _Escenario(unittest.TestCase):
+    """Escuela con 2 prendas × tallas 6 y 8, y ayudas para ventas y conteos."""
+
     def setUp(self) -> None:
         self.engine = create_engine("sqlite:///:memory:")
         Base.metadata.create_all(self.engine)
@@ -95,7 +97,8 @@ class RevisarTests(unittest.TestCase):
         self.s.flush()
         return j
 
-    # --- pruebas ---------------------------------------------------------------
+
+class RevisarTests(_Escenario):
     def test_ventas_desde_el_conteo_anterior_por_sku(self) -> None:
         v0 = self.v[0]
         self._conteo_previo(v0, 20, HOY - timedelta(days=14))
@@ -234,6 +237,49 @@ class HojaDePedidoTests(unittest.TestCase):
         self.assertIn("Camisa Blanca", html)
         self.assertIn("<b>12</b>", html)
         self.assertIn("12 piezas", html)
+
+
+class HistoriaTests(_Escenario):
+    def test_conteos_con_lo_pedido_y_lo_vendido_despues(self) -> None:
+        v0 = self.v[0]
+        self._conteo_previo(v0, 12, HOY - timedelta(days=42), pedido=6, sugerido=4)
+        self._conteo_previo(v0, 8, HOY - timedelta(days=21))
+        self._venta(HOY - timedelta(days=30), v0.sku, 3)   # entre el 1º y el 2º
+        self._venta(HOY - timedelta(days=10), v0.sku, 5)   # después del 2º
+        self._venta(HOY, v0.sku, 1)                        # hoy también cuenta
+        h = rv.historia_de_talla(self.s, v0.id, hoy=HOY)
+        self.assertEqual(h.talla, "6")
+        self.assertEqual([c.conto for c in h.conteos], [8, 12])
+        self.assertEqual([c.vendidas_despues for c in h.conteos], [6, 3])
+        self.assertEqual((h.conteos[1].pedido, h.conteos[1].sugerido), (6, 4))
+        self.assertEqual(h.pedido_total, 6)
+
+    def test_ventas_por_semana_con_lo_que_pidieron(self) -> None:
+        v0 = self.v[0]
+        lunes = HOY - timedelta(days=HOY.weekday())
+        self._venta(lunes, v0.sku, 2)
+        self._venta(lunes - timedelta(days=7), v0.sku, 4)
+        self._venta(lunes - timedelta(weeks=20), v0.sku, 9)   # fuera de las 12 semanas
+        self.s.add(DemandaNoAtendida(tipo="talla_agotada", sku=v0.sku, piezas=1, created_at=_dt(lunes + timedelta(days=2))))
+        self.s.flush()
+        h = rv.historia_de_talla(self.s, v0.id, hoy=HOY)
+        self.assertEqual(len(h.semanas), 12)
+        self.assertEqual((h.semanas[-1].vendidas, h.semanas[-1].pidieron), (2, 1))
+        self.assertEqual(h.semanas[-2].vendidas, 4)
+        self.assertEqual(h.vendidas_total, 6)
+        self.assertEqual(h.maximo_semana, 4)
+        self.assertEqual(h.semanas[-1].etiqueta, lunes.strftime("%d/%m"))
+
+    def test_sin_libreta_no_dice_vendidas(self) -> None:
+        v0 = self.v[0]
+        self._conteo_previo(v0, 3, HOY - timedelta(days=5))
+        h = rv.historia_de_talla(self.s, v0.id, hoy=HOY)
+        self.assertIsNone(h.conteos[0].vendidas_despues)
+        self.assertEqual(h.vendidas_total, 0)
+
+    def test_variante_inexistente(self) -> None:
+        with self.assertRaises(ValueError):
+            rv.historia_de_talla(self.s, 99999, hoy=HOY)
 
 
 if __name__ == "__main__":

@@ -11,8 +11,8 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import date
 
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QBrush, QColor
+from PyQt6.QtCore import QRectF, Qt
+from PyQt6.QtGui import QBrush, QColor, QPainter, QPen
 from PyQt6.QtWidgets import (
     QApplication,
     QComboBox,
@@ -254,6 +254,7 @@ class ConteoRevisionDialog(QDialog):
         for c in range(1, len(self.COLUMNAS)):
             h.setSectionResizeMode(c, QHeaderView.ResizeMode.ResizeToContents)
         self._table.itemChanged.connect(self._pedido_editado)
+        self._table.itemDoubleClicked.connect(self._doble_clic)
         layout.addWidget(self._table, 1)
 
         acciones = QHBoxLayout()
@@ -265,6 +266,9 @@ class ConteoRevisionDialog(QDialog):
         self._hoja_btn = QPushButton("Hoja de pedido")
         self._hoja_btn.clicked.connect(self._hoja_de_pedido)
         acciones.addWidget(self._hoja_btn)
+        self._historia_btn = QPushButton("Historia de la talla")
+        self._historia_btn.clicked.connect(self._historia)
+        acciones.addWidget(self._historia_btn)
         acciones.addStretch()
         descartar = QPushButton("Descartar")
         descartar.setObjectName("dangerButton")
@@ -447,6 +451,25 @@ class ConteoRevisionDialog(QDialog):
         r = self._revision_con_pedidos()
         PedidoHojaDialog(self, texto=texto_pedido(r), html=html_pedido(r), titulo=f"Pedido · {r.titulo}").exec()
 
+    def _doble_clic(self, item: QTableWidgetItem) -> None:
+        # En Pedido el doble clic edita; en cualquier otra columna abre la historia.
+        if item.column() != self.COL_PEDIDO:
+            self._historia(item.row())
+
+    def _historia(self, fila: int | None = None) -> None:
+        if self._revision is None:
+            return
+        if fila is None or fila is False:
+            fila = self._table.currentRow()
+        if fila < 0:
+            QMessageBox.information(self, "Historia", "Elige una talla en la tabla.")
+            return
+        conteo_id = self._table.item(fila, 0).data(Qt.ItemDataRole.UserRole)
+        linea = next((l for l in self._revision.lineas if l.conteo_id == conteo_id), None)
+        if linea is None:
+            return
+        TallaHistoriaDialog(self, variante_id=linea.variante_id, titulo=self._revision.titulo, session_factory=self._session_factory).exec()
+
     def _aplicar(self) -> None:
         if self._revision is None:
             return
@@ -566,6 +589,144 @@ class PedidoHojaDialog(QDialog):
             return
         self._telegram_btn.setText("Enviado ✓")
         self._telegram_btn.setEnabled(False)
+
+
+class SemanasWidget(QWidget):
+    """Barras por semana: vendidas (café) y encima lo que pidieron y no había (rojo)."""
+
+    def __init__(self, semanas=(), parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.semanas = list(semanas)
+        self.setMinimumHeight(170)
+
+    def poner(self, semanas) -> None:
+        self.semanas = list(semanas)
+        self.update()
+
+    def paintEvent(self, _e) -> None:
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.fillRect(self.rect(), QColor("#ffffff"))
+        if not self.semanas:
+            p.setPen(QColor("#8a8a8a"))
+            p.drawText(self.rect(), Qt.AlignmentFlag.AlignCenter, "Sin ventas registradas")
+            return
+        margen_izq, margen_inf, margen_sup = 8, 26, 22
+        ancho = (self.width() - margen_izq * 2) / len(self.semanas)
+        alto_util = self.height() - margen_inf - margen_sup
+        tope = max(1, max(s.vendidas + s.pidieron for s in self.semanas))
+        p.setPen(QPen(QColor("#e5e5e5"), 1))
+        p.drawLine(margen_izq, self.height() - margen_inf, self.width() - margen_izq, self.height() - margen_inf)
+        for i, sem in enumerate(self.semanas):
+            x = margen_izq + i * ancho + ancho * 0.18
+            w = ancho * 0.64
+            base = self.height() - margen_inf
+            h_v = alto_util * sem.vendidas / tope
+            h_p = alto_util * sem.pidieron / tope
+            p.setPen(Qt.PenStyle.NoPen)
+            p.setBrush(QBrush(QColor("#87492c")))
+            p.drawRect(QRectF(x, base - h_v, w, h_v))
+            p.setBrush(QBrush(QColor("#c0392b")))
+            p.drawRect(QRectF(x, base - h_v - h_p, w, h_p))
+            total = sem.vendidas + sem.pidieron
+            p.setPen(QColor("#1a1a1a"))
+            if total:
+                p.drawText(QRectF(x - 10, base - h_v - h_p - 18, w + 20, 16), Qt.AlignmentFlag.AlignCenter, str(total))
+            p.setPen(QColor("#6b6b6b"))
+            p.drawText(QRectF(x - 12, base + 4, w + 24, 18), Qt.AlignmentFlag.AlignCenter, sem.etiqueta)
+
+
+class TallaHistoriaDialog(QDialog):
+    """Cómo ha evolucionado una talla: ventas por semana y cada conteo con lo
+    que se pidió y lo que se vendió después."""
+
+    def __init__(self, parent: QWidget | None = None, *, variante_id: int, titulo: str = "", session_factory: Callable[[], Session] | None = None) -> None:
+        super().__init__(parent)
+        self.setStyleSheet(_ESTILO)
+        self._session_factory = session_factory or _default_session_factory
+        self._variante_id = variante_id
+        self._titulo = titulo
+        self.historia = None
+
+        layout = QVBoxLayout()
+        layout.setSpacing(10)
+        self._encabezado = QLabel("")
+        self._encabezado.setStyleSheet("font-size: 15px; font-weight: 600; color: #5c3019;")
+        layout.addWidget(self._encabezado)
+        self._resumen = QLabel("")
+        self._resumen.setWordWrap(True)
+        layout.addWidget(self._resumen)
+        leyenda = QLabel("Ventas por semana · <span style='color:#87492c'>■ vendidas</span> · <span style='color:#c0392b'>■ pidieron y no había</span>")
+        layout.addWidget(leyenda)
+        self._grafica = SemanasWidget()
+        layout.addWidget(self._grafica)
+
+        layout.addWidget(QLabel("Conteos"))
+        self._tabla = QTableWidget()
+        self._tabla.setColumnCount(6)
+        self._tabla.setHorizontalHeaderLabels(["Fecha", "Contó", "Quién", "Sugerido", "Pediste", "Vendidas después"])
+        self._tabla.verticalHeader().setVisible(False)
+        self._tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._tabla.setAlternatingRowColors(True)
+        self._tabla.setShowGrid(False)
+        h = self._tabla.horizontalHeader()
+        h.setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
+        for c in (0, 1, 3, 4, 5):
+            h.setSectionResizeMode(c, QHeaderView.ResizeMode.ResizeToContents)
+        layout.addWidget(self._tabla, 1)
+
+        botones = QHBoxLayout()
+        botones.addStretch()
+        cerrar = QPushButton("Cerrar")
+        cerrar.setObjectName("primaryButton")
+        cerrar.clicked.connect(self.accept)
+        botones.addWidget(cerrar)
+        layout.addLayout(botones)
+        self.setLayout(layout)
+        self.resize(720, 620)
+        self._cargar()
+
+    def _cargar(self) -> None:
+        from pos_uniformes.services.conteo_hoja_carta_service import nombre_para_hoja
+        from pos_uniformes.services.revision_service import historia_de_talla
+
+        session = self._session_factory()
+        try:
+            self.historia = historia_de_talla(session, self._variante_id)
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Error", f"No se pudo leer la historia:\n{exc}")
+            return
+        finally:
+            session.close()
+        h = self.historia
+        nombre = nombre_para_hoja(h.producto, self._titulo)
+        talla = f"{h.talla} {h.color}".strip() if h.color and h.color.upper() not in ("UNICO", "ÚNICO") else h.talla
+        self.setWindowTitle(f"Historia · {nombre} · {talla}")
+        self._encabezado.setText(f"{nombre} · talla {talla}")
+        piezas = f"<b>{h.vendidas_total}</b> vendidas en {len(h.semanas)} semanas"
+        pedidas = f" · has pedido <b>{h.pedido_total}</b> en total" if h.pedido_total else ""
+        conteos = f" · <b>{len(h.conteos)}</b> conteos" if h.conteos else " · nunca se ha contado"
+        self._resumen.setText(piezas + pedidas + conteos)
+        self._grafica.poner(h.semanas if h.vendidas_total or any(s.pidieron for s in h.semanas) else [])
+        self._tabla.setRowCount(len(h.conteos))
+        for fila, c in enumerate(h.conteos):
+            valores = (
+                c.fecha.strftime("%d/%m/%Y"),
+                str(c.conto),
+                c.quien,
+                "—" if c.sugerido is None else str(c.sugerido),
+                "—" if c.pedido is None else str(c.pedido),
+                "—" if c.vendidas_despues is None else str(c.vendidas_despues),
+            )
+            for col, txt in enumerate(valores):
+                item = QTableWidgetItem(txt)
+                if col != 2:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                if col == 4 and c.pedido:
+                    fuente = item.font()
+                    fuente.setBold(True)
+                    item.setFont(fuente)
+                self._tabla.setItem(fila, col, item)
 
 
 class ConteoDestinoDialog(QDialog):

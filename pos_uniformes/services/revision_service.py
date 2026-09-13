@@ -369,3 +369,107 @@ def html_pedido(revision: Revision) -> str:
         partes.append("</table>")
     partes.append("</body></html>")
     return "\n".join(partes)
+
+
+# --- la historia de una talla ------------------------------------------------------
+
+SEMANAS_HISTORIA = 12
+
+
+@dataclass(frozen=True)
+class ConteoHistorico:
+    fecha: date
+    conto: int
+    quien: str
+    pedido: int | None
+    sugerido: int | None
+    vendidas_despues: int | None   # hasta el siguiente conteo (o hasta hoy); None si no hay Libreta
+
+
+@dataclass(frozen=True)
+class SemanaHistorica:
+    inicio: date          # lunes
+    vendidas: int
+    pidieron: int
+
+    @property
+    def etiqueta(self) -> str:
+        return self.inicio.strftime("%d/%m")
+
+
+@dataclass(frozen=True)
+class Historia:
+    variante_id: int
+    producto: str
+    talla: str
+    color: str
+    hoy: date
+    conteos: list[ConteoHistorico]        # del más reciente al más viejo
+    semanas: list[SemanaHistorica]         # de la más vieja a la actual
+    pedido_total: int                      # todo lo que Daniel ha pedido de esta talla
+    vendidas_total: int                    # en las semanas mostradas
+
+    @property
+    def maximo_semana(self) -> int:
+        return max((s.vendidas + s.pidieron for s in self.semanas), default=0)
+
+
+def _lunes(d: date) -> date:
+    return d - timedelta(days=d.weekday())
+
+
+def historia_de_talla(session: Session, variante_id: int, *, hoy: date | None = None, semanas: int = SEMANAS_HISTORIA) -> Historia:
+    """Cómo ha evolucionado una talla: conteos con lo que se pidió y lo que se
+    vendió después, y ventas por semana (con lo que pidieron y no había)."""
+    hoy = hoy or date.today()
+    variante = session.get(Variante, variante_id)
+    if variante is None:
+        raise ValueError(f"No existe la variante {variante_id}")
+    producto = session.get(Producto, variante.producto_id)
+
+    inicio = _lunes(hoy) - timedelta(weeks=semanas - 1)
+    hay_libreta = _primera_venta(session) is not None
+    ventas = _ventas_por_sku(session, min(inicio, hoy - timedelta(days=365))).get(variante.sku or "", [])
+    pidieron = _pidieron_por_sku(session, inicio).get(variante.sku or "", [])
+
+    por_semana: dict[date, list[int]] = {inicio + timedelta(weeks=i): [0, 0] for i in range(semanas)}
+    for f, p in ventas:
+        k = _lunes(f)
+        if k in por_semana:
+            por_semana[k][0] += p
+    for f, p in pidieron:
+        k = _lunes(f)
+        if k in por_semana:
+            por_semana[k][1] += p
+    semanas_out = [SemanaHistorica(k, v, q) for k, (v, q) in sorted(por_semana.items())]
+
+    filas = list(session.scalars(
+        select(ConteoInventario)
+        .where(ConteoInventario.variante_id == variante_id)
+        .order_by(ConteoInventario.contado_at.desc(), ConteoInventario.id.desc())
+    ).all())
+    conteos: list[ConteoHistorico] = []
+    siguiente: date | None = None   # fecha del conteo posterior (vamos del más nuevo al más viejo)
+    for c in filas:
+        fecha = _fecha(c.contado_at) or hoy
+        if hay_libreta:
+            tope = siguiente or (hoy + timedelta(days=1))
+            vendidas_despues = sum(p for f, p in ventas if fecha <= f < tope)
+        else:
+            vendidas_despues = None
+        conteos.append(ConteoHistorico(
+            fecha=fecha, conto=int(c.stock_fisico), quien=str(c.contado_por or ""),
+            pedido=c.pedido, sugerido=c.pedido_sugerido, vendidas_despues=vendidas_despues,
+        ))
+        siguiente = fecha
+    return Historia(
+        variante_id=variante_id,
+        producto=str(producto.nombre if producto else ""),
+        talla=str(variante.talla or ""),
+        color=str(variante.color or ""),
+        hoy=hoy,
+        conteos=conteos,
+        semanas=semanas_out,
+        pedido_total=sum(c.pedido or 0 for c in conteos),
+        vendidas_total=sum(s.vendidas for s in semanas_out),
+    )
