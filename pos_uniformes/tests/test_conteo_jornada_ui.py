@@ -125,9 +125,12 @@ class TarjetasTests(unittest.TestCase):
 
 
 class RevisionDialogTests(unittest.TestCase):
-    """El dueño ve las diferencias y aplica o descarta."""
+    """El dueño ve qué pedir por talla, decide, y aplica o descarta."""
 
     def setUp(self) -> None:
+        from datetime import timedelta
+
+        from pos_uniformes.database.models import LibretaVenta
         from pos_uniformes.services.conteo_service import ConteoInput, registrar_conteos_lote
         from pos_uniformes.tests.test_conteo_jornada_service import _seed
 
@@ -138,13 +141,20 @@ class RevisionDialogTests(unittest.TestCase):
         s = self.factory()
         e = _seed(s, "Uno")
         s.commit()
-        j = jn.abrir_jornada(s, escuela_id=e.id, empleada_code="VEND-4", empleada_nombre="Stayce")
         v = list(s.scalars(select(Variante).order_by(Variante.id)).all())
+        # La talla 0 se vende: 14 en dos semanas (7/sem → 4 semanas = 28). La 1 no.
+        s.add(LibretaVenta(
+            employee_code="VEND-4", tipo="venta", piezas=14, monto_total=1400,
+            detalle=[{"sku": v[0].sku, "talla": "6", "nombre": "x", "cantidad": 14, "precio": "100", "subtotal": "1400"}],
+            created_at=datetime.now() - timedelta(days=14),
+        ))
+        j = jn.abrir_jornada(s, escuela_id=e.id, empleada_code="VEND-4", empleada_nombre="Stayce")
         registrar_conteos_lote(s, [ConteoInput(v[0].id, 7), ConteoInput(v[1].id, 10)], "x", jornada_id=j.id)
         jn.terminar_jornada(s, j, empleada_code="VEND-4")
         s.commit()
         s.refresh(j)
         self.foto = jn.ref(j)
+        self.v_ids = [x.id for x in v]
         s.close()
 
     def _dialogo(self, quien="VEND-1"):
@@ -161,15 +171,57 @@ class RevisionDialogTests(unittest.TestCase):
         self._dialogos = []
         _APP.processEvents()
 
-    def test_muestra_solo_las_que_difieren_por_defecto(self) -> None:
+    def _fila(self, d, talla_col_texto: str) -> int:
+        for i in range(d._table.rowCount()):
+            if d._table.item(i, 1).text().startswith(talla_col_texto):
+                return i
+        raise AssertionError(f"no está la fila {talla_col_texto}")
+
+    def test_muestra_solo_lo_que_hay_que_pedir_por_defecto(self) -> None:
         d = self._dialogo()
         self.assertEqual(d._table.rowCount(), 1)
-        self.assertEqual(d._table.item(0, 4).text(), "-3")
+        fila = self._fila(d, "6")
+        self.assertEqual(d._table.item(fila, 2).text(), "7")            # hay
+        self.assertEqual(d._table.item(fila, 3).text(), "14 en 14 d")   # vendidas
+        self.assertEqual(d._table.item(fila, 8).text(), "21")           # sugerido: 28 − 7
+        self.assertEqual(d._table.item(fila, 9).text(), "21")           # pedido arranca en lo sugerido
         self.assertIn("Stayce", d._resumen_label.text())
-        d._solo_dif.setChecked(False)
+        self.assertIn("21", d._resumen_label.text())
+        d._solo_pedir.setChecked(False)
         self.assertEqual(d._table.rowCount(), 2)
+        self.assertEqual(d._table.item(self._fila(d, "8"), 8).text(), "no se mueve")
 
-    def test_aplicar_cambia_el_stock_y_cierra_la_jornada(self) -> None:
+    def test_editar_pedido_y_guardarlo(self) -> None:
+        from pos_uniformes.database.models import ConteoInventario
+
+        d = self._dialogo()
+        fila = self._fila(d, "6")
+        d._table.item(fila, 9).setText("30")
+        self.assertIn("<b>30</b> piezas", d._resumen_label.text())
+        d._table.item(fila, 9).setText("abc")   # no es número: vuelve a lo anterior
+        self.assertEqual(d._table.item(fila, 9).text(), "30")
+        with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.QMessageBox.information"):
+            self.assertTrue(d._guardar_pedidos())
+        s = self.factory()
+        c = s.scalars(select(ConteoInventario).where(ConteoInventario.variante_id == self.v_ids[0])).one()
+        self.assertEqual((c.pedido, c.pedido_sugerido), (30, 21))
+        # Al reabrir, trae lo decidido.
+        d2 = self._dialogo()
+        self.assertEqual(d2._table.item(self._fila(d2, "6"), 9).text(), "30")
+
+    def test_la_hoja_de_pedido_lleva_lo_escrito(self) -> None:
+        from pos_uniformes.services.revision_service import texto_pedido
+
+        d = self._dialogo()
+        d._table.item(self._fila(d, "6"), 9).setText("12")
+        texto = texto_pedido(d._revision_con_pedidos())
+        self.assertIn("Pedido Uno", texto)
+        self.assertIn("6: 12", texto)
+        self.assertIn("Total: 12 piezas", texto)
+
+    def test_aplicar_guarda_el_pedido_y_cambia_el_stock(self) -> None:
+        from pos_uniformes.database.models import ConteoInventario
+
         d = self._dialogo()
         with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.QMessageBox.question",
                    return_value=QMessageBox.StandardButton.Yes), \
@@ -181,6 +233,8 @@ class RevisionDialogTests(unittest.TestCase):
         self.assertEqual(v[0].stock_actual, 7)
         self.assertEqual(v[1].stock_actual, 10)
         self.assertIsNotNone(s.get(ConteoJornada, self.foto.id).revisada_at)
+        c = s.scalars(select(ConteoInventario).where(ConteoInventario.variante_id == self.v_ids[0])).one()
+        self.assertEqual(c.pedido, 21)
 
     def test_descartar_no_toca_el_stock(self) -> None:
         d = self._dialogo()
@@ -192,7 +246,7 @@ class RevisionDialogTests(unittest.TestCase):
         self.assertEqual(s.scalars(select(Variante)).first().stock_actual, 10)
         self.assertIsNotNone(s.get(ConteoJornada, self.foto.id).revisada_at)
 
-    def test_una_empleada_no_puede_aplicar(self) -> None:
+    def test_una_empleada_no_puede_aplicar_ni_pedir(self) -> None:
         d = self._dialogo(quien="VEND-4")
         with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.QMessageBox.question",
                    return_value=QMessageBox.StandardButton.Yes), \

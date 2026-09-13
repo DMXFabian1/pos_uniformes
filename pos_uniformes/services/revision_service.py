@@ -304,3 +304,68 @@ def guardar_pedidos(session: Session, jornada: ConteoJornada, pedidos: dict[int,
         session.add(c)
     session.flush()
     return guardados
+
+
+# --- la hoja de pedido ---------------------------------------------------------------
+
+def _agrupar_pedido(revision: Revision) -> list[tuple[str, list[tuple[str, str, int]]]]:
+    """[(prenda, [(talla, color, piezas), ...])] con lo que Daniel decidió (> 0),
+    en el orden de la revisión."""
+    from pos_uniformes.services.conteo_hoja_carta_service import nombre_para_hoja
+
+    grupos: dict[str, list[tuple[str, str, int]]] = {}
+    for l in revision.lineas:
+        if not l.pedido or l.pedido <= 0:
+            continue
+        nombre = nombre_para_hoja(l.producto, revision.titulo)
+        grupos.setdefault(nombre, []).append((l.talla, l.color, int(l.pedido)))
+    return list(grupos.items())
+
+
+def texto_pedido(revision: Revision) -> str:
+    """El pedido como mensaje: para Telegram o para copiarlo al WhatsApp del
+    maquilador. Una prenda por bloque, tallas con su cantidad."""
+    grupos = _agrupar_pedido(revision)
+    fecha = revision.hoy.strftime("%d/%m/%Y")
+    if not grupos:
+        return f"Pedido {revision.titulo} · {fecha}\n(sin piezas)"
+    partes = [f"Pedido {revision.titulo} · {fecha}"]
+    total = 0
+    colores = len({c for _, tallas in grupos for _, c, _ in tallas}) > 1
+    for prenda, tallas in grupos:
+        partes.append("")
+        partes.append(prenda)
+        for talla, color, piezas in tallas:
+            etiqueta = f"{talla} {color}".strip() if colores else talla
+            partes.append(f"  {etiqueta or 'Uni'}: {piezas}")
+            total += piezas
+    partes.append("")
+    partes.append(f"Total: {total} piezas")
+    return "\n".join(partes)
+
+
+def html_pedido(revision: Revision) -> str:
+    """La misma hoja, para imprimir en carta (QTextDocument: atributos HTML,
+    no CSS de tablas)."""
+    import html as _html
+
+    grupos = _agrupar_pedido(revision)
+    fecha = revision.hoy.strftime("%d/%m/%Y")
+    total = sum(p for _, tallas in grupos for _, _, p in tallas)
+    partes = [
+        "<html><body style='font-family: Arial, sans-serif; color: #1a1a1a;'>",
+        f"<h2 style='color:#6f331d; margin-bottom:2px;'>Pedido · {_html.escape(revision.titulo)}</h2>",
+        f"<p style='margin-top:0; color:#555;'>{fecha} · {total} piezas · contó {_html.escape(revision.quien)}</p>",
+    ]
+    if not grupos:
+        partes.append("<p>(sin piezas)</p>")
+    for prenda, tallas in grupos:
+        partes.append(f"<h3 style='color:#6f331d; margin:14px 0 4px 0;'>{_html.escape(prenda)}</h3>")
+        partes.append("<table cellpadding='5' cellspacing='0' border='1' bordercolor='#d9c7b8' width='60%'>")
+        partes.append("<tr bgcolor='#f5ebe0'><th align='left'>Talla</th><th align='left'>Color</th><th align='right'>Piezas</th></tr>")
+        for i, (talla, color, piezas) in enumerate(tallas):
+            fondo = " bgcolor='#faf7f3'" if i % 2 else ""
+            partes.append(f"<tr{fondo}><td>{_html.escape(talla or 'Uni')}</td><td>{_html.escape(color)}</td><td align='right'><b>{piezas}</b></td></tr>")
+        partes.append("</table>")
+    partes.append("</body></html>")
+    return "\n".join(partes)

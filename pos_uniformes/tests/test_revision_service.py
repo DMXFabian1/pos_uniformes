@@ -190,5 +190,51 @@ class RevisarTests(unittest.TestCase):
         self.assertEqual(rev.quien, "Fanny")
 
 
+class HojaDePedidoTests(unittest.TestCase):
+    def _revision(self, pedidos):
+        lineas = [
+            rv.LineaRevision(
+                conteo_id=i, variante_id=i, producto=prod, talla=talla, color=color, conto=0, anterior=None,
+                anterior_at=None, vendidas=0, dias_observados=0, ritmo_semana=0, semanas_cubiertas=None,
+                pidieron=0, ellas_sugieren=None, sugerido=0, estado=rv.SIN_DATOS, pedido_anterior=None,
+                pedido_anterior_at=None, vendidas_desde_pedido=None, pedido=pedido,
+            )
+            for i, (prod, talla, color, pedido) in enumerate(pedidos)
+        ]
+        return rv.Revision(1, "Práxedis Guerrero", "Fanny", date(2026, 9, 13), lineas)
+
+    def test_texto_agrupa_por_prenda_y_suma(self) -> None:
+        r = self._revision([
+            ("Camisa Blanca Práxedis Guerrero", "6", "", 12),
+            ("Camisa Blanca Práxedis Guerrero", "8", "", 3),
+            ("Pantalón Gris Práxedis Guerrero", "6", "", None),
+            ("Pantalón Gris Práxedis Guerrero", "8", "", 0),
+            ("Suéter Práxedis Guerrero", "M", "", 2),
+        ])
+        texto = rv.texto_pedido(r)
+        self.assertEqual(texto.splitlines()[0], "Pedido Práxedis Guerrero · 13/09/2026")
+        self.assertIn("Camisa Blanca\n  6: 12\n  8: 3", texto)
+        self.assertNotIn("Pantalón", texto)   # sin piezas no aparece
+        self.assertIn("Suéter\n  M: 2", texto)
+        self.assertTrue(texto.endswith("Total: 17 piezas"))
+
+    def test_el_color_solo_cuando_hay_mas_de_uno(self) -> None:
+        r = self._revision([("Polo Práxedis Guerrero", "6", "AZUL", 1), ("Polo Práxedis Guerrero", "6", "ROJO", 2)])
+        self.assertIn("6 AZUL: 1", rv.texto_pedido(r))
+        r = self._revision([("Polo Práxedis Guerrero", "6", "AZUL", 1), ("Polo Práxedis Guerrero", "8", "AZUL", 2)])
+        self.assertIn("  6: 1", rv.texto_pedido(r))
+
+    def test_sin_piezas_lo_dice(self) -> None:
+        self.assertIn("(sin piezas)", rv.texto_pedido(self._revision([("Camisa", "6", "", None)])))
+
+    def test_html_lleva_lo_mismo(self) -> None:
+        r = self._revision([("Camisa Blanca Práxedis Guerrero", "6", "", 12)])
+        html = rv.html_pedido(r)
+        self.assertIn("Pedido · Práxedis Guerrero", html)
+        self.assertIn("Camisa Blanca", html)
+        self.assertIn("<b>12</b>", html)
+        self.assertIn("12 piezas", html)
+
+
 if __name__ == "__main__":
     unittest.main()
