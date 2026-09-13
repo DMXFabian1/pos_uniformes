@@ -233,29 +233,63 @@ def guardar_horario(
     session.commit()
 
 
+_NOTA_DESCANSO_MOVIDO = "descanso movido al "
+
+
 def marcar_dia(
     session, employee_code: str, fecha: date, tipo: str, *, nota: str | None = None
 ) -> None:
-    """Marca el día (falta/descanso/trabajo); reemplaza la marca previa."""
-    quitar_marca(session, employee_code, fecha, commit=False)
+    """Marca el día (falta/descanso/trabajo); reemplaza la marca previa.
+
+    Un descanso en un día que no es el suyo **mueve** el descanso de esa
+    semana: el fijo pasa a "trabaja" (Daniel, 2026-09-13: "faltó, pero
+    tomamos ese día como descanso" — no es falta, y no descansa dos veces).
+    """
+    code = str(employee_code).strip().upper()
+    quitar_marca(session, code, fecha, commit=False)
     from pos_uniformes.database.models import EmpleadaEvento
 
-    session.add(
-        EmpleadaEvento(
-            employee_code=str(employee_code).strip().upper(),
-            fecha=fecha,
-            tipo=tipo,
-            nota=nota,
-        )
-    )
+    session.add(EmpleadaEvento(employee_code=code, fecha=fecha, tipo=tipo, nota=nota))
+    if tipo == DESCANSO:
+        session.flush()
+        for otro in _otros_descansos_fijos_de_la_semana(session, code, fecha):
+            session.add(EmpleadaEvento(
+                employee_code=code, fecha=otro, tipo=TRABAJO,
+                nota=f"{_NOTA_DESCANSO_MOVIDO}{fecha.strftime('%d/%m')}",
+            ))
     session.commit()
+
+
+def _otros_descansos_fijos_de_la_semana(session, code: str, fecha: date) -> list[date]:
+    """Los días de esa semana que son descanso POR PATRÓN (sin evento propio)
+    y no son `fecha`. Un descanso explícito de otro día se respeta."""
+    horario = cargar_horario(session, code)
+    if horario.por_dia:
+        return []
+    lunes, domingo = _semana_de(fecha)
+    dia = lunes
+    out: list[date] = []
+    while dia <= domingo:
+        if dia != fecha and dia not in horario.eventos and estado_del_dia(horario, dia) == DESCANSO:
+            out.append(dia)
+        dia += timedelta(days=1)
+    return out
 
 
 def quitar_marca(session, employee_code: str, fecha: date, *, commit: bool = True) -> None:
     from pos_uniformes.database.models import EmpleadaEvento
 
+    code = str(employee_code).strip().upper()
+    # Si lo que se quita es un descanso que movió el fijo, el fijo vuelve.
     session.query(EmpleadaEvento).filter(
-        EmpleadaEvento.employee_code == str(employee_code).strip().upper(),
+        EmpleadaEvento.employee_code == code,
+        EmpleadaEvento.tipo == TRABAJO,
+        EmpleadaEvento.nota == f"{_NOTA_DESCANSO_MOVIDO}{fecha.strftime('%d/%m')}",
+        EmpleadaEvento.fecha >= _semana_de(fecha)[0],
+        EmpleadaEvento.fecha <= _semana_de(fecha)[1],
+    ).delete()
+    session.query(EmpleadaEvento).filter(
+        EmpleadaEvento.employee_code == code,
         EmpleadaEvento.fecha == fecha,
         EmpleadaEvento.tipo != PAGO,  # el historial de pagos no se pisa al remarcar
     ).delete()

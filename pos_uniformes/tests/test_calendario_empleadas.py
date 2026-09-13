@@ -7,7 +7,7 @@ Lógica pura — sin base de datos ni Qt.
 from __future__ import annotations
 
 import unittest
-from datetime import date
+from datetime import date, timedelta
 
 from pos_uniformes.services.calendario_empleadas_service import (
     DESCANSO,
@@ -494,6 +494,97 @@ class LimiteMensualTests(unittest.TestCase):
         marcar_dia(self.session, "VEND-2", hoy, DESCANSO)  # sin nota de autoservicio
         marcar_dia(self.session, "VEND-2", hoy, FALTA)
         self.assertEqual(cambios_del_mes(self.session, "VEND-2", hoy), 0)
+
+
+class DescansoMovidoTests(unittest.TestCase):
+    """Faltó pero se toma como descanso: el fijo de esa semana pasa a trabajo."""
+
+    def setUp(self) -> None:
+        from sqlalchemy import create_engine
+        from sqlalchemy.orm import sessionmaker
+
+        from pos_uniformes.database.models import EmpleadaEvento, EmpleadaHorario
+
+        engine = create_engine("sqlite://")
+        for t in (EmpleadaHorario, EmpleadaEvento):
+            t.__table__.create(engine)
+        self.session = sessionmaker(bind=engine)()
+        # Fanny descansa los jueves.
+        self.session.add(EmpleadaHorario(employee_code="VEND-5", descanso_weekday=3))
+        self.session.commit()
+        self.lunes = date(2026, 9, 7)
+        self.jueves = date(2026, 9, 10)
+
+    def tearDown(self) -> None:
+        self.session.close()
+
+    def _estado(self, dia: date) -> str:
+        from pos_uniformes.services.calendario_empleadas_service import cargar_horario, estado_del_dia
+
+        return estado_del_dia(cargar_horario(self.session, "VEND-5"), dia)
+
+    def test_descanso_en_otro_dia_mueve_el_fijo(self) -> None:
+        from pos_uniformes.services.calendario_empleadas_service import DESCANSO, TRABAJO, faltas_en_rango, marcar_dia, cargar_horario
+
+        marcar_dia(self.session, "VEND-5", self.lunes, DESCANSO, nota="Daniel desde Telegram")
+        self.assertEqual(self._estado(self.lunes), DESCANSO)
+        self.assertEqual(self._estado(self.jueves), TRABAJO)     # su jueves ya es de trabajo
+        self.assertEqual(faltas_en_rango(cargar_horario(self.session, "VEND-5"), self.lunes, self.lunes + timedelta(days=6)), 0)
+        # Solo un descanso en la semana.
+        descansos = [self.lunes + timedelta(days=i) for i in range(7) if self._estado(self.lunes + timedelta(days=i)) == DESCANSO]
+        self.assertEqual(descansos, [self.lunes])
+
+    def test_quitar_ese_descanso_regresa_el_fijo(self) -> None:
+        from pos_uniformes.services.calendario_empleadas_service import DESCANSO, TRABAJO, marcar_dia, quitar_marca
+
+        marcar_dia(self.session, "VEND-5", self.lunes, DESCANSO)
+        quitar_marca(self.session, "VEND-5", self.lunes)
+        self.assertEqual(self._estado(self.lunes), TRABAJO)
+        self.assertEqual(self._estado(self.jueves), DESCANSO)
+
+    def test_descanso_en_su_dia_fijo_no_toca_nada(self) -> None:
+        from pos_uniformes.services.calendario_empleadas_service import DESCANSO, marcar_dia, cargar_horario
+
+        marcar_dia(self.session, "VEND-5", self.jueves, DESCANSO)
+        eventos = cargar_horario(self.session, "VEND-5").eventos
+        self.assertEqual(list(eventos), [self.jueves])
+
+    def test_una_falta_no_mueve_el_descanso(self) -> None:
+        from pos_uniformes.services.calendario_empleadas_service import DESCANSO, FALTA, marcar_dia
+
+        marcar_dia(self.session, "VEND-5", self.lunes, FALTA)
+        self.assertEqual(self._estado(self.lunes), FALTA)
+        self.assertEqual(self._estado(self.jueves), DESCANSO)
+
+    def test_si_el_fijo_ya_tenia_marca_propia_se_respeta(self) -> None:
+        from pos_uniformes.services.calendario_empleadas_service import DESCANSO, FALTA, marcar_dia
+
+        # El jueves ya está marcado como falta (vino y se fue, lo que sea): no se pisa.
+        marcar_dia(self.session, "VEND-5", self.jueves, FALTA)
+        marcar_dia(self.session, "VEND-5", self.lunes, DESCANSO)
+        self.assertEqual(self._estado(self.jueves), FALTA)
+
+    def test_por_dias_no_tiene_fijo_que_mover(self) -> None:
+        from pos_uniformes.database.models import EmpleadaHorario
+        from pos_uniformes.services.calendario_empleadas_service import DESCANSO, marcar_dia, cargar_horario
+
+        self.session.add(EmpleadaHorario(employee_code="VEND-9", modo_pago="por_dia", dias_trabajo=[5, 6]))
+        self.session.commit()
+        marcar_dia(self.session, "VEND-9", date(2026, 9, 12), DESCANSO)   # sábado
+        self.assertEqual(list(cargar_horario(self.session, "VEND-9").eventos), [date(2026, 9, 12)])
+
+    def test_el_telegram_lo_hace_igual(self) -> None:
+        from pos_uniformes.database.models import Empleada
+        from pos_uniformes.services import asistencia_service as asis
+        from pos_uniformes.services.calendario_empleadas_service import DESCANSO, TRABAJO
+
+        Empleada.__table__.create(self.session.get_bind())
+        self.session.add(Empleada(codigo="VEND-5", nombre_completo="Fanny Ortiz", activo=True))
+        self.session.commit()
+        self.assertIn("descansa", asis.marcar(self.session, "VEND-5", asis.DESCANSA, self.lunes))
+        self.assertEqual(self._estado(self.jueves), TRABAJO)
+        self.assertIn("quitada", asis.marcar(self.session, "VEND-5", asis.DESCANSA, self.lunes))
+        self.assertEqual(self._estado(self.jueves), DESCANSO)
 
 
 if __name__ == "__main__":
