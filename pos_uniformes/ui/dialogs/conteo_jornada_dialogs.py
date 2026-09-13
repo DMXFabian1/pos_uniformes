@@ -269,8 +269,11 @@ class ConteoRevisionDialog(QDialog):
     Aplicar al inventario también guarda los pedidos: un solo gesto.
     """
 
-    COLUMNAS = ("Prenda", "Talla", "Hay", "Vendidas", "Ritmo/sem", "Alcanza", "Pidieron", "Hoja", "Sugerido", "Pedido", "La vez pasada")
-    COL_PEDIDO = 9
+    COLUMNAS = ("Prenda", "Talla", "A la mano", "En cajas", "Vendidas", "Ritmo/sem", "Alcanza", "Pidieron", "Hoja", "Surtir", "Sugerido", "Pedido", "La vez pasada")
+    COL_CAJAS = 3
+    COL_SURTIR = 9
+    COL_SUGERIDO = 10
+    COL_PEDIDO = 11
 
     def __init__(
         self,
@@ -318,7 +321,7 @@ class ConteoRevisionDialog(QDialog):
         layout.addWidget(self._table, 1)
 
         acciones = QHBoxLayout()
-        self._solo_pedir = QPushButton("Ver solo qué pedir")
+        self._solo_pedir = QPushButton("Ver solo qué hacer")
         self._solo_pedir.setCheckable(True)
         self._solo_pedir.setChecked(True)
         self._solo_pedir.toggled.connect(self._pintar)
@@ -346,7 +349,7 @@ class ConteoRevisionDialog(QDialog):
         acciones.addWidget(cerrar)
         layout.addLayout(acciones)
         self.setLayout(layout)
-        self.resize(1180, 620)
+        self.resize(1320, 620)
         self._cargar()
 
     # --- datos ---------------------------------------------------------------------
@@ -378,6 +381,8 @@ class ConteoRevisionDialog(QDialog):
         tallas = sum(1 for p in self._pedidos.values() if p)
         partes = [f"<b>{r.quien}</b> contó <b>{len(r.lineas)}</b> tallas de <b>{r.titulo}</b>"]
         partes.append(f"se sugiere pedir <b>{r.piezas_sugeridas}</b> piezas en {r.tallas_a_pedir} tallas")
+        if r.piezas_a_surtir:
+            partes.append(f"surtir de las cajas <b>{r.piezas_a_surtir}</b> piezas en {r.tallas_a_surtir} tallas")
         if r.urgentes:
             partes.append(f"<span style='color:#b91c1c'><b>{r.urgentes} urgentes</b> (no hay y la piden)</span>")
         partes.append(f"tu pedido: <b>{piezas}</b> piezas en {tallas} tallas")
@@ -385,11 +390,11 @@ class ConteoRevisionDialog(QDialog):
         self._hoja_btn.setEnabled(piezas > 0)
 
     def _lineas_visibles(self):
-        from pos_uniformes.services.revision_service import PEDIR, URGENTE
+        from pos_uniformes.services.revision_service import PEDIR, SURTIR, URGENTE
 
         if not self._solo_pedir.isChecked():
             return list(self._revision.lineas)
-        return [l for l in self._revision.lineas if l.estado in (URGENTE, PEDIR) or self._pedidos.get(l.conteo_id)]
+        return [l for l in self._revision.lineas if l.estado in (URGENTE, PEDIR, SURTIR) or self._pedidos.get(l.conteo_id)]
 
     # --- pintura -------------------------------------------------------------------
     def _pintar(self) -> None:
@@ -425,11 +430,13 @@ class ConteoRevisionDialog(QDialog):
                 nombre_para_hoja(l.producto, self._revision.titulo),
                 f"{l.talla} {l.color}".strip() if l.color and l.color.upper() not in ("", "UNICO", "ÚNICO") else l.talla,
                 str(l.conto),
+                str(l.en_cajas) if l.en_cajas else "—",
                 vendidas,
                 f"{l.ritmo_semana:.1f}" if l.ritmo_semana else "—",
                 alcanza,
                 str(l.pidieron) if l.pidieron else "—",
                 str(l.ellas_sugieren) if l.ellas_sugieren is not None else "—",
+                str(l.surtir) if l.surtir else "—",
                 sugerido,
                 "" if pedido is None else str(pedido),
                 pasada,
@@ -446,11 +453,18 @@ class ConteoRevisionDialog(QDialog):
                     item.setFont(fuente)
                 else:
                     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                if col == 8:
+                if col == self.COL_SUGERIDO:
                     if l.estado == URGENTE:
                         item.setForeground(QBrush(QColor("#b91c1c")))
                     elif l.estado in (NO_SE_MUEVE, SIN_DATOS):
                         item.setForeground(QBrush(QColor("#8a8a8a")))
+                if col == self.COL_CAJAS and l.cajas:
+                    item.setToolTip("En cajas: " + " · ".join(f"{codigo} ×{n}" for codigo, n in l.cajas))
+                if col == self.COL_SURTIR and l.surtir:
+                    item.setForeground(QBrush(QColor("#1d4ed8")))
+                    fuente = item.font()
+                    fuente.setBold(True)
+                    item.setFont(fuente)
                 if col == 2 and l.conto == 0:
                     item.setForeground(QBrush(QColor("#b91c1c")))
                 self._table.setItem(fila, col, item)

@@ -29,6 +29,8 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from pos_uniformes.database.models import (
+    BodegaCaja,
+    BodegaContenido,
     ConteoInventario,
     ConteoJornada,
     DemandaNoAtendida,
@@ -39,12 +41,14 @@ from pos_uniformes.database.models import (
 from pos_uniformes.services.conteo_jornada_service import DUENO_CODE
 
 SEMANAS_OBJETIVO = 4          # Daniel: "4 semanas, igual para todas" (2026-09-13)
+SEMANAS_A_LA_MANO = 2         # cuánto conviene tener colgado antes de ir a las cajas por más
 VENTANA_MAX_DIAS = 84         # no mirar ventas de hace más de 12 semanas: la temporada cambia
 MIN_DIAS_OBSERVADOS = 7       # con menos de una semana, "sin datos" en vez de "no se mueve"
 TIPOS_SALIDA = ("venta", "apartado")  # lo que se lleva piezas del piso
 
 URGENTE = "URGENTE"
 PEDIR = "PEDIR"
+SURTIR = "SURTIR"             # no hace falta pedir: hay en cajas, hay que pasarlo al piso
 BIEN = "BIEN"
 NO_SE_MUEVE = "NO_SE_MUEVE"
 SIN_DATOS = "SIN_DATOS"
@@ -59,7 +63,10 @@ class LineaRevision:
     producto: str
     talla: str
     color: str
-    conto: int
+    conto: int                      # a la mano (lo colgado, lo que la empleada ve)
+    en_cajas: int                   # guardado en cajas de bodega, esté la caja donde esté
+    cajas: tuple                    # (("A-12", 8), ("A-3", 4)) para enseñar de dónde
+    surtir: int                     # cuántas pasar de las cajas al piso
     anterior: int | None            # último conteo previo a esta jornada
     anterior_at: date | None
     vendidas: int                   # desde el conteo anterior (o desde que hay Libreta)
@@ -78,6 +85,10 @@ class LineaRevision:
     @property
     def urgente(self) -> bool:
         return self.estado == URGENTE
+
+    @property
+    def total(self) -> int:
+        return self.conto + self.en_cajas
 
 
 @dataclass(frozen=True)
@@ -103,6 +114,14 @@ class Revision:
     @property
     def piezas_pedidas(self) -> int:
         return sum(l.pedido or 0 for l in self.lineas)
+
+    @property
+    def piezas_a_surtir(self) -> int:
+        return sum(l.surtir for l in self.lineas)
+
+    @property
+    def tallas_a_surtir(self) -> int:
+        return sum(1 for l in self.lineas if l.surtir > 0)
 
 
 # --- fechas ------------------------------------------------------------------------
@@ -158,6 +177,24 @@ def _pidieron_por_sku(session: Session, desde: date) -> dict[str, list[tuple[dat
     return out
 
 
+def _en_cajas(session: Session, variante_ids: list[int]) -> dict[int, tuple[int, tuple]]:
+    """{variante_id: (total, (("A-12", 8), ...))} de lo guardado en cajas de
+    bodega. Da igual si la caja está en el almacén o bajo el rack: lo que no
+    está colgado no lo ve la empleada al contar."""
+    if not variante_ids:
+        return {}
+    filas = session.execute(
+        select(BodegaContenido.variante_id, BodegaCaja.codigo, BodegaContenido.cantidad)
+        .join(BodegaCaja, BodegaCaja.id == BodegaContenido.caja_id)
+        .where(BodegaContenido.variante_id.in_(variante_ids), BodegaContenido.cantidad > 0)
+        .order_by(BodegaContenido.cantidad.desc(), BodegaCaja.codigo)
+    ).all()
+    por_vid: dict[int, list[tuple[str, int]]] = defaultdict(list)
+    for vid, codigo, cantidad in filas:
+        por_vid[int(vid)].append((str(codigo), int(cantidad)))
+    return {vid: (sum(c for _, c in cajas), tuple(cajas)) for vid, cajas in por_vid.items()}
+
+
 def _suma_desde(eventos: list[tuple[date, int]], desde: date) -> int:
     return sum(p for f, p in eventos if f >= desde)
 
@@ -169,25 +206,46 @@ def _ellas_sugieren(notas: str | None) -> int | None:
 
 # --- la cuenta ---------------------------------------------------------------------
 
-def sugerir(*, conto: int, vendidas: int, dias_observados: int, pidieron: int, semanas: int = SEMANAS_OBJETIVO) -> tuple[int, float, float | None, str]:
-    """Devuelve (sugerido, ritmo_semana, semanas_cubiertas, estado).
+@dataclass(frozen=True)
+class Sugerencia:
+    sugerido: int            # cuántas pedir al maquilador
+    surtir: int              # cuántas pasar de las cajas al piso
+    ritmo_semana: float
+    semanas_cubiertas: float | None   # con el total (a la mano + cajas)
+    estado: str
 
-    La demanda no atendida cuenta como venta perdida: entra al ritmo, porque si
-    hubiera habido pieza se habría vendido.
+
+def sugerir(*, conto: int, vendidas: int, dias_observados: int, pidieron: int, en_cajas: int = 0, semanas: int = SEMANAS_OBJETIVO) -> Sugerencia:
+    """Qué hacer con una talla: pedir, surtir del almacén, o nada.
+
+    - La demanda no atendida cuenta como venta perdida: entra al ritmo, porque
+      si hubiera habido pieza se habría vendido.
+    - Se pide contra el TOTAL (a la mano + en cajas): lo guardado también es
+      inventario. Se surte cuando a la mano no alcanza para `SEMANAS_A_LA_MANO`
+      y en cajas sí hay.
     """
     dias = max(1, dias_observados)
     ritmo = (vendidas + pidieron) / (dias / 7)
-    cubiertas = (conto / ritmo) if ritmo > 0 else None
-    sugerido = max(0, math.ceil(ritmo * semanas - conto)) if ritmo > 0 else 0
-    if conto <= 0 and (vendidas > 0 or pidieron > 0):
+    total = conto + en_cajas
+    cubiertas = (total / ritmo) if ritmo > 0 else None
+    sugerido = max(0, math.ceil(ritmo * semanas - total)) if ritmo > 0 else 0
+    if en_cajas > 0 and ritmo > 0:
+        surtir = min(en_cajas, max(0, math.ceil(ritmo * SEMANAS_A_LA_MANO) - conto))
+    elif en_cajas > 0 and conto <= 0:
+        surtir = min(en_cajas, 1)   # sin ritmo pero nada colgado: que al menos se vea
+    else:
+        surtir = 0
+    if total <= 0 and (vendidas > 0 or pidieron > 0):
         estado = URGENTE
     elif sugerido > 0:
         estado = PEDIR
+    elif surtir > 0:
+        estado = SURTIR
     elif ritmo == 0:
         estado = SIN_DATOS if dias_observados < MIN_DIAS_OBSERVADOS else NO_SE_MUEVE
     else:
         estado = BIEN
-    return sugerido, round(ritmo, 2), (round(cubiertas, 1) if cubiertas is not None else None), estado
+    return Sugerencia(sugerido, surtir, round(ritmo, 2), (round(cubiertas, 1) if cubiertas is not None else None), estado)
 
 
 def revisar(session: Session, jornada: ConteoJornada, *, hoy: date | None = None) -> Revision:
@@ -220,6 +278,7 @@ def revisar(session: Session, jornada: ConteoJornada, *, hoy: date | None = None
     primera_venta = _primera_venta(session)
     ventas = _ventas_por_sku(session, piso)
     pidieron = _pidieron_por_sku(session, piso)
+    cajas = _en_cajas(session, variante_ids)
 
     lineas: list[LineaRevision] = []
     for conteo, variante, producto in filas:
@@ -243,7 +302,8 @@ def revisar(session: Session, jornada: ConteoJornada, *, hoy: date | None = None
         sku = variante.sku or ""
         vendidas = _suma_desde(ventas.get(sku, []), desde)
         pidieron_n = _suma_desde(pidieron.get(sku, []), desde)
-        sugerido, ritmo, cubiertas, estado = sugerir(conto=conteo.stock_fisico, vendidas=vendidas, dias_observados=dias, pidieron=pidieron_n)
+        en_cajas, detalle_cajas = cajas.get(variante.id, (0, ()))
+        sug = sugerir(conto=conteo.stock_fisico, vendidas=vendidas, dias_observados=dias, pidieron=pidieron_n, en_cajas=en_cajas)
 
         con_pedido = [p for p in anteriores if p.pedido is not None]
         pedido_ant = con_pedido[0] if con_pedido else None
@@ -257,16 +317,19 @@ def revisar(session: Session, jornada: ConteoJornada, *, hoy: date | None = None
             talla=str(variante.talla or ""),
             color=str(variante.color or ""),
             conto=int(conteo.stock_fisico),
+            en_cajas=en_cajas,
+            cajas=detalle_cajas,
+            surtir=sug.surtir,
             anterior=int(anterior.stock_fisico) if anterior else None,
             anterior_at=anterior_at,
             vendidas=vendidas,
             dias_observados=dias,
-            ritmo_semana=ritmo,
-            semanas_cubiertas=cubiertas,
+            ritmo_semana=sug.ritmo_semana,
+            semanas_cubiertas=sug.semanas_cubiertas,
             pidieron=pidieron_n,
             ellas_sugieren=_ellas_sugieren(conteo.notas),
-            sugerido=sugerido,
-            estado=estado,
+            sugerido=sug.sugerido,
+            estado=sug.estado,
             pedido_anterior=int(pedido_ant.pedido) if pedido_ant else None,
             pedido_anterior_at=pedido_ant_at,
             vendidas_desde_pedido=vendidas_desde_pedido,

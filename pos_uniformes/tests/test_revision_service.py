@@ -25,30 +25,54 @@ def _dt(d: date, hora: int = 12) -> datetime:
 class SugerirTests(unittest.TestCase):
     def test_pide_lo_que_falta_para_cuatro_semanas(self) -> None:
         # 14 vendidas en 14 días = 7/semana; 4 semanas = 28; hay 10 → pedir 18
-        sugerido, ritmo, cubiertas, estado = rv.sugerir(conto=10, vendidas=14, dias_observados=14, pidieron=0)
-        self.assertEqual((sugerido, ritmo, cubiertas, estado), (18, 7.0, 1.4, rv.PEDIR))
+        r = rv.sugerir(conto=10, vendidas=14, dias_observados=14, pidieron=0)
+        self.assertEqual((r.sugerido, r.ritmo_semana, r.semanas_cubiertas, r.estado), (18, 7.0, 1.4, rv.PEDIR))
+        self.assertEqual(r.surtir, 0)
 
     def test_bien_cuando_alcanza(self) -> None:
-        sugerido, _, cubiertas, estado = rv.sugerir(conto=40, vendidas=14, dias_observados=14, pidieron=0)
-        self.assertEqual((sugerido, estado), (0, rv.BIEN))
-        self.assertGreaterEqual(cubiertas, 4)
+        r = rv.sugerir(conto=40, vendidas=14, dias_observados=14, pidieron=0)
+        self.assertEqual((r.sugerido, r.estado), (0, rv.BIEN))
+        self.assertGreaterEqual(r.semanas_cubiertas, 4)
 
-    def test_urgente_si_no_hay_y_la_piden(self) -> None:
-        sugerido, _, _, estado = rv.sugerir(conto=0, vendidas=0, dias_observados=20, pidieron=3)
-        self.assertEqual(estado, rv.URGENTE)
-        self.assertGreater(sugerido, 0)
+    def test_urgente_si_no_hay_en_ningun_lado_y_la_piden(self) -> None:
+        r = rv.sugerir(conto=0, vendidas=0, dias_observados=20, pidieron=3)
+        self.assertEqual(r.estado, rv.URGENTE)
+        self.assertGreater(r.sugerido, 0)
+        # Con piezas en cajas ya no es urgente: es surtir.
+        r = rv.sugerir(conto=0, vendidas=0, dias_observados=20, pidieron=3, en_cajas=10)
+        self.assertNotEqual(r.estado, rv.URGENTE)
 
     def test_lo_que_pidieron_y_no_habia_cuenta_como_venta(self) -> None:
-        con, *_ = rv.sugerir(conto=0, vendidas=4, dias_observados=28, pidieron=0)
-        con_demanda, *_ = rv.sugerir(conto=0, vendidas=4, dias_observados=28, pidieron=4)
+        con = rv.sugerir(conto=0, vendidas=4, dias_observados=28, pidieron=0).sugerido
+        con_demanda = rv.sugerir(conto=0, vendidas=4, dias_observados=28, pidieron=4).sugerido
         self.assertEqual((con, con_demanda), (4, 8))
 
     def test_no_se_mueve_vs_sin_datos(self) -> None:
-        self.assertEqual(rv.sugerir(conto=5, vendidas=0, dias_observados=30, pidieron=0)[3], rv.NO_SE_MUEVE)
-        self.assertEqual(rv.sugerir(conto=5, vendidas=0, dias_observados=3, pidieron=0)[3], rv.SIN_DATOS)
+        self.assertEqual(rv.sugerir(conto=5, vendidas=0, dias_observados=30, pidieron=0).estado, rv.NO_SE_MUEVE)
+        self.assertEqual(rv.sugerir(conto=5, vendidas=0, dias_observados=3, pidieron=0).estado, rv.SIN_DATOS)
 
     def test_semanas_configurables(self) -> None:
-        self.assertEqual(rv.sugerir(conto=0, vendidas=7, dias_observados=7, pidieron=0, semanas=2)[0], 14)
+        self.assertEqual(rv.sugerir(conto=0, vendidas=7, dias_observados=7, pidieron=0, semanas=2).sugerido, 14)
+
+    def test_se_pide_contra_el_total_y_se_surte_de_las_cajas(self) -> None:
+        # 7/semana. A la mano 2, en cajas 30 → total 32 ≥ 28: no se pide.
+        # Pero a la mano no alcanza 2 semanas (14): surtir 12 de las cajas.
+        r = rv.sugerir(conto=2, vendidas=14, dias_observados=14, pidieron=0, en_cajas=30)
+        self.assertEqual((r.sugerido, r.surtir, r.estado), (0, 12, rv.SURTIR))
+        self.assertEqual(r.semanas_cubiertas, 4.6)
+
+    def test_pedir_y_surtir_a_la_vez(self) -> None:
+        # 7/semana. A la mano 0, en cajas 5 → total 5: pedir 23 y mientras surtir las 5.
+        r = rv.sugerir(conto=0, vendidas=14, dias_observados=14, pidieron=0, en_cajas=5)
+        self.assertEqual((r.sugerido, r.surtir, r.estado), (23, 5, rv.PEDIR))
+
+    def test_no_surtir_si_a_la_mano_ya_alcanza(self) -> None:
+        r = rv.sugerir(conto=20, vendidas=14, dias_observados=14, pidieron=0, en_cajas=30)
+        self.assertEqual((r.surtir, r.estado), (0, rv.BIEN))
+
+    def test_sin_ritmo_pero_nada_colgado_y_hay_en_cajas(self) -> None:
+        r = rv.sugerir(conto=0, vendidas=0, dias_observados=30, pidieron=0, en_cajas=6)
+        self.assertEqual((r.surtir, r.estado), (1, rv.SURTIR))
 
 
 class _Escenario(unittest.TestCase):
@@ -148,6 +172,37 @@ class RevisarTests(_Escenario):
         self.assertEqual(linea.pidieron, 2)
         self.assertEqual(linea.estado, rv.URGENTE)
 
+    def _caja(self, codigo: str, variante: Variante, cantidad: int) -> None:
+        from pos_uniformes.database.models import BodegaCaja, BodegaContenido
+
+        caja = self.s.scalar(select(BodegaCaja).where(BodegaCaja.codigo == codigo))
+        if caja is None:
+            caja = BodegaCaja(codigo=codigo)
+            self.s.add(caja)
+            self.s.flush()
+        self.s.add(BodegaContenido(caja_id=caja.id, variante_id=variante.id, cantidad=cantidad))
+        self.s.flush()
+
+    def test_lo_de_las_cajas_entra_al_total_y_dice_de_donde(self) -> None:
+        v0, v1 = self.v[0], self.v[1]
+        self._caja("A-12", v0, 8)
+        self._caja("A-3", v0, 4)
+        self._venta(HOY - timedelta(days=14), v0.sku, 14)   # 7/semana
+        j = self._jornada_con({v0: 2, v1: 5})
+        l0, l1 = rv.revisar(self.s, j, hoy=HOY).lineas
+        self.assertEqual((l0.conto, l0.en_cajas, l0.total), (2, 12, 14))
+        self.assertEqual(l0.cajas, (("A-12", 8), ("A-3", 4)))
+        # total 14 < 28 → pedir 14; a la mano 2 < 14 → surtir las 12
+        self.assertEqual((l0.sugerido, l0.surtir, l0.estado), (14, 12, rv.PEDIR))
+        self.assertEqual((l1.en_cajas, l1.cajas, l1.surtir), (0, (), 0))
+
+    def test_sin_cajas_todo_sigue_igual(self) -> None:
+        v0 = self.v[0]
+        self._venta(HOY - timedelta(days=14), v0.sku, 14)
+        j = self._jornada_con({v0: 10})
+        l = rv.revisar(self.s, j, hoy=HOY).lineas[0]
+        self.assertEqual((l.sugerido, l.surtir, l.estado), (18, 0, rv.PEDIR))
+
     def test_lo_que_ellas_anotaron_en_la_hoja(self) -> None:
         v0 = self.v[0]
         j = self._jornada_con({v0: 3}, notas={v0: "Pedido: 12"})
@@ -197,7 +252,7 @@ class HojaDePedidoTests(unittest.TestCase):
     def _revision(self, pedidos):
         lineas = [
             rv.LineaRevision(
-                conteo_id=i, variante_id=i, producto=prod, talla=talla, color=color, conto=0, anterior=None,
+                conteo_id=i, variante_id=i, producto=prod, talla=talla, color=color, conto=0, en_cajas=0, cajas=(), surtir=0, anterior=None,
                 anterior_at=None, vendidas=0, dias_observados=0, ritmo_semana=0, semanas_cubiertas=None,
                 pidieron=0, ellas_sugieren=None, sugerido=0, estado=rv.SIN_DATOS, pedido_anterior=None,
                 pedido_anterior_at=None, vendidas_desde_pedido=None, pedido=pedido,

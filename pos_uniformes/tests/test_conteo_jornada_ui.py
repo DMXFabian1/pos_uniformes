@@ -181,25 +181,44 @@ class RevisionDialogTests(unittest.TestCase):
         d = self._dialogo()
         self.assertEqual(d._table.rowCount(), 1)
         fila = self._fila(d, "6")
-        self.assertEqual(d._table.item(fila, 2).text(), "7")            # hay
-        self.assertEqual(d._table.item(fila, 3).text(), "14 en 14 d")   # vendidas
-        self.assertEqual(d._table.item(fila, 8).text(), "21")           # sugerido: 28 − 7
-        self.assertEqual(d._table.item(fila, 9).text(), "21")           # pedido arranca en lo sugerido
+        self.assertEqual(d._table.item(fila, 2).text(), "7")            # a la mano
+        self.assertEqual(d._table.item(fila, 3).text(), "—")            # nada en cajas
+        self.assertEqual(d._table.item(fila, 4).text(), "14 en 14 d")   # vendidas
+        self.assertEqual(d._table.item(fila, 10).text(), "21")          # sugerido: 28 − 7
+        self.assertEqual(d._table.item(fila, 11).text(), "21")          # pedido arranca en lo sugerido
         self.assertIn("Stayce", d._resumen_label.text())
         self.assertIn("21", d._resumen_label.text())
         d._solo_pedir.setChecked(False)
         self.assertEqual(d._table.rowCount(), 2)
-        self.assertEqual(d._table.item(self._fila(d, "8"), 8).text(), "no se mueve")
+        self.assertEqual(d._table.item(self._fila(d, "8"), 10).text(), "no se mueve")
+
+    def test_lo_de_las_cajas_se_ve_y_dice_surtir(self) -> None:
+        from pos_uniformes.database.models import BodegaCaja, BodegaContenido
+
+        s = self.factory()
+        caja = BodegaCaja(codigo="A-12")
+        s.add(caja); s.flush()
+        s.add(BodegaContenido(caja_id=caja.id, variante_id=self.v_ids[0], cantidad=30))
+        s.commit(); s.close()
+        d = self._dialogo()
+        fila = self._fila(d, "6")
+        # 7/sem; a la mano 7, en cajas 30 → total 37 ≥ 28: no pedir; surtir 14 − 7 = 7.
+        self.assertEqual(d._table.item(fila, 3).text(), "30")
+        self.assertIn("A-12 ×30", d._table.item(fila, 3).toolTip())
+        self.assertEqual(d._table.item(fila, 9).text(), "7")
+        self.assertEqual(d._table.item(fila, 10).text(), "bien")
+        self.assertEqual(d._table.item(fila, 11).text(), "")
+        self.assertIn("surtir de las cajas <b>7</b>", d._resumen_label.text())
 
     def test_editar_pedido_y_guardarlo(self) -> None:
         from pos_uniformes.database.models import ConteoInventario
 
         d = self._dialogo()
         fila = self._fila(d, "6")
-        d._table.item(fila, 9).setText("30")
+        d._table.item(fila, 11).setText("30")
         self.assertIn("<b>30</b> piezas", d._resumen_label.text())
-        d._table.item(fila, 9).setText("abc")   # no es número: vuelve a lo anterior
-        self.assertEqual(d._table.item(fila, 9).text(), "30")
+        d._table.item(fila, 11).setText("abc")   # no es número: vuelve a lo anterior
+        self.assertEqual(d._table.item(fila, 11).text(), "30")
         with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.QMessageBox.information"):
             self.assertTrue(d._guardar_pedidos())
         s = self.factory()
@@ -207,13 +226,13 @@ class RevisionDialogTests(unittest.TestCase):
         self.assertEqual((c.pedido, c.pedido_sugerido), (30, 21))
         # Al reabrir, trae lo decidido.
         d2 = self._dialogo()
-        self.assertEqual(d2._table.item(self._fila(d2, "6"), 9).text(), "30")
+        self.assertEqual(d2._table.item(self._fila(d2, "6"), 11).text(), "30")
 
     def test_la_hoja_de_pedido_lleva_lo_escrito(self) -> None:
         from pos_uniformes.services.revision_service import texto_pedido
 
         d = self._dialogo()
-        d._table.item(self._fila(d, "6"), 9).setText("12")
+        d._table.item(self._fila(d, "6"), 11).setText("12")
         texto = texto_pedido(d._revision_con_pedidos())
         self.assertIn("Pedido Uno", texto)
         self.assertIn("6: 12", texto)
@@ -244,7 +263,7 @@ class RevisionDialogTests(unittest.TestCase):
             hist.assert_called_once()
             self.assertEqual(hist.call_args.kwargs["variante_id"], self.v_ids[0])
             hist.reset_mock()
-            d._doble_clic(d._table.item(fila, 9))      # Pedido: ahí el doble clic edita
+            d._doble_clic(d._table.item(fila, 11))     # Pedido: ahí el doble clic edita
             hist.assert_not_called()
 
     def test_la_historia_muestra_conteos_y_semanas(self) -> None:
