@@ -317,6 +317,19 @@ def main(argv: list[str] | None = None) -> int:
     args = parser.parse_args(argv)
 
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s", datefmt="%H:%M:%S")
+    # También a archivo: en el servidor corre oculto (sin consola), y sin esto
+    # un error moría sin que nadie lo viera. logs/afluencia.log, junto a los del POS.
+    try:
+        from logging.handlers import RotatingFileHandler
+
+        ruta_log = RAIZ_POS / "logs" / "afluencia.log"
+        ruta_log.parent.mkdir(parents=True, exist_ok=True)
+        h = RotatingFileHandler(ruta_log, maxBytes=1_000_000, backupCount=3, encoding="utf-8")
+        h.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(message)s", datefmt="%d/%m %H:%M:%S"))
+        logging.getLogger().addHandler(h)
+    except Exception:  # noqa: BLE001 — sin archivo de log se sigue igual
+        pass
+    log.info("Contador arrancando (pid %s)", os.getpid())
     cfg = cargar_config(Path(args.config))
     host, puerto, user, password = credenciales_dvr()
     urls = {cam["nombre"]: url_rtsp(host, puerto, user, password, int(cam["canal"])) for cam in cfg["camaras"]}

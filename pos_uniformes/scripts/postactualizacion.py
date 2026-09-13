@@ -35,7 +35,9 @@ from pathlib import Path
 #       programar_snapshot_casa.bat y abría la ventana negra cada 15 min;
 #       la limpieza de la v2 no la conocía y la dejó viva (2026-09-12)
 #   4 = "POS Asistencia": la lista de quién vino, a las 11:00 (2026-09-12)
-INFRA_VERSION = 4
+#   5 = "POS Afluencia" (el contador de personas) también oculta; su instalador
+#       la creaba con consola visible "que había que dejar abierta" (2026-09-13)
+INFRA_VERSION = 5
 
 # Tareas que ya no van (las crearon versiones anteriores).
 TAREAS_OBSOLETAS = (
@@ -65,7 +67,7 @@ class Tarea:
         return ["schtasks", "/Create", "/F", "/TN", self.nombre, *self.schedule, "/TR", " ".join(partes)]
 
 
-def tareas_esperadas(*, hay_telegram: bool, resumen_a_hora_fija: bool, snapshot_casa: bool = False) -> list[Tarea]:
+def tareas_esperadas(*, hay_telegram: bool, resumen_a_hora_fija: bool, snapshot_casa: bool = False, afluencia: bool = False) -> list[Tarea]:
     """Las tareas que deben existir en esta PC (puro, testeable).
 
     `snapshot_casa`: la copia de la Libreta a la PC de la casa cada 15 min
@@ -78,6 +80,10 @@ def tareas_esperadas(*, hay_telegram: bool, resumen_a_hora_fija: bool, snapshot_
     ]
     if snapshot_casa:
         tareas.append(Tarea("POS Snapshot Casa", ("/SC", "MINUTE", "/MO", "15"), "enviar_snapshot_casa.bat"))
+    if afluencia:
+        # El .bat vive en afluencia\, no en scripts\: correr_oculto.vbs arma la
+        # ruta relativa a scripts\, por eso el "..\afluencia\".
+        tareas.append(Tarea("POS Afluencia", ("/SC", "ONLOGON"), "..\\afluencia\\contador_afluencia.bat"))
     if hay_telegram and not resumen_a_hora_fija:
         # El resumen sale 15 min antes de cerrar; el script decide cuál toca.
         tareas.append(Tarea("POS Resumen 1645", ("/SC", "DAILY", "/ST", "16:45"), "resumen_diario_telegram.bat", ("--si-toca",)))
@@ -178,7 +184,9 @@ def aplicar(*, forzar: bool = False) -> list[str]:
         # El snapshot a la casa solo se conserva si Daniel ya lo tenía; se
         # recrea con /F por encima de la versión visible (misma /TN).
         snapshot = existe_tarea("POS Snapshot Casa")
-        for t in tareas_esperadas(hay_telegram=hay_telegram(), resumen_a_hora_fija=fijo, snapshot_casa=snapshot):
+        # El contador de personas solo si está instalado en esta PC (tiene su venv).
+        afluencia = existe_tarea("POS Afluencia") or (scripts_dir().parent / "afluencia" / ".venv").exists()
+        for t in tareas_esperadas(hay_telegram=hay_telegram(), resumen_a_hora_fija=fijo, snapshot_casa=snapshot, afluencia=afluencia):
             hechos.append(f"tarea al dia: {t.nombre}" if crear_tarea(t) else f"NO se pudo crear: {t.nombre}")
         marcar_aplicada()
         hechos.append(f"infraestructura en la version {INFRA_VERSION}")

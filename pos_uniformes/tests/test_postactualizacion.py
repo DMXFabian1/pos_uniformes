@@ -80,7 +80,18 @@ class AplicarTests(unittest.TestCase):
         self.assertIn("POS Snapshot Casa", con)
 
     def test_la_version_subio_para_que_se_aplique_al_actualizar(self) -> None:
-        self.assertGreaterEqual(post.INFRA_VERSION, 4)
+        self.assertGreaterEqual(post.INFRA_VERSION, 5)
+
+    def test_el_contador_de_afluencia_va_oculto_y_solo_si_esta_instalado(self) -> None:
+        sin = [t.nombre for t in post.tareas_esperadas(hay_telegram=False, resumen_a_hora_fija=False)]
+        self.assertNotIn("POS Afluencia", sin)
+        con = {t.nombre: t for t in post.tareas_esperadas(hay_telegram=False, resumen_a_hora_fija=False, afluencia=True)}
+        t = con["POS Afluencia"]
+        self.assertEqual(t.schedule, ("/SC", "ONLOGON"))
+        comando = " ".join(t.comando(Path("C:/x/scripts")))
+        self.assertIn("correr_oculto.vbs", comando)
+        self.assertIn("afluencia", comando)
+        self.assertIn("contador_afluencia.bat", comando)
 
     def test_con_telegram_manda_la_asistencia_a_las_11(self) -> None:
         tareas = {t.nombre: t for t in post.tareas_esperadas(hay_telegram=True, resumen_a_hora_fija=False)}

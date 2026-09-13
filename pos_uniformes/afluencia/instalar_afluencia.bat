@@ -1,8 +1,8 @@
 @echo off
 rem =====================================================
 rem  Instala el contador de afluencia en ESTA PC (servidor):
-rem  entorno propio + modelo + config + tarea al iniciar sesion.
-rem  Uso: afluencia\instalar_afluencia.bat   (una sola vez)
+rem  entorno propio + modelo + config + tarea OCULTA al iniciar sesion.
+rem  Uso: afluencia\instalar_afluencia.bat   (una sola vez; repetirlo no dana)
 rem =====================================================
 setlocal
 cd /d "%~dp0"
@@ -32,24 +32,27 @@ if errorlevel 1 goto :error
 echo   Revisa la carpeta calibracion\ : la linea roja debe cruzar la puerta.
 
 echo.
-echo === 4/4 Tarea de Windows: arranca solo al iniciar sesion ===
-schtasks /Create /F /TN "POS Afluencia" /SC ONLOGON /TR "\"%~dp0contador_afluencia.bat\"" >nul
+echo === 4/4 Tarea de Windows: arranca solo al iniciar sesion, SIN ventana ===
+rem Va por scripts\correr_oculto.vbs: la version anterior abria una consola
+rem que habia que dejar abierta (y que se cerraba sin querer).
+schtasks /Create /F /TN "POS Afluencia" /SC ONLOGON /TR "wscript.exe \"%~dp0..\scripts\correr_oculto.vbs\" ..\afluencia\contador_afluencia.bat" >nul
 if errorlevel 1 (
-    echo   No se pudo crear la tarea programada; puedes abrir contador_afluencia.bat a mano.
+    echo   No se pudo crear la tarea programada; corre este .bat como administrador.
 ) else (
-    echo   Tarea "POS Afluencia" creada.
+    echo   Tarea "POS Afluencia" creada (oculta).
 )
 
 echo.
 echo ============================================
-echo  LISTO. Arrancando el contador ahora...
-echo  (Deja esta ventana abierta; cuenta y guarda cada minuto.)
+echo  LISTO. Arrancando el contador ahora, oculto.
+echo  Lo que hace queda en logs\afluencia.log.
+echo  Para revisarlo: afluencia\diagnostico_afluencia.bat
 echo ============================================
-start "POS Afluencia" "%~dp0contador_afluencia.bat"
+wscript.exe "%~dp0..\scripts\correr_oculto.vbs" ..\afluencia\contador_afluencia.bat
 exit /b 0
 
 :error
 echo.
-echo *** ALGO FALLO - toma foto de este error y mandala ***
+echo *** ALGO FALLO - corre afluencia\diagnostico_afluencia.bat y manda el reporte ***
 pause
 exit /b 1
