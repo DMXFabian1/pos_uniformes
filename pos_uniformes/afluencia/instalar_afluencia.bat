@@ -18,12 +18,18 @@ if errorlevel 1 goto :error
 
 echo.
 echo === 2/4 Configuracion de camaras y lineas ===
-if not exist afluencia.json (
-    copy afluencia.json.example afluencia.json >nul
-    echo   Creado afluencia.json desde el ejemplo.
-) else (
-    echo   Ya existe afluencia.json, se conserva.
-)
+rem Las lineas se calibran desde la Mac y viajan en afluencia.json.example;
+rem por eso SIEMPRE se copia encima: asi un cambio de linea llega con
+rem actualizar + este .bat, sin editar nada a mano en el servidor.
+copy /Y afluencia.json.example afluencia.json >nul
+echo   afluencia.json tomado del ejemplo (lineas calibradas).
+
+echo.
+echo === 2b/4 Deteniendo el contador que ya corria (si hay) ===
+rem El contador solo lee afluencia.json al arrancar; hay que bajarlo para
+rem que tome la linea nueva. Se cierran el bucle .bat y su python.
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.ProcessId -ne $PID -and $_.CommandLine -like '*contador_afluencia*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }"
+echo   Listo.
 
 echo.
 echo === 3/4 Prueba de conexion con el DVR (cuadros de calibracion) ===

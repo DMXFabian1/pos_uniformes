@@ -39,6 +39,20 @@ class LineaTests(unittest.TestCase):
         self.assertTrue(PUERTA.dentro_del_segmento(0.28, 0.5))  # dentro del margen 0.05
         self.assertFalse(PUERTA.dentro_del_segmento(0.1, 0.5))
 
+    def test_entrada22_calibrada_por_daniel(self) -> None:
+        # 2026-09-13: la línea original iba sobre la banqueta y contaba a quien
+        # pasaba por fuera. Daniel la puso de (0.5, 0.6) a (0.7, 0.8), cruzando
+        # el pasillo que entra desde la calle; la calle queda arriba-derecha.
+        import json
+        from pathlib import Path
+
+        ejemplo = json.loads((Path(__file__).resolve().parents[1] / "afluencia" / "afluencia.json.example").read_text("utf-8"))
+        cam = next(c for c in ejemplo["camaras"] if c["nombre"] == "ENTRADA2.2")
+        self.assertEqual(cam["linea"], [0.5, 0.6, 0.7, 0.8])
+        linea = Linea(*cam["linea"], lado_dentro=cam["lado_dentro"])
+        self.assertEqual(linea.lado(0.85, 0.5), -1, "la calle es fuera")
+        self.assertEqual(linea.lado(0.4, 0.8), 1, "el piso de la tienda es dentro")
+
     def test_validaciones(self) -> None:
         with self.assertRaises(ValueError):
             Linea(0.1, 0.1, 0.1, 0.1)
