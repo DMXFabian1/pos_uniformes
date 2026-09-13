@@ -111,7 +111,7 @@ def listar(current: tuple = Depends(get_current_employee), db: Session = Depends
         if u.fecha is not None:
             f = u.fecha.astimezone().date() if u.fecha.tzinfo else u.fecha.date()
             dias = (date.today() - f).days
-        return {"texto": u.texto(), "dias": dias, "quien": u.quien}
+        return {"texto": u.texto(), "dias": dias, "quien": u.quien, "reciente": u.reciente()}
 
     for e in list_all_schools(db):
         escuelas.append({

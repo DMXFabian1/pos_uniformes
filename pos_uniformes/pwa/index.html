@@ -63,6 +63,7 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
 .chip.reciente small{color:var(--verde)}
 .chip.proceso{border-color:#b45309; background:#fff4e5}
 .chip.proceso small{color:#b45309; font-weight:600}
+#cont-ver-todas a{color:var(--acento-osc); font-weight:700; text-decoration:underline; cursor:pointer}
 .prenda{padding:0; overflow:hidden}
 .prenda .cab{background:var(--acento-osc); color:#fff; padding:10px 14px; font-weight:800;
   font-size:15px; display:flex; justify-content:space-between; align-items:center; gap:8px}
@@ -255,6 +256,7 @@ table.tallas input{margin:0; min-height:46px; font-size:20px; font-weight:800; t
         <div class="chips" id="cont-escuelas"></div>
         <p class="sub" style="margin:12px 0 0">Básicos, por prenda</p>
         <div class="chips" id="cont-basicos"></div>
+        <p class="sub" id="cont-ver-todas" style="margin:12px 0 0"></p>
       </div>
     </div>
     <div id="cont-hoja" class="oculto">
@@ -419,10 +421,12 @@ async function contCargarLista() {
     // Cada ficha dice cuándo se contó por última vez: las recientes se ven
     // apagadas para que no se cuente la misma escuela a cada rato.
     contUltimos = {};
-    // "En proceso · Fanny": ya la está contando alguien; al tocarla se sigue
-    // esa misma jornada, no se abre otra (así nadie se pisa).
+    // Las contadas hace poco no se muestran (las empleadas lo pidieron: que
+    // una ya contada no aparezca). "Ver todas" las trae. Una en proceso se ve siempre.
+    let ocultas = 0;
     const ficha = (nombre, ultimo, onclick, toca, enProceso) => {
       const reciente = ultimo && ultimo.dias !== null && ultimo.dias < 7;
+      if (!enProceso && ultimo && ultimo.reciente && !contVerTodas) { ocultas++; return ""; }
       if (enProceso) {
         return `<span class="chip proceso" onclick="contSeguirEnProceso(${enProceso.jornada_id}, '${nombre.replace(/'/g, "")}', '${enProceso.quien.replace(/'/g, "")}')">` +
           `${nombre}<small>En proceso · ${enProceso.quien}</small></span>`;
@@ -440,12 +444,16 @@ async function contCargarLista() {
       contUltimos["b" + t] = u;
       return ficha(t, u, `contEmpezar(null, '${t.replace(/'/g, "")}')`, false, typeof b === "string" ? null : b.en_proceso);
     }).join("") || "<span class='sub'>—</span>";
+    $("cont-ver-todas").innerHTML = contVerTodas
+      ? `<a onclick="contVerTodas=false; contCargarLista()">Ocultar las contadas hace poco</a>`
+      : (ocultas ? `<a onclick="contVerTodas=true; contCargarLista()">Ver todas (${ocultas} contada${ocultas === 1 ? "" : "s"} hace poco)</a>` : "");
   } catch (e) {
     $("cont-abiertas").innerHTML = "<div class='card error'>No se pudo cargar. ¿Hay WiFi?</div>";
   }
 }
 
 let contUltimos = {};
+let contVerTodas = false;
 async function contEmpezar(escuelaId, tipoPieza) {
   const que = tipoPieza ? ("Básicos · " + tipoPieza) : "esta escuela";
   const u = contUltimos[tipoPieza ? "b" + tipoPieza : "e" + escuelaId];

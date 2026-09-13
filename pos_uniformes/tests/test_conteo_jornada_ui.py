@@ -362,14 +362,25 @@ class SelectorConFechaTests(unittest.TestCase):
         self._dialogos.append(d)
         return d
 
-    def test_cada_escuela_lleva_su_fecha_en_el_combo(self) -> None:
+    def _textos(self, d):
+        return [d._escuela_combo.itemText(i) for i in range(d._escuela_combo.count())]
+
+    def test_las_contadas_hace_poco_no_salen_salvo_ver_todas(self) -> None:
+        # Las empleadas pidieron que una escuela ya contada no aparezca en el
+        # menú de impresión. Alfa se contó hace 2 días: fuera, hasta "Ver todas".
         d = self._dialogo()
-        textos = [d._escuela_combo.itemText(i) for i in range(d._escuela_combo.count())]
-        self.assertTrue(any(t.startswith("Alfa") and "hace 2 días (Stayce)" in t for t in textos), textos)
+        textos = self._textos(d)
+        self.assertFalse(any(t.startswith("Alfa") for t in textos), textos)
         self.assertTrue(any(t.startswith("Beta") and "nunca" in t for t in textos), textos)
+        self.assertEqual(d._ocultas_label.text(), "1 escuela contada hace poco no se muestra.")
+        d._ver_todas.setChecked(True)
+        textos = self._textos(d)
+        self.assertTrue(any(t.startswith("Alfa") and "hace 2 días (Stayce)" in t for t in textos), textos)
+        self.assertEqual(d._ocultas_label.text(), "")
 
     def test_avisa_si_fue_hace_poco_y_el_titulo_queda_limpio(self) -> None:
         d = self._dialogo()
+        d._ver_todas.setChecked(True)
         idx = next(i for i in range(d._escuela_combo.count()) if d._escuela_combo.itemText(i).startswith("Alfa"))
         d._escuela_combo.setCurrentIndex(idx)
         self.assertIn("Ojo", d._ultimo_label.text())
@@ -388,6 +399,7 @@ class SelectorConFechaTests(unittest.TestCase):
         jn.abrir_jornada(s, escuela_id=self.b_id, empleada_code="VEND-5", empleada_nombre="Fanny Ortiz")
         s.commit(); s.close()
         d = self._dialogo()
+        d._ver_todas.setChecked(True)   # para que Alfa también esté
         idx = next(i for i in range(d._escuela_combo.count()) if d._escuela_combo.itemText(i).startswith("Beta"))
         self.assertIn("EN PROCESO (Fanny Ortiz)", d._escuela_combo.itemText(idx))
         d._escuela_combo.setCurrentIndex(idx)
@@ -400,6 +412,15 @@ class SelectorConFechaTests(unittest.TestCase):
         idx = next(i for i in range(d._escuela_combo.count()) if d._escuela_combo.itemText(i).startswith("Alfa"))
         d._escuela_combo.setCurrentIndex(idx)
         self.assertIsNone(d.abierta_elegida())
+
+    def test_la_que_esta_en_proceso_se_ve_aunque_se_haya_contado_hace_poco(self) -> None:
+        s = self.factory()
+        jn.abrir_jornada(s, escuela_id=self.a_id, empleada_code="VEND-5", empleada_nombre="Fanny Ortiz")
+        s.commit(); s.close()
+        d = self._dialogo()
+        textos = self._textos(d)
+        self.assertTrue(any(t.startswith("Alfa") and "EN PROCESO" in t for t in textos), textos)
+        self.assertEqual(d._ocultas_label.text(), "")
 
 
 class OfrecerSeguirTests(unittest.TestCase):

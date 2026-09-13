@@ -15,6 +15,7 @@ from PyQt6.QtCore import QRectF, Qt
 from PyQt6.QtGui import QBrush, QColor, QPainter, QPen
 from PyQt6.QtWidgets import (
     QApplication,
+    QCheckBox,
     QComboBox,
     QDialog,
     QDialogButtonBox,
@@ -95,6 +96,16 @@ class ConteoNuevaJornadaDialog(QDialog):
         layout.addWidget(self._ultimo_label)
         self._ultimos: dict = {}
         self._abiertas: dict = {}
+        self._escuelas: list = []
+        self._tipos_pintados_con = None   # con qué valor de "ver todas" se llenó el combo de básicos
+        # Las contadas hace poco no aparecen: así no se cuenta la misma a cada
+        # rato. "Ver todas" las trae por si Daniel quiere forzar una.
+        self._ver_todas = QCheckBox("Ver todas (también las contadas hace poco)")
+        self._ver_todas.toggled.connect(self._pintar_escuelas)
+        layout.addWidget(self._ver_todas)
+        self._ocultas_label = QLabel("")
+        self._ocultas_label.setStyleSheet("color: #8a7a68; font-size: 12px;")
+        layout.addWidget(self._ocultas_label)
         pista = QLabel("Imprime la hoja antes de ir al piso, y regresa aquí a capturar.")
         pista.setStyleSheet("color: #8a7a68; font-size: 12px;")
         pista.setWordWrap(True)
@@ -136,16 +147,33 @@ class ConteoNuevaJornadaDialog(QDialog):
             escuelas = []
         finally:
             session.close()
+        self._escuelas = list(escuelas)
+        self._pintar_escuelas()
+
+    def _pintar_escuelas(self, *_args) -> None:
+        from pos_uniformes.services.conteo_jornada_service import ultimo_conteo_de
+
+        todas = self._ver_todas.isChecked()
+        self._escuela_combo.blockSignals(True)
         self._escuela_combo.clear()
         self._escuela_combo.addItem(f"— {NOMBRE_BASICOS} —", ESCUELA_ID_BASICOS)
-        for e in escuelas:
+        ocultas = 0
+        for e in self._escuelas:
             u = ultimo_conteo_de(self._ultimos, int(e["escuela_id"]))
             abierta = self._abiertas.get(int(e["escuela_id"]))
+            # Una en proceso siempre se ve: hay que poder seguirla.
+            if abierta is None and u.reciente() and not todas:
+                ocultas += 1
+                continue
             estado = f"EN PROCESO ({abierta.quien})" if abierta is not None else u.texto()
             self._escuela_combo.addItem(f'{e["escuela_nombre"]}   ·  {estado}', e["escuela_id"])
-        if self._escuela_combo.count() > 1:
-            self._escuela_combo.setCurrentIndex(1)
-        self._pintar_ultimo()
+        self._escuela_combo.blockSignals(False)
+        self._ocultas_label.setText(
+            f"{ocultas} escuela{'s' if ocultas != 1 else ''} contada{'s' if ocultas != 1 else ''} hace poco no se muestra{'n' if ocultas != 1 else ''}."
+            if ocultas else ""
+        )
+        self._escuela_combo.setCurrentIndex(1 if self._escuela_combo.count() > 1 else 0)
+        self._on_escuela()
 
     def ultimo_elegido(self):
         """El UltimoConteo de lo que está seleccionado ahora."""
@@ -192,7 +220,9 @@ class ConteoNuevaJornadaDialog(QDialog):
         es_basicos = self._escuela_combo.currentData() == ESCUELA_ID_BASICOS
         self._tipo_combo.setVisible(es_basicos)
         self._pintar_ultimo()
-        if es_basicos and self._tipo_combo.count() == 0:
+        if es_basicos and self._tipos_pintados_con != self._ver_todas.isChecked():
+            self._tipos_pintados_con = self._ver_todas.isChecked()
+            self._tipo_combo.clear()
             from pos_uniformes.services.conteo_service import obtener_variantes_basicos_agrupadas
 
             session = self._session_factory()
@@ -205,8 +235,12 @@ class ConteoNuevaJornadaDialog(QDialog):
             tipos = sorted({g["tipo_pieza"] for g in grupos if not g.get("virtual") and g["tipo_pieza"]})
             # Una jornada de básicos SIEMPRE es de una prenda: los 2,361
             # renglones de "todos" no se cuentan en una tarde.
+            from pos_uniformes.services.conteo_jornada_service import ultimo_conteo_de
+
             for t in tipos:
                 abierta = self._abiertas.get(("basicos", t))
+                if abierta is None and ultimo_conteo_de(self._ultimos, None, t).reciente() and not self._ver_todas.isChecked():
+                    continue
                 self._tipo_combo.addItem(f"{t}   ·  EN PROCESO ({abierta.quien})" if abierta is not None else t, t)
 
     def _aceptar(self) -> None:

@@ -313,6 +313,20 @@ class UltimoConteoTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.s.close()
 
+    def test_reciente_es_menos_de_catorce_dias(self) -> None:
+        from datetime import datetime, timedelta
+
+        hoy = date(2026, 9, 13)
+        nunca = jn.UltimoConteo(None)
+        self.assertIsNone(nunca.dias(hoy))
+        self.assertFalse(nunca.reciente(hoy))
+        hace_5 = jn.UltimoConteo(datetime(2026, 9, 8, 10, 0))
+        self.assertEqual(hace_5.dias(hoy), 5)
+        self.assertTrue(hace_5.reciente(hoy))
+        hace_14 = jn.UltimoConteo(datetime.combine(hoy - timedelta(days=14), datetime.min.time()))
+        self.assertFalse(hace_14.reciente(hoy))
+        self.assertTrue(hace_14.reciente(hoy, dias=30))
+
     def test_texto_habla_como_persona(self) -> None:
         from datetime import datetime, timedelta
 

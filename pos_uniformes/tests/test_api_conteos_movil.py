@@ -178,7 +178,7 @@ class UltimoConteoEnLaListaTests(ApiConteosMovilTests):
     def test_nunca_contada(self) -> None:
         self._como("VEND-4")
         e = self.client.get("/api/v1/movil/conteos").json()["escuelas"][0]
-        self.assertEqual(e["ultimo"], {"texto": "nunca", "dias": None, "quien": ""})
+        self.assertEqual(e["ultimo"], {"texto": "nunca", "dias": None, "quien": "", "reciente": False})
 
     def test_despues_de_terminar_dice_hoy_y_quien(self) -> None:
         hoja = self._abrir("VEND-4")
@@ -190,6 +190,7 @@ class UltimoConteoEnLaListaTests(ApiConteosMovilTests):
         self.assertEqual(e["ultimo"]["dias"], 0)
         self.assertEqual(e["ultimo"]["quien"], "Stayce Chavarria")
         self.assertEqual(e["ultimo"]["texto"], "hoy (Stayce)")
+        self.assertTrue(e["ultimo"]["reciente"])   # el celular la esconde hasta "Ver todas"
 
     def test_los_basicos_tambien_traen_su_fecha(self) -> None:
         self._como("VEND-4")

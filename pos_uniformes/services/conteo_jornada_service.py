@@ -483,18 +483,32 @@ def cuando(momento: datetime | None) -> str:
 
 
 # ─── ¿Cuándo se contó por última vez? ───────────────────────────────────
+DIAS_RECIEN_CONTADA = 14   # contada hace menos de esto: fuera del menú, salvo "Ver todas"
+
+
 @dataclass(frozen=True)
 class UltimoConteo:
     fecha: datetime | None      # None = nunca
     quien: str = ""             # nombre de quien terminó la última jornada (si la hubo)
 
+    def dias(self, hoy: date | None = None) -> int | None:
+        """Días desde el último conteo; None si nunca."""
+        if self.fecha is None:
+            return None
+        hoy = hoy or date.today()
+        f = self.fecha.astimezone().date() if self.fecha.tzinfo else self.fecha.date()
+        return (hoy - f).days
+
+    def reciente(self, hoy: date | None = None, dias: int = DIAS_RECIEN_CONTADA) -> bool:
+        """Se contó hace menos de `dias`: no hace falta volver todavía."""
+        d = self.dias(hoy)
+        return d is not None and d < dias
+
     def texto(self, hoy: date | None = None) -> str:
         """'hoy', 'ayer', 'hace 3 días', 'hace 2 meses' o 'nunca'."""
         if self.fecha is None:
             return "nunca"
-        hoy = hoy or date.today()
-        f = self.fecha.astimezone().date() if self.fecha.tzinfo else self.fecha.date()
-        dias = (hoy - f).days
+        dias = self.dias(hoy)
         if dias <= 0:
             base = "hoy"
         elif dias == 1:
