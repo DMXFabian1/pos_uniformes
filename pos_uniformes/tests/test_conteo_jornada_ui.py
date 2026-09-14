@@ -223,19 +223,40 @@ class RevisionDialogTests(unittest.TestCase):
         raise AssertionError(f"no está la fila {talla_col_texto}")
 
     def test_muestra_solo_lo_que_hay_que_pedir_por_defecto(self) -> None:
+        # Compacto: fila de prenda + la talla que pide acción. Primero la decisión.
         d = self._dialogo()
-        self.assertEqual(d._table.rowCount(), 1)
+        self.assertEqual(d._table.rowCount(), 2)                        # "Prenda 0" + talla 6
+        self.assertIn("pedir 21", d._table.item(0, 0).text())           # la prenda resume
         fila = self._fila(d, "6")
-        self.assertEqual(d._table.item(fila, 2).text(), "7")            # a la mano
-        self.assertEqual(d._table.item(fila, 3).text(), "—")            # nada en cajas
-        self.assertEqual(d._table.item(fila, 4).text(), "14 en 14 d")   # vendidas
-        self.assertEqual(d._table.item(fila, 10).text(), "21")          # sugerido: 28 − 7
-        self.assertEqual(d._table.item(fila, 11).text(), "21")          # pedido arranca en lo sugerido
+        self.assertEqual(d._table.item(fila, 2).text(), "7")            # hay
+        self.assertEqual(d._table.item(fila, 3).text(), "pedir 21")     # qué hacer: 28 − 7
+        self.assertEqual(d._table.item(fila, 4).text(), "21")           # pedido arranca en lo sugerido
         self.assertIn("Stayce", d._resumen_label.text())
-        self.assertIn("21", d._resumen_label.text())
-        d._solo_pedir.setChecked(False)
+        self.assertIn("<b>21</b> piezas", d._resumen_label.text())
+        # Las tarjetas: PEDIR prendida con 1; URGENTE y SURTIR apagadas (no hay); BIEN apagada.
+        self.assertTrue(d._tarjetas["PEDIR"].isChecked())
+        self.assertEqual(d._tarjetas["PEDIR"]._valor.text(), "1")
+        self.assertFalse(d._tarjetas["URGENTE"].isEnabled())
+        self.assertFalse(d._tarjetas["OTRAS"].isChecked())
+        # Prender BIEN trae la talla 8 ("no se mueve").
+        d._tarjetas["OTRAS"].setChecked(True)
+        self.assertEqual(d._table.rowCount(), 3)
+        self.assertEqual(d._table.item(self._fila(d, "8"), 3).text(), "no se mueve")
+        # Ver todas las columnas: la tabla completa de antes, sin filas de prenda.
+        d._completo.setChecked(True)
+        self.assertEqual(d._table.columnCount(), 13)
         self.assertEqual(d._table.rowCount(), 2)
-        self.assertEqual(d._table.item(self._fila(d, "8"), 10).text(), "no se mueve")
+        self.assertEqual(d._table.item(self._fila(d, "6"), 4).text(), "14 en 14 d")   # vendidas
+        self.assertEqual(d._table.item(self._fila(d, "6"), 11).text(), "21")          # pedido
+
+    def test_al_tocar_una_talla_dice_por_que(self) -> None:
+        d = self._dialogo()
+        self.assertIn("Toca una talla", d._por_que_label.text())
+        d._table.selectRow(self._fila(d, "6"))
+        self.assertIn("vendidas <b>14</b> en 14 días", d._por_que_label.text())
+        self.assertIn("primer conteo", d._por_que_label.text())
+        d._table.selectRow(0)   # la fila de prenda no es una talla
+        self.assertIn("Toca una talla", d._por_que_label.text())
 
     def test_si_nada_hay_que_pedir_se_muestran_todas_y_lo_dice(self) -> None:
         from pos_uniformes.database.models import LibretaVenta
@@ -244,10 +265,10 @@ class RevisionDialogTests(unittest.TestCase):
         s.query(LibretaVenta).delete()   # sin Libreta: todo "sin datos"
         s.commit(); s.close()
         d = self._dialogo()
-        self.assertTrue(d._solo_pedir.isChecked())
-        self.assertEqual(d._table.rowCount(), 2)   # no una tabla vacía
-        self.assertIn("se muestran todas", d._resumen_label.text())
-        self.assertEqual(d._table.item(0, 10).text(), "sin datos")
+        self.assertEqual(d._table.rowCount(), 3)   # prenda + 2 tallas, no una tabla vacía
+        self.assertIn("Nada que pedir ni surtir", d._resumen_label.text())
+        self.assertEqual(d._table.item(1, 3).text(), "sin datos")
+        self.assertTrue(d._tarjetas["OTRAS"].isChecked())
 
     def test_lo_de_las_cajas_se_ve_y_dice_surtir(self) -> None:
         from pos_uniformes.database.models import BodegaCaja, BodegaContenido
@@ -260,22 +281,22 @@ class RevisionDialogTests(unittest.TestCase):
         d = self._dialogo()
         fila = self._fila(d, "6")
         # 7/sem; a la mano 7, en cajas 30 → total 37 ≥ 28: no pedir; surtir 14 − 7 = 7.
-        self.assertEqual(d._table.item(fila, 3).text(), "30")
-        self.assertIn("A-12 ×30", d._table.item(fila, 3).toolTip())
-        self.assertEqual(d._table.item(fila, 9).text(), "7")
-        self.assertEqual(d._table.item(fila, 10).text(), "bien")
-        self.assertEqual(d._table.item(fila, 11).text(), "")
-        self.assertIn("surtir de las cajas <b>7</b>", d._resumen_label.text())
+        self.assertEqual(d._table.item(fila, 2).text(), "7  + 30 en cajas")
+        self.assertIn("A-12 ×30", d._table.item(fila, 2).toolTip())
+        self.assertEqual(d._table.item(fila, 3).text(), "surtir 7")
+        self.assertEqual(d._table.item(fila, 4).text(), "")
+        self.assertTrue(d._tarjetas["SURTIR"].isChecked())
+        self.assertIn("7 piezas de las cajas", d._tarjetas["SURTIR"]._sub.text())
 
     def test_editar_pedido_y_guardarlo(self) -> None:
         from pos_uniformes.database.models import ConteoInventario
 
         d = self._dialogo()
         fila = self._fila(d, "6")
-        d._table.item(fila, 11).setText("30")
+        d._table.item(fila, 4).setText("30")
         self.assertIn("<b>30</b> piezas", d._resumen_label.text())
-        d._table.item(fila, 11).setText("abc")   # no es número: vuelve a lo anterior
-        self.assertEqual(d._table.item(fila, 11).text(), "30")
+        d._table.item(fila, 4).setText("abc")   # no es número: vuelve a lo anterior
+        self.assertEqual(d._table.item(fila, 4).text(), "30")
         with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.QMessageBox.information"):
             self.assertTrue(d._guardar_pedidos())
         s = self.factory()
@@ -283,13 +304,13 @@ class RevisionDialogTests(unittest.TestCase):
         self.assertEqual((c.pedido, c.pedido_sugerido), (30, 21))
         # Al reabrir, trae lo decidido.
         d2 = self._dialogo()
-        self.assertEqual(d2._table.item(self._fila(d2, "6"), 11).text(), "30")
+        self.assertEqual(d2._table.item(self._fila(d2, "6"), 4).text(), "30")
 
     def test_la_hoja_de_pedido_lleva_lo_escrito(self) -> None:
         from pos_uniformes.services.revision_service import texto_pedido
 
         d = self._dialogo()
-        d._table.item(self._fila(d, "6"), 11).setText("12")
+        d._table.item(self._fila(d, "6"), 4).setText("12")
         texto = texto_pedido(d._revision_con_pedidos())
         self.assertIn("Pedido Uno", texto)
         self.assertIn("6: 12", texto)
@@ -320,7 +341,7 @@ class RevisionDialogTests(unittest.TestCase):
             hist.assert_called_once()
             self.assertEqual(hist.call_args.kwargs["variante_id"], self.v_ids[0])
             hist.reset_mock()
-            d._doble_clic(d._table.item(fila, 11))     # Pedido: ahí el doble clic edita
+            d._doble_clic(d._table.item(fila, 4))      # Pedido: ahí el doble clic edita
             hist.assert_not_called()
 
     def test_la_historia_muestra_conteos_y_semanas(self) -> None:

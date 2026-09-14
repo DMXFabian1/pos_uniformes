@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
     QComboBox,
     QDialog,
     QDialogButtonBox,
+    QFrame,
     QHBoxLayout,
     QHeaderView,
     QLabel,
@@ -49,6 +50,22 @@ _ESTILO = """
     QPushButton#primaryButton { background: #87492c; color: #ffffff; border: none; font-weight: 600; }
     QPushButton#primaryButton:hover { background: #5c3019; }
     QPushButton#dangerButton { color: #8a2f2f; border-color: #e0c4c4; }
+"""
+
+
+_ESTILO_TARJETAS = """
+    QFrame#tarjetaFiltro { background: #ffffff; border: 1.5px solid #e5d9cd; border-radius: 12px; }
+    QFrame#tarjetaFiltro[prendida="si"] { background: #87492c; border-color: #87492c; }
+    QFrame#tarjetaFiltro[prendida="si"][clave="URGENTE"] { background: #b91c1c; border-color: #b91c1c; }
+    QFrame#tarjetaFiltro[prendida="si"][clave="SURTIR"] { background: #1d4ed8; border-color: #1d4ed8; }
+    QFrame#tarjetaFiltro:disabled { background: #faf7f3; }
+    QFrame#tarjetaFiltro QLabel { background: transparent; color: #5c3019; }
+    QFrame#tarjetaFiltro[prendida="si"] QLabel { color: #ffffff; }
+    QFrame#tarjetaFiltro:disabled QLabel { color: #b9a89b; }
+    QLabel#tarjetaTitulo { font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+    QLabel#tarjetaValor { font-size: 26px; font-weight: 800; }
+    QLabel#tarjetaSub { font-size: 11px; }
+    QLabel#porQue { background: #f5ebe0; color: #2c2a27; border-radius: 8px; padding: 8px 12px; font-size: 13px; }
 """
 
 
@@ -262,18 +279,83 @@ class ConteoNuevaJornadaDialog(QDialog):
         self.accept()
 
 
-class ConteoRevisionDialog(QDialog):
-    """Revisar = decidir qué pedir. Por talla: cuántas hay, cuántas se
-    vendieron, a qué ritmo, cuánto se sugiere y lo que Daniel decide.
+class _TarjetaFiltro(QFrame):
+    """Tarjeta tipo Libreta (título chico, número grande, línea chica) que
+    además es un filtro: se prende y apaga al tocarla."""
 
-    Aplicar al inventario también guarda los pedidos: un solo gesto.
+    def __init__(self, clave: str, titulo: str, al_cambiar) -> None:
+        super().__init__()
+        self.clave = clave
+        self._checked = False
+        self._enabled = True
+        self._al_cambiar = al_cambiar
+        self.setObjectName("tarjetaFiltro")
+        self.setProperty("clave", clave)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        ly = QVBoxLayout()
+        ly.setContentsMargins(14, 10, 14, 10)
+        ly.setSpacing(2)
+        self._titulo = QLabel(titulo)
+        self._titulo.setObjectName("tarjetaTitulo")
+        self._valor = QLabel("0")
+        self._valor.setObjectName("tarjetaValor")
+        self._sub = QLabel("")
+        self._sub.setObjectName("tarjetaSub")
+        for w in (self._titulo, self._valor, self._sub):
+            w.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            ly.addWidget(w)
+        self.setLayout(ly)
+        self._repintar()
+
+    def poner(self, valor: int, sub: str) -> None:
+        self._valor.setText(str(valor))
+        self._sub.setText(sub)
+        self.setEnabled(valor > 0)
+
+    def setEnabled(self, on: bool) -> None:  # noqa: N802
+        self._enabled = bool(on)
+        super().setEnabled(on)
+        self._repintar()
+
+    def isEnabled(self) -> bool:  # noqa: N802
+        return self._enabled
+
+    def isChecked(self) -> bool:  # noqa: N802
+        return self._checked
+
+    def setChecked(self, on: bool) -> None:  # noqa: N802
+        if self._checked == bool(on):
+            return
+        self._checked = bool(on)
+        self._repintar()
+        self._al_cambiar()
+
+    def mousePressEvent(self, e) -> None:  # noqa: N802
+        if self._enabled and e.button() == Qt.MouseButton.LeftButton:
+            self.setChecked(not self._checked)
+
+    def _repintar(self) -> None:
+        self.setProperty("prendida", "si" if self._checked else "no")
+        self.style().unpolish(self)
+        self.style().polish(self)
+        for w in (self._titulo, self._valor, self._sub):
+            w.style().unpolish(w)
+            w.style().polish(w)
+
+
+class ConteoRevisionDialog(QDialog):
+    """Revisar = decidir qué pedir. Primero la decisión, después la evidencia.
+
+    Arriba cuatro tarjetas (URGENTE · PEDIR · SURTIR · BIEN) que filtran; la
+    tabla compacta dice por talla cuántas hay, **qué hacer** y el Pedido
+    editable; al tocar una talla, debajo aparece **por qué** en una línea.
+    "Ver todas las columnas" trae la tabla completa. Aplicar al inventario
+    también guarda los pedidos: un solo gesto.
     """
 
-    COLUMNAS = ("Prenda", "Talla", "A la mano", "En cajas", "Vendidas", "Ritmo/sem", "Alcanza", "Pidieron", "Hoja", "Surtir", "Sugerido", "Pedido", "La vez pasada")
-    COL_CAJAS = 3
-    COL_SURTIR = 9
-    COL_SUGERIDO = 10
-    COL_PEDIDO = 11
+    COLUMNAS_COMPLETAS = ("Prenda", "Talla", "A la mano", "En cajas", "Vendidas", "Ritmo/sem", "Alcanza", "Pidieron", "Hoja", "Surtir", "Sugerido", "Pedido", "La vez pasada")
+    COLUMNAS_COMPACTAS = ("Prenda", "Talla", "Hay", "Qué hacer", "Pedido")
+    _FILTROS = ("URGENTE", "PEDIR", "SURTIR", "OTRAS")
 
     def __init__(
         self,
@@ -285,7 +367,7 @@ class ConteoRevisionDialog(QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle(f"Revisar conteo · {jornada.titulo}")
-        self.setStyleSheet(_ESTILO)
+        self.setStyleSheet(_ESTILO + _ESTILO_TARJETAS)
         self._session_factory = session_factory or _default_session_factory
         self._jornada = jornada
         self._revisada_por = revisada_por
@@ -293,6 +375,7 @@ class ConteoRevisionDialog(QDialog):
         self._revision = None
         self._pedidos: dict[int, int | None] = {}   # conteo_id → lo que Daniel escribió
         self._pintando = False
+        self._por_fila: dict[int, int] = {}          # fila → conteo_id (las de prenda no están)
 
         layout = QVBoxLayout()
         layout.setSpacing(10)
@@ -301,64 +384,91 @@ class ConteoRevisionDialog(QDialog):
         self._resumen_label.setStyleSheet("font-size: 13px;")
         layout.addWidget(self._resumen_label)
 
+        # Las cuatro tarjetas: cifra grande, y son el filtro.
+        tarjetas = QHBoxLayout()
+        tarjetas.setSpacing(10)
+        self._tarjetas: dict[str, _TarjetaFiltro] = {}
+        for clave, titulo in (("URGENTE", "URGENTE"), ("PEDIR", "PEDIR"), ("SURTIR", "SURTIR DE CAJAS"), ("OTRAS", "BIEN / SIN DATOS")):
+            b = _TarjetaFiltro(clave, titulo, self._pintar)
+            self._tarjetas[clave] = b
+            tarjetas.addWidget(b, 1)
+        layout.addLayout(tarjetas)
+
         self._table = QTableWidget()
-        self._table.setColumnCount(len(self.COLUMNAS))
-        self._table.setHorizontalHeaderLabels(list(self.COLUMNAS))
         self._table.verticalHeader().setVisible(False)
         self._table.setAlternatingRowColors(True)
         self._table.setShowGrid(False)
+        self._table.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self._table.setEditTriggers(
             QTableWidget.EditTrigger.DoubleClicked
             | QTableWidget.EditTrigger.SelectedClicked
             | QTableWidget.EditTrigger.AnyKeyPressed
         )
-        h = self._table.horizontalHeader()
-        h.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        for c in range(1, len(self.COLUMNAS)):
-            h.setSectionResizeMode(c, QHeaderView.ResizeMode.ResizeToContents)
         self._table.itemChanged.connect(self._pedido_editado)
         self._table.itemDoubleClicked.connect(self._doble_clic)
+        self._table.itemSelectionChanged.connect(self._por_que)
         layout.addWidget(self._table, 1)
 
+        # Por qué: la evidencia de la talla tocada, en una línea.
+        self._por_que_label = QLabel("Toca una talla para ver por qué se sugiere eso.")
+        self._por_que_label.setObjectName("porQue")
+        self._por_que_label.setWordWrap(True)
+        layout.addWidget(self._por_que_label)
+
         acciones = QHBoxLayout()
-        self._solo_pedir = QPushButton("Ver solo qué hacer")
-        self._solo_pedir.setCheckable(True)
-        self._solo_pedir.setChecked(True)
-        self._solo_pedir.toggled.connect(self._pintar)
-        acciones.addWidget(self._solo_pedir)
-        self._hoja_btn = QPushButton("Hoja de pedido")
-        self._hoja_btn.clicked.connect(self._hoja_de_pedido)
-        acciones.addWidget(self._hoja_btn)
+        self._completo = QPushButton("Ver todas las columnas")
+        self._completo.setCheckable(True)
+        self._completo.setAutoDefault(False)
+        self._completo.toggled.connect(self._pintar)
+        acciones.addWidget(self._completo)
         self._historia_btn = QPushButton("Historia de la talla")
+        self._historia_btn.setAutoDefault(False)
         self._historia_btn.clicked.connect(self._historia)
         acciones.addWidget(self._historia_btn)
         self._escuela_btn = QPushButton("Historia de la escuela")
+        self._escuela_btn.setAutoDefault(False)
         self._escuela_btn.clicked.connect(self._historia_escuela)
         acciones.addWidget(self._escuela_btn)
         acciones.addStretch()
         descartar = QPushButton("Descartar")
         descartar.setObjectName("dangerButton")
+        descartar.setAutoDefault(False)
         descartar.clicked.connect(self._descartar)
         acciones.addWidget(descartar)
         self._guardar_btn = QPushButton("Guardar pedido")
+        self._guardar_btn.setAutoDefault(False)
         self._guardar_btn.clicked.connect(self._guardar_pedidos)
         acciones.addWidget(self._guardar_btn)
+        self._hoja_btn = QPushButton("Hoja de pedido")
+        self._hoja_btn.setAutoDefault(False)
+        self._hoja_btn.clicked.connect(self._hoja_de_pedido)
+        acciones.addWidget(self._hoja_btn)
         self._aplicar_btn = QPushButton("Aplicar al inventario")
         self._aplicar_btn.setObjectName("primaryButton")
+        self._aplicar_btn.setAutoDefault(False)
         self._aplicar_btn.clicked.connect(self._aplicar)
         acciones.addWidget(self._aplicar_btn)
         cerrar = QPushButton("Cerrar")
+        cerrar.setAutoDefault(False)
         cerrar.clicked.connect(self.reject)
         acciones.addWidget(cerrar)
         layout.addLayout(acciones)
         self.setLayout(layout)
-        self.resize(1320, 620)
+        self.resize(1040, 680)
         self._cargar()
+
+    # --- compatibilidad con lo que había ------------------------------------------
+    @property
+    def COL_PEDIDO(self) -> int:  # noqa: N802 — nombre heredado
+        return len(self._columnas()) - 1 if not self._completo.isChecked() else 11
+
+    def _columnas(self) -> tuple:
+        return self.COLUMNAS_COMPLETAS if self._completo.isChecked() else self.COLUMNAS_COMPACTAS
 
     # --- datos ---------------------------------------------------------------------
     def _cargar(self) -> None:
         from pos_uniformes.database.models import ConteoJornada
-        from pos_uniformes.services.revision_service import revisar
+        from pos_uniformes.services.revision_service import PEDIR, SURTIR, URGENTE, revisar
 
         session = self._session_factory()
         try:
@@ -375,123 +485,241 @@ class ConteoRevisionDialog(QDialog):
             l.conteo_id: (l.pedido if l.pedido is not None else (l.sugerido or None))
             for l in self._revision.lineas
         }
+        # Filtro inicial: lo que pide acción. Si no hay nada de eso, todas.
+        hay_accion = any(l.estado in (URGENTE, PEDIR, SURTIR) for l in self._revision.lineas)
+        self._pintando = True
+        for clave, b in self._tarjetas.items():
+            b.setChecked(clave != "OTRAS" if hay_accion else True)
+        self._pintando = False
         self._resumen()
         self._pintar()
+
+    def _conteo(self, clave: str) -> tuple[int, int, int]:
+        """(tallas, piezas sugeridas, piezas a surtir) de un grupo del filtro."""
+        from pos_uniformes.services.revision_service import PEDIR, SURTIR, URGENTE
+
+        grupo = {"URGENTE": (URGENTE,), "PEDIR": (PEDIR,), "SURTIR": (SURTIR,)}.get(clave)
+        lineas = [l for l in self._revision.lineas if (l.estado in grupo if grupo else l.estado not in (URGENTE, PEDIR, SURTIR))]
+        return len(lineas), sum(l.sugerido for l in lineas), sum(l.surtir for l in lineas)
 
     def _resumen(self) -> None:
         r = self._revision
         piezas = sum(p for p in self._pedidos.values() if p)
         tallas = sum(1 for p in self._pedidos.values() if p)
-        partes = [f"<b>{r.quien}</b> contó <b>{len(r.lineas)}</b> tallas de <b>{r.titulo}</b>"]
-        partes.append(f"se sugiere pedir <b>{r.piezas_sugeridas}</b> piezas en {r.tallas_a_pedir} tallas")
-        if r.piezas_a_surtir:
-            partes.append(f"surtir de las cajas <b>{r.piezas_a_surtir}</b> piezas en {r.tallas_a_surtir} tallas")
-        if r.urgentes:
-            partes.append(f"<span style='color:#b91c1c'><b>{r.urgentes} urgentes</b> (no hay y la piden)</span>")
-        partes.append(f"tu pedido: <b>{piezas}</b> piezas en {tallas} tallas")
-        texto = " · ".join(partes)
+        texto = f"<b>{r.quien}</b> contó <b>{len(r.lineas)}</b> tallas de <b>{r.titulo}</b>  ·  tu pedido va en <b>{piezas}</b> piezas en {tallas} tallas"
         if not r.lineas:
             texto += "<br><span style='color:#8a8a8a'>Esta jornada no tiene tallas capturadas.</span>"
-        elif self._filtro_sin_efecto():
-            texto += "<br><span style='color:#8a8a8a'>Nada que pedir ni surtir todavía (faltan ventas para sacar el ritmo): se muestran todas las tallas.</span>"
+        elif not any(l.estado in ("URGENTE", "PEDIR", "SURTIR") for l in r.lineas):
+            texto += "<br><span style='color:#8a8a8a'>Nada que pedir ni surtir todavía (faltan ventas para sacar el ritmo).</span>"
         self._resumen_label.setText(texto)
         self._hoja_btn.setEnabled(piezas > 0)
+        # Las tarjetas: cifra grande + una línea chica.
+        for clave, b in self._tarjetas.items():
+            n, sug, sur = self._conteo(clave)
+            if clave == "URGENTE":
+                sub = "no hay y la piden" if n else "ninguna"
+            elif clave == "PEDIR":
+                sub = f"{sug} piezas al maquilador" if n else "nada"
+            elif clave == "SURTIR":
+                sub = f"{sur} piezas de las cajas" if n else "nada"
+            else:
+                sub = "tallas que están bien o sin datos"
+            b.poner(n, sub)
 
     def _lineas_visibles(self):
         from pos_uniformes.services.revision_service import PEDIR, SURTIR, URGENTE
 
-        if not self._solo_pedir.isChecked():
+        activos = {k for k, b in self._tarjetas.items() if b.isChecked() and b.isEnabled()}
+        if not activos:
             return list(self._revision.lineas)
-        que_hacer = [l for l in self._revision.lineas if l.estado in (URGENTE, PEDIR, SURTIR) or self._pedidos.get(l.conteo_id)]
-        # Con poca Libreta casi nada tiene ritmo: si el filtro se lo come todo,
-        # se enseñan todas en vez de una tabla vacía (pasó el 2026-09-13).
-        return que_hacer if que_hacer else list(self._revision.lineas)
+        grupo_de = {URGENTE: "URGENTE", PEDIR: "PEDIR", SURTIR: "SURTIR"}
+        return [l for l in self._revision.lineas if grupo_de.get(l.estado, "OTRAS") in activos or self._pedidos.get(l.conteo_id)]
 
     def _filtro_sin_efecto(self) -> bool:
-        from pos_uniformes.services.revision_service import PEDIR, SURTIR, URGENTE
-
-        return self._solo_pedir.isChecked() and bool(self._revision.lineas) and not any(
-            l.estado in (URGENTE, PEDIR, SURTIR) or self._pedidos.get(l.conteo_id) for l in self._revision.lineas
-        )
+        return bool(self._revision.lineas) and not any(l.estado in ("URGENTE", "PEDIR", "SURTIR") for l in self._revision.lineas)
 
     # --- pintura -------------------------------------------------------------------
-    def _pintar(self) -> None:
-        if self._revision is None:
-            return
-        from pos_uniformes.services.conteo_hoja_carta_service import nombre_para_hoja
+    def _que_hacer(self, l) -> str:
         from pos_uniformes.services.revision_service import NO_SE_MUEVE, SIN_DATOS, URGENTE
 
+        if l.estado == SIN_DATOS:
+            return "sin datos"
+        if l.estado == NO_SE_MUEVE:
+            return "no se mueve"
+        partes = []
+        if l.sugerido:
+            partes.append(f"pedir {l.sugerido}")
+        if l.surtir:
+            partes.append(f"surtir {l.surtir}")
+        texto = " · ".join(partes) if partes else "bien"
+        return f"¡URGENTE! {texto}" if l.estado == URGENTE else texto
+
+    def _pintar(self, *_a) -> None:
+        if self._revision is None or self._pintando:
+            return
+        from pos_uniformes.services.conteo_hoja_carta_service import nombre_para_hoja
+        from pos_uniformes.services.revision_service import NO_SE_MUEVE, SIN_DATOS, SURTIR, URGENTE
+
         self._pintando = True
+        columnas = self._columnas()
+        self._table.clear()
+        self._table.setColumnCount(len(columnas))
+        self._table.setHorizontalHeaderLabels(list(columnas))
+        h = self._table.horizontalHeader()
+        h.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        for c in range(1, len(columnas)):
+            h.setSectionResizeMode(c, QHeaderView.ResizeMode.ResizeToContents)
         lineas = self._lineas_visibles()
-        self._table.setRowCount(len(lineas))
-        for fila, l in enumerate(lineas):
-            vendidas = f"{l.vendidas} en {l.dias_observados} d" if l.dias_observados else "—"
-            alcanza = "—" if l.semanas_cubiertas is None else (f"{l.semanas_cubiertas:g} sem" if l.semanas_cubiertas < 99 else "+")
-            if l.estado == SIN_DATOS:
-                sugerido = "sin datos"
-            elif l.estado == NO_SE_MUEVE:
-                sugerido = "no se mueve"
-            elif l.estado == URGENTE:
-                sugerido = f"{l.sugerido}  ¡urgente!"
-            else:
-                sugerido = str(l.sugerido) if l.sugerido else "bien"
-            if l.pedido_anterior is not None:
-                cuando = l.pedido_anterior_at.strftime("%d/%m") if l.pedido_anterior_at else ""
-                vendio = f", vendiste {l.vendidas_desde_pedido}" if l.vendidas_desde_pedido is not None else ""
-                pasada = f"pediste {l.pedido_anterior} el {cuando}{vendio}"
-            elif l.anterior is not None:
-                pasada = f"había {l.anterior} el {l.anterior_at.strftime('%d/%m')}"
-            else:
-                pasada = "primer conteo"
+        compacto = not self._completo.isChecked()
+        col_pedido = self.COL_PEDIDO
+        self._por_fila = {}
+
+        # Compacto: agrupado por prenda con una fila de encabezado por prenda.
+        filas: list = []
+        if compacto:
+            grupos: dict[str, list] = {}
+            for l in lineas:
+                grupos.setdefault(l.producto, []).append(l)
+            for producto, tallas in grupos.items():
+                filas.append(("prenda", producto, tallas))
+                filas.extend(("talla", l, None) for l in tallas)
+        else:
+            filas = [("talla", l, None) for l in lineas]
+        self._table.setRowCount(len(filas))
+
+        for fila, (tipo, dato, extra) in enumerate(filas):
+            if tipo == "prenda":
+                sug = sum(l.sugerido for l in extra)
+                sur = sum(l.surtir for l in extra)
+                resumen = " · ".join(p for p in (f"pedir {sug}" if sug else "", f"surtir {sur}" if sur else "") if p)
+                item = QTableWidgetItem(nombre_para_hoja(dato, self._revision.titulo) + (f"   —   {resumen}" if resumen else ""))
+                fuente = item.font()
+                fuente.setBold(True)
+                item.setFont(fuente)
+                item.setBackground(QBrush(QColor("#f5ebe0")))
+                item.setForeground(QBrush(QColor("#5c3019")))
+                item.setFlags(Qt.ItemFlag.ItemIsEnabled)
+                self._table.setItem(fila, 0, item)
+                for c in range(1, len(columnas)):
+                    vacio = QTableWidgetItem("")
+                    vacio.setBackground(QBrush(QColor("#f5ebe0")))
+                    vacio.setFlags(Qt.ItemFlag.ItemIsEnabled)
+                    self._table.setItem(fila, c, vacio)
+                self._table.setSpan(fila, 0, 1, len(columnas))
+                continue
+
+            l = dato
+            self._por_fila[fila] = l.conteo_id
             pedido = self._pedidos.get(l.conteo_id)
-            valores = (
-                nombre_para_hoja(l.producto, self._revision.titulo),
-                f"{l.talla} {l.color}".strip() if l.color and l.color.upper() not in ("", "UNICO", "ÚNICO") else l.talla,
-                str(l.conto),
-                str(l.en_cajas) if l.en_cajas else "—",
-                vendidas,
-                f"{l.ritmo_semana:.1f}" if l.ritmo_semana else "—",
-                alcanza,
-                str(l.pidieron) if l.pidieron else "—",
-                str(l.ellas_sugieren) if l.ellas_sugieren is not None else "—",
-                str(l.surtir) if l.surtir else "—",
-                sugerido,
-                "" if pedido is None else str(pedido),
-                pasada,
-            )
+            talla = f"{l.talla} {l.color}".strip() if l.color and l.color.upper() not in ("", "UNICO", "ÚNICO") else l.talla
+            if compacto:
+                hay = f"{l.conto}" + (f"  + {l.en_cajas} en cajas" if l.en_cajas else "")
+                valores = ("", talla, hay, self._que_hacer(l), "" if pedido is None else str(pedido))
+                col_que = 3
+            else:
+                vendidas = f"{l.vendidas} en {l.dias_observados} d" if l.dias_observados else "—"
+                alcanza = "—" if l.semanas_cubiertas is None else (f"{l.semanas_cubiertas:g} sem" if l.semanas_cubiertas < 99 else "+")
+                if l.estado == SIN_DATOS:
+                    sugerido = "sin datos"
+                elif l.estado == NO_SE_MUEVE:
+                    sugerido = "no se mueve"
+                elif l.estado == URGENTE:
+                    sugerido = f"{l.sugerido}  ¡urgente!"
+                else:
+                    sugerido = str(l.sugerido) if l.sugerido else "bien"
+                valores = (
+                    nombre_para_hoja(l.producto, self._revision.titulo), talla, str(l.conto),
+                    str(l.en_cajas) if l.en_cajas else "—", vendidas,
+                    f"{l.ritmo_semana:.1f}" if l.ritmo_semana else "—", alcanza,
+                    str(l.pidieron) if l.pidieron else "—",
+                    str(l.ellas_sugieren) if l.ellas_sugieren is not None else "—",
+                    str(l.surtir) if l.surtir else "—", sugerido,
+                    "" if pedido is None else str(pedido), self._la_vez_pasada(l),
+                )
+                col_que = 10
             for col, txt in enumerate(valores):
                 item = QTableWidgetItem(txt)
                 item.setData(Qt.ItemDataRole.UserRole, l.conteo_id)
-                if col not in (0, len(valores) - 1):
+                if col not in (0, len(valores) - 1) or (compacto and col == len(valores) - 1):
                     item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-                if col == self.COL_PEDIDO:
+                if col == col_pedido:
                     item.setBackground(QBrush(QColor("#fff8e6")))
                     fuente = item.font()
                     fuente.setBold(True)
                     item.setFont(fuente)
                 else:
                     item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEditable)
-                if col == self.COL_SUGERIDO:
+                if col == col_que:
                     if l.estado == URGENTE:
                         item.setForeground(QBrush(QColor("#b91c1c")))
+                    elif l.estado == SURTIR:
+                        item.setForeground(QBrush(QColor("#1d4ed8")))
                     elif l.estado in (NO_SE_MUEVE, SIN_DATOS):
                         item.setForeground(QBrush(QColor("#8a8a8a")))
-                if col == self.COL_CAJAS and l.cajas:
+                    elif l.sugerido:
+                        item.setForeground(QBrush(QColor("#5c3019")))
+                    if compacto:
+                        fuente = item.font()
+                        fuente.setBold(bool(l.sugerido or l.surtir))
+                        item.setFont(fuente)
+                if not compacto and col == 3 and l.cajas:
                     item.setToolTip("En cajas: " + " · ".join(f"{codigo} ×{n}" for codigo, n in l.cajas))
-                if col == self.COL_SURTIR and l.surtir:
-                    item.setForeground(QBrush(QColor("#1d4ed8")))
-                    fuente = item.font()
-                    fuente.setBold(True)
-                    item.setFont(fuente)
+                if compacto and col == 2 and l.cajas:
+                    item.setToolTip("En cajas: " + " · ".join(f"{codigo} ×{n}" for codigo, n in l.cajas))
                 if col == 2 and l.conto == 0:
                     item.setForeground(QBrush(QColor("#b91c1c")))
                 self._table.setItem(fila, col, item)
         self._pintando = False
+        self._por_que()
+
+    def _la_vez_pasada(self, l) -> str:
+        if l.pedido_anterior is not None:
+            cuando = l.pedido_anterior_at.strftime("%d/%m") if l.pedido_anterior_at else ""
+            vendio = f", vendiste {l.vendidas_desde_pedido}" if l.vendidas_desde_pedido is not None else ""
+            return f"pediste {l.pedido_anterior} el {cuando}{vendio}"
+        if l.anterior is not None:
+            return f"había {l.anterior} el {l.anterior_at.strftime('%d/%m')}"
+        return "primer conteo"
+
+    def _linea_en_fila(self, fila: int):
+        conteo_id = self._por_fila.get(fila)
+        if conteo_id is None:
+            return None
+        return next((l for l in self._revision.lineas if l.conteo_id == conteo_id), None)
+
+    def _por_que(self) -> None:
+        """La evidencia de la talla seleccionada, en una línea."""
+        if self._revision is None or self._pintando:
+            return
+        l = self._linea_en_fila(self._table.currentRow())
+        if l is None:
+            self._por_que_label.setText("Toca una talla para ver por qué se sugiere eso.")
+            return
+        from pos_uniformes.services.conteo_hoja_carta_service import nombre_para_hoja
+
+        partes = []
+        if l.dias_observados:
+            partes.append(f"vendidas <b>{l.vendidas}</b> en {l.dias_observados} días ({l.ritmo_semana:.1f} por semana)")
+            if l.semanas_cubiertas is not None:
+                partes.append(f"con lo que hay alcanza <b>{l.semanas_cubiertas:g}</b> semanas")
+        else:
+            partes.append("sin ventas registradas todavía")
+        if l.pidieron:
+            partes.append(f"<span style='color:#b91c1c'>pidieron <b>{l.pidieron}</b> y no había</span>")
+        if l.ellas_sugieren is not None:
+            partes.append(f"en la hoja anotaron pedir {l.ellas_sugieren}")
+        if l.cajas:
+            partes.append("en cajas: " + " · ".join(f"{c} ×{n}" for c, n in l.cajas))
+        partes.append(self._la_vez_pasada(l))
+        talla = f"{l.talla} {l.color}".strip() if l.color and l.color.upper() not in ("", "UNICO", "ÚNICO") else l.talla
+        self._por_que_label.setText(f"<b>{nombre_para_hoja(l.producto, self._revision.titulo)} · {talla}</b>  —  " + " · ".join(partes))
 
     def _pedido_editado(self, item: QTableWidgetItem) -> None:
         if self._pintando or item.column() != self.COL_PEDIDO:
             return
         conteo_id = item.data(Qt.ItemDataRole.UserRole)
+        if conteo_id is None:
+            return
         texto = item.text().strip()
         if texto == "":
             self._pedidos[conteo_id] = None
@@ -553,12 +781,9 @@ class ConteoRevisionDialog(QDialog):
             return
         if fila is None or fila is False:
             fila = self._table.currentRow()
-        if fila < 0:
-            QMessageBox.information(self, "Historia", "Elige una talla en la tabla.")
-            return
-        conteo_id = self._table.item(fila, 0).data(Qt.ItemDataRole.UserRole)
-        linea = next((l for l in self._revision.lineas if l.conteo_id == conteo_id), None)
+        linea = self._linea_en_fila(fila) if fila >= 0 else None
         if linea is None:
+            QMessageBox.information(self, "Historia", "Elige una talla en la tabla.")
             return
         TallaHistoriaDialog(self, variante_id=linea.variante_id, titulo=self._revision.titulo, session_factory=self._session_factory).exec()
 
