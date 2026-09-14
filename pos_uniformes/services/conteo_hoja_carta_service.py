@@ -231,14 +231,14 @@ def construir_hoja_html(
     return "\n".join(partes)
 
 
-def grupos_para_hoja(session, *, escuela_id: int | None, tipo_pieza: str = "") -> tuple[str, list[dict]]:
-    """(título, grupos) para una escuela o una prenda básica."""
+def grupos_para_hoja(session, *, escuela_id: int | None, tipo_pieza: str = "", prenda: str = "") -> tuple[str, list[dict]]:
+    """(título, grupos) para una escuela, un tipo de básicos o una sola prenda."""
     from pos_uniformes.database.models import Escuela
-    from pos_uniformes.services.conteo_jornada_service import alcance
+    from pos_uniformes.services.conteo_jornada_service import alcance, nombre_corto_prenda
 
-    grupos = alcance(session, escuela_id, tipo_pieza)
+    grupos = alcance(session, escuela_id, tipo_pieza, prenda)
     if escuela_id is None:
-        titulo = f"Básicos · {tipo_pieza}" if tipo_pieza else "Básicos"
+        titulo = f"Básicos · {nombre_corto_prenda(prenda)}" if prenda else (f"Básicos · {tipo_pieza}" if tipo_pieza else "Básicos")
     else:
         escuela = session.get(Escuela, escuela_id)
         titulo = escuela.nombre if escuela is not None else f"Escuela {escuela_id}"

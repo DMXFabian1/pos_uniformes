@@ -30,6 +30,7 @@ router = APIRouter(prefix="/api/v1/movil/conteos", tags=["movil-conteos"])
 class AbrirRequest(BaseModel):
     escuela_id: int | None = None
     tipo_pieza: str = ""
+    prenda: str = ""   # básicos: una sola prenda (nombre del producto)
 
 
 class TallaIn(BaseModel):
@@ -155,7 +156,7 @@ def abrir(body: AbrirRequest, current: tuple = Depends(get_current_employee), db
             "code": "sin_alcance", "message": "Elige una escuela o una prenda de básicos."}})
     try:
         j = jn.abrir_jornada(
-            db, escuela_id=body.escuela_id, tipo_pieza=body.tipo_pieza.strip(),
+            db, escuela_id=body.escuela_id, tipo_pieza=body.tipo_pieza.strip(), prenda=body.prenda.strip(),
             empleada_code=code, empleada_nombre=str(empleada.nombre_completo or ""),
         )
     except jn.JornadaEnProceso as en_proceso:

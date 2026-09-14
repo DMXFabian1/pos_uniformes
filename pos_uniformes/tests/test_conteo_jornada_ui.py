@@ -597,6 +597,65 @@ class SelectorConFechaTests(unittest.TestCase):
         self.assertEqual(d._ocultas_label.text(), "")
 
 
+class SelectorBasicosPorPrendaTests(unittest.TestCase):
+    """Básicos: tipo → todas o una sola prenda, cada una con su última fecha."""
+
+    def setUp(self) -> None:
+        from pos_uniformes.tests.test_conteo_jornada_service import _seed, _seed_basicos
+
+        engine = create_engine("sqlite:///:memory:")
+        Base.metadata.create_all(engine)
+        self.factory = lambda: Session(engine)
+        s = self.factory()
+        e = _seed(s, "Alfa")
+        self.gris, self.azul = _seed_basicos(s, e, "Pantalón")
+        s.commit()
+        j = jn.abrir_jornada(s, escuela_id=None, tipo_pieza="Pantalón", prenda=self.gris, empleada_code="VEND-4", empleada_nombre="Stayce Chavarria")
+        jn.terminar_jornada(s, j, empleada_code="VEND-4")
+        s.commit()
+        s.close()
+        self._dialogos = []
+
+    def tearDown(self) -> None:
+        for d in self._dialogos:
+            d.close(); d.deleteLater()
+        _APP.processEvents()
+
+    def _dialogo(self):
+        from pos_uniformes.ui.dialogs.conteo_jornada_dialogs import ConteoNuevaJornadaDialog
+
+        d = ConteoNuevaJornadaDialog(session_factory=self.factory)
+        self._dialogos.append(d)
+        d._ver_todas.setChecked(True)
+        d._escuela_combo.setCurrentIndex(0)   # básicos
+        return d
+
+    def test_tipo_y_prendas_con_su_fecha(self) -> None:
+        d = self._dialogo()
+        tipos = [d._tipo_combo.itemText(i) for i in range(d._tipo_combo.count())]
+        self.assertTrue(any(t.startswith("Pantalón") and "hoy (Stayce)" in t for t in tipos), tipos)
+        prendas = [d._prenda_combo.itemText(i) for i in range(d._prenda_combo.count())]
+        self.assertEqual(len(prendas), 3)   # todas + 2
+        self.assertTrue(prendas[0].startswith("Todas las de Pantalón"))
+        self.assertTrue(any(p.startswith("Pantalón Gris Escolar") and "hoy (Stayce)" in p for p in prendas), prendas)
+        self.assertTrue(any(p.startswith("Pantalón Azul Escolar") and "nunca" in p for p in prendas), prendas)
+
+    def test_elegir_una_prenda_la_lleva_al_resultado(self) -> None:
+        d = self._dialogo()
+        idx = next(i for i in range(d._prenda_combo.count()) if d._prenda_combo.itemData(i) == self.azul)
+        d._prenda_combo.setCurrentIndex(idx)
+        self.assertEqual(d._ultimo_label.text(), "Nunca se ha contado.")
+        d._aceptar()
+        self.assertEqual((d.escuela_id, d.tipo_pieza, d.prenda, d.titulo), (None, "Pantalón", self.azul, "Básicos · Pantalón Azul Escolar"))
+
+    def test_todas_las_del_tipo_deja_prenda_vacia(self) -> None:
+        d = self._dialogo()
+        d._prenda_combo.setCurrentIndex(0)
+        self.assertIn("Ojo", d._ultimo_label.text())   # el tipo se contó hoy (una prenda)
+        d._aceptar()
+        self.assertEqual((d.prenda, d.titulo), ("", "Básicos · Pantalón"))
+
+
 class OfrecerSeguirTests(unittest.TestCase):
     """En el kiosko, elegir una escuela ya abierta ofrece seguirla o imprimir otra hoja."""
 
@@ -633,7 +692,7 @@ class OfrecerSeguirTests(unittest.TestCase):
     def test_otra_hoja_imprime_sin_volver_a_preguntar(self) -> None:
         w, foto = self._correr("Imprimir otra hoja")
         self.assertEqual(w.capturadas, [])
-        self.assertEqual(w.hojas, [{"escuela_id": 7, "tipo_pieza": "", "titulo": "Beta"}])
+        self.assertEqual(w.hojas, [{"escuela_id": 7, "tipo_pieza": "", "titulo": "Beta", "prenda": ""}])
 
     def test_cancelar_no_hace_nada(self) -> None:
         w, _ = self._correr("Cancelar")

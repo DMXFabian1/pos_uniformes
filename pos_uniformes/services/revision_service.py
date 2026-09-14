@@ -587,16 +587,18 @@ class HistoriaEscuela:
         return len(self.prendas)
 
 
-def historia_de_escuela(session: Session, escuela_id: int | None, tipo_pieza: str = "", *, hoy: date | None = None, semanas: int = SEMANAS_HISTORIA) -> HistoriaEscuela:
+def historia_de_escuela(session: Session, escuela_id: int | None, tipo_pieza: str = "", *, prenda: str = "", hoy: date | None = None, semanas: int = SEMANAS_HISTORIA) -> HistoriaEscuela:
     """Cómo se ha vendido una escuela (o una prenda de básicos): piezas por
     semana y, por prenda y talla, vendidas, pidieron-y-no-había, lo que hay
     y lo que se ha pedido. Para ver qué se pide más y qué menos."""
     from pos_uniformes.services.conteo_jornada_service import alcance
 
     hoy = hoy or date.today()
-    grupos = alcance(session, escuela_id, tipo_pieza)
+    grupos = alcance(session, escuela_id, tipo_pieza, prenda)
     if escuela_id is None:
-        titulo = f"Básicos · {tipo_pieza}" if tipo_pieza else "Básicos"
+        from pos_uniformes.services.conteo_jornada_service import nombre_corto_prenda
+
+        titulo = f"Básicos · {nombre_corto_prenda(prenda)}" if prenda else (f"Básicos · {tipo_pieza}" if tipo_pieza else "Básicos")
     else:
         from pos_uniformes.database.models import Escuela
 

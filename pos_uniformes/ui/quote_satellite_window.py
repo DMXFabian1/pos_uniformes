@@ -3658,7 +3658,7 @@ class QuoteSatelliteWindow(QMainWindow):
             abiertas, por_revisar, recientes = [], [], []
         pintar_jornadas(self, abiertas=abiertas, por_revisar=por_revisar, recientes=recientes, code=code)
 
-    def _conteos_imprimir_hoja(self, *, escuela_id=None, tipo_pieza: str = "", titulo: str = "") -> None:
+    def _conteos_imprimir_hoja(self, *, escuela_id=None, tipo_pieza: str = "", titulo: str = "", prenda: str = "") -> None:
         """La hoja de conteo en papel carta (HP), para una escuela o prenda.
 
         Mismo orden y numeración que la pantalla de captura. La tira térmica
@@ -3670,7 +3670,7 @@ class QuoteSatelliteWindow(QMainWindow):
         from pos_uniformes.ui.dialogs.conteo_jornada_dialogs import ConteoNuevaJornadaDialog
 
         if titulo:
-            dlg = SimpleNamespace(escuela_id=escuela_id, tipo_pieza=tipo_pieza, titulo=titulo)
+            dlg = SimpleNamespace(escuela_id=escuela_id, tipo_pieza=tipo_pieza, titulo=titulo, prenda=prenda)
         else:
             dlg = ConteoNuevaJornadaDialog(self, titulo="Imprimir hoja de conteo", boton="Imprimir")
             if dlg.exec() != int(QDialog.DialogCode.Accepted):
@@ -3689,7 +3689,7 @@ class QuoteSatelliteWindow(QMainWindow):
         if destino_dlg.exec() != int(QDialog.DialogCode.Accepted) or not destino_dlg.destino:
             return
         if destino_dlg.destino == ConteoDestinoDialog.TIRA:
-            self._conteos_imprimir_tira(dlg.escuela_id, dlg.tipo_pieza)
+            self._conteos_imprimir_tira(dlg.escuela_id, dlg.tipo_pieza, getattr(dlg, "prenda", ""))
             return
         try:
             from pos_uniformes.services.conteo_hoja_carta_service import (
@@ -3699,7 +3699,7 @@ class QuoteSatelliteWindow(QMainWindow):
 
             with get_session() as session:
                 titulo, grupos = grupos_para_hoja(
-                    session, escuela_id=dlg.escuela_id, tipo_pieza=dlg.tipo_pieza
+                    session, escuela_id=dlg.escuela_id, tipo_pieza=dlg.tipo_pieza, prenda=getattr(dlg, "prenda", ""),
                 )
             if not grupos:
                 QMessageBox.information(self, "Sin piezas", f"{titulo} no tiene piezas para contar.")
@@ -3713,7 +3713,7 @@ class QuoteSatelliteWindow(QMainWindow):
         if imprimir_hoja_carta(self, html, f"Hoja de conteo · {titulo}"):
             self._set_status(f"Hoja de {titulo} enviada a la impresora.")
 
-    def _conteos_imprimir_tira(self, escuela_id: int | None, tipo_pieza: str) -> None:
+    def _conteos_imprimir_tira(self, escuela_id: int | None, tipo_pieza: str, prenda: str = "") -> None:
         """La hoja de siempre en la impresora de tickets: una tira por prenda.
 
         Mismo generador que el admin (`conteo_sheet_service`) y misma salida
@@ -3728,8 +3728,10 @@ class QuoteSatelliteWindow(QMainWindow):
         try:
             with get_session() as session:
                 if escuela_id is None:
-                    titulo = f"Básicos · {tipo_pieza}" if tipo_pieza else "Básicos"
-                    sheets = build_conteo_sheets_basicos(session, tipo_pieza=tipo_pieza or None)
+                    from pos_uniformes.services.conteo_jornada_service import nombre_corto_prenda
+
+                    titulo = f"Básicos · {nombre_corto_prenda(prenda)}" if prenda else (f"Básicos · {tipo_pieza}" if tipo_pieza else "Básicos")
+                    sheets = build_conteo_sheets_basicos(session, tipo_pieza=tipo_pieza or None, prenda=prenda or None)
                 else:
                     from pos_uniformes.database.models import Escuela
 
@@ -3763,6 +3765,7 @@ class QuoteSatelliteWindow(QMainWindow):
                     session,
                     escuela_id=dlg.escuela_id,
                     tipo_pieza=dlg.tipo_pieza,
+                    prenda=getattr(dlg, "prenda", ""),
                     empleada_code=str(self._conteos_code or ""),
                     empleada_nombre=str(self._conteos_nombre or ""),
                 )
@@ -3795,7 +3798,7 @@ class QuoteSatelliteWindow(QMainWindow):
         if pulsado is seguir:
             self._conteos_capturar(foto)
         elif pulsado is otra_hoja:
-            self._conteos_imprimir_hoja(escuela_id=foto.escuela_id, tipo_pieza=foto.tipo_pieza, titulo=foto.titulo)
+            self._conteos_imprimir_hoja(escuela_id=foto.escuela_id, tipo_pieza=foto.tipo_pieza, titulo=foto.titulo, prenda=getattr(foto, "prenda", ""))
 
     def _conteos_capturar(self, foto) -> None:
         """Abre la captura amarrada a una jornada (nueva o retomada)."""

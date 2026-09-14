@@ -19,7 +19,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from pos_uniformes.database.models import ConteoInventario, ConteoJornada, Escuela
@@ -62,6 +62,7 @@ class JornadaRef:
     terminada_at: datetime | None = None
     revisada_at: datetime | None = None
     aplicada: bool = True   # False = el dueño la descartó
+    prenda: str = ""        # básicos: una sola prenda; "" = todo el tipo
 
     @property
     def quien(self) -> str:
@@ -85,15 +86,28 @@ def ref(jornada: ConteoJornada) -> JornadaRef:
         terminada_at=jornada.terminada_at,
         revisada_at=jornada.revisada_at,
         aplicada=(jornada.notas or "") != DESCARTADA,
+        prenda=str(getattr(jornada, "prenda", "") or ""),
     )
 
 
-def alcance(session: Session, escuela_id: int | None, tipo_pieza: str = "") -> list[dict]:
+def clave_alcance(escuela_id: int | None, tipo_pieza: str = "", prenda: str = ""):
+    """La llave con la que se indexa un alcance en `ultimos_conteos` y
+    `abiertas_por_alcance`: escuela_id, ("basicos", tipo) o ("basicos", tipo, prenda)."""
+    if escuela_id is not None:
+        return int(escuela_id)
+    tipo = (tipo_pieza or "").strip()
+    prenda = (prenda or "").strip()
+    return ("basicos", tipo, prenda) if prenda else ("basicos", tipo)
+
+
+def alcance(session: Session, escuela_id: int | None, tipo_pieza: str = "", prenda: str = "") -> list[dict]:
     """Los grupos producto→tallas de una escuela (o prenda básica), en el
     orden que comparten la pantalla de captura y la hoja de papel.
 
     Es UNA sola función a propósito: si la hoja dice "7. Suéter Cuello V" y la
     pantalla dice "7. Suéter Cuello V", es porque las dos preguntaron aquí.
+    `prenda` (básicos): solo ese producto — "a veces no quiero contar todos
+    los pantalones, solo un tipo o solo un color" (Daniel 2026-09-14).
     """
     from pos_uniformes.services.conteo_service import (
         obtener_variantes_agrupadas_por_producto,
@@ -102,9 +116,21 @@ def alcance(session: Session, escuela_id: int | None, tipo_pieza: str = "") -> l
 
     if escuela_id is None:
         grupos = obtener_variantes_basicos_agrupadas(session, tipo_pieza=tipo_pieza or None)
+        if (prenda or "").strip():
+            grupos = [g for g in grupos if str(g.get("producto_nombre") or "") == prenda.strip()]
     else:
         grupos = obtener_variantes_agrupadas_por_producto(session, escuela_id)
     return [g for g in grupos if not g.get("virtual")]
+
+
+def prendas_basicas(session: Session, tipo_pieza: str) -> list[str]:
+    """Los productos básicos de un tipo (para elegir una sola prenda)."""
+    return [str(g["producto_nombre"]) for g in alcance(session, None, tipo_pieza)]
+
+
+def nombre_corto_prenda(prenda: str) -> str:
+    """'Pantalón Gris Escolar | Oficial | Pantalón' → 'Pantalón Gris Escolar'."""
+    return str(prenda or "").split("|")[0].strip()
 
 
 def abrir_jornada(
@@ -114,6 +140,7 @@ def abrir_jornada(
     tipo_pieza: str = "",
     empleada_code: str,
     empleada_nombre: str = "",
+    prenda: str = "",
 ) -> ConteoJornada:
     """Abre una jornada nueva y deja anotado cuántas tallas abarca.
 
@@ -122,20 +149,24 @@ def abrir_jornada(
     """
     if not empleada_code or not empleada_code.strip():
         raise ValueError("Una jornada necesita el gafete de quien cuenta.")
-    abierta = jornada_abierta_de(session, escuela_id, tipo_pieza)
+    prenda = (prenda or "").strip() if escuela_id is None else ""
+    abierta = jornada_abierta_de(session, escuela_id, tipo_pieza, prenda)
     if abierta is not None:
         raise JornadaEnProceso(abierta)
-    grupos = alcance(session, escuela_id, tipo_pieza)
+    grupos = alcance(session, escuela_id, tipo_pieza, prenda)
     total = sum(len(g["variantes"]) for g in grupos)
     if escuela_id is None:
         titulo = f"Básicos · {tipo_pieza}" if tipo_pieza else "Básicos"
+        if prenda:
+            titulo = f"Básicos · {nombre_corto_prenda(prenda)}"
     else:
         escuela = session.get(Escuela, escuela_id)
         titulo = escuela.nombre if escuela is not None else f"Escuela {escuela_id}"
     jornada = ConteoJornada(
         escuela_id=escuela_id,
         tipo_pieza=(tipo_pieza or "").strip(),
-        titulo=titulo,
+        prenda=prenda,
+        titulo=titulo[:160],
         empleada_code=empleada_code.strip().upper(),
         empleada_nombre=(empleada_nombre or "").strip(),
         total_tallas=total,
@@ -145,22 +176,28 @@ def abrir_jornada(
     return jornada
 
 
-def jornada_abierta_de(session: Session, escuela_id: int | None, tipo_pieza: str = "") -> ConteoJornada | None:
-    """La jornada sin terminar de esa escuela (o prenda de básicos), si hay."""
+def jornada_abierta_de(session: Session, escuela_id: int | None, tipo_pieza: str = "", prenda: str = "") -> ConteoJornada | None:
+    """La jornada sin terminar que choca con ese alcance, si hay.
+
+    Básicos: una de todo el tipo choca con cualquiera del tipo; una de una
+    prenda choca con la de todo el tipo y con la de esa misma prenda."""
     q = select(ConteoJornada).where(ConteoJornada.terminada_at.is_(None))
     if escuela_id is None:
         q = q.where(ConteoJornada.escuela_id.is_(None), ConteoJornada.tipo_pieza == (tipo_pieza or "").strip())
+        prenda = (prenda or "").strip()
+        if prenda:
+            q = q.where(or_(ConteoJornada.prenda == "", ConteoJornada.prenda == prenda))
     else:
         q = q.where(ConteoJornada.escuela_id == escuela_id)
     return session.scalars(q.order_by(ConteoJornada.iniciada_at.desc())).first()
 
 
 def abiertas_por_alcance(session: Session) -> dict:
-    """{escuela_id | ("basicos", tipo_pieza): jornada abierta} para marcar
-    "en proceso" en los selectores."""
+    """{escuela_id | ("basicos", tipo) | ("basicos", tipo, prenda): jornada
+    abierta} para marcar "en proceso" en los selectores."""
     out: dict = {}
     for j in jornadas_abiertas(session):
-        clave = ("basicos", j.tipo_pieza) if j.escuela_id is None else j.escuela_id
+        clave = clave_alcance(j.escuela_id, j.tipo_pieza, getattr(j, "prenda", ""))
         out.setdefault(clave, j)
     return out
 
@@ -358,7 +395,7 @@ def hoja_de_jornada(session: Session, jornada: ConteoJornada) -> dict:
             except ValueError:
                 pedido = None
         capturado[int(vid)] = (int(fisico), pedido)
-    grupos = alcance(session, jornada.escuela_id, jornada.tipo_pieza)
+    grupos = alcance(session, jornada.escuela_id, jornada.tipo_pieza, getattr(jornada, "prenda", ""))
     prendas = []
     for numero, g in enumerate(grupos, 1):
         tallas = []
@@ -414,7 +451,7 @@ class Avance:
 def avance(session: Session, jornada: ConteoJornada) -> Avance:
     """Cuántas tallas y cuántas prendas van (puro sobre la consulta)."""
     hechas = capturado_en_jornada(session, jornada.id)
-    grupos = alcance(session, jornada.escuela_id, jornada.tipo_pieza)
+    grupos = alcance(session, jornada.escuela_id, jornada.tipo_pieza, getattr(jornada, "prenda", ""))
     prendas_total = len(grupos)
     prendas_hechas = sum(
         1 for g in grupos
@@ -640,14 +677,18 @@ def ultimos_conteos(session: Session) -> dict:
     # 1. Jornadas terminadas: la más reciente por escuela / prenda básica.
     filas = session.execute(
         select(ConteoJornada.escuela_id, ConteoJornada.tipo_pieza, ConteoJornada.empleada_nombre,
-               ConteoJornada.empleada_code, ConteoJornada.terminada_at)
+               ConteoJornada.empleada_code, ConteoJornada.terminada_at, ConteoJornada.prenda)
         .where(ConteoJornada.terminada_at.is_not(None))
         .order_by(ConteoJornada.terminada_at.desc())
     ).all()
-    for escuela_id, tipo_pieza, nombre, code, terminada in filas:
+    for escuela_id, tipo_pieza, nombre, code, terminada, prenda in filas:
+        quien = nombre or code or ""
+        if escuela_id is None and prenda:
+            # Una prenda sola: cuenta para esa prenda Y como último toque al tipo.
+            salida.setdefault(("basicos", str(tipo_pieza or ""), str(prenda)), UltimoConteo(terminada, quien))
         clave = int(escuela_id) if escuela_id is not None else ("basicos", str(tipo_pieza or ""))
         if clave not in salida:
-            salida[clave] = UltimoConteo(terminada, nombre or code or "")
+            salida[clave] = UltimoConteo(terminada, quien)
     # 2. Conteos viejos (sin jornada): la talla contada más recientemente.
     viejos = session.execute(
         select(Producto.escuela_id, func.max(Variante.ultimo_conteo_at))
@@ -659,7 +700,33 @@ def ultimos_conteos(session: Session) -> dict:
         clave = int(escuela_id)
         if clave not in salida and fecha is not None:
             salida[clave] = UltimoConteo(fecha, "")
+    # 3. Básicos sin jornada: por prenda (nombre del producto) y por tipo.
+    from pos_uniformes.database.models import TipoPieza
+
+    viejos_basicos = session.execute(
+        select(TipoPieza.nombre, Producto.nombre, func.max(Variante.ultimo_conteo_at))
+        .join(Variante, Variante.producto_id == Producto.id)
+        .join(TipoPieza, TipoPieza.id == Producto.tipo_pieza_id)
+        .where(Producto.escuela_id.is_(None), Variante.ultimo_conteo_at.is_not(None))
+        .group_by(TipoPieza.nombre, Producto.nombre)
+    ).all()
+    for tipo, prenda, fecha in viejos_basicos:
+        if fecha is None:
+            continue
+        salida.setdefault(("basicos", str(tipo), str(prenda)), UltimoConteo(fecha, ""))
+        clave_tipo = ("basicos", str(tipo))
+        actual = salida.get(clave_tipo)
+        if actual is None or (actual.fecha is not None and actual.quien == "" and _mas_nuevo(fecha, actual.fecha)):
+            salida[clave_tipo] = UltimoConteo(fecha, "")
     return salida
+
+
+def _mas_nuevo(a: datetime, b: datetime) -> bool:
+    """a > b tolerando naive vs con zona (SQLite vs Postgres)."""
+    if (a.tzinfo is None) != (b.tzinfo is None):
+        a = a.replace(tzinfo=None)
+        b = b.replace(tzinfo=None)
+    return a > b
 
 
 @dataclass(frozen=True)
@@ -741,6 +808,5 @@ def tablero_conteos(session: Session) -> list[FilaTablero]:
     return filas
 
 
-def ultimo_conteo_de(ultimos: dict, escuela_id: int | None, tipo_pieza: str = "") -> UltimoConteo:
-    clave = int(escuela_id) if escuela_id is not None else ("basicos", tipo_pieza or "")
-    return ultimos.get(clave, UltimoConteo(None))
+def ultimo_conteo_de(ultimos: dict, escuela_id: int | None, tipo_pieza: str = "", prenda: str = "") -> UltimoConteo:
+    return ultimos.get(clave_alcance(escuela_id, tipo_pieza, prenda), UltimoConteo(None))

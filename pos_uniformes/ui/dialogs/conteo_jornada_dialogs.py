@@ -94,6 +94,7 @@ class ConteoNuevaJornadaDialog(QDialog):
         self._session_factory = session_factory or _default_session_factory
         self.escuela_id: int | None = None
         self.tipo_pieza: str = ""
+        self.prenda: str = ""   # básicos: una sola prenda (nombre del producto); "" = todo el tipo
         self.titulo: str = ""   # "Práxedis Guerrero" o "Básicos · Camisa", para rotular
 
         layout = QVBoxLayout()
@@ -104,8 +105,14 @@ class ConteoNuevaJornadaDialog(QDialog):
         layout.addWidget(self._escuela_combo)
         self._tipo_combo = QComboBox()
         self._tipo_combo.setVisible(False)
-        self._tipo_combo.currentIndexChanged.connect(self._pintar_ultimo)
+        self._tipo_combo.currentIndexChanged.connect(self._on_tipo)
         layout.addWidget(self._tipo_combo)
+        # Tercer nivel (básicos): todas las prendas del tipo, o una sola —
+        # "a veces no quiero contar todos los pantalones" (Daniel 2026-09-14).
+        self._prenda_combo = QComboBox()
+        self._prenda_combo.setVisible(False)
+        self._prenda_combo.currentIndexChanged.connect(self._pintar_ultimo)
+        layout.addWidget(self._prenda_combo)
         # Cuándo se contó por última vez lo elegido: para no contar la misma
         # escuela a cada rato. Verde si fue hace poco.
         self._ultimo_label = QLabel("")
@@ -200,7 +207,7 @@ class ConteoNuevaJornadaDialog(QDialog):
         if dato is None:
             return ultimo_conteo_de({}, None)
         if int(dato) == ESCUELA_ID_BASICOS:
-            return ultimo_conteo_de(self._ultimos, None, str(self._tipo_combo.currentData() or ""))
+            return ultimo_conteo_de(self._ultimos, None, str(self._tipo_combo.currentData() or ""), str(self._prenda_combo.currentData() or ""))
         return ultimo_conteo_de(self._ultimos, int(dato))
 
     def abierta_elegida(self):
@@ -209,7 +216,16 @@ class ConteoNuevaJornadaDialog(QDialog):
         if dato is None:
             return None
         if int(dato) == ESCUELA_ID_BASICOS:
-            return self._abiertas.get(("basicos", str(self._tipo_combo.currentData() or "")))
+            from pos_uniformes.services.conteo_jornada_service import clave_alcance
+
+            tipo = str(self._tipo_combo.currentData() or "")
+            prenda = str(self._prenda_combo.currentData() or "")
+            # Una prenda choca con la de todo el tipo; todo el tipo, con cualquier prenda abierta.
+            if prenda:
+                return self._abiertas.get(clave_alcance(None, tipo, prenda)) or self._abiertas.get(("basicos", tipo))
+            return self._abiertas.get(("basicos", tipo)) or next(
+                (j for k, j in self._abiertas.items() if isinstance(k, tuple) and len(k) == 3 and k[1] == tipo), None
+            )
         return self._abiertas.get(int(dato))
 
     def _pintar_ultimo(self, *_args) -> None:
@@ -236,6 +252,8 @@ class ConteoNuevaJornadaDialog(QDialog):
     def _on_escuela(self) -> None:
         es_basicos = self._escuela_combo.currentData() == ESCUELA_ID_BASICOS
         self._tipo_combo.setVisible(es_basicos)
+        if not es_basicos:
+            self._prenda_combo.setVisible(False)
         self._pintar_ultimo()
         if es_basicos and self._tipos_pintados_con != self._ver_todas.isChecked():
             self._tipos_pintados_con = self._ver_todas.isChecked()
@@ -256,9 +274,39 @@ class ConteoNuevaJornadaDialog(QDialog):
 
             for t in tipos:
                 abierta = self._abiertas.get(("basicos", t))
-                if abierta is None and ultimo_conteo_de(self._ultimos, None, t).reciente() and not self._ver_todas.isChecked():
+                u = ultimo_conteo_de(self._ultimos, None, t)
+                if abierta is None and u.reciente() and not self._ver_todas.isChecked():
                     continue
-                self._tipo_combo.addItem(f"{t}   ·  EN PROCESO ({abierta.quien})" if abierta is not None else t, t)
+                estado = f"EN PROCESO ({abierta.quien})" if abierta is not None else u.texto()
+                self._tipo_combo.addItem(f"{t}   ·  {estado}", t)
+        self._on_tipo()
+
+    def _on_tipo(self, *_args) -> None:
+        """Llena el combo de prendas del tipo elegido, cada una con su última fecha."""
+        from pos_uniformes.services.conteo_jornada_service import nombre_corto_prenda, prendas_basicas, ultimo_conteo_de
+
+        tipo = str(self._tipo_combo.currentData() or "")
+        es_basicos = self._escuela_combo.currentData() == ESCUELA_ID_BASICOS
+        self._prenda_combo.blockSignals(True)
+        self._prenda_combo.clear()
+        if es_basicos and tipo:
+            u_tipo = ultimo_conteo_de(self._ultimos, None, tipo)
+            self._prenda_combo.addItem(f"Todas las de {tipo}   ·  {u_tipo.texto()}", "")
+            session = self._session_factory()
+            try:
+                prendas = prendas_basicas(session, tipo)
+            except Exception:  # noqa: BLE001
+                prendas = []
+            finally:
+                session.close()
+            for prenda in prendas:
+                abierta = self._abiertas.get(("basicos", tipo, prenda))
+                u = ultimo_conteo_de(self._ultimos, None, tipo, prenda)
+                estado = f"EN PROCESO ({abierta.quien})" if abierta is not None else u.texto()
+                self._prenda_combo.addItem(f"{nombre_corto_prenda(prenda)}   ·  {estado}", prenda)
+        self._prenda_combo.setVisible(es_basicos and self._prenda_combo.count() > 1)
+        self._prenda_combo.blockSignals(False)
+        self._pintar_ultimo()
 
     def _aceptar(self) -> None:
         dato = self._escuela_combo.currentData()
@@ -269,9 +317,12 @@ class ConteoNuevaJornadaDialog(QDialog):
             if not tipo:
                 QMessageBox.information(self, "Elige una prenda", "Los básicos se cuentan por prenda: elige cuál.")
                 return
+            from pos_uniformes.services.conteo_jornada_service import nombre_corto_prenda
+
             self.escuela_id = None
             self.tipo_pieza = str(tipo)
-            self.titulo = f"Básicos · {tipo}"
+            self.prenda = str(self._prenda_combo.currentData() or "")
+            self.titulo = f"Básicos · {nombre_corto_prenda(self.prenda)}" if self.prenda else f"Básicos · {tipo}"
         else:
             self.escuela_id = int(dato)
             self.tipo_pieza = ""
@@ -797,7 +848,7 @@ class ConteoRevisionDialog(QDialog):
     def _historia_escuela(self) -> None:
         EscuelaHistoriaDialog(
             self, escuela_id=self._jornada.escuela_id, tipo_pieza=getattr(self._jornada, "tipo_pieza", "") or "",
-            session_factory=self._session_factory,
+            prenda=getattr(self._jornada, "prenda", "") or "", session_factory=self._session_factory,
         ).exec()
 
     def _aplicar(self) -> None:
@@ -1064,12 +1115,13 @@ class EscuelaHistoriaDialog(QDialog):
     talla, qué se pide más y qué menos. Lo pidió Daniel el 2026-09-13:
     "más que historial de talla me viene bien un historial de escuela"."""
 
-    def __init__(self, parent: QWidget | None = None, *, escuela_id: int | None, tipo_pieza: str = "", session_factory: Callable[[], Session] | None = None) -> None:
+    def __init__(self, parent: QWidget | None = None, *, escuela_id: int | None, tipo_pieza: str = "", prenda: str = "", session_factory: Callable[[], Session] | None = None) -> None:
         super().__init__(parent)
         self.setStyleSheet(_ESTILO)
         self._session_factory = session_factory or _default_session_factory
         self._escuela_id = escuela_id
         self._tipo_pieza = tipo_pieza
+        self._prenda = prenda
         self.historia = None
 
         layout = QVBoxLayout()
@@ -1121,7 +1173,7 @@ class EscuelaHistoriaDialog(QDialog):
 
         session = self._session_factory()
         try:
-            self.historia = historia_de_escuela(session, self._escuela_id, self._tipo_pieza)
+            self.historia = historia_de_escuela(session, self._escuela_id, self._tipo_pieza, prenda=self._prenda)
         except Exception as exc:  # noqa: BLE001
             QMessageBox.warning(self, "Error", f"No se pudo leer la historia:\n{exc}")
             return

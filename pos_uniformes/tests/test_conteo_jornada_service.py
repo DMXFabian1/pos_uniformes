@@ -45,6 +45,31 @@ def _seed(session: Session, nombre: str, *, productos: int = 2, tallas=("6", "8"
     return e
 
 
+def _seed_basicos(session: Session, escuela, tipo: str, prendas=("Pantalón Gris Escolar", "Pantalón Azul Escolar"), tallas=("6", "8")):
+    """Productos básicos (sin escuela) de un tipo, ligados por catálogo a `escuela`."""
+    from pos_uniformes.database.models import CatalogSchoolProductLink, TipoPieza
+
+    tp = session.scalar(select(TipoPieza).where(TipoPieza.nombre == tipo))
+    if tp is None:
+        tp = TipoPieza(nombre=tipo)
+        session.add(tp)
+        session.flush()
+    cat = session.scalar(select(Categoria))
+    marca = session.scalar(select(Marca))
+    nombres = []
+    for nombre in prendas:
+        completo = f"{nombre} | Oficial | {tipo}"
+        prod = Producto(nombre=completo, nombre_base=nombre, categoria_id=cat.id, marca_id=marca.id, escuela_id=None, tipo_pieza_id=tp.id)
+        session.add(prod)
+        session.flush()
+        session.add(CatalogSchoolProductLink(escuela_id=escuela.id, producto_id=prod.id, activo=True))
+        for talla in tallas:
+            session.add(Variante(producto_id=prod.id, sku=f"B{prod.id}{talla}", talla=talla, color="X", precio_venta=100, stock_actual=5))
+        nombres.append(completo)
+    session.flush()
+    return nombres
+
+
 class JornadaTests(unittest.TestCase):
     def setUp(self) -> None:
         self.engine = create_engine("sqlite:///:memory:")
@@ -183,6 +208,53 @@ class JornadaTests(unittest.TestCase):
             jn.abrir_jornada(self.s, escuela_id=None, tipo_pieza="Playera", empleada_code="VEND-5")
         jn.abrir_jornada(self.s, escuela_id=None, tipo_pieza="Pants", empleada_code="VEND-5")
         self.assertIs(jn.abiertas_por_alcance(self.s)[("basicos", "Playera")], j)
+
+    def test_basicos_una_sola_prenda(self) -> None:
+        # Daniel (2026-09-14): "a veces no quiero contar todos los pantalones, solo un tipo o un color".
+        gris, azul = _seed_basicos(self.s, self.escuela, "Pantalón")
+        self.s.commit()
+        self.assertEqual(jn.prendas_basicas(self.s, "Pantalón"), [azul, gris])   # orden alfabético
+        self.assertEqual([g["producto_nombre"] for g in jn.alcance(self.s, None, "Pantalón", gris)], [gris])
+        j = jn.abrir_jornada(self.s, escuela_id=None, tipo_pieza="Pantalón", prenda=gris, empleada_code="VEND-4", empleada_nombre="Stayce")
+        self.assertEqual((j.prenda, j.titulo, j.total_tallas), (gris, "Básicos · Pantalón Gris Escolar", 2))
+        self.assertEqual(jn.ref(j).prenda, gris)
+        # Otra prenda del mismo tipo sí puede abrirse a la vez; todo el tipo, no.
+        jn.abrir_jornada(self.s, escuela_id=None, tipo_pieza="Pantalón", prenda=azul, empleada_code="VEND-5")
+        with self.assertRaises(jn.JornadaEnProceso):
+            jn.abrir_jornada(self.s, escuela_id=None, tipo_pieza="Pantalón", empleada_code="VEND-5")
+        with self.assertRaises(jn.JornadaEnProceso):
+            jn.abrir_jornada(self.s, escuela_id=None, tipo_pieza="Pantalón", prenda=gris, empleada_code="VEND-5")
+        self.assertIn(("basicos", "Pantalón", gris), jn.abiertas_por_alcance(self.s))
+        # La hoja y el avance ven solo esa prenda.
+        hoja = jn.hoja_de_jornada(self.s, j)
+        self.assertEqual([p["nombre"] for p in hoja["prendas"]], ["Pantalón Gris Escolar"])   # nombre corto
+        self.assertEqual(jn.avance(self.s, j).tallas_total, 2)
+        # Y al terminarla, la prenda (y el tipo) saben cuándo se contó; la otra prenda, no.
+        jn.terminar_jornada(self.s, j, empleada_code="VEND-4")
+        self.s.commit()
+        u = jn.ultimos_conteos(self.s)
+        self.assertEqual(jn.ultimo_conteo_de(u, None, "Pantalón", gris).texto(), "hoy (Stayce)")
+        self.assertEqual(jn.ultimo_conteo_de(u, None, "Pantalón").texto(), "hoy (Stayce)")
+        self.assertEqual(jn.ultimo_conteo_de(u, None, "Pantalón", azul).texto(), "nunca")
+
+    def test_todo_el_tipo_abierto_bloquea_una_prenda(self) -> None:
+        gris, _azul = _seed_basicos(self.s, self.escuela, "Pantalón")
+        self.s.commit()
+        jn.abrir_jornada(self.s, escuela_id=None, tipo_pieza="Pantalón", empleada_code="VEND-4")
+        with self.assertRaises(jn.JornadaEnProceso):
+            jn.abrir_jornada(self.s, escuela_id=None, tipo_pieza="Pantalón", prenda=gris, empleada_code="VEND-5")
+
+    def test_basicos_sin_jornada_recuerdan_la_fecha_de_sus_tallas(self) -> None:
+        from datetime import datetime, timedelta
+
+        gris, azul = _seed_basicos(self.s, self.escuela, "Pantalón")
+        v = self.s.scalar(select(Variante).where(Variante.sku.like("B%")).order_by(Variante.id))
+        v.ultimo_conteo_at = datetime.now() - timedelta(days=5)
+        self.s.commit()
+        u = jn.ultimos_conteos(self.s)
+        contada = next(n for n in (gris, azul) if n.startswith(v.producto.nombre_base))
+        self.assertEqual(jn.ultimo_conteo_de(u, None, "Pantalón", contada).texto(), "hace 5 días")
+        self.assertEqual(jn.ultimo_conteo_de(u, None, "Pantalón").texto(), "hace 5 días")
 
     def test_terminar_no_toca_el_inventario(self) -> None:
         j = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4")

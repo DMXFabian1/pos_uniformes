@@ -177,9 +177,13 @@ def build_conteo_sheets_basicos(
     session,
     fecha: str | None = None,
     tipo_pieza: str | None = None,
+    prenda: str | None = None,
 ) -> list[str]:
-    """Hojas de conteo para productos básicos (ligados por catálogo, sin escuela directa)."""
+    """Hojas de conteo para productos básicos (ligados por catálogo, sin escuela directa).
+    `prenda`: solo ese producto (nombre completo)."""
     grupos = obtener_variantes_basicos_agrupadas(session, tipo_pieza=tipo_pieza)
+    if prenda:
+        grupos = [g for g in grupos if str(g.get("producto_nombre") or "") == prenda]
     if not grupos:
         return []
 

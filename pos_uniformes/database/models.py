@@ -1106,6 +1106,8 @@ class ConteoJornada(Base):
         ForeignKey("escuela.id", ondelete="RESTRICT"), nullable=True, index=True
     )
     tipo_pieza: Mapped[str] = mapped_column(String(60), nullable=False, default="")
+    # Una sola prenda de básicos (nombre del producto); "" = todo el tipo (2026-09-14).
+    prenda: Mapped[str] = mapped_column(String(200), nullable=False, default="", server_default="")
     titulo: Mapped[str] = mapped_column(String(160), nullable=False, default="")
     empleada_code: Mapped[str] = mapped_column(String(40), nullable=False, index=True)
     empleada_nombre: Mapped[str] = mapped_column(String(120), nullable=False, default="")
