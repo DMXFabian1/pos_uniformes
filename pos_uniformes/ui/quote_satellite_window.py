@@ -2513,6 +2513,14 @@ class QuoteSatelliteWindow(QMainWindow):
         momento_btn.setAutoDefault(False)
         momento_btn.clicked.connect(lambda: self._ver_momento_libreta(row))
         botones.addWidget(momento_btn)
+        # Reimprimir desde aquí (Daniel 2026-09-14): copia del ticket, no
+        # registra nada. Los abonos no tienen ticket.
+        if str(row.tipo) != "abono":
+            reimprimir_btn = QPushButton("🖨 Reimprimir ticket")
+            reimprimir_btn.setObjectName("secondaryButton")
+            reimprimir_btn.setAutoDefault(False)
+            reimprimir_btn.clicked.connect(lambda: self._reimprimir_row_libreta(row))
+            botones.addWidget(reimprimir_btn)
         botones.addStretch()
         cerrar = QPushButton("Cerrar")
         cerrar.setAutoDefault(False)
@@ -2815,7 +2823,13 @@ class QuoteSatelliteWindow(QMainWindow):
                 "Selecciona en MOVIMIENTOS el ticket que quieres reimprimir.",
             )
             return
-        row = rows[idx]
+        self._reimprimir_row_libreta(rows[idx])
+
+    def _reimprimir_row_libreta(self, row) -> bool:
+        """Reimprime el ticket de una operación (copia con la fecha de
+        entonces y la leyenda REIMPRESION). NO registra nada. Lo usan el
+        botón de MOVIMIENTOS (dueño) y el detalle de la operación (todas:
+        el cliente que perdió su ticket lo pide en el mostrador)."""
         texto = self.quick_sale_widget.build_reprint_ticket(
             tipo=str(row.tipo),
             detalle=list(row.detalle or []),
@@ -2828,11 +2842,12 @@ class QuoteSatelliteWindow(QMainWindow):
             QMessageBox.information(
                 self, "Sin ticket", "Los abonos no generan ticket para reimprimir."
             )
-            return
+            return False
         from pos_uniformes.ui.helpers.ticket_routing_helper import route_tickets
 
         # Sin on_printed: reimprimir jamás vuelve a registrar la venta.
         route_tickets(self, "Reimpresión de ticket", [texto])
+        return True
 
     def _borrar_registro_libreta(self) -> None:
         """Borra el registro seleccionado en MOVIMIENTOS (solo dueño).

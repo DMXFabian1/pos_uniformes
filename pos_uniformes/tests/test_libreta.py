@@ -1519,14 +1519,18 @@ class ReimprimirDesdeLibretaTests(unittest.TestCase):
     """El botón del dueño reimprime SIN on_printed (no re-registra)."""
 
     def _fake(self, row, owner=True, idx=0):
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
         widget = MagicMock()
         widget.build_reprint_ticket.return_value = "TEXTO DEL TICKET"
-        return SimpleNamespace(
+        fake = SimpleNamespace(
             _libreta_is_owner=owner,
             _libreta_rows_pintadas=[row],
             libreta_table=SimpleNamespace(currentRow=lambda: idx),
             quick_sale_widget=widget,
         )
+        fake._reimprimir_row_libreta = lambda r: QuoteSatelliteWindow._reimprimir_row_libreta(fake, r)
+        return fake
 
     def test_reimprime_sin_registrar(self) -> None:
         from datetime import datetime
@@ -1544,7 +1548,7 @@ class ReimprimirDesdeLibretaTests(unittest.TestCase):
         self.assertEqual(ruta.call_args.args[2], ["TEXTO DEL TICKET"])
         self.assertNotIn("on_printed", ruta.call_args.kwargs)  # jamás re-registra
 
-    def test_empleada_no_puede_reimprimir(self) -> None:
+    def test_empleada_no_puede_reimprimir_desde_movimientos(self) -> None:
         from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
 
         fake = self._fake(SimpleNamespace(), owner=False)
@@ -1552,6 +1556,28 @@ class ReimprimirDesdeLibretaTests(unittest.TestCase):
             QuoteSatelliteWindow._reimprimir_ticket_libreta(fake)
         ruta.assert_not_called()
         fake.quick_sale_widget.build_reprint_ticket.assert_not_called()
+
+    def test_desde_el_detalle_cualquiera_reimprime_menos_abonos(self) -> None:
+        # Daniel (2026-09-14): botón de reimpresión también en "Detalle de la
+        # operación". El cliente que perdió su ticket lo pide en el mostrador.
+        from datetime import datetime
+
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        row = SimpleNamespace(
+            tipo="venta", detalle=[{"sku": "S"}], cliente=None, employee_name="Cristal",
+            employee_code="VEND-5", descuento_empleada=False, created_at=datetime(2026, 9, 14, 13, 10),
+        )
+        fake = self._fake(row, owner=False)
+        with patch("pos_uniformes.ui.helpers.ticket_routing_helper.route_tickets") as ruta:
+            self.assertTrue(QuoteSatelliteWindow._reimprimir_row_libreta(fake, row))
+        ruta.assert_called_once()
+        self.assertNotIn("on_printed", ruta.call_args.kwargs)
+        fake.quick_sale_widget.build_reprint_ticket.return_value = ""   # abono: sin ticket
+        with patch("pos_uniformes.ui.helpers.ticket_routing_helper.route_tickets") as ruta, \
+             patch("pos_uniformes.ui.quote_satellite_window.QMessageBox.information"):
+            self.assertFalse(QuoteSatelliteWindow._reimprimir_row_libreta(fake, row))
+        ruta.assert_not_called()
 
 
 
