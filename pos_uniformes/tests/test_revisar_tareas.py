@@ -25,3 +25,16 @@ class RevisarTareasTests(unittest.TestCase):
 
     def test_csv_vacio_no_truena(self) -> None:
         self.assertEqual(tareas_del_pos(""), [])
+
+    def test_windows_en_espanol_con_el_acento_roto(self) -> None:
+        # 2026-09-14: en la PC de Daniel la columna llegaba como 'Tarea que se ejecutar\xe1'
+        # mal decodificada y TODAS salían como "abre ventana".
+        csv_es = (
+            '"Nombre de host","Nombre de tarea","Pr\xf3xima ejecuci\xf3n","Estado","Tarea que se ejecutar\ufffd"\n'
+            '"PC","\\\\POS Asistencia","15/09/2026 11:00","Listo","wscript.exe \\"C:\\\\pos\\\\scripts\\\\correr_oculto.vbs\\" resumen_diario_telegram.bat --asistencia"\n'
+            '"PC","\\\\POS Corte 1630","14/09/2026 16:30","Listo","\\"C:\\\\pos\\\\scripts\\\\corte_automatico.bat\\""\n'
+        )
+        tareas = dict(tareas_del_pos(csv_es))
+        self.assertIn("correr_oculto.vbs", tareas["POS Asistencia"])
+        culpables = [n for n, o in tareas.items() if abre_ventana(o)]
+        self.assertEqual(culpables, ["POS Corte 1630"])

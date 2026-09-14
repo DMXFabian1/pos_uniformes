@@ -18,13 +18,30 @@ PREFIJO = "POS "
 OCULTO = "correr_oculto.vbs"
 
 
+def _plano(texto: str) -> str:
+    """Sin acentos ni mayúsculas: el Windows en español devuelve 'Tarea que se
+    ejecutará' y según la consola el acento llega roto (2026-09-14: por eso
+    todas las tareas salían como 'abre ventana')."""
+    import unicodedata
+
+    sin = unicodedata.normalize("NFKD", texto or "").encode("ascii", "ignore").decode()
+    return sin.strip().lower()
+
+
+def _columna(fila: dict, *prefijos: str) -> str:
+    for clave, valor in fila.items():
+        if any(_plano(clave).startswith(p) for p in prefijos):
+            return (valor or "").strip()
+    return ""
+
+
 def tareas_del_pos(salida_csv: str) -> list[tuple[str, str]]:
     """(nombre, orden) de las tareas del POS, leyendo el CSV de schtasks (puro)."""
     filas = list(csv.DictReader(io.StringIO(salida_csv)))
     vistas: dict[str, str] = {}
     for fila in filas:
-        nombre = (fila.get("TaskName") or fila.get("Nombre de tarea") or "").strip().lstrip("\\")
-        orden = (fila.get("Task To Run") or fila.get("Tarea que se ejecutará") or "").strip()
+        nombre = _columna(fila, "taskname", "nombre de tarea").lstrip("\\")
+        orden = _columna(fila, "task to run", "tarea que se ejecutar")
         if nombre.startswith(PREFIJO) and nombre not in vistas:
             vistas[nombre] = orden
     return sorted(vistas.items())

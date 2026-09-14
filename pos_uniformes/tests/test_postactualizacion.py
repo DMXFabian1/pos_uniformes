@@ -80,7 +80,7 @@ class AplicarTests(unittest.TestCase):
         self.assertIn("POS Snapshot Casa", con)
 
     def test_la_version_subio_para_que_se_aplique_al_actualizar(self) -> None:
-        self.assertGreaterEqual(post.INFRA_VERSION, 5)
+        self.assertGreaterEqual(post.INFRA_VERSION, 6)
 
     def test_el_contador_de_afluencia_va_oculto_y_solo_si_esta_instalado(self) -> None:
         sin = [t.nombre for t in post.tareas_esperadas(hay_telegram=False, resumen_a_hora_fija=False)]
@@ -92,6 +92,21 @@ class AplicarTests(unittest.TestCase):
         self.assertIn("correr_oculto.vbs", comando)
         self.assertIn("afluencia", comando)
         self.assertIn("contador_afluencia.bat", comando)
+
+    def test_las_tareas_del_corte_van_ocultas_si_estaban_instaladas(self) -> None:
+        # 2026-09-14: en la PC principal 'POS Corte 1630/1730' corrian el .bat
+        # directo y eran la ventana negra.
+        sin = [t.nombre for t in post.tareas_esperadas(hay_telegram=True, resumen_a_hora_fija=False)]
+        self.assertNotIn("POS Corte 1630", sin)
+        con = {t.nombre: t for t in post.tareas_esperadas(hay_telegram=True, resumen_a_hora_fija=False, corte=True)}
+        for nombre, hora in (("POS Corte 1630", "16:30"), ("POS Corte 1730", "17:30"), ("POS Corte recordatorio 1650", "16:50"), ("POS Corte recordatorio 1750", "17:50")):
+            t = con[nombre]
+            self.assertEqual(t.schedule, ("/SC", "DAILY", "/ST", hora))
+            comando = " ".join(t.comando(Path("C:/x/scripts")))
+            self.assertIn("correr_oculto.vbs", comando)
+            self.assertIn("corte_automatico.bat", comando)
+        self.assertIn("--recordar", " ".join(con["POS Corte recordatorio 1650"].comando(Path("C:/x/scripts"))))
+        self.assertNotIn("--recordar", " ".join(con["POS Corte 1630"].comando(Path("C:/x/scripts"))))
 
     def test_con_telegram_manda_la_asistencia_a_las_11(self) -> None:
         tareas = {t.nombre: t for t in post.tareas_esperadas(hay_telegram=True, resumen_a_hora_fija=False)}

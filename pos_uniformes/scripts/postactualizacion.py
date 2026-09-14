@@ -37,7 +37,7 @@ from pathlib import Path
 #   4 = "POS Asistencia": la lista de quién vino, a las 11:00 (2026-09-12)
 #   5 = "POS Afluencia" (el contador de personas) también oculta; su instalador
 #       la creaba con consola visible "que había que dejar abierta" (2026-09-13)
-INFRA_VERSION = 5
+INFRA_VERSION = 6
 
 # Tareas que ya no van (las crearon versiones anteriores).
 TAREAS_OBSOLETAS = (
@@ -67,7 +67,7 @@ class Tarea:
         return ["schtasks", "/Create", "/F", "/TN", self.nombre, *self.schedule, "/TR", " ".join(partes)]
 
 
-def tareas_esperadas(*, hay_telegram: bool, resumen_a_hora_fija: bool, snapshot_casa: bool = False, afluencia: bool = False) -> list[Tarea]:
+def tareas_esperadas(*, hay_telegram: bool, resumen_a_hora_fija: bool, snapshot_casa: bool = False, afluencia: bool = False, corte: bool = False) -> list[Tarea]:
     """Las tareas que deben existir en esta PC (puro, testeable).
 
     `snapshot_casa`: la copia de la Libreta a la PC de la casa cada 15 min
@@ -84,6 +84,14 @@ def tareas_esperadas(*, hay_telegram: bool, resumen_a_hora_fija: bool, snapshot_
         # El .bat vive en afluencia\, no en scripts\: correr_oculto.vbs arma la
         # ruta relativa a scripts\, por eso el "..\afluencia\".
         tareas.append(Tarea("POS Afluencia", ("/SC", "ONLOGON"), "..\\afluencia\\contador_afluencia.bat"))
+    if corte:
+        # El corte propuesto (2026-09-14: en la PC de Daniel estaban creadas
+        # con el .bat directo, y eran LA ventana negra). Mismas horas que
+        # instalar_corte_propuesto.bat; se recrean ocultas.
+        tareas.append(Tarea("POS Corte 1630", ("/SC", "DAILY", "/ST", "16:30"), "corte_automatico.bat"))
+        tareas.append(Tarea("POS Corte 1730", ("/SC", "DAILY", "/ST", "17:30"), "corte_automatico.bat"))
+        tareas.append(Tarea("POS Corte recordatorio 1650", ("/SC", "DAILY", "/ST", "16:50"), "corte_automatico.bat", ("--recordar",)))
+        tareas.append(Tarea("POS Corte recordatorio 1750", ("/SC", "DAILY", "/ST", "17:50"), "corte_automatico.bat", ("--recordar",)))
     if hay_telegram and not resumen_a_hora_fija:
         # El resumen sale 15 min antes de cerrar; el script decide cuál toca.
         tareas.append(Tarea("POS Resumen 1645", ("/SC", "DAILY", "/ST", "16:45"), "resumen_diario_telegram.bat", ("--si-toca",)))
@@ -186,7 +194,9 @@ def aplicar(*, forzar: bool = False) -> list[str]:
         snapshot = existe_tarea("POS Snapshot Casa")
         # El contador de personas solo si está instalado en esta PC (tiene su venv).
         afluencia = existe_tarea("POS Afluencia") or (scripts_dir().parent / "afluencia" / ".venv").exists()
-        for t in tareas_esperadas(hay_telegram=hay_telegram(), resumen_a_hora_fija=fijo, snapshot_casa=snapshot, afluencia=afluencia):
+        # El corte propuesto solo si Daniel ya lo tenía instalado (cualquiera de sus tareas).
+        corte = existe_tarea("POS Corte 1630") or existe_tarea("POS Corte 1730")
+        for t in tareas_esperadas(hay_telegram=hay_telegram(), resumen_a_hora_fija=fijo, snapshot_casa=snapshot, afluencia=afluencia, corte=corte):
             hechos.append(f"tarea al dia: {t.nombre}" if crear_tarea(t) else f"NO se pudo crear: {t.nombre}")
         marcar_aplicada()
         hechos.append(f"infraestructura en la version {INFRA_VERSION}")
