@@ -421,8 +421,12 @@ def avance(session: Session, jornada: ConteoJornada) -> Avance:
         if g["variantes"] and all(v.variante_id in hechas for v in g["variantes"])
     )
     total = sum(len(g["variantes"]) for g in grupos) or jornada.total_tallas
+    # Solo las tallas que siguen en el alcance: si la escuela se partió en
+    # dos después (Práxedis, 2026-09-14), la jornada vieja no dice "94 de 38".
+    en_alcance = {v.variante_id for g in grupos for v in g["variantes"]}
+    tallas_hechas = sum(1 for vid in hechas if vid in en_alcance) if en_alcance else len(hechas)
     return Avance(
-        tallas_hechas=len(hechas),
+        tallas_hechas=tallas_hechas,
         tallas_total=total,
         prendas_hechas=prendas_hechas,
         prendas_total=prendas_total,
