@@ -605,7 +605,7 @@ class EncargadoMovilTests(unittest.TestCase):
             })
         self.assertEqual(r.status_code, 200, r.text)
         texto = self.session.query(Trabajo).one().contenido["texto"]
-        self.assertNotIn("Con tarjeta", texto)
+        self.assertNotIn("Tarjeta, llega", texto)
         self.assertNotIn("705", texto)
 
     def test_corte_del_dueno_por_defecto_imprime_la_tarjeta(self) -> None:
@@ -630,7 +630,7 @@ class EncargadoMovilTests(unittest.TestCase):
             })
         self.assertEqual(r.status_code, 200, r.text)
         texto = self.session.query(Trabajo).one().contenido["texto"]
-        self.assertIn("Con tarjeta", texto)
+        self.assertIn("Tarjeta, llega", texto)
 
     def test_ocultar_deja_el_movimiento_fuera_de_lo_que_ve_el_encargado(self) -> None:
         """No es solo el papel: para el encargado ese cobro no existe."""
@@ -687,7 +687,7 @@ class EncargadoMovilTests(unittest.TestCase):
         ):
             self.client.post("/api/v1/movil/encargado/corte", json={})
         texto = self.session.query(Trabajo).order_by(Trabajo.id.desc()).first().contenido["texto"]
-        self.assertNotIn("Con tarjeta", texto)
+        self.assertNotIn("Tarjeta, llega", texto)
         self.assertNotIn("705", texto)
         pago = self.session.query(EmpleadaPago).order_by(EmpleadaPago.id.desc()).first()
         self.assertEqual(pago.comisiones, 4)  # el pago no se recorta por ocultar
