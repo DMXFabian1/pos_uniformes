@@ -658,6 +658,84 @@ def ultimos_conteos(session: Session) -> dict:
     return salida
 
 
+@dataclass(frozen=True)
+class FilaTablero:
+    """Una escuela (o prenda básica) en el tablero de Conteos: cuándo se contó
+    por última vez, quién, cuántas tallas y en qué quedó."""
+
+    titulo: str
+    escuela_id: int | None
+    tipo_pieza: str
+    ultimo: UltimoConteo
+    tallas: str            # "51 de 52", "" si no hay jornada
+    estado: str            # "Aplicada" / "Por revisar" / "Descartada" / "Conteo viejo" / "Nunca" / "En proceso"
+    quien_en_proceso: str  # nombre si hay jornada abierta
+
+    @property
+    def dias(self) -> int | None:
+        return self.ultimo.dias()
+
+
+def tablero_conteos(session: Session) -> list[FilaTablero]:
+    """TODAS las escuelas y prendas básicas con su último conteo (Daniel,
+    2026-09-14: "sé que esas no son todas las escuelas que se han contado").
+    Orden: en proceso primero, luego de la contada más reciente a la más
+    vieja, y al final las que nunca se han contado."""
+    from pos_uniformes.services.catalog_school_link_service import list_all_schools
+    from pos_uniformes.services.conteo_service import obtener_variantes_basicos_agrupadas
+
+    ultimos = ultimos_conteos(session)
+    abiertas = abiertas_por_alcance(session)
+    # Última jornada terminada por alcance: tallas y estado.
+    ultimas: dict = {}
+    for j in session.scalars(
+        select(ConteoJornada).where(ConteoJornada.terminada_at.is_not(None)).order_by(ConteoJornada.terminada_at.desc())
+    ).all():
+        clave = ("basicos", j.tipo_pieza) if j.escuela_id is None else int(j.escuela_id)
+        if clave not in ultimas:
+            ultimas[clave] = j
+
+    def fila(titulo: str, escuela_id: int | None, tipo_pieza: str, clave) -> FilaTablero:
+        u = ultimos.get(clave, UltimoConteo(None))
+        j = ultimas.get(clave)
+        abierta = abiertas.get(clave)
+        if j is not None:
+            a = avance(session, j)
+            tallas = f"{a.tallas_hechas} de {a.tallas_total}"
+            estado = estado_de(j)
+        elif u.fecha is not None:
+            tallas, estado = "", "Conteo viejo"
+        else:
+            tallas, estado = "", "Nunca"
+        quien = ""
+        if abierta is not None:
+            quien = abierta.empleada_nombre or abierta.empleada_code
+            estado = "En proceso"
+        return FilaTablero(titulo, escuela_id, tipo_pieza, u, tallas, estado, quien)
+
+    filas: list[FilaTablero] = []
+    for e in list_all_schools(session):
+        eid = int(e["escuela_id"])
+        filas.append(fila(str(e["escuela_nombre"]), eid, "", eid))
+    try:
+        grupos = obtener_variantes_basicos_agrupadas(session)
+        tipos = sorted({g["tipo_pieza"] for g in grupos if not g.get("virtual") and g["tipo_pieza"]})
+    except Exception:  # noqa: BLE001
+        tipos = []
+    for t in tipos:
+        filas.append(fila(f"Básicos · {t}", None, t, ("basicos", t)))
+
+    def orden(f: FilaTablero):
+        if f.quien_en_proceso:
+            return (0, 0)
+        if f.ultimo.fecha is None:
+            return (2, 0)
+        return (1, -(f.ultimo.fecha.timestamp()))
+
+    filas.sort(key=orden)
+    return filas
+
+
 def ultimo_conteo_de(ultimos: dict, escuela_id: int | None, tipo_pieza: str = "") -> UltimoConteo:
     clave = int(escuela_id) if escuela_id is not None else ("basicos", tipo_pieza or "")
     return ultimos.get(clave, UltimoConteo(None))

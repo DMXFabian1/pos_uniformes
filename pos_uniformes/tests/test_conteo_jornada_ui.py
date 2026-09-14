@@ -133,7 +133,7 @@ class TarjetasTests(unittest.TestCase):
 
         from PyQt6.QtWidgets import QTableWidget
 
-        tabla = QTableWidget(0, 5, self.padre)
+        tabla = QTableWidget(0, 6, self.padre)
         ahora = datetime.now()
         recientes = [
             (_foto(id=1, terminada_at=ahora), _avance(14, 14, 128, 128)),                      # por revisar
@@ -142,10 +142,31 @@ class TarjetasTests(unittest.TestCase):
         ]
         tarjetas.pintar_historial(tabla, recientes)
         self.assertEqual(tabla.rowCount(), 3)
-        self.assertEqual([tabla.item(i, 4).text() for i in range(3)], ["Por revisar", "Aplicada", "Descartada"])
-        self.assertEqual(tabla.item(0, 3).text(), "128 de 128")
+        self.assertEqual([tabla.item(i, 5).text() for i in range(3)], ["Por revisar", "Aplicada", "Descartada"])
+        self.assertEqual(tabla.item(0, 4).text(), "128 de 128")
         tarjetas.pintar_historial(tabla, [])
         self.assertIn("Todavía no hay", tabla.item(0, 0).text())
+
+    def test_el_tablero_pinta_todas_las_escuelas(self) -> None:
+        from datetime import timedelta
+
+        from PyQt6.QtWidgets import QTableWidget
+
+        tabla = QTableWidget(0, 6, self.padre)
+        ahora = datetime.now()
+        filas = [
+            jn.FilaTablero("Bicentenario", 3, "", jn.UltimoConteo(None), "", "En proceso", "Fanny Ortiz"),
+            jn.FilaTablero("Práxedis Guerrero", 1, "", jn.UltimoConteo(ahora - timedelta(days=1), "Stayce Chavarria"), "94 de 94", "Aplicada", ""),
+            jn.FilaTablero("CECYTE", 2, "", jn.UltimoConteo(ahora - timedelta(days=40), ""), "", "Conteo viejo", ""),
+            jn.FilaTablero("Básicos · Playera", None, "Playera", jn.UltimoConteo(None), "", "Nunca", ""),
+        ]
+        tarjetas.pintar_historial(tabla, filas)
+        self.assertEqual(tabla.rowCount(), 4)
+        self.assertEqual([tabla.item(i, 0).text() for i in range(4)], ["Bicentenario", "Práxedis Guerrero", "CECYTE", "Básicos · Playera"])
+        self.assertEqual(tabla.item(0, 5).text(), "En proceso · Fanny Ortiz")
+        self.assertEqual((tabla.item(1, 1).text(), tabla.item(1, 3).text(), tabla.item(1, 4).text(), tabla.item(1, 5).text()), ("ayer", "Stayce Chavarria", "94 de 94", "Aplicada"))
+        self.assertEqual(tabla.item(2, 1).text(), "hace 1 mes")
+        self.assertEqual((tabla.item(3, 1).text(), tabla.item(3, 5).text()), ("nunca", "Nunca"))
 
 
 class RevisionDialogTests(unittest.TestCase):

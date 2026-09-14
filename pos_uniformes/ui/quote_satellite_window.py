@@ -3482,14 +3482,16 @@ class QuoteSatelliteWindow(QMainWindow):
         self.conteos_revisar_panel.setVisible(False)
         layout.addWidget(self.conteos_revisar_panel)
 
-        # Historial: las últimas jornadas terminadas, en tabla como la Libreta.
-        historial_titulo = QLabel("HISTORIAL  ·  últimos conteos terminados")
+        # Tablero: TODAS las escuelas y prendas básicas con su último conteo
+        # (antes eran solo las 8 jornadas más recientes, y Daniel no veía las
+        # demás — 2026-09-14).
+        historial_titulo = QLabel("ESCUELAS Y BÁSICOS  ·  cuándo se contó cada una")
         historial_titulo.setObjectName("libretaSeccion")
         layout.addWidget(historial_titulo)
-        self.conteos_historial_table = QTableWidget(0, 5)
+        self.conteos_historial_table = QTableWidget(0, 6)
         self.conteos_historial_table.setObjectName("libretaTabla")
         self.conteos_historial_table.setHorizontalHeaderLabels(
-            ["Escuela / prenda", "Quién", "Terminada", "Tallas", "Estado"]
+            ["Escuela / prenda", "Último conteo", "Fecha", "Quién", "Tallas", "Estado"]
         )
         self.conteos_historial_table.verticalHeader().setVisible(False)
         self.conteos_historial_table.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
@@ -3499,7 +3501,7 @@ class QuoteSatelliteWindow(QMainWindow):
         self.conteos_historial_table.setMinimumHeight(180)
         hh = self.conteos_historial_table.horizontalHeader()
         hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
-        for col in (1, 2, 3, 4):
+        for col in (1, 2, 3, 4, 5):
             hh.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
         layout.addWidget(self.conteos_historial_table, 1)
 
@@ -3646,9 +3648,7 @@ class QuoteSatelliteWindow(QMainWindow):
                     [(jn.ref(j), jn.avance(session, j)) for j in jn.jornadas_por_revisar(session)]
                     if code == jn.DUENO_CODE else []
                 )
-                recientes = [
-                    (jn.ref(j), jn.avance(session, j)) for j in jn.jornadas_recientes(session)
-                ]
+                recientes = jn.tablero_conteos(session)
         except Exception:  # noqa: BLE001 — sin conexión: la página sigue
             logger.exception("Conteos: no se pudieron leer las jornadas")
             abiertas, por_revisar, recientes = [], [], []

@@ -154,6 +154,29 @@ class JornadaTests(unittest.TestCase):
         self.assertEqual((j.empleada_code, j.quien if hasattr(j, "quien") else j.empleada_nombre), ("VEND-5", "Fanny Ortiz"))
         self.assertEqual(self.s.scalars(select(ConteoInventario)).one().contado_por, "Stayce (VEND-4)")
 
+    def test_el_tablero_trae_todas_las_escuelas_en_orden(self) -> None:
+        from datetime import datetime, timedelta
+
+        dos = _seed(self.s, "Dos")
+        tres = _seed(self.s, "Tres")
+        self.s.commit()
+        # Uno: jornada aplicada ayer. Dos: en proceso. Tres: nunca.
+        j = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4", empleada_nombre="Stayce")
+        v = self._variantes()
+        registrar_conteos_lote(self.s, [ConteoInput(v[0].id, 3)], "x", jornada_id=j.id)
+        jn.terminar_jornada(self.s, j, empleada_code="VEND-4")
+        jn.aplicar_jornada(self.s, j, revisada_por="VEND-1")
+        self.s.commit()
+        j.terminada_at = datetime.now() - timedelta(days=1)
+        self.s.commit()
+        jn.abrir_jornada(self.s, escuela_id=dos.id, empleada_code="VEND-5", empleada_nombre="Fanny")
+        self.s.commit()
+        filas = jn.tablero_conteos(self.s)
+        self.assertEqual([f.titulo for f in filas], ["Dos", "Uno", "Tres"])
+        self.assertEqual((filas[0].estado, filas[0].quien_en_proceso), ("En proceso", "Fanny"))
+        self.assertEqual((filas[1].estado, filas[1].tallas, filas[1].ultimo.quien), ("Aplicada", "1 de 4", "Stayce"))
+        self.assertEqual((filas[2].estado, filas[2].tallas, filas[2].dias), ("Nunca", "", None))
+
     def test_basicos_una_abierta_por_prenda(self) -> None:
         j = jn.abrir_jornada(self.s, escuela_id=None, tipo_pieza="Playera", empleada_code="VEND-4")
         with self.assertRaises(jn.JornadaEnProceso):

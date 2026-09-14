@@ -182,28 +182,40 @@ def pintar_jornadas(window, *, abiertas, por_revisar, code: str, recientes=()) -
         pintar_historial(tabla, recientes)
 
 
-def pintar_historial(tabla, recientes) -> None:
-    """Las últimas jornadas terminadas, una fila cada una."""
+def pintar_historial(tabla, filas) -> None:
+    """El tablero: cada escuela y prenda básica con su último conteo
+    (`FilaTablero`), o las jornadas recientes `(JornadaRef, Avance)` de antes."""
     from PyQt6.QtGui import QBrush, QColor
     from PyQt6.QtWidgets import QTableWidgetItem
 
     from pos_uniformes.services.conteo_jornada_service import cuando
 
-    colores = {"Aplicada": "#166534", "Descartada": "#8a8177", "Por revisar": "#b9770e"}
-    filas = list(recientes)
+    colores = {
+        "Aplicada": "#166534", "Descartada": "#8a8177", "Por revisar": "#b9770e",
+        "En proceso": "#b45309", "Nunca": "#b91c1c", "Conteo viejo": "#8a8177",
+    }
+    filas = list(filas)
     tabla.setRowCount(len(filas))
-    for i, (foto, avance) in enumerate(filas):
-        estado = foto.estado
-        valores = (
-            foto.titulo, foto.quien, cuando(foto.terminada_at),
-            f"{avance.tallas_hechas} de {avance.tallas_total}", estado,
-        )
+    for i, f in enumerate(filas):
+        if isinstance(f, tuple):   # formato viejo: (JornadaRef, Avance)
+            foto, avance = f
+            valores = (foto.titulo, cuando(foto.terminada_at), "", foto.quien, f"{avance.tallas_hechas} de {avance.tallas_total}", foto.estado)
+            estado = foto.estado
+        else:
+            u = f.ultimo
+            fecha = u.fecha.astimezone().strftime("%d/%m/%Y") if u.fecha is not None and u.fecha.tzinfo else (u.fecha.strftime("%d/%m/%Y") if u.fecha is not None else "")
+            hace = u.texto().split(" (")[0] if u.fecha is not None else "nunca"
+            quien = f.quien_en_proceso or u.quien
+            valores = (f.titulo, hace, fecha, quien, f.tallas, f.estado + (f" · {f.quien_en_proceso}" if f.quien_en_proceso else ""))
+            estado = f.estado
         for col, txt in enumerate(valores):
             item = QTableWidgetItem(txt)
-            if col in (2, 3, 4):
+            if col in (1, 2, 4, 5):
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
-            if col == 4:
+            if col == 5:
                 item.setForeground(QBrush(QColor(colores.get(estado, "#2c2a27"))))
+            if col == 1 and estado == "Nunca":
+                item.setForeground(QBrush(QColor("#b91c1c")))
             tabla.setItem(i, col, item)
     if not filas:
         tabla.setRowCount(1)
