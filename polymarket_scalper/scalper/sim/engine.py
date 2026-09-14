@@ -19,6 +19,8 @@ from ..models import GameState, ModelRegistry, WinProb, match_outcome, parse_gam
 from ..evaluacion import minimos_requeridos
 from ..micro import instantanea
 from ..models.crypto import UpDownModel, UpDownState
+from .. import pata as pata_mod
+from ..pata import PataSuelta
 from ..reaction import ReactionEngine
 from ..salud import CONTAMINADOS, Salud, Umbrales, evaluar as evaluar_salud
 from ..signals import MarketContext, Signal, build_detectors
@@ -47,6 +49,10 @@ class Engine:
         self._ultima_decision: dict[tuple[str, str, str], int] = {}
         self._seguidas: list[Position] = []        # posiciones cuyo precio posterior se sigue midiendo
         self._por_escribir: list[Position] = []    # cerradas que esperan a completar sus marcas antes de ir al ledger
+        # patas sueltas: captura de spread con un solo lado llenado, seguidas para medir qué cuesta salir
+        self.patas: dict[int, "PataSuelta"] = {}   # id(posición) -> pata abierta
+        self.patas_cerradas: list["PataSuelta"] = []
+        self._desactivadas = set(cfg.validacion.desactivadas)
         self.markets: dict[str, MarketInfo] = {}
         self.token_to_cid: dict[str, str] = {}
         self.event_index: dict[str, list[str]] = defaultdict(list)
@@ -415,6 +421,7 @@ class Engine:
         """Llamar periódicamente aunque no lleguen eventos (latencia y expiraciones)."""
         self.now_ms = max(self.now_ms, ts_ms)
         self._marcar_adversa(ts_ms)
+        self._seguir_patas(ts_ms)
         self._process_pending(ts_ms)
         self._caducar_entradas(ts_ms)
         self._expire(ts_ms)
@@ -551,6 +558,7 @@ class Engine:
     def _marcar_adversa(self, ts_ms: int, token_id: str | None = None) -> None:
         """Nombre anterior del seguimiento. Se conserva porque lo usan las pruebas y el motor."""
         self._seguir(ts_ms, token_id)
+        self._seguir_patas(ts_ms, token_id)
 
     def _iniciar_marcas(self, pos: Position, ts_ms: int) -> None:
         """Primer fill: desde aquí se mide todo lo que hace el precio después."""
@@ -688,6 +696,14 @@ class Engine:
         s.strategy = strategy_id(s.kind, s.meta, m_cat)
         if self.writer is not None:
             self.writer.append("signals", signal_row(s, self.run_id))
+        # Estrategia apagada para esta fase de medición: se registra la decisión —para no perder la
+        # cuenta de cuántas señales habría habido— pero no se abre nada ni se sigue como sombra.
+        # No es un veredicto: es dejar de gastar muestra en algo ya medido.
+        if s.strategy in self._desactivadas:
+            self.stats["skipped_estrategia_desactivada"] += 1
+            self._decision(s.ts_ms, s.condition_id, s.kind, "no_trade", "DISABLED_FOR_VALIDATION",
+                           s.edge_net, {"estrategia": s.strategy}, s.strategy, s.signal_id)
+            return
         if res.gate:
             self._rechazar(s, "modelo_p_win_baja", {"p_win": res.p_blend})
             return
@@ -985,8 +1001,61 @@ class Engine:
         pos.cost, pos.payout, pos.inventory = cost, payout, inv
         pos.size_filled = max(o.filled for o in pos.maker_orders)
         if all(o.done for o in pos.maker_orders):
+            self._cerrar_pata(pos, ts_ms, pata_mod.RECUPERADA, "both_filled", ts_segunda=ts_ms)
             pos.inventory = {}
             self._close(pos, ts_ms, "both_filled")
+            return
+        self._abrir_pata(pos, ts_ms)
+
+    # ------------------------------------------------------------------ patas sueltas
+    def _abrir_pata(self, pos: Position, ts_ms: int) -> None:
+        """Un solo lado llenado: nace la pata suelta y se fotografía T0.
+
+        Solo se crea una vez por posición, en el primer llenado parcial. No se deduce del resultado
+        ni del motivo de cierre: se crea por lo que pasó en el libro, que es cuándo ocurrió de
+        verdad.
+        """
+        if id(pos) in self.patas or pos.sombra:
+            return
+        llenas = [o for o in pos.maker_orders if o.filled > 1e-9]
+        vacias = [o for o in pos.maker_orders if o.filled <= 1e-9]
+        if len(llenas) != 1 or not vacias:
+            return
+        llena, falta = llenas[0], vacias[0]
+        precio = (sum(f.notional for f in llena.fills) / llena.filled) if llena.filled else llena.price
+        pata = pata_mod.abrir(
+            self.experiment, pos.signal, llena, falta, ts_ms, llena.filled, precio,
+            self.books.get(llena.token_id), self.books.get(falta.token_id))
+        self.patas[id(pos)] = pata
+        self.stats["patas_sueltas_abiertas"] += 1
+        if self.writer is not None:
+            for punto in pata_mod.medir(pata, ts_ms, self.books.get(llena.token_id)):
+                self.writer.append("partial_leg_track", punto.to_row(pata, self.run_id))
+
+    def _seguir_patas(self, ts_ms: int, token_id: str | None = None) -> None:
+        """Fotografía cada pata suelta en los horizontes que hayan vencido. No decide nada."""
+        for clave, pata in list(self.patas.items()):
+            if token_id is not None and pata.token_id != token_id:
+                continue
+            nuevos = pata_mod.medir(pata, ts_ms, self.books.get(pata.token_id))
+            if nuevos and self.writer is not None:
+                for punto in nuevos:
+                    self.writer.append("partial_leg_track", punto.to_row(pata, self.run_id))
+
+    def _cerrar_pata(self, pos: Position, ts_ms: int, desenlace: str, motivo: str,
+                     ts_segunda: int | None = None) -> None:
+        """Anota el desenlace de la pata y la escribe. El P&L real va al lado del hipotético."""
+        pata = self.patas.pop(id(pos), None)
+        if pata is None:
+            return
+        pata_mod.medir(pata, ts_ms, self.books.get(pata.token_id))
+        pata_mod.cerrar(pata, ts_ms, desenlace, motivo,
+                        pnl_realizado=pos.realized_pnl if pos.status == "closed" else None,
+                        ts_segunda_pata=ts_segunda)
+        self.patas_cerradas.append(pata)
+        self.stats[f"patas_{desenlace}"] += 1
+        if self.writer is not None:
+            self.writer.append("partial_legs", pata.to_row(self.run_id))
 
     def _check_directional(self, ts_ms: int, token_id: str | None = None) -> None:
         """Salidas de una posición direccional, en este orden: target, stop, time stop, tope duro.
@@ -1094,6 +1163,12 @@ class Engine:
         if pos in self.positions:
             self.positions.remove(pos)
         self.closed.append(pos)
+        # Si esta posición tenía una pata suelta abierta, termina aquí. El desenlace sale del
+        # motivo de cierre y se decide en un solo sitio: `expired` es que se agotó el tiempo de
+        # sostén, cualquier otra vía es un cierre. La recuperación ya se anotó antes de llegar aquí.
+        if id(pos) in self.patas:
+            desenlace = pata_mod.CADUCADA if reason.startswith("expired") else pata_mod.CERRADA
+            self._cerrar_pata(pos, ts_ms, desenlace, reason)
         self.stats[f"closed_{reason}"] += 1
         self._guardar_observacion_fill(pos)
         if self.writer is not None:
@@ -1122,6 +1197,7 @@ class Engine:
         sombras = [p for p in self.closed if p.sombra]
         return {
             "run_id": self.run_id, "experiment": self.experiment, "mode": self.mode,
+            "patas_abiertas": len(self.patas), "patas_cerradas": len(self.patas_cerradas),
             "cash": round(self.cash, 4), "pnl": round(self.cash - self.cfg.sim.start_cash, 4),
             "positions_closed": len(reales), "positions_filled": len(closed),
             "open": self._abiertas(), "sombras_cerradas": len(sombras),

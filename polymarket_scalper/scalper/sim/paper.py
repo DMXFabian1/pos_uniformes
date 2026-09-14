@@ -7,7 +7,7 @@ import time
 
 from ..collector import Collector
 from ..config import Config
-from ..experimento import congelar, registrar
+from ..experimento import MotorCambiado, assert_engine_frozen, congelar, registrar
 from ..storage import ParquetWriter
 from .engine import Engine
 
@@ -18,12 +18,25 @@ async def run_paper(cfg: Config, duration_seconds: int | None = None, run_id: st
                     persist_market_data: bool = True) -> Engine:
     run_id = run_id or f"paper-{int(time.time())}"
     # congelar el motor antes de empezar: si algo que decide cambia, esto será otro experimento
+    congelado = cfg.validacion.motor_congelado
+    if congelado and cfg.learn.enabled:
+        # Congelar de verdad significa que el reentrenamiento no puede promocionar nada a mitad de
+        # corrida. Se apaga aquí, sobre una copia, antes de tomar la huella, para que la huella
+        # refleje el motor que va a correr y no el que había configurado.
+        cfg = cfg.model_copy(deep=True)
+        cfg.learn.enabled = False
+        log.info("motor congelado: reentrenamiento desactivado para esta corrida")
     exp = congelar(cfg, nota=f"paper {run_id}")
     registrar(cfg, exp)
     log.info("motor congelado:\n%s", exp.resumen())
     if exp.dirty:
         log.warning("el árbol de trabajo tiene cambios sin comprometer: los datos de esta corrida "
                     "no se podrán reproducir exactamente")
+    if congelado and exp.dirty:
+        raise MotorCambiado(
+            "corrida congelada con el árbol de trabajo sucio: el commit no describe el código que "
+            "va a correr, así que el experimento no sería reproducible. Comprometa los cambios "
+            "primero, o desactive validacion.motor_congelado si esta corrida no es para medir.")
     col = Collector(cfg, persist=persist_market_data)
     writer = ParquetWriter(cfg.data_dir, cfg.collector.flush_seconds, cfg.collector.flush_rows, subdir=f"run={run_id}")
     eng = Engine(cfg, run_id, "paper", writer, experiment=exp.experiment_id)
@@ -44,6 +57,24 @@ async def run_paper(cfg: Config, duration_seconds: int | None = None, run_id: st
         while True:
             await asyncio.sleep(120)
             log.info("paper: %s", eng.summary())
+
+    async def guardian() -> None:
+        """Comprueba que el motor sigue siendo el que se congeló. Si no, corta la corrida.
+
+        Que la huella coincida significa que el commit, los umbrales, los modelos promovidos y el
+        código de simulación son los mismos que al arrancar. Seguir escribiendo filas con el mismo
+        experiment_id después de que algo se mueva produce exactamente el dato inservible que esto
+        existe para evitar, así que se para y se dice por qué.
+        """
+        while True:
+            await asyncio.sleep(max(cfg.validacion.comprobar_congelado_s, 5))
+            try:
+                assert_engine_frozen(cfg, exp)
+            except MotorCambiado as e:
+                log.error("CORRIDA ABORTADA: %s", e)
+                eng.stats["abortada_motor_cambiado"] += 1
+                col.stop()
+                return
 
     async def retrainer() -> None:
         """Reentrena y, si eso cambia lo que el motor decide, abre un experimento nuevo.
@@ -70,6 +101,8 @@ async def run_paper(cfg: Config, duration_seconds: int | None = None, run_id: st
                 eng.experiment = exp.experiment_id
 
     tasks = [asyncio.create_task(ticker()), asyncio.create_task(reporter())]
+    if congelado:
+        tasks.append(asyncio.create_task(guardian()))
     if cfg.learn.enabled:
         tasks.append(asyncio.create_task(retrainer()))
     if duration_seconds:

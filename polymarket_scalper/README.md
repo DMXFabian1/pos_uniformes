@@ -241,6 +241,18 @@ trayectoria del precio hasta 15 minutos, y cada señal rechazada se sigue como s
 si se descartan malos trades o buenas oportunidades. El detalle está en
 [docs/VALIDACION.md](docs/VALIDACION.md).
 
+### Fase de pata suelta (`scalper patas`)
+La captura de spread entra por los dos lados. Cuando se llenan los dos gana +1,72 por operación,
+estable en tres corridas; cuando solo se llena uno queda un direccional que nadie pidió, se
+sostiene diez minutos y cuesta −6,9. Pasa la mitad de las veces. Esta fase mide **cuándo** aparece
+esa pérdida: cada pata suelta se fotografía a 1, 5, 10, 20, 30, 60, 120, 300 y 600 segundos, con el
+precio al que de verdad se podría salir —VWAP contra el lado correcto del libro, nunca el mid— y el
+resultado hipotético de haber cerrado ahí. No introduce ningún stop: mide el problema.
+
+Aquí el motor se congela de verdad: sin reentrenamiento, sin arrancar con el árbol sucio, y con un
+guardián que **aborta la corrida** si la huella cambia a mitad. `scalper calidad` da el visto bueno
+antes de mirar ningún número. El detalle está en [docs/PATA_SUELTA.md](docs/PATA_SUELTA.md).
+
 ### Reacción del mercado (`scalper/reaction.py`)
 La tesis del scalping en vivo es que el marcador cambia antes que el precio. En lugar de suponerlo,
 cada cambio de marcador abre una medición: se guarda el mid de cada token y se espera a que se

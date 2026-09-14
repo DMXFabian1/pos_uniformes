@@ -128,6 +128,7 @@ SCHEMAS: dict[str, pa.Schema] = {
     "experiments": pa.schema([
         ("ts_ms", I()), ("experiment_id", S()), ("commit", S()), ("dirty", B()), ("huella", S()),
         ("umbrales", S()), ("modelos", S()), ("nota", S()),
+        ("simulador", S()), ("reentrenamiento", B()),
     ]),
     # una fila por orden puesta: las condiciones del momento y si acabó llenándose. Es el conjunto
     # de datos con el que después se puede estimar P(fill | condiciones) sin suponer nada.
@@ -157,6 +158,31 @@ SCHEMAS: dict[str, pa.Schema] = {
         ("p95_ms", I()), ("mensajes_por_segundo", F()), ("ultimo_mensaje_hace_ms", I()),
         ("libros_validos", I()), ("libros_totales", I()), ("reconexiones", I()),
         ("trade_feed_lag_s", I()), ("paginas_llenas", I()),
+    ]),
+    # patas sueltas: una fila por posición de captura de spread con un solo lado llenado
+    "partial_legs": pa.schema([
+        ("ts_ms", I()), ("run_id", S()), ("experiment", S()), ("partial_leg_id", S()),
+        ("signal_id", S()), ("strategy", S()), ("condition_id", S()), ("event_id", S()),
+        ("token_id", S()), ("lado", S()), ("precio_entrada", F()), ("shares", F()),
+        ("token_faltante", S()), ("lado_faltante", S()), ("precio_faltante", F()),
+        ("t0_ms", I()), ("t0_best_bid", F()), ("t0_best_ask", F()), ("t0_spread", F()),
+        ("t0_profundidad", F()), ("t0_precio_completar", F()), ("t0_coste_completar", F()),
+        ("t0_salida_precio", F()), ("t0_contrafactual_pnl", F()),
+        ("spread_esperado", F()), ("ventaja_prometida", F()),
+        ("desenlace", S()), ("ts_fin", I()), ("duracion_ms", I()),
+        ("time_to_second_leg_ms", I()), ("pnl_realizado_final", F()), ("motivo_cierre", S()),
+        ("puntos_medidos", I()),
+    ]),
+    # trayectoria de cada pata suelta: una fila por horizonte medido
+    "partial_leg_track": pa.schema([
+        ("ts_ms", I()), ("run_id", S()), ("experiment", S()), ("partial_leg_id", S()),
+        ("strategy", S()), ("condition_id", S()), ("token_id", S()), ("horizonte_ms", I()),
+        ("best_bid", F()), ("best_ask", F()), ("mid", F()), ("spread", F()),
+        ("profundidad_salida", F()), ("distancia_entrada", F()),
+        ("salida_precio", F()), ("salida_peor_nivel", F()), ("salida_slippage", F()),
+        ("salida_completa", B()),
+        ("contrafactual_pnl", F()), ("contrafactual_pnl_share", F()), ("contrafactual_pnl_pct", F()),
+        ("incompleto", S()),
     ]),
     # Market Reaction Engine: cuánto tarda el precio en moverse tras un cambio en el partido
     "reactions": pa.schema([

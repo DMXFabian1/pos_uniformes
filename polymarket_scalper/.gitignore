@@ -6,3 +6,6 @@ __pycache__/
 *.egg-info/
 .venv/
 logs/
+
+# Copias de seguridad: se guardan fuera del repo, no dentro.
+respaldos/

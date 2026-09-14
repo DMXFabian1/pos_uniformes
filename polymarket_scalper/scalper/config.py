@@ -135,6 +135,14 @@ class SaludCfg(BaseModel):
 
 class ValidacionCfg(BaseModel):
     """Cuánto se sigue el precio después de un fill. Solo mide: no cambia ninguna decisión."""
+    # Estrategias apagadas mientras dure una fase de medición. No es un filtro de calidad: es
+    # dejar de gastar muestra en algo ya medido para no contaminar lo que se está midiendo.
+    # TENNIS_DIRECTIONAL sale con EV negativo demostrado en tres corridas, intervalo entero por
+    # debajo de cero y correlación no significativa en las cuatro mediciones.
+    desactivadas: list[str] = Field(default_factory=list)
+    # Congelar de verdad: sin reentrenamiento, y abortando si el motor cambia a mitad de corrida.
+    motor_congelado: bool = False
+    comprobar_congelado_s: float = 60
     seguimiento_s: float = 900          # hasta dónde se sigue la trayectoria (el time stop actual)
     ledger_horizonte_s: float = 60      # MAE/MFE del ledger: la ventana de scalping que importa
     horizontes_ms: list[int] = Field(default_factory=lambda: [

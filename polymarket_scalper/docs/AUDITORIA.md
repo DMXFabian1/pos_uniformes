@@ -360,6 +360,23 @@ sensibilidad al llenado se calcula sobre los llenados limpios, y quedan seis en 
 y doce en `TENNIS_SPREAD_CAPTURE`. **No hay contrafactual limpio que calcular**, y eso ya es la
 respuesta: no existe una versión de estas estrategias que se llene sin que la barran.
 
+### Lo que la fase siguiente instrumenta
+
+El hallazgo de las patas dejó una pregunta que los datos existentes no pueden contestar: si la
+pérdida de una pata suelta aparece en el primer segundo o se acumula a lo largo de los diez minutos.
+La diferencia decide si hay algo que construir.
+
+Para medirlo, la pata suelta pasa a ser una entidad con identificador propio (`partial_legs`), con
+su T0 y su trayectoria a 1, 5, 10, 20, 30, 60, 120, 300 y 600 segundos (`partial_leg_track`). El
+precio de salida sale del libro por VWAP contra el lado correcto, y cuando no hay profundidad el
+punto se marca como incompleto en vez de rellenarse con el mid. Todo lo que se calcula ahí lleva
+`contrafactual` en el nombre y vive aparte del resultado realizado.
+
+Los siete fallos de esta auditoría se convirtieron además en comprobaciones que **abortan la
+corrida** en vez de dejarla producir dato con buena pinta (`scalper calidad`), y el congelado del
+motor pasó de ser una foto al arrancar a un guardián que comprueba la huella cada minuto. El detalle
+está en [PATA_SUELTA.md](PATA_SUELTA.md).
+
 ### La regla que no cambia
 
 Ningún número del ledger anterior al cambio A cuenta como evidencia sobre las señales maker: se

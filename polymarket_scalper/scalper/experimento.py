@@ -38,6 +38,25 @@ def _git(*args: str) -> str:
         return ""
 
 
+def version_simulador(raiz: Path | None = None) -> str:
+    """Huella del código que simula la ejecución, aparte del commit.
+
+    El commit ya cubre esto cuando el árbol está limpio, pero con el árbol sucio no cubre nada: se
+    puede editar el modelo de llenado a mitad de una sesión y seguir informando del mismo commit.
+    Estos son los archivos que deciden qué se llena, a qué precio y cuándo se cierra, así que
+    cualquier cambio en ellos tiene que mover la huella.
+    """
+    base = raiz or Path(__file__).resolve().parent
+    partes: list[str] = []
+    for rel in ("sim/fill_model.py", "sim/engine.py", "sim/ledger.py", "book.py", "fees.py", "pata.py"):
+        f = base / rel
+        try:
+            partes.append(f"{rel}:{hashlib.sha256(f.read_bytes()).hexdigest()[:16]}")
+        except OSError:
+            partes.append(f"{rel}:ausente")
+    return hashlib.sha256("|".join(partes).encode("utf-8")).hexdigest()[:16]
+
+
 def commit_actual() -> tuple[str, bool]:
     """Hash corto del commit y si había cambios sin comprometer."""
     return _git("rev-parse", "--short", "HEAD"), bool(_git("status", "--porcelain"))
@@ -88,31 +107,77 @@ class Experimento:
     umbrales: dict[str, Any] = field(default_factory=dict)
     modelos: dict[str, int] = field(default_factory=dict)
     nota: str = ""
+    simulador: str = ""          # huella del código que simula la ejecución
+    reentrenamiento: bool = True  # ¿podía promocionarse un modelo durante la corrida?
 
     def to_row(self) -> dict[str, Any]:
         return {"ts_ms": self.ts_ms, "experiment_id": self.experiment_id, "commit": self.commit,
                 "dirty": self.dirty, "huella": self.huella, "umbrales": dumps(self.umbrales),
-                "modelos": dumps(self.modelos), "nota": self.nota}
+                "modelos": dumps(self.modelos), "nota": self.nota,
+                "simulador": self.simulador, "reentrenamiento": self.reentrenamiento}
 
     def resumen(self) -> str:
         sucio = "  (ÁRBOL SUCIO: hay cambios sin comprometer)" if self.dirty else ""
+        reentr = "ACTIVO (la muestra puede partirse)" if self.reentrenamiento else "desactivado"
         return (f"experimento {self.experiment_id}\n"
                 f"  commit   {self.commit or 'desconocido'}{sucio}\n"
                 f"  huella   {self.huella}\n"
+                f"  simulador {self.simulador}\n"
                 f"  modelos  {self.modelos or 'ninguno promovido'}\n"
+                f"  reentren. {reentr}\n"
                 f"  nota     {self.nota or '-'}")
 
 
 def congelar(cfg: Config, nota: str = "", ts_ms: int | None = None) -> Experimento:
-    """Calcula la huella del motor tal y como está ahora mismo."""
+    """Calcula la huella del motor tal y como está ahora mismo.
+
+    Entra todo lo que puede cambiar una decisión o una medición: el commit, si el árbol estaba
+    sucio, todos los umbrales, la versión de cada modelo promovido, la huella del código de
+    simulación y si el reentrenamiento estaba activo. Ese último no cambia nada por sí solo, pero
+    determina si el motor **podía** cambiar durante la corrida, que es justo el fallo que dejó
+    186 de 680 posiciones de `muestra-3` mezcladas con las de otro motor.
+    """
     commit, dirty = commit_actual()
     thr = umbrales(cfg)
     mods = modelos_en_uso(cfg.data_dir)
-    crudo = json.dumps({"commit": commit, "umbrales": thr, "modelos": mods}, sort_keys=True, default=str)
+    sim = version_simulador()
+    reentr = bool(cfg.learn.enabled and cfg.learn.retrain_hours > 0)
+    crudo = json.dumps({"commit": commit, "umbrales": thr, "modelos": mods,
+                        "simulador": sim, "reentrenamiento": reentr}, sort_keys=True, default=str)
     huella = hashlib.sha256(crudo.encode("utf-8")).hexdigest()[:12]
     ts = ts_ms if ts_ms is not None else int(datetime.now(tz=timezone.utc).timestamp() * 1000)
     fecha = datetime.fromtimestamp(ts / 1000, tz=timezone.utc).strftime("%Y%m%d")
-    return Experimento(f"exp-{fecha}-{huella[:8]}", commit, dirty, huella, ts, thr, mods, nota)
+    return Experimento(f"exp-{fecha}-{huella[:8]}", commit, dirty, huella, ts, thr, mods, nota,
+                       simulador=sim, reentrenamiento=reentr)
+
+
+class MotorCambiado(RuntimeError):
+    """El motor cambió durante una corrida. No es recuperable: la muestra ya está mezclada."""
+
+
+def assert_engine_frozen(cfg: Config, exp: Experimento) -> None:
+    """Comprueba que el motor sigue siendo el que se congeló. Si no, aborta la corrida.
+
+    Se llama periódicamente durante la corrida, no solo al arrancar. Que la huella coincida
+    significa que el commit, los umbrales, los modelos promovidos y el código de simulación son los
+    mismos que cuando empezó. Si algo se movió, seguir escribiendo filas con el mismo
+    `experiment_id` produciría exactamente el dato inservible que esta comprobación existe para
+    evitar, así que se corta.
+    """
+    ahora = congelar(cfg, ts_ms=exp.ts_ms)
+    if ahora.huella == exp.huella:
+        return
+    cambios = cambios_que_deciden(
+        {"umbrales": dumps(exp.umbrales), "modelos": dumps(exp.modelos)},
+        {"umbrales": dumps(ahora.umbrales), "modelos": dumps(ahora.modelos)}) or []
+    if ahora.commit != exp.commit:
+        cambios.append(f"commit: {exp.commit} → {ahora.commit}")
+    if ahora.simulador != exp.simulador:
+        cambios.append(f"código de simulación: {exp.simulador} → {ahora.simulador}")
+    raise MotorCambiado(
+        f"el motor cambió durante la corrida (huella {exp.huella} → {ahora.huella}): "
+        + "; ".join(cambios or ["no se pudo precisar qué"])
+        + ". La corrida se aborta: dos motores distintos no pueden compartir experiment_id.")
 
 
 def registrar(cfg: Config, exp: Experimento, writer: ParquetWriter | None = None) -> None:

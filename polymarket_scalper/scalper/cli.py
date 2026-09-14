@@ -293,6 +293,27 @@ def cmd_validacion(args: argparse.Namespace) -> None:
     print(formatear(analizar(cfg.data_dir, getattr(args, "experimento", None))))
 
 
+def cmd_patas(args: argparse.Namespace) -> None:
+    """Qué cuesta cerrar una pata suelta y cuándo aparece ese coste."""
+    from .patas_informe import analizar, formatear
+
+    cfg = load_config(args.config)
+    print(formatear(analizar(cfg.data_dir, getattr(args, "experimento", None))))
+
+
+def cmd_calidad(args: argparse.Namespace) -> None:
+    """Comprobaciones que invalidan una corrida. Sale con código 1 si alguna falla."""
+    import sys
+
+    from .calidad import verificar
+
+    cfg = load_config(args.config)
+    inf = verificar(cfg.data_dir, getattr(args, "run_id", None), getattr(args, "experimento", None))
+    print(inf)
+    if not inf.valida:
+        sys.exit(1)
+
+
 def cmd_experimentos(args: argparse.Namespace) -> None:
     """Versiones del motor que han operado, y qué cambió entre una y otra."""
     from .experimento import congelar, formatear_historial, registrar
@@ -328,6 +349,7 @@ def cmd_overview(args: argparse.Namespace) -> None:
         ("ARRASTRE ENTRE VENTANAS DE CRIPTO: ¿a favor o en contra de la racha?", cmd_updown_study),
         ("RESULTADOS POR TIPO DE SEÑAL (predicho contra real)", cmd_report),
         ("EJECUCIÓN: ¿se llenan las órdenes que ponemos?", cmd_ejecucion),
+        ("PATA SUELTA: ¿cuánto cuesta salir y cuándo aparece ese coste?", cmd_patas),
         ("WALLETS CON HISTORIAL", cmd_wallets),
         ("MODELOS APRENDIDOS", cmd_models),
         ("RADIOGRAFÍA DEL MERCADO", cmd_mercado),
@@ -577,6 +599,15 @@ def main(argv: list[str] | None = None) -> None:
     s = sub.add_parser("validacion", help="informe de medición: llenado, ventaja mínima, selección adversa, frescura")
     s.add_argument("--experimento", help="quedarse con una sola versión del motor")
     s.set_defaults(fn=cmd_validacion)
+
+    s = sub.add_parser("patas", help="coste de cerrar una pata suelta y cuándo aparece ese coste")
+    s.add_argument("--experimento", help="quedarse con una sola versión del motor")
+    s.set_defaults(fn=cmd_patas)
+
+    s = sub.add_parser("calidad", help="comprobaciones que invalidan una corrida (código 1 si falla)")
+    s.add_argument("--run-id", dest="run_id", help="comprobar además que la corrida usó un solo motor")
+    s.add_argument("--experimento", help="quedarse con una sola versión del motor")
+    s.set_defaults(fn=cmd_calidad)
 
     s = sub.add_parser("experimentos", help="versiones congeladas del motor y qué cambió entre ellas")
     s.add_argument("--congelar", action="store_true", help="registrar la versión actual")

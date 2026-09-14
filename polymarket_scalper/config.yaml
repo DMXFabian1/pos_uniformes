@@ -88,6 +88,15 @@ validacion:                     # fase de medición: seguir qué pasa después d
   ticks_movimiento: [0.5, 1, 2, 3]
   sombras: true                 # seguir también las señales rechazadas, para saber qué se deja pasar
   max_sombras: 60
+  # Congelar de verdad: sin reentrenamiento durante la corrida, y abortando si el motor cambia.
+  # La corrida también se niega a arrancar con el árbol de trabajo sucio, porque entonces el commit
+  # no describe el código que va a correr.
+  motor_congelado: true
+  comprobar_congelado_s: 60
+  # Estrategias apagadas mientras dure la fase de medición de pata suelta. No es un veredicto: es
+  # dejar de gastar muestra en algo ya medido. TENNIS_DIRECTIONAL tiene EV negativo demostrado en
+  # tres corridas, con el intervalo entero por debajo de cero.
+  desactivadas: ["TENNIS_DIRECTIONAL"]
 
 retention:                      # disco: book_deltas crece ~4 GB/día; el aprendizaje no los necesita
   enabled: true
