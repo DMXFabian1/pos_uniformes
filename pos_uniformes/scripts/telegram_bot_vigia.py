@@ -54,10 +54,14 @@ def levantar() -> int:
     raiz = runtime_base_dir().parent  # carpeta que contiene el paquete pos_uniformes
     kwargs: dict = {"cwd": str(raiz), "stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
     if sys.platform.startswith("win"):
-        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)
+        # Solo CREATE_NO_WINDOW (el flag de proceso separado lo anulaba). Y con
+        # pythonw.exe ni siquiera hay consola que ocultar.
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     else:
         kwargs["start_new_session"] = True
-    proc = subprocess.Popen([sys.executable, "-m", "pos_uniformes.scripts.telegram_bot"], **kwargs)
+    from pos_uniformes.utils.config import python_sin_consola
+
+    proc = subprocess.Popen([python_sin_consola(), "-m", "pos_uniformes.scripts.telegram_bot"], **kwargs)
     return proc.pid
 
 

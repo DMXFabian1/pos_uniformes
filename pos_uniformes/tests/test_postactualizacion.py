@@ -168,3 +168,37 @@ class MainTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class PythonSinConsolaTests(unittest.TestCase):
+    """El bot y la PWA arrancan con pythonw.exe en Windows (sin ventana)."""
+
+    def test_en_windows_usa_pythonw_si_existe(self) -> None:
+        import sys
+        from unittest.mock import patch
+
+        from pos_uniformes.utils import config
+
+        with patch.object(sys, "platform", "win32"), patch.object(sys, "executable", r"C:\x\.venv\Scripts\python.exe"), \
+             patch("os.path.exists", return_value=True):
+            self.assertTrue(config.python_sin_consola().lower().endswith("pythonw.exe"))
+        with patch.object(sys, "platform", "win32"), patch.object(sys, "executable", r"C:\x\.venv\Scripts\python.exe"), \
+             patch("os.path.exists", return_value=False):
+            self.assertTrue(config.python_sin_consola().lower().endswith("python.exe"))
+
+    def test_fuera_de_windows_no_cambia(self) -> None:
+        import sys
+
+        from pos_uniformes.utils import config
+
+        self.assertEqual(config.python_sin_consola(), sys.executable)
+
+    def test_los_servicios_lo_usan_y_sin_detached(self) -> None:
+        import inspect
+
+        from pos_uniformes.scripts import servidor_pwa_vigia, telegram_bot_vigia
+
+        for mod in (servidor_pwa_vigia, telegram_bot_vigia):
+            fuente = inspect.getsource(mod)
+            self.assertIn("python_sin_consola", fuente)
+            self.assertNotIn("DETACHED_PROCESS", fuente.split("def levantar")[1].split("\n\n\ndef")[0])

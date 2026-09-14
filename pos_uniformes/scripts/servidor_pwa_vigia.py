@@ -69,8 +69,10 @@ def matar(pid: int | None) -> None:
 
 
 def comando() -> list[str]:
+    from pos_uniformes.utils.config import python_sin_consola
+
     return [
-        sys.executable, "-m", "uvicorn", "pos_uniformes.api.main:app",
+        python_sin_consola(), "-m", "uvicorn", "pos_uniformes.api.main:app",
         "--host", "0.0.0.0", "--port", str(PUERTO),
     ]
 
@@ -82,7 +84,8 @@ def levantar() -> int:
     raiz = runtime_base_dir().parent  # carpeta que contiene el paquete pos_uniformes
     kwargs: dict = {"cwd": str(raiz), "stdin": subprocess.DEVNULL, "stdout": subprocess.DEVNULL, "stderr": subprocess.DEVNULL}
     if sys.platform.startswith("win"):
-        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(subprocess, "DETACHED_PROCESS", 0)
+        # Solo CREATE_NO_WINDOW (el flag de proceso separado lo anulaba); el comando ya va con pythonw.exe.
+        kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     else:
         kwargs["start_new_session"] = True
     proc = subprocess.Popen(comando(), **kwargs)

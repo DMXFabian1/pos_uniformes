@@ -173,3 +173,23 @@ class Settings:
 
 
 settings = Settings.from_env()
+
+
+def python_sin_consola() -> str:
+    """El Python con el que arrancar servicios de fondo SIN ventana.
+
+    En Windows 11 con Windows Terminal como terminal por defecto, un
+    `python.exe` lanzado con CREATE_NO_WINDOW igual aparece como pestaña
+    (2026-09-14: el bot y la PWA salían como "dos ventanas rebeldes"). Con
+    `pythonw.exe` no hay consola que mostrar. Fuera de Windows, o si no
+    existe, se usa el mismo Python de siempre."""
+    import os
+    import sys
+
+    exe = str(sys.executable)
+    if sys.platform.startswith("win") and exe.lower().endswith("python.exe"):
+        pythonw = exe[: -len("python.exe")] + "pythonw.exe"
+        if os.path.exists(pythonw):
+            return pythonw
+    return exe
+
