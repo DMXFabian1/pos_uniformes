@@ -21,11 +21,11 @@ async def run_paper(cfg: Config, duration_seconds: int | None = None, run_id: st
     congelado = cfg.validacion.motor_congelado
     if congelado and cfg.learn.enabled:
         # Congelar de verdad significa que el reentrenamiento no puede promocionar nada a mitad de
-        # corrida. Se apaga aquí, sobre una copia, antes de tomar la huella, para que la huella
-        # refleje el motor que va a correr y no el que había configurado.
-        cfg = cfg.model_copy(deep=True)
-        cfg.learn.enabled = False
-        log.info("motor congelado: reentrenamiento desactivado para esta corrida")
+        # corrida. No se toca la configuración para conseguirlo —`learn.enabled` entra en los
+        # umbrales, y cambiarlo movería la huella y haría que `scalper experimentos --congelar`
+        # registrase un experimento distinto del que la corrida usa—: simplemente no se arranca el
+        # reentrenador. El hecho de que no pueda reentrenar ya viaja en la huella por su cuenta.
+        log.info("motor congelado: el reentrenador no se arranca en esta corrida")
     exp = congelar(cfg, nota=f"paper {run_id}")
     registrar(cfg, exp)
     log.info("motor congelado:\n%s", exp.resumen())
@@ -103,7 +103,7 @@ async def run_paper(cfg: Config, duration_seconds: int | None = None, run_id: st
     tasks = [asyncio.create_task(ticker()), asyncio.create_task(reporter())]
     if congelado:
         tasks.append(asyncio.create_task(guardian()))
-    if cfg.learn.enabled:
+    if cfg.learn.enabled and not congelado:
         tasks.append(asyncio.create_task(retrainer()))
     if duration_seconds:
         async def stopper() -> None:

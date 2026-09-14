@@ -217,3 +217,25 @@ def test_el_resultado_realizado_no_puede_vivir_en_la_trayectoria(tmp_path):
 
     assert not [c for c in SCHEMAS["partial_leg_track"].names
                 if c in ("realized_pnl", "pnl_realizado")]
+
+
+def test_la_huella_del_cli_es_la_misma_que_usara_la_corrida(cfg, tmp_path, monkeypatch):
+    # El procedimiento documentado es `scalper experimentos --congelar` y después `scalper paper`.
+    # Si la corrida apaga el reentrenamiento por su cuenta y la huella no lo refleja, el CLI registra
+    # un experimento fantasma que ninguna fila lleva.
+    cfg.data_dir = str(tmp_path)
+    monkeypatch.setattr(ex, "commit_actual", lambda: ("abc1234", False))
+    monkeypatch.setattr(ex, "modelos_en_uso", lambda _d: {})
+    cfg.learn.enabled = True
+    cfg.validacion.motor_congelado = True
+    del_cli = ex.congelar(cfg)
+    assert not del_cli.reentrenamiento          # con el motor congelado no puede reentrenar
+
+    # La corrida NO toca la configuración para conseguirlo: solo deja de arrancar el reentrenador.
+    # Así la huella del CLI y la de la corrida son la misma, que es lo único que importa aquí.
+    assert ex.congelar(cfg).huella == del_cli.huella
+    # Y sin el motor congelado, el reentrenamiento sí cuenta como activo.
+    suelto = cfg.model_copy(deep=True)
+    suelto.validacion.motor_congelado = False
+    assert ex.congelar(suelto).reentrenamiento
+    assert ex.congelar(suelto).huella != del_cli.huella

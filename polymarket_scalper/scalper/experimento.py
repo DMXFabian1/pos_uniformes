@@ -141,7 +141,12 @@ def congelar(cfg: Config, nota: str = "", ts_ms: int | None = None) -> Experimen
     thr = umbrales(cfg)
     mods = modelos_en_uso(cfg.data_dir)
     sim = version_simulador()
-    reentr = bool(cfg.learn.enabled and cfg.learn.retrain_hours > 0)
+    # Con el motor congelado, la corrida apaga el reentrenamiento antes de arrancar. La huella tiene
+    # que describir lo que va a correr, no lo que pone la configuración: si no, `scalper experimentos
+    # --congelar` registra un experimento distinto del que la corrida usa, y el procedimiento
+    # documentado deja un experimento fantasma en la tabla.
+    reentr = bool(cfg.learn.enabled and cfg.learn.retrain_hours > 0
+                  and not cfg.validacion.motor_congelado)
     crudo = json.dumps({"commit": commit, "umbrales": thr, "modelos": mods,
                         "simulador": sim, "reentrenamiento": reentr}, sort_keys=True, default=str)
     huella = hashlib.sha256(crudo.encode("utf-8")).hexdigest()[:12]
