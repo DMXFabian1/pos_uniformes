@@ -429,6 +429,10 @@ class ConteoRevisionDialog(QDialog):
         self._escuela_btn.setAutoDefault(False)
         self._escuela_btn.clicked.connect(self._historia_escuela)
         acciones.addWidget(self._escuela_btn)
+        self._comparar_btn = QPushButton("Comparar con el anterior")
+        self._comparar_btn.setAutoDefault(False)
+        self._comparar_btn.clicked.connect(self._comparar)
+        acciones.addWidget(self._comparar_btn)
         acciones.addStretch()
         descartar = QPushButton("Descartar")
         descartar.setObjectName("dangerButton")
@@ -786,6 +790,9 @@ class ConteoRevisionDialog(QDialog):
             QMessageBox.information(self, "Historia", "Elige una talla en la tabla.")
             return
         TallaHistoriaDialog(self, variante_id=linea.variante_id, titulo=self._revision.titulo, session_factory=self._session_factory).exec()
+
+    def _comparar(self) -> None:
+        ConteoComparativoDialog(self, jornada_id=self._jornada.id, session_factory=self._session_factory).exec()
 
     def _historia_escuela(self) -> None:
         EscuelaHistoriaDialog(
@@ -1170,6 +1177,159 @@ class EscuelaHistoriaDialog(QDialog):
                         item.setBackground(QBrush(QColor("#f5ebe0")))
                 if col == 4 and ((t is None and p.pidieron) or (t is not None and t.pidieron)):
                     item.setForeground(QBrush(QColor("#b91c1c")))
+                self._tabla.setItem(i, col, item)
+
+
+class ConteoComparativoDialog(QDialog):
+    """Este conteo contra el anterior: cuánto había, cuánto hay, cuánto se
+    vendió en medio y cuánto no se explica. Se abre desde el tablero de
+    Conteos (doble clic en una escuela) y desde Revisar, aplicado o no.
+    Daniel (2026-09-14): "ver cómo estuvo de diferente, qué se movió más y cuánto"."""
+
+    def __init__(self, parent: QWidget | None = None, *, jornada_id: int, session_factory: Callable[[], Session] | None = None) -> None:
+        super().__init__(parent)
+        self.setStyleSheet(_ESTILO + _ESTILO_TARJETAS)
+        self._session_factory = session_factory or _default_session_factory
+        self._jornada_id = jornada_id
+        self.comparativo = None
+
+        layout = QVBoxLayout()
+        layout.setSpacing(10)
+        self._encabezado = QLabel("")
+        self._encabezado.setStyleSheet("font-size: 15px; font-weight: 600; color: #5c3019;")
+        layout.addWidget(self._encabezado)
+        self._resumen = QLabel("")
+        self._resumen.setWordWrap(True)
+        layout.addWidget(self._resumen)
+
+        tarjetas = QHBoxLayout()
+        tarjetas.setSpacing(10)
+        self._cards: dict[str, _TarjetaFiltro] = {}
+        for clave, titulo in (("ANTES", "HABÍA"), ("AHORA", "HAY"), ("VENDIDAS", "VENDIDAS EN MEDIO"), ("FALTAN", "FALTAN SIN EXPLICAR"), ("SOBRAN", "SOBRAN SIN EXPLICAR")):
+            c = _TarjetaFiltro(clave, titulo, lambda: None)
+            c.setCursor(Qt.CursorShape.ArrowCursor)
+            c.mousePressEvent = lambda e: None   # solo informan
+            self._cards[clave] = c
+            tarjetas.addWidget(c, 1)
+        layout.addLayout(tarjetas)
+
+        fila = QHBoxLayout()
+        fila.addWidget(QLabel("Por talla, de lo que más se movió a lo que menos"))
+        fila.addStretch()
+        self._solo_cambios = QPushButton("Solo lo que cambió")
+        self._solo_cambios.setCheckable(True)
+        self._solo_cambios.setChecked(True)
+        self._solo_cambios.setAutoDefault(False)
+        self._solo_cambios.toggled.connect(self._pintar)
+        fila.addWidget(self._solo_cambios)
+        layout.addLayout(fila)
+
+        self._tabla = QTableWidget()
+        self._tabla.setColumnCount(7)
+        self._tabla.setHorizontalHeaderLabels(["Prenda", "Talla", "Había", "Hay", "Cambio", "Vendidas", "Sin explicar"])
+        self._tabla.verticalHeader().setVisible(False)
+        self._tabla.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
+        self._tabla.setAlternatingRowColors(True)
+        self._tabla.setShowGrid(False)
+        h = self._tabla.horizontalHeader()
+        h.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        for c in range(1, 7):
+            h.setSectionResizeMode(c, QHeaderView.ResizeMode.ResizeToContents)
+        layout.addWidget(self._tabla, 1)
+
+        pie = QLabel("Sin explicar = había − vendidas − hay. Positivo: faltan piezas que ninguna venta explica (merma o venta sin registrar). Negativo: sobran (llegó mercancía que no se anotó).")
+        pie.setWordWrap(True)
+        pie.setStyleSheet("color: #8a8a8a; font-size: 12px;")
+        layout.addWidget(pie)
+
+        botones = QHBoxLayout()
+        botones.addStretch()
+        cerrar = QPushButton("Cerrar")
+        cerrar.setObjectName("primaryButton")
+        cerrar.setAutoDefault(False)
+        cerrar.clicked.connect(self.accept)
+        botones.addWidget(cerrar)
+        layout.addLayout(botones)
+        self.setLayout(layout)
+        self.resize(980, 680)
+        self._cargar()
+
+    def _cargar(self) -> None:
+        from pos_uniformes.database.models import ConteoJornada
+        from pos_uniformes.services.conteo_jornada_service import cuando
+        from pos_uniformes.services.revision_service import comparativo_de_jornada
+
+        session = self._session_factory()
+        try:
+            j = session.get(ConteoJornada, self._jornada_id)
+            if j is None:
+                raise ValueError("Esa jornada ya no existe.")
+            self.comparativo = comparativo_de_jornada(session, j)
+            terminada = cuando(j.terminada_at) if j.terminada_at else "a medias"
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.warning(self, "Error", f"No se pudo leer el conteo:\n{exc}")
+            return
+        finally:
+            session.close()
+        c = self.comparativo
+        self.setWindowTitle(f"Comparativo · {c.titulo}")
+        self._encabezado.setText(f"{c.titulo}  ·  contado {terminada} por {c.quien}")
+        if c.con_anterior:
+            ant = c.anterior_at.strftime("%d/%m/%Y") if c.anterior_at else "antes"
+            self._resumen.setText(
+                f"Contra el conteo anterior del <b>{ant}</b>: <b>{len(c.con_anterior)}</b> tallas con qué comparar"
+                + (f", <b>{len(c.lineas) - len(c.con_anterior)}</b> contadas por primera vez" if len(c.lineas) > len(c.con_anterior) else "") + "."
+            )
+        else:
+            self._resumen.setText("Es el primer conteo de esta escuela: todavía no hay con qué comparar. El siguiente ya tendrá.")
+        self._cards["ANTES"].poner(c.antes_total, "piezas en el conteo anterior")
+        self._cards["AHORA"].poner(c.ahora_total, "piezas en este conteo")
+        self._cards["VENDIDAS"].poner(c.vendidas_total, "según la Libreta")
+        self._cards["FALTAN"].poner(c.faltan, "piezas que ninguna venta explica")
+        self._cards["SOBRAN"].poner(c.sobran, "piezas de más")
+        for k in ("ANTES", "AHORA", "VENDIDAS", "FALTAN", "SOBRAN"):
+            self._cards[k].setEnabled(True)
+        self._cards["FALTAN"].setChecked(c.faltan > 0)
+        self._cards["FALTAN"].setProperty("clave", "URGENTE")
+        self._cards["SOBRAN"].setChecked(c.sobran > 0)
+        self._cards["SOBRAN"].setProperty("clave", "SURTIR")
+        for k in ("FALTAN", "SOBRAN"):
+            self._cards[k]._repintar()
+        self._pintar()
+
+    def _pintar(self, *_a) -> None:
+        if self.comparativo is None:
+            return
+        from pos_uniformes.services.conteo_hoja_carta_service import nombre_para_hoja
+
+        c = self.comparativo
+        lineas = [l for l in c.lineas if not self._solo_cambios.isChecked() or l.cambio or l.vendidas]
+        if not lineas:
+            lineas = list(c.lineas)
+        self._tabla.setRowCount(len(lineas))
+        for i, l in enumerate(lineas):
+            talla = f"{l.talla} {l.color}".strip() if l.color and l.color.upper() not in ("UNICO", "ÚNICO") else l.talla
+            if l.antes is None:
+                valores = (nombre_para_hoja(l.producto, c.titulo), talla, "—", str(l.ahora), "primer conteo", str(l.vendidas) if l.vendidas else "—", "—")
+            else:
+                valores = (
+                    nombre_para_hoja(l.producto, c.titulo), talla, str(l.antes), str(l.ahora),
+                    f"{l.cambio:+d}" if l.cambio else "=", str(l.vendidas) if l.vendidas else "—",
+                    (f"faltan {l.sin_explicar}" if l.sin_explicar > 0 else f"sobran {-l.sin_explicar}") if l.sin_explicar else "cuadra",
+                )
+            for col, txt in enumerate(valores):
+                item = QTableWidgetItem(txt)
+                if col:
+                    item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
+                if col == 4 and l.cambio:
+                    item.setForeground(QBrush(QColor("#b91c1c" if l.cambio < 0 else "#166534")))
+                    fuente = item.font()
+                    fuente.setBold(abs(l.cambio) >= 3)
+                    item.setFont(fuente)
+                if col == 6 and l.sin_explicar:
+                    item.setForeground(QBrush(QColor("#b91c1c" if l.sin_explicar > 0 else "#1d4ed8")))
+                if col == 6 and l.antes is not None and not l.sin_explicar:
+                    item.setForeground(QBrush(QColor("#8a8a8a")))
                 self._tabla.setItem(i, col, item)
 
 

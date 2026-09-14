@@ -660,3 +660,83 @@ def historia_de_escuela(session: Session, escuela_id: int | None, tipo_pieza: st
         pidieron_total=sum(p.pidieron for p in prendas),
         pedido_total=sum(p.pedido_total for p in prendas),
     )
+
+
+# --- el comparativo con el conteo anterior --------------------------------------
+
+@dataclass(frozen=True)
+class LineaComparativo:
+    variante_id: int
+    producto: str
+    talla: str
+    color: str
+    antes: int | None        # el conteo anterior de esa talla (None = primer conteo)
+    antes_at: date | None
+    ahora: int
+    vendidas: int            # entre los dos conteos, según la Libreta
+    pidieron: int
+
+    @property
+    def cambio(self) -> int | None:
+        return None if self.antes is None else self.ahora - self.antes
+
+    @property
+    def sin_explicar(self) -> int | None:
+        """antes − vendidas − ahora. Positivo = piezas que faltan sin venta que
+        lo explique (merma, venta sin registrar); negativo = sobran (llegó
+        mercancía que no se anotó)."""
+        return None if self.antes is None else self.antes - self.vendidas - self.ahora
+
+
+@dataclass(frozen=True)
+class Comparativo:
+    titulo: str
+    quien: str
+    fecha: date | None            # cuándo se terminó esta jornada
+    lineas: list[LineaComparativo]   # de lo que más se movió a lo que menos
+
+    @property
+    def con_anterior(self) -> list[LineaComparativo]:
+        return [l for l in self.lineas if l.antes is not None]
+
+    @property
+    def antes_total(self) -> int:
+        return sum(l.antes for l in self.con_anterior)
+
+    @property
+    def ahora_total(self) -> int:
+        return sum(l.ahora for l in self.lineas)
+
+    @property
+    def vendidas_total(self) -> int:
+        return sum(l.vendidas for l in self.lineas)
+
+    @property
+    def faltan(self) -> int:
+        return sum(l.sin_explicar for l in self.con_anterior if l.sin_explicar and l.sin_explicar > 0)
+
+    @property
+    def sobran(self) -> int:
+        return -sum(l.sin_explicar for l in self.con_anterior if l.sin_explicar and l.sin_explicar < 0)
+
+    @property
+    def anterior_at(self) -> date | None:
+        fechas = [l.antes_at for l in self.con_anterior if l.antes_at]
+        return max(fechas) if fechas else None
+
+
+def comparativo_de_jornada(session: Session, jornada: ConteoJornada, *, hoy: date | None = None) -> Comparativo:
+    """Este conteo contra el anterior de cada talla: cuánto había, cuánto hay,
+    cuánto se vendió en medio y cuánto no se explica. Daniel (2026-09-14):
+    "ver cómo estuvo de diferente, qué se movió más y cuánto"."""
+    r = revisar(session, jornada, hoy=hoy)
+    lineas = [
+        LineaComparativo(
+            variante_id=l.variante_id, producto=l.producto, talla=l.talla, color=l.color,
+            antes=l.anterior, antes_at=l.anterior_at, ahora=l.conto, vendidas=l.vendidas, pidieron=l.pidieron,
+        )
+        for l in r.lineas
+    ]
+    lineas.sort(key=lambda l: (-(abs(l.cambio) if l.cambio is not None else -1), -l.vendidas, l.producto, l.talla))
+    fecha = _fecha(jornada.terminada_at) if jornada.terminada_at else None
+    return Comparativo(titulo=r.titulo, quien=r.quien, fecha=fecha, lineas=lineas)

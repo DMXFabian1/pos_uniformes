@@ -11,6 +11,7 @@ import pytest
 
 pytest.importorskip("PyQt6.QtWidgets")
 
+from PyQt6.QtCore import Qt  # noqa: E402
 from PyQt6.QtWidgets import QApplication, QLabel, QMessageBox, QVBoxLayout, QWidget  # noqa: E402
 from sqlalchemy import create_engine, select  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
@@ -167,6 +168,27 @@ class TarjetasTests(unittest.TestCase):
         self.assertEqual((tabla.item(1, 1).text(), tabla.item(1, 3).text(), tabla.item(1, 4).text(), tabla.item(1, 5).text()), ("ayer", "Stayce Chavarria", "94 de 94", "Aplicada"))
         self.assertEqual(tabla.item(2, 1).text(), "hace 1 mes")
         self.assertEqual((tabla.item(3, 1).text(), tabla.item(3, 5).text()), ("nunca", "Nunca"))
+
+    def test_doble_clic_en_el_tablero_abre_el_comparativo(self) -> None:
+        from PyQt6.QtWidgets import QTableWidget
+
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        tabla = QTableWidget(0, 6, self.padre)
+        tarjetas.pintar_historial(tabla, [
+            jn.FilaTablero("Práxedis Guerrero", 1, "", jn.UltimoConteo(datetime.now(), "Stayce"), "94 de 94", "Aplicada", "", jornada_id=77),
+            jn.FilaTablero("CECYTE", 2, "", jn.UltimoConteo(None), "", "Nunca", ""),
+        ])
+        self.assertEqual(tabla.item(0, 0).data(Qt.ItemDataRole.UserRole), 77)
+        avisos = []
+        w = SimpleNamespace(conteos_historial_table=tabla, _set_status=avisos.append)
+        with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.ConteoComparativoDialog") as comp:
+            QuoteSatelliteWindow._conteos_comparar_fila(w, 0)
+            comp.assert_called_once()
+            self.assertEqual(comp.call_args.kwargs["jornada_id"], 77)
+            QuoteSatelliteWindow._conteos_comparar_fila(w, 1)
+            comp.assert_called_once()   # la nunca contada no abre nada
+        self.assertTrue(avisos and "todavía" in avisos[0])
 
 
 class RevisionDialogTests(unittest.TestCase):
@@ -377,6 +399,40 @@ class RevisionDialogTests(unittest.TestCase):
             d._historia_escuela()
             esc.assert_called_once()
             self.assertEqual(esc.call_args.kwargs["escuela_id"], self.foto.escuela_id)
+
+    def test_el_comparativo_se_abre_aunque_este_aplicada(self) -> None:
+        from pos_uniformes.ui.dialogs.conteo_jornada_dialogs import ConteoComparativoDialog
+
+        # Un conteo anterior de la talla 6 con 20; ahora contaron 7 y se vendieron 14.
+        from datetime import timedelta
+
+        from pos_uniformes.database.models import ConteoInventario
+
+        s = self.factory()
+        s.add(ConteoInventario(variante_id=self.v_ids[0], escuela_id=self.foto.escuela_id, stock_sistema=0, stock_fisico=20,
+                               diferencia=0, contado_por="x", contado_at=datetime.now() - timedelta(days=20)))
+        s.commit()
+        d = self._dialogo()
+        with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.QMessageBox.question", return_value=QMessageBox.StandardButton.Yes), \
+             patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.QMessageBox.information"):
+            d._aplicar()
+        self.assertEqual(d.resultado, "aplicada")
+        c = ConteoComparativoDialog(jornada_id=self.foto.id, session_factory=self.factory)
+        self._dialogos.append(c)
+        self.assertIn("Uno", c._encabezado.text())
+        self.assertEqual(c._cards["ANTES"]._valor.text(), "20")
+        self.assertEqual(c._cards["AHORA"]._valor.text(), "17")     # 7 + 10
+        self.assertEqual(c._cards["VENDIDAS"]._valor.text(), "14")
+        self.assertEqual(c._cards["SOBRAN"]._valor.text(), "1")     # 20 − 14 − 7 = −1
+        self.assertEqual(c._tabla.rowCount(), 1)                    # solo lo que cambió
+        self.assertEqual([c._tabla.item(0, i).text() for i in (1, 2, 3, 4, 5, 6)], ["6 AZUL", "20", "7", "-13", "14", "sobran 1"])
+        c._solo_cambios.setChecked(False)
+        self.assertEqual(c._tabla.rowCount(), 2)
+        self.assertEqual(c._tabla.item(1, 4).text(), "primer conteo")
+        # Desde Revisar hay botón.
+        with patch("pos_uniformes.ui.dialogs.conteo_jornada_dialogs.ConteoComparativoDialog") as comp:
+            d._comparar()
+            comp.assert_called_once()
 
     def test_descartar_no_toca_el_stock(self) -> None:
         d = self._dialogo()

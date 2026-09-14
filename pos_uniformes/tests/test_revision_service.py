@@ -370,5 +370,34 @@ class HistoriaEscuelaTests(_Escenario):
         self.assertTrue(all(s.vendidas == 0 for s in h.semanas))
 
 
+class ComparativoTests(_Escenario):
+    def test_antes_ahora_vendidas_y_lo_que_no_se_explica(self) -> None:
+        v0, v1 = self.v[0], self.v[1]
+        self._conteo_previo(v0, 20, HOY - timedelta(days=14))
+        self._conteo_previo(v1, 5, HOY - timedelta(days=14))
+        self._venta(HOY - timedelta(days=5), v0.sku, 6)
+        j = self._jornada_con({v0: 11, v1: 7})   # v0: 20 − 6 vendidas = 14 esperadas, hay 11 → faltan 3; v1: sobran 2
+        jn.terminar_jornada(self.s, j, empleada_code="VEND-4")
+        c = rv.comparativo_de_jornada(self.s, j, hoy=HOY)
+        self.assertEqual((c.titulo, c.quien), ("Uno", "Fanny"))
+        self.assertIsNotNone(c.fecha)   # terminada_at real (hoy de verdad)
+        self.assertEqual([l.talla for l in c.lineas], ["6", "8"])      # la que más se movió primero (−9 vs +2)
+        l0, l1 = c.lineas
+        self.assertEqual((l0.antes, l0.ahora, l0.cambio, l0.vendidas, l0.sin_explicar), (20, 11, -9, 6, 3))
+        self.assertEqual((l1.antes, l1.ahora, l1.cambio, l1.vendidas, l1.sin_explicar), (5, 7, 2, 0, -2))
+        self.assertEqual((c.antes_total, c.ahora_total, c.vendidas_total, c.faltan, c.sobran), (25, 18, 6, 3, 2))
+        self.assertEqual(c.anterior_at, HOY - timedelta(days=14))
+
+    def test_primer_conteo_no_tiene_con_que_comparar(self) -> None:
+        v0 = self.v[0]
+        j = self._jornada_con({v0: 4})
+        c = rv.comparativo_de_jornada(self.s, j, hoy=HOY)
+        l = c.lineas[0]
+        self.assertIsNone(l.antes)
+        self.assertIsNone(l.cambio)
+        self.assertIsNone(l.sin_explicar)
+        self.assertEqual((c.con_anterior, c.anterior_at, c.faltan), ([], None, 0))
+
+
 if __name__ == "__main__":
     unittest.main()

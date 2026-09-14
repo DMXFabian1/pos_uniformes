@@ -670,6 +670,7 @@ class FilaTablero:
     tallas: str            # "51 de 52", "" si no hay jornada
     estado: str            # "Aplicada" / "Por revisar" / "Descartada" / "Conteo viejo" / "Nunca" / "En proceso"
     quien_en_proceso: str  # nombre si hay jornada abierta
+    jornada_id: int | None = None   # la última jornada terminada, para abrir su comparativo
 
     @property
     def dias(self) -> int | None:
@@ -711,7 +712,7 @@ def tablero_conteos(session: Session) -> list[FilaTablero]:
         if abierta is not None:
             quien = abierta.empleada_nombre or abierta.empleada_code
             estado = "En proceso"
-        return FilaTablero(titulo, escuela_id, tipo_pieza, u, tallas, estado, quien)
+        return FilaTablero(titulo, escuela_id, tipo_pieza, u, tallas, estado, quien, j.id if j is not None else None)
 
     filas: list[FilaTablero] = []
     for e in list_all_schools(session):

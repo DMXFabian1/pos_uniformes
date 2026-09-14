@@ -208,8 +208,12 @@ def pintar_historial(tabla, filas) -> None:
             quien = f.quien_en_proceso or u.quien
             valores = (f.titulo, hace, fecha, quien, f.tallas, f.estado + (f" · {f.quien_en_proceso}" if f.quien_en_proceso else ""))
             estado = f.estado
+        jornada_id = None if isinstance(f, tuple) else f.jornada_id
         for col, txt in enumerate(valores):
             item = QTableWidgetItem(txt)
+            item.setData(Qt.ItemDataRole.UserRole, jornada_id)   # doble clic → comparativo
+            if jornada_id is not None:
+                item.setToolTip("Doble clic: comparar con el conteo anterior")
             if col in (1, 2, 4, 5):
                 item.setTextAlignment(Qt.AlignmentFlag.AlignCenter)
             if col == 5:

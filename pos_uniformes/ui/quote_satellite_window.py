@@ -3499,6 +3499,9 @@ class QuoteSatelliteWindow(QMainWindow):
         self.conteos_historial_table.setShowGrid(False)
         self.conteos_historial_table.setAlternatingRowColors(True)
         self.conteos_historial_table.setMinimumHeight(180)
+        # Doble clic en una escuela: el comparativo de su último conteo contra
+        # el anterior (Daniel 2026-09-14: "una vez aplicado no puedo volver a verlo").
+        self.conteos_historial_table.cellDoubleClicked.connect(self._conteos_comparar_fila)
         hh = self.conteos_historial_table.horizontalHeader()
         hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         for col in (1, 2, 3, 4, 5):
@@ -3805,6 +3808,17 @@ class QuoteSatelliteWindow(QMainWindow):
         ).exec()
         self._refresh_conteo_banner()
         self._refresh_conteos_vista()
+
+    def _conteos_comparar_fila(self, fila: int, _col: int = 0) -> None:
+        """Abre el comparativo de la última jornada terminada de esa escuela."""
+        item = self.conteos_historial_table.item(fila, 0)
+        jornada_id = item.data(Qt.ItemDataRole.UserRole) if item is not None else None
+        if jornada_id is None:
+            self._set_status("Esa escuela todavía no tiene un conteo terminado que comparar.")
+            return
+        from pos_uniformes.ui.dialogs.conteo_jornada_dialogs import ConteoComparativoDialog
+
+        ConteoComparativoDialog(self, jornada_id=int(jornada_id)).exec()
 
     def _conteos_eliminar(self, foto) -> None:
         """Borra una jornada a medias (duplicada o abierta por error) con lo
