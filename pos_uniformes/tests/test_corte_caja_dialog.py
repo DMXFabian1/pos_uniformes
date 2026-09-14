@@ -70,7 +70,7 @@ class TicketCorteTests(unittest.TestCase):
         self.assertIn("Venta en efectivo:", texto)
         self.assertIn("Tarjeta, llega (2):", texto)
         self.assertIn("$673.50", texto)
-        self.assertIn("(cobrado $705.00 menos 4.5%)", texto)
+        self.assertNotIn("cobrado", texto)   # Daniel: sin esa leyenda en el papel
         self.assertIn("VENTA TOTAL:", texto)
         self.assertIn("$11,414.50", texto)   # efectivo + lo que llega
         self.assertNotIn("Tarjeta", texto_ticket_corte(_corte(), venta_efectivo=Decimal("1"), tarjeta=Decimal("0")))
@@ -86,12 +86,11 @@ class TicketCorteTests(unittest.TestCase):
         self.assertNotIn("Tarjeta", sin)
         self.assertNotIn("705", sin)
         self.assertIn("Venta en efectivo:", sin)
-        # Lo único que cambia son las líneas de tarjeta (llega · cobrado · VENTA TOTAL · nota).
+        # Lo único que cambia son las líneas de tarjeta (llega · VENTA TOTAL · nota).
         quitadas = [l for l in con.splitlines() if l not in sin.splitlines()]
-        self.assertEqual(len(quitadas), 4)
+        self.assertEqual(len(quitadas), 3)
         self.assertIn("Tarjeta, llega", quitadas[0])
-        self.assertIn("cobrado", quitadas[1])
-        self.assertIn("VENTA TOTAL", quitadas[2])
+        self.assertIn("VENTA TOTAL", quitadas[1])
 
     def test_sin_pagos_no_imprime_la_linea(self) -> None:
         texto = texto_ticket_corte(_corte(retiros_pagos=Decimal("0.00")))
@@ -254,7 +253,7 @@ class TicketEncargadoTests(unittest.TestCase):
         self.assertIn("Venta en efectivo:", texto)
         self.assertIn("$10,741.00", texto)
         self.assertIn("Tarjeta, llega (2):", texto)
-        self.assertIn("cobrado $705.00", texto)
+        self.assertNotIn("cobrado", texto)
         self.assertIn("no esta en el cajon", texto)
         self.assertIn("Hoy no se paga a nadie.", texto)
         self.assertIn("SACAR DE LA VENTA:", texto)

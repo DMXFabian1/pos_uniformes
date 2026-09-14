@@ -101,13 +101,12 @@ def _bloque_cuenta(lines, *, corte, venta, tarjeta, tarjeta_ops, pagos_restar, r
     lines.append(tk_row("Venta en efectivo:", f"${venta:,.2f}"))
     if tarjeta_monto > 0:
         # Lo que LLEGA por la terminal (neto del 4.5%) es la cifra que manda
-        # (Daniel 2026-09-14); lo cobrado va en chico.
+        # (Daniel 2026-09-14); lo cobrado no va en el papel.
         from pos_uniformes.services.libreta_service import aplicar_comision_terminal
 
         llega = Decimal(tarjeta_neto if tarjeta_neto is not None else aplicar_comision_terminal(tarjeta_monto)).quantize(Decimal("0.01"))
         cuantas = f" ({tarjeta_ops})" if tarjeta_ops else ""
         lines.append(tk_row(f"Tarjeta, llega{cuantas}:", f"${llega:,.2f}"))
-        lines.append(tk_line(f"  (cobrado ${tarjeta_monto:,.2f} menos 4.5%)"))
         lines.append(tk_row("VENTA TOTAL:", f"${(venta + llega):,.2f}"))
         lines.append(tk_line("  (la tarjeta no esta en el cajon)"))
     restas = list(pagos_restar or []) or list(retiros or [])
