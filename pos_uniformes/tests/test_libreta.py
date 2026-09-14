@@ -1720,7 +1720,7 @@ class LibretaDuenoRedisenoTests(unittest.TestCase):
         titulos = [t.text() for _c, t, _v, _s in win._libreta_cards]
         self.assertEqual(
             titulos,
-            ["EN EL CAJÓN (EFECTIVO)", "CON TARJETA", "ABONOS", "COMISIONES"],
+            ["EN EL CAJÓN (EFECTIVO)", "CON TARJETA (LLEGA)", "ABONOS", "COMISIONES"],
         )
         # Solo dinero real: tarjeta 1 = efectivo en el cajón ($500); tarjeta 2
         # = lo que llega por la terminal ($500, neto tras 4.5%). El valor del

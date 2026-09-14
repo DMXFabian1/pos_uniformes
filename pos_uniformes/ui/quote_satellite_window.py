@@ -3120,10 +3120,11 @@ class QuoteSatelliteWindow(QMainWindow):
                         pie_cajon,
                     ),
                     (
-                        "CON TARJETA",
-                        f"${total_tarjeta:,.0f}",
+                        # Lo que LLEGA en grande; lo cobrado en chico (Daniel 2026-09-14).
+                        "CON TARJETA (LLEGA)",
+                        f"${neto_tarjeta:,.0f}",
                         (
-                            f"llega por la terminal · neto tras 4.5%: ${neto_tarjeta:,.0f}"
+                            f"cobrado ${total_tarjeta:,.0f} · neto tras 4.5% de la terminal"
                             if total_tarjeta
                             else "sin cobros con tarjeta"
                         ),

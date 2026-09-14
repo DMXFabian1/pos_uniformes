@@ -46,8 +46,9 @@ class ResumenPeriodo:
     ventas: Decimal          # cobrado en ventas (efectivo + tarjeta)
     abonos: Decimal          # cobrado en abonos (efectivo + tarjeta)
     apartados: Decimal       # comprometido, no es dinero recibido
-    tarjeta: Decimal         # lo que entró por terminal (no está en el cajón)
+    tarjeta: Decimal         # lo cobrado con tarjeta (no está en el cajón)
     efectivo: Decimal        # ventas + abonos pagados en efectivo
+    tarjeta_neto: Decimal = Decimal("0.00")   # lo que de verdad LLEGA por la terminal (tras el 4.5%)
 
 
 @dataclass(frozen=True)
@@ -75,7 +76,7 @@ def resumir_periodo(rows: list) -> ResumenPeriodo:
     """Suma las operaciones de la Libreta de un periodo (mismas reglas que
     el corte por día: tarjeta no está en caja, apartado no es dinero)."""
     operaciones = piezas = 0
-    ventas = abonos = apartados = tarjeta = efectivo = Decimal("0.00")
+    ventas = abonos = apartados = tarjeta = efectivo = tarjeta_neto = Decimal("0.00")
     for row in rows:
         operaciones += 1
         piezas += int(row.piezas or 0)
@@ -91,6 +92,7 @@ def resumir_periodo(rows: list) -> ResumenPeriodo:
             ventas += monto
         if con_tarjeta:
             tarjeta += monto
+            tarjeta_neto += _d(getattr(row, "monto_neto", None) or monto)
         else:
             efectivo += monto
     return ResumenPeriodo(
@@ -101,6 +103,7 @@ def resumir_periodo(rows: list) -> ResumenPeriodo:
         apartados=apartados.quantize(_CENT),
         tarjeta=tarjeta.quantize(_CENT),
         efectivo=efectivo.quantize(_CENT),
+        tarjeta_neto=tarjeta_neto.quantize(_CENT),
     )
 
 
@@ -369,6 +372,7 @@ class DatosTicketEncargado:
     tarjeta: Decimal
     tarjeta_ops: int
     retiros: list
+    tarjeta_neto: Decimal = Decimal("0.00")
 
 
 def datos_ticket_encargado(session, desde: datetime | None, hasta: datetime) -> DatosTicketEncargado:
@@ -391,6 +395,14 @@ def datos_ticket_encargado(session, desde: datetime | None, hasta: datetime) -> 
         for r in visibles
         if str(r.tipo) in ("venta", "abono") and bool(getattr(r, "pago_tarjeta", False))
     )
+    tarjeta_neto = sum(
+        (
+            _d(getattr(r, "monto_neto", None) or r.monto_total)
+            for r in visibles
+            if str(r.tipo) in ("venta", "abono") and bool(getattr(r, "pago_tarjeta", False))
+        ),
+        Decimal("0.00"),
+    )
     try:
         from pos_uniformes.services.retiros_service import retiros_del_periodo
 
@@ -399,7 +411,8 @@ def datos_ticket_encargado(session, desde: datetime | None, hasta: datetime) -> 
         session.rollback()
         retiros = []
     return DatosTicketEncargado(
-        por_empleada=resumir_por_empleada(rows), tarjeta=tarjeta, tarjeta_ops=ops, retiros=retiros
+        por_empleada=resumir_por_empleada(rows), tarjeta=tarjeta, tarjeta_ops=ops, retiros=retiros,
+        tarjeta_neto=tarjeta_neto.quantize(_CENT),
     )
 
 

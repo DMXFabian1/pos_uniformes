@@ -993,10 +993,10 @@ function pintarDueno(data) {
   const tarjeta = Number(d.hoy.tarjeta || 0);
   $("d-dinero").innerHTML =
     `<div class="tarjetas">` +
-      `<div class="tarjeta"><div class="et">💳  CON TARJETA</div>` +
-      `<div class="valor">${pesos(d.hoy.tarjeta || 0)}</div>` +
+      `<div class="tarjeta"><div class="et">💳  CON TARJETA (LLEGA)</div>` +
+      `<div class="valor">${pesos(tarjeta ? d.hoy.neto_tarjeta : 0)}</div>` +
       `<div class="sub" style="margin:2px 0 0">${tarjeta
-        ? "neto tras 4.5%: " + pesos(d.hoy.neto_tarjeta)
+        ? "cobrado " + pesos(d.hoy.tarjeta) + " · neto tras 4.5%"
         : "sin cobros con tarjeta"}</div></div>` +
       `<div class="tarjeta"><div class="et">🏷  ABONOS</div>` +
       `<div class="valor">${pesos(d.hoy.abonos || 0)}</div>` +

@@ -130,7 +130,7 @@ def hacer_corte_y_avisar(
         venta_papel = (Decimal(retirar) + total_pagos + ya_salio).quantize(Decimal("0.01"))
     texto = texto_ticket_corte_encargado(
         auto.corte, venta_papel, auto.pagos, datos.por_empleada, retiros=datos.retiros,
-        tarjeta=datos.tarjeta, tarjeta_ops=datos.tarjeta_ops, ya_pagados=ya_pagados,
+        tarjeta=datos.tarjeta, tarjeta_ops=datos.tarjeta_ops, ya_pagados=ya_pagados, tarjeta_neto=getattr(datos, "tarjeta_neto", None),
     )
     impreso = False
     try:
