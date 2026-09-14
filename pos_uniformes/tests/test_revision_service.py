@@ -224,8 +224,8 @@ class RevisarTests(_Escenario):
         rev = rv.revisar(self.s, j, hoy=HOY)
         ids = {l.variante_id: l.conteo_id for l in rev.lineas}
         with self.assertRaises(PermissionError):
-            rv.guardar_pedidos(self.s, j, {ids[v0.id]: 20}, decidido_por="VEND-4")
-        n = rv.guardar_pedidos(self.s, j, {ids[v0.id]: 20, ids[v1.id]: None}, decidido_por="VEND-1")
+            rv.guardar_pedidos(self.s, j, {ids[v0.id]: 20}, decidido_por="VEND-4", hoy=HOY)
+        n = rv.guardar_pedidos(self.s, j, {ids[v0.id]: 20, ids[v1.id]: None}, decidido_por="VEND-1", hoy=HOY)
         self.assertEqual(n, 1)
         c0 = self.s.get(ConteoInventario, ids[v0.id])
         self.assertEqual((c0.pedido, c0.pedido_sugerido), (20, rev.lineas[0].sugerido))

@@ -338,12 +338,12 @@ def revisar(session: Session, jornada: ConteoJornada, *, hoy: date | None = None
     return Revision(jornada.id, jornada.titulo, jornada.empleada_nombre or jornada.empleada_code, hoy, lineas)
 
 
-def guardar_pedidos(session: Session, jornada: ConteoJornada, pedidos: dict[int, int | None], *, decidido_por: str) -> int:
+def guardar_pedidos(session: Session, jornada: ConteoJornada, pedidos: dict[int, int | None], *, decidido_por: str, hoy: date | None = None) -> int:
     """Guarda lo que Daniel decidió por talla (`{conteo_id: piezas}`) y lo que
     se le sugirió en ese momento. `None` o vacío borra la decisión. Solo el dueño."""
     if (decidido_por or "").strip().upper() != DUENO_CODE:
         raise PermissionError("Solo el dueño decide el pedido.")
-    sugeridos = {l.conteo_id: l.sugerido for l in revisar(session, jornada).lineas}
+    sugeridos = {l.conteo_id: l.sugerido for l in revisar(session, jornada, hoy=hoy).lineas}
     conteos = {
         c.id: c
         for c in session.scalars(

@@ -745,7 +745,8 @@ class Variante(Base):
     __tablename__ = "variante"
     __table_args__ = (
         UniqueConstraint("producto_id", "talla", "color", name="producto_talla_color_unico"),
-        CheckConstraint("stock_actual >= -1", name="variante_stock_actual_no_negativo"),
+        # Sin piso: desde 2026-09-14 la venta del kiosko descuenta y un stock
+        # negativo es la lista de qué recontar (migración cd3e4f5a6b7c).
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -1206,7 +1207,6 @@ class MovimientoInventario(Base):
     __tablename__ = "movimiento_inventario"
     __table_args__ = (
         CheckConstraint("cantidad <> 0", name="movimiento_inventario_cantidad_no_cero"),
-        CheckConstraint("stock_posterior >= -1", name="movimiento_inventario_stock_posterior_no_negativo"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

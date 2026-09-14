@@ -10,6 +10,7 @@ Ventanas: "hoy" (día local) y "semana" (calendario, lunes a domingo).
 
 from __future__ import annotations
 
+import logging
 import re
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
@@ -19,6 +20,11 @@ from sqlalchemy import select, true as sa_true
 
 from pos_uniformes.database.models import LibretaVenta
 from pos_uniformes.utils.date_format import local_day_window
+
+logger = logging.getLogger(__name__)
+
+# Tipos de operación que se llevan piezas del piso. El abono no mueve piezas.
+TIPOS_QUE_DESCUENTAN = ("venta", "apartado")
 
 
 def ventana_hoy(reference: date | None = None) -> tuple[datetime, datetime]:
@@ -193,7 +199,101 @@ def registrar_operacion(
     if created_at is not None:
         entry.created_at = created_at
     session.add(entry)
+    session.flush()
+    descontar_stock(session, entry)
     return entry
+
+
+def _referencia(entry: LibretaVenta) -> str | None:
+    entry_id = getattr(entry, "id", None)
+    return f"libreta:{entry_id}" if entry_id is not None else None
+
+
+def descontar_stock(session, entry: LibretaVenta) -> int:
+    """La venta (o apartado) baja el stock de cada talla que se llevó.
+
+    Desde 2026-09-14 (Daniel: "que la venta descuente stock"). Antes solo lo
+    hacía el POS viejo y el número llevaba congelado desde el 16 de julio.
+
+    - Va amarrado al id de la Libreta (`referencia = libreta:N`): si por lo
+      que sea se vuelve a llamar, no descuenta dos veces.
+    - Puede dejar negativo: un negativo es la lista de qué recontar.
+    - NUNCA tumba la venta: cada talla va en un savepoint; si algo falla se
+      anota en el log y la venta se guarda igual.
+    Devuelve cuántas tallas se descontaron.
+    """
+    if getattr(entry, "tipo", None) not in TIPOS_QUE_DESCUENTAN:
+        return 0
+    from pos_uniformes.database.models import MovimientoInventario, TipoMovimientoInventario, Variante
+    from pos_uniformes.services.inventario_service import InventarioService
+
+    referencia = _referencia(entry)
+    if referencia is None:
+        return 0
+    ya = set(session.scalars(
+        select(MovimientoInventario.variante_id).where(MovimientoInventario.referencia == referencia)
+    ).all())
+    tipo = TipoMovimientoInventario.SALIDA_VENTA if entry.tipo == "venta" else TipoMovimientoInventario.APARTADO_RESERVA
+    hechas = 0
+    for linea in entry.detalle or []:
+        sku = str(linea.get("sku") or "").strip()
+        try:
+            cantidad = int(linea.get("cantidad") or 0)
+        except (TypeError, ValueError):
+            continue
+        if not sku or cantidad <= 0:
+            continue
+        try:
+            with session.begin_nested():
+                variante = session.scalar(select(Variante).where(Variante.sku == sku))
+                if variante is None or variante.id in ya:
+                    continue
+                InventarioService.registrar_movimiento(
+                    session, variante, tipo, -cantidad,
+                    referencia=referencia,
+                    observacion=f"{entry.tipo} en el kiosko ({entry.employee_code})",
+                    creado_por=str(entry.employee_code or "kiosko"),
+                    allow_negative_stock=True,
+                )
+                hechas += 1
+        except Exception:  # noqa: BLE001 — la venta vale más que el número
+            logger.exception("Libreta %s: no se pudo descontar %s (sku %s)", entry.id, cantidad, sku)
+    return hechas
+
+
+def devolver_stock(session, entry: LibretaVenta) -> int:
+    """Regresa al stock lo que descontó una operación (cuando el dueño la
+    borra). Devuelve cuántas tallas regresaron."""
+    from pos_uniformes.database.models import MovimientoInventario, TipoMovimientoInventario, Variante
+    from pos_uniformes.services.inventario_service import InventarioService
+
+    referencia = _referencia(entry)
+    if referencia is None:
+        return 0
+    movimientos = list(session.scalars(
+        select(MovimientoInventario).where(
+            MovimientoInventario.referencia == referencia,
+            MovimientoInventario.tipo_movimiento.in_((TipoMovimientoInventario.SALIDA_VENTA, TipoMovimientoInventario.APARTADO_RESERVA)),
+        )
+    ).all())
+    hechas = 0
+    for mov in movimientos:
+        try:
+            with session.begin_nested():
+                variante = session.get(Variante, mov.variante_id)
+                if variante is None:
+                    continue
+                InventarioService.registrar_movimiento(
+                    session, variante, TipoMovimientoInventario.CANCELACION_VENTA, abs(int(mov.cantidad)),
+                    referencia=f"{referencia}:borrada",
+                    observacion="Operación borrada de la Libreta",
+                    creado_por="dueno",
+                    allow_negative_stock=True,
+                )
+                hechas += 1
+        except Exception:  # noqa: BLE001
+            logger.exception("Libreta %s: no se pudo devolver el stock de la variante %s", entry.id, mov.variante_id)
+    return hechas
 
 
 def listar_operaciones(
@@ -346,6 +446,10 @@ def eliminar_operacion(session, operacion_id: int) -> bool:
     entry = session.get(LibretaVenta, int(operacion_id))
     if entry is None:
         return False
+    try:
+        devolver_stock(session, entry)   # lo que se llevó, regresa
+    except Exception:  # noqa: BLE001 — borrar la operación vale más que el número
+        logger.exception("Libreta %s: no se pudo devolver el stock", operacion_id)
     session.delete(entry)
     return True
 
