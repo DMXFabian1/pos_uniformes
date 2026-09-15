@@ -278,6 +278,22 @@ def capturado_en_jornada(session: Session, jornada_id: int) -> dict[int, int]:
     return {int(vid): int(fisico) for vid, fisico in filas}
 
 
+def capturado_por_jornada(session: Session, jornada_ids: list[int]) -> dict[int, dict[int, int]]:
+    """Lo mismo que `capturado_en_jornada` pero para varias de un jalón (el
+    tablero: una consulta en vez de una por escuela)."""
+    if not jornada_ids:
+        return {}
+    filas = session.execute(
+        select(ConteoInventario.jornada_id, ConteoInventario.variante_id, ConteoInventario.stock_fisico)
+        .where(ConteoInventario.jornada_id.in_(jornada_ids))
+        .order_by(ConteoInventario.contado_at.asc(), ConteoInventario.id.asc())
+    ).all()
+    out: dict[int, dict[int, int]] = {int(j): {} for j in jornada_ids}
+    for jid, vid, fisico in filas:
+        out[int(jid)][int(vid)] = int(fisico)
+    return out
+
+
 @dataclass(frozen=True)
 class Conflicto:
     """Una talla que otra persona ya capturó en esta jornada con otro número."""
@@ -448,9 +464,11 @@ class Avance:
         return int(round(100 * self.tallas_hechas / self.tallas_total)) if self.tallas_total else 0
 
 
-def avance(session: Session, jornada: ConteoJornada) -> Avance:
-    """Cuántas tallas y cuántas prendas van (puro sobre la consulta)."""
-    hechas = capturado_en_jornada(session, jornada.id)
+def avance(session: Session, jornada: ConteoJornada, hechas: dict[int, int] | None = None) -> Avance:
+    """Cuántas tallas y cuántas prendas van (puro sobre la consulta).
+    `hechas`: lo capturado, si ya se trajo en lote (`capturado_por_jornada`)."""
+    if hechas is None:
+        hechas = capturado_en_jornada(session, jornada.id)
     grupos = alcance(session, jornada.escuela_id, jornada.tipo_pieza, getattr(jornada, "prenda", ""))
     prendas_total = len(grupos)
     prendas_hechas = sum(
@@ -766,13 +784,14 @@ def tablero_conteos(session: Session) -> list[FilaTablero]:
         clave = ("basicos", j.tipo_pieza) if j.escuela_id is None else int(j.escuela_id)
         if clave not in ultimas:
             ultimas[clave] = j
+    capturado = capturado_por_jornada(session, [j.id for j in ultimas.values()])
 
     def fila(titulo: str, escuela_id: int | None, tipo_pieza: str, clave) -> FilaTablero:
         u = ultimos.get(clave, UltimoConteo(None))
         j = ultimas.get(clave)
         abierta = abiertas.get(clave)
         if j is not None:
-            a = avance(session, j)
+            a = avance(session, j, capturado.get(j.id))
             tallas = f"{a.tallas_hechas} de {a.tallas_total}"
             estado = estado_de(j)
         elif u.fecha is not None:

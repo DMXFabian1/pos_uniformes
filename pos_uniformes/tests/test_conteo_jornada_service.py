@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import unittest
+from unittest.mock import patch
 from datetime import date
 
 from sqlalchemy import create_engine, select
@@ -201,6 +202,21 @@ class JornadaTests(unittest.TestCase):
         self.assertEqual((filas[0].estado, filas[0].quien_en_proceso), ("En proceso", "Fanny"))
         self.assertEqual((filas[1].estado, filas[1].tallas, filas[1].ultimo.quien), ("Aplicada", "1 de 4", "Stayce"))
         self.assertEqual((filas[2].estado, filas[2].tallas, filas[2].dias), ("Nunca", "", None))
+
+    def test_el_tablero_trae_lo_capturado_de_todas_las_jornadas_de_un_jalon(self) -> None:
+        # Una consulta para todas (antes una por escuela: 85 consultas y 1.5 s
+        # en abrir Conteos por wifi).
+        j = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4")
+        v = self._variantes()
+        registrar_conteos_lote(self.s, [ConteoInput(v[0].id, 3), ConteoInput(v[1].id, 0)], "x", jornada_id=j.id)
+        jn.terminar_jornada(self.s, j, empleada_code="VEND-4")
+        self.s.commit()
+        lote = jn.capturado_por_jornada(self.s, [j.id, 999])
+        self.assertEqual(lote, {j.id: {v[0].id: 3, v[1].id: 0}, 999: {}})
+        # avance con lo ya traído no vuelve a preguntar por lo capturado
+        with patch.object(jn, "capturado_en_jornada", side_effect=AssertionError("no debía consultar")):
+            a = jn.avance(self.s, j, lote[j.id])
+        self.assertEqual((a.tallas_hechas, a.tallas_total), (2, 4))
 
     def test_basicos_una_abierta_por_prenda(self) -> None:
         j = jn.abrir_jornada(self.s, escuela_id=None, tipo_pieza="Playera", empleada_code="VEND-4")
