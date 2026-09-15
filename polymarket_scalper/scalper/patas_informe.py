@@ -88,6 +88,7 @@ def resumen(d: Datos) -> dict[str, Any]:
                if r.get("time_to_second_leg_ms") is not None]
     duraciones = [r["duracion_ms"] / 1000 for r in d.patas if r.get("duracion_ms")]
     reales = [r["pnl_realizado_final"] for r in d.patas if r.get("pnl_realizado_final") is not None]
+    sin_realizado = sum(1 for r in d.patas if r.get("pnl_realizado_final") is None)
     return {
         "patas": n, "desenlaces": por,
         "tasa_recuperacion": round(recuperadas / n, 4) if n else None,
@@ -95,6 +96,7 @@ def resumen(d: Datos) -> dict[str, Any]:
         "mediana_duracion_s": _mediana(duraciones),
         "pnl_realizado_total": round(sum(reales), 2) if reales else None,
         "pnl_realizado_medio": round(_media(reales), 3) if reales else None,
+        "n_con_realizado": len(reales), "n_sin_realizado": sin_realizado,
         "nivel": nivel(n),
     }
 
@@ -309,8 +311,10 @@ def formatear(inf: InformePatas) -> str:  # noqa: C901 - es un informe, se lee d
     L.append(f"Mediana hasta la segunda pata: {_ms(r['mediana_segunda_pata_s'] * 1000) if r['mediana_segunda_pata_s'] else '-'}"
              f"   ·   mediana de duración: {_ms(r['mediana_duracion_s'] * 1000) if r['mediana_duracion_s'] else '-'}")
     if r["pnl_realizado_medio"] is not None:
-        L.append(f"Resultado REALIZADO de esas posiciones: {r['pnl_realizado_total']:+.2f} USD "
-                 f"({r['pnl_realizado_medio']:+.3f} por pata)")
+        L.append(f"Resultado REALIZADO de {r['n_con_realizado']} de las {r['patas']} patas: "
+                 f"{r['pnl_realizado_total']:+.2f} USD ({r['pnl_realizado_medio']:+.3f} por pata)")
+        if r["n_sin_realizado"]:
+            L.append(f"  ({r['n_sin_realizado']} sin resultado registrado: no entran en esa media)")
     L.append("")
 
     L.append("-- COSTE DE SALIR, POR HORIZONTE --------------------------------------------------")

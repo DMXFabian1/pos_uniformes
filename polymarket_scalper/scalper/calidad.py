@@ -134,17 +134,26 @@ def modelo_inmutable(data_dir: str | Path, run_id: str) -> list[Problema]:
     suyas = df.filter(pl.col("run_id") == run_id)
     if suyas.is_empty():
         return []
-    # El nulo cuenta como una versión más: "sin modelo" y "con modelo v2" son dos motores, y pasar
-    # de uno al otro es exactamente la promoción a mitad de corrida que hay que detectar. En
-    # `muestra-3` fueron 494 filas sin modelo y 186 con la v2, y una comprobación que ignorase los
-    # nulos habría dicho que todo estaba en orden.
-    versiones = sorted({("sin modelo" if v is None else f"v{v}")
-                        for v in suyas["model_version"].to_list()})
-    if len(versiones) > 1:
-        return [Problema("modelo_inmutable",
-                         f"la corrida {run_id} mezcla {', '.join(versiones)}: se promocionó un "
-                         f"modelo a mitad", suyas.height)]
-    return []
+    # Hay que mirar **por estrategia**. Que la captura de spread tenga modelo y el dinero
+    # inteligente no lo tenga es lo normal: son detectores distintos y cada uno lleva el suyo. Lo
+    # que delata una promoción a mitad es que UNA MISMA estrategia cambie de versión con el tiempo,
+    # que es lo que pasó en `muestra-3` con TENNIS_SPREAD_CAPTURE: 494 filas sin modelo y 186 con la
+    # v2. Comparar entre estrategias daba fallo en cualquier corrida honesta.
+    #
+    # El nulo cuenta como una versión: "sin modelo" y "con modelo v2" son dos motores distintos, y
+    # pasar de uno al otro es justo lo que hay que detectar.
+    if "strategy" not in suyas.columns:
+        return []
+    out: list[Problema] = []
+    for est in sorted({e for e in suyas["strategy"].to_list() if e}):
+        filas = suyas.filter(pl.col("strategy") == est)
+        versiones = sorted({("sin modelo" if v is None else f"v{v}")
+                            for v in filas["model_version"].to_list()})
+        if len(versiones) > 1:
+            out.append(Problema("modelo_inmutable",
+                                f"la corrida {run_id} decidió {est} con {', '.join(versiones)}: se "
+                                f"promocionó un modelo a mitad", filas.height))
+    return out
 
 
 def ordenes_conservadas(data_dir: str | Path, experiment: str | None = None) -> list[Problema]:

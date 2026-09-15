@@ -138,11 +138,28 @@ def test_dos_versiones_de_modelo_en_una_corrida_la_invalidan(tmp_path):
             "kind": "spread_capture", "condition_id": "c", "event_id": "e",
             "status": "closed", "exit_reason": "expired", "size_filled": 50.0,
             "realized_pnl": -1.0, "sombra": False}
+    base["strategy"] = "TENNIS_SPREAD_CAPTURE"
     _escribir(tmp_path, "ledger", [{**base, "model_version": None}, {**base, "model_version": 2}])
     problemas = calidad.modelo_inmutable(tmp_path, "muestra-x")
     # Pasar de "sin modelo" a "con modelo v2" es la promoción a mitad de corrida: son dos motores.
     assert problemas and "se promocionó un modelo a mitad" in problemas[0].detalle
     assert "sin modelo" in problemas[0].detalle and "v2" in problemas[0].detalle
+
+
+def test_que_cada_estrategia_tenga_su_propio_modelo_es_normal(tmp_path):
+    # La captura de spread tiene modelo promovido y el dinero inteligente no. Son detectores
+    # distintos con su propio modelo cada uno: eso NO es una promoción a mitad de corrida.
+    # Comparar entre estrategias daba fallo en cualquier corrida honesta.
+    base = {"ts_ms": 1_700_000_000_000, "run_id": "muestra-x", "experiment": "exp-a", "signal_id": "s",
+            "kind": "spread_capture", "condition_id": "c", "event_id": "e",
+            "status": "closed", "exit_reason": "expired", "size_filled": 50.0,
+            "realized_pnl": -1.0, "sombra": False}
+    _escribir(tmp_path, "ledger", [
+        {**base, "strategy": "TENNIS_SPREAD_CAPTURE", "model_version": 2},
+        {**base, "strategy": "TENNIS_SPREAD_CAPTURE", "model_version": 2},
+        {**base, "strategy": "SMART_MONEY", "model_version": None},
+    ])
+    assert calidad.modelo_inmutable(tmp_path, "muestra-x") == []
 
 
 def _punto(**kw):

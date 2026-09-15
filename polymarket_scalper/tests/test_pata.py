@@ -328,3 +328,24 @@ def test_la_estrategia_apagada_no_abre_nada_pero_deja_constancia(cfg, tmp_path):
     cfg.validacion.desactivadas = ["TENNIS_DIRECTIONAL"]
     eng, w = _engine_spread(cfg, tmp_path)
     assert "TENNIS_DIRECTIONAL" in eng._desactivadas
+
+
+def test_una_pata_recuperada_guarda_su_resultado_realizado(cfg, tmp_path):
+    # La cifra hipotética solo sirve si hay una real con la que compararla. Al cerrar la pata antes
+    # que la posición, `realized_pnl` todavía no existía y las 52 patas recuperadas de la primera
+    # corrida quedaron sin resultado: justo la mitad que hacía falta para el balance.
+    eng, w = _engine_spread(cfg, tmp_path)
+    pos = _posicion(eng)
+    eng.fill_model.maker_on_trade(pos.maker_orders[0],
+                                  {"token_id": SI, "side": "SELL", "price": 0.46, "size": 50}, 2_000)
+    eng._after_maker_fill(pos, 2_000)
+    eng.fill_model.maker_on_trade(pos.maker_orders[1],
+                                  {"token_id": NO, "side": "BUY", "price": 0.54, "size": 50}, 32_000)
+    eng._after_maker_fill(pos, 32_000)
+    pata = eng.patas_cerradas[0]
+    assert pata.desenlace == P.RECUPERADA and pata.time_to_second_leg_ms == 30_000
+    assert pata.pnl_realizado_final is not None
+    assert pata.pnl_realizado_final == pytest.approx(pos.realized_pnl)
+    w.flush()
+    fila = scan(tmp_path, "partial_legs").collect().to_dicts()[0]
+    assert fila["pnl_realizado_final"] is not None

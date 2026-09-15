@@ -1001,7 +1001,9 @@ class Engine:
         pos.cost, pos.payout, pos.inventory = cost, payout, inv
         pos.size_filled = max(o.filled for o in pos.maker_orders)
         if all(o.done for o in pos.maker_orders):
-            self._cerrar_pata(pos, ts_ms, pata_mod.RECUPERADA, "both_filled", ts_segunda=ts_ms)
+            # `_close` cierra también la pata, y su desenlace sale del motivo. Tiene que ir en este
+            # orden: antes, la posición todavía no tiene `realized_pnl` y la pata se guardaba sin
+            # resultado realizado, que es justo la cifra con la que hay que comparar el hipotético.
             pos.inventory = {}
             self._close(pos, ts_ms, "both_filled")
             return
@@ -1167,8 +1169,13 @@ class Engine:
         # motivo de cierre y se decide en un solo sitio: `expired` es que se agotó el tiempo de
         # sostén, cualquier otra vía es un cierre. La recuperación ya se anotó antes de llegar aquí.
         if id(pos) in self.patas:
-            desenlace = pata_mod.CADUCADA if reason.startswith("expired") else pata_mod.CERRADA
-            self._cerrar_pata(pos, ts_ms, desenlace, reason)
+            if reason == "both_filled":
+                desenlace, ts_segunda = pata_mod.RECUPERADA, ts_ms
+            elif reason.startswith("expired"):
+                desenlace, ts_segunda = pata_mod.CADUCADA, None
+            else:
+                desenlace, ts_segunda = pata_mod.CERRADA, None
+            self._cerrar_pata(pos, ts_ms, desenlace, reason, ts_segunda)
         self.stats[f"closed_{reason}"] += 1
         self._guardar_observacion_fill(pos)
         if self.writer is not None:
