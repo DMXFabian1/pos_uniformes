@@ -18,6 +18,12 @@ Reglas de la casa:
 **Para agregar un paso nuevo**: si es una tarea de Windows, métela en
 `tareas_esperadas()`; si es algo que se retira, en `TAREAS_OBSOLETAS`. Sube
 `INFRA_VERSION` y listo: entra sola en la siguiente actualización.
+
+**Pasos únicos** (`--pasos-unicos`, solo desde `actualizar_pc_principal.bat`):
+cosas que se hacen UNA vez en la PC principal y que antes había que correr a
+mano — una migración de datos, un instalador. Van en `PASOS_UNICOS`; cada uno
+queda anotado en `data/pasos_unicos.txt` cuando sale bien, y si falla se
+reintenta en la siguiente actualización (queda en el log por qué).
 """
 
 from __future__ import annotations
@@ -25,6 +31,7 @@ from __future__ import annotations
 import logging
 import subprocess
 import sys
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -132,12 +139,19 @@ def marcar_aplicada(version: int = INFRA_VERSION) -> None:
     p.write_text(str(version), encoding="utf-8")
 
 
-def _correr(cmd: list[str], timeout: float = 30.0) -> bool:
+def _correr(cmd: list[str], timeout: float = 30.0, cwd: Path | None = None, guardar_en: Path | None = None) -> bool:
+    """`guardar_en`: dónde dejar lo que imprimió (para que Daniel lo pueda leer)."""
     try:
-        r = subprocess.run(cmd, capture_output=True, timeout=timeout)
-        return r.returncode == 0
+        r = subprocess.run(cmd, capture_output=True, timeout=timeout, cwd=cwd, stdin=subprocess.DEVNULL)
     except Exception:  # noqa: BLE001
         return False
+    if guardar_en is not None:
+        try:
+            guardar_en.parent.mkdir(parents=True, exist_ok=True)
+            guardar_en.write_bytes(r.stdout + r.stderr)
+        except Exception:  # noqa: BLE001
+            pass
+    return r.returncode == 0
 
 
 def existe_tarea(nombre: str) -> bool:
@@ -177,6 +191,118 @@ def reiniciar_servicios() -> None:
         )
     except Exception:  # noqa: BLE001 — el mutex evita duplicados; si falla, la tarea lo levanta
         pass
+
+
+# ───────────────────────────────────────────────────────────── pasos únicos
+def _raiz_repo() -> Path:
+    """La carpeta que contiene `pos_uniformes/` (desde ahí corre `python -m`)."""
+    return scripts_dir().parent.parent
+
+
+def _powershell(script: str, timeout: float = 60.0) -> bool:
+    return _correr(["powershell", "-NoProfile", "-NonInteractive", "-Command", script], timeout=timeout)
+
+
+def paso_meilisearch_oculto() -> bool:
+    """La tarea MeilisearchPOS arrancaba `meilisearch.exe` con sesión Interactive:
+    esa era la ventana negra al prender la PC. Se cambia a S4U (sin ventana)
+    y se relanza. Si la tarea no existe en esta PC, no hay nada que hacer."""
+    if not existe_tarea("MeilisearchPOS"):
+        return True
+    return _powershell(
+        "$t = Get-ScheduledTask -TaskName MeilisearchPOS -ErrorAction Stop; "
+        "if ($t.Principal.LogonType -eq 'S4U') { exit 0 }; "
+        "$u = $t.Principal.UserId; if (-not $u) { $u = $env:USERNAME }; "
+        "$p = New-ScheduledTaskPrincipal -UserId $u -LogonType S4U -RunLevel Highest; "
+        "Set-ScheduledTask -TaskName MeilisearchPOS -Principal $p | Out-Null; "
+        "Stop-Process -Name meilisearch -Force -ErrorAction SilentlyContinue; "
+        "Start-ScheduledTask -TaskName MeilisearchPOS",
+    )
+
+
+def paso_descontar_ventas_pasadas() -> bool:
+    """Las ventas de la Libreta anteriores a que la venta descontara sola
+    (2026-09-14) se restan del stock. El script salta lo ya descontado."""
+    salida = _base() / "logs" / "descontar_ventas_pasadas.log"
+    return _correr(
+        [sys.executable, "-m", "pos_uniformes.scripts.descontar_ventas_pasadas", "--aplicar"],
+        timeout=600, cwd=_raiz_repo(), guardar_en=salida,
+    )
+
+
+def paso_instalar_afluencia() -> bool:
+    """El contador de personas: entorno propio, modelo, tarea oculta. El
+    instalador es idempotente; se le quita el teclado para que su `pause`
+    no detenga la actualización. Al final abre la ventana para dibujar las
+    líneas (eso sí lo hace Daniel, con el ratón)."""
+    afl = scripts_dir().parent / "afluencia"
+    instalador = afl / "instalar_afluencia.bat"
+    if not instalador.exists():
+        return True
+    if not _correr(["cmd", "/c", str(instalador)], timeout=1800, cwd=afl):
+        return False
+    try:
+        subprocess.Popen(
+            ["cmd", "/c", "start", "Lineas de afluencia", str(afl / "dibujar_lineas.bat")],
+            cwd=afl, creationflags=getattr(subprocess, "CREATE_NEW_CONSOLE", 0),
+        )
+    except Exception:  # noqa: BLE001 — se puede abrir después con dibujar_lineas.bat
+        pass
+    return True
+
+
+@dataclass(frozen=True)
+class PasoUnico:
+    nombre: str
+    que_hace: str
+    correr: Callable[[], bool]
+
+
+PASOS_UNICOS: tuple[PasoUnico, ...] = (
+    PasoUnico("meilisearch_s4u", "Meilisearch arranca sin ventana negra", paso_meilisearch_oculto),
+    PasoUnico("descontar_ventas_pasadas", "stock: descontadas las ventas de la Libreta anteriores al 14/09", paso_descontar_ventas_pasadas),
+    PasoUnico("instalar_afluencia", "contador de personas instalado (afluencia)", paso_instalar_afluencia),
+)
+
+
+def ruta_pasos() -> Path:
+    return _base() / "data" / "pasos_unicos.txt"
+
+
+def pasos_hechos() -> set[str]:
+    try:
+        return {l.strip() for l in ruta_pasos().read_text(encoding="utf-8").splitlines() if l.strip()}
+    except Exception:  # noqa: BLE001
+        return set()
+
+
+def marcar_paso(nombre: str) -> None:
+    p = ruta_pasos()
+    p.parent.mkdir(parents=True, exist_ok=True)
+    with p.open("a", encoding="utf-8") as f:
+        f.write(nombre + "\n")
+
+
+def pasos_pendientes(hechos: set[str]) -> list[PasoUnico]:
+    return [p for p in PASOS_UNICOS if p.nombre not in hechos]
+
+
+def correr_pasos_unicos() -> list[str]:
+    """Corre lo que falte, en orden; cada paso se anota solo si salió bien."""
+    if not sys.platform.startswith("win"):
+        return []
+    hechos: list[str] = []
+    for paso in pasos_pendientes(pasos_hechos()):
+        try:
+            ok = paso.correr()
+        except Exception:  # noqa: BLE001
+            ok = False
+        if ok:
+            marcar_paso(paso.nombre)
+            hechos.append(f"hecho: {paso.que_hace}")
+        else:
+            hechos.append(f"PENDIENTE (se reintenta al actualizar): {paso.que_hace} [{paso.nombre}]")
+    return hechos
 
 
 def aplicar(*, forzar: bool = False) -> list[str]:
@@ -230,6 +356,12 @@ def main(argv: list[str] | None = None) -> int:
         log.exception("Postactualizacion")
         print(f"Aviso: no se pudo dejar todo al dia ({exc}). El POS abre igual.")
         return 0
+    if "--pasos-unicos" in argv:
+        try:
+            hechos += correr_pasos_unicos()
+        except Exception as exc:  # noqa: BLE001
+            log.exception("Pasos unicos")
+            hechos.append(f"Aviso: los pasos unicos no se pudieron correr ({exc}).")
     for h in hechos:
         log.info(h)
         print(f"  {h}")

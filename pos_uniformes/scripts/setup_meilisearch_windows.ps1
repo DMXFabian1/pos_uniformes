@@ -97,13 +97,17 @@ $settings = New-ScheduledTaskSettingsSet `
     -RestartCount 3 `
     -RestartInterval (New-TimeSpan -Minutes 1)
 
+# S4U: corre con la cuenta del usuario pero SIN sesion interactiva, o sea sin
+# la ventana negra de meilisearch.exe al iniciar sesion.
+$principal = New-ScheduledTaskPrincipal -UserId "$env:USERDOMAIN\$env:USERNAME" -LogonType S4U -RunLevel Highest
+
 Register-ScheduledTask `
     -TaskName $TaskName `
     -Action $action `
     -Trigger $trigger `
     -Settings $settings `
-    -Description "Meilisearch para POS Uniformes - busqueda rapida de catalogo" `
-    -RunLevel Highest | Out-Null
+    -Principal $principal `
+    -Description "Meilisearch para POS Uniformes - busqueda rapida de catalogo" | Out-Null
 
 Write-Host "  Tarea programada '$TaskName' registrada (auto-start al encender)" -ForegroundColor Green
 

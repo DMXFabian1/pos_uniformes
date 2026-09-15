@@ -32,8 +32,8 @@ call scripts\build_presupuestos_satelite_windows.bat
 if errorlevel 1 goto :error
 
 echo.
-echo === Dejando tareas y servicios al dia (supervisor, resumen, pendientes) ===
-call scripts\postactualizacion.bat
+echo === Dejando tareas y servicios al dia (y los pasos de una sola vez) ===
+call scripts\postactualizacion.bat --pasos-unicos
 
 echo.
 echo ============================================

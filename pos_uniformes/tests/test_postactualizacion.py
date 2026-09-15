@@ -202,3 +202,129 @@ class PythonSinConsolaTests(unittest.TestCase):
             fuente = inspect.getsource(mod)
             self.assertIn("python_sin_consola", fuente)
             self.assertNotIn("DETACHED_PROCESS", fuente.split("def levantar")[1].split("\n\n\ndef")[0])
+
+
+class PasosUnicosTests(unittest.TestCase):
+    """Lo que antes había que correr a mano en la PC principal, una sola vez."""
+
+    def setUp(self) -> None:
+        self._dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self._dir.cleanup)
+        for p in (patch.object(post, "_base", return_value=Path(self._dir.name)),
+                  patch.object(post.sys, "platform", "win32")):
+            p.start()
+            self.addCleanup(p.stop)
+
+    def _pasos(self, resultados: dict[str, bool]) -> tuple:
+        corridos: list[str] = []
+
+        def hacer(nombre: str):
+            def _f() -> bool:
+                corridos.append(nombre)
+                return resultados.get(nombre, True)
+            return _f
+
+        pasos = tuple(post.PasoUnico(p.nombre, p.que_hace, hacer(p.nombre)) for p in post.PASOS_UNICOS)
+        return pasos, corridos
+
+    def test_los_tres_pasos_pendientes_de_septiembre_estan(self) -> None:
+        nombres = [p.nombre for p in post.PASOS_UNICOS]
+        self.assertEqual(nombres, ["meilisearch_s4u", "descontar_ventas_pasadas", "instalar_afluencia"])
+
+    def test_primera_vez_corre_todo_y_lo_anota(self) -> None:
+        pasos, corridos = self._pasos({})
+        with patch.object(post, "PASOS_UNICOS", pasos):
+            hechos = post.correr_pasos_unicos()
+        self.assertEqual(corridos, ["meilisearch_s4u", "descontar_ventas_pasadas", "instalar_afluencia"])
+        self.assertEqual(post.pasos_hechos(), set(corridos))
+        self.assertTrue(all(h.startswith("hecho: ") for h in hechos))
+
+    def test_segunda_vez_no_repite_nada(self) -> None:
+        for p in post.PASOS_UNICOS:
+            post.marcar_paso(p.nombre)
+        pasos, corridos = self._pasos({})
+        with patch.object(post, "PASOS_UNICOS", pasos):
+            self.assertEqual(post.correr_pasos_unicos(), [])
+        self.assertEqual(corridos, [])
+
+    def test_el_que_falla_no_se_anota_y_se_reintenta_despues(self) -> None:
+        pasos, corridos = self._pasos({"instalar_afluencia": False})
+        with patch.object(post, "PASOS_UNICOS", pasos):
+            hechos = post.correr_pasos_unicos()
+        self.assertEqual(post.pasos_hechos(), {"meilisearch_s4u", "descontar_ventas_pasadas"})
+        self.assertTrue(any(h.startswith("PENDIENTE") and "instalar_afluencia" in h for h in hechos))
+        # siguiente actualización: solo ese
+        pasos, corridos = self._pasos({})
+        with patch.object(post, "PASOS_UNICOS", pasos):
+            post.correr_pasos_unicos()
+        self.assertEqual(corridos, ["instalar_afluencia"])
+
+    def test_un_paso_que_truena_cuenta_como_fallido_y_los_demas_siguen(self) -> None:
+        def truena() -> bool:
+            raise RuntimeError("sin DVR")
+        pasos = (post.PasoUnico("a", "a", truena), post.PasoUnico("b", "b", lambda: True))
+        with patch.object(post, "PASOS_UNICOS", pasos):
+            hechos = post.correr_pasos_unicos()
+        self.assertEqual(post.pasos_hechos(), {"b"})
+        self.assertEqual(len(hechos), 2)
+
+    def test_en_la_mac_no_corre_nada(self) -> None:
+        pasos, corridos = self._pasos({})
+        with patch.object(post.sys, "platform", "darwin"), patch.object(post, "PASOS_UNICOS", pasos):
+            self.assertEqual(post.correr_pasos_unicos(), [])
+        self.assertEqual(corridos, [])
+
+    def test_main_solo_los_corre_con_la_bandera(self) -> None:
+        with patch.object(post, "aplicar", return_value=[]), patch.object(post, "reiniciar_servicios"), patch.object(
+            post, "_log"
+        ), patch.object(post, "correr_pasos_unicos", return_value=["hecho: x"]) as corre:
+            post.main([])                       # abrir_pos.bat: nunca
+            corre.assert_not_called()
+            post.main(["--pasos-unicos"])       # actualizar_pc_principal.bat: sí
+            corre.assert_called_once()
+
+    def test_descontar_ventas_corre_el_script_con_aplicar_desde_la_raiz(self) -> None:
+        with patch.object(post, "_correr", return_value=True) as correr:
+            self.assertTrue(post.paso_descontar_ventas_pasadas())
+        cmd = correr.call_args.args[0]
+        self.assertEqual(cmd[1:], ["-m", "pos_uniformes.scripts.descontar_ventas_pasadas", "--aplicar"])
+        self.assertEqual(correr.call_args.kwargs["cwd"], post._raiz_repo())
+
+    def test_meilisearch_sin_tarea_no_hace_nada(self) -> None:
+        with patch.object(post, "existe_tarea", return_value=False), patch.object(post, "_powershell") as ps:
+            self.assertTrue(post.paso_meilisearch_oculto())
+        ps.assert_not_called()
+
+    def test_meilisearch_con_tarea_la_pasa_a_s4u(self) -> None:
+        with patch.object(post, "existe_tarea", return_value=True), patch.object(post, "_powershell", return_value=True) as ps:
+            self.assertTrue(post.paso_meilisearch_oculto())
+        script = ps.call_args.args[0]
+        self.assertIn("-LogonType S4U", script)
+        self.assertIn("Start-ScheduledTask -TaskName MeilisearchPOS", script)
+
+    def test_afluencia_sin_instalador_no_hace_nada(self) -> None:
+        with patch.object(post, "scripts_dir", return_value=Path(self._dir.name) / "scripts"), patch.object(post, "_correr") as correr:
+            self.assertTrue(post.paso_instalar_afluencia())
+        correr.assert_not_called()
+
+    def test_afluencia_corre_el_instalador_sin_teclado_y_abre_el_dibujo(self) -> None:
+        raiz = Path(self._dir.name)
+        (raiz / "afluencia").mkdir()
+        (raiz / "afluencia" / "instalar_afluencia.bat").write_text("rem", encoding="utf-8")
+        with patch.object(post, "scripts_dir", return_value=raiz / "scripts"), patch.object(
+            post, "_correr", return_value=True
+        ) as correr, patch.object(post.subprocess, "Popen") as popen:
+            self.assertTrue(post.paso_instalar_afluencia())
+        self.assertTrue(str(correr.call_args.args[0][-1]).endswith("instalar_afluencia.bat"))
+        self.assertEqual(correr.call_args.kwargs["timeout"], 1800)
+        self.assertTrue(str(popen.call_args.args[0][-1]).endswith("dibujar_lineas.bat"))
+
+    def test_afluencia_si_el_instalador_falla_no_abre_el_dibujo(self) -> None:
+        raiz = Path(self._dir.name)
+        (raiz / "afluencia").mkdir()
+        (raiz / "afluencia" / "instalar_afluencia.bat").write_text("rem", encoding="utf-8")
+        with patch.object(post, "scripts_dir", return_value=raiz / "scripts"), patch.object(
+            post, "_correr", return_value=False
+        ), patch.object(post.subprocess, "Popen") as popen:
+            self.assertFalse(post.paso_instalar_afluencia())
+        popen.assert_not_called()
