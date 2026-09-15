@@ -86,6 +86,19 @@ class CalcularPagoTests(unittest.TestCase):
         d = calcular_pago(h, comisiones=0, params=PARAMS, hasta=date(2026, 9, 13))
         self.assertEqual((d.faltas, d.total), (0, Decimal("1300.00")))
 
+    def test_descanso_movido_mas_una_falta_si_se_descuenta(self) -> None:
+        # Martes descanso (movido), el sábado trabajó por eso, y ADEMÁS faltó el
+        # miércoles: laboró 5 de sus 6 días. El sábado no es "día de más", es
+        # el que compensa el martes; la falta del miércoles sí se descuenta.
+        from pos_uniformes.services.calendario_empleadas_service import DESCANSO, TRABAJO
+
+        h = HorarioEmpleada("VEND-4", descanso_weekday=5, fecha_ultimo_pago=date(2026, 9, 6))
+        h.eventos[date(2026, 9, 8)] = DESCANSO   # martes: descanso movido
+        h.eventos[date(2026, 9, 9)] = FALTA      # miércoles
+        h.eventos[date(2026, 9, 12)] = TRABAJO   # sábado: trabaja porque el descanso se movió
+        d = calcular_pago(h, comisiones=0, params=PARAMS, hasta=date(2026, 9, 13))
+        self.assertEqual((d.faltas, d.total), (1, Decimal("1083.33")))
+
     def test_sin_pago_previo_mira_los_ultimos_7_dias(self) -> None:
         h = HorarioEmpleada("VEND-3")
         h.eventos[date(2026, 9, 3)] = FALTA

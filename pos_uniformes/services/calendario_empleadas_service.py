@@ -14,6 +14,7 @@ La lógica de fechas es pura (testeable sin base); las funciones con
 
 from __future__ import annotations
 
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
@@ -146,14 +147,21 @@ def faltas_en_rango(horario: HorarioEmpleada, desde: date, hasta: date) -> int:
 
 
 def dias_extra_en_rango(horario: HorarioEmpleada, desde: date, hasta: date) -> int:
-    """Días que trabajó cuando por patrón le tocaba descansar (marcados
-    "trabajo", incluido el fijo que se movió)."""
+    """Días que trabajó DE MÁS: vino en su descanso fijo sin haber descansado
+    otro día de esa semana. Si el descanso se movió (martes descanso, sábado
+    trabaja), ese sábado no es de más: solo compensa el martes."""
     if horario.por_dia or horario.descanso_weekday is None:
         return 0
-    return sum(
-        1 for f, t in horario.eventos.items()
-        if t == TRABAJO and desde <= f <= hasta and f.weekday() == horario.descanso_weekday
-    )
+    por_semana: dict[date, list[int]] = defaultdict(lambda: [0, 0])   # [trabajó el fijo, descansó otro día]
+    for f, t in horario.eventos.items():
+        if not desde <= f <= hasta:
+            continue
+        semana = _semana_de(f)[0]
+        if t == TRABAJO and f.weekday() == horario.descanso_weekday:
+            por_semana[semana][0] += 1
+        elif t == DESCANSO and f.weekday() != horario.descanso_weekday:
+            por_semana[semana][1] += 1
+    return sum(max(0, fijo - movidos) for fijo, movidos in por_semana.values())
 
 
 def faltas_netas_en_rango(horario: HorarioEmpleada, desde: date, hasta: date) -> int:
