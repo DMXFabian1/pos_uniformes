@@ -207,6 +207,7 @@ class ParquetWriter:
         self.flush_rows = flush_rows
         self._buf: dict[str, list[dict[str, Any]]] = defaultdict(list)
         self._last_flush = time.time()
+        self._seq = 0                     # contador de archivos escritos por este escritor
         self.rows_written: dict[str, int] = defaultdict(int)
 
     def append(self, table: str, row: dict[str, Any]) -> None:
@@ -243,7 +244,15 @@ class ParquetWriter:
                 d = d / self.subdir
             d = d / f"date={day}"
             d.mkdir(parents=True, exist_ok=True)
-            fname = d / f"{int(time.time() * 1000)}_{os.getpid()}_{len(drows)}.parquet"
+            # El nombre lleva un contador propio del escritor, además del reloj y el pid. Solo con
+            # el milisegundo, dos escrituras seguidas de la misma tabla con el mismo número de filas
+            # daban el mismo nombre y la segunda PISABA a la primera: pérdida silenciosa de datos.
+            # Pasó en un Mac rápido, con dos flushes de una fila en el mismo milisegundo, y un test
+            # lo cazó porque tenía cuatro puntos en memoria y tres en disco.
+            self._seq += 1
+            fname = d / f"{int(time.time() * 1000)}_{os.getpid()}_{self._seq:06d}_{len(drows)}.parquet"
+            if fname.exists():           # no debería pasar nunca; si pasa, que no pise nada
+                raise FileExistsError(f"colisión de nombre al escribir {table}: {fname}")
             pq.write_table(tbl, fname, compression="zstd")
             self.rows_written[table] += len(drows)
 

@@ -349,3 +349,24 @@ def test_una_pata_recuperada_guarda_su_resultado_realizado(cfg, tmp_path):
     w.flush()
     fila = scan(tmp_path, "partial_legs").collect().to_dicts()[0]
     assert fila["pnl_realizado_final"] is not None
+
+
+def test_dos_escrituras_en_el_mismo_milisegundo_no_se_pisan(tmp_path, monkeypatch):
+    # El nombre del archivo Parquet llevaba solo milisegundo, pid y número de filas. Dos flushes de
+    # una fila en el mismo milisegundo daban el mismo nombre, y el segundo pisaba al primero: en la
+    # corrida `patas-nube-1` quedaron 594 puntos de trayectoria en disco de 595 medidos. Se congela
+    # el reloj para que el choque sea seguro y no cuestión de suerte de la máquina.
+    import time as _time
+
+    from scalper.storage import ParquetWriter
+
+    monkeypatch.setattr(_time, "time", lambda: 1_700_000_000.0)
+    w = ParquetWriter(tmp_path, flush_seconds=10**9, flush_rows=1)
+    for h in (1_000, 5_000, 10_000, 20_000):
+        w.append("partial_leg_track", {"ts_ms": 1_700_000_000_000 + h, "run_id": "r",
+                                       "experiment": "e", "partial_leg_id": "pl-1",
+                                       "strategy": "TENNIS_SPREAD_CAPTURE", "condition_id": "c",
+                                       "token_id": "t", "horizonte_ms": h})
+    w.flush()
+    filas = scan(tmp_path, "partial_leg_track").collect().sort("horizonte_ms")
+    assert filas["horizonte_ms"].to_list() == [1_000, 5_000, 10_000, 20_000]
