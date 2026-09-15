@@ -1,5 +1,6 @@
-"""Descuenta del stock las ventas de la Libreta que se hicieron ANTES de que
-la venta descontara sola (2026-09-14). Una sola vez.
+"""Descuenta del stock las ventas de la Libreta que no descontaron: las de
+antes de que la venta descontara sola (2026-09-14) y las de un kiosko que
+vendió con código viejo. Idempotente; lo corre cada actualización.
 
 Regla: a cada talla se le restan las ventas posteriores a su último conteo
 (si nunca se contó, todas las de la Libreta). Lo que ya está descontado
@@ -79,7 +80,7 @@ def main(argv: list[str] | None = None) -> int:
             tipo = TipoMovimientoInventario.SALIDA_VENTA if e.tipo == "venta" else TipoMovimientoInventario.APARTADO_RESERVA
             InventarioService.registrar_movimiento(
                 session, v, tipo, -cantidad, referencia=f"libreta:{e.id}",
-                observacion=f"{e.tipo} del {e.created_at:%d/%m} descontada al arrancar (2026-09-14)",
+                observacion=f"{e.tipo} del {e.created_at:%d/%m} descontada después (no descontó al venderse)",
                 creado_por="descontar_ventas_pasadas", allow_negative_stock=True,
             )
             hechas += 1

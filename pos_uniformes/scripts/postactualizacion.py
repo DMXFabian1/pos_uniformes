@@ -256,11 +256,15 @@ class PasoUnico:
     nombre: str
     que_hace: str
     correr: Callable[[], bool]
+    # True = corre en CADA actualización (es idempotente y barato); no se anota.
+    cada_vez: bool = False
 
 
 PASOS_UNICOS: tuple[PasoUnico, ...] = (
     PasoUnico("meilisearch_s4u", "Meilisearch arranca sin ventana negra", paso_meilisearch_oculto),
-    PasoUnico("descontar_ventas_pasadas", "stock: descontadas las ventas de la Libreta anteriores al 14/09", paso_descontar_ventas_pasadas),
+    # Cada vez: un kiosko que aún no se actualizó sigue vendiendo sin descontar
+    # hasta que se reinicia; la siguiente actualización barre lo que dejó.
+    PasoUnico("descontar_ventas_pasadas", "stock: descontadas las ventas de la Libreta que no habían descontado", paso_descontar_ventas_pasadas, cada_vez=True),
     PasoUnico("instalar_afluencia", "contador de personas instalado (afluencia)", paso_instalar_afluencia),
 )
 
@@ -284,7 +288,7 @@ def marcar_paso(nombre: str) -> None:
 
 
 def pasos_pendientes(hechos: set[str]) -> list[PasoUnico]:
-    return [p for p in PASOS_UNICOS if p.nombre not in hechos]
+    return [p for p in PASOS_UNICOS if p.cada_vez or p.nombre not in hechos]
 
 
 def correr_pasos_unicos() -> list[str]:
@@ -298,7 +302,8 @@ def correr_pasos_unicos() -> list[str]:
         except Exception:  # noqa: BLE001
             ok = False
         if ok:
-            marcar_paso(paso.nombre)
+            if not paso.cada_vez:
+                marcar_paso(paso.nombre)
             hechos.append(f"hecho: {paso.que_hace}")
         else:
             hechos.append(f"PENDIENTE (se reintenta al actualizar): {paso.que_hace} [{paso.nombre}]")

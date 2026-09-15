@@ -224,40 +224,43 @@ class PasosUnicosTests(unittest.TestCase):
                 return resultados.get(nombre, True)
             return _f
 
-        pasos = tuple(post.PasoUnico(p.nombre, p.que_hace, hacer(p.nombre)) for p in post.PASOS_UNICOS)
+        pasos = tuple(post.PasoUnico(p.nombre, p.que_hace, hacer(p.nombre), p.cada_vez) for p in post.PASOS_UNICOS)
         return pasos, corridos
 
     def test_los_tres_pasos_pendientes_de_septiembre_estan(self) -> None:
         nombres = [p.nombre for p in post.PASOS_UNICOS]
         self.assertEqual(nombres, ["meilisearch_s4u", "descontar_ventas_pasadas", "instalar_afluencia"])
 
-    def test_primera_vez_corre_todo_y_lo_anota(self) -> None:
+    def test_primera_vez_corre_todo_y_anota_los_de_una_vez(self) -> None:
         pasos, corridos = self._pasos({})
         with patch.object(post, "PASOS_UNICOS", pasos):
             hechos = post.correr_pasos_unicos()
         self.assertEqual(corridos, ["meilisearch_s4u", "descontar_ventas_pasadas", "instalar_afluencia"])
-        self.assertEqual(post.pasos_hechos(), set(corridos))
+        self.assertEqual(post.pasos_hechos(), {"meilisearch_s4u", "instalar_afluencia"})   # el de cada vez no se anota
         self.assertTrue(all(h.startswith("hecho: ") for h in hechos))
 
-    def test_segunda_vez_no_repite_nada(self) -> None:
+    def test_segunda_vez_solo_repite_el_de_cada_vez(self) -> None:
+        # Descontar ventas es idempotente y barre lo que vendió un kiosko que
+        # aún no se había actualizado; los demás son de una sola vez.
         for p in post.PASOS_UNICOS:
             post.marcar_paso(p.nombre)
         pasos, corridos = self._pasos({})
         with patch.object(post, "PASOS_UNICOS", pasos):
-            self.assertEqual(post.correr_pasos_unicos(), [])
-        self.assertEqual(corridos, [])
+            hechos = post.correr_pasos_unicos()
+        self.assertEqual(corridos, ["descontar_ventas_pasadas"])
+        self.assertEqual(len(hechos), 1)
 
     def test_el_que_falla_no_se_anota_y_se_reintenta_despues(self) -> None:
         pasos, corridos = self._pasos({"instalar_afluencia": False})
         with patch.object(post, "PASOS_UNICOS", pasos):
             hechos = post.correr_pasos_unicos()
-        self.assertEqual(post.pasos_hechos(), {"meilisearch_s4u", "descontar_ventas_pasadas"})
+        self.assertEqual(post.pasos_hechos(), {"meilisearch_s4u"})
         self.assertTrue(any(h.startswith("PENDIENTE") and "instalar_afluencia" in h for h in hechos))
-        # siguiente actualización: solo ese
+        # siguiente actualización: ese, más el de cada vez
         pasos, corridos = self._pasos({})
         with patch.object(post, "PASOS_UNICOS", pasos):
             post.correr_pasos_unicos()
-        self.assertEqual(corridos, ["instalar_afluencia"])
+        self.assertEqual(corridos, ["descontar_ventas_pasadas", "instalar_afluencia"])
 
     def test_un_paso_que_truena_cuenta_como_fallido_y_los_demas_siguen(self) -> None:
         def truena() -> bool:
