@@ -228,13 +228,10 @@ def confirmar_ajustes_lote(
         stock_anterior = variante.stock_actual
         cantidad = conteo.diferencia  # positivo=faltaba, negativo=sobraba
 
-        # Si el stock cambió desde el conteo, el ajuste podría dejar el total
-        # en negativo (viola el CheckConstraint y revienta TODO el lote).
-        # Se omite este conteo y se deja pendiente para revisión manual,
-        # sin bloquear los demás ajustes del lote.
-        if stock_anterior + cantidad < 0:
-            omitidos += 1
-            continue
+        # Desde 2026-09-14 el stock puede quedar negativo (la venta descuenta
+        # sola y un negativo = "esta talla hay que recontarla"). Antes aquí se
+        # omitía el ajuste si dejaba negativo, y el número quedaba inflado:
+        # justo la talla que se acabó era la que no se corregía.
 
         tipo = (
             TipoMovimientoInventario.AJUSTE_ENTRADA

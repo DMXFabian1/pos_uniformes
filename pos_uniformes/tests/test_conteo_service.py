@@ -131,9 +131,10 @@ class TestConteoScopeTienda(unittest.TestCase):
         )
         self.assertEqual(total_bodega, 8)
 
-    def test_ajuste_que_dejaria_stock_negativo_se_omite_sin_romper_lote(self) -> None:
-        """Si el stock bajó desde el conteo y el ajuste dejaría el total en
-        negativo, ese conteo se omite (queda pendiente) sin reventar el lote."""
+    def test_ajuste_que_deja_stock_negativo_se_aplica_igual(self) -> None:
+        """Si el stock bajó desde el conteo (ventas) y el ajuste deja el total
+        en negativo, se aplica igual: el negativo es la señal de recontar. Antes
+        se omitía y el número quedaba inflado justo en la talla que se acabó."""
         session = _make_session()
         v = _seed_variante(session, stock_actual=10)  # tienda=10
 
@@ -146,13 +147,12 @@ class TestConteoScopeTienda(unittest.TestCase):
         v.stock_actual = 2
         session.flush()
 
-        # Aplicar -7 dejaría -5 (< 0): debe omitirse, NO lanzar excepción
         ajustados, omitidos = confirmar_ajustes_lote(session, [conteo.id], "ADMIN")
-        self.assertEqual(ajustados, 0)
-        self.assertEqual(omitidos, 1)
+        self.assertEqual((ajustados, omitidos), (1, 0))
+        session.flush()
         session.refresh(v)
-        self.assertEqual(v.stock_actual, 2)  # intacto
-        self.assertFalse(conteo.ajustado)    # sigue pendiente para revisión
+        self.assertEqual(v.stock_actual, -5)
+        self.assertTrue(conteo.ajustado)
 
     def test_sin_bodega_tienda_igual_a_total(self) -> None:
         """Sin stock en bodega, tienda == total (no hay regresión)."""

@@ -881,7 +881,7 @@ class ConteoRevisionDialog(QDialog):
         self.resultado = "aplicada"
         QMessageBox.information(
             self, "Inventario actualizado",
-            f"Se ajustaron {ajustados} tallas." + (f" {omitidos} se omitieron (dejarían negativo)." if omitidos else ""),
+            f"Se ajustaron {ajustados} tallas." + (f" {omitidos} sin diferencia." if omitidos else ""),
         )
         self.accept()
 
