@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import shlex
 import unicodedata
+from functools import lru_cache
 
 SEARCH_GENERAL_BLOB_KEY = "_search_general_blob"
 SEARCH_ALIAS_BLOBS_KEY = "_search_alias_blobs"
@@ -78,7 +79,17 @@ INVENTORY_SEARCH_GENERAL_FIELDS: tuple[str, ...] = (
 
 
 def _normalize_search_fragment(value: object) -> str:
-    text = str(value or "").strip().casefold()
+    return _normalize_texto(str(value or ""))
+
+
+@lru_cache(maxsize=65_536)
+def _normalize_texto(text: str) -> str:
+    """Con caché: al arrancar el POS se normalizan ~285,000 fragmentos de
+    ~5,000 filas, pero casi todos se repiten (tallas, colores, escuelas).
+    Y si es ASCII puro no hay acentos que quitar."""
+    text = text.strip().casefold()
+    if text.isascii():
+        return text
     decomposed = unicodedata.normalize("NFKD", text)
     return "".join(char for char in decomposed if not unicodedata.combining(char))
 

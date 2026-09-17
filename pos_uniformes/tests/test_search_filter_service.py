@@ -210,3 +210,26 @@ class SearchFilterServiceTests(unittest.TestCase):
                 general_fields=self.general_fields,
             )
         )
+
+
+class NormalizacionConCacheTests(unittest.TestCase):
+    """~285,000 fragmentos al arrancar el POS, casi todos repetidos."""
+
+    def test_quita_acentos_y_casefold_igual_que_antes(self) -> None:
+        from pos_uniformes.services.search_filter_service import _normalize_search_fragment as n
+
+        self.assertEqual(n("  Suéter Cuello V  "), "sueter cuello v")
+        self.assertEqual(n("PANTALÓN Gris"), "pantalon gris")
+        self.assertEqual(n(None), "")
+        self.assertEqual(n(12), "12")
+        self.assertEqual(n("Práxedis G. Guerrero"), "praxedis g. guerrero")
+
+    def test_el_mismo_texto_se_calcula_una_vez(self) -> None:
+        from pos_uniformes.services import search_filter_service as sfs
+
+        sfs._normalize_texto.cache_clear()
+        for _ in range(50):
+            sfs._normalize_search_fragment("Azul Marino")
+        info = sfs._normalize_texto.cache_info()
+        self.assertEqual(info.misses, 1)
+        self.assertEqual(info.hits, 49)
