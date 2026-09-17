@@ -23,26 +23,29 @@ def list_schools_for_tariff(session) -> list[dict]:
     schools = session.scalars(
         select(Escuela).where(Escuela.activo == True).order_by(Escuela.nombre)  # noqa: E712
     ).all()
+    # Una sola consulta para todas las escuelas (antes una o dos por escuela:
+    # ~100 idas a la base por Wi-Fi cada vez que se abría Tarifarios).
+    # nivel None = la escuela tiene productos activos sin nivel.
+    filas = session.execute(
+        select(Producto.escuela_id, NivelEducativo.id, NivelEducativo.nombre)
+        .outerjoin(NivelEducativo, NivelEducativo.id == Producto.nivel_educativo_id)
+        .where(Producto.escuela_id.is_not(None), Producto.activo == True)  # noqa: E712
+        .distinct()
+        .order_by(Producto.escuela_id, NivelEducativo.id)
+    ).all()
+    niveles_por_escuela: dict[int, list[tuple[int, str]]] = {}
+    con_productos: set[int] = set()
+    for eid, nid, nnombre in filas:
+        con_productos.add(int(eid))
+        if nid is not None:
+            niveles_por_escuela.setdefault(int(eid), []).append((int(nid), str(nnombre)))
 
     result: list[dict] = []
     for s in schools:
-        # Obtener los niveles distintos que tiene esta escuela
-        nivel_rows = session.execute(
-            select(NivelEducativo.id, NivelEducativo.nombre)
-            .join(Producto, Producto.nivel_educativo_id == NivelEducativo.id)
-            .where(Producto.escuela_id == s.id, Producto.activo == True)  # noqa: E712
-            .distinct()
-            .order_by(NivelEducativo.id)
-        ).all()
-
+        nivel_rows = niveles_por_escuela.get(int(s.id), [])
         if not nivel_rows:
-            # Escuela sin nivel asignado — verificar que tenga productos
-            count = session.scalar(
-                select(Producto.id)
-                .where(Producto.escuela_id == s.id, Producto.activo == True)  # noqa: E712
-                .limit(1)
-            )
-            if count is not None:
+            # Escuela sin nivel asignado — solo si tiene productos
+            if int(s.id) in con_productos:
                 result.append({
                     "escuela_id": int(s.id),
                     "escuela_nombre": str(s.nombre),
@@ -55,8 +58,8 @@ def list_schools_for_tariff(session) -> list[dict]:
             result.append({
                 "escuela_id": int(s.id),
                 "escuela_nombre": str(s.nombre),
-                "nivel_id": int(nivel_rows[0][0]),
-                "nivel_nombre": str(nivel_rows[0][1]),
+                "nivel_id": nivel_rows[0][0],
+                "nivel_nombre": nivel_rows[0][1],
                 "display_name": str(s.nombre),
             })
         else:
@@ -65,8 +68,8 @@ def list_schools_for_tariff(session) -> list[dict]:
                 result.append({
                     "escuela_id": int(s.id),
                     "escuela_nombre": str(s.nombre),
-                    "nivel_id": int(nivel_id),
-                    "nivel_nombre": str(nivel_nombre),
+                    "nivel_id": nivel_id,
+                    "nivel_nombre": nivel_nombre,
                     "display_name": f"{s.nombre} — {nivel_nombre}",
                 })
 
