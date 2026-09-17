@@ -218,6 +218,35 @@ class JornadaTests(unittest.TestCase):
             a = jn.avance(self.s, j, lote[j.id])
         self.assertEqual((a.tallas_hechas, a.tallas_total), (2, 4))
 
+    def test_alcances_en_lote_da_lo_mismo_que_alcance_uno_por_uno(self) -> None:
+        dos = _seed(self.s, "Dos")
+        _seed_basicos(self.s, self.escuela, "Pantalón")
+        self.s.commit()
+        j1 = jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-4")
+        j2 = jn.abrir_jornada(self.s, escuela_id=dos.id, empleada_code="VEND-5")
+        j3 = jn.abrir_jornada(self.s, escuela_id=None, tipo_pieza="Pantalón", empleada_code="VEND-6")
+        self.s.commit()
+        lote = jn.alcances_en_lote(self.s, [j1, j2, j3])
+        for j in (j1, j2, j3):
+            uno = jn.alcance(self.s, j.escuela_id, j.tipo_pieza, j.prenda)
+            self.assertEqual(
+                [(g["producto_nombre"], [v.variante_id for v in g["variantes"]]) for g in lote[j.id]],
+                [(g["producto_nombre"], [v.variante_id for v in g["variantes"]]) for g in uno],
+            )
+        self.assertTrue(lote[j1.id] and lote[j3.id])
+
+    def test_el_tablero_no_pregunta_escuela_por_escuela(self) -> None:
+        _seed(self.s, "Dos"); _seed(self.s, "Tres")
+        for e, code in ((self.escuela, "VEND-4"),):
+            j = jn.abrir_jornada(self.s, escuela_id=e.id, empleada_code=code)
+            jn.terminar_jornada(self.s, j, empleada_code=code)
+        self.s.commit()
+        with patch.object(jn, "alcance", side_effect=AssertionError("el tablero debe usar alcances_en_lote")), patch.object(
+            jn, "capturado_en_jornada", side_effect=AssertionError("el tablero debe usar capturado_por_jornada")
+        ):
+            filas = jn.tablero_conteos(self.s)
+        self.assertEqual(len(filas), 3)
+
     def test_basicos_una_abierta_por_prenda(self) -> None:
         j = jn.abrir_jornada(self.s, escuela_id=None, tipo_pieza="Playera", empleada_code="VEND-4")
         with self.assertRaises(jn.JornadaEnProceso):

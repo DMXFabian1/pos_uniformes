@@ -123,6 +123,33 @@ def alcance(session: Session, escuela_id: int | None, tipo_pieza: str = "", pren
     return [g for g in grupos if not g.get("virtual")]
 
 
+def alcances_en_lote(session: Session, jornadas: list[ConteoJornada]) -> dict[int, list[dict]]:
+    """`alcance()` de varias jornadas con pocas consultas: dos para todas las
+    escuelas y una para todos los básicos (el tablero pedía una por una)."""
+    from pos_uniformes.services.conteo_service import (
+        agrupar_variantes_por_producto,
+        obtener_variantes_basicos_agrupadas,
+        obtener_variantes_para_conteo_varias,
+    )
+
+    out: dict[int, list[dict]] = {}
+    escuela_ids = sorted({int(j.escuela_id) for j in jornadas if j.escuela_id is not None})
+    por_escuela = obtener_variantes_para_conteo_varias(session, escuela_ids) if escuela_ids else {}
+    basicos = None
+    for j in jornadas:
+        if j.escuela_id is not None:
+            grupos = agrupar_variantes_por_producto(por_escuela.get(int(j.escuela_id), []))
+        else:
+            if basicos is None:
+                basicos = obtener_variantes_basicos_agrupadas(session)
+            grupos = [g for g in basicos if not j.tipo_pieza or g["tipo_pieza"] == j.tipo_pieza]
+            prenda = (getattr(j, "prenda", "") or "").strip()
+            if prenda:
+                grupos = [g for g in grupos if str(g.get("producto_nombre") or "") == prenda]
+        out[j.id] = [g for g in grupos if not g.get("virtual")]
+    return out
+
+
 def prendas_basicas(session: Session, tipo_pieza: str) -> list[str]:
     """Los productos básicos de un tipo (para elegir una sola prenda)."""
     return [str(g["producto_nombre"]) for g in alcance(session, None, tipo_pieza)]
@@ -464,12 +491,14 @@ class Avance:
         return int(round(100 * self.tallas_hechas / self.tallas_total)) if self.tallas_total else 0
 
 
-def avance(session: Session, jornada: ConteoJornada, hechas: dict[int, int] | None = None) -> Avance:
+def avance(session: Session, jornada: ConteoJornada, hechas: dict[int, int] | None = None, grupos: list[dict] | None = None) -> Avance:
     """Cuántas tallas y cuántas prendas van (puro sobre la consulta).
-    `hechas`: lo capturado, si ya se trajo en lote (`capturado_por_jornada`)."""
+    `hechas` y `grupos`: lo capturado y el alcance, si ya se trajeron en lote
+    (`capturado_por_jornada`, `alcances_en_lote`)."""
     if hechas is None:
         hechas = capturado_en_jornada(session, jornada.id)
-    grupos = alcance(session, jornada.escuela_id, jornada.tipo_pieza, getattr(jornada, "prenda", ""))
+    if grupos is None:
+        grupos = alcance(session, jornada.escuela_id, jornada.tipo_pieza, getattr(jornada, "prenda", ""))
     prendas_total = len(grupos)
     prendas_hechas = sum(
         1 for g in grupos
@@ -785,13 +814,14 @@ def tablero_conteos(session: Session) -> list[FilaTablero]:
         if clave not in ultimas:
             ultimas[clave] = j
     capturado = capturado_por_jornada(session, [j.id for j in ultimas.values()])
+    alcances = alcances_en_lote(session, list(ultimas.values()))
 
     def fila(titulo: str, escuela_id: int | None, tipo_pieza: str, clave) -> FilaTablero:
         u = ultimos.get(clave, UltimoConteo(None))
         j = ultimas.get(clave)
         abierta = abiertas.get(clave)
         if j is not None:
-            a = avance(session, j, capturado.get(j.id))
+            a = avance(session, j, capturado.get(j.id), alcances.get(j.id))
             tallas = f"{a.tallas_hechas} de {a.tallas_total}"
             estado = estado_de(j)
         elif u.fecha is not None:

@@ -269,13 +269,26 @@ def obtener_variantes_para_conteo(
     nivel_id: int | None = None,
 ) -> list[VarianteParaConteo]:
     """Variantes activas de una escuela (y nivel opcional), ordenadas por urgencia."""
-    config = session.scalar(
-        select(ConfigConteoEscuela).where(ConfigConteoEscuela.escuela_id == escuela_id)
-    )
-    dias_vigencia = config.dias_vigencia if config else DIAS_VIGENCIA_DEFAULT
+    return obtener_variantes_para_conteo_varias(session, [escuela_id], nivel_id=nivel_id).get(int(escuela_id), [])
+
+
+def obtener_variantes_para_conteo_varias(
+    session: Session,
+    escuela_ids: list[int],
+    nivel_id: int | None = None,
+) -> dict[int, list[VarianteParaConteo]]:
+    """Lo mismo, para VARIAS escuelas en dos consultas (el tablero de Conteos
+    pedía escuela por escuela: 2 idas a la base × 50 escuelas)."""
+    ids = sorted({int(e) for e in escuela_ids})
+    if not ids:
+        return {}
+    vigencias = {
+        int(c.escuela_id): int(c.dias_vigencia)
+        for c in session.scalars(select(ConfigConteoEscuela).where(ConfigConteoEscuela.escuela_id.in_(ids))).all()
+    }
 
     wheres = [
-        Producto.escuela_id == escuela_id,
+        Producto.escuela_id.in_(ids),
         Producto.activo.is_(True),
         Variante.activo.is_(True),
     ]
@@ -300,39 +313,44 @@ def obtener_variantes_para_conteo(
     ).unique().all()
 
     ahora = datetime.now(timezone.utc)
-    resultado: list[VarianteParaConteo] = []
-
+    resultado: dict[int, list[VarianteParaConteo]] = {e: [] for e in ids}
     for v in variantes:
-        if v.ultimo_conteo_at is not None:
-            ultimo = v.ultimo_conteo_at
-            if ultimo.tzinfo is None:
-                # SQLite (tests) devuelve la fecha sin zona; Postgres con zona.
-                ultimo = ultimo.replace(tzinfo=timezone.utc)
-            dias = (ahora - ultimo).days
-            requiere = dias >= dias_vigencia
-        else:
-            dias = None
-            requiere = True
-
-        tipo_nombre = v.producto.tipo_pieza.nombre if v.producto.tipo_pieza else ""
-
-        resultado.append(VarianteParaConteo(
-            variante_id=v.id,
-            sku=v.sku,
-            producto_nombre=v.producto.nombre,
-            tipo_pieza=tipo_nombre,
-            talla=v.talla,
-            color=v.color,
-            stock_actual=v.stock_actual,
-            stock_bodega=v.stock_bodega,
-            stock_piso=v.stock_piso,
-            stock_tienda=v.stock_tienda,
-            ultimo_conteo_at=v.ultimo_conteo_at,
-            dias_desde_conteo=dias,
-            requiere_conteo=requiere,
-        ))
-
+        eid = int(v.producto.escuela_id)
+        resultado.setdefault(eid, []).append(
+            _variante_para_conteo(v, ahora, vigencias.get(eid, DIAS_VIGENCIA_DEFAULT))
+        )
     return resultado
+
+
+def _variante_para_conteo(v: Variante, ahora: datetime, dias_vigencia: int) -> VarianteParaConteo:
+    if v.ultimo_conteo_at is not None:
+        ultimo = v.ultimo_conteo_at
+        if ultimo.tzinfo is None:
+            # SQLite (tests) devuelve la fecha sin zona; Postgres con zona.
+            ultimo = ultimo.replace(tzinfo=timezone.utc)
+        dias = (ahora - ultimo).days
+        requiere = dias >= dias_vigencia
+    else:
+        dias = None
+        requiere = True
+
+    tipo_nombre = v.producto.tipo_pieza.nombre if v.producto.tipo_pieza else ""
+
+    return VarianteParaConteo(
+        variante_id=v.id,
+        sku=v.sku,
+        producto_nombre=v.producto.nombre,
+        tipo_pieza=tipo_nombre,
+        talla=v.talla,
+        color=v.color,
+        stock_actual=v.stock_actual,
+        stock_bodega=v.stock_bodega,
+        stock_piso=v.stock_piso,
+        stock_tienda=v.stock_tienda,
+        ultimo_conteo_at=v.ultimo_conteo_at,
+        dias_desde_conteo=dias,
+        requiere_conteo=requiere,
+    )
 
 
 _PIEZA_ORDER = {
@@ -382,7 +400,11 @@ def obtener_variantes_agrupadas_por_producto(
     nivel_id: int | None = None,
 ) -> list[dict]:
     """Variantes agrupadas por producto, ordenadas según PIEZA_ORDER."""
-    variantes = obtener_variantes_para_conteo(session, escuela_id, nivel_id=nivel_id)
+    return agrupar_variantes_por_producto(obtener_variantes_para_conteo(session, escuela_id, nivel_id=nivel_id))
+
+
+def agrupar_variantes_por_producto(variantes: list[VarianteParaConteo]) -> list[dict]:
+    """Puro: la misma agrupación y orden que ven la pantalla y la hoja."""
     grupos: dict[str, dict] = {}
     for v in variantes:
         key = v.producto_nombre
@@ -442,35 +464,7 @@ def obtener_variantes_basicos_para_conteo(
     ).unique().all()
 
     ahora = datetime.now(timezone.utc)
-    resultado: list[VarianteParaConteo] = []
-
-    for v in variantes:
-        if v.ultimo_conteo_at is not None:
-            dias = (ahora - v.ultimo_conteo_at).days
-            requiere = dias >= DIAS_VIGENCIA_DEFAULT
-        else:
-            dias = None
-            requiere = True
-
-        tipo_nombre = v.producto.tipo_pieza.nombre if v.producto.tipo_pieza else ""
-
-        resultado.append(VarianteParaConteo(
-            variante_id=v.id,
-            sku=v.sku,
-            producto_nombre=v.producto.nombre,
-            tipo_pieza=tipo_nombre,
-            talla=v.talla,
-            color=v.color,
-            stock_actual=v.stock_actual,
-            stock_bodega=v.stock_bodega,
-            stock_piso=v.stock_piso,
-            stock_tienda=v.stock_tienda,
-            ultimo_conteo_at=v.ultimo_conteo_at,
-            dias_desde_conteo=dias,
-            requiere_conteo=requiere,
-        ))
-
-    return resultado
+    return [_variante_para_conteo(v, ahora, DIAS_VIGENCIA_DEFAULT) for v in variantes]
 
 
 def obtener_variantes_basicos_agrupadas(
@@ -481,27 +475,7 @@ def obtener_variantes_basicos_agrupadas(
     variantes = obtener_variantes_basicos_para_conteo(session)
     if tipo_pieza:
         variantes = [v for v in variantes if v.tipo_pieza == tipo_pieza]
-    grupos: dict[str, dict] = {}
-    for v in variantes:
-        key = v.producto_nombre
-        if key not in grupos:
-            grupos[key] = {
-                "producto_nombre": key,
-                "tipo_pieza": v.tipo_pieza,
-                "virtual": v.tipo_pieza in _TIPOS_VIRTUALES,
-                "variantes": [],
-            }
-        grupos[key]["variantes"].append(v)
-
-    # Reusar la misma lógica de ordenamiento de tallas
-    for g in grupos.values():
-        g["variantes"].sort(key=_talla_sort_key)
-
-    resultado = sorted(
-        grupos.values(),
-        key=lambda g: (_PIEZA_ORDER.get(g["tipo_pieza"], 99), g["producto_nombre"]),
-    )
-    return resultado
+    return agrupar_variantes_por_producto(variantes)
 
 
 def obtener_conteos_pendientes(
