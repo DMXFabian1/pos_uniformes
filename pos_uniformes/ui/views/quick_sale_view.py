@@ -559,11 +559,7 @@ class QuickSaleWidget(QWidget):
         if not sku:
             return False
         try:
-            if self.satellite.offline_mode:
-                snap = self.satellite._kiosk_lookup_from_cache(sku)
-            else:
-                with get_session() as session:
-                    snap = load_quote_kiosk_lookup_snapshot(session, sku=sku)
+            snap = self._lookup_sku(sku)
         except Exception as exc:
             QMessageBox.warning(self, "SKU no encontrado", str(exc))
             return False
@@ -633,6 +629,27 @@ class QuickSaleWidget(QWidget):
         self._refresh_items_table()
         self._refresh_totals()
         return True
+
+    def _lookup_sku(self, sku: str):
+        """El catálogo en memoria primero; Postgres solo si el SKU no está.
+
+        Antes, en línea, cada escaneo viajaba a la PC principal por Wi-Fi
+        aunque el catálogo ya estuviera cargado (y se refresca cada 5 min y
+        al cambiar precios). Daniel (2026-09-17): "éntrale". Sin conexión se
+        queda con el cache, como siempre.
+        """
+        finder = getattr(self.satellite, "_kiosk_lookup_from_cache", None)
+        if callable(finder):
+            try:
+                return finder(sku)
+            except Exception:
+                if self.satellite.offline_mode:
+                    raise
+        elif self.satellite.offline_mode:
+            raise ValueError(f"No existe una presentacion activa para el SKU '{sku}' en el catalogo guardado.")
+        # No está en el cache (producto recién dado de alta): la base manda.
+        with get_session() as session:
+            return load_quote_kiosk_lookup_snapshot(session, sku=sku)
 
     def _satellite_rows(self) -> list[dict]:
         return list(getattr(self.satellite, "catalog_snapshot_rows", None) or [])

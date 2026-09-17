@@ -230,6 +230,38 @@ class GateScanDbErrorLoggingTests(unittest.TestCase):
     def setUpClass(cls) -> None:
         cls.app = QApplication.instance() or QApplication([])
 
+    def test_en_linea_el_escaneo_usa_el_cache_y_no_viaja_a_la_base(self) -> None:
+        satellite = SimpleNamespace(offline_mode=False, _kiosk_lookup_from_cache=lambda sku: _snap(sku))
+        widget = QuickSaleWidget(satellite)
+        widget._employee_code = "VEND-1"
+        with patch.object(QuickSaleWidget, "_refresh_items_table"), patch("pos_uniformes.ui.views.quick_sale_view.get_session", side_effect=AssertionError("no debía ir a la base")):
+            self.assertTrue(widget.add_sku("SKU004838", 1))
+        self.assertEqual(widget._items[0]["sku"], "SKU004838")
+
+    def test_en_linea_si_no_esta_en_el_cache_pregunta_a_la_base(self) -> None:
+        def _no_esta(sku):
+            raise ValueError("no en cache")
+        satellite = SimpleNamespace(offline_mode=False, _kiosk_lookup_from_cache=_no_esta)
+        widget = QuickSaleWidget(satellite)
+        widget._employee_code = "VEND-1"
+        with patch.object(QuickSaleWidget, "_refresh_items_table"), patch("pos_uniformes.ui.views.quick_sale_view.get_session"), patch(
+            "pos_uniformes.ui.views.quick_sale_view.load_quote_kiosk_lookup_snapshot", return_value=_snap("SKU009999")
+        ) as db:
+            self.assertTrue(widget.add_sku("SKU009999", 1))
+        db.assert_called_once()
+
+    def test_sin_conexion_y_sin_cache_no_intenta_la_base(self) -> None:
+        def _no_esta(sku):
+            raise ValueError("no en cache")
+        satellite = SimpleNamespace(offline_mode=True, _kiosk_lookup_from_cache=_no_esta)
+        widget = QuickSaleWidget(satellite)
+        widget._employee_code = "VEND-1"
+        with patch("pos_uniformes.ui.views.quick_sale_view.get_session", side_effect=AssertionError("no debía ir a la base")), patch(
+            "pos_uniformes.ui.views.quick_sale_view.QMessageBox.warning"
+        ) as warn:
+            self.assertFalse(widget.add_sku("SKU009999", 1))
+        warn.assert_called_once()
+
     def test_gate_scan_db_error_is_logged(self) -> None:
         satellite = SimpleNamespace(offline_mode=False, _kiosk_lookup_from_cache=None)
         widget = QuickSaleWidget(satellite)
