@@ -1056,36 +1056,40 @@ def _inject_linked_products(
         if eid is not None and school and school != "General":
             already_in_school.setdefault(int(eid), set()).add(nombre_base)
 
+    # Generales agrupados por nombre normalizado UNA vez: antes se normalizaba
+    # cada general por cada escuela con links (50 escuelas × 1,500 filas era
+    # lo más caro del arranque del kiosko).
     general_rows = [
-        row for row in all_active_rows
+        (_normalize_text(row.get("producto_nombre_base") or ""), row)
+        for row in all_active_rows
         if str(row.get("escuela_nombre") or "General").strip() == "General"
     ]
 
     injected: list[dict[str, object]] = []
     for escuela_id, (school_name, linked_names) in links_by_id.items():
         nivel = id_to_nivel.get(escuela_id, "")
-        existing = already_in_school.get(escuela_id, set())
-        for row in general_rows:
-            nombre_base_normalized = _normalize_text(row.get("producto_nombre_base") or "")
-            if nombre_base_normalized not in linked_names:
-                continue
-            if nombre_base_normalized in existing:
-                continue
-            synthetic = dict(row)
-            synthetic["escuela_id"] = escuela_id
-            synthetic["escuela_nombre"] = school_name
-            # Si el producto ligado trae su propio nivel, se respeta; si no, se
-            # hereda el nivel inferido de la escuela (comportamiento anterior).
-            # Esto permite que un general con nivel explícito (p.ej. Secundaria)
-            # caiga en ese nivel aunque la escuela tenga varios niveles.
-            own_nivel = str(row.get("nivel_educativo_nombre") or "").strip()
-            synthetic["nivel_educativo_nombre"] = (
-                own_nivel if own_nivel and own_nivel != "Sin nivel" else nivel
-            )
-            synthetic["_linked"] = True
-            injected.append(synthetic)
+        wanted = linked_names - already_in_school.get(escuela_id, set())
+        if not wanted:
+            continue
+        for nombre_base_normalized, row in general_rows:
+            if nombre_base_normalized in wanted:
+                _agregar_ligado(injected, row, escuela_id, school_name, nivel)
 
     return school_mode_rows + injected
+
+
+def _agregar_ligado(injected: list, row: dict, escuela_id: int, school_name: str, nivel: str) -> None:
+    synthetic = dict(row)
+    synthetic["escuela_id"] = escuela_id
+    synthetic["escuela_nombre"] = school_name
+    # Si el producto ligado trae su propio nivel, se respeta; si no, se
+    # hereda el nivel inferido de la escuela (comportamiento anterior).
+    # Esto permite que un general con nivel explícito (p.ej. Secundaria)
+    # caiga en ese nivel aunque la escuela tenga varios niveles.
+    own_nivel = str(row.get("nivel_educativo_nombre") or "").strip()
+    synthetic["nivel_educativo_nombre"] = own_nivel if own_nivel and own_nivel != "Sin nivel" else nivel
+    synthetic["_linked"] = True
+    injected.append(synthetic)
 
 
 # ─── Tallas agotadas ─────────────────────────────────────────────────────
