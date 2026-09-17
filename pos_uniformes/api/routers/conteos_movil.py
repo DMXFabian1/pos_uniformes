@@ -104,11 +104,11 @@ def listar(current: tuple = Depends(get_current_employee), db: Session = Depends
     # y al tocarla se sigue esa jornada en vez de abrir otra.
     en_proceso = {}
     for j in jn.jornadas_abiertas(db):
-        clave = ("basicos", j.tipo_pieza) if j.escuela_id is None else j.escuela_id
+        clave = jn.clave_alcance(j.escuela_id, j.tipo_pieza, getattr(j, "prenda", ""))
         en_proceso.setdefault(clave, {"jornada_id": j.id, "quien": j.empleada_nombre or j.empleada_code, "cuando": jn.cuando(j.iniciada_at)})
 
-    def _ultimo(escuela_id, tipo_pieza=""):
-        u = jn.ultimo_conteo_de(ultimos, escuela_id, tipo_pieza)
+    def _ultimo(escuela_id, tipo_pieza="", prenda=""):
+        u = jn.ultimo_conteo_de(ultimos, escuela_id, tipo_pieza, prenda)
         dias = None
         if u.fecha is not None:
             f = u.fecha.astimezone().date() if u.fecha.tzinfo else u.fecha.date()
@@ -127,12 +127,26 @@ def listar(current: tuple = Depends(get_current_employee), db: Session = Depends
     from pos_uniformes.services.conteo_service import obtener_variantes_basicos_agrupadas
 
     try:
-        grupos = obtener_variantes_basicos_agrupadas(db)
-        tipos = sorted({g["tipo_pieza"] for g in grupos if not g.get("virtual") and g["tipo_pieza"]})
+        grupos = [g for g in obtener_variantes_basicos_agrupadas(db) if not g.get("virtual") and g["tipo_pieza"]]
     except Exception:  # noqa: BLE001
         db.rollback()
-        tipos = []
-    basicos = [{"tipo_pieza": t, "ultimo": _ultimo(None, t), "en_proceso": en_proceso.get(("basicos", t))} for t in tipos]
+        grupos = []
+    # Por tipo, y dentro de cada tipo sus prendas: "a veces no quiero contar
+    # todos los pantalones, solo un tipo o solo un color" (Daniel 2026-09-14).
+    basicos = []
+    for t in sorted({g["tipo_pieza"] for g in grupos}):
+        prendas = [str(g["producto_nombre"]) for g in grupos if g["tipo_pieza"] == t]
+        cortos = [jn.nombre_corto_prenda(pr) for pr in prendas]
+        # Dos prendas con el mismo nombre corto ("Camisa Cuello olan Blanca" ×2):
+        # se enseña el completo para que la ficha no salga repetida.
+        repetidos = {c for c in cortos if cortos.count(c) > 1}
+        basicos.append({
+            "tipo_pieza": t, "ultimo": _ultimo(None, t), "en_proceso": en_proceso.get(("basicos", t)),
+            "prendas": [{
+                "nombre": pr, "corto": pr if jn.nombre_corto_prenda(pr) in repetidos else jn.nombre_corto_prenda(pr),
+                "ultimo": _ultimo(None, t, pr), "en_proceso": en_proceso.get(("basicos", t, pr)),
+            } for pr in prendas],
+        })
     return {"modo": "tienda" if _es_tienda() else "casa", "abiertas": abiertas, "escuelas": escuelas, "basicos": basicos}
 
 

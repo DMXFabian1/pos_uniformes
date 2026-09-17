@@ -258,6 +258,7 @@ table.tallas input{margin:0; min-height:46px; font-size:20px; font-weight:800; t
         <div class="chips" id="cont-escuelas"></div>
         <p class="sub" style="margin:12px 0 0">Básicos, por prenda</p>
         <div class="chips" id="cont-basicos"></div>
+        <div id="cont-prendas"></div>
         <p class="sub" id="cont-ver-todas" style="margin:12px 0 0"></p>
       </div>
     </div>
@@ -440,12 +441,18 @@ async function contCargarLista() {
       contUltimos["e" + e.escuela_id] = e.ultimo;
       return ficha(e.nombre, e.ultimo, `contEmpezar(${e.escuela_id}, '')`, e.toca, e.en_proceso);
     }).join("") || "<span class='sub'>Sin escuelas.</span>";
+    contBasicos = {};
     $("cont-basicos").innerHTML = (d.basicos || []).map(b => {
       const t = typeof b === "string" ? b : b.tipo_pieza;
       const u = typeof b === "string" ? null : b.ultimo;
       contUltimos["b" + t] = u;
-      return ficha(t, u, `contEmpezar(null, '${t.replace(/'/g, "")}')`, false, typeof b === "string" ? null : b.en_proceso);
+      contBasicos[t] = b;
+      (b.prendas || []).forEach(p => { contUltimos["p" + p.nombre] = p.ultimo; });
+      // Un tipo con varias prendas abre el selector (todas o una sola); con una, va directo.
+      const onclick = (b.prendas || []).length > 1 ? `contElegirPrenda('${t.replace(/'/g, "")}')` : `contEmpezar(null, '${t.replace(/'/g, "")}')`;
+      return ficha(t, u, onclick, false, typeof b === "string" ? null : b.en_proceso);
     }).join("") || "<span class='sub'>—</span>";
+    $("cont-prendas").innerHTML = "";
     $("cont-ver-todas").innerHTML = contVerTodas
       ? `<a onclick="contVerTodas=false; contCargarLista()">Ocultar las contadas hace poco</a>`
       : (ocultas ? `<a onclick="contVerTodas=true; contCargarLista()">Ver todas (${ocultas} contada${ocultas === 1 ? "" : "s"} hace poco)</a>` : "");
@@ -455,15 +462,31 @@ async function contCargarLista() {
 }
 
 let contUltimos = {};
+let contBasicos = {};
 let contVerTodas = false;
-async function contEmpezar(escuelaId, tipoPieza) {
-  const que = tipoPieza ? ("Básicos · " + tipoPieza) : "esta escuela";
-  const u = contUltimos[tipoPieza ? "b" + tipoPieza : "e" + escuelaId];
+// Básicos: "¿todas las de Pantalón o solo una prenda?" — como el tercer combo del kiosko.
+function contElegirPrenda(tipo) {
+  const b = contBasicos[tipo]; if (!b) return;
+  const esc = s => s.replace(/'/g, "");
+  const chip = (texto, ultimo, onclick, enProceso) => enProceso
+    ? `<span class="chip proceso" onclick="contSeguirEnProceso(${enProceso.jornada_id}, '${esc(texto)}', '${esc(enProceso.quien)}')">${texto}<small>En proceso · ${enProceso.quien}</small></span>`
+    : `<span class="chip" onclick="${onclick}">${texto}<small>${ultimo ? ultimo.texto : ""}</small></span>`;
+  $("cont-prendas").innerHTML = `<div class="card" style="margin-top:10px"><strong>${tipo}: ¿qué contamos?</strong>` +
+    `<div class="chips" style="margin-top:8px">` +
+    chip("Todas las de " + tipo, b.ultimo, `contEmpezar(null, '${esc(tipo)}')`, b.en_proceso) +
+    (b.prendas || []).map(p => chip(p.corto, p.ultimo, `contEmpezar(null, '${esc(tipo)}', '${esc(p.nombre)}')`, p.en_proceso)).join("") +
+    `</div><p class="sub" style="margin:8px 0 0"><a onclick="$('cont-prendas').innerHTML=''">Cancelar</a></p></div>`;
+  $("cont-prendas").scrollIntoView({behavior: "smooth", block: "nearest"});
+}
+async function contEmpezar(escuelaId, tipoPieza, prenda) {
+  prenda = prenda || "";
+  const que = prenda ? (prenda.split("|")[0].trim()) : tipoPieza ? ("Básicos · " + tipoPieza) : "esta escuela";
+  const u = contUltimos[prenda ? "p" + prenda : tipoPieza ? "b" + tipoPieza : "e" + escuelaId];
   let aviso = "";
   if (u && u.dias !== null && u.dias < 7) aviso = `Ojo: ${que === "esta escuela" ? "esta escuela" : que} ya se contó ${u.texto}.\n\n`;
   if (!confirm(`${aviso}¿Empezar el conteo de ${que}?`)) return;
   try {
-    const hoja = await contPost("/api/v1/movil/conteos", {escuela_id: escuelaId, tipo_pieza: tipoPieza || ""});
+    const hoja = await contPost("/api/v1/movil/conteos", {escuela_id: escuelaId, tipo_pieza: tipoPieza || "", prenda: prenda});
     if (hoja.en_proceso) alert(`Ya la está contando ${hoja.en_proceso.quien}. Sigues en esa misma jornada; lo que anotes queda a tu nombre.`);
     contPintarHoja(hoja);
   } catch (e) { alert(e.message); }

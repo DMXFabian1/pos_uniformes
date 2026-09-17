@@ -212,6 +212,29 @@ class UltimoConteoEnLaListaTests(ApiConteosMovilTests):
         self.assertEqual(e["ultimo"]["texto"], "hoy (Stayce)")
         self.assertTrue(e["ultimo"]["reciente"])   # el celular la esconde hasta "Ver todas"
 
+    def test_los_basicos_traen_sus_prendas_y_se_puede_contar_una_sola(self) -> None:
+        # Daniel (2026-09-14): "a veces no quiero contar todos los pantalones, solo un tipo o un color".
+        from pos_uniformes.tests.test_conteo_jornada_service import _seed_basicos
+
+        gris, azul = _seed_basicos(self.session, self.escuela, "Pantalón")
+        self.session.commit()
+        self._como("VEND-4")
+        basicos = self.client.get("/api/v1/movil/conteos").json()["basicos"]
+        pant = next(b for b in basicos if b["tipo_pieza"] == "Pantalón")
+        self.assertEqual([p["corto"] for p in pant["prendas"]], ["Pantalón Azul Escolar", "Pantalón Gris Escolar"])
+        self.assertEqual(pant["prendas"][0]["ultimo"]["texto"], "nunca")
+        # Abrir solo la gris: la hoja trae una prenda, y el tipo dice que la gris está en proceso.
+        r = self.client.post("/api/v1/movil/conteos", json={"escuela_id": None, "tipo_pieza": "Pantalón", "prenda": gris})
+        self.assertEqual(r.status_code, 200, r.text)
+        hoja = r.json()
+        self.assertEqual([p["nombre"] for p in hoja["prendas"]], ["Pantalón Gris Escolar"])
+        basicos = self.client.get("/api/v1/movil/conteos").json()["basicos"]
+        pant = next(b for b in basicos if b["tipo_pieza"] == "Pantalón")
+        por_nombre = {p["nombre"]: p for p in pant["prendas"]}
+        self.assertEqual(por_nombre[gris]["en_proceso"]["quien"], "Stayce Chavarria")
+        self.assertIsNone(por_nombre[azul]["en_proceso"])
+        self.assertIsNone(pant["en_proceso"])   # "todas" sigue libre
+
     def test_los_basicos_tambien_traen_su_fecha(self) -> None:
         self._como("VEND-4")
         basicos = self.client.get("/api/v1/movil/conteos").json()["basicos"]
