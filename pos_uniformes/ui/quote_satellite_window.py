@@ -331,6 +331,7 @@ class QuoteSatelliteWindow(QMainWindow):
     _db_refresh_ready = pyqtSignal(object, object)
     # Avisa (en hilo de UI) que el cache de anuncios se refrescó desde la DB.
     _anuncios_ready = pyqtSignal()
+    _conteo_banner_ready = pyqtSignal(object)   # lista de escuelas vencidas, o None si no se pudo
     # Hay versión nueva publicada en la PC principal (payload: la versión).
     _update_disponible = pyqtSignal(str)
     # False hasta el primer _refresh_catalog_snapshot: el reindex de arranque
@@ -393,6 +394,7 @@ class QuoteSatelliteWindow(QMainWindow):
         # en ~1ms) la señal se perdería y _db_refresh_running quedaría
         # atorado en True — watchdog muerto hasta reiniciar.
         self._db_refresh_ready.connect(self._on_db_refresh_ready)
+        self._conteo_banner_ready.connect(self._on_conteo_banner_ready)
         self._update_disponible.connect(self._ofrecer_actualizacion)
         # Buscar actualizaciones en background poco después de arrancar
         # (también hay botón manual en el admin Ctrl+Shift+A).
@@ -3552,25 +3554,49 @@ class QuoteSatelliteWindow(QMainWindow):
         return self.conteo_banner
 
     def _refresh_conteo_banner(self) -> None:
-        """Consulta escuelas con conteo vencido y muestra/oculta el banner."""
+        """Consulta escuelas con conteo vencido y muestra/oculta el banner.
+
+        La consulta va en un hilo: corre cada 10 min y por Wi-Fi podía dejar
+        la pantalla congelada hasta que Postgres contestara.
+        """
         banner = getattr(self, "conteo_banner", None)
         if banner is None:
             return
         if self.offline_mode:
             banner.setVisible(False)
             return
-        try:
-            from pos_uniformes.services.conteo_calendario_service import (
-                escuelas_con_conteo_vencido,
-            )
-
-            with get_session() as session:
-                vencidas = escuelas_con_conteo_vencido(session)
-        except Exception:  # noqa: BLE001 — sin conexión: no molestar
-            banner.setVisible(False)
+        if getattr(self, "_conteo_banner_running", False):
             return
+        self._conteo_banner_running = True
+        import threading
 
-        n = len(vencidas)
+        def _worker() -> None:
+            vencidas = None
+            try:
+                from pos_uniformes.services.conteo_calendario_service import (
+                    escuelas_con_conteo_vencido,
+                )
+                from pos_uniformes.services.satellite_startup_service import probe_database_host
+
+                if probe_database_host():
+                    with get_session() as session:
+                        vencidas = escuelas_con_conteo_vencido(session)
+            except Exception:  # noqa: BLE001 — sin conexión: no molestar
+                vencidas = None
+            finally:
+                self._conteo_banner_running = False
+                try:
+                    self._conteo_banner_ready.emit(vencidas)
+                except RuntimeError:
+                    pass  # la ventana ya se cerró
+
+        threading.Thread(target=_worker, daemon=True, name="conteo-banner").start()
+
+    def _on_conteo_banner_ready(self, vencidas) -> None:
+        banner = getattr(self, "conteo_banner", None)
+        if banner is None:
+            return
+        n = len(vencidas or [])
         if n == 0:
             banner.setVisible(False)
             return

@@ -194,3 +194,53 @@ class GafeteEnConteosTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ConteoBannerTests(unittest.TestCase):
+    """El banner de conteo vencido consulta la DB en un hilo, no en la UI."""
+
+    def _stub(self):
+        from unittest.mock import MagicMock
+
+        w = QuoteSatelliteWindow.__new__(QuoteSatelliteWindow)
+        w.conteo_banner = MagicMock()
+        w.conteo_banner_label = MagicMock()
+        w.offline_mode = False
+        return w
+
+    def test_la_consulta_va_en_hilo_y_solo_una_a_la_vez(self) -> None:
+        from unittest.mock import patch
+
+        w = self._stub()
+        w._conteo_banner_running = True   # ya hay una en vuelo
+        with patch("threading.Thread") as hilo:
+            QuoteSatelliteWindow._refresh_conteo_banner(w)
+        hilo.assert_not_called()
+        w._conteo_banner_running = False
+        with patch("threading.Thread") as hilo:
+            QuoteSatelliteWindow._refresh_conteo_banner(w)
+        hilo.assert_called_once()
+        self.assertEqual(hilo.call_args.kwargs["name"], "conteo-banner")
+        self.assertTrue(w._conteo_banner_running)
+
+    def test_offline_esconde_el_banner_sin_hilo(self) -> None:
+        from unittest.mock import patch
+
+        w = self._stub()
+        w.offline_mode = True
+        with patch("threading.Thread") as hilo:
+            QuoteSatelliteWindow._refresh_conteo_banner(w)
+        hilo.assert_not_called()
+        w.conteo_banner.setVisible.assert_called_with(False)
+
+    def test_el_resultado_pinta_el_banner_en_la_ui(self) -> None:
+        from types import SimpleNamespace
+
+        w = self._stub()
+        QuoteSatelliteWindow._on_conteo_banner_ready(w, None)          # no se pudo: se esconde
+        w.conteo_banner.setVisible.assert_called_with(False)
+        QuoteSatelliteWindow._on_conteo_banner_ready(w, [SimpleNamespace(escuela_nombre="Práxedis")])
+        w.conteo_banner_label.setText.assert_called_with("⚠  Conteo pendiente: Práxedis")
+        w.conteo_banner.setVisible.assert_called_with(True)
+        QuoteSatelliteWindow._on_conteo_banner_ready(w, [SimpleNamespace(escuela_nombre="A"), SimpleNamespace(escuela_nombre="B")])
+        w.conteo_banner_label.setText.assert_called_with("⚠  Conteo pendiente en 2 escuelas")
