@@ -305,6 +305,26 @@ def texto_estado_caja(estado: EstadoCaja) -> str:
     return "\n".join(partes)
 
 
+def texto_estado_caja_sin_totales(estado: EstadoCaja) -> str:
+    """El encabezado del corte cuando los pagos y retiros van desglosados abajo."""
+    r = estado.resumen
+    partes = [
+        f"Periodo: {_periodo(estado)}",
+        f"Fondo (reactivo) con que abrió: ${estado.reactivo:,.2f}",
+        f"VENTA EN EFECTIVO: ${r.efectivo:,.2f}   ({r.operaciones} operaciones)",
+    ]
+    if r.tarjeta:
+        partes.append(f"Con tarjeta llega ${r.tarjeta_neto:,.2f} (cobrado ${r.tarjeta:,.2f}; no está en el cajón)")
+    return "\n".join(partes)
+
+
+def _cuando(momento) -> str:
+    if momento is None:
+        return ""
+    m = momento.astimezone() if getattr(momento, "tzinfo", None) else momento
+    return m.strftime("%d/%m %H:%M")
+
+
 def _periodo(estado: EstadoCaja) -> str:
     h = estado.hasta.astimezone() if estado.hasta.tzinfo else estado.hasta
     if estado.desde is None:
@@ -333,6 +353,23 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
             from pos_uniformes.services.corte_caja_service import cargar_parametros, pagos_que_tocan_hoy
 
             parametros = cargar_parametros(session)
+            # Lo que YA salió del cajón en el periodo, uno por uno: Daniel
+            # desmarca lo que no salió (2026-09-18: "el pago a Evelyn lo hice
+            # ayer, así que no tomé el dinero hoy, pero los otros gastos sí").
+            from pos_uniformes.services.retiros_service import retiros_del_periodo
+
+            pagos_hechos = [
+                (p.id, _nombre_de(p.employee_name or p.employee_code, corto=True), Decimal(p.total), _cuando(p.created_at), bool(p.en_cajon))
+                for p in pagos_registrados_del_periodo(session, estado.desde, estado.hasta, solo_en_cajon=False)
+            ]
+            try:
+                retiros_hechos = [
+                    (r.id, str(r.motivo or "Retiro"), Decimal(r.monto), _cuando(r.created_at), bool(r.en_cajon))
+                    for r in retiros_del_periodo(session, estado.desde, estado.hasta, solo_en_cajon=False)
+                ]
+            except Exception:  # noqa: BLE001
+                session.rollback()
+                retiros_hechos = []
             # Los pagos que caen hoy y nadie ha registrado: se ofrecen aquí
             # mismo (Daniel 2026-09-13: "al hacer corte no me descontó los pagos").
             try:
@@ -352,9 +389,35 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
     ly.setSpacing(10)
     if grande:
         dlg.setStyleSheet("QDialog { background: #f4ede2; } QLabel { color: #2c2a27; font-size: 18px; }")
-    resumen = QLabel(texto_estado_caja(estado))
+    resumen = QLabel(texto_estado_caja_sin_totales(estado) if (pagos_hechos or retiros_hechos) else texto_estado_caja(estado))
     resumen.setWordWrap(True)
     ly.addWidget(resumen)
+
+    # Desglose de lo que ya salió: marcado = salió del cajón en este periodo.
+    casillas_hechos: list[tuple[QCheckBox, str, int, Decimal]] = []   # (casilla, "pago"/"retiro", id, monto)
+    for titulo_txt, filas, tipo in (
+        ("Pagos a empleadas en este periodo (desmarca el que NO salió del cajón):", pagos_hechos, "pago"),
+        ("Retiros apuntados en este periodo (desmarca el que NO salió del cajón):", retiros_hechos, "retiro"),
+    ):
+        if not filas:
+            continue
+        t = QLabel(titulo_txt)
+        t.setStyleSheet("font-weight: 700;")
+        ly.addWidget(t)
+        for rid, quien, monto, cuando, en_cajon in filas:
+            cb = QCheckBox(f"{quien}  ·  ${monto:,.2f}  ·  {cuando}")
+            cb.setChecked(en_cajon)
+            cb.setProperty("en_cajon_inicial", en_cajon)
+            if grande:
+                cb.setStyleSheet("font-size: 17px;")
+            ly.addWidget(cb)
+            casillas_hechos.append((cb, tipo, rid, monto))
+    if pagos_hechos or retiros_hechos:
+        esperado_lbl = QLabel("")
+        esperado_lbl.setWordWrap(True)
+        ly.addWidget(esperado_lbl)
+    else:
+        esperado_lbl = None
 
     form = QFormLayout()
     # Se pregunta por la VENTA (Daniel 2026-09-10): es la cifra con la que se
@@ -403,17 +466,45 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
     def _pagos_marcados() -> list:
         return [a for cb, a in casillas_pago if cb.isChecked()]
 
+    def _fuera_del_cajon() -> tuple[list[int], list[int], Decimal]:
+        """(pagos desmarcados, retiros desmarcados, cuánto NO se resta)."""
+        pagos_ids, retiros_ids, monto = [], [], Decimal("0.00")
+        for cb, tipo, rid, m in casillas_hechos:
+            if cb.isChecked():
+                continue
+            (pagos_ids if tipo == "pago" else retiros_ids).append(rid)
+            monto += m
+        return pagos_ids, retiros_ids, monto.quantize(Decimal("0.01"))
+
+    def _dentro_del_cajon() -> tuple[list[int], list[int]]:
+        pagos_ids = [rid for cb, tipo, rid, _m in casillas_hechos if cb.isChecked() and tipo == "pago"]
+        retiros_ids = [rid for cb, tipo, rid, _m in casillas_hechos if cb.isChecked() and tipo == "retiro"]
+        return pagos_ids, retiros_ids
+
     def _contado() -> Decimal:
         """Lo que queda en el cajón con la venta capturada."""
         base = contado_desde_venta(
             estado, Decimal(str(venta.value())), Decimal(str(otros.value()))
         )
         pagos_nuevos = sum((Decimal(a.total_estimado) for a in _pagos_marcados()), Decimal("0.00"))
-        return max(base - pagos_nuevos, Decimal("0.00")).quantize(Decimal("0.01"))
+        # `estado` ya viene con lo guardado en la base; aquí solo se corrige lo
+        # que Daniel cambió en las casillas: lo que desmarcó nunca salió de
+        # aquí (se regresa) y lo que volvió a marcar sí salió (se resta).
+        regresa = sum((m for cb, _t, _i, m in casillas_hechos if not cb.isChecked() and cb.property("en_cajon_inicial")), Decimal("0.00"))
+        resta = sum((m for cb, _t, _i, m in casillas_hechos if cb.isChecked() and not cb.property("en_cajon_inicial")), Decimal("0.00"))
+        return max(base - pagos_nuevos + regresa - resta, Decimal("0.00")).quantize(Decimal("0.01"))
 
     def _refrescar_dif() -> None:
         v = Decimal(str(venta.value())).quantize(Decimal("0.01"))
         d = diferencia(v, estado.resumen.efectivo)
+        if esperado_lbl is not None:
+            _p, _r, no_salio = _fuera_del_cajon()
+            marcados = sum((m for cb, _t, _i, m in casillas_hechos if cb.isChecked()), Decimal("0.00"))
+            esperado_lbl.setText(
+                f"Salió del cajón en este periodo: -${marcados:,.2f}"
+                + (f"  (no se resta ${no_salio:,.2f} que no salió de aquí)" if no_salio else "")
+                + f"\nEn el cajón debe haber: ${(estado.reactivo + estado.resumen.efectivo - marcados):,.2f}"
+            )
         detalle = f"En el cajón quedan ${_contado():,.2f}."
         if d == 0:
             dif.setText(f"✅ Es la venta registrada. {detalle}")
@@ -425,6 +516,8 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
     venta.valueChanged.connect(lambda _v: _refrescar_dif())
     otros.valueChanged.connect(lambda _v: _refrescar_dif())
     for cb, _a in casillas_pago:
+        cb.toggled.connect(lambda _v: _refrescar_dif())
+    for cb, _t, _i, _m in casillas_hechos:
         cb.toggled.connect(lambda _v: _refrescar_dif())
     _refrescar_dif()
 
@@ -455,6 +548,14 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
                     session, aviso.employee_code, creado_por=creado_por,
                     fecha=estado.hasta.date(), momento=estado.hasta,
                 )
+            # Lo que Daniel desmarcó no salió del cajón: queda anotado y el
+            # esperado del corte se calcula sin eso (y al revés si volvió a marcar).
+            from pos_uniformes.services.corte_caja_service import marcar_fuera_del_cajon
+
+            fuera_p, fuera_r, _no_salio = _fuera_del_cajon()
+            marcar_fuera_del_cajon(session, pagos_ids=fuera_p, retiros_ids=fuera_r, en_cajon=False)
+            dentro_p, dentro_r = _dentro_del_cajon()
+            marcar_fuera_del_cajon(session, pagos_ids=dentro_p, retiros_ids=dentro_r, en_cajon=True)
             corte = cerrar_corte(
                 session,
                 contado=_contado(),

@@ -44,10 +44,12 @@ def registrar_retiro(session, *, monto, motivo: str, creado_por: str):
     return retiro
 
 
-def retiros_del_periodo(session, desde: datetime | None, hasta: datetime) -> list:
+def retiros_del_periodo(session, desde: datetime | None, hasta: datetime, *, solo_en_cajon: bool = True) -> list:
     from pos_uniformes.database.models import CajaRetiro
 
     stmt = select(CajaRetiro).where(CajaRetiro.created_at <= hasta)
+    if solo_en_cajon:
+        stmt = stmt.where(CajaRetiro.en_cajon.is_(True))
     if desde is not None:
         stmt = stmt.where(CajaRetiro.created_at > desde)
     return list(session.scalars(stmt.order_by(CajaRetiro.id)).all())
@@ -56,7 +58,9 @@ def retiros_del_periodo(session, desde: datetime | None, hasta: datetime) -> lis
 def total_retiros(session, desde: datetime | None, hasta: datetime) -> Decimal:
     from pos_uniformes.database.models import CajaRetiro
 
-    stmt = select(func.coalesce(func.sum(CajaRetiro.monto), 0)).where(CajaRetiro.created_at <= hasta)
+    stmt = select(func.coalesce(func.sum(CajaRetiro.monto), 0)).where(
+        CajaRetiro.created_at <= hasta, CajaRetiro.en_cajon.is_(True)
+    )
     if desde is not None:
         stmt = stmt.where(CajaRetiro.created_at > desde)
     return Decimal(str(session.scalar(stmt) or 0)).quantize(_CENT)

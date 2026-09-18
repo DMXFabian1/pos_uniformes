@@ -15,14 +15,14 @@ from sqlalchemy.orm import Session
 from sqlalchemy.pool import StaticPool
 
 from pos_uniformes.database.connection import Base
-from pos_uniformes.database.models import CajaParametros, Empleada, EmpleadaHorario, EmpleadaPago, LibretaCorte, LibretaVenta
+from pos_uniformes.database.models import CajaParametros, CajaRetiro, Empleada, EmpleadaHorario, EmpleadaPago, LibretaCorte, LibretaVenta
 
 app = QApplication.instance() or QApplication(sys.argv)
 
 HOY = date.today()
 
 
-class CortePagosDeHoyTests(unittest.TestCase):
+class _CorteBase(unittest.TestCase):
     def setUp(self) -> None:
         engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
         Base.metadata.create_all(engine)
@@ -62,6 +62,9 @@ class CortePagosDeHoyTests(unittest.TestCase):
             p.stop()
         self.s.close()
 
+
+
+class CortePagosDeHoyTests(_CorteBase):
     def test_los_pagos_de_hoy_se_registran_y_se_descuentan(self) -> None:
         from pos_uniformes.ui.dialogs.corte_caja_dialog import hacer_corte_caja
 
@@ -107,6 +110,79 @@ class CortePagosDeHoyTests(unittest.TestCase):
         self.assertEqual([p.employee_code for p in pagos], ["VEND-4"])
         corte_db = self.s.scalars(select(LibretaCorte)).one()
         self.assertEqual(corte_db.retiros_pagos, pagos[0].total)
+
+
+class LoQueYaSalioDelCajonTests(_CorteBase):
+    """El corte desglosa los pagos y retiros del periodo, uno por uno, y Daniel
+    desmarca el que no salió del cajón (2026-09-18: "el pago a Evelyn lo hice ayer")."""
+
+    def setUp(self) -> None:
+        super().setUp()
+        # Katherine no toca hoy, así que no la ofrece; pero sí hay un pago suyo
+        # de anoche y un retiro del proveedor, ambos dentro del periodo.
+        self.s.add_all([
+            EmpleadaPago(employee_code="VEND-8", employee_name="Katherine Posada", fecha=HOY - timedelta(days=1),
+                         hasta=HOY - timedelta(days=1), total=Decimal("1428.00"), creado_por="VEND-1",
+                         created_at=datetime.now() - timedelta(hours=20)),
+            CajaRetiro(monto=Decimal("730.00"), motivo="Liquidación Fany", creado_por="VEND-1", created_at=datetime.now() - timedelta(hours=1)),
+        ])
+        self.s.commit()
+
+    def _casillas(self, dlg):
+        return {cb.text(): cb for cb in dlg.findChildren(QCheckBox)}
+
+    def test_se_desglosan_con_fecha_y_marcados(self) -> None:
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import hacer_corte_caja
+
+        vistas = {}
+
+        def _mira(dlg):
+            vistas.update({t: cb.isChecked() for t, cb in self._casillas(dlg).items()})
+            return QDialog.DialogCode.Rejected
+
+        with patch("pos_uniformes.ui.dialogs.corte_caja_dialog.QDialog.exec", _mira):
+            hacer_corte_caja(None, creado_por="VEND-1")
+        katherine = next(t for t in vistas if t.startswith("Katherine"))
+        fany = next(t for t in vistas if "Liquidación Fany" in t)
+        self.assertIn("$1,428.00", katherine); self.assertRegex(katherine, r"\d\d/\d\d \d\d:\d\d$")
+        self.assertIn("$730.00", fany)
+        self.assertTrue(vistas[katherine] and vistas[fany])
+
+    def test_desmarcar_el_pago_de_ayer_lo_regresa_al_esperado_y_queda_anotado(self) -> None:
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import hacer_corte_caja
+
+        def _exec(dlg):
+            for t, cb in self._casillas(dlg).items():
+                if t.startswith("Katherine") or "comisiones" in t:   # el pago de ayer no salió hoy; los de hoy no se pagan
+                    cb.setChecked(False)
+            return QDialog.DialogCode.Accepted
+
+        with patch("pos_uniformes.ui.dialogs.corte_caja_dialog.QDialog.exec", _exec):
+            corte = hacer_corte_caja(None, creado_por="VEND-1")
+        self.assertIsNotNone(corte)
+        pago = self.s.scalars(select(EmpleadaPago).where(EmpleadaPago.employee_code == "VEND-8")).one()
+        self.assertFalse(pago.en_cajon)
+        retiro = self.s.scalars(select(CajaRetiro)).one()
+        self.assertTrue(retiro.en_cajon)
+        corte_db = self.s.scalars(select(LibretaCorte)).one()
+        # esperado = 11,160 + 5,000 − 730 (el retiro sí salió); el pago de ayer ya no se resta
+        self.assertEqual(corte_db.monto_esperado, Decimal("15430.00"))
+        self.assertEqual(corte_db.retiros_pagos, Decimal("0.00"))
+        self.assertEqual(corte_db.monto_final, corte_db.monto_esperado)
+
+    def test_todo_marcado_se_resta_como_siempre(self) -> None:
+        from pos_uniformes.ui.dialogs.corte_caja_dialog import hacer_corte_caja
+
+        def _exec(dlg):
+            for t, cb in self._casillas(dlg).items():
+                if "comisiones" in t:
+                    cb.setChecked(False)
+            return QDialog.DialogCode.Accepted
+
+        with patch("pos_uniformes.ui.dialogs.corte_caja_dialog.QDialog.exec", _exec):
+            hacer_corte_caja(None, creado_por="VEND-1")
+        corte_db = self.s.scalars(select(LibretaCorte)).one()
+        self.assertEqual(corte_db.monto_esperado, Decimal("11160.00") + Decimal("5000.00") - Decimal("1428.00") - Decimal("730.00"))
 
 
 if __name__ == "__main__":

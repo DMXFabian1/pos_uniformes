@@ -178,17 +178,40 @@ def operaciones_del_periodo(session, desde: datetime | None, hasta: datetime) ->
 def pagos_del_periodo(session, desde: datetime | None, hasta: datetime) -> Decimal:
     from pos_uniformes.database.models import EmpleadaPago
 
-    stmt = select(func.coalesce(func.sum(EmpleadaPago.total), 0)).where(EmpleadaPago.created_at <= hasta)
+    stmt = select(func.coalesce(func.sum(EmpleadaPago.total), 0)).where(
+        EmpleadaPago.created_at <= hasta, EmpleadaPago.en_cajon.is_(True)
+    )
     if desde is not None:
         stmt = stmt.where(EmpleadaPago.created_at > desde)
     return _d(session.scalar(stmt))
 
 
-def pagos_registrados_del_periodo(session, desde: datetime | None, hasta: datetime) -> list:
-    """Filas EmpleadaPago del periodo (para desglosarlas en el ticket)."""
+def marcar_fuera_del_cajon(session, *, pagos_ids: list[int] = (), retiros_ids: list[int] = (), en_cajon: bool = False) -> int:
+    """Daniel desmarca en el corte lo que no salió del cajón en este periodo
+    (un pago hecho con otro dinero, un retiro ya contado). Queda anotado en
+    el registro y deja de restarse. Devuelve cuántos cambió."""
+    from pos_uniformes.database.models import CajaRetiro, EmpleadaPago
+
+    n = 0
+    for modelo, ids in ((EmpleadaPago, pagos_ids), (CajaRetiro, retiros_ids)):
+        for rid in ids:
+            fila = session.get(modelo, int(rid))
+            if fila is not None and bool(fila.en_cajon) != en_cajon:
+                fila.en_cajon = en_cajon
+                session.add(fila)
+                n += 1
+    session.flush()
+    return n
+
+
+def pagos_registrados_del_periodo(session, desde: datetime | None, hasta: datetime, *, solo_en_cajon: bool = True) -> list:
+    """Filas EmpleadaPago del periodo (para desglosarlas en el ticket). Por
+    default solo las que sí salieron del cajón; el diálogo del corte pide todas."""
     from pos_uniformes.database.models import EmpleadaPago
 
     stmt = select(EmpleadaPago).where(EmpleadaPago.created_at <= hasta)
+    if solo_en_cajon:
+        stmt = stmt.where(EmpleadaPago.en_cajon.is_(True))
     if desde is not None:
         stmt = stmt.where(EmpleadaPago.created_at > desde)
     return list(session.scalars(stmt.order_by(EmpleadaPago.id)).all())

@@ -2148,6 +2148,9 @@ class EmpleadaPago(Base):
     descuento_faltas: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     total: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal("0.00"))
     creado_por: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    # False = este pago no salió del cajón en el periodo del corte (se pagó
+    # con otro dinero, o ya se había contado antes); no se resta del esperado.
+    en_cajon: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     # Modo por día: cuántos días trabajó y a cuánto (sueldo_base = días × tarifa).
     dias_trabajados: Mapped[int | None] = mapped_column(Integer)
     tarifa_dia: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
@@ -2206,6 +2209,7 @@ class CajaRetiro(Base):
     monto: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     motivo: Mapped[str] = mapped_column(String(120), nullable=False, default="")
     creado_por: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    en_cajon: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True, server_default="true")
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
