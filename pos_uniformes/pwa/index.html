@@ -325,7 +325,7 @@ body.con-topbar .app{padding-top:calc(58px + env(safe-area-inset-top))}
 const $ = id => document.getElementById(id);
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const DIAS = ["lun","mar","mié","jue","vie","sáb","dom"];
-const PWA_VERSION = "v21";
+const PWA_VERSION = "v22";
 let token = localStorage.getItem("pos_token") || "";
 let calY = 0, calM = 0;
 let rolActual = "", vistaInicio = "", modoServidor = "casa";
@@ -506,6 +506,8 @@ function contTab(cual) {
   $("cont-tab-escuelas").classList.toggle("oculto", cual !== "escuelas");
   $("cont-tab-basicos").classList.toggle("oculto", cual !== "basicos");
 }
+// "Sin color" / "Único" no dicen nada: no se enseñan junto a la talla.
+const colorVisible = c => c && !/^(sin color|unico|único)$/i.test(c.trim()) ? c : "";
 const contNorm = s => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 function contBuscando() { const i = $("cont-busca"); return !!(i && i.value.trim()); }
 // Escuelas en grupos: TOCAN (ya vencidas), NUNCA CONTADAS, CONTADAS. Con texto
@@ -708,7 +710,7 @@ async function buscarTexto() {
     if (!fams.length) { $("buscar-resultado").innerHTML = "<div class='card'>Nada con ese nombre. 🤷</div>"; return; }
     $("buscar-resultado").innerHTML = fams.slice(0, 8).map(f => {
       const tallas = f.variantes.map(v =>
-        `<span class="talla-chip" onclick="buscarSku('${v.sku}')">${v.talla}${v.color ? " · " + v.color : ""}</span>`).join("");
+        `<span class="talla-chip" onclick="buscarSku('${v.sku}')">${v.talla}${colorVisible(v.color) ? " · " + v.color : ""}</span>`).join("");
       return `<div class="card"><strong>${f.nombre_base}</strong>` +
         `<div class="sub">${f.tipo_pieza} · desde ${pesos(f.precio_desde)}</div>` +
         `<div>${tallas}</div></div>`;
@@ -734,7 +736,7 @@ async function buscarSku(codigo) {
     }
     $("buscar-resultado").innerHTML = `<div class="card">
         <strong>${v.nombre}</strong>
-        <div class="sub">${v.categoria} · ${v.marca} · Talla ${v.talla}${v.color ? " · " + v.color : ""} · ${v.sku}</div>
+        <div class="sub">${v.categoria} · ${v.marca} · Talla ${v.talla}${colorVisible(v.color) ? " · " + v.color : ""} · ${v.sku}</div>
         <div class="precio-grande">${pesos(v.precio_venta)}</div>
         <div class="${stockCls}" style="font-weight:800">${stockTxt}</div>
         ${botones}</div>`;
@@ -1224,7 +1226,7 @@ async function bodElegirPrenda(i) {
   const filas = bodPrenda.tallas.map(t => {
     const pista = [t.a_la_mano ? `${t.a_la_mano} a la mano` : "", t.en_cajas ? `${t.en_cajas} en cajas` : ""].filter(Boolean).join(" · ");
     const pediste = t.pedido ? `<small class="quien">pediste ${t.pedido}</small>` : "";
-    return `<tr><td class="t">${t.talla}${t.color && !/^(unico|único|sin color)$/i.test(t.color) ? " " + t.color : ""}${pediste}<small class="quien">${pista}</small></td>` +
+    return `<tr><td class="t">${t.talla}${colorVisible(t.color) ? " " + t.color : ""}${pediste}<small class="quien">${pista}</small></td>` +
       `<td><input inputmode="numeric" pattern="[0-9]*" placeholder="0" value="${t.pedido || ""}" data-v="${t.variante_id}"></td>` +
       `<td class="bod-acaja oculto"><input inputmode="numeric" pattern="[0-9]*" placeholder="0" data-caja-v="${t.variante_id}"></td></tr>`;
   }).join("");
