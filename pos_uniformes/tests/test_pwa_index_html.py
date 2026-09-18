@@ -13,7 +13,10 @@ HTML = Path(__file__).resolve().parent.parent / "pwa" / "index.html"
 
 class PwaIndexTests(unittest.TestCase):
     def test_ningun_id_repetido(self) -> None:
-        ids = re.findall(r'\sid="([^"]+)"', HTML.read_text(encoding="utf-8"))
+        # Solo el HTML estático: los ids dentro de <script> son plantillas que
+        # se pintan una a la vez (p.ej. `bod-cajas` en dos pantallas de bodega).
+        estatico = re.sub(r"<script>[\s\S]*?</script>", "", HTML.read_text(encoding="utf-8"))
+        ids = re.findall(r'\sid="([^"]+)"', estatico)
         repetidos = [i for i, n in Counter(ids).items() if n > 1]
         self.assertEqual(repetidos, [], f"ids repetidos en pwa/index.html: {repetidos}")
 
