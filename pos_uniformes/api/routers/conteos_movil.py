@@ -89,7 +89,13 @@ def listar(current: tuple = Depends(get_current_employee), db: Session = Depends
         from pos_uniformes.services.conteo_calendario_service import escuelas_con_conteo_vencido
 
         vencidas = escuelas_con_conteo_vencido(db)
-        vencidas_ids = {int(v.escuela_id) for v in vencidas if getattr(v, "escuela_id", None)}
+        # ⚠ solo para las que ya se contaron y se les pasó la vigencia; una
+        # escuela nunca contada va en su propio grupo, no con alerta (si todo
+        # trae ⚠, nada destaca — Daniel 2026-09-18).
+        vencidas_ids = {
+            int(v.escuela_id) for v in vencidas
+            if getattr(v, "escuela_id", None) and getattr(v, "dias_para_vencer", None) is not None
+        }
     except Exception:  # noqa: BLE001 — sin calendario igual se puede contar
         db.rollback()
     from pos_uniformes.services.catalog_school_link_service import list_all_schools

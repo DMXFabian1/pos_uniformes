@@ -212,6 +212,20 @@ class UltimoConteoEnLaListaTests(ApiConteosMovilTests):
         self.assertEqual(e["ultimo"]["texto"], "hoy (Stayce)")
         self.assertTrue(e["ultimo"]["reciente"])   # el celular la esconde hasta "Ver todas"
 
+    def test_una_escuela_nunca_contada_no_lleva_alerta_y_una_vencida_si(self) -> None:
+        # ⚠ solo para las que ya se contaron y se les pasó la vigencia: si todo trae ⚠, nada destaca.
+        from types import SimpleNamespace
+        from unittest.mock import patch
+
+        self._como("VEND-4")
+        eid = self.escuela.id
+        r = self.client.get("/api/v1/movil/conteos").json()
+        self.assertFalse(next(e for e in r["escuelas"] if e["escuela_id"] == eid)["toca"])   # nunca contada
+        vencida = [SimpleNamespace(escuela_id=eid, dias_para_vencer=-3)]
+        with patch("pos_uniformes.services.conteo_calendario_service.escuelas_con_conteo_vencido", return_value=vencida):
+            r = self.client.get("/api/v1/movil/conteos").json()
+        self.assertTrue(next(e for e in r["escuelas"] if e["escuela_id"] == eid)["toca"])
+
     def test_los_basicos_traen_sus_prendas_y_se_puede_contar_una_sola(self) -> None:
         # Daniel (2026-09-14): "a veces no quiero contar todos los pantalones, solo un tipo o un color".
         from pos_uniformes.tests.test_conteo_jornada_service import _seed_basicos

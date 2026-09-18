@@ -64,6 +64,14 @@ input,select{width:100%; border:1px solid var(--borde); border-radius:12px;
 .chip.proceso{border-color:#b45309; background:#fff4e5}
 .chip.proceso small{color:#b45309; font-weight:600}
 #cont-ver-todas a{color:var(--acento-osc); font-weight:700; text-decoration:underline; cursor:pointer}
+.tabs{display:flex; gap:6px; margin:10px 0 12px; background:#efe8dc; border-radius:14px; padding:4px}
+.tabs .tab{flex:1; min-height:42px; font-size:15px; border-radius:11px; background:transparent; color:var(--tenue); font-weight:700}
+.tabs .tab.activa{background:var(--carta); color:var(--acento-osc); box-shadow:0 1px 2px rgba(0,0,0,.08)}
+#cont-busca{margin-bottom:6px}
+.grupo-t{font-size:12px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:var(--tenue); margin:14px 0 2px}
+.grupo-t.toca{color:var(--acento)}
+.grupo-t.proceso{color:#b45309}
+.grupo-t:first-child{margin-top:6px}
 .tallas .quien{display:block; font-size:10px; color:var(--tenue); font-weight:600}
 .prenda{padding:0; overflow:hidden}
 .prenda .cab{background:var(--acento-osc); color:#fff; padding:10px 14px; font-weight:800;
@@ -254,12 +262,20 @@ table.tallas input{margin:0; min-height:46px; font-size:20px; font-weight:800; t
       <div id="cont-abiertas"></div>
       <div class="card">
         <strong>Empezar un conteo</strong>
-        <p class="sub" style="margin:4px 0 0">Escuela (las que ya tocan van primero)</p>
-        <div class="chips" id="cont-escuelas"></div>
-        <p class="sub" style="margin:12px 0 0">Básicos, por prenda</p>
-        <div class="chips" id="cont-basicos"></div>
-        <div id="cont-prendas"></div>
-        <p class="sub" id="cont-ver-todas" style="margin:12px 0 0"></p>
+        <div class="tabs" id="cont-tabs">
+          <button class="tab activa" onclick="contTab('escuelas')">🏫 Escuelas</button>
+          <button class="tab" onclick="contTab('basicos')">👕 Básicos</button>
+        </div>
+        <div id="cont-tab-escuelas">
+          <input id="cont-busca" type="search" placeholder="Buscar escuela…" autocomplete="off" oninput="contPintarEscuelas()">
+          <div id="cont-escuelas"></div>
+          <p class="sub" id="cont-ver-todas" style="margin:12px 0 0"></p>
+        </div>
+        <div id="cont-tab-basicos" class="oculto">
+          <p class="sub" style="margin:4px 0 0">Toca un tipo: todas sus prendas o una sola</p>
+          <div class="chips" id="cont-basicos"></div>
+          <div id="cont-prendas"></div>
+        </div>
       </div>
     </div>
     <div id="cont-hoja" class="oculto">
@@ -426,10 +442,10 @@ async function contCargarLista() {
     contUltimos = {};
     // Las contadas hace poco no se muestran (las empleadas lo pidieron: que
     // una ya contada no aparezca). "Ver todas" las trae. Una en proceso se ve siempre.
-    let ocultas = 0;
+    contOcultas = 0;
     const ficha = (nombre, ultimo, onclick, toca, enProceso) => {
       const reciente = ultimo && ultimo.dias !== null && ultimo.dias < 7;
-      if (!enProceso && ultimo && ultimo.reciente && !contVerTodas) { ocultas++; return ""; }
+      if (!enProceso && ultimo && ultimo.reciente && !contVerTodas && !contBuscando()) { contOcultas++; return ""; }
       if (enProceso) {
         return `<span class="chip proceso" onclick="contSeguirEnProceso(${enProceso.jornada_id}, '${nombre.replace(/'/g, "")}', '${enProceso.quien.replace(/'/g, "")}')">` +
           `${nombre}<small>En proceso · ${enProceso.quien}</small></span>`;
@@ -437,11 +453,9 @@ async function contCargarLista() {
       return `<span class="chip${toca ? " toca" : ""}${reciente ? " reciente" : ""}" onclick="${onclick}">` +
         `${toca ? "⚠ " : ""}${nombre}<small>${ultimo ? ultimo.texto : ""}</small></span>`;
     };
-    $("cont-escuelas").innerHTML = (d.escuelas || []).map(e => {
-      contUltimos["e" + e.escuela_id] = e.ultimo;
-      return ficha(e.nombre, e.ultimo, `contEmpezar(${e.escuela_id}, '')`, e.toca, e.en_proceso);
-    }).join("") || "<span class='sub'>Sin escuelas.</span>";
-    contBasicos = {};
+    contEscuelas = d.escuelas || [];
+    contFicha = ficha;
+    contPintarEscuelas();
     $("cont-basicos").innerHTML = (d.basicos || []).map(b => {
       const t = typeof b === "string" ? b : b.tipo_pieza;
       const u = typeof b === "string" ? null : b.ultimo;
@@ -453,9 +467,6 @@ async function contCargarLista() {
       return ficha(t, u, onclick, false, typeof b === "string" ? null : b.en_proceso);
     }).join("") || "<span class='sub'>—</span>";
     $("cont-prendas").innerHTML = "";
-    $("cont-ver-todas").innerHTML = contVerTodas
-      ? `<a onclick="contVerTodas=false; contCargarLista()">Ocultar las contadas hace poco</a>`
-      : (ocultas ? `<a onclick="contVerTodas=true; contCargarLista()">Ver todas (${ocultas} contada${ocultas === 1 ? "" : "s"} hace poco)</a>` : "");
   } catch (e) {
     $("cont-abiertas").innerHTML = "<div class='card error'>No se pudo cargar. ¿Hay WiFi?</div>";
   }
@@ -463,7 +474,49 @@ async function contCargarLista() {
 
 let contUltimos = {};
 let contBasicos = {};
+let contEscuelas = [];
+let contFicha = null;
+let contOcultas = 0;
 let contVerTodas = false;
+function contTab(cual) {
+  document.querySelectorAll("#cont-tabs .tab").forEach((b, i) => b.classList.toggle("activa", (i === 0) === (cual === "escuelas")));
+  $("cont-tab-escuelas").classList.toggle("oculto", cual !== "escuelas");
+  $("cont-tab-basicos").classList.toggle("oculto", cual !== "basicos");
+}
+const contNorm = s => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+function contBuscando() { const i = $("cont-busca"); return !!(i && i.value.trim()); }
+// Escuelas en grupos: TOCAN (ya vencidas), NUNCA CONTADAS, CONTADAS. Con texto
+// en el buscador, todas las que coincidan, sin grupos ni escondidas.
+function contPintarEscuelas() {
+  if (!contFicha) return;
+  const q = contNorm(($("cont-busca") || {}).value);
+  contOcultas = 0;
+  const html = e => { contUltimos["e" + e.escuela_id] = e.ultimo; return contFicha(e.nombre, e.ultimo, `contEmpezar(${e.escuela_id}, '')`, e.toca, e.en_proceso); };
+  let out = "";
+  if (q) {
+    const hits = contEscuelas.filter(e => contNorm(e.nombre).includes(q));
+    out = hits.length ? `<div class="chips">${hits.map(html).join("")}</div>` : "<span class='sub'>Ninguna escuela con ese nombre.</span>";
+  } else {
+    const nunca = e => !(e.ultimo && e.ultimo.dias !== null);
+    const grupos = [
+      ["En proceso", "proceso", e => e.en_proceso],
+      ["Tocan", "toca", e => !e.en_proceso && e.toca],
+      ["Nunca contadas", "", e => !e.en_proceso && !e.toca && nunca(e)],
+      ["Contadas", "", e => !e.en_proceso && !e.toca && !nunca(e)],
+    ];
+    for (const [titulo, clase, filtro] of grupos) {
+      const lista = contEscuelas.filter(filtro).sort((a, b) => a.nombre.localeCompare(b.nombre, "es"));
+      const chips = lista.map(html).join("");
+      if (!chips) continue;
+      out += `<div class="grupo-t ${clase}">${titulo} · ${lista.length}</div><div class="chips">${chips}</div>`;
+    }
+    if (!out) out = "<span class='sub'>Sin escuelas.</span>";
+  }
+  $("cont-escuelas").innerHTML = out;
+  $("cont-ver-todas").innerHTML = q ? "" : (contVerTodas
+    ? `<a onclick="contVerTodas=false; contPintarEscuelas()">Ocultar las contadas hace poco</a>`
+    : (contOcultas ? `<a onclick="contVerTodas=true; contPintarEscuelas()">Ver todas (${contOcultas} contada${contOcultas === 1 ? "" : "s"} hace poco)</a>` : ""));
+}
 // Básicos: "¿todas las de Pantalón o solo una prenda?" — como el tercer combo del kiosko.
 function contElegirPrenda(tipo) {
   const b = contBasicos[tipo]; if (!b) return;
