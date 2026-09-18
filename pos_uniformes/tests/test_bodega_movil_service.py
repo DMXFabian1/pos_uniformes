@@ -156,6 +156,25 @@ class BodegaMovilTests(unittest.TestCase):
         self.assertEqual(bm.buscar_prendas(self.s, "prenda zzz"), [])  # varias palabras, todas deben estar
         self.assertEqual(len(bm.buscar_prendas(self.s, "prenda")), 2)
 
+    def test_buscar_prendas_sigue_las_reglas_de_la_hoja(self) -> None:
+        # Sin Pants 3pz ni Chamarra (se arman, no llegan), orden por tipo de pieza y tallas de chica a grande.
+        from pos_uniformes.database.models import Categoria, Marca, Producto, TipoPieza
+
+        cat = self.s.scalar(select(Categoria)); marca = self.s.scalar(select(Marca))
+        tipos = {n: TipoPieza(nombre=n) for n in ("Pants 3pz", "Chamarra", "Playera", "Pants 2pz")}
+        self.s.add_all(tipos.values()); self.s.flush()
+        for n, tallas in (("Pants 3pz", ["6"]), ("Chamarra", ["6"]), ("Playera", ["12", "4", "CH"]), ("Pants 2pz", ["8"])):
+            prod = Producto(nombre=f"{n} Conalep", nombre_base=n, categoria_id=cat.id, marca_id=marca.id,
+                            escuela_id=self.escuela.id, tipo_pieza_id=tipos[n].id)
+            self.s.add(prod); self.s.flush()
+            for i, t in enumerate(tallas):
+                self.s.add(Variante(producto_id=prod.id, sku=f"C-{n[:3]}-{t}", talla=t, color="", precio_venta=100, stock_actual=1))
+        self.s.commit()
+        prendas = bm.buscar_prendas(self.s, "conalep")
+        self.assertEqual([p["tipo_pieza"] for p in prendas], ["Pants 2pz", "Playera"])   # 3pz y Chamarra fuera; orden de la hoja
+        playera = next(p for p in prendas if p["tipo_pieza"] == "Playera")
+        self.assertEqual([t["talla"] for t in playera["tallas"]], ["4", "12", "CH"])
+
     # --- corregir caja -----------------------------------------------------------
     def test_corregir_caja_cambia_solo_la_caja(self) -> None:
         from pos_uniformes.database.models import BodegaMovimiento

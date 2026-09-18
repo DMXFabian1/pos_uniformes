@@ -1185,8 +1185,8 @@ async function bodBuscar() {
     const d = await api("/api/v1/movil/bodega/prendas?q=" + encodeURIComponent(q));
     window._bodPrendas = d.prendas;
     $("bod-resultado").innerHTML = d.prendas.length
-      ? d.prendas.map((p, i) => `<div class="fila" onclick="bodElegirPrenda(${i})" style="cursor:pointer"><span><b>${p.nombre}</b>` +
-          `<span class="sub" style="display:block">${p.escuela} · ${p.tallas.length} tallas</span></span><span class="monto">›</span></div>`).join("")
+      ? d.prendas.map((p, i) => `<div class="fila" onclick="bodElegirPrenda(${i})" style="cursor:pointer"><span><b>${p.nombre.split("|")[0].trim()}</b>` +
+          `<span class="sub" style="display:block">${p.tipo_pieza ? p.tipo_pieza + " · " : ""}${p.escuela} · ${p.tallas.length === 1 ? "1 talla" : p.tallas.length + " tallas"}</span></span><span class="monto">›</span></div>`).join("")
       : "<div class='card'>No encontré esa prenda.</div>";
   } catch (e) { $("bod-resultado").innerHTML = "<div class='card error'>No se pudo buscar.</div>"; }
 }

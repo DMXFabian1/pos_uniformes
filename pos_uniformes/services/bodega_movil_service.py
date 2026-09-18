@@ -114,15 +114,30 @@ def _pedidos_vigentes(session: Session, variante_ids: list[int], hoy: date | Non
 
 
 def buscar_prendas(session: Session, texto: str, *, limite: int = 12) -> list[dict]:
-    """Prendas por nombre (y escuela), con sus tallas y lo que hay de cada una."""
+    """Prendas por nombre (y escuela), con sus tallas y lo que hay de cada una.
+
+    Mismas reglas que las hojas de conteo (Daniel, 2026-09-18): el orden por
+    tipo de pieza y las tallas de chica a grande, y **sin Pants 3pz ni
+    Chamarra**: esas no llegan como pieza, se arman con 2pz + playera o
+    quitándole la chamarra a un 2pz.
+    """
+    from sqlalchemy.orm import selectinload
+
+    from pos_uniformes.services.conteo_service import _PIEZA_ORDER, _TIPOS_VIRTUALES, _talla_sort_key
+
     q = (texto or "").strip()
     if len(q) < 2:
         return []
     palabras = [p for p in q.split() if p]
-    stmt = select(Producto).where(Producto.activo.is_(True))
+    stmt = select(Producto).where(Producto.activo.is_(True)).options(selectinload(Producto.tipo_pieza))
     for p in palabras:
         stmt = stmt.where(Producto.nombre.ilike(f"%{p}%"))
-    productos = list(session.scalars(stmt.order_by(Producto.nombre).limit(limite)).all())
+    productos = [
+        p for p in session.scalars(stmt.order_by(Producto.nombre).limit(limite * 2)).all()
+        if not (p.tipo_pieza and p.tipo_pieza.nombre in _TIPOS_VIRTUALES)
+    ]
+    productos.sort(key=lambda p: (_PIEZA_ORDER.get(p.tipo_pieza.nombre if p.tipo_pieza else "", 99), str(p.nombre)))
+    productos = productos[:limite]
     if not productos:
         return []
     ids = [p.id for p in productos]
@@ -152,10 +167,15 @@ def buscar_prendas(session: Session, texto: str, *, limite: int = 12) -> list[di
             "pedido": ped[0] if ped else None,
             "pedido_fecha": ped[1].isoformat() if ped else None,
         })
+    from types import SimpleNamespace
+
+    for tallas in por_producto.values():
+        tallas.sort(key=lambda t: _talla_sort_key(SimpleNamespace(talla=t["talla"])))
     return [
         {
             "producto_id": p.id,
             "nombre": str(p.nombre),
+            "tipo_pieza": p.tipo_pieza.nombre if p.tipo_pieza else "",
             "escuela": escuelas.get(p.escuela_id, "") if p.escuela_id else "Básicos",
             "tallas": por_producto.get(p.id, []),
         }
