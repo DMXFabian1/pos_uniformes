@@ -112,7 +112,7 @@ def listar(current: tuple = Depends(get_current_employee), db: Session = Depends
     en_proceso = {}
     for j in jn.jornadas_abiertas(db):
         clave = jn.clave_alcance(j.escuela_id, j.tipo_pieza, getattr(j, "prenda", ""))
-        en_proceso.setdefault(clave, {"jornada_id": j.id, "quien": _nombre_de(j.empleada_nombre or j.empleada_code), "cuando": jn.cuando(j.iniciada_at)})
+        en_proceso.setdefault(clave, {"jornada_id": j.id, "quien": _nombre_de(j.empleada_nombre or j.empleada_code), "cuando": jn.cuando(j.iniciada_at), "hoja": jn.ref(j).hoja_texto})
 
     def _ultimo(escuela_id, tipo_pieza="", prenda=""):
         u = jn.ultimo_conteo_de(ultimos, escuela_id, tipo_pieza, prenda)

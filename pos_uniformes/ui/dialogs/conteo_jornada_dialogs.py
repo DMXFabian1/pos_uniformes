@@ -75,6 +75,12 @@ def _default_session_factory() -> Session:
     return get_session().__enter__()
 
 
+def _estado_en_proceso(abierta) -> str:
+    """'EN PROCESO (Fanny) · hoja impresa 10:32'."""
+    hoja = getattr(abierta, "hoja_texto", "")
+    return f"EN PROCESO ({abierta.quien})" + (f" · {hoja}" if hoja else "")
+
+
 class ConteoNuevaJornadaDialog(QDialog):
     """¿Qué vas a contar? Escuela, o una prenda de los básicos."""
 
@@ -189,7 +195,7 @@ class ConteoNuevaJornadaDialog(QDialog):
             if abierta is None and u.reciente() and not todas:
                 ocultas += 1
                 continue
-            estado = f"EN PROCESO ({abierta.quien})" if abierta is not None else u.texto()
+            estado = _estado_en_proceso(abierta) if abierta is not None else u.texto()
             self._escuela_combo.addItem(f'{e["escuela_nombre"]}   ·  {estado}', e["escuela_id"])
         self._escuela_combo.blockSignals(False)
         self._ocultas_label.setText(
@@ -231,7 +237,8 @@ class ConteoNuevaJornadaDialog(QDialog):
     def _pintar_ultimo(self, *_args) -> None:
         abierta = self.abierta_elegida()
         if abierta is not None:
-            self._ultimo_label.setText(f"En proceso: la está contando {abierta.quien} desde {abierta.iniciada_at.strftime('%H:%M') if abierta.iniciada_at else 'hoy'}. Puedes seguirla.")
+            hoja = f" Ya tiene su {abierta.hoja_texto}: no la imprimas otra vez." if abierta.hoja_texto else ""
+            self._ultimo_label.setText(f"En proceso: la está contando {abierta.quien} desde {abierta.iniciada_at.strftime('%H:%M') if abierta.iniciada_at else 'hoy'}. Puedes seguirla.{hoja}")
             self._ultimo_label.setStyleSheet("color: #b45309; font-size: 12px; font-weight: 700;")
             return
         u = self.ultimo_elegido()
@@ -277,7 +284,7 @@ class ConteoNuevaJornadaDialog(QDialog):
                 u = ultimo_conteo_de(self._ultimos, None, t)
                 if abierta is None and u.reciente() and not self._ver_todas.isChecked():
                     continue
-                estado = f"EN PROCESO ({abierta.quien})" if abierta is not None else u.texto()
+                estado = _estado_en_proceso(abierta) if abierta is not None else u.texto()
                 self._tipo_combo.addItem(f"{t}   ·  {estado}", t)
         self._on_tipo()
 
@@ -302,7 +309,7 @@ class ConteoNuevaJornadaDialog(QDialog):
             for prenda in prendas:
                 abierta = self._abiertas.get(("basicos", tipo, prenda))
                 u = ultimo_conteo_de(self._ultimos, None, tipo, prenda)
-                estado = f"EN PROCESO ({abierta.quien})" if abierta is not None else u.texto()
+                estado = _estado_en_proceso(abierta) if abierta is not None else u.texto()
                 self._prenda_combo.addItem(f"{nombre_corto_prenda(prenda)}   ·  {estado}", prenda)
         self._prenda_combo.setVisible(es_basicos and self._prenda_combo.count() > 1)
         self._prenda_combo.blockSignals(False)

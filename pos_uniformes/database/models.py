@@ -1117,6 +1117,10 @@ class ConteoJornada(Base):
     terminada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     revisada_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     revisada_por: Mapped[str] = mapped_column(String(40), nullable=False, default="")
+    # Hojas de papel impresas para esta jornada y cuándo fue la última: imprimir
+    # la hoja ya cuenta como "la está contando" (2026-09-18).
+    hojas_impresas: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    impresa_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     # Cuántas tallas abarca la jornada al abrirse (para el "4 de 14").
     total_tallas: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
     notas: Mapped[str | None] = mapped_column(Text())

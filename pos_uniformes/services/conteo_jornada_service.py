@@ -64,10 +64,22 @@ class JornadaRef:
     revisada_at: datetime | None = None
     aplicada: bool = True   # False = el dueño la descartó
     prenda: str = ""        # básicos: una sola prenda; "" = todo el tipo
+    hojas_impresas: int = 0
+    impresa_at: datetime | None = None
 
     @property
     def quien(self) -> str:
         return self.empleada_nombre or self.empleada_code
+
+    @property
+    def hoja_texto(self) -> str:
+        """'hoja impresa 10:32' / '2 hojas impresas, la última 10:40' / ''."""
+        if not self.hojas_impresas or self.impresa_at is None:
+            return ""
+        hora = self.impresa_at.astimezone().strftime("%H:%M") if self.impresa_at.tzinfo else self.impresa_at.strftime("%H:%M")
+        if self.hojas_impresas == 1:
+            return f"hoja impresa {hora}"
+        return f"{self.hojas_impresas} hojas impresas, la última {hora}"
 
     @property
     def estado(self) -> str:
@@ -88,6 +100,8 @@ def ref(jornada: ConteoJornada) -> JornadaRef:
         revisada_at=jornada.revisada_at,
         aplicada=(jornada.notas or "") != DESCARTADA,
         prenda=str(getattr(jornada, "prenda", "") or ""),
+        hojas_impresas=int(getattr(jornada, "hojas_impresas", 0) or 0),
+        impresa_at=getattr(jornada, "impresa_at", None),
     )
 
 
@@ -202,6 +216,33 @@ def abrir_jornada(
     session.add(jornada)
     session.flush()
     return jornada
+
+
+def registrar_impresion(
+    session: Session,
+    *,
+    escuela_id: int | None,
+    tipo_pieza: str = "",
+    prenda: str = "",
+    empleada_code: str,
+    empleada_nombre: str = "",
+) -> tuple[ConteoJornada, bool]:
+    """Imprimir la hoja cuenta como empezar a contar (Daniel, 2026-09-18: las
+    chicas imprimían conteos que otra ya estaba haciendo, porque imprimir no
+    dejaba huella). Abre la jornada a nombre de quien imprime, o si ya hay
+    una abierta se pega a ella. Devuelve (jornada, ya_habia)."""
+    prenda = (prenda or "").strip() if escuela_id is None else ""
+    abierta = jornada_abierta_de(session, escuela_id, tipo_pieza, prenda)
+    ya_habia = abierta is not None
+    jornada = abierta or abrir_jornada(
+        session, escuela_id=escuela_id, tipo_pieza=tipo_pieza, prenda=prenda,
+        empleada_code=empleada_code, empleada_nombre=empleada_nombre,
+    )
+    jornada.hojas_impresas = int(jornada.hojas_impresas or 0) + 1
+    jornada.impresa_at = func.now()
+    session.add(jornada)
+    session.flush()
+    return jornada, ya_habia
 
 
 def jornada_abierta_de(session: Session, escuela_id: int | None, tipo_pieza: str = "", prenda: str = "") -> ConteoJornada | None:
@@ -474,6 +515,7 @@ def _dict_ref(r: "JornadaRef") -> dict:
         "iniciada_at": r.iniciada_at.isoformat() if r.iniciada_at else None,
         "terminada_at": r.terminada_at.isoformat() if r.terminada_at else None,
         "estado": r.estado, "cuando": cuando(r.terminada_at or r.iniciada_at),
+        "hojas_impresas": r.hojas_impresas, "hoja": r.hoja_texto,
     }
 
 

@@ -697,3 +697,71 @@ class OfrecerSeguirTests(unittest.TestCase):
     def test_cancelar_no_hace_nada(self) -> None:
         w, _ = self._correr("Cancelar")
         self.assertEqual((w.capturadas, w.hojas), ([], []))
+
+
+class ImprimirDejaHuellaTests(unittest.TestCase):
+    """Imprimir la hoja abre la jornada (o se pega a la abierta) y, si ya
+    había una, avisa fuerte antes de gastar papel (2026-09-18)."""
+
+    def _ventana(self):
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        w = SimpleNamespace(estados=[], refrescos=0, _conteos_code="VEND-3", _conteos_nombre="Ana")
+        w._set_status = lambda t: w.estados.append(t)
+        w._refresh_conteos_vista = lambda: setattr(w, "refrescos", w.refrescos + 1)
+        for m in ("_conteos_confirmar_otra_hoja", "_conteos_anotar_impresion"):
+            setattr(w, m, getattr(QuoteSatelliteWindow, m).__get__(w))
+        return w
+
+    def test_la_hoja_impresa_abre_la_jornada_a_nombre_de_quien_imprimio(self) -> None:
+        w = self._ventana()
+        jornada = SimpleNamespace(titulo="Beta", empleada_nombre="Ana", empleada_code="VEND-3")
+        llamadas = []
+        with patch("pos_uniformes.services.conteo_jornada_service.registrar_impresion", side_effect=lambda s, **kw: (llamadas.append(kw), (jornada, False))[1]), patch(
+            "pos_uniformes.ui.quote_satellite_window.get_session"
+        ):
+            w._conteos_anotar_impresion(7, "", "")
+        self.assertEqual(llamadas[0]["empleada_code"], "VEND-3")
+        self.assertEqual(llamadas[0]["escuela_id"], 7)
+        self.assertIn("queda en proceso a nombre de Ana", w.estados[-1])
+        self.assertEqual(w.refrescos, 1)
+
+    def test_si_ya_habia_jornada_la_hoja_se_anota_ahi(self) -> None:
+        w = self._ventana()
+        jornada = SimpleNamespace(titulo="Beta", empleada_nombre="Fanny", empleada_code="VEND-5")
+        with patch("pos_uniformes.services.conteo_jornada_service.registrar_impresion", return_value=(jornada, True)), patch(
+            "pos_uniformes.ui.quote_satellite_window.get_session"
+        ):
+            w._conteos_anotar_impresion(7, "", "")
+        self.assertIn("otra hoja para la jornada de Fanny", w.estados[-1])
+
+    def test_el_aviso_dice_quien_y_cuando_y_por_defecto_no_imprime(self) -> None:
+        from datetime import datetime
+        from unittest.mock import MagicMock
+
+        w = self._ventana()
+        foto = _foto(escuela_id=7, titulo="Beta", empleada_nombre="Fanny")
+        foto = foto.__class__(**{**foto.__dict__, "hojas_impresas": 1, "impresa_at": datetime(2026, 9, 18, 10, 32)})
+        botones = {}
+        caja = MagicMock()
+        caja.addButton.side_effect = lambda texto, *a: botones.setdefault(texto, object())
+        caja.buttons.return_value = [object(), botones.get("No imprimir")]
+        caja.clickedButton.side_effect = lambda: botones.get("No imprimir")
+        with patch("pos_uniformes.ui.quote_satellite_window.QMessageBox", return_value=caja):
+            self.assertFalse(w._conteos_confirmar_otra_hoja(foto))
+        texto = caja.setText.call_args.args[0]
+        self.assertIn("Fanny", texto)
+        self.assertIn("hoja impresa 10:32", texto)
+        caja.clickedButton.side_effect = lambda: botones.get("Sí, imprimir otra hoja")
+        with patch("pos_uniformes.ui.quote_satellite_window.QMessageBox", return_value=caja):
+            self.assertTrue(w._conteos_confirmar_otra_hoja(foto))
+
+    def test_imprimir_pide_gafete_y_pregunta_si_ya_esta_abierta(self) -> None:
+        import inspect
+
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        fuente = inspect.getsource(QuoteSatelliteWindow._conteos_imprimir_hoja)
+        self.assertIn("_conteos_contado_por() is None", fuente)
+        self.assertIn("_conteos_confirmar_otra_hoja(abierta)", fuente)
+        self.assertEqual(fuente.count("_conteos_anotar_impresion("), 2)   # carta y tira

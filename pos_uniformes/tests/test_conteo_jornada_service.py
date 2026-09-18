@@ -247,6 +247,30 @@ class JornadaTests(unittest.TestCase):
             filas = jn.tablero_conteos(self.s)
         self.assertEqual(len(filas), 3)
 
+    def test_imprimir_la_hoja_abre_la_jornada_a_nombre_de_quien_imprime(self) -> None:
+        # Daniel (2026-09-18): imprimían conteos que otra ya estaba haciendo, porque imprimir no dejaba huella.
+        j, ya_habia = jn.registrar_impresion(self.s, escuela_id=self.escuela.id, empleada_code="VEND-5", empleada_nombre="Fanny")
+        self.s.commit()
+        self.assertFalse(ya_habia)
+        self.assertEqual((j.empleada_code, j.hojas_impresas), ("VEND-5", 1))
+        self.assertIsNotNone(j.impresa_at)
+        r = jn.ref(j)
+        self.assertTrue(r.hoja_texto.startswith("hoja impresa "))
+        # Ana quiere imprimir la misma: se ve EN PROCESO (Fanny) y su hoja se anota en la misma jornada
+        self.assertIs(jn.abiertas_por_alcance(self.s)[self.escuela.id], j)
+        j2, ya_habia = jn.registrar_impresion(self.s, escuela_id=self.escuela.id, empleada_code="VEND-3", empleada_nombre="Ana")
+        self.assertTrue(ya_habia)
+        self.assertIs(j2, j)
+        self.assertEqual(j.hojas_impresas, 2)
+        self.assertTrue(jn.ref(j).hoja_texto.startswith("2 hojas impresas"))
+        # y "Empezar" en pantalla cae en la misma jornada, no en otra
+        with self.assertRaises(jn.JornadaEnProceso):
+            jn.abrir_jornada(self.s, escuela_id=self.escuela.id, empleada_code="VEND-3")
+
+    def test_imprimir_sin_gafete_no_abre_nada(self) -> None:
+        with self.assertRaises(ValueError):
+            jn.registrar_impresion(self.s, escuela_id=self.escuela.id, empleada_code="")
+
     def test_basicos_una_abierta_por_prenda(self) -> None:
         j = jn.abrir_jornada(self.s, escuela_id=None, tipo_pieza="Playera", empleada_code="VEND-4")
         with self.assertRaises(jn.JornadaEnProceso):

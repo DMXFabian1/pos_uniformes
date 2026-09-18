@@ -448,7 +448,7 @@ async function contCargarLista() {
       if (!enProceso && ultimo && ultimo.reciente && !contVerTodas && !contBuscando()) { contOcultas++; return ""; }
       if (enProceso) {
         return `<span class="chip proceso" onclick="contSeguirEnProceso(${enProceso.jornada_id}, '${nombre.replace(/'/g, "")}', '${enProceso.quien.replace(/'/g, "")}')">` +
-          `${nombre}<small>En proceso · ${enProceso.quien}</small></span>`;
+          `${nombre}<small>En proceso · ${enProceso.quien}${enProceso.hoja ? " · " + enProceso.hoja : ""}</small></span>`;
       }
       return `<span class="chip${toca ? " toca" : ""}${reciente ? " reciente" : ""}" onclick="${onclick}">` +
         `${toca ? "⚠ " : ""}${nombre}<small>${ultimo ? ultimo.texto : ""}</small></span>`;
@@ -522,7 +522,7 @@ function contElegirPrenda(tipo) {
   const b = contBasicos[tipo]; if (!b) return;
   const esc = s => s.replace(/'/g, "");
   const chip = (texto, ultimo, onclick, enProceso) => enProceso
-    ? `<span class="chip proceso" onclick="contSeguirEnProceso(${enProceso.jornada_id}, '${esc(texto)}', '${esc(enProceso.quien)}')">${texto}<small>En proceso · ${enProceso.quien}</small></span>`
+    ? `<span class="chip proceso" onclick="contSeguirEnProceso(${enProceso.jornada_id}, '${esc(texto)}', '${esc(enProceso.quien)}')">${texto}<small>En proceso · ${enProceso.quien}${enProceso.hoja ? " · " + enProceso.hoja : ""}</small></span>`
     : `<span class="chip" onclick="${onclick}">${texto}<small>${ultimo ? ultimo.texto : ""}</small></span>`;
   $("cont-prenda-sel").innerHTML = `<div class="card" style="margin-top:10px"><strong>${tipo}: ¿qué contamos?</strong>` +
     `<div class="chips" style="margin-top:8px">` +

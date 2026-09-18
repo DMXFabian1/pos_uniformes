@@ -3551,9 +3551,12 @@ class QuoteSatelliteWindow(QMainWindow):
         row.setSpacing(10)
         self.conteo_banner_label = QLabel("")
         row.addWidget(self.conteo_banner_label, 1)
-        banner_btn = QPushButton("Imprimir orden de conteo")
+        # Antes imprimía directo (ConteoOrdenDialog) sin gafete y sin dejar
+        # huella: esa era una de las puertas por donde salían hojas repetidas.
+        # Ahora lleva a Conteos, donde imprimir abre la jornada a tu nombre.
+        banner_btn = QPushButton("Ir a Conteos")
         banner_btn.setObjectName("secondaryButton")
-        banner_btn.clicked.connect(self._open_conteo_orden)
+        banner_btn.clicked.connect(lambda: self._set_page("conteos"))
         row.addWidget(banner_btn)
         self.conteo_banner.setLayout(row)
         self.conteo_banner.setVisible(False)
@@ -3701,11 +3704,18 @@ class QuoteSatelliteWindow(QMainWindow):
 
         from pos_uniformes.ui.dialogs.conteo_jornada_dialogs import ConteoNuevaJornadaDialog
 
+        # Imprimir cuenta como empezar a contar: queda a nombre de quien
+        # imprime, y por eso hace falta el gafete (2026-09-18).
+        if self._conteos_contado_por() is None:
+            return
         if titulo:
-            dlg = SimpleNamespace(escuela_id=escuela_id, tipo_pieza=tipo_pieza, titulo=titulo, prenda=prenda)
+            dlg = SimpleNamespace(escuela_id=escuela_id, tipo_pieza=tipo_pieza, titulo=titulo, prenda=prenda, abierta_elegida=lambda: None)
         else:
             dlg = ConteoNuevaJornadaDialog(self, titulo="Imprimir hoja de conteo", boton="Imprimir")
             if dlg.exec() != int(QDialog.DialogCode.Accepted):
+                return
+            abierta = dlg.abierta_elegida()
+            if abierta is not None and not self._conteos_confirmar_otra_hoja(abierta):
                 return
         from pos_uniformes.services.satellite_startup_service import probe_database_host
 
@@ -3722,6 +3732,7 @@ class QuoteSatelliteWindow(QMainWindow):
             return
         if destino_dlg.destino == ConteoDestinoDialog.TIRA:
             self._conteos_imprimir_tira(dlg.escuela_id, dlg.tipo_pieza, getattr(dlg, "prenda", ""))
+            self._conteos_anotar_impresion(dlg.escuela_id, dlg.tipo_pieza, getattr(dlg, "prenda", ""))
             return
         try:
             from pos_uniformes.services.conteo_hoja_carta_service import (
@@ -3744,6 +3755,48 @@ class QuoteSatelliteWindow(QMainWindow):
 
         if imprimir_hoja_carta(self, html, f"Hoja de conteo · {titulo}"):
             self._set_status(f"Hoja de {titulo} enviada a la impresora.")
+            self._conteos_anotar_impresion(dlg.escuela_id, dlg.tipo_pieza, getattr(dlg, "prenda", ""))
+
+    def _conteos_confirmar_otra_hoja(self, abierta) -> bool:
+        """Esa escuela ya la está contando alguien (o ya imprimió su hoja):
+        antes de gastar papel, que lo diga con todas sus letras."""
+        cuando = abierta.iniciada_at.strftime("%H:%M") if abierta.iniciada_at else "hoy"
+        hoja = abierta.hoja_texto
+        caja = QMessageBox(self)
+        caja.setIcon(QMessageBox.Icon.Warning)
+        caja.setWindowTitle("Esa hoja ya se imprimió")
+        caja.setText(
+            f"{abierta.titulo} la está contando {abierta.quien} desde las {cuando}"
+            + (f" ({hoja})." if hoja else ".")
+        )
+        caja.setInformativeText(
+            "Si ya tienen esa hoja en la mano, no hace falta otra: cuando terminen, capturan en esa misma jornada.\n"
+            "Imprime otra solo si se van a repartir las prendas."
+        )
+        otra = caja.addButton("Sí, imprimir otra hoja", QMessageBox.ButtonRole.AcceptRole)
+        caja.addButton("No imprimir", QMessageBox.ButtonRole.RejectRole)
+        caja.setDefaultButton(caja.buttons()[-1])
+        caja.exec()
+        return caja.clickedButton() is otra
+
+    def _conteos_anotar_impresion(self, escuela_id, tipo_pieza: str, prenda: str = "") -> None:
+        """La hoja salió: la jornada queda abierta a nombre de quien imprimió
+        (o se anota una hoja más en la que ya estaba). Best-effort."""
+        from pos_uniformes.services import conteo_jornada_service as jn
+
+        try:
+            with get_session() as session:
+                jornada, ya_habia = jn.registrar_impresion(
+                    session, escuela_id=escuela_id, tipo_pieza=tipo_pieza, prenda=prenda,
+                    empleada_code=str(self._conteos_code or ""), empleada_nombre=str(self._conteos_nombre or ""),
+                )
+                session.commit()
+                titulo, quien = jornada.titulo, jornada.empleada_nombre or jornada.empleada_code
+        except Exception:  # noqa: BLE001 — la hoja ya salió; esto es la huella
+            logger.exception("Conteos: no se pudo anotar la impresión de la hoja")
+            return
+        self._set_status(f"{titulo}: hoja impresa, queda en proceso a nombre de {quien}." if not ya_habia else f"{titulo}: otra hoja para la jornada de {quien}.")
+        self._refresh_conteos_vista()
 
     def _conteos_imprimir_tira(self, escuela_id: int | None, tipo_pieza: str, prenda: str = "") -> None:
         """La hoja de siempre en la impresora de tickets: una tira por prenda.
