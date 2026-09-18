@@ -70,6 +70,8 @@ from pos_uniformes.services.school_links_cache_service import load_school_links_
 from pos_uniformes.ui.dialogs.school_product_link_dialog import prompt_school_product_link_admin
 from pos_uniformes.services.satellite_favorites_service import load_favorites, seed_favorites_from_bundle, toggle_favorite
 from pos_uniformes.services.catalog_snapshot_service import load_catalog_snapshot_rows
+from pos_uniformes.services.nombres_empleadas_service import mostrar as _nombre_de
+from pos_uniformes.services.nombres_empleadas_service import nombres_por_codigo
 from pos_uniformes.services.client_service import ClientService
 from pos_uniformes.services.presupuesto_service import PresupuestoService
 from pos_uniformes.services.offline_quote_storage_service import (
@@ -604,6 +606,10 @@ class QuoteSatelliteWindow(QMainWindow):
                 if probe_database_host():
                     with get_session() as session:
                         rows = load_catalog_snapshot_rows(session)
+                        try:
+                            nombres_por_codigo(session)   # y su copia local, para sin red
+                        except Exception:  # noqa: BLE001
+                            pass
                         try:
                             links = list_all_active_links(session)
                         except Exception:  # noqa: BLE001
@@ -2469,7 +2475,7 @@ class QuoteSatelliteWindow(QMainWindow):
         encabezado = (
             f"{str(row.tipo).capitalize()} · {local_dt.strftime('%d/%m/%Y %H:%M')}"
         )
-        nombre = row.employee_name or row.employee_code
+        nombre = _nombre_de(row.employee_name or row.employee_code)
         encabezado += f" · {nombre}"
         if getattr(row, "pago_tarjeta", False):
             encabezado += " · 💳 tarjeta"
@@ -2557,7 +2563,7 @@ class QuoteSatelliteWindow(QMainWindow):
         from pos_uniformes.ui.dialogs.camera_playback_dialog import CameraPlaybackDialog
 
         momento = self._momento_local_libreta(row)
-        nombre = row.employee_name or row.employee_code or ""
+        nombre = _nombre_de(row.employee_name or row.employee_code)
         titulo = f"{str(row.tipo).capitalize()} · {nombre}".strip(" ·")
         dialog = CameraPlaybackDialog(
             momento,
@@ -2836,7 +2842,7 @@ class QuoteSatelliteWindow(QMainWindow):
             tipo=str(row.tipo),
             detalle=list(row.detalle or []),
             cliente=getattr(row, "cliente", None),
-            employee_name=str(row.employee_name or row.employee_code or ""),
+            employee_name=_nombre_de(row.employee_name or row.employee_code),
             descuento_empleada=bool(getattr(row, "descuento_empleada", False)),
             created_at=row.created_at,
         )
@@ -2880,7 +2886,7 @@ class QuoteSatelliteWindow(QMainWindow):
         )
         detalle = (
             f"{local_dt.strftime('%d/%m %H:%M')} · {str(row.tipo).capitalize()} · "
-            f"{row.employee_name or row.employee_code} · "
+            f"{_nombre_de(row.employee_name or row.employee_code)} · "
             f"${Decimal(str(row.monto_total or 0)):,.2f}"
         )
         confirmacion = QMessageBox.question(
@@ -3211,7 +3217,7 @@ class QuoteSatelliteWindow(QMainWindow):
                     QListWidgetItem("Sin movimientos de empleadas en el periodo.")
                 )
             for i, r in enumerate(por_empleada):
-                nombre = r.employee_name or r.employee_code
+                nombre = _nombre_de(r.employee_name or r.employee_code)
                 lugar = medallas[i] if i < len(medallas) else f" {i + 1}."
                 marca = " ◀" if r.employee_code == self._libreta_emp_filtro else ""
                 self.libreta_ranking_list.addItem(
@@ -3257,7 +3263,7 @@ class QuoteSatelliteWindow(QMainWindow):
             if getattr(row, "privado", False):
                 tipo_txt = f"🔒 {tipo_txt}"  # este dinero no sale del corte
             if self._libreta_is_owner:
-                nombre = row.employee_name or row.employee_code
+                nombre = _nombre_de(row.employee_name or row.employee_code)
                 tipo_txt = f"{tipo_txt} — {nombre}"
             if str(row.tipo) == "abono":
                 prendas_txt = f"Abono — {getattr(row, 'cliente', None) or 'cliente'}"
@@ -5243,6 +5249,7 @@ class QuoteSatelliteWindow(QMainWindow):
     def _load_operator_context(self) -> None:
         try:
             with get_session() as session:
+                nombres_por_codigo(session)
                 usuario = session.get(Usuario, self.user_id)
                 if usuario is None:
                     raise ValueError("Usuario no encontrado.")

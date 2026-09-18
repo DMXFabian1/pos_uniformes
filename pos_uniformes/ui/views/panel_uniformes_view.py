@@ -22,6 +22,8 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from pos_uniformes.services.nombres_empleadas_service import mostrar as _nombre_de
+
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
 
@@ -237,7 +239,7 @@ class PanelBridge(QObject):
                         "stock_sistema": c.stock_sistema,
                         "stock_fisico": c.stock_fisico,
                         "diferencia": c.diferencia,
-                        "contado_por": c.contado_por,
+                        "contado_por": _nombre_de(c.contado_por),
                         "contado_at": c.contado_at.isoformat() if c.contado_at else None,
                     }
                     for c in conteos
@@ -344,7 +346,7 @@ class PanelBridge(QObject):
                         "stock_fisico": c.stock_fisico,
                         "diferencia": c.diferencia,
                         "ajustado": c.ajustado,
-                        "contado_por": c.contado_por,
+                        "contado_por": _nombre_de(c.contado_por),
                         "contado_at": c.contado_at.isoformat() if c.contado_at else None,
                         "notas": c.notas,
                     }

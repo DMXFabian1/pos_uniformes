@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from pos_uniformes.api.dependencies import get_current_employee, get_db
+from pos_uniformes.services.nombres_empleadas_service import mostrar, nombres_por_codigo
 
 router = APIRouter(prefix="/api/v1/movil", tags=["movil"])
 
@@ -131,12 +132,13 @@ def _payload_cortes(db: Session) -> list[dict]:
     from pos_uniformes.services.libreta_service import listar_cortes
 
     filas = []
+    nombres = nombres_por_codigo(db)
     for corte in listar_cortes(db, limit=15):
         legacy = es_legacy(corte)
         filas.append({
             "fecha": corte.fecha.isoformat(),
             "monto": str(corte.monto_final),
-            "por": corte.creado_por,
+            "por": mostrar(corte.creado_por, nombres),
             "periodo": corte.periodo_label or "HOY",
             "legacy": legacy,
             # En los viejos (totales del día) no hubo retiro ni fondo: '—'.
@@ -222,7 +224,7 @@ def _payload_dueno(db: Session) -> dict:
         "ranking": [
             {
                 "codigo": r.employee_code,
-                "nombre": r.employee_name or r.employee_code,
+                "nombre": mostrar(r.employee_name or r.employee_code, nombres_por_codigo(db)),
                 "comisiones": r.comisiones,
                 "piezas": r.piezas,
                 "operaciones": r.operaciones,

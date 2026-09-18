@@ -13,6 +13,9 @@ from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from decimal import Decimal
 
+from pos_uniformes.services.nombres_empleadas_service import mostrar as _nombre_de
+from pos_uniformes.services.nombres_empleadas_service import nombres_por_codigo
+
 _CENT = Decimal("0.01")
 _DIAS = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
 
@@ -162,6 +165,8 @@ def recolectar(session, hoy: date | None = None) -> DatosResumen:
     from pos_uniformes.services.corte_caja_service import resumir_periodo
     from pos_uniformes.services.libreta_service import listar_operaciones, resumir_por_empleada, ventana_hoy
 
+    nombres_por_codigo(session)   # los códigos salen como nombres en todo el resumen
+
     hoy = hoy or date.today()
     desde, hasta = ventana_hoy(hoy)
     d = DatosResumen(fecha=hoy)
@@ -171,7 +176,7 @@ def recolectar(session, hoy: date | None = None) -> DatosResumen:
     d.operaciones, d.piezas = r.operaciones, r.piezas
     d.ventas, d.abonos, d.apartados, d.efectivo, d.tarjeta = r.ventas, r.abonos, r.apartados, r.efectivo, r.tarjeta
     d.por_empleada = [
-        ((e.employee_name or e.employee_code).split()[0], e.operaciones, e.comisiones)
+        (_nombre_de(e.employee_name or e.employee_code, corto=True), e.operaciones, e.comisiones)
         for e in resumir_por_empleada(rows)
     ]
 
@@ -188,7 +193,7 @@ def recolectar(session, hoy: date | None = None) -> DatosResumen:
 def _retiros(session, d: DatosResumen, desde: datetime, hasta: datetime) -> None:
     from pos_uniformes.services.retiros_service import retiros_del_periodo
 
-    d.retiros = [(r.motivo, Decimal(r.monto), r.creado_por) for r in retiros_del_periodo(session, desde - timedelta(seconds=1), hasta)]
+    d.retiros = [(r.motivo, Decimal(r.monto), _nombre_de(r.creado_por)) for r in retiros_del_periodo(session, desde - timedelta(seconds=1), hasta)]
 
 
 def _pendientes(session, d: DatosResumen, hoy: date) -> None:
@@ -233,7 +238,7 @@ def _cortes(session, d: DatosResumen, hoy: date) -> None:
         d.cortes.append(
             CorteResumen(
                 hora=momento.strftime("%H:%M"),
-                creado_por=str(c.creado_por or ""),
+                creado_por=_nombre_de(c.creado_por),
                 contado=Decimal(c.monto_final),
                 esperado=Decimal(c.monto_esperado or 0),
                 reactivo_final=Decimal(c.reactivo_final or 0),
@@ -260,7 +265,7 @@ def _pagos(session, d: DatosResumen, desde: datetime, hasta: datetime) -> None:
     )
     d.pagos = [
         PagoResumen(
-            nombre=(p.employee_name or p.employee_code).split()[0],
+            nombre=_nombre_de(p.employee_name or p.employee_code, corto=True),
             total=Decimal(p.total),
             comisiones=int(p.comisiones or 0),
             faltas=int(p.faltas or 0),

@@ -27,6 +27,8 @@ from PyQt6.QtWidgets import (
 
 from pos_uniformes.services.corte_caja_service import EstadoCaja, diferencia
 from pos_uniformes.services.nomina_service import OWNER_CODE
+from pos_uniformes.services.nombres_empleadas_service import mostrar as _nombre_de
+from pos_uniformes.services.nombres_empleadas_service import nombres_por_codigo
 
 logger = logging.getLogger(__name__)
 
@@ -186,7 +188,7 @@ def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list |
         tk_field("Corte:", _hora_local(corte.created_at).strftime("%d/%m/%Y %H:%M"), lines)
     tk_field("Impreso:", datetime.now().strftime("%d/%m/%Y %H:%M"), lines)
     if corte.creado_por:
-        tk_field("Por:", str(corte.creado_por), lines)
+        tk_field("Por:", _nombre_de(corte.creado_por), lines)
     if corte.nota:
         tk_field("Nota:", str(corte.nota), lines)
     lines.append(tk_bot())
@@ -219,7 +221,7 @@ def texto_ticket_corte(corte, por_empleada: list | None = None, *, pagos: list |
             if not first:
                 lines.append(tk_mid())
             first = False
-            lines.append(tk_line((r.employee_name or r.employee_code)[: _TW - 4]))
+            lines.append(tk_line(_nombre_de(r.employee_name or r.employee_code)[: _TW - 4]))
             lines.append(tk_row(f"{r.operaciones} ops:", f"{r.comisiones} com."))
         lines.append(tk_bot())
     lines.append("")
@@ -324,6 +326,7 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
 
     try:
         with get_session() as session:
+            nombres_por_codigo(session)
             estado = estado_caja(session)
             rows = operaciones_del_periodo(session, estado.desde, estado.hasta)
             por_empleada = resumir_por_empleada(rows)
@@ -385,7 +388,7 @@ def hacer_corte_caja(parent: QWidget | None, *, creado_por: str, grande: bool = 
         titulo_pagos.setStyleSheet("font-weight: 700;")
         ly.addWidget(titulo_pagos)
         for aviso in avisos_hoy:
-            nombre = str(aviso.employee_name or aviso.employee_code).split()[0]
+            nombre = _nombre_de(aviso.employee_name or aviso.employee_code, corto=True)
             cb = QCheckBox(f"{nombre}  ·  ${Decimal(aviso.total_estimado):,.2f}  ({aviso.comisiones} comisiones)")
             cb.setChecked(True)
             if grande:

@@ -52,6 +52,7 @@ from pos_uniformes.services.calendario_empleadas_service import (
     resumen_empleada,
 )
 
+from pos_uniformes.services.nombres_empleadas_service import mostrar as _nombre_de
 logger = logging.getLogger(__name__)
 
 # Colores dark-mode-proof (mismos tonos crema/terracota del satélite).
@@ -852,7 +853,7 @@ class CalendarioEncargadoDialog(QDialog):
         auto, _texto = resultado
         lineas = [f"✅ Corte hecho:\n\nVenta ${Decimal(auto.estado.resumen.efectivo):,.2f}"]
         for p in auto.pagos:
-            lineas.append(f"Pagar a {(p.employee_name or p.employee_code).split()[0]}: ${Decimal(p.total):,.2f}")
+            lineas.append(f"Pagar a {_nombre_de(p.employee_name or p.employee_code, corto=True)}: ${Decimal(p.total):,.2f}")
         retiro = Decimal(auto.corte.monto_final) - Decimal(auto.corte.reactivo_final)
         lineas.append(f"\nSe retira ${retiro:,.2f}")
         self._mostrar_listo("\n".join(lineas), con_deshacer=False)

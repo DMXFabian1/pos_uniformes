@@ -301,3 +301,31 @@ def _usuario_de_prueba() -> None:
             session.commit()
     except Exception:  # noqa: BLE001 — que la falta de base no tumbe la colecta
         return
+
+
+# La copia local de nombres (data/empleadas_nombres.json) va a un temporal
+# durante TODA la vida del proceso de pruebas: hay hilos de fondo del satélite
+# que sobreviven a cualquier fixture y escribirían en data/ del repo.
+def _desviar_copia_local_de_nombres() -> None:
+    import atexit
+    import tempfile
+    from pathlib import Path
+
+    from pos_uniformes.services import nombres_empleadas_service as ne
+
+    d = tempfile.mkdtemp(prefix="nombres_empleadas_")
+    ne._ruta_local = lambda: Path(d) / "nombres.json"
+    atexit.register(lambda: __import__("shutil").rmtree(d, ignore_errors=True))
+
+
+_desviar_copia_local_de_nombres()
+
+
+@pytest.fixture(autouse=True)
+def _nombres_empleadas_limpios():
+    """La caché de nombres (VEND-1 → Daniel) es global: cada test arranca sin ella."""
+    from pos_uniformes.services import nombres_empleadas_service as ne
+
+    ne._cache, ne._cache_en = {}, 0.0
+    yield
+    ne._cache, ne._cache_en = {}, 0.0

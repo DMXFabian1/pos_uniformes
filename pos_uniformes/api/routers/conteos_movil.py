@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from pos_uniformes.api.dependencies import get_current_employee, get_db
 from pos_uniformes.api.routers.movil import _solo_tienda
+from pos_uniformes.services.nombres_empleadas_service import mostrar as _nombre_de
 
 router = APIRouter(prefix="/api/v1/movil/conteos", tags=["movil-conteos"])
 
@@ -60,7 +61,7 @@ def _jornada_mia(db: Session, jornada_id: int, code: str):
     if not puede_seguirla(j, code):
         raise HTTPException(status_code=403, detail={"error": {
             "code": "jornada_ajena",
-            "message": f"Esa jornada la abrió {j.empleada_nombre or j.empleada_code}."}})
+            "message": f"Esa jornada la abrió {_nombre_de(j.empleada_nombre or j.empleada_code)}."}})
     return j
 
 
@@ -105,7 +106,7 @@ def listar(current: tuple = Depends(get_current_employee), db: Session = Depends
     en_proceso = {}
     for j in jn.jornadas_abiertas(db):
         clave = jn.clave_alcance(j.escuela_id, j.tipo_pieza, getattr(j, "prenda", ""))
-        en_proceso.setdefault(clave, {"jornada_id": j.id, "quien": j.empleada_nombre or j.empleada_code, "cuando": jn.cuando(j.iniciada_at)})
+        en_proceso.setdefault(clave, {"jornada_id": j.id, "quien": _nombre_de(j.empleada_nombre or j.empleada_code), "cuando": jn.cuando(j.iniciada_at)})
 
     def _ultimo(escuela_id, tipo_pieza="", prenda=""):
         u = jn.ultimo_conteo_de(ultimos, escuela_id, tipo_pieza, prenda)
@@ -178,7 +179,7 @@ def abrir(body: AbrirRequest, current: tuple = Depends(get_current_employee), db
         # marca, y el celular la sigue. Nadie se pisa con nadie.
         db.rollback()
         hoja = jn.hoja_de_jornada(db, en_proceso.jornada)
-        hoja["en_proceso"] = {"quien": en_proceso.jornada.empleada_nombre or en_proceso.jornada.empleada_code}
+        hoja["en_proceso"] = {"quien": _nombre_de(en_proceso.jornada.empleada_nombre or en_proceso.jornada.empleada_code)}
         return hoja
     db.commit()
     db.refresh(j)

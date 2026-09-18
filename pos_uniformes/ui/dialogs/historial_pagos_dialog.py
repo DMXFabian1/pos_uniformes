@@ -24,6 +24,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from pos_uniformes.services.nombres_empleadas_service import mostrar as _nombre_de
+from pos_uniformes.services.nombres_empleadas_service import nombres_por_codigo
+
 logger = logging.getLogger(__name__)
 
 _MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre")
@@ -48,13 +51,13 @@ def filas_tabla(pagos: list) -> list[tuple[str, ...]]:
         desde = p.desde.strftime("%d/%m") if p.desde else "inicio"
         filas.append((
             p.fecha.strftime("%d/%m/%Y"),
-            p.employee_name or p.employee_code,
+            _nombre_de(p.employee_name or p.employee_code),
             f"{desde} → {p.hasta:%d/%m}",
             f"${Decimal(p.sueldo_base):,.2f}",
             f"{int(p.comisiones or 0)} × ${Decimal(p.tarifa_comision):,.2f} = ${Decimal(p.monto_comisiones):,.2f}",
             f"{int(p.faltas or 0)} (−${Decimal(p.descuento_faltas):,.2f})" if int(p.faltas or 0) else "0",
             f"${Decimal(p.total):,.2f}",
-            str(p.creado_por or ""),
+            _nombre_de(p.creado_por),
         ))
     return filas
 
@@ -150,6 +153,7 @@ class HistorialPagosDialog(QDialog):
             from pos_uniformes.database.models import Empleada
 
             with get_session() as session:
+                nombres_por_codigo(session)
                 filas = session.query(Empleada).filter(Empleada.activo.is_(True)).order_by(Empleada.nombre_completo).all()
                 for e in filas:
                     if e.codigo.upper() in ("VEND-1", "ENC-1"):
@@ -190,7 +194,7 @@ class HistorialPagosDialog(QDialog):
             return
         p = self._pagos[fila]
         texto = (
-            f"¿Deshacer el pago a {p.employee_name or p.employee_code} del {p.fecha:%d/%m/%Y} por ${Decimal(p.total):,.2f}?\n\n"
+            f"¿Deshacer el pago a {_nombre_de(p.employee_name or p.employee_code)} del {p.fecha:%d/%m/%Y} por ${Decimal(p.total):,.2f}?\n\n"
             "Se quita el registro y la marca del calendario; su ciclo vuelve a contar desde antes de ese pago. "
             "Úsalo solo si NO le diste ese dinero."
         )

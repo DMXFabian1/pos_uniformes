@@ -38,6 +38,7 @@ data/ticket_print_settings.json
 data/anuncios/
 data/label_printer_settings.json
 data/dvr_settings.json
+data/empleadas_nombres.json
 data/satellite_errors.log
 data/pos_errors.log
 # Afluencia (contador con YOLO): entorno, modelo, config por máquina y salidas

@@ -23,6 +23,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from pos_uniformes.database.models import ConteoInventario, ConteoJornada, Escuela
+from pos_uniformes.services.nombres_empleadas_service import mostrar, nombres_por_codigo
 
 DUENO_CODE = "VEND-1"
 # Marca en `notas` de una jornada que el dueño descartó (sin aplicar).
@@ -288,7 +289,8 @@ def quien_capturo(session: Session, jornada_id: int) -> dict[int, str]:
         .where(ConteoInventario.jornada_id == jornada_id)
         .order_by(ConteoInventario.contado_at.asc(), ConteoInventario.id.asc())
     ).all()
-    return {int(vid): str(por or "") for vid, por in filas}
+    nombres = nombres_por_codigo(session)
+    return {int(vid): mostrar(por or "", nombres) for vid, por in filas}
 
 
 def capturado_en_jornada(session: Session, jornada_id: int) -> dict[int, int]:
@@ -397,7 +399,7 @@ def guardar_tallas(
                 variante_id=vid,
                 producto=str(prod.nombre) if prod is not None else "",
                 talla=str(v.talla or "") if v is not None else "",
-                quien=str(existente.contado_por or ""),
+                quien=mostrar(existente.contado_por or "", nombres_por_codigo(session)),
                 fisico_suyo=int(existente.stock_fisico),
                 fisico_tuyo=fisico,
                 cuando=cuando(existente.contado_at),
@@ -574,7 +576,7 @@ def resumen_para_revisar(session: Session, jornada: ConteoJornada) -> ResumenRev
     return ResumenRevision(
         jornada_id=jornada.id,
         titulo=jornada.titulo,
-        quien=jornada.empleada_nombre or jornada.empleada_code,
+        quien=mostrar(jornada.empleada_nombre or jornada.empleada_code, nombres_por_codigo(session)),
         lineas=lineas,
     )
 
@@ -728,8 +730,9 @@ def ultimos_conteos(session: Session) -> dict:
         .where(ConteoJornada.terminada_at.is_not(None))
         .order_by(ConteoJornada.terminada_at.desc())
     ).all()
+    nombres = nombres_por_codigo(session)
     for escuela_id, tipo_pieza, nombre, code, terminada, prenda in filas:
-        quien = nombre or code or ""
+        quien = mostrar(nombre or code or "", nombres)
         if escuela_id is None and prenda:
             # Una prenda sola: cuenta para esa prenda Y como último toque al tipo.
             salida.setdefault(("basicos", str(tipo_pieza or ""), str(prenda)), UltimoConteo(terminada, quien))

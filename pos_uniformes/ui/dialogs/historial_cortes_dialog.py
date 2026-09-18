@@ -39,6 +39,8 @@ from pos_uniformes.services.historial_cortes_service import (
     venta_real,
 )
 
+from pos_uniformes.services.nombres_empleadas_service import mostrar as _nombre_de
+from pos_uniformes.services.nombres_empleadas_service import nombres_por_codigo
 logger = logging.getLogger(__name__)
 
 _MESES = ("enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre")
@@ -97,7 +99,7 @@ def filas_tabla(cortes: list) -> list[tuple[str, ...]]:
             c.fecha.strftime("%d/%m/%Y"),
             _hora(c),
             str(c.periodo_label or ""),
-            str(c.creado_por or ""),
+            _nombre_de(c.creado_por),
             "—" if es_legacy(c) else f"${Decimal(c.reactivo_inicial or 0):,.2f}",
             f"${venta_oficial(c):,.2f}",
             texto_real(c),
@@ -271,6 +273,7 @@ class HistorialCortesDialog(QDialog):
             from pos_uniformes.database.connection import get_session
 
             with get_session() as session:
+                nombres_por_codigo(session)
                 cortes = listar_cortes_mes(session, desde, hasta)
                 for c in cortes:
                     session.expunge(c)
@@ -465,7 +468,7 @@ class HistorialCortesDialog(QDialog):
             return
         texto = (
             f"¿Borrar el corte del {corte.fecha:%d/%m/%Y} a las {_hora(corte)} "
-            f"({str(corte.creado_por or '')}, en caja ${Decimal(corte.monto_final):,.2f})?\n\n"
+            f"({_nombre_de(corte.creado_por)}, en caja ${Decimal(corte.monto_final):,.2f})?\n\n"
             "Lo vendido en ese tramo pasa al siguiente corte (o al que está abierto). "
             "Si era el último, el reactivo regresa al que tenía antes. No se puede deshacer."
         )

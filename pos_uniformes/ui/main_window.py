@@ -630,6 +630,8 @@ from pos_uniformes.utils.date_format import format_display_date, format_display_
 from pos_uniformes.utils.product_templates import merge_choice_lists
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 from pos_uniformes.utils.qr_generator import QrGenerator
+from pos_uniformes.services.nombres_empleadas_service import mostrar as _nombre_de
+from pos_uniformes.services.nombres_empleadas_service import nombres_por_codigo
 
 # Pestañas que dejaron de tener sentido aquí porque su trabajo se mudó al
 # kiosko: la caja se cierra con el corte del satélite, los presupuestos se
@@ -9042,6 +9044,7 @@ class MainWindow(QMainWindow):
         self._invalidate_listing_snapshot_caches()
         try:
             with self._busy_scope("Estado: cargando datos..."), get_session() as session:
+                nombres_por_codigo(session)
                 self._refresh_current_user(session)
                 self._refresh_cash_session(session)
                 self._refresh_permissions()
@@ -10632,7 +10635,7 @@ class MainWindow(QMainWindow):
                         "stock_anterior": movimiento.stock_anterior,
                         "stock_posterior": movimiento.stock_posterior,
                         "referencia": movimiento.referencia,
-                        "creado_por": movimiento.creado_por,
+                        "creado_por": _nombre_de(movimiento.creado_por),
                         "observacion": movimiento.observacion,
                     }
                     for movimiento in session.scalars(

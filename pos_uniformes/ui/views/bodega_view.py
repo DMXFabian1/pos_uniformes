@@ -42,6 +42,8 @@ from pos_uniformes.database.models import (
     Variante,
 )
 from pos_uniformes.services.bodega_service import BodegaService
+from pos_uniformes.services.nombres_empleadas_service import mostrar as _nombre_de
+from pos_uniformes.services.nombres_empleadas_service import nombres_por_codigo
 
 if TYPE_CHECKING:
     from pos_uniformes.ui.main_window import MainWindow
@@ -696,6 +698,7 @@ class BodegaWidget(QWidget):
                 self.tabla_contenido.setItem(row, 4, QTableWidgetItem(c.variante.sku or ""))
 
             # Historial
+            nombres_por_codigo(session)
             movimientos = BodegaService.historial_caja(session, caja_id, limit=20)
             self.tabla_historial.setRowCount(len(movimientos))
             for row, mov in enumerate(movimientos):
@@ -709,7 +712,7 @@ class BodegaWidget(QWidget):
                 self.tabla_historial.setItem(row, 2, QTableWidgetItem(prod_text))
                 cant_text = str(mov.cantidad) if mov.cantidad else "—"
                 self.tabla_historial.setItem(row, 3, QTableWidgetItem(cant_text))
-                self.tabla_historial.setItem(row, 4, QTableWidgetItem(mov.creado_por))
+                self.tabla_historial.setItem(row, 4, QTableWidgetItem(_nombre_de(mov.creado_por)))
 
     # ─── Búsqueda ────────────────────────────────────────────────────────
 
