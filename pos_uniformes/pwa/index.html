@@ -274,7 +274,7 @@ table.tallas input{margin:0; min-height:46px; font-size:20px; font-weight:800; t
         <div id="cont-tab-basicos" class="oculto">
           <p class="sub" style="margin:4px 0 0">Toca un tipo: todas sus prendas o una sola</p>
           <div class="chips" id="cont-basicos"></div>
-          <div id="cont-prendas"></div>
+          <div id="cont-prenda-sel"></div>
         </div>
       </div>
     </div>
@@ -466,7 +466,7 @@ async function contCargarLista() {
       const onclick = (b.prendas || []).length > 1 ? `contElegirPrenda('${t.replace(/'/g, "")}')` : `contEmpezar(null, '${t.replace(/'/g, "")}')`;
       return ficha(t, u, onclick, false, typeof b === "string" ? null : b.en_proceso);
     }).join("") || "<span class='sub'>—</span>";
-    $("cont-prendas").innerHTML = "";
+    $("cont-prenda-sel").innerHTML = "";
   } catch (e) {
     $("cont-abiertas").innerHTML = "<div class='card error'>No se pudo cargar. ¿Hay WiFi?</div>";
   }
@@ -524,12 +524,12 @@ function contElegirPrenda(tipo) {
   const chip = (texto, ultimo, onclick, enProceso) => enProceso
     ? `<span class="chip proceso" onclick="contSeguirEnProceso(${enProceso.jornada_id}, '${esc(texto)}', '${esc(enProceso.quien)}')">${texto}<small>En proceso · ${enProceso.quien}</small></span>`
     : `<span class="chip" onclick="${onclick}">${texto}<small>${ultimo ? ultimo.texto : ""}</small></span>`;
-  $("cont-prendas").innerHTML = `<div class="card" style="margin-top:10px"><strong>${tipo}: ¿qué contamos?</strong>` +
+  $("cont-prenda-sel").innerHTML = `<div class="card" style="margin-top:10px"><strong>${tipo}: ¿qué contamos?</strong>` +
     `<div class="chips" style="margin-top:8px">` +
     chip("Todas las de " + tipo, b.ultimo, `contEmpezar(null, '${esc(tipo)}')`, b.en_proceso) +
     (b.prendas || []).map(p => chip(p.corto, p.ultimo, `contEmpezar(null, '${esc(tipo)}', '${esc(p.nombre)}')`, p.en_proceso)).join("") +
-    `</div><p class="sub" style="margin:8px 0 0"><a onclick="$('cont-prendas').innerHTML=''">Cancelar</a></p></div>`;
-  $("cont-prendas").scrollIntoView({behavior: "smooth", block: "nearest"});
+    `</div><p class="sub" style="margin:8px 0 0"><a onclick="$('cont-prenda-sel').innerHTML=''">Cancelar</a></p></div>`;
+  $("cont-prenda-sel").scrollIntoView({behavior: "smooth", block: "nearest"});
 }
 async function contEmpezar(escuelaId, tipoPieza, prenda) {
   prenda = prenda || "";
