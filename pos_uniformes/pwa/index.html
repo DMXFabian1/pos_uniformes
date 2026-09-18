@@ -110,6 +110,22 @@ table.tallas input{margin:0; min-height:46px; font-size:20px; font-weight:800; t
 .salir{margin-top:16px}
 .pill{font-size:12px; background:var(--crema); border:1px solid var(--borde);
   border-radius:99px; padding:3px 10px; color:var(--tenue)}
+.topbar{position:fixed; top:0; left:0; right:0; z-index:50; display:flex; align-items:center; gap:4px;
+  background:var(--carta); border-bottom:1px solid var(--borde); padding:calc(4px + env(safe-area-inset-top)) 8px 4px;
+  max-width:520px; margin:0 auto; min-height:46px}
+.topbar button{width:auto; min-height:40px; min-width:40px; padding:0 10px; font-size:17px; border-radius:11px;
+  background:transparent; color:var(--acento-osc)}
+.topbar .tb-atras{font-size:16px; padding-left:6px}
+.topbar .tb-atras span{font-size:24px; line-height:1; vertical-align:-2px; margin-right:2px}
+.topbar .tb-titulo{flex:1; text-align:center; font-weight:800; font-size:15px; color:var(--tinta);
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.topbar button.girando{animation:ptr-spin .7s linear infinite}
+body.con-topbar .app{padding-top:calc(58px + env(safe-area-inset-top))}
+.hoja-menu{position:fixed; inset:0; z-index:70; background:rgba(0,0,0,.35); display:flex; align-items:flex-end}
+.hoja-menu .panel{background:var(--carta); width:100%; max-width:520px; margin:0 auto; border-radius:18px 18px 0 0;
+  padding:14px 16px calc(16px + env(safe-area-inset-bottom))}
+.hoja-menu .panel button{margin-top:8px; text-align:left; padding:0 16px; font-size:16px; min-height:50px}
+.hoja-menu .info{font-size:12px; color:var(--tenue); margin:0 0 6px}
 .nav{position:fixed; bottom:0; left:0; right:0; display:flex; gap:8px;
   background:var(--carta); border-top:1px solid var(--borde); padding:8px 12px
   calc(8px + env(safe-area-inset-bottom)); max-width:520px; margin:0 auto}
@@ -153,6 +169,12 @@ table.tallas input{margin:0; min-height:46px; font-size:20px; font-weight:800; t
 </style>
 </head>
 <body>
+<div class="topbar oculto" id="topbar">
+  <button class="tb-atras" id="tb-atras" onclick="navAtras()"><span>‹</span>Atrás</button>
+  <span class="tb-titulo" id="tb-titulo"></span>
+  <button id="tb-refresh" onclick="navActualizar()" title="Actualizar">↻</button>
+  <button id="tb-menu" onclick="navMenu()" title="Menú">⋯</button>
+</div>
 <div class="app">
 
   <!-- LOGIN -->
@@ -303,6 +325,7 @@ table.tallas input{margin:0; min-height:46px; font-size:20px; font-weight:800; t
 const $ = id => document.getElementById(id);
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const DIAS = ["lun","mar","mié","jue","vie","sáb","dom"];
+const PWA_VERSION = "v21";
 let token = localStorage.getItem("pos_token") || "";
 let calY = 0, calM = 0;
 let rolActual = "", vistaInicio = "", modoServidor = "casa";
@@ -381,7 +404,7 @@ function salir() { token = ""; localStorage.removeItem("pos_token"); cargarLogin
 
 async function cargarInicio() {
   const data = await api("/api/v1/movil/inicio");
-  rolActual = data.rol; modoServidor = data.modo || "casa";
+  rolActual = data.rol; modoServidor = data.modo || "casa"; window._yo = {nombre: data.nombre || ""};
   if (data.rol === "empleada") pintarEmpleada(data);
   else if (data.rol === "encargado") pintarEncargado(data);
   else pintarDueno(data);
@@ -1111,6 +1134,7 @@ function duenoBodega() {
   duenoSub(`<h1>📦 Bodega</h1>
     <p class="sub">Lo que llega del maquilador entra al piso; si guardas parte en una caja, lo dices ahí mismo. Lo que sacas de una caja al rack, "Pasar al piso". Si recontaste una caja, "Corregir caja".</p>
     <button class="btn-grande btn-acento" onclick="bodLlegoInicio()">📥  Llegó mercancía</button>
+    <button class="btn-grande btn-suave" onclick="bodLlegadas()">📜  Lo que ha llegado</button>
     <button class="btn-grande" onclick="bodPisoInicio()">🧺  Pasar al piso</button>
     <button class="btn-grande" onclick="bodCorregirInicio()">✏️  Corregir caja (recuento)</button>
     <button class="btn-suave salir" onclick="duenoMenu()">← Regresar</button>`);
@@ -1200,12 +1224,12 @@ async function bodElegirPrenda(i) {
   const filas = bodPrenda.tallas.map(t => {
     const pista = [t.a_la_mano ? `${t.a_la_mano} a la mano` : "", t.en_cajas ? `${t.en_cajas} en cajas` : ""].filter(Boolean).join(" · ");
     const pediste = t.pedido ? `<small class="quien">pediste ${t.pedido}</small>` : "";
-    return `<tr><td class="t">${t.talla}${t.color && !/^(unico|único)$/i.test(t.color) ? " " + t.color : ""}${pediste}<small class="quien">${pista}</small></td>` +
+    return `<tr><td class="t">${t.talla}${t.color && !/^(unico|único|sin color)$/i.test(t.color) ? " " + t.color : ""}${pediste}<small class="quien">${pista}</small></td>` +
       `<td><input inputmode="numeric" pattern="[0-9]*" placeholder="0" value="${t.pedido || ""}" data-v="${t.variante_id}"></td>` +
       `<td class="bod-acaja oculto"><input inputmode="numeric" pattern="[0-9]*" placeholder="0" data-caja-v="${t.variante_id}"></td></tr>`;
   }).join("");
   const opciones = cajas.map(c => `<option value="${c.id}">${c.codigo} · ${c.ubicacion || "sin ubicación"} · ${c.piezas} pzas</option>`).join("");
-  duenoSub(`<h1>📥 ${bodPrenda.nombre}</h1>
+  duenoSub(`<h1>📥 ${bodPrenda.nombre.split("|")[0].trim()}</h1>
     <p class="sub">${bodPrenda.escuela} · escribe cuántas llegaron de cada talla</p>
     <div class="card prenda"><table class="tallas" id="bod-tabla"><tr><th>Talla</th><th>Llegaron</th><th class="bod-acaja oculto">A caja</th></tr>${filas}</table></div>
     <div class="card">
@@ -1219,6 +1243,10 @@ async function bodElegirPrenda(i) {
         </select>
       </div>
       <input id="bod-ref" placeholder="Nota: maquilador, fecha... (opcional)" style="margin-top:8px">
+      <label style="display:flex;align-items:center;gap:10px;font-weight:700;margin-top:4px">
+        <input type="checkbox" id="bod-etiquetas" ${modoServidor === "tienda" ? "checked" : "disabled"} style="width:22px;height:22px;margin:0"> 🏷 Imprimir una etiqueta por pieza
+      </label>
+      <p class="sub" style="margin:4px 0 0">Salen en la Brother de la tienda, listas para pegar antes de colgar.</p>
     </div>
     <div class="barra-fija">
       <button class="btn-suave" onclick="bodLlegoInicio()">← Otra prenda</button>
@@ -1244,18 +1272,38 @@ async function bodLlegoGuardar() {
   const total = items.reduce((a, b) => a + b.cantidad, 0);
   const enCaja = items.reduce((a, b) => a + b.a_caja, 0);
   const donde = enCaja ? `${total - enCaja} al piso y ${enCaja} a ${caja === "nueva" ? "una caja nueva" : "la caja elegida"}` : "todas al piso";
-  if (!confirm(`${total} piezas de ${bodPrenda.nombre} entran al inventario: ${donde}. ¿Guardar?`)) return;
+  if (!confirm(`${total} piezas de ${bodPrenda.nombre.split("|")[0].trim()} entran al inventario: ${donde}. ¿Guardar?`)) return;
   try {
+    const etiquetas = Boolean(($("bod-etiquetas") || {}).checked);
     const r = await contPost("/api/v1/movil/bodega/llego", {
       items, caja_id: caja === "nueva" ? null : Number(caja), caja_nueva: caja === "nueva", referencia: $("bod-ref").value.trim(),
+      imprimir_etiquetas: etiquetas,
     });
     const detalle = r.en_caja ? `${r.al_piso} al piso y ${r.en_caja} en la caja <b>${r.caja_codigo}</b>` : "todas al piso";
+    const etq = etiquetas ? (r.etiquetas ? `<p class="sub">🏷 ${r.etiquetas} etiqueta${r.etiquetas === 1 ? "" : "s"} en cola en la impresora de la tienda.</p>`
+                                        : `<p class="sub error">Las etiquetas no se pudieron encolar; imprímelas desde Buscar.</p>`) : "";
     duenoSub(`<h1>✓ Guardado</h1>
-      <div class="card"><strong>${r.piezas} piezas</strong> de ${bodPrenda.nombre} en ${r.tallas} tallas: ${detalle}.
-      <p class="sub">Ya cuentan en el inventario.</p></div>
+      <div class="card"><strong>${r.piezas} piezas</strong> de ${bodPrenda.nombre.split("|")[0].trim()} en ${r.tallas} tallas: ${detalle}.
+      <p class="sub">Ya cuentan en el inventario.</p>${etq}</div>
       <button class="btn-grande btn-acento" onclick="bodLlegoInicio()">📥  Llegó otra prenda</button>
       <button class="btn-suave salir" onclick="duenoBodega()">← Bodega</button>`);
   } catch (e) { alert(e.message); }
+}
+
+async function bodLlegadas() {
+  duenoSub(`<h1>📜 Lo que ha llegado</h1><p class="sub">Último mes, de lo más nuevo a lo más viejo</p><div id="bod-llegadas"><div class="card">Cargando...</div></div>
+    <button class="btn-suave salir" onclick="duenoBodega()">← Regresar</button>`);
+  try {
+    const d = await api("/api/v1/movil/bodega/llegadas");
+    const fecha = f => { const [y, m, dd] = f.split("-"); return `${dd}/${m}`; };
+    $("bod-llegadas").innerHTML = d.llegadas.length
+      ? d.llegadas.map(g => `<div class="card"><strong>${fecha(g.fecha)} ${g.hora} · ${g.piezas} pieza${g.piezas === 1 ? "" : "s"}</strong>` +
+          `<span class="sub" style="display:block">${g.quien}${g.referencia ? " · " + g.referencia : ""}</span>` +
+          g.prendas.map(p => `<div class="fila"><span><b>${p.nombre}</b><span class="sub" style="display:block">${p.escuela} · ` +
+            p.tallas.map(t => `${t.talla}×${t.cantidad}${t.en_caja ? "📦" : ""}`).join(" · ") + `</span></span><span class="monto">${p.piezas}</span></div>`).join("") +
+          `</div>`).join("")
+      : "<div class='card'>No ha llegado nada en el último mes.</div>";
+  } catch (e) { $("bod-llegadas").innerHTML = "<div class='card error'>No se pudo cargar.</div>"; }
 }
 
 async function bodPisoInicio() {
@@ -1376,6 +1424,123 @@ async function duenoGuardarCorte() {
     `</div><button class="btn-grande" onclick="cargarInicio()">✅  Listo</button>`);
 }
 
+// ── Navegación: pila de pantallas, ‹ Atrás, ↻ Actualizar, ⋯ Menú ──────
+// Cada función que PINTA una pantalla se envuelve: al llamarla se apila (y
+// se hace history.pushState, para que el botón atrás del celular y el gesto
+// de deslizar regresen dentro de la app). Volver = re-pintar la anterior.
+// Las que HACEN algo (guardar, marcar, cobrar) no se apilan ni se repiten:
+// después de ellas la pila vuelve a la raíz de su pestaña.
+const NAV_RAICES = new Set(["pintarEmpleada", "pintarEncargado", "pintarDueno", "irBuscar", "contCargarLista"]);
+const NAV_PANTALLAS = ["pintarEmpleada", "pintarEncargado", "pintarDueno", "irBuscar", "contCargarLista", "contPintarHoja",
+  "encMenu", "encVerCortes", "encApuntar", "encElegir", "encTipo", "encCorteHoy", "encRetiro", "encPagar", "encPagarA",
+  "duenoMenu", "duenoBodega", "bodLlegadas", "bodCorregirInicio", "bodCorregirCaja", "bodLlegoInicio", "bodElegirPrenda", "bodPisoInicio", "bodElegirCaja", "duenoCorte"];
+const NAV_ACCIONES = ["encMarcar", "encDeshacer", "encHacerCorte", "encGuardarRetiro", "encConfirmarPago",
+  "bodCorregirGuardar", "bodLlegoGuardar", "bodPisoGuardar", "duenoGuardarCorte", "encRequiereTienda"];
+let navPila = [];            // [{nombre, args}]
+let navRestaurando = false;
+let navRefrescando = false;
+
+function navTitulo() {
+  const vista = document.querySelector("#vista-empleada:not(.oculto), #vista-encargado:not(.oculto), #vista-dueno:not(.oculto), #vista-buscar:not(.oculto), #vista-conteos:not(.oculto)");
+  const h1 = vista && [...vista.querySelectorAll("h1")].find(h => h.offsetParent !== null);
+  return h1 ? h1.textContent.trim() : "";
+}
+function navPintar() {
+  const logueado = Boolean(token) && !$("vista-login") .offsetParent;
+  document.body.classList.toggle("con-topbar", logueado);
+  $("topbar").classList.toggle("oculto", !logueado);
+  if (!logueado) return;
+  $("tb-atras").style.visibility = navPila.length > 1 ? "visible" : "hidden";
+  $("tb-titulo").textContent = navTitulo();
+}
+function navApilar(nombre, args) {
+  const top = navPila[navPila.length - 1];
+  // El menú del encargado/dueño ES la pantalla de inicio: volver a él es volver a la raíz.
+  if (nombre === "encMenu" || nombre === "duenoMenu") { navPila = navPila.slice(0, 1); history.replaceState({i: 0}, ""); return; }
+  // Repintar la misma pantalla con los mismos datos no es un paso nuevo.
+  if (top && top.nombre === nombre && JSON.stringify(top.args) === JSON.stringify(args)) return;
+  if (NAV_RAICES.has(nombre)) {
+    navPila = [{nombre, args}];
+    history.replaceState({i: 0}, "");
+  } else {
+    navPila.push({nombre, args});
+    history.pushState({i: navPila.length - 1}, "");
+  }
+}
+function navMostrar(entrada) {
+  navRestaurando = true;
+  try { const r = window[entrada.nombre](...entrada.args); if (r && r.then) r.catch(() => {}); }
+  finally { navRestaurando = false; }
+}
+function navAtras() {
+  if (navPila.length > 1) history.back(); else irInicio();
+}
+window.addEventListener("popstate", e => {
+  if (!token || navPila.length === 0) return;
+  const i = e.state && typeof e.state.i === "number" ? e.state.i : 0;
+  if (i >= navPila.length) { history.replaceState({i: navPila.length - 1}, ""); return; }   // "adelante": no hay
+  navPila.length = i + 1;
+  navMostrar(navPila[i]);
+  setTimeout(navPintar, 60);
+});
+async function navActualizar() {
+  if (navRefrescando) return;
+  navRefrescando = true;
+  $("tb-refresh").classList.add("girando");
+  try {
+    const top = navPila[navPila.length - 1];
+    if (!top || top.nombre === "pintarEmpleada" || top.nombre === "pintarEncargado" || top.nombre === "pintarDueno") await cargarInicio();
+    else if (top.nombre === "contPintarHoja" && contJornada) contPintarHoja(await api("/api/v1/movil/conteos/" + contJornada));
+    else { navRestaurando = true; try { await window[top.nombre](...top.args); } finally { navRestaurando = false; } }
+  } catch (e) {}
+  $("tb-refresh").classList.remove("girando");
+  navRefrescando = false;
+  navPintar();
+}
+function navMenu() {
+  const quien = (window._yo && window._yo.nombre) || "";
+  const modo = modoServidor === "tienda" ? "en la tienda" : "modo consulta";
+  const m = document.createElement("div"); m.className = "hoja-menu"; m.id = "hoja-menu";
+  m.innerHTML = `<div class="panel"><p class="info">${quien ? quien + " · " : ""}${modo} · app ${PWA_VERSION}</p>` +
+    `<button class="btn-suave" onclick="navActualizar(); navCerrarMenu()">↻  Actualizar esta pantalla</button>` +
+    `<button class="btn-suave" onclick="navReinstalar()">⬇️  Traer la última versión de la app</button>` +
+    `<button class="btn-suave" onclick="navCerrarMenu(); salir()">🚪  Cerrar sesión</button>` +
+    `<button class="btn-suave" onclick="navCerrarMenu()">Cancelar</button></div>`;
+  m.addEventListener("click", e => { if (e.target === m) navCerrarMenu(); });
+  document.body.appendChild(m);
+}
+function navCerrarMenu() { const m = $("hoja-menu"); if (m) m.remove(); }
+async function navReinstalar() {
+  // Borra el cascarón cacheado y recarga: es el "recargar dos veces" en un botón.
+  try { const ks = await caches.keys(); await Promise.all(ks.map(k => caches.delete(k))); } catch (e) {}
+  try { const rs = await navigator.serviceWorker.getRegistrations(); await Promise.all(rs.map(r => r.unregister())); } catch (e) {}
+  location.reload();
+}
+for (const nombre of NAV_PANTALLAS) {
+  const f = window[nombre];
+  if (typeof f !== "function") continue;
+  window[nombre] = function (...args) {
+    if (!navRestaurando) navApilar(nombre, args);
+    const r = f.apply(this, args);
+    if (r && r.then) r.finally(() => setTimeout(navPintar, 30)); else setTimeout(navPintar, 30);
+    return r;
+  };
+}
+for (const nombre of NAV_ACCIONES) {
+  const f = window[nombre];
+  if (typeof f !== "function") continue;
+  window[nombre] = function (...args) {
+    const r = f.apply(this, args);
+    const alTerminar = () => { navPila = navPila.slice(0, 1); history.replaceState({i: 0}, ""); setTimeout(navPintar, 30); };
+    if (r && r.then) r.finally(alTerminar); else alTerminar();
+    return r;
+  };
+}
+const _mostrarOriginal = mostrar;
+mostrar = function (vista) { _mostrarOriginal(vista); setTimeout(navPintar, 30); };
+const _salirOriginal = salir;
+salir = function () { navPila = []; _salirOriginal(); navPintar(); };
+
 // ── Jalar hacia abajo para actualizar ──────────────────────────────
 const ptr = document.createElement("div");
 ptr.id = "ptr"; ptr.textContent = "↓";
@@ -1384,10 +1549,9 @@ let ptrY0 = null, ptrDist = 0, ptrOcupado = false;
 const PTR_UMBRAL = 48;
 
 function ptrElegible() {
-  if (!token || ptrOcupado || window.scrollY > 0) return false;
-  const vista = ["empleada", "encargado", "dueno"].find(
-    v => !$("vista-" + v).classList.contains("oculto"));
-  return Boolean(vista);
+  if (!token || ptrOcupado || window.scrollY > 0 || navRefrescando) return false;
+  if (contJornada && !$("cont-hoja").classList.contains("oculto")) return false;   // la hoja se guarda sola; no la recargues por accidente
+  return Boolean(document.querySelector("#vista-empleada:not(.oculto), #vista-encargado:not(.oculto), #vista-dueno:not(.oculto), #vista-conteos:not(.oculto)"));
 }
 
 document.addEventListener("touchstart", (e) => {
@@ -1410,7 +1574,7 @@ document.addEventListener("touchend", async () => {
   if (suelto >= PTR_UMBRAL) {
     ptrOcupado = true;
     ptr.style.top = "16px"; ptr.textContent = "↻"; ptr.classList.add("girando");
-    try { await cargarInicio(); } catch (e) {}
+    try { await navActualizar(); } catch (e) {}
     ptr.classList.remove("girando");
     ptrOcupado = false;
   }

@@ -27,6 +27,7 @@ class LlegoRequest(BaseModel):
     caja_id: int | None = None
     caja_nueva: bool = False
     referencia: str = Field(default="", max_length=120)
+    imprimir_etiquetas: bool = False   # una etiqueta por pieza que llegó, a la Brother de la tienda
 
 
 class PisoRequest(BaseModel):
@@ -73,7 +74,46 @@ def llego(body: LlegoRequest, current: tuple = Depends(get_current_employee), db
     except ValueError as exc:
         db.rollback()
         raise HTTPException(status_code=422, detail={"error": {"code": "invalido", "message": str(exc)}})
-    return {"ok": True, **r}
+    etiquetas = _encolar_etiquetas(db, body.items, code) if body.imprimir_etiquetas else 0
+    return {"ok": True, "etiquetas": etiquetas, **r}
+
+
+def _encolar_etiquetas(db: Session, items, code: str) -> int:
+    """Una etiqueta por pieza que llegó (lo que se pega en la prenda antes de
+    colgarla). Va por la misma cola `trabajo` que el botón de Buscar. Si algo
+    falla, la mercancía ya quedó guardada: se avisa y se pueden imprimir
+    después desde Buscar."""
+    from pathlib import Path
+
+    from pos_uniformes.database.models import Variante
+    from pos_uniformes.services import trabajos_service
+    from pos_uniformes.services.inventory_label_service import render_inventory_label
+
+    total = 0
+    for it in items:
+        n = int(it.cantidad or 0)
+        if n <= 0:
+            continue
+        try:
+            v = db.get(Variante, int(it.variante_id))
+            r = render_inventory_label(db, int(it.variante_id), mode="standard", requested_copies=n)
+            trabajos_service.enviar_etiqueta(
+                db, Path(r.image_path).read_bytes(), sku=str(v.sku if v else ""), copies=r.effective_copies,
+                paper_mode=r.mode, origen="pwa", creado_por=code,
+            )
+            total += r.effective_copies
+        except Exception:  # noqa: BLE001 — la llegada ya está guardada
+            db.rollback()
+            continue
+    db.commit()
+    return total
+
+
+@router.get("/llegadas")
+def llegadas(current: tuple = Depends(get_current_employee), db: Session = Depends(get_db)) -> dict:
+    """Lo que ha llegado en el último mes, para el dueño."""
+    _dueno(current)
+    return {"llegadas": bm.llegadas_recientes(db)}
 
 
 @router.post("/piso")

@@ -75,6 +75,39 @@ class ApiBodegaMovilTests(unittest.TestCase):
         self.session.expire_all()
         self.assertEqual(self.session.get(Variante, vid).stock_actual, 22)
 
+    def test_llego_con_etiquetas_encola_una_por_pieza_y_las_llegadas_se_ven(self) -> None:
+        from types import SimpleNamespace
+
+        self._como("VEND-1")
+        prendas = self.client.get("/api/v1/movil/bodega/prendas?q=prenda 0").json()["prendas"]
+        v6, v8 = prendas[0]["tallas"][0]["variante_id"], prendas[0]["tallas"][1]["variante_id"]
+        encoladas = []
+        render = lambda db, vid, mode, requested_copies: SimpleNamespace(image_path=__file__, effective_copies=requested_copies, mode=mode)
+        with patch("pos_uniformes.services.inventory_label_service.render_inventory_label", side_effect=render), patch(
+            "pos_uniformes.services.trabajos_service.enviar_etiqueta", side_effect=lambda db, img, **kw: encoladas.append(kw) or SimpleNamespace(id=1)
+        ):
+            r = self.client.post("/api/v1/movil/bodega/llego", json={
+                "items": [{"variante_id": v6, "cantidad": 3}, {"variante_id": v8, "cantidad": 2}, {"variante_id": v8, "cantidad": 0}],
+                "referencia": "Maquilador 18/09", "imprimir_etiquetas": True,
+            })
+        self.assertEqual(r.status_code, 200, r.text)
+        self.assertEqual(r.json()["etiquetas"], 5)
+        self.assertEqual([(e["copies"], e["origen"], e["creado_por"]) for e in encoladas], [(3, "pwa", "VEND-1"), (2, "pwa", "VEND-1")])
+        # sin la casilla, nada se encola
+        with patch("pos_uniformes.services.trabajos_service.enviar_etiqueta") as env:
+            r = self.client.post("/api/v1/movil/bodega/llego", json={"items": [{"variante_id": v6, "cantidad": 1}]})
+        self.assertEqual(r.json()["etiquetas"], 0); env.assert_not_called()
+        # el dueño ve lo que ha llegado, agrupado por día + nota + quién
+        ll = self.client.get("/api/v1/movil/bodega/llegadas").json()["llegadas"]
+        self.assertEqual(len(ll), 2)
+        con_nota = next(g for g in ll if g["referencia"] == "Maquilador 18/09")
+        self.assertEqual((con_nota["piezas"], con_nota["quien"]), (5, "Daniel"))
+        self.assertEqual([(t["talla"], t["cantidad"]) for t in con_nota["prendas"][0]["tallas"]], [("6", 3), ("8", 2)])
+        self.assertEqual(next(g for g in ll if g["referencia"] == "")["piezas"], 1)   # "maquilador" por default no se enseña
+        # una empleada no ve las llegadas
+        self._como("VEND-4")
+        self.assertEqual(self.client.get("/api/v1/movil/bodega/llegadas").status_code, 403)
+
     def test_todo_al_piso_no_abre_caja(self) -> None:
         self._como("VEND-1")
         r = self.client.post("/api/v1/movil/bodega/llego", json={"items": [{"variante_id": self.v[0].id, "cantidad": 3}]})

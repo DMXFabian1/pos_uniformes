@@ -184,6 +184,62 @@ def buscar_prendas(session: Session, texto: str, *, limite: int = 12) -> list[di
     ]
 
 
+def llegadas_recientes(session: Session, *, dias: int = 30, limite: int = 60) -> list[dict]:
+    """Lo que ha llegado (movimientos "Llegó: …" de `llego_mercancia`),
+    agrupado por día + nota + quién, de lo más nuevo a lo más viejo. Es la
+    vista del dueño: "¿qué entró esta semana y quién lo anotó?"."""
+    from datetime import datetime, timezone
+
+    from pos_uniformes.database.models import MovimientoInventario, Producto, TipoMovimientoInventario
+    from pos_uniformes.services.nombres_empleadas_service import mostrar, nombres_por_codigo
+
+    desde = datetime.now(timezone.utc) - timedelta(days=dias)
+    filas = session.execute(
+        select(MovimientoInventario, Variante, Producto.nombre, Producto.escuela_id)
+        .join(Variante, Variante.id == MovimientoInventario.variante_id)
+        .join(Producto, Producto.id == Variante.producto_id)
+        .where(
+            MovimientoInventario.tipo_movimiento == TipoMovimientoInventario.ENTRADA_COMPRA,
+            MovimientoInventario.observacion.like("Llegó:%"),
+            MovimientoInventario.created_at >= desde,
+        )
+        .order_by(MovimientoInventario.created_at.desc(), MovimientoInventario.id.desc())
+    ).all()
+    nombres = nombres_por_codigo(session)
+    escuelas = {e.id: e.nombre for e in session.scalars(select(Escuela)).all()}
+    grupos: dict[tuple, dict] = {}
+    for mov, v, producto, escuela_id in filas:
+        momento = mov.created_at.astimezone() if mov.created_at.tzinfo else mov.created_at
+        clave = (momento.date().isoformat(), mov.referencia or "", mov.creado_por or "")
+        g = grupos.get(clave)
+        if g is None:
+            g = grupos[clave] = {
+                "fecha": momento.date().isoformat(), "hora": momento.strftime("%H:%M"),
+                "referencia": "" if (mov.referencia or "") == "maquilador" else (mov.referencia or ""),
+                "quien": mostrar(mov.creado_por or "", nombres, corto=True),
+                "piezas": 0, "prendas": {},
+            }
+        g["piezas"] += int(mov.cantidad)
+        pr = g["prendas"].setdefault(str(producto), {
+            "nombre": str(producto).split("|")[0].strip(),
+            "escuela": escuelas.get(escuela_id, "") if escuela_id else "Básicos",
+            "tallas": [], "piezas": 0,
+        })
+        pr["piezas"] += int(mov.cantidad)
+        pr["tallas"].append({"talla": str(v.talla or ""), "cantidad": int(mov.cantidad), "en_caja": "en " in (mov.observacion or "")})
+    from types import SimpleNamespace
+
+    from pos_uniformes.services.conteo_service import _talla_sort_key
+
+    out = []
+    for g in list(grupos.values())[:limite]:
+        g["prendas"] = list(g["prendas"].values())
+        for pr in g["prendas"]:
+            pr["tallas"].sort(key=lambda t: _talla_sort_key(SimpleNamespace(talla=t["talla"])))
+        out.append(g)
+    return out
+
+
 # --- los dos gestos ----------------------------------------------------------------
 
 def _ubicacion_almacen(session: Session) -> int | None:
