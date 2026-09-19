@@ -491,7 +491,37 @@ def _payload_pagos(db: Session) -> list[dict]:
 class MarcarRequest(BaseModel):
     employee_code: str = Field(min_length=1, max_length=40)
     fecha: date
-    tipo: str = Field(pattern="^(falta|descanso|quitar)$")
+    tipo: str = Field(pattern="^(falta|descanso|trabajo|quitar)$")
+
+
+@router.get("/encargado/marcas/{employee_code}")
+def encargado_marcas(
+    employee_code: str,
+    current: tuple = Depends(get_current_employee),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Las marcas de las últimas dos semanas de una persona (falta / descanso
+    / vino), para corregir desde el celular sin tener que ir al kiosko
+    (Daniel 2026-09-19: "le puse que faltó Naye hoy y no tengo manera de
+    corregirlo"). También su equipo, para elegir a otra sin regresar."""
+    from datetime import timedelta
+
+    from pos_uniformes.services.calendario_empleadas_service import DESCANSO, FALTA, TRABAJO, cargar_horario
+
+    empleada, _p = current
+    _solo_gestor(empleada)
+    code = employee_code.strip().upper()
+    horario = cargar_horario(db, code)
+    hoy = date.today()
+    desde = hoy - timedelta(days=14)
+    etiqueta = {FALTA: "Faltó", DESCANSO: "Descansó", TRABAJO: "Sí vino"}
+    marcas = [
+        {"fecha": f.isoformat(), "tipo": t, "texto": etiqueta.get(t, t)}
+        for f, t in sorted(horario.eventos.items(), reverse=True)
+        if desde <= f <= hoy + timedelta(days=7) and t in etiqueta
+    ]
+    nombre = next((e["nombre"] for e in _equipo(db) if e["codigo"] == code), code)
+    return {"codigo": code, "nombre": nombre, "marcas": marcas}
 
 
 @router.post("/encargado/marcar")

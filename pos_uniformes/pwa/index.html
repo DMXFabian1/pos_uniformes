@@ -245,6 +245,7 @@ body.con-topbar .app{padding-top:calc(58px + env(safe-area-inset-top))}
     <div id="d-dinero"></div>
     <button class="btn-grande btn-acento oculto" id="d-btn-corte" onclick="duenoCorte()">🧾  Hacer corte</button>
     <button class="btn-grande oculto" id="d-btn-bodega" onclick="duenoBodega()">📦  Bodega: llegó mercancía / pasar al piso</button>
+    <button class="btn-grande oculto" id="d-btn-asistencia" onclick="duenoAsistencia()">👥  Asistencia: faltó / descanso / quitar marca</button>
     <div class="card">
       <strong>Hoy por empleada</strong>
       <div id="d-ranking"></div>
@@ -325,7 +326,7 @@ body.con-topbar .app{padding-top:calc(58px + env(safe-area-inset-top))}
 const $ = id => document.getElementById(id);
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const DIAS = ["lun","mar","mié","jue","vie","sáb","dom"];
-const PWA_VERSION = "v22";
+const PWA_VERSION = "v23";
 let token = localStorage.getItem("pos_token") || "";
 let calY = 0, calM = 0;
 let rolActual = "", vistaInicio = "", modoServidor = "casa";
@@ -884,13 +885,21 @@ function pintarTarjetasEncargado(t) {
 }
 
 function encMenu() {
+  if (rolActual === "dueno") { duenoMenu(); return; }   // el dueño usa las mismas pantallas desde su vista
   $("enc-menu").classList.remove("oculto");
   $("enc-sub").innerHTML = "";
 }
 
 function encSub(html) {
+  if (rolActual === "dueno") { duenoSub(html); return; }
   $("enc-menu").classList.add("oculto");
   $("enc-sub").innerHTML = html;
+}
+
+// El dueño apunta faltas/descansos (y las quita) con el mismo flujo del encargado.
+async function duenoAsistencia() {
+  if (!encData) { try { encData = await api("/api/v1/movil/encargado"); } catch (e) { encData = null; } }
+  encApuntar();
 }
 
 function encVerCortes() {
@@ -921,7 +930,33 @@ function encElegir(codigo, nombre) {
   encSub(`<h1>¿Qué pasó con ${nombre}?</h1>` +
     `<button class="btn-grande" onclick="encTipo('falta')">🚫  Faltó</button>` +
     `<button class="btn-grande" onclick="encTipo('descanso')">🛌  Le doy descanso</button>` +
+    `<button class="btn-grande" onclick="encTipo('trabajo')">✅  Sí vino (en su descanso)</button>` +
+    `<div id="enc-marcas"></div>` +
     `<button class="btn-suave" onclick="encApuntar()">← Regresar</button>`);
+  encPintarMarcas(codigo);
+}
+
+// Lo apuntado en las últimas dos semanas, cada marca con su "Quitar": así se
+// corrige un "faltó" que no era sin ir al kiosko ni a Telegram.
+async function encPintarMarcas(codigo) {
+  const caja = $("enc-marcas"); if (!caja) return;
+  try {
+    const d = await api("/api/v1/movil/encargado/marcas/" + encodeURIComponent(codigo));
+    if (!d.marcas.length) { caja.innerHTML = "<p class='sub'>Sin marcas en las últimas dos semanas.</p>"; return; }
+    const icono = {falta: "🚫", descanso: "🛌", trabajo: "✅"};
+    caja.innerHTML = `<div class="card" style="margin-top:12px"><strong>Apuntado (últimas dos semanas)</strong>` +
+      d.marcas.map(m => `<div class="fila"><span>${icono[m.tipo] || ""} ${m.texto} · ${fechaLarga(m.fecha)}</span>` +
+        `<button class="btn-suave" style="width:auto;min-height:38px;padding:0 12px;font-size:14px" onclick="encQuitarMarca('${codigo}','${m.fecha}')">Quitar</button></div>`).join("") +
+      `</div>`;
+  } catch (e) { caja.innerHTML = ""; }
+}
+
+async function encQuitarMarca(codigo, fecha) {
+  if (!confirm(`¿Quitar la marca del ${fechaLarga(fecha)}? Queda como si no se hubiera apuntado nada.`)) return;
+  try {
+    await encPost("/api/v1/movil/encargado/marcar", {employee_code: codigo, fecha, tipo: "quitar"});
+    encPintarMarcas(codigo);
+  } catch (e) { alert("No se pudo quitar. ¿Hay WiFi?"); }
 }
 
 function encTipo(tipo) {
@@ -955,13 +990,13 @@ async function encMarcar(fecha) {
     return;
   }
   encSel.fecha = fecha;
-  const verbo = encSel.tipo === "falta" ? "faltó" : "descansa";
+  const verbo = encSel.tipo === "falta" ? "faltó" : encSel.tipo === "trabajo" ? "sí vino" : "descansa";
   encSub(`<div class="listo-texto">✅ Apuntado:<br><br>${encSel.nombre} ${verbo} el ${fechaLarga(fecha)}.</div>` +
     `<button class="btn-grande" style="background:var(--acento);color:#fff;border:none" onclick="encListo()">✅  Listo</button>` +
     `<button class="btn-suave" onclick="encDeshacer()">❌  Me equivoqué (borrar)</button>`);
 }
 
-async function encListo() { await pintarEncargado(); }
+async function encListo() { if (rolActual === "dueno") { await cargarInicio(); } else { await pintarEncargado(); } }
 
 async function encDeshacer() {
   try {
@@ -1123,6 +1158,7 @@ function pintarDueno(data) {
   // El corte escribe en la base viva: solo desde la tienda.
   $("d-btn-corte").classList.toggle("oculto", modoServidor !== "tienda");
   $("d-btn-bodega").classList.toggle("oculto", modoServidor !== "tienda");
+  $("d-btn-asistencia").classList.toggle("oculto", modoServidor !== "tienda");
   mostrar("dueno");
 }
 
@@ -1435,7 +1471,7 @@ async function duenoGuardarCorte() {
 const NAV_RAICES = new Set(["pintarEmpleada", "pintarEncargado", "pintarDueno", "irBuscar", "contCargarLista"]);
 const NAV_PANTALLAS = ["pintarEmpleada", "pintarEncargado", "pintarDueno", "irBuscar", "contCargarLista", "contPintarHoja",
   "encMenu", "encVerCortes", "encApuntar", "encElegir", "encTipo", "encCorteHoy", "encRetiro", "encPagar", "encPagarA",
-  "duenoMenu", "duenoBodega", "bodLlegadas", "bodCorregirInicio", "bodCorregirCaja", "bodLlegoInicio", "bodElegirPrenda", "bodPisoInicio", "bodElegirCaja", "duenoCorte"];
+  "duenoMenu", "duenoBodega", "duenoAsistencia", "bodLlegadas", "bodCorregirInicio", "bodCorregirCaja", "bodLlegoInicio", "bodElegirPrenda", "bodPisoInicio", "bodElegirCaja", "duenoCorte"];
 const NAV_ACCIONES = ["encMarcar", "encDeshacer", "encHacerCorte", "encGuardarRetiro", "encConfirmarPago",
   "bodCorregirGuardar", "bodLlegoGuardar", "bodPisoGuardar", "duenoGuardarCorte", "encRequiereTienda"];
 let navPila = [];            // [{nombre, args}]

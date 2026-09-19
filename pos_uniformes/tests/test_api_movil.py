@@ -472,6 +472,26 @@ class EncargadoMovilTests(unittest.TestCase):
             )
             self.assertEqual(self.session.query(EmpleadaEvento).count(), 0)
 
+    def test_las_marcas_recientes_se_ven_y_se_quitan_desde_el_celular(self) -> None:
+        # Daniel (2026-09-19): "le puse que faltó Naye hoy y no tengo manera de corregirlo".
+        from datetime import timedelta
+
+        hoy = date.today()
+        with patch("pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"):
+            for fecha, tipo in ((hoy, "falta"), (hoy - timedelta(days=3), "descanso"), (hoy - timedelta(days=30), "falta")):
+                self.client.post("/api/v1/movil/encargado/marcar", json={"employee_code": "VEND-4", "fecha": fecha.isoformat(), "tipo": tipo})
+            r = self.client.get("/api/v1/movil/encargado/marcas/VEND-4")
+            self.assertEqual(r.status_code, 200, r.text)
+            marcas = r.json()["marcas"]
+            self.assertEqual([(m["fecha"], m["texto"]) for m in marcas], [(hoy.isoformat(), "Faltó"), ((hoy - timedelta(days=3)).isoformat(), "Descansó")])   # la de hace un mes no
+            self.client.post("/api/v1/movil/encargado/marcar", json={"employee_code": "VEND-4", "fecha": hoy.isoformat(), "tipo": "quitar"})
+            marcas = self.client.get("/api/v1/movil/encargado/marcas/VEND-4").json()["marcas"]
+            self.assertEqual([m["texto"] for m in marcas], ["Descansó"])
+            # "sí vino" también se apunta desde el celular
+            r = self.client.post("/api/v1/movil/encargado/marcar", json={"employee_code": "VEND-4", "fecha": hoy.isoformat(), "tipo": "trabajo"})
+            self.assertEqual(r.status_code, 200, r.text)
+            self.assertIn("Sí vino", [m["texto"] for m in self.client.get("/api/v1/movil/encargado/marcas/VEND-4").json()["marcas"]])
+
     def test_marcar_en_modo_casa_se_niega(self) -> None:
         with patch(
             "pos_uniformes.api.routers.movil._modo_servidor", return_value="casa"
