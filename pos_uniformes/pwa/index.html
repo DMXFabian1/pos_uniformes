@@ -135,6 +135,7 @@ body.con-topbar .app{padding-top:calc(58px + env(safe-area-inset-top))}
 .mapa-tile b{display:block; font-size:14px; color:var(--tinta); line-height:1.2}
 .mapa-tile .sub{margin:2px 0 0; font-size:12px}
 .mapa-tile.al_dia{border-left:5px solid var(--verde)} .mapa-tile.vieja{border-left:5px solid #c98a2b} .mapa-tile.nunca{border-left:5px solid #b9b0a4}
+.mapa-tile.proceso{background:#fff4e5; border-color:#e0b27a}
 .mapa-nivel{font-size:12px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:var(--tenue); margin:16px 0 0}
 .mapa-leyenda{display:flex; gap:12px; font-size:12px; color:var(--tenue); margin:6px 0 0}
 .mapa-leyenda i{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:4px; vertical-align:-1px}
@@ -344,7 +345,7 @@ body.con-topbar .app{padding-top:calc(58px + env(safe-area-inset-top))}
 const $ = id => document.getElementById(id);
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const DIAS = ["lun","mar","mié","jue","vie","sáb","dom"];
-const PWA_VERSION = "v24";
+const PWA_VERSION = "v25";
 let token = localStorage.getItem("pos_token") || "";
 let calY = 0, calM = 0;
 let rolActual = "", vistaInicio = "", modoServidor = "casa";
@@ -1349,6 +1350,7 @@ async function bodLlegoGuardar() {
 // ── Mapa de conteos: tres capas (nivel → escuela/prenda → tallas), semáforo por tallas ──
 const semHtml = c => { const t = c.tallas || 1; return `<div class="sem"><i class="ok" style="width:${100*c.al_dia/t}%"></i><i class="old" style="width:${100*c.viejas/t}%"></i><i class="no" style="width:${100*c.nunca/t}%"></i></div>`; };
 const semTexto = c => `${c.pct_al_dia}% al día` + (c.ultimo_dias === null ? " · nunca" : c.ultimo_dias === 0 ? " · hoy" : ` · hace ${c.ultimo_dias} d`);
+const mapaTile = (e, onclick) => `<div class="mapa-tile ${e.estado}${e.en_proceso ? " proceso" : ""}" onclick="${onclick}"><b>${e.nombre}</b>${semHtml(e)}<p class="sub">${semTexto(e)}${e.quien && !e.en_proceso ? " · " + e.quien : ""}</p>${e.en_proceso ? `<p class="sub" style="color:#b45309;font-weight:700">En proceso · ${e.en_proceso}</p>` : ""}</div>`;
 const LEYENDA = `<div class="mapa-leyenda"><span><i style="background:var(--verde)"></i>al día</span><span><i style="background:#c98a2b"></i>viejo</span><span><i style="background:#b9b0a4"></i>nunca</span></div>`;
 
 async function mapaConteos() {
@@ -1363,10 +1365,10 @@ async function mapaConteos() {
     for (const n of niveles) {
       const lista = d.escuelas.filter(e => e.nivel === n);
       html += `<div class="mapa-nivel">${n} · ${lista.length}</div><div class="mapa-grid">` +
-        lista.map(e => `<div class="mapa-tile ${e.estado}" onclick="mapaEscuela(${e.escuela_id})"><b>${e.nombre}</b>${semHtml(e)}<p class="sub">${semTexto(e)}</p></div>`).join("") + `</div>`;
+        lista.map(e => mapaTile(e, `mapaEscuela(${e.escuela_id})`)).join("") + `</div>`;
     }
     html += `<div class="mapa-nivel">Básicos · ${d.basicos.length} tipos</div><div class="mapa-grid">` +
-      d.basicos.map(b => `<div class="mapa-tile ${b.estado}" onclick="mapaBasicos('${b.tipo_pieza.replace(/'/g, "")}')"><b>${b.tipo_pieza}</b>${semHtml(b)}<p class="sub">${semTexto(b)}</p></div>`).join("") + `</div>`;
+      d.basicos.map(b => mapaTile({...b, nombre: b.tipo_pieza}, `mapaBasicos('${b.tipo_pieza.replace(/'/g, "")}')`)).join("") + `</div>`;
     $("mapa").innerHTML = html;
   } catch (e) { $("mapa").innerHTML = "<div class='card error'>No se pudo cargar.</div>"; }
 }

@@ -3500,9 +3500,26 @@ class QuoteSatelliteWindow(QMainWindow):
         # Tablero: TODAS las escuelas y prendas básicas con su último conteo
         # (antes eran solo las 8 jornadas más recientes, y Daniel no veía las
         # demás — 2026-09-14).
-        historial_titulo = QLabel("ESCUELAS Y BÁSICOS  ·  cuándo se contó cada una")
+        # Desde el 20/09 el tablero es el MAPA (Daniel: "una guía visual para ver
+        # qué está contado y qué no… la sección Conteos"); la tabla de siempre
+        # queda a un clic (ahí vive el doble clic al comparativo).
+        titulo_fila = QHBoxLayout()
+        historial_titulo = QLabel("ESCUELAS Y BÁSICOS  ·  qué está contado y qué no")
         historial_titulo.setObjectName("libretaSeccion")
-        layout.addWidget(historial_titulo)
+        titulo_fila.addWidget(historial_titulo, 1)
+        self.conteos_ver_tabla_btn = QPushButton("Ver tabla")
+        self.conteos_ver_tabla_btn.setAutoDefault(False)
+        self.conteos_ver_tabla_btn.setCheckable(True)
+        self.conteos_ver_tabla_btn.setToolTip("La lista de siempre: doble clic en una escuela abre el comparativo con su conteo anterior")
+        self.conteos_ver_tabla_btn.toggled.connect(self._conteos_alternar_tabla)
+        titulo_fila.addWidget(self.conteos_ver_tabla_btn)
+        layout.addLayout(titulo_fila)
+        from pos_uniformes.ui.dialogs.conteo_mapa_dialog import ConteoMapaWidget
+
+        # `auto=False`: se arma cuando la página se abre (_refresh_conteos_vista),
+        # no al construir la ventana (WebEngine + consulta por Wi-Fi).
+        self.conteos_mapa = ConteoMapaWidget(auto=False, scroll_propio=False)
+        layout.addWidget(self.conteos_mapa, 1)
         self.conteos_historial_table = QTableWidget(0, 6)
         self.conteos_historial_table.setObjectName("libretaTabla")
         self.conteos_historial_table.setHorizontalHeaderLabels(
@@ -3521,6 +3538,7 @@ class QuoteSatelliteWindow(QMainWindow):
         hh.setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
         for col in (1, 2, 3, 4, 5):
             hh.setSectionResizeMode(col, QHeaderView.ResizeMode.ResizeToContents)
+        self.conteos_historial_table.setVisible(False)
         layout.addWidget(self.conteos_historial_table, 1)
 
         aviso = QLabel("Lo que se captura queda pendiente de revisión: no cambia el inventario solo.")
@@ -3698,6 +3716,9 @@ class QuoteSatelliteWindow(QMainWindow):
             logger.exception("Conteos: no se pudieron leer las jornadas")
             abiertas, por_revisar, recientes = [], [], []
         pintar_jornadas(self, abiertas=abiertas, por_revisar=por_revisar, recientes=recientes, code=code)
+        mapa = getattr(self, "conteos_mapa", None)
+        if mapa is not None:
+            mapa.recargar()   # en hilo; no más de una vez por minuto
 
     def _conteos_imprimir_hoja(self, *, escuela_id=None, tipo_pieza: str = "", titulo: str = "", prenda: str = "") -> None:
         """La hoja de conteo en papel carta (HP), para una escuela o prenda.
@@ -4009,6 +4030,11 @@ class QuoteSatelliteWindow(QMainWindow):
 
         ConteoOrdenDialog(self).exec()
         self._refresh_conteo_banner()
+
+    def _conteos_alternar_tabla(self, tabla: bool) -> None:
+        self.conteos_historial_table.setVisible(tabla)
+        self.conteos_mapa.setVisible(not tabla)
+        self.conteos_ver_tabla_btn.setText("Ver mapa" if tabla else "Ver tabla")
 
     def _open_conteo_mapa(self) -> None:
         from pos_uniformes.ui.dialogs.conteo_mapa_dialog import ConteoMapaDialog

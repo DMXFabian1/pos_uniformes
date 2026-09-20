@@ -1,99 +1,173 @@
 """🗺 Mapa de conteos en el kiosko: qué está contado y qué no, por capas.
 
-La misma página que el celular, pero armada aquí (HTML autónomo de
-`conteo_mapa_service.html`) y mostrada en un QWebEngineView: no necesita
-servidor de la PWA ni sesión. Se genera en un hilo (por Wi-Fi tarda unos
-segundos) y la ve cualquiera que esté en Conteos, con o sin gafete.
+Pintado con texto enriquecido de Qt (`conteo_mapa_rich_text`), sin WebEngine
+—el kiosko no lo trae y son ~200 MB por máquina—. Los datos se arman en un
+hilo (por Wi-Fi tarda segundos). Vive dentro de la sección Conteos
+(`ConteoMapaWidget`) y también como diálogo grande (`ConteoMapaDialog`).
 """
 
 from __future__ import annotations
 
 import logging
 import threading
+import time
 
 from PyQt6.QtCore import Qt, pyqtSignal
-from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QPushButton, QVBoxLayout, QWidget
+from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea, QVBoxLayout, QWidget
+
+from pos_uniformes.ui.helpers import conteo_mapa_rich_text as rt
 
 logger = logging.getLogger(__name__)
 
-_CARGANDO = (
-    "<html><body style='display:flex;justify-content:center;align-items:center;height:100vh;"
-    "font-family:sans-serif;color:#888;background:#f4ede2'><div><h2>Armando el mapa de conteos…</h2>"
-    "<p>Unos segundos: se revisa cada talla de cada escuela.</p></div></body></html>"
-)
 
-
-def generar_html() -> str:
+def generar_datos() -> dict:
     from pos_uniformes.database.connection import get_session
-    from pos_uniformes.services.conteo_mapa_service import html
+    from pos_uniformes.services.conteo_mapa_service import todo
 
     with get_session() as session:
-        return html(session)
+        return todo(session)
 
 
-class ConteoMapaDialog(QDialog):
-    _listo = pyqtSignal(str)   # html generado, o "" si falló
+class ConteoMapaWidget(QWidget):
+    """Barra (buscador, estado, ↻) + una QLabel enriquecida con la capa actual."""
 
-    def __init__(self, parent: QWidget | None = None, *, generar=generar_html) -> None:
+    _listo = pyqtSignal(object)   # dict de datos, o None si falló
+
+    def __init__(self, parent: QWidget | None = None, *, generar=generar_datos, auto: bool = True, columnas: int = 4, scroll_propio: bool = True) -> None:
+        """`scroll_propio=False`: dentro de una página que ya hace scroll (la
+        sección Conteos) el mapa crece a su tamaño, sin scroll anidado."""
         super().__init__(parent)
-        self.setWindowTitle("Mapa de conteos")
-        self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint, True)
-        self.resize(1100, 760)
         self._generar = generar
-        self._web = None
+        self._columnas = columnas
+        self._datos: dict | None = None
+        self._capa: str = "mapa"          # "mapa" o la clave de detalle ("e19" / "bPantalón")
+        self._abiertas: set[int] = set()  # prendas desplegadas en el detalle
+        self._generando = False
+        self._generado_en: float = 0.0
         ly = QVBoxLayout(self)
         ly.setContentsMargins(0, 0, 0, 0)
-        ly.setSpacing(0)
+        ly.setSpacing(6)
         barra = QHBoxLayout()
-        barra.setContentsMargins(12, 8, 12, 8)
-        self.estado = QLabel("Armando el mapa…")
-        self.estado.setStyleSheet("color: #8a7358; font-size: 13px;")
-        barra.addWidget(self.estado, 1)
+        barra.setContentsMargins(0, 0, 0, 0)
+        self.busca = QLineEdit()
+        self.busca.setPlaceholderText("Buscar escuela…")
+        self.busca.setClearButtonEnabled(True)
+        self.busca.textChanged.connect(lambda _t: self._pintar())
+        barra.addWidget(self.busca, 1)
+        self.estado = QLabel("")
+        self.estado.setStyleSheet("color: #8a7358; font-size: 12px;")
+        barra.addWidget(self.estado, 2)
         self.refrescar_btn = QPushButton("↻ Actualizar")
         self.refrescar_btn.setAutoDefault(False)
-        self.refrescar_btn.clicked.connect(self.recargar)
+        self.refrescar_btn.clicked.connect(lambda: self.recargar(forzar=True))
         barra.addWidget(self.refrescar_btn)
-        cerrar = QPushButton("Cerrar")
-        cerrar.setAutoDefault(False)
-        cerrar.clicked.connect(self.accept)
-        barra.addWidget(cerrar)
         ly.addLayout(barra)
-        try:
-            from PyQt6.QtWebEngineWidgets import QWebEngineView
+        self.cuerpo = QLabel("Armando el mapa…")
+        self.cuerpo.setWordWrap(True)
+        self.cuerpo.setTextFormat(Qt.TextFormat.RichText)
+        self.cuerpo.setOpenExternalLinks(False)
+        self.cuerpo.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
+        self.cuerpo.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
+        self.cuerpo.linkActivated.connect(self._navegar)
+        self.cuerpo.setStyleSheet("background: transparent; font-size: 13px;")
+        if scroll_propio:
+            scroll = QScrollArea()
+            scroll.setWidgetResizable(True)
+            scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+            scroll.setWidget(self.cuerpo)
+            self.scroll = scroll
+            ly.addWidget(scroll, 1)
+        else:
+            self.scroll = None
+            ly.addWidget(self.cuerpo, 1)
+        self._listo.connect(self._recibir)
+        if auto:
+            self.recargar(forzar=True)
 
-            self._web = QWebEngineView()
-            ly.addWidget(self._web, 1)
-        except Exception as exc:  # noqa: BLE001 — sin WebEngine se avisa y ya
-            aviso = QLabel(f"No se puede mostrar el mapa aquí (falta PyQt6-WebEngine):\n{exc}")
-            aviso.setAlignment(Qt.AlignmentFlag.AlignCenter)
-            ly.addWidget(aviso, 1)
-        self._listo.connect(self._pintar)
-        self.recargar()
-
-    def recargar(self) -> None:
+    # ── datos ──
+    def recargar(self, *, forzar: bool = False, cada_seg: float = 60.0) -> bool:
+        """Vuelve a armar los datos en un hilo. Sin `forzar`, no más de una vez
+        por minuto: la sección se refresca a cada rato. Devuelve si arrancó."""
+        if self._generando:
+            return False
+        if not forzar and self._generado_en and time.monotonic() - self._generado_en < cada_seg:
+            return False
+        self._generando = True
         self.refrescar_btn.setEnabled(False)
         self.estado.setText("Armando el mapa…")
-        if self._web is not None:
-            self._web.setHtml(_CARGANDO)
 
         def _worker() -> None:
             try:
-                html = self._generar()
+                datos = self._generar()
             except Exception:  # noqa: BLE001
                 logger.exception("Mapa de conteos: no se pudo generar")
-                html = ""
+                datos = None
             try:
-                self._listo.emit(html)
+                self._listo.emit(datos)
             except RuntimeError:
                 pass
 
         threading.Thread(target=_worker, daemon=True, name="conteo-mapa").start()
+        return True
 
-    def _pintar(self, html: str) -> None:
+    def _recibir(self, datos) -> None:
+        self._generando = False
         self.refrescar_btn.setEnabled(True)
-        if not html:
+        if not datos:
             self.estado.setText("No se pudo armar el mapa (¿sin conexión con la PC principal?).")
             return
-        self.estado.setText("Verde = al día · ámbar = ya venció · gris = nunca contada. Toca una escuela.")
-        if self._web is not None:
-            self._web.setHtml(html)
+        self._datos = datos
+        self._generado_en = time.monotonic()
+        self.estado.setText("Verde = al día · ámbar = ya venció · gris = nunca · naranja = en proceso. Toca una escuela; luego una prenda.")
+        self._pintar()
+
+    # ── capas ──
+    def _navegar(self, href: str) -> None:
+        if href == "mapa":
+            self._capa, self._abiertas = "mapa", set()
+        elif href.startswith("p") and href[1:].isdigit():
+            i = int(href[1:])
+            self._abiertas ^= {i}
+        else:
+            self._capa, self._abiertas = href, set()
+        self._pintar()
+        if self.scroll is not None:
+            self.scroll.verticalScrollBar().setValue(0)
+
+    def _pintar(self) -> None:
+        if not self._datos:
+            return
+        if self._capa == "mapa":
+            self.cuerpo.setText(rt.mapa(self._datos, columnas=self._columnas, filtro=self.busca.text()))
+            self.busca.setVisible(True)
+        else:
+            d = self._datos.get("detalles", {}).get(self._capa)
+            if d is None:
+                self._capa = "mapa"
+                return self._pintar()
+            self.cuerpo.setText(rt.detalle(d, abiertas=self._abiertas))
+            self.busca.setVisible(False)
+
+
+class ConteoMapaDialog(QDialog):
+    def __init__(self, parent: QWidget | None = None, *, generar=generar_datos) -> None:
+        super().__init__(parent)
+        self.setWindowTitle("Mapa de conteos")
+        self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint, True)
+        self.resize(1100, 760)
+        ly = QVBoxLayout(self)
+        ly.setContentsMargins(12, 12, 12, 12)
+        self.mapa = ConteoMapaWidget(self, generar=generar)
+        ly.addWidget(self.mapa, 1)
+        cerrar = QPushButton("Cerrar")
+        cerrar.setAutoDefault(False)
+        cerrar.clicked.connect(self.accept)
+        ly.addWidget(cerrar)
+
+    @property
+    def estado(self) -> QLabel:
+        return self.mapa.estado
+
+    @property
+    def refrescar_btn(self) -> QPushButton:
+        return self.mapa.refrescar_btn

@@ -78,7 +78,8 @@ class HtmlYKioskoTests(unittest.TestCase):
         from pos_uniformes.ui.dialogs.conteo_mapa_dialog import ConteoMapaDialog
 
         app = QApplication.instance() or QApplication(sys.argv)
-        d = ConteoMapaDialog(None, generar=lambda: "<html><body>MAPA</body></html>")
+        datos = m.todo(self.s)
+        d = ConteoMapaDialog(None, generar=lambda: datos)
         for _ in range(50):
             app.processEvents()
             if d.refrescar_btn.isEnabled():
@@ -94,3 +95,76 @@ class HtmlYKioskoTests(unittest.TestCase):
             time.sleep(0.02)
         self.assertIn("No se pudo armar", d2.estado.text())
         d.close(); d2.close()
+
+
+class SeccionConteosTests(unittest.TestCase):
+    """El mapa vive dentro de la sección Conteos del kiosko; la tabla a un clic."""
+
+    def test_el_widget_no_se_arma_dos_veces_seguidas_ni_antes_de_un_minuto(self) -> None:
+        import sys, time
+        from PyQt6.QtWidgets import QApplication
+        from pos_uniformes.ui.dialogs.conteo_mapa_dialog import ConteoMapaWidget
+
+        app = QApplication.instance() or QApplication(sys.argv)
+        veces = []
+        datos = {"total": {"tallas": 0, "al_dia": 0, "viejas": 0, "nunca": 0, "pct_al_dia": 0, "ultimo_dias": None, "estado": "nunca"}, "escuelas": [], "basicos": [], "detalles": {}}
+        w = ConteoMapaWidget(None, generar=lambda: veces.append(1) or datos, auto=False)
+        self.assertTrue(w.recargar())
+        self.assertFalse(w.recargar())            # ya hay una en vuelo
+        for _ in range(50):
+            app.processEvents()
+            if w.refrescar_btn.isEnabled():
+                break
+            time.sleep(0.02)
+        self.assertEqual(veces, [1])
+        self.assertFalse(w.recargar())            # recién armado: no antes de un minuto
+        self.assertTrue(w.recargar(forzar=True))  # el botón ↻ sí
+        w.close()
+
+    def test_las_capas_se_navegan_con_los_enlaces(self) -> None:
+        import sys, time
+        from PyQt6.QtWidgets import QApplication
+        from pos_uniformes.ui.dialogs.conteo_mapa_dialog import ConteoMapaWidget
+
+        app = QApplication.instance() or QApplication(sys.argv)
+        engine = create_engine("sqlite:///:memory:"); Base.metadata.create_all(engine)
+        s = Session(engine); uno = _seed(s, "Uno", stock=3); _seed_basicos(s, uno, "Pantalón"); s.commit()
+        datos = m.todo(s)   # sqlite en memoria no se puede usar desde el hilo del widget
+        w = ConteoMapaWidget(None, generar=lambda: datos, auto=True)
+        for _ in range(50):
+            app.processEvents()
+            if w.refrescar_btn.isEnabled() and w._datos:
+                break
+            time.sleep(0.02)
+        self.assertIn("Uno", w.cuerpo.text()); self.assertIn("BÁSICOS", w.cuerpo.text())
+        w._navegar(f"e{uno.id}")                      # capa 2: la escuela
+        self.assertIn("‹ Mapa", w.cuerpo.text()); self.assertIn("Prenda 0 Uno", w.cuerpo.text()); self.assertNotIn(" pz</span>", w.cuerpo.text())
+        w._navegar("p0")                              # capa 3: tallas de la primera prenda
+        self.assertIn("3 pz", w.cuerpo.text())
+        w._navegar("mapa")
+        self.assertIn("BÁSICOS", w.cuerpo.text())
+        w.busca.setText("zzz")
+        self.assertIn("Ninguna escuela", w.cuerpo.text())
+        w.close()
+
+    def test_la_seccion_tiene_mapa_y_boton_ver_tabla(self) -> None:
+        import inspect
+        from pos_uniformes.ui.quote_satellite_window import QuoteSatelliteWindow
+
+        fuente = inspect.getsource(QuoteSatelliteWindow._conteos_alternar_tabla)
+        self.assertIn("conteos_historial_table.setVisible(tabla)", fuente)
+        self.assertIn("conteos_mapa.setVisible(not tabla)", fuente)
+        refresco = inspect.getsource(QuoteSatelliteWindow._refresh_conteos_vista)
+        self.assertIn("mapa.recargar()", refresco)
+
+    def test_los_mosaicos_dicen_quien_la_esta_contando(self) -> None:
+        from pos_uniformes.services import conteo_jornada_service as jn
+
+        engine = create_engine("sqlite:///:memory:"); Base.metadata.create_all(engine)
+        s = Session(engine)
+        uno = _seed(s, "Uno", stock=3); s.commit()
+        j, _ = jn.registrar_impresion(s, escuela_id=uno.id, empleada_code="VEND-5", empleada_nombre="Fanny"); s.commit()
+        r = m.resumen(s)
+        fila = next(e for e in r["escuelas"] if e["nombre"] == "Uno")
+        self.assertTrue(fila["en_proceso"].startswith("Fanny · hoja impresa"))
+        self.assertIn('"en_proceso": "Fanny · hoja impresa', m.html(s))   # el mosaico lo pinta el JS con ese dato

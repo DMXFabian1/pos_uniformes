@@ -82,21 +82,45 @@ def _niveles_por_escuela(session: Session) -> dict[int, str]:
     return {eid: (next(iter(ns)) if len(ns) == 1 else "Varios niveles") for eid, ns in por_escuela.items()}
 
 
+def _jornadas_por_clave(session: Session) -> dict:
+    """{clave de alcance: {"en_proceso": quién·hoja, "quien": quién terminó la última}}:
+    lo que el tablero de siempre decía en sus columnas, ahora en los mosaicos."""
+    from pos_uniformes.services import conteo_jornada_service as jn
+
+    out: dict = defaultdict(dict)
+    try:
+        for clave, j in jn.abiertas_por_alcance(session).items():
+            r = jn.ref(j)   # ORM → foto plana (quien, hoja_texto)
+            out[clave]["en_proceso"] = r.quien + (f" · {r.hoja_texto}" if r.hoja_texto else "")
+        for clave, u in jn.ultimos_conteos(session).items():
+            if u.quien:
+                out[clave]["quien"] = u.quien
+    except Exception:  # noqa: BLE001 — sin jornadas el mapa sirve igual
+        pass
+    return out
+
+
 def resumen(session: Session) -> dict:
     escuelas = list(session.scalars(select(Escuela).where(Escuela.activo.is_(True)).order_by(Escuela.nombre)).all())
     por_escuela = obtener_variantes_para_conteo_varias(session, [int(e.id) for e in escuelas])
     niveles = _niveles_por_escuela(session)
+    jornadas = _jornadas_por_clave(session)
     filas = []
     for e in escuelas:
         vs = [v for v in por_escuela.get(int(e.id), []) if v.tipo_pieza not in _TIPOS_VIRTUALES]
         if not vs:
             continue
-        filas.append({"escuela_id": int(e.id), "nombre": str(e.nombre), "nivel": niveles.get(int(e.id), "Sin nivel"), **_cifras(vs)})
+        j = jornadas.get(int(e.id), {})
+        filas.append({"escuela_id": int(e.id), "nombre": str(e.nombre), "nivel": niveles.get(int(e.id), "Sin nivel"),
+                      "en_proceso": j.get("en_proceso", ""), "quien": j.get("quien", ""), **_cifras(vs)})
     basicos_vs = [v for v in obtener_variantes_basicos_para_conteo(session) if v.tipo_pieza not in _TIPOS_VIRTUALES]
     por_tipo: dict[str, list] = defaultdict(list)
     for v in basicos_vs:
         por_tipo[v.tipo_pieza or "Sin tipo"].append(v)
-    basicos = [{"tipo_pieza": t, **_cifras(vs)} for t, vs in sorted(por_tipo.items())]
+    basicos = []
+    for t, vs in sorted(por_tipo.items()):
+        j = jornadas.get(("basicos", t), {})
+        basicos.append({"tipo_pieza": t, "en_proceso": j.get("en_proceso", ""), "quien": j.get("quien", ""), **_cifras(vs)})
     todo = [v for vs in por_escuela.values() for v in vs if v.tipo_pieza not in _TIPOS_VIRTUALES] + basicos_vs
     return {"total": _cifras(todo), "escuelas": filas, "basicos": basicos}
 
@@ -138,6 +162,7 @@ h1{font-size:24px;color:var(--acento-osc);margin:6px 0 2px}.sub{color:var(--tenu
 .tile{background:var(--carta);border:1px solid var(--borde);border-radius:14px;padding:10px 12px;cursor:pointer}.tile:hover{border-color:var(--acento-osc)}
 .tile b{display:block;font-size:14px;line-height:1.2}.tile .sub{margin:2px 0 0;font-size:12px}
 .tile.al_dia{border-left:5px solid var(--verde)}.tile.vieja{border-left:5px solid #c98a2b}.tile.nunca{border-left:5px solid #b9b0a4}
+.tile.proceso{background:#fff4e5;border-color:#e0b27a}.tile .proc{color:#b45309;font-weight:700}
 .nivel{font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--tenue);margin:16px 0 0}
 .ley{display:flex;gap:14px;font-size:12px;color:var(--tenue);margin:6px 0 0}.ley i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
 .fila{display:flex;justify-content:space-between;align-items:center;cursor:pointer}.fila b{font-size:15px}
@@ -154,6 +179,7 @@ const txt = c => `${c.pct_al_dia}% al día` + (c.ultimo_dias === null ? " · nun
 const LEY = `<div class="ley"><span><i style="background:var(--verde)"></i>al día</span><span><i style="background:#c98a2b"></i>viejo</span><span><i style="background:#b9b0a4"></i>nunca</span></div>`;
 const norm = s => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+const tile = (e, onclick) => `<div class="tile ${e.estado}${e.en_proceso ? " proceso" : ""}" onclick="${onclick}"><b>${esc(e.nombre)}</b>${sem(e)}<p class="sub">${txt(e)}${e.quien && !e.en_proceso ? " · " + esc(e.quien) : ""}</p>${e.en_proceso ? `<p class="sub proc">En proceso · ${esc(e.en_proceso)}</p>` : ""}</div>`;
 function mapa(q) {
   q = norm(q || "");
   const t = D.total;
@@ -165,9 +191,9 @@ function mapa(q) {
   const niveles = [...new Set(esc_.map(e => e.nivel))].sort((a, b) => (orden.indexOf(a) + 99) % 99 - (orden.indexOf(b) + 99) % 99 || a.localeCompare(b));
   for (const n of niveles) {
     const l = esc_.filter(e => e.nivel === n);
-    h += `<div class="nivel">${n} · ${l.length}</div><div class="grid">` + l.map(e => `<div class="tile ${e.estado}" onclick="detalle('e${e.escuela_id}')"><b>${esc(e.nombre)}</b>${sem(e)}<p class="sub">${txt(e)}</p></div>`).join("") + `</div>`;
+    h += `<div class="nivel">${n} · ${l.length}</div><div class="grid">` + l.map(e => tile(e, `detalle('e${e.escuela_id}')`)).join("") + `</div>`;
   }
-  if (!q) h += `<div class="nivel">Básicos · ${D.basicos.length} tipos</div><div class="grid">` + D.basicos.map(b => `<div class="tile ${b.estado}" onclick="detalle('b${esc(b.tipo_pieza)}')"><b>${esc(b.tipo_pieza)}</b>${sem(b)}<p class="sub">${txt(b)}</p></div>`).join("") + `</div>`;
+  if (!q) h += `<div class="nivel">Básicos · ${D.basicos.length} tipos</div><div class="grid">` + D.basicos.map(b => tile({...b, nombre: b.tipo_pieza}, `detalle('b${esc(b.tipo_pieza)}')`)).join("") + `</div>`;
   document.getElementById("app").innerHTML = h; window.scrollTo(0, 0);
   const i = document.querySelector(".busca"); if (q && i) { i.focus(); i.setSelectionRange(q.length, q.length); }
 }
