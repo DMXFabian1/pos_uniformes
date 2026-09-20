@@ -165,6 +165,28 @@ def _es_tienda() -> bool:
         return False
 
 
+# ── Mapa de conteos (qué está contado y qué no), por capas ──────────────────
+@router.get("/mapa")
+def mapa(current: tuple = Depends(get_current_employee), db: Session = Depends(get_db)) -> dict:
+    from pos_uniformes.services import conteo_mapa_service as mapa_svc
+
+    return mapa_svc.resumen(db)
+
+
+@router.get("/mapa/escuela/{escuela_id}")
+def mapa_escuela(escuela_id: int, current: tuple = Depends(get_current_employee), db: Session = Depends(get_db)) -> dict:
+    from pos_uniformes.services import conteo_mapa_service as mapa_svc
+
+    return mapa_svc.escuela(db, escuela_id)
+
+
+@router.get("/mapa/basicos/{tipo_pieza}")
+def mapa_basicos(tipo_pieza: str, current: tuple = Depends(get_current_employee), db: Session = Depends(get_db)) -> dict:
+    from pos_uniformes.services import conteo_mapa_service as mapa_svc
+
+    return mapa_svc.basicos(db, tipo_pieza)
+
+
 @router.post("")
 def abrir(body: AbrirRequest, current: tuple = Depends(get_current_employee), db: Session = Depends(get_db)) -> dict:
     _solo_tienda()

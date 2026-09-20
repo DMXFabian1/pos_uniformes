@@ -126,6 +126,23 @@ body.con-topbar .app{padding-top:calc(58px + env(safe-area-inset-top))}
   padding:14px 16px calc(16px + env(safe-area-inset-bottom))}
 .hoja-menu .panel button{margin-top:8px; text-align:left; padding:0 16px; font-size:16px; min-height:50px}
 .hoja-menu .info{font-size:12px; color:var(--tenue); margin:0 0 6px}
+/* Mapa de conteos: semáforo por tallas (al día / viejas / nunca) */
+.sem{display:flex; height:8px; border-radius:4px; overflow:hidden; background:#e6ddd0; margin-top:6px}
+.sem i{display:block; height:100%}
+.sem .ok{background:var(--verde)} .sem .old{background:#c98a2b} .sem .no{background:#b9b0a4}
+.mapa-grid{display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px}
+.mapa-tile{background:var(--carta); border:1px solid var(--borde); border-radius:14px; padding:10px 12px; cursor:pointer}
+.mapa-tile b{display:block; font-size:14px; color:var(--tinta); line-height:1.2}
+.mapa-tile .sub{margin:2px 0 0; font-size:12px}
+.mapa-tile.al_dia{border-left:5px solid var(--verde)} .mapa-tile.vieja{border-left:5px solid #c98a2b} .mapa-tile.nunca{border-left:5px solid #b9b0a4}
+.mapa-nivel{font-size:12px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:var(--tenue); margin:16px 0 0}
+.mapa-leyenda{display:flex; gap:12px; font-size:12px; color:var(--tenue); margin:6px 0 0}
+.mapa-leyenda i{display:inline-block; width:10px; height:10px; border-radius:3px; margin-right:4px; vertical-align:-1px}
+.talla-sem{display:inline-block; border-radius:8px; padding:6px 9px; margin:4px 6px 0 0; font-weight:700; font-size:13px; border:1px solid var(--borde); background:var(--carta)}
+.talla-sem.al_dia{background:var(--verde-bg); color:var(--verde); border-color:transparent}
+.talla-sem.vieja{background:#f6e3c6; color:#8a5a12; border-color:transparent}
+.talla-sem.nunca{background:#eee9e1; color:#6f675c; border-color:transparent}
+.talla-sem small{display:block; font-weight:600; font-size:10px; opacity:.85}
 .nav{position:fixed; bottom:0; left:0; right:0; display:flex; gap:8px;
   background:var(--carta); border-top:1px solid var(--borde); padding:8px 12px
   calc(8px + env(safe-area-inset-bottom)); max-width:520px; margin:0 auto}
@@ -246,6 +263,7 @@ body.con-topbar .app{padding-top:calc(58px + env(safe-area-inset-top))}
     <button class="btn-grande btn-acento oculto" id="d-btn-corte" onclick="duenoCorte()">🧾  Hacer corte</button>
     <button class="btn-grande oculto" id="d-btn-bodega" onclick="duenoBodega()">📦  Bodega: llegó mercancía / pasar al piso</button>
     <button class="btn-grande oculto" id="d-btn-asistencia" onclick="duenoAsistencia()">👥  Asistencia: faltó / descanso / quitar marca</button>
+    <button class="btn-grande" id="d-btn-mapa" onclick="mapaConteos()">🗺  Mapa de conteos: qué está contado y qué no</button>
     <div class="card">
       <strong>Hoy por empleada</strong>
       <div id="d-ranking"></div>
@@ -326,7 +344,7 @@ body.con-topbar .app{padding-top:calc(58px + env(safe-area-inset-top))}
 const $ = id => document.getElementById(id);
 const MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
 const DIAS = ["lun","mar","mié","jue","vie","sáb","dom"];
-const PWA_VERSION = "v23";
+const PWA_VERSION = "v24";
 let token = localStorage.getItem("pos_token") || "";
 let calY = 0, calM = 0;
 let rolActual = "", vistaInicio = "", modoServidor = "casa";
@@ -1328,6 +1346,51 @@ async function bodLlegoGuardar() {
   } catch (e) { alert(e.message); }
 }
 
+// ── Mapa de conteos: tres capas (nivel → escuela/prenda → tallas), semáforo por tallas ──
+const semHtml = c => { const t = c.tallas || 1; return `<div class="sem"><i class="ok" style="width:${100*c.al_dia/t}%"></i><i class="old" style="width:${100*c.viejas/t}%"></i><i class="no" style="width:${100*c.nunca/t}%"></i></div>`; };
+const semTexto = c => `${c.pct_al_dia}% al día` + (c.ultimo_dias === null ? " · nunca" : c.ultimo_dias === 0 ? " · hoy" : ` · hace ${c.ultimo_dias} d`);
+const LEYENDA = `<div class="mapa-leyenda"><span><i style="background:var(--verde)"></i>al día</span><span><i style="background:#c98a2b"></i>viejo</span><span><i style="background:#b9b0a4"></i>nunca</span></div>`;
+
+async function mapaConteos() {
+  duenoSub(`<h1>🗺 Mapa de conteos</h1><p class="sub">Toca una escuela o un tipo de básicos para ver sus prendas</p><div id="mapa"><div class="card">Cargando...</div></div>
+    <button class="btn-suave salir" onclick="duenoMenu()">← Regresar</button>`);
+  try {
+    const d = await api("/api/v1/movil/conteos/mapa");
+    const t = d.total;
+    let html = `<div class="card"><strong>Toda la tienda · ${t.tallas.toLocaleString()} tallas</strong>${semHtml(t)}<p class="sub" style="margin:6px 0 0">${t.al_dia.toLocaleString()} al día · ${t.viejas.toLocaleString()} viejas · ${t.nunca.toLocaleString()} nunca</p>${LEYENDA}</div>`;
+    const orden = ["Preescolar", "Primaria", "Secundaria", "Preparatoria", "Varios niveles", "Sin nivel"];
+    const niveles = [...new Set(d.escuelas.map(e => e.nivel))].sort((a, b) => (orden.indexOf(a) + 99) % 99 - (orden.indexOf(b) + 99) % 99 || a.localeCompare(b));
+    for (const n of niveles) {
+      const lista = d.escuelas.filter(e => e.nivel === n);
+      html += `<div class="mapa-nivel">${n} · ${lista.length}</div><div class="mapa-grid">` +
+        lista.map(e => `<div class="mapa-tile ${e.estado}" onclick="mapaEscuela(${e.escuela_id})"><b>${e.nombre}</b>${semHtml(e)}<p class="sub">${semTexto(e)}</p></div>`).join("") + `</div>`;
+    }
+    html += `<div class="mapa-nivel">Básicos · ${d.basicos.length} tipos</div><div class="mapa-grid">` +
+      d.basicos.map(b => `<div class="mapa-tile ${b.estado}" onclick="mapaBasicos('${b.tipo_pieza.replace(/'/g, "")}')"><b>${b.tipo_pieza}</b>${semHtml(b)}<p class="sub">${semTexto(b)}</p></div>`).join("") + `</div>`;
+    $("mapa").innerHTML = html;
+  } catch (e) { $("mapa").innerHTML = "<div class='card error'>No se pudo cargar.</div>"; }
+}
+
+function mapaPintarDetalle(d, volver) {
+  const prendas = d.prendas.map((p, i) => `<div class="card" style="padding:12px 14px">` +
+    `<div class="fila" style="border:none;padding:0;cursor:pointer" onclick="const x=document.getElementById('mapa-t${i}'); x.classList.toggle('oculto')"><span><b>${p.nombre}</b><span class="sub" style="display:block">${p.tipo_pieza ? p.tipo_pieza + " · " : ""}${p.tallas} tallas · ${semTexto(p)}</span></span><span class="monto">›</span></div>` +
+    semHtml(p) +
+    `<div id="mapa-t${i}" class="oculto" style="margin-top:6px">` +
+      p.tallas_detalle.map(t => `<span class="talla-sem ${t.estado}">${t.talla}${colorVisible(t.color) ? " " + t.color : ""}<small>${t.dias === null ? "nunca" : t.dias === 0 ? "hoy" : "hace " + t.dias + " d"} · ${t.stock} pz</small></span>`).join("") +
+    `</div></div>`).join("");
+  duenoSub(`<h1>${d.titulo}</h1><p class="sub">${d.tallas} tallas · ${semTexto(d)}</p>${semHtml(d)}${LEYENDA}<div style="margin-top:12px">${prendas || "<div class='card'>Sin prendas para contar.</div>"}</div>
+    <p class="sub">Toca una prenda para ver sus tallas.</p>
+    <button class="btn-suave salir" onclick="mapaConteos()">← Mapa</button>`);
+}
+async function mapaEscuela(id) {
+  duenoSub(`<div class="card">Cargando...</div>`);
+  try { mapaPintarDetalle(await api("/api/v1/movil/conteos/mapa/escuela/" + id)); } catch (e) { alert("No se pudo cargar."); mapaConteos(); }
+}
+async function mapaBasicos(tipo) {
+  duenoSub(`<div class="card">Cargando...</div>`);
+  try { mapaPintarDetalle(await api("/api/v1/movil/conteos/mapa/basicos/" + encodeURIComponent(tipo))); } catch (e) { alert("No se pudo cargar."); mapaConteos(); }
+}
+
 async function bodLlegadas() {
   duenoSub(`<h1>📜 Lo que ha llegado</h1><p class="sub">Último mes, de lo más nuevo a lo más viejo</p><div id="bod-llegadas"><div class="card">Cargando...</div></div>
     <button class="btn-suave salir" onclick="duenoBodega()">← Regresar</button>`);
@@ -1471,7 +1534,7 @@ async function duenoGuardarCorte() {
 const NAV_RAICES = new Set(["pintarEmpleada", "pintarEncargado", "pintarDueno", "irBuscar", "contCargarLista"]);
 const NAV_PANTALLAS = ["pintarEmpleada", "pintarEncargado", "pintarDueno", "irBuscar", "contCargarLista", "contPintarHoja",
   "encMenu", "encVerCortes", "encApuntar", "encElegir", "encTipo", "encCorteHoy", "encRetiro", "encPagar", "encPagarA",
-  "duenoMenu", "duenoBodega", "duenoAsistencia", "bodLlegadas", "bodCorregirInicio", "bodCorregirCaja", "bodLlegoInicio", "bodElegirPrenda", "bodPisoInicio", "bodElegirCaja", "duenoCorte"];
+  "duenoMenu", "duenoBodega", "duenoAsistencia", "mapaConteos", "mapaEscuela", "mapaBasicos", "bodLlegadas", "bodCorregirInicio", "bodCorregirCaja", "bodLlegoInicio", "bodElegirPrenda", "bodPisoInicio", "bodElegirCaja", "duenoCorte"];
 const NAV_ACCIONES = ["encMarcar", "encDeshacer", "encHacerCorte", "encGuardarRetiro", "encConfirmarPago",
   "bodCorregirGuardar", "bodLlegoGuardar", "bodPisoGuardar", "duenoGuardarCorte", "encRequiereTienda"];
 let navPila = [];            // [{nombre, args}]
