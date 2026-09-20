@@ -271,6 +271,23 @@ class JornadaTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             jn.registrar_impresion(self.s, escuela_id=self.escuela.id, empleada_code="")
 
+    def test_basicos_incluyen_generales_con_existencia_aunque_no_esten_ligados(self) -> None:
+        # Daniel (2026-09-20): "hay piezas que no aparecen… el pants liso rojo y verde".
+        from pos_uniformes.database.models import Categoria, Marca, Producto, TipoPieza
+        from pos_uniformes.services.conteo_service import obtener_variantes_basicos_agrupadas
+
+        cat = self.s.scalar(select(Categoria)); marca = self.s.scalar(select(Marca))
+        tp = TipoPieza(nombre="Pants 2pz"); self.s.add(tp); self.s.flush()
+        for nombre, stock in (("Pants 2pz Liso Rojo", 79), ("Pants 2pz Punto Gris", 0), ("Pants 2pz Liso Vino", -2)):
+            prod = Producto(nombre=nombre, nombre_base=nombre, categoria_id=cat.id, marca_id=marca.id, escuela_id=None, tipo_pieza_id=tp.id)
+            self.s.add(prod); self.s.flush()
+            self.s.add(Variante(producto_id=prod.id, sku=f"G{prod.id}", talla="8", color="", precio_venta=100, stock_actual=stock))
+        self.s.commit()
+        nombres = [g["producto_nombre"] for g in obtener_variantes_basicos_agrupadas(self.s, tipo_pieza="Pants 2pz")]
+        self.assertIn("Pants 2pz Liso Rojo", nombres)      # sin liga, pero hay 79 en el piso
+        self.assertIn("Pants 2pz Liso Vino", nombres)      # negativo también cuenta: hay que recontarlo
+        self.assertNotIn("Pants 2pz Punto Gris", nombres)  # sin liga y en cero: nada que contar
+
     def test_basicos_una_abierta_por_prenda(self) -> None:
         j = jn.abrir_jornada(self.s, escuela_id=None, tipo_pieza="Playera", empleada_code="VEND-4")
         with self.assertRaises(jn.JornadaEnProceso):

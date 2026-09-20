@@ -432,11 +432,23 @@ def agrupar_variantes_por_producto(variantes: list[VarianteParaConteo]) -> list[
 def obtener_variantes_basicos_para_conteo(
     session: Session,
 ) -> list[VarianteParaConteo]:
-    """Variantes de productos básicos (sin escuela directa, vinculados por catálogo)."""
+    """Variantes de productos básicos: generales (sin escuela directa) que están
+    ligados a alguna escuela por catálogo **o tienen existencia en alguna
+    talla** (Daniel, 2026-09-20: "hay piezas que no aparecen… el pants liso
+    rojo y verde"; no estaban ligadas pero sí en el piso). Los generales sin
+    liga y en cero en todas sus tallas se quedan fuera: no hay qué contar."""
+    from sqlalchemy import or_
+
     # Sub-query: productos con al menos un link activo en catálogo
     linked_ids = (
         select(CatalogSchoolProductLink.producto_id)
         .where(CatalogSchoolProductLink.activo.is_(True))
+        .distinct()
+        .scalar_subquery()
+    )
+    con_existencia = (
+        select(Variante.producto_id)
+        .where(Variante.activo.is_(True), Variante.stock_actual != 0)
         .distinct()
         .scalar_subquery()
     )
@@ -454,7 +466,7 @@ def obtener_variantes_basicos_para_conteo(
             Producto.escuela_id.is_(None),
             Producto.activo.is_(True),
             Variante.activo.is_(True),
-            Producto.id.in_(linked_ids),
+            or_(Producto.id.in_(linked_ids), Producto.id.in_(con_existencia)),
         )
         .order_by(
             Variante.ultimo_conteo_at.asc().nulls_first(),
