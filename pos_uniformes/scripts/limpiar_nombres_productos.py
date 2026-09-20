@@ -30,11 +30,27 @@ from pos_uniformes.database.models import Producto, TipoPieza, TipoPrenda
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 
 
+_CONECTORES = {"de", "del", "la", "las", "los", "el", "en", "y", "a", "con", "por", "para"}
+
+
+def con_mayusculas(nombre: str) -> str:
+    """Cada palabra con inicial mayúscula ("olan" → "Olan", "cielo" → "Cielo"),
+    salvo conectores (de, del, y…). No toca lo que ya empieza en mayúscula
+    ni las siglas (CBTIS, SABES, ESTV) ni "2pz"."""
+    palabras = nombre.split()
+    out = []
+    for i, w in enumerate(palabras):
+        if w[:1].islower() and not (i > 0 and w.lower() in _CONECTORES):
+            w = w[0].upper() + w[1:]
+        out.append(w)
+    return " ".join(out)
+
+
 def nombre_limpio(p: Producto) -> str:
     base = str(p.nombre_base or "").strip()
     if base and "|" not in base:
-        return sanitize_product_display_name(base)
-    return sanitize_product_display_name(str(p.nombre or "").split("|")[0])
+        return con_mayusculas(sanitize_product_display_name(base))
+    return con_mayusculas(sanitize_product_display_name(str(p.nombre or "").split("|")[0]))
 
 
 def planear(session) -> list[dict]:
@@ -75,6 +91,8 @@ def aplicar(session, plan: list[dict]) -> int:
     for paso in plan:
         p = paso["producto"]
         p.nombre = paso["nuevo"]
+        if p.nombre_base and "|" not in p.nombre_base:
+            p.nombre_base = con_mayusculas(sanitize_product_display_name(p.nombre_base))
         if paso["tipo_prenda"] is not None:
             p.tipo_prenda_id = paso["tipo_prenda"].id
         if paso["tipo_pieza"] is not None:

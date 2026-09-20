@@ -37,6 +37,15 @@ class NombresLimpiosTests(unittest.TestCase):
         p2 = self._p("Pants 2pz Liso Rojo", tz=self.pants)
         self.assertEqual(p2.nombre_completo, "Pants 2pz Liso Rojo · Pants 2pz")
 
+    def test_mayusculas_en_cada_palabra_menos_conectores_y_siglas(self) -> None:
+        # Daniel (2026-09-20): "¿puedes poner mayúscula en Olan?"
+        self.assertEqual(lim.con_mayusculas("Camisa Cuello olan Blanca"), "Camisa Cuello Olan Blanca")
+        self.assertEqual(lim.con_mayusculas("Boina Escolta Azul cielo"), "Boina Escolta Azul Cielo")
+        self.assertEqual(lim.con_mayusculas("Pantalón Vestir Pata de gallo"), "Pantalón Vestir Pata de Gallo")
+        self.assertEqual(lim.con_mayusculas("Playera Deportiva SABES"), "Playera Deportiva SABES")
+        self.assertEqual(lim.con_mayusculas("Pants 2pz Liso Rojo CBTIS 148"), "Pants 2pz Liso Rojo CBTIS 148")
+        self.assertEqual(lim.con_mayusculas("Suéter Cuello V H Verde"), "Suéter Cuello V H Verde")
+
     def test_el_plan_limpia_recupera_campos_y_avisa_choques(self) -> None:
         a = self._p("Camisa Cuello olan Blanca | Oficial | Camisa", tp=self.oficial, tz=self.camisa)
         b = self._p("Camisa Cuello olan Blanca", tp=self.oficial, tz=self.camisa)                 # ya limpio: choca con a
@@ -47,13 +56,13 @@ class NombresLimpiosTests(unittest.TestCase):
         self.s.commit()
         plan = {x["producto"].id: x for x in lim.planear(self.s)}
         self.assertNotIn(e.id, plan)
-        self.assertEqual(plan[a.id]["nuevo"], "Camisa Cuello olan Blanca"); self.assertIsNone(plan[a.id]["choque"])
-        self.assertEqual(plan[b.id]["nuevo"], "Camisa Cuello olan Blanca (2)"); self.assertEqual(plan[b.id]["choque"], a.id)
+        self.assertEqual(plan[a.id]["nuevo"], "Camisa Cuello Olan Blanca"); self.assertIsNone(plan[a.id]["choque"])
+        self.assertEqual(plan[b.id]["nuevo"], "Camisa Cuello Olan Blanca (2)"); self.assertEqual(plan[b.id]["choque"], a.id)
         self.assertEqual((plan[c.id]["nuevo"], plan[c.id]["tipo_prenda"].nombre), ("Pants 2pz Vicente Guerrero", "Deportivo"))
         self.assertEqual(plan[d.id]["nuevo"], "Playera Deportiva Zapata")      # manda nombre_base, el curado
         self.assertEqual(plan[viejo.id]["nuevo"], "Falda Vieja")               # los inactivos también se limpian, sin contar para choques
         lim.aplicar(self.s, list(plan.values())); self.s.commit()
         self.assertEqual({p.nombre for p in self.s.scalars(select(Producto)).all()},
-                         {"Camisa Cuello olan Blanca", "Camisa Cuello olan Blanca (2)", "Pants 2pz Vicente Guerrero", "Playera Deportiva Zapata", "Pants 2pz Liso Rojo", "Falda Vieja"})
+                         {"Camisa Cuello Olan Blanca", "Camisa Cuello Olan Blanca (2)", "Pants 2pz Vicente Guerrero", "Playera Deportiva Zapata", "Pants 2pz Liso Rojo", "Falda Vieja"})
         self.s.refresh(c); self.assertEqual(c.tipo_prenda_id, self.deportivo.id)
         self.assertEqual(lim.planear(self.s), [])
