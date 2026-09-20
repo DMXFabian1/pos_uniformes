@@ -1,0 +1,59 @@
+"""Fase 1 del rediseño del catálogo: el nombre va limpio."""
+
+from __future__ import annotations
+
+import unittest
+
+from sqlalchemy import create_engine, select
+from sqlalchemy.orm import Session
+
+from pos_uniformes.database.connection import Base
+from pos_uniformes.database.models import Categoria, Marca, Producto, TipoPieza, TipoPrenda
+from pos_uniformes.scripts import limpiar_nombres_productos as lim
+from pos_uniformes.services.catalog_service import CatalogService
+
+
+class NombresLimpiosTests(unittest.TestCase):
+    def setUp(self) -> None:
+        engine = create_engine("sqlite:///:memory:"); Base.metadata.create_all(engine)
+        self.s = Session(engine)
+        self.cat = Categoria(nombre="Básico"); self.marca = Marca(nombre="Genérica")
+        self.oficial = TipoPrenda(nombre="Oficial"); self.deportivo = TipoPrenda(nombre="Deportivo")
+        self.camisa = TipoPieza(nombre="Camisa"); self.pants = TipoPieza(nombre="Pants 2pz")
+        self.s.add_all([self.cat, self.marca, self.oficial, self.deportivo, self.camisa, self.pants]); self.s.flush()
+
+    def _p(self, nombre, base=None, tp=None, tz=None, activo=True):
+        p = Producto(nombre=nombre, nombre_base=base or nombre.split("|")[0].strip(), categoria_id=self.cat.id, marca_id=self.marca.id,
+                     tipo_prenda_id=tp.id if tp else None, tipo_pieza_id=tz.id if tz else None, activo=activo)
+        self.s.add(p); self.s.flush(); return p
+
+    def test_crear_producto_ya_no_pega_el_sufijo(self) -> None:
+        nombre = CatalogService._build_product_display_name(base_name="camisa cuello olan blanca", school=None, garment_type=self.oficial, piece_type=self.camisa)
+        self.assertEqual(nombre, "Camisa Cuello Olan Blanca")
+
+    def test_nombre_completo_lo_arma_desde_los_campos(self) -> None:
+        p = self._p("Camisa Cuello olan Blanca | Oficial | Camisa", tp=self.oficial, tz=self.camisa)
+        self.assertEqual(p.nombre_completo, "Camisa Cuello olan Blanca · Oficial · Camisa")
+        p2 = self._p("Pants 2pz Liso Rojo", tz=self.pants)
+        self.assertEqual(p2.nombre_completo, "Pants 2pz Liso Rojo · Pants 2pz")
+
+    def test_el_plan_limpia_recupera_campos_y_avisa_choques(self) -> None:
+        a = self._p("Camisa Cuello olan Blanca | Oficial | Camisa", tp=self.oficial, tz=self.camisa)
+        b = self._p("Camisa Cuello olan Blanca", tp=self.oficial, tz=self.camisa)                 # ya limpio: choca con a
+        c = self._p("Pants 2pz Vicente Guerrero | Deportivo | Pants 2pz", tz=self.pants)          # sin tipo_prenda: se recupera
+        d = self._p("Playera Deportiva Ad Hoc Zapata | Deportivo | Playera", base="Playera Deportiva Zapata", tp=self.deportivo)
+        e = self._p("Pants 2pz Liso Rojo", tz=self.pants)                                          # nada que hacer
+        viejo = self._p("Falda Vieja | Oficial | Falda", activo=False)
+        self.s.commit()
+        plan = {x["producto"].id: x for x in lim.planear(self.s)}
+        self.assertNotIn(e.id, plan)
+        self.assertEqual(plan[a.id]["nuevo"], "Camisa Cuello olan Blanca"); self.assertIsNone(plan[a.id]["choque"])
+        self.assertEqual(plan[b.id]["nuevo"], "Camisa Cuello olan Blanca (2)"); self.assertEqual(plan[b.id]["choque"], a.id)
+        self.assertEqual((plan[c.id]["nuevo"], plan[c.id]["tipo_prenda"].nombre), ("Pants 2pz Vicente Guerrero", "Deportivo"))
+        self.assertEqual(plan[d.id]["nuevo"], "Playera Deportiva Zapata")      # manda nombre_base, el curado
+        self.assertEqual(plan[viejo.id]["nuevo"], "Falda Vieja")               # los inactivos también se limpian, sin contar para choques
+        lim.aplicar(self.s, list(plan.values())); self.s.commit()
+        self.assertEqual({p.nombre for p in self.s.scalars(select(Producto)).all()},
+                         {"Camisa Cuello olan Blanca", "Camisa Cuello olan Blanca (2)", "Pants 2pz Vicente Guerrero", "Playera Deportiva Zapata", "Pants 2pz Liso Rojo", "Falda Vieja"})
+        self.s.refresh(c); self.assertEqual(c.tipo_prenda_id, self.deportivo.id)
+        self.assertEqual(lim.planear(self.s), [])

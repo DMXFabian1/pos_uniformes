@@ -732,6 +732,18 @@ class Producto(Base):
     marca: Mapped["Marca"] = relationship(back_populates="productos")
     escuela: Mapped["Escuela | None"] = relationship(back_populates="productos")
     tipo_prenda: Mapped["TipoPrenda | None"] = relationship(back_populates="productos")
+
+    @property
+    def nombre_completo(self) -> str:
+        """'Camisa Cuello olan Blanca · Oficial · Camisa': el nombre con su tipo
+        de prenda y de pieza, para donde haga falta decirlo todo. Desde el
+        rediseño del catálogo (2026-09-20) `nombre` va limpio y esto se arma."""
+        partes = [str(self.nombre or "").split("|")[0].strip()]
+        for rel in (self.tipo_prenda, self.tipo_pieza):
+            n = str(getattr(rel, "nombre", "") or "").strip()
+            if n and n not in partes:
+                partes.append(n)
+        return " · ".join(partes)
     tipo_pieza: Mapped["TipoPieza | None"] = relationship(back_populates="productos")
     nivel_educativo: Mapped["NivelEducativo | None"] = relationship(back_populates="productos")
     atributo: Mapped["AtributoProducto | None"] = relationship(back_populates="productos")

@@ -75,18 +75,15 @@ class CatalogService:
         garment_type: TipoPrenda | None = None,
         piece_type: TipoPieza | None = None,
     ) -> str:
-        nombre_base = cls._build_nombre_base(base_name=base_name, school=school)
-        suffix_parts = [
-            part
-            for part in (
-                cls._optional_name(garment_type),
-                cls._optional_name(piece_type),
-            )
-            if part
-        ]
-        if not suffix_parts:
-            return nombre_base
-        return f"{nombre_base} | {' | '.join(suffix_parts)}"
+        # Fase 1 del rediseño del catálogo (2026-09-20): el nombre ya NO carga
+        # "| Tipo de prenda | Tipo de pieza". Eso vive en sus campos
+        # (`tipo_prenda_id`, `tipo_pieza_id`) y se arma para mostrar con
+        # `Producto.nombre_completo` donde haga falta. Antes: "Camisa Cuello
+        # olan Blanca | Oficial | Camisa" — nombres repetidos y ruido en todas
+        # las pantallas. `garment_type`/`piece_type` se aceptan por
+        # compatibilidad; no cambian el nombre.
+        del garment_type, piece_type
+        return cls._build_nombre_base(base_name=base_name, school=school)
 
     @staticmethod
     def _title_case(text: str) -> str:
