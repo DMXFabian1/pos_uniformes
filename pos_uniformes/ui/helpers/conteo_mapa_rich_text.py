@@ -75,7 +75,7 @@ def mapa(datos: dict, *, columnas: int = 4, filtro: str = "") -> str:
     t = datos["total"]
     q = filtro.strip().lower()
     partes = [
-        f'<p style="margin:0"><b>Toda la tienda · {t["tallas"]:,} tallas</b> &nbsp; '
+        f'<p style="margin:0;color:#2c2a27"><b>Toda la tienda · {t["tallas"]:,} tallas</b> &nbsp; '
         f'<span style="color:#5f594f;font-size:12px">{t["al_dia"]:,} al día · {t["viejas"]:,} viejas · {t["nunca"]:,} nunca</span></p>',
         barra(t, 600), LEYENDA,
     ]
@@ -97,8 +97,8 @@ def detalle(d: dict, *, abiertas: set[int] | None = None) -> str:
     """Capa 2 + 3: las prendas con su barra; las de `abiertas` muestran sus tallas."""
     abiertas = abiertas or set()
     partes = [
-        f'<p style="margin:0"><a href="mapa" style="color:#8a4326;font-weight:700;text-decoration:none">‹ Mapa</a> &nbsp; '
-        f'<b style="font-size:16px">{escape(d["titulo"])}</b> &nbsp; <span style="color:#5f594f;font-size:12px">{d["tallas"]} tallas · {escape(texto(d))}</span></p>',
+        f'<p style="margin:0;color:#2c2a27"><a href="mapa" style="color:#8a4326;font-weight:700;text-decoration:none">‹ Mapa</a> &nbsp; '
+        f'<b style="font-size:16px;color:#2c2a27">{escape(d["titulo"])}</b> &nbsp; <span style="color:#5f594f;font-size:12px">{d["tallas"]} tallas · {escape(texto(d))}</span></p>',
         barra(d, 600), LEYENDA,
     ]
     for i, p in enumerate(d["prendas"]):

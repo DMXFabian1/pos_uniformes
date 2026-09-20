@@ -69,11 +69,16 @@ class ConteoMapaWidget(QWidget):
         self.cuerpo.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
         self.cuerpo.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
         self.cuerpo.linkActivated.connect(self._navegar)
-        self.cuerpo.setStyleSheet("background: transparent; font-size: 13px;")
+        # Colores explícitos: con el modo oscuro del sistema, el área con scroll
+        # heredaba un fondo negro y el texto (del mismo color) desaparecía.
+        self.cuerpo.setStyleSheet("background: #f4ede2; color: #2c2a27; font-size: 13px; padding: 2px;")
+        self.cuerpo.setAutoFillBackground(True)
         if scroll_propio:
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
             scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+            scroll.setStyleSheet("QScrollArea { background: #f4ede2; border: none; } QScrollArea > QWidget > QWidget { background: #f4ede2; }")
+            scroll.viewport().setStyleSheet("background: #f4ede2;")
             scroll.setWidget(self.cuerpo)
             self.scroll = scroll
             ly.addWidget(scroll, 1)
@@ -155,6 +160,7 @@ class ConteoMapaDialog(QDialog):
         self.setWindowTitle("Mapa de conteos")
         self.setWindowFlag(Qt.WindowType.WindowMaximizeButtonHint, True)
         self.resize(1100, 760)
+        self.setStyleSheet("QDialog { background: #f4ede2; } QLabel { color: #2c2a27; } QLineEdit { background: #fffdf8; color: #2c2a27; }")
         ly = QVBoxLayout(self)
         ly.setContentsMargins(12, 12, 12, 12)
         self.mapa = ConteoMapaWidget(self, generar=generar)
