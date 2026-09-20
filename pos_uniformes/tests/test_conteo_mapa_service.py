@@ -86,7 +86,7 @@ class HtmlYKioskoTests(unittest.TestCase):
                 break
             time.sleep(0.02)
         self.assertTrue(d.refrescar_btn.isEnabled())
-        self.assertIn("Verde = al día", d.estado.text())
+        self.assertIn("Toca una escuela", d.estado.text())
         d2 = ConteoMapaDialog(None, generar=lambda: (_ for _ in ()).throw(RuntimeError("sin red")))
         for _ in range(50):
             app.processEvents()
@@ -123,7 +123,7 @@ class SeccionConteosTests(unittest.TestCase):
 
     def test_las_capas_se_navegan_con_los_enlaces(self) -> None:
         import sys, time
-        from PyQt6.QtWidgets import QApplication
+        from PyQt6.QtWidgets import QApplication, QLabel
         from pos_uniformes.ui.dialogs.conteo_mapa_dialog import ConteoMapaWidget
 
         app = QApplication.instance() or QApplication(sys.argv)
@@ -136,15 +136,23 @@ class SeccionConteosTests(unittest.TestCase):
             if w.refrescar_btn.isEnabled() and w._datos:
                 break
             time.sleep(0.02)
-        self.assertIn("Uno", w.cuerpo.text()); self.assertIn("BÁSICOS", w.cuerpo.text())
+        from pos_uniformes.ui.helpers.conteo_mapa_widgets import CapaDetalle, CapaMapa, Mosaico
+
+        textos = lambda: " | ".join(l.text() for l in w.cuerpo.findChildren(QLabel))
+        self.assertIsInstance(w._capa_widget, CapaMapa)
+        self.assertIn("Uno", textos()); self.assertIn("BÁSICOS", textos())
         w._navegar(f"e{uno.id}")                      # capa 2: la escuela
-        self.assertIn("‹ Mapa", w.cuerpo.text()); self.assertIn("Prenda 0 Uno", w.cuerpo.text()); self.assertNotIn(" pz</span>", w.cuerpo.text())
-        w._navegar("p0")                              # capa 3: tallas de la primera prenda
-        self.assertIn("3 pz", w.cuerpo.text())
+        self.assertIsInstance(w._capa_widget, CapaDetalle)
+        self.assertIn("Prenda 0 Uno", textos())
+        prenda = w._capa_widget.prendas[0]
+        self.assertFalse(prenda._tallas.isVisibleTo(prenda))
+        self.assertTrue(prenda.alternar())            # capa 3: las tallas
+        self.assertIn("3 pz", textos())
         w._navegar("mapa")
-        self.assertIn("BÁSICOS", w.cuerpo.text())
+        self.assertIsInstance(w._capa_widget, CapaMapa)
+        self.assertEqual(len(w.cuerpo.findChildren(Mosaico)), 2)   # Uno + Básicos·Pantalón
         w.busca.setText("zzz")
-        self.assertIn("Ninguna escuela", w.cuerpo.text())
+        self.assertIn("Ninguna escuela", textos())
         w.close()
 
     def test_la_seccion_tiene_mapa_y_boton_ver_tabla(self) -> None:

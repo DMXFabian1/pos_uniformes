@@ -1,8 +1,9 @@
 """🗺 Mapa de conteos en el kiosko: qué está contado y qué no, por capas.
 
-Pintado con texto enriquecido de Qt (`conteo_mapa_rich_text`), sin WebEngine
-—el kiosko no lo trae y son ~200 MB por máquina—. Los datos se arman en un
-hilo (por Wi-Fi tarda segundos). Vive dentro de la sección Conteos
+Con los mismos widgets del kiosko (tarjetas `libretaCard`, títulos
+`libretaSeccion`; ver `ui/helpers/conteo_mapa_widgets.py`), sin WebEngine —el
+kiosko no lo trae y son ~200 MB por máquina—. Los datos se arman en un hilo
+(por Wi-Fi tarda segundos). Vive dentro de la sección Conteos
 (`ConteoMapaWidget`) y también como diálogo grande (`ConteoMapaDialog`).
 """
 
@@ -15,7 +16,7 @@ import time
 from PyQt6.QtCore import Qt, pyqtSignal
 from PyQt6.QtWidgets import QDialog, QHBoxLayout, QLabel, QLineEdit, QPushButton, QScrollArea, QVBoxLayout, QWidget
 
-from pos_uniformes.ui.helpers import conteo_mapa_rich_text as rt
+from pos_uniformes.ui.helpers.conteo_mapa_widgets import CapaDetalle, CapaMapa
 
 logger = logging.getLogger(__name__)
 
@@ -29,7 +30,7 @@ def generar_datos() -> dict:
 
 
 class ConteoMapaWidget(QWidget):
-    """Barra (buscador, estado, ↻) + una QLabel enriquecida con la capa actual."""
+    """Barra (buscador, estado, ↻) + la capa actual (mapa o detalle)."""
 
     _listo = pyqtSignal(object)   # dict de datos, o None si falló
 
@@ -41,42 +42,44 @@ class ConteoMapaWidget(QWidget):
         self._columnas = columnas
         self._datos: dict | None = None
         self._capa: str = "mapa"          # "mapa" o la clave de detalle ("e19" / "bPantalón")
-        self._abiertas: set[int] = set()  # prendas desplegadas en el detalle
         self._generando = False
         self._generado_en: float = 0.0
         ly = QVBoxLayout(self)
         ly.setContentsMargins(0, 0, 0, 0)
-        ly.setSpacing(6)
+        ly.setSpacing(8)
         barra = QHBoxLayout()
         barra.setContentsMargins(0, 0, 0, 0)
+        barra.setSpacing(10)
         self.busca = QLineEdit()
         self.busca.setPlaceholderText("Buscar escuela…")
         self.busca.setClearButtonEnabled(True)
+        self.busca.setMaximumWidth(320)
         self.busca.textChanged.connect(lambda _t: self._pintar())
-        barra.addWidget(self.busca, 1)
+        barra.addWidget(self.busca)
         self.estado = QLabel("")
-        self.estado.setStyleSheet("color: #8a7358; font-size: 12px;")
-        barra.addWidget(self.estado, 2)
+        self.estado.setObjectName("libretaSubtitulo")
+        self.estado.setWordWrap(True)
+        barra.addWidget(self.estado, 1)
         self.refrescar_btn = QPushButton("↻ Actualizar")
+        self.refrescar_btn.setObjectName("secondaryButton")
         self.refrescar_btn.setAutoDefault(False)
         self.refrescar_btn.clicked.connect(lambda: self.recargar(forzar=True))
         barra.addWidget(self.refrescar_btn)
         ly.addLayout(barra)
-        self.cuerpo = QLabel("Armando el mapa…")
-        self.cuerpo.setWordWrap(True)
-        self.cuerpo.setTextFormat(Qt.TextFormat.RichText)
-        self.cuerpo.setOpenExternalLinks(False)
-        self.cuerpo.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
-        self.cuerpo.setAlignment(Qt.AlignmentFlag.AlignTop | Qt.AlignmentFlag.AlignLeft)
-        self.cuerpo.linkActivated.connect(self._navegar)
-        # Colores explícitos: con el modo oscuro del sistema, el área con scroll
-        # heredaba un fondo negro y el texto (del mismo color) desaparecía.
-        self.cuerpo.setStyleSheet("background: #f4ede2; color: #2c2a27; font-size: 13px; padding: 2px;")
-        self.cuerpo.setAutoFillBackground(True)
+        # El cuerpo es un contenedor cuyo único hijo se reemplaza por capa.
+        self.cuerpo = QWidget()
+        self._cuerpo_ly = QVBoxLayout(self.cuerpo)
+        self._cuerpo_ly.setContentsMargins(0, 0, 0, 0)
+        self._capa_widget: QWidget | None = None
+        aviso = QLabel("Armando el mapa…")
+        aviso.setObjectName("libretaPanelVacio")
+        self._poner(aviso)
         if scroll_propio:
             scroll = QScrollArea()
             scroll.setWidgetResizable(True)
             scroll.setFrameShape(QScrollArea.Shape.NoFrame)
+            scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            scroll.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOn)   # ancho fijo: las tarjetas no se cortan al aparecer
             scroll.setStyleSheet("QScrollArea { background: #f4ede2; border: none; } QScrollArea > QWidget > QWidget { background: #f4ede2; }")
             scroll.viewport().setStyleSheet("background: #f4ede2;")
             scroll.setWidget(self.cuerpo)
@@ -88,6 +91,16 @@ class ConteoMapaWidget(QWidget):
         self._listo.connect(self._recibir)
         if auto:
             self.recargar(forzar=True)
+
+    def _poner(self, w: QWidget) -> None:
+        if self._capa_widget is not None:
+            viejo = self._capa_widget
+            self._cuerpo_ly.removeWidget(viejo)
+            viejo.hide()            # que no se vea "por detrás" mientras Qt lo borra
+            viejo.setParent(None)
+            viejo.deleteLater()
+        self._capa_widget = w
+        self._cuerpo_ly.addWidget(w)
 
     # ── datos ──
     def recargar(self, *, forzar: bool = False, cada_seg: float = 60.0) -> bool:
@@ -123,18 +136,12 @@ class ConteoMapaWidget(QWidget):
             return
         self._datos = datos
         self._generado_en = time.monotonic()
-        self.estado.setText("Verde = al día · ámbar = ya venció · gris = nunca · naranja = en proceso. Toca una escuela; luego una prenda.")
+        self.estado.setText("Toca una escuela o un tipo de básicos; luego una prenda para ver sus tallas.")
         self._pintar()
 
     # ── capas ──
     def _navegar(self, href: str) -> None:
-        if href == "mapa":
-            self._capa, self._abiertas = "mapa", set()
-        elif href.startswith("p") and href[1:].isdigit():
-            i = int(href[1:])
-            self._abiertas ^= {i}
-        else:
-            self._capa, self._abiertas = href, set()
+        self._capa = "mapa" if href == "mapa" else href
         self._pintar()
         if self.scroll is not None:
             self.scroll.verticalScrollBar().setValue(0)
@@ -143,15 +150,18 @@ class ConteoMapaWidget(QWidget):
         if not self._datos:
             return
         if self._capa == "mapa":
-            self.cuerpo.setText(rt.mapa(self._datos, columnas=self._columnas, filtro=self.busca.text()))
+            capa = CapaMapa(self._datos, columnas=self._columnas, filtro=self.busca.text())
+            capa.elegido.connect(self._navegar)
             self.busca.setVisible(True)
         else:
             d = self._datos.get("detalles", {}).get(self._capa)
             if d is None:
                 self._capa = "mapa"
                 return self._pintar()
-            self.cuerpo.setText(rt.detalle(d, abiertas=self._abiertas))
+            capa = CapaDetalle(d)
+            capa.volver.connect(lambda: self._navegar("mapa"))
             self.busca.setVisible(False)
+        self._poner(capa)
 
 
 class ConteoMapaDialog(QDialog):
