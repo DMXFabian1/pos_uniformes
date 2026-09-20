@@ -74,7 +74,9 @@ def planear(session) -> list[dict]:
     """[{producto, nuevo, tipo_prenda, tipo_pieza, choque}] de lo que cambiaría."""
     prendas = {t.nombre.strip().lower(): t for t in session.scalars(select(TipoPrenda)).all()}
     piezas = {t.nombre.strip().lower(): t for t in session.scalars(select(TipoPieza)).all()}
-    productos = list(session.scalars(select(Producto).order_by(Producto.id)).all())
+    # Activos primero: ellos se quedan con el nombre limpio; un inactivo que
+    # choque (el UNIQUE marca+nombre no distingue activos) recibe el " (2)".
+    productos = sorted(session.scalars(select(Producto)).all(), key=lambda p: (not p.activo, p.id))
     escuelas = [str(e.nombre) for e in session.scalars(select(Escuela)).all()]
     plan = []
     vistos: dict[tuple[int, str], int] = {}   # (marca, nombre limpio) → id que lo tomó primero
@@ -85,14 +87,13 @@ def planear(session) -> list[dict]:
         tz = next((piezas[x.lower()] for x in sufijo if x.lower() in piezas), None) if p.tipo_pieza_id is None else None
         clave = (int(p.marca_id), nuevo.lower())
         choque = None
-        if p.activo:
-            if clave in vistos:
-                choque = vistos[clave]
-                n = 2
-                while (int(p.marca_id), f"{nuevo} ({n})".lower()) in vistos:
-                    n += 1
-                nuevo = f"{nuevo} ({n})"
-            vistos[(int(p.marca_id), nuevo.lower())] = int(p.id)
+        if clave in vistos:
+            choque = vistos[clave] if p.activo else None   # solo se avisa si los dos están activos
+            n = 2
+            while (int(p.marca_id), f"{nuevo} ({n})".lower()) in vistos:
+                n += 1
+            nuevo = f"{nuevo} ({n})"
+        vistos[(int(p.marca_id), nuevo.lower())] = int(p.id)
         if nuevo != (p.nombre or "") or tp is not None or tz is not None:
             plan.append({"producto": p, "nuevo": nuevo, "tipo_prenda": tp, "tipo_pieza": tz, "choque": choque})
     return plan

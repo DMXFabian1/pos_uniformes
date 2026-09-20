@@ -65,6 +65,7 @@ class NombresLimpiosTests(unittest.TestCase):
         d = self._p("Playera Deportiva Ad Hoc Zapata | Deportivo | Playera", base="Playera Deportiva Zapata", tp=self.deportivo)
         e = self._p("Pants 2pz Liso Rojo", tz=self.pants)                                          # nada que hacer
         viejo = self._p("Falda Vieja | Oficial | Falda", activo=False)
+        muerto = self._p("Pants 2pz Liso Rojo | Básico | Pants 2pz", activo=False)   # inactivo que chocaría con e
         self.s.commit()
         plan = {x["producto"].id: x for x in lim.planear(self.s)}
         self.assertNotIn(e.id, plan)
@@ -72,9 +73,10 @@ class NombresLimpiosTests(unittest.TestCase):
         self.assertEqual(plan[b.id]["nuevo"], "Camisa Cuello Olan Blanca (2)"); self.assertEqual(plan[b.id]["choque"], a.id)
         self.assertEqual((plan[c.id]["nuevo"], plan[c.id]["tipo_prenda"].nombre), ("Pants 2pz Vicente Guerrero", "Deportivo"))
         self.assertEqual(plan[d.id]["nuevo"], "Playera Deportiva Zapata")      # manda nombre_base, el curado
-        self.assertEqual(plan[viejo.id]["nuevo"], "Falda Vieja")               # los inactivos también se limpian, sin contar para choques
+        self.assertEqual(plan[viejo.id]["nuevo"], "Falda Vieja")               # los inactivos también se limpian
+        self.assertEqual((plan[muerto.id]["nuevo"], plan[muerto.id]["choque"]), ("Pants 2pz Liso Rojo (2)", None))   # cede el nombre sin aviso
         lim.aplicar(self.s, list(plan.values())); self.s.commit()
         self.assertEqual({p.nombre for p in self.s.scalars(select(Producto)).all()},
-                         {"Camisa Cuello Olan Blanca", "Camisa Cuello Olan Blanca (2)", "Pants 2pz Vicente Guerrero", "Playera Deportiva Zapata", "Pants 2pz Liso Rojo", "Falda Vieja"})
+                         {"Camisa Cuello Olan Blanca", "Camisa Cuello Olan Blanca (2)", "Pants 2pz Vicente Guerrero", "Playera Deportiva Zapata", "Pants 2pz Liso Rojo", "Pants 2pz Liso Rojo (2)", "Falda Vieja"})
         self.s.refresh(c); self.assertEqual(c.tipo_prenda_id, self.deportivo.id)
         self.assertEqual(lim.planear(self.s), [])
