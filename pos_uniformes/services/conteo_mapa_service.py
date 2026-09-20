@@ -113,3 +113,81 @@ def basicos(session: Session, tipo_pieza: str) -> dict:
     vs = [v for v in obtener_variantes_basicos_para_conteo(session) if (v.tipo_pieza or "Sin tipo") == tipo_pieza]
     prendas = _prendas(agrupar_variantes_por_producto(vs))
     return {"titulo": f"Básicos · {tipo_pieza}", "prendas": prendas, **_cifras([v for v in vs if v.tipo_pieza not in _TIPOS_VIRTUALES])}
+
+
+def todo(session: Session) -> dict:
+    """Las tres capas de un jalón (para el kiosko, que lo pinta sin servidor)."""
+    r = resumen(session)
+    detalles = {
+        **{f"e{e['escuela_id']}": escuela(session, e["escuela_id"]) for e in r["escuelas"]},
+        **{f"b{b['tipo_pieza']}": basicos(session, b["tipo_pieza"]) for b in r["basicos"]},
+    }
+    return {**r, "detalles": detalles}
+
+
+_HTML = """<!doctype html><html lang="es"><head><meta charset="utf-8"><title>Mapa de conteos</title>
+<style>
+:root{--crema:#f4ede2;--carta:#fffdf8;--tinta:#2c2a27;--tenue:#5f594f;--acento-osc:#8a4326;--borde:#ddd0c0;--verde-bg:#d9ecd0;--verde:#3d6b2f}
+*{box-sizing:border-box}body{margin:0;background:var(--crema);color:var(--tinta);font-family:"Avenir Next","Helvetica Neue",sans-serif;font-size:15px}
+.app{max-width:1100px;margin:0 auto;padding:18px 22px}
+h1{font-size:24px;color:var(--acento-osc);margin:6px 0 2px}.sub{color:var(--tenue);font-size:13px;margin:0 0 12px}
+.card{background:var(--carta);border:1px solid var(--borde);border-radius:14px;padding:14px 16px;margin-bottom:10px}
+.sem{display:flex;height:9px;border-radius:4px;overflow:hidden;background:#e6ddd0;margin-top:6px}.sem i{display:block;height:100%}
+.sem .ok{background:var(--verde)}.sem .old{background:#c98a2b}.sem .no{background:#b9b0a4}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px;margin-top:8px}
+.tile{background:var(--carta);border:1px solid var(--borde);border-radius:14px;padding:10px 12px;cursor:pointer}.tile:hover{border-color:var(--acento-osc)}
+.tile b{display:block;font-size:14px;line-height:1.2}.tile .sub{margin:2px 0 0;font-size:12px}
+.tile.al_dia{border-left:5px solid var(--verde)}.tile.vieja{border-left:5px solid #c98a2b}.tile.nunca{border-left:5px solid #b9b0a4}
+.nivel{font-size:12px;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:var(--tenue);margin:16px 0 0}
+.ley{display:flex;gap:14px;font-size:12px;color:var(--tenue);margin:6px 0 0}.ley i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px}
+.fila{display:flex;justify-content:space-between;align-items:center;cursor:pointer}.fila b{font-size:15px}
+.t{display:inline-block;border-radius:8px;padding:6px 9px;margin:6px 6px 0 0;font-weight:700;font-size:13px;border:1px solid var(--borde);background:var(--carta)}
+.t.al_dia{background:var(--verde-bg);color:var(--verde);border-color:transparent}.t.vieja{background:#f6e3c6;color:#8a5a12;border-color:transparent}.t.nunca{background:#eee9e1;color:#6f675c;border-color:transparent}
+.t small{display:block;font-weight:600;font-size:10px;opacity:.85}
+button{border:1px solid var(--borde);background:var(--carta);color:var(--acento-osc);border-radius:12px;padding:10px 16px;font-size:15px;font-weight:700;cursor:pointer;margin:10px 0 0}
+.oculto{display:none}.busca{width:100%;border:1px solid var(--borde);border-radius:12px;padding:10px 14px;font-size:16px;margin:8px 0 0;background:var(--carta)}
+</style></head><body><div class="app" id="app"></div>
+<script>
+const D = __DATA__;
+const sem = c => { const t = c.tallas || 1; return `<div class="sem"><i class="ok" style="width:${100*c.al_dia/t}%"></i><i class="old" style="width:${100*c.viejas/t}%"></i><i class="no" style="width:${100*c.nunca/t}%"></i></div>`; };
+const txt = c => `${c.pct_al_dia}% al día` + (c.ultimo_dias === null ? " · nunca" : c.ultimo_dias === 0 ? " · hoy" : ` · hace ${c.ultimo_dias} d`);
+const LEY = `<div class="ley"><span><i style="background:var(--verde)"></i>al día</span><span><i style="background:#c98a2b"></i>viejo</span><span><i style="background:#b9b0a4"></i>nunca</span></div>`;
+const norm = s => (s || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;").replace(/'/g, "&#39;");
+function mapa(q) {
+  q = norm(q || "");
+  const t = D.total;
+  let h = `<h1>🗺 Mapa de conteos</h1><p class="sub">Toca una escuela o un tipo de básicos para ver sus prendas · generado ${D.generado}</p>` +
+    `<div class="card"><strong>Toda la tienda · ${t.tallas.toLocaleString()} tallas</strong>${sem(t)}<p class="sub" style="margin:6px 0 0">${t.al_dia.toLocaleString()} al día · ${t.viejas.toLocaleString()} viejas · ${t.nunca.toLocaleString()} nunca</p>${LEY}</div>` +
+    `<input class="busca" placeholder="Buscar escuela…" value="${esc(q)}" oninput="mapa(this.value)">`;
+  const esc_ = D.escuelas.filter(e => !q || norm(e.nombre).includes(q));
+  const orden = ["Preescolar", "Primaria", "Secundaria", "Preparatoria", "Varios niveles", "Sin nivel"];
+  const niveles = [...new Set(esc_.map(e => e.nivel))].sort((a, b) => (orden.indexOf(a) + 99) % 99 - (orden.indexOf(b) + 99) % 99 || a.localeCompare(b));
+  for (const n of niveles) {
+    const l = esc_.filter(e => e.nivel === n);
+    h += `<div class="nivel">${n} · ${l.length}</div><div class="grid">` + l.map(e => `<div class="tile ${e.estado}" onclick="detalle('e${e.escuela_id}')"><b>${esc(e.nombre)}</b>${sem(e)}<p class="sub">${txt(e)}</p></div>`).join("") + `</div>`;
+  }
+  if (!q) h += `<div class="nivel">Básicos · ${D.basicos.length} tipos</div><div class="grid">` + D.basicos.map(b => `<div class="tile ${b.estado}" onclick="detalle('b${esc(b.tipo_pieza)}')"><b>${esc(b.tipo_pieza)}</b>${sem(b)}<p class="sub">${txt(b)}</p></div>`).join("") + `</div>`;
+  document.getElementById("app").innerHTML = h; window.scrollTo(0, 0);
+  const i = document.querySelector(".busca"); if (q && i) { i.focus(); i.setSelectionRange(q.length, q.length); }
+}
+function detalle(k) {
+  const d = D.detalles[k]; if (!d) return;
+  const prendas = d.prendas.map((p, i) => `<div class="card" style="padding:12px 14px"><div class="fila" onclick="document.getElementById('t${i}').classList.toggle('oculto')"><span><b>${esc(p.nombre)}</b><span class="sub" style="display:block">${p.tipo_pieza ? esc(p.tipo_pieza) + " · " : ""}${p.tallas} tallas · ${txt(p)}</span></span><span>›</span></div>${sem(p)}` +
+    `<div id="t${i}" class="oculto">` + p.tallas_detalle.map(t => `<span class="t ${t.estado}">${esc(t.talla)}${t.color && !/^(sin color|unico|único)$/i.test(t.color) ? " " + esc(t.color) : ""}<small>${t.dias === null ? "nunca" : t.dias === 0 ? "hoy" : "hace " + t.dias + " d"} · ${t.stock} pz</small></span>`).join("") + `</div></div>`).join("");
+  document.getElementById("app").innerHTML = `<button onclick="mapa()">‹ Mapa</button><h1>${esc(d.titulo)}</h1><p class="sub">${d.tallas} tallas · ${txt(d)}</p>${sem(d)}${LEY}<div style="margin-top:12px">${prendas || "<div class='card'>Sin prendas para contar.</div>"}</div><p class="sub">Toca una prenda para ver sus tallas.</p><button onclick="mapa()">‹ Mapa</button>`;
+  window.scrollTo(0, 0);
+}
+mapa();
+</script></body></html>
+"""
+
+
+def html(session: Session) -> str:
+    """El mapa completo como una sola página, sin servidor ni sesión (kiosko)."""
+    import json
+    from datetime import datetime
+
+    datos = todo(session)
+    datos["generado"] = datetime.now().strftime("%d/%m %H:%M")
+    return _HTML.replace("__DATA__", json.dumps(datos, ensure_ascii=False).replace("</", "<\\/"))

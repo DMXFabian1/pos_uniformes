@@ -53,3 +53,44 @@ class MapaTests(unittest.TestCase):
         self.assertEqual(d["titulo"], "Básicos · Pantalón")
         self.assertEqual([p["nombre"] for p in d["prendas"]], ["Pantalón Azul Escolar", "Pantalón Gris Escolar"])
         self.assertEqual(d["al_dia"] + d["nunca"], 4)
+
+
+class HtmlYKioskoTests(unittest.TestCase):
+    def setUp(self) -> None:
+        engine = create_engine("sqlite:///:memory:"); Base.metadata.create_all(engine)
+        self.s = Session(engine)
+        self.uno = _seed(self.s, "Uno", stock=3); _seed_basicos(self.s, self.uno, "Pantalón"); self.s.commit()
+
+    def test_el_html_lleva_todas_las_capas_y_no_rompe_el_script(self) -> None:
+        import json, re
+        html = m.html(self.s)
+        datos = json.loads(re.search(r"const D = (\{.*?\});\n", html, re.S).group(1).replace("<\\/", "</"))
+        self.assertIn("e%d" % self.uno.id, datos["detalles"])
+        self.assertIn("bPantalón", datos["detalles"])
+        self.assertEqual(datos["total"]["tallas"], 8)
+        self.assertNotIn("</script>", json.dumps(datos))   # nada dentro del JSON puede cerrar el script
+        self.assertIn("Mapa de conteos", html)
+
+    def test_el_dialogo_del_kiosko_pinta_lo_que_genera_el_hilo(self) -> None:
+        import sys
+        import time
+        from PyQt6.QtWidgets import QApplication
+        from pos_uniformes.ui.dialogs.conteo_mapa_dialog import ConteoMapaDialog
+
+        app = QApplication.instance() or QApplication(sys.argv)
+        d = ConteoMapaDialog(None, generar=lambda: "<html><body>MAPA</body></html>")
+        for _ in range(50):
+            app.processEvents()
+            if d.refrescar_btn.isEnabled():
+                break
+            time.sleep(0.02)
+        self.assertTrue(d.refrescar_btn.isEnabled())
+        self.assertIn("Verde = al día", d.estado.text())
+        d2 = ConteoMapaDialog(None, generar=lambda: (_ for _ in ()).throw(RuntimeError("sin red")))
+        for _ in range(50):
+            app.processEvents()
+            if d2.refrescar_btn.isEnabled():
+                break
+            time.sleep(0.02)
+        self.assertIn("No se pudo armar", d2.estado.text())
+        d.close(); d2.close()

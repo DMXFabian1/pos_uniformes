@@ -3460,6 +3460,12 @@ class QuoteSatelliteWindow(QMainWindow):
         empezar_btn.clicked.connect(self._conteos_empezar)
         acciones_ly.addWidget(empezar_btn)
         acciones_ly.addStretch()
+        # El mapa (qué está contado y qué no) lo ve cualquiera: es solo lectura.
+        mapa_btn = QPushButton("🗺 Mapa")
+        mapa_btn.setAutoDefault(False)
+        mapa_btn.setToolTip("Qué está contado y qué no, escuela por escuela y talla por talla")
+        mapa_btn.clicked.connect(self._open_conteo_mapa)
+        acciones_ly.addWidget(mapa_btn)
         layout.addWidget(self.conteos_acciones_bar)
 
         # Aviso en ámbar cuando no hay servidor (mismo tono que la Libreta).
@@ -4003,6 +4009,11 @@ class QuoteSatelliteWindow(QMainWindow):
 
         ConteoOrdenDialog(self).exec()
         self._refresh_conteo_banner()
+
+    def _open_conteo_mapa(self) -> None:
+        from pos_uniformes.ui.dialogs.conteo_mapa_dialog import ConteoMapaDialog
+
+        ConteoMapaDialog(self).exec()
 
     def _open_conteo_subir(self) -> None:
         from pos_uniformes.ui.dialogs.conteo_subir_dialog import ConteoSubirDialog
