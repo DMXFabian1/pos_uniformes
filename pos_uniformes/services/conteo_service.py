@@ -17,7 +17,7 @@ from pos_uniformes.database.models import (
     AjusteInventarioLoteDetalle,
     BodegaCaja,
     BodegaContenido,
-    CatalogSchoolProductLink,
+    Categoria,
     ConfigConteoEscuela,
     ConfiguracionNegocio,
     ConteoInventario,
@@ -25,6 +25,7 @@ from pos_uniformes.database.models import (
     MovimientoInventario,
     Producto,
     TipoMovimientoInventario,
+    TipoPrenda,
     Variante,
 )
 
@@ -363,6 +364,13 @@ _PIEZA_ORDER = {
 
 _TIPOS_VIRTUALES = {"Pants 3pz", "Chamarra"}
 
+# Lo que NO es uniforme y por eso no entra a básicos (misma lista que el
+# formulario de catálogo usa para "ropa normal": ui/helpers/catalog_product_form_mode_helper).
+# En minúsculas: se compara contra categoría y tipo de prenda.
+CATEGORIAS_ROPA_NORMAL = frozenset({
+    "ropa casual", "casual", "calzado", "accesorios", "temporada", "ropa interior", "interior", "pijamas", "descanso", "deportivo casual", "formal",
+})
+
 _LETRA_ORDER = {
     "CH": 0, "MD": 1, "GD": 2, "EXG": 3,
     "XXS": 4, "XS": 5, "S": 6, "M": 7, "L": 8, "XL": 9, "XXL": 10,
@@ -432,26 +440,16 @@ def agrupar_variantes_por_producto(variantes: list[VarianteParaConteo]) -> list[
 def obtener_variantes_basicos_para_conteo(
     session: Session,
 ) -> list[VarianteParaConteo]:
-    """Variantes de productos básicos: generales (sin escuela directa) que están
-    ligados a alguna escuela por catálogo **o tienen existencia en alguna
-    talla** (Daniel, 2026-09-20: "hay piezas que no aparecen… el pants liso
-    rojo y verde"; no estaban ligadas pero sí en el piso). Los generales sin
-    liga y en cero en todas sus tallas se quedan fuera: no hay qué contar."""
-    from sqlalchemy import or_
+    """Variantes de productos básicos: TODO producto general (sin escuela
+    directa) que sea de uniforme, tenga o no existencia y esté o no ligado a
+    una escuela. Fuera solo la ropa normal (casual, temporada, interior…):
+    Daniel, 2026-09-20: "me gustaría que aparezcan, menos lo que es ropa
+    normal, como blusa, jeans"."""
+    from sqlalchemy import func as _f
 
-    # Sub-query: productos con al menos un link activo en catálogo
-    linked_ids = (
-        select(CatalogSchoolProductLink.producto_id)
-        .where(CatalogSchoolProductLink.activo.is_(True))
-        .distinct()
-        .scalar_subquery()
-    )
-    con_existencia = (
-        select(Variante.producto_id)
-        .where(Variante.activo.is_(True), Variante.stock_actual != 0)
-        .distinct()
-        .scalar_subquery()
-    )
+    ropa_normal = list(CATEGORIAS_ROPA_NORMAL)
+    sin_categoria_normal = ~Producto.categoria.has(_f.lower(Categoria.nombre).in_(ropa_normal))
+    sin_tipo_prenda_normal = ~Producto.tipo_prenda.has(_f.lower(TipoPrenda.nombre).in_(ropa_normal))
 
     variantes = session.scalars(
         select(Variante)
@@ -463,10 +461,7 @@ def obtener_variantes_basicos_para_conteo(
             .joinedload(BodegaCaja.ubicacion),
         )
         .where(
-            Producto.escuela_id.is_(None),
-            Producto.activo.is_(True),
-            Variante.activo.is_(True),
-            or_(Producto.id.in_(linked_ids), Producto.id.in_(con_existencia)),
+            *_filtro_basicos(),
         )
         .order_by(
             Variante.ultimo_conteo_at.asc().nulls_first(),
@@ -667,24 +662,23 @@ def obtener_dias_vigencia_basicos(session: Session) -> int:
     return int(valor) if valor else DIAS_VIGENCIA_DEFAULT
 
 
+def _filtro_basicos():
+    """Las condiciones de "es un básico": general, activo y de uniforme (no
+    ropa normal por categoría ni por tipo de prenda). Una sola definición
+    para la lista, el estado y el calendario."""
+    ropa_normal = list(CATEGORIAS_ROPA_NORMAL)
+    return (
+        Producto.escuela_id.is_(None),
+        Producto.activo.is_(True),
+        Variante.activo.is_(True),
+        ~Producto.categoria.has(func.lower(Categoria.nombre).in_(ropa_normal)),
+        ~Producto.tipo_prenda.has(func.lower(TipoPrenda.nombre).in_(ropa_normal)),
+    )
+
+
 def _basico_variant_ids_subquery():
     """Sub-query con los ids de variantes de productos básicos activos."""
-    linked_ids = (
-        select(CatalogSchoolProductLink.producto_id)
-        .where(CatalogSchoolProductLink.activo.is_(True))
-        .distinct()
-        .scalar_subquery()
-    )
-    return (
-        select(Variante.id)
-        .join(Variante.producto)
-        .where(
-            Producto.escuela_id.is_(None),
-            Producto.activo.is_(True),
-            Variante.activo.is_(True),
-            Producto.id.in_(linked_ids),
-        )
-    )
+    return select(Variante.id).join(Variante.producto).where(*_filtro_basicos())
 
 
 def obtener_estado_conteo_basicos(session: Session) -> EstadoConteoEscuela:

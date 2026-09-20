@@ -271,22 +271,32 @@ class JornadaTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             jn.registrar_impresion(self.s, escuela_id=self.escuela.id, empleada_code="")
 
-    def test_basicos_incluyen_generales_con_existencia_aunque_no_esten_ligados(self) -> None:
-        # Daniel (2026-09-20): "hay piezas que no aparecen… el pants liso rojo y verde".
-        from pos_uniformes.database.models import Categoria, Marca, Producto, TipoPieza
+    def test_basicos_son_todos_los_generales_de_uniforme_menos_la_ropa_normal(self) -> None:
+        # Daniel (2026-09-20): "me gustaría que aparezcan, menos lo que es ropa normal, como blusa, jeans".
+        from pos_uniformes.database.models import Categoria, Marca, Producto, TipoPieza, TipoPrenda
         from pos_uniformes.services.conteo_service import obtener_variantes_basicos_agrupadas
 
-        cat = self.s.scalar(select(Categoria)); marca = self.s.scalar(select(Marca))
-        tp = TipoPieza(nombre="Pants 2pz"); self.s.add(tp); self.s.flush()
-        for nombre, stock in (("Pants 2pz Liso Rojo", 79), ("Pants 2pz Punto Gris", 0), ("Pants 2pz Liso Vino", -2)):
-            prod = Producto(nombre=nombre, nombre_base=nombre, categoria_id=cat.id, marca_id=marca.id, escuela_id=None, tipo_pieza_id=tp.id)
+        marca = self.s.scalar(select(Marca))
+        cats = {n: Categoria(nombre=n) for n in ("Básico", "Accesorio", "Ropa casual", "Temporada")}
+        tps = {n: TipoPrenda(nombre=n) for n in ("Básico", "Casual", "Interior")}
+        tipos = {n: TipoPieza(nombre=n) for n in ("Pants 2pz", "Moño", "Jeans", "Blusa", "Camisa")}
+        self.s.add_all([*cats.values(), *tps.values(), *tipos.values()]); self.s.flush()
+        casos = [  # (nombre, categoría, tipo_prenda, tipo_pieza, stock, ¿debe salir?)
+            ("Pants 2pz Liso Rojo", "Básico", "Básico", "Pants 2pz", 0, True),        # en cero y sin liga: sí (es uniforme)
+            ("Moño Verde", "Accesorio", "Básico", "Moño", 0, True),                  # accesorio de uniforme: sí
+            ("Jeans Brillos Adulto", "Ropa casual", "Casual", "Jeans", 5, False),     # ropa normal por categoría
+            ("Blusa de Dama", "Temporada", "Básico", "Blusa", 9, False),              # temporada = ropa normal
+            ("Camiseta Interior", "Básico", "Interior", "Camisa", 3, False),          # ropa normal por tipo de prenda
+        ]
+        for nombre, cat, tp, tipo, stock, _ in casos:
+            prod = Producto(nombre=nombre, nombre_base=nombre, categoria_id=cats[cat].id, marca_id=marca.id, escuela_id=None,
+                            tipo_pieza_id=tipos[tipo].id, tipo_prenda_id=tps[tp].id)
             self.s.add(prod); self.s.flush()
             self.s.add(Variante(producto_id=prod.id, sku=f"G{prod.id}", talla="8", color="", precio_venta=100, stock_actual=stock))
         self.s.commit()
-        nombres = [g["producto_nombre"] for g in obtener_variantes_basicos_agrupadas(self.s, tipo_pieza="Pants 2pz")]
-        self.assertIn("Pants 2pz Liso Rojo", nombres)      # sin liga, pero hay 79 en el piso
-        self.assertIn("Pants 2pz Liso Vino", nombres)      # negativo también cuenta: hay que recontarlo
-        self.assertNotIn("Pants 2pz Punto Gris", nombres)  # sin liga y en cero: nada que contar
+        nombres = {g["producto_nombre"] for g in obtener_variantes_basicos_agrupadas(self.s)}
+        for nombre, _c, _t, _p, _s, debe in casos:
+            (self.assertIn if debe else self.assertNotIn)(nombre, nombres)
 
     def test_basicos_una_abierta_por_prenda(self) -> None:
         j = jn.abrir_jornada(self.s, escuela_id=None, tipo_pieza="Playera", empleada_code="VEND-4")
