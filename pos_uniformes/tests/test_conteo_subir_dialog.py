@@ -257,6 +257,33 @@ class ConteoConJornadaTests(unittest.TestCase):
         self.assertTrue(d._pausar_btn.isVisibleTo(d))
         self.assertFalse(d._pausar_btn.isEnabled())  # nada nuevo todavía
 
+    def test_una_jornada_de_una_sola_prenda_carga_solo_esa_prenda(self) -> None:
+        # Daniel (2026-09-20): "hay piezas del básico que eligen de manera individual y aparecen todas".
+        from pos_uniformes.services.conteo_jornada_service import abrir_jornada, ref
+        from pos_uniformes.tests.test_conteo_jornada_service import _seed_basicos
+
+        from pos_uniformes.database.models import Escuela
+
+        s = self.factory()
+        escuela = s.query(Escuela).filter_by(nombre="Uno").one()   # la de setUp quedó fuera de sesión
+        gris, _azul = _seed_basicos(s, escuela, "Pantalón")   # 2 prendas × 2 tallas
+        s.commit()
+        j = abrir_jornada(s, escuela_id=None, tipo_pieza="Pantalón", prenda=gris, empleada_code="VEND-4")
+        s.commit(); s.refresh(j); foto = ref(j); s.close()
+        d = ConteoSubirDialog(session_factory=self.factory, contado_por="Stayce (VEND-4)", jornada=foto, empleada_code="VEND-4")
+        self._dialogos.append(d)
+        self.assertEqual(len(d._fisico_inputs), 2)            # solo las 2 tallas de la gris, no las 4 del tipo
+        # y una jornada de todo el tipo sí trae las dos prendas (la de la gris se cierra primero: chocan)
+        from pos_uniformes.services.conteo_jornada_service import terminar_jornada
+
+        s = self.factory()
+        terminar_jornada(s, s.get(type(j), foto.id), empleada_code="VEND-4"); s.commit()
+        j2 = abrir_jornada(s, escuela_id=None, tipo_pieza="Pantalón", empleada_code="VEND-5")
+        s.commit(); s.refresh(j2); foto2 = ref(j2); s.close()
+        d2 = ConteoSubirDialog(session_factory=self.factory, contado_por="Fanny (VEND-5)", jornada=foto2, empleada_code="VEND-5")
+        self._dialogos.append(d2)
+        self.assertEqual(len(d2._fisico_inputs), 4)
+
     def test_pausar_guarda_lo_que_va_y_deja_la_jornada_abierta(self) -> None:
         from pos_uniformes.database.models import ConteoJornada
 

@@ -263,7 +263,18 @@ class ConteoSubirDialog(QDialog):
             )
         session = self._session_factory()
         try:
-            if int(escuela_id) == ESCUELA_ID_BASICOS:
+            if self._jornada is not None:
+                # Amarrada a una jornada: EXACTAMENTE su alcance (escuela, tipo o
+                # UNA sola prenda), el mismo que la hoja impresa y el celular.
+                # Antes cargaba por tipo y una jornada de "Pantalón Gris" traía
+                # todos los pantalones (Daniel, 2026-09-20).
+                from pos_uniformes.services.conteo_jornada_service import alcance
+
+                grupos_raw = alcance(
+                    session, self._jornada.escuela_id, self._jornada.tipo_pieza or "",
+                    getattr(self._jornada, "prenda", "") or "",
+                )
+            elif int(escuela_id) == ESCUELA_ID_BASICOS:
                 grupos_raw = obtener_variantes_basicos_agrupadas(session, tipo_pieza=tipo_basicos)
             else:
                 grupos_raw = obtener_variantes_agrupadas_por_producto(session, int(escuela_id))
