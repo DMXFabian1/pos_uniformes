@@ -26,7 +26,7 @@ import sys
 from sqlalchemy import select
 
 from pos_uniformes.database.connection import get_session
-from pos_uniformes.database.models import Producto, TipoPieza, TipoPrenda
+from pos_uniformes.database.models import Escuela, Producto, TipoPieza, TipoPrenda
 from pos_uniformes.utils.product_name import sanitize_product_display_name
 
 
@@ -46,11 +46,28 @@ def con_mayusculas(nombre: str) -> str:
     return " ".join(out)
 
 
-def nombre_limpio(p: Producto) -> str:
+def con_su_escuela(nombre: str, p: Producto, escuelas: list[str]) -> str:
+    """Si el plantel se separó (Vicente Guerrero → Vicente Guerrero Preescolar)
+    el nombre de la prenda sigue diciendo el viejo: se cambia por el actual
+    cuando el viejo es un prefijo del nuevo y va al final del nombre."""
+    if p.escuela is None:
+        return nombre
+    actual = str(p.escuela.nombre or "").strip()
+    if not actual or actual.lower() in nombre.lower():
+        return nombre
+    for otro in sorted(escuelas, key=len, reverse=True):
+        if otro and otro != actual and actual.lower().startswith(otro.lower()) and nombre.lower().endswith(otro.lower()):
+            return nombre[: len(nombre) - len(otro)].rstrip() + " " + actual
+    return nombre
+
+
+def nombre_limpio(p: Producto, escuelas: list[str] = ()) -> str:
     base = str(p.nombre_base or "").strip()
     if base and "|" not in base:
-        return con_mayusculas(sanitize_product_display_name(base))
-    return con_mayusculas(sanitize_product_display_name(str(p.nombre or "").split("|")[0]))
+        crudo = base
+    else:
+        crudo = str(p.nombre or "").split("|")[0]
+    return con_su_escuela(con_mayusculas(sanitize_product_display_name(crudo)), p, list(escuelas))
 
 
 def planear(session) -> list[dict]:
@@ -58,10 +75,11 @@ def planear(session) -> list[dict]:
     prendas = {t.nombre.strip().lower(): t for t in session.scalars(select(TipoPrenda)).all()}
     piezas = {t.nombre.strip().lower(): t for t in session.scalars(select(TipoPieza)).all()}
     productos = list(session.scalars(select(Producto).order_by(Producto.id)).all())
+    escuelas = [str(e.nombre) for e in session.scalars(select(Escuela)).all()]
     plan = []
     vistos: dict[tuple[int, str], int] = {}   # (marca, nombre limpio) → id que lo tomó primero
     for p in productos:
-        nuevo = nombre_limpio(p)
+        nuevo = nombre_limpio(p, escuelas)
         sufijo = [x.strip() for x in str(p.nombre or "").split("|")[1:]]
         tp = next((prendas[x.lower()] for x in sufijo if x.lower() in prendas), None) if p.tipo_prenda_id is None else None
         tz = next((piezas[x.lower()] for x in sufijo if x.lower() in piezas), None) if p.tipo_pieza_id is None else None
@@ -92,7 +110,7 @@ def aplicar(session, plan: list[dict]) -> int:
         p = paso["producto"]
         p.nombre = paso["nuevo"]
         if p.nombre_base and "|" not in p.nombre_base:
-            p.nombre_base = con_mayusculas(sanitize_product_display_name(p.nombre_base))
+            p.nombre_base = paso["nuevo"].removesuffix(" (2)").removesuffix(" (3)")   # el base sigue al nombre (sin el (n) de choque)
         if paso["tipo_prenda"] is not None:
             p.tipo_prenda_id = paso["tipo_prenda"].id
         if paso["tipo_pieza"] is not None:

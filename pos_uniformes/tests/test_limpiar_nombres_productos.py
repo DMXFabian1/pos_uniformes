@@ -8,7 +8,7 @@ from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
 from pos_uniformes.database.connection import Base
-from pos_uniformes.database.models import Categoria, Marca, Producto, TipoPieza, TipoPrenda
+from pos_uniformes.database.models import Categoria, Escuela, Marca, Producto, TipoPieza, TipoPrenda
 from pos_uniformes.scripts import limpiar_nombres_productos as lim
 from pos_uniformes.services.catalog_service import CatalogService
 
@@ -45,6 +45,18 @@ class NombresLimpiosTests(unittest.TestCase):
         self.assertEqual(lim.con_mayusculas("Playera Deportiva SABES"), "Playera Deportiva SABES")
         self.assertEqual(lim.con_mayusculas("Pants 2pz Liso Rojo CBTIS 148"), "Pants 2pz Liso Rojo CBTIS 148")
         self.assertEqual(lim.con_mayusculas("Suéter Cuello V H Verde"), "Suéter Cuello V H Verde")
+
+    def test_la_prenda_dice_el_nombre_de_su_plantel_ya_separado(self) -> None:
+        vg = Escuela(nombre="Vicente Guerrero"); vgp = Escuela(nombre="Vicente Guerrero Preescolar"); self.s.add_all([vg, vgp]); self.s.flush()
+        pri = self._p("Pants 2pz Deportivo Vicente Guerrero | Deportivo | Pants 2pz", tz=self.pants); pri.escuela_id = vg.id
+        pre = self._p("Pants 2pz Deportivo Vicente Guerrero | Deportivo | Pants 2pz #2", base="Pants 2pz Deportivo Vicente Guerrero", tz=self.pants); pre.escuela_id = vgp.id
+        self.s.commit()
+        plan = {x["producto"].id: x for x in lim.planear(self.s)}
+        self.assertEqual(plan[pri.id]["nuevo"], "Pants 2pz Deportivo Vicente Guerrero")
+        self.assertEqual(plan[pre.id]["nuevo"], "Pants 2pz Deportivo Vicente Guerrero Preescolar")   # ya no chocan
+        self.assertIsNone(plan[pre.id]["choque"])
+        lim.aplicar(self.s, list(plan.values())); self.s.commit(); self.s.refresh(pre)
+        self.assertEqual(pre.nombre_base, "Pants 2pz Deportivo Vicente Guerrero Preescolar")
 
     def test_el_plan_limpia_recupera_campos_y_avisa_choques(self) -> None:
         a = self._p("Camisa Cuello olan Blanca | Oficial | Camisa", tp=self.oficial, tz=self.camisa)
