@@ -63,6 +63,10 @@ class VarianteParaConteo:
     ultimo_conteo_at: datetime | None
     dias_desde_conteo: int | None
     requiere_conteo: bool
+    producto_id: int = 0
+    # Posición de la prenda dentro del uniforme de su escuela (catálogo fase 2);
+    # None si la escuela no tiene uniforme armado o la prenda no está en él.
+    orden_uniforme: int | None = None
 
 
 @dataclass(frozen=True)
@@ -314,16 +318,46 @@ def obtener_variantes_para_conteo_varias(
     ).unique().all()
 
     ahora = datetime.now(timezone.utc)
+    ordenes = _orden_uniforme_por_escuela(session, ids)
     resultado: dict[int, list[VarianteParaConteo]] = {e: [] for e in ids}
     for v in variantes:
         eid = int(v.producto.escuela_id)
         resultado.setdefault(eid, []).append(
-            _variante_para_conteo(v, ahora, vigencias.get(eid, DIAS_VIGENCIA_DEFAULT))
+            _variante_para_conteo(
+                v, ahora, vigencias.get(eid, DIAS_VIGENCIA_DEFAULT),
+                orden_uniforme=ordenes.get(eid, {}).get(int(v.producto_id)),
+            )
         )
     return resultado
 
 
-def _variante_para_conteo(v: Variante, ahora: datetime, dias_vigencia: int) -> VarianteParaConteo:
+def _orden_uniforme_por_escuela(session: Session, escuela_ids: list[int]) -> dict[int, dict[int, int]]:
+    """{escuela_id: {producto_id: orden}} de las piezas activas del uniforme de
+    cada escuela (catálogo fase 2). La hoja y el mapa siguen listando TODAS las
+    prendas activas de la escuela (lo que tiene stock se cuenta); el uniforme
+    solo dice en qué orden, y lo que no está en él va al final."""
+    from pos_uniformes.database.models import Uniforme, UniformePieza
+
+    filas = session.execute(
+        select(Uniforme.escuela_id, UniformePieza.producto_id, UniformePieza.orden)
+        .join(UniformePieza, UniformePieza.uniforme_id == Uniforme.id)
+        .where(
+            Uniforme.escuela_id.in_(escuela_ids),
+            Uniforme.activo.is_(True),
+            UniformePieza.activo.is_(True),
+        )
+        .order_by(UniformePieza.orden, UniformePieza.id)
+    ).all()
+    ordenes: dict[int, dict[int, int]] = {}
+    for eid, pid, _orden in filas:
+        por_escuela = ordenes.setdefault(int(eid), {})
+        por_escuela.setdefault(int(pid), len(por_escuela))
+    return ordenes
+
+
+def _variante_para_conteo(
+    v: Variante, ahora: datetime, dias_vigencia: int, *, orden_uniforme: int | None = None
+) -> VarianteParaConteo:
     if v.ultimo_conteo_at is not None:
         ultimo = v.ultimo_conteo_at
         if ultimo.tzinfo is None:
@@ -351,6 +385,8 @@ def _variante_para_conteo(v: Variante, ahora: datetime, dias_vigencia: int) -> V
         ultimo_conteo_at=v.ultimo_conteo_at,
         dias_desde_conteo=dias,
         requiere_conteo=requiere,
+        producto_id=int(v.producto_id),
+        orden_uniforme=orden_uniforme,
     )
 
 
@@ -421,6 +457,7 @@ def agrupar_variantes_por_producto(variantes: list[VarianteParaConteo]) -> list[
                 "producto_nombre": key,
                 "tipo_pieza": v.tipo_pieza,
                 "virtual": v.tipo_pieza in _TIPOS_VIRTUALES,
+                "orden_uniforme": v.orden_uniforme,
                 "variantes": [],
             }
         grupos[key]["variantes"].append(v)
@@ -429,10 +466,14 @@ def agrupar_variantes_por_producto(variantes: list[VarianteParaConteo]) -> list[
     for g in grupos.values():
         g["variantes"].sort(key=_talla_sort_key)
 
-    # Ordenar grupos por PIEZA_ORDER, luego por nombre de producto
+    # Primero en el orden del uniforme (fase 2); lo que no está en él, después,
+    # por PIEZA_ORDER y nombre (como siempre).
     resultado = sorted(
         grupos.values(),
-        key=lambda g: (_PIEZA_ORDER.get(g["tipo_pieza"], 99), g["producto_nombre"]),
+        key=lambda g: (
+            (0, g["orden_uniforme"], "") if g["orden_uniforme"] is not None
+            else (1, _PIEZA_ORDER.get(g["tipo_pieza"], 99), g["producto_nombre"])
+        ),
     )
     return resultado
 

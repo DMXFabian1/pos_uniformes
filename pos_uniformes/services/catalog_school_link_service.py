@@ -10,6 +10,53 @@ from pos_uniformes.database.models import CatalogSchoolProductLink, Escuela, Pro
 
 
 def list_all_active_links(session) -> list[dict]:
+    """Prendas generales que aparecen en el guiado junto a las de cada escuela.
+
+    Catálogo fase 2: si la escuela tiene su uniforme armado, salen las piezas
+    generales del uniforme (en su orden); si no, las ligas de siempre. Como
+    `uniforme_service` mantiene las ligas en espejo, hoy coinciden; cuando las
+    ligas se retiren, solo quedará la rama del uniforme."""
+    filas = _links_desde_ligas(session)
+    desde_uniforme, armadas = _links_desde_uniformes(session)
+    if not armadas:
+        return filas
+    return [f for f in filas if f["escuela_id"] not in armadas] + desde_uniforme
+
+
+def _links_desde_uniformes(session) -> tuple[list[dict], set[int]]:
+    """(filas de piezas generales por escuela con uniforme, escuelas armadas)."""
+    from pos_uniformes.database.models import Uniforme, UniformePieza
+
+    piezas = session.execute(
+        select(Uniforme.escuela_id, Escuela.nombre, Producto.id, Producto.nombre_base, Producto.nombre)
+        .join(Escuela, Escuela.id == Uniforme.escuela_id)
+        .join(UniformePieza, UniformePieza.uniforme_id == Uniforme.id)
+        .join(Producto, Producto.id == UniformePieza.producto_id)
+        .where(
+            Uniforme.activo == True,  # noqa: E712
+            UniformePieza.activo == True,  # noqa: E712
+            Producto.activo == True,  # noqa: E712
+            Producto.escuela_id == None,  # noqa: E711
+        )
+        .order_by(Uniforme.escuela_id, UniformePieza.orden, UniformePieza.id)
+    ).all()
+    # Una escuela con uniforme pero sin piezas generales también cuenta como
+    # armada: sus ligas viejas ya no mandan.
+    armadas = {int(e) for e in session.scalars(select(Uniforme.escuela_id).where(Uniforme.activo == True)).all()}  # noqa: E712
+    filas = [
+        {
+            "link_id": None,
+            "escuela_id": int(eid),
+            "escuela_nombre": str(enombre),
+            "producto_id": int(pid),
+            "producto_nombre_base": str(nombre_base or nombre),
+        }
+        for eid, enombre, pid, nombre_base, nombre in piezas
+    ]
+    return filas, armadas
+
+
+def _links_desde_ligas(session) -> list[dict]:
     links = session.scalars(
         select(CatalogSchoolProductLink)
         .options(

@@ -107,7 +107,9 @@ def build_school_tariff_text(
                 lines.append(tk_dbl())
                 first_in_section = False
 
-            # Nombre del producto
+            # Nombre del producto (y si en el uniforme es opcional, se dice)
+            if prod.get("opcional"):
+                nombre = f"{nombre} (opcional)"
             for dl in textwrap.wrap(str(nombre), width=_IW) or [str(nombre)]:
                 lines.append(tk_line(dl))
 
@@ -137,10 +139,11 @@ def build_school_tariff_text(
 
 
 def _group_by_section(productos: list[dict]) -> list[tuple[str, list[dict]]]:
-    """Agrupa productos por tipo_prenda preservando el orden de entrada."""
+    """Agrupa productos por sección (grupo del uniforme, o tipo_prenda si la
+    escuela no tiene uniforme armado) preservando el orden de entrada."""
     groups: list[tuple[str, list[dict]]] = []
     for p in productos:
-        sec = p.get("tipo_prenda", "") or ""
+        sec = p.get("seccion") or p.get("tipo_prenda", "") or ""
         if groups and groups[-1][0] == sec:
             groups[-1][1].append(p)
         else:

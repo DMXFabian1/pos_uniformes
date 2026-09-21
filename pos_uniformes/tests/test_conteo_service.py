@@ -219,3 +219,58 @@ class TestConteosPendientesPorNivel(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestOrdenDelUniforme(unittest.TestCase):
+    """Catálogo fase 2: la hoja y el mapa listan las prendas en el orden del
+    uniforme de la escuela; lo que no está en él va al final; sin uniforme,
+    el orden de siempre (PIEZA_ORDER, nombre)."""
+
+    def setUp(self) -> None:
+        from pos_uniformes.database.models import TipoPieza
+        from pos_uniformes.services import uniforme_service as us
+
+        self.s = _make_session()
+        cat = Categoria(nombre="Uniformes"); marca = Marca(nombre="Genérica")
+        self.esc = Escuela(nombre="Justo Sierra"); self.otra = Escuela(nombre="Patria")
+        self.s.add_all([cat, marca, self.esc, self.otra]); self.s.flush()
+        tz = {n: TipoPieza(nombre=n) for n in ("Camisa", "Falda", "Chaleco", "Playera")}
+        self.s.add_all(tz.values()); self.s.flush()
+
+        def prod(nombre, escuela, pieza):
+            p = Producto(nombre=nombre, nombre_base=nombre, categoria_id=cat.id, marca_id=marca.id, escuela_id=escuela.id, tipo_pieza_id=tz[pieza].id)
+            self.s.add(p); self.s.flush()
+            self.s.add(Variante(producto_id=p.id, sku=f"S{p.id}", talla="10", color="X", precio_venta=100, stock_actual=5))
+            return p
+
+        self.camisa = prod("Camisa JS", self.esc, "Camisa")
+        self.falda = prod("Falda JS", self.esc, "Falda")
+        self.chaleco = prod("Chaleco JS", self.esc, "Chaleco")
+        self.playera = prod("Playera JS", self.esc, "Playera")
+        prod("Camisa Patria", self.otra, "Camisa"); prod("Falda Patria", self.otra, "Falda")
+        self.s.commit()
+        self.us = us
+
+    def _orden(self, escuela) -> list[str]:
+        from pos_uniformes.services.conteo_service import obtener_variantes_agrupadas_por_producto
+        return [g["producto_nombre"] for g in obtener_variantes_agrupadas_por_producto(self.s, escuela.id)]
+
+    def test_sin_uniforme_es_el_orden_de_siempre(self) -> None:
+        self.assertEqual(self._orden(self.esc), ["Playera JS", "Camisa JS", "Chaleco JS", "Falda JS"])
+
+    def test_con_uniforme_manda_su_orden_y_lo_que_no_esta_va_al_final(self) -> None:
+        uni = self.us.armar(self.s, self.esc.id)
+        piezas = {p["nombre"]: p["pieza_id"] for p in self.us.piezas_de(self.s, uni.id)}
+        # Daniel pone la falda hasta arriba y quita el chaleco del uniforme
+        self.us.mover_pieza(self.s, piezas["Falda JS"], -10)
+        self.us.quitar_pieza(self.s, piezas["Chaleco JS"]); self.s.commit()
+        self.assertEqual(self._orden(self.esc), ["Falda JS", "Playera JS", "Camisa JS", "Chaleco JS"])
+        # La otra escuela, sin uniforme, no se entera
+        self.assertEqual(self._orden(self.otra), ["Camisa Patria", "Falda Patria"])
+
+    def test_el_mapa_usa_el_mismo_orden(self) -> None:
+        from pos_uniformes.services import conteo_mapa_service as mapa
+        uni = self.us.armar(self.s, self.esc.id)
+        piezas = {p["nombre"]: p["pieza_id"] for p in self.us.piezas_de(self.s, uni.id)}
+        self.us.mover_pieza(self.s, piezas["Chaleco JS"], -10); self.s.commit()
+        self.assertEqual([p["nombre"] for p in mapa.escuela(self.s, self.esc.id)["prendas"]][:2], ["Chaleco JS", "Playera JS"])

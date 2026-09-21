@@ -131,6 +131,8 @@ body {{
                 )
             if colores:
                 detail_parts.append(escape(", ".join(colores)))
+            if prod.get("opcional"):
+                detail_parts.append("opcional")
 
             detail_html = ""
             if detail_parts:
@@ -198,10 +200,11 @@ body {{
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
 def _group_by_section(productos: list[dict]) -> list[tuple[str, list[dict]]]:
-    """Agrupa productos por tipo_prenda preservando el orden de entrada."""
+    """Agrupa productos por sección (grupo del uniforme, o tipo_prenda si la
+    escuela no tiene uniforme armado) preservando el orden de entrada."""
     groups: list[tuple[str, list[dict]]] = []
     for p in productos:
-        sec = p.get("tipo_prenda", "") or ""
+        sec = p.get("seccion") or p.get("tipo_prenda", "") or ""
         if groups and groups[-1][0] == sec:
             groups[-1][1].append(p)
         else:

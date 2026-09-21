@@ -203,3 +203,30 @@ class ScriptTests(_Base):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class GuiadoTests(_Base):
+    """El flujo guiado del kiosko lee `list_all_active_links`: con uniforme
+    armado, son las piezas generales del uniforme; sin él, las ligas."""
+
+    def _links(self):
+        from pos_uniformes.services.catalog_school_link_service import list_all_active_links
+        return [(f["escuela_nombre"], f["producto_nombre_base"]) for f in list_all_active_links(self.s)]
+
+    def test_sin_uniforme_son_las_ligas(self) -> None:
+        self.assertEqual(self._links(), [("Justo Sierra", "Pants Suelto Liso Rojo")])
+
+    def test_con_uniforme_mandan_sus_piezas_generales_en_su_orden(self) -> None:
+        uni = us.armar(self.s, self.vg.id)
+        us.agregar_pieza(self.s, uni.id, self.olan.id)
+        us.agregar_pieza(self.s, uni.id, self.pants_rojo.id)
+        pz_olan = self.s.scalar(select(UniformePieza).where(UniformePieza.uniforme_id == uni.id, UniformePieza.producto_id == self.olan.id))
+        us.mover_pieza(self.s, pz_olan.id, +10); self.s.commit()
+        self.assertEqual(self._links(), [
+            ("Justo Sierra", "Pants Suelto Liso Rojo"),            # sin uniforme: su liga
+            ("Vicente Guerrero", "Pants Suelto Liso Rojo"),        # con uniforme: sus generales, en orden
+            ("Vicente Guerrero", "Camisa Cuello Olan Blanca"),
+        ])
+        # Una liga suelta que alguien meta por fuera a una escuela armada ya no manda
+        self.s.add(CatalogSchoolProductLink(escuela_id=self.vg.id, producto_id=self.sueter.id)); self.s.commit()
+        self.assertNotIn(("Vicente Guerrero", "Suéter Escolar Vino"), self._links())

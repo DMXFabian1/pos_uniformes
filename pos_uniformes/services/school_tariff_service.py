@@ -99,33 +99,16 @@ def build_school_tariff(session, escuela_id: int, *, nivel_id: int | None = None
     if escuela is None:
         return {"escuela_nombre": "", "productos": []}
 
-    # Productos directos de la escuela (con filtro de nivel si aplica)
-    direct_where = [Producto.escuela_id == int(escuela_id), Producto.activo == True]  # noqa: E712
-    if nivel_id is not None:
-        direct_where.append(Producto.nivel_educativo_id == int(nivel_id))
-    directos = session.scalars(
-        select(Producto)
-        .options(joinedload(Producto.variantes))
-        .where(*direct_where)
-        .order_by(Producto.nombre_base)
-    ).unique().all()
-
-    # Productos ligados via catalog_school_product_link
-    ligados = session.scalars(
-        select(Producto)
-        .join(CatalogSchoolProductLink, CatalogSchoolProductLink.producto_id == Producto.id)
-        .options(joinedload(Producto.variantes))
-        .where(
-            CatalogSchoolProductLink.escuela_id == int(escuela_id),
-            CatalogSchoolProductLink.activo == True,  # noqa: E712
-            Producto.activo == True,  # noqa: E712
-        )
-        .order_by(Producto.nombre_base)
-    ).unique().all()
-
-    # Unión sin duplicados (un producto puede estar directo Y ligado)
-    seen_ids: set[int] = {p.id for p in directos}
-    todos_productos = list(directos) + [p for p in ligados if p.id not in seen_ids]
+    # Catálogo fase 2: si la escuela tiene su uniforme armado, el tarifario es
+    # el uniforme (sus piezas, en su orden y sus grupos). Si no, lo de siempre:
+    # productos directos + ligados.
+    piezas = _piezas_del_uniforme(session, escuela_id, nivel_id=nivel_id)
+    if piezas is not None:
+        todos_productos = [pz["producto"] for pz in piezas]
+        extra_por_producto = {int(pz["producto"].id): pz for pz in piezas}
+    else:
+        todos_productos = _directos_y_ligados(session, escuela_id, nivel_id=nivel_id)
+        extra_por_producto = {}
 
     escuela_nombre = str(escuela.nombre)
 
@@ -145,7 +128,7 @@ def build_school_tariff(session, escuela_id: int, *, nivel_id: int | None = None
         for v in variantes:
             t = str(v.talla or "U")
             color = str(v.color or "").strip()
-            if color:
+            if color and color.lower() != "sin color":  # "Sin color" no es un color: no se imprime
                 colores_set.add(color)
             if t not in seen_tallas:
                 seen_tallas.add(t)
@@ -155,19 +138,32 @@ def build_school_tariff(session, escuela_id: int, *, nivel_id: int | None = None
         tipo_pieza = prod.tipo_pieza.nombre if prod.tipo_pieza else ""
         tipo_prenda = prod.tipo_prenda.nombre if prod.tipo_prenda else ""
         genero = str(prod.genero or "").strip().upper()
-        result_products.append({
+        extra = extra_por_producto.get(int(prod.id))
+        fila = {
             "nombre": clean_name,
             "tipo_pieza": tipo_pieza,
             "tipo_prenda": tipo_prenda,
             "tallas": tallas,
             "genero": genero,
             "colores": sorted(colores_set),
-        })
+        }
+        if extra is not None:
+            # La pieza del uniforme manda: sección = grupo, su color si Daniel
+            # lo dijo, y si es opcional se dice.
+            fila["seccion"] = extra["grupo"]
+            fila["orden"] = extra["orden"]
+            fila["opcional"] = not extra["obligatoria"]
+            if extra["color"]:
+                fila["colores"] = [extra["color"]]
+        result_products.append(fila)
 
-    result_products.sort(key=lambda p: (
-        _tariff_section_sort_key(p.get("tipo_prenda", "")),
-        _tariff_product_sort_key(p.get("tipo_pieza", "")),
-    ))
+    if piezas is not None:
+        result_products.sort(key=lambda p: (_GRUPO_ORDER.get(p.get("seccion", ""), 9), p.get("orden", 0)))
+    else:
+        result_products.sort(key=lambda p: (
+            _tariff_section_sort_key(p.get("tipo_prenda", "")),
+            _tariff_product_sort_key(p.get("tipo_pieza", "")),
+        ))
     merged = _merge_same_price_products(result_products)
 
     # Nombre de display: con sufijo de nivel si se filtró por él
@@ -181,6 +177,68 @@ def build_school_tariff(session, escuela_id: int, *, nivel_id: int | None = None
         "escuela_nombre": display_nombre,
         "productos": merged,
     }
+
+
+def _directos_y_ligados(session, escuela_id: int, *, nivel_id: int | None) -> list[Producto]:
+    """Lo de antes de la fase 2: productos con `escuela_id` más los ligados a mano."""
+    direct_where = [Producto.escuela_id == int(escuela_id), Producto.activo == True]  # noqa: E712
+    if nivel_id is not None:
+        direct_where.append(Producto.nivel_educativo_id == int(nivel_id))
+    directos = session.scalars(
+        select(Producto)
+        .options(joinedload(Producto.variantes))
+        .where(*direct_where)
+        .order_by(Producto.nombre_base)
+    ).unique().all()
+    ligados = session.scalars(
+        select(Producto)
+        .join(CatalogSchoolProductLink, CatalogSchoolProductLink.producto_id == Producto.id)
+        .options(joinedload(Producto.variantes))
+        .where(
+            CatalogSchoolProductLink.escuela_id == int(escuela_id),
+            CatalogSchoolProductLink.activo == True,  # noqa: E712
+            Producto.activo == True,  # noqa: E712
+        )
+        .order_by(Producto.nombre_base)
+    ).unique().all()
+    seen_ids: set[int] = {p.id for p in directos}
+    return list(directos) + [p for p in ligados if p.id not in seen_ids]
+
+
+def _piezas_del_uniforme(session, escuela_id: int, *, nivel_id: int | None) -> list[dict] | None:
+    """Piezas activas del uniforme de la escuela (catálogo fase 2) con su
+    producto cargado, en el orden de Daniel; None si no hay uniforme armado."""
+    from pos_uniformes.database.models import Uniforme, UniformePieza
+
+    uni = session.scalar(
+        select(Uniforme).where(Uniforme.escuela_id == int(escuela_id), Uniforme.activo == True)  # noqa: E712
+        .order_by(Uniforme.id)
+    )
+    if uni is None:
+        return None
+    piezas = session.scalars(
+        select(UniformePieza)
+        .options(joinedload(UniformePieza.producto).joinedload(Producto.variantes))
+        .where(UniformePieza.uniforme_id == uni.id, UniformePieza.activo == True)  # noqa: E712
+        .order_by(UniformePieza.orden, UniformePieza.id)
+    ).unique().all()
+    filas = []
+    for i, pz in enumerate(piezas):
+        prod = pz.producto
+        if not prod.activo:
+            continue
+        # El filtro de nivel aplica a las prendas propias; una general no tiene nivel.
+        if nivel_id is not None and prod.escuela_id is not None and prod.nivel_educativo_id != int(nivel_id):
+            continue
+        filas.append({
+            "producto": prod, "grupo": str(pz.grupo or "Otro"), "orden": i,
+            "obligatoria": bool(pz.obligatoria), "color": (pz.color or "").strip(),
+        })
+    return filas
+
+
+# Orden de los grupos del uniforme en el tarifario (fase 2)
+_GRUPO_ORDER = {"Deportivo": 1, "Diario": 2, "Escolta": 3, "Accesorio": 4, "Otro": 5}
 
 
 def _merge_same_price_products(products: list[dict]) -> list[dict]:
@@ -200,7 +258,12 @@ def _merge_same_price_products(products: list[dict]) -> list[dict]:
             if j in used:
                 continue
             prices_b = [(t["talla"], t["precio"]) for t in products[j]["tallas"]]
-            if prices_a == prices_b and a.get("tipo_prenda") == products[j].get("tipo_prenda"):
+            if (
+                prices_a == prices_b
+                and a.get("tipo_prenda") == products[j].get("tipo_prenda")
+                and a.get("seccion") == products[j].get("seccion")
+                and bool(a.get("opcional")) == bool(products[j].get("opcional"))
+            ):
                 group.append(products[j])
                 used.add(j)
         if len(group) == 1:
@@ -216,13 +279,17 @@ def _merge_same_price_products(products: list[dict]) -> list[dict]:
             merged_colores: set[str] = set()
             for g in group:
                 merged_colores.update(g.get("colores", []))
-            merged.append({
+            fila = {
                 "nombre": _build_merged_name(names),
                 "tipo_prenda": merged_tipo_prenda,
                 "tallas": a["tallas"],
                 "genero": merged_genero,
                 "colores": sorted(merged_colores),
-            })
+            }
+            for k in ("seccion", "orden", "opcional"):
+                if k in a:
+                    fila[k] = a[k]
+            merged.append(fila)
     return merged
 
 
