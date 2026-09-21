@@ -27,10 +27,11 @@ from PyQt6.QtWidgets import (
 )
 
 from pos_uniformes.database.connection import get_session
+from pos_uniformes.services import conjunto_service as cs
 from pos_uniformes.services import uniforme_service as us
 from pos_uniformes.services.catalog_school_link_service import list_all_schools, list_general_products
 
-COLS = ("Grupo", "Pieza", "Tipo", "Origen", "Color", "Oblig.", "", "", "")
+COLS = ("Grupo", "Pieza", "Tipo", "Origen", "Color", "Oblig.", "Se arma de", "", "", "")
 
 _INPUT_CSS = (
     "QLineEdit { border: 1.5px solid #d5c9b9; border-radius: 8px; padding: 5px 10px; min-height: 20px;"
@@ -45,7 +46,8 @@ _ARROW_CSS = (
     "QPushButton { background: #fff; border: 1px solid #d9e5ef; border-radius: 6px; color: #294f69;"
     " padding: 0; font-size: 11px; min-width: 0; } QPushButton:hover { background: #eef5fb; }"
 )
-_COL_GRUPO, _COL_PIEZA, _COL_TIPO, _COL_ORIGEN, _COL_COLOR, _COL_OBLIG, _COL_UP, _COL_DOWN, _COL_QUITAR = range(9)
+(_COL_GRUPO, _COL_PIEZA, _COL_TIPO, _COL_ORIGEN, _COL_COLOR, _COL_OBLIG, _COL_RECETA,
+ _COL_UP, _COL_DOWN, _COL_QUITAR) = range(10)
 
 
 def prompt_uniforme_escuela_admin(parent=None, *, on_changed=None) -> None:
@@ -159,7 +161,7 @@ class UniformeEscuelaDialog(QDialog):
         )
         hdr = self._tabla.horizontalHeader()
         hdr.setSectionResizeMode(_COL_PIEZA, QHeaderView.ResizeMode.Stretch)
-        for c in (_COL_GRUPO, _COL_TIPO, _COL_ORIGEN, _COL_COLOR, _COL_OBLIG, _COL_UP, _COL_DOWN, _COL_QUITAR):
+        for c in (_COL_GRUPO, _COL_TIPO, _COL_ORIGEN, _COL_COLOR, _COL_OBLIG, _COL_RECETA, _COL_UP, _COL_DOWN, _COL_QUITAR):
             hdr.setSectionResizeMode(c, QHeaderView.ResizeMode.ResizeToContents)
         self._vacio = QLabel("Esta escuela todavía no tiene uniforme armado.")
         self._vacio.setStyleSheet("color: #9aacb8; font-style: italic; padding: 8px 4px; background: transparent; border: none;")
@@ -280,6 +282,8 @@ class UniformeEscuelaDialog(QDialog):
                 uni = us.uniforme_de(s, self._escuela["escuela_id"])
                 self._uniforme_id = int(uni.id) if uni is not None else None
                 self._piezas = us.piezas_de(s, uni.id) if uni is not None else []
+                for p in self._piezas:
+                    p["receta"] = cs.receta_texto(s, p["producto_id"]) if p["tipo_pieza"] in cs.TIPOS_CONJUNTO else None
         except Exception as exc:  # noqa: BLE001
             QMessageBox.critical(self, "Error", str(exc))
             return
@@ -318,6 +322,15 @@ class UniformeEscuelaDialog(QDialog):
             oblig.setToolTip("Obligatoria (sin palomita = opcional: suéter, chaleco…)")
             oblig.toggled.connect(lambda v, pid=p["pieza_id"]: self._cambiar(pid, obligatoria=v))
             self._tabla.setCellWidget(i, _COL_OBLIG, self._centrado(oblig))
+            if p.get("receta") is not None:
+                # Conjunto artificial (fase 3): se dice de qué se arma y se puede cambiar
+                rb = QPushButton(self._receta_corta(p["receta"]) or "⚠ sin receta")
+                rb.setStyleSheet(_ARROW_CSS + ("QPushButton { color: #b3541e; font-weight: 700; }" if not p["receta"] else ""))
+                rb.setToolTip(p["receta"] or "Este conjunto no sabe de qué se arma: su stock no se calcula y venderlo no baja sus piezas.")
+                rb.clicked.connect(lambda _c, pid=p["producto_id"], n=p["nombre"]: self._editar_receta(pid, n))
+                self._tabla.setCellWidget(i, _COL_RECETA, rb)
+            else:
+                self._tabla.setItem(i, _COL_RECETA, QTableWidgetItem(""))
             for col, texto, delta in ((_COL_UP, "▲", -1), (_COL_DOWN, "▼", +1)):
                 b = QPushButton(texto)
                 b.setFixedSize(28, 26)
@@ -332,6 +345,22 @@ class UniformeEscuelaDialog(QDialog):
             q.clicked.connect(lambda _c, pid=p["pieza_id"], n=p["nombre"]: self._quitar(pid, n))
             self._tabla.setCellWidget(i, _COL_QUITAR, q)
         self._pintando = False
+
+    @staticmethod
+    def _receta_corta(texto: str) -> str:
+        """'se arma de Pants 2pz Deportivo X + Playera Deportiva X' → '2pz X + Playera X'."""
+        if not texto:
+            return ""
+        corto = texto
+        for palabra in ("se arma de ", "sale de ", "Pants 2pz Deportivo ", "Deportivo ", "Deportiva "):
+            corto = corto.replace(palabra, "2pz " if palabra.startswith("Pants 2pz") else "")
+        return corto if len(corto) <= 44 else corto[:41] + "…"
+
+    def _editar_receta(self, producto_id: int, nombre: str) -> None:
+        dlg = RecetaDialog(self, session_factory=self._session_factory, conjunto_id=producto_id, nombre=nombre, piezas=self._piezas)
+        if dlg.exec():
+            self._recargar()
+            self._avisar(f"Receta guardada: {nombre}")
 
     @staticmethod
     def _centrado(w: QWidget) -> QWidget:
@@ -420,3 +449,85 @@ class UniformeEscuelaDialog(QDialog):
             self._status.setText("")
         except RuntimeError:
             pass
+
+
+class RecetaDialog(QDialog):
+    """De qué se arma un conjunto (Pants 3pz, Chamarra): una prenda del
+    uniforme por cada pieza que pide la receta. Ver conjunto_service."""
+
+    def __init__(self, parent=None, *, session_factory, conjunto_id: int, nombre: str, piezas: list[dict]) -> None:
+        super().__init__(parent)
+        self._session_factory = session_factory
+        self._conjunto_id = int(conjunto_id)
+        self._combos: list[tuple[str, int, QComboBox]] = []
+        self.setWindowTitle(f"Receta · {nombre}")
+        self.setModal(True)
+        self.resize(560, 220)
+        lay = QVBoxLayout(self)
+        titulo = QLabel(nombre)
+        titulo.setStyleSheet("font-size: 14px; font-weight: 700; color: #294f69; background: transparent; border: none;")
+        lay.addWidget(titulo)
+        tipo = next((p["tipo_pieza"] for p in piezas if p["producto_id"] == self._conjunto_id), "")
+        plantilla = cs.RECETAS_POR_TIPO.get(tipo, ())
+        candidatas = [p for p in piezas if p["tipo_pieza"] not in cs.TIPOS_CONJUNTO]
+        actual: dict[int, int] = {}
+        try:
+            with self._session_factory() as s:
+                actual = {int(c.componente_id): int(c.cantidad) for c in cs.receta_de(s, self._conjunto_id)}
+        except Exception:  # noqa: BLE001
+            actual = {}
+        for tipo_pieza, cantidad in plantilla:
+            fila = QHBoxLayout()
+            etiqueta = QLabel(("Se lleva 1 " if cantidad > 0 else "Deja 1 ") + tipo_pieza + ":")
+            etiqueta.setStyleSheet("background: transparent; border: none; color: #294f69;")
+            etiqueta.setFixedWidth(170)
+            combo = QComboBox()
+            combo.setStyleSheet(_CELL_CSS)
+            combo.addItem("— elegir —", None)
+            # Primero las del tipo que pide la receta, luego el resto por si la escuela lo hace distinto
+            for p in sorted(candidatas, key=lambda p: (p["tipo_pieza"] != tipo_pieza, p["nombre"])):
+                combo.addItem(p["nombre"] + ("" if p["tipo_pieza"] == tipo_pieza else f"  ({p['tipo_pieza']})"), p["producto_id"])
+            del_tipo = [p for p in candidatas if p["tipo_pieza"] == tipo_pieza]
+            elegido = next((pid for pid, c in actual.items() if (c > 0) == (cantidad > 0) and any(p["producto_id"] == pid for p in del_tipo)), None)
+            if elegido is None:
+                elegido = next((pid for pid, c in actual.items() if (c > 0) == (cantidad > 0) and any(p["producto_id"] == pid for p in candidatas)), None)
+            if elegido is None and len(del_tipo) == 1:
+                elegido = del_tipo[0]["producto_id"]
+            if elegido is not None:
+                combo.setCurrentIndex(combo.findData(elegido))
+            fila.addWidget(etiqueta)
+            fila.addWidget(combo, 1)
+            lay.addLayout(fila)
+            self._combos.append((tipo_pieza, int(cantidad), combo))
+        nota = QLabel("Al venderlo bajan las piezas que se lleva y sube la que deja; su stock es el de sus piezas.")
+        nota.setWordWrap(True)
+        nota.setStyleSheet("color: #5f6d78; font-size: 12px; background: transparent; border: none;")
+        lay.addWidget(nota)
+        botones = QHBoxLayout()
+        botones.addStretch()
+        cancelar = QPushButton("Cancelar")
+        cancelar.setObjectName("toolbarSecondaryButton")
+        cancelar.clicked.connect(self.reject)
+        guardar = QPushButton("Guardar receta")
+        guardar.setObjectName("toolbarPrimaryButton")
+        guardar.clicked.connect(self._guardar)
+        botones.addWidget(cancelar)
+        botones.addWidget(guardar)
+        lay.addLayout(botones)
+
+    def componentes(self) -> list[tuple[int, int]]:
+        return [(int(c.currentData()), cant) for _t, cant, c in self._combos if c.currentData() is not None]
+
+    def _guardar(self) -> None:
+        comps = self.componentes()
+        if len(comps) != len(self._combos):
+            QMessageBox.warning(self, "Falta una pieza", "Elige una prenda para cada pieza de la receta.")
+            return
+        try:
+            with self._session_factory() as s:
+                cs.definir_receta(s, self._conjunto_id, comps)
+                s.commit()
+        except Exception as exc:  # noqa: BLE001
+            QMessageBox.critical(self, "Error", str(exc))
+            return
+        self.accept()

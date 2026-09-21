@@ -55,6 +55,9 @@ class AjusteMasivoPreview:
     unidades_negativas: int
 
 
+_PREFIJO_DERIVADO = "derivado:"
+
+
 class InventarioService:
     """Aplica movimientos auditables sin permitir stock negativo."""
 
@@ -79,9 +82,25 @@ class InventarioService:
         observacion: str | None = None,
         creado_por: str = "SYSTEM",
         allow_negative_stock: bool = False,
-    ) -> MovimientoInventario:
+    ) -> MovimientoInventario | None:
         if cantidad == 0:
             raise ValueError("La cantidad del movimiento no puede ser cero.")
+
+        # Catálogo fase 3: un conjunto (Pants 3pz, Chamarra) con receta no tiene
+        # montón propio; el movimiento se aplica a sus piezas y su stock se
+        # recalcula. Los movimientos `derivado:` son ese recálculo y no se rutean.
+        es_derivado = bool(referencia) and str(referencia).startswith(_PREFIJO_DERIVADO)
+        con_conjuntos = isinstance(session, Session) and getattr(variante, "producto_id", None) is not None
+        if con_conjuntos and not es_derivado:
+            from pos_uniformes.services import conjunto_service
+
+            receta = conjunto_service.receta_de(session, variante.producto_id)
+            if receta:
+                movimientos = conjunto_service.descomponer(
+                    session, variante, tipo_movimiento, cantidad, receta=receta,
+                    referencia=referencia, observacion=observacion, creado_por=creado_por,
+                )
+                return movimientos[0] if movimientos else None
 
         # Adquirir lock a nivel de fila antes de leer y modificar stock.
         # Evita race conditions cuando dos transacciones concurrentes reducen
@@ -112,6 +131,11 @@ class InventarioService:
 
         session.add(movimiento)
         session.add(variante)
+        if con_conjuntos and not es_derivado:
+            # Si esta prenda es pieza de un conjunto, el conjunto cambia con ella.
+            from pos_uniformes.services import conjunto_service
+
+            conjunto_service.sincronizar_por_componente(session, variante, creado_por=creado_por)
         return movimiento
 
     @classmethod

@@ -1699,6 +1699,34 @@ class UniformePieza(Base):
     producto: Mapped["Producto"] = relationship()
 
 
+class ConjuntoComponente(Base):
+    """Receta de un producto artificial (catálogo, fase 3): el Pants 3pz "se
+    arma de" un Pants 2pz y una Playera; la Chamarra "sale de" un Pants 2pz y
+    deja un Pants Suelto. `cantidad` > 0 = se consume al venderlo; < 0 = queda.
+    El conjunto conserva su SKU y su precio; su stock se calcula de sus piezas."""
+
+    __tablename__ = "conjunto_componente"
+    __table_args__ = (
+        UniqueConstraint("conjunto_id", "componente_id", name="uq_conjunto_componente"),
+        CheckConstraint("cantidad <> 0", name="conjunto_componente_cantidad_no_cero"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    conjunto_id: Mapped[int] = mapped_column(
+        ForeignKey("producto.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    componente_id: Mapped[int] = mapped_column(
+        ForeignKey("producto.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    cantidad: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    conjunto: Mapped["Producto"] = relationship(foreign_keys=[conjunto_id])
+    componente: Mapped["Producto"] = relationship(foreign_keys=[componente_id])
+
+
 class ApartadoAbono(Base):
     __tablename__ = "apartado_abono"
     __table_args__ = (

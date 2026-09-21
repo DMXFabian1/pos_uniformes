@@ -156,7 +156,39 @@ def _ventas_por_sku(session: Session, desde: date) -> dict[str, list[tuple[date,
                 continue
             if piezas > 0 and fecha is not None:
                 por_sku[sku].append((fecha, piezas))
+    # Catálogo fase 3: un Pants 3pz vendido también es un 2pz y una playera
+    # que salieron; la Chamarra, un 2pz. Sin eso, Revisar pediría de menos.
+    for sku_conjunto, piezas_sku in _piezas_de_conjuntos(session, list(por_sku)).items():
+        for fecha, piezas in list(por_sku[sku_conjunto]):
+            for sku_pieza in piezas_sku:
+                por_sku[sku_pieza].append((fecha, piezas))
     return por_sku
+
+
+def _piezas_de_conjuntos(session: Session, skus: list[str]) -> dict[str, list[str]]:
+    """{sku del conjunto: [sku de cada pieza que se lleva, misma talla]} para
+    los SKUs vendidos que son conjuntos con receta."""
+    from pos_uniformes.database.models import ConjuntoComponente
+
+    if not skus:
+        return {}
+    vendidas = session.scalars(select(Variante).where(Variante.sku.in_(skus))).all()
+    receta_por_conjunto: dict[int, list[int]] = defaultdict(list)
+    for c in session.scalars(select(ConjuntoComponente).where(ConjuntoComponente.cantidad > 0)).all():
+        receta_por_conjunto[int(c.conjunto_id)].append(int(c.componente_id))
+    if not receta_por_conjunto:
+        return {}
+    out: dict[str, list[str]] = {}
+    for v in vendidas:
+        componentes = receta_por_conjunto.get(int(v.producto_id))
+        if not componentes:
+            continue
+        talla = str(v.talla or "").strip().upper()
+        piezas = session.scalars(
+            select(Variante).where(Variante.producto_id.in_(componentes), Variante.activo.is_(True))
+        ).all()
+        out[v.sku] = [p.sku for p in piezas if str(p.talla or "").strip().upper() == talla]
+    return out
 
 
 def _primera_venta(session: Session) -> date | None:

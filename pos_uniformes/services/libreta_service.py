@@ -225,6 +225,7 @@ def descontar_stock(session, entry: LibretaVenta) -> int:
     if getattr(entry, "tipo", None) not in TIPOS_QUE_DESCUENTAN:
         return 0
     from pos_uniformes.database.models import MovimientoInventario, TipoMovimientoInventario, Variante
+    from pos_uniformes.services import conjunto_service
     from pos_uniformes.services.inventario_service import InventarioService
 
     referencia = _referencia(entry)
@@ -248,6 +249,10 @@ def descontar_stock(session, entry: LibretaVenta) -> int:
                 variante = session.scalar(select(Variante).where(Variante.sku == sku))
                 if variante is None or variante.id in ya:
                     continue
+                # Un conjunto (3pz, chamarra) no se mueve él: se mueven sus
+                # piezas (fase 3). Si alguna ya trae esta referencia, ya se hizo.
+                if any(p.id in ya for p in conjunto_service.variantes_pieza_de(session, variante)):
+                    continue
                 InventarioService.registrar_movimiento(
                     session, variante, tipo, -cantidad,
                     referencia=referencia,
@@ -270,10 +275,15 @@ def devolver_stock(session, entry: LibretaVenta) -> int:
     referencia = _referencia(entry)
     if referencia is None:
         return 0
+    # Todo lo que la operación movió con su referencia: la salida de cada talla
+    # y, si vendió una chamarra, el pants suelto que dejó (AJUSTE_ENTRADA).
     movimientos = list(session.scalars(
         select(MovimientoInventario).where(
             MovimientoInventario.referencia == referencia,
-            MovimientoInventario.tipo_movimiento.in_((TipoMovimientoInventario.SALIDA_VENTA, TipoMovimientoInventario.APARTADO_RESERVA)),
+            MovimientoInventario.tipo_movimiento.in_((
+                TipoMovimientoInventario.SALIDA_VENTA, TipoMovimientoInventario.APARTADO_RESERVA,
+                TipoMovimientoInventario.AJUSTE_ENTRADA, TipoMovimientoInventario.AJUSTE_SALIDA,
+            )),
         )
     ).all())
     hechas = 0
@@ -283,8 +293,11 @@ def devolver_stock(session, entry: LibretaVenta) -> int:
                 variante = session.get(Variante, mov.variante_id)
                 if variante is None:
                     continue
+                regresa = -int(mov.cantidad)
                 InventarioService.registrar_movimiento(
-                    session, variante, TipoMovimientoInventario.CANCELACION_VENTA, abs(int(mov.cantidad)),
+                    session, variante,
+                    TipoMovimientoInventario.CANCELACION_VENTA if regresa > 0 else TipoMovimientoInventario.AJUSTE_SALIDA,
+                    regresa,
                     referencia=f"{referencia}:borrada",
                     observacion="Operación borrada de la Libreta",
                     creado_por="dueno",
