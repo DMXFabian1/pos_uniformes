@@ -1916,6 +1916,8 @@ class MainWindow(QMainWindow):
         header_menu.addSeparator()
         self.conteo_calendario_action = header_menu.addAction("Calendario de conteos")
         self.conteo_calendario_action.triggered.connect(self._handle_open_conteo_calendario)
+        self.uniformes_escuela_action = header_menu.addAction("Uniformes por escuela")
+        self.uniformes_escuela_action.triggered.connect(self._handle_open_uniformes_escuela)
         self.header_more_button = QToolButton()
         self.header_more_button.setText("Mas")
         self.header_more_button.setObjectName("toolbarSoftButton")
@@ -8783,6 +8785,14 @@ class MainWindow(QMainWindow):
         from pos_uniformes.ui.dialogs.conteo_calendario_dialog import ConteoCalendarioDialog
 
         ConteoCalendarioDialog(self).exec()
+
+    def _handle_open_uniformes_escuela(self) -> None:
+        if self.current_role != RolUsuario.ADMIN:
+            QMessageBox.warning(self, "Sin permisos", "Solo ADMIN puede armar los uniformes.")
+            return
+        from pos_uniformes.ui.dialogs.uniforme_escuela_dialog import prompt_uniforme_escuela_admin
+
+        prompt_uniforme_escuela_admin(self)
 
     def _handle_inventory_count(self) -> None:
         if self.current_role != RolUsuario.ADMIN:

@@ -1636,6 +1636,69 @@ class CatalogSchoolProductLink(Base):
     producto: Mapped["Producto"] = relationship()
 
 
+class Uniforme(Base):
+    """El uniforme de una escuela como entidad (catálogo, fase 2): sus piezas
+    señalan productos (propios de la escuela o generales) sin copiarlos.
+    Ver Obsidian 38 - Catálogo Fase 2 - Uniformes."""
+
+    __tablename__ = "uniforme"
+    __table_args__ = (
+        UniqueConstraint("escuela_id", "nombre", name="uq_uniforme_escuela_nombre"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    escuela_id: Mapped[int] = mapped_column(
+        ForeignKey("escuela.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    nivel_educativo_id: Mapped[int | None] = mapped_column(
+        ForeignKey("nivel_educativo.id", ondelete="RESTRICT"), index=True
+    )
+    nombre: Mapped[str] = mapped_column(String(80), nullable=False, default="Uniforme")
+    activo: Mapped[bool] = mapped_column(default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+
+    escuela: Mapped["Escuela"] = relationship()
+    nivel_educativo: Mapped["NivelEducativo | None"] = relationship()
+    piezas: Mapped[list["UniformePieza"]] = relationship(
+        back_populates="uniforme", cascade="all, delete-orphan", order_by="UniformePieza.orden"
+    )
+
+
+class UniformePieza(Base):
+    """Una prenda dentro de un uniforme: qué producto, en qué grupo (Diario,
+    Deportivo…), en qué orden, si es obligatoria y en qué color va."""
+
+    __tablename__ = "uniforme_pieza"
+    __table_args__ = (
+        UniqueConstraint("uniforme_id", "producto_id", name="uq_uniforme_pieza_producto"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    uniforme_id: Mapped[int] = mapped_column(
+        ForeignKey("uniforme.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    producto_id: Mapped[int] = mapped_column(
+        ForeignKey("producto.id", ondelete="RESTRICT"), nullable=False, index=True
+    )
+    grupo: Mapped[str] = mapped_column(String(30), nullable=False, default="Diario")
+    orden: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    obligatoria: Mapped[bool] = mapped_column(default=True, nullable=False)
+    color: Mapped[str | None] = mapped_column(String(50))
+    nota: Mapped[str | None] = mapped_column(String(200))
+    activo: Mapped[bool] = mapped_column(default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+    uniforme: Mapped["Uniforme"] = relationship(back_populates="piezas")
+    producto: Mapped["Producto"] = relationship()
+
+
 class ApartadoAbono(Base):
     __tablename__ = "apartado_abono"
     __table_args__ = (

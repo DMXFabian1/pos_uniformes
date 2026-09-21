@@ -477,13 +477,17 @@ class EncargadoMovilTests(unittest.TestCase):
         from datetime import timedelta
 
         hoy = date.today()
+        # El descanso se marca en su día fijo de la semana pasada (mismo weekday
+        # que hoy): un descanso en OTRO día haría que el calendario apunte
+        # "Sí vino" en el fijo y el resultado dependería del día en que corra el test.
+        hace_una_semana = hoy - timedelta(days=7)
         with patch("pos_uniformes.api.routers.movil._modo_servidor", return_value="tienda"):
-            for fecha, tipo in ((hoy, "falta"), (hoy - timedelta(days=3), "descanso"), (hoy - timedelta(days=30), "falta")):
+            for fecha, tipo in ((hoy, "falta"), (hace_una_semana, "descanso"), (hoy - timedelta(days=30), "falta")):
                 self.client.post("/api/v1/movil/encargado/marcar", json={"employee_code": "VEND-4", "fecha": fecha.isoformat(), "tipo": tipo})
             r = self.client.get("/api/v1/movil/encargado/marcas/VEND-4")
             self.assertEqual(r.status_code, 200, r.text)
             marcas = r.json()["marcas"]
-            self.assertEqual([(m["fecha"], m["texto"]) for m in marcas], [(hoy.isoformat(), "Faltó"), ((hoy - timedelta(days=3)).isoformat(), "Descansó")])   # la de hace un mes no
+            self.assertEqual([(m["fecha"], m["texto"]) for m in marcas], [(hoy.isoformat(), "Faltó"), (hace_una_semana.isoformat(), "Descansó")])   # la de hace un mes no
             self.client.post("/api/v1/movil/encargado/marcar", json={"employee_code": "VEND-4", "fecha": hoy.isoformat(), "tipo": "quitar"})
             marcas = self.client.get("/api/v1/movil/encargado/marcas/VEND-4").json()["marcas"]
             self.assertEqual([m["texto"] for m in marcas], ["Descansó"])
