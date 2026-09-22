@@ -1062,7 +1062,9 @@ class PorContar:
         al día? La regla vive en `conteo_mapa_service.semaforo`."""
         from pos_uniformes.services import conteo_mapa_service  # noqa: PLC0415
 
-        return conteo_mapa_service.semaforo(self.en_rojo, self.faltan)
+        return conteo_mapa_service.semaforo(
+            self.en_rojo, self.faltan, nunca=self.nunca, tallas=self.tallas
+        )
 
     @property
     def motivo(self) -> str:

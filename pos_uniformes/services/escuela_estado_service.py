@@ -94,13 +94,15 @@ class EstadoDeEscuela:
     def salud(self) -> str:
         """El semáforo, con lo más urgente mandando.
 
-        `rojo` = el sistema cree que hay menos que nada (se vendió sin contar);
+        `rojo` = se vendió sin contar, **o** nunca se ha contado ni una talla;
         `ambar` = le falta contarse; `verde` = contada y al día.
 
         La regla vive en `conteo_mapa_service.semaforo`, no aquí y menos en
         quien lo pinta: el mapa, el panel, el celular y el kiosko tienen que
         estar de acuerdo en cuándo una escuela está en rojo."""
-        return conteo_mapa_service.semaforo(self.en_rojo, self.faltan_de_contar)
+        return conteo_mapa_service.semaforo(
+            self.en_rojo, self.faltan_de_contar, nunca=self.nunca, tallas=self.tallas
+        )
 
     @property
     def titular(self) -> str:

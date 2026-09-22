@@ -1055,7 +1055,7 @@ def build_mapa():
         "</div>"
         '<p style="color:var(--text-muted);font-size:12px;margin:8px 2px 0">'
         "El relleno dice el nivel y el anillo cómo va la escuela: "
-        '<b style="color:#c0392b">rojo</b> se vendió sin contar · '
+        '<b style="color:#c0392b">rojo</b> no sabemos qué hay (nunca contada, o se vendió sin contar) · '
         '<b style="color:#e08b1e">ámbar</b> le falta contarse · '
         '<b style="color:#3d6b2f">verde</b> al día. '
         "Necesita internet para pintar las calles.</p>"

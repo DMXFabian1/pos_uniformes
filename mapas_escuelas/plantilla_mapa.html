@@ -154,9 +154,10 @@ let SEG = {};
 try { SEG = JSON.parse(localStorage.getItem("mapaEscuelasSeguimiento") || "{}"); } catch (err) {}
 
 // Cómo va la escuela en el POS (lo dice escuela_estado_service, aquí solo se
-// pinta): rojo = se vendió sin contar, ámbar = le falta contarse, verde = al día.
+// pinta): rojo = no sabemos qué hay (nunca se contó, o se vendió sin contar),
+// ámbar = le falta contarse, verde = al día.
 const SALUD = { rojo: "#c0392b", ambar: "#e08b1e", verde: "#3d6b2f" };
-const SALUD_TXT = { rojo: "se vendió sin contar", ambar: "le falta contarse", verde: "al día" };
+const SALUD_TXT = { rojo: "no sabemos qué hay", ambar: "le falta contarse", verde: "al día" };
 
 function plural(n, una, muchas) {
   return n === 1 ? una : muchas;

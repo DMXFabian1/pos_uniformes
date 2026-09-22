@@ -189,9 +189,21 @@ class SaludTest(_Base):
         self._var(p, "9-12", stock=5)
         self.assertEqual(self.estado().salud, "rojo")
 
-    def test_si_le_falta_contarse_va_en_ambar(self):
+    def test_nunca_contada_va_en_rojo(self):
+        """Daniel, 2026-09-22: si nadie la ha contado nunca, el número no lo
+        verificó nadie — es tan ciego como una talla en negativo."""
         p = self._prod("Playera JS", escuela=self.esc)
         self._var(p, "10", stock=4)
+        self.assertEqual(self.estado().salud, "rojo")
+        self.assertEqual(self.estado().titular, "nunca se ha contado")
+
+    def test_contada_a_medias_va_en_ambar(self):
+        # Una talla al día y otra sin contar: ya no es ciega, le falta terminar.
+        p = self._prod("Playera JS", escuela=self.esc)
+        contada = self._var(p, "10", stock=4)
+        self._var(p, "12", stock=4)
+        contada.ultimo_conteo_at = datetime.now(timezone.utc)
+        self.s.flush()
         self.assertEqual(self.estado().salud, "ambar")
 
     def test_una_escuela_sin_prendas_no_esta_en_rojo(self):

@@ -22,8 +22,19 @@ class SemaforoTest(unittest.TestCase):
         self.assertEqual(cm.semaforo(en_rojo=1, faltan=0), "rojo")
         self.assertEqual(cm.semaforo(en_rojo=1, faltan=99), "rojo")
 
+    def test_nunca_contada_tambien_es_rojo(self):
+        # Daniel, 2026-09-22: nadie verificó ese número nunca; es tan ciego
+        # como una talla en negativo.
+        self.assertEqual(cm.semaforo(en_rojo=0, faltan=9, nunca=9, tallas=9), "rojo")
+
+    def test_contada_a_medias_es_ambar_no_rojo(self):
+        self.assertEqual(cm.semaforo(en_rojo=0, faltan=7, nunca=7, tallas=9), "ambar")
+
     def test_si_le_falta_contarse_va_en_ambar(self):
         self.assertEqual(cm.semaforo(en_rojo=0, faltan=7), "ambar")
+
+    def test_sin_nada_que_contar_no_es_una_urgencia(self):
+        self.assertEqual(cm.semaforo(en_rojo=0, faltan=0, nunca=0, tallas=0), "verde")
 
     def test_contada_y_al_dia_va_en_verde(self):
         self.assertEqual(cm.semaforo(en_rojo=0, faltan=0), "verde")

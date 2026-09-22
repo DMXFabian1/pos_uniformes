@@ -44,15 +44,19 @@ def estado_talla(v) -> str:
 ROJO, AMBAR, VERDE = "rojo", "ambar", "verde"
 
 
-def semaforo(en_rojo: int, faltan: int) -> str:
+def semaforo(en_rojo: int, faltan: int, *, nunca: int = 0, tallas: int = 0) -> str:
     """Cómo va algo que se cuenta: una escuela, un tipo de básicos, lo que sea.
 
-    `rojo` = el sistema cree que hay menos que nada, o sea que se vendió sin
-    contar; es lo más urgente y le gana a cualquier vigencia.
-    `ambar` = le falta contarse (nunca se contó, o ya venció).
+    `rojo` en dos casos, y los dos quieren decir *"aquí no sabemos qué hay"*:
+      - el sistema cree que hay **menos que nada** (se vendió sin contar), o
+      - **nunca se ha contado** ni una talla, así que el número nunca fue
+        verificado por nadie (Daniel, 2026-09-22).
+    `ambar` = le falta contarse: ya venció, o se contó a medias.
     `verde` = contado y al día.
     """
     if en_rojo:
+        return ROJO
+    if tallas and nunca >= tallas:
         return ROJO
     if faltan:
         return AMBAR
