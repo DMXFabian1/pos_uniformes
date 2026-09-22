@@ -162,8 +162,10 @@ class SeccionConteosTests(unittest.TestCase):
         fuente = inspect.getsource(QuoteSatelliteWindow._conteos_alternar_tabla)
         self.assertIn("conteos_historial_table.setVisible(tabla)", fuente)
         self.assertIn("conteos_mapa.setVisible(not tabla)", fuente)
-        refresco = inspect.getsource(QuoteSatelliteWindow._refresh_conteos_vista)
-        self.assertIn("mapa.recargar()", refresco)
+        # El refresco lee en un hilo y pinta al volver (2026-09-22): el mapa
+        # se recarga cuando llegan los datos, no dentro del refresco.
+        pintado = inspect.getsource(QuoteSatelliteWindow._on_conteos_datos_listos)
+        self.assertIn("mapa.recargar()", pintado)
 
     def test_los_mosaicos_dicen_quien_la_esta_contando(self) -> None:
         from pos_uniformes.services import conteo_jornada_service as jn
