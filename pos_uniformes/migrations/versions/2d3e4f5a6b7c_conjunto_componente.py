@@ -25,7 +25,6 @@ def upgrade() -> None:
         sa.Column("conjunto_id", sa.Integer(), sa.ForeignKey("producto.id", ondelete="CASCADE"), nullable=False),
         sa.Column("componente_id", sa.Integer(), sa.ForeignKey("producto.id", ondelete="RESTRICT"), nullable=False),
         sa.Column("cantidad", sa.Integer(), nullable=False, server_default="1"),
-        sa.Column("grupo", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
         sa.UniqueConstraint("conjunto_id", "componente_id", name="uq_conjunto_componente"),
         sa.CheckConstraint("cantidad <> 0", name="conjunto_componente_cantidad_no_cero"),
