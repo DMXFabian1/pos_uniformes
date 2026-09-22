@@ -699,13 +699,13 @@ class LoQueTocaTests(unittest.TestCase):
     def _mapa(self, escuelas=(), basicos=()):
         return {"escuelas": list(escuelas), "basicos": list(basicos)}
 
-    def _escuela(self, nombre, eid, *, tallas, al_dia, viejas=0, nunca=0, en_proceso=""):
+    def _escuela(self, nombre, eid, *, tallas, al_dia, viejas=0, nunca=0, en_proceso="", en_rojo=0):
         return {"nombre": nombre, "escuela_id": eid, "tallas": tallas, "al_dia": al_dia,
-                "viejas": viejas, "nunca": nunca, "en_proceso": en_proceso}
+                "viejas": viejas, "nunca": nunca, "en_proceso": en_proceso, "en_rojo": en_rojo}
 
-    def _basico(self, tipo, *, tallas, al_dia, viejas=0, nunca=0, en_proceso=""):
+    def _basico(self, tipo, *, tallas, al_dia, viejas=0, nunca=0, en_proceso="", en_rojo=0):
         return {"tipo_pieza": tipo, "tallas": tallas, "al_dia": al_dia,
-                "viejas": viejas, "nunca": nunca, "en_proceso": en_proceso}
+                "viejas": viejas, "nunca": nunca, "en_proceso": en_proceso, "en_rojo": en_rojo}
 
     def _correr(self, mapa, ultimos=None):
         from unittest.mock import patch
@@ -713,6 +713,41 @@ class LoQueTocaTests(unittest.TestCase):
 
         with patch.object(jn, "ultimos_conteos", return_value=ultimos or {}):
             return jn.lo_que_toca(None, mapa=mapa)
+
+    def test_lo_que_esta_en_rojo_va_primero_aunque_se_haya_contado_ayer(self) -> None:
+        """El sistema cree que hay menos que nada: alguien vendió sin contar."""
+        mapa = self._mapa(
+            basicos=[
+                self._basico("Calceta", tallas=42, al_dia=42, en_rojo=5),
+                self._basico("Jumper", tallas=20, al_dia=2, nunca=18),
+            ],
+        )
+        filas = self._correr(mapa)
+        self.assertEqual(filas[0].titulo, "Básicos · Calceta", "lo rojo le gana a la vigencia")
+        self.assertEqual(filas[0].motivo, "5 tallas en rojo · se vendió sin contar")
+
+    def test_una_sola_talla_en_rojo_se_dice_en_singular(self) -> None:
+        mapa = self._mapa(basicos=[self._basico("Bata", tallas=37, al_dia=37, en_rojo=1)])
+        filas = self._correr(mapa)
+        self.assertEqual(filas[0].motivo, "una talla en rojo · se vendió sin contar")
+
+    def test_entre_dos_rojos_va_primero_el_mas_rojo(self) -> None:
+        mapa = self._mapa(
+            basicos=[
+                self._basico("Corbatín", tallas=9, al_dia=9, en_rojo=2),
+                self._basico("Calceta", tallas=42, al_dia=42, en_rojo=5),
+            ],
+        )
+        self.assertEqual(
+            [f.titulo for f in self._correr(mapa)],
+            ["Básicos · Calceta", "Básicos · Corbatín"],
+        )
+
+    def test_lo_rojo_que_alguien_esta_contando_no_se_vuelve_a_ofrecer(self) -> None:
+        mapa = self._mapa(
+            basicos=[self._basico("Calceta", tallas=42, al_dia=42, en_rojo=5, en_proceso="Fanny")],
+        )
+        self.assertEqual(self._correr(mapa), [], "ya la están contando")
 
     def test_lo_completo_no_aparece_y_lo_incompleto_si(self) -> None:
         mapa = self._mapa(

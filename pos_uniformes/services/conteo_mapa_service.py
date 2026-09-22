@@ -44,6 +44,10 @@ def _cifras(variantes) -> dict:
     dias = [v.dias_desde_conteo for v in variantes if v.dias_desde_conteo is not None]
     return {
         "tallas": total, "al_dia": c[AL_DIA], "viejas": c[VIEJA], "nunca": c[NUNCA],
+        # En rojo: el sistema cree que hay menos que nada. Nadie tiene -3 calcetas,
+        # así que es la tienda avisando que esa talla se vendió sin estar contada.
+        # Es la señal más fuerte de que hay que contarla, más que la vigencia.
+        "en_rojo": sum(1 for v in variantes if v.stock_actual < 0),
         "pct_al_dia": round(100 * c[AL_DIA] / total) if total else 0,
         "ultimo_dias": min(dias) if dias else None,   # el conteo más reciente que la tocó
         "estado": AL_DIA if total and c[AL_DIA] == total else (NUNCA if total and c[NUNCA] == total else (VIEJA if total else NUNCA)),

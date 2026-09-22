@@ -1042,6 +1042,7 @@ class PorContar:
     nunca: int           # nunca se han contado
     ultimo: UltimoConteo
     quien_en_proceso: str = ""
+    en_rojo: int = 0     # tallas cuya existencia quedó por debajo de cero
 
     @property
     def faltan(self) -> int:
@@ -1054,6 +1055,9 @@ class PorContar:
 
     @property
     def motivo(self) -> str:
+        if self.en_rojo:
+            cuantas = "una talla" if self.en_rojo == 1 else f"{self.en_rojo} tallas"
+            return f"{cuantas} en rojo · se vendió sin contar"
         if self.al_dia == 0:
             return "nunca se ha contado" if self.nunca == self.tallas else f"le toca · {self.faltan} tallas"
         return f"faltan {self.faltan} de {self.tallas} tallas"
@@ -1065,9 +1069,11 @@ def lo_que_toca(session: Session, *, limite: int | None = None, mapa: dict | Non
     contando ahora no entra.
 
     Orden, de lo que más conviene hacer primero:
-      1. lo **empezado** (falta poco para cerrarlo), de lo que menos falta al que más;
-      2. lo **vencido** entero, de lo más viejo a lo más nuevo;
-      3. lo que **nunca** se ha contado, por nombre.
+      1. lo que está **en rojo** (existencia por debajo de cero: se vendió sin
+         contar), de lo más rojo al menos — entra aunque se haya contado ayer;
+      2. lo **empezado** (falta poco para cerrarlo), de lo que menos falta al que más;
+      3. lo **vencido** entero, de lo más viejo a lo más nuevo;
+      4. lo que **nunca** se ha contado, por nombre.
 
     `mapa`: `conteo_mapa_service.resumen()` ya calculado, para no pedirlo dos veces.
     """
@@ -1083,6 +1089,7 @@ def lo_que_toca(session: Session, *, limite: int | None = None, mapa: dict | Non
                 tallas=int(e["tallas"]), al_dia=int(e["al_dia"]), viejas=int(e["viejas"]), nunca=int(e["nunca"]),
                 ultimo=ultimo_conteo_de(ultimos, int(e["escuela_id"])),
                 quien_en_proceso=str(e.get("en_proceso") or ""),
+                en_rojo=int(e.get("en_rojo") or 0),
             )
         )
     for b in datos.get("basicos", []):
@@ -1093,16 +1100,21 @@ def lo_que_toca(session: Session, *, limite: int | None = None, mapa: dict | Non
                 tallas=int(b["tallas"]), al_dia=int(b["al_dia"]), viejas=int(b["viejas"]), nunca=int(b["nunca"]),
                 ultimo=ultimo_conteo_de(ultimos, None, tipo),
                 quien_en_proceso=str(b.get("en_proceso") or ""),
+                en_rojo=int(b.get("en_rojo") or 0),
             )
         )
-    pendientes = [f for f in filas if f.faltan > 0 and not f.quien_en_proceso]
+    # Lo que está en rojo entra aunque se haya contado ayer: que el sistema crea
+    # que hay menos que nada le gana a cualquier vigencia.
+    pendientes = [f for f in filas if (f.faltan > 0 or f.en_rojo) and not f.quien_en_proceso]
 
     def orden(f: PorContar):
+        if f.en_rojo:
+            return (0, -f.en_rojo, f.titulo)
         if f.empezado:
-            return (0, f.faltan, f.titulo)
+            return (1, f.faltan, f.titulo)
         if f.ultimo.fecha is not None:
-            return (1, -(f.ultimo.dias() or 0), f.titulo)
-        return (2, 0, f.titulo)
+            return (2, -(f.ultimo.dias() or 0), f.titulo)
+        return (3, 0, f.titulo)
 
     pendientes.sort(key=orden)
     return pendientes[:limite] if limite is not None else pendientes
