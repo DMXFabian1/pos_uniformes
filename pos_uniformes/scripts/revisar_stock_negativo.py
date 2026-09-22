@@ -87,8 +87,9 @@ def ids_de_conjuntos(session) -> set[int]:
 def reconciliar(session) -> tuple[int, int]:
     """Sube a cero lo que está en rojo y recalcula los conjuntos.
 
-    Devuelve `(tallas ajustadas, conjuntos recalculados)`. Cada ajuste deja su
-    movimiento, firmado, para poder auditarlo después."""
+    Devuelve `(tallas ajustadas, conjuntos recalculados, conjuntos sin piezas en
+    su talla)`. Cada ajuste deja su movimiento, firmado, para poder auditarlo
+    después."""
     conjuntos = ids_de_conjuntos(session)
     ajustadas = 0
     recalculadas = 0
@@ -121,7 +122,33 @@ def reconciliar(session) -> tuple[int, int]:
             recalculadas += conjunto_service.sincronizar_conjunto(
                 session, v.producto_id, creado_por=FIRMA
             )
-    return ajustadas, recalculadas
+
+    # Los que ni así: su talla no existe en alguna de sus piezas, así que
+    # `stock_derivado` no tiene de dónde sacar el número y `sincronizar_conjunto`
+    # los salta. Sin esto se quedan en rojo para siempre — le pasó al Pants 3pz
+    # de Álvaro Obregón en la tienda el 22/09, que aguantó dos reconciliaciones.
+    # Un conjunto que no se puede armar en esa talla tiene cero, no menos.
+    huerfanas = 0
+    for v in listar_negativas(session):
+        if v.producto_id not in conjuntos:
+            continue
+        InventarioService.registrar_movimiento(
+            session=session,
+            variante=v,
+            tipo_movimiento=TipoMovimientoInventario.AJUSTE_ENTRADA,
+            cantidad=-v.stock_actual,
+            # El prefijo `derivado:` es lo que evita que el movimiento se reparta
+            # entre sus piezas: aquí se quiere mover el conjunto mismo.
+            referencia=f"{conjunto_service.PREFIJO_DERIVADO}{int(v.producto_id)}",
+            observacion=(
+                "Reconciliación: no se puede armar en esta talla (alguna pieza "
+                "no la tiene), así que no hay de dónde calcularlo. Queda en cero."
+            ),
+            creado_por=FIRMA,
+        )
+        huerfanas += 1
+
+    return ajustadas, recalculadas, huerfanas
 
 
 def main() -> None:
@@ -168,9 +195,15 @@ def main() -> None:
             print("Y para arreglarlas de verdad: contarlas. Empieza por las de arriba.")
             return
 
-        ajustadas, recalculadas = reconciliar(session)
+        ajustadas, recalculadas, huerfanas = reconciliar(session)
         session.commit()
         print(f"\nListo: {ajustadas} tallas subidas a cero, {recalculadas} conjuntos recalculados.")
+        if huerfanas:
+            print(
+                f"{huerfanas} conjunto(s) quedaron en cero porque no se pueden armar en esa "
+                "talla: alguna de sus piezas no la tiene. Vale la pena revisar la receta "
+                "o quitarle esa talla al conjunto."
+            )
         print("Cada una dejó su movimiento de ajuste, así que se puede auditar después.")
 
 

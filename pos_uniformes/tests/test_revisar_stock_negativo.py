@@ -86,7 +86,7 @@ class ReconciliarTest(_Base):
         p = self._prod("Calceta Escolar Blanca")
         v = self._var(p, "13-18", -4)
 
-        ajustadas, recalculadas = rsn.reconciliar(self.s)
+        ajustadas, recalculadas, _ = rsn.reconciliar(self.s)
         self.assertEqual((ajustadas, recalculadas), (1, 0))
         self.assertEqual(v.stock_actual, 0, "deja de mentir hacia abajo")
 
@@ -126,7 +126,7 @@ class ReconciliarTest(_Base):
         ])
         self.s.flush()
 
-        ajustadas, _ = rsn.reconciliar(self.s)
+        ajustadas, _r, _h = rsn.reconciliar(self.s)
         self.assertEqual(ajustadas, 0, "el conjunto no cuenta como talla ajustada")
         self.assertEqual(conjunto.stock_actual, 4, "lo que alcanzan sus piezas")
 
@@ -147,16 +147,61 @@ class ReconciliarTest(_Base):
         ])
         self.s.flush()
 
-        ajustadas, _ = rsn.reconciliar(self.s)
+        ajustadas, _r, _h = rsn.reconciliar(self.s)
         self.assertEqual(ajustadas, 2, "las dos piezas")
         self.assertEqual(conjunto.stock_actual, 0, "una sola pasada tiene que bastar")
         self.assertEqual(rsn.listar_negativas(self.s), [], "no queda nada en rojo")
+
+    def test_el_conjunto_que_no_se_puede_armar_en_esa_talla_queda_en_cero(self):
+        """El caso que aguantó dos reconciliaciones en la tienda (22/09).
+
+        El Pants 3pz tiene talla 14 pero su playera no, así que `stock_derivado`
+        devuelve None y `sincronizar_conjunto` lo salta. Sin esta pasada se
+        queda en rojo para siempre: ni se recalcula ni se ajusta."""
+        pants = self._prod("Pants 2pz Liso", "Pants 2pz")
+        playera = self._prod("Playera Lisa", "Playera")
+        tres = self._prod("Pants 3pz Liso", "Chamarra")
+        self._var(pants, "14", 5)
+        self._var(playera, "10", 5)      # la playera NO tiene la 14
+        conjunto = self._var(tres, "14", -1)
+        self.s.add_all([
+            ConjuntoComponente(conjunto_id=tres.id, componente_id=pants.id, cantidad=1, grupo=0),
+            ConjuntoComponente(conjunto_id=tres.id, componente_id=playera.id, cantidad=1, grupo=1),
+        ])
+        self.s.flush()
+        self.assertIsNone(
+            __import__("pos_uniformes.services.conjunto_service", fromlist=["x"]).stock_derivado(self.s, conjunto),
+            "el escenario es el correcto: no hay de dónde calcularlo",
+        )
+
+        ajustadas, recalculadas, huerfanas = rsn.reconciliar(self.s)
+        self.assertEqual((ajustadas, recalculadas, huerfanas), (0, 0, 1))
+        self.assertEqual(conjunto.stock_actual, 0)
+        self.assertEqual(rsn.listar_negativas(self.s), [], "una sola pasada basta")
+
+    def test_ajustar_el_conjunto_no_mueve_sus_piezas(self):
+        # Un movimiento normal sobre un conjunto se reparte entre sus piezas;
+        # por eso este lleva el prefijo `derivado:`.
+        pants = self._prod("Pants 2pz Liso", "Pants 2pz")
+        playera = self._prod("Playera Lisa", "Playera")
+        tres = self._prod("Pants 3pz Liso", "Chamarra")
+        p14 = self._var(pants, "14", 5)
+        self._var(playera, "10", 5)
+        self._var(tres, "14", -2)
+        self.s.add_all([
+            ConjuntoComponente(conjunto_id=tres.id, componente_id=pants.id, cantidad=1, grupo=0),
+            ConjuntoComponente(conjunto_id=tres.id, componente_id=playera.id, cantidad=1, grupo=1),
+        ])
+        self.s.flush()
+
+        rsn.reconciliar(self.s)
+        self.assertEqual(p14.stock_actual, 5, "las piezas no se tocan")
 
     def test_correrlo_dos_veces_no_hace_dano(self):
         p = self._prod("Calceta Escolar Blanca")
         v = self._var(p, "13-18", -2)
         rsn.reconciliar(self.s)
-        ajustadas, _ = rsn.reconciliar(self.s)
+        ajustadas, _r, _h = rsn.reconciliar(self.s)
         self.assertEqual(ajustadas, 0)
         self.assertEqual(v.stock_actual, 0)
 
