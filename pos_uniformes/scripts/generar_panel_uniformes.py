@@ -199,6 +199,9 @@ def fetch_all_data(conn):
         LEFT JOIN bodega_stock bs ON bs.variante_id = v.id
         LEFT JOIN school_products sp ON sp.producto_id = p.id
         WHERE v.activo = true AND p.activo = true
+          -- Los conjuntos (Pants 3pz, Chamarra) no se suman: su existencia es
+          -- la del pants 2pz y la playera que ya vienen contados.
+          AND p.id NOT IN (SELECT conjunto_id FROM conjunto_componente)
     """)
     row = cur.fetchone()
     stats["stock_total"] = int(row[0])
@@ -316,6 +319,7 @@ def fetch_all_data(conn):
         JOIN producto p ON p.id = v.producto_id AND p.activo = true
         JOIN nivel_educativo ne ON ne.id = p.nivel_educativo_id
         WHERE v.activo = true AND p.escuela_id IS NOT NULL
+          AND p.id NOT IN (SELECT conjunto_id FROM conjunto_componente)
         GROUP BY ne.nombre
         ORDER BY ne.nombre
     """)

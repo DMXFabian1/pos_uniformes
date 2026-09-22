@@ -453,6 +453,24 @@ def sincronizar_todo(session: Session, *, creado_por: str = "SYSTEM") -> int:
     return sum(sincronizar_conjunto(session, c.id, creado_por=creado_por) for c in conjuntos_activos(session))
 
 
+# ------------------------------------------------------- totales del inventario
+
+def filtro_sin_conjuntos():
+    """Para no contar dos veces: un Pants 3pz con receta **es** el pants 2pz y
+    la playera que ya están en el estante, así que su existencia no se suma a
+    los totales (piezas en tienda, valor del inventario, stock bajo). El stock
+    por talla del conjunto sigue siendo el bueno para vender y para el kiosko;
+    lo que no se hace es sumarlo aparte."""
+    from pos_uniformes.database.models import Producto as _P
+
+    return ~_P.id.in_(select(ConjuntoComponente.conjunto_id))
+
+
+SQL_SIN_CONJUNTOS = (
+    "p.id NOT IN (SELECT conjunto_id FROM conjunto_componente)"
+)
+
+
 # ------------------------------------------------------------------- la venta
 
 def descomponer(

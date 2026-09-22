@@ -150,6 +150,7 @@ from pos_uniformes.services.cash_session_history_service import build_cash_sessi
 from pos_uniformes.services.caja_service import CajaService
 from pos_uniformes.services.client_service import ClientService
 from pos_uniformes.services.employee_identity_service import EmployeeIdentityService
+from pos_uniformes.services import conjunto_service
 from pos_uniformes.services.catalog_service import CatalogService
 from pos_uniformes.services.catalog_snapshot_service import load_catalog_snapshot_rows
 from pos_uniformes.services.catalog_mutation_service import (
@@ -9312,7 +9313,12 @@ class MainWindow(QMainWindow):
                 select(func.count(Proveedor.id)).scalar_subquery(),
                 select(func.count(Producto.id)).scalar_subquery(),
                 select(func.count(Variante.id)).scalar_subquery(),
-                select(func.coalesce(func.sum(Variante.stock_actual), 0)).scalar_subquery(),
+                # Sin los conjuntos (3pz, chamarra): su existencia es la de sus
+                # piezas, sumarla otra vez inflaria el total. Ver conjunto_service.
+                select(func.coalesce(func.sum(Variante.stock_actual), 0))
+                .select_from(Variante).join(Variante.producto)
+                .where(conjunto_service.filtro_sin_conjuntos())
+                .scalar_subquery(),
                 select(func.count(Compra.id)).scalar_subquery(),
                 select(func.count(Venta.id)).scalar_subquery(),
                 select(func.count(Venta.id))
@@ -9325,7 +9331,8 @@ class MainWindow(QMainWindow):
                 .where(Compra.estado == EstadoCompra.CONFIRMADA)
                 .scalar_subquery(),
                 select(func.count(Variante.id))
-                .where(Variante.stock_actual <= 3)
+                .select_from(Variante).join(Variante.producto)
+                .where(Variante.stock_actual <= 3, conjunto_service.filtro_sin_conjuntos())
                 .scalar_subquery(),
             )
         ).one()

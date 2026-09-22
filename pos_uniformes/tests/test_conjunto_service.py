@@ -323,3 +323,30 @@ class GrupoLegadoTests(_Base):
         self.s.commit()
         cs.reagrupar_por_tipo_de_pieza(self.s); self.s.commit()
         self.assertEqual(cs.receta_texto(self.s, self.p3.id), "se arma de Pants 2pz Deportivo JS + Playera Deportiva JS o Playera Deportiva M JS")
+
+
+class TotalesTests(_Base):
+    """Un 3pz con receta ES el pants 2pz y la playera que ya están contados:
+    su existencia no se suma otra vez a los totales del inventario."""
+
+    def test_el_filtro_deja_fuera_solo_a_los_conjuntos_con_receta(self) -> None:
+        from sqlalchemy import func
+        total = lambda: int(self.s.scalar(  # noqa: E731
+            select(func.coalesce(func.sum(Variante.stock_actual), 0))
+            .select_from(Variante).join(Variante.producto)
+            .where(cs.filtro_sin_conjuntos())
+        ))
+        todo = int(self.s.scalar(select(func.coalesce(func.sum(Variante.stock_actual), 0))))
+        self.assertEqual(total(), todo)          # sin recetas, nada se excluye
+        self._armar()
+        self.s.commit()
+        derivado = sum(
+            int(v.stock_actual)
+            for p in (self.p3, self.cham)
+            for v in self.s.scalars(select(Variante).where(Variante.producto_id == p.id)).all()
+        )
+        self.assertGreater(derivado, 0)
+        self.assertEqual(total(), int(self.s.scalar(select(func.coalesce(func.sum(Variante.stock_actual), 0)))) - derivado)
+        # y las prendas normales siguen contando
+        self.assertIn(self.p2.id, [v.producto_id for v in self.s.scalars(
+            select(Variante).join(Variante.producto).where(cs.filtro_sin_conjuntos())).all()])
