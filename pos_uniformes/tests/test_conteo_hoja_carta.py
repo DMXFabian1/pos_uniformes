@@ -170,3 +170,40 @@ class ImpresionTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SoloLoQueFaltaTests(unittest.TestCase):
+    """La hoja de algo empezado sale solo con lo que falta: no se recuenta lo
+    que ya está al día (Daniel, 2026-09-22: la Calceta se contó de un color)."""
+
+    def _variante(self, vid, *, dias, requiere):
+        from types import SimpleNamespace
+
+        return SimpleNamespace(
+            variante_id=vid, sku=f"S{vid}", talla=str(vid), color="X",
+            dias_desde_conteo=dias, requiere_conteo=requiere,
+        )
+
+    def test_deja_fuera_las_contadas_y_vigentes(self) -> None:
+        from pos_uniformes.services.conteo_hoja_carta_service import _solo_lo_que_falta
+
+        grupos = [
+            {"producto_nombre": "Calceta Blanca", "tipo_pieza": "Calceta", "variantes": [
+                self._variante(1, dias=2, requiere=False),    # al día
+                self._variante(2, dias=None, requiere=True),  # nunca
+                self._variante(3, dias=200, requiere=True),   # vencida
+            ]},
+            {"producto_nombre": "Calceta Negra", "tipo_pieza": "Calceta", "variantes": [
+                self._variante(4, dias=1, requiere=False),    # toda al día → la prenda desaparece
+            ]},
+        ]
+        salida = _solo_lo_que_falta(grupos)
+        self.assertEqual([g["producto_nombre"] for g in salida], ["Calceta Blanca"])
+        self.assertEqual([v.variante_id for v in salida[0]["variantes"]], [2, 3])
+
+    def test_si_no_falta_nada_devuelve_vacio_y_la_hoja_sale_completa(self) -> None:
+        from pos_uniformes.services.conteo_hoja_carta_service import _solo_lo_que_falta
+
+        grupos = [{"producto_nombre": "Calceta Blanca", "tipo_pieza": "Calceta",
+                   "variantes": [self._variante(1, dias=1, requiere=False)]}]
+        self.assertEqual(_solo_lo_que_falta(grupos), [])

@@ -3881,13 +3881,12 @@ class QuoteSatelliteWindow(QMainWindow):
         col.addWidget(nombre)
         if fila.ultimo.fecha is None:
             detalle, color = "nunca se ha contado", "#b91c1c"
-        elif fila.quedo_a_medias:
-            # Se contó, pero se cerró sin terminar: faltan prendas enteras
-            # (la Calceta se contó de un color y faltaron los otros seis).
-            detalle = f"faltan {fila.prendas_faltantes} de {fila.prendas_total} prendas · se contó {fila.ultimo.texto()}"
+        elif fila.empezado:
+            # Se contó una parte: la hoja saldrá solo con lo que falta.
+            detalle = f"{fila.motivo} · se contó {fila.ultimo.texto()}"
             color = "#b45309"
         else:
-            detalle, color = f"último: {fila.ultimo.texto()}", "#8a8177"
+            detalle, color = f"{fila.motivo} · último: {fila.ultimo.texto()}", "#8a8177"
         sub = QLabel(detalle)
         sub.setWordWrap(True)
         sub.setStyleSheet(f"font-size: 12px; color: {color}; background: transparent; border: none;")
@@ -3898,6 +3897,7 @@ class QuoteSatelliteWindow(QMainWindow):
         boton.clicked.connect(
             lambda _c=False, f=fila: self._conteos_imprimir_hoja(
                 escuela_id=f.escuela_id, tipo_pieza=f.tipo_pieza, titulo=f.titulo,
+                solo_lo_que_falta=f.empezado,
             )
         )
         ly.addWidget(boton)
@@ -3941,7 +3941,7 @@ class QuoteSatelliteWindow(QMainWindow):
                         ]
                         datos["por_revisar"] = [(jn.ref(j), avances[int(j.id)]) for j in pendientes]
                         datos["recientes"] = jn.tablero_conteos(session, cache=cache)
-                        datos["toca"] = jn.lo_que_toca(session, filas=datos["recientes"])
+                        datos["toca"] = jn.lo_que_toca(session)
             except Exception:  # noqa: BLE001 — sin conexión: la página sigue
                 logger.exception("Conteos: no se pudieron leer las jornadas")
                 datos["sin_conexion"] = True
@@ -3976,7 +3976,10 @@ class QuoteSatelliteWindow(QMainWindow):
         if mapa is not None and mapa.isVisible():
             mapa.recargar()   # en hilo; no más de una vez por minuto
 
-    def _conteos_imprimir_hoja(self, *, escuela_id=None, tipo_pieza: str = "", titulo: str = "", prenda: str = "") -> None:
+    def _conteos_imprimir_hoja(
+        self, *, escuela_id=None, tipo_pieza: str = "", titulo: str = "", prenda: str = "",
+        solo_lo_que_falta: bool = False,
+    ) -> None:
         """La hoja de conteo en papel carta (HP), para una escuela o prenda.
 
         Mismo orden y numeración que la pantalla de captura. La tira térmica
@@ -4026,6 +4029,7 @@ class QuoteSatelliteWindow(QMainWindow):
             with get_session() as session:
                 titulo, grupos = grupos_para_hoja(
                     session, escuela_id=dlg.escuela_id, tipo_pieza=dlg.tipo_pieza, prenda=getattr(dlg, "prenda", ""),
+                    solo_lo_que_falta=solo_lo_que_falta,
                 )
             if not grupos:
                 QMessageBox.information(self, "Sin piezas", f"{titulo} no tiene piezas para contar.")

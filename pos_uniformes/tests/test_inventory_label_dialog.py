@@ -9,6 +9,7 @@ from types import SimpleNamespace
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
+from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication, QDialog, QLabel, QPushButton, QVBoxLayout, QWidget
 
 from pos_uniformes.ui.dialogs.inventory_label_dialog import build_inventory_label_dialog
@@ -145,13 +146,17 @@ class InventoryLabelDialogTouchTests(unittest.TestCase):
                 )
             dialog = captured["dialog"]
             botones = {b.text(): b for b in dialog.findChildren(QPushButton)}
-            from PyQt6.QtTest import QTest
-
             botones["Split"].click()
             botones["+"].click()
             botones["+"].click()
             botones["−"].click()
-            QTest.qWait(400)  # el render de copias va con retraso (debounce)
+            # El render de copias va con retraso (debounce de 250 ms). Se dispara
+            # su timer a mano en vez de esperar con `QTest.qWait`: bombear el
+            # bucle de eventos aquí dejaba entrar cosas de otras pruebas y el
+            # proceso se caía al azar en la suite en paralelo (2026-09-22).
+            timer = next(t for t in dialog.findChildren(QTimer) if t.isSingleShot() and t.interval() == 250)
+            timer.stop()
+            timer.timeout.emit()
             botones["✓  💲 Mostrar precio"].click()  # apaga el precio
 
             self.assertEqual(render_calls[0], ("standard", 1, True))
@@ -162,7 +167,7 @@ class InventoryLabelDialogTouchTests(unittest.TestCase):
 
             # Chip rápido: un toque fija 20 copias (y el chip queda marcado)
             botones["20"].click()
-            QTest.qWait(400)
+            timer.stop(); timer.timeout.emit()
             self.assertEqual(render_calls[-1], ("split", 20, False))
             self.assertTrue(botones["20"].isChecked())
             # Mantener presionado: los botones cuentan solos

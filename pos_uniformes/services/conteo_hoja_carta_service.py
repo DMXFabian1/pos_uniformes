@@ -231,12 +231,35 @@ def construir_hoja_html(
     return "\n".join(partes)
 
 
-def grupos_para_hoja(session, *, escuela_id: int | None, tipo_pieza: str = "", prenda: str = "") -> tuple[str, list[dict]]:
-    """(título, grupos) para una escuela, un tipo de básicos o una sola prenda."""
+def _solo_lo_que_falta(grupos: list[dict]) -> list[dict]:
+    """Los mismos grupos, sin las tallas contadas y vigentes; las prendas que
+    quedan vacías desaparecen."""
+    from pos_uniformes.services.conteo_mapa_service import AL_DIA, estado_talla
+
+    recortados = []
+    for g in grupos:
+        faltan = [v for v in g["variantes"] if estado_talla(v) != AL_DIA]
+        if faltan:
+            recortados.append({**g, "variantes": faltan})
+    return recortados
+
+
+def grupos_para_hoja(
+    session, *, escuela_id: int | None, tipo_pieza: str = "", prenda: str = "", solo_lo_que_falta: bool = False
+) -> tuple[str, list[dict]]:
+    """(título, grupos) para una escuela, un tipo de básicos o una sola prenda.
+
+    `solo_lo_que_falta`: deja fuera las tallas que ya están contadas y al día,
+    para terminar lo que quedó a medias sin recontar lo hecho (Daniel,
+    2026-09-22: la Calceta se contó de un color y faltaban seis). Si con eso no
+    queda nada, se devuelve la hoja completa: es lo que la persona espera al
+    pedir una hoja."""
     from pos_uniformes.database.models import Escuela
     from pos_uniformes.services.conteo_jornada_service import alcance, nombre_corto_prenda
 
     grupos = alcance(session, escuela_id, tipo_pieza, prenda)
+    if solo_lo_que_falta:
+        grupos = _solo_lo_que_falta(grupos) or grupos
     if escuela_id is None:
         titulo = f"Básicos · {nombre_corto_prenda(prenda)}" if prenda else (f"Básicos · {tipo_pieza}" if tipo_pieza else "Básicos")
     else:

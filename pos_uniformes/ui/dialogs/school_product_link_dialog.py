@@ -370,7 +370,15 @@ class SchoolProductLinkDialog(QDialog):
         color = {"success": "#1f6a3b", "warning": "#8a5a0a"}.get(tone, "#5f6d78")
         self._status_label.setText(text)
         self._status_label.setStyleSheet(f"color: {color}; font-size: 12px;")
-        QTimer.singleShot(4000, self._clear_status)
+        timer = getattr(self, "_status_timer", None)
+        if timer is None:
+            # Un QTimer del diálogo, no un `singleShot` suelto: si la ventana se
+            # cierra antes de que dispare, el timer se va con ella.
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.timeout.connect(self._clear_status)
+            self._status_timer = timer
+        timer.start(4000)
 
     def _clear_status(self) -> None:
         try:

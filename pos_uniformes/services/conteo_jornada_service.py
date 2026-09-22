@@ -1022,47 +1022,90 @@ def tablero_conteos(session: Session, *, cache: dict | None = None) -> list[Fila
     return filas
 
 
-def lo_que_toca(session: Session, *, limite: int | None = None, filas: list[FilaTablero] | None = None) -> list[FilaTablero]:
-    """Lo que hay que contar hoy: lo vencido (se le pasó la vigencia de su
-    escuela) y lo que nunca se ha contado. Lo que alguien ya está contando no
-    entra — para eso está "a medias".
+@dataclass(frozen=True)
+class PorContar:
+    """Algo que hay que contar: una escuela o un tipo de básicos, con cuántas
+    de sus tallas están sin contar o ya vencieron.
 
-    Orden: primero lo vencido, de lo más viejo a lo más nuevo; al final lo que
-    nunca se ha contado (Daniel, 2026-09-18: si todo trae ⚠, nada destaca).
-
-    `filas`: el tablero ya calculado, para no pedirlo dos veces.
+    Se mide **talla por talla**, igual que el mapa, no por la última jornada:
+    un tipo contado en dos tandas ya no se ve "a medias" para siempre, y lo
+    que se cerró sin terminar sigue apareciendo hasta que de verdad se cuente
+    (Daniel, 2026-09-22: la Calceta se contó de un color y faltaban seis).
     """
-    from pos_uniformes.services.conteo_calendario_service import escuelas_con_conteo_vencido
-    from pos_uniformes.services.conteo_service import obtener_estado_conteo_basicos
 
-    try:
-        vencidas = {int(e.escuela_id) for e in escuelas_con_conteo_vencido(session)}
-    except Exception:  # noqa: BLE001 — sin calendario, se decide solo por "nunca"
-        logger.exception("Conteos: no se pudo leer el calendario de vigencias")
-        vencidas = set()
-    try:
-        basicos_vencidos = bool(obtener_estado_conteo_basicos(session).requiere_conteo)
-    except Exception:  # noqa: BLE001
-        basicos_vencidos = False
+    titulo: str
+    escuela_id: int | None
+    tipo_pieza: str
+    tallas: int          # cuántas tiene en total
+    al_dia: int          # contadas y todavía vigentes
+    viejas: int          # contadas pero ya vencieron
+    nunca: int           # nunca se han contado
+    ultimo: UltimoConteo
+    quien_en_proceso: str = ""
 
-    del_tablero = tablero_conteos(session) if filas is None else filas
-    filas = []
-    for f in del_tablero:
-        if f.quien_en_proceso:
-            continue
-        nunca = f.ultimo.fecha is None
-        if f.escuela_id is not None:
-            vencio = int(f.escuela_id) in vencidas
-        else:
-            vencio = basicos_vencidos
-        # Lo que quedó a medias también toca, aunque se haya contado ayer: la
-        # Calceta se contó de un color y faltaron los otros seis.
-        if nunca or vencio or f.quedo_a_medias:
-            filas.append(f)
-    # Primero lo que quedó a medias (es lo más rápido de terminar), luego lo
-    # vencido de lo más viejo a lo más nuevo, y al final lo que nunca se contó.
-    filas.sort(key=lambda f: (not f.quedo_a_medias, f.ultimo.fecha is None, -(f.dias or 0), f.titulo))
-    return filas[:limite] if limite is not None else filas
+    @property
+    def faltan(self) -> int:
+        return self.viejas + self.nunca
+
+    @property
+    def empezado(self) -> bool:
+        """Ya se contó una parte: lo que falta es terminar."""
+        return self.al_dia > 0 and self.faltan > 0
+
+    @property
+    def motivo(self) -> str:
+        if self.al_dia == 0:
+            return "nunca se ha contado" if self.nunca == self.tallas else f"le toca · {self.faltan} tallas"
+        return f"faltan {self.faltan} de {self.tallas} tallas"
+
+
+def lo_que_toca(session: Session, *, limite: int | None = None, mapa: dict | None = None) -> list[PorContar]:
+    """Lo que hay que contar hoy, medido talla por talla (el mismo criterio del
+    mapa): lo que nunca se contó y lo que ya venció. Lo que alguien está
+    contando ahora no entra.
+
+    Orden, de lo que más conviene hacer primero:
+      1. lo **empezado** (falta poco para cerrarlo), de lo que menos falta al que más;
+      2. lo **vencido** entero, de lo más viejo a lo más nuevo;
+      3. lo que **nunca** se ha contado, por nombre.
+
+    `mapa`: `conteo_mapa_service.resumen()` ya calculado, para no pedirlo dos veces.
+    """
+    from pos_uniformes.services import conteo_mapa_service as mapa_service
+
+    datos = mapa if mapa is not None else mapa_service.resumen(session)
+    ultimos = ultimos_conteos(session)
+    filas: list[PorContar] = []
+    for e in datos.get("escuelas", []):
+        filas.append(
+            PorContar(
+                titulo=str(e["nombre"]), escuela_id=int(e["escuela_id"]), tipo_pieza="",
+                tallas=int(e["tallas"]), al_dia=int(e["al_dia"]), viejas=int(e["viejas"]), nunca=int(e["nunca"]),
+                ultimo=ultimo_conteo_de(ultimos, int(e["escuela_id"])),
+                quien_en_proceso=str(e.get("en_proceso") or ""),
+            )
+        )
+    for b in datos.get("basicos", []):
+        tipo = str(b["tipo_pieza"])
+        filas.append(
+            PorContar(
+                titulo=f"Básicos · {tipo}", escuela_id=None, tipo_pieza=tipo,
+                tallas=int(b["tallas"]), al_dia=int(b["al_dia"]), viejas=int(b["viejas"]), nunca=int(b["nunca"]),
+                ultimo=ultimo_conteo_de(ultimos, None, tipo),
+                quien_en_proceso=str(b.get("en_proceso") or ""),
+            )
+        )
+    pendientes = [f for f in filas if f.faltan > 0 and not f.quien_en_proceso]
+
+    def orden(f: PorContar):
+        if f.empezado:
+            return (0, f.faltan, f.titulo)
+        if f.ultimo.fecha is not None:
+            return (1, -(f.ultimo.dias() or 0), f.titulo)
+        return (2, 0, f.titulo)
+
+    pendientes.sort(key=orden)
+    return pendientes[:limite] if limite is not None else pendientes
 
 
 def ultimo_conteo_de(ultimos: dict, escuela_id: int | None, tipo_pieza: str = "", prenda: str = "") -> UltimoConteo:

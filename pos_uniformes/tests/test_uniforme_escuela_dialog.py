@@ -145,3 +145,44 @@ class RecetaDialogTests(unittest.TestCase):
             self.assertEqual(s.scalar(select(Variante.stock_actual).where(Variante.producto_id == p3_id)), 2)  # min(4, 2)
         self.d._recargar()
         self.assertEqual(self.d._tabla.cellWidget(fila, ued._COL_RECETA).text(), "2pz JS + Playera Polo JS")
+
+
+class StatusTimerTests(unittest.TestCase):
+    """El aviso de "Guardado" se borra con un QTimer del diálogo. Con un
+    `QTimer.singleShot` suelto, si la ventana se cerraba antes de los 4 s el
+    timer disparaba sobre un objeto ya borrado y tumbaba el proceso
+    (segfault en la suite, 2026-09-22)."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.app = QApplication.instance() or QApplication([])
+
+    def test_el_timer_es_hijo_del_dialogo_y_no_sobrevive_al_cierre(self) -> None:
+        from PyQt6.QtCore import QTimer
+        from sqlalchemy.pool import StaticPool
+
+        engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
+        Base.metadata.create_all(engine)
+        d = ued.UniformeEscuelaDialog(session_factory=sessionmaker(bind=engine))
+        d._avisar("Guardado.")
+        timer = d._status_timer
+        self.assertIsInstance(timer, QTimer)
+        self.assertIs(timer.parent(), d)     # se va con el diálogo
+        self.assertTrue(timer.isActive())
+        d.close(); d.deleteLater()
+        self.app.processEvents()
+
+    def test_el_dialogo_de_ligas_tambien(self) -> None:
+        from PyQt6.QtCore import QTimer
+        from unittest.mock import patch
+        from pos_uniformes.ui.dialogs import school_product_link_dialog as spl
+
+        with patch.object(spl, "get_session"), \
+             patch.object(spl, "list_all_schools", return_value=[]), \
+             patch.object(spl, "list_general_products", return_value=[]):
+            d = spl.SchoolProductLinkDialog()
+        d._set_status("Ligado")
+        self.assertIsInstance(d._status_timer, QTimer)
+        self.assertIs(d._status_timer.parent(), d)
+        d.close(); d.deleteLater()
+        self.app.processEvents()

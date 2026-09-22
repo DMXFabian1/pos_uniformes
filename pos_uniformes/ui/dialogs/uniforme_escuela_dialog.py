@@ -442,7 +442,19 @@ class UniformeEscuelaDialog(QDialog):
         self._status.setText(texto)
         if self._on_changed:
             self._on_changed()
-        QTimer.singleShot(4000, self._limpiar_status)
+        self._borrar_status_en(4000)
+
+    def _borrar_status_en(self, ms: int) -> None:
+        """Un QTimer del diálogo, no un `singleShot` suelto: si la ventana se
+        cierra antes de que dispare, el timer se va con ella. Con el suelto,
+        disparaba sobre un objeto ya borrado y tumbaba el proceso."""
+        timer = getattr(self, "_status_timer", None)
+        if timer is None:
+            timer = QTimer(self)
+            timer.setSingleShot(True)
+            timer.timeout.connect(self._limpiar_status)
+            self._status_timer = timer
+        timer.start(ms)
 
     def _limpiar_status(self) -> None:
         try:
