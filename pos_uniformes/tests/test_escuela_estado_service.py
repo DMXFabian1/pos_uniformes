@@ -199,6 +199,33 @@ class SaludTest(_Base):
         self.assertEqual(self.estado().salud, "verde")
 
 
+class EstadosDeTodasTest(_Base):
+    def test_trae_una_entrada_por_escuela_activa(self):
+        self._var(self._prod("Playera JS", escuela=self.esc), "10", stock=3)
+        self._var(self._prod("Playera FK", escuela=self.otra), "10", stock=3)
+        todas = ee.estados_de_todas(self.s)
+        self.assertEqual(set(todas), {self.esc.id, self.otra.id})
+        self.assertEqual(todas[self.esc.id].nombre, "Justo Sierra")
+
+    def test_la_escuela_apagada_no_sale(self):
+        self._var(self._prod("Playera JS", escuela=self.esc), "10", stock=3)
+        self.otra.activo = False
+        self.s.flush()
+        self.assertEqual(set(ee.estados_de_todas(self.s)), {self.esc.id})
+
+    def test_pregunta_el_reparto_una_sola_vez(self):
+        """Recorrerlo mira uniformes y ligas de todas las escuelas: hacerlo una
+        vez por escuela es lo que volvía cara esta consulta."""
+        from unittest.mock import patch
+
+        self._var(self._prod("Playera JS", escuela=self.esc), "10", stock=3)
+        self._var(self._prod("Playera FK", escuela=self.otra), "10", stock=3)
+        real = ee.escuela_piezas_service.productos_por_escuela
+        with patch.object(ee.escuela_piezas_service, "productos_por_escuela", side_effect=real) as espia:
+            ee.estados_de_todas(self.s)
+        self.assertEqual(espia.call_count, 1, "una vez para las dos escuelas")
+
+
 class EscuelaQueNoExisteTest(_Base):
     def test_avisa_en_vez_de_devolver_vacio(self):
         with self.assertRaises(ValueError):

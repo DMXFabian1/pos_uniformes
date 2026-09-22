@@ -122,16 +122,25 @@ def _ventana(dias: int) -> datetime:
     return datetime.now(timezone.utc) - timedelta(days=int(dias))
 
 
-def _variantes_de(session: Session, escuela_id: int) -> list[int]:
+def _reparto(session: Session, cache: dict | None = None) -> list[tuple]:
+    """El reparto de prendas por escuela, pedido una sola vez.
+
+    Recorrerlo es caro (mira uniformes y ligas de todas las escuelas), así que
+    quien pregunte por varias escuelas seguidas lo pasa en `cache` y se lee una
+    vez en lugar de una por escuela."""
+    if cache is not None:
+        if "reparto" not in cache:
+            cache["reparto"] = escuela_piezas_service.productos_por_escuela(session)
+        return cache["reparto"]
+    return escuela_piezas_service.productos_por_escuela(session)
+
+
+def _variantes_de(session: Session, escuela_id: int, reparto) -> list[int]:
     """Las tallas que le tocan a la escuela, incluidas las generales que lleva.
 
     Sale del mismo reparto que usan Piezas y los tarifarios, para que "las
     prendas de esta escuela" quiera decir lo mismo en todas partes."""
-    productos = {
-        pid
-        for eid, pid, _nivel_id, _nivel in escuela_piezas_service.productos_por_escuela(session)
-        if eid == int(escuela_id)
-    }
+    productos = {pid for eid, pid, _nivel_id, _nivel in reparto if eid == int(escuela_id)}
     if not productos:
         return []
     return [
@@ -231,7 +240,9 @@ def _faltas_sentidas(session: Session, variantes: list[int], desde: datetime) ->
     return faltas
 
 
-def estado_de(session: Session, escuela_id: int, *, dias: int = VENTANA_DIAS) -> EstadoDeEscuela:
+def estado_de(
+    session: Session, escuela_id: int, *, dias: int = VENTANA_DIAS, cache: dict | None = None
+) -> EstadoDeEscuela:
     """Cómo va esta escuela: contada, surtida, pedida, vendida y sentida."""
     escuela = session.get(Escuela, int(escuela_id))
     if escuela is None:
@@ -245,20 +256,15 @@ def estado_de(session: Session, escuela_id: int, *, dias: int = VENTANA_DIAS) ->
     # si imprimió hoja. No se lee el ORM a mano para no inventar otra versión.
     quien = conteo_jornada_service.ref(abierta).quien if abierta is not None else ""
 
-    niveles = sorted(
-        {
-            nivel
-            for eid, _pid, _nid, nivel in escuela_piezas_service.productos_por_escuela(session)
-            if eid == int(escuela_id)
-        }
-    )
+    reparto = _reparto(session, cache)
+    niveles = sorted({nivel for eid, _pid, _nid, nivel in reparto if eid == int(escuela_id)})
 
     prendas = mapa.get("prendas", [])
     tallas_detalle = [t for p in prendas for t in p.get("tallas_detalle", [])]
     agotadas = sum(1 for t in tallas_detalle if int(t.get("stock") or 0) <= 0)
     piezas = sum(max(0, int(t.get("stock") or 0)) for t in tallas_detalle)
 
-    variantes = _variantes_de(session, int(escuela_id))
+    variantes = _variantes_de(session, int(escuela_id), reparto)
     desde = _ventana(dias)
 
     return EstadoDeEscuela(
@@ -278,3 +284,13 @@ def estado_de(session: Session, escuela_id: int, *, dias: int = VENTANA_DIAS) ->
         vendido_piezas=_vendido(session, variantes, desde),
         faltas_sentidas=_faltas_sentidas(session, variantes, desde),
     )
+
+
+def estados_de_todas(session: Session, *, dias: int = VENTANA_DIAS) -> dict[int, EstadoDeEscuela]:
+    """Cómo va cada escuela activa, indexado por su id.
+
+    Para quien pinta muchas de un jalón (el panel, el mapa). Comparte el
+    reparto entre todas en vez de recalcularlo escuela por escuela."""
+    cache: dict = {}
+    ids = [int(e) for e in session.scalars(select(Escuela.id).where(Escuela.activo.is_(True))).all()]
+    return {eid: estado_de(session, eid, dias=dias, cache=cache) for eid in ids}

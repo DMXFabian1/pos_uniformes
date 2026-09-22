@@ -171,6 +171,7 @@ def _cerrar_session():
 
 
 def fetch_all_data():
+    from pos_uniformes.services import escuela_estado_service  # noqa: PLC0415
     from pos_uniformes.services import escuela_piezas_service  # noqa: PLC0415
     from pos_uniformes.services import inventario_totales_service  # noqa: PLC0415
 
@@ -211,8 +212,13 @@ def fetch_all_data():
 
     valor_por_nivel = inventario_totales_service.valor_por_nivel(_session())
 
+    # Cómo va cada escuela, del mismo servicio que usa el mapa: el panel no
+    # vuelve a decidir cuándo una escuela está en rojo.
+    estados = escuela_estado_service.estados_de_todas(_session())
+
     _cerrar_session()
-    return stats, multi_level_ids, school_levels, pieces_raw, catalog_rows, catalog_cols, valor_por_nivel
+    return (stats, multi_level_ids, school_levels, pieces_raw, catalog_rows,
+            catalog_cols, valor_por_nivel, estados)
 
 
 # ---------------------------------------------------------------------------
@@ -768,7 +774,26 @@ def build_tariffs(catalog_rows, catalog_cols, multi_level_ids):
 
 
 
-def build_variants(catalog_rows, catalog_cols, multi_level_ids):
+#: Los colores del semáforo, los mismos del mapa.
+SALUD_COLOR = {"rojo": "#c0392b", "ambar": "#e08b1e", "verde": "#3d6b2f"}
+
+
+def chip_de_salud(estado):
+    """Cómo va la escuela, dicho en el encabezado.
+
+    El semáforo lo decide `escuela_estado_service`; aquí solo se pinta, igual
+    que en el mapa, para que las dos ventanas no puedan contradecirse."""
+    if estado is None:
+        return ""
+    color = SALUD_COLOR.get(estado.salud, "#777")
+    return (
+        f'<span class="disp-sch-chip salud" style="border-color:{color};color:{color}" '
+        f'title="{_esc(estado.titular)} · se contó {_esc(estado.ultimo_conteo.texto())}">'
+        f'● {_esc(estado.titular)}</span>'
+    )
+
+
+def build_variants(catalog_rows, catalog_cols, multi_level_ids, estados=None):
     col_idx = {c: i for i, c in enumerate(catalog_cols)}
 
     # Build product data with per-talla stock
@@ -932,6 +957,7 @@ def build_variants(catalog_rows, catalog_cols, multi_level_ids):
         h.append(f'<span class="disp-chevron">▾</span>')
         h.append(f'<span class="nivel-dot" style="background:{nivel_color}"></span>')
         h.append(f'<span class="disp-sch-name">{_esc(school_name)}</span>')
+        h.append(chip_de_salud((estados or {}).get(sdata["eid"])))
         h.append(f'{chips}')
         h.append(f'<span class="disp-sch-meta">{n_prods} prod · {sch_total_tallas} tallas</span>')
         # Mini progress bar
@@ -1235,6 +1261,7 @@ body {{ font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', sys
 
 .nav {{ display: flex; background: var(--card-bg); border-bottom: 1px solid var(--border);
     padding: 0 24px; position: sticky; top: 56px; z-index: 99; overflow-x: auto; }}
+.disp-sch-chip.salud {{ background: transparent; border: 1px solid; font-weight: 600; }}
 .nav-tab {{ padding: 12px 18px; cursor: pointer; font-weight: 600; font-size: 13px;
     color: var(--text-muted); border-bottom: 2px solid transparent;
     transition: all var(--transition); white-space: nowrap; user-select: none; }}
@@ -2882,7 +2909,8 @@ if (typeof QWebChannel !== 'undefined' && typeof qt !== 'undefined') {{
 
 def main():
     print("Consultando datos...")
-    stats, multi_level_ids, school_levels, pieces_raw, catalog_rows, catalog_cols, valor_por_nivel = fetch_all_data()
+    (stats, multi_level_ids, school_levels, pieces_raw, catalog_rows,
+     catalog_cols, valor_por_nivel, estados) = fetch_all_data()
     print(f"  {stats['escuelas']} escuelas, {stats['productos']} productos, {stats['variantes_activas']} variantes")
 
     print("Calculando insights...")
@@ -2894,7 +2922,7 @@ def main():
     resumen = build_resumen(stats, insights, coverage_data, valor_por_nivel)
     pieces = build_pieces(school_levels, pieces_raw, multi_level_ids, default_na)
     tariffs = build_tariffs(catalog_rows, catalog_cols, multi_level_ids)
-    variants = build_variants(catalog_rows, catalog_cols, multi_level_ids)
+    variants = build_variants(catalog_rows, catalog_cols, multi_level_ids, estados)
     conteo = build_conteo(school_levels)
     mapa = build_mapa()
 
