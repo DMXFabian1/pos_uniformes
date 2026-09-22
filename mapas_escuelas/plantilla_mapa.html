@@ -57,6 +57,9 @@
     #panel, .leaflet-control-zoom { display: none !important; }
     #map { width: 100% !important; height: 100vh !important; }
   }
+  .salud{margin-top:8px;padding:6px 8px;border-left:3px solid #999;background:rgba(0,0,0,.04);border-radius:4px}
+  .salud-cifras{font-size:11px;color:#5f594f;margin-top:2px}
+  .salud-punto{display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:5px;vertical-align:middle}
 </style>
 </head>
 <body>
@@ -147,6 +150,35 @@ const ESTADOS_TXT = { contactada: "Contactada", platica: "En plática", ganada: 
 let SEG = {};
 try { SEG = JSON.parse(localStorage.getItem("mapaEscuelasSeguimiento") || "{}"); } catch (err) {}
 
+// Cómo va la escuela en el POS (lo dice escuela_estado_service, aquí solo se
+// pinta): rojo = se vendió sin contar, ámbar = le falta contarse, verde = al día.
+const SALUD = { rojo: "#c0392b", ambar: "#e08b1e", verde: "#3d6b2f" };
+const SALUD_TXT = { rojo: "se vendió sin contar", ambar: "le falta contarse", verde: "al día" };
+
+function plural(n, una, muchas) {
+  return n === 1 ? una : muchas;
+}
+
+function saludDe(e) {
+  return (e.estado && e.estado.salud) || "";
+}
+
+function estadoHtml(e) {
+  const s = e.estado;
+  if (!s || !s.salud) return "";
+  const cifras = [
+    `${s.pct_al_dia}% contada`,
+    s.agotadas ? `${s.agotadas} ${plural(s.agotadas, "talla agotada", "tallas agotadas")}` : "",
+    s.vendido ? `${s.vendido} ${plural(s.vendido, "pieza vendida", "piezas vendidas")} (30 d)` : "",
+    s.pedido ? `${s.pedido} ${plural(s.pedido, "talla", "tallas")} por pedir` : "",
+    s.faltas ? `${plural(s.faltas, "una vez", s.faltas + " veces")} que la pidieron y no había` : "",
+  ].filter(Boolean).join(" · ");
+  return `<div class="salud" style="border-color:${SALUD[s.salud]}">` +
+         `<b style="color:${SALUD[s.salud]}">${s.titular}</b>` +
+         `<div class="salud-cifras">${cifras}</div>` +
+         `<div class="salud-cifras">se contó ${s.ultimo}</div></div>`;
+}
+
 function icono(e) {
   const color = C[e.nivel] || C.Otro;
   // tamaño proporcional a la matrícula
@@ -155,8 +187,11 @@ function icono(e) {
   const badge = est ? `<span style="position:absolute;top:-9px;right:-9px;font-size:11px">${ESTADOS[est]}</span>` : "";
   if (e.cliente) {
     const s = Math.round(14 + extra);
+    // El relleno sigue diciendo el nivel; el anillo dice cómo va en el POS.
+    const salud = saludDe(e);
+    const anillo = salud ? `box-shadow:0 0 0 3px ${SALUD[salud]}` : "";
     return L.divIcon({ className: "", iconSize: [s, s], iconAnchor: [s / 2, s / 2],
-      html: `<div class="marker-cliente" style="position:relative;width:${s}px;height:${s}px;background:${color}">${badge}</div>` });
+      html: `<div class="marker-cliente" style="position:relative;width:${s}px;height:${s}px;background:${color};${anillo}">${badge}</div>` });
   }
   const s = Math.round(10 + extra);
   return L.divIcon({ className: "", iconSize: [s, s], iconAnchor: [s / 2, s / 2],
@@ -183,6 +218,7 @@ function popupHtml(e) {
   ).join("");
   return `<b>${e.nombre}</b>${badge}${pos}${nota}${al}<br>${NIVEL[e.nivel]}${tipoTxt}${turno}` +
          `<br>${e.domicilio || e.localidad}${cont}<br><small>${e.localidad} · CCT ${e.cct}</small>${prob}` +
+         estadoHtml(e) +
          `<div class="est-fila">${botones}</div>`;
 }
 
@@ -340,7 +376,9 @@ grupos.forEach((g, gi) => {
     const style = e.cliente ? `background:${C[e.nivel]}` : `border-color:${C[e.nivel]}`;
     const extraNv = TIPO_TXT[e.tipo] ? ` · ${TIPO_TXT[e.tipo]}` : "";
     const al = e.alumnos ? `${e.alumnos} al. · ` : "";
-    d.innerHTML = `<span class="${dotCls}" style="${style}"></span>` +
+    const salud = saludDe(e);
+    const pinta = salud ? `<span class="salud-punto" style="background:${SALUD[salud]}" title="${SALUD_TXT[salud]}"></span>` : "";
+    d.innerHTML = `<span class="${dotCls}" style="${style}"></span>` + pinta +
       `<b>${e.probable ? '<span class="prob">~</span> ' : ""}${e.nombre}</b>` +
       `<span class="seg-tag">${SEG[e.cct] ? " " + ESTADOS[SEG[e.cct]] : ""}</span>` +
       `<div class="addr">${al}${NIVEL[e.nivel]}${extraNv}${e.turno ? " · " + e.turno : ""}${e.domicilio ? " · " + e.domicilio : ""}</div>`;

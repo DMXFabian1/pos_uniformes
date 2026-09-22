@@ -101,8 +101,9 @@ CLIENTES_CCT: dict[str, dict] = {
     "11PPR0445Z": {"pos": "Colegio Motolinea"},
     "11PJN0546H": {"pos": "Colegio Motolinea"},
     "11PES0197B": {"pos": "Colegio Motolinea"},
-    "11DES0014Z": {"pos": "Práxedis Guerrero"},
-    "11DPR0217A": {"pos": "Práxedis Guerrero"},
+    # El POS tiene las dos por separado; el CCT dice cuál es cuál.
+    "11DES0014Z": {"pos": "Práxedis Guerrero Secundaria"},
+    "11DPR0217A": {"pos": "Práxedis G Guerrero"},
     "11DES0110B": {"pos": "Bicentenario"},
     "11ETV0522H": {"pos": "Telesecundaria 512"},
     "11ETV0459W": {"pos": "Telesecundaria 454"},
@@ -134,7 +135,7 @@ CLIENTES_CCT: dict[str, dict] = {
     "11EJN0897F": {"pos": "", "nota": "Uniforme básico (sin escudo)"},
     "11EPR0437L": {"pos": "", "nota": "Uniforme básico (sin escudo)"},
     # En el directorio sale como CEBA/primaria nocturna, pero es la secundaria.
-    "11DBA0022L": {"pos": "Práxedis Guerrero", "nota": "Secundaria (el directorio la lista como CEBA)"},
+    "11DBA0022L": {"pos": "Práxedis Guerrero Secundaria", "nota": "Secundaria (el directorio la lista como CEBA)"},
 }
 
 # Correcciones a datos del directorio SEP.
@@ -309,6 +310,65 @@ def carga_clientes_pos() -> set[str]:
         return set()
 
 
+def carga_estado_pos(nombres: set[str]) -> dict[str, dict]:
+    """Cómo va cada escuela cliente, según el POS.
+
+    Le pregunta a `escuela_estado_service`, que es el que junta conteo, stock,
+    pedido, venta y demanda. Aquí no se calcula nada: si el mapa pinta algo
+    raro, la cuenta está mal en el servicio, no en el mapa.
+
+    Si la base no responde (esto corre también sin el POS a la mano), el mapa
+    sale como siempre, sin los colores de estado.
+    """
+    if not nombres:
+        return {}
+    try:
+        sys.path.insert(0, str(BASE_DIR.parent))
+        from sqlalchemy import select  # noqa: PLC0415
+
+        from pos_uniformes.database.connection import get_session  # noqa: PLC0415
+        from pos_uniformes.database.models import Escuela  # noqa: PLC0415
+        from pos_uniformes.services import escuela_estado_service  # noqa: PLC0415
+    except Exception as exc:  # noqa: BLE001
+        print(f"  [aviso] sin POS a la mano, el mapa va sin estado ({exc})")
+        return {}
+
+    out: dict[str, dict] = {}
+    try:
+        session = get_session()
+    except Exception as exc:  # noqa: BLE001
+        print(f"  [aviso] la base no responde, el mapa va sin estado ({exc})")
+        return {}
+    try:
+        por_nombre = {
+            str(e.nombre): int(e.id)
+            for e in session.scalars(select(Escuela).where(Escuela.activo.is_(True))).all()
+        }
+        for nombre in sorted(nombres):
+            escuela_id = por_nombre.get(nombre)
+            if escuela_id is None:
+                print(f"  [aviso] '{nombre}' no existe en la base del POS")
+                continue
+            est = escuela_estado_service.estado_de(session, escuela_id)
+            out[nombre] = {
+                "titular": est.titular,
+                "en_rojo": est.en_rojo,
+                "faltan": est.faltan_de_contar,
+                "tallas": est.tallas,
+                "pct_al_dia": est.pct_al_dia,
+                "agotadas": est.agotadas,
+                "piezas": est.piezas_en_tienda,
+                "vendido": est.vendido_piezas,
+                "pedido": len(est.pedido),
+                "faltas": len(est.faltas_sentidas),
+                "ultimo": est.ultimo_conteo.texto(),
+                "salud": est.salud,
+            }
+    finally:
+        session.close()
+    return out
+
+
 def main() -> int:
     CACHE_DIR.mkdir(exist_ok=True)
     print("Descargando listados por categoría…")
@@ -354,6 +414,16 @@ def main() -> int:
                 print(f"  [aviso] '{info['pos']}' no está en catalog_cache")
     mercado.extend(EXTRAS)
     clientes += sum(1 for e in EXTRAS if e["cliente"])
+
+    print("Preguntándole al POS cómo va cada escuela…")
+    estados = carga_estado_pos({e["pos"] for e in mercado if e.get("pos")})
+    for e in mercado:
+        e["estado"] = estados.get(e.get("pos", ""), {})
+    if estados:
+        rojas = sum(1 for v in estados.values() if v["salud"] == "rojo")
+        ambar = sum(1 for v in estados.values() if v["salud"] == "ambar")
+        print(f"  {len(estados)} escuelas con estado: {rojas} en rojo, {ambar} por contar, "
+              f"{len(estados) - rojas - ambar} al día")
 
     faltantes = [i["pos"] for c, i in CLIENTES_CCT.items()
                  if c not in {e['cct'] for e in mercado}]

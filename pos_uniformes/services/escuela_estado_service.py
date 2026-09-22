@@ -91,6 +91,21 @@ class EstadoDeEscuela:
         return round(100 * self.al_dia / self.tallas) if self.tallas else 0
 
     @property
+    def salud(self) -> str:
+        """El semáforo, con lo más urgente mandando.
+
+        `rojo` = el sistema cree que hay menos que nada (se vendió sin contar);
+        `ambar` = le falta contarse; `verde` = contada y al día.
+
+        Vive aquí y no en quien lo pinta: el mapa, el panel y el kiosko tienen
+        que estar de acuerdo en cuándo una escuela está en rojo."""
+        if self.en_rojo:
+            return "rojo"
+        if self.faltan_de_contar:
+            return "ambar"
+        return "verde"
+
+    @property
     def titular(self) -> str:
         """Una línea para decir cómo va, con lo más urgente primero."""
         if self.en_rojo:

@@ -179,6 +179,26 @@ class TitularTest(_Base):
         self.assertEqual(self.estado().titular, "nunca se ha contado")
 
 
+class SaludTest(_Base):
+    """El semáforo vive en el servicio, no en quien lo pinta: el mapa, el panel
+    y el kiosko tienen que coincidir en cuándo una escuela está en rojo."""
+
+    def test_en_rojo_manda_sobre_todo(self):
+        p = self._prod("Calceta Blanca", "Calceta", escuela=self.esc)
+        self._var(p, "6-8", stock=-1)
+        self._var(p, "9-12", stock=5)
+        self.assertEqual(self.estado().salud, "rojo")
+
+    def test_si_le_falta_contarse_va_en_ambar(self):
+        p = self._prod("Playera JS", escuela=self.esc)
+        self._var(p, "10", stock=4)
+        self.assertEqual(self.estado().salud, "ambar")
+
+    def test_una_escuela_sin_prendas_no_esta_en_rojo(self):
+        # Nada que contar no es una urgencia: es que no hay nada.
+        self.assertEqual(self.estado().salud, "verde")
+
+
 class EscuelaQueNoExisteTest(_Base):
     def test_avisa_en_vez_de_devolver_vacio(self):
         with self.assertRaises(ValueError):
